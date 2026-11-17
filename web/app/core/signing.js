@@ -1,0 +1,378 @@
+// Signing with your own certificate (I5): what Settings > Signing reads out of the files the user picks, and the
+// request the page sends a signing server. Pure JS, no DOM: the browser parts (IndexedDB, the HUD, opening the
+// itms-services link) are signing-client.js. docs/signing.md has the whole picture.
+//
+//   const p = parseProfile(bytes);    // { name, teamId, teamName, appId, expires, devices, allDevices, certs: [cert…] }
+//   parseCert(der);                   // { name, team, org, notBefore, notAfter }
+//   await checkP12Password(bytes, pw) // true / false, or null when the file has no MAC to check against
+//   summary({ profile, now })         // the rows the page shows: certificate, team, expiry, devices, problems
+//   signBody({ url, p12, profile, password })  // the JSON for POST <server>/sign
+//
+// Everything here reads bytes (Uint8Array or ArrayBuffer) and never leaves the phone.
+
+const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b));
+
+// ---- DER ------------------------------------------------------------------------------------------------------
+
+// One TLV at `at`: { tag, start (of the value), end, next }. Definite lengths only (DER); throws on anything else.
+export function der(buf, at = 0) {
+  const b = bytesOf(buf);
+  if (at + 2 > b.length) throw new Error("truncated DER");
+  const tag = b[at];
+  if ((tag & 0x1f) === 0x1f) throw new Error("long-form DER tags are not supported");
+  let len = b[at + 1];
+  let start = at + 2;
+  if (len & 0x80) {
+    const n = len & 0x7f;
+    if (n === 0 || n > 4) throw new Error("indefinite or huge DER length");
+    len = 0;
+    for (let i = 0; i < n; i++) len = len * 256 + b[start + i];
+    start += n;
+  }
+  const end = start + len;
+  if (end > b.length) throw new Error("truncated DER");
+  return { tag, start, end, next: end };
+}
+
+// The children of a constructed TLV.
+export function children(buf, node) {
+  const out = [];
+  for (let at = node.start; at < node.end;) {
+    const c = der(buf, at);
+    out.push(c);
+    at = c.next;
+  }
+  return out;
+}
+
+const OID = {
+  cn: "2.5.4.3", ou: "2.5.4.11", o: "2.5.4.10",
+  data: "1.2.840.113549.1.7.1",
+  sha1: "1.3.14.3.2.26", sha256: "2.16.840.1.101.3.4.2.1", sha384: "2.16.840.1.101.3.4.2.2", sha512: "2.16.840.1.101.3.4.2.3",
+};
+
+export function oidString(buf, node) {
+  const b = bytesOf(buf).subarray(node.start, node.end);
+  const parts = [Math.floor(b[0] / 40), b[0] % 40];
+  let v = 0;
+  for (let i = 1; i < b.length; i++) {
+    v = v * 128 + (b[i] & 0x7f);
+    if (!(b[i] & 0x80)) { parts.push(v); v = 0; }
+  }
+  return parts.join(".");
+}
+
+const utf8 = (b) => new TextDecoder("utf-8").decode(b);
+
+function derString(buf, node) {
+  const b = bytesOf(buf).subarray(node.start, node.end);
+  if (node.tag === 0x1e) { // BMPString
+    let s = "";
+    for (let i = 0; i + 1 < b.length; i += 2) s += String.fromCharCode((b[i] << 8) | b[i + 1]);
+    return s;
+  }
+  return utf8(b);
+}
+
+function derTime(buf, node) {
+  const s = utf8(bytesOf(buf).subarray(node.start, node.end));
+  const m = node.tag === 0x17 ? /^(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)?Z$/.exec(s) : /^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)?(?:\.\d+)?Z$/.exec(s);
+  if (!m) return null;
+  let year = Number(m[1]);
+  if (node.tag === 0x17) year += year < 50 ? 2000 : 1900; // RFC 5280: UTCTime YY >= 50 is 19YY
+  return new Date(Date.UTC(year, Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] || 0)));
+}
+
+function nameAttrs(buf, node) {
+  const out = {};
+  for (const set of children(buf, node)) {
+    for (const atv of children(buf, set)) {
+      const [oid, value] = children(buf, atv);
+      const key = oidString(buf, oid);
+      if (!(key in out)) out[key] = derString(buf, value);
+    }
+  }
+  return out;
+}
+
+// An X.509 certificate (DER): the subject's name, team (OU) and organisation, and its validity.
+export function parseCert(buf) {
+  const b = bytesOf(buf);
+  const cert = der(b, 0);
+  const [tbs] = children(b, cert);
+  let f = children(b, tbs);
+  if (f[0].tag === 0xa0) f = f.slice(1); // [0] version
+  const [, , , validity, subject] = f;   // serial, signature, issuer, validity, subject
+  const [nb, na] = children(b, validity);
+  const s = nameAttrs(b, subject);
+  return { name: s[OID.cn] ?? null, team: s[OID.ou] ?? null, org: s[OID.o] ?? null, notBefore: derTime(b, nb), notAfter: derTime(b, na) };
+}
+
+// ---- plist (XML) ----------------------------------------------------------------------------------------------
+
+const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+const unescape = (s) => s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e) =>
+  e[0] === "#" ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : ENTITIES[e] ?? m);
+
+function base64Bytes(s) {
+  const clean = s.replace(/\s+/g, "");
+  if (typeof atob === "function") return Uint8Array.from(atob(clean), (c) => c.charCodeAt(0));
+  return new Uint8Array(Buffer.from(clean, "base64"));
+}
+
+// A plist's XML (Apple's DTD: dict, array, key, string, data, date, integer, real, true, false) as JS values:
+// <data> as Uint8Array, <date> as Date.
+export function parsePlist(xml) {
+  const re = /<(\/?)([a-zA-Z]+)(?:\s[^>]*?)?\s*(\/?)>|<\?[^>]*\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>/g;
+  const tokens = [];
+  let last = 0;
+  for (let m; (m = re.exec(xml));) {
+    if (m[2]) tokens.push({ close: !!m[1], name: m[2], empty: !!m[3], text: xml.slice(last, m.index) });
+    last = re.lastIndex;
+  }
+  let i = 0;
+  const expectClose = (name) => {
+    const t = tokens[i++];
+    if (!t || !t.close || t.name !== name) throw new Error(`plist: expected </${name}>`);
+    return t.text;
+  };
+  const value = () => {
+    const t = tokens[i++];
+    if (!t || t.close) throw new Error("plist: unexpected end");
+    switch (t.name) {
+      case "dict": {
+        const o = {};
+        if (t.empty) return o;
+        while (tokens[i] && !(tokens[i].close && tokens[i].name === "dict")) {
+          const k = tokens[i++];
+          if (k.name !== "key") throw new Error("plist: dict without key");
+          const key = unescape(k.empty ? "" : expectClose("key"));
+          o[key] = value();
+        }
+        expectClose("dict");
+        return o;
+      }
+      case "array": {
+        const a = [];
+        if (t.empty) return a;
+        while (tokens[i] && !(tokens[i].close && tokens[i].name === "array")) a.push(value());
+        expectClose("array");
+        return a;
+      }
+      case "true": case "false":
+        if (!t.empty) expectClose(t.name);
+        return t.name === "true";
+      case "string": return t.empty ? "" : unescape(expectClose("string"));
+      case "integer": return Number(expectClose("integer").trim());
+      case "real": return Number(expectClose("real").trim());
+      case "date": return new Date(expectClose("date").trim());
+      case "data": return t.empty ? new Uint8Array(0) : base64Bytes(expectClose("data"));
+      case "plist": {
+        const v = value();
+        expectClose("plist");
+        return v;
+      }
+      default: throw new Error(`plist: unknown <${t.name}>`);
+    }
+  };
+  while (tokens[i] && tokens[i].name !== "plist") i++;
+  if (!tokens[i]) throw new Error("plist: no <plist>");
+  return value();
+}
+
+// ---- the provisioning profile ---------------------------------------------------------------------------------
+
+function indexOf(b, needle, from = 0, back = false) {
+  const n = new TextEncoder().encode(needle);
+  const step = back ? -1 : 1;
+  for (let i = back ? b.length - n.length : from; back ? i >= 0 : i <= b.length - n.length; i += step) {
+    let ok = true;
+    for (let j = 0; j < n.length && ok; j++) ok = b[i + j] === n[j];
+    if (ok) return i;
+  }
+  return -1;
+}
+
+// A .mobileprovision is a CMS-signed XML plist; the plist sits in it as plain bytes.
+export function parseProfile(buf) {
+  const b = bytesOf(buf);
+  const start = indexOf(b, "<?xml");
+  const end = indexOf(b, "</plist>", 0, true);
+  if (start < 0 || end < start) throw new Error("That file is not a provisioning profile (.mobileprovision).");
+  const p = parsePlist(utf8(b.subarray(start, end + "</plist>".length)));
+  const ent = p.Entitlements && typeof p.Entitlements === "object" ? p.Entitlements : {};
+  const teamId = (p.TeamIdentifier ?? [])[0] ?? ent["com.apple.developer.team-identifier"] ?? null;
+  const full = String(ent["application-identifier"] ?? "");
+  const prefix = [...(p.ApplicationIdentifierPrefix ?? []), teamId].find((x) => x && full.startsWith(x + "."));
+  const certs = [];
+  for (const d of p.DeveloperCertificates ?? []) {
+    try { certs.push(parseCert(d)); } catch { /* a certificate we can't read: the server still checks it */ }
+  }
+  return {
+    name: p.Name ?? null,
+    teamId,
+    teamName: p.TeamName ?? null,
+    appId: prefix ? full.slice(prefix.length + 1) : full,
+    created: p.CreationDate instanceof Date ? p.CreationDate : null,
+    expires: p.ExpirationDate instanceof Date ? p.ExpirationDate : null,
+    devices: (p.ProvisionedDevices ?? []).length,
+    allDevices: p.ProvisionsAllDevices === true,
+    getTaskAllow: ent["get-task-allow"] === true,
+    certs,
+  };
+}
+
+// What kind of profile: Development (get-task-allow), Ad Hoc (a device list), Enterprise (every device).
+export function profileKind(p) {
+  if (p.allDevices) return "Enterprise";
+  if (p.getTaskAllow) return "Development";
+  return p.devices ? "Ad Hoc" : "Distribution";
+}
+
+// ---- the .p12's password --------------------------------------------------------------------------------------
+
+const HASHES = {
+  [OID.sha1]: { name: "SHA-1", u: 20, v: 64 }, [OID.sha256]: { name: "SHA-256", u: 32, v: 64 },
+  [OID.sha384]: { name: "SHA-384", u: 48, v: 128 }, [OID.sha512]: { name: "SHA-512", u: 64, v: 128 },
+};
+
+// RFC 7292 B.1: the password as a BMPString with its two-byte terminator; no password is no bytes at all.
+export function bmpPassword(pw) {
+  if (pw == null) return new Uint8Array(0);
+  const out = new Uint8Array((pw.length + 1) * 2);
+  for (let i = 0; i < pw.length; i++) { out[2 * i] = pw.charCodeAt(i) >> 8; out[2 * i + 1] = pw.charCodeAt(i) & 0xff; }
+  return out;
+}
+
+// RFC 7292 B.2: PKCS#12's own key derivation (id 3: the MAC key), with WebCrypto's digest.
+export async function pkcs12Kdf(subtle, hash, password, salt, iterations, id, n) {
+  const { name, u, v } = hash;
+  const fill = (src, len) => { const o = new Uint8Array(len); for (let i = 0; i < len; i++) o[i] = src[i % src.length]; return o; };
+  const S = salt.length ? fill(salt, v * Math.ceil(salt.length / v)) : new Uint8Array(0);
+  const P = password.length ? fill(password, v * Math.ceil(password.length / v)) : new Uint8Array(0);
+  const I = new Uint8Array(S.length + P.length);
+  I.set(S); I.set(P, S.length);
+  const D = new Uint8Array(v).fill(id);
+  const out = new Uint8Array(n);
+  for (let done = 0; done < n;) {
+    let A = new Uint8Array(D.length + I.length);
+    A.set(D); A.set(I, D.length);
+    for (let r = 0; r < iterations; r++) A = new Uint8Array(await subtle.digest(name, A));
+    out.set(A.subarray(0, Math.min(u, n - done)), done);
+    done += u;
+    if (done >= n) break;
+    const B = fill(A, v);
+    for (let j = 0; j < I.length; j += v) { // I_j = (I_j + B + 1) mod 2^(8v)
+      let carry = 1;
+      for (let k = v - 1; k >= 0; k--) {
+        const x = I[j + k] + B[k] + carry;
+        I[j + k] = x & 0xff;
+        carry = x >> 8;
+      }
+    }
+  }
+  return out;
+}
+
+// Does `password` open this .p12? Checks the file's MAC (every PKCS#12 that has a password has one), so it works
+// whatever the file encrypts with. True or false; null when the file has no MAC or can't be read here.
+export async function checkP12Password(buf, password, subtle = globalThis.crypto?.subtle) {
+  const b = bytesOf(buf);
+  let pfx, authSafe, mac;
+  try {
+    pfx = children(b, der(b, 0));
+    [, authSafe, mac] = pfx;
+  } catch { return null; }
+  if (!mac || !subtle) return null;
+  try {
+    const [ctype, wrapped] = children(b, authSafe);
+    if (oidString(b, ctype) !== OID.data) return null; // public-key integrity mode: nothing to check here
+    const octets = children(b, wrapped)[0];
+    if (octets.tag !== 0x04) return null; // a constructed (BER) OCTET STRING: leave it to the server
+    const content = b.subarray(octets.start, octets.end);
+    const [digestInfo, saltNode, iterNode] = children(b, mac);
+    const [algId, digest] = children(b, digestInfo);
+    const hash = HASHES[oidString(b, children(b, algId)[0])];
+    if (!hash) return null;
+    const salt = b.slice(saltNode.start, saltNode.end);
+    let iterations = 1;
+    if (iterNode) { iterations = 0; for (let i = iterNode.start; i < iterNode.end; i++) iterations = iterations * 256 + b[i]; }
+    if (iterations < 1 || iterations > 10_000_000) return null;
+    const expected = b.subarray(digest.start, digest.end);
+    // An empty password is ambiguous (no bytes, or just the terminator): either opening it counts.
+    for (const pw of password ? [bmpPassword(password)] : [bmpPassword(""), new Uint8Array(0)]) {
+      const key = await pkcs12Kdf(subtle, hash, pw, salt, iterations, 3, hash.u);
+      const k = await subtle.importKey("raw", key, { name: "HMAC", hash: hash.name }, false, ["sign"]);
+      const got = new Uint8Array(await subtle.sign("HMAC", k, content));
+      if (got.length === expected.length && got.every((x, i) => x === expected[i])) return true;
+    }
+    return false;
+  } catch { return null; }
+}
+
+// ---- what the page shows --------------------------------------------------------------------------------------
+
+export const DEFAULT_SERVER = "https://cydian.dev";
+
+// A typed server address as a base URL: "sign.example.org" -> "https://sign.example.org". Null when unusable.
+export function normalizeServer(s) {
+  let t = String(s ?? "").trim();
+  if (!t) return null;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) t = "https://" + t;
+  try {
+    const u = new URL(t);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    if (u.username || u.password || u.search || u.hash) return null;
+    return (u.origin + u.pathname).replace(/\/+$/, "");
+  } catch { return null; }
+}
+
+const fmtDate = (d, locale, timeZone) => (d ? d.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric", timeZone }) : "Unknown");
+
+// The profile's certificate: the one whose team is the profile's, first. A profile can list several (a team's
+// developers); the server checks the .p12's is among them.
+export function profileCert(p) {
+  return p.certs.find((c) => c.team && c.team === p.teamId) ?? p.certs[0] ?? null;
+}
+
+// The Signing page's facts and problems for a saved identity: { rows: [{label, detail}], problems: [text] }.
+export function summary({ profile, passwordOk = null, now = new Date(), locale, timeZone } = {}) {
+  const rows = [];
+  const problems = [];
+  if (!profile) return { rows, problems };
+  const cert = profileCert(profile);
+  rows.push({ label: "Certificate", detail: cert?.name ?? "Unknown" });
+  rows.push({ label: "Team", detail: [profile.teamName, profile.teamId && `(${profile.teamId})`].filter(Boolean).join(" ") || "Unknown" });
+  if (cert?.notAfter) rows.push({ label: "Certificate Expires", detail: fmtDate(cert.notAfter, locale, timeZone) });
+  rows.push({ label: "Profile Expires", detail: fmtDate(profile.expires, locale, timeZone) });
+  rows.push({ label: "Devices", detail: profile.allDevices ? "All" : String(profile.devices) });
+  rows.push({ label: "App ID", detail: profile.appId || "Unknown" });
+  if (profile.certs.length > 1) rows.push({ label: "Certificates in Profile", detail: String(profile.certs.length) });
+  if (cert?.notAfter && cert.notAfter < now) problems.push(`The certificate expired on ${fmtDate(cert.notAfter, locale, timeZone)}.`);
+  if (profile.expires && profile.expires < now) problems.push(`The provisioning profile expired on ${fmtDate(profile.expires, locale, timeZone)}.`);
+  if (passwordOk === false) problems.push("The certificate's password is wrong.");
+  return { rows, problems };
+}
+
+// ---- the request ----------------------------------------------------------------------------------------------
+
+export function toBase64(buf) {
+  const b = bytesOf(buf);
+  if (typeof btoa !== "function") return Buffer.from(b).toString("base64");
+  let s = "";
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+// The JSON body of POST <server>/sign.
+export function signBody({ url, p12, profile, password }) {
+  return JSON.stringify({ url, p12: toBase64(p12), profile: toBase64(profile), password: password ?? "" });
+}
+
+// A server's error answer as one sentence for an alert.
+export function errorText(status, body) {
+  if (body && typeof body.error === "string" && body.error) return body.error;
+  if (status === 429) return "Too many signing requests: wait a few minutes.";
+  if (status === 404 || status === 405) return "This signing server doesn't sign apps (no /sign).";
+  return `The signing server answered HTTP ${status}.`;
+}

@@ -1,0 +1,175 @@
+Package: backgrounder
+Version: 1:1.1.0-1
+Section: System
+Maintainer: BigBoss <bigboss@thebigboss.org>
+Depends: mobilesubstrate, libactivator (>= 1.3.1), firmware (>= 3.0), firmware (<< 4.0) | libstatusbar
+Conflicts: sbsettings (<< 3.0.2-14)
+Architecture: iphoneos-arm
+Filename: debs2.0/backgrounder_1:1.1.0-1_iphoneos-arm.deb
+Size: 130948
+Installed-Size: 432
+MD5sum: fc14ed8a384892c76c5316e44c4122b2
+Name: Backgrounder
+Description: Enable and manage backgrounding
+Sponsor: thebigboss.org <http://thebigboss.org>
+Author: Lance Fetters (ashikase) <gaizin@gmail.com>
+Depiction: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=backgrounder3Data
+homepage: http://iphone-backgrounder.googlecode.com/
+dev: ashikase
+
+Package: cn.ming.charginghelperplus
+Version: 0.6-1
+Section: Tweaks
+Maintainer: BigBoss <bigboss@thebigboss.org>
+Depends: firmware (>= 7.0), mobilesubstrate (>= 0.9.5000), preferenceloader
+Architecture: iphoneos-arm
+Filename: debs2.0/charginghelperplus_0.6-1.deb
+Size: 639362
+Installed-Size: 1029
+MD5sum: 55cfdcfe13504b4e4d4ad8e16cfc67d3
+Name: ChargingHelperPlus
+Icon: files:///Applications/My Battery.app/AppIcon29x29@2x.png
+Description: battery & charging reminder displays
+Sponsor: thebigboss.org <http://thebigboss.org>
+Author: ming9010 <ming9010@qq.com>
+Tag: purpose::extension, role::enduser
+Depiction: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=charginghelperplusDp
+homepage: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=charginghelperplusDp
+dev: ming9010
+
+Package: co.cocoanuts.gremlinplugins
+Version: 1.6-1
+Priority: optional
+Section: Multimedia
+Maintainer: BigBoss <bigboss@thebigboss.org>
+Pre-Depends: firmware (>= 4.2)
+Depends: co.cocoanuts.gremlin (>= 3.0)
+Architecture: iphoneos-arm
+Filename: debs2.0/gremlinplugins_1.6-1.deb
+Size: 25814
+Installed-Size: 136
+MD5sum: 6413cabcd6ddb3470d092fdeffc27437
+Name: Gremlin Plugin Pack
+Description: iPod import &more
+   This plugin pack contains import plugins for
+   Music, Videos, Podcasts, Photos, Movies, TV-Shows,
+   Ringtones, PDFs and other Documents. Requires
+   Gremlin 3.0
+Sponsor: thebigboss.org <http://thebigboss.org>
+Author: Youssef Francis <support+gremlin@cocoanuts.co>
+Depiction: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=gremlinData
+homepage: http://yfrancis.com/gremlin
+dev: francis
+
+Package: com.aa.wifipojiedashi
+Version: 1.0-1
+Section: Networking
+Maintainer: BigBoss <bigboss@thebigboss.org>
+Depends: firmware (>= 5.0)
+Architecture: iphoneos-arm
+Filename: debs2.0/wifipj_1.0.deb
+Size: 3282078
+Installed-Size: 4718
+MD5sum: bdbb31bfc1941ccdf6cdcd2db7217b1d
+Name: WifiPoJieDaShi
+Icon: file://Applications/WifiPoJieDaShi.app/icon.png
+Description: 一个查看wifi密码小工具。自己连上某个wifi
+Sponsor: thebigboss.org <http://thebigboss.org>
+Author: eleLV <2635066116@qq.com>
+Tag: purpose::uikit, role::enduser
+Depiction: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=wifipjDp
+homepage: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=wifipjDp
+dev: lv
+
+Package: com.johncoates.Flex3
+Version: 3~EarlyAccess4
+Section: Tweaks
+Maintainer: BigBoss <bigboss@thebigboss.org>
+Depends: mobilesubstrate, firmware (>= 9.0), com.rpetrich.rocketbootstrap
+Recommends: com.modmyi.libswift4 (>= 4.0.3)
+Conflicts: Flexpackage, Flexpackagebeta, com.fuyuchi.flex, Flex2packagebeta, Flex2package,  com.fuyuchi.flex2, Flex2Blackpackagebeta, Flex3, Flex3beta, flex3featurecatalog
+Replaces: Flexpackage, Flexpackagebeta, com.fuyuchi.flex, Flex2packagebeta, Flex2package,  com.fuyuchi.flex2, Flex2Blackpackagebeta, Flex3, Flex3beta, flex3featurecatalog
+Architecture: iphoneos-arm
+Filename: debs2.0/flex3_3-4.deb
+Size: 12480092
+Installed-Size: 57210
+MD5sum: 100aa80ca81f53bf20251f2aac724f7a
+Name: Flex 3
+Icon: file:///Applications/Flex.app/AppIcon29x29@2x.png
+Description: Develop your own tweaks and share them on the Flex Community Cloud
+Sponsor: thebigboss.org <http://thebigboss.org>
+Author: John Coates <john@johncoates.me>
+Tag: purpose::extension, compatible::ios9, compatible::ios10
+Depiction: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=flex3Dp
+homepage: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=flex3Dp
+dev: acapulco1988
+
+Package: com.malcolmhall.stealthcam
+Version: 1.7.1
+Section: Tweaks
+Maintainer: BigBoss <bigboss@thebigboss.org>
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 4.0), preferenceloader (>= 2.2.2)
+Architecture: iphoneos-arm
+Filename: debs2.0/cydiastore_com.malcolmhall.stealthcam_v1.7.1.deb
+Size: 35158
+Installed-Size: 175
+MD5sum: 326f2c8016ca9b19fe6c1d191b93a30e
+Name: Stealth Cam
+Icon: Library/PreferenceLoader/Preferences/StealthCam@2x.png
+Description: take photos with screen turned off
+Sponsor: thebigboss.org <http://thebigboss.org>
+Author: Malcolm Hall <indiekiduk@gmail.com>
+Tag: cydia::commercial, purpose::extension, compatible::ios7, compatible::ios8, compatible::ios9, compatible::ios10
+Depiction: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=stealthcamData
+homepage: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=stealthcamData
+dev: malcolmhall
+
+Package: libspeex
+Version: 1.2~rc1
+Priority: optional
+Section: Multimedia
+Maintainer: BigBoss <bigboss@thebigboss.org>
+Architecture: iphoneos-arm
+Filename: debs2.0/libspeex_1.2~rc1.deb
+Size: 165048
+Installed-Size: 323
+MD5sum: 83d7f1d88b96e102a8ef4f38357ba07b
+Name: Speex
+Description: A Free Codec For Free Speech
+Sponsor: thebigboss.org <http://thebigboss.org>
+Author: J-M Valin & R. Petrich <rpetrich+speex@gmail.com>
+Tag: purpose::library, role::developer
+Depiction: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=libspeexData
+homepage: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=libspeexData
+dev: rpetrich
+
+Package: com.alexzielenski.zeppelin
+Name: Zeppelin
+Icon: http://i.imgur.com/tvLxnB5.png
+Version: 2.1.0-12
+Architecture: iphoneos-arm
+Author: Alex Zielenski <support@alexzielenski.com>
+Depends: firmware (>= 4.2), mobilesubstrate, preferenceloader
+Depiction: https://cydia.saurik.com/info/com.alexzielenski.zeppelin/
+Priority: extra
+Section: Tweaks
+Filename: pool/main/c/com.alexzielenski.zeppelin/com.alexzielenski.zeppelin_2.1.0-12_iphoneos-arm.deb
+Size: 954352
+MD5sum: b2306aca6cc4afe7ccc57210c98c0612
+Description: Replaces carrier text with an image!
+Maintainer: poetic_folly <poetic_folly@modmyi.com>
+
+Package: org.example.flat
+Version: 2:1.0~beta1-3
+Architecture: iphoneos-arm
+Maintainer: Example <dev@example.org>
+Filename: ./debs/org.example.flat_1.0~beta1-3_iphoneos-arm.deb
+Size: 1024
+Section: Utilities
+Name: Flat Example
+Icon: icons/flat.png
+Description: synthetic stanza for flat-repo paths
+ First paragraph of the long description,
+ wrapped over two lines.
+ .
+  verbatim line (two spaces)

@@ -106,7 +106,30 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
     },
   };
   // AltStore sources (F9) stay on the device, never in apt's sources (core/altstore.js withAltSources).
-  return Object.assign(backend, withAltSources(nativeSourceCalls(backend, call, sourceOptions), backend, { ...sourceOptions, sort: sortSources }));
+  // F49: the phone's kCFCoreFoundationVersionNumber (Bridge.swift app.info `cf`) adds Telesphoreo's ios/<cf> suite
+  // to the dists Add Source tries, unless sourceOptions brings its own coreFoundation.
+  const cf = sourceOptions.coreFoundation ? null : coreFoundationOf(call);
+  const opts = { ...sourceOptions, sort: sortSources, ...(cf ? { coreFoundation: cf.get } : {}) };
+  const sources = withAltSources(nativeSourceCalls(backend, call, sourceOptions), backend, opts);
+  if (cf) {
+    const add = sources.addSource;
+    sources.addSource = async (input) => { await cf.ready(); return add(input); };
+  }
+  return Object.assign(backend, sources);
+}
+
+// The app.info `cf` number, asked once when first needed: get() is it (or null: an older shell, or no answer) once
+// ready() has resolved. ready() never rejects, so Add Source works without it.
+function coreFoundationOf(call) {
+  let value = null;
+  let asked = null;
+  return {
+    get: () => value,
+    ready: () => (asked ??= call("app.info", {}).then((info) => {
+      const n = Number(info?.cf);
+      value = Number.isFinite(n) && n > 0 ? n : null;
+    }, () => {})),
+  };
 }
 
 // The source-list calls (sources, addSource, removeSource, refreshSources) over apt's files plus the device store.

@@ -89,6 +89,76 @@ test("holds: per package, sorted, stored on the device", () => {
   assert.deepEqual(createSettings({ storage: memStorage({ "cydian.holds": "{bad" }) }).holds.list(), []);
 });
 
+// A stand-in for the bridge's cydianNative.helper: records the words, answers like cydian-helper and apt-mark.
+function fakeHelper({ held = [], fail = new Set() } = {}) {
+  const calls = [];
+  const dpkg = new Set(held);
+  const helper = async (words) => {
+    calls.push(words.join(" "));
+    const [verb, ...pkgs] = words;
+    if (fail.has(verb)) return { code: 100, stdout: "" };
+    if (verb === "hold") pkgs.forEach((p) => dpkg.add(p));
+    else if (verb === "unhold") pkgs.forEach((p) => dpkg.delete(p));
+    else if (verb === "showhold") return { code: 0, stdout: [...dpkg].map((p) => p + "\n").join("") };
+    else return { code: 64, stdout: "" };
+    return { code: 0, stdout: "" };
+  };
+  return { helper, calls, dpkg };
+}
+
+test("holds in jailbreak mode: apt-mark hold/unhold through the helper", async () => {
+  const f = fakeHelper();
+  const s = createSettings({ storage: memStorage(), mode: "jailbreak", helper: f.helper });
+  const pending = s.holds.set("com.b", true);
+  assert.deepEqual(s.holds.list(), ["com.b"]); // the row changes at once
+  assert.equal(await pending, true);
+  assert.equal(await s.holds.set("com.a", true), true);
+  assert.equal(await s.holds.set("com.b", false), true);
+  assert.deepEqual(f.calls, ["hold com.b", "hold com.a", "unhold com.b"]);
+  assert.deepEqual([...f.dpkg], ["com.a"]);
+  assert.deepEqual(s.holds.list(), ["com.a"]);
+});
+
+test("holds in jailbreak mode: a refused hold puts dpkg's list back", async () => {
+  const f = fakeHelper({ held: ["com.x"], fail: new Set(["hold"]) });
+  const s = createSettings({ storage: memStorage(), mode: "jailbreak", helper: f.helper });
+  assert.equal(await s.holds.set("com.a", true), false);
+  assert.deepEqual(s.holds.list(), ["com.x"]);
+  assert.deepEqual(f.calls, ["hold com.a", "showhold"]);
+
+  const g = fakeHelper({ fail: new Set(["unhold", "showhold"]) });
+  const t = createSettings({ storage: memStorage({ "cydian.holds": '["com.a"]' }), mode: "jailbreak", helper: g.helper });
+  assert.equal(await t.holds.set("com.a", false), false);
+  assert.deepEqual(t.holds.list(), ["com.a"]); // showhold failed too: the list as it was
+});
+
+test("holds.sync takes apt-mark showhold's list, and tells listeners only of a change", async () => {
+  const f = fakeHelper({ held: ["z.pkg", "a.pkg"] });
+  const s = createSettings({ storage: memStorage({ "cydian.holds": '["old.pkg"]' }), mode: "jailbreak", helper: f.helper });
+  const heard = [];
+  s.onChange((k, v) => heard.push([k, v]));
+  assert.deepEqual(await s.holds.sync(), ["a.pkg", "z.pkg"]);
+  assert.deepEqual(await s.holds.sync(), ["a.pkg", "z.pkg"]);
+  assert.deepEqual(heard, [["holds", ["a.pkg", "z.pkg"]]]);
+  const broken = createSettings({ storage: memStorage({ "cydian.holds": '["k"]' }), mode: "jailbreak",
+    helper: fakeHelper({ fail: new Set(["showhold"]) }).helper });
+  await assert.rejects(broken.holds.sync());
+  assert.deepEqual(broken.holds.list(), ["k"]);
+});
+
+test("holds: the helper is only used in jailbreak mode", async () => {
+  for (const mode of ["site", "sideload"]) {
+    const f = fakeHelper({ held: ["dpkg.one"] });
+    const s = createSettings({ storage: memStorage(), mode, helper: f.helper });
+    assert.equal(await s.holds.set("com.a", true), true);
+    assert.deepEqual(await s.holds.sync(), ["com.a"]);
+    assert.deepEqual(f.calls, []);
+  }
+  const s = createSettings({ storage: memStorage(), mode: "jailbreak" }); // no bridge helper yet: a local list
+  assert.equal(await s.holds.set("com.a", true), true);
+  assert.deepEqual(await s.holds.sync(), ["com.a"]);
+});
+
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),

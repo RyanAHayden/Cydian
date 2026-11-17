@@ -22,7 +22,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
                 const char **err) {
     static char status_apt[64], status_dpkg[16];
     memset(p, 0, sizeof *p);
-    if (argc < 1) { *err = "no verb (update, install, remove, upgrade, configure)"; return -1; }
+    if (argc < 1) { *err = "no verb (" HELPER_VERBS ")"; return -1; }
     const char *verb = argv[0];
     int wants_packages;
     if (!strcmp(verb, "update")) { p->verb = HV_UPDATE; wants_packages = 0; }
@@ -30,7 +30,10 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "remove")) { p->verb = HV_REMOVE; wants_packages = 1; }
     else if (!strcmp(verb, "upgrade")) { p->verb = HV_UPGRADE; wants_packages = 0; }
     else if (!strcmp(verb, "configure")) { p->verb = HV_CONFIGURE; wants_packages = 0; }
-    else { *err = "unknown verb (update, install, remove, upgrade, configure)"; return -1; }
+    else if (!strcmp(verb, "hold")) { p->verb = HV_HOLD; wants_packages = 1; }
+    else if (!strcmp(verb, "unhold")) { p->verb = HV_UNHOLD; wants_packages = 1; }
+    else if (!strcmp(verb, "showhold")) { p->verb = HV_SHOWHOLD; wants_packages = 0; }
+    else { *err = "unknown verb (" HELPER_VERBS ")"; return -1; }
 
     int n = argc - 1;
     if (!wants_packages && n) { *err = "this verb takes no arguments"; return -1; }
@@ -39,7 +42,8 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     for (int i = 1; i < argc; i++)
         if (!helper_name_ok(argv[i])) { *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return -1; }
 
-    const char *tool = p->verb == HV_CONFIGURE ? "dpkg" : "apt-get";
+    int mark = p->verb == HV_HOLD || p->verb == HV_UNHOLD || p->verb == HV_SHOWHOLD;
+    const char *tool = p->verb == HV_CONFIGURE ? "dpkg" : mark ? "apt-mark" : "apt-get";
     if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/%s", prefix, tool) >= sizeof p->path) {
         *err = "prefix too long"; return -1;
     }
@@ -58,6 +62,13 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
         }
         a[k++] = "--configure";
         a[k++] = "-a";
+    } else if (mark) {
+        /* apt-mark has no progress to report: no status fd. Only a name dpkg knows gets here (helper_first_unknown),
+         * so apt-mark never reads one as a pattern. */
+        a[k++] = verb; /* hold, unhold or showhold: the literals checked above */
+        p->packages = (const char *const *)&a[k];
+        p->npackages = n;
+        for (int i = 1; i < argc; i++) a[k++] = argv[i];
     } else {
         if (p->verb != HV_UPDATE) {
             a[k++] = "-y";
@@ -106,12 +117,12 @@ static int first_missing(const struct helper_plan *p, const char *found) {
 }
 
 int helper_first_unknown(const char *prefix, const struct helper_plan *p) {
-    if (p->verb != HV_INSTALL && p->verb != HV_REMOVE) return -1;
+    if (p->verb != HV_INSTALL && p->verb != HV_REMOVE && p->verb != HV_HOLD && p->verb != HV_UNHOLD) return -1;
     char found[HELPER_MAX_PACKAGES] = {0};
     char path[PATH_MAX];
     snprintf(path, sizeof path, "%s/var/lib/dpkg/status", prefix);
     scan(path, p, found);
-    if (p->verb == HV_REMOVE || first_missing(p, found) < 0) return first_missing(p, found);
+    if (p->verb != HV_INSTALL || first_missing(p, found) < 0) return first_missing(p, found);
 
     snprintf(path, sizeof path, "%s/var/lib/apt/lists", prefix);
     DIR *d = opendir(path);

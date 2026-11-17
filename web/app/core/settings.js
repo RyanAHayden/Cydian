@@ -7,7 +7,8 @@
 //   s.set("appearance", "dark");    // stored at localStorage["cydian.appearance"], listeners told
 //   s.onChange((key, value) => …);  // returns an unsubscribe function
 //   s.sections();                   // [{ id, title, footer, settings: [def…] }], only the rows this mode shows
-//   s.holds.set("com.example.tweak", true);  // Ignore upgrades, kept on the device
+//   s.holds.set("com.example.tweak", true);  // Ignore upgrades, kept on the device (jailbreak: also a dpkg hold)
+//   await s.holds.sync();                    // jailbreak: take dpkg's holds (apt-mark showhold) as the list
 //
 // Every value is stored as a string under `cydian.<key>`, so backend.js getArch() keeps reading `cydian.arch`.
 // A stored value that is not one of the setting's options reads as the default (a hand-edited or older value
@@ -23,7 +24,7 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // Features that exist today. "appearance": this task's theme. "sources": the source list and its refresh (F4).
 // Still to come, by the setting that waits on it: "update-check" (Check for updates), "cellular" (Use cellular
 // data, app only), "notifications" (Notifications), "badge" (App icon badge), "holds" (Ignore upgrades: needs the
-// upgrades list, and in jailbreak mode apt-mark in the N2 helper), "auto-install" (the three automatic-install
+// upgrades list; the helper's apt-mark side is F22's), "auto-install" (the three automatic-install
 // rows), "rollback" (Keep previous versions), "resign" (Re-sign reminder, F14).
 export const FEATURES = new Set(["appearance", "sources"]);
 
@@ -155,7 +156,10 @@ function safeStorage(storage) {
   };
 }
 
-export function createSettings({ storage = globalThis.localStorage, mode = "site", features = FEATURES } = {}) {
+// `helper` (jailbreak mode only): runs cydian-helper with the given words and resolves to { code, stdout }, e.g.
+// helper(["hold", "com.foo"]). The app's bridge provides it as `cydianNative.helper` (N3); without one the holds
+// stay a list on the device, as in the other modes.
+export function createSettings({ storage = globalThis.localStorage, mode = "site", features = FEATURES, helper } = {}) {
   if (!MODES.includes(mode)) throw new Error(`unknown mode ${mode}`);
   const store = safeStorage(storage);
   const listeners = new Set();
@@ -193,21 +197,50 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     }
   }
 
-  // Ignore upgrades, per package, on the device. In jailbreak mode the real hold is dpkg's (apt-mark hold through
-  // the N2 helper); this list is then the cache the row shows until `apt-mark showhold` answers (`replace`).
+  function writeHolds(list) {
+    store.set(HOLDS_KEY, JSON.stringify(list));
+    notify("holds", list);
+  }
+  const dpkg = mode === "jailbreak" && typeof helper === "function" ? helper : null;
+  async function run(words) {
+    const r = await dpkg(words);
+    if (!r || r.code !== 0) throw new Error(`cydian-helper ${words[0]} failed (exit ${r?.code})`);
+    return r;
+  }
+
+  // Ignore upgrades, per package, on the device. In jailbreak mode with a helper the real hold is dpkg's
+  // (apt-mark hold/unhold through cydian-helper, F22); this list is then the cache the row shows, set at once and
+  // put right by `sync()` (apt-mark showhold) when the helper fails or something else changed the holds.
   const holds = {
     list: () => readHolds().sort(),
     has: (pkg) => readHolds().includes(pkg),
-    set(pkg, on) {
-      const list = new Set(readHolds());
+    // Resolves to true once the hold is in place (at once without a helper), false when dpkg refused it; the list
+    // then shows dpkg's holds again (or the old list if showhold failed too).
+    async set(pkg, on) {
+      const before = readHolds().sort();
+      const list = new Set(before);
       if (on) list.add(pkg); else list.delete(pkg);
-      store.set(HOLDS_KEY, JSON.stringify([...list].sort()));
-      notify("holds", [...list].sort());
+      writeHolds([...list].sort());
+      if (!dpkg) return true;
+      try {
+        await run([on ? "hold" : "unhold", pkg]);
+        return true;
+      } catch {
+        try { await holds.sync(); } catch { writeHolds(before); }
+        return false;
+      }
     },
     replace(pkgs) {
-      const list = [...new Set(pkgs.filter((p) => typeof p === "string"))].sort();
-      store.set(HOLDS_KEY, JSON.stringify(list));
-      notify("holds", list);
+      writeHolds([...new Set(pkgs.filter((p) => typeof p === "string"))].sort());
+    },
+    // Jailbreak with a helper: dpkg's holds become the list (told to listeners only when it changed). Elsewhere a
+    // no-op. Resolves to the list; rejects when the helper fails, leaving the list as it was.
+    async sync() {
+      if (!dpkg) return holds.list();
+      const { stdout = "" } = await run(["showhold"]);
+      const held = [...new Set(String(stdout).split("\n").map((l) => l.trim()).filter((l) => l))].sort();
+      if (JSON.stringify(held) !== JSON.stringify(holds.list())) writeHolds(held);
+      return held;
     },
   };
 

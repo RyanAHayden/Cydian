@@ -13,7 +13,8 @@ import { catalog, ALL } from "../catalog.js";
 import { compatFilterOn } from "../device.js";
 import { settings, createSwitch } from "./settings.js";
 import { SECTION_GROUPS } from "../core/catalog.js";
-import { displayName } from "../core/sources.js";
+import { displayName, sourcesFor, loadNeverLoaded } from "../core/sources.js";
+import { orderSources, loadOrder } from "../core/sourcelist.js";
 import { getBackend } from "../backend.js";
 import { grouped } from "../nav/ui.js";
 
@@ -42,6 +43,13 @@ export function searchFilters(f) {
   for (const k of Object.keys(EMPTY)) if (f[k] != null && f[k] !== "") out[k] = f[k];
   return Object.keys(out).length ? out : undefined;
 }
+
+// F53: the Filter panel's Source rows: only the sources the device type shows (Not Jailbroken: AltStore ones,
+// core/sources.js sourcesFor), in the Sources tab's order (Manage > Sources, F45) and by its display name.
+export function sourceChoices(list, type, order = null) {
+  return sourcesFor(orderSources(list, order), type).shown.map((s) => ({ label: displayName(s), value: s.key }));
+}
+const triedFirstLoad = new Set(); // F53: never-loaded sources the panel already asked for (loadNeverLoaded `tried`)
 
 // The segment a section filter selects: its index in SCOPES, or -1 (a section picked in the sheet).
 export function scopeIndex(section) {
@@ -240,7 +248,7 @@ async function openFilters(scope, changed, redraw) {
     catalog.statusSource() === "upload" ? "Installed packages come from the dpkg status file uploaded on the Installed page." : null));
     box.append(choiceGroup("Price", [{ label: "Free and Paid" }, { label: "Free", value: "free" }, { label: "Paid", value: "paid" }],
       f.price, (v) => set("price", v)));
-    box.append(choiceGroup("Source", [{ label: "All Sources" }, ...sources.map((s) => ({ label: displayName(s), value: s.key }))],
+    box.append(choiceGroup("Source", [{ label: "All Sources" }, ...sources],
       f.source, (v) => set("source", v)));
     const groupRows = SECTION_GROUPS.map((g) => ({ label: `All ${g}`, value: `group:${g}` }));
     box.append(choiceGroup("Section", [{ label: "All Sections" }, ...groupRows, ...sections.map((s) => ({ label: s, value: s }))],
@@ -249,11 +257,20 @@ async function openFilters(scope, changed, redraw) {
   }
   draw();
   try {
+    const type = settings.deviceType();
     const [list, data] = await Promise.all([getBackend().sources(), catalog.sections(ALL)]);
-    sources = list;
+    sources = sourceChoices(list, type, loadOrder());
     sections = data.sections.map((s) => s.name);
+    // A source picked under the other device type, now hidden: back to All Sources.
+    if (f.source != null && !sources.some((o) => o.value === f.source)) { f.source = null; changed(); }
     if (box.isConnected) draw();
+    // F53: AltStore sources seeded by URL (F28) have no name until loaded, as on the Sources tab's first visit
+    // (F43): load them quietly and redraw with their names.
+    if (await loadNeverLoaded(getBackend(), list, type, { tried: triedFirstLoad })) {
+      sources = sourceChoices(await getBackend().sources(), type, loadOrder());
+      if (box.isConnected) draw();
+    }
   } catch {
-    // no sources or sections yet: the sheet keeps its other filters
+    // no sources or sections yet (or a first load failed): the sheet keeps what it has
   }
 }

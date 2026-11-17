@@ -185,13 +185,14 @@ function loadIcon(row, item) {
 }
 
 // A virtualised package list. `letters`: Cydia's A–Z headers (lists sorted by name; search results aren't).
-export function packageList(body, route, rows, { letters = true } = {}) {
-  rememberNames(rows);
+// `rows` may hold { header } items of their own when `letters` is off. `decorate(row, item)` runs after each bind.
+export function packageList(body, route, rows, { letters = true, decorate = null } = {}) {
+  rememberNames(rows.filter((r) => r.id));
   const items = letters ? withLetterHeaders(rows, (r) => indexLetter(r.name)) : rows;
   const list = createVList(body, {
     items, rowHeight: ROW_HEIGHT, headerHeight: 23,
     createRow,
-    bindRow: (row, item) => bindRow(row, item, route),
+    bindRow: (row, item) => { bindRow(row, item, route); decorate?.(row, item); },
     idle: loadIcon,
   });
   return list;

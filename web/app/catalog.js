@@ -4,6 +4,7 @@
 //   await catalog.ensure();                    // every source loaded for getArch(), at most once per refresh
 //   catalog.sections(key)  catalog.list(key, section)  catalog.search(q)  catalog.author(name)
 //   catalog.package(id, key)  catalog.has(names)       // all promises; key "*" = All Sources
+//   catalog.changes()  catalog.onChange(f)             // the Changes tab (core/changes.js)
 //
 // Cydia's model: the package lists change when the sources are refreshed, not on every visit. A source's
 // Packages text is kept in IndexedDB (core/cache.js) and reused while it is newer than the source's last
@@ -13,6 +14,7 @@ import { getBackend, getParser, getArch } from "./backend.js";
 import { repoLayout } from "./core/apt.js";
 import { openIndexCache } from "./core/cache.js";
 import { ALL } from "./core/catalog.js";
+import { openSeenStore, recordRefresh, changeGroups } from "./core/changes.js";
 
 export { ALL };
 
@@ -56,6 +58,26 @@ async function packagesText(source, arch) {
   return { text: parts.join("\n\n"), root: layout.root };
 }
 
+// ---- Changes (core/changes.js): every reload that loaded something files what it saw, under one `now`. ----
+let seenStore;            // Promise of the first-seen store, or of null where there is no IndexedDB
+const changeListeners = new Set();
+
+function seen() {
+  return (seenStore ??= openSeenStore().catch(() => null));
+}
+
+async function recordSeen() {
+  try {
+    const store = await seen();
+    if (!store) return;
+    const triples = await getParser().catalog("versions", []);
+    const added = await recordRefresh(store, triples, Date.now());
+    if (added) for (const f of changeListeners) f();
+  } catch {
+    // Changes is a nicety: a failed write only means the next refresh files these instead
+  }
+}
+
 async function loadSource(source, arch, sig) {
   try {
     // The last refresh found nothing for this arch (Telesphoreo's Release lists no arm64): nothing to fetch.
@@ -79,10 +101,14 @@ async function run() {
       await getParser().catalog("remove", [key]);
     }
   }
+  let reloaded = false;
   await Promise.all(sources.map((s) => {
     const sig = signature(s, arch);
-    return loaded.get(s.key)?.sig === sig ? null : loadSource(s, arch, sig);
+    if (loaded.get(s.key)?.sig === sig) return null;
+    reloaded = true;
+    return loadSource(s, arch, sig);
   }));
+  if (reloaded) await recordSeen();
   return sources;
 }
 
@@ -109,4 +135,12 @@ export const catalog = {
   author: (name) => ask("author", [name]),
   package: (id, key = ALL) => ask("package", [id, key]),
   has: (names) => ask("has", [names]),
+  // The Changes tab: [{ seen, rows: [{ ...row, change: "new" | "updated" }] }], newest first (core/changes.js).
+  changes: async () => {
+    const rows = await ask("list", [ALL, ALL]);
+    const store = await seen();
+    return store ? changeGroups(await store.all(), rows) : [];
+  },
+  // Called after a refresh filed something new; returns unsubscribe.
+  onChange: (f) => { changeListeners.add(f); return () => changeListeners.delete(f); },
 };

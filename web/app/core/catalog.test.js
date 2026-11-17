@@ -157,3 +157,12 @@ test("the worker runs catalog ops, with the Packages text as bytes", async () =>
   assert.equal((await p.catalog("sections", ["P"])).total, 4);
   await assert.rejects(p.catalog("nope"));
 });
+
+test("versions lists every source's candidate per id, for the Changes tab", () => {
+  const c = createCatalog();
+  c.load("a", REPO_A, "https://a.example/", "iphoneos-arm64");
+  const v = c.versions();
+  assert.deepEqual(v.find(([, id]) => id === "com.a.tweak"), ["a", "com.a.tweak", "1.2"]);
+  assert.ok(!v.some(([, id]) => id === "com.a.rootful"));
+  assert.deepEqual(reply({ id: 1, type: "catalog", op: "versions" }).ok, true);
+});

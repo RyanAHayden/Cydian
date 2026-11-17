@@ -10,6 +10,7 @@
 //   c.search(query)                        -> [row], best matches first
 //   c.author(name)                         -> [row]: every package whose Author or Maintainer is `name`
 //   c.package(id, key | "*")               -> { stanza, key, others: [{ key, version }] } or null
+//   c.versions()                           -> [[key, id, version]] for every source (Changes, core/changes.js)
 //
 // A row is the slim record lists draw: { id, name, short, version, section, icon, key, author }.
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
@@ -204,13 +205,21 @@ export function createCatalog() {
   // Which of `names` the catalog has (for linking Depends on the package page).
   const has = (names) => names.filter((n) => entries(ALL).has(n));
 
-  return { load, remove, sections, list, search, author, package: pkg, has, keys: () => [...sources.keys()] };
+  // Every (source, id, candidate version) loaded: what the Changes tab files on a refresh (core/changes.js).
+  function versions() {
+    const out = [];
+    for (const [k, { byId }] of sources) for (const [id, e] of byId) out.push([k, id, e.stanza.version ?? ""]);
+    return out;
+  }
+
+  return { load, remove, sections, list, search, author, package: pkg, has, versions, keys: () => [...sources.keys()] };
 }
 
 // Runs a catalog operation by name: the worker's entry point. Unknown ops throw.
 export function runCatalog(catalog, op, args = []) {
   const f = { load: catalog.load, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
-    search: catalog.search, author: catalog.author, package: catalog.package, has: catalog.has, keys: catalog.keys }[op];
+    search: catalog.search, author: catalog.author, package: catalog.package, has: catalog.has, keys: catalog.keys,
+    versions: catalog.versions }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);
 }

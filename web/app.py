@@ -20,7 +20,8 @@ if int(os.environ.get("CYDIAN_PROXY_HOPS", "0") or 0) > 0:
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=int(os.environ["CYDIAN_PROXY_HOPS"]))
 
-fetcher = fetch.Fetcher()
+# F55: repeat fetches ask the repo If-None-Match/If-Modified-Since and a 304 is served from the kept body.
+fetcher = fetch.Fetcher(upstream_cache=fetch.UpstreamCache())
 packages_cache = fetch.PackagesCache()
 rate_limiter = fetch.RateLimiter(rate=int(os.environ.get("CYDIAN_FETCH_RATE", "60")), per=60.0)
 # Assets (icons, depictions, screenshots, .debs: any fetch without kind=packages) get their own, larger bucket, so a
@@ -69,8 +70,8 @@ def _not_modified(etag, last_modified=None):
 
 def _answer(body, headers, last_modified=None):
     """The body with an ETag (and the repo's Last-Modified), or an empty 304 when the visitor has it already: an
-    unchanged Release costs the phone no transfer (F19). The upstream fetch still happens (fetch.py sends no
-    conditional headers upstream)."""
+    unchanged Release costs the phone no transfer (F19). Upstream, the fetcher revalidates with the repo's own
+    ETag/Last-Modified, so an unchanged file costs the repo a 304 too (F55)."""
     etag = _etag(body)
     headers["ETag"] = etag
     if last_modified:
@@ -113,6 +114,8 @@ def api_fetch():
     headers["Content-Type"] = (r.headers["content-type"] if ctype in PASSTHROUGH_TYPES
                                else "application/octet-stream")
     headers["X-Source-URL"] = _header_url(r.url)
+    if r.revalidated:
+        headers["X-Cache"] = "REVALIDATED"  # F55: the repo said 304; this is the kept body
     return _answer(r.body, headers, r.headers.get("last-modified"))
 
 

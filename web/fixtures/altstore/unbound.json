@@ -1,0 +1,103 @@
+{
+ "name": "Unbound App Repo",
+ "identifier": "app.unbound.ios.repo",
+ "iconURL": "https://builds.unbound.rip/repo/icon.png",
+ "apps": [
+  {
+   "name": "Unbound",
+   "bundleIdentifier": "com.hammerandchisel.discord",
+   "developerName": "Unbound Team",
+   "iconURL": "https://builds.unbound.rip/repo/icon.png",
+   "localizedDescription": "A client modification for Discord on mobile. Install plugins, themes, fonts, and icon packs on the official Discord app.",
+   "subtitle": "A client modification for Discord on mobile.",
+   "tintColor": "aa454d",
+   "category": "social",
+   "appPermissions": {
+    "entitlements": [
+     "application-identifier",
+     "aps-environment",
+     "com.apple.developer.associated-domains"
+    ],
+    "privacy": {
+     "NSBluetoothAlwaysUsageDescription": "To connect to your devices",
+     "NSBluetoothPeripheralUsageDescription": "To connect to your devices",
+     "NSCameraUsageDescription": "By allowing access to your camera, you can take pictures and others will be able to see you in voice and video calls.",
+     "NSContactsUsageDescription": "We can help you find people you know on Discord. Your contacts will be regularly sent to us so you can connect with friends. You can turn this off any time.",
+     "NSLocalNetworkUsageDescription": "Allow Discord access to your local network to find devices using the same internet connection.",
+     "NSLocationAlwaysAndWhenInUseUsageDescription": "To enable services that require location",
+     "NSLocationAlwaysUsageDescription": "To enable services that require location",
+     "NSLocationWhenInUseUsageDescription": "To enable services that require location",
+     "NSMicrophoneUsageDescription": "By allowing access to your microphone, you'll be able to talk in calls.",
+     "NSPhotoLibraryAddUsageDescription": "By allowing access to your library, you'll be able to download photos and videos.",
+     "NSPhotoLibraryUsageDescription": "By allowing us access to your photos, you will be able to upload images as an avatar, server icon, and more, and you can send photos and videos to your frien...",
+     "NSUserTrackingUsageDescription": "Allowing tracking helps us show you Quests for games you play or are interested in. You can opt out anytime in your iOS settings.",
+     "NSSpeechRecognitionUsageDescription": "Unbound plugins turn voice messages into text."
+    }
+   },
+   "versions": [
+    {
+     "version": "353.0_1.9.0",
+     "buildVersion": "122208",
+     "date": "2026-11-17T19:26:11Z",
+     "size": 104755102,
+     "downloadURL": "https://github.com/marioparaschiv/unbound/releases/download/discord-353.0-ios/Unbound.ipa",
+     "localizedDescription": "Discord 353.0 (122208) with Unbound loader 1.9.0.",
+     "minOSVersion": "16.0"
+    }
+   ]
+  },
+  {
+   "name": "Unbound (TestFlight)",
+   "bundleIdentifier": "com.hammerandchisel.discord.testflight",
+   "developerName": "Unbound Team",
+   "beta": true,
+   "iconURL": "https://builds.unbound.rip/repo/icon.png",
+   "localizedDescription": "A client modification for Discord on mobile, built on Discord's TestFlight beta. Install plugins, themes, fonts, and icon packs on the official Discord app.",
+   "subtitle": "A client modification for Discord on mobile (TestFlight builds).",
+   "tintColor": "aa454d",
+   "category": "social",
+   "appPermissions": {
+    "entitlements": [
+     "application-identifier",
+     "aps-environment",
+     "beta-reports-active"
+    ],
+    "privacy": {
+     "NSBluetoothAlwaysUsageDescription": "To connect to your devices",
+     "NSBluetoothPeripheralUsageDescription": "To connect to your devices",
+     "NSCameraUsageDescription": "By allowing access to your camera, you can take pictures and others will be able to see you in voice and video calls.",
+     "NSContactsUsageDescription": "We can help you find people you know on Discord. Your contacts will be regularly sent to us so you can connect with friends. You can turn this off any time.",
+     "NSLocalNetworkUsageDescription": "Allow Discord access to your local network to find devices using the same internet connection.",
+     "NSLocationAlwaysAndWhenInUseUsageDescription": "To enable services that require location",
+     "NSLocationAlwaysUsageDescription": "To enable services that require location",
+     "NSLocationWhenInUseUsageDescription": "To enable services that require location",
+     "NSMicrophoneUsageDescription": "By allowing access to your microphone, you'll be able to talk in calls.",
+     "NSPhotoLibraryAddUsageDescription": "By allowing access to your library, you'll be able to download photos and videos.",
+     "NSPhotoLibraryUsageDescription": "By allowing us access to your photos, you will be able to upload images as an avatar, server icon, and more, and you can send photos and videos to your frien...",
+     "NSUserTrackingUsageDescription": "Allowing tracking helps us show you Quests for games you play or are interested in. You can opt out anytime in your iOS settings.",
+     "NSSpeechRecognitionUsageDescription": "Unbound plugins turn voice messages into text."
+    }
+   },
+   "versions": [
+    {
+     "version": "356.0_1.8.0",
+     "buildVersion": "123283",
+     "date": "2026-11-16T17:38:16Z",
+     "size": 65351743,
+     "downloadURL": "https://github.com/marioparaschiv/unbound/releases/download/discord-356.0_123283-ios-testflight/Unbound.ipa",
+     "localizedDescription": "Discord 356.0 (123283) with Unbound loader 1.8.0.",
+     "minOSVersion": "18.0"
+    },
+    {
+     "version": "356.0_1.8.0",
+     "buildVersion": "123252",
+     "date": "2026-11-16T17:26:47Z",
+     "size": 65781739,
+     "downloadURL": "https://github.com/marioparaschiv/unbound/releases/download/discord-356.0_123252-ios-testflight/Unbound.ipa",
+     "localizedDescription": "Discord 356.0 (123252) with Unbound loader 1.8.0.",
+     "minOSVersion": "18.0"
+    }
+   ]
+  }
+ ]
+}

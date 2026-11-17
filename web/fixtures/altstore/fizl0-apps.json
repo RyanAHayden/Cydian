@@ -1,0 +1,80 @@
+{
+ "name": "FIZL0",
+ "identifier": "io.github.fizl0",
+ "sourceURL": "https://fizl0.github.io/apps/source.json",
+ "website": "https://fizl0.github.io/apps/",
+ "iconURL": "https://avatars.githubusercontent.com/u/48865825?v=4",
+ "subtitle": "Open remasters by FIZL0",
+ "apps": [
+  {
+   "name": "openMX",
+   "bundleIdentifier": "io.github.fizl0.openmx",
+   "developerName": "FIZL0",
+   "subtitle": "A remaster of MX Unleashed (PS2)",
+   "localizedDescription": "MX Unleashed (PS2, 2004) rewritten: the original's physics, tricks and timing, on today's screens. Plays from your own disc image (USA, SLUS-20767), no game ...",
+   "iconURL": "https://openmx.dev/icon-1024.png",
+   "tintColor": "#8e0f17",
+   "category": "games",
+   "version": "0.16.0",
+   "versionDate": "2026-11-17",
+   "downloadURL": "https://github.com/FIZL0/openmx/releases/download/v0.16.0/openmx-ios.ipa",
+   "size": 13735980,
+   "versions": [
+    {
+     "version": "0.16.0",
+     "date": "2026-11-17",
+     "downloadURL": "https://github.com/FIZL0/openmx/releases/download/v0.16.0/openmx-ios.ipa",
+     "size": 13735980,
+     "minOSVersion": "15.0"
+    }
+   ]
+  },
+  {
+   "name": "OpenTennis",
+   "bundleIdentifier": "io.github.fizl0.hst",
+   "developerName": "FIZL0",
+   "subtitle": "A remaster of Hot Shots Tennis (PS2)",
+   "localizedDescription": "A remaster of Hot Shots Tennis (PS2). Plays from your own disc image (SCUS-97610): put the ISO in Files → On My iPhone → OpenTennis.",
+   "iconURL": "https://opentennis.dev/icon-180.png",
+   "tintColor": "#2fae4a",
+   "category": "games",
+   "version": "1.7.1",
+   "versionDate": "2026-11-17",
+   "downloadURL": "https://github.com/FIZL0/opentennis/releases/download/v1.7.1/opentennis-ios.ipa",
+   "size": 42761637,
+   "versions": [
+    {
+     "version": "1.7.1",
+     "date": "2026-11-17",
+     "downloadURL": "https://github.com/FIZL0/opentennis/releases/download/v1.7.1/opentennis-ios.ipa",
+     "size": 42761637,
+     "minOSVersion": "15.0"
+    }
+   ]
+  },
+  {
+   "name": "Party Board",
+   "bundleIdentifier": "com.mariopartyrd.partyboard",
+   "developerName": "FIZL0",
+   "subtitle": "Mario Party 4 (GameCube) with online play",
+   "localizedDescription": "A PC/mobile port of the Mario Party 4 decompilation, with online play. Plays from your own disc image (USA, GMPE01): put it in Files → On My iPhone → Party B...",
+   "iconURL": "https://raw.githubusercontent.com/FIZL0/partyboard/main/res/icon.png",
+   "tintColor": "#e60012",
+   "category": "games",
+   "version": "0.1.8",
+   "versionDate": "2026-10-30",
+   "downloadURL": "https://github.com/FIZL0/partyboard/releases/download/v0.1.8/partyboard-ios.ipa",
+   "size": 28749543,
+   "versions": [
+    {
+     "version": "0.1.8",
+     "date": "2026-10-30",
+     "downloadURL": "https://github.com/FIZL0/partyboard/releases/download/v0.1.8/partyboard-ios.ipa",
+     "size": 28749543,
+     "minOSVersion": "15.0"
+    }
+   ]
+  }
+ ],
+ "news": []
+}

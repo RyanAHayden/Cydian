@@ -1,0 +1,94 @@
+{
+ "description": "Official source for iTorrent app",
+ "featuredApps": [
+  "com.xitrix.iTorrent2"
+ ],
+ "headerURL": "https://raw.githubusercontent.com/XITRIX/xitrix.github.io/master/sourceIcon.png",
+ "iconURL": "https://raw.githubusercontent.com/XITRIX/xitrix.github.io/master/sourceIcon.png",
+ "identifier": "com.xitrix.itorrent",
+ "name": "iTorrent Source",
+ "patreonURL": "https://www.patreon.com/xitrix",
+ "subtitle": "Torrent client for iOS",
+ "tintColor": "D03E43",
+ "website": "https://github.com/XITRIX/iTorrent",
+ "apps": [
+  {
+   "appPermissions": {
+    "entitlements": [
+     "com.apple.security.application-groups"
+    ],
+    "privacy": {}
+   },
+   "beta": true,
+   "bundleIdentifier": "com.xitrix.iTorrent2",
+   "category": "utilities",
+   "developerName": "XITRIX",
+   "downloadURL": "https://github.com/XITRIX/iTorrent/releases/download/v2.2.0-1/iTorrent.ipa",
+   "iconURL": "https://raw.githubusercontent.com/XITRIX/xitrix.github.io/master/icon.png",
+   "localizedDescription": "iTorrent officially in the AltStore!\n\nIt is an ordinary torrent client for iOS with Files app support and much more.\n\nWhat can this app do:\n\n• Download in th...",
+   "name": "iTorrent",
+   "patreon": {
+    "tiers": [
+     "5007319",
+     "5016009"
+    ]
+   },
+   "permissions": [
+    {
+     "type": "network",
+     "usageDescription": "Needs to download torrents"
+    },
+    {
+     "type": "background-audio",
+     "usageDescription": "Needs to hold app working in background"
+    },
+    {
+     "type": "location",
+     "usageDescription": "More robust alternative to hold app working in background which requires additional permission"
+    }
+   ],
+   "screenshotURLs": [
+    "https://raw.githubusercontent.com/XITRIX/xitrix.github.io/master/screenshots/sidestore/1.png",
+    "https://raw.githubusercontent.com/XITRIX/xitrix.github.io/master/screenshots/sidestore/2.png",
+    "https://raw.githubusercontent.com/XITRIX/xitrix.github.io/master/screenshots/sidestore/3.png"
+   ],
+   "screenshots": [
+    "https://raw.githubusercontent.com/XITRIX/xitrix.github.io/master/screenshots/1.PNG",
+    "https://raw.githubusercontent.com/XITRIX/xitrix.github.io/master/screenshots/2.PNG",
+    "https://raw.githubusercontent.com/XITRIX/xitrix.github.io/master/screenshots/3.PNG"
+   ],
+   "subtitle": "Torrent client for iOS",
+   "tintColor": "#F19E69",
+   "versions": [
+    {
+     "buildVersion": "1",
+     "date": "2026-07-19T09:59:41Z",
+     "downloadURL": "https://github.com/XITRIX/iTorrent/releases/download/v2.2.0-1/iTorrent.ipa",
+     "localizedDescription": "## What's new:\r\n* Meet the new built-in VLC player. Play compatible video and audio files directly in iTorrent, even while they are still downloading.\r\n* Enj...",
+     "minOSVersion": "16.0",
+     "size": 24288935,
+     "version": "2.2.0"
+    },
+    {
+     "buildVersion": "1",
+     "date": "2025-12-18T09:43:35Z",
+     "downloadURL": "https://github.com/XITRIX/iTorrent/releases/download/v2.1.1-1/iTorrent.ipa",
+     "localizedDescription": "## What’s new\r\n* Import/Export of RSS channels\r\n\r\n## Improvements\r\n* Files thumbnails now looks properly\r\n* Minor UI changes\r\n\r\n## Fixes\r\n* HTTPS trackers no...",
+     "minOSVersion": "16.0",
+     "size": 8362011,
+     "version": "2.1.1"
+    }
+   ]
+  }
+ ],
+ "news": [
+  {
+   "caption": "We’re back 🎉\niTorrent is available again on AltStore after resolving our account issue.\nThanks for sticking with us!",
+   "date": "2025-10-25",
+   "identifier": "apple_account_issue_solved",
+   "notify": true,
+   "tintColor": "#EB4144",
+   "title": "iTorrent came back!"
+  }
+ ]
+}

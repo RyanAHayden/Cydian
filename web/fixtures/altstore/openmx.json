@@ -1,0 +1,35 @@
+{
+ "name": "openMX",
+ "identifier": "io.github.fizl0.openmx",
+ "sourceURL": "https://github.com/FIZL0/openmx/releases/latest/download/altstore-source.json",
+ "website": "https://openmx.dev/",
+ "iconURL": "https://openmx.dev/icon-1024.png",
+ "tintColor": "#8e0f17",
+ "subtitle": "A remaster of MX Unleashed (PS2)",
+ "apps": [
+  {
+   "name": "openMX",
+   "bundleIdentifier": "io.github.fizl0.openmx",
+   "developerName": "FIZL0",
+   "subtitle": "A remaster of MX Unleashed (PS2)",
+   "localizedDescription": "MX Unleashed (PS2, 2004) rewritten: the original's physics, tricks and timing, on today's screens. Plays from your own disc image (USA, SLUS-20767), no game ...",
+   "iconURL": "https://openmx.dev/icon-1024.png",
+   "tintColor": "#8e0f17",
+   "category": "games",
+   "version": "0.16.0",
+   "versionDate": "2026-11-17",
+   "downloadURL": "https://github.com/FIZL0/openmx/releases/download/v0.16.0/openmx-ios.ipa",
+   "size": 13735980,
+   "versions": [
+    {
+     "version": "0.16.0",
+     "date": "2026-11-17",
+     "downloadURL": "https://github.com/FIZL0/openmx/releases/download/v0.16.0/openmx-ios.ipa",
+     "size": 13735980,
+     "minOSVersion": "15.0"
+    }
+   ]
+  }
+ ],
+ "news": []
+}

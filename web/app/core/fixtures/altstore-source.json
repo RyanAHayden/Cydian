@@ -51,7 +51,7 @@
     },
     { "name": "No versions", "bundleIdentifier": "dev.example.empty", "versions": [] },
     { "name": "No id", "versions": [{ "version": "1", "downloadURL": "https://example.dev/x.ipa" }] },
-    { "name": "Emu again", "bundleIdentifier": "dev.example.emu", "versions": [{ "version": "9", "downloadURL": "https://example.dev/dup.ipa" }] }
+    { "name": "Emu", "bundleIdentifier": "dev.example.emu", "versions": [{ "version": "1.5", "downloadURL": "https://example.dev/emu-1.5.ipa" }] }
   ],
   "news": [
     { "title": "Emu 2.0 is out", "identifier": "emu-2", "caption": "Now for iOS 17.", "date": "2026-11-10", "tintColor": "#0e8a4f", "imageURL": "https://example.dev/news.png", "notify": true, "appID": "dev.example.emu" },

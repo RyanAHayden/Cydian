@@ -237,7 +237,7 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
 
 // Pressed look while a finger is down, like Cydia's: .is-pressed on the bar button or row under it, off when the
 // finger lifts, leaves, or the touch turns into a scroll (pointercancel). :active alone is unreliable on iOS.
-const PRESSABLE = ".bar-button, a.cell-inner, button.cell-inner, .alert-button";
+const PRESSABLE = ".bar-button, a.cell-inner, button.cell-inner, .alert-button, .del-confirm";
 let pressed = null;
 const unpress = () => { if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; } };
 document.addEventListener("pointerdown", (e) => {

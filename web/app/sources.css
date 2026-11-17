@@ -64,36 +64,44 @@
 .source-row .cell-error { color: #b0262a; }
 .source-row { position: relative; overflow: hidden; }
 
-/* ---- edit mode and swipe-to-delete. Rows slide by transform; the red minus turns 90deg when armed. ---- */
+/* ---- edit mode and swipe-to-delete, as Cydia does it on the 4S (ref/4s/screens/cy-sources-edit*.png): the red
+   minus slides in solid with the row (the row clips it until then), the row's content narrows in step so its text
+   ellipsizes instead of jumping, and the chevron fades. Tapping the minus turns its bar upright and the Delete
+   button opens from the right edge while the text makes room. Colours from the 4S art: UIRemoveControlMinus (disc),
+   UIRemoveControlRed / ...PressedRed (Delete). No white rows under anything (the art's edge rows aren't drawn). ---- */
 .del-toggle {
-  position: absolute; left: 9px; top: 50%; width: 29px; height: 29px; margin-top: -14.5px; padding: 0; border: 0;
-  background: none; cursor: pointer; opacity: 0; transform: translateX(-40px);
-  transition: transform .3s ease, opacity .3s ease;
+  position: absolute; left: 7px; top: 50%; width: 29px; height: 29px; margin-top: -14.5px; padding: 0; border: 0;
+  background: none; cursor: pointer; transform: translateX(-40px); transition: transform .3s ease-in-out;
 }
-.del-toggle::before { /* red disc, white rim, white bar */
-  content: ""; position: absolute; inset: 3px; border-radius: 50%;
-  background: linear-gradient(#f5979b, #d5494d 50%, #cf2b2d 50%, #c2181b);
-  box-shadow: 0 0 0 2px #fff, 0 1px 3px 2px rgba(0,0,0,.35);
+.del-toggle::before { /* UIRemoveControlMinus: 2pt white rim, glossy top half, flat red bottom, soft shadow */
+  content: ""; position: absolute; inset: 0; box-sizing: border-box; border-radius: 50%; border: 2px solid #fff;
+  background: linear-gradient(#dd878d, #c73742 50%, #bd1421 50%, #bd1421); background-origin: border-box;
+  box-shadow: 0 1.5px 2px rgba(0,0,0,.45);
 }
-.del-toggle::after {
+.del-toggle::after { /* the white bar, drawn apart from the disc so it can turn */
   content: ""; position: absolute; left: 8px; right: 8px; top: 13px; height: 3px; border-radius: 1px; background: #fff;
-  box-shadow: 0 -1px 0 rgba(0,0,0,.25); transition: transform .25s ease;
+  box-shadow: 0 -.5px 0 rgba(0,0,0,.2); transition: transform .25s ease-in-out;
 }
-.source-row .cell-inner { transition: transform .3s ease; }
-.editing .source-row .del-toggle { opacity: 1; transform: none; }
-.editing .source-row .cell-inner { transform: translateX(38px); width: calc(100% - 38px); }
+.source-row .cell-inner { width: 100%; transition: transform .3s ease-in-out, width .3s ease-in-out; }
+.source-row .cell-inner.chevron::after, .source-row .cell-detail, .source-row .cell-count { transition: opacity .2s ease; }
+.editing .source-row .del-toggle { transform: none; }
+.editing .source-row .cell-inner { transform: translateX(37px); width: calc(100% - 37px); }
 .editing .source-row .cell-inner.chevron::after { opacity: 0; }
 .source-row.armed .del-toggle::after { transform: rotate(-90deg); }
-/* "Button (Email Delete)": red, 28px, 5px corners, darker edge. */
-.del-confirm {
-  position: absolute; right: 10px; top: 50%; height: 30px; margin-top: -15px; padding: 0 10px; border-radius: 5px;
-  font-size: 14px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4); cursor: pointer;
-  border: 1px solid #30363e; border-bottom-color: #3f3f3f;
-  background: linear-gradient(#f5979b, #d5494d 50%, #cf2b2d 50%, #cf2b2d);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.3), 0 1px 0 rgba(255,255,255,.6);
-  opacity: 0; transform: translateX(16px); pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+.source-row.armed .cell-inner { width: calc(100% - 76px); } /* room for Delete; the URL ellipsizes */
+.editing .source-row.armed .cell-inner { width: calc(100% - 37px - 76px); }
+.del-confirm { /* UIRemoveControlRed: dark top edge, gloss over the top half, flat red, dark red bottom edge */
+  position: absolute; right: 9px; top: 50%; height: 32px; margin-top: -16px; padding: 0 11px; border-radius: 6px;
+  font-size: 15px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4); cursor: pointer;
+  border: 1px solid; border-color: #2c1c1c #6b1516 #721819;
+  background: linear-gradient(#f6989c, #d64a4e 50%, #cf2d2f 50%, #cf2b2d); background-origin: border-box;
+  box-shadow: none;
+  clip-path: inset(0 0 0 100% round 6px); pointer-events: none; transition: clip-path .22s ease-out;
 }
-.source-row.armed .del-confirm { opacity: 1; transform: none; pointer-events: auto; }
+.del-confirm:active, .del-confirm.is-pressed {
+  background: linear-gradient(#a75a61, #93252e 50%, #8d141e 50%, #8d131e); background-origin: border-box;
+}
+.source-row.armed .del-confirm { clip-path: inset(0 round 6px); pointer-events: auto; }
 .source-row.armed .cell-detail, .source-row.armed .cell-count, .source-row.armed .cell-inner.chevron::after { opacity: 0; }
 .source-row.removing { opacity: 0; transition: opacity .25s ease; }
 .source-row { touch-action: pan-y; }

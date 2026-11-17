@@ -16,6 +16,13 @@
 .vlist { position: relative; contain: layout; }
 .vlist-row, .vlist-header { position: absolute; top: 0; left: 0; right: 0; }
 .vlist-header { z-index: 1; }
+/* Placeholder rows under a package list: a fast fling can outrun drawing the real rows (they're placed once a frame),
+   so the gap shows rows still loading instead of blank space. The real rows cover them; the list is only as tall
+   as its items, so they stop where the list ends. */
+.pkg-vlist {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='58'%3E%3Cg fill='%23808080'%3E%3Crect x='9' y='13' width='32' height='32' rx='7' fill-opacity='.22'/%3E%3Crect x='51' y='15' width='130' height='13' rx='4' fill-opacity='.2'/%3E%3Crect x='51' y='34' width='190' height='9' rx='3' fill-opacity='.13'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 260px 58px repeat-y,
+    linear-gradient(transparent 57px, var(--keyline) 57px) 0 0 / 100% 58px repeat-y, var(--plain);
+}
 .vlist-sticky { position: sticky; top: 0; z-index: 2; margin-bottom: -23px; } /* top: 0 is just under the nav: sticky offsets count from inside the scroller's padding */
 
 /* Package rows: 58px, the 32px icon, name in bold with the version beside it, the short description under. */

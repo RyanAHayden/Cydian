@@ -292,6 +292,7 @@ export function packageList(body, route, rows, { letters = true, decorate = null
     bindRow: (row, item) => { bindRow(row, item, route); decorate?.(row, item); },
     idle: loadIcon,
   });
+  list.el.classList.add("pkg-vlist"); // placeholder rows show through wherever real rows aren't drawn yet
   return list;
 }
 

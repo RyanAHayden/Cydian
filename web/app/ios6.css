@@ -169,6 +169,7 @@ html[data-theme="dark"] .bar-button.back:active, html[data-theme="dark"] .bar-bu
 }
 .group:first-child > .group-header { margin-top: 10px; }
 .group-footer {
+  overflow-wrap: anywhere; /* a long URL wraps instead of running off the screen */
   margin: 7px 9px 0; font-size: 15px; line-height: 19px; text-align: center;
   color: var(--head); text-shadow: var(--emboss);
 }

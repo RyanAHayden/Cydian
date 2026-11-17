@@ -8,7 +8,7 @@ commit it, so this is a remake: our own drawing with the same idea.
 - Looked at `ref/4s/Applications/Cydia.app/icon@2x.png` and `Icon-60@3x.png` for the era's style only. They are
   Apple CgBI PNGs, decoded locally with `tools/themecmp.py`'s `load()`, and nothing from them was committed. Their
   idea: a white ring and a white box drawn with brown lines, on a brown-tan gradient.
-- Drew `web/app/icons/icon.svg`, the one master, by hand. It has a **warm amber gradient** (#f6b25c → #d97a33 →
+- (First version, since redrawn: see below.) Drew `web/app/icons/icon.svg`, the one master, by hand. It has a **warm amber gradient** (#f6b25c → #d97a33 →
   #9a4518) with a soft glow behind the middle, and a white ring. Inside the ring is an **open shipping box** seen
   from the front: a dark inside, a back flap leaning away, side flaps folded out, a strip of tape and a label on
   the front, and a **down arrow dropping in** ("install"). It differs from Cydia's on purpose: no stack of small
@@ -36,6 +36,29 @@ commit it, so this is a remake: our own drawing with the same idea.
   - `home-header.png`: Home in headless Chromium at 2x, served from `web/app/`.
   - `home-screen.png`: a mock home screen at 3x, scaled to half. It shows the native @3x and the web 180 icons
     with iOS's rounded mask, beside placeholder apps.
+
+## Redraw: the classic colour and starburst (user direction, relayed by another session)
+
+After the first version landed, another session passed on the user's direction: make it like the original Cydia
+icon, with our own little download box, on the classic colour with the star pattern behind it. Keep the rest of
+F31. So the master's background changed (the box and arrow glyph stayed):
+
+- A warm brown radial base, with colours sampled from the 4S's Home screenshot (`ref/4s/screens/cydia-home.png`,
+  icon at x 50-168, y 150-268 @2x): #442213 at the edges, rising to about #8e5a46 at the middle.
+- A starburst: 138 thin wedges of #a37060 from the centre, each 0.5-2.2° wide with 0.4-2.2° gaps and opacity
+  0.2-0.75. They fade towards the corners under a radial mask, with a lighter glow at the centre. I laid them out
+  once with Python (`random.Random(31)`) and wrote them into the SVG as plain paths, so the master stands alone.
+- The white ring is a little thinner (40). The glyph's lines and the inside of the box use the same browns.
+- The flat master has no glossy top band. iOS 7+ takes it flat, as the brief says. The band is in the glossy
+  variant: `tools/icons.sh`'s gloss is now stronger (0.62 → 0.18) with a flatter, higher lower edge, like the
+  4S's.
+- I didn't redraw Cydia's stacked boxes: the glyph is our open box with the arrow going in. The starburst is
+  drawn from scratch and not traced: the rays are random, not Cydia's.
+- The screenshots were taken again for the new art. `glossy-and-flat.png` shows the glossy variant beside the
+  flat master. While comparing, I placed a crop of Cydia's icon next to ours but didn't commit that image,
+  because AGENTS.md forbids committing Cydia's logo.
+- The colours and the starburst-in-a-ring layout are now close to Cydia's on purpose (the user asked for that).
+  The glyph and every path are ours. If the trademark ever matters, the glyph is what tells the two apart.
 
 ## Decisions
 

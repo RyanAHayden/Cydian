@@ -24,14 +24,14 @@ master=$dir/icon.svg
   echo '  <defs>'
   echo '    <clipPath id="ios6-mask"><rect width="1024" height="1024" rx="180" ry="180"/></clipPath>'
   echo '    <linearGradient id="ios6-gloss" x1="0" y1="0" x2="0" y2="1">'
-  echo '      <stop offset="0" stop-color="#fff" stop-opacity="0.55"/>'
-  echo '      <stop offset="1" stop-color="#fff" stop-opacity="0.12"/>'
+  echo '      <stop offset="0" stop-color="#fff" stop-opacity="0.62"/>'
+  echo '      <stop offset="1" stop-color="#fff" stop-opacity="0.18"/>'
   echo '    </linearGradient>'
   echo '  </defs>'
   echo '  <g clip-path="url(#ios6-mask)">'
   # the master between its <svg> tags, comments dropped
   perl -0pe 's/<!--.*?-->\n?//gs; s/^.*?<svg[^>]*>\n//s; s/<\/svg>.*//s' "$master"
-  echo '    <path d="M0 0 H1024 V470 C800 540 224 540 0 470 Z" fill="url(#ios6-gloss)"/>'
+  echo '    <path d="M0 0 H1024 V440 C760 500 264 500 0 440 Z" fill="url(#ios6-gloss)"/>'
   echo '  </g>'
   echo '</svg>'
 } > "$dir/icon-glossy.svg"

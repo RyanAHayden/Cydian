@@ -10,3 +10,8 @@ Work is planned in `plan/TODO.md` and run with [agent-runner](https://github.com
 `tmux new -s cydian agent-runner run 3`.
 
 Not affiliated with Cydia or SaurikIT. No Apple or Cydia artwork is included; the look is redrawn in CSS.
+
+## License
+
+GPL-3.0-or-later (see `LICENSE`). Anyone who distributes Cydian or a modified version has to release the
+source under the same license.

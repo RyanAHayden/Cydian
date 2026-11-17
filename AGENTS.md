@@ -24,4 +24,5 @@ Shortcuts recipes live in `docs/shortcuts.md`.
 - The iPhone 4S (iOS 6, jailbroken) is the test device: `ssh 4s` (see R1). Only touch it when your task says so.
   Never run `apt-get upgrade`, `dpkg -i` or `rm` on it unless the task says so. It can't be re-jailbroken
   easily.
+- License: GPL-3.0-or-later. Code taken from GPLv3 projects (Cydia) is fine; never copy code under a license GPLv3 can't include.
 - Write findings worth keeping to `journal/<ID>/notes.md`.

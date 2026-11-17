@@ -1,5 +1,5 @@
-/* AltStore sources (F9, screens/altstore.js): the source page in the source's tint, news cards, screenshots and
-   the version history. --alt-tint comes from the source's (or app's, or news item's) tintColor, hex only. */
+/* AltStore sources (F9, screens/altstore.js): the source page in the source's tint, news cards and screenshots
+   (the version history has its own page, F29). --alt-tint comes from the source's (or app's, or news item's) tintColor, hex only. */
 .alt-source, .alt-app { --alt-tint: var(--detail); }
 
 .alt-header { position: relative; margin: 10px 10px 0; border-radius: 10px; overflow: hidden; background: var(--alt-tint, #385487); min-height: 96px; }
@@ -28,7 +28,3 @@
 .alt-shots { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
 .alt-shot { flex: none; height: 360px; aspect-ratio: 9 / 19.5; object-fit: cover; border-radius: 10px; scroll-snap-align: start;
   border: 1px solid rgba(0,0,0,.2); background: rgba(0,0,0,.05); }
-
-.alt-history-item { display: block; padding: 9px 10px; }
-.alt-history-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.alt-history-notes { margin: 4px 0 0; font-size: 14px; line-height: 18px; color: var(--subtitle); white-space: pre-wrap; overflow-wrap: anywhere; }

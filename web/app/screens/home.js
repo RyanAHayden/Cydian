@@ -69,7 +69,7 @@ export function nav(route, ctx) {
 async function showAbout(ctx) {
   await ctx.showAlert({
     title: "About Cydian",
-    message: "Version 0.1\nFree and open source (GPL-3.0)\n\nA package manager with the\niOS 6 look, for modern iPhones\ngithub.com/RyanAHayden/Cydian",
+    message: "Version 0.1\nFree and open source (GPL-3.0)\n\nA package manager with the\niOS 6 look, for modern iPhones\ngithub.com/RyanAHayden/Cydian\n\nInspired by Cydia by Jay Freeman (saurik).\nNot affiliated with Cydia or SaurikIT.",
     buttons: ["Close"],
   });
 }
@@ -158,7 +158,9 @@ function renderRoot(body) {
   const home = el("div", "home");
   const head = el("div", "home-head");
   const icon = el("img", "home-icon");
-  icon.src = "icons/icon-glossy.svg";
+  icon.src = "icons/icon-glossy-76.png";
+  icon.srcset = "icons/icon-glossy-76.png 1x, icons/icon-glossy-152.png 2x, icons/icon-glossy-228.png 3x";
+  icon.width = icon.height = 76;
   icon.alt = "";
   const words = el("div", "home-words");
   words.append(el("h2", "home-title", "Welcome to Cydian"));
@@ -169,8 +171,14 @@ function renderRoot(body) {
   who.rel = "noopener";
   by.append(who);
   words.append(by);
-  // A nod to the original, without claiming any link to it.
-  words.append(el("p", "home-honor", "In honor of Jay Freeman (saurik) · not affiliated"));
+  // A nod to the original, in the by-line's own style (the "not affiliated" note is in About).
+  const nod = el("p", "home-by home-nod", "inspired by ");
+  const cydia = el("a", null, "saurik's Cydia");
+  cydia.href = "https://cydia.saurik.com/";
+  cydia.target = "_blank";
+  cydia.rel = "noopener";
+  nod.append(cydia);
+  words.append(nod);
   head.append(icon, words);
 
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));

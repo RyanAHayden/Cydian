@@ -13,9 +13,9 @@ SIZES = {
     HERE / "icon-180.png": 180,
     HERE / "icon-192.png": 192,
     HERE / "icon-512.png": 512,
-    HERE / "icon-glossy-58.png": 58,
-    HERE / "icon-glossy-116.png": 116,
-    HERE / "icon-glossy-174.png": 174,
+    HERE / "icon-glossy-76.png": 76,
+    HERE / "icon-glossy-152.png": 152,
+    HERE / "icon-glossy-228.png": 228,
     ROOT / "native/icon/AppIcon60x60.png": 60,
     ROOT / "native/icon/AppIcon60x60@2x.png": 120,
     ROOT / "native/icon/AppIcon60x60@3x.png": 180,
@@ -62,7 +62,7 @@ class Icons(unittest.TestCase):
         for s in srcs:
             self.assertTrue((app / s).is_file(), s)
         self.assertIn('href="icons/icon-180.png"', (app / "index.html").read_text())
-        self.assertIn('"icons/icon-glossy.svg"', (app / "screens/home.js").read_text())
+        self.assertIn('"icons/icon-glossy-76.png"', (app / "screens/home.js").read_text())  # Home header: 1x/2x/3x PNGs
 
 
 if __name__ == "__main__":

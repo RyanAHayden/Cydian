@@ -6,7 +6,7 @@
 #   web/app/icons/icon-glossy.svg       the iOS 6 variant for places inside the app (Home header): the master with
 #                                       iOS 6's rounded corners and gloss baked in
 #   web/app/icons/icon-{180,192,512}.png  apple-touch-icon (180) and the web manifest (192, 512), flat
-#   web/app/icons/icon-glossy-{58,116,174}.png  the glossy variant at the Home header's 58pt, 1x/2x/3x
+#   web/app/icons/icon-glossy-{76,152,228}.png  the glossy variant at the Home header's 76pt, 1x/2x/3x
 #   native/icon/AppIcon60x60{,@2x,@3x}.png  the native app's home-screen icon (60/120/180), flat
 #
 # Needs rsvg-convert (librsvg). Run it after editing the master and commit what it writes.
@@ -48,7 +48,9 @@ python3 -I -c 'import base64,sys; t=open(sys.argv[1]).read(); b=base64.b64encode
 png() { rsvg-convert -w "$2" -h "$2" "$1" -o "$3"; }
 
 for n in 180 192 512; do png "$master" "$n" "$dir/icon-$n.png"; done
-for n in 58 116 174; do png "$dir/icon-glossy.svg" "$n" "$dir/icon-glossy-$n.png"; done
+# The Home header shows the glossy icon at 76pt: PNGs at 1x/2x/3x (Safari can draw an SVG <img> with an embedded
+# picture at low resolution, which looked blurry and smeared on the phone).
+for n in 76 152 228; do png "$dir/icon-glossy.svg" "$n" "$dir/icon-glossy-$n.png"; done
 png "$master" 60 native/icon/AppIcon60x60.png
 png "$master" 120 native/icon/AppIcon60x60@2x.png
 png "$master" 180 native/icon/AppIcon60x60@3x.png

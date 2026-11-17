@@ -288,3 +288,56 @@ test("F37: Not Jailbroken shows AltStore sources only; a jailbroken type shows t
   assert.deepEqual(sourcesFor(list, "iphoneos-arm"), { shown: list, hidden: 0 });
   assert.deepEqual(sourcesFor(null, "none"), { shown: [], hidden: 0 });
 });
+
+// ---- F48: dist repos ----------------------------------------------------------------------------------------
+
+test("add a dist repo: Release under dists/<suite>/, components counted, key deb:<uri>:<suite>", async () => {
+  const base = "https://apt.example.com/dists/1800/";
+  const b = fakeBackend({
+    [base + "Release"]: "Origin: Example APT\nSuite: 1800\nComponents: main extra\nArchitectures: iphoneos-arm64\n",
+    [base + "main/binary-iphoneos-arm64/Packages.xz"]: PACKAGES,
+  });
+  const s = await verifySource(b, { uri: "apt.example.com", dist: "1800", components: ["main"] });
+  assert.equal(s.key, "deb:https://apt.example.com/:1800");
+  assert.deepEqual([s.uri, s.dist, s.components], ["https://apt.example.com/", "1800", ["main"]]);
+  assert.equal(s.count, 3);
+  assert.equal(s.origin, "Example APT");
+  assert.equal(s.error, undefined);
+});
+
+test("add a dist repo with no components: the Release's Components", async () => {
+  const base = "https://apt.example.com/dists/stable/";
+  const b = fakeBackend({
+    [base + "InRelease"]: "Origin: X\nComponents: main\n",
+    [base + "main/binary-iphoneos-arm64/Packages"]: PACKAGES,
+  });
+  const s = await verifySource(b, { uri: "https://apt.example.com/", dist: "stable", components: [] });
+  assert.deepEqual(s.components, ["main"]);
+  assert.equal(s.count, 3);
+});
+
+test("add a dist repo whose Release leaves our architecture out: added with count 0", async () => {
+  const b = fakeBackend({ "http://apt.saurik.com/dists/ios/1800.00/Release": "Origin: Telesphoreo\nArchitectures: iphoneos-arm\nComponents: main\n" });
+  const s = await verifySource(b, { uri: "http://apt.saurik.com/", dist: "ios/1800.00", components: ["main"] });
+  assert.equal(s.count, 0);
+  assert.equal(s.key, "deb:http://apt.saurik.com/:ios/1800.00");
+});
+
+test("add a dist repo: no Release, a wrong component, a bad suite, a flat dist", async () => {
+  await assert.rejects(verifySource(fakeBackend({}), { uri: "https://r.example/", dist: "stable", components: ["main"] }),
+    { kind: "not_repository" });
+  const html = fakeBackend({ "https://r.example/dists/stable/Release": "<html>" });
+  await assert.rejects(verifySource(html, { uri: "https://r.example/", dist: "stable", components: ["main"] }), { kind: "not_repository" });
+  const rel = fakeBackend({ "https://r.example/dists/stable/Release": "Origin: R\nComponents: main\n" });
+  await assert.rejects(verifySource(rel, { uri: "https://r.example/", dist: "stable", components: ["nope"] }), { kind: "verification" });
+  const none = fakeBackend({ "https://r.example/dists/stable/Release": "Origin: R\n" });
+  await assert.rejects(verifySource(none, { uri: "https://r.example/", dist: "stable" }), { kind: "verification" });
+  for (const dist of ["../x", "a b", "/abs", "stable/../.."]) {
+    await assert.rejects(verifySource(rel, { uri: "https://r.example/", dist, components: ["main"] }), { kind: "invalid_url" }, dist);
+  }
+  await assert.rejects(verifySource(rel, { uri: "https://r.example/", dist: "stable", components: ["../main"] }), { kind: "invalid_url" });
+  await assert.rejects(verifySource(rel, { uri: "ftp://r.example/", dist: "stable", components: ["main"] }), { kind: "invalid_url" });
+  // "./" is a flat repo: the usual check
+  const flat = fakeBackend({ "https://f.example/Packages": PACKAGES });
+  assert.equal((await verifySource(flat, { uri: "https://f.example/", dist: "./", components: [] })).key, "deb:https://f.example/:./");
+});

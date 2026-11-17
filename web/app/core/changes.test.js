@@ -115,3 +115,88 @@ test("changes: duplicate triples in one refresh make one record; unrecorded rows
 test("changes: no IndexedDB is a rejection, not a throw", async () => {
   await assert.rejects(openSeenStore({ indexedDB: null }), /not available/);
 });
+
+// ---- F51: by day, the last 7 days ----
+import { dayGroups, dayTitle, dayOf, filterRows, filterGroups, defaultScope, WINDOW_DAYS } from "./changes.js";
+import { installedIds } from "./installed.js";
+
+const at = (d, h = 12) => new Date(2026, 10, d, h).getTime(); // November 2026, local time
+const rec = (id, version, first, date) => ({ k: recordKey("r1", id, version), key: "r1", id, version, first, ...(date != null ? { date } : {}) });
+
+test("changes by day: one group per local day, newest first; the first load is left out, later refreshes count", () => {
+  const now = at(17, 15);
+  const records = [
+    rec("old", "1", at(1, 9)), rec("a", "1", at(1, 9)), // the first load (archive)
+    rec("a", "2", at(17, 8)),                          // a bumped this morning
+    rec("b", "1", at(17, 10)),                         // b new this morning
+    rec("c", "1", at(16, 23)),                         // c new late yesterday
+    rec("d", "1", at(16, 1)),                          // d early yesterday
+  ];
+  const rows = ["a", "b", "c", "d", "old"].map((id) => row(id, id === "a" ? "2" : "1"));
+  const groups = dayGroups(records, rows, { now });
+  assert.deepEqual(groups.map((g) => [g.day, g.rows.map((r) => `${r.id}:${r.change}`)]),
+    [[dayOf(now), ["b:new", "a:updated"]], [dayOf(at(16)), ["c:new", "d:new"]]]);
+  assert.equal(dayTitle(groups[0].day, now, "en-US"), "Today");
+  assert.equal(dayTitle(groups[1].day, now, "en-US"), "Yesterday");
+  assert.equal(dayTitle(at(14), now, "en-US"), "Saturday, November 14");
+});
+
+test("changes by day: only the last 7 days (today and 6 before), however many refreshes", () => {
+  const now = at(17, 15);
+  const records = [rec("base", "1", at(1)), ...[17, 16, 12, 11, 10, 9].map((d) => rec(`p${d}`, "1", at(d, 0)))];
+  const rows = [17, 16, 12, 11, 10, 9].map((d) => row(`p${d}`, "1"));
+  const groups = dayGroups(records, rows, { now });
+  assert.equal(WINDOW_DAYS, 7);
+  assert.deepEqual(groups.map((g) => g.rows[0].id), ["p17", "p16", "p12", "p11"]); // Nov 11 is day 7; 10 and 9 are out
+  assert.deepEqual(dayGroups(records, rows, { now, days: 1 }).map((g) => g.rows[0].id), ["p17"]);
+});
+
+test("changes by day: AltStore dates file a version under its own day, even on the first load", () => {
+  const now = at(17, 15);
+  const records = [
+    rec("apt", "1", at(17, 9)),                     // first load, undated: archive
+    rec("emu", "1.5", at(17, 9), at(14, 0)),        // dated: Saturday
+    rec("emu", "1.4", at(17, 9), at(2, 0)),         // its older version: so 1.5 is an update
+    rec("fresh", "1", at(17, 9), at(17, 1)),
+    rec("ancient", "1", at(17, 9), at(1, 0)),       // dated outside the window
+    rec("future", "1", at(17, 9), at(20, 0)),       // a source dated ahead: today
+  ];
+  const rows = [row("apt", "1"), row("emu", "1.5"), row("fresh", "1"), row("ancient", "1"), row("future", "1")];
+  const groups = dayGroups(records, rows, { now });
+  assert.deepEqual(groups.map((g) => [dayTitle(g.day, now, "en-US"), g.rows.map((r) => `${r.id}:${r.change}`)]),
+    [["Today", ["future:new", "fresh:new"]], ["Saturday, November 14", ["emu:updated"]]]);
+});
+
+test("changes by day: refreshes file AltStore dates, and date a record filed before dates were kept", async () => {
+  const store = await openSeenStore({ indexedDB: fakeIndexedDB(), name: "f51" });
+  assert.equal(await recordRefresh(store, [["r1", "a", "1"], ["alt:x", "emu", "1.5", at(14)]], at(17)), 2);
+  assert.equal((await store.all()).find((r) => r.id === "emu").date, at(14));
+  assert.equal(await recordRefresh(store, [["r1", "a", "1"], ["alt:x", "emu", "1.5", at(14)]], at(17, 13)), 0);
+  assert.equal(await recordRefresh(store, [["r1", "a", "1", at(10)]], at(17, 14)), 1); // undated record gets its date
+  const a = (await store.all()).find((r) => r.id === "a");
+  assert.deepEqual([a.first, a.date], [at(17), at(10)]);
+});
+
+test("changes filters: search matches name, id, description and author, every word; scope Installed", () => {
+  const rows = [
+    { id: "com.a.bar", name: "Barrel", short: "page effects", author: "Aaron" },
+    { id: "com.b.zep", name: "Zeppelin", short: "carrier logo", author: "Alex" },
+  ];
+  const ids = (o) => filterRows(rows, o).map((r) => r.id);
+  assert.deepEqual(ids({ query: "" }), ["com.a.bar", "com.b.zep"]);
+  assert.deepEqual(ids({ query: "barr" }), ["com.a.bar"]);
+  assert.deepEqual(ids({ query: "COM.B" }), ["com.b.zep"]);
+  assert.deepEqual(ids({ query: "carrier alex" }), ["com.b.zep"]);
+  assert.deepEqual(ids({ query: "carrier aaron" }), []);
+  assert.deepEqual(ids({ scope: "installed", installed: new Set(["com.b.zep"]) }), ["com.b.zep"]);
+  assert.deepEqual(ids({ scope: "installed" }), []);
+  assert.deepEqual(filterGroups([{ day: 1, rows }, { day: 0, rows: [rows[0]] }], { query: "zep" }).map((g) => g.day), [1]);
+});
+
+test("changes default scope: Installed with dpkg packages or recorded apps, All with nothing installed", () => {
+  assert.equal(defaultScope(installedIds(null, []).size), "all");
+  assert.equal(defaultScope(installedIds([], undefined).size), "all");
+  assert.equal(defaultScope(installedIds([{ id: "bash" }], []).size), "installed");
+  assert.equal(defaultScope(installedIds(null, [{ id: "com.delta" }]).size), "installed");
+  assert.deepEqual([...installedIds([{ id: "a" }], [{ id: "a" }, { id: "b" }])], ["a", "b"]);
+});

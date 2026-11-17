@@ -28,25 +28,21 @@
 }
 .alert-buttons { position: relative; display: flex; gap: 8px; margin-top: 4px; }
 .alert-buttons.stacked { flex-direction: column; }
-/* Alert buttons from the 4S's UIKit art (UIPopupAlertSheetButton, ...DefaultButton, ...ButtonPress) by way of
-   sidedrop's, which the user picked (2026-11-17): white-to-clear glosses over the alert's navy, no highlight lines.
-   background-origin: border-box after every background, or the gradient tiles into the see-through border and its
-   bright top shows as a line at the bottom. */
+/* Alert buttons as Cydia's UIAlertView draws them on the 4S (ref/4s/screens/cydia-about.png, sampled): opaque greys
+   over the navy, a gloss split at half, a dark edge, no white line on top or below. These are the kit's "Button
+   (continue)" values, which match the device. background-origin: border-box after every background. */
 .alert-button {
-  flex: 1; min-width: 0; height: 43px; padding: 0 6px; border-radius: 6px; cursor: pointer;
-  font-size: 16px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.5);
+  flex: 1; min-width: 0; height: 43px; padding: 0 6px; border-radius: 5px; cursor: pointer;
+  font-size: 18px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  border: 1px solid rgba(0,0,0,.3); box-shadow: none;
-  background: linear-gradient(rgba(255,255,255,.81), rgba(255,255,255,.3) 50%, rgba(255,255,255,.2) 50%, rgba(255,255,255,.3));
-  background-origin: border-box;
+  border: 1px solid rgba(19,29,57,.9); box-shadow: none;
+  background: linear-gradient(#b4b9c8, #5f6882 49%, #596484 51%, #4d597a); background-origin: border-box;
 }
-.alert-button.cancel {
-  background: linear-gradient(rgba(255,255,255,.62), rgba(255,255,255,.1) 50%, rgba(255,255,255,0) 50%, rgba(255,255,255,.1));
-  background-origin: border-box;
+.alert-button.cancel { /* "Button (Cancel)": darker */
+  background: linear-gradient(#707a91, #283659 49%, #0b1b43 50%, #182747); background-origin: border-box;
 }
 .alert-button:active, .alert-button.is-pressed {
-  background: linear-gradient(rgba(185,185,185,.82), rgba(62,62,62,.61) 50%, rgba(3,3,3,.61) 50%, rgba(24,24,24,.57));
-  background-origin: border-box;
+  background: linear-gradient(#6d7da3, #3c4e7d 49%, #22325e 51%, #2f3f6c); background-origin: border-box;
 }
 
 /* ---- Done: "Button (Gloss Blue)" ---- */

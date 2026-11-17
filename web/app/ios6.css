@@ -4,8 +4,8 @@
 
 :root {
   color-scheme: light;
-  --pin-dark: #c9ced8;  /* "Stripe (light grey)" bitmap: 2.5px dark, 5.5px light, 8px period */
-  --pin-light: #ccd1da;
+  --pin-dark: #cbd0da;  /* 2.5px dark, 5.5px light, 8px period; colours sampled from Cydia on the 4S */
+  --pin-light: #ced3dc;
   --head: #4c566c;      /* "Table Label" */
   --emboss: 0 1px 0 rgba(255,255,255,.75); /* its white emboss under the label */
   --detail: #385487;
@@ -54,10 +54,9 @@ body { color: var(--text); background: #000; }
 /* ---- Nav bar: "Menu Bar (Blue)" and, under the notch, "Status Bar (Blue)" ---- */
 .navbar {
   background:
-    linear-gradient(#3f5b7f, #3f5b7f) bottom / 100% 1px no-repeat,              /* bottom dark shadow */
-    linear-gradient(rgba(255,255,255,.6) 50%, rgba(255,255,255,.35) 50%)        /* top highlight, 1px */
-      0 env(safe-area-inset-top) / 100% 1px no-repeat,
-    linear-gradient(#bdcbdd, #577397) bottom / 100% 44px no-repeat,              /* background */
+    linear-gradient(#2d3642, #2d3642) bottom / 100% 1px no-repeat,              /* bottom edge */
+    linear-gradient(#eff2f7, #eff2f7) 0 env(safe-area-inset-top) / 100% 1px no-repeat, /* top highlight, 1px */
+    linear-gradient(#bdcbdc, #597498) bottom / 100% 44px no-repeat,              /* background: Cydia on the 4S */
     linear-gradient(#4f698b, #3f5b7f);                                           /* status bar */
 }
 .navbar::after { /* Shadow: 2.5px of black at 18% fading down over the screen */
@@ -299,3 +298,7 @@ html.no-zoom, html.no-zoom body { touch-action: pan-x pan-y; }
 .scroll-indicator.on { opacity: 1; pointer-events: auto; }
 .scroll-indicator::before { content: ""; position: absolute; inset: -12px -2px -12px -26px; } /* a finger-sized grab area */
 .scroll-indicator.grab { width: 7px; right: 1px; border-radius: 4px; }
+
+/* Short pages still rubber-band like iOS: a scroller only bounces when it can scroll, so every page is at least
+   1px taller than its box. */
+.page-body > :first-child { min-height: calc(100% + 1px); }

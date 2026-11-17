@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   parseControl, description, parseRelations, stripClearsign, parseRelease, repoLayout, parseSourceLine,
   resolveFilename, resolveIcon, isLocalUrl, parsePackages, parseVersion, compareVersions, satisfies,
+  matchesArch, filterArch, DEFAULT_ARCH,
 } from "./apt.js";
 import { handle, reply } from "./worker.js";
 import { createParser } from "./parser.js";
@@ -100,12 +101,12 @@ test("repo layout: flat and dist", () => {
     packages: ["https://repo.example/cydia/Packages"],
   });
   assert.equal(repoLayout({ uri: "https://repo.example/" }).release, "https://repo.example/Release");
-  const d = repoLayout("deb http://apt.saurik.com/ ios/793.00 main");
+  const d = repoLayout("deb http://apt.saurik.com/ ios/793.00 main", "iphoneos-arm");
   assert.equal(d.flat, false);
   assert.equal(d.root, "http://apt.saurik.com/");
   assert.equal(d.release, "http://apt.saurik.com/dists/ios/793.00/Release");
   assert.deepEqual(d.packages, ["http://apt.saurik.com/dists/ios/793.00/main/binary-iphoneos-arm/Packages"]);
-  assert.deepEqual(repoLayout("deb https://r.example/x stable main extra", "iphoneos-arm64").packages, [
+  assert.deepEqual(repoLayout("deb https://r.example/x stable main extra").packages, [ // rootless by default
     "https://r.example/x/dists/stable/main/binary-iphoneos-arm64/Packages",
     "https://r.example/x/dists/stable/extra/binary-iphoneos-arm64/Packages",
   ]);
@@ -263,4 +264,13 @@ test("parser: falls back to parsing inline without Worker", async () => {
   const broken = createParser({ Worker: class { constructor() { throw new Error("no module workers"); } } });
   assert.ok(!broken.inWorker);
   assert.equal((await broken.release("Origin: o\n")).origin, "o");
+});
+
+test("architecture filter: rootless by default, plus all; no Architecture is dropped", () => {
+  const st = parseControl("Package: a\nArchitecture: iphoneos-arm64\n\nPackage: b\nArchitecture: iphoneos-arm\n\n"
+    + "Package: c\nArchitecture: all\n\nPackage: d\n");
+  assert.equal(DEFAULT_ARCH, "iphoneos-arm64");
+  assert.deepEqual(filterArch(st).map((p) => p.package), ["a", "c"]);
+  assert.deepEqual(filterArch(st, "iphoneos-arm").map((p) => p.package), ["b", "c"]);
+  assert.equal(matchesArch({}), false);
 });

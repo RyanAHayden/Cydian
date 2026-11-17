@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Cydian app icon: an open parcel on iOS 6 nav-bar blue. Original artwork; iOS masks the corners. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8aa4c8"/>
+      <stop offset="0.5" stop-color="#5c7aa3"/>
+      <stop offset="1" stop-color="#3a557c"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f6fa"/>
+      <stop offset="1" stop-color="#cfd8e6"/>
+    </linearGradient>
+    <linearGradient id="right" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dfe6f0"/>
+      <stop offset="1" stop-color="#aebcd2"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <g stroke="#2c4566" stroke-width="14" stroke-linejoin="round">
+    <!-- box: left face, right face, open top -->
+    <path d="M232 400 L512 532 L512 852 L232 720 Z" fill="url(#left)"/>
+    <path d="M792 400 L512 532 L512 852 L792 720 Z" fill="url(#right)"/>
+    <path d="M232 400 L512 268 L792 400 L512 532 Z" fill="#33507a"/>
+    <!-- flaps -->
+    <path d="M232 400 L132 308 L412 176 L512 268 Z" fill="#e9eef5"/>
+    <path d="M792 400 L892 308 L612 176 L512 268 Z" fill="#d3dcea"/>
+  </g>
+  <!-- arrow going in -->
+  <path d="M452 140 H572 V330 H652 L512 470 L372 330 H452 Z" fill="#fff" stroke="#2c4566" stroke-width="14" stroke-linejoin="round"/>
+  <path d="M0 0 H1024 V430 Q512 560 0 430 Z" fill="url(#gloss)"/>
+</svg>

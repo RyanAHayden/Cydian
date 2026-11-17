@@ -1,4 +1,4 @@
-"""Cydian's web server. Thin: serves the shared frontend in web/app/ and the SSRF-safe fetch proxy (push later)."""
+"""Cydian's web server. Thin: serves the shared frontend in web/app/, the SSRF-safe fetch proxy, and Web Push (push.py)."""
 import os
 from pathlib import Path
 from urllib.parse import quote
@@ -6,6 +6,7 @@ from urllib.parse import quote
 from flask import Flask, jsonify, request, send_from_directory
 
 import fetch
+import push
 
 APP_DIR = Path(__file__).resolve().parent / "app"
 
@@ -22,6 +23,8 @@ rate_limiter = fetch.RateLimiter(rate=int(os.environ.get("CYDIAN_FETCH_RATE", "6
 # Assets (icons, depictions, screenshots, .debs: any fetch without kind=packages) get their own, larger bucket, so a
 # page of http icons can't starve Packages refreshes and a refresh can't blank the icons (B3).
 asset_limiter = fetch.RateLimiter(rate=int(os.environ.get("CYDIAN_ASSET_RATE", "300")), per=60.0)
+# Upgrade alerts (F10): /api/push/* and the private feed /feed/<token>; the daily check is `python push.py daemon`.
+app.register_blueprint(push.create_blueprint(fetcher, packages_cache))
 
 ERROR_STATUS = {"bad_url": 400, "refused": 403, "too_large": 502, "timeout": 504, "upstream": 502,
                 "not_found": 404, "network": 502}

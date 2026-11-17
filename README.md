@@ -22,6 +22,14 @@ Not affiliated with Cydia or SaurikIT. No Apple or Cydia artwork is included; th
   | --- | --- | --- |
   | `CYDIAN_PROXY_HOPS` | `0` | Number of proxies in front of the app. Set it to `1` behind Cloudflare Tunnel, or every visitor shares one rate-limit bucket (the server would see the tunnel's address) |
   | `CYDIAN_FETCH_RATE` | `60` | Repo fetches per visitor per minute |
+  | `CYDIAN_PUSH_HOUR` | `16` | Hour (UTC) of the daily upgrade check and push (`cydian-push` service, `web/push.py`) |
+  | `CYDIAN_VAPID_SUBJECT` | the site's origin | The `sub` push services see in the VAPID token (`https://…` or `mailto:…`) |
+  | `CYDIAN_PUSH_MAX` | `10000` | Most opted-in subscribers the server keeps |
+  | `CYDIAN_PUSH_EXPIRE_DAYS` | `180` | A subscriber whose Cydian hasn't been opened this long is deleted |
+
+  Upgrade alerts (F10) keep their SQLite file and VAPID key in the `cydian-data` volume. The key is made on first
+  use; losing it means every subscriber has to turn alerts off and on again. Run a check by hand with
+  `docker compose -p cydian exec cydian-push python push.py run`.
 
 ## Deploy (TrueNAS + Cloudflare Tunnel)
 

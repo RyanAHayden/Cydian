@@ -4,8 +4,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends nodejs && rm -r
 WORKDIR /app
 COPY web/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY web/app.py web/fetch.py ./
+COPY web/app.py web/fetch.py web/push.py web/push.mjs ./
 COPY web/app ./app
+# Push subscribers and the VAPID key (F10) live here; compose mounts a volume, which takes this owner.
+RUN mkdir /data && chown 568:568 /data
+ENV CYDIAN_DATA=/data
 USER 568:568
 EXPOSE 8080
 HEALTHCHECK CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"

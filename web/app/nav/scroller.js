@@ -21,13 +21,18 @@ export function initScroller(screens) {
     const th = Math.max(36, track * body.clientHeight / body.scrollHeight);
     return { top: r.top + 3, track, h, th };
   };
+  // Like UIScrollView: a page that fits on screen still shows a full-length indicator while it bounces, and pulling
+  // past either end squashes the indicator against that end.
   const draw = () => {
     if (!body || !body.isConnected) return;
     const m = geom();
-    if (m.h <= 1) return;
-    const y = Math.min(Math.max(body.scrollTop / m.h, 0), 1);
-    sb.style.height = m.th + "px";
-    sb.style.transform = `translateY(${m.top + (m.track - m.th) * y}px)`;
+    const top = body.scrollTop;
+    const over = top < 0 ? -top : top > m.h ? top - m.h : 0;
+    const base = m.h <= 1 ? m.track : m.th;
+    const th = Math.max(7, base - over);
+    const y = m.h <= 1 ? (top > 0 ? 1 : 0) : Math.min(Math.max(top / m.h, 0), 1);
+    sb.style.height = th + "px";
+    sb.style.transform = `translateY(${m.top + (m.track - th) * y}px)`;
     sb.classList.add("on");
     clearTimeout(hideTimer);
     if (grab === null) hideTimer = setTimeout(() => sb.classList.remove("on"), 600);
@@ -52,6 +57,7 @@ export function initScroller(screens) {
   sb.addEventListener("pointermove", (e) => {
     if (grab === null || !body) return;
     const m = geom();
+    if (m.h <= 1) return; // nothing to scrub on a page that fits
     body.scrollTop = (e.clientY - grab - m.top) / (m.track - m.th) * m.h;
   });
   const end = () => {

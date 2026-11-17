@@ -66,6 +66,13 @@ class Helper(unittest.TestCase):
         self.assertEqual(self.plan("configure"), ["/var/jb/usr/bin/dpkg", "dpkg", "--force-confdef",
                                                   "--force-confold", "--status-fd", "3", "--configure", "-a"])
 
+    def test_hold_unhold_showhold(self):
+        """F22: apt-mark, with no status fd and nothing but the verb and the names."""
+        self.assertEqual(self.plan("hold", "com.a.b", "libstdc++"),
+                         ["/var/jb/usr/bin/apt-mark", "apt-mark", "hold", "com.a.b", "libstdc++"])
+        self.assertEqual(self.plan("unhold", "com.a.b", fd="-1"), ["/var/jb/usr/bin/apt-mark", "apt-mark", "unhold", "com.a.b"])
+        self.assertEqual(self.plan("showhold"), ["/var/jb/usr/bin/apt-mark", "apt-mark", "showhold"])
+
     def test_refusals(self):
         cases = {
             (): "no verb",
@@ -74,6 +81,14 @@ class Helper(unittest.TestCase):
             ("Update",): "unknown verb",
             ("purge", "ab"): "unknown verb",
             ("clean",): "unknown verb",
+            ("markauto", "ab"): "unknown verb",
+            ("Hold", "ab"): "unknown verb",
+            ("showhold", "ab"): "takes no arguments",
+            ("hold",): "no package names",
+            ("unhold",): "no package names",
+            ("hold", "-o", "Dir::Etc=/tmp"): "bad package name",
+            ("hold", "ab", "--file=/tmp/x"): "bad package name",
+            ("unhold", "a*"): "bad package name",
             ("update", "ab"): "takes no arguments",
             ("upgrade", "-y"): "takes no arguments",
             ("configure", "-a"): "takes no arguments",
@@ -120,6 +135,11 @@ class Helper(unittest.TestCase):
         self.assertEqual(k("install", "only.in.release"), "only.in.release")  # only *_Packages files
         self.assertEqual(k("remove", "installed.one", "half"), "all known")
         self.assertEqual(k("remove", "com.repo.tweak"), "com.repo.tweak")  # not installed
+        self.assertEqual(k("hold", "installed.one", "libstdc++"), "all known")
+        self.assertEqual(k("unhold", "half"), "all known")
+        self.assertEqual(k("hold", "com.repo.tweak"), "com.repo.tweak")  # not installed: dpkg's status only
+        self.assertEqual(k("unhold", "installed"), "installed")  # no prefix match
+        self.assertEqual(k("showhold"), "all known")
         self.assertEqual(k("update"), "all known")
         empty = tempfile.mkdtemp(dir=self.tmp)
         self.assertEqual(self.run_driver("known", empty, "install", "ab")[0], "ab")
@@ -150,7 +170,7 @@ class Helper(unittest.TestCase):
         os.makedirs(os.path.join(p, "usr/bin"))
         app = os.path.join(p, "Applications/Cydian.app/Cydian")
         shutil.copy(self.driver, app)
-        for tool in ("apt-get", "dpkg"):
+        for tool in ("apt-get", "apt-mark", "dpkg"):
             path = os.path.join(p, "usr/bin", tool)
             with open(path, "w") as f:
                 f.write('#!/bin/sh\necho "argv: $0 $*"\necho "cwd: $(pwd)"\necho "env: $(env | sort | tr \'\\n\' \' \')"\n'
@@ -183,6 +203,16 @@ class Helper(unittest.TestCase):
         out = self.run_driver("spawn", helper, "configure", driver=app)
         self.assertIn(f"1: argv: {p}/usr/bin/dpkg --force-confdef --force-confold --status-fd 3 --configure -a", out)
 
+    def test_chain_holds(self):
+        p, app, helper = self.chain_prefix()
+        out = self.run_driver("spawn", helper, "hold", "installed.one", driver=app)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-mark hold installed.one", out)
+        self.assertEqual(out[-1], "exit: 7")
+        out = self.run_driver("spawn", helper, "unhold", "installed.one", "libstdc++", driver=app)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-mark unhold installed.one libstdc++", out)
+        out = self.run_driver("spawn", helper, "showhold", driver=app)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-mark showhold", out)
+
     def test_chain_refuses(self):
         p, app, helper = self.chain_prefix()
         cases = [
@@ -190,6 +220,7 @@ class Helper(unittest.TestCase):
             (app, ["install", "com.repo"], "unknown package: com.repo", 64),
             (app, ["remove", "com.repo.tweak"], "unknown package: com.repo.tweak", 64),
             (app, ["shell"], "unknown verb", 64),
+            (app, ["hold", "com.repo.tweak"], "unknown package: com.repo.tweak", 64),  # in a list, not installed
             (self.driver, ["update"], "isn't Cydian", 77),  # same program, but not the file at the app's path
         ]
         for parent, words, msg, code in cases:

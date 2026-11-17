@@ -1,10 +1,12 @@
 /* cydian-helper: the one place Cydian's root work goes through (docs/native.md, "3. Root").
  *
  *   cydian-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
+ *   cydian-helper hold <pkg>... | unhold <pkg>... | showhold
  *
  * No setuid bit: Cydian spawns it as root with the persona spawn attributes (spawn.c), which the kernel allows
  * only because Cydian is signed with com.apple.private.persona-mgmt. Run by anything else it is plain mobile and
- * refuses. It runs exactly one of apt-get update|install|remove|upgrade or dpkg --configure -a from the rootless
+ * refuses. It runs exactly one of apt-get update|install|remove|upgrade, apt-mark hold|unhold|showhold or
+ * dpkg --configure -a from the rootless
  * prefix, with fixed options; the caller only picks the verb and package names ([a-z0-9][a-z0-9.+-]+, known to
  * dpkg or apt). If fd 3 is open, apt's/dpkg's status lines go there (pmstatus:pkg:percent:text); stdout and stderr
  * are apt's own. Exit: 64 refused arguments, 77 refused caller, 126 exec failed, else apt's/dpkg's status.

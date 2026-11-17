@@ -10,7 +10,7 @@ import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
-import { displayName, sourceIconUrls, sourcesFor } from "../core/sources.js";
+import { displayName, sourceIconUrls, sourcesFor, sourceFilter } from "../core/sources.js";
 import { settings } from "./settings.js";
 import { isAltKey } from "../core/altstore.js";
 
@@ -216,7 +216,7 @@ async function refresh(ctx) {
   state.busy = true;
   const hide = ctx.showHUD("Reloading Data");
   try {
-    await getBackend().refreshSources();
+    await getBackend().refreshSources(undefined, { filter: sourceFilter(settings.deviceType()) }); // F41: only what's shown
     state.sources = await getBackend().sources();
     draw();
   } catch (e) {

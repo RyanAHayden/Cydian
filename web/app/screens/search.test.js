@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SCOPES, searchFilters, scopeIndex, sheetActive } from "./search.js";
+import { SCOPES, scopesFor, searchFilters, scopeIndex, sheetActive } from "./search.js";
 
 test("F35: the scope bar's segments and what the catalog is asked", () => {
   assert.deepEqual(SCOPES, ["All", "Tweaks", "Themes", "Apps"]);
@@ -14,4 +14,10 @@ test("F35: the scope bar's segments and what the catalog is asked", () => {
   assert.equal(sheetActive({ section: "group:Themes" }), false);
   assert.equal(sheetActive({ section: "Addons" }), true);
   assert.equal(sheetActive({ price: "paid" }), true);
+});
+
+test("F41: Not Jailbroken hides the Tweaks and Themes segments", () => {
+  assert.deepEqual(scopesFor("none"), ["All", "Apps"]);
+  assert.deepEqual(scopesFor("iphoneos-arm64"), SCOPES);
+  assert.deepEqual(scopesFor("iphoneos-arm"), SCOPES);
 });

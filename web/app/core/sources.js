@@ -322,9 +322,10 @@ export function sourceCalls(backend, opts = {}) {
     },
     removeSource: async (key) => (await store()).remove(key),
     // Refreshes every source (all at once), saving each as it lands; onEach(source) sees the updated record.
-    async refreshSources(onEach = () => {}) {
+    // `filter` (F41, sourceFilter): only the sources it keeps are fetched.
+    async refreshSources(onEach = () => {}, { filter } = {}) {
       const db = await store();
-      const list = await db.list();
+      const list = (await db.list()).filter(filter ?? (() => true));
       return Promise.all(list.map(async (s) => {
         const fields = await refreshSource(backend, s, { arch: arch(), count });
         const next = await db.update(s.key, fields);
@@ -342,4 +343,12 @@ export function sourcesFor(list, type) {
   if (type !== "none") return { shown: all, hidden: 0 };
   const shown = all.filter((s) => String(s?.key ?? "").startsWith("alt:"));
   return { shown, hidden: all.length - shown.length };
+}
+
+// F41: which sources Refresh fetches for a device type, as a refreshSources `filter`: Not Jailbroken ("none")
+// keeps AltStore-style sources only (what sourcesFor shows), so nobody's hidden APT Packages go through the
+// site's proxy; a jailbroken type refreshes everything (null: no filter).
+export function sourceFilter(type) {
+  if (type !== "none") return null;
+  return (s) => String(s?.key ?? "").startsWith("alt:");
 }

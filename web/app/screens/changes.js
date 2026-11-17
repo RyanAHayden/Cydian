@@ -12,6 +12,7 @@ import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { groupTitle } from "../core/changes.js";
 import { settings } from "./settings.js";
+import { sourceFilter } from "../core/sources.js";
 
 export const title = "Changes";
 
@@ -113,7 +114,7 @@ async function refresh(ctx) {
   state.busy = true;
   const hide = ctx.showHUD("Reloading Data");
   try {
-    await getBackend().refreshSources();
+    await getBackend().refreshSources(undefined, { filter: sourceFilter(settings.deviceType()) }); // F41
     if (catalog.statusSource() === "native") await catalog.reloadInstalled();
     await load();
   } catch (e) {

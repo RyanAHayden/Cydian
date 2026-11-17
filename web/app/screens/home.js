@@ -58,6 +58,9 @@ export function deviceHint(type, mode = "site") {
   return { text: DEVICE_HINT, href: format({ tab: "settings", path: ["device"] }) };
 }
 
+// F41: whether Home offers Themes (the tile, Featured's Browse Themes). Not Jailbroken lists apps only (F37).
+export const showsThemes = (type) => type !== "none";
+
 export function nav(route, ctx) {
   switch (route.path[0]) {
     case "about": return { title: "About" };
@@ -198,11 +201,18 @@ function renderRoot(body) {
     a.href = h.href;
     hintBox.replaceChildren(a);
   };
+  // The Themes tile hides while Not Jailbroken (F41); Featured then fills the row.
+  const halves = tileRow("halves",
+    tile({ label: "Featured", href: format({ tab: "home", path: ["featured"] }), glyph: "featured" }),
+    tile({ label: "Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }), glyph: "themes" }));
+  const drawThemes = () => { halves.lastChild.hidden = !showsThemes(settings.deviceType()); };
   drawHint();
+  drawThemes();
   const offHint = settings.onChange((key) => {
     if (key !== "device") return;
     if (!hintBox.isConnected) { offHint(); return; }
     drawHint();
+    drawThemes();
   });
 
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));
@@ -215,9 +225,7 @@ function renderRoot(body) {
     tileRow("pair",
       tile({ label: "GitHub", href: REPO_URL, glyph: "github", external: true }),
       tile({ label: "Sources", href: format({ tab: "sources" }), glyph: "sources" })),
-    tileRow("halves",
-      tile({ label: "Featured", href: format({ tab: "home", path: ["featured"] }), glyph: "featured" }),
-      tile({ label: "Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }), glyph: "themes" })),
+    halves,
     stateRow,
   );
   body.append(home);
@@ -264,7 +272,7 @@ function renderHelp(body) {
 
 function renderFeatured(body) {
   body.append(grouped([{
-    rows: [{ label: "Browse Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }) },
+    rows: [...(showsThemes(settings.deviceType()) ? [{ label: "Browse Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }) }] : []),
       { label: "All Packages", href: format({ tab: "sources", path: ["*", "section:*"] }) }],
     footer: "Featured packages appear here when your sources publish them.",
   }]));

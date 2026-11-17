@@ -19,6 +19,12 @@
 // The format: https://faq.altstore.io/developers/make-a-source (2.0 with `versions`; 1.x apps carry version,
 // versionDate, versionDescription, downloadURL and size on the app itself, and `screenshotURLs`/`permissions`).
 // Anything optional that is missing or the wrong type is dropped, never thrown: sources are hand-written JSON.
+//
+// F16a: the list keeps every IPA source format (core/sources/detect.js FORMATS: altstore, esign, scarlet, gbox) as a
+// record with `format`; parseSource(format, json) reads any of them into parseAltSource's shape (plus `extra`) through
+// core/sources/ipa.js parseIpaSource. A record with `unsupported` (an encrypted GBox source) has a reason and no
+// apps: its page shows the reason and the Open in row (F8).
+import { parseIpaSource } from "./sources/ipa.js";
 
 export const ALT_PREFIX = "alt:";
 export const isAltKey = (key) => String(key ?? "").startsWith(ALT_PREFIX);
@@ -347,14 +353,51 @@ export async function verifyAltSource(backend, input) {
   return altRecord(url, parsed);
 }
 
+// F16a: an IPA source's JSON (text or parsed) by its record's `format` (none: AltStore, the records from before
+// F16a) -> parseAltSource's result with `format` and `extra` (core/sources/ipa.js parseIpaSource), so the rows and
+// extras are the same whether the source was just added, refreshed, or loaded into the catalog. Throws.
+export function parseSource(format, input) {
+  const fmt = format || "altstore";
+  let json = input;
+  if (typeof input === "string") {
+    try { json = JSON.parse(input.replace(/^\uFEFF/, "")); } catch { throw new Error("The source is not valid JSON."); }
+  }
+  if (fmt === "altstore" && !looksLikeAltSource(json)) throw new Error("This JSON is not an AltStore source (it has no apps list).");
+  return parseIpaSource(fmt, json);
+}
+
+// An encrypted GBox source (appRepositories is a string): known, but only GBox can read it (detect.js detectJson).
+export const GBOX_ENCRYPTED = "This GBox source is encrypted, so only GBox can read it.";
+const unreadable = (format, input) => {
+  if (format !== "gbox") return null;
+  try {
+    const json = typeof input === "string" ? JSON.parse(input.replace(/^\uFEFF/, "")) : input;
+    return typeof json?.appRepositories === "string" ? GBOX_ENCRYPTED : null;
+  } catch { return null; }
+};
+
 export async function refreshAltSource(backend, source) {
   try {
-    const parsed = parseAltSource(await backend.text(source.uri));
+    const text = await backend.text(source.uri);
+    const reason = unreadable(source.format, text);
+    // Still encrypted: nothing to read, and no error either (the page says why and offers Open in).
+    if (reason) return { updated: Date.now(), error: null, count: null, unsupported: reason };
+    const parsed = parseSource(source.format, text);
     const { key, kind, uri, ...fields } = altRecord(source.uri, parsed);
+    if (source.format) fields.format = source.format;
+    // A source that was unsupported and now reads (GBox dropped the encryption) loses the mark.
+    if (source.unsupported) fields.unsupported = null;
     return fields;
   } catch (e) {
     return { updated: Date.now(), error: e?.message || String(e) };
   }
+}
+
+// F16a: Telesphoreo's suite for this phone, as Cydia writes it: ios/<kCFCoreFoundationVersionNumber %.2f>
+// (docs/cydia.md, ios/793.00 on the 4S), or null without a number.
+export function coreFoundationDist(cf) {
+  const n = Number(cf);
+  return Number.isFinite(n) && n > 0 ? `ios/${n.toFixed(2)}` : null;
 }
 
 // A default source's record before its first refresh: the URL and nothing read from it yet (F28).
@@ -413,18 +456,35 @@ export function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "cy
 }
 
 // Wraps a backend's source calls (core/sources.js sourceCalls, or backend-native's) so AltStore sources live
-// beside the APT ones: listed together (`sort`: the list's order), added from the same Add Source alert (a .json
-// URL or sideloader link is tried as AltStore first; an APT check that finds no repo falls back to AltStore),
-// removed and refreshed by key. opts: { indexedDB, altName, sort, altDefaults: URLs seeded once (F28) }.
+// beside the APT ones: listed together (`sort`: the list's order), added from the same Add Source alert, removed
+// and refreshed by key. F16a: Add Source asks core/sources/add.js detectSource what the URL is: an IPA source of
+// any format (AltStore, ESign, Scarlet, GBox; an encrypted GBox one saved with `unsupported`) goes in this list
+// with its `format`; an APT repo (flat, or dist under dists/<d>/ for each `dists` candidate) goes to the wrapped
+// calls, which save it their own way (apt's sources in the app). A dist repo given as { uri, dist, components }
+// (F48) goes straight to the wrapped calls.
+// opts: { indexedDB, altName, sort, altDefaults: URLs seeded once (F28), arch: () => string, count,
+//         dists: [suite] or () => [suite] (add.js DEFAULT_DISTS when none; give it coreFoundationDist's suite),
+//         coreFoundation: () => number, the phone's kCFCoreFoundationVersionNumber (adds its Telesphoreo suite) }.
 export function withAltSources(calls, backend, opts = {}) {
   let opened = null;
   const store = () => (opened ??= openAltStore({ indexedDB: opts.indexedDB, name: opts.altName, defaults: opts.altDefaults }));
   const sort = opts.sort ?? ((l) => l);
-  async function addAlt(input) {
-    const rec = await verifyAltSource(backend, input);
+  const value = (v) => (typeof v === "function" ? v() : v);
+  async function saveAlt(rec) {
     const db = await store();
     const cur = await db.get(rec.key);
-    return db.put({ ...cur, ...rec });
+    const next = { ...cur, ...rec };
+    if (!rec.unsupported) delete next.unsupported;
+    return db.put(next);
+  }
+  // Loaded when first needed: add.js imports core/sources.js, which imports this file.
+  async function detectOpts() {
+    const { DEFAULT_DISTS } = await import("./sources/add.js");
+    const dists = [...(value(opts.dists) ?? DEFAULT_DISTS)];
+    const cf = coreFoundationDist(value(opts.coreFoundation));
+    if (cf && !dists.includes(cf)) dists.push(cf);
+    const arch = value(opts.arch);
+    return { ...(arch ? { arch } : {}), ...(opts.count ? { count: opts.count } : {}), dists };
   }
   return {
     async sources() {
@@ -432,13 +492,13 @@ export function withAltSources(calls, backend, opts = {}) {
       return sort([...apt, ...alt]);
     },
     async addSource(input) {
-      if (looksLikeAltUrl(input)) return addAlt(input);
-      try {
-        return await calls.addSource(input);
-      } catch (e) {
-        if (e?.kind !== "not_repository") throw e;
-        try { return await addAlt(input); } catch { throw e; } // neither: APT's own message
-      }
+      if (input && typeof input === "object") return calls.addSource(input);
+      const { detectSource } = await import("./sources/add.js");
+      const found = await detectSource(backend, input, await detectOpts());
+      if (found.kind === "ipa") return saveAlt(found.source);
+      const s = found.source;
+      // The wrapped calls check it again on their own terms (and the app writes it into apt's sources).
+      return calls.addSource(!s.dist || s.dist.endsWith("/") ? s.uri : { uri: s.uri, dist: s.dist, components: s.components });
     },
     async removeSource(key) {
       if (isAltKey(key)) return (await store()).remove(key);

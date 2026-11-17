@@ -143,6 +143,8 @@ function decorate(li, source, backend) {
   li.classList.add("source-row");
   li.dataset.key = source.key;
   if (source.error) li.querySelector(".cell-subtitle")?.classList.add("cell-error");
+  // F16a: a source only its own app can read (an encrypted GBox one) says so under its name; its page says why.
+  if (source.unsupported && !source.error) li.querySelector(".cell-subtitle")?.classList.add("cell-error");
   // CydiaIcon.png loads behind the letter and replaces it once it's there (Cydia: unknown.png, then the icon).
   const img = new Image();
   img.alt = "";

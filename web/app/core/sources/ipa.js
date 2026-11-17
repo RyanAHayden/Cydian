@@ -78,8 +78,11 @@ const ALT_APP_KEYS = new Set(["bundleIdentifier", "name", "developerName", "subt
 const ALT_VERSION_KEYS = new Set(["version", "marketingVersion", "buildVersion", "date", "versionDate",
   "localizedDescription", "versionDescription", "downloadURL", "size", "minOSVersion", "maxOSVersion"]);
 
+// Repeated ids are left as they are (F16a): parseAltSource merges an id listed again under the same name into one
+// app's versions and keeps other names as variants (F42, AppTesters lists one entry per version). An app with no
+// real id gets esign.<name slug>, the same for each entry of one app, so those merge too.
 function esignToAlt(json) {
-  const id = idMaker("esign");
+  const id = (real, name) => real || `esign.${slug(name)}`;
   return {
     ...json,
     name: str(json.name),

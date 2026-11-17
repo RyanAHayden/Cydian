@@ -4,7 +4,9 @@ import { readFileSync } from "node:fs";
 import {
   parseAltSource, runsOn, appStanza, installOptions, newsToNotify, normalizeAltUrl, looksLikeAltUrl, tintOf,
   withAltSources, altKey, isAltKey, appSection, compareOS, sideloaderLink,
+  refreshAltSource, coreFoundationDist, GBOX_ENCRYPTED,
 } from "./altstore.js";
+import { parseIpaSource } from "./sources/ipa.js";
 import { sourceFilter } from "./sources.js";
 import { createCatalog, ALL } from "./catalog.js";
 import { newRecords, changeGroups, recordKey } from "./changes.js";
@@ -222,7 +224,12 @@ function fakeIndexedDB() {
 
 test("altstore: sources sit beside the APT list: add, list, refresh, remove", async () => {
   let json = FIXTURE;
-  const backend = { text: async (u) => { if (u === URL_) return json; throw Object.assign(new Error("404"), { code: "not_found" }); } };
+  const get = (u) => { if (u === URL_) return json; throw Object.assign(new Error("404"), { code: "not_found" }); };
+  const backend = {
+    text: async (u) => get(u),
+    fetch: async (u) => new Response(get(u)),
+    packages: async () => { throw Object.assign(new Error("no Packages"), { code: "not_found" }); },
+  };
   const apt = [{ key: "deb:https://repo.example/:./", uri: "https://repo.example/" }];
   const calls = {
     sources: async () => apt,
@@ -238,8 +245,8 @@ test("altstore: sources sit beside the APT list: add, list, refresh, remove", as
   assert.equal(added.count, 6 - 3);
   assert.equal(added.tintColor, "#8a28f7");
   assert.deepEqual((await s.sources()).map((x) => x.key), [apt[0].key, KEY]);
-  // An APT check that finds nothing falls back to AltStore; when that fails too, APT's error stands.
-  await assert.rejects(s.addSource("https://nothing.example/"), (e) => e.kind === "not_repository");
+  // F16a: nothing at the URL, as JSON or as an APT repo: detectSource's message says what was looked for.
+  await assert.rejects(s.addSource("https://nothing.example/"), (e) => e.kind === "not_source" && /APT repository/.test(e.message));
   // Refresh: both lists, each record passed to onEach.
   json = JSON.stringify({ ...JSON.parse(FIXTURE), name: "Renamed" });
   const seen = [];
@@ -320,4 +327,135 @@ test("F42: repeated entries of one app merge into its version history; variants 
   assert.equal(v.stanza.ipa.versions[0].downloadURL, ipa("v15"));
   assert.deepEqual(c.history("dev.ex.app", KEY).versions.map((x) => x.version), ["3.0", "2.0", "1.0"]);
   assert.deepEqual(c.altSource(KEY).featured.map((r) => r.name), ["App"]);
+});
+
+// ---- F16a: every IPA format through the same list and catalog --------------------------------------------------
+
+const SRC = (f) => readFileSync(new URL(`./fixtures/sources/${f}`, import.meta.url), "utf8");
+
+// URL -> text; a missing URL fails as the proxy does ("upstream" 404), Packages as "not_found".
+function formatBackend(files) {
+  const get = (u) => {
+    if (!(u in files)) throw Object.assign(new Error("upstream answered HTTP 404"), { code: "upstream", status: 404 });
+    return files[u];
+  };
+  return {
+    files,
+    text: async (u) => get(u),
+    fetch: async (u) => new Response(get(u)),
+    packages: async () => { throw Object.assign(new Error("no Packages"), { code: "not_found" }); },
+  };
+}
+
+const aptCalls = (added = []) => ({
+  sources: async () => [],
+  addSource: async (input) => { added.push(input); return { key: "deb:apt", input }; },
+  removeSource: async () => {},
+  refreshSources: async () => [],
+});
+
+test("F16a: a Scarlet repo is added, refreshed and loaded by its format, with Scarlet's extras", async () => {
+  const url = "https://x.dev/scarlet.json";
+  const backend = formatBackend({ [url]: SRC("scarlet-locus.json") });
+  const s = withAltSources(aptCalls(), backend, { indexedDB: fakeIndexedDB() });
+  const rec = await s.addSource(url);
+  assert.equal(rec.key, altKey(url));
+  assert.equal(rec.kind, "altstore");
+  assert.equal(rec.format, "scarlet");
+  const want = parseIpaSource("scarlet", JSON.parse(SRC("scarlet-locus.json")));
+  assert.ok(want.apps.length > 0);
+  assert.equal(rec.count, want.apps.length);
+  assert.equal(rec.name, want.name);
+  // A scarlet:// link names the same source.
+  assert.equal((await s.addSource("scarlet://repo=" + url)).key, rec.key);
+  assert.equal((await s.sources()).length, 1);
+
+  // Refresh reads it as Scarlet again (parseAltSource alone would find no apps list and fail).
+  const listed = (await s.sources())[0];
+  const fields = await refreshAltSource(backend, listed);
+  assert.equal(fields.error, null);
+  assert.equal(fields.format, "scarlet");
+  assert.equal(fields.count, want.apps.length);
+  await s.refreshSources();
+  assert.equal((await s.sources())[0].error, null);
+
+  // The catalog reads it by the record's format: the same apps, and each app's Scarlet extras on its stanza.
+  const c = createCatalog();
+  assert.equal(c.loadAlt(rec.key, SRC("scarlet-locus.json"), null, rec.format), want.apps.length);
+  const first = want.apps[0];
+  const p = c.package(first.id, rec.key);
+  assert.equal(p.stanza.kind, "ipa");
+  assert.equal(p.stanza.name, first.name);
+  assert.deepEqual(p.stanza.ipa.extra, first.extra);
+  assert.ok("group" in p.stanza.ipa.extra, "Scarlet's group is kept");
+  assert.equal(c.altSource(rec.key).name, want.name);
+  // Without the format the old AltStore reader refuses it, which is why the record keeps `format`.
+  assert.throws(() => c.loadAlt(rec.key, SRC("scarlet-locus.json"), null), /AltStore/);
+});
+
+test("F16a: a GBox source is added and loaded as GBox; an encrypted one is kept as unsupported", async () => {
+  const url = "https://g.dev/apps.json";
+  const backend = formatBackend({ [url]: SRC("gbox-qoli.json") });
+  const s = withAltSources(aptCalls(), backend, { indexedDB: fakeIndexedDB() });
+  const rec = await s.addSource(url);
+  assert.equal(rec.format, "gbox");
+  assert.equal(rec.unsupported, undefined);
+  const want = parseIpaSource("gbox", JSON.parse(SRC("gbox-qoli.json")));
+  assert.equal(rec.count, want.apps.length);
+  const c = createCatalog();
+  assert.equal(c.loadAlt(rec.key, SRC("gbox-qoli.json"), null, "gbox"), want.apps.length);
+  const p = c.package(want.apps[0].id, rec.key);
+  assert.equal(p.stanza.ipa.bundleIdentifier, want.apps[0].bundleIdentifier);
+  assert.deepEqual(p.stanza.ipa.extra, want.apps[0].extra);
+
+  // Encrypted: added with its reason and no apps, refreshed without an error, and readable again once it isn't.
+  const enc = "https://g.dev/locked.json";
+  backend.files[enc] = SRC("gbox-encrypted.json");
+  const locked = await s.addSource(enc);
+  assert.equal(locked.format, "gbox");
+  assert.equal(locked.unsupported, GBOX_ENCRYPTED);
+  assert.equal(locked.count, null);
+  await s.refreshSources();
+  let now = (await s.sources()).find((x) => x.key === locked.key);
+  assert.equal(now.unsupported, GBOX_ENCRYPTED);
+  assert.equal(now.error, null);
+  backend.files[enc] = SRC("gbox-qoli.json");
+  await s.refreshSources();
+  now = (await s.sources()).find((x) => x.key === locked.key);
+  assert.equal(now.unsupported, null);
+  assert.equal(now.count, want.apps.length);
+  // Re-adding it as readable drops the mark entirely.
+  assert.equal("unsupported" in (await s.addSource(enc)), false);
+});
+
+test("F16a: an APT repo found by detection goes to the wrapped calls; dist repos as { uri, dist, components }", async () => {
+  const added = [];
+  const dir = "https://apt.example/";
+  const backend = formatBackend({
+    [dir]: "<html>a landing page</html>",
+    [dir + "dists/ios/793.00/Release"]: SRC("apt-dist-Release"),
+    [dir + "dists/ios/793.00/main/binary-iphoneos-arm/Packages"]: SRC("apt-dist-Packages"),
+  });
+  backend.packages = async (d) => {
+    if (d === dir + "dists/ios/793.00/main/binary-iphoneos-arm/") return { text: SRC("apt-dist-Packages"), source: d, cached: false };
+    throw Object.assign(new Error("no Packages"), { code: "not_found" });
+  };
+  // The phone's CoreFoundation number gives Telesphoreo's suite, ios/793.00 on the 4S.
+  assert.equal(coreFoundationDist(793), "ios/793.00");
+  assert.equal(coreFoundationDist(1854.1), "ios/1854.10");
+  assert.equal(coreFoundationDist(null), null);
+  const s = withAltSources(aptCalls(added), backend, { indexedDB: fakeIndexedDB(), arch: () => "iphoneos-arm", coreFoundation: () => 793 });
+  const r = await s.addSource(dir);
+  assert.equal(r.key, "deb:apt");
+  assert.equal(added.length, 1);
+  assert.equal(added[0].uri, dir);
+  assert.equal(added[0].dist, "ios/793.00");
+  assert.ok(added[0].components.length > 0);
+  // Without that suite among the dists, the same repo is not found.
+  const t = withAltSources(aptCalls(), backend, { indexedDB: fakeIndexedDB(), arch: () => "iphoneos-arm" });
+  await assert.rejects(t.addSource(dir), (e) => e.kind === "not_source");
+  // An Import line's dist repo skips detection.
+  await s.addSource({ uri: dir, dist: "stable", components: ["main"] });
+  assert.deepEqual(added[1], { uri: dir, dist: "stable", components: ["main"] });
+  assert.equal((await s.sources()).length, 0, "nothing went in the AltStore list");
 });

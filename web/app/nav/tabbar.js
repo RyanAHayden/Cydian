@@ -31,3 +31,16 @@ export function createTabbar(el, tabs, titleOf) {
     },
   };
 }
+
+// A tap on tab `tab` while `current` is the route on screen. As on iOS: another tab -> switch to it (selectTab
+// keeps its place); the current tab below its root -> back to the root (selectTab again); the current tab at its
+// root -> the screen's reselect(), e.g. Search focuses its field (F36). Everything runs synchronously inside the
+// tap's click handler, so iOS counts a focus() there as user-initiated and shows the keyboard.
+export function tapTab(tab, current, { selectTab, reselect }) {
+  if (current && current.tab === tab && current.path.length === 0 && reselect) {
+    reselect();
+    return "reselect";
+  }
+  selectTab(tab);
+  return "select";
+}

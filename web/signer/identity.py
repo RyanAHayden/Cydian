@@ -147,15 +147,18 @@ def check(identity: Identity, profile: Profile, now: dt.datetime | None = None) 
 
 def target_bundle_id(profile: Profile, bundle_id: str) -> str:
     """The bundle ID the app is signed as. A full wildcard ("*") keeps the app's own ID. A prefix wildcard (com.you.*)
-    keeps it if it fits, and otherwise signs the app under the profile's prefix: com.you.<the app's own ID>, so a
-    personal profile signs any app (its extensions follow: zsign -b moves their IDs too). An explicit profile signs
-    it as the profile's ID (one app ID, one app)."""
+    keeps it if it fits, and otherwise signs the app under the profile's prefix with the last part of its own ID:
+    io.github.fizl0.openmx -> com.you.openmx, so a personal profile signs any app (its extensions follow: zsign -b
+    moves their IDs too). The same app always gets the same ID, so updates replace it. An explicit profile signs it
+    as the profile's ID (one app ID, one app)."""
     app_id = profile.app_id
     if app_id == "*":
         return bundle_id
     if app_id.endswith(".*"):
         prefix = app_id[:-1]
-        return bundle_id if bundle_id.startswith(prefix) else prefix + bundle_id
+        # ponytail: two apps whose IDs end the same (….a.openmx, ….b.openmx) would share an ID and replace each other;
+        # add the next part up if that ever bites.
+        return bundle_id if bundle_id.startswith(prefix) else prefix + bundle_id.rsplit(".", 1)[-1]
     if not app_id:
         raise SignError("bad_profile", "The provisioning profile has no app ID.")
     return app_id

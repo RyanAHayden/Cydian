@@ -166,20 +166,20 @@ class IdentityTest(unittest.TestCase):
 
     def test_entitlements_narrowed_to_the_app(self):
         prof = I.parse_profile(T.profile(KEY, CERT, app_id="com.ryha.*"))
-        ents = I.app_entitlements(prof, "com.ryha.io.github.fizl0.openmx")
+        ents = I.app_entitlements(prof, "com.ryha.openmx")
         team = prof.entitlements["com.apple.developer.team-identifier"]
-        self.assertEqual(ents["application-identifier"], f"{team}.com.ryha.io.github.fizl0.openmx")
+        self.assertEqual(ents["application-identifier"], f"{team}.com.ryha.openmx")
         self.assertFalse(ents["get-task-allow"])
         if "keychain-access-groups" in prof.entitlements:
-            self.assertEqual(ents["keychain-access-groups"], [f"{team}.com.ryha.io.github.fizl0.openmx"])
+            self.assertEqual(ents["keychain-access-groups"], [f"{team}.com.ryha.openmx"])
 
     def test_app_id_fit(self):
         prof = lambda app_id: I.parse_profile(T.profile(KEY, CERT, app_id=app_id))  # noqa: E731
         self.assertEqual(I.target_bundle_id(prof("*"), "dev.cydian.fixture"), "dev.cydian.fixture")
         self.assertEqual(I.target_bundle_id(prof("dev.cydian.*"), "dev.cydian.fixture"), "dev.cydian.fixture")
         self.assertEqual(I.target_bundle_id(prof("com.me.myapp"), "dev.cydian.fixture"), "com.me.myapp")
-        # A prefix wildcard that doesn't cover the app signs it under the prefix (the app's whole ID after it: unique).
-        self.assertEqual(I.target_bundle_id(prof("com.other.*"), "dev.cydian.fixture"), "com.other.dev.cydian.fixture")
+        # A prefix wildcard that doesn't cover the app signs it under the prefix, by the last part of its own ID.
+        self.assertEqual(I.target_bundle_id(prof("com.other.*"), "dev.cydian.fixture"), "com.other.fixture")
 
 
 class StoreTest(unittest.TestCase):

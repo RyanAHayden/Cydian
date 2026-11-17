@@ -23,7 +23,11 @@ import {
   EXPORT_FILENAME,
 } from "../core/sourcelist.js";
 import { qrSvg } from "../core/qr.js";
-import { RECOMMENDED_SOURCES } from "../core/recommended.js";
+import { sourceWarning, warningAlert } from "../core/warnings.js";
+import {
+  RECOMMENDED_SOURCES, JAILBREAKS, jailbreakName, detectJailbreak, recommendedFor, savedJailbreak, saveJailbreak,
+  markRecommendedSeen,
+} from "../core/recommended.js";
 import { copyText } from "../nav/menu.js";
 import { settings } from "./settings.js";
 
@@ -255,6 +259,7 @@ export async function addSource(ctx, prefill = null) {
   });
   if (index !== 1) return;
   const input = dist && value.trim() === prefill.url ? { uri: prefill.url, dist: prefill.dist, components: prefill.components } : value;
+  if (!(await confirmWarning(input))) return;
   const hide = ctx.showHUD("Verifying URL");
   let error = null;
   try {
@@ -271,6 +276,14 @@ export async function addSource(ctx, prefill = null) {
   changed();
   const body = document.querySelector(".page.is-top .manage-list")?.closest(".page-body");
   if (body) renderSources(body);
+}
+
+// F19: Cydia's Source Warning, from our own list (core/warnings.js), before anything is fetched. Resolves true to
+// go on: the source isn't listed, or the user tapped Add Anyway.
+export async function confirmWarning(input) {
+  const w = sourceWarning(input);
+  if (!w) return true;
+  return (await showAlert(warningAlert(w))).index === 1;
 }
 
 // ---- Import & Export -------------------------------------------------------------------------------------------
@@ -385,7 +398,7 @@ async function startReview(text, route, ctx) {
     return;
   }
   const have = await getBackend().sources().catch(() => []);
-  pending = reviewImport(entries, have).map((e) => ({ ...e, pick: e.status === "new" }));
+  pending = reviewImport(entries, have).map((e) => ({ ...e, pick: e.status === "new" && !e.warning }));
   ctx.go({ tab: "sources", path: [...route.path, "review"] });
 }
 
@@ -395,17 +408,26 @@ function renderReview(body) {
     return;
   }
   const row = (e) => ({ label: e.uri.replace(/^https?:\/\//, ""), subtitle: e.dist && e.dist !== "./" ? `${e.dist} ${e.components.join(" ")}` : undefined });
-  const fresh = pending.filter((e) => e.status === "new");
+  const fresh = pending.filter((e) => e.status === "new" && !e.warning);
+  const warned = pending.filter((e) => e.status === "new" && e.warning); // F19: Source Warning, unticked
   const listed = pending.filter((e) => e.status === "listed");
   const unsupported = pending.filter((e) => e.status === "unsupported");
   const sections = [];
+  const toggle = (e) => (ev) => {
+    e.pick = !e.pick;
+    const inner = ev.currentTarget;
+    inner.querySelector(".cell-check")?.remove();
+    if (e.pick) inner.append(el("span", "cell-check"));
+  };
   if (fresh.length) {
-    sections.push({ header: `New (${fresh.length})`, rows: fresh.map((e) => ({ ...row(e), checked: e.pick, onClick: (ev) => {
-      e.pick = !e.pick;
-      const inner = ev.currentTarget;
-      inner.querySelector(".cell-check")?.remove();
-      if (e.pick) inner.append(el("span", "cell-check"));
-    } })), footer: "Tap a source to leave it out." });
+    sections.push({ header: `New (${fresh.length})`, rows: fresh.map((e) => ({ ...row(e), checked: e.pick, onClick: toggle(e) })),
+      footer: "Tap a source to leave it out." });
+  }
+  if (warned.length) {
+    sections.push({ header: `Source Warning (${warned.length})`,
+      rows: warned.map((e) => ({ ...row(e), subtitle: e.warning.reason, checked: e.pick, onClick: toggle(e) })),
+      footer: "These are on Cydian's list of piracy sources. "
+        + "Tap one to add it anyway." });
   }
   if (listed.length) sections.push({ header: `Already Listed (${listed.length})`, rows: listed.map(row) });
   if (unsupported.length) {
@@ -444,10 +466,46 @@ async function addPicked(ctx) {
 
 const previews = new Map(); // key -> { record fields read before adding (name, iconURL, count), apps }
 
+// F19: which jailbreak Recommended is for: the user's pick, else what apt's source files say (the jailbreak app;
+// core/recommended.js detectJailbreak), else null (every tweak repo, as before). { id, detected }.
+let detectedJailbreak; // a promise, asked once per session
+export async function currentJailbreak() {
+  const saved = savedJailbreak();
+  if (saved) return { id: saved, detected: false };
+  const backend = getBackend();
+  detectedJailbreak ??= backend.aptSourceFiles
+    ? backend.aptSourceFiles().then(detectJailbreak, () => null)
+    : Promise.resolve(null);
+  const id = await detectedJailbreak;
+  return { id, detected: Boolean(id) };
+}
+
 const recRows = async () => {
   const sources = await getBackend().sources().catch(() => []);
-  return recommendedRows(RECOMMENDED_SOURCES, sources, { jailbroken: settings.deviceType() !== "none", previews });
+  const jailbroken = settings.deviceType() !== "none";
+  const recs = jailbroken ? recommendedFor(RECOMMENDED_SOURCES, (await currentJailbreak()).id) : RECOMMENDED_SOURCES;
+  return recommendedRows(recs, sources, { jailbroken, previews });
 };
+
+// F19: the Jailbreak row's picker: one button per jailbreak, then Cancel.
+async function pickJailbreak(body, ctx) {
+  const buttons = [...JAILBREAKS.map((j) => j.name), "Cancel"];
+  const { index } = await showAlert({ title: "Jailbreak", message: "Recommended lists the sources that suit it.",
+    buttons, cancel: buttons.length - 1 });
+  if (index >= JAILBREAKS.length) return;
+  saveJailbreak(JAILBREAKS[index].id);
+  renderRecommended(body, ctx);
+}
+
+function jailbreakRow(jb, body, ctx) {
+  const ul = plain([{ rows: [{
+    label: "Jailbreak",
+    subtitle: jb.id ? `${jailbreakName(jb.id)}${jb.detected ? " (found on this iPhone)" : ""}` : "Not set: every tweak repo is listed",
+    onClick: () => pickJailbreak(body, ctx), chevron: true,
+  }] }]);
+  ul.classList.add("rec-jailbreak");
+  return ul;
+}
 
 // An AltStore source's JSON, read once per visit, so its row gets a name, icon and count and its preview its apps.
 async function loadPreview(row) {
@@ -517,6 +575,7 @@ async function renderRecommended(body, ctx) {
     badge: r.count != null ? r.count.toLocaleString() : undefined, href: recHref(r), chevron: false,
   })) }]);
   ul.classList.add("rec-list");
+  markRecommendedSeen(); // F19: the Sources tab's first-run row has done its job
   const cells = [...ul.querySelectorAll(":scope > .cell")];
   rows.forEach((r, i) => {
     const li = cells[i];
@@ -526,6 +585,7 @@ async function renderRecommended(body, ctx) {
     li.append(getButton(r, async () => { if (await addRecommended(r, ctx)) renderRecommended(body, ctx); }));
   });
   body.replaceChildren(ul);
+  if (settings.deviceType() !== "none") body.prepend(jailbreakRow(await currentJailbreak(), body, ctx));
   if (settings.deviceType() === "none") {
     body.append(el("p", "group-footer", "Tweak repos show here once Settings > Device says this iPhone is jailbroken."));
   }

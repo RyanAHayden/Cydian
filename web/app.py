@@ -1,5 +1,6 @@
 """Cydian's web server. Thin: serves the shared frontend in web/app/, the SSRF-safe fetch proxy, Web Push (push.py),
 and the signer (signer/, I5: POST /sign, docs/signing.md)."""
+import hashlib
 import os
 from pathlib import Path
 from urllib.parse import quote
@@ -53,6 +54,33 @@ def _error(code, message, status=None):
     return resp
 
 
+def _etag(body):
+    return '"' + hashlib.sha256(body).hexdigest()[:32] + '"'
+
+
+def _not_modified(etag, last_modified=None):
+    """F19: whether the visitor's If-None-Match (else If-Modified-Since) says it already has this body."""
+    inm = request.headers.get("If-None-Match")
+    if inm is not None:
+        return etag in [t.strip().removeprefix("W/") for t in inm.split(",")] or inm.strip() == "*"
+    ims = request.headers.get("If-Modified-Since")
+    return bool(ims and last_modified and ims.strip() == last_modified.strip())
+
+
+def _answer(body, headers, last_modified=None):
+    """The body with an ETag (and the repo's Last-Modified), or an empty 304 when the visitor has it already: an
+    unchanged Release costs the phone no transfer (F19). The upstream fetch still happens (fetch.py sends no
+    conditional headers upstream)."""
+    etag = _etag(body)
+    headers["ETag"] = etag
+    if last_modified:
+        headers["Last-Modified"] = last_modified
+    if _not_modified(etag, last_modified):
+        headers.pop("Content-Encoding", None)
+        return b"", 304, headers
+    return body, 200, headers
+
+
 @app.get("/api/fetch")
 def api_fetch():
     """`?url=<URL>`: the body of URL. `?url=<repo dir>&kind=packages`: the repo's Packages, as gzip-encoded
@@ -72,7 +100,7 @@ def api_fetch():
             headers.update({"Content-Type": "text/plain; charset=utf-8", "Content-Encoding": "gzip",
                             "X-Source-URL": _header_url(source), "X-Cache": "HIT" if cached else "MISS",
                             "Vary": "Accept-Encoding"})
-            return gz, 200, headers
+            return _answer(gz, headers)
         if kind:
             return _error("bad_url", f"unknown kind {kind!r}")
         r = fetcher.get(url)
@@ -85,7 +113,7 @@ def api_fetch():
     headers["Content-Type"] = (r.headers["content-type"] if ctype in PASSTHROUGH_TYPES
                                else "application/octet-stream")
     headers["X-Source-URL"] = _header_url(r.url)
-    return r.body, 200, headers
+    return _answer(r.body, headers, r.headers.get("last-modified"))
 
 
 @app.get("/healthz")

@@ -13,6 +13,7 @@
 // Release under dists/<dist>/ (core/sources.js verifyDistSource). "unsupported" is left for an entry with no input.
 import { parseListFile, parseDeb822File } from "./aptsources.js";
 import { normalizeSourceUrl, sourceKey, sourceIcons, sourceSubtitle } from "./sources.js";
+import { sourceWarning } from "./warnings.js";
 import { altKey, isAltKey, normalizeAltUrl, looksLikeAltUrl, seedRecord } from "./altstore.js";
 
 export const EXPORT_FILENAME = "cydian-sources.txt";
@@ -124,7 +125,8 @@ export function parseImport(text) {
   const seen = new Set();
   entries = entries.filter((e) => {
     if (!e) return false;
-    const id = `${e.uri} ${e.dist ?? ""}`;
+    // F19: one source once, whichever way it was written (a trailing slash or not, a bare URL or `deb <url> ./`).
+    const id = `${String(e.uri).replace(/\/+$/, "")} ${e.dist && e.dist !== "./" ? e.dist : ""}`;
     if (seen.has(id)) return false;
     seen.add(id);
     return true;
@@ -154,7 +156,23 @@ export function reviewImport(entries, sources) {
   return (entries ?? []).map((e) => {
     const keys = entryKeys(e);
     const listed = keys.some((k) => have.has(k) || haveLoose.has(slashless(k)));
-    return { ...e, status: listed ? "listed" : e.input ? "new" : "unsupported" };
+    const status = listed ? "listed" : e.input ? "new" : "unsupported";
+    // F19: a new source on the Source Warning list (core/warnings.js) carries the entry, so Import leaves it unticked.
+    const warning = status === "new" ? sourceWarning(e.uri) : null;
+    return warning ? { ...e, status, warning } : { ...e, status };
+  });
+}
+
+// F19: the Sources tab's search box: sources whose name, URL or subtitle hold every word of `query` (no case, no
+// diacritics). `name` is how the row is labelled (core/sources.js displayName). An empty query keeps the list.
+export function filterSources(list, query, name = (s) => s?.name ?? "") {
+  const fold = (t) => String(t ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  const all = Array.isArray(list) ? list : [];
+  if (!words.length) return all;
+  return all.filter((s) => {
+    const hay = fold([name(s), s?.uri, sourceSubtitle(s), s?.origin].join(" "));
+    return words.every((w) => hay.includes(w));
   });
 }
 

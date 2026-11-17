@@ -14,7 +14,9 @@ import { getBackend } from "../backend.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor, sourceFilter, loadNeverLoaded } from "../core/sources.js";
 import { settings } from "./settings.js";
 import * as manage from "./manage.js";
-import { orderSources, loadOrder } from "../core/sourcelist.js";
+import { orderSources, loadOrder, filterSources } from "../core/sourcelist.js";
+import { healthOf } from "../core/health.js";
+import { recommendedSeen, jailbreakName } from "../core/recommended.js";
 
 export const title = "Sources";
 
@@ -23,6 +25,9 @@ const state = {
   body: null,      // the root page's scroller
   busy: false,     // a refresh is running
   tried: new Set(), // F43: keys first-loaded this session (core/sources.js loadNeverLoaded)
+  query: "",        // F19: the search box's text
+  bar: null,        // F19: the search box, kept across redraws so typing keeps its focus
+  box: null,        // F19: where the list goes, under the search box
 };
 
 const byKey = (key) => state.sources?.find((s) => s.key === key);
@@ -95,6 +100,35 @@ async function firstLoad(ctx) {
 
 // ---- the list --------------------------------------------------------------------------------------------
 
+// F19: the search box above the list, the iOS 6 grey search bar Search uses (packages.css .search-bar). It filters
+// the rows as you type (core/sourcelist.js filterSources); All Sources steps aside while a search is on.
+function searchBar() {
+  if (state.bar) return state.bar;
+  const bar = document.createElement("form");
+  bar.className = "search-bar sources-search";
+  bar.setAttribute("role", "search");
+  const field = document.createElement("label");
+  field.className = "search-field";
+  const input = document.createElement("input");
+  Object.assign(input, { type: "search", placeholder: "Search Sources", autocapitalize: "off", autocomplete: "off",
+    spellcheck: false, enterKeyHint: "search", value: state.query });
+  input.setAttribute("autocorrect", "off");
+  input.setAttribute("aria-label", "Search sources: name or URL");
+  input.addEventListener("input", () => { state.query = input.value; draw(); });
+  bar.addEventListener("submit", (e) => { e.preventDefault(); input.blur(); });
+  field.append(input);
+  bar.append(field);
+  return (state.bar = bar);
+}
+
+// F19 first run: on a jailbroken type, a row to Recommended (named for the jailbreak once it's known) until
+// Recommended has been opened once.
+function recommendedRow() {
+  if (settings.deviceType() === "none" || recommendedSeen()) return null;
+  return { label: "Recommended Sources", subtitle: "sources that suit this jailbreak",
+    href: format({ tab: "sources", path: [manage.SEGMENT, "recommended"] }) };
+}
+
 function draw() {
   const el = state.body;
   if (!el) return;
@@ -103,38 +137,60 @@ function draw() {
     el.replaceChildren(Object.assign(document.createElement("p"), { className: "empty", textContent: state.loadError }));
     return;
   }
+  const bar = searchBar();
+  if (!state.box || state.box.parentNode !== el || bar.parentNode !== el) {
+    state.box = document.createElement("div");
+    el.replaceChildren(bar, state.box);
+  }
+  const box = state.box;
   const backend = getBackend();
   // F37: Not Jailbroken shows AltStore sources only; the APT ones stay in the list, out of sight.
   // F45: in the order set in Manage > Sources (none set: by name).
-  const { shown: list, hidden } = sourcesFor(orderSources(state.sources, loadOrder()), settings.deviceType());
-  const ul = plain([{
-    rows: [{
-      label: "All Sources",
-      subtitle: "combined package list for below sources",
-      href: format({ tab: "sources", path: ["*"] }),
-    }],
-  }, {
-    header: "Individual Sources",
-    rows: list.map((s) => ({
-      label: displayName(s),
-      subtitle: sourceSubtitle(s), // F44: github.com/<user>/<repo> for GitHub-hosted sources
-      icon: { text: displayName(s)[0]?.toUpperCase() ?? "?" },
-      badge: typeof s.count === "number" ? s.count.toLocaleString() : undefined,
-      href: format({ tab: "sources", path: [s.key] }),
-    })),
+  const { shown, hidden } = sourcesFor(orderSources(state.sources, loadOrder()), settings.deviceType());
+  const searching = Boolean(state.query.trim());
+  const list = filterSources(shown, state.query, displayName);
+  const rec = searching ? null : recommendedRow();
+  const top = searching ? [] : [{
+    label: "All Sources",
+    subtitle: "combined package list for below sources",
+    href: format({ tab: "sources", path: ["*"] }),
+  }, ...(rec ? [rec] : [])];
+  const ul = plain([...(top.length ? [{ rows: top }] : []), {
+    header: searching ? `${list.length} of ${shown.length}` : "Individual Sources",
+    rows: list.map((s) => {
+      const health = healthOf(s);
+      return {
+        label: displayName(s),
+        // F44: github.com/<user>/<repo> for GitHub-hosted sources. F19: a source whose last refresh failed says so.
+        subtitle: health.state === "down" ? `Not Responding · ${sourceSubtitle(s)}` : sourceSubtitle(s),
+        icon: { text: displayName(s)[0]?.toUpperCase() ?? "?" },
+        badge: typeof s.count === "number" ? s.count.toLocaleString() : undefined,
+        href: format({ tab: "sources", path: [s.key] }),
+      };
+    }),
   }]);
   const cells = ul.querySelectorAll(":scope > .cell");
-  cells[0].classList.add("all-sources-row");
-  cells[0].querySelector(".cell-inner").prepend(Object.assign(document.createElement("span"), { className: "folder" }));
-  list.forEach((s, i) => decorate(cells[i + 1], s, backend));
-  attachRowGestures(ul);
-  el.replaceChildren(ul);
-  if (!list.length) {
-    el.append(Object.assign(document.createElement("p"), { className: "empty", textContent: "No sources. Tap Manage, then Sources." }));
+  if (top.length) {
+    cells[0].classList.add("all-sources-row");
+    cells[0].querySelector(".cell-inner").prepend(Object.assign(document.createElement("span"), { className: "folder" }));
   }
-  if (hidden) {
+  if (rec) {
+    cells[1].classList.add("recommended-row");
+    manage.currentJailbreak().then((jb) => {
+      const label = cells[1].querySelector(".cell-label");
+      if (jb.id && jb.id !== "other" && label) label.textContent = `Recommended for ${jailbreakName(jb.id)}`;
+    }).catch(() => {});
+  }
+  list.forEach((s, i) => decorate(cells[i + top.length], s, backend));
+  attachRowGestures(ul);
+  box.replaceChildren(ul);
+  if (!list.length) {
+    box.append(Object.assign(document.createElement("p"), { className: "empty",
+      textContent: searching ? "No sources match." : "No sources. Tap Manage, then Sources." }));
+  }
+  if (hidden && !searching) {
     const n = `${hidden} APT ${hidden === 1 ? "source is" : "sources are"}`;
-    el.append(Object.assign(document.createElement("p"), { className: "group-footer sources-hidden",
+    box.append(Object.assign(document.createElement("p"), { className: "group-footer sources-hidden",
       textContent: `${n} hidden: they list tweaks and themes for jailbroken iPhones. Jailbroken? Settings > Device.` }));
   }
 }

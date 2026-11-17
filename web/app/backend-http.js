@@ -12,6 +12,7 @@
 
 import { sourceCalls, sortSources, DEFAULT_ALT_SOURCES } from "./core/sources.js";
 import { withAltSources } from "./core/altstore.js";
+import { validatorCache } from "./core/health.js";
 
 export class BackendError extends Error {
   constructor(code, message, status) {
@@ -27,13 +28,18 @@ export class BackendError extends Error {
 export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(globalThis), sourceOptions = {} } = {}) {
   const endpoint = (params) => `${base}/api/fetch?${new URLSearchParams(params)}`;
 
-  async function call(params) {
+  // F19: the proxy answers with an ETag (and the repo's Last-Modified); text() sends them back, and a 304 reuses
+  // the text kept here, so a Release that hasn't changed costs no transfer.
+  const validators = validatorCache();
+
+  async function call(params, headers = null) {
     let res;
     try {
-      res = await fetchFn(endpoint(params));
+      res = await (headers ? fetchFn(endpoint(params), { headers }) : fetchFn(endpoint(params)));
     } catch (e) {
       throw new BackendError("network", `cannot reach the server: ${e.message}`);
     }
+    if (res.status === 304 && headers) return res;
     if (!res.ok) {
       let body = {};
       try {
@@ -54,7 +60,16 @@ export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(g
     // A URL an <img> can load the remote image through (repo icons): the proxy, since it's on our origin.
     assetUrl: (url) => endpoint({ url }),
     async text(url) {
-      return (await call({ url })).text();
+      const cond = validators.headers(url);
+      const res = await call({ url }, Object.keys(cond).length ? cond : null);
+      if (res.status === 304) {
+        const kept = validators.reuse(url);
+        if (kept !== undefined) return kept;
+        return (await call({ url })).text(); // forgotten meanwhile: ask again in full
+      }
+      const text = await res.text();
+      validators.store(url, res.headers, text);
+      return text;
     },
     // A repo's Packages index as plain text: the server tries Packages.xz, .bz2, .gz, then plain in `repoDir`
     // (a flat repo's URL, or a dists/<suite>/<component>/binary-<arch>/ directory) and caches it 30 minutes.

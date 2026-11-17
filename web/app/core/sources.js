@@ -10,6 +10,7 @@
 // network, rate_limited). Cydia's behaviour this follows: docs/cydia.md, "Fetching a source" and "Sources tab".
 import { repoLayout, parseRelease, parseControl, matchesArch, DEFAULT_ARCH } from "./apt.js";
 import { isAltKey, neverLoaded } from "./altstore.js";
+import { releaseTime, fingerprint, healthFields, withTimeout, pool, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 
 // A source: { key, uri, dist, components, name?, origin?, depiction?, count?, updated?, error? }. `name` is ours
 // (the defaults), `origin` comes from the repo's Release; the row shows the first there is, else the host.
@@ -210,7 +211,7 @@ async function releaseOf(backend, base) {
   for (const name of ["Release", "InRelease"]) {
     try {
       const text = await backend.text(base + name);
-      if (looksLikeRelease(text)) return parseRelease(text);
+      if (looksLikeRelease(text)) return { ...parseRelease(text), raw: text }; // raw: F19's fingerprint
     } catch (e) {
       if (!missing(e)) throw e;
     }
@@ -262,7 +263,13 @@ export async function verifySource(backend, input, { arch = DEFAULT_ARCH, count 
   if (release?.origin) source.origin = release.origin;
   if (release) source.depiction = release.fields.depiction || null;
   source.count = text == null ? null : await count(text, arch);
-  source.updated = Date.now();
+  source.updated = source.reachedAt = Date.now(); // F19: health
+  source.failures = 0;
+  if (release) {
+    source.releaseDate = releaseTime(release);
+    source.releaseHash = fingerprint(release.raw);
+  }
+  if (source.count != null) source.countArch = arch;
   return source;
 }
 
@@ -298,8 +305,8 @@ export async function verifyDistSource(backend, { uri: rawUri, dist, components 
   source.key = sourceKey(source);
   const fields = await refreshSource(backend, source, { arch, count });
   if (fields.error) throw new SourceError("verification", fields.error);
-  const { error, ...rest } = fields;
-  return { ...source, ...rest };
+  const { error, unchanged, ...rest } = fields;
+  return { ...source, ...rest, reachedAt: rest.updated, failures: 0 };
 }
 
 // A package's fallback depiction: the source's Release Depiction: template with every `*` replaced by the
@@ -316,6 +323,11 @@ export function releaseDepiction(source, id) {
 // is only set when a Release was read, so a refresh that can't reach it keeps the stored template. A dist repo whose
 // Release lists Architectures without ours has nothing for us (Telesphoreo is rootful only): count 0, no index
 // fetched. Errors don't throw: they come back as `error` so one bad source doesn't stop the others.
+//
+// F19, Release first: the Release is read before any Packages. When it is the very text the last refresh saw
+// (`releaseHash`), for the same architecture, and that refresh counted the packages without an error, the count
+// stands and no Packages is fetched: an unchanged repo costs one request. `releaseDate` (its Date:) and
+// `releaseHash` are saved for the health line (core/health.js) and the next refresh.
 export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, count = countInline } = {}) {
   const layout = repoLayout(source, arch);
   const out = { updated: Date.now(), error: null };
@@ -327,7 +339,18 @@ export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, coun
       if (!layout.flat) throw e;
     }
     if (release?.origin) out.origin = release.origin;
-    if (release) out.depiction = release.fields.depiction || null;
+    if (release) {
+      out.depiction = release.fields.depiction || null;
+      out.releaseDate = releaseTime(release);
+      out.releaseHash = fingerprint(release.raw);
+    }
+    out.countArch = arch;
+    if (release && out.releaseHash === source?.releaseHash && source?.countArch === arch
+        && typeof source?.count === "number" && !source?.error) {
+      out.count = source.count;
+      out.unchanged = true;
+      return out;
+    }
     if (!layout.flat && release?.architectures.length && !release.architectures.includes(arch)) {
       out.count = 0;
       return out;
@@ -342,6 +365,16 @@ export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, coun
     out.error = e?.message || String(e);
   }
   return out;
+}
+
+// F19: refreshSource with a time limit. The fetches it started go on unawaited; the source gets the timeout as its
+// error, so the row says Not Responding and the rest of Refresh goes on.
+export async function refreshTimed(backend, source, { timeout = REFRESH_TIMEOUT, ...rest } = {}) {
+  try {
+    return await withTimeout(refreshSource(backend, source, rest), timeout);
+  } catch (e) {
+    return { updated: Date.now(), error: e?.message || String(e) };
+  }
 }
 
 // ---- the store ----------------------------------------------------------------------------------------------
@@ -417,15 +450,18 @@ export function sourceCalls(backend, opts = {}) {
     removeSource: async (key) => (await store()).remove(key),
     // Refreshes every source (all at once), saving each as it lands; onEach(source) sees the updated record.
     // `filter` (F41, sourceFilter): only the sources it keeps are fetched.
-    async refreshSources(onEach = () => {}, { filter } = {}) {
+    // F19: at most REFRESH_CONCURRENCY at once, each given `timeout` ms (a dead host is marked Not Responding
+    // instead of holding the rest), with the health fields (reachedAt, failures) saved beside the result.
+    async refreshSources(onEach = () => {}, { filter, timeout = opts.timeout ?? REFRESH_TIMEOUT,
+      concurrency = opts.concurrency ?? REFRESH_CONCURRENCY } = {}) {
       const db = await store();
       const list = (await db.list()).filter(filter ?? (() => true));
-      return Promise.all(list.map(async (s) => {
-        const fields = await refreshSource(backend, s, { arch: arch(), count });
-        const next = await db.update(s.key, fields);
+      return pool(list, concurrency, async (s) => {
+        const fields = await refreshTimed(backend, s, { arch: arch(), count, timeout });
+        const next = await db.update(s.key, { ...fields, ...healthFields(s, fields) });
         if (next) onEach(next);
         return next;
-      }));
+      });
     },
   };
 }

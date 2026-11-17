@@ -5,7 +5,7 @@ journal = "journal"
 
 [run]
 test = "tools/check.sh"
-slots = 3
+slots = 5
 mode = "d"
 rules = "AGENTS.md"
 notes = ".runner"

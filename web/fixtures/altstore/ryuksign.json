@@ -1,0 +1,380 @@
+{
+ "description": "Self-hosted IPA source by Ryuk.",
+ "iconURL": "https://source.ryuksign.com/assets/ryukgram-icon.png",
+ "identifier": "com.ryuksign.source",
+ "name": "RyukSign Source",
+ "subtitle": "IPAs by Ryuk",
+ "tintColor": "5B6EE1",
+ "website": "https://source.ryuksign.com",
+ "apps": [
+  {
+   "appPermissions": {
+    "entitlements": [],
+    "privacy": {
+     "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+     "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+     "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+     "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+     "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+     "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+     "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+     "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+     "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+     "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+     "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+     "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+     "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+    }
+   },
+   "bundleIdentifier": "com.burbn.instagram",
+   "category": "social",
+   "developerName": "Ryuk",
+   "downloadURL": "https://source.ryuksign.com/ipas/3288e9a370947dc46d8c.ipa",
+   "iconURL": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/30/e5/f2/30e5f206-5a5b-c586-5d94-619f69c53448/Placeholder.mill/400x400bb-75.png",
+   "localizedDescription": "RyukGram is an enhanced Instagram client for iOS — the full Instagram app with a built-in suite of privacy, logging and customization tweaks. Highlights: fol...",
+   "minOSVersion": "16.3",
+   "name": "RyukGram",
+   "size": 361338517,
+   "subtitle": "Instagram, supercharged with RyukGram · by @axryuk · RyukGram v1.5.1",
+   "version": "453.0.0",
+   "versionDate": "2026-10-29T00:00:00Z",
+   "versionDescription": "# [release] RyukGram v1.5.1\n\n### 🆕 New features\n\n#### Interface\n\n- Native liquid glass tab bar on iOS 26 and later, with its options under Tab bar > Liquid g...",
+   "versions": [
+    {
+     "appPermissions": {
+      "entitlements": [],
+      "privacy": {
+       "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+       "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+       "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+       "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+       "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+       "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+       "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+       "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+       "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+       "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+       "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+      }
+     },
+     "buildVersion": "1099096960",
+     "date": "2026-10-29T00:00:00Z",
+     "downloadURL": "https://source.ryuksign.com/ipas/3288e9a370947dc46d8c.ipa",
+     "localizedDescription": "# [release] RyukGram v1.5.1\n\n### 🆕 New features\n\n#### Interface\n\n- Native liquid glass tab bar on iOS 26 and later, with its options under Tab bar > Liquid g...",
+     "minOSVersion": "16.3",
+     "sha256": "5194ab9a14096cab726695fbf1a777190bcfb0ecb2ed5d70a8b9cd24f0fa0787",
+     "size": 361338517,
+     "version": "453.0.0"
+    },
+    {
+     "appPermissions": {
+      "entitlements": [],
+      "privacy": {
+       "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+       "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+       "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+       "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+       "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+       "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+       "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+       "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+       "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+       "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+       "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+      }
+     },
+     "buildVersion": "1093431980",
+     "date": "2026-10-23T00:00:00Z",
+     "downloadURL": "https://source.ryuksign.com/ipas/22ac767c9d09aed8795b.ipa",
+     "localizedDescription": "# [release] RyukGram v1.5.0\n\n### ✨ Highlights\n\n- **Save all**: download every post, reel, story, highlight and profile picture from any profile, paced and re...",
+     "minOSVersion": "16.3",
+     "sha256": "1311d240f6092be31d8a4ddce26b242603966370588e5cd52cb0f1551af8dc9e",
+     "size": 355597879,
+     "version": "452.0.1"
+    }
+   ],
+   "website": "https://source.ryuksign.com"
+  },
+  {
+   "appPermissions": {
+    "entitlements": [],
+    "privacy": {
+     "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+     "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+     "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+     "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+     "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+     "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+     "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+     "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+     "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+     "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+     "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+     "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+     "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+    }
+   },
+   "bundleIdentifier": "com.ryuk.ryukgram",
+   "category": "social",
+   "developerName": "Ryuk",
+   "downloadURL": "https://source.ryuksign.com/ipas/4b461da4211ef1875749.ipa",
+   "iconURL": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/30/e5/f2/30e5f206-5a5b-c586-5d94-619f69c53448/Placeholder.mill/400x400bb-75.png",
+   "localizedDescription": "RyukGram installed side by side with the real Instagram — a separate app with its own name, icon and login, so both stay signed in at once. The no-plugins Ry...",
+   "minOSVersion": "16.3",
+   "name": "RyukGram (Duplicate)",
+   "size": 291222596,
+   "subtitle": "RyukGram side by side with Instagram · by @axryuk · RyukGram v1.5.1",
+   "version": "453.0.0",
+   "versionDate": "2026-10-29T00:00:00Z",
+   "versionDescription": "# [release] RyukGram v1.5.1\n\n### 🆕 New features\n\n#### Interface\n\n- Native liquid glass tab bar on iOS 26 and later, with its options under Tab bar > Liquid g...",
+   "versions": [
+    {
+     "appPermissions": {
+      "entitlements": [],
+      "privacy": {
+       "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+       "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+       "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+       "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+       "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+       "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+       "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+       "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+       "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+       "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+       "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+      }
+     },
+     "buildVersion": "1099096960",
+     "date": "2026-10-29T00:00:00Z",
+     "downloadURL": "https://source.ryuksign.com/ipas/4b461da4211ef1875749.ipa",
+     "localizedDescription": "# [release] RyukGram v1.5.1\n\n### 🆕 New features\n\n#### Interface\n\n- Native liquid glass tab bar on iOS 26 and later, with its options under Tab bar > Liquid g...",
+     "minOSVersion": "16.3",
+     "sha256": "b7a06fb76a2cee0f1f2953c95dab230dd80a54e2f14abd0e9c779cc210fc91ee",
+     "size": 291222596,
+     "version": "453.0.0"
+    },
+    {
+     "appPermissions": {
+      "entitlements": [],
+      "privacy": {
+       "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+       "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+       "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+       "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+       "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+       "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+       "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+       "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+       "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+       "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+       "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+      }
+     },
+     "buildVersion": "1093431980",
+     "date": "2026-10-23T00:00:00Z",
+     "downloadURL": "https://source.ryuksign.com/ipas/95583c21d13f3be3d271.ipa",
+     "localizedDescription": "# [release] RyukGram v1.5.0\n\n### ✨ Highlights\n\n- **Save all**: download every post, reel, story, highlight and profile picture from any profile, paced and re...",
+     "minOSVersion": "16.3",
+     "sha256": "c69f1a13830e6ebe4ddf3a0ecc9656b3d65be4ecf8d44728033d3cc2a0103e55",
+     "size": 286441634,
+     "version": "452.0.1"
+    }
+   ],
+   "website": "https://source.ryuksign.com"
+  },
+  {
+   "appPermissions": {
+    "entitlements": [],
+    "privacy": {
+     "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+     "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+     "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+     "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+     "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+     "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+     "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+     "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+     "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+     "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+     "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+     "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+     "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+    }
+   },
+   "bundleIdentifier": "com.ryuk.ryukgram",
+   "category": "social",
+   "developerName": "Ryuk",
+   "downloadURL": "https://source.ryuksign.com/ipas/ee9982847dfe9db4f5e4.ipa",
+   "iconURL": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/30/e5/f2/30e5f206-5a5b-c586-5d94-619f69c53448/Placeholder.mill/400x400bb-75.png",
+   "localizedDescription": "RyukGram installed side by side with the real Instagram — a separate app with its own name, icon and login, so both stay signed in at once. The no-plugins Ry...",
+   "minOSVersion": "15.0",
+   "name": "RyukGram (Duplicate, iOS 15)",
+   "size": 290592009,
+   "subtitle": "RyukGram side by side with Instagram · iOS 15 backport · by @axryuk · RyukGram v1.5.1",
+   "version": "453.0.0",
+   "versionDate": "2026-10-29T00:00:00Z",
+   "versionDescription": "# [release] RyukGram v1.5.1\n\n### 🆕 New features\n\n#### Interface\n\n- Native liquid glass tab bar on iOS 26 and later, with its options under Tab bar > Liquid g...",
+   "versions": [
+    {
+     "appPermissions": {
+      "entitlements": [],
+      "privacy": {
+       "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+       "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+       "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+       "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+       "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+       "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+       "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+       "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+       "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+       "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+       "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+      }
+     },
+     "buildVersion": "1099096960",
+     "date": "2026-10-29T00:00:00Z",
+     "downloadURL": "https://source.ryuksign.com/ipas/ee9982847dfe9db4f5e4.ipa",
+     "localizedDescription": "# [release] RyukGram v1.5.1\n\n### 🆕 New features\n\n#### Interface\n\n- Native liquid glass tab bar on iOS 26 and later, with its options under Tab bar > Liquid g...",
+     "minOSVersion": "15.0",
+     "sha256": "a725703146cb652091d8f7bda4a3eab8d25f4486a53be5cab5d4bf4b0bd99c5d",
+     "size": 290592009,
+     "version": "453.0.0"
+    },
+    {
+     "appPermissions": {
+      "entitlements": [],
+      "privacy": {
+       "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+       "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+       "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+       "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+       "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+       "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+       "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+       "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+       "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+       "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+       "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+      }
+     },
+     "buildVersion": "1093431980",
+     "date": "2026-10-23T00:00:00Z",
+     "downloadURL": "https://source.ryuksign.com/ipas/f54be28f7a27399dca92.ipa",
+     "localizedDescription": "# [release] RyukGram v1.5.0\n\n### ✨ Highlights\n\n- **Save all**: download every post, reel, story, highlight and profile picture from any profile, paced and re...",
+     "minOSVersion": "15.0",
+     "sha256": "d4ec3cfd71fadf6194f7848c41ccf21a3672b2510e92dd9cbe14d0ae686e2f15",
+     "size": 285803857,
+     "version": "452.0.1"
+    }
+   ],
+   "website": "https://source.ryuksign.com"
+  },
+  {
+   "appPermissions": {
+    "entitlements": [],
+    "privacy": {
+     "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+     "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+     "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+     "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+     "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+     "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+     "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+     "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+     "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+     "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+     "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+     "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+     "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+    }
+   },
+   "bundleIdentifier": "com.ryuk.ryukgram",
+   "category": "social",
+   "developerName": "Ryuk",
+   "downloadURL": "https://source.ryuksign.com/ipas/aa11cb3cbaa2017b72ba.ipa",
+   "iconURL": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/30/e5/f2/30e5f206-5a5b-c586-5d94-619f69c53448/Placeholder.mill/400x400bb-75.png",
+   "localizedDescription": "RyukGram installed side by side with the real Instagram — a separate app with its own name, icon and login, so both stay signed in at once. The no-plugins Ry...",
+   "minOSVersion": "16.0",
+   "name": "RyukGram (Duplicate, iOS 16)",
+   "size": 288080092,
+   "subtitle": "RyukGram side by side with Instagram · iOS 16 backport · by @axryuk · RyukGram v1.5.1",
+   "version": "453.0.0",
+   "versionDate": "2026-10-29T00:00:00Z",
+   "versionDescription": "# [release] RyukGram v1.5.1\n\n### 🆕 New features\n\n#### Interface\n\n- Native liquid glass tab bar on iOS 26 and later, with its options under Tab bar > Liquid g...",
+   "versions": [
+    {
+     "appPermissions": {
+      "entitlements": [],
+      "privacy": {
+       "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+       "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+       "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+       "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+       "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+       "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+       "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+       "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+       "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+       "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+       "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+      }
+     },
+     "buildVersion": "1099096960",
+     "date": "2026-10-29T00:00:00Z",
+     "downloadURL": "https://source.ryuksign.com/ipas/aa11cb3cbaa2017b72ba.ipa",
+     "localizedDescription": "# [release] RyukGram v1.5.1\n\n### 🆕 New features\n\n#### Interface\n\n- Native liquid glass tab bar on iOS 26 and later, with its options under Tab bar > Liquid g...",
+     "minOSVersion": "16.0",
+     "sha256": "45a036dba968089dd81dba4e9a6818b3e85ff567655d92fb5f02dbb58d0adfa2",
+     "size": 288080092,
+     "version": "453.0.0"
+    },
+    {
+     "appPermissions": {
+      "entitlements": [],
+      "privacy": {
+       "NSCameraUsageDescription": "Instagram uses your device's camera to do things like help you take photos, record videos and use effects.",
+       "NSMicrophoneUsageDescription": "Instagram uses your device's microphone to do things like help you record videos and preview audio effects.",
+       "NSPhotoLibraryUsageDescription": "Instagram uses access to your camera roll to do things like help you share photos and videos to Instagram, apply effects and suggest photos and videos to share.",
+       "NSPhotoLibraryAddUsageDescription": "This lets you save photos and videos to your Camera Roll.",
+       "NSContactsUsageDescription": "Instagram will use your contacts to suggest people and things you care about, and offer a better service.",
+       "NSLocationWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSLocationAlwaysAndWhenInUseUsageDescription": "Instagram uses this to make some features work, personalize content and help people find places.",
+       "NSFaceIDUsageDescription": "Enable Face ID for quick and secure authentication on Instagram.",
+       "NSCalendarsUsageDescription": "This will let Instagram sync events to your calendar.",
+       "NSBluetoothAlwaysUsageDescription": "This allows your phone to find and connect to devices using a Bluetooth connection.",
+       "NSLocalNetworkUsageDescription": "Used to discover and connect to compatible streaming devices on your Wi-Fi network.",
+       "NSFocusStatusUsageDescription": "This allows Instagram to check whether you've been missing notifications from friends.",
+       "NSUserTrackingUsageDescription": "This helps Instagram personalize ads we show you."
+      }
+     },
+     "buildVersion": "1093431980",
+     "date": "2026-10-23T00:00:00Z",
+     "downloadURL": "https://source.ryuksign.com/ipas/1523fb0d30380084f0ea.ipa",
+     "localizedDescription": "# [release] RyukGram v1.5.0\n\n### ✨ Highlights\n\n- **Save all**: download every post, reel, story, highlight and profile picture from any profile, paced and re...",
+     "minOSVersion": "16.0",
+     "sha256": "12651a128cd85bc3cd33518151d3e482065da19fd170be2d3ee62b9325c75c51",
+     "size": 283340916,
+     "version": "452.0.1"
+    }
+   ],
+   "website": "https://source.ryuksign.com"
+  }
+ ],
+ "news": []
+}

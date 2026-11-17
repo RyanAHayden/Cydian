@@ -1,0 +1,35 @@
+{
+ "name": "Party Board",
+ "identifier": "com.mariopartyrd.partyboard",
+ "sourceURL": "https://github.com/FIZL0/partyboard/releases/latest/download/altstore-source.json",
+ "website": "https://github.com/FIZL0/partyboard",
+ "iconURL": "https://raw.githubusercontent.com/FIZL0/partyboard/main/res/icon.png",
+ "tintColor": "#e60012",
+ "subtitle": "Mario Party 4 (GameCube) with online play",
+ "apps": [
+  {
+   "name": "Party Board",
+   "bundleIdentifier": "com.mariopartyrd.partyboard",
+   "developerName": "FIZL0",
+   "subtitle": "Mario Party 4 (GameCube) with online play",
+   "localizedDescription": "A PC/mobile port of the Mario Party 4 decompilation, with online play. Plays from your own disc image (USA, GMPE01): put it in Files → On My iPhone → Party B...",
+   "iconURL": "https://raw.githubusercontent.com/FIZL0/partyboard/main/res/icon.png",
+   "tintColor": "#e60012",
+   "category": "games",
+   "version": "0.1.8",
+   "versionDate": "2026-10-30",
+   "downloadURL": "https://github.com/FIZL0/partyboard/releases/download/v0.1.8/partyboard-ios.ipa",
+   "size": 28749543,
+   "versions": [
+    {
+     "version": "0.1.8",
+     "date": "2026-10-30",
+     "downloadURL": "https://github.com/FIZL0/partyboard/releases/download/v0.1.8/partyboard-ios.ipa",
+     "size": 28749543,
+     "minOSVersion": "15.0"
+    }
+   ]
+  }
+ ],
+ "news": []
+}

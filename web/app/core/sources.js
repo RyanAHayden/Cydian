@@ -21,6 +21,40 @@ export const DEFAULT_SOURCES = [
   { name: "Procursus", uri: "https://apt.procurs.us/", dist: "1800", components: ["main"] },
 ].map((s) => ({ ...s, key: sourceKey(s) }));
 
+// F28: the AltStore sources the site lists by default (the user's own test sources, 2026-11-17): URLs only. They
+// go in the AltStore list (core/altstore.js withAltSources `defaults`, seeded once like DEFAULT_SOURCES), not this
+// one. Several redirect (github.com/.../raw/..., releases/latest/download/...): the proxy follows each hop, so the
+// URL kept is the one given. Deduped on the parsed URL.
+export const DEFAULT_ALT_SOURCES = dedupeUrls([
+  "https://provenance-emu.com/apps.json",
+  "https://fizl0.github.io/apps/source.json",
+  "https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json",
+  "https://github.com/chachillie/Flycast-iOS/raw/main/flycast-ios.json",
+  "https://xitrix.github.io/iTorrent/AltStore.json",
+  "https://alt.crystall1ne.dev/",
+  "https://repository.apptesters.org/",
+  "https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json",
+  "https://source.ryuksign.com/source.json",
+  "https://repo.unbound.rip/app-repo.json",
+  "https://github.com/FIZL0/opentennis/releases/latest/download/altstore-source.json",
+  "https://github.com/FIZL0/partyboard/releases/latest/download/altstore-source.json",
+  "https://github.com/FIZL0/openmx/releases/latest/download/altstore-source.json",
+]);
+
+// URLs -> their parsed hrefs (host lower-cased, a bare host gets its "/"), first of each kept, in order.
+export function dedupeUrls(urls) {
+  const seen = new Set();
+  const out = [];
+  for (const u of urls) {
+    let href;
+    try { href = new URL(String(u).trim()).href; } catch { continue; }
+    if (!/^https?:/.test(href) || seen.has(href)) continue;
+    seen.add(href);
+    out.push(href);
+  }
+  return out;
+}
+
 // Cydia's key, `deb:<URI>:<dist>`.
 export function sourceKey({ uri, dist }) {
   return `deb:${uri}:${dist || "./"}`;
@@ -93,9 +127,16 @@ function verificationError(e) {
 
 // A Release (or InRelease) file, not an HTML page the host sent for any path.
 function looksLikeRelease(text) {
-  if (/^\s*</.test(text)) return false;
+  if (/^\s*[<{[]/.test(text)) return false; // a page, or JSON served for every path (F28)
   const r = parseRelease(text);
   return Boolean(r.origin || r.label || r.suite || r.codename || r.architectures.length || Object.keys(r.hashes).length);
+}
+
+// A Packages text, not a page or a JSON file the host sends for every path (alt.crystall1ne.dev serves its
+// AltStore JSON at /Packages, /Release and the rest, F28): such a host is no APT repo, so Add Source falls through
+// to AltStore. An empty file is a repo with nothing in it yet.
+function looksLikePackages(text) {
+  return !/^\s*[<{[]/.test(String(text ?? ""));
 }
 
 const MAGIC = {
@@ -140,7 +181,8 @@ export async function verifySource(backend, input, { arch = DEFAULT_ARCH, count 
   let found = false;
   try {
     text = (await backend.packages(uri)).text;
-    found = true;
+    found = looksLikePackages(text);
+    if (!found) text = null;
   } catch (e) {
     if (!missing(e)) throw verificationError(e);
   }

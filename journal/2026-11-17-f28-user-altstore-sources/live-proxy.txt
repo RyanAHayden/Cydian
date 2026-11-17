@@ -1,0 +1,13 @@
+200 54K https://provenance-emu.com/apps.json -> Provenance Emulator apps=4
+200 3K https://fizl0.github.io/apps/source.json -> FIZL0 apps=3
+200 3K https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json -> Feather Repository apps=1
+200 1K https://github.com/chachillie/Flycast-iOS/raw/main/flycast-ios.json -> Flycast-iOS26 apps=1
+200 24K https://xitrix.github.io/iTorrent/AltStore.json -> iTorrent Source apps=1
+200 15K https://alt.crystall1ne.dev/ -> crystall1ne.dev apps=2
+200 10297K https://repository.apptesters.org/ -> AppTesters IPA Repo apps=789
+200 7K https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json -> YouMod Repo apps=1
+200 482K https://source.ryuksign.com/source.json -> RyukSign Source apps=2
+200 10K https://repo.unbound.rip/app-repo.json -> Unbound App Repo apps=2
+200 1K https://github.com/FIZL0/opentennis/releases/latest/download/altstore-source.json -> OpenTennis apps=1
+200 1K https://github.com/FIZL0/partyboard/releases/latest/download/altstore-source.json -> Party Board apps=1
+200 1K https://github.com/FIZL0/openmx/releases/latest/download/altstore-source.json -> openMX apps=1

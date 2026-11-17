@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  DEFAULT_SOURCES, normalizeSourceUrl, sourceKey, sourceIconUrl, sourceIconUrls, displayName, sortSources, verifySource,
+  DEFAULT_SOURCES, DEFAULT_ALT_SOURCES, normalizeSourceUrl, sourceKey, sourceIconUrl, sourceIconUrls, displayName, sortSources, verifySource,
   refreshSource, releaseDepiction, openSourceStore, sourceCalls, SourceError, sourcesFor,
 } from "./sources.js";
 import { createHttpBackend, BackendError } from "../backend-http.js";
@@ -170,14 +170,14 @@ test("add through the HTTP backend: the proxy's 403 refused reaches the alert; n
   const b = createHttpBackend({ fetchFn, sourceOptions: { indexedDB: fakeIndexedDB() } });
   await assert.rejects(b.addSource("http://192.168.1.1/repo/"), { kind: "verification", code: "refused" });
   const before = await b.sources();
-  assert.equal(before.length, DEFAULT_SOURCES.length);
+  assert.equal(before.length, DEFAULT_SOURCES.length + DEFAULT_ALT_SOURCES.length);
   const added = await b.addSource("https://good.example/");
   assert.equal(added.count, 3);
   const after = await b.sources();
-  assert.equal(after.length, DEFAULT_SOURCES.length + 1);
+  assert.equal(after.length, DEFAULT_SOURCES.length + DEFAULT_ALT_SOURCES.length + 1);
   assert.ok(after.some((s) => s.key === "deb:https://good.example/:./" && s.count === 3));
   await b.addSource("https://good.example");  // the same source again: updated, not doubled
-  assert.equal((await b.sources()).length, DEFAULT_SOURCES.length + 1);
+  assert.equal((await b.sources()).length, DEFAULT_SOURCES.length + DEFAULT_ALT_SOURCES.length + 1);
 });
 
 test("store: seeded once with the defaults, sorted by name; deletes stick", async () => {

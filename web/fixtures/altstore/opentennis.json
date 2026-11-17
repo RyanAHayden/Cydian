@@ -1,0 +1,35 @@
+{
+ "name": "OpenTennis",
+ "identifier": "io.github.fizl0.hst",
+ "sourceURL": "https://github.com/FIZL0/opentennis/releases/latest/download/altstore-source.json",
+ "website": "https://opentennis.dev/",
+ "iconURL": "https://opentennis.dev/icon-180.png",
+ "tintColor": "#2fae4a",
+ "subtitle": "A remaster of Hot Shots Tennis (PS2)",
+ "apps": [
+  {
+   "name": "OpenTennis",
+   "bundleIdentifier": "io.github.fizl0.hst",
+   "developerName": "FIZL0",
+   "subtitle": "A remaster of Hot Shots Tennis (PS2)",
+   "localizedDescription": "A remaster of Hot Shots Tennis (PS2). Plays from your own disc image (SCUS-97610): put the ISO in Files → On My iPhone → OpenTennis.",
+   "iconURL": "https://opentennis.dev/icon-180.png",
+   "tintColor": "#2fae4a",
+   "category": "games",
+   "version": "1.7.1",
+   "versionDate": "2026-11-17",
+   "downloadURL": "https://github.com/FIZL0/opentennis/releases/download/v1.7.1/opentennis-ios.ipa",
+   "size": 42761637,
+   "versions": [
+    {
+     "version": "1.7.1",
+     "date": "2026-11-17",
+     "downloadURL": "https://github.com/FIZL0/opentennis/releases/download/v1.7.1/opentennis-ios.ipa",
+     "size": 42761637,
+     "minOSVersion": "15.0"
+    }
+   ]
+  }
+ ],
+ "news": []
+}

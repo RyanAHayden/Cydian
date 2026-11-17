@@ -5,8 +5,7 @@
 # Needs:
 #   SWIFT_TOOLCHAIN  a swift.org Linux toolchain (6.4.x to match the SDK's compiler), the dir holding usr/bin/swiftc
 #                    (default: the one swiftc on PATH belongs to)
-#   IOS_SDK          iPhoneOS.sdk pulled from an Xcode .xip (opentennis tools/ios-sdk.py does it on Linux)
-#                    (default ~/.local/share/hst-ios/iPhoneOS.sdk)
+#   IOS_SDK          iPhoneOS.sdk extracted from an Xcode .xip (required; Cydian's own extraction script is task T3)
 #   LD64_LLD         an ld64.lld (default: rustup's gcc-ld/ld64.lld, else ld64.lld on PATH)
 # What docs/native.md "Building on Linux" explains: arm64 only (lld can't link arm64e), Swift 5.6 back-deploy shim
 # off (-runtime-compatibility-version none), SwiftShims from the toolchain via -I.
@@ -14,11 +13,12 @@ set -euo pipefail
 cd "$(dirname "$0")"
 tc=${SWIFT_TOOLCHAIN:-$(dirname "$(dirname "$(dirname "$(readlink -f "$(command -v swiftc)")")")")}
 swiftc=$tc/usr/bin/swiftc
-sdk=${IOS_SDK:-$HOME/.local/share/hst-ios/iPhoneOS.sdk}
+[ -n "${IOS_SDK:-}" ] || { echo "IOS_SDK is not set: point it at an iPhoneOS.sdk extracted from Xcode" >&2; exit 1; }
+sdk=$IOS_SDK
 lld=${LD64_LLD:-$(rustc --print sysroot 2>/dev/null)/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld/ld64.lld}
 [ -x "$lld" ] || lld=$(command -v ld64.lld)
 [ -x "$swiftc" ] || { echo "no swiftc: set SWIFT_TOOLCHAIN" >&2; exit 1; }
-[ -d "$sdk" ] || { echo "no SDK at $sdk: set IOS_SDK" >&2; exit 1; }
+[ -d "$sdk" ] || { echo "IOS_SDK=$sdk is not a directory" >&2; exit 1; }
 min=15.0 target=arm64-apple-ios15.0
 out=build
 mkdir -p "$out"

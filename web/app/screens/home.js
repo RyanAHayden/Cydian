@@ -69,7 +69,7 @@ export function nav(route, ctx) {
 async function showAbout(ctx) {
   await ctx.showAlert({
     title: "About Cydian",
-    message: "Version 0.1\nFree and open source (GPL-3.0)\n\nA package manager with the\niOS 6 look, for modern iPhones\ngithub.com/RyanAHayden/Cydian\n\nInspired by Cydia by Jay Freeman (saurik).\nNot affiliated with Cydia or SaurikIT.",
+    message: "Version 0.1\nFree and open source\n\nRyan Hayden\n\nInspired by Cydia\nby Jay Freeman (saurik)\nNot affiliated with SaurikIT",
     buttons: ["Close"],
   });
 }

@@ -16,15 +16,32 @@ export function initScroller(screens) {
 
   const navbar = document.getElementById("navbar");
   const tabbar = document.getElementById("tabbar");
-  const geom = () => {
-    // The track runs between the fixed bars (the scroller itself fills the window under them).
+  // Measured rarely, never per frame: the bars' edges only change on resize, the content's height only when it
+  // resizes (a ResizeObserver tells us). Reading layout in a frame where a list has just moved its rows forced a full
+  // layout every frame of a fling.
+  let bars = null;     // { top, track }
+  let sizes = null;    // { h, th } for the current body
+  const measureBars = () => {
     const top0 = navbar ? navbar.getBoundingClientRect().bottom : screens.getBoundingClientRect().top;
     const bottom0 = tabbar ? tabbar.getBoundingClientRect().top : screens.getBoundingClientRect().bottom;
-    const r = { top: top0, height: bottom0 - top0 };
-    const track = r.height - 6;
-    const h = body.scrollHeight - body.clientHeight;
-    const th = Math.max(36, track * body.clientHeight / body.scrollHeight);
-    return { top: r.top + 3, track, h, th };
+    bars = { top: top0 + 3, track: bottom0 - top0 - 6 };
+  };
+  const measureBody = () => {
+    if (!bars) measureBars();
+    const sh = body.scrollHeight, ch = body.clientHeight;
+    sizes = { h: sh - ch, th: Math.max(36, bars.track * ch / sh) };
+  };
+  addEventListener("resize", () => { bars = null; sizes = null; });
+  const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => { sizes = null; if (sb.classList.contains("on")) place(); }) : null;
+  const watch = (b) => {
+    ro?.disconnect();
+    if (!b || !ro) return;
+    ro.observe(b);
+    for (const c of b.children) ro.observe(c); // lists grow inside the scroller (Search results, a source loading)
+  };
+  const geom = () => {
+    if (!sizes) measureBody();
+    return { top: bars.top, track: bars.track, h: sizes.h, th: sizes.th };
   };
   // Like UIScrollView: a page that fits on screen still shows a full-length indicator while it bounces, and pulling
   // past either end squashes the indicator against that end.
@@ -40,17 +57,9 @@ export function initScroller(screens) {
     sb.style.transform = `translateY(${m.top + (m.track - th) * y}px)`;
     return true;
   };
-  // While it shows, re-measure every frame: lists that are still loading (Search's results, a source's packages)
-  // change length under it without a scroll event, which left it the wrong size or jumping.
-  let follow = 0;
-  const followLoop = () => {
-    if (!sb.classList.contains("on") || !place()) { follow = 0; return; }
-    follow = requestAnimationFrame(followLoop);
-  };
   const draw = () => {
     if (!place()) return;
     sb.classList.add("on");
-    if (!follow) follow = requestAnimationFrame(followLoop);
     clearTimeout(hideTimer);
     if (grab === null) hideTimer = setTimeout(() => sb.classList.remove("on"), 600);
   };
@@ -58,7 +67,7 @@ export function initScroller(screens) {
   document.addEventListener("scroll", (e) => {
     const t = e.target;
     if (!(t instanceof Element) || !t.classList.contains("page-body")) return;
-    body = t;
+    if (body !== t) { body = t; sizes = null; watch(t); }
     draw();
   }, { capture: true, passive: true });
 

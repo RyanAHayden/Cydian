@@ -94,7 +94,9 @@ export function createVList(scroller, { items = [], rowHeight = 58, headerHeight
       sticky.hidden = true;
       return;
     }
-    const offset = el.offsetTop; // the list's top inside the scroller (anything drawn above it)
+    // The list's top inside the scroller, cached: reading offsetTop right after moving rows forced a full layout
+    // every frame of a fling. Re-read only when sizes change (onResize) or the items do.
+    offset ??= el.offsetTop;
     const top = scroller.scrollTop - offset;
     viewH ||= scroller.clientHeight;
     const first = indexAt(Math.max(0, top - OVERSCAN));
@@ -126,7 +128,8 @@ export function createVList(scroller, { items = [], rowHeight = 58, headerHeight
   function settle() {
     idleTimer = 0;
     if (!idle) return;
-    const top = scroller.scrollTop - el.offsetTop;
+    offset ??= el.offsetTop;
+    const top = scroller.scrollTop - offset;
     for (const [i, n] of live) {
       if (items[i].header == null && tops[i] + rowHeight > top && tops[i] < top + viewH) idle(n, items[i]);
     }
@@ -139,13 +142,16 @@ export function createVList(scroller, { items = [], rowHeight = 58, headerHeight
       idleTimer = setTimeout(settle, 120);
     }
   }
-  const onResize = () => { viewH = scroller.clientHeight; onScroll(); };
+  let offset = null; // see update()
+  const onResize = () => { viewH = scroller.clientHeight; offset = null; onScroll(); };
 
   scroller.addEventListener("scroll", onScroll, { passive: true });
   const ro = typeof ResizeObserver === "function" ? new ResizeObserver(onResize) : null;
   ro?.observe(scroller);
+  ro?.observe(el); // the list moved or resized: re-read its offset
 
   function setItems(list) {
+    offset = null;
     for (const [i, n] of live) release(i, n);
     live.clear();
     stickyText = null;

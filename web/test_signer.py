@@ -279,6 +279,118 @@ class GuardTest(Base):
         self.assertEqual(self.c.get("/sign/nope/app.ipa").status_code, 404)
 
 
+class AsyncJobTest(Base):
+    """F47: POST /sign with "async": true answers 202 {job} at once; GET /sign/job/<id> tells the phase, then the
+    install link or the error. zsign is replaced by a copy (with a gate the test opens) so this runs everywhere."""
+
+    def setUp(self):
+        super().setUp()
+        self.gate = threading.Event()
+        self.phases = []
+
+        def fake_sign(binary, src, out, p12, profile, work, bundle_id=None, timeout=300.0):
+            self.phases.append("zsign")
+            if not self.gate.wait(10):
+                raise AssertionError("gate never opened")
+            shutil.copyfile(src, out)
+
+        patch = mock.patch.object(signer.zsign, "sign", fake_sign)
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.addCleanup(self.gate.set)  # never leave a job thread hanging
+
+    def poll(self, job, until, limit=10.0):
+        """Poll until the status is in `until` (an event-free wait: the job thread moves on its own)."""
+        import time
+        deadline = time.monotonic() + limit
+        while True:
+            r = self.c.get(f"/sign/job/{job}")
+            self.assertEqual(r.status_code, 200, r.json)
+            if r.json["status"] in until:
+                return r
+            self.assertLess(time.monotonic(), deadline, f"job stuck at {r.json['status']}")
+            time.sleep(0.01)
+
+    def test_answers_at_once_then_done(self):
+        r = self.post(**{"async": True})
+        self.assertEqual(r.status_code, 202, r.json)
+        self.assertEqual(r.headers["Access-Control-Allow-Origin"], "*")
+        job = r.json["job"]
+        self.assertGreaterEqual(len(job), 40)
+        self.assertTrue(r.headers["Location"].endswith(f"/sign/job/{job}"))
+        self.assertEqual(r.json["status"], "downloading")
+        # zsign is held at the gate: the POST answered while the job runs, and the poll says so
+        self.assertEqual(self.poll(job, {"signing"}).json["status"], "signing")
+        self.gate.set()
+        j = self.poll(job, {"done", "error"}).json
+        self.assertEqual(j["status"], "done", j)
+        self.assertEqual((j["bundleId"], j["name"], j["version"], j["expiresIn"]),
+                         ("dev.cydian.fixture", "Fixture", "1.0", 600))
+        self.assertTrue(j["itms"].startswith("itms-services://?action=download-manifest&url=http%3A%2F%2F"))
+        token = j["manifest"].split("/sign/")[1].split("/")[0]
+        self.assertEqual(self.c.get(f"/sign/{token}/manifest.plist").status_code, 200)
+        r = self.c.get(f"/sign/{token}/app.ipa")
+        self.assertEqual(r.data, IPA)
+        r.close()
+        self.assertEqual(self.c.get(f"/sign/job/{job}").json["status"], "done")  # a late poll still reads it
+        self.assertEqual(os.listdir(self.dir), [])
+
+    def test_bad_pair_fails_in_the_post(self):
+        r = self.post(password="wrong", **{"async": True})
+        self.assertEqual((r.status_code, r.json["code"]), (400, "bad_password"))
+        self.assertEqual(self.dialed, [])
+
+    def test_download_error_reaches_the_poll(self):
+        self.gate.set()
+        for url, code, status in [("http://127.0.0.1/app.ipa", "refused", 403), (self.url("/missing.ipa"), "upstream", 502)]:
+            with self.subTest(url=url):
+                r = self.post(url=url, **{"async": True})
+                self.assertEqual(r.status_code, 202, r.json)
+                j = self.poll(r.json["job"], {"done", "error"}).json
+                self.assertEqual((j["status"], j["code"], j["httpStatus"]), ("error", code, status), j)
+                self.assertTrue(j["error"])
+        self.assertNotIn("zsign", self.phases)
+        self.assertEqual(os.listdir(self.dir), [])
+
+    def test_job_slots_are_held_until_the_job_ends(self):
+        with mock.patch.object(signer, "JOBS", 1):
+            self.app = Flask(__name__)
+            self.app.register_blueprint(signer.create_blueprint(self.fetcher, self.store, self.limiter, binary="/x"))
+            self.c = self.app.test_client()
+            job = self.post(**{"async": True}).json["job"]
+            self.poll(job, {"signing"})
+            r = self.post(**{"async": True})
+            self.assertEqual((r.status_code, r.json["code"]), (503, "busy"))
+            self.gate.set()
+            self.poll(job, {"done"})
+            self.assertEqual(self.post(**{"async": True}).status_code, 202)  # the slot came back
+
+    def test_crash_ends_the_job(self):
+        with mock.patch.object(signer.ipa_mod, "inspect", side_effect=RuntimeError("secret hunter2")):
+            job = self.post(**{"async": True}).json["job"]
+            j = self.poll(job, {"done", "error"}).json
+        self.assertEqual((j["status"], j["code"], j["httpStatus"]), ("error", "internal", 500))
+        self.assertNotIn("hunter2", j["error"])
+
+    def test_unknown_and_expired_jobs(self):
+        r = self.c.get("/sign/job/nope")
+        self.assertEqual((r.status_code, r.json["code"]), (404, "gone"))
+        self.assertEqual(r.headers["Access-Control-Allow-Origin"], "*")
+        self.assertEqual(self.c.options("/sign/job/nope").status_code, 204)
+        jobs = signer.Jobs(ttl=600, clock=lambda: now[0])
+        now = [0.0]
+        a, b = jobs.new(), jobs.new()
+        jobs.set(a, "done", {"itms": "x"})
+        now[0] = 599
+        self.assertEqual(jobs.get(a).answer, {"itms": "x"})
+        now[0] = 600
+        self.assertIsNone(jobs.get(a))  # finished 10 minutes ago: gone
+        self.assertEqual(jobs.get(b).status, "downloading")  # still running: kept however long it takes
+
+    def test_status_says_jobs(self):
+        self.assertIs(self.c.get("/sign/status").json["jobs"], True)
+
+
 def _zip(files):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
@@ -404,6 +516,23 @@ class SignTest(Base):
                         json={"url": self.url(), "p12": base64.b64encode(P12).decode(),
                               "profile": base64.b64encode(PROFILE).decode(), "password": "hunter2"})
         self.assertTrue(r.json["manifest"].startswith("https://sign.example.org/sign/"), r.json)
+
+    def test_async_job_signs(self):
+        import time
+        r = self.post(**{"async": True})
+        self.assertEqual(r.status_code, 202, r.json)
+        deadline = time.monotonic() + 60
+        while (j := self.c.get(f"/sign/job/{r.json['job']}").json)["status"] not in ("done", "error"):
+            self.assertLess(time.monotonic(), deadline, j)
+            time.sleep(0.05)
+        self.assertEqual(j["status"], "done", j)
+        token = j["manifest"].split("/sign/")[1].split("/")[0]
+        r = self.c.get(f"/sign/{token}/app.ipa")
+        with zipfile.ZipFile(io.BytesIO(r.data)) as z:
+            _, _, cs = code_signature(z.read("Payload/Fixture.app/Fixture"))
+        r.close()
+        self.assertEqual(cs["identifier"], "dev.cydian.fixture")
+        self.assertTrue(cs["pages_ok"])
 
     def test_key_reaches_zsign_only_through_memory(self):
         seen = {}

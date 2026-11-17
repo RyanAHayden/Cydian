@@ -20,6 +20,12 @@ class AppTest(unittest.TestCase):
             self.assertEqual(r.status_code, 200)
             self.assertIn(b'<script type="module" src="app.js">', r.data)
 
+    def test_add_link(self):
+        # F8: the share link serves the app, which opens Add Source with the query's url.
+        with self.c.get("/add?url=https%3A%2F%2Frepo.example.com%2F") as r:
+            self.assertEqual(r.status_code, 200)
+            self.assertIn(b'<script type="module" src="app.js">', r.data)
+
     def test_static(self):
         for p in STATIC:
             with self.subTest(p=p):

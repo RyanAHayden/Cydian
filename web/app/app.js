@@ -26,6 +26,8 @@ import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
 import { startPush } from "./push-client.js";
 import { launchURL } from "./launch.js";
+import { isAddPath, parseAddLink } from "./core/handoff.js";
+import { addSource } from "./screens/manage.js";
 
 const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
 
@@ -274,7 +276,13 @@ for (const tab of TABS) if (SCREENS[tab].init) SCREENS[tab].init(ctx);
 // Home Screen launches open on Home (F32, launch.js); a return from the background runs none of this.
 const startAt = launchURL(window);
 if (startAt) history.replaceState(null, "", startAt);
+// F8: a /add?url=… link (core/handoff.js) opens Sources > Manage > Sources with Add Source's alert filled in.
+const addFrom = isAddPath(location.pathname) ? parseAddLink(location.search) : null;
+if (isAddPath(location.pathname)) {
+  history.replaceState(null, "", location.pathname.replace(/add\/?$/, "") + format({ tab: "sources", path: ["manage", "sources"] }));
+}
 router.start();
+if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.
 if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch")) getBackend().refreshSources(undefined, { filter: sourceFilter(settingsScreen.settings.deviceType()) }).catch(() => {});

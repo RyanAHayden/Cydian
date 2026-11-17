@@ -30,6 +30,7 @@ import { signingReady, signingAvailable, signAndInstall } from "../signing-clien
 import { installOptions } from "../core/altstore.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
+import { openInGroup } from "./handoff.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -170,6 +171,11 @@ async function drawSections(page) {
   if (status?.error) body.append(el("p", "empty", status.error));
   else if (editing ? !data.sections.length : !data.total) {
     body.append(el("p", "empty", data.sections.length ? "Every section is hidden. Tap Edit to show them." : "No packages for this device."));
+  }
+  // F8: Open In, this source in another package manager, under the sections.
+  if (!editing && key !== ALL) {
+    const source = await getBackend().sources().then((l) => l.find((x) => x.key === key)).catch(() => null);
+    if (source && turn === page.draw && body.isConnected) body.append(openInGroup(source));
   }
 }
 
@@ -479,6 +485,8 @@ async function renderPackage(body, route, key, id, ctx) {
   if (conflicts.length) body.append(grouped([{ header: "Conflicts", rows: conflicts }]));
   // An installed package no source carries (F27) has no source to name: its page is the status stanza alone.
   if (!pkg.installedOnly) body.append(grouped([{ header: pkg.others.length > 1 ? "Sources" : "Source", rows: srcRows }]));
+  // F8: Open In, the package in another package manager (and its source from another device).
+  if (!pkg.installedOnly && source) body.append(openInGroup(source, { pkg: st.package || id }));
   if (st.debUrl && getBackend().kind === "http") {
     // Paid packages (cydia::commercial) only download for a buyer's device: the repo refuses the proxy.
     if (/(^|,)\s*cydia::commercial\s*(,|$)/.test(st.tag ?? "")) body.append(grouped([{ footer: "A paid package: buy and install it from a package manager on the phone." }]));

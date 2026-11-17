@@ -241,10 +241,12 @@ function renderHelp(body) {
     {
       header: "Which Jailbreak",
       rows: [{ label: "Not Jailbroken", detail: "apps only" }, { label: "Rootless", detail: "iOS 15 and later" },
-        { label: "Rootful", detail: "older, or palera1n" }],
+        { label: "Rootful", detail: "older, or palera1n" },
+        { label: "Roothide", detail: "Dopamine roothide, Bootstrap" }],
       footer: "On a phone without a jailbreak Cydian lists apps from AltStore-style sources, installed with a "
         + "sideloader. Set Settings > Device to Jailbroken to list tweaks and themes built for rootless "
-        + "(iphoneos-arm64) or rootful (iphoneos-arm) jailbreaks. A package built for the other kind will not install.",
+        + "(iphoneos-arm64), rootful (iphoneos-arm) or roothide (iphoneos-arm64e) jailbreaks. A package built for "
+        + "another kind will not install.",
     },
     {
       header: "Upgrading",

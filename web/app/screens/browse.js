@@ -19,9 +19,15 @@ import { NO_SECTION, indexLetter, parseAuthor, simpleSection } from "../core/cat
 import { description, parseRelations } from "../core/apt.js";
 import { displayName, releaseDepiction } from "../core/sources.js";
 import { renderSileo, mediaUrl } from "./depiction.js";
+import { settings, createSwitch } from "./settings.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
+
+// Section Visibility (F24): the hidden sections live on the device (core/settings.js hiddenSections) and reach
+// the worker's catalog before its next answer, so every list, Search and Changes leave them out.
+catalog.setHidden(settings.hiddenSections.list());
+settings.onChange((key, value) => { if (key === "hiddenSections") catalog.setHidden(value); });
 
 export function parseToken(seg) {
   const s = String(seg ?? "");
@@ -52,7 +58,10 @@ export function pageOf(route) {
 export function nav(route, sourceName = () => null) {
   const p = pageOf(route);
   switch (p.page) {
-    case "sections": return { title: p.key === ALL ? "Sections" : sourceName(p.key) || "Sections", style: "plain" };
+    case "sections": return {
+      title: p.key === ALL ? "Sections" : sourceName(p.key) || "Sections", style: "plain",
+      right: { label: "Edit", onClick: (e) => toggleVisibility(route, e.currentTarget) },
+    };
     case "section": return { title: p.value === ALL ? "All Packages" : p.value, style: "plain" };
     case "author": return { title: p.value || "Author", style: "plain" };
     case "package": return { title: names.get(p.value) || p.value };
@@ -89,23 +98,72 @@ const deeper = (route, seg) => format({ tab: route.tab, path: [...route.path, se
 
 // ---- Sections (Cydia's SectionsController): "All Packages", then every section with its count -----------
 
-async function renderSections(body, route, key) {
-  body.append(spinner());
+// Sections pages on screen, by route, so their nav bar's Edit can find them: { body, route, key, editing, title }.
+const sectionPages = new Map();
+
+function renderSections(body, route, key) {
+  for (const [k, p] of sectionPages) if (!p.body.isConnected) sectionPages.delete(k);
+  const page = { body, route, key, editing: false, title: null, draw: 0 };
+  sectionPages.set(format(route), page);
+  return drawSections(page);
+}
+
+async function drawSections(page) {
+  const { body, route, key, editing } = page;
+  const turn = ++page.draw; // an Edit tapped while the worker answers: only the last draw lands
+  body.replaceChildren(spinner());
   let data;
   try {
     await catalog.ensure();
-    data = await catalog.sections(key);
+    data = await catalog.sections(key, editing ? { hidden: true } : undefined);
   } catch (e) {
-    body.replaceChildren(el("p", "empty", e.message));
+    if (turn === page.draw) body.replaceChildren(el("p", "empty", e.message));
     return;
   }
+  if (turn !== page.draw) return;
   const status = key === ALL ? null : catalog.status(key);
   const ul = el("ul", "table plain sections");
-  ul.append(sectionRow("All Packages", data.total, deeper(route, token("section", ALL))));
-  for (const s of data.sections) ul.append(sectionRow(s.name, s.count, deeper(route, token("section", s.name))));
+  if (editing) {
+    // Cydia's edit mode: every section, hidden ones too, each with a switch (on = shown); no All Packages row.
+    ul.classList.add("visibility");
+    for (const s of data.sections) ul.append(visibilityRow(s));
+  } else {
+    ul.append(sectionRow("All Packages", data.total, deeper(route, token("section", ALL))));
+    for (const s of data.sections) ul.append(sectionRow(s.name, s.count, deeper(route, token("section", s.name))));
+  }
   body.replaceChildren(ul);
   if (status?.error) body.append(el("p", "empty", status.error));
-  else if (!data.total) body.append(el("p", "empty", "No packages for this device."));
+  else if (editing ? !data.sections.length : !data.total) {
+    body.append(el("p", "empty", data.sections.length ? "Every section is hidden. Tap Edit to show them." : "No packages for this device."));
+  }
+}
+
+// Edit <-> Done: the title becomes "Section Visibility" (Cydia's SECTION_VISIBILITY) and the rows turn into switches.
+function toggleVisibility(route, button) {
+  const page = sectionPages.get(format(route));
+  if (!page || !page.body.isConnected) return;
+  page.editing = !page.editing;
+  button.textContent = page.editing ? "Done" : "Edit";
+  button.classList.toggle("done", page.editing);
+  const h1 = button.closest(".nav-item")?.querySelector(".nav-title");
+  if (h1) {
+    if (page.editing) { page.title = h1.textContent; h1.textContent = "Section Visibility"; }
+    else if (page.title != null) h1.textContent = page.title;
+  }
+  drawSections(page);
+}
+
+function visibilityRow(s) {
+  const li = el("li", "cell section-row");
+  const inner = el("div", "cell-inner has-switch");
+  const folder = el("span", "folder");
+  folder.append(el("span", "folder-count", s.count > 9999 ? `${Math.floor(s.count / 1000)}k` : String(s.count)));
+  inner.append(folder, el("span", "cell-label", s.name), createSwitch({
+    label: `Show ${s.name}`, checked: !s.hidden,
+    onToggle: (on) => settings.hiddenSections.set(s.name, !on),
+  }));
+  li.append(inner);
+  return li;
 }
 
 function sectionRow(name, count, href) {

@@ -5,6 +5,7 @@
 //   catalog.sections(key)  catalog.list(key, section)  catalog.search(q)  catalog.author(name)
 //   catalog.package(id, key)  catalog.has(names)       // all promises; key "*" = All Sources
 //   catalog.changes()  catalog.onChange(f)             // the Changes tab (core/changes.js)
+//   catalog.setHidden(names)                           // Section Visibility: sent to the worker before the next question
 //
 // Cydia's model: the package lists change when the sources are refreshed, not on every visit. A source's
 // Packages text is kept in IndexedDB (core/cache.js) and reused while it is newer than the source's last
@@ -121,15 +122,32 @@ function ensure() {
 
 let first = null; // the first ensure, so search keystrokes don't each re-read the source list
 const ready = () => (first ??= ensure());
+// Section Visibility (F24): the hidden section names, sent to the worker ahead of the next question, so the
+// worker's catalog filters every list, Search and Changes with them (core/catalog.js setHidden).
+let hidden = [];
+let hiddenSent = true;
+function setHidden(names) {
+  const next = [...new Set(names ?? [])].sort();
+  if (JSON.stringify(next) === JSON.stringify(hidden)) return;
+  hidden = next;
+  hiddenSent = false;
+  for (const f of changeListeners) f(); // the Changes tab redraws without the hidden sections
+}
+
 const ask = async (op, args) => {
   await (running ?? ready());
+  if (!hiddenSent) {
+    hiddenSent = true;
+    await getParser().catalog("setHidden", [hidden]);
+  }
   return getParser().catalog(op, args);
 };
 
 export const catalog = {
   ensure: () => (first = ensure()),
   status: (key) => loaded.get(key) ?? null,
-  sections: (key = ALL) => ask("sections", [key]),
+  sections: (key = ALL, opts) => ask("sections", opts ? [key, opts] : [key]),
+  setHidden,
   list: (key = ALL, section = ALL) => ask("list", [key, section]),
   search: (q) => ask("search", [q]),
   author: (name) => ask("author", [name]),

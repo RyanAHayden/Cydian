@@ -2,7 +2,7 @@
 
 Everything here works on bytes in memory and returns objects in memory: nothing is written anywhere. The checks
 give the clear errors the page shows (a wrong password, an expired certificate or profile, a certificate the profile
-doesn't list, a profile whose app ID doesn't fit the app) before any IPA is downloaded.
+doesn't list) before any IPA is downloaded.
 """
 from __future__ import annotations
 
@@ -146,17 +146,16 @@ def check(identity: Identity, profile: Profile, now: dt.datetime | None = None) 
 
 
 def target_bundle_id(profile: Profile, bundle_id: str) -> str:
-    """The bundle ID the app is signed as. A wildcard profile keeps the app's own ID if it fits; an explicit one
-    signs it as the profile's ID (one app ID, one app)."""
+    """The bundle ID the app is signed as. A full wildcard ("*") keeps the app's own ID. A prefix wildcard (com.you.*)
+    keeps it if it fits, and otherwise signs the app under the profile's prefix: com.you.<the app's own ID>, so a
+    personal profile signs any app (its extensions follow: zsign -b moves their IDs too). An explicit profile signs
+    it as the profile's ID (one app ID, one app)."""
     app_id = profile.app_id
     if app_id == "*":
         return bundle_id
     if app_id.endswith(".*"):
-        if bundle_id.startswith(app_id[:-1]):
-            return bundle_id
-        raise SignError("app_id_mismatch",
-                        f"The provisioning profile is for {app_id}, which doesn't fit this app ({bundle_id}). "
-                        "Use a wildcard profile or one made for this app.")
+        prefix = app_id[:-1]
+        return bundle_id if bundle_id.startswith(prefix) else prefix + bundle_id
     if not app_id:
         raise SignError("bad_profile", "The provisioning profile has no app ID.")
     return app_id

@@ -169,9 +169,8 @@ class IdentityTest(unittest.TestCase):
         self.assertEqual(I.target_bundle_id(prof("*"), "dev.cydian.fixture"), "dev.cydian.fixture")
         self.assertEqual(I.target_bundle_id(prof("dev.cydian.*"), "dev.cydian.fixture"), "dev.cydian.fixture")
         self.assertEqual(I.target_bundle_id(prof("com.me.myapp"), "dev.cydian.fixture"), "com.me.myapp")
-        with self.assertRaises(I.SignError) as cm:
-            I.target_bundle_id(prof("com.other.*"), "dev.cydian.fixture")
-        self.assertEqual(cm.exception.code, "app_id_mismatch")
+        # A prefix wildcard that doesn't cover the app signs it under the prefix (the app's whole ID after it: unique).
+        self.assertEqual(I.target_bundle_id(prof("com.other.*"), "dev.cydian.fixture"), "com.other.dev.cydian.fixture")
 
 
 class StoreTest(unittest.TestCase):
@@ -269,10 +268,6 @@ class GuardTest(Base):
         self.limiter._b.clear()
         codes = [self.post(password="wrong").status_code for _ in range(3)]
         self.assertEqual(codes, [400, 400, 429])
-
-    def test_app_id_mismatch(self):
-        r = self.post(profile=T.profile(KEY, CERT, app_id="com.other.*"))  # judged before zsign runs
-        self.assertEqual((r.status_code, r.json["code"]), (400, "app_id_mismatch"))
 
     def test_unknown_token(self):
         self.assertEqual(self.c.get("/sign/nope/manifest.plist").status_code, 404)

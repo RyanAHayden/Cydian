@@ -16,12 +16,18 @@
 // Sources: the list is apt's (core/aptsources.js), so what the app shows is what apt installs from. Refresh runs
 // `apt-get update` through the helper first, then reads each source's Release and Packages from apt's lists
 // directory, falling back to the network for anything apt has no list for. A source added in Cydian is checked
-// like on the site and kept on the device (IndexedDB, `added: true`) beside apt's; writing it into apt's sources
-// needs a helper verb (follow-up to N3). Counts, origin and refresh times of every source are kept there too.
+// like on the site, then written into apt's own sources through the helper (F33: `cydian-helper addsource`, which
+// edits only sources.list.d/cydian.sources), so apt-get update and installs use it too. Only where the helper
+// can't be run (not installed) is it kept on the device alone (IndexedDB, `added: true`); refreshSources moves such
+// records into cydian.sources once it can. Removing works for cydian.sources' sources; apt's other files are left
+// to the user. Counts, origin and refresh times of every source are kept in IndexedDB.
 import { BackendError } from "./backend-http.js";
 import { verifySource, refreshSource, openSourceStore, sortSources } from "./core/sources.js";
 import { parseAptSources, listNamesFor } from "./core/aptsources.js";
 import { DEFAULT_ARCH } from "./core/apt.js";
+
+// The one apt source file Cydian writes (cydian-helper addsource/removesource, F33).
+const CYDIAN_SOURCES = /(^|\/)sources\.list\.d\/cydian\.sources$/;
 
 const CODES = new Set(["bad_url", "refused", "too_large", "timeout", "upstream", "not_found", "network", "helper"]);
 
@@ -110,6 +116,39 @@ function nativeSourceCalls(backend, call, opts) {
   const count = opts.count;
   const aptSources = async () => parseAptSources((await call("apt.sources")) ?? []);
 
+  // F33: cydian-helper addsource|removesource. Resolves true when it ran and succeeded, false when the helper
+  // couldn't be run at all (no helper: the sideload build); a refusal or failed write is an error with its message.
+  async function writeSource(verb, s) {
+    const dist = s.dist || "./";
+    const words = verb === "addsource" ? [verb, s.uri, dist, ...(dist.endsWith("/") ? [] : s.components ?? [])] : [verb, s.uri, dist];
+    let r;
+    try {
+      r = await backend.helper(words);
+    } catch (e) {
+      if (e?.code === "helper") return false;
+      throw e;
+    }
+    if (r.code !== 0) throw new BackendError("helper", `cydian-helper ${verb} failed (${r.code}): ${lastLine(r.stderr) || "no output"}`);
+    return true;
+  }
+
+  // Records kept on the device only (`added: true`, from before F33 or without a helper) go into cydian.sources,
+  // one at a time; one that can't be written stays as it is and is tried again on the next refresh.
+  async function migrateAdded() {
+    const db = await store();
+    const added = (await db.list()).filter((s) => s.added);
+    if (!added.length) return;
+    const aptKeys = new Set((await aptSources()).map((s) => s.key));
+    for (const s of added) {
+      const { added: _, ...rest } = s;
+      try {
+        if (aptKeys.has(s.key) || (await writeSource("addsource", s))) await db.put(rest);
+      } catch {
+        // refused or not written: still listed from the device store, and the next refresh tries again
+      }
+    }
+  }
+
   async function list() {
     const db = await store();
     const stored = new Map((await db.list()).map((s) => [s.key, s]));
@@ -130,15 +169,23 @@ function nativeSourceCalls(backend, call, opts) {
       const db = await store();
       const cur = await db.get(s.key);
       const inApt = (await aptSources()).some((a) => a.key === s.key);
-      return db.put({ ...cur, ...s, ...(inApt ? {} : { added: true }) });
+      const written = !inApt && (await writeSource("addsource", s));
+      const { added, ...rest } = { ...cur, ...s };
+      return db.put(inApt || written ? rest : { ...rest, added: true });
     },
     async removeSource(key) {
       const apt = (await aptSources()).find((s) => s.key === key);
-      if (apt) throw new Error(`This source is listed in ${apt.file}, which Cydian can't change yet. Remove it there (Filza or a terminal), then Refresh.`);
+      if (apt && CYDIAN_SOURCES.test(apt.file)) {
+        if (!(await writeSource("removesource", apt))) throw new BackendError("helper", "cydian-helper is not installed, so Cydian can't change apt's sources.");
+      } else if (apt) {
+        throw new Error(`This source is listed in ${apt.file}, which Cydian doesn't change. Remove it there (Filza or a terminal), then Refresh.`);
+      }
       return (await store()).remove(key);
     },
-    // apt-get update, then every source's count and Release from apt's lists (all at once), saved as each lands.
+    // Device-only sources into cydian.sources, apt-get update, then every source's count and Release from apt's
+    // lists (all at once), saved as each lands.
     async refreshSources(onEach = () => {}) {
+      await migrateAdded();
       await backend.update();
       const db = await store();
       const sources = await list();

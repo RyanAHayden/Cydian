@@ -109,6 +109,133 @@ class Helper(unittest.TestCase):
                 self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
         self.assertEqual(len(self.plan("install", *(["ab"] * 256))), 2 + 8 + 256)
 
+    # --- F33: addsource / removesource and cydian.sources
+
+    def test_source_strings(self):
+        good_uris = ["https://repo.example/", "http://a.b/", "https://repo.example:8443/deb/", "https://h/a/b-c_d~e/",
+                     "https://repo.example/%7Euser/", "https://Repo.Example/x+y=z,1:2/", "https://a.b/x//y/"]
+        bad_uris = ["", "https://repo.example", "ftp://a.b/", "HTTPS://a.b/", "file:///etc/", "https://user:pw@a.b/",
+                    "https://a.b/ x/", "https://a.b/#/", "https://a.b/\n/", "https://a.b/'/", "https://a.b/[x]/",
+                    "https:///", "https://-a.b/", "https://.a/", "https://a.b:/", "https://a.b:123456/",
+                    "https://a.b/../", "https://a.b/x/./", "https://a.b/x/../y/", "https://a.b/x\ny/",
+                    "https://a.b/" + "x" * 1012 + "/", "https://a.b/é/", "https://a.b/?q=1/", "https://a.b/;x/"]
+        self.assertEqual(len("https://a.b/" + "x" * 1011 + "/"), 1024)
+        self.assertEqual(self.run_driver("uri", *good_uris, "https://a.b/" + "x" * 1011 + "/"),
+                         ["ok"] * (len(good_uris) + 1))
+        self.assertEqual(self.run_driver("uri", *bad_uris), ["bad"] * len(bad_uris))
+        good_suites = ["./", "1800", "stable", "iphoneos-arm64/1800", "sub/", "a.b_c+d-e", "x/y/"]
+        bad_suites = ["", "-o", "/abs", "../", "a/../b", ".", "..", "a b", "a#b", "a\nb", "a:b", "a" * 256, "x/./"]
+        self.assertEqual(self.run_driver("suite", *good_suites), ["ok"] * len(good_suites))
+        self.assertEqual(self.run_driver("suite", *bad_suites), ["bad"] * len(bad_suites))
+        good_comps = ["main", "contrib", "main/debian-installer", "non-free", "a1.2+3_4", "M"]
+        bad_comps = ["", "-main", ".main", "main/", "a/../b", "a b", "a#", "a\n", "/main", "a" * 65, "a:b"]
+        self.assertEqual(self.run_driver("component", *good_comps), ["ok"] * len(good_comps))
+        self.assertEqual(self.run_driver("component", *bad_comps), ["bad"] * len(bad_comps))
+
+    def test_source_plan(self):
+        f = "/var/jb/etc/apt/sources.list.d/cydian.sources"
+        self.assertEqual(self.plan("addsource", "https://r.test/", "./"), [f, "addsource", "https://r.test/", "./"])
+        self.assertEqual(self.plan("addsource", "https://r.test/", "stable", "main", "extra"),
+                         [f, "addsource", "https://r.test/", "stable", "main", "extra"])
+        self.assertEqual(self.plan("removesource", "https://r.test/", "stable"), [f, "removesource", "https://r.test/", "stable"])
+        cases = {
+            ("addsource",): "needs a URI and a suite",
+            ("addsource", "https://r.test/"): "needs a URI and a suite",
+            ("removesource", "https://r.test/"): "needs a URI and a suite",
+            ("addsource", "https://r.test", "./"): "bad URI",
+            ("addsource", "-o", "./"): "bad URI",
+            ("addsource", "https://r.test/\nTrusted: yes", "./"): "bad URI",
+            ("addsource", "https://r.test/", "./\nTrusted: yes"): "bad suite",
+            ("addsource", "https://r.test/", "stable", "main\nTrusted: yes"): "bad component",
+            ("addsource", "https://r.test/", "./", "main"): "flat suite",
+            ("addsource", "https://r.test/", "stable"): "needs components",
+            ("addsource", "https://r.test/", "stable", *(["c"] * 17)): "too many components",
+            ("removesource", "https://r.test/", "stable", "main"): "URI and a suite only",
+            ("AddSource", "https://r.test/", "./"): "unknown verb",
+        }
+        for words, msg in cases.items():
+            with self.subTest(words=words[:4]):
+                out = self.plan(*words)
+                self.assertEqual(len(out), 1, out)
+                self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
+
+    def sources_file(self, prefix):
+        os.makedirs(os.path.join(prefix, "etc/apt"), exist_ok=True)  # always there on a device; sources.list.d may not be
+        return os.path.join(prefix, "etc/apt/sources.list.d/cydian.sources")
+
+    def test_sources_apply(self):
+        p = tempfile.mkdtemp(dir=self.tmp)
+        f = self.sources_file(p)
+        a = lambda *w: self.run_driver("apply", p, *w)[0]
+        read = lambda: open(f).read()
+        self.assertEqual(a("removesource", "https://r.test/", "./"), "unchanged")  # nothing there, nothing made
+        self.assertFalse(os.path.exists(f))
+        self.assertEqual(a("addsource", "https://r.test/", "./"), "changed")  # sources.list.d made too
+        self.assertEqual(read(), "Types: deb\nURIs: https://r.test/\nSuites: ./\n")
+        self.assertEqual(stat.S_IMODE(os.stat(f).st_mode), 0o644)
+        self.assertEqual(a("addsource", "https://r.test/", "./"), "unchanged")
+        self.assertEqual(a("addsource", "https://d.test/deb/", "stable", "main", "extra"), "changed")
+        self.assertEqual(read(), "Types: deb\nURIs: https://r.test/\nSuites: ./\n\n"
+                                 "Types: deb\nURIs: https://d.test/deb/\nSuites: stable\nComponents: main extra\n")
+        # the same URI and suite again replaces the stanza in place (new components); another suite is another source
+        self.assertEqual(a("addsource", "https://r.test/", "sub/"), "changed")
+        self.assertEqual(a("addsource", "https://d.test/deb/", "stable", "main"), "changed")
+        self.assertEqual(read(), "Types: deb\nURIs: https://r.test/\nSuites: ./\n\n"
+                                 "Types: deb\nURIs: https://d.test/deb/\nSuites: stable\nComponents: main\n\n"
+                                 "Types: deb\nURIs: https://r.test/\nSuites: sub/\n")
+        self.assertEqual(a("removesource", "https://r.test/", "./"), "changed")
+        self.assertEqual(a("removesource", "https://r.test/", "./"), "unchanged")
+        self.assertEqual(a("removesource", "https://d.test/deb/", "stable"), "changed")
+        self.assertEqual(read(), "Types: deb\nURIs: https://r.test/\nSuites: sub/\n")
+        self.assertEqual(a("removesource", "https://r.test/", "sub/"), "changed")
+        self.assertFalse(os.path.exists(f))  # the last one gone: no empty file for apt to read
+        self.assertEqual([n for n in os.listdir(os.path.dirname(f))], [])  # no temp files left
+
+    def test_sources_apply_concurrent(self):
+        """Adds at the same time all land: the edit holds a flock on sources.list.d."""
+        p = tempfile.mkdtemp(dir=self.tmp)
+        f = self.sources_file(p)
+        uris = [f"https://r{i}.test/" for i in range(12)]
+        procs = [subprocess.Popen([self.driver, "apply", p, "addsource", u, "./"], stdout=subprocess.PIPE, text=True)
+                 for u in uris]
+        self.assertEqual([pr.communicate(timeout=30)[0] for pr in procs], ["changed\n"] * len(uris))
+        text = open(f).read()
+        self.assertEqual(sorted(l[6:] for l in text.splitlines() if l.startswith("URIs: ")), sorted(uris))
+
+    def test_sources_apply_hand_edits(self):
+        """Stanzas someone wrote by hand stay as written; only ones naming exactly this URI and suite change."""
+        p = tempfile.mkdtemp(dir=self.tmp)
+        f = self.sources_file(p)
+        os.makedirs(os.path.dirname(f))
+        hand = ("# mine\nTypes: deb deb-src\nURIs: https://r.test/ https://m.test/\nSuites: ./\n\n\n"
+                "types: deb\nuris:   https://r.test/  \r\nsuites: ./\nSigned-By: /x.gpg\n   \n"
+                "Types: deb\nURIs:\n https://c.test/\nSuites: ./\n")
+        with open(f, "w") as fh:
+            fh.write(hand)
+        a = lambda *w: self.run_driver("apply", p, *w)[0]
+        self.assertEqual(a("addsource", "https://r.test/", "./"), "changed")
+        self.assertEqual(open(f).read(), "# mine\nTypes: deb deb-src\nURIs: https://r.test/ https://m.test/\nSuites: ./\n\n"
+                                         "Types: deb\nURIs: https://r.test/\nSuites: ./\n\n"
+                                         "Types: deb\nURIs:\n https://c.test/\nSuites: ./\n")
+        self.assertEqual(a("removesource", "https://c.test/", "./"), "changed")  # a folded URIs field counts too
+        self.assertEqual(a("removesource", "https://m.test/", "./"), "unchanged")  # in a two-URI stanza: left alone
+
+    def test_sources_apply_refuses_odd_files(self):
+        p = tempfile.mkdtemp(dir=self.tmp)
+        f = self.sources_file(p)
+        os.makedirs(os.path.dirname(f))
+        secret = os.path.join(self.tmp, "secret")
+        with open(secret, "w") as fh:
+            fh.write("root:x:0:0\n")
+        os.symlink(secret, f)
+        out = self.run_driver("apply", p, "addsource", "https://r.test/", "./")[0]
+        self.assertTrue(out.startswith("error: can't read cydian.sources"), out)
+        self.assertTrue(os.path.islink(f))
+        os.unlink(f)
+        os.mkdir(f)
+        out = self.run_driver("apply", p, "addsource", "https://r.test/", "./")[0]
+        self.assertTrue(out.startswith("error: "), out)
+
     # --- packages must be known to dpkg (remove) or dpkg/apt (install)
 
     def fake_prefix(self):
@@ -229,6 +356,34 @@ class Helper(unittest.TestCase):
                 self.assertTrue(any(l.startswith("2: cydian-helper: ") and msg in l for l in out), out)
                 self.assertEqual(out[-1], f"exit: {code}")
                 self.assertFalse(any(l.startswith("1: argv") for l in out), out)
+
+    def test_chain_sources(self):
+        """F33: addsource/removesource through the chain edit cydian.sources and run no apt at all."""
+        p, app, helper = self.chain_prefix()
+        f = self.sources_file(p)
+        out = self.run_driver("spawn", helper, "addsource", "https://r.test/", "stable", "main", driver=app)
+        self.assertEqual(out, ["1: Added https://r.test/ stable: cydian.sources updated", "exit: 0"])
+        self.assertEqual(open(f).read(), "Types: deb\nURIs: https://r.test/\nSuites: stable\nComponents: main\n")
+        out = self.run_driver("spawn", helper, "addsource", "https://r.test/", "stable", "main", driver=app)
+        self.assertEqual(out, ["1: Added https://r.test/ stable: nothing to change", "exit: 0"])
+        out = self.run_driver("spawn", helper, "addsource", "file:///etc/", "./", driver=app)
+        self.assertTrue(any("bad URI" in l for l in out), out)
+        self.assertEqual(out[-1], "exit: 64")
+        out = self.run_driver("spawn", helper, "removesource", "https://r.test/", "stable", driver=app)
+        self.assertEqual(out[-1], "exit: 0")
+        self.assertFalse(os.path.exists(f))
+        out = self.run_driver("spawn", helper, "addsource", "https://r.test/", "./", driver=self.driver)
+        self.assertEqual(out[-1], "exit: 77")  # the caller check comes first
+        self.assertFalse(os.path.exists(f))
+        os.chmod(os.path.dirname(f), 0o555)  # can't write there: exit 74, the file as it was
+        try:
+            if os.access(os.path.dirname(f), os.W_OK):
+                self.skipTest("running as root: can't make sources.list.d unwritable")
+            out = self.run_driver("spawn", helper, "addsource", "https://r.test/", "./", driver=app)
+            self.assertTrue(any("can't create a temp file" in l for l in out), out)
+            self.assertEqual(out[-1], "exit: 74")
+        finally:
+            os.chmod(os.path.dirname(f), 0o755)
 
     def test_not_root(self):
         """The helper as shipped (root uid 0) refuses a normal user even when Cydian is the parent."""

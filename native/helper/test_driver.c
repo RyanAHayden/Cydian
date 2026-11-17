@@ -2,7 +2,9 @@
  *   test_driver name <s>...                    print "ok" or "bad" per name
  *   test_driver plan <prefix> <status_fd> <verb> [args]...   print the exec path and argv, one per line, or "error: ..."
  *   test_driver known <prefix> <verb> <pkg>... print the first unknown package or "all known"
- *   test_driver caller <uid> <euid> <root_uid> <parent_exe> <expected>   print "ok" or "error: ..."
+ *   test_driver apply <prefix> <verb> [args]...  F33: addsource/removesource on the prefix; "changed",
+ *                                              "unchanged" or "error: ..."
+ *   test_driver uri|suite|component <s>...     print "ok" or "bad" per string <uid> <euid> <root_uid> <parent_exe> <expected>   print "ok" or "error: ..."
  *   test_driver spawn <helper> [args]...       spawn helper, print its streams as "1: ...", "2: ...", "3: ..."
  *                                              lines, then "exit: <code>"
  * SPDX-License-Identifier: GPL-3.0-or-later */
@@ -73,6 +75,15 @@ int main(int argc, char **argv) {
         if (helper_plan(argc - 3, argv + 3, argv[2], -1, &p, &err)) { printf("error: %s\n", err); return 0; }
         int i = helper_first_unknown(argv[2], &p);
         printf("%s\n", i < 0 ? "all known" : p.packages[i]);
+    } else if (!strcmp(cmd, "uri") || !strcmp(cmd, "suite") || !strcmp(cmd, "component")) {
+        int (*ok)(const char *) = cmd[0] == 'u' ? helper_uri_ok : cmd[0] == 's' ? helper_suite_ok : helper_component_ok;
+        for (int i = 2; i < argc; i++) printf("%s\n", ok(argv[i]) ? "ok" : "bad");
+    } else if (!strcmp(cmd, "apply") && argc >= 4) {
+        struct helper_plan p;
+        int changed;
+        if (helper_plan(argc - 3, argv + 3, argv[2], -1, &p, &err) || helper_sources_apply(&p, &changed, &err))
+            printf("error: %s\n", err);
+        else printf("%s\n", changed ? "changed" : "unchanged");
     } else if (!strcmp(cmd, "caller") && argc == 7) {
         if (helper_caller_ok((uid_t)atol(argv[2]), (uid_t)atol(argv[3]), (uid_t)atol(argv[4]), argv[5], argv[6], &err))
             printf("error: %s\n", err);

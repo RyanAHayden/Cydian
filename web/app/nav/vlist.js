@@ -135,8 +135,12 @@ export function createVList(scroller, { items = [], rowHeight = 58, headerHeight
     }
   }
 
+  // Rows are placed in the scroll event itself, not a frame later: the browser sends one scroll event per frame,
+  // and waiting for the next frame left the rows a frame behind, so dragging the scroll bar (thousands of px a
+  // move) mostly showed the placeholder rows.
   function onScroll() {
-    if (!frame) frame = requestAnimationFrame(update);
+    if (frame) { cancelAnimationFrame(frame); frame = 0; }
+    update();
     if (idle) {
       clearTimeout(idleTimer);
       idleTimer = setTimeout(settle, 120);

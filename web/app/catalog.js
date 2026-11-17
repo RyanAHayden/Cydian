@@ -257,6 +257,7 @@ export const catalog = {
   history: (id, key = ALL) => ask("history", [id, key]), // F29: Version History (core/catalog.js history)
   altSource: (key) => ask("altSource", [key]),
   has: (names) => ask("has", [names]),
+  deps: (id, key = ALL) => ask("deps", [id, key]), // F18: plain-language dependency problems (core/deps.js)
   // The Changes tab: [{ seen, rows: [{ ...row, change: "new" | "updated" }] }], newest first (core/changes.js).
   changes: async () => {
     const rows = await ask("list", [ALL, ALL]);

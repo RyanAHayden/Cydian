@@ -31,6 +31,7 @@ import { installOptions } from "../core/altstore.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
 import { openInGroup } from "./handoff.js";
+import { addSource } from "./manage.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -443,9 +444,13 @@ async function renderPackage(body, route, key, id, ctx) {
   // Depends (and Pre-Depends): each line links to the first alternative we carry.
   const rels = [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)];
   const known = new Set(rels.length ? await catalog.has([...new Set(rels.flat().map((r) => r.name))]) : []);
+  // F18: what stops it installing, in plain words; its `targets` also link a virtual name to its provider.
+  const depReport = await catalog.deps(id, key).catch(() => null);
   const depRows = rels.map((group) => {
     const text = group.map((r) => r.name + (r.op ? ` (${r.op} ${r.version})` : "")).join(" | ");
     const target = group.find((r) => known.has(r.name));
+    const via = !target && group.map((r) => depReport?.targets?.[r.name]).find(Boolean);
+    if (via) return { label: text, href: deeper(route, token("package", via)) };
     return target ? { label: text, href: deeper(route, token("package", target.name)) } : { label: text, chevron: false };
   });
   const conflicts = parseRelations(st.conflicts).map((g) => ({ label: g.map((r) => r.name + (r.op ? ` (${r.op} ${r.version})` : "")).join(" | ") }));
@@ -481,6 +486,7 @@ async function renderPackage(body, route, key, id, ctx) {
     footer: fit.detail }]));
   const installedEl = await installedGroup(st.package || id);
   if (installedEl) body.append(installedEl);
+  if (depReport?.problems.length) body.append(depProblemsGroup(depReport, route, ctx));
   if (depRows.length) body.append(grouped([{ header: "Depends", rows: depRows }]));
   if (conflicts.length) body.append(grouped([{ header: "Conflicts", rows: conflicts }]));
   // An installed package no source carries (F27) has no source to name: its page is the status stanza alone.
@@ -727,6 +733,44 @@ async function installedGroup(id) {
     cell.classList.add("has-switch");
   }
   return frag;
+}
+
+// F18: the package's dependency problems (core/deps.js explain), each sentence in a cell of its own with its
+// action under it: Add <source>, Remove <package> (through N4's queue where the backend has one, else its page),
+// Open <package>, or Settings' iOS Version. The firmware explanation goes in the footer.
+function depProblemsGroup(report, route, ctx) {
+  const frag = document.createDocumentFragment();
+  const blocking = report.problems.some((p) => p.blocking);
+  report.problems.forEach((p, i) => {
+    const g = el("div", "group deps-problem");
+    if (i === 0) g.append(el("h2", "group-header", blocking ? "Can't Install Yet" : "Before Installing"));
+    // One table: the sentence in a wrapping cell, the action row under it.
+    const row = depActionRow(p, route, ctx);
+    const ul = row ? grouped([{ rows: [row] }]).firstElementChild.querySelector("ul") : el("ul", "table grouped");
+    const li = el("li", "cell");
+    li.append(el("div", "pkg-description", p.sentence));
+    ul.prepend(li);
+    g.append(ul);
+    if (p.detail) g.append(el("p", "group-footer", p.detail));
+    frag.append(g);
+  });
+  return frag;
+}
+
+function depActionRow(p, route, ctx) {
+  const a = p.action;
+  if (!a) return p.id && p.id !== "firmware" && p.kind !== "missing" ? { label: p.id, href: deeper(route, token("package", p.id)) } : null;
+  switch (a.kind) {
+    case "open": return { label: a.label, href: deeper(route, token("package", a.id)) };
+    case "add-source": return { label: a.label, subtitle: a.url, chevron: true, onClick: () => addSource(ctx, { url: a.url }) };
+    case "settings": return getBackend().kind === "http" ? { label: a.label, href: format({ tab: "settings", path: ["iosVersion"] }) } : null;
+    case "remove": {
+      const q = queueOf();
+      if (q) return { label: a.label, onClick: () => q({ op: "remove", id: a.id }) };
+      return { label: a.label.replace(/^Remove /, "Open "), href: deeper(route, token("package", a.id)) };
+    }
+    default: return null;
+  }
 }
 
 // A deep link titles the page with the id until the package loads; then its name goes in the nav bar. app.js

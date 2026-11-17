@@ -1,0 +1,60 @@
+{
+  "name": "Example Apps",
+  "identifier": "dev.example.apps",
+  "subtitle": "Apps for testing Cydian",
+  "description": "A fixture source in AltStore's 2.0 format, with one 1.x-style app.",
+  "iconURL": "https://example.dev/icon.png",
+  "headerURL": "https://example.dev/header.png",
+  "website": "https://example.dev",
+  "tintColor": "8A28F7",
+  "featuredApps": ["dev.example.emu", "dev.example.missing"],
+  "apps": [
+    {
+      "name": "Emu",
+      "bundleIdentifier": "dev.example.emu",
+      "developerName": "Example Dev",
+      "subtitle": "A game emulator.",
+      "localizedDescription": "Plays old games.\nSaves states.",
+      "iconURL": "https://example.dev/emu.png",
+      "tintColor": "#0e8a4f",
+      "category": "games",
+      "screenshots": { "iphone": ["https://example.dev/s1.png", { "imageURL": "https://example.dev/s2.png", "width": 1179, "height": 2556 }], "ipad": ["https://example.dev/pad.png"] },
+      "versions": [
+        { "version": "2.0", "buildVersion": "20", "date": "2026-11-10T10:00:00Z", "localizedDescription": "Needs iOS 17.", "downloadURL": "https://example.dev/emu-2.0.ipa", "size": 52428800, "minOSVersion": "17.0" },
+        { "version": "1.5", "buildVersion": "15", "date": "2026-10-01", "localizedDescription": "Faster.", "downloadURL": "https://example.dev/emu-1.5.ipa", "size": 41943040, "minOSVersion": "15.0" },
+        { "version": "1.0", "date": "2026-01-01", "localizedDescription": "First release.", "downloadURL": "https://example.dev/emu-1.0.ipa", "size": 31457280, "minOSVersion": "14.0", "maxOSVersion": "16" }
+      ],
+      "appPermissions": {
+        "entitlements": ["com.apple.developer.kernel.increased-memory-limit"],
+        "privacy": { "NSCameraUsageDescription": "Scan QR codes.", "NSLocalNetworkUsageDescription": "Play with friends." }
+      }
+    },
+    {
+      "name": "Legacy",
+      "bundleIdentifier": "dev.example.legacy",
+      "developerName": "Old Dev",
+      "localizedDescription": "An app in the 1.x format.",
+      "version": "3.1",
+      "versionDate": "2025-05-05",
+      "versionDescription": "Bug fixes.",
+      "downloadURL": "https://example.dev/legacy.ipa",
+      "size": 1048576,
+      "screenshotURLs": ["https://example.dev/l1.png"],
+      "permissions": [{ "type": "photos", "usageDescription": "Save pictures." }]
+    },
+    {
+      "name": "Signed",
+      "bundleIdentifier": "dev.example.signed",
+      "developerName": "Example Dev",
+      "category": "utilities",
+      "versions": [{ "version": "1.0", "date": "2026-11-01", "downloadURL": "https://example.dev/signed.ipa", "manifestURL": "https://example.dev/signed.plist", "size": 2048 }]
+    },
+    { "name": "No versions", "bundleIdentifier": "dev.example.empty", "versions": [] },
+    { "name": "No id", "versions": [{ "version": "1", "downloadURL": "https://example.dev/x.ipa" }] },
+    { "name": "Emu again", "bundleIdentifier": "dev.example.emu", "versions": [{ "version": "9", "downloadURL": "https://example.dev/dup.ipa" }] }
+  ],
+  "news": [
+    { "title": "Emu 2.0 is out", "identifier": "emu-2", "caption": "Now for iOS 17.", "date": "2026-11-10", "tintColor": "#0e8a4f", "imageURL": "https://example.dev/news.png", "notify": true, "appID": "dev.example.emu" },
+    { "title": "Welcome", "identifier": "welcome", "caption": "Our new source.", "date": "2026-01-01", "notify": false, "url": "https://example.dev/blog" }
+  ]
+}

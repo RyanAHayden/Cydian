@@ -159,7 +159,8 @@ async function lists(holds, mode) {
   }
   const installed = await catalog.installed();
   if (!installed) throw new Error(NO_STATUS);
-  return { sources: await getBackend().sources(), installed, holds, arch: getArch() };
+  // AltStore sources (F9) carry no dpkg upgrades: the server check gets the APT ones.
+  return { sources: (await getBackend().sources()).filter((s) => s.kind !== "altstore"), installed, holds, arch: getArch() };
 }
 
 async function send(subscription, holds, mode = saved()?.mode ?? "server") {

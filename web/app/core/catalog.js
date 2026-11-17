@@ -19,6 +19,10 @@
 //   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
 //   c.installed()                          -> [row] installed, sorted by name, each with `installed` (its version)
 //   c.upgrades(holds, { dpkgHolds })       -> { available: [row], ignored: [row] } (Changes, core/installed.js)
+//   c.loadAlt(key, json, ios)              -> an AltStore source (F9, core/altstore.js): each app a row, its
+//                                             candidate the newest version iOS `ios` runs; apps none runs on left out
+//   c.altSource(key)                       -> the AltStore source's page data: { name, tintColor, headerURL, news,
+//                                             featured: [row], ... } or null
 //   c.setDevice(device, { filter })        -> "Works on my phone" (F17, core/compat.js): every row gets `compat`,
 //                                             its code for `device`; with filter on (the default) rows that can't
 //                                             work drop out of sections, list, search and author like hidden ones
@@ -27,6 +31,7 @@
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
 import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
 import { compat, compatCode, isIncompatible, normalizeDevice, needText } from "./compat.js";
+import { parseAltSource, appStanza } from "./altstore.js";
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -104,13 +109,14 @@ function makeRow(st, key) {
   return {
     id: st.package, name, short: desc.short, version: st.version ?? "", section: sectionName(st.section),
     icon: st.iconUrl ?? null, key, author: author || maint, paid: tagsOf(st).includes("cydia::commercial"),
+    kind: st.kind === "ipa" ? "ipa" : undefined,
     // search fields, lower-cased once at load; dropped before rows leave the worker
     _hay: [name, st.package, desc.short, desc.long, author, maint].join("\n").toLowerCase(),
     _n: name.toLowerCase(), _id: st.package.toLowerCase(), _a: author.toLowerCase(), _m: maint.toLowerCase(),
   };
 }
 
-const slim = ({ id, name, short, version, section, icon, key, author, compat, paid }) => ({ id, name, short, version, section, icon, key, author, compat, paid });
+const slim = ({ id, name, short, version, section, icon, key, author, compat, paid, kind }) => ({ id, name, short, version, section, icon, key, author, compat, paid, kind });
 
 // Search's segmented control (F35): a few broad kinds over Cydia's sections. A section belongs to a group by its
 // simple name (simpleSection): "Themes (SpringBoard)" is a Theme, "Tweaks" a Tweak.
@@ -166,7 +172,37 @@ export function createCatalog() {
     return byId.size;
   }
 
+  // F9: an AltStore source's JSON (text or parsed). Its apps go in like packages; the rest (news, header, tint,
+  // featured apps) is kept for its source page.
+  const altMeta = new Map(); // key -> parsed source without apps
+  function loadAlt(key, json, ios = null) {
+    const parsed = parseAltSource(json);
+    const byId = new Map();
+    for (const app of parsed.apps) {
+      const st = appStanza(app, { url: key.replace(/^alt:/, ""), name: parsed.name }, ios);
+      if (st) byId.set(st.package, { stanza: st, row: makeRow(st, key) });
+    }
+    for (const e of byId.values()) judge(e);
+    const { apps, ...meta } = parsed;
+    altMeta.set(key, meta);
+    sources.set(key, { byId });
+    merged = null;
+    sorted.clear();
+    shown.clear();
+    fitting.clear();
+    return byId.size;
+  }
+
+  function altSource(key) {
+    const meta = altMeta.get(key);
+    if (!meta) return null;
+    const byId = sources.get(key)?.byId ?? new Map();
+    const featured = meta.featuredApps.map((id) => byId.get(id)?.row).filter(Boolean).map(slim);
+    return { ...meta, featured, count: byId.size };
+  }
+
   function remove(key) {
+    altMeta.delete(key);
     sources.delete(key);
     merged = null;
     sorted.clear();
@@ -369,13 +405,13 @@ export function createCatalog() {
     return findUpgrades(installedPkgs, (id) => { const e = all.get(id); return e ? slim(e.row) : null; }, holds, opts);
   }
 
-  return { load, remove, setHidden, sections, list, search, author, package: pkg, has, versions, keys: () => [...sources.keys()],
+  return { load, loadAlt, altSource, remove, setHidden, sections, list, search, author, package: pkg, has, versions, keys: () => [...sources.keys()],
     setInstalled, installed, upgrades, setDevice };
 }
 
 // Runs a catalog operation by name: the worker's entry point. Unknown ops throw.
 export function runCatalog(catalog, op, args = []) {
-  const f = { load: catalog.load, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
+  const f = { load: catalog.load, loadAlt: catalog.loadAlt, altSource: catalog.altSource, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
     search: catalog.search, author: catalog.author, package: catalog.package, has: catalog.has, keys: catalog.keys,
     versions: catalog.versions, setHidden: catalog.setHidden, setInstalled: catalog.setInstalled,
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice }[op];

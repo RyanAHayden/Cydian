@@ -1,0 +1,158 @@
+Package: 3proxy
+Version: 0.5.3k-2p
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Installed-Size: 1208
+Filename: debs/3proxy_0.5.3k-2p_iphoneos-arm.deb
+Size: 416322
+MD5sum: 870db4e8c1477b2642e401b4ce256def
+Section: Networking
+Priority: optional
+Homepage: http://3proxy.ru/download/
+Description: tiny free proxy server
+Depiction: https://cydia.saurik.com/info/3proxy/
+Name: 3proxy
+Tag: purpose::daemon, role::hacker
+
+Package: adv-cmds
+Version: 119-6
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Installed-Size: 536
+Pre-Depends: dpkg (>= 1.14.25-8)
+Depends: ncurses
+Provides: ps
+Filename: debs/adv-cmds_119-6_iphoneos-arm.deb
+Size: 62804
+MD5sum: fb4a7c239d1089eee056df930a61718c
+Section: Administration
+Priority: important
+Description: finger, fingerd, last, lsvfs, md, ps
+Tag: purpose::console, role::hacker
+
+Package: apt
+Version: 1:0-23
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Installed-Size: 12
+Pre-Depends: dpkg (>= 1.14.25-8)
+Depends: apt7
+Conflicts: cydia (<< 1.0.2843-1)
+Filename: debs/apt_1:0-23_iphoneos-arm.deb
+Size: 686
+MD5sum: c26a27bdd7e7edbc496ed16aafcdf408
+Section: Packaging
+Priority: required
+Description: any advanced packaging tool from Debian
+Name: APT 0.6 Transitional
+Tag: purpose::console, purpose::library, role::hacker
+
+Package: com.saurik.impactor
+Version: 0.9.43
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Depends: firmware (>= 7.1), firmware (<= 10.3.3)
+Breaks: com.saurik.patych (<< 1.0.1)
+Filename: debs/com.saurik.impactor_0.9.43_iphoneos-arm.deb
+Size: 386560
+MD5sum: 21cb7131e2949c1696ece268d6056c6d
+Section: Utilities
+Priority: optional
+Description: specific utility to unjailbreak most devices
+Tag: purpose::uikit, role::enduser
+Author: Jay Freeman (saurik) <saurik@saurik.com>
+Depiction: https://cydia.saurik.com/info/com.saurik.impactor/
+Icon: file:///Applications/Eraser.app/Icon-60.png
+Name: Cydia Eraser
+
+Package: gdb
+Version: 1518-12
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Installed-Size: 32180
+Pre-Depends: dpkg (>= 1.14.25-8)
+Depends: ncurses, readline, sqlite3
+Filename: debs/gdb_1518-12_iphoneos-arm.deb
+Size: 3585014
+MD5sum: fd441ed5aa6faaf7efc2ff9d34fd9ffe
+Section: Development
+Priority: optional
+Homepage: http://www.gnu.org/software/gdb/
+Description: debugger for native software
+ A debugger for native software from GNU. This is Apple's Open Source
+ GDB that targets ARM. It still has some limitations, but they are being
+ worked on.
+Depiction: https://cydia.saurik.com/info/gdb/
+Name: GNU Debugger
+Tag: purpose::console, role::developer
+
+Package: ldid
+Version: 1:1.2.1
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Installed-Size: 272
+Filename: debs/ldid_1:1.2.1_iphoneos-arm.deb
+Size: 46666
+MD5sum: 52fba17f6b568ca3dafc1b1be6572e53
+Section: Development
+Priority: optional
+Description: pseudo-codesign Mach-O files
+Tag: purpose::console, role::developer
+Author: Jay Freeman (saurik) <saurik@saurik.com>
+Depiction: https://cydia.saurik.com/info/ldid/
+Name: Link Identity Editor
+
+Package: libffi
+Version: 1:3.0.10-5
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Installed-Size: 88
+Pre-Depends: dpkg (>= 1.14.25-8)
+Filename: debs/libffi_1:3.0.10-5_iphoneos-arm.deb
+Size: 12744
+MD5sum: c456e3cfbf886774ed94a1ee5a74e23b
+Section: Development
+Priority: optional
+Description: dynamic generation of function calls
+Tag: purpose::library, role::developer
+
+Package: mobileterminal
+Version: 364.1-10
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Installed-Size: 536
+Pre-Depends: dpkg (>= 1.14.25-8)
+Depends: bash, coreutils, ncurses, system-cmds
+Filename: debs/mobileterminal_364.1-10_iphoneos-arm.deb
+Size: 239682
+MD5sum: 1d9fe63d7db1d19e261a01d054476e45
+Section: Terminal_Support
+Priority: standard
+Homepage: http://code.google.com/p/mobileterminal/
+Description: local UIKit-based Terminal emulator
+ This is a Terminal emulator for the iPhone. With it you can do all of
+ your standard system administration tasks from anywhere: ssh into
+ remote boxes, download files, edit configuration files, whatever.
+ Please note, though, that this package does not fully work yet on
+ iPhoneOS 2.x. For more information (and a status update) please click
+ below for More Information.
+Author: Allen Porter <allen.porter@gmail.com>
+Depiction: https://cydia.saurik.com/info/mobileterminal/
+Name: MobileTerminal (Obsolete)
+Tag: purpose::uikit, role::enduser
+
+Package: pincrush
+Version: 0.9.2-1
+Architecture: iphoneos-arm
+Maintainer: Dustin Howett <dustin@howett.net>
+Installed-Size: 124
+Filename: debs/pincrush_0.9.2-1_iphoneos-arm.deb
+Size: 57116
+MD5sum: a56a3ba7ddda6461ace85e0e91f45066
+Section: Utilities
+Homepage: http://howett.net/pincrush
+Description: optimize PNGs just like Apple does
+ pincrush is an open, cross-platform alternative to Apple's proprietary PNG mangler, to optimize PNGs for display on iPhoneOS devices.
+Tag: purpose::console, role::hacker
+Author: Dustin Howett <dustin@howett.net>
+Name: pincrush

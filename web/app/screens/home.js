@@ -158,7 +158,7 @@ function renderRoot(body) {
   const home = el("div", "home");
   const head = el("div", "home-head");
   const icon = el("img", "home-icon");
-  icon.src = "img/cydian-icon.svg";
+  icon.src = "icons/icon-glossy.svg";
   icon.alt = "";
   const words = el("div", "home-words");
   words.append(el("h2", "home-title", "Welcome to Cydian"));

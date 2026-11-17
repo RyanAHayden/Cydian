@@ -10,3 +10,6 @@
 
 ### IPA (only if R4 says build)
 - [x] **I1** IPA shell (WKWebView over the site plus native local notifications from a BGAppRefreshTask upgrade check), signed through sidedrop's ad hoc profile. BLOCKED: (after R4) R4 decides whether this exists — dropped: R4 (docs/ipa.md): no IPA. F10 Web Push + F11 Shortcuts cover non-jailbroken update checks; an IPA adds only an unreliable BGAppRefreshTask, a widget and no install ability, at sidedrop signing cost (wildcard ad hoc: no push, no App Groups)
+
+### Shortcuts
+- [x] **F11** `/api/upgrades` JSON (computed by `web/app/core/` under node) (sources + installed in, upgrades out) and `docs/shortcuts.md` with two recipes. Without a jailbreak: a daily Personal Automation that calls the API and shows a notification or opens the `itms-services` link. With a jailbreak: "Run Script over SSH" to `localhost` running the N2 helper's update + upgrade. Shortcuts need building by hand on a phone; give exact action-by-action steps, and the user exports the iCloud links. t: test_api.py. | files: web/app.py, web/test_api.py, docs/shortcuts.md | after: F7 — dropped: replaced (user 2026-11-17): Shortcuts recipes were only an idea; background updates live in the app and its daemon, and Shortcuts come from the app's own App Intents (see the App Intents task)

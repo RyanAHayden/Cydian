@@ -41,8 +41,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Shortcuts
 
-- [ ] **F11** `/api/upgrades` JSON (computed by `web/app/core/` under node) (sources + installed in, upgrades out) and `docs/shortcuts.md` with two recipes. Without a jailbreak: a daily Personal Automation that calls the API and shows a notification or opens the `itms-services` link. With a jailbreak: "Run Script over SSH" to `localhost` running the N2 helper's update + upgrade. Shortcuts need building by hand on a phone; give exact action-by-action steps, and the user exports the iCloud links. t: test_api.py. | files: web/app.py, web/test_api.py, docs/shortcuts.md | after: F7
-
 ### Follow-ups
 
 - [ ] **D1** (follow-up, low) AGENTS.md and README: R4 decided no IPA (docs/ipa.md). Remove 'ipa/' as the third front door and the 'IPA builds' gate line; point to docs/ipa.md | files: AGENTS.md, README.md

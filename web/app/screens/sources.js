@@ -10,9 +10,8 @@ import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
-import { displayName, sourceIconUrls, sourcesFor, sourceFilter, loadNeverLoaded } from "../core/sources.js";
+import { displayName, sourceIcons, sourceSubtitle, sourcesFor, sourceFilter, loadNeverLoaded } from "../core/sources.js";
 import { settings } from "./settings.js";
-import { isAltKey } from "../core/altstore.js";
 
 export const title = "Sources";
 
@@ -115,7 +114,7 @@ function draw() {
     header: "Individual Sources",
     rows: list.map((s) => ({
       label: displayName(s),
-      subtitle: s.uri,
+      subtitle: sourceSubtitle(s), // F44: github.com/<user>/<repo> for GitHub-hosted sources
       icon: { text: displayName(s)[0]?.toUpperCase() ?? "?" },
       badge: typeof s.count === "number" ? s.count.toLocaleString() : undefined,
       href: format({ tab: "sources", path: [s.key] }),
@@ -148,8 +147,9 @@ function decorate(li, source, backend) {
   img.decoding = "async";
   img.onload = () => img.classList.add("loaded");
   // Cydia's <base>CydiaIcon.png first, then the repo's top level for dist repos (sourceIconUrls).
-  // An AltStore source (F9) names its icon in its JSON.
-  const urls = (isAltKey(source.key) ? [source.iconURL].filter(Boolean) : sourceIconUrls(source)).map((u) => (backend.assetUrl ? backend.assetUrl(u) : u));
+  // An AltStore source (F9) names its icon in its JSON. A GitHub-hosted source without one gets its owner's
+  // avatar (F44, core/sources.js sourceIcons).
+  const urls = sourceIcons(source).map((u) => (backend.assetUrl ? backend.assetUrl(u) : u));
   img.onerror = () => (urls.length ? (img.src = urls.shift()) : img.remove());
   img.src = urls.shift();
   li.querySelector(".cell-icon").append(img);

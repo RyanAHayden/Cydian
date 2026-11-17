@@ -10,7 +10,7 @@ import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
-import { displayName, sourceIconUrl } from "../core/sources.js";
+import { displayName, sourceIconUrls } from "../core/sources.js";
 
 export const title = "Sources";
 
@@ -111,8 +111,10 @@ function decorate(li, source, backend) {
   img.alt = "";
   img.decoding = "async";
   img.onload = () => img.classList.add("loaded");
-  img.onerror = () => img.remove();
-  img.src = backend.assetUrl ? backend.assetUrl(sourceIconUrl(source)) : sourceIconUrl(source);
+  // Cydia's <base>CydiaIcon.png first, then the repo's top level for dist repos (sourceIconUrls).
+  const urls = sourceIconUrls(source).map((u) => (backend.assetUrl ? backend.assetUrl(u) : u));
+  img.onerror = () => (urls.length ? (img.src = urls.shift()) : img.remove());
+  img.src = urls.shift();
   li.querySelector(".cell-icon").append(img);
 
   const toggle = document.createElement("button");

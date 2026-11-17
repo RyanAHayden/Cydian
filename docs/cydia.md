@@ -131,7 +131,8 @@ compares without case or diacritics (`LaxCompareOptions_`).
   - Section 1, header "Individual Sources": one row per source, sorted by name.
 - A source row has:
   - the icon: `unknown.png` first, then `<base>CydiaIcon.png` fetched in the background (base as above, so
-    dist-style repos use `…/dists/<dist>/CydiaIcon.png`);
+    dist-style repos use `…/dists/<dist>/CydiaIcon.png`). Many dist repos (Procursus) only serve it at the
+    top level, so Cydian falls back to `<URI>CydiaIcon.png` for dist repos (B1);
   - the name (Origin) and, underneath, the root URI;
   - a small grey spinner on the right while that source is fetching.
   Cydia shows **no package count**; F4's count is Cydian's own addition.

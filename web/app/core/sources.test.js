@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  DEFAULT_SOURCES, normalizeSourceUrl, sourceKey, sourceIconUrl, displayName, sortSources, verifySource,
+  DEFAULT_SOURCES, normalizeSourceUrl, sourceKey, sourceIconUrl, sourceIconUrls, displayName, sortSources, verifySource,
   refreshSource, releaseDepiction, openSourceStore, sourceCalls, SourceError,
 } from "./sources.js";
 import { createHttpBackend, BackendError } from "../backend-http.js";
@@ -201,6 +201,15 @@ test("icon URL: flat dir, or dists/<dist>/ for dist repos", () => {
   assert.equal(sourceIconUrl(DEFAULT_SOURCES.find((s) => s.name === "Chariz")), "https://repo.chariz.com/CydiaIcon.png");
   assert.equal(sourceIconUrl(DEFAULT_SOURCES.find((s) => s.name === "BigBoss")),
     "http://apt.thebigboss.org/repofiles/cydia/dists/stable/CydiaIcon.png");
+});
+
+test("icon URLs: a dist repo tries dists/<dist>/, then the top level; a flat repo has one", () => {
+  assert.deepEqual(sourceIconUrls(DEFAULT_SOURCES.find((s) => s.name === "Procursus")),
+    ["https://apt.procurs.us/dists/1800/CydiaIcon.png", "https://apt.procurs.us/CydiaIcon.png"]);
+  assert.deepEqual(sourceIconUrls(DEFAULT_SOURCES.find((s) => s.name === "Chariz")), ["https://repo.chariz.com/CydiaIcon.png"]);
+  assert.deepEqual(sourceIconUrls({ uri: "http://cydia.akemi.ai/", dist: "./" }), ["http://cydia.akemi.ai/CydiaIcon.png"]);
+  assert.deepEqual(sourceIconUrls({ uri: "https://r.example/repo/", dist: "sub/" }),
+    ["https://r.example/repo/sub/CydiaIcon.png"]);
 });
 
 test("refresh: dist repo counts every component for our arch; rootful-only Release counts 0 without fetching", async () => {

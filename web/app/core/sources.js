@@ -62,6 +62,14 @@ export function normalizeSourceUrl(input) {
 export const sourceBase = (source) => repoLayout(source).base;
 export const sourceIconUrl = (source) => sourceBase(source) + "CydiaIcon.png";
 
+// Where to look for CydiaIcon.png, in order. Cydia asks only <base> (MetaIndexURI(""), so dists/<dist>/ for a
+// dist repo), but dist repos such as Procursus serve it at the top level (the URI) instead, so a dist repo also
+// gets the root as a fallback. A flat repo has the one place.
+export function sourceIconUrls(source) {
+  const { flat, base, root } = repoLayout(source);
+  return flat ? [base + "CydiaIcon.png"] : [base + "CydiaIcon.png", root + "CydiaIcon.png"];
+}
+
 export function displayName(source) {
   if (source.name) return source.name;
   if (source.origin) return source.origin;

@@ -88,6 +88,7 @@ export function render(body, route, ctx) {
   input.enterKeyHint = "search";
   input.value = state.query;
   rootInput = input;
+  input.addEventListener("focus", () => drop?.close()); // typing a search puts the Filter panel away
   field.append(input);
   bar.append(field);
 
@@ -117,7 +118,10 @@ export function render(body, route, ctx) {
   function drawScope() {
     const sel = scopeIndex(state.filters.section);
     segButtons.forEach((b, i) => { b.classList.toggle("selected", i === sel); b.setAttribute("aria-selected", String(i === sel)); });
-    filterButton.classList.toggle("selected", Boolean(drop) || sheetActive(state.filters));
+    // While the panel is open the button is a blue Done that puts it away.
+    filterButton.textContent = drop ? "Done" : "Filter";
+    filterButton.classList.toggle("done", Boolean(drop));
+    filterButton.classList.toggle("selected", !drop && sheetActive(state.filters));
   }
   drawScope();
 

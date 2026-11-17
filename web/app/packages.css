@@ -184,6 +184,14 @@ html.native .navbar.sheet-bar { display: block; } /* the app hides the web nav b
 }
 .scope-segment.selected + .scope-segment { border-left-color: #43597b; }
 .scope-filter { flex: none; padding: 0 10px; border-radius: 5px; box-shadow: 0 1px 0 rgba(255,255,255,.3); }
+/* Filter becomes a blue Done while its panel is open (the nav bar's Done colours, sources.css). */
+.scope-filter.done, html[data-theme="dark"] .scope-filter.done {
+  border-color: #1f3f86; border-top-color: #30363e;
+  background: linear-gradient(#79a1f3, #3b71e1 49%, #215fdd 51%, #2361dd); background-origin: border-box;
+}
+.scope-filter.done:active, html[data-theme="dark"] .scope-filter.done:active {
+  background: linear-gradient(#5f86d6, #2a5bc0 49%, #164bb8 51%, #184db9); background-origin: border-box;
+}
 html[data-theme="dark"] .search-bar.has-scope { background: linear-gradient(#4c4c4c, #2a2a2a 7%, #1a1a1a); }
 html[data-theme="dark"] .search-scope { background: linear-gradient(#000, #000) bottom / 100% 1px no-repeat, #1a1a1a; }
 html[data-theme="dark"] .scope-segment, html[data-theme="dark"] .scope-filter {

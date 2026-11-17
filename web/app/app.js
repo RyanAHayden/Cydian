@@ -24,6 +24,7 @@ import * as search from "./screens/search.js";
 import * as settingsScreen from "./screens/settings.js";
 import { getBackend } from "./backend.js";
 import { startPush } from "./push-client.js";
+import { launchURL } from "./launch.js";
 
 const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
 
@@ -265,6 +266,9 @@ document.addEventListener("touchstart", () => {}, { passive: true });
 
 initScroller(document.getElementById("screens"));
 for (const tab of TABS) if (SCREENS[tab].init) SCREENS[tab].init(ctx);
+// Home Screen launches open on Home (F32, launch.js); a return from the background runs none of this.
+const startAt = launchURL(window);
+if (startAt) history.replaceState(null, "", startAt);
 router.start();
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.

@@ -54,6 +54,9 @@ self.addEventListener("notificationclick", (event) => {
       if (c.navigate && c.url !== url) await c.navigate(url).catch(() => {});
       return;
     }
-    await self.clients.openWindow(url);
+    // Marked so the app's Home Screen launch rule (F32, launch.js) keeps this page instead of opening on Home.
+    const open = new URL(url);
+    open.searchParams.set("launch", "push");
+    await self.clients.openWindow(open.href);
   })());
 });

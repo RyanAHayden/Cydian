@@ -114,7 +114,7 @@ body { color: #000; background: #000; }
 .table { list-style: none; margin: 0; padding: 0; }
 .table.grouped { /* "Grouped Table": #f7f7f7, 1px #b7b9bd, 9.5px corners, white drop shadow, faint inner shadow */
   overflow: hidden; background: #f7f7f7; border: 1px solid #b7b9bd; border-radius: 9.5px;
-  box-shadow: 0 1.5px 1px #fff, inset 0 .5px .5px rgba(0,0,0,.2);
+  box-shadow: inset 0 .5px .5px rgba(0,0,0,.2); /* no white drop below: on a phone it read as white past the outline */
 }
 .cell-inner {
   display: flex; align-items: center; gap: 8px; width: 100%; min-height: 43px; padding: 0 10px;

@@ -51,7 +51,10 @@ export function animate(pair, p0, p1, { duration = DURATION * Math.abs(p1 - p0),
     for (const anim of anims) anim.cancel();
     if (onEnd) onEnd();
   };
-  // Every animation has the same timing, so the first one finishing means they all have.
-  anims[0].finished.then(end, () => {});
+  // Every animation has the same timing, so the first one finishing means they all have. A cancelled animation
+  // (iOS can cancel them, e.g. when the app goes to the background) must end the slide too, or the tap block that
+  // covers the nav bar and screens during a slide never lifts. The timer is the last resort if neither fires.
+  anims[0].finished.then(end, end);
+  setTimeout(end, Math.max(0, duration) + 300);
   return { finish: end };
 }

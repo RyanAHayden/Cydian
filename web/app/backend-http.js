@@ -10,7 +10,8 @@
 // Failures throw BackendError with the proxy's `code` (bad_url, refused, too_large, timeout, upstream,
 // not_found, network, rate_limited) and, for code "upstream", the repo's HTTP `status`.
 
-import { sourceCalls } from "./core/sources.js";
+import { sourceCalls, sortSources } from "./core/sources.js";
+import { withAltSources } from "./core/altstore.js";
 
 export class BackendError extends Error {
   constructor(code, message, status) {
@@ -66,5 +67,6 @@ export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(g
       };
     },
   };
-  return Object.assign(backend, sourceCalls(backend, sourceOptions));
+  // AltStore sources (F9) sit beside the APT list, in their own store (core/altstore.js withAltSources).
+  return Object.assign(backend, withAltSources(sourceCalls(backend, sourceOptions), backend, { ...sourceOptions, sort: sortSources }));
 }

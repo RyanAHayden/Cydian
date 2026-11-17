@@ -61,8 +61,9 @@ export function archNeed(st) {
   return ARCH_JAILBREAK[a] ?? a;
 }
 
-// AltStore-format apps (F9): an app record, not a deb. They carry bundleIdentifier or downloadURL, never Package.
-const isApp = (st) => !field(st, "package") && Boolean(field(st, "bundleIdentifier") || field(st, "downloadURL") || field(st, "minOSVersion") || field(st, "maxOSVersion"));
+// AltStore-format apps (F9): an app record, not a deb. They carry bundleIdentifier or downloadURL, never Package;
+// in the catalog (core/altstore.js appStanza) an app has a Package (its bundle id) and kind "ipa".
+const isApp = (st) => st?.kind === "ipa" || !field(st, "package") && Boolean(field(st, "bundleIdentifier") || field(st, "downloadURL") || field(st, "minOSVersion") || field(st, "maxOSVersion"));
 
 // The iOS constraints a package states: { groups: [[{op, version}]] } where every group must hold and one
 // alternative in a group is enough; `conflicts` are ranges it can't be on. An alternative with no version means

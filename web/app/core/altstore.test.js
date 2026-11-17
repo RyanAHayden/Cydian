@@ -1,0 +1,256 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import {
+  parseAltSource, runsOn, appStanza, installOptions, newsToNotify, normalizeAltUrl, looksLikeAltUrl, tintOf,
+  withAltSources, altKey, isAltKey, appSection, compareOS,
+} from "./altstore.js";
+import { createCatalog, ALL } from "./catalog.js";
+import { newRecords, changeGroups, recordKey } from "./changes.js";
+import { compat } from "./compat.js";
+
+const FIXTURE = readFileSync(new URL("./fixtures/altstore-source.json", import.meta.url), "utf8");
+const URL_ = "https://example.dev/apps.json";
+const KEY = altKey(URL_);
+
+test("altstore: fixture JSON parses into catalog rows, newest version the phone runs", () => {
+  const c = createCatalog();
+  assert.equal(c.loadAlt(KEY, FIXTURE, "16.5"), 3); // the empty, id-less and duplicate apps are dropped
+  const rows = c.list(KEY);
+  assert.deepEqual(rows.map((r) => [r.id, r.name, r.version, r.section, r.kind]), [
+    ["dev.example.emu", "Emu", "1.5", "Apps (Games)", "ipa"], // 2.0 needs iOS 17: hidden
+    ["dev.example.legacy", "Legacy", "3.1", "Apps", "ipa"],
+    ["dev.example.signed", "Signed", "1.0", "Apps (Utilities)", "ipa"],
+  ]);
+  const emu = rows[0];
+  assert.equal(emu.short, "A game emulator.");
+  assert.equal(emu.author, "Example Dev");
+  assert.equal(emu.icon, "https://example.dev/emu.png");
+  // Rows are in All Sources and Search like any package.
+  assert.equal(c.list(ALL).length, 3);
+  assert.deepEqual(c.search("emulator").map((r) => r.id), ["dev.example.emu"]);
+  assert.deepEqual(c.search("emu", { section: "group:Apps" }).map((r) => r.id), ["dev.example.emu"]);
+
+  // The package page gets the whole app, with only the versions this phone runs (newest first).
+  const p = c.package("dev.example.emu", KEY);
+  assert.equal(p.stanza.kind, "ipa");
+  assert.deepEqual(p.stanza.ipa.versions.map((v) => v.version), ["1.5", "1.0"]);
+  assert.equal(p.stanza.ipa.sourceUrl, URL_);
+  assert.equal(p.stanza.ipa.sourceName, "Example Apps");
+  assert.equal(p.stanza.size, 41943040);
+
+  // Other iOS versions: 17 gets 2.0; 13 runs no Emu at all (1.0 needs 14), so it is left out; unknown: newest.
+  assert.equal(c.loadAlt(KEY, FIXTURE, "17.1"), 3);
+  assert.equal(c.package("dev.example.emu", KEY).stanza.version, "2.0");
+  assert.equal(c.loadAlt(KEY, FIXTURE, "13.0"), 2);
+  assert.equal(c.package("dev.example.emu", KEY), null);
+  c.loadAlt(KEY, FIXTURE, null);
+  assert.equal(c.package("dev.example.emu", KEY).stanza.version, "2.0");
+});
+
+test("altstore: apps suit phones without a jailbreak; debs don't", () => {
+  const c = createCatalog();
+  c.loadAlt(KEY, FIXTURE, "16.5");
+  const st = c.package("dev.example.emu", KEY).stanza;
+  assert.equal(compat(st, { ios: "16.5", jailbreak: "none" }).status, "works");
+  assert.equal(compat(st, { ios: "14.0", jailbreak: "none" }).status, "no"); // 1.5 needs 15
+  assert.equal(compat({ package: "com.ex.tweak", architecture: "iphoneos-arm64" }, { ios: "16.5", jailbreak: "none" }).reason, "jailbreak");
+  c.setDevice({ ios: "16.5", jailbreak: "none" });
+  assert.equal(c.list(KEY)[0].compat, "works");
+});
+
+test("altstore: Changes lists a bumped version, and never one the phone can't run", () => {
+  const c = createCatalog();
+  const json = JSON.parse(FIXTURE);
+  const day1 = Date.UTC(2026, 10, 16, 9);
+  const day2 = day1 + 86400000;
+  const day3 = day2 + 86400000;
+  const records = [];
+  const refresh = (now) => {
+    const known = new Set(records.map((r) => r.k));
+    records.push(...newRecords(known, c.versions(), now));
+  };
+  // Day 1: Emu's newest is 2.0 (iOS 17 only), so iOS 16.5 files 1.5.
+  c.loadAlt(KEY, json, "16.5");
+  refresh(day1);
+  assert.ok(records.some((r) => r.k === recordKey(KEY, "dev.example.emu", "1.5")));
+  assert.ok(!records.some((r) => r.version === "2.0"));
+  // Day 2: a new 2.1 that also needs iOS 17: nothing new for this phone.
+  json.apps[0].versions.unshift({ version: "2.1", date: "2026-11-16", downloadURL: "https://example.dev/emu-2.1.ipa", minOSVersion: "17.0" });
+  c.loadAlt(KEY, json, "16.5");
+  refresh(day2);
+  assert.equal(records.filter((r) => r.first === day2).length, 0);
+  // Day 3: Legacy is bumped to 3.2: it shows under day 3 as updated.
+  json.apps[1].version = "3.2";
+  c.loadAlt(KEY, json, "16.5");
+  refresh(day3);
+  const groups = changeGroups(records, c.list(ALL));
+  assert.equal(groups.length, 1); // day 1 (the first load) is dropped
+  assert.equal(groups[0].seen, day3);
+  assert.deepEqual(groups[0].rows.map((r) => [r.id, r.version, r.change]), [["dev.example.legacy", "3.2", "updated"]]);
+});
+
+test("altstore: source fields, news, screenshots and permissions", () => {
+  const s = parseAltSource(FIXTURE);
+  assert.equal(s.name, "Example Apps");
+  assert.equal(s.tintColor, "#8a28f7");
+  assert.equal(s.headerURL, "https://example.dev/header.png");
+  assert.deepEqual(s.featuredApps, ["dev.example.emu"]); // ids with no app are dropped
+  assert.deepEqual(s.news.map((n) => [n.identifier, n.notify]), [["emu-2", true], ["welcome", false]]);
+  const emu = s.apps[0];
+  assert.deepEqual(emu.screenshots.map((x) => x.url), ["https://example.dev/s1.png", "https://example.dev/s2.png", "https://example.dev/pad.png"]);
+  assert.equal(emu.screenshots[1].width, 1179);
+  assert.deepEqual(emu.permissions.privacy.map((p) => [p.name, p.description]), [["Camera", "Scan QR codes."], ["Local Network", "Play with friends."]]);
+  assert.deepEqual(emu.permissions.entitlements.map((e) => e.name), ["com.apple.developer.kernel.increased-memory-limit"]);
+  assert.deepEqual(emu.versions.map((v) => [v.version, v.localizedDescription, v.size]), [
+    ["2.0", "Needs iOS 17.", 52428800], ["1.5", "Faster.", 41943040], ["1.0", "First release.", 31457280]]);
+  assert.equal(emu.versions[1].date, new Date(2026, 9, 1).getTime()); // a bare date is local
+  assert.equal(emu.versions[0].date, Date.parse("2026-11-10T10:00:00Z"));
+  const legacy = s.apps[1];
+  assert.deepEqual(legacy.versions.map((v) => [v.version, v.localizedDescription, v.size, v.date]),
+    [["3.1", "Bug fixes.", 1048576, new Date(2025, 4, 5).getTime()]]);
+  assert.deepEqual(legacy.permissions.privacy.map((p) => p.name), ["Photos"]);
+  assert.deepEqual(legacy.screenshots.map((x) => x.url), ["https://example.dev/l1.png"]);
+  // The catalog keeps the page data apart from the apps.
+  const c = createCatalog();
+  c.loadAlt(KEY, FIXTURE, "16.5");
+  const meta = c.altSource(KEY);
+  assert.equal(meta.name, "Example Apps");
+  assert.deepEqual(meta.featured.map((r) => r.version), ["1.5"]);
+  assert.equal(meta.apps, undefined);
+  c.remove(KEY);
+  assert.equal(c.altSource(KEY), null);
+});
+
+test("altstore: bad JSON and non-sources throw; bad optional fields are dropped", () => {
+  assert.throws(() => parseAltSource("<html>"), /not valid JSON/);
+  assert.throws(() => parseAltSource("[]"), /not an AltStore source/);
+  assert.throws(() => parseAltSource('{"name":"x"}'), /not an AltStore source/);
+  const s = parseAltSource({ apps: [{ bundleIdentifier: "a", version: 2, downloadURL: "https://x/a.ipa", iconURL: "javascript:alert(1)", tintColor: "red;background:url(x)", screenshots: "nope" }], news: "no" });
+  assert.equal(s.apps[0].iconURL, null);
+  assert.equal(s.apps[0].tintColor, null);
+  assert.deepEqual(s.apps[0].screenshots, []);
+  assert.equal(s.apps[0].versions[0].version, "2");
+  assert.deepEqual(s.news, []);
+  assert.equal(tintOf("#ABC"), "#aabbcc");
+});
+
+test("altstore: min/maxOSVersion", () => {
+  assert.equal(compareOS("16.4.1", "16.4"), 1);
+  assert.equal(compareOS("16", "16.0.0"), 0);
+  assert.equal(runsOn({ minOSVersion: "15.0" }, "14.8"), false);
+  assert.equal(runsOn({ minOSVersion: "15.0" }, "15"), true);
+  assert.equal(runsOn({ maxOSVersion: "16" }, "16.7.2"), true); // any 16.x
+  assert.equal(runsOn({ maxOSVersion: "16.1" }, "16.2"), false);
+  assert.equal(runsOn({ minOSVersion: "99" }, null), true);
+  assert.equal(appStanza({ bundleIdentifier: "a", name: "A", localizedDescription: "", subtitle: "", versions: [{ version: "1", minOSVersion: "18" }] }, null, "17.0"), null);
+  assert.equal(appSection("photo-video"), "Apps (Photo & Video)");
+  assert.equal(appSection("weird"), "Apps (Weird)");
+});
+
+test("altstore: itms-services only where a signed link exists, else sideloader links", () => {
+  const s = parseAltSource(FIXTURE);
+  const signed = installOptions(s.apps[2].versions[0], URL_);
+  assert.equal(signed.itms, "itms-services://?action=download-manifest&url=https%3A%2F%2Fexample.dev%2Fsigned.plist");
+  const plain = installOptions(s.apps[0].versions[0], URL_);
+  assert.equal(plain.itms, null);
+  assert.equal(plain.download, "https://example.dev/emu-2.0.ipa");
+  assert.deepEqual(plain.open.map((o) => o.url), [
+    "altstore://source?url=https%3A%2F%2Fexample.dev%2Fapps.json",
+    "sidestore://source?url=https%3A%2F%2Fexample.dev%2Fapps.json",
+    "feather://source?url=https%3A%2F%2Fexample.dev%2Fapps.json",
+  ]);
+  assert.equal(installOptions({ downloadURL: "itms-services://?action=download-manifest&url=x" }, URL_).itms, "itms-services://?action=download-manifest&url=x");
+});
+
+test("altstore: news to notify", () => {
+  const s = parseAltSource(FIXTURE);
+  assert.deepEqual(newsToNotify(s).map((n) => n.identifier), ["emu-2"]);
+  assert.deepEqual(newsToNotify(s, ["emu-2"]), []);
+});
+
+test("altstore: source URLs", () => {
+  assert.equal(normalizeAltUrl("example.dev/apps.json"), "https://example.dev/apps.json");
+  assert.equal(normalizeAltUrl("altstore://source?url=https%3A%2F%2Fexample.dev%2Fa.json"), "https://example.dev/a.json");
+  assert.equal(normalizeAltUrl("ftp://x"), null);
+  assert.equal(looksLikeAltUrl("https://x/apps.json"), true);
+  assert.equal(looksLikeAltUrl("sidestore://source?url=x"), true);
+  assert.equal(looksLikeAltUrl("https://repo.chariz.com/"), false);
+  assert.equal(isAltKey(KEY), true);
+  assert.equal(isAltKey("deb:https://x/:./"), false);
+});
+
+// A tiny IndexedDB with get, put, delete and getAll, for the source list.
+function fakeIndexedDB() {
+  const dbs = new Map();
+  const later = (f) => setTimeout(f, 0);
+  return {
+    open(name) {
+      const req = {};
+      later(() => {
+        let db = dbs.get(name);
+        const fresh = !db;
+        if (fresh) {
+          const stores = new Map();
+          db = {
+            objectStoreNames: { contains: (n) => stores.has(n) },
+            createObjectStore(n, { keyPath }) { stores.set(n, { keyPath, rows: new Map() }); },
+            transaction(n) {
+              const s = stores.get(n);
+              const tx = {};
+              const request = (f) => { const r = {}; later(() => { r.result = f(); later(() => tx.oncomplete?.()); }); return r; };
+              tx.objectStore = () => ({
+                put: (v) => request(() => { s.rows.set(v[s.keyPath], structuredClone(v)); }),
+                get: (k) => request(() => structuredClone(s.rows.get(k))),
+                delete: (k) => request(() => { s.rows.delete(k); }),
+                getAll: () => request(() => [...s.rows.values()].map((v) => structuredClone(v))),
+              });
+              return tx;
+            },
+          };
+          dbs.set(name, db);
+        }
+        req.result = db;
+        if (fresh) req.onupgradeneeded?.();
+        req.onsuccess?.();
+      });
+      return req;
+    },
+  };
+}
+
+test("altstore: sources sit beside the APT list: add, list, refresh, remove", async () => {
+  let json = FIXTURE;
+  const backend = { text: async (u) => { if (u === URL_) return json; throw Object.assign(new Error("404"), { code: "not_found" }); } };
+  const apt = [{ key: "deb:https://repo.example/:./", uri: "https://repo.example/" }];
+  const calls = {
+    sources: async () => apt,
+    addSource: async () => { throw Object.assign(new Error("not found"), { kind: "not_repository" }); },
+    removeSource: async () => "apt",
+    refreshSources: async (onEach) => { onEach(apt[0]); return apt; },
+  };
+  const s = withAltSources(calls, backend, { indexedDB: fakeIndexedDB() });
+  const added = await s.addSource("altstore://source?url=" + encodeURIComponent(URL_));
+  assert.equal(added.key, KEY);
+  assert.equal(added.kind, "altstore");
+  assert.equal(added.name, "Example Apps");
+  assert.equal(added.count, 6 - 3);
+  assert.equal(added.tintColor, "#8a28f7");
+  assert.deepEqual((await s.sources()).map((x) => x.key), [apt[0].key, KEY]);
+  // An APT check that finds nothing falls back to AltStore; when that fails too, APT's error stands.
+  await assert.rejects(s.addSource("https://nothing.example/"), (e) => e.kind === "not_repository");
+  // Refresh: both lists, each record passed to onEach.
+  json = JSON.stringify({ ...JSON.parse(FIXTURE), name: "Renamed" });
+  const seen = [];
+  await s.refreshSources((x) => seen.push(x.key));
+  assert.deepEqual(seen.sort(), [apt[0].key, KEY].sort());
+  assert.equal((await s.sources())[1].name, "Renamed");
+  // A broken source keeps its record with an error.
+  json = "oops";
+  await s.refreshSources();
+  assert.match((await s.sources())[1].error, /JSON/);
+  assert.equal((await s.sources())[1].name, "Renamed");
+  assert.equal(await s.removeSource(apt[0].key), "apt");
+  await s.removeSource(KEY);
+  assert.deepEqual((await s.sources()).map((x) => x.key), [apt[0].key]);
+});

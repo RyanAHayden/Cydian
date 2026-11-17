@@ -8,6 +8,7 @@
 //   catalog.setHidden(names)                           // Section Visibility: sent to the worker before the next question
 //   catalog.setDevice(device, { filter })              // Works on my phone (F17, device.js): likewise
 //   catalog.installed()  catalog.upgrades(holds)       // dpkg's status file (F7): rows or null; { available, ignored }
+//   catalog.altSource(key)                     // an AltStore source's page data (F9, core/altstore.js), or null
 //   catalog.setStatus(text)  catalog.reloadInstalled() // the site's upload (kept on the device); the app re-reads dpkg
 //
 // Cydia's model: the package lists change when the sources are refreshed, not on every visit. A source's
@@ -20,6 +21,7 @@ import { openIndexCache } from "./core/cache.js";
 import { ALL } from "./core/catalog.js";
 import { openSeenStore, recordRefresh, changeGroups } from "./core/changes.js";
 import { looksLikeStatus } from "./core/installed.js";
+import { isAltKey } from "./core/altstore.js";
 
 export { ALL };
 
@@ -83,7 +85,32 @@ async function recordSeen() {
   }
 }
 
+// F9: an AltStore source's JSON, cached like a Packages text (reused while newer than the source's refresh).
+async function altText(source) {
+  const db = await indexCache();
+  const cacheKey = `altstore:${source.uri}`;
+  try {
+    const hit = db && (await db.get(cacheKey));
+    if (hit && hit.savedAt >= (source.updated ?? 0)) return hit.value;
+  } catch {
+    // a broken cache only costs a fetch
+  }
+  const text = await getBackend().text(source.uri);
+  db?.put(cacheKey, text).catch(() => {});
+  return text;
+}
+
 async function loadSource(source, arch, sig) {
+  if (isAltKey(source.key)) {
+    // The candidate is the newest version this phone's iOS runs (core/altstore.js), so the iOS is in the signature.
+    try {
+      const count = await getParser().catalog("loadAlt", [source.key, undefined, device?.device.ios ?? null], await altText(source));
+      loaded.set(source.key, { sig, count, error: null });
+    } catch (e) {
+      loaded.set(source.key, { sig, count: loaded.get(source.key)?.count ?? 0, error: e?.message || String(e) });
+    }
+    return;
+  }
   try {
     // The last refresh found nothing for this arch (Telesphoreo's Release lists no arm64): nothing to fetch.
     const empty = source.count === 0 && !source.error;
@@ -108,7 +135,7 @@ async function run() {
   }
   let reloaded = false;
   await Promise.all(sources.map((s) => {
-    const sig = signature(s, arch);
+    const sig = signature(s, arch) + (isAltKey(s.key) ? `|${device?.device.ios ?? ""}` : "");
     if (loaded.get(s.key)?.sig === sig) return null;
     reloaded = true;
     return loadSource(s, arch, sig);
@@ -212,6 +239,7 @@ export const catalog = {
   search: (q, filters) => ask("search", filters ? [q, filters] : [q]), // F35: core/catalog.js search filters
   author: (name) => ask("author", [name]),
   package: (id, key = ALL) => ask("package", [id, key]),
+  altSource: (key) => ask("altSource", [key]),
   has: (names) => ask("has", [names]),
   // The Changes tab: [{ seen, rows: [{ ...row, change: "new" | "updated" }] }], newest first (core/changes.js).
   changes: async () => {

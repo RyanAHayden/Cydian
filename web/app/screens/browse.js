@@ -22,6 +22,8 @@ import { renderSileo, mediaUrl } from "./depiction.js";
 import { settings, createSwitch } from "./settings.js";
 import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js";
 import { compat, markOf, isIncompatible } from "../core/compat.js";
+import { isAltKey } from "../core/altstore.js";
+import { renderAltSource, renderApp } from "./altstore.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -79,7 +81,8 @@ export function pageOf(route) {
 export function nav(route, sourceName = () => null) {
   const p = pageOf(route);
   switch (p.page) {
-    case "sections": return {
+    case "sections": if (isAltKey(p.key)) return { title: sourceName(p.key) || "Source" }; // F9: screens/altstore.js
+    return {
       title: p.key === ALL ? "Sections" : sourceName(p.key) || "Sections", style: "plain",
       right: { label: "Edit", onClick: (e) => toggleVisibility(route, e.currentTarget) },
     };
@@ -93,7 +96,7 @@ export function nav(route, sourceName = () => null) {
 export function render(body, route, ctx) {
   const p = pageOf(route);
   switch (p.page) {
-    case "sections": return renderSections(body, route, p.key);
+    case "sections": return isAltKey(p.key) ? renderAltSource(body, route, p.key) : renderSections(body, route, p.key);
     case "section": return renderList(body, route, () => catalog.list(p.key, p.value), true);
     case "author": return renderList(body, route, () => catalog.author(p.value), true);
     case "package": return renderPackage(body, route, p.key, p.value, ctx);
@@ -326,6 +329,11 @@ async function renderPackage(body, route, key, id, ctx) {
     return;
   }
   const st = pkg.stanza;
+  if (st.kind === "ipa" && st.ipa) { // F9: an AltStore app
+    names.set(id, st.name);
+    setTitle(body, st.name);
+    return renderApp(body, route, pkg, sources.find((s) => s.key === pkg.key));
+  }
   const sourceOf = (k) => sources.find((s) => s.key === k);
   const source = sourceOf(pkg.key);
   const sourceName = source ? displayName(source) : "";

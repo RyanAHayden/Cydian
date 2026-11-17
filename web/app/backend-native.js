@@ -25,6 +25,7 @@ import { BackendError } from "./backend-http.js";
 import { verifySource, refreshSource, openSourceStore, sortSources } from "./core/sources.js";
 import { parseAptSources, listNamesFor } from "./core/aptsources.js";
 import { DEFAULT_ARCH } from "./core/apt.js";
+import { withAltSources } from "./core/altstore.js";
 
 // The one apt source file Cydian writes (cydian-helper addsource/removesource, F33).
 const CYDIAN_SOURCES = /(^|\/)sources\.list\.d\/cydian\.sources$/;
@@ -104,7 +105,8 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
       return r;
     },
   };
-  return Object.assign(backend, nativeSourceCalls(backend, call, sourceOptions));
+  // AltStore sources (F9) stay on the device, never in apt's sources (core/altstore.js withAltSources).
+  return Object.assign(backend, withAltSources(nativeSourceCalls(backend, call, sourceOptions), backend, { ...sourceOptions, sort: sortSources }));
 }
 
 // The source-list calls (sources, addSource, removeSource, refreshSources) over apt's files plus the device store.

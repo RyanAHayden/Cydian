@@ -1,4 +1,4 @@
-Package: io.github.fizl0.cydian
+Package: com.ryha.cydian
 Name: Cydian
 Version: @VERSION@
 Architecture: iphoneos-arm64

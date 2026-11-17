@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleExecutable</key><string>Cydian</string>
-	<key>CFBundleIdentifier</key><string>io.github.fizl0.cydian</string>
+	<key>CFBundleIdentifier</key><string>com.ryha.cydian</string>
 	<key>CFBundleName</key><string>Cydian</string>
 	<key>CFBundleDisplayName</key><string>Cydian</string>
 	<key>CFBundlePackageType</key><string>APPL</string>

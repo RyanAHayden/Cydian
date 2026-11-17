@@ -11,6 +11,9 @@ rules = "AGENTS.md"
 notes = ".runner"
 joinable = ["plan/TODO.md", "plan/DONE.md", "journal/*/*.md"]
 untested = ["*.md", "docs/*", "journal/*", "LICENSE*"]
+# The native build (tools/check.sh) needs these two; they come from the shell that starts the runner (~/.bashrc),
+# so no machine paths live in the repo. Without them the gate skips the native build with a note.
+pass_env = ["SWIFT_TOOLCHAIN", "IOS_SDK"]
 
 [git]
 push = "origin"

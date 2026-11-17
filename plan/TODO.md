@@ -37,6 +37,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### IPA (only if R4 says build)
 - [ ] **I2** One app, two builds (user 2026-11-17, overrules R4's drop): the N1 Swift shell also builds as a plain IPA (no helper, no jailbreak), unsigned on Linux and signed through sidedrop's ad hoc profile (its 'Sign your own IPA' path). At launch the app picks its mode: jailbreak when the N2 helper exists at its rootless path, otherwise sideload. The web UI gets the mode from the bridge and hides apt-only screens in sideload mode. t: both artifacts build; a test that mode detection picks sideload without the helper and jailbreak with a fake one. Nobody has a newer jailbroken phone yet, so no device test. | files: native/** | after: N1
+- [ ] **I3** Sideload management in the IPA (user 2026-11-17): AltStore/IPA sources (F9) in the native backend; tapping Install opens the itms-services link and records the version you downloaded on the device, like sidedrop's installed.json. Updates show in Changes with a tab badge and an icon badge. A BGAppRefreshTask checks sources in the background and posts a local notification "n updates". t: node tests for remembered-version upgrades; Swift unit test for the notification text; the user installs it via sidedrop and reports how it feels. | files: web/app/**, native/** | after: I2, F9
 
 ### Shortcuts
 

@@ -1,0 +1,22 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<link rel="stylesheet" href="spike.css">
+<style>
+  body { overflow: hidden; }
+  .tab { position: absolute; left: 0; right: 0; top: env(safe-area-inset-top); bottom: calc(49px + env(safe-area-inset-bottom));
+    overflow: hidden; background: #fff; }
+  .screen { position: absolute; inset: 0; background: #fff; touch-action: pan-y; will-change: transform; }
+  .screen::before { content: ""; position: absolute; top: 0; bottom: 0; left: -12px; width: 12px; pointer-events: none;
+    background: linear-gradient(to left, rgba(0,0,0,.18), transparent); }
+  .content { position: absolute; top: 44px; left: 0; right: 0; bottom: 0; overflow-y: auto; touch-action: pan-y;
+    overscroll-behavior: contain; }
+  .shade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+  .edge { position: absolute; top: 0; bottom: 0; left: 0; width: 24px; z-index: 5; touch-action: none; }
+  .top { padding-top: env(safe-area-inset-top); background: #6d84a2; position: absolute; top: 0; left: 0; right: 0; }
+</style>
+</head><body>
+<div id="tabs"></div>
+<nav class="tabbar" id="tabbar"></nav>
+<script type="module" src="a.js"></script>
+</body></html>

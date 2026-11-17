@@ -1,0 +1,25 @@
+/* Shared look for both spikes: roughly iOS 6 weight (gradients, 1px lines), not a faithful skin. */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+html, body { margin: 0; height: 100%; font: 17px "Helvetica Neue", Helvetica, sans-serif; background: #fff;
+  -webkit-user-select: none; user-select: none; -webkit-text-size-adjust: 100%; touch-action: manipulation; }
+.vlist { position: relative; contain: strict; width: 100%; }
+.row { position: absolute; left: 0; right: 0; top: 0; height: 44px; padding: 4px 30px 0 10px; background: #fff;
+  border-bottom: 1px solid #e0e0e0; overflow: hidden; white-space: nowrap; will-change: transform; }
+.row:active { background: linear-gradient(#058cf5, #015fe6); color: #fff; }
+.row b { display: block; font-size: 16px; line-height: 20px; }
+.row small { display: block; font-size: 12px; line-height: 16px; color: #7a7a7a; }
+.row i { position: absolute; right: 10px; top: 15px; width: 9px; height: 9px; border: solid #8c8c8c;
+  border-width: 3px 3px 0 0; transform: rotate(45deg); }
+.navbar { position: relative; height: 44px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 6px; background: linear-gradient(#b0bccd, #889bb3 50%, #8195af 50%, #6d84a2);
+  border-bottom: 1px solid #2d3642; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.5); }
+.navbar h1 { position: absolute; left: 80px; right: 80px; margin: 0; text-align: center; font-size: 20px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.navbar button { font: bold 12px "Helvetica Neue", sans-serif; color: #fff; height: 30px; padding: 0 9px;
+  border: 1px solid #375073; border-radius: 5px; text-shadow: 0 -1px 0 rgba(0,0,0,.5);
+  background: linear-gradient(#90a4c0, #5877a2 50%, #4a6c9b 50%, #4a6c9b); }
+.tabbar { position: absolute; left: 0; right: 0; bottom: 0; height: calc(49px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom); display: flex; background: linear-gradient(#353535, #0a0a0a 50%, #000);
+  border-top: 1px solid #000; }
+.tabbar button { flex: 1; border: 0; background: none; color: #a0a0a0; font: bold 10px "Helvetica Neue"; padding-top: 30px; }
+.tabbar button.on { color: #fff; background: rgba(255,255,255,.15); border-radius: 3px; margin: 2px; }

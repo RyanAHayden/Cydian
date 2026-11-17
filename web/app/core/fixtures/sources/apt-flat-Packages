@@ -1,0 +1,63 @@
+Package: com.laughingquoll.prefixui
+Name: PrefixUI
+Architecture: iphoneos-arm
+Description: An awesome framework of some sort!
+Author: LaughingQuoll <me@laughingquoll.net>
+Maintainer: LaughingQuoll <me@laughingquoll.net>
+Version: 1.3.1
+Section: System
+Icon: https://img.chariz.cloud/icon/prefixui/icon@3x.png
+Depiction: https://chariz.com/get/prefixui
+SileoDepiction: https://repo.chariz.com/api/sileo/package/com.laughingquoll.prefixui/depiction.json
+Tag: role::developer, compatible_min::ios11.0
+Depends: firmware (<< 12.0) | ws.hbang.alderis (>= 1.1), firmware (>= 12.0) | org.thebigboss.libcolorpicker, com.spark.libsparkapplist
+Filename: debs/com.laughingquoll.prefixui_1.3.1_iphoneos-arm.deb
+Size: 24614
+Installed-Size: 204
+SHA256: 9b6ac9c35ad04966dea30a024912ae903871817cdcaf72646870db640ba4c263
+MD5sum: 313509cc4c154ac88b0062ab8c253ece
+
+Package: com.ryannair05.cask3
+Version: 1.0.1
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: Ryan Nair <ryannairtweaks@gmail.com>
+Author: Ryan Nair <ryannairtweaks@gmail.com>
+Installed-Size: 860
+Depends: dev.theos.orion (>= 1.0.0), firmware (>= 14.0)
+Replaces: com.ryannair05.cask2
+Name: Cask 3
+Description: Animated table scrolling
+Icon: https://img.chariz.cloud/icon/cask-3/icon@3x.png
+Depiction: https://chariz.com/get/cask-3
+Tag: compatible_min::ios14.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.ryannair05.cask3/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/cask-3.jpg
+Filename: debs/8LpbWHP2MsggsR8yKYMOgQUFIbxi_ZIaUbBqBSF-tMHO828AEEB1zkQig9e98bkv0ldyl-J_zGH1xxtwLPKeVQ/com.ryannair05.cask3_1.0.1_iphoneos-arm64.deb
+SHA256: 3015a266f5164ed6d94803c7035048970959f46eee0095c3f34165806806a4e6
+MD5Sum: 0de69376fb7922b2176b2aac68f88377
+Size: 318630
+
+Package: ws.hbang.newterm3
+Version: 3.0~beta1
+Architecture: iphoneos-arm64
+Section: Terminal Support
+Maintainer: HASHBANG Productions <support@hbang.ws>
+Author: HASHBANG Productions <support@hbang.ws>
+Installed-Size: 14899
+Depends: firmware (>= 14.0), zsh | bash | fish, coreutils, ncurses, system-cmds
+Conflicts: ws.hbang.newterm, ws.hbang.newterm2
+Replaces: ws.hbang.newterm, ws.hbang.newterm2
+Name: NewTerm 3 Beta
+Description: Powerful terminal app for iOS
+Support: https://hashbang.productions/support/
+Icon: https://img.chariz.cloud/icon/newterm-beta/icon@3x.png
+Depiction: https://chariz.com/get/newterm-beta
+Tag: compatible_min::ios14.0
+SileoDepiction: https://chariz.com/api/sileo/package/ws.hbang.newterm3/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/newterm-beta.jpg
+Filename: debs/ws.hbang.newterm3_3.0~beta1_iphoneos-arm64.deb
+SHA256: cbd965fbdc25634e4e447ba4609598a67a0f354a63fce2dbf9e0dce99042b055
+MD5Sum: fed66db963cb17131b239dc6deb7058c
+Size: 3836904
+

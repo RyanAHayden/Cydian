@@ -1,0 +1,59 @@
+{
+  "name": "UTM Repository",
+  "identifier": "com.utmapp.repos.UTM",
+  "subtitle": "Virtual machines for iOS",
+  "website": "https://getutm.app",
+  "tintColor": "#1a2cc2",
+  "featuredApps": [
+    "com.utmapp.UTM"
+  ],
+  "apps": [
+    {
+      "name": "UTM",
+      "bundleIdentifier": "com.utmapp.UTM",
+      "developerName": "osy",
+      "localizedDescription": "UTM is a full featured virtual machine host for iOS. In short, it allows you to run Windows, Android, and more on your iPhone and iPad.\nThis version requires using AltJIT. Install UTM SE for slower emulation without JIT.\n\n\nMore information at https://getutm.app/\n\nFeatures:\n\n• Emulate any Processor\n30+ processors supported by qemu including x86_64, ARM64, and RISC-V\n• Run any Operating System\nWindo…",
+      "iconURL": "https://alt.getutm.app/icon.png",
+      "versions": [
+        {
+          "version": "5.0.9",
+          "date": "2026-11-16T19:46:15Z",
+          "localizedDescription": "## Highlights\n* (macOS) **DirectX graphics support for Windows**: Modern accelerated graphics for Windows 11 is now available on UTM for the first time. The driver is still experimental and games compatibility is currently limited.\n* **Vulkan 1.3 graphics support for Linux**: Vulkan 1.3 is now supported on Linux guests with VirtIO Venus drivers in Mesa. Additionally, OpenGL 4.1 is supported with t…",
+          "minOSVersion": "14.0",
+          "downloadURL": "https://github.com/utmapp/UTM/releases/download/v5.0.9/UTM.ipa",
+          "size": 150730050
+        }
+      ],
+      "subtitle": "Virtual machines for iOS (with JIT support)",
+      "tintColor": "#1a2cc2",
+      "screenshotURLs": [
+        "https://alt.getutm.app/screen0.png",
+        "https://alt.getutm.app/screen1.png"
+      ]
+    },
+    {
+      "name": "UTM SE",
+      "bundleIdentifier": "com.utmapp.UTM-SE",
+      "developerName": "osy",
+      "localizedDescription": "UTM is a full featured virtual machine host for iOS. In short, it allows you to run Windows, Android, and more on your iPhone and iPad.\nThis version runs on all iOS 14+ devices but lacks JIT support and is slower than regular UTM.\n\n\nMore information at https://getutm.app/\n\nFeatures:\n\n• Emulate any Processor\n30+ processors supported by qemu including x86_64, ARM64, and RISC-V\n• Run any Operating Sy…",
+      "iconURL": "https://alt.getutm.app/icon.png",
+      "versions": [
+        {
+          "version": "5.0.9",
+          "date": "2026-11-16T19:46:15Z",
+          "localizedDescription": "## Highlights\n* (macOS) **DirectX graphics support for Windows**: Modern accelerated graphics for Windows 11 is now available on UTM for the first time. The driver is still experimental and games compatibility is currently limited.\n* **Vulkan 1.3 graphics support for Linux**: Vulkan 1.3 is now supported on Linux guests with VirtIO Venus drivers in Mesa. Additionally, OpenGL 4.1 is supported with t…",
+          "minOSVersion": "14.0",
+          "downloadURL": "https://github.com/utmapp/UTM/releases/download/v5.0.9/UTM-SE.ipa",
+          "size": 237418773
+        }
+      ],
+      "subtitle": "Virtual machines for iOS (without JIT support)",
+      "tintColor": "#1a2cc2",
+      "screenshotURLs": [
+        "https://alt.getutm.app/screen0.png",
+        "https://alt.getutm.app/screen1.png"
+      ]
+    }
+  ],
+  "news": []
+}

@@ -1,0 +1,53 @@
+Package: 2048
+Architecture: iphoneos-arm64
+Version: 0.2019.6.29
+Priority: optional
+Section: Games
+Maintainer: Procursus Team <support@procurs.us>
+Installed-Size: 52
+Depends: libiosexec1 (>= 1.2.2)
+Filename: pool/main/iphoneos-arm64-rootless/1800/2048/2048_0.2019.6.29_iphoneos-arm64.deb
+Size: 4974
+MD5sum: 66c4a8f4049c95bca886345fc3e4584e
+SHA1: d193d6118f40865d615f4fcb03e26a8cce5842c6
+SHA256: 901b9918b929dba43f2b5fa24dc568609f70f7daa8397e695c0432e3d7867ace
+SHA512: 40247a9a9a6c32618b317cad6f2253bdca8f8affdd3691544a430093cd7b112686f3b62ae0712b8a1d4816ee6aa25b8c4afd10ba2fdc234079f90b08b3e6a37f
+Homepage: https://github.com/mevdschee/2048.c
+Description: 4x4 tile mathematics puzzle game
+ The 2048 game is a mathematics based puzzle game where you have to slide tiles in a 4x4 board in any of the four possible directions. Touching tiles with the same value are then merged into tiles with the added value of the merged ones. You start with a couple of 2-valued tiles and new tiles appear randomly after sliding. The target of the game is to reach a tile with a value of 2048 before the board is full.
+
+Package: 2048
+Architecture: iphoneos-arm64
+Version: 1.0.1
+Priority: optional
+Section: Games
+Maintainer: Procursus Team <support@procurs.us>
+Installed-Size: 80
+Depends: libiosexec1 (>= 1.3.1)
+Filename: pool/main/iphoneos-arm64-rootless/1800/2048/2048_1.0.1_iphoneos-arm64.deb
+Size: 9786
+MD5sum: b9d4de0144a26dd600c97bc5c81e67b7
+SHA1: 82831a50d10b697fd40d33c9870d5d62323f727e
+SHA256: 453a9dbd30965ddebf15c807efcec9a0b2613eab846996d06a50b3b44b3b32f0
+SHA512: dae1491a5e955d01743d27a217ebedfe2620f9799b6ae92b54be906a39d8dea386ece52a13e2942b674ca026efc654c0a54a8dcd64d698c61ccf6c166252f81f
+Homepage: https://github.com/mevdschee/2048.c
+Description: 4x4 tile mathematics puzzle game
+ The 2048 game is a mathematics based puzzle game where you have to slide tiles in a 4x4 board in any of the four possible directions. Touching tiles with the same value are then merged into tiles with the added value of the merged ones. You start with a couple of 2-valued tiles and new tiles appear randomly after sliding. The target of the game is to reach a tile with a value of 2048 before the board is full.
+
+Package: adv-cmds
+Architecture: iphoneos-arm64
+Version: 216.100.1
+Multi-Arch: foreign
+Priority: important
+Section: Administration
+Maintainer: Procursus Team <support@procurs.us>
+Installed-Size: 1004
+Depends: libiosexec1 (>= 1.3.1), libncursesw6, libxo0 | firmware (>= 17.0)
+Filename: pool/main/iphoneos-arm64-rootless/1800/adv-cmds/adv-cmds_216.100.1_iphoneos-arm64.deb
+Size: 104528
+MD5sum: cb943dcf38c90df991c9fedf329de402
+SHA1: d424b27ba8ae2ee5cfaf02b6f01a9102863e65bd
+SHA256: dcd1e677f15b654657e1ccdc63cbb2aeee7e1aa7ee5c8373204b1044c4afabec
+SHA512: 66fd7043d68dacdc5f07b9a272de4e79ca74ca3e62e38b5365ce3e8293a6714033393e82217fb35a41832e1a82758c8e5c56beb907a020ce4e27cf4ca0dc2f30
+Description: cap_mkdb, colldef, finger, gencat, last, locale, lsvfs, tabs
+

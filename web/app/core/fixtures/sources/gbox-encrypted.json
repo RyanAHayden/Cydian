@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "sourceName": "Encrypted example",
+  "sourceAuthor": "Example",
+  "sourceImage": "https://example.dev/source.png",
+  "sourceUpdateTime": "2019-10-10T13:00+0800",
+  "sourceDescription": "The shape of a GBox source encrypted by GBox (GBoxApp/GBoxSource README): appRepositories is a base64 string.",
+  "appCategories": ["Tools"],
+  "appRepositories": "AwGTxWfhOXLcvwhKgAfRe6YZfcmAYxS3ZGyfRz1b1oBBTbs+X5epLINZSU8Idc9aMX5bF+zIicp99o1PvrKM6UeaRDoYzBJADisd8nQLykP/HtfvemdPjZJJmmweoS2yEImdUwwq1b7GweSfnLvkG0G9rCBqOhg6oZGZV7wYpuSZ"
+}

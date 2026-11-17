@@ -1,0 +1,190 @@
+{
+  "name": "AltStore",
+  "identifier": "com.rileytestut.AltStore",
+  "subtitle": "A home for apps that push the boundaries of iOS.",
+  "description": "This is the default source for AltStore. You can add additional sources to manage what apps appear in AltStore.\n\nFor more info, check out our FAQ: https://faq.altstore.io/patreon/beta-access/sources",
+  "website": "https://altstore.io",
+  "patreonURL": "https://www.patreon.com/rileyshane",
+  "apps": [
+    {
+      "name": "AltStore",
+      "bundleIdentifier": "com.rileytestut.AltStore",
+      "developerName": "Riley Testut",
+      "versions": [
+        {
+          "version": "2.3.3",
+          "date": "2026-11-09T13:00:00-04:00",
+          "localizedDescription": "This update fixes the 415 error when sideloading and refreshing apps.\n\n⚠️ You may need to manually install this update by re-installing AltStore with AltServer. You do NOT need to delete AltStore first.",
+          "downloadURL": "https://cdn.altstore.io/file/altstore/apps/altstore/2_3_3.ipa",
+          "size": 40615381,
+          "sha256": "3bcfc4ef816abf1551ab31304040d8d556382657663e1f0b720d1a505ca8aca9",
+          "minOSVersion": "17.4"
+        },
+        {
+          "version": "2.3.2",
+          "date": "2026-10-28T13:00:00-04:00",
+          "localizedDescription": "This update fixes 503 and -80046 errors when sideloading and refreshing apps.\n⚠️ You may need to manually install this update by re-installing AltStore with AltServer. You do NOT need to delete AltStore first\n\nPREVIOUS UPDATE\n\nNEW\n\nRandomize Bundle IDs\n• New experimental feature in AltStore’s settings\n• Randomizes bundle IDs for sideloaded apps\n\nIMPROVED\n• Improved error messages for common Remote…",
+          "downloadURL": "https://cdn.altstore.io/file/altstore/apps/altstore/2_3_2.ipa",
+          "size": 40614848,
+          "sha256": "579e7343c911af87c31c31ede646af30f257edc34914ea49e3cd381116ef2189",
+          "minOSVersion": "17.4"
+        }
+      ],
+      "version": "1.6.3",
+      "versionDate": "2023-04-12T12:00:00-05:00",
+      "versionDescription": "• Fixed error fetching Friend Zone patrons due to unexpected nil name\n• Fixed incorrect cell height for some News items",
+      "downloadURL": "https://cdn.altstore.io/file/altstore/apps/altstore/1_6_3.ipa",
+      "localizedDescription": "AltStore is an alternative app store for non-jailbroken devices. \n\nThis version of AltStore allows you to install Delta, an all-in-one emulator for iOS, as well as sideload other .ipa files from the Files app.",
+      "iconURL": "https://user-images.githubusercontent.com/705880/65270980-1eb96f80-dad1-11e9-9367-78ccd25ceb02.png",
+      "tintColor": "018084",
+      "size": 5625134,
+      "category": "utilities",
+      "screenshots": [
+        "https://user-images.githubusercontent.com/705880/277757391-76c02f48-be2a-485a-ba75-277480c99356.jpeg",
+        "https://user-images.githubusercontent.com/705880/277757303-ee0b7695-0e7d-4a93-8b25-4fbbbd3cb745.PNG"
+      ],
+      "screenshotURLs": [
+        "https://user-images.githubusercontent.com/705880/78942028-acf54300-7a6d-11ea-821c-5bb7a9b3e73a.PNG",
+        "https://user-images.githubusercontent.com/705880/78942222-0fe6da00-7a6e-11ea-9f2a-dda16157583c.PNG"
+      ],
+      "permissions": [
+        {
+          "type": "background-fetch",
+          "usageDescription": "AltStore periodically refreshes apps in the background to prevent them from expiring."
+        },
+        {
+          "type": "background-audio",
+          "usageDescription": "Allows AltStore to run longer than 30 seconds when refreshing apps in background."
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [
+          {
+            "name": "get-task-allow"
+          },
+          {
+            "name": "com.apple.security.application-groups"
+          },
+          {
+            "name": "aps-environment"
+          },
+          {
+            "name": "com.apple.developer.siri"
+          }
+        ],
+        "privacy": [
+          {
+            "name": "LocalNetwork",
+            "usageDescription": "AltStore uses the local network to find and communicate with AltServer."
+          }
+        ]
+      }
+    },
+    {
+      "name": "AltStore",
+      "bundleIdentifier": "com.rileytestut.AltStore.Beta",
+      "developerName": "Riley Testut",
+      "subtitle": "An alternative App Store for iOS.",
+      "versions": [
+        {
+          "version": "2.3.3b",
+          "date": "2026-11-09T13:00:00-04:00",
+          "localizedDescription": "This update fixes the 415 error when sideloading and refreshing apps.\n\n⚠️ You may need to manually install this update by re-installing AltStore with AltServer. You do NOT need to delete AltStore first.",
+          "downloadURL": "https://cdn.altstore.io/file/altstore/apps/altstore/2_3_3_b.ipa",
+          "size": 40615449,
+          "sha256": "2bab23840b8fc3fa4854c9c057ee89e117cce562f61533577cb2775c57fdf4fe",
+          "minOSVersion": "17.4"
+        },
+        {
+          "version": "2.3.2",
+          "date": "2026-10-28T13:00:00-04:00",
+          "localizedDescription": "This update fixes 503 and -80046 errors when sideloading and refreshing apps.\n\n⚠️ You may need to manually install this update by re-installing AltStore with AltServer. You do NOT need to delete AltStore first.",
+          "downloadURL": "https://cdn.altstore.io/file/altstore/apps/altstore/2_3_2_b.ipa",
+          "size": 40614869,
+          "sha256": "b7184f8c26a79a55540fda35f53a04154ef17116b64134f4091477b720283e39",
+          "minOSVersion": "17.4"
+        }
+      ],
+      "version": "1.6.2b",
+      "versionDate": "2023-03-21T12:00:00-05:00",
+      "versionDescription": "This beta fixes the \"no provisioning profile with the requested identifier…\" error when sideloading or refreshing apps.\n\n⚠️ You must manually install this update by downloading the latest AltServer beta from Patreon and using it to re-reinstall AltStore. You do not need to delete AltStore first.",
+      "downloadURL": "https://cdn.altstore.io/file/altstore/apps/altstore/1_6_2_b.ipa",
+      "localizedDescription": "AltStore is an alternative app store for non-jailbroken devices. \n\nThis beta release of AltStore adds support for 3rd party sources, allowing you to download apps from other developers directly through AltStore.",
+      "iconURL": "https://user-images.githubusercontent.com/705880/65270980-1eb96f80-dad1-11e9-9367-78ccd25ceb02.png",
+      "tintColor": "018084",
+      "size": 5624104,
+      "category": "utilities",
+      "beta": true,
+      "patreon": {
+        "pledge": 3,
+        "benefit": "1186336",
+        "hidden": true
+      },
+      "screenshots": [
+        "https://user-images.githubusercontent.com/705880/277757361-da7fcafa-6fc7-4b2b-90c9-debaddf80954.PNG",
+        "https://user-images.githubusercontent.com/705880/277757303-ee0b7695-0e7d-4a93-8b25-4fbbbd3cb745.PNG"
+      ],
+      "screenshotURLs": [
+        "https://user-images.githubusercontent.com/705880/78942028-acf54300-7a6d-11ea-821c-5bb7a9b3e73a.PNG",
+        "https://user-images.githubusercontent.com/705880/78942222-0fe6da00-7a6e-11ea-9f2a-dda16157583c.PNG"
+      ],
+      "permissions": [
+        {
+          "type": "background-fetch",
+          "usageDescription": "AltStore periodically refreshes apps in the background to prevent them from expiring."
+        },
+        {
+          "type": "background-audio",
+          "usageDescription": "Allows AltStore to run longer than 30 seconds when refreshing apps in background."
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [
+          {
+            "name": "get-task-allow"
+          },
+          {
+            "name": "com.apple.security.application-groups"
+          },
+          {
+            "name": "aps-environment"
+          },
+          {
+            "name": "com.apple.developer.siri"
+          }
+        ],
+        "privacy": [
+          {
+            "name": "LocalNetwork",
+            "usageDescription": "AltStore uses the local network to find and communicate with AltServer."
+          }
+        ]
+      }
+    }
+  ],
+  "featuredApps": [],
+  "news": [
+    {
+      "title": "Delta Gaining DS Support",
+      "identifier": "delta-ds-support",
+      "caption": "Available this Saturday for patrons, coming soon for everyone else.",
+      "tintColor": "8A28F7",
+      "imageURL": "https://user-images.githubusercontent.com/705880/65603159-0676a400-df5a-11e9-882e-dc5566f4d50a.png",
+      "date": "2019-09-25",
+      "notify": false
+    },
+    {
+      "title": "Delta Now Available",
+      "identifier": "delta-now-available",
+      "caption": "Finally, relive your favorite NES, SNES, GB(C), GBA, and N64 games.",
+      "tintColor": "8A28F7",
+      "imageURL": "https://user-images.githubusercontent.com/705880/65604130-c1ec0800-df5b-11e9-8150-7657c474e3c3.png",
+      "appID": "com.rileytestut.Delta",
+      "date": "2019-09-28",
+      "notify": true
+    }
+  ],
+  "userInfo": {
+    "patreonAccessToken": "uqoDoTxH8dY1ImE8tK76wxrzKk67gjyjBAcK8sD3RLU"
+  }
+}

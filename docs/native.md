@@ -118,7 +118,7 @@ Desktop traces (`native/spike/trace/`: `trace.mjs` for Chromium, `trace_webkit.p
   the render server: that part of (b) was never in doubt.
 
 **Measuring on a phone.** `native/spike/build.sh` → `native/spike/build/CydianSpike.ipa` (unsigned, about 80 KB,
-arm64, iOS 15+). It needs no jailbreak, so sign it through sidedrop like the opentennis IPA and install it on the
+arm64, iOS 15+). It needs no jailbreak: sideload it with any signer (Feather, AltStore, SideStore) and install it on the
 iPhone 15 Pro. Its menu has Spike A, Spike B, a probe page and Results. There are two switches: the WebKit 60 fps
 preference, and the native CADisplayLink meter (which itself holds the display at 120 Hz).
 
@@ -144,8 +144,8 @@ folder in the Files app. Paste the table here when it exists.
   `.swiftinterface` files (made by Apple Swift 6.4). A different minor version refuses with "this SDK is not
   supported by the compiler". On Arch it wants `libncurses.so.6`; a symlink to `libncursesw.so.6` on
   `LD_LIBRARY_PATH` does it.
-- **SDK:** `iPhoneOS.sdk` extracted from an Xcode `.xip` on Linux by opentennis' `tools/ios-sdk.py`, already at
-  `~/.local/share/hst-ios/iPhoneOS.sdk` (Xcode 27.1, iOS 27.1). It also renames `arm64e.x1` to `arm64` in the
+- **SDK:** `iPhoneOS.sdk` extracted from an Xcode `.xip` on Linux by Cydian's own `tools/ios-sdk.sh` (T3), found
+  through `$IOS_SDK`. On this machine an extracted Xcode 27.1 SDK (iOS 27.1) already exists and `$IOS_SDK` can point at it. It also renames `arm64e.x1` to `arm64` in the
   `.tbd` stubs, which lld needs.
 - **Compile:** `swiftc -parse-as-library -wmo -swift-version 5 -target arm64-apple-ios15.0 -sdk $SDK
   -resource-dir R -I R/shims -runtime-compatibility-version none -c`.

@@ -40,3 +40,5 @@
 
 .manage-qr { text-align: center; }
 .manage-qr img { display: block; width: 100%; max-width: 320px; margin: 20px auto 10px; image-rendering: pixelated; background: #fff; }
+/* F8: the add link under the QR code of a source's Open In > Add on Another Device (screens/handoff.js). */
+.handoff-qr .handoff-link { word-break: break-all; -webkit-user-select: text; user-select: text; }

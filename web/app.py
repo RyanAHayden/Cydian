@@ -100,6 +100,12 @@ def index():
     return resp
 
 
+# F8: /add?url=… opens Cydian with Add Source filled in (web/app/core/handoff.js); the page reads the query itself.
+@app.get("/add")
+def add_link():
+    return index()
+
+
 @app.get("/<path:path>")
 def static_file(path):
     # send_from_directory refuses paths that leave APP_DIR and 404s missing files.

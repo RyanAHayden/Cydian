@@ -17,6 +17,7 @@ import { compat } from "../core/compat.js";
 import { currentDevice, compatBadge } from "../device.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
+import { openInGroup } from "./handoff.js";
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -151,10 +152,8 @@ export async function renderAltSource(body, route, key) {
   body.append(grouped([{ rows: [{ label: "All Apps", detail: String(meta.count), href: deeper(route, `section:${ALL}`) }],
     footer: meta.count ? null : "No app on this source runs on this iPhone's iOS version." }]));
 
-  const url = key.replace(/^alt:/, "");
-  const opens = installOptions({}, url).open;
-  body.append(grouped([{ header: "Add to a Sideloader", rows: opens.map((o) => ({ label: `Add to ${o.name}`, onClick: () => { location.href = o.url; } })),
-    footer: url }]));
+  // F8: Open In, every sideloader that takes AltStore sources, and the add link's QR code (screens/handoff.js).
+  body.append(openInGroup(source ?? { key }));
   if (meta.website) body.append(grouped([{ rows: [{ label: "Website", subtitle: meta.website, onClick: () => window.open(meta.website, "_blank", "noopener") }] }]));
   if (status?.error) body.append(el("p", "empty", status.error));
 }
@@ -248,5 +247,6 @@ export function renderApp(body, route, pkg, source) {
   const sourceName = app.sourceName || (source ? displayName(source) : "") || app.sourceUrl;
   body.append(grouped([{ header: "Source", rows: [{ label: sourceName, subtitle: app.sourceUrl,
     href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) }] }]));
+  body.append(openInGroup(source ?? { key: pkg.key }, { pkg: app.bundleIdentifier || pkg.row.id })); // F8
   body.append(grouped([{ footer: `${app.bundleIdentifier}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
 }

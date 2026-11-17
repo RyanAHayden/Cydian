@@ -235,19 +235,23 @@ async function saveFullOrder(shownKeys) {
 }
 
 // Add Source, as the Sources tab's Edit mode had it (docs/cydia.md "Sources tab").
-async function addSource(ctx) {
+// F8: `prefill` ({ url, dist?, components? }, from a /add?url= link, core/handoff.js parseAddLink) fills the field;
+// a dist repo's suite and components are named in the message and go along while the URL is left as it was.
+export async function addSource(ctx, prefill = null) {
+  const dist = prefill?.dist ? `Suite ${prefill.dist}${prefill.components?.length ? `, ${prefill.components.join(" ")}` : ""}.` : "";
   const { index, value } = await showAlert({
     title: "Enter APT URL",
-    message: "Or an AltStore source (.json) for apps.",
-    input: { placeholder: "https://", value: "https://", type: "url" },
+    message: dist || "Or an AltStore source (.json) for apps.",
+    input: { placeholder: "https://", value: prefill?.url || "https://", type: "url" },
     buttons: ["Cancel", "Add Source"],
     cancel: 0,
   });
   if (index !== 1) return;
+  const input = dist && value.trim() === prefill.url ? { uri: prefill.url, dist: prefill.dist, components: prefill.components } : value;
   const hide = ctx.showHUD("Verifying URL");
   let error = null;
   try {
-    await getBackend().addSource(value);
+    await getBackend().addSource(input);
   } catch (e) {
     error = e;
   } finally {

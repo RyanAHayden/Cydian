@@ -23,7 +23,7 @@ const SOURCES = {
   "https://alt.crystall1ne.dev/": ["crystall1ne", "crystall1ne.dev", 2],
   "https://repository.apptesters.org/": ["apptesters", "AppTesters IPA Repo", 4],
   "https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json": ["mountainofpenguin", "YouMod Repo", 1],
-  "https://source.ryuksign.com/source.json": ["ryuksign", "RyukSign Source", 2],
+  "https://source.ryuksign.com/source.json": ["ryuksign", "RyukSign Source", 4],
   "https://repo.unbound.rip/app-repo.json": ["unbound", "Unbound App Repo", 2],
 };
 const parse = (name) => parseAltSource(fixture(name));
@@ -94,8 +94,11 @@ test("F28 shape: ESign-style entries (META, bundleID/down, one entry per version
   const raw = JSON.parse(text);
   assert.equal(raw.apps.length, 6);
   const p = parse("apptesters");
-  // A bundle id listed more than once keeps its first entry, as for any source (core/altstore.js parseAltSource).
+  // F42: a bundle id listed again under the same name is another version of that app: one app, every version.
   assert.deepEqual(ids(p), ["com.andyworks.camera", "com.ulisesolave.Fitia", "com.calm.calmapp", "com.madarsoft.fitness"]);
+  assert.deepEqual(versions(p.apps[0]), ["1.64", "1.63"]);
+  assert.deepEqual(versions(p.apps[3]), ["22.0", "4.4.1"]); // no name: the bundle id is the name on both
+  assert.equal(p.apps[0].versions[1].downloadURL, raw.apps[3].downloadURL);
   assert.equal(p.apps[0].versions[0].downloadURL, raw.apps[0].downloadURL);
   assert.equal(p.apps[0].versions[0].size, raw.apps[0].size);
 });
@@ -104,7 +107,12 @@ test("F28 shape: variants that share a bundle id, with per-version permissions a
   const raw = JSON.parse(fixture("ryuksign"));
   assert.equal(raw.apps.length, 4);
   const p = parse("ryuksign");
-  assert.deepEqual(ids(p), ["com.burbn.instagram", "com.ryuk.ryukgram"]);
+  // F42: the same bundle id under other names is a variant: each its own app and row, the real bundle id kept.
+  assert.deepEqual(ids(p), ["com.burbn.instagram", "com.ryuk.ryukgram", "com.ryuk.ryukgram", "com.ryuk.ryukgram"]);
+  assert.deepEqual(p.apps.map((a) => a.id), ["com.burbn.instagram", "com.ryuk.ryukgram",
+    "com.ryuk.ryukgram~ryukgram-duplicate-ios-15", "com.ryuk.ryukgram~ryukgram-duplicate-ios-16"]);
+  assert.deepEqual(p.apps.map((a) => a.name), raw.apps.map((a) => a.name));
+  assert.deepEqual(p.apps.map((a) => a.versions[0].minOSVersion), ["16.3", "16.3", "15.0", "16.0"]);
   assert.equal(p.apps[0].name, raw.apps[0].name);
   assert.equal(p.apps[0].versions[0].minOSVersion, "16.3");
 });

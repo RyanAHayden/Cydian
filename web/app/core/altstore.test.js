@@ -16,7 +16,7 @@ const KEY = altKey(URL_);
 
 test("altstore: fixture JSON parses into catalog rows, newest version the phone runs", () => {
   const c = createCatalog();
-  assert.equal(c.loadAlt(KEY, FIXTURE, "16.5"), 3); // the empty, id-less and duplicate apps are dropped
+  assert.equal(c.loadAlt(KEY, FIXTURE, "16.5"), 3); // the empty and id-less apps are dropped; Emu listed again with a build it has merges into it (F42)
   const rows = c.list(KEY);
   assert.deepEqual(rows.map((r) => [r.id, r.name, r.version, r.section, r.kind]), [
     ["dev.example.emu", "Emu", "1.5", "Apps (Games)", "ipa"], // 2.0 needs iOS 17: hidden
@@ -277,4 +277,47 @@ test("F37: GET hands the source's own IPA URL to the chosen sideloader, or the I
   assert.equal(sideloaderLink(v, "weird").name, "Feather");
   assert.equal(sideloaderLink({ downloadURL: "itms-services://?action=x" }, "feather"), null);
   assert.equal(sideloaderLink({}, "feather"), null);
+});
+
+test("F42: repeated entries of one app merge into its version history; variants under one bundle id stay apart", () => {
+  const ipa = (n) => `https://example.dev/${n}.ipa`;
+  const json = { name: "Repeats", featuredApps: ["dev.ex.app"], apps: [
+    // AppTesters-style: one entry per version, same name, listed out of date order once.
+    { name: "App", bundleIdentifier: "dev.ex.app", version: "2.0", versionDate: "2026-11-02", downloadURL: ipa("a2"), iconURL: "https://example.dev/a.png" },
+    { name: "app", bundleIdentifier: "dev.ex.app", version: "1.0", versionDate: "2026-10-01", downloadURL: ipa("a1"), iconURL: "https://example.dev/old.png" },
+    { name: "App", bundleIdentifier: "dev.ex.app", version: "3.0", versionDate: "2026-11-10", downloadURL: ipa("a3") },
+    { name: "App", bundleIdentifier: "dev.ex.app", version: "2.0", versionDate: "2026-11-02", downloadURL: ipa("a2") }, // listed twice
+    // RyukSign-style: variants with other names.
+    { name: "App (iOS 15)", bundleIdentifier: "dev.ex.app", version: "3.0", minOSVersion: "15.0", downloadURL: ipa("v15") },
+    { name: "App (iOS 15)", bundleIdentifier: "dev.ex.app", version: "2.0", minOSVersion: "15.0", downloadURL: ipa("v15-2") },
+    { name: "App iOS 15", bundleIdentifier: "dev.ex.app", version: "3.0", downloadURL: ipa("v15b") }, // same slug: ~2
+    // Undated versions keep the source's order.
+    { name: "Plain", bundleIdentifier: "dev.ex.plain", version: "1", downloadURL: ipa("p1") },
+    { name: "Plain", bundleIdentifier: "dev.ex.plain", version: "2", downloadURL: ipa("p2") },
+  ] };
+  const s = parseAltSource(json);
+  assert.deepEqual(s.apps.map((a) => [a.id, a.bundleIdentifier, a.name]), [
+    ["dev.ex.app", "dev.ex.app", "App"],
+    ["dev.ex.app~app-ios-15", "dev.ex.app", "App (iOS 15)"],
+    ["dev.ex.app~app-ios-15~2", "dev.ex.app", "App iOS 15"],
+    ["dev.ex.plain", "dev.ex.plain", "Plain"],
+  ]);
+  assert.deepEqual(s.apps[0].versions.map((v) => v.version), ["3.0", "2.0", "1.0"]);
+  assert.equal(s.apps[0].iconURL, "https://example.dev/a.png"); // the first entry's app fields win
+  assert.deepEqual(s.apps[1].versions.map((v) => v.version), ["3.0", "2.0"]);
+  assert.deepEqual(s.apps[3].versions.map((v) => v.version), ["1", "2"]);
+  assert.deepEqual(s.featuredApps, ["dev.ex.app"]);
+  assert.equal(s.apps[0].merged, undefined);
+
+  // In the catalog each variant is its own row, keyed by its id; the merged app has the whole history.
+  const c = createCatalog();
+  assert.equal(c.loadAlt(KEY, json, "14.0"), 3); // the iOS 15 variant runs nothing on 14
+  assert.deepEqual(c.list(KEY).map((r) => [r.id, r.version]),
+    [["dev.ex.app", "3.0"], ["dev.ex.app~app-ios-15~2", "3.0"], ["dev.ex.plain", "1"]]);
+  c.loadAlt(KEY, json, "16.0");
+  const v = c.package("dev.ex.app~app-ios-15", KEY);
+  assert.equal(v.stanza.ipa.bundleIdentifier, "dev.ex.app");
+  assert.equal(v.stanza.ipa.versions[0].downloadURL, ipa("v15"));
+  assert.deepEqual(c.history("dev.ex.app", KEY).versions.map((x) => x.version), ["3.0", "2.0", "1.0"]);
+  assert.deepEqual(c.altSource(KEY).featured.map((r) => r.name), ["App"]);
 });

@@ -4,9 +4,10 @@
 //
 //   parseAltSource(json | text)          -> { name, identifier, subtitle, description, iconURL, headerURL, website,
 //                                            tintColor, featuredApps, news: [...], apps: [app] }  or throws
-//   app: { bundleIdentifier, name, developerName, subtitle, localizedDescription, iconURL, tintColor, category,
+//   app: { id, bundleIdentifier, name, developerName, subtitle, localizedDescription, iconURL, tintColor, category,
 //          screenshots: [{ url, width, height }], permissions: { entitlements: [{ name, description }],
 //          privacy: [{ name, description }] }, versions: [version] }   (versions newest first, as the source lists them)
+//          id: the catalog key, the bundle id; a variant sharing it gets <bundle id>~<name slug> (F42, see variantId)
 //   version: { version, buildVersion, date, localizedDescription, downloadURL, size, minOSVersion, maxOSVersion }
 //   runsOn(version, ios)                 -> false when the phone's iOS is outside min/maxOSVersion (ios null: true)
 //   runnableVersions(app, ios)           -> the versions this phone can run: the only ones shown or filed in Changes
@@ -165,6 +166,41 @@ function parseNews(n) {
   };
 }
 
+// F42: sources that list a bundle id more than once. AppTesters (ESign-style) lists one entry per version under
+// the same name (10,279 entries for 789 ids): those merge into one app, the versions in the order the source
+// lists them (newest first), sorted by date when every one has a date. RyukSign lists variants of one app under
+// one bundle id with different names ("RyukGram (Duplicate)", "... (Duplicate, iOS 15)"): each stays its own app
+// and row. The first keeps the bundle id as its `id` (the catalog key); a later variant gets
+// `<bundle id>~<name slug>` (~2, ~3 if that is taken too). `bundleIdentifier` stays the real one on every app.
+const nameSlug = (s) => str(s).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+  .replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "app";
+const entryKey = (app) => `${app.bundleIdentifier}\n${app.name.toLowerCase()}`;
+
+function variantId(app, seen) {
+  if (!seen.has(app.bundleIdentifier)) return app.bundleIdentifier;
+  const base = `${app.bundleIdentifier}~${nameSlug(app.name)}`;
+  let id = base;
+  for (let n = 2; seen.has(id); n++) id = `${base}~${n}`;
+  return id;
+}
+
+// Adds the versions an app doesn't have yet (same version and IPA: the same build listed twice).
+function mergeVersions(app, versions) {
+  const have = new Set(app.versions.map((v) => `${v.version}\n${v.downloadURL}`));
+  for (const v of versions) {
+    const k = `${v.version}\n${v.downloadURL}`;
+    if (have.has(k)) continue;
+    have.add(k);
+    app.versions.push(v);
+    app.merged = true;
+  }
+}
+
+// Newest first by date, only when every version has one (an undated entry has no place in the order); stable.
+function sortByDate(versions) {
+  if (versions.every((v) => v.date != null)) versions.sort((a, b) => b.date - a.date);
+}
+
 // Does this parsed JSON look like an AltStore source? An object with an apps array (empty counts: a new source).
 export const looksLikeAltSource = (json) => Boolean(json && typeof json === "object" && !Array.isArray(json) && Array.isArray(json.apps));
 
@@ -175,13 +211,19 @@ export function parseAltSource(input) {
   }
   if (!looksLikeAltSource(json)) throw new Error("This JSON is not an AltStore source (it has no apps list).");
   const apps = [];
-  const seen = new Set();
+  const seen = new Set(); // app ids (catalog keys): the bundle id, or a variant's bundleid~name
+  const byName = new Map(); // bundle id + name -> app, for repeated entries (F42)
   for (const a of json.apps) {
     const app = parseApp(a);
-    if (!app || seen.has(app.bundleIdentifier)) continue;
-    seen.add(app.bundleIdentifier);
+    if (!app) continue;
+    const same = byName.get(entryKey(app));
+    if (same) { mergeVersions(same, app.versions); continue; }
+    app.id = variantId(app, seen);
+    seen.add(app.id);
+    byName.set(entryKey(app), app);
     apps.push(app);
   }
+  for (const app of apps) if (app.merged) { sortByDate(app.versions); delete app.merged; }
   const news = (Array.isArray(json.news) ? json.news : []).map(parseNews).filter(Boolean)
     .sort((a, b) => (b.date ?? 0) - (a.date ?? 0));
   return {
@@ -214,7 +256,7 @@ export function appStanza(app, source, ios = null) {
   const short = app.subtitle || app.localizedDescription.split("\n")[0].slice(0, 120);
   const long = app.localizedDescription || app.subtitle;
   return {
-    package: app.bundleIdentifier, name: app.name, version: v.version, section: appSection(app.category),
+    package: app.id ?? app.bundleIdentifier, name: app.name, version: v.version, section: appSection(app.category),
     // "Description: short\n long" is how core/apt.js description() splits it.
     description: long && long !== short ? `${short}\n ${long.replace(/\n/g, "\n ")}` : short,
     author: app.developerName, size: v.size ?? undefined, iconUrl: app.iconURL,

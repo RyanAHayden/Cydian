@@ -23,8 +23,11 @@ export function initScroller(screens) {
   let bars = null;     // { top, track }
   let sizes = null;    // { h, th } for the current body
   const measureBars = () => {
-    const top0 = navbar ? navbar.getBoundingClientRect().bottom : screens.getBoundingClientRect().top;
-    const bottom0 = tabbar ? tabbar.getBoundingClientRect().top : screens.getBoundingClientRect().bottom;
+    // A page scrolls between the nav bar and the tab bar; another scroller (data-scroller: Search's Filter panel)
+    // within its own box.
+    const own = body && !body.classList.contains("page-body") ? body.getBoundingClientRect() : null;
+    const top0 = own ? own.top : navbar ? navbar.getBoundingClientRect().bottom : screens.getBoundingClientRect().top;
+    const bottom0 = own ? own.bottom : tabbar ? tabbar.getBoundingClientRect().top : screens.getBoundingClientRect().bottom;
     bars = { top: top0 + 3, track: bottom0 - top0 - 6 };
   };
   const measureBody = () => {
@@ -67,8 +70,8 @@ export function initScroller(screens) {
 
   document.addEventListener("scroll", (e) => {
     const t = e.target;
-    if (!(t instanceof Element) || !t.classList.contains("page-body")) return;
-    if (body !== t) { body = t; sizes = null; watch(t); }
+    if (!(t instanceof Element) || !(t.classList.contains("page-body") || t.hasAttribute("data-scroller"))) return;
+    if (body !== t) { body = t; sizes = null; bars = null; watch(t); }
     draw();
   }, { capture: true, passive: true });
 

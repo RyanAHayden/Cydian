@@ -196,6 +196,7 @@ function choiceGroup(header, options, current, pick, footer) {
 let drop = null; // the open panel: { close() }
 async function openFilters(scope, changed, redraw) {
   const box = el("div", "grouped filter-sheet filter-drop-inner");
+  box.dataset.scroller = ""; // the iOS 6 scroll indicator follows it too (nav/scroller.js)
   const wrap = el("div", "filter-drop");
   wrap.style.top = Math.round(scope.getBoundingClientRect().bottom) + "px";
   wrap.append(box);

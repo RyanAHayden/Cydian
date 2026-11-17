@@ -23,8 +23,8 @@ function fakeWindow(hash = "") {
   }.init();
 }
 
-test("tabs are the five iOS 6 tabs in order", () => {
-  assert.deepEqual(TABS, ["home", "sources", "changes", "installed", "search"]);
+test("tabs are the five iOS 6 tabs in order, then Settings", () => {
+  assert.deepEqual(TABS, ["home", "sources", "changes", "installed", "search", "settings"]);
 });
 
 test("parse and format", () => {

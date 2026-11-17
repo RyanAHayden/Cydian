@@ -3,13 +3,53 @@
    No Apple images: every shape is CSS or an inline SVG redrawn from the kit's vectors. Layout lives in style.css. */
 
 :root {
+  color-scheme: light;
   --pin-dark: #c9ced8;  /* "Stripe (light grey)" bitmap: 2.5px dark, 5.5px light, 8px period */
   --pin-light: #ccd1da;
   --head: #4c566c;      /* "Table Label" */
+  --emboss: 0 1px 0 rgba(255,255,255,.75); /* its white emboss under the label */
   --detail: #385487;
   --select: linear-gradient(#85a7e9, #2765db); /* cell selection: the kit's "Button (Matte Blue)" gradient */
+  --text: #000;
+  --subtitle: #7f7f7f;
+  --table: #f7f7f7;     /* "Grouped Table" */
+  --table-edge: #b7b9bd;
+  --table-inset: rgba(0,0,0,.2);
+  --divider: #c9c9c9;   /* "divider": shadow, then highlight */
+  --divider-hi: #fff;
+  --count: #8c99b3;
+  --plain: #fff;        /* "Scroll pane" */
+  --keyline: #dfdfdf;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%237f7f7f' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+  --category: linear-gradient(rgba(109,123,133,.9), rgba(133,145,153,.9) 2%, rgba(177,187,195,.9) 5%,
+    rgba(140,154,165,.9) 8%, rgba(173,182,188,.9) 94%, rgba(137,149,158,.9) 96%);
 }
-body { color: #000; background: #000; }
+/* Dark: our own theme in the iOS 6 spirit (F13). The kit's black bars ("Status Bar (Black)", the black menu and
+   tool bars, "Button (Black)") over gunmetal grouped tables, with white text at full contrast. The tab bar is
+   black in both. Values not from the kit are ours, picked to keep the light theme's steps (pinstripe, edge,
+   divider shadow and highlight) one shade apart. */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --pin-dark: #2b2e33;
+  --pin-light: #303338;
+  --head: #e4e8ef;
+  --emboss: 0 -1px 0 rgba(0,0,0,.8);
+  --detail: #a9c4f2;
+  --text: #fff;
+  --subtitle: #c3c8d0;
+  --table: #3b3f46;
+  --table-edge: #15171a;
+  --table-inset: rgba(255,255,255,.08);
+  --divider: #202226;
+  --divider-hi: rgba(255,255,255,.08);
+  --count: #66728b;
+  --plain: #25272b;
+  --keyline: #3d4046;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23c3c8d0' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+  --category: linear-gradient(rgba(40,42,46,.94), rgba(70,74,80,.94) 5%, rgba(52,55,60,.94) 8%, rgba(36,38,42,.94) 94%,
+    rgba(20,21,24,.94) 96%);
+}
+body { color: var(--text); background: #000; }
 
 /* ---- Nav bar: "Menu Bar (Blue)" and, under the notch, "Status Bar (Blue)" ---- */
 .navbar {
@@ -28,6 +68,16 @@ body { color: #000; background: #000; }
   font-size: 20px; font-weight: bold; line-height: 44px; color: #fff; text-align: center;
   text-shadow: 0 -1px 0 rgba(0,0,0,.5);
 }
+/* Dark: "Status Bar (Black)" under the notch and the black menu bar ("Semi-transparent black bar", opaque):
+   #4c4c4c to black at 52%, a 1px white-at-20% highlight on top, a 1px black-at-70% shadow at the bottom. */
+html[data-theme="dark"] .navbar {
+  background:
+    linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) bottom / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#4c4c4c, #000 52%) bottom / 100% 44px no-repeat,
+    #000;
+}
+html[data-theme="dark"] .navbar::after { background: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,0)); }
 
 /* "blue button": 29px tall, 5px corners, 0.5px border darker at the top, inner shadow at the top edge and a
    half-pixel white line under it. */
@@ -40,6 +90,12 @@ body { color: #000; background: #000; }
   box-shadow: inset 0 1px 1px rgba(0,0,0,.35), 0 .5px .5px rgba(255,255,255,.5);
 }
 .bar-button:active { background: linear-gradient(#6f86a6, #2d4a74); }
+/* Dark: "Button (Black)": #757575 to #272727 just under half, then black; edge #30363e to #3f3f3f. */
+html[data-theme="dark"] .bar-button:not(.back):not(.done) {
+  border-color: #3f3f3f; border-top-color: #30363e;
+  background: linear-gradient(#757575, #272727 48.8%, #000 50.5%, #000);
+}
+html[data-theme="dark"] .bar-button:not(.back):not(.done):active { background: linear-gradient(#5a5a5a, #1a1a1a 48.8%, #000 50.5%); }
 /* "back button": the kit's arrow path, stretched through the middle by border-image; 30px with its shadow. */
 .bar-button.back {
   height: 30px; min-width: 0; max-width: 42vw; padding: 0 3px 1px 0; line-height: 29px;
@@ -48,6 +104,9 @@ body { color: #000; background: #000; }
   border-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='60' viewBox='0 0 100 60'%3E%3Cdefs%3E%3ClinearGradient id='f' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23889fbd'/%3E%3Cstop offset='1' stop-color='%2341618d'/%3E%3C/linearGradient%3E%3ClinearGradient id='s' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2330363e'/%3E%3Cstop offset='.31' stop-color='%23375074'/%3E%3C/linearGradient%3E%3Cfilter id='i'%3E%3CfeOffset in='SourceAlpha' dy='2'/%3E%3CfeGaussianBlur stdDeviation='1' result='o'/%3E%3CfeFlood flood-color='%23000' flood-opacity='.7'/%3E%3CfeComposite operator='out' in2='o'/%3E%3CfeComposite operator='in' in2='SourceAlpha'/%3E%3C/filter%3E%3Cpath id='p' d='M25.7,0.52 C26.87,0.52 89.49,0.52 89.49,0.52 95.01,0.52 99.49,5 99.49,10.52 99.49,10.52 99.49,48.55 99.49,48.55 99.49,54.08 95.01,58.55 89.49,58.55 89.49,58.55 27.37,58.55 25.87,58.55 24.37,58.55 22.04,57.24 17.71,52.22 17.71,52.22 0.61,30.41 0.61,30.41 0.61,30.41 15.87,8.85 15.87,8.85 21.54,1.17 24.54,0.52 25.7,0.52Z'/%3E%3C/defs%3E%3Cuse href='%23p' fill='%23fff' opacity='.5' y='1'/%3E%3Cuse href='%23p' fill='url(%23f)'/%3E%3Cuse href='%23p' filter='url(%23i)'/%3E%3Cuse href='%23p' fill='none' stroke='url(%23s)'/%3E%3C/svg%3E") 0 12 0 30 fill / 0 6px 0 15px stretch;
 }
 .bar-button.back:active { filter: brightness(.8); }
+html[data-theme="dark"] .bar-button.back {
+  border-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='60' viewBox='0 0 100 60'%3E%3Cdefs%3E%3ClinearGradient id='f' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23757575'/%3E%3Cstop offset='.488' stop-color='%23272727'/%3E%3Cstop offset='.505' stop-color='%23000'/%3E%3Cstop offset='1' stop-color='%23000'/%3E%3C/linearGradient%3E%3ClinearGradient id='s' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2330363e'/%3E%3Cstop offset='.31' stop-color='%233f3f3f'/%3E%3C/linearGradient%3E%3Cfilter id='i'%3E%3CfeOffset in='SourceAlpha' dy='2'/%3E%3CfeGaussianBlur stdDeviation='1' result='o'/%3E%3CfeFlood flood-color='%23000' flood-opacity='.7'/%3E%3CfeComposite operator='out' in2='o'/%3E%3CfeComposite operator='in' in2='SourceAlpha'/%3E%3C/filter%3E%3Cpath id='p' d='M25.7,0.52 C26.87,0.52 89.49,0.52 89.49,0.52 95.01,0.52 99.49,5 99.49,10.52 99.49,10.52 99.49,48.55 99.49,48.55 99.49,54.08 95.01,58.55 89.49,58.55 89.49,58.55 27.37,58.55 25.87,58.55 24.37,58.55 22.04,57.24 17.71,52.22 17.71,52.22 0.61,30.41 0.61,30.41 0.61,30.41 15.87,8.85 15.87,8.85 21.54,1.17 24.54,0.52 25.7,0.52Z'/%3E%3C/defs%3E%3Cuse href='%23p' fill='%23fff' opacity='.5' y='1'/%3E%3Cuse href='%23p' fill='url(%23f)'/%3E%3Cuse href='%23p' filter='url(%23i)'/%3E%3Cuse href='%23p' fill='none' stroke='url(%23s)'/%3E%3C/svg%3E") 0 12 0 30 fill / 0 6px 0 15px stretch;
+}
 
 /* ---- Tab bar: "Tab bar" ---- */
 .tabbar {
@@ -85,6 +144,7 @@ body { color: #000; background: #000; }
 .tab[data-tab="changes"]   { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath fill-rule='evenodd' d='M14 2a12 12 0 1 0 0 24 12 12 0 1 0 0-24zm0 3a9 9 0 1 1 0 18 9 9 0 1 1 0-18z'/%3E%3Cpath d='M12.6 7h2.8v6.3l4.4 3.1-1.6 2.3-5.6-4z'/%3E%3C/svg%3E"); }
 .tab[data-tab="installed"] { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M11 2h6v8h5l-8 8-8-8h5z'/%3E%3Cpath d='M2 17h6l2 3h8l2-3h6v9H2z'/%3E%3C/svg%3E"); }
 .tab[data-tab="search"]    { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath fill-rule='evenodd' d='M11.5 2a9.5 9.5 0 1 0 0 19 9.5 9.5 0 1 0 0-19zm0 3a6.5 6.5 0 1 1 0 13 6.5 6.5 0 1 1 0-13z'/%3E%3Cpath d='m17.6 19.7 2.1-2.1 6.6 6.6-2.1 2.1z'/%3E%3C/svg%3E"); }
+.tab[data-tab="settings"]  { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' fill='none' stroke='%23000'%3E%3Ccircle cx='14' cy='14' r='7.4' stroke-width='5.2'/%3E%3Ccircle cx='14' cy='14' r='10.9' stroke-width='3.4' stroke-dasharray='4.28 4.28'/%3E%3C/svg%3E"); } /* our gear: a ring and eight teeth */
 
 /* "# indicator": red gloss pill, 2px white ring, shadow under it. Scaled to the tab bar (the kit's is 23px). */
 .badge {
@@ -104,32 +164,32 @@ body { color: #000; background: #000; }
 .group + .group { margin-top: 23px; }
 .group-header { /* "Table Label": 17px bold slate, white emboss */
   margin: 0 9px 7px; font-size: 17px; font-weight: bold; line-height: 21px; letter-spacing: -.01em;
-  color: var(--head); text-shadow: 0 1px 0 rgba(255,255,255,.75);
+  color: var(--head); text-shadow: var(--emboss);
 }
 .group:first-child > .group-header { margin-top: 10px; }
 .group-footer {
   margin: 7px 9px 0; font-size: 15px; line-height: 19px; text-align: center;
-  color: var(--head); text-shadow: 0 1px 0 rgba(255,255,255,.75);
+  color: var(--head); text-shadow: var(--emboss);
 }
 .table { list-style: none; margin: 0; padding: 0; }
 .table.grouped { /* "Grouped Table": #f7f7f7, 1px #b7b9bd, 9.5px corners, white drop shadow, faint inner shadow */
-  overflow: hidden; background: #f7f7f7; border: 1px solid #b7b9bd; border-radius: 9.5px;
-  box-shadow: inset 0 .5px .5px rgba(0,0,0,.2); /* no white drop below: on a phone it read as white past the outline */
+  overflow: hidden; background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px;
+  box-shadow: inset 0 .5px .5px var(--table-inset); /* no white drop below: on a phone it read as white past the outline */
 }
 .cell-inner {
   display: flex; align-items: center; gap: 8px; width: 100%; min-height: 43px; padding: 0 10px;
-  border: 0; background: none; text-align: left; color: #000; text-decoration: none; cursor: default;
+  border: 0; background: none; text-align: left; color: var(--text); text-decoration: none; cursor: default;
 }
 a.cell-inner, button.cell-inner { cursor: pointer; }
-.grouped .cell + .cell { border-top: 1px solid #c9c9c9; }                 /* "divider": shadow, */
-.grouped .cell + .cell > .cell-inner { box-shadow: inset 0 1px 0 #fff; }  /* then highlight */
+.grouped .cell + .cell { border-top: 1px solid var(--divider); }                 /* "divider": shadow, */
+.grouped .cell + .cell > .cell-inner { box-shadow: inset 0 1px 0 var(--divider-hi); }  /* then highlight */
 .cell-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .cell-label { font-size: 17px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.cell-subtitle { font-size: 14px; color: #7f7f7f; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cell-subtitle { font-size: 14px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .cell-detail { flex: none; max-width: 50%; font-size: 17px; color: var(--detail); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .cell-count {
   flex: none; min-width: 26px; height: 20px; padding: 0 7px; border-radius: 10px; text-align: center;
-  font-size: 14px; font-weight: bold; line-height: 20px; color: #fff; background: #8c99b3;
+  font-size: 14px; font-weight: bold; line-height: 20px; color: #fff; background: var(--count);
 }
 .cell-icon {
   flex: none; width: 29px; height: 29px; border-radius: 6px; display: grid; place-items: center;
@@ -139,7 +199,7 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
 /* "arrows copy": 8.75 x 13.2 chevron, #7f7f7f, its right edge 10.5px in from the cell's */
 .cell-inner.chevron::after {
   content: ""; flex: none; width: 9px; height: 13px; margin-right: .5px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%237f7f7f' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  background: var(--chevron) center / contain no-repeat;
 }
 .cell-check::after { content: "✓"; font-size: 20px; font-weight: bold; color: var(--detail); }
 /* Tap: the blue selection, white text, as UITableViewCell does on touch down. */
@@ -149,17 +209,39 @@ a.cell-inner.chevron:active::after, button.cell-inner.chevron:active::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
 }
 
+/* "switch (on)" / "switch (off)": 77 x 27, a pill with the kit's edge gradient (on #819fb9 to #255985, off #ccc to
+   #878787), track #007fe9 or #ededed with an inner shadow, ON in white or OFF in grey, and the 27px handle
+   (#fbfbfb to #cfcfcf, black edge at 49%) that slides across by transform. Same in both themes, as the kit's. */
+.cell-inner.has-switch { padding-right: 9px; }
+.switch {
+  position: relative; flex: none; width: 77px; height: 27px; padding: 0; overflow: hidden; cursor: pointer;
+  border: 1px solid #878787; border-top-color: #ccc; border-radius: 13.5px;
+  background: #ededed; box-shadow: inset 0 2px 3px rgba(0,0,0,.28);
+  font-size: 17px; font-weight: bold; line-height: 25px; touch-action: manipulation;
+}
+.switch::before {
+  content: "OFF"; position: absolute; top: 0; right: 11px; color: #808080; text-shadow: 0 1px 0 rgba(255,255,255,.75);
+}
+.switch[aria-checked="true"] { background: #007fe9; border-color: #255985; border-top-color: #819fb9; }
+.switch[aria-checked="true"]::before { content: "ON"; right: auto; left: 15px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.25); }
+.switch::after {
+  content: ""; position: absolute; top: -1px; left: -1px; width: 27px; height: 27px; border-radius: 50%;
+  background: linear-gradient(#fbfbfb, #cfcfcf); border: 1px solid rgba(0,0,0,.49);
+  box-shadow: 0 1px 2px rgba(0,0,0,.4); transition: transform .2s ease;
+}
+.switch[aria-checked="true"]::after { transform: translateX(50px); }
+@media (prefers-reduced-motion: reduce) { .switch::after { transition: none; } }
+
 /* ---- Plain tables: "Scroll pane" ---- */
-.page-body.plain { background: #fff; }
-.table.plain { background: #fff; }
-.plain .cell { border-bottom: 1px solid #dfdfdf; } /* "keyline" */
+.page-body.plain { background: var(--plain); }
+.table.plain { background: var(--plain); }
+.plain .cell { border-bottom: 1px solid var(--keyline); } /* "keyline" */
 .plain .cell-inner { padding-top: 4px; padding-bottom: 4px; }
 .plain .cell-label { font-size: 20px; line-height: 24px; }
 .section-header { /* "category bar": 23px, the kit's gradient at 90%, 18px bold white, dark emboss; sticks */
   position: sticky; top: 0; z-index: 1; height: 23px; padding: 0 12px;
   font-size: 18px; font-weight: bold; line-height: 23px; color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.42);
-  background: linear-gradient(rgba(109,123,133,.9), rgba(133,145,153,.9) 2%, rgba(177,187,195,.9) 5%,
-    rgba(140,154,165,.9) 8%, rgba(173,182,188,.9) 94%, rgba(137,149,158,.9) 96%);
+  background: var(--category);
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 
@@ -175,6 +257,6 @@ a.cell-inner.chevron:active::after, button.cell-inner.chevron:active::after {
 .hud-spinner { width: 36px; height: 36px; animation: hud-spin .96s steps(12) infinite; }
 @keyframes hud-spin { to { transform: rotate(360deg); } }
 
-.empty { color: var(--head); text-shadow: 0 1px 0 rgba(255,255,255,.75); font-size: 17px; }
+.empty { color: var(--head); text-shadow: var(--emboss); font-size: 17px; }
 
 @media (prefers-reduced-motion: reduce) { .hud-spinner { animation-duration: 3s; } }

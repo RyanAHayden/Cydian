@@ -7,8 +7,15 @@
   <!-- Opaque black status bar: with a translucent one the nav bar sits under it, iOS 26 blurs it there and taps
        near the top can go to the status bar instead of the buttons. -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="theme-color" content="#000000">
+  <!-- Light: the top of the blue status bar; dark: "Status Bar (Black)". screens/settings.js repaints both when
+       Appearance is fixed to Light or Dark. -->
+  <meta name="theme-color" content="#4f698b" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <!-- We draw our own dark theme: the Dark Reader extension must leave the page alone. -->
+  <meta name="darkreader-lock">
   <title>Cydian</title>
+  <script src="theme-boot.js"></script>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="ios6.css">
   <link rel="stylesheet" href="sources.css">

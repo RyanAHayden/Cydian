@@ -96,7 +96,8 @@ Components: $*"
   *) refuse "unknown verb (update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource)" ;;
 esac
 for p in "$@"; do
-  printf '%s' "$p" | grep -Eqx '[a-z0-9][a-z0-9.+-]+' || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"
+  # B5: grep -x matches a line, so "ab\n--force-yes" would pass; the real helper refuses it, so refuse it first.
+  one_line "$p" && printf '%s' "$p" | grep -Eqx '[a-z0-9][a-z0-9.+-]+' || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"
   case $verb in
     install) cat "$status" "$lists"/*_Packages 2>/dev/null | grep -qx "Package: $p" || refuse "unknown package: $p" ;;
     remove|hold|unhold) grep -qx "Package: $p" "$status" 2>/dev/null || refuse "unknown package: $p" ;;

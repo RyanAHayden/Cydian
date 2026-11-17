@@ -21,7 +21,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #ifdef __APPLE__
-#include <libproc.h>
+/* <libproc.h> ships in the macOS SDK but not the iOS one; proc_pidpath is in libSystem on iOS too, so declare it
+ * ourselves (as Sileo and Zebra do). */
+#include <stdint.h>
+int proc_pidpath(int pid, void *buffer, uint32_t buffersize);
 #endif
 
 #ifndef CYDIAN_PREFIX

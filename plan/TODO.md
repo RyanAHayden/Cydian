@@ -36,6 +36,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 - [~] **N6** Hand test on a modern jailbroken phone (the 4S never runs Cydian): add source, install, upgrade, remove, notification. BLOCKED: (after N5) needs the user with the phones
 
 ### IPA (only if R4 says build)
+- [ ] **I2** One app, two builds (user 2026-11-17, overrules R4's drop): the N1 Swift shell also builds as a plain IPA (no helper, no jailbreak), unsigned on Linux and signed through sidedrop's ad hoc profile (its 'Sign your own IPA' path). At launch the app picks its mode: jailbreak when the N2 helper exists at its rootless path, otherwise sideload. The web UI gets the mode from the bridge and hides apt-only screens in sideload mode. t: both artifacts build; a test that mode detection picks sideload without the helper and jailbreak with a fake one. Nobody has a newer jailbroken phone yet, so no device test. | files: native/** | after: N1
 
 ### Shortcuts
 

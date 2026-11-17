@@ -1,0 +1,19 @@
+{
+  "name": "History Apps",
+  "identifier": "dev.example.history",
+  "apps": [
+    {
+      "name": "Tracker",
+      "bundleIdentifier": "dev.example.tracker",
+      "developerName": "Example Dev",
+      "localizedDescription": "Tracks things.",
+      "category": "utilities",
+      "versions": [
+        { "version": "3.0", "buildVersion": "300", "date": "2026-11-01", "localizedDescription": "Needs iOS 18.", "downloadURL": "https://example.dev/tracker-3.0.ipa", "size": 30000000, "minOSVersion": "18.0" },
+        { "version": "2.1", "buildVersion": "210", "date": "2026-09-15", "localizedDescription": "Bug fixes.", "downloadURL": "https://example.dev/tracker-2.1.ipa", "size": 28000000, "minOSVersion": "15.0" },
+        { "version": "2.0", "date": "2026-06-01", "localizedDescription": "Withdrawn: no download any more.", "size": 27000000 },
+        { "version": "1.0", "date": "2025-01-01", "localizedDescription": "First release.", "downloadURL": "https://example.dev/tracker-1.0.ipa", "size": 12000000, "maxOSVersion": "16" }
+      ]
+    }
+  ]
+}

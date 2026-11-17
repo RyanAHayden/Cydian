@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { deviceFrom, deviceLabel } from "./device.js";
+import { deviceFrom, deviceLabel, applyNativeJailbreak } from "./device.js";
 
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1";
 
@@ -28,4 +28,19 @@ test("F37: the device type decides the jailbreak; Not Jailbroken is 'none' whate
   assert.deepEqual(deviceFrom({ userAgent: UA16, arch: "iphoneos-arm64", type: "iphoneos-arm" }), { ios: "16.5", jailbreak: "rootful" });
   assert.deepEqual(deviceFrom({ userAgent: UA16, arch: "iphoneos-arm", type: "iphoneos-arm64" }), { ios: "16.5", jailbreak: "rootless" });
   assert.deepEqual(deviceFrom({ userAgent: UA16, type: "iphoneos-arm64", mode: "sideload" }), { ios: "16.5", jailbreak: "none" });
+});
+
+test("F38: Roothide (iphoneos-arm64e) judges as roothide; app.info's type becomes arch in the jailbreak app only", () => {
+  assert.deepEqual(deviceFrom({ userAgent: UA, type: "iphoneos-arm64e" }), { ios: "16.5", jailbreak: "roothide" });
+  assert.equal(deviceLabel({ ios: "16.5", jailbreak: "roothide" }), "iOS 16.5 · Roothide");
+  const fake = (mode, arch = "iphoneos-arm64") => ({ mode, arch, get: function () { return this.arch; }, set: function (k, v) { this.arch = v; } });
+  const app = fake("jailbreak");
+  assert.equal(applyNativeJailbreak({ jailbreak: "roothide" }, app), true);
+  assert.equal(app.arch, "iphoneos-arm64e");
+  assert.equal(applyNativeJailbreak({ jailbreak: "roothide" }, app), false, "no change, no notification");
+  assert.equal(applyNativeJailbreak({ jailbreak: "none" }, app), false);
+  assert.equal(applyNativeJailbreak({}, app), false);
+  const site = fake("site");
+  assert.equal(applyNativeJailbreak({ jailbreak: "rootful" }, site), false);
+  assert.equal(site.arch, "iphoneos-arm64");
 });

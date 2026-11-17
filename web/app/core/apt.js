@@ -116,9 +116,10 @@ export function parseRelease(text) {
 
 // ---- repo layout and URLs ---------------------------------------------------------------------------------
 
-// Cydian targets rootless jailbreaks; "iphoneos-arm" (rootful, palera1n rootful) stays available as a setting.
+// Cydian targets rootless jailbreaks; "iphoneos-arm" (rootful, palera1n rootful) and "iphoneos-arm64e" (roothide,
+// F38) stay available as a setting.
 export const DEFAULT_ARCH = "iphoneos-arm64";
-export const ARCHES = ["iphoneos-arm64", "iphoneos-arm"];
+export const ARCHES = ["iphoneos-arm64", "iphoneos-arm", "iphoneos-arm64e"];
 
 // Whether a stanza is installable on `arch`: its Architecture is that arch or "all". Flat repos list rootful and
 // rootless builds in one Packages file, so every package list goes through this. A stanza with no Architecture

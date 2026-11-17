@@ -3,14 +3,16 @@
 // the jailbreak type is Settings > Device's (F37: core/settings.js deviceType(), "none" when not jailbroken). Both stay on the device (core/settings.js). The worker's catalog
 // hears every change (catalog.setDevice), so lists, Search and Changes follow the Works on My Phone switch.
 //
-//   currentDevice()          -> { ios: "16.5" | null, jailbreak: "rootless" | "rootful" | "none" (sideload build) }
+//   currentDevice()          -> { ios: "16.5" | null, jailbreak: "rootless" | "rootful" | "roothide" | "none" (sideload build) }
 //   compatFilterOn()         -> whether rows that can't work are hidden (on by default)
 //   filterRow(onChange)      -> the "Works on My Phone" switch row for the Sections page and Search
 //   compatBadge(code)        -> a row badge's text, or "" when the row was not judged
+//   applyNativeJailbreak(info, s) -> the app.info jailbreak type (F38) written to `arch`, in the jailbreak app only
 import { plain } from "./nav/ui.js";
 import { getArch } from "./backend.js";
 import { catalog } from "./catalog.js";
 import { settings, createSwitch } from "./screens/settings.js";
+import { bridgeArch } from "./core/settings.js";
 import { iosFromUserAgent, jailbreakOfArch, badge, normalizeDevice } from "./core/compat.js";
 
 // The settings that change who the rows are judged for (F37 adds Device, which also sets "arch").
@@ -75,6 +77,18 @@ export function filterRow(onChange = () => {}) {
   return ul;
 }
 
+// F38: Bridge.swift app.info says which jailbreak the app runs on ("roothide" | "rootless" | "rootful" | "none").
+// In the jailbreak build its architecture becomes `arch`, which deviceType() and getArch() read, so packages are
+// listed and judged for this phone. The site keeps the visitor's Device choice and the sideload build stays Not
+// Jailbroken. Returns whether `arch` changed.
+export function applyNativeJailbreak(info, s = settings) {
+  if (s.mode !== "jailbreak") return false;
+  const arch = bridgeArch({ jailbreak: info?.jailbreak });
+  if (!arch || s.get("arch") === arch) return false;
+  s.set("arch", arch);
+  return true;
+}
+
 let wired = false;
 export function initDevice() {
   if (wired) return;
@@ -84,6 +98,7 @@ export function initDevice() {
   const n = globalThis.cydianNative;
   if (n?.call) {
     n.call("app.info", {}).then((info) => {
+      applyNativeJailbreak(info); // a changed arch tells the catalog through settings.onChange
       if (typeof info?.ios === "string" && info.ios) { nativeIos = info.ios; send(); }
     }).catch(() => {});
   }

@@ -30,6 +30,7 @@ Shortcuts recipes live in `docs/shortcuts.md`.
   https://git.saurik.com/cydia.git.
 - Cydian is its own project, with its own patterns: don't copy or depend on the user's other projects (code,
   CSS, deploy scripts, signing or hosting). Sideload installs happen on the phone, Feather-style (docs/sideload.md, R5).
+- Bundle ID and package name: `com.ryha.cydian` (extensions and spikes add a suffix: `com.ryha.cydian.share`).
 - Never commit Apple artwork (UIKit `.artwork` extracts, system icons) or Cydia's logo. Pulled device files go in
   `ref/` (gitignored). Use them as a reference and redraw in CSS/SVG. Don't name the product or pages "Cydia".
   `ref/` exists only in the main checkout. In a worktree, link it first:

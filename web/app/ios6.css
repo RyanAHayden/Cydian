@@ -330,3 +330,26 @@ html[data-theme="dark"] { background: #5f656f; }
 .menu.below .menu-arrow { top: auto; bottom: 100%; margin: 0 0 -1px -10px; border: 10px solid transparent; border-top: 0; border-bottom-color: #3c3c3c; }
 .cell.is-held > .cell-inner, .cell.is-held > .cell-inner * { background-color: transparent; color: #fff; }
 .cell.is-held > .cell-inner { background: var(--select); }
+
+/* Settings > Signing (screens/settings.js certificateBlock). Choose buttons: a <label> over a hidden file input, drawn
+   as iOS 6's white round button (iTunesStoreUI GradientButtonBackground), going blue while held. */
+.visually-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+.sign-file { margin: 0 10px 10px; }
+.grey-button {
+  display: block; box-sizing: border-box; width: 100%; padding: 11px; cursor: pointer; text-align: center;
+  font-weight: bold; font-size: 17px; line-height: 1.2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  color: #38404b; text-shadow: var(--emboss); border: 1px solid #8d97a5; border-radius: 9px;
+  background: linear-gradient(#fff, #e9ebee 50%, #dde0e5 51%, #eceef1); background-origin: border-box;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.2);
+}
+.grey-button:active { color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.3); border-color: #005ee8; background: linear-gradient(#058af5, #0160e6); box-shadow: none; }
+html[data-theme="dark"] .grey-button { color: #e6e8eb; border-color: #111; background: linear-gradient(#4a4f58, #2c2f34 50%, #24272c 51%, #2c2f34); box-shadow: inset 0 1px 0 rgba(255,255,255,.15); }
+.sign-files .table { margin-top: 0; }
+.sign-files .cell { position: relative; }
+.sign-password { gap: 10px; padding-right: 78px; }
+.sign-password .cell-label { flex: none; }
+.sign-password input {
+  flex: 1; min-width: 0; border: 0; padding: 0; margin: 0; background: none; font: inherit; font-size: 17px;
+  color: var(--detail-blue, #385487); -webkit-user-select: text; user-select: text; outline: none;
+}
+.sign-browse { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); min-width: 0; display: inline-block; }

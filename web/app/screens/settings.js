@@ -286,37 +286,21 @@ function redrawAll() {
   }
 }
 
-// A file picker; resolves with { name, bytes } or null.
-function pickFile() {
-  return new Promise((resolve) => {
-    const input = Object.assign(document.createElement("input"), { type: "file" });
-    input.addEventListener("change", async () => {
-      const file = input.files?.[0];
-      resolve(file ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : null);
-    });
-    input.addEventListener("cancel", () => resolve(null));
-    input.click();
-  });
-}
-
 const alertOK = (title, message) => showAlert({ title, message, buttons: ["OK"] });
 
-async function chooseP12(el) {
-  const f = await pickFile();
+async function chooseP12(el, f) {
   if (!f) return;
   if (f.bytes[0] !== 0x30 || f.bytes.length > 256 * 1024) {
     await alertOK("Not a Certificate", `${f.name} is not a .p12 file. Export your certificate and its key from Keychain as .p12.`);
     return;
   }
   await saveIdentity({ p12: f.bytes, p12Name: f.name, passwordOk: null });
-  redrawAll();
   const id = await loadIdentity();
-  if (!id.password) await askPassword(el);
-  else await recheckPassword(el);
+  if (id.password != null) await recheckPassword(el, true);
+  redrawAll();
 }
 
-async function chooseProfile(el) {
-  const f = await pickFile();
+async function chooseProfile(el, f) {
   if (!f) return;
   try {
     if (f.bytes.length > 1024 * 1024) throw new Error("too large");
@@ -329,21 +313,19 @@ async function chooseProfile(el) {
   redrawAll();
 }
 
-async function recheckPassword(el) {
+// Whether the saved password opens the .p12; the result shows under the password field. `redraw` false while the
+// field is being typed in (a redraw would take its focus).
+async function recheckPassword(el, redraw = true) {
   const id = await loadIdentity();
   if (!id?.p12) return;
   const ok = await checkP12Password(id.p12, id.password ?? "");
   await saveIdentity({ passwordOk: ok });
-  redrawAll();
-  if (ok === false) await alertOK("Wrong Password", "That password doesn't open this certificate.");
-}
-
-async function askPassword(el) {
-  const { index, value } = await showAlert({ title: "Certificate Password", message: "The password you set when you exported the .p12.",
-    input: { type: "password", placeholder: "Password" }, buttons: ["Cancel", "Save"], cancel: 0 });
-  if (index !== 1) return;
-  await saveIdentity({ password: value });
-  await recheckPassword(el);
+  if (redraw) redrawAll();
+  else {
+    const foot = el.querySelector(".sign-files .group-footer");
+    if (foot) foot.textContent = foot.textContent.replace(/ The password (doesn't open this certificate|opens it)\.$/, "")
+      + (ok === false ? " The password doesn't open this certificate." : ok ? " The password opens it." : "");
+  }
 }
 
 async function askServer(el) {
@@ -386,15 +368,7 @@ async function drawSigning(el) {
   let profile = null;
   try { profile = id?.profile ? parseProfile(id.profile) : null; } catch { /* checked when picked */ }
   const info = summary({ profile, passwordOk: id?.passwordOk ?? null });
-  const sections = [{
-    header: "Certificate",
-    rows: [
-      { label: "Certificate", subtitle: id?.p12Name ?? null, detail: id?.p12 ? "" : "Choose", onClick: () => chooseP12(el), chevron: true },
-      { label: "Password", detail: id?.password ? "\u2022".repeat(8) : "None", onClick: () => askPassword(el), chevron: true },
-      { label: "Provisioning Profile", subtitle: id?.profileName ?? null, detail: id?.profile ? "" : "Choose", onClick: () => chooseProfile(el), chevron: true },
-    ],
-    footer: "Your .p12 (the certificate and its key), its password and a .mobileprovision made for it. They're kept on this iPhone only, in this browser's storage.",
-  }];
+  const sections = [];
   if (profile) {
     sections.push({ header: profile.name ? `${profileKind(profile)} Profile: ${profile.name}` : `${profileKind(profile)} Profile`,
       // Long values (a certificate's name, a team) go under the label, where they wrap, not cut off on the right.
@@ -411,6 +385,69 @@ async function drawSigning(el) {
       + "Run your own with docker compose up (docs/signing.md) and put its address here.",
   });
   if (id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeCertificate(el) }] });
-  el.replaceChildren(grouped(sections));
+  el.replaceChildren(certificateBlock(el, id), grouped(sections));
   el.scrollTop = top;
+}
+
+// The certificate, its password and the profile: two big Choose buttons (each a <label> over a hidden file input, so
+// iOS opens its picker straight from the tap) that show the chosen file's name, and the password typed in place.
+function certificateBlock(el, id) {
+  const box = document.createElement("div");
+  box.className = "sign-files";
+  const head = Object.assign(document.createElement("h3"), { className: "group-header", textContent: "Certificate" });
+  box.append(head,
+    fileButton(id?.p12Name ?? "Choose .p12 Certificate", ".p12,application/x-pkcs12", (f) => chooseP12(el, f)),
+    fileButton(id?.profileName ?? "Choose .mobileprovision", ".mobileprovision", (f) => chooseProfile(el, f)));
+  const ul = document.createElement("ul");
+  ul.className = "table grouped";
+  const li = document.createElement("li");
+  li.className = "cell";
+  const row = document.createElement("label");
+  row.className = "cell-inner sign-password";
+  const name = Object.assign(document.createElement("span"), { className: "cell-label", textContent: "Password" });
+  const input = Object.assign(document.createElement("input"), { type: "password", placeholder: "The .p12's password", value: id?.password ?? "" });
+  input.autocomplete = "off";
+  input.setAttribute("autocapitalize", "off");
+  input.setAttribute("autocorrect", "off");
+  let timer = 0;
+  const save = async () => { clearTimeout(timer); await saveIdentity({ password: input.value }); await recheckPassword(el, false); };
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(save, 500); });
+  input.addEventListener("change", save);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
+  // Or read it from a .txt file (the first line, without its line break).
+  const txt = Object.assign(document.createElement("input"), { type: "file", accept: ".txt,text/plain", className: "visually-hidden" });
+  txt.id = "pw" + Math.random().toString(36).slice(2);
+  const browse = Object.assign(document.createElement("label"), { className: "bar-button sign-browse", textContent: "Browse" });
+  browse.htmlFor = txt.id;
+  txt.addEventListener("change", async () => {
+    const file = txt.files?.[0];
+    txt.value = "";
+    if (!file || file.size > 4096) return;
+    input.value = (await file.text()).split(/\r?\n/)[0];
+    await save();
+  });
+  row.append(name, input);
+  li.append(row, txt, browse);
+  ul.append(li);
+  const state = id?.p12 && id?.password != null ? (id.passwordOk === false ? " The password doesn't open this certificate." : id.passwordOk ? " The password opens it." : "") : "";
+  const foot = Object.assign(document.createElement("p"), { className: "group-footer",
+    textContent: "Your .p12 (the certificate and its key), its password and a .mobileprovision made for it. They're kept on this iPhone only, in this browser's storage." + state });
+  box.append(ul, foot);
+  return box;
+}
+
+function fileButton(text, accept, onFile) {
+  const wrap = document.createElement("div");
+  wrap.className = "sign-file";
+  const input = Object.assign(document.createElement("input"), { type: "file", accept, className: "visually-hidden" });
+  input.id = "f" + Math.random().toString(36).slice(2);
+  const label = Object.assign(document.createElement("label"), { className: "grey-button", textContent: text });
+  label.htmlFor = input.id;
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    if (file) onFile({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
+    input.value = "";
+  });
+  wrap.append(input, label);
+  return wrap;
 }

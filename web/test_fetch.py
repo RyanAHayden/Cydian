@@ -338,13 +338,16 @@ class RouteTest(Base):
         import app as A
         self.A = A
         self._saved = (A.fetcher, A.rate_limiter, A.packages_cache)
+        self._saved_assets = A.asset_limiter
         A.fetcher = self.f
         A.rate_limiter = fetch.RateLimiter(rate=1000)
+        A.asset_limiter = fetch.RateLimiter(rate=1000)
         A.packages_cache = fetch.PackagesCache()
         self.c = A.app.test_client()
 
     def tearDown(self):
         self.A.fetcher, self.A.rate_limiter, self.A.packages_cache = self._saved
+        self.A.asset_limiter = self._saved_assets
 
     def test_packages_gzip_encoded(self):
         Handler.routes = {"/r/Packages.bz2": (200, {}, bz2.compress(PACKAGES))}
@@ -382,10 +385,22 @@ class RouteTest(Base):
         self.assertEqual(r.get_json()["status"], 404)
 
     def test_rate_limited(self):
-        self.A.rate_limiter = fetch.RateLimiter(rate=2)
+        self.A.asset_limiter = fetch.RateLimiter(rate=2)
         Handler.routes = {"/": (200, {}, b"hi")}
         codes = [self.c.get("/api/fetch", query_string={"url": self.url("/")}).status_code for _ in range(3)]
         self.assertEqual(codes, [200, 200, 429])
+
+    def test_assets_have_their_own_bucket(self):
+        """B3: icons and depictions don't spend the Packages bucket, and Packages don't spend theirs."""
+        self.A.rate_limiter = fetch.RateLimiter(rate=1)
+        self.A.asset_limiter = fetch.RateLimiter(rate=3)
+        Handler.routes = {"/i.png": (200, {"Content-Type": "image/png"}, b"\x89PNG"),
+                          "/r/Packages": (200, {}, PACKAGES)}
+        icon = {"url": self.url("/i.png")}
+        pk = {"url": self.url("/r"), "kind": "packages"}
+        codes = [self.c.get("/api/fetch", query_string=q).status_code for q in [icon, icon, pk, icon, pk, icon]]
+        self.assertEqual(codes, [200, 200, 200, 200, 429, 429])
+        self.assertEqual(self.c.get("/api/fetch", query_string={**pk, "kind": "bogus"}).status_code, 429)
 
 
 if __name__ == "__main__":

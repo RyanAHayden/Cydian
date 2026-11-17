@@ -22,6 +22,7 @@
 ### Follow-ups
 - [x] **D1** (follow-up, low) AGENTS.md and README: R4 decided no IPA (docs/ipa.md). Remove 'ipa/' as the third front door and the 'IPA builds' gate line; point to docs/ipa.md | files: AGENTS.md, README.md
 - [x] **R6** (follow-up, low) Measure the R3 spike on a ProMotion phone (needs the user): build native/spike/build.sh, sign via sidedrop, install on the iPhone 15 Pro, run the menu's protocol for spike A and B with the 60 fps switch on and off plus the probe page; paste the Results table and probe JSON into docs/native.md 'R3 answers' and confirm or revisit the choice of A. | files: docs/native.md — dropped: user 2026-11-17: no iPhone measurement (they report if it feels off) and never sidedrop
+- [x] **B3** (follow-up, low) The site proxy's rate limit (60 fetches/min per IP, web/app.py) is shared by Packages, http package icons, depictions (Sileo JSON, proxied http HTML) and .deb downloads (F5). Browsing a repo with many http icons, or a few depictions after a refresh, can hit 429 and show blank icons or a failed depiction. Give asset fetches (no kind=packages) their own larger bucket, or cache them. | files: web/app.py, web/test_app.py
 
 ### Parked
 - [x] **F12** (follow-up, later) Widget-only IPA (WidgetKit 'n upgrades' + local notifications), only if F10's Web Push proves unreliable on real phones. Needs an explicit App ID with Push/App Groups and its own ad hoc profile in sidedrop. See docs/ipa.md | files: ipa/** — dropped: superseded: the IPA build (I2-I3) and N8's widget cover it

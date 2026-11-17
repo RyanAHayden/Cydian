@@ -19,6 +19,9 @@ if int(os.environ.get("CYDIAN_PROXY_HOPS", "0") or 0) > 0:
 fetcher = fetch.Fetcher()
 packages_cache = fetch.PackagesCache()
 rate_limiter = fetch.RateLimiter(rate=int(os.environ.get("CYDIAN_FETCH_RATE", "60")), per=60.0)
+# Assets (icons, depictions, screenshots, .debs: any fetch without kind=packages) get their own, larger bucket, so a
+# page of http icons can't starve Packages refreshes and a refresh can't blank the icons (B3).
+asset_limiter = fetch.RateLimiter(rate=int(os.environ.get("CYDIAN_ASSET_RATE", "300")), per=60.0)
 
 ERROR_STATUS = {"bad_url": 400, "refused": 403, "too_large": 502, "timeout": 504, "upstream": 502,
                 "not_found": 404, "network": 502}
@@ -47,13 +50,14 @@ def _error(code, message, status=None):
 def api_fetch():
     """`?url=<URL>`: the body of URL. `?url=<repo dir>&kind=packages`: the repo's Packages, as gzip-encoded
     plain text, whichever of Packages.xz/.bz2/.gz/plain exists first (cached 30 min per repo)."""
-    if not rate_limiter.allow(request.remote_addr or "?"):
+    url = request.args.get("url", "")
+    kind = request.args.get("kind", "")
+    limiter = asset_limiter if kind == "" else rate_limiter
+    if not limiter.allow(request.remote_addr or "?"):
         resp = _error("rate_limited", "too many fetches, slow down")
         resp.status_code = 429
         resp.headers["Retry-After"] = "5"
         return resp
-    url = request.args.get("url", "")
-    kind = request.args.get("kind", "")
     try:
         if kind == "packages":
             source, gz, cached = fetch.fetch_packages(fetcher, url, packages_cache)

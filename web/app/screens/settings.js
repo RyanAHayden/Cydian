@@ -13,6 +13,7 @@ import { drawSection as drawPushSection } from "../push-client.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, summary, profileKind, DEFAULT_SERVER } from "../core/signing.js";
+import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus } from "../signing-client.js";
 
 export const title = "Settings";
@@ -288,19 +289,39 @@ function redrawAll() {
 
 const alertOK = (title, message) => showAlert({ title, message, buttons: ["OK"] });
 
-async function chooseP12(el, f) {
+// Everything picked at once: the .p12 and profile are checked and saved as if picked alone, then the password is
+// found among any text files (or the empty password), unless the saved one already opens the certificate.
+async function chooseFiles(el, files) {
+  const hide = showHUD("Reading");
+  let found;
+  try { found = await sortCertFiles(files); } catch { found = { p12: null, profile: null, passwords: [] }; }
+  hide();
+  if (!found.p12 && !found.profile && !found.passwords.length) {
+    await alertOK("No Certificate Files", "Choose your .p12, its .mobileprovision and (if you have one) a .txt with the password, or the .zip they came in.");
+    return;
+  }
+  if (found.profile) await chooseProfile(el, found.profile, false);
+  if (found.p12) await chooseP12(el, found.p12, false);
+  const id = await loadIdentity();
+  if (id?.p12 && !(id.password != null && await checkP12Password(id.p12, id.password) === true)) {
+    const pw = await findPassword(id.p12, found.passwords);
+    if (pw != null) await saveIdentity({ password: pw, passwordOk: true });
+  }
+  if (id?.p12) await recheckPassword(el, false);
+  redrawAll();
+}
+
+async function chooseP12(el, f, redraw = true) {
   if (!f) return;
   if (f.bytes[0] !== 0x30 || f.bytes.length > 256 * 1024) {
     await alertOK("Not a Certificate", `${f.name} is not a .p12 file. Export your certificate and its key from Keychain as .p12.`);
     return;
   }
-  await saveIdentity({ p12: f.bytes, p12Name: f.name, passwordOk: null });
-  const id = await loadIdentity();
-  if (id.password != null) await recheckPassword(el, true);
-  redrawAll();
+  await saveIdentity({ p12: f.bytes, p12Name: f.name.split("/").pop(), passwordOk: null });
+  if (redraw) redrawAll();
 }
 
-async function chooseProfile(el, f) {
+async function chooseProfile(el, f, redraw = true) {
   if (!f) return;
   try {
     if (f.bytes.length > 1024 * 1024) throw new Error("too large");
@@ -309,8 +330,8 @@ async function chooseProfile(el, f) {
     await alertOK("Not a Profile", `${f.name} is not a provisioning profile (.mobileprovision).`);
     return;
   }
-  await saveIdentity({ profile: f.bytes, profileName: f.name });
-  redrawAll();
+  await saveIdentity({ profile: f.bytes, profileName: f.name.split("/").pop() });
+  if (redraw) redrawAll();
 }
 
 // Whether the saved password opens the .p12; the result shows under the password field. `redraw` false while the
@@ -395,9 +416,16 @@ function certificateBlock(el, id) {
   const box = document.createElement("div");
   box.className = "sign-files";
   const head = Object.assign(document.createElement("h3"), { className: "group-header", textContent: "Certificate" });
-  box.append(head,
-    fileButton(id?.p12Name ?? "Choose .p12 Certificate", ".p12,application/x-pkcs12", (f) => chooseP12(el, f)),
-    fileButton(id?.profileName ?? "Choose .mobileprovision", ".mobileprovision", (f) => chooseProfile(el, f)));
+  // One pick for all of it: select the .p12, the .mobileprovision and a password .txt together, or the .zip they came
+  // in; each goes where it belongs and the password is found if a text file holds it (core/certfiles.js).
+  const label = id?.p12 && id?.profile ? "Choose Different Files" : "Choose Certificate Files";
+  box.append(head, fileButton(label, ".p12,.pfx,.mobileprovision,.txt,.zip,application/x-pkcs12,application/zip,text/plain", (files) => chooseFiles(el, files)));
+  const names = grouped([{ rows: [
+    { label: "Certificate", detail: id?.p12Name ? "" : "None", subtitle: id?.p12Name ?? null },
+    { label: "Profile", detail: id?.profileName ? "" : "None", subtitle: id?.profileName ?? null },
+  ] }]);
+  names.firstChild.classList.add("sign-names");
+  box.append(names);
   const ul = document.createElement("ul");
   ul.className = "table grouped";
   const li = document.createElement("li");
@@ -436,17 +464,18 @@ function certificateBlock(el, id) {
   return box;
 }
 
-function fileButton(text, accept, onFile) {
+function fileButton(text, accept, onFiles) {
   const wrap = document.createElement("div");
   wrap.className = "sign-file";
   const input = Object.assign(document.createElement("input"), { type: "file", accept, className: "visually-hidden" });
   input.id = "f" + Math.random().toString(36).slice(2);
   const label = Object.assign(document.createElement("label"), { className: "grey-button", textContent: text });
   label.htmlFor = input.id;
+  input.multiple = true;
   input.addEventListener("change", async () => {
-    const file = input.files?.[0];
-    if (file) onFile({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
+    const files = await Promise.all([...(input.files ?? [])].map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));
     input.value = "";
+    if (files.length) onFiles(files);
   });
   wrap.append(input, label);
   return wrap;

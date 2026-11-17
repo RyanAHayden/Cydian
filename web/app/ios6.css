@@ -345,6 +345,7 @@ html[data-theme="dark"] { background: #5f656f; }
 .grey-button:active { color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.3); border-color: #005ee8; background: linear-gradient(#058af5, #0160e6); box-shadow: none; }
 html[data-theme="dark"] .grey-button { color: #e6e8eb; border-color: #111; background: linear-gradient(#4a4f58, #2c2f34 50%, #24272c 51%, #2c2f34); box-shadow: inset 0 1px 0 rgba(255,255,255,.15); }
 .sign-files .table { margin-top: 0; }
+.sign-files .sign-names { margin-bottom: 10px; }
 .sign-files .cell { position: relative; }
 .sign-password { gap: 10px; padding-right: 78px; }
 .sign-password .cell-label { flex: none; }

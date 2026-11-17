@@ -23,11 +23,11 @@ import { ARCHES, DEFAULT_ARCH } from "./apt.js";
 export const MODES = ["site", "jailbreak", "sideload"];
 
 // Features that exist today. "appearance": this task's theme. "sources": the source list and its refresh (F4).
+// "holds": Ignored Upgrades (F7's upgrades list leaves them out; the helper's apt-mark side is F22's).
 // Still to come, by the setting that waits on it: "update-check" (Check for updates), "cellular" (Use cellular
-// data, app only), "notifications" (Notifications), "badge" (App icon badge), "holds" (Ignore upgrades: needs the
-// upgrades list; the helper's apt-mark side is F22's), "auto-install" (the three automatic-install
-// rows), "rollback" (Keep previous versions), "resign" (Re-sign reminder, F14).
-export const FEATURES = new Set(["appearance", "sources"]);
+// data, app only), "notifications" (Notifications), "badge" (App icon badge), "auto-install" (the three
+// automatic-install rows), "rollback" (Keep previous versions), "resign" (Re-sign reminder, F14).
+export const FEATURES = new Set(["appearance", "sources", "holds"]);
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];

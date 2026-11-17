@@ -170,9 +170,9 @@ test("rows each mode shows once every feature exists", () => {
     ["appearance", "allowZoom", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge", "resignReminder"]);
 });
 
-test("rows wait for their feature: today only Appearance and the sources settings", () => {
+test("rows wait for their feature: today Appearance, the sources settings and Ignored Upgrades", () => {
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "arch", "refreshOnLaunch"]);
+  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "arch", "refreshOnLaunch", "holds"]);
   assert.equal(s.isShown("autoInstall"), false);
   assert.ok(FEATURES.has("appearance"));
   assert.deepEqual(createSettings({ storage: memStorage(), mode: "site", features: new Set(["appearance"]) })

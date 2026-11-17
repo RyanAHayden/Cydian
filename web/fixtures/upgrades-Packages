@@ -1,0 +1,69 @@
+Package: bash
+Version: 4.0.44-17
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Filename: debs/bash_4.0.44-17_iphoneos-arm.deb
+Section: Terminal_Support
+Description: the best shell ever written by Brian Fox
+Name: Bourne-Again SHell
+
+Package: coreutils
+Version: 8.12-13
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Filename: debs/coreutils_8.12-13_iphoneos-arm.deb
+Section: Utilities
+Description: core set of Unix shell utilities from GNU
+Name: Core Utilities
+
+Package: cydia
+Version: 1.1.32~b1
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Filename: debs/cydia_1.1.32~b1_iphoneos-arm.deb
+Section: Packaging
+Description: graphical iPhone front-end for APT
+Name: Cydia Installer
+
+Package: mobilesubstrate
+Version: 0.9.7000
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Filename: debs/mobilesubstrate_0.9.7000_iphoneos-arm.deb
+Section: System
+Description: powerful code insertion platform
+Name: Cydia Substrate
+
+Package: winterboard
+Version: 0.9.3919
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Filename: debs/winterboard_0.9.3919_iphoneos-arm.deb
+Section: System
+Description: more powerful, open-source SummerBoard
+Name: WinterBoard
+
+Package: com.iphonecake.appcakeinstaller
+Version: 7.2
+Architecture: iphoneos-arm
+Maintainer: SarahH12099
+Filename: debs/appcake_7.2_iphoneos-arm.deb
+Section: Tweaks
+Description: AppCake Installer
+Name: AppCake 7 Installer
+
+Package: com.exile90.icleanerpro
+Version: 8.0
+Architecture: iphoneos-arm
+Filename: debs/icleanerpro_8.0_iphoneos-arm.deb
+Section: Utilities
+Description: system cleaner
+Name: iCleaner Pro
+
+Package: com.saurik.substrate.safemode
+Version: 0.9.6005
+Architecture: iphoneos-arm64
+Filename: debs/safemode_0.9.6005_iphoneos-arm64.deb
+Section: Tweaks
+Description: safe mode safety extension (safe)
+Name: Substrate Safe Mode

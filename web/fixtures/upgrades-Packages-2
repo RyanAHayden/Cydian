@@ -1,0 +1,25 @@
+Package: apt7
+Version: 1:0.7.25.3-1
+Architecture: iphoneos-arm
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Filename: debs/apt7_0.7.25.3-1_iphoneos-arm.deb
+Section: Packaging
+Description: the advanced packaging tool from Debian
+Name: APT 0.7 Strict
+
+Package: bash
+Version: 4.0.44-16
+Architecture: iphoneos-arm
+Filename: debs/bash_4.0.44-16_iphoneos-arm.deb
+Section: Terminal_Support
+Description: the best shell ever written by Brian Fox
+Name: Bourne-Again SHell
+
+Package: com.saurik.substrate.safemode
+Version: 0.9.6003
+Architecture: iphoneos-arm
+Filename: debs/safemode_0.9.6003_iphoneos-arm.deb
+Section: Tweaks
+Description: safe mode safety extension (safe)
+Name: Substrate Safe Mode
+Tag: cydia::obsolete

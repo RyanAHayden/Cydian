@@ -7,7 +7,8 @@ import { parseControl, parsePackages, parseRelease, matchesArch } from "./apt.js
 import { createCatalog, runCatalog } from "./catalog.js";
 
 // The package catalog (core/catalog.js) lives here, so sections, lists and search never run on the UI thread.
-// {type: "catalog", op, args}; for op "load" the Packages file comes as text or bytes and goes in as args[1].
+// {type: "catalog", op, args}; for op "load" the Packages file comes as text or bytes and goes in as args[1], for
+// "setInstalled" dpkg's status file goes in as args[0].
 const catalog = createCatalog();
 
 export function handle(msg) {
@@ -15,6 +16,10 @@ export function handle(msg) {
     const args = msg.args ?? [];
     if (msg.op === "load" && (msg.bytes != null || msg.text != null)) {
       args[1] = msg.bytes != null ? new TextDecoder("utf-8").decode(msg.bytes) : msg.text;
+    }
+    // dpkg's status file (F7) rides the same way, as args[0].
+    if (msg.op === "setInstalled" && (msg.bytes != null || msg.text != null)) {
+      args[0] = msg.bytes != null ? new TextDecoder("utf-8").decode(msg.bytes) : msg.text;
     }
     return runCatalog(catalog, msg.op, args);
   }

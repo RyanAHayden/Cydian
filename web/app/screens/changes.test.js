@@ -14,3 +14,13 @@ test("Changes: a header per group, newest first, then its rows; package pages op
   assert.equal(nav({ tab: "changes", path: [] }).left.label, "Refresh");
   assert.deepEqual(pageOf({ tab: "changes", path: [token("package", "a")] }), { key: "*", page: "package", value: "a" });
 });
+
+test("Changes: Available then Ignored Upgrades first; an upgraded package isn't listed again under New at", () => {
+  const t1 = Date.UTC(2026, 10, 17, 12, 0, 0);
+  const items = itemsOf([{ seen: t1, rows: [{ id: "bash", name: "Bash", change: "updated" }, { id: "x", name: "X", change: "new" }] }],
+    "en-US", { available: [{ id: "bash", name: "Bash", version: "2", installed: "1" }], ignored: [{ id: "wb", name: "WB", version: "3", installed: "2" }] });
+  assert.deepEqual(items.map((i) => i.header ?? `${i.id}:${i.change}`),
+    ["Available Upgrades", "bash:upgrade", "Ignored Upgrades", "wb:upgrade", items[4].header, "x:new"]);
+  assert.match(items[4].header, /^New at/);
+  assert.deepEqual(itemsOf([], "en-US", { available: [], ignored: [] }), []);
+});

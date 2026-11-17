@@ -6,6 +6,8 @@
 //   catalog.package(id, key)  catalog.has(names)       // all promises; key "*" = All Sources
 //   catalog.changes()  catalog.onChange(f)             // the Changes tab (core/changes.js)
 //   catalog.setHidden(names)                           // Section Visibility: sent to the worker before the next question
+//   catalog.installed()  catalog.upgrades(holds)       // dpkg's status file (F7): rows or null; { available, ignored }
+//   catalog.setStatus(text)  catalog.reloadInstalled() // the site's upload (kept on the device); the app re-reads dpkg
 //
 // Cydia's model: the package lists change when the sources are refreshed, not on every visit. A source's
 // Packages text is kept in IndexedDB (core/cache.js) and reused while it is newer than the source's last
@@ -16,6 +18,7 @@ import { repoLayout } from "./core/apt.js";
 import { openIndexCache } from "./core/cache.js";
 import { ALL } from "./core/catalog.js";
 import { openSeenStore, recordRefresh, changeGroups } from "./core/changes.js";
+import { looksLikeStatus } from "./core/installed.js";
 
 export { ALL };
 
@@ -134,8 +137,47 @@ function setHidden(names) {
   for (const f of changeListeners) f(); // the Changes tab redraws without the hidden sections
 }
 
+// ---- Installed (F7): dpkg's status file, parsed in the worker beside the catalog. In the app the native
+// backend reads it (N3: `cydianNative.dpkgStatus()` resolves to the text of /var/lib/dpkg/status, or
+// /var/jb/var/lib/dpkg/status rootless; core/installed.js STATUS_PATHS); on the site the visitor uploads it and
+// it is kept in IndexedDB on the device, never sent anywhere. ----
+const STATUS_KEY = "dpkg:status";
+let statusSent = null; // Promise of the worker's installed count (-1: no status file), once sent
+
+export const statusSource = () => (typeof globalThis.cydianNative?.dpkgStatus === "function" ? "native" : "upload");
+
+async function statusText() {
+  if (statusSource() === "native") return (await globalThis.cydianNative.dpkgStatus()) ?? null;
+  const db = await indexCache();
+  return (db && (await db.get(STATUS_KEY))?.value) ?? null;
+}
+
+function sendStatus() {
+  return (statusSent ??= statusText().catch(() => null)
+    .then((text) => getParser().catalog("setInstalled", [], text ?? undefined)));
+}
+
+// The site's upload: checked, kept on the device, then handed to the worker. Resolves to the installed count.
+async function setStatus(text) {
+  if (!looksLikeStatus(text)) throw new Error("That isn't a dpkg status file. Choose the file named status from /var/jb/var/lib/dpkg/ (rootless) or /var/lib/dpkg/.");
+  const db = await indexCache();
+  await db?.put(STATUS_KEY, text);
+  statusSent = getParser().catalog("setInstalled", [], text);
+  const n = await statusSent;
+  for (const f of changeListeners) f();
+  return n;
+}
+
+// The app: read dpkg's status again (after an install or remove).
+async function reloadInstalled() {
+  statusSent = null;
+  await sendStatus();
+  for (const f of changeListeners) f();
+}
+
 const ask = async (op, args) => {
   await (running ?? ready());
+  await sendStatus();
   if (!hiddenSent) {
     hiddenSent = true;
     await getParser().catalog("setHidden", [hidden]);
@@ -159,6 +201,17 @@ export const catalog = {
     const store = await seen();
     return store ? changeGroups(await store.all(), rows) : [];
   },
-  // Called after a refresh filed something new; returns unsubscribe.
+  // The installed packages as rows (each with `installed`, its version), or null before a status file came.
+  installed: () => ask("installed", []),
+  // { available: [row], ignored: [row] }: installed packages with a newer version on a source (core/installed.js);
+  // `holds` (Ignored Upgrades) go under ignored, and so do the status file's dpkg holds, except in the app, where
+  // `holds` is dpkg's own list already (core/settings.js holds.sync) and newer than the file.
+  upgrades: (holds = []) => ask("upgrades", [holds, { dpkgHolds: statusSource() !== "native" }]),
+  setStatus,
+  reloadInstalled,
+  // Whether there is a status file at all, without loading the sources (the launch badge waits on it).
+  hasStatus: () => statusText().then((t) => t != null, () => false),
+  statusSource,
+  // Called after a refresh filed something new, or the installed list changed; returns unsubscribe.
   onChange: (f) => { changeListeners.add(f); return () => changeListeners.delete(f); },
 };

@@ -13,3 +13,11 @@ Trimmed apt index files for `node --test` (`web/app/core/apt.test.js`). Taken fr
   and one synthetic stanza, `org.example.flat`, last: `./`-relative Filename, repo-relative Icon,
   `2:` epoch with `~`, a ` .` paragraph break and a verbatim line. None of the pulled lists is a flat repo
   (`deb <url> ./`), and the Packages format is the same either way; only the URL layout differs.
+- `dpkg-status`: 10 stanzas from the 4S's `/var/lib/dpkg/status` (`ref/4s/var/lib/dpkg/status`), byte for byte:
+  `install ok installed` packages (an epoch-less `apt7`, `cydia` with a `file:///` Icon), two `hold ok installed`
+  (`org.herf.flux`, `winterboard`), one `deinstall ok config-files` and one `install ok not-installed` stanza
+  (`web/app/core/installed.test.js`).
+- `upgrades-Packages`, `upgrades-Packages-2`: synthetic repos for those packages (written for the test, not
+  pulled): newer, equal and older candidates, a `~` pre-release, an epoch bump on the second repo, a candidate for
+  the wrong arch and one tagged `cydia::obsolete`, and candidates for packages that are only in config-files or
+  not installed.

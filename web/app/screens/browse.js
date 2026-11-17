@@ -395,6 +395,8 @@ async function renderPackage(body, route, key, id, ctx) {
   }
   if (more.length) body.append(grouped([{ rows: more.map((r) => ({ ...r, chevron: true })) }]));
   body.append(grouped([{ header: "Details", rows: details }]));
+  const installedEl = await installedGroup(st.package || id);
+  if (installedEl) body.append(installedEl);
   if (depRows.length) body.append(grouped([{ header: "Depends", rows: depRows }]));
   if (conflicts.length) body.append(grouped([{ header: "Conflicts", rows: conflicts }]));
   body.append(grouped([{ header: pkg.others.length > 1 ? "Sources" : "Source", rows: srcRows }]));
@@ -406,6 +408,29 @@ async function renderPackage(body, route, key, id, ctx) {
   body.append(grouped([{ footer: `${st.package}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
 
   if (sileo) loadSileo(depictionSlot, sileo, { fallback: descText });
+}
+
+// Installed Package (F7, Cydia's Installed Details): the version on the device and the Ignore Upgrades switch
+// (Settings' Ignored Upgrades; in the app a dpkg hold, core/settings.js holds). Null when it isn't installed.
+async function installedGroup(id) {
+  let rows;
+  try { rows = await catalog.installed(); } catch { return null; }
+  const p = rows?.find((r) => r.id === id);
+  if (!p) return null;
+  // On the site a hold in the uploaded status file is dpkg's, set on the phone: shown, not switchable here.
+  const dpkgHeld = p.held && catalog.statusSource() !== "native";
+  const frag = grouped([{
+    header: "Installed Package",
+    rows: [{ label: "Version", detail: p.version }, { label: "Ignore Upgrades", detail: dpkgHeld ? "Held by dpkg" : null }],
+    footer: "Do not include this package when selecting Upgrade All.",
+  }]);
+  if (!dpkgHeld) {
+    // grouped() draws plain rows; the switch goes into its cell afterwards, as on the Settings tab.
+    const cell = frag.querySelectorAll(".cell-inner")[1];
+    cell.append(createSwitch({ label: "Ignore Upgrades", checked: settings.holds.has(id), onToggle: (on) => { settings.holds.set(id, on); } }));
+    cell.classList.add("has-switch");
+  }
+  return frag;
 }
 
 // A deep link titles the page with the id until the package loads; then its name goes in the nav bar. app.js

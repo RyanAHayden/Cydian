@@ -14,9 +14,13 @@
 //   c.author(name)                         -> [row]: every package whose Author or Maintainer is `name`
 //   c.package(id, key | "*")               -> { stanza, key, others: [{ key, version }] } or null
 //   c.versions()                           -> [[key, id, version]] for every source (Changes, core/changes.js)
+//   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
+//   c.installed()                          -> [row] installed, sorted by name, each with `installed` (its version)
+//   c.upgrades(holds, { dpkgHolds })       -> { available: [row], ignored: [row] } (Changes, core/installed.js)
 //
 // A row is the slim record lists draw: { id, name, short, version, section, icon, key, author }.
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
+import { parseStatus, findUpgrades } from "./installed.js";
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -238,14 +242,43 @@ export function createCatalog() {
     return out;
   }
 
-  return { load, remove, setHidden, sections, list, search, author, package: pkg, has, versions, keys: () => [...sources.keys()] };
+  // ---- installed packages (F7): dpkg's status file, matched against every source's candidate ----
+  let installedPkgs = null; // parseStatus rows, or null before a status file came
+
+  function setInstalled(text) {
+    installedPkgs = text == null ? null : parseStatus(text);
+    return installedPkgs ? installedPkgs.length : -1;
+  }
+
+  // The installed list as rows: the status file's own fields (name, version, description), with the source's
+  // icon and key where a source carries the package, so the row's icon and package page work.
+  function installed() {
+    if (!installedPkgs) return null;
+    const all = entries(ALL);
+    return installedPkgs.map((p) => {
+      const e = all.get(p.id);
+      return { id: p.id, name: p.name, short: p.short, version: p.version, section: p.section,
+        icon: e?.row.icon ?? null, key: e?.row.key ?? null, author: p.author, installed: p.version, held: p.held };
+    });
+  }
+
+  // Every source counts (not just visible sections): an upgrade in a hidden section is still an upgrade.
+  function upgrades(holds = [], opts = {}) {
+    if (!installedPkgs) return { available: [], ignored: [] };
+    const all = entries(ALL);
+    return findUpgrades(installedPkgs, (id) => { const e = all.get(id); return e ? slim(e.row) : null; }, holds, opts);
+  }
+
+  return { load, remove, setHidden, sections, list, search, author, package: pkg, has, versions, keys: () => [...sources.keys()],
+    setInstalled, installed, upgrades };
 }
 
 // Runs a catalog operation by name: the worker's entry point. Unknown ops throw.
 export function runCatalog(catalog, op, args = []) {
   const f = { load: catalog.load, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
     search: catalog.search, author: catalog.author, package: catalog.package, has: catalog.has, keys: catalog.keys,
-    versions: catalog.versions, setHidden: catalog.setHidden }[op];
+    versions: catalog.versions, setHidden: catalog.setHidden, setInstalled: catalog.setInstalled,
+    installed: catalog.installed, upgrades: catalog.upgrades }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);
 }

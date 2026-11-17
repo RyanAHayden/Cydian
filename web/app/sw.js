@@ -5,6 +5,11 @@
 // A push from the server (web/push.py message()) is JSON: { title, body, count, url, tag, id, seq }. iOS needs every
 // push to show a notification, and this always does. It also sets the Home Screen badge to `count` (Badging API,
 // iOS 16.4+ Home Screen apps) and tells the server it arrived, for Settings' "Last Push Delivered".
+//
+// F34: a push `{ type: "check", id, seq }` asks the phone to check for upgrades itself ("Check on This Device").
+// sw-device.js (a module worker that imports this file) sets self.cydianDeviceCheck, which does the check and
+// shows the result. Here, without it, the push still shows a notification (iOS revokes push otherwise) asking
+// to open Cydian.
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
@@ -26,6 +31,10 @@ function badge(count) {
 
 self.addEventListener("push", (event) => {
   const msg = parse(event.data);
+  if (msg.type === "check") {
+    event.waitUntil(self.cydianDeviceCheck ? self.cydianDeviceCheck(msg) : checkUnsupported(msg));
+    return;
+  }
   const shown = self.registration.showNotification(msg.title || "Cydian", {
     body: msg.body || "",
     tag: msg.tag || "cydian",
@@ -41,6 +50,21 @@ self.addEventListener("push", (event) => {
     : null;
   event.waitUntil(Promise.all([shown, badge(msg.count), ack]));
 });
+
+function checkUnsupported(msg) {
+  const shown = self.registration.showNotification("Cydian", {
+    body: "Open Cydian to check for upgrades.", tag: "cydian-upgrades", icon: "icons/icon-180.png",
+    data: { url: msg.url || "/#/changes" },
+  });
+  const ack = msg.id
+    ? fetch("/api/push/ack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: msg.id, seq: msg.seq, outcome: "unsupported" }),
+    }).catch(() => {})
+    : null;
+  return Promise.all([shown, ack]);
+}
 
 // Tapping the notification: bring the open app forward on the page it names, or open it there.
 self.addEventListener("notificationclick", (event) => {

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { subscribeBody, keyBytes, support, pushState, when, saved } from "./push-client.js";
+import { subscribeBody, keyBytes, support, pushState, when, saved, checkDetail } from "./push-client.js";
 
 test("subscribeBody sends only what the check needs", () => {
   const b = subscribeBody({
@@ -42,4 +42,22 @@ test("when and saved", () => {
   assert.match(when(t, t * 1000 + 3 * 86400e3, "en-US"), /^Nov 17, /);
   assert.equal(saved({ getItem: () => "{bad" }), null);
   assert.deepEqual(saved({ getItem: () => '{"id":"a","feed":"f"}' }), { id: "a", feed: "f" });
+});
+
+test("F34: device mode sends the subscription and nothing of the lists", () => {
+  const b = subscribeBody({
+    id: "abc", mode: "device", arch: "iphoneos-arm64",
+    subscription: { endpoint: "https://web.push.apple.com/x", keys: { p256dh: "P", auth: "A" } },
+    sources: [{ uri: "https://r/", dist: "./" }], installed: [{ id: "foo", installed: "1" }], holds: ["foo"],
+  });
+  assert.deepEqual(b, { id: "abc", mode: "device", arch: "iphoneos-arm64", sources: [], installed: [], holds: [],
+    subscription: { endpoint: "https://web.push.apple.com/x", keys: { p256dh: "P", auth: "A" } } });
+});
+
+test("F34: checkDetail", () => {
+  const now = Date.UTC(2026, 10, 17, 12);
+  assert.equal(checkDetail(null, now), "Never");
+  assert.match(checkDetail({ t: now - 60000, ms: 3140, outcome: "ok" }, now), /^Today, .*, 3\.1 s$/);
+  assert.match(checkDetail({ t: now, ms: 20000, outcome: "timeout" }, now), /Timed Out$/);
+  assert.match(checkDetail({ t: now, ms: 10, outcome: "error" }, now), /Failed$/);
 });

@@ -46,17 +46,18 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
     scrim.append(box);
     document.body.append(scrim);
 
-    // Locked in place, as on iOS 6: nothing behind it scrolls, and with the keyboard up it stays centred in the part of
-    // the screen that's still showing (iOS pans the page when a field takes focus; the visual viewport says where to).
+    // Locked in place, as on iOS 6. Nothing behind it scrolls, and a tap outside the box does nothing (it would
+    // otherwise drop the keyboard and scroll the page). The backdrop reaches well past the screen's edges, so
+    // nothing white shows when iOS pans the page for the keyboard. Only the box moves, by `translate` (the pop-in owns
+    // `transform`), to stay centred in the part of the screen still showing.
     const noScroll = (e) => { if (e.cancelable) e.preventDefault(); };
     scrim.addEventListener("touchmove", noScroll, { passive: false });
     scrim.addEventListener("wheel", noScroll, { passive: false });
+    const outside = (e) => { if (e.target === scrim && e.cancelable) e.preventDefault(); };
+    scrim.addEventListener("touchstart", outside, { passive: false });
+    scrim.addEventListener("mousedown", outside);
     const vv = globalThis.visualViewport;
-    const fit = () => {
-      scrim.style.top = vv.offsetTop + "px";
-      scrim.style.height = vv.height + "px";
-      scrim.style.bottom = "auto";
-    };
+    const fit = () => { box.style.translate = `0 ${Math.round(vv.offsetTop + vv.height / 2 - innerHeight / 2)}px`; };
     if (vv) { fit(); vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit); }
 
     const onKey = (e) => {

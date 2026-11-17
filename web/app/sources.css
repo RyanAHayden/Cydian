@@ -4,8 +4,9 @@
 /* ---- "Alert diaglog": 272px wide, 10px corners, #0b1b43 at 80%, a 2px #b1b7c1 -> #e1e3e3 rim, 8px/19px shadow,
    a white gloss over the top 31px that dips in a curve. ---- */
 .alert-scrim {
-  position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px;
-  background: radial-gradient(ellipse at center, rgba(0,0,0,.25), rgba(0,0,0,.6) 70%);
+  /* a screen's height past each edge (nav/alert.js: no white shows when iOS pans for the keyboard) */
+  position: fixed; inset: -100vh 0; z-index: 30; display: grid; place-items: center; padding: calc(100vh + 16px) 16px;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.25), rgba(0,0,0,.6) 70%) center / 100% 100vh no-repeat, rgba(0,0,0,.6);
 }
 .alert {
   position: relative; width: 272px; max-width: 100%; padding: 16px 12px 11px; border-radius: 10px;

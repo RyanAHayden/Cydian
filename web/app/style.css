@@ -25,6 +25,7 @@ button { font: inherit; color: inherit; margin: 0; }
 /* Screens: one .tab-stack per tab, its .pages stacked root first; each page scrolls on its own. */
 #screens { flex: 1; position: relative; z-index: 1; overflow: hidden; min-height: 0; }
 .tab-stack, .page { position: absolute; inset: 0; }
+.tab-stack, .nav-stack { visibility: hidden; } /* every stack covers the screen: only its shown page may take touches */
 .page { visibility: hidden; } /* later pages paint over earlier ones: the top is always the last child */
 .page-body {
   position: absolute; inset: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;

@@ -1,0 +1,159 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  createCatalog, sectionName, simpleSection, parseAuthor, isVisible, indexLetter, NO_SECTION, ALL,
+} from "./catalog.js";
+import { reply } from "./worker.js";
+import { createParser } from "./parser.js";
+
+const stanza = (f) => Object.entries(f).map(([k, v]) => `${k}: ${v}`).join("\n");
+const packages = (...list) => list.map(stanza).join("\n\n") + "\n";
+const ids = (rows) => rows.map((r) => r.id);
+
+const REPO_A = packages(
+  { Package: "com.a.tweak", Name: "Alpha Tweak", Version: "1.0", Architecture: "iphoneos-arm64", Section: "Tweaks",
+    Author: "Jane Dev <jane@example.com>", Description: "makes things alpha\n long text about springboard",
+    Filename: "debs/alpha_1.0.deb", Icon: "icons/alpha.png" },
+  { Package: "com.a.tweak", Name: "Alpha Tweak", Version: "1.2", Architecture: "iphoneos-arm64", Section: "Tweaks",
+    Author: "Jane Dev <jane@example.com>", Description: "makes things alpha", Filename: "debs/alpha_1.2.deb" },
+  { Package: "com.a.rootful", Name: "Rootful Only", Version: "1", Architecture: "iphoneos-arm", Section: "Tweaks" },
+  { Package: "com.a.util", Name: "beta util", Version: "2", Architecture: "all", Section: "Utility",
+    Maintainer: "Sam Packager <sam@example.com>", Description: "a utility" },
+  { Package: "com.a.theme", Name: "Gamma Theme", Version: "1", Architecture: "iphoneos-arm64", Section: "Themes_(Lockscreen)",
+    Author: "jane dev", Description: "lock screen look" },
+  { Package: "com.a.nosection", Version: "1", Architecture: "iphoneos-arm64", Description: "no section here" },
+  { Package: "com.a.old", Name: "Old", Version: "1", Architecture: "iphoneos-arm64", Section: "Tweaks", Tag: "cydia::obsolete" },
+  { Package: "com.a.hidden", Name: "Hidden", Version: "1", Architecture: "iphoneos-arm64", Section: "Tweaks", Tag: "purpose::x, role::cydia" },
+);
+const REPO_B = packages(
+  { Package: "com.a.tweak", Name: "Alpha Tweak", Version: "1.10", Architecture: "iphoneos-arm64", Section: "Tweaks",
+    Author: "Jane Dev <jane@example.com>", Description: "makes things alpha (B)\n long text about springboard" },
+  { Package: "com.b.springy", Name: "Springy", Version: "3", Architecture: "iphoneos-arm64", Section: "Tweaks",
+    Author: "Other <o@example.com>", Maintainer: "Jane Dev <jane@example.com>", Description: "bouncy icons" },
+);
+
+function loaded() {
+  const c = createCatalog();
+  assert.equal(c.load("A", REPO_A, "https://a.example/"), 4);
+  assert.equal(c.load("B", REPO_B, "https://b.example/"), 2);
+  return c;
+}
+
+test("section names follow Cydia: underscores, Sections.plist fixes, (No Section)", () => {
+  assert.equal(sectionName("Utility"), "Utilities");
+  assert.equal(sectionName("Themes_(Lockscreen)"), "Themes (LockScreen)");
+  assert.equal(sectionName("Tweaks"), "Tweaks");
+  assert.equal(sectionName("Some_New Section"), "Some New Section");
+  assert.equal(sectionName(""), NO_SECTION);
+  assert.equal(sectionName(undefined), NO_SECTION);
+  assert.equal(simpleSection("Themes (SpringBoard)"), "Themes");
+  assert.equal(simpleSection("[Beta]"), "Beta");
+  assert.equal(simpleSection("(No Section)"), "No Section");
+});
+
+test("authors, visibility and index letters", () => {
+  assert.deepEqual(parseAuthor("Jay Freeman (saurik) <saurik@saurik.com>"), { name: "Jay Freeman (saurik)", email: "saurik@saurik.com" });
+  assert.deepEqual(parseAuthor("just a name"), { name: "just a name", email: "" });
+  assert.deepEqual(parseAuthor("<only@mail>"), { name: "only@mail", email: "only@mail" });
+  assert.equal(parseAuthor(""), null);
+  assert.equal(isVisible({ tag: "purpose::extension, role::enduser" }), true);
+  assert.equal(isVisible({ tag: "role::cydia" }), false);
+  assert.equal(isVisible({ tag: "cydia::obsolete" }), false);
+  assert.equal(isVisible({}), true);
+  assert.equal(indexLetter("alpha"), "A");
+  assert.equal(indexLetter("Écran"), "E");
+  assert.equal(indexLetter("3D Touch"), "#");
+});
+
+test("load keeps this arch only, the newest version, and visible packages", () => {
+  const c = loaded();
+  const a = c.list("A");
+  assert.deepEqual(ids(a), ["com.a.tweak", "com.a.util", "com.a.nosection", "com.a.theme"]);
+  const tweak = a[0];
+  assert.equal(tweak.version, "1.2");
+  assert.equal(tweak.author, "Jane Dev");
+  assert.equal(tweak.short, "makes things alpha");
+  assert.equal(c.list("A").find((r) => r.id === "com.a.util").author, "Sam Packager", "maintainer when no author");
+  assert.equal(Object.keys(tweak).some((k) => k.startsWith("_")), false, "search fields stay in the worker");
+  // rootful arch sees the rootful package and the arch-all one
+  const r = createCatalog();
+  assert.equal(r.load("A", REPO_A, "https://a.example/", "iphoneos-arm"), 2);
+});
+
+test("sections group with counts, sorted by name; All Sources merges", () => {
+  const c = loaded();
+  assert.deepEqual(c.sections("A"), {
+    total: 4,
+    sections: [
+      { name: NO_SECTION, count: 1 }, { name: "Themes (LockScreen)", count: 1 },
+      { name: "Tweaks", count: 1 }, { name: "Utilities", count: 1 },
+    ],
+  });
+  const all = c.sections(ALL);
+  assert.equal(all.total, 5, "com.a.tweak counted once across sources");
+  assert.deepEqual(all.sections.find((s) => s.name === "Tweaks"), { name: "Tweaks", count: 2 });
+  assert.deepEqual(ids(c.list(ALL, "Tweaks")), ["com.a.tweak", "com.b.springy"]);
+  assert.deepEqual(ids(c.list("A", NO_SECTION)), ["com.a.nosection"]);
+  assert.equal(c.list("missing").length, 0);
+});
+
+test("All Sources picks the newest version (dpkg order: 1.10 > 1.2)", () => {
+  const c = loaded();
+  const p = c.package("com.a.tweak");
+  assert.equal(p.stanza.version, "1.10");
+  assert.equal(p.key, "B");
+  assert.deepEqual(p.others, [{ key: "A", version: "1.2" }, { key: "B", version: "1.10" }]);
+  const a = c.package("com.a.tweak", "A");
+  assert.equal(a.stanza.version, "1.2");
+  assert.equal(a.stanza.debUrl, "https://a.example/debs/alpha_1.2.deb");
+  assert.equal(c.package("nope"), null);
+  assert.deepEqual(c.has(["com.a.util", "libc", "com.b.springy"]), ["com.a.util", "com.b.springy"]);
+});
+
+test("search covers name, id, description and author, ranked", () => {
+  const c = loaded();
+  assert.deepEqual(ids(c.search("springy")), ["com.b.springy"]);
+  assert.deepEqual(ids(c.search("com.a.ut")), ["com.a.util"], "id prefix");
+  assert.deepEqual(ids(c.search("bouncy")), ["com.b.springy"], "short description");
+  assert.deepEqual(ids(c.search("springboard")), ["com.a.tweak"], "long description");
+  assert.deepEqual(ids(c.search("sam packager")), ["com.a.util"], "maintainer, all words");
+  // exact name first, then name prefix, then the rest by name
+  assert.deepEqual(ids(c.search("alpha tweak")), ["com.a.tweak"]);
+  const jane = ids(c.search("jane"));
+  assert.deepEqual(jane.sort(), ["com.a.theme", "com.a.tweak", "com.b.springy"].sort());
+  const t = ids(c.search("g"));
+  assert.equal(t[0], "com.a.theme", "name or id prefix outranks a match inside");
+  assert.deepEqual(c.search("   "), []);
+  assert.deepEqual(c.search("zzz-nothing"), []);
+  assert.equal(c.search("a", { limit: 2 }).length, 2);
+});
+
+test("author lists every package by Author or Maintainer name, any case", () => {
+  const c = loaded();
+  assert.deepEqual(ids(c.author("Jane Dev")), ["com.a.tweak", "com.a.theme", "com.b.springy"]);
+  assert.deepEqual(ids(c.author("other")), ["com.b.springy"]);
+  assert.deepEqual(c.author(""), []);
+});
+
+test("reloading a source replaces it; removing drops it from All Sources", () => {
+  const c = loaded();
+  c.load("B", packages({ Package: "com.b.new", Name: "New", Version: "1", Architecture: "all" }), "https://b.example/");
+  assert.equal(c.package("com.a.tweak").stanza.version, "1.2");
+  assert.deepEqual(c.search("springy"), []);
+  c.remove("A");
+  assert.deepEqual(ids(c.list(ALL)), ["com.b.new"]);
+  assert.deepEqual(c.keys(), ["B"]);
+});
+
+test("the worker runs catalog ops, with the Packages text as bytes", async () => {
+  const bytes = new TextEncoder().encode(REPO_B).buffer;
+  const r = reply({ id: 1, type: "catalog", op: "load", args: ["W", null, "https://b.example/", "iphoneos-arm64"], bytes });
+  assert.deepEqual(r, { id: 1, ok: true, result: 2 });
+  assert.equal(reply({ id: 2, type: "catalog", op: "search", args: ["bouncy"] }).result[0].id, "com.b.springy");
+  assert.equal(reply({ id: 3, type: "catalog", op: "bogus" }).ok, false);
+  // and through the parser's inline fallback (no Worker in node)
+  const p = createParser({ Worker: null });
+  assert.equal(await p.catalog("load", ["P", undefined, "https://a.example/"], REPO_A), 4);
+  assert.equal((await p.catalog("sections", ["P"])).total, 4);
+  await assert.rejects(p.catalog("nope"));
+});

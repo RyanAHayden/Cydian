@@ -2,7 +2,11 @@
 // page, and it works the same from the site and from the app bundle (file:// or a custom scheme). No DOM here:
 // the router gets a window-like object, which keeps it testable under `node --test`.
 
-export const TABS = ["home", "sources", "changes", "installed", "search", "settings"];
+import { tabsFor } from "./mode.js";
+
+export const ALL_TABS = ["home", "sources", "changes", "installed", "search", "settings"];
+// The tabs this build shows: the sideload app leaves out the apt-only ones (mode.js), and so does every route.
+export const TABS = tabsFor(ALL_TABS);
 export const DEFAULT_TAB = "home";
 
 // "#/sources/a%20b/c" -> { tab: "sources", path: ["a b", "c"] }. Anything unknown lands on the default tab.

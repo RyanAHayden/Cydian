@@ -9,16 +9,20 @@
 //   cydianNative.jailbreak: "rootless" | "rootful"           the jailbreak type the shell found (F40), read by
 //                                                            core/settings.js bridgeArch(); Apt.swift fills in
 //                                                            @JAILBREAK@ below, and left as it is it stays unset
+//   cydianNative.mode: "jailbreak" | "sideload"              which build is running (I2, native/Sources/Mode.swift),
+//                                                            read by core/settings.js detectMode(); Apt.swift fills
+//                                                            in @MODE@, and left as it is it stays unset (jailbreak)
 //
 // Request/response is postMessage({ id, method, params, stream }) on the WKScriptMessageHandlerWithReply named
 // "cydian"; its promise resolves with the reply or rejects with Error(message). A message "<code>: <text>" (the
 // shell's errors, e.g. "timeout: ...") becomes an error with that `code`. `cydianApp` tells nav/haptic.js to use the
-// shell's haptic.tap. `mode` is left unset: core/settings.js reads that as the jailbreak build (I2 sets it).
+// shell's haptic.tap.
 (function (g) {
   const handler = g.webkit && g.webkit.messageHandlers && g.webkit.messageHandlers.cydian;
   if (!handler || g.cydianNative) return;
   let nextId = 1;
   const jailbreak = "@JAILBREAK@";
+  const mode = "@MODE@";
   const streams = new Map();
 
   function withCode(e) {
@@ -60,4 +64,5 @@
     dpkgStatus: () => call("apt.dpkgStatus"),
   };
   if (jailbreak === "rootless" || jailbreak === "rootful") g.cydianNative.jailbreak = jailbreak;
+  if (mode === "jailbreak" || mode === "sideload") g.cydianNative.mode = mode;
 })(globalThis);

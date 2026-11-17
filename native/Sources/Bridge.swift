@@ -26,7 +26,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         on("app.info") { c in
             let info = Bundle.main.infoDictionary ?? [:]
             c.reply(["version": info["CFBundleShortVersionString"] ?? "", "build": info["CFBundleVersion"] ?? "",
-                     "ios": UIDevice.current.systemVersion, "jailbreak": Jailbreak.type,
+                     "ios": UIDevice.current.systemVersion, "jailbreak": Jailbreak.type, "mode": AppMode.current.rawValue,
                      // F49: Telesphoreo's suite is ios/<this %.2f> (core/altstore.js coreFoundationDist)
                      "cf": kCFCoreFoundationVersionNumber], nil)
         }

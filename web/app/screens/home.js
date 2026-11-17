@@ -169,6 +169,8 @@ function renderRoot(body) {
   who.rel = "noopener";
   by.append(who);
   words.append(by);
+  // A nod to the original, without claiming any link to it.
+  words.append(el("p", "home-honor", "In honor of Jay Freeman (saurik) · not affiliated"));
   head.append(icon, words);
 
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));

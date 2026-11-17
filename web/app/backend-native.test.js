@@ -2,7 +2,7 @@
 // sources, lists and dpkg status, and native/fake/cydian-helper), fed into the same core as the site.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import vm from "node:vm";
 import { createNativeBackend } from "./backend-native.js";
@@ -151,19 +151,91 @@ test("fetch() and text() go through the shell; HTTP errors are 'upstream' like t
   await assert.rejects(offline.text("https://r.test/x"), { code: "network" });
 });
 
-test("addSource checks the repo and keeps it beside apt's; apt's own sources can't be removed from here", async (t) => {
-  const { backend } = setup(t, { net: {
-    "https://new.test/Packages": "Package: a\nVersion: 1\nArchitecture: iphoneos-arm64\n",
-    "https://new.test/Release": "Origin: New Repo\nArchitectures: iphoneos-arm64\n",
-  } });
+const NEW_NET = {
+  "https://new.test/Packages": "Package: a\nVersion: 1\nArchitecture: iphoneos-arm64\n",
+  "https://new.test/Release": "Origin: New Repo\nArchitectures: iphoneos-arm64\n",
+};
+const NEW = "deb:https://new.test/:./";
+const cydianSources = (fx) => join(fx.prefix, "etc/apt/sources.list.d/cydian.sources");
+const readOrNull = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null);
+
+test("addSource checks the repo and writes it into apt's sources (cydian.sources) through the helper", async (t) => {
+  const { backend, native, fx } = setup(t, { net: NEW_NET });
   const added = await backend.addSource("new.test");
-  assert.equal(added.key, "deb:https://new.test/:./");
+  assert.equal(added.key, NEW);
   assert.equal(added.origin, "New Repo");
   assert.equal(added.count, 1);
-  assert.ok((await backend.sources()).some((s) => s.key === added.key && s.added));
+  assert.equal(added.added, undefined); // in apt's files now, not the device's alone
+  assert.deepEqual(native.calls.filter((c) => c.method === "helper.run").map((c) => c.params.words),
+    [["addsource", "https://new.test/", "./"]]);
+  assert.equal(readOrNull(cydianSources(fx)), "Types: deb\nURIs: https://new.test/\nSuites: ./\n");
+  const listed = (await backend.sources()).find((s) => s.key === NEW);
+  assert.match(listed.file, /sources\.list\.d\/cydian\.sources$/);
+  assert.equal(listed.origin, "New Repo"); // the device's metadata stays with apt's entry
+  assert.equal(listed.added, undefined);
+  await backend.addSource("new.test"); // again: no second stanza
+  assert.equal(readOrNull(cydianSources(fx)), "Types: deb\nURIs: https://new.test/\nSuites: ./\n");
+});
+
+test("removeSource takes a source out of cydian.sources; apt's other files are left alone", async (t) => {
+  const { backend, native, fx } = setup(t, { net: NEW_NET });
+  await backend.addSource("new.test");
   await assert.rejects(backend.removeSource(PROCURSUS), /procursus\.sources/);
-  await backend.removeSource(added.key);
-  assert.ok(!(await backend.sources()).some((s) => s.key === added.key));
+  assert.ok(!native.calls.some((c) => c.method === "helper.run" && c.params.words[0] === "removesource"));
+  await backend.removeSource(NEW);
+  assert.deepEqual(native.calls.filter((c) => c.method === "helper.run").pop().params.words, ["removesource", "https://new.test/", "./"]);
+  assert.equal(readOrNull(cydianSources(fx)), null); // the last one gone: the file too
+  assert.ok(!(await backend.sources()).some((s) => s.key === NEW));
+  assert.equal(readOrNull(join(fx.prefix, "etc/apt/sources.list.d/procursus.sources")).includes("apt.procurs.us"), true);
+});
+
+test("a failed write is an error with the helper's message, and nothing is kept", async (t) => {
+  const { backend, fx } = setup(t, { net: NEW_NET, env: { FAKE_FAIL: "addsource" } });
+  await assert.rejects(backend.addSource("new.test"), (e) => e.code === "helper" && /addsource failed \(74\).*temp file/.test(e.message));
+  assert.equal(readOrNull(cydianSources(fx)), null);
+  assert.ok(!(await backend.sources()).some((s) => s.key === NEW));
+});
+
+test("without a helper (sideload build) an added source is kept on the device, and moved into apt's sources later", async (t) => {
+  const fx = makeFixture();
+  t.after(fx.cleanup);
+  const indexedDB = fakeIndexedDB();
+  const make = (helper) => createNativeBackend({
+    native: createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: NEW_NET, ...(helper ? { helper } : {}) }),
+    sourceOptions: { indexedDB },
+  });
+  const bare = make(join(fx.dir, "no-helper"));
+  const kept = await bare.addSource("new.test");
+  assert.equal(kept.added, true);
+  assert.ok((await bare.sources()).some((s) => s.key === NEW && s.added && !s.file));
+  await assert.rejects(bare.removeSource(PROCURSUS), /procursus\.sources/);
+
+  // The same device store, now with the helper: Refresh writes the record into cydian.sources first.
+  const app = make();
+  const seen = [];
+  await app.refreshSources((s) => seen.push(s.key));
+  assert.equal(readOrNull(cydianSources(fx)), "Types: deb\nURIs: https://new.test/\nSuites: ./\n");
+  assert.ok(seen.includes(NEW));
+  const listed = (await app.sources()).find((s) => s.key === NEW);
+  assert.match(listed.file, /cydian\.sources$/);
+  assert.equal(listed.added, undefined);
+  assert.equal(listed.origin, "New Repo");
+});
+
+test("refreshSources keeps a device-only source that can't be written yet, and still refreshes", async (t) => {
+  const fx = makeFixture();
+  t.after(fx.cleanup);
+  const indexedDB = fakeIndexedDB();
+  const make = (opts) => createNativeBackend({
+    native: createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: NEW_NET, ...opts }),
+    sourceOptions: { indexedDB },
+  });
+  await make({ helper: join(fx.dir, "no-helper") }).addSource("new.test");
+  const app = make({ env: { FAKE_FAIL: "addsource" } });
+  const out = await app.refreshSources();
+  assert.ok(out.some((s) => s.key === PROCURSUS && s.count === 2));
+  assert.equal(readOrNull(cydianSources(fx)), null);
+  assert.ok((await app.sources()).some((s) => s.key === NEW && s.added)); // tried again next time
 });
 
 test("native/bridge.js: postMessage ids, stream events, error codes, cydianApp", async () => {

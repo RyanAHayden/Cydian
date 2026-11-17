@@ -1,0 +1,11 @@
+const top = (sel) => `document.querySelector('.tab-stack.is-active .page.is-top ${sel}')`;
+const body = top(".page-body");
+const measure = () => q(`(() => { const b = ${body}; const r = b.getBoundingClientRect();
+  const kids = [...b.children].map(c => c.className + ":" + Math.round(c.getBoundingClientRect().height));
+  return JSON.stringify({ view: Math.round(r.height), scrollH: b.scrollHeight, clientH: b.clientHeight, kids }); })()`);
+await go("#/settings", 1200); await shot("settings"); console.log("settings", await measure());
+await q(`localStorage.setItem("cydian.arch", "iphoneos-arm")`);
+await p.send("Page.reload"); await sleep(1500);
+await go("#/search/" + encodeURIComponent("package:winterboard"), 300); await waitFor(top(".pkg-head"), 90000); await sleep(1500);
+await shot("package"); console.log("package", await measure());
+await go("#/home", 1200); await shot("home"); console.log("home", await measure());

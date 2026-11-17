@@ -12,7 +12,7 @@ import { TABS, createRouter, format, parent } from "./router.js";
 import { createStacks, swipeCommits } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transition.js";
 import { attachEdgeSwipe } from "./nav/swipe.js";
-import { createTabbar } from "./nav/tabbar.js";
+import { createTabbar, tapTab } from "./nav/tabbar.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
@@ -245,7 +245,9 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
   const a = e.target.closest("a.tab");
   if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
   e.preventDefault();
-  router.selectTab(a.dataset.tab);
+  // A second tap at the root runs the screen's reselect() (Search focuses its field), in this handler (F36).
+  const tab = a.dataset.tab;
+  tapTab(tab, router.current(), { selectTab: (t) => router.selectTab(t), reselect: SCREENS[tab].reselect });
 });
 
 // Pressed look while a finger is down, like Cydia's: .is-pressed on the bar button or row under it, off when the

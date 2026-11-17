@@ -8,6 +8,15 @@ import { catalog } from "../catalog.js";
 export const title = "Search";
 
 const state = { query: "", seq: 0 };
+let rootInput = null; // the root page's field, for reselect()
+
+// A tap on the Search tab while already on its root (nav/tabbar.js tapTab, F36): focus the field. Called straight
+// from the tap's click handler, never after an await or timer, or iOS won't bring up the keyboard.
+export function reselect() {
+  if (!rootInput || !rootInput.isConnected) return false;
+  rootInput.focus();
+  return true;
+}
 
 export function nav(route) {
   if (route.path.length) return browse.nav(route);
@@ -34,6 +43,7 @@ export function render(body, route, ctx) {
   input.setAttribute("aria-label", "Search packages: name, description or author");
   input.enterKeyHint = "search";
   input.value = state.query;
+  rootInput = input;
   field.append(input);
   bar.append(field);
   const note = document.createElement("p");

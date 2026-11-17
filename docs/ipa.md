@@ -1,5 +1,10 @@
 # IPA: does Cydian need one?
 
+> **Overruled by the user, 2026-11-17: build it.** Not as a separate app: the `native/` shell also builds as a
+> sideload IPA (plan I2-I4). It remembers the version you downloaded, checks sources in the background and posts
+> local notifications. When the root helper is present (jailbreak mode) it reads real installed versions instead.
+> The research below still holds for what an IPA can and can't see.
+
 R4, 2026-11-17. **Verdict: drop it.** Don't build a non-jailbroken IPA now. F10 (PWA + Web Push) and F11 (the
 Shortcuts recipe) cover the job. The IPA's only real extras (a Home Screen widget, a check that never leaves the
 phone) aren't worth what it costs to sign and ship it. I1 is dropped. A widget-only IPA is parked as a `later`

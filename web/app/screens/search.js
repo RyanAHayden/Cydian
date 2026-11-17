@@ -4,7 +4,7 @@
 // Below the root, the routes are screens/browse.js tokens (package:<id>, author:<name>).
 //
 // Filters (F35): under the bar, iOS 6's search scope bar: a segmented control over the broad kinds (All, Tweaks,
-// Themes, Apps: core/catalog.js SECTION_GROUPS) and a Filter button whose sheet picks a section, a source,
+// Themes, Apps: core/catalog.js SECTION_GROUPS) and a Filter button whose drop-down panel picks a section, a source,
 // installed or not, free or paid, and Show Incompatible. Show Incompatible is the Works on My Phone setting turned
 // round (F17), so Search, Sections and Settings agree; an exact name or id match shows even when it can't work, in
 // red with the reason under it (browse.js bindRow).
@@ -16,7 +16,6 @@ import { SECTION_GROUPS } from "../core/catalog.js";
 import { displayName } from "../core/sources.js";
 import { getBackend } from "../backend.js";
 import { grouped } from "../nav/ui.js";
-import { showSheet } from "../nav/sheet.js";
 
 export const title = "Search";
 
@@ -50,6 +49,7 @@ export const sheetActive = (f) => Boolean(f.source || f.installed || f.price || 
 // A tap on the Search tab while already on its root (nav/tabbar.js tapTab, F36): focus the field. Called straight
 // from the tap's click handler, never after an await or timer, or iOS won't bring up the keyboard.
 export function reselect() {
+  if (drop) { drop.close(); return true; } // an open Filter panel closes first
   if (!rootInput || !rootInput.isConnected) return false;
   rootInput.focus();
   return true;
@@ -109,12 +109,15 @@ export function render(body, route, ctx) {
   seg.append(...segButtons);
   const filterButton = el("button", "scope-filter", "Filter");
   filterButton.type = "button";
-  filterButton.addEventListener("click", () => openFilters(() => { drawScope(); run(); }));
+  filterButton.addEventListener("click", () => {
+    if (drop) drop.close();
+    else openFilters(scope, () => { drawScope(); run(); }, drawScope);
+  });
   scope.append(seg, filterButton);
   function drawScope() {
     const sel = scopeIndex(state.filters.section);
     segButtons.forEach((b, i) => { b.classList.toggle("selected", i === sel); b.setAttribute("aria-selected", String(i === sel)); });
-    filterButton.classList.toggle("selected", sheetActive(state.filters));
+    filterButton.classList.toggle("selected", Boolean(drop) || sheetActive(state.filters));
   }
   drawScope();
 
@@ -171,8 +174,31 @@ function choiceGroup(header, options, current, pick, footer) {
   })) }]);
 }
 
-async function openFilters(changed) {
-  const box = el("div", "sheet-scroll grouped page-body filter-sheet");
+// The Filter panel drops down from under the scope bar and covers only the results (the search field and the
+// segments stay), like a menu; Filter again, or a tap on the Search tab, puts it away (reselect()). Leaving Search
+// closes it too. Transform only.
+let drop = null; // the open panel: { close() }
+async function openFilters(scope, changed, redraw) {
+  const box = el("div", "grouped filter-sheet filter-drop-inner");
+  const wrap = el("div", "filter-drop");
+  wrap.style.top = Math.round(scope.getBoundingClientRect().bottom) + "px";
+  wrap.append(box);
+  document.body.append(wrap);
+  const ease = "cubic-bezier(.25,.1,.25,1)";
+  box.animate([{ transform: "translateY(-100%)" }, { transform: "none" }], { duration: 280, easing: ease });
+  const onRoute = () => { if (!/^#\/search\/?$/.test(location.hash)) close(); };
+  addEventListener("hashchange", onRoute);
+  function close() {
+    if (drop !== ctl) return;
+    drop = null;
+    removeEventListener("hashchange", onRoute);
+    redraw?.();
+    const a = box.animate([{ transform: "none" }, { transform: "translateY(-100%)" }], { duration: 220, easing: ease, fill: "forwards" });
+    a.finished.then(() => wrap.remove(), () => wrap.remove());
+  }
+  const ctl = { close };
+  drop = ctl;
+  redraw?.();
   let sources = [], sections = [];
   const f = state.filters;
   const set = (key, value) => { f[key] = value; draw(); changed(); };
@@ -205,7 +231,6 @@ async function openFilters(changed) {
     box.scrollTop = top;
   }
   draw();
-  showSheet({ title: "Filter", body: box });
   try {
     const [list, data] = await Promise.all([getBackend().sources(), catalog.sections(ALL)]);
     sources = list;

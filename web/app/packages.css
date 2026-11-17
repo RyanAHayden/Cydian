@@ -218,3 +218,12 @@ html[data-theme="dark"] .pkg-name.incompatible { color: #ff7b6b; }
 .pkg-head-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .pkg-head-top .pkg-head-name { min-width: 0; }
 html[data-theme="dark"] .scope-segment + .scope-segment, html[data-theme="dark"] .scope-segment.selected + .scope-segment { border-left-color: #000; }
+
+/* Search's Filter panel (screens/search.js): drops down from under the scope bar over the results only, between the
+   scope bar and the tab bar; scrolls on its own. */
+.filter-drop { position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 2; overflow: hidden; }
+.filter-drop-inner {
+  position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 20px;
+  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
+  box-shadow: inset 0 3px 3px -2px rgba(0,0,0,.35);
+}

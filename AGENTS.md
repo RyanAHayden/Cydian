@@ -28,10 +28,15 @@ Shortcuts recipes live in `docs/shortcuts.md`.
   https://git.saurik.com/cydia.git.
 - Never commit Apple artwork (UIKit `.artwork` extracts, system icons) or Cydia's logo. Pulled device files go in
   `ref/` (gitignored). Use them as a reference and redraw in CSS/SVG. Don't name the product or pages "Cydia".
+  `ref/` exists only in the main checkout. In a worktree, link it first:
+  `ln -s "$(git rev-parse --path-format=absolute --git-common-dir)/../ref" ref`.
 - The server fetches URLs visitors type in. Every fetch goes through the SSRF guard (F3): no private, loopback or
   link-local addresses, size and time caps.
 - The iPhone 4S (iOS 6, jailbroken) is the test device: `ssh 4s` (see R1). Only touch it when your task says so.
   Never run `apt-get upgrade`, `dpkg -i` or `rm` on it unless the task says so. It can't be re-jailbroken
   easily.
+  Only one agent may drive its screen at a time. Taps, swipes, opening URLs and screenshots go through
+  `tools/ui-4s.sh` under its lock: `lock <ID>` first, `unlock <ID>` when done (also after a failure). If it's
+  locked, do other work and try later. Reading or pulling files over ssh needs no lock and can run alongside.
 - License: GPL-3.0-or-later. Code taken from GPLv3 projects (Cydia) is fine; never copy code under a license GPLv3 can't include.
 - Write findings worth keeping to `journal/<ID>/notes.md`.

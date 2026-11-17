@@ -33,7 +33,7 @@
 ## Phone control (added after SimulateTouch + Veency)
 - Taps: `ssh 4s stouch touch X Y` (points, 320x480 portrait); swipes: `stouch swipe x1 y1 x2 y2 [dur]`.
 - Screens: `uiopen cydia://sources` etc. Screenshots: `activator send libactivator.system.take-screenshot`;
-  `tools/shot-4s.sh <name>` copies the latest one to `ref/4s/screens/`. Screenshots pile up in the Camera Roll
+  `tools/ui-4s.sh` wraps taps, swipes, `uiopen`, home and screenshots behind a one-agent lock. Screenshots pile up in the Camera Roll
   (no `rm` on the 4S).
 - Veency listens on 5900 and asks Accept/Reject on the phone for every connection until a VNC password is set.
   Even a plain TCP probe of 5900 brings up the prompt.

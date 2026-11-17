@@ -141,3 +141,46 @@ test("sw-device.js loads as a module worker over sw.js and answers a check push"
     globalThis.fetch = prev.fetch;
   }
 });
+
+// ---- F39: AltStore news on the device ----
+
+test("deviceCheck: AltStore news with notify:true shows once, notify:false never", async () => {
+  const ALT = "https://alt.example/apps.json";
+  let items = [{ identifier: "old", title: "Old", notify: true, date: "2026-01-01" }];
+  const { env, log } = fakeEnv({
+    altSources: async () => [ALT],
+    altText: async (u) => { assert.equal(u, ALT); return JSON.stringify({ name: "Alt", apps: [], news: items }); },
+  });
+  await deviceCheck({ type: "check" }, env);
+  assert.equal(log.shown.length, 1); // only the upgrades: the first look sets the baseline
+  assert.deepEqual(log.state.news, { [ALT]: ["old"] });
+
+  items = [...items, { identifier: "loud", title: "Loud", caption: "Big news", notify: true, date: "2026-11-16" },
+    { identifier: "quiet", title: "Quiet", notify: false, date: "2026-11-17" }];
+  const r = await deviceCheck({ type: "check" }, env);
+  assert.equal(r.news, 1);
+  const shown = log.shown.slice(1).filter((n) => n.tag !== "cydian-upgrades");
+  assert.deepEqual(shown.map((n) => [n.title, n.body, n.data.url]),
+    [["Loud", "Big news", "/#/sources/" + encodeURIComponent("alt:" + ALT)]]);
+  assert.equal(log.state.notified[0], "foo=1.1"); // the upgrade state is kept beside it
+
+  const before = log.shown.length;
+  await deviceCheck({ type: "check" }, env);
+  assert.equal(log.shown.length, before + 1); // the upgrade notification only
+  assert.equal(log.shown.at(-1).tag, "cydian-upgrades");
+});
+
+test("deviceCheck: an unreachable AltStore source or a failed show keeps the news baseline", async () => {
+  const ALT = "https://alt.example/apps.json";
+  const initial = { news: { [ALT]: [] } };
+  const down = fakeEnv({ initial, altSources: async () => [ALT], altText: async () => { throw new Error("HTTP 500"); } });
+  await deviceCheck({ type: "check" }, down.env);
+  assert.deepEqual(down.log.state.news, { [ALT]: [] });
+
+  const json = JSON.stringify({ apps: [], news: [{ identifier: "n", title: "N", notify: true }] });
+  const failing = fakeEnv({ initial, altSources: async () => [ALT], altText: async () => json,
+    show: async (title) => { if (title === "N") throw new Error("no permission"); } });
+  const r = await deviceCheck({ type: "check" }, failing.env);
+  assert.equal(r.news, 0);
+  assert.deepEqual(failing.log.state.news, { [ALT]: [] });
+});

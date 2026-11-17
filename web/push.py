@@ -15,6 +15,11 @@ no sources and no installed list, and the daily run sends those subscribers a ba
 device and shows the notification itself. Its delivery ack reports how long that took (check_ms), which is how
 iOS's push-handler time limit gets measured in the field.
 
+F39 adds AltStore news: a server-mode subscriber's AltStore source URLs come along (`altSources`), the daily run
+fetches each source's JSON (through the SSRF guard, once for everyone) and pushes the news items flagged
+`notify: true` that subscriber hasn't been sent (check_news; the rule is app/core/altnews.js, run in node).
+A device-mode phone does the same itself in device-check.js.
+
     python push.py run       check everyone now and push "n upgrades" where something new showed up
     python push.py daemon    run once a day at CYDIAN_PUSH_HOUR (UTC); compose runs this as its own service
 
@@ -124,8 +129,15 @@ def clean_subscription(body: dict) -> dict:
         raise Invalid("unknown mode")
     out["mode"] = mode
     if mode == "device":  # the lists stay on the phone: nothing of them is kept here, whatever was sent
-        out["sources"], out["installed"], out["holds"] = [], [], []
+        out["sources"], out["installed"], out["holds"], out["alt_sources"] = [], [], [], []
         return out
+    alt = body.get("altSources") or []
+    if not isinstance(alt, list) or len(alt) > MAX_SOURCES:
+        raise Invalid(f"altSources must be a list of at most {MAX_SOURCES}")
+    for u in alt:
+        if urlsplit(_str(u, "AltStore source")).scheme not in ("http", "https"):
+            raise Invalid("an AltStore source must be http(s)")
+    out["alt_sources"] = list(dict.fromkeys(alt))
     sources = body.get("sources")
     if not isinstance(sources, list) or len(sources) > MAX_SOURCES:
         raise Invalid(f"sources must be a list of at most {MAX_SOURCES}")
@@ -167,11 +179,13 @@ CREATE TABLE IF NOT EXISTS subs (
   notified TEXT, seq INTEGER NOT NULL DEFAULT 0, pushed REAL, push_status TEXT, delivered REAL
 );
 """
-JSON_COLS = ("sources", "installed", "holds", "upgrades", "notified")
+JSON_COLS = ("sources", "installed", "holds", "upgrades", "notified", "alt_sources", "news_sent")
 MODES = ("server", "device")
 ACK_OUTCOMES = ("ok", "timeout", "error", "unsupported")  # how an on-device check ended (app/device-check.js)
 # Columns added after F10's schema, added to an existing push.sqlite on open.
-ADDED_COLS = {"mode": "TEXT NOT NULL DEFAULT 'server'", "check_ms": "INTEGER", "check_outcome": "TEXT"}
+ADDED_COLS = {"mode": "TEXT NOT NULL DEFAULT 'server'", "check_ms": "INTEGER", "check_outcome": "TEXT",
+              # F39: AltStore source URLs, and {url: [news identifier]} already pushed to this subscriber
+              "alt_sources": "TEXT", "news_sent": "TEXT"}
 
 
 class Store:
@@ -248,6 +262,8 @@ class Store:
                            "holds=?, inputs=?, seen=?, mode=? WHERE id=?",
                            (enc["endpoint"], enc["p256dh"], enc["auth"], origin, enc["arch"], enc["sources"],
                             enc["installed"], enc["holds"], inputs, t, enc["mode"], sub_id))
+            # F39: kept beside the APT lists, outside `inputs`: a new AltStore source needs no upgrade check
+            db.execute("UPDATE subs SET alt_sources=? WHERE id=?", (json.dumps(fields.get("alt_sources") or []), sub_id))
             if mode == "device":  # nothing about the packages stays from a server-mode past either
                 db.execute("UPDATE subs SET upgrades=NULL, notified=NULL, checked=NULL, check_error=NULL WHERE id=?",
                            (sub_id,))
@@ -483,6 +499,66 @@ def check_device(store: Store, keys: dict | None = None, poster=post, t: float |
             for s, _ in items}
 
 
+MAX_ALT_BYTES = 8 * 1024 * 1024  # one AltStore source's JSON
+
+
+def fetch_alt(urls, fetcher, workdir: Path, workers: int = 8) -> dict:
+    """url -> path of that AltStore source's body in workdir, or None (refused, unreachable, not 2xx)."""
+    def one(i_url):
+        i, url = i_url
+        try:
+            r = fetcher.get(url, max_bytes=MAX_ALT_BYTES)
+        except fetch.FetchError:
+            return url, None
+        if not 200 <= r.status < 300:
+            return url, None
+        p = workdir / f"alt{i}.json"
+        p.write_bytes(r.body)
+        return url, str(p)
+    with concurrent.futures.ThreadPoolExecutor(workers) as ex:
+        return dict(ex.map(one, enumerate(sorted(urls))))
+
+
+def check_news(store: Store, fetcher, keys: dict | None = None, poster=post, t: float | None = None,
+               log=lambda *a: None) -> dict:
+    """F39: AltStore news for server-mode subscribers with notifications on. Each source is fetched once; node
+    (core/altnews.js) picks each subscriber's notify: true items not sent before. A source a subscriber hasn't been
+    checked against yet only sets the baseline. `news_sent` moves on once that subscriber's pushes all went out,
+    so a failed push is retried tomorrow. Returns {id: number of news pushed}."""
+    t = now() if t is None else t
+    subs = [s for s in store.all() if s.get("mode") != "device" and s.get("endpoint") and s.get("alt_sources")]
+    if not subs:
+        return {}
+    urls = {u for s in subs for u in s["alt_sources"]}
+    with tempfile.TemporaryDirectory(prefix="cydian-news-") as tmp:
+        files = fetch_alt(urls, fetcher, Path(tmp))
+        result = node("news", {"files": files, "subscribers": [
+            {"id": s["id"], "altSources": s["alt_sources"],
+             "sent": s["news_sent"] if isinstance(s["news_sent"], dict) else {}} for s in subs]})
+    log(f"push: {len(urls)} AltStore sources, {sum(1 for v in files.values() if v)} fetched")
+    out, ok = {}, {}
+    rounds: list[list] = []
+    for s in subs:
+        r = result.get(s["id"]) or {"payloads": [], "sent": s["news_sent"]}
+        out[s["id"]], ok[s["id"]] = 0, True
+        for i, p in enumerate(r["payloads"]):
+            while len(rounds) <= i:
+                rounds.append([])
+            rounds[i].append((s, {**p, "id": s["id"]}))
+    for items in rounds:  # send() files one status per subscriber, so one item per subscriber per call
+        status = send(store, items, keys or vapid_keys(), poster, t)
+        for s, _ in items:
+            code = status.get(s["id"])
+            if isinstance(code, int) and 200 <= code < 300:
+                out[s["id"]] += 1
+            else:
+                ok[s["id"]] = False
+    for s in subs:
+        if ok[s["id"]] and s["id"] in result:
+            store.update(s["id"], news_sent=result[s["id"]]["sent"])
+    return out
+
+
 def run_daily(store: Store, fetcher, cache, log=print):
     expired = store.expire(now() - float(os.environ.get("CYDIAN_PUSH_EXPIRE_DAYS", "180")) * 86400)
     if expired:
@@ -490,6 +566,11 @@ def run_daily(store: Store, fetcher, cache, log=print):
     res = check(store, fetcher, cache, notify=True, log=log)
     res.update(check_device(store))
     log(f"push: pushed {sum(1 for r in res.values() if r['pushed'])} of {len(res)}")
+    try:
+        news = check_news(store, fetcher, log=log)
+        log(f"push: {sum(news.values())} AltStore news pushed to {sum(1 for n in news.values() if n)} subscribers")
+    except Exception as e:  # news is extra: it never costs the upgrade pushes above
+        log(f"push: AltStore news failed: {e}")
     return res
 
 

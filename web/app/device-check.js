@@ -15,10 +15,16 @@
 // the last. The check races a time budget (BUDGET_MS): how long iOS lets a push handler run is not documented,
 // so past the budget a "open Cydian" notification goes up anyway, and every check reports its duration
 // (`ms`) to the server's ack, where Settings shows it ("Last Check"): that is the field measurement of the limit.
+//
+// F39: the same check also reads this browser's AltStore sources (core/altstore.js's store), fetches each one's
+// JSON through /api/fetch and shows a notification for every news item flagged notify: true it hasn't shown
+// before (core/altnews.js, the server's rule too). The identifiers shown live in the push state ("news").
 import { repoLayout, ARCHES, DEFAULT_ARCH } from "./core/apt.js";
 import { createCatalog } from "./core/catalog.js";
 import { openIndexCache } from "./core/cache.js";
 import { openSourceStore } from "./core/sources.js";
+import { openAltStore } from "./core/altstore.js";
+import { newsRound, newsPayload } from "./core/altnews.js";
 
 export const BUDGET_MS = 20000;
 export const TAG = "cydian-upgrades";
@@ -86,6 +92,17 @@ export async function findDeviceUpgrades({ sources, status, holds = [], arch }, 
   return { available: available.map(({ id, name, version, installed }) => ({ id, name: name || id, version, installed })), failed };
 }
 
+// ---- AltStore news (F39) ----------------------------------------------------------------------------------
+
+// env.altSources() -> [url], env.altText(url) -> the source's JSON text (throws when unreachable).
+// -> { payloads: [{ title, body, url, tag }], sent } where `sent` is the next "news" state once they are shown.
+export async function deviceNews(env, sent = {}) {
+  const urls = (await env.altSources()) ?? [];
+  const texts = Object.fromEntries(await Promise.all(urls.map(async (u) => [u, await Promise.resolve().then(() => env.altText(u)).catch(() => null)])));
+  const r = newsRound(urls, sent ?? {}, texts);
+  return { payloads: r.items.map(newsPayload), sent: r.sent };
+}
+
 // ---- the check --------------------------------------------------------------------------------------------
 
 // env: { inputs() -> { sources, status, holds, arch }, packages(dir), state() -> { notified, last },
@@ -98,9 +115,12 @@ export async function deviceCheck(msg, env) {
     const found = await findDeviceUpgrades(await env.inputs(), env.packages);
     return { outcome: "ok", available: found.available };
   })().catch((e) => ({ outcome: "error", error: String(e?.message ?? e) }));
+  // F39: news runs beside the upgrade check, inside the same budget; a failure there only skips the news.
+  const newsWork = env.altSources ? deviceNews(env, state.news).catch(() => null) : Promise.resolve(null);
   let timer;
   const late = new Promise((resolve) => { timer = setTimeout(() => resolve({ outcome: "timeout" }), env.budget ?? BUDGET_MS); });
   const r = await Promise.race([work, late]);
+  const news = await Promise.race([newsWork, late.then(() => null)]);
   clearTimeout(timer);
   const fresh = r.outcome === "ok" && isFresh(r.available, state.notified);
   const note = notificationFor({ ...r, fresh, lastCount: state.last?.count ?? null });
@@ -111,14 +131,21 @@ export async function deviceCheck(msg, env) {
       data: { url: msg.url || "/#/changes" } }),
     count != null ? env.badge(count) : null,
   ].map((p) => Promise.resolve(p).catch(() => {})));
+  let newsShown = true;
+  for (const p of news?.payloads ?? []) {
+    await Promise.resolve().then(() => env.show(p.title, { body: p.body, tag: p.tag, icon: "icons/icon-180.png", data: { url: p.url } }))
+      .catch(() => { newsShown = false; });
+  }
   const last = { t: t0, ms, count, outcome: r.outcome, ...(r.error ? { error: r.error.slice(0, 200) } : {}) };
   await Promise.resolve(env.saveState({
     // As on the server: the baseline is what this check saw, so tomorrow only something newer counts as fresh.
     notified: r.outcome === "ok" ? r.available.map(upgradeKey) : state.notified ?? [],
     last,
+    // F39: what was shown moves the news baseline; a check that couldn't read or show them tries again tomorrow.
+    ...(news && newsShown ? { news: news.sent } : state.news ? { news: state.news } : {}),
   })).catch(() => {});
   if (msg.id) await Promise.resolve(env.ack({ id: msg.id, seq: msg.seq, ms, outcome: r.outcome })).catch(() => {});
-  return { ...last, fresh };
+  return { ...last, fresh, news: news && newsShown ? news.payloads.length : 0 };
 }
 
 // ---- IndexedDB and the service worker -----------------------------------------------------------------------
@@ -148,6 +175,12 @@ export async function clearDeviceState(idb) {
   }
 }
 
+async function textVia(fetchFn, url) {
+  const res = await fetchFn(`/api/fetch?${new URLSearchParams({ url })}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return res.text();
+}
+
 async function packagesVia(fetchFn, dir) {
   const res = await fetchFn(`/api/fetch?${new URLSearchParams({ url: dir, kind: "packages" })}`);
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${dir}`);
@@ -168,6 +201,8 @@ export function swEnv(g = globalThis) {
       return { sources, status, holds: saved.holds ?? [], arch: saved.arch };
     },
     packages: (dir) => packagesVia(g.fetch.bind(g), dir),
+    altSources: async () => (await (await openAltStore({ indexedDB: idb })).list()).map((s) => s.uri).filter(Boolean),
+    altText: (url) => textVia(g.fetch.bind(g), url),
     state: async () => (await (await pushStore(idb)).get("state"))?.value ?? {},
     saveState: async (s) => (await pushStore(idb)).put("state", s),
     show: (title, opts) => g.registration.showNotification(title, opts),

@@ -9,6 +9,8 @@
 //            -> { <id>: { available: [{id,name,version,installed}], ignored: n } }
 //   encrypt  { vapid: { publicKey, privateKey, subject }, ttl, messages: [{ endpoint, p256dh, auth, payload }] }
 //            -> [{ endpoint, headers, body }]                                body is base64
+//   news     { files: {url: path|null}, subscribers: [{ id, altSources: [url], sent: {url: [identifier]} }] }
+//            -> { <id>: { payloads: [{title,body,url,tag}], dropped, sent } }  AltStore news to push (F39)
 //
 // `installed` is [{id, version, held}]: the little the browser sends on opt-in, not the whole status file.
 import { readFileSync } from "node:fs";
@@ -16,6 +18,7 @@ import { pathToFileURL } from "node:url";
 import { webcrypto as crypto } from "node:crypto";
 import { repoLayout, DEFAULT_ARCH, ARCHES } from "./app/core/apt.js";
 import { createCatalog } from "./app/core/catalog.js";
+import { newsRound, newsPayload } from "./app/core/altnews.js";
 
 const subtle = crypto.subtle;
 const enc = new TextEncoder();
@@ -95,6 +98,23 @@ export function diff({ files = {}, subscribers = [] }) {
   const catalogFor = (sig, c) => (c ? catalogs.set(sig, c) : catalogs.get(sig));
   const out = {};
   for (const sub of subscribers) out[sub.id] = upgradesFor(sub, textOf, catalogFor);
+  return out;
+}
+
+// ---- AltStore news (F39) ----------------------------------------------------------------------------------
+
+// Each subscriber's news round (core/altnews.js, the rule the on-device check runs too) over the source JSON
+// Python fetched: `files` maps a source URL to the file holding its body, or null when the fetch failed.
+export function news({ files = {}, subscribers = [] }) {
+  const texts = {};
+  for (const [url, path] of Object.entries(files)) {
+    try { texts[url] = path ? readFileSync(path, "utf8") : null; } catch { texts[url] = null; }
+  }
+  const out = {};
+  for (const sub of subscribers) {
+    const r = newsRound(sub.altSources, sub.sent, texts);
+    out[sub.id] = { payloads: r.items.map(newsPayload), dropped: r.dropped, sent: r.sent };
+  }
   return out;
 }
 
@@ -198,6 +218,7 @@ async function main(cmd) {
     case "dirs": return (input.sources ?? []).map((s) => packageDirs(s, input.arch));
     case "diff": return diff(input);
     case "encrypt": return prepare(input);
+    case "news": return news(input);
     default: throw new Error(`unknown command ${cmd}`);
   }
 }

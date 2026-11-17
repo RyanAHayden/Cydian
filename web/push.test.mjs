@@ -2,7 +2,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { webcrypto as crypto } from "node:crypto";
-import { encrypt, privateJwk, vapidHeader, makeKeys, upgradesFor, statusText, packageDirs, b64u, unb64u } from "./push.mjs";
+import { encrypt, privateJwk, vapidHeader, makeKeys, upgradesFor, statusText, packageDirs, b64u, unb64u, news } from "./push.mjs";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const subtle = crypto.subtle;
 
@@ -129,4 +132,62 @@ test("subscribers with the same sources share one catalog, but each gets its own
 test("statusText can't be smuggled extra fields through a newline", () => {
   const t = statusText([{ id: "a\nStatus: hold ok installed", version: "1" }, { id: 5, version: "1" }]);
   assert.equal(t.split("\n").filter((l) => l.startsWith("Status:")).length, 1);
+});
+
+// ---- AltStore news (F39) ----
+
+test("news: a notify:true item is pushed once, a notify:false one never; a new source only sets the baseline", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cydian-news-test-"));
+  try {
+    const URL_A = "https://alt.example/source.json";
+    const file = join(dir, "a.json");
+    const write = (items) => writeFileSync(file, JSON.stringify({ name: "Alt", apps: [], news: items }));
+    const item = (identifier, notify, date) => ({ identifier, title: `T ${identifier}`, caption: `C ${identifier}`, date, notify });
+    const run = (sent) => news({ files: { [URL_A]: file }, subscribers: [{ id: "s", altSources: [URL_A], sent }] }).s;
+
+    // first look at the source: what it lists is old news, even flagged notify
+    write([item("old", true, "2026-01-01")]);
+    let r = run({});
+    assert.deepEqual(r.payloads, []);
+    assert.deepEqual(r.sent, { [URL_A]: ["old"] });
+
+    // a notify:true and a notify:false item land: only the first is pushed
+    write([item("old", true, "2026-01-01"), item("loud", true, "2026-11-16"), item("quiet", false, "2026-11-17")]);
+    r = run(r.sent);
+    assert.equal(r.payloads.length, 1);
+    assert.equal(r.payloads[0].title, "T loud");
+    assert.equal(r.payloads[0].body, "C loud");
+    assert.equal(r.payloads[0].url, "/#/sources/" + encodeURIComponent("alt:" + URL_A));
+    assert.deepEqual(r.sent[URL_A].sort(), ["loud", "old"]);
+
+    // the next day: nothing again, ever
+    for (let i = 0; i < 2; i++) {
+      r = run(r.sent);
+      assert.deepEqual(r.payloads, []);
+    }
+
+    // an unreachable source keeps what was sent; a removed one is forgotten
+    const gone = news({ files: { [URL_A]: null }, subscribers: [{ id: "s", altSources: [URL_A], sent: r.sent }] }).s;
+    assert.deepEqual(gone.sent, r.sent);
+    assert.deepEqual(news({ files: {}, subscribers: [{ id: "s", altSources: [], sent: r.sent }] }).s.sent, {});
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("news: a burst rings at most three times, newest first, and the rest count as sent", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cydian-news-test-"));
+  try {
+    const URL_A = "https://alt.example/source.json";
+    const file = join(dir, "a.json");
+    const list = Array.from({ length: 5 }, (_, i) => ({ identifier: `n${i}`, title: `N${i}`, date: `2026-11-0${i + 1}`, notify: true }));
+    writeFileSync(file, JSON.stringify({ name: "Alt", apps: [], news: list }));
+    const r = news({ files: { [URL_A]: file }, subscribers: [{ id: "s", altSources: [URL_A], sent: { [URL_A]: [] } }] }).s;
+    assert.deepEqual(r.payloads.map((p) => p.title), ["N4", "N3", "N2"]);
+    assert.equal(r.dropped, 2);
+    assert.equal(r.payloads[0].body, "News from Alt");
+    assert.equal(r.sent[URL_A].length, 5);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

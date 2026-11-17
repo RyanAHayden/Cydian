@@ -49,4 +49,3 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 ### Follow-ups
 
 ### Parked
-- [ ] **F12** (follow-up, later) Widget-only IPA (WidgetKit 'n upgrades' + local notifications), only if F10's Web Push proves unreliable on real phones. Needs an explicit App ID with Push/App Groups and its own ad hoc profile in sidedrop. See docs/ipa.md | files: ipa/**

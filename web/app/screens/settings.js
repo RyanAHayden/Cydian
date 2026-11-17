@@ -93,7 +93,8 @@ function makeSwitch(d) {
   b.className = "switch";
   b.setAttribute("role", "switch");
   b.setAttribute("aria-label", d.label);
-  const TRAVEL = 50; // px the knob moves: track 75 inside the border, knob 25
+  b.innerHTML = '<span class="sw-track"></span><span class="sw-knob"></span>';
+  const TRAVEL = 52; // px the knob moves (79px track, 29px knob over the border)
   const set = (on) => {
     b.style.removeProperty("--x");
     b.setAttribute("aria-checked", String(on));

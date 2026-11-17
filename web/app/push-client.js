@@ -25,7 +25,8 @@ const KEY = "cydian.push"; // { id, feed, push, mode } once opted in
 
 // What the server's /api/push/subscribe takes. Only what the check needs leaves the device.
 // In "device" mode (F34) none of the lists go: only the subscription and the arch.
-export function subscribeBody({ id = null, subscription = null, sources = [], installed = [], holds = [], arch, mode = "server" }) {
+// `altSources` (F39) are the AltStore source URLs, for their news: the server pushes notify: true items.
+export function subscribeBody({ id = null, subscription = null, sources = [], altSources = [], installed = [], holds = [], arch, mode = "server" }) {
   const sub = subscription && typeof subscription.toJSON === "function" ? subscription.toJSON() : subscription;
   if (mode === "device") {
     return {
@@ -33,13 +34,15 @@ export function subscribeBody({ id = null, subscription = null, sources = [], in
       subscription: sub ? { endpoint: sub.endpoint, keys: { p256dh: sub.keys?.p256dh, auth: sub.keys?.auth } } : null,
     };
   }
+  const alt = [...new Set([...altSources, ...sources.filter((s) => s.kind === "altstore").map((s) => s.uri)])].filter(Boolean);
   return {
     id,
     subscription: sub ? { endpoint: sub.endpoint, keys: { p256dh: sub.keys?.p256dh, auth: sub.keys?.auth } } : null,
     arch,
-    sources: sources.map(({ uri, dist, components }) => ({ uri, dist: dist || "./", components: components ?? [] })),
+    sources: sources.filter((s) => s.kind !== "altstore").map(({ uri, dist, components }) => ({ uri, dist: dist || "./", components: components ?? [] })),
     installed: (installed ?? []).map(({ id: pkg, installed: v, version, held }) => ({ id: pkg, version: v ?? version, ...(held ? { held: true } : {}) })),
     holds: [...holds],
+    ...(alt.length ? { altSources: alt } : {}),
   };
 }
 
@@ -159,8 +162,9 @@ async function lists(holds, mode) {
   }
   const installed = await catalog.installed();
   if (!installed) throw new Error(NO_STATUS);
-  // AltStore sources (F9) carry no dpkg upgrades: the server check gets the APT ones.
-  return { sources: (await getBackend().sources()).filter((s) => s.kind !== "altstore"), installed, holds, arch: getArch() };
+  // AltStore sources (F9) carry no dpkg upgrades: the server's upgrade check gets the APT ones, and the AltStore
+  // URLs go as altSources, for their news (F39). subscribeBody splits them.
+  return { sources: await getBackend().sources(), installed, holds, arch: getArch() };
 }
 
 async function send(subscription, holds, mode = saved()?.mode ?? "server") {

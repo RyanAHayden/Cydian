@@ -412,26 +412,23 @@ async function drawSigning(el) {
   el.scrollTop = top;
 }
 
-// The certificate, its password and the profile: two big Choose buttons (each a <label> over a hidden file input, so
-// iOS opens its picker straight from the tap) that show the chosen file's name, and the password typed in place.
+// The certificate, its profile and its password: one group of rows, each with its name on the left, its value in the
+// middle and a Browse button on the right (a <label> over a hidden file input, so iOS opens its picker straight from
+// the tap). Any Browse takes several files at once, or the .zip they came in: each goes where it belongs and the
+// password is found if a text file holds it (core/certfiles.js), so one pick can fill all three.
 function certificateBlock(el, id) {
   const box = document.createElement("div");
   box.className = "sign-files";
   const head = Object.assign(document.createElement("h3"), { className: "group-header", textContent: "Certificate" });
-  // A button each, showing the file it holds. Either takes several files at once (or the .zip they came in): each
-  // goes where it belongs and the password is found if a text file holds it (core/certfiles.js), so one pick can do all.
-  const accept = ".p12,.pfx,.mobileprovision,.txt,.zip,application/x-pkcs12,application/zip,text/plain";
-  box.append(head,
-    fileButton(id?.p12Name ? `.p12: ${id.p12Name}` : "Choose .p12 Certificate", accept, (files) => chooseFiles(el, files, "p12")),
-    fileButton(id?.profileName ? `.mobileprovision: ${id.profileName}` : "Choose .mobileprovision", accept, (files) => chooseFiles(el, files, "profile")));
   const ul = document.createElement("ul");
   ul.className = "table grouped";
-  const li = document.createElement("li");
-  li.className = "cell";
-  const row = document.createElement("label");
-  row.className = "cell-inner sign-password";
-  const name = Object.assign(document.createElement("span"), { className: "cell-label", textContent: "Password" });
-  const input = Object.assign(document.createElement("input"), { type: "password", placeholder: "The .p12's password", value: id?.password ?? "" });
+  const accept = ".p12,.pfx,.mobileprovision,.txt,.zip,application/x-pkcs12,application/zip,text/plain";
+  const fileRow = (name, value, slot) => {
+    const shown = Object.assign(document.createElement("span"), { className: "sign-value" + (value ? "" : " is-empty"), textContent: value || "None" });
+    return signRow(name, shown, browseButton(accept, true, (files) => chooseFiles(el, files, slot)));
+  };
+
+  const input = Object.assign(document.createElement("input"), { type: "password", className: "sign-value", placeholder: "None", value: id?.password ?? "" });
   input.autocomplete = "off";
   input.setAttribute("autocapitalize", "off");
   input.setAttribute("autocorrect", "off");
@@ -440,41 +437,41 @@ function certificateBlock(el, id) {
   input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(save, 500); });
   input.addEventListener("change", save);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
-  // Or read it from a .txt file (the first line, without its line break).
-  const txt = Object.assign(document.createElement("input"), { type: "file", accept: ".txt,text/plain", className: "visually-hidden" });
-  txt.id = "pw" + Math.random().toString(36).slice(2);
-  const browse = Object.assign(document.createElement("label"), { className: "bar-button sign-browse", textContent: "Browse" });
-  browse.htmlFor = txt.id;
-  txt.addEventListener("change", async () => {
-    const file = txt.files?.[0];
-    txt.value = "";
-    if (!file || file.size > 4096) return;
-    input.value = (await file.text()).split(/\r?\n/)[0];
+  // Browse here reads the password from a .txt (its first line).
+  const pwBrowse = browseButton(".txt,text/plain", false, async ([f]) => {
+    if (!f || f.bytes.length > 4096) return;
+    input.value = new TextDecoder().decode(f.bytes).split(/\r?\n/)[0];
     await save();
   });
-  row.append(name, input);
-  li.append(row, txt, browse);
-  ul.append(li);
+
+  ul.append(fileRow(".p12", id?.p12Name, "p12"), fileRow(".mobileprovision", id?.profileName, "profile"), signRow("Password", input, pwBrowse));
   const state = id?.p12 && id?.password != null ? (id.passwordOk === false ? " The password doesn't open this certificate." : id.passwordOk ? " The password opens it." : "") : "";
   const foot = Object.assign(document.createElement("p"), { className: "group-footer",
-    textContent: "Your .p12 (the certificate and its key), its password and a .mobileprovision made for it. They're kept on this iPhone only, in this browser's storage." + state });
-  box.append(ul, foot);
+    textContent: "Your .p12 (the certificate and its key), its .mobileprovision and the password. Browse can take all of them at once, or their .zip. They're kept on this iPhone only, in this browser's storage." + state });
+  box.append(head, ul, foot);
   return box;
 }
 
-function fileButton(text, accept, onFiles) {
-  const wrap = document.createElement("div");
-  wrap.className = "sign-file";
-  const input = Object.assign(document.createElement("input"), { type: "file", accept, className: "visually-hidden" });
+function signRow(name, value, button) {
+  const li = document.createElement("li");
+  li.className = "cell";
+  const row = document.createElement(value.tagName === "INPUT" ? "label" : "div");
+  row.className = "cell-inner sign-row";
+  row.append(Object.assign(document.createElement("span"), { className: "cell-label", textContent: name }), value);
+  li.append(row, ...button);
+  return li;
+}
+
+// [hidden file input, its Browse label]; onFiles gets [{ name, bytes }].
+function browseButton(accept, multiple, onFiles) {
+  const input = Object.assign(document.createElement("input"), { type: "file", accept, multiple, className: "visually-hidden" });
   input.id = "f" + Math.random().toString(36).slice(2);
-  const label = Object.assign(document.createElement("label"), { className: "grey-button", textContent: text });
+  const label = Object.assign(document.createElement("label"), { className: "bar-button sign-browse", textContent: "Browse" });
   label.htmlFor = input.id;
-  input.multiple = true;
   input.addEventListener("change", async () => {
     const files = await Promise.all([...(input.files ?? [])].map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));
     input.value = "";
     if (files.length) onFiles(files);
   });
-  wrap.append(input, label);
-  return wrap;
+  return [input, label];
 }

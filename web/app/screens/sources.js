@@ -5,7 +5,7 @@
 // device and comes through the backend (core/sources.js sourceCalls), so the app runs this file unchanged.
 // Above the sources, Cydia's "All Sources" row; a source (or All Sources) opens its Sections, and everything
 // below that is screens/browse.js.
-import { plain } from "../nav/ui.js";
+import { plain, collapse } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
 import { showMenu, longPress, copyText } from "../nav/menu.js";
@@ -231,19 +231,6 @@ async function remove(li, source) {
   }, 200);
 }
 
-// UITableView's delete: the row goes and everything under it slides up into its place. FLIP, by transform only:
-// remove the row, then start everything that was below it one row lower and let it ease up.
-function collapse(li) {
-  const h = li.getBoundingClientRect().height;
-  const below = [];
-  for (let n = li; n && !n.classList?.contains("page-body"); n = n.parentElement) {
-    for (let s = n.nextElementSibling; s; s = s.nextElementSibling) below.push(s);
-  }
-  li.remove();
-  for (const el of below) {
-    el.animate([{ transform: `translateY(${h}px)` }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
-  }
-}
 
 // ---- Refresh and Add -------------------------------------------------------------------------------------
 

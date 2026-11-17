@@ -10,7 +10,7 @@
 // Source keys always hold a ':' (deb:..., alt:...), so "manage" can't be one. The parsing, export text and order
 // live in core/sourcelist.js; the QR code in core/qr.js. A change here (add, delete, reorder) tells sources.js
 // through onSourcesChanged, so the tab's list is right when the user goes back.
-import { grouped, plain } from "../nav/ui.js";
+import { grouped, plain, collapse } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showSheet } from "../nav/sheet.js";
 import { format } from "../router.js";
@@ -175,7 +175,10 @@ async function removeRow(li, source, body) {
     return;
   }
   changed();
-  setTimeout(() => { li.remove(); if (!body.querySelector(".source-row")) renderSources(body); }, 250);
+  setTimeout(() => {
+    if (li.parentNode.querySelectorAll(".source-row").length > 1) collapse(li); // the rows below slide up
+    else { li.remove(); renderSources(body); }
+  }, 200);
 }
 
 // Drag a row by its grabber: it follows the finger (transform only) and the rows it passes slide out of its way;

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Cydian's icons, all from one master: web/app/icons/icon.svg (flat, square; iOS 7+ masks the corners itself).
+# Cydian's icons, all from one master: web/app/icons/icon.svg (flat, square; iOS 7+ masks the corners itself),
+# itself built from tools/icon.svg.in and tools/icon_bg.py.
 #
 # Writes:
 #   web/app/icons/icon-glossy.svg       the iOS 6 variant for places inside the app (Home header): the master with
@@ -15,6 +16,14 @@ command -v rsvg-convert >/dev/null || { echo "icons: needs rsvg-convert (librsvg
 
 dir=web/app/icons
 master=$dir/icon.svg
+
+# The master: the template with the generated starburst background embedded (it must be inline: an SVG shown as an
+# <img> can't load other files).
+command -v python3 >/dev/null || { echo "icons: needs python3 with numpy, scipy and Pillow" >&2; exit 1; }
+bg=$(mktemp --suffix=.jpg)
+trap 'rm -f "$bg"' EXIT
+python3 -I tools/icon_bg.py "$bg" >/dev/null
+python3 -I -c 'import base64,sys; t=open(sys.argv[1]).read(); b=base64.b64encode(open(sys.argv[2],"rb").read()).decode(); open(sys.argv[3],"w").write(t.replace("@BG@",b))' tools/icon.svg.in "$bg" "$master"
 
 # Glossy variant: the master's drawing inside iOS 6's rounded square (corner radius 10/57 of the side, as the
 # 57pt icon's mask). The shine is already in the master's background, so no extra gloss goes on top.

@@ -1,0 +1,232 @@
+// Settings: what each one is, which mode shows it, its default, and where it lives on the device. Pure JS, no DOM:
+// the Settings tab (screens/settings.js) draws what `visible()` returns, and the rest of the app reads values with
+// `get()`. Both modes and the site run this same file, so a setting means the same everywhere.
+//
+//   const s = createSettings({ mode: detectMode() });
+//   s.get("appearance");            // "auto" | "light" | "dark"
+//   s.set("appearance", "dark");    // stored at localStorage["cydian.appearance"], listeners told
+//   s.onChange((key, value) => …);  // returns an unsubscribe function
+//   s.sections();                   // [{ id, title, footer, settings: [def…] }], only the rows this mode shows
+//   s.holds.set("com.example.tweak", true);  // Ignore upgrades, kept on the device
+//
+// Every value is stored as a string under `cydian.<key>`, so backend.js getArch() keeps reading `cydian.arch`.
+// A stored value that is not one of the setting's options reads as the default (a hand-edited or older value
+// never breaks the app).
+//
+// A row only shows once the feature it controls exists (user 2026-11-17). FEATURES lists the ones that do; the task
+// that builds a feature adds its name here, and its row appears. Each def names its `feature`.
+
+import { ARCHES, DEFAULT_ARCH } from "./apt.js";
+
+export const MODES = ["site", "jailbreak", "sideload"];
+
+// Features that exist today. "appearance": this task's theme. "sources": the source list and its refresh (F4).
+// Still to come, by the setting that waits on it: "update-check" (Check for updates), "cellular" (Use cellular
+// data, app only), "notifications" (Notifications), "badge" (App icon badge), "holds" (Ignore upgrades: needs the
+// upgrades list, and in jailbreak mode apt-mark in the N2 helper), "auto-install" (the three automatic-install
+// rows), "rollback" (Keep previous versions), "resign" (Re-sign reminder, F14).
+export const FEATURES = new Set(["appearance", "sources"]);
+
+const BOTH = ["jailbreak", "sideload"];
+const ALL = ["site", ...BOTH];
+const onOff = [{ value: false, label: "Off" }, { value: true, label: "On" }];
+
+export const SECTIONS = [
+  { id: "appearance", title: "Appearance" },
+  { id: "sources", title: "Sources" },
+  { id: "updates", title: "Updates" },
+  { id: "notifications", title: "Notifications" },
+  { id: "automatic", title: "Automatic Installs" },
+  { id: "signing", title: "Signing" },
+];
+
+// kind: "choice" (one row per option, the chosen one checked), "toggle" (a switch), "list" (pushes a page that
+// picks one option; its footer shows there), "holds" (pushes the held packages). `default` is a value, or a function of the mode.
+export const SETTINGS = [
+  {
+    key: "appearance", section: "appearance", kind: "choice", feature: "appearance", modes: ALL, default: "auto",
+    label: "Appearance",
+    options: [{ value: "auto", label: "Automatic" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }],
+    footer: "Automatic follows the iPhone's own Light or Dark setting.",
+  },
+  {
+    key: "arch", section: "sources", kind: "list", feature: "sources", modes: ["site", "jailbreak"], default: DEFAULT_ARCH,
+    label: "Architecture",
+    options: [
+      { value: "iphoneos-arm64", label: "Rootless", subtitle: "iphoneos-arm64: Dopamine, palera1n rootless" },
+      { value: "iphoneos-arm", label: "Rootful", subtitle: "iphoneos-arm: palera1n rootful, older jailbreaks" },
+    ],
+    footer: "Packages are listed for this architecture.",
+  },
+  {
+    key: "refreshOnLaunch", section: "sources", kind: "toggle", feature: "sources", modes: ALL,
+    default: (mode) => mode !== "site", // the site fetches through our proxy: opt in there
+    label: "Refresh Sources on Launch", options: onOff,
+  },
+  {
+    key: "checkUpdates", section: "updates", kind: "list", feature: "update-check", modes: ALL, default: "launch",
+    label: "Check for Updates",
+    options: [
+      { value: "off", label: "Off" }, { value: "launch", label: "On Launch" },
+      { value: "6h", label: "Every 6 Hours" }, { value: "daily", label: "Daily" },
+    ],
+    footer: (mode) => mode === "sideload"
+      ? "Looks for new versions of the apps you sideloaded."
+      : "Looks for new versions of the packages you installed.",
+  },
+  { key: "cellular", section: "updates", kind: "toggle", feature: "cellular", modes: BOTH, default: true,
+    label: "Use Cellular Data", options: onOff },
+  {
+    key: "holds", section: "updates", kind: "holds", feature: "holds", modes: ALL, label: "Ignored Upgrades",
+    footer: (mode) => mode === "jailbreak"
+      ? "Held with dpkg, so other package managers leave them alone too."
+      : "Kept on this device.",
+  },
+  {
+    key: "notifications", section: "notifications", kind: "list", feature: "notifications", modes: ALL, default: "summary",
+    label: "Notifications",
+    options: [{ value: "off", label: "Off" }, { value: "summary", label: "Summary" }, { value: "each", label: "One per Package" }],
+  },
+  { key: "badge", section: "notifications", kind: "toggle", feature: "badge", modes: ALL, default: true,
+    label: "App Icon Badge", options: onOff },
+  {
+    key: "autoInstall", section: "automatic", kind: "list", feature: "auto-install", modes: ["jailbreak"], default: "off",
+    label: "Install Updates Automatically",
+    options: [{ value: "off", label: "Off" }, { value: "marked", label: "Only Packages I Mark" }, { value: "all", label: "Everything" }],
+  },
+  { key: "autoInstallIdle", section: "automatic", kind: "toggle", feature: "auto-install", modes: ["jailbreak"], default: true,
+    label: "Only When Charging and Locked", options: onOff },
+  {
+    key: "respring", section: "automatic", kind: "list", feature: "auto-install", modes: ["jailbreak"], default: "notify",
+    label: "After a Respring Update",
+    options: [{ value: "notify", label: "Just Notify Me" }, { value: "locked", label: "Respring When Locked" }],
+  },
+  {
+    key: "keepVersions", section: "automatic", kind: "list", feature: "rollback", modes: ["jailbreak"], default: 1,
+    label: "Keep Previous Versions",
+    options: [{ value: 0, label: "None" }, { value: 1, label: "1" }, { value: 2, label: "2" }],
+    footer: "Cached .debs to roll back to.",
+  },
+  {
+    key: "resignReminder", section: "signing", kind: "list", feature: "resign", modes: ["sideload"], default: 2,
+    label: "Re-sign Reminder",
+    options: [
+      { value: 0, label: "Off" }, { value: 1, label: "1 Day Before" }, { value: 2, label: "2 Days Before" },
+      { value: 3, label: "3 Days Before" }, { value: 7, label: "7 Days Before" },
+    ],
+    footer: "Reminds you before an app's signature expires.",
+  },
+];
+
+const PREFIX = "cydian.";
+const HOLDS_KEY = PREFIX + "holds";
+const byKey = new Map(SETTINGS.map((d) => [d.key, d]));
+
+// The architecture list in core/apt.js is the source of truth; the options above must cover it.
+for (const a of ARCHES) if (!byKey.get("arch").options.some((o) => o.value === a)) throw new Error(`arch ${a} has no option`);
+
+// The mode: the app's bridge says which build is running (I2 sets `cydianNative.mode`); a bridge without one is
+// the N1 jailbreak shell; no bridge is the site.
+export function detectMode(g = globalThis) {
+  const n = g.cydianNative;
+  if (!n) return "site";
+  return MODES.includes(n.mode) && n.mode !== "site" ? n.mode : "jailbreak";
+}
+
+const resolve = (v, mode) => (typeof v === "function" ? v(mode) : v);
+
+// Storage that never throws: Safari's private mode and a full quota both throw on setItem; settings then live
+// for this session only.
+function safeStorage(storage) {
+  const mem = new Map();
+  return {
+    get(k) {
+      try { const v = storage?.getItem(k); if (v != null) return v; } catch { /* unavailable */ }
+      return mem.has(k) ? mem.get(k) : null;
+    },
+    set(k, v) {
+      mem.set(k, v);
+      try { storage?.setItem(k, v); } catch { /* unavailable: the memory copy stands */ }
+    },
+  };
+}
+
+export function createSettings({ storage = globalThis.localStorage, mode = "site", features = FEATURES } = {}) {
+  if (!MODES.includes(mode)) throw new Error(`unknown mode ${mode}`);
+  const store = safeStorage(storage);
+  const listeners = new Set();
+
+  function def(key) {
+    const d = byKey.get(key);
+    if (!d || !d.options) throw new Error(`unknown setting ${key}`);
+    return d;
+  }
+  const defaultOf = (d) => resolve(d.default, mode);
+  const shown = (d) => d.modes.includes(mode) && features.has(d.feature);
+  const notify = (key, value) => { for (const f of listeners) f(key, value); };
+
+  function get(key) {
+    const d = def(key);
+    const raw = store.get(PREFIX + key);
+    const hit = raw == null ? null : d.options.find((o) => String(o.value) === raw);
+    return hit ? hit.value : defaultOf(d);
+  }
+
+  function set(key, value) {
+    const d = def(key);
+    const hit = d.options.find((o) => o.value === value);
+    if (!hit) throw new Error(`${key}: ${JSON.stringify(value)} is not one of its options`);
+    store.set(PREFIX + key, String(value));
+    notify(key, value);
+  }
+
+  function readHolds() {
+    try {
+      const list = JSON.parse(store.get(HOLDS_KEY) || "[]");
+      return Array.isArray(list) ? list.filter((p) => typeof p === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+
+  // Ignore upgrades, per package, on the device. In jailbreak mode the real hold is dpkg's (apt-mark hold through
+  // the N2 helper); this list is then the cache the row shows until `apt-mark showhold` answers (`replace`).
+  const holds = {
+    list: () => readHolds().sort(),
+    has: (pkg) => readHolds().includes(pkg),
+    set(pkg, on) {
+      const list = new Set(readHolds());
+      if (on) list.add(pkg); else list.delete(pkg);
+      store.set(HOLDS_KEY, JSON.stringify([...list].sort()));
+      notify("holds", [...list].sort());
+    },
+    replace(pkgs) {
+      const list = [...new Set(pkgs.filter((p) => typeof p === "string"))].sort();
+      store.set(HOLDS_KEY, JSON.stringify(list));
+      notify("holds", list);
+    },
+  };
+
+  return {
+    mode,
+    get,
+    set,
+    holds,
+    defaultOf: (key) => defaultOf(def(key)),
+    onChange(f) { listeners.add(f); return () => listeners.delete(f); },
+    isShown: (key) => { const d = byKey.get(key); return Boolean(d && shown(d)); },
+    visible: () => SETTINGS.filter(shown),
+    sections: () => SECTIONS.map((s) => {
+      const settings = SETTINGS.filter((d) => d.section === s.id && shown(d));
+      const footers = settings.filter((d) => d.kind !== "list").map((d) => resolve(d.footer, mode)).filter(Boolean);
+      return { ...s, settings, footer: footers.join(" ") || undefined };
+    }).filter((s) => s.settings.length),
+    footerOf: (key) => resolve(byKey.get(key)?.footer, mode),
+  };
+}
+
+// The theme Appearance asks for, given whether the system is dark right now.
+export function themeFor(appearance, systemDark) {
+  if (appearance === "light" || appearance === "dark") return appearance;
+  return systemDark ? "dark" : "light";
+}

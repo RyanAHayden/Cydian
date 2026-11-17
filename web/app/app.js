@@ -19,8 +19,10 @@ import * as sources from "./screens/sources.js";
 import * as changes from "./screens/changes.js";
 import * as installed from "./screens/installed.js";
 import * as search from "./screens/search.js";
+import * as settingsScreen from "./screens/settings.js";
+import { getBackend } from "./backend.js";
 
-const SCREENS = { home, sources, changes, installed, search };
+const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
 
 const screensEl = document.getElementById("screens");
 const navbarEl = document.getElementById("navbar");
@@ -236,3 +238,6 @@ document.addEventListener("touchstart", () => {}, { passive: true });
 
 for (const tab of TABS) if (SCREENS[tab].init) SCREENS[tab].init(ctx);
 router.start();
+
+// Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.
+if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch")) getBackend().refreshSources().catch(() => {});

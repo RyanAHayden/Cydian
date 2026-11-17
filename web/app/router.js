@@ -2,7 +2,7 @@
 // page, and it works the same from the site and from the app bundle (file:// or a custom scheme). No DOM here:
 // the router gets a window-like object, which keeps it testable under `node --test`.
 
-export const TABS = ["home", "sources", "changes", "installed", "search"];
+export const TABS = ["home", "sources", "changes", "installed", "search", "settings"];
 export const DEFAULT_TAB = "home";
 
 // "#/sources/a%20b/c" -> { tab: "sources", path: ["a b", "c"] }. Anything unknown lands on the default tab.

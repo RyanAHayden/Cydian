@@ -1,11 +1,80 @@
-"""Cydian's web server. Thin: serves the shared frontend in web/app/ (fetch proxy and push come later)."""
+"""Cydian's web server. Thin: serves the shared frontend in web/app/ and the SSRF-safe fetch proxy (push later)."""
+import os
 from pathlib import Path
+from urllib.parse import quote
 
-from flask import Flask, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
+
+import fetch
 
 APP_DIR = Path(__file__).resolve().parent / "app"
 
 app = Flask(__name__, static_folder=None)
+
+# Behind a reverse proxy, set CYDIAN_PROXY_HOPS to the number of proxies so the rate limit sees the visitor's IP.
+if int(os.environ.get("CYDIAN_PROXY_HOPS", "0") or 0) > 0:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=int(os.environ["CYDIAN_PROXY_HOPS"]))
+
+fetcher = fetch.Fetcher()
+packages_cache = fetch.PackagesCache()
+rate_limiter = fetch.RateLimiter(rate=int(os.environ.get("CYDIAN_FETCH_RATE", "60")), per=60.0)
+
+ERROR_STATUS = {"bad_url": 400, "refused": 403, "too_large": 502, "timeout": 504, "upstream": 502,
+                "not_found": 404, "network": 502}
+# Proxied bodies come from strangers: never let them run as our origin.
+SAFE_HEADERS = {"X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": "default-src 'none'; sandbox",
+                "Cache-Control": "no-store"}
+PASSTHROUGH_TYPES = ("image/png", "image/jpeg", "image/gif", "image/webp", "text/plain", "application/json")
+
+
+def _header_url(url):
+    return quote(url, safe=":/?#[]@!$&'()*+,;=%~")
+
+
+def _error(code, message, status=None):
+    body = {"error": message, "code": code}
+    if status is not None:
+        body["status"] = status
+    resp = jsonify(body)
+    resp.status_code = ERROR_STATUS.get(code, 502)
+    resp.headers.update(SAFE_HEADERS)
+    return resp
+
+
+@app.get("/api/fetch")
+def api_fetch():
+    """`?url=<URL>`: the body of URL. `?url=<repo dir>&kind=packages`: the repo's Packages, as gzip-encoded
+    plain text, whichever of Packages.xz/.bz2/.gz/plain exists first (cached 30 min per repo)."""
+    if not rate_limiter.allow(request.remote_addr or "?"):
+        resp = _error("rate_limited", "too many fetches, slow down")
+        resp.status_code = 429
+        resp.headers["Retry-After"] = "5"
+        return resp
+    url = request.args.get("url", "")
+    kind = request.args.get("kind", "")
+    try:
+        if kind == "packages":
+            source, gz, cached = fetch.fetch_packages(fetcher, url, packages_cache)
+            headers = dict(SAFE_HEADERS)
+            headers.update({"Content-Type": "text/plain; charset=utf-8", "Content-Encoding": "gzip",
+                            "X-Source-URL": _header_url(source), "X-Cache": "HIT" if cached else "MISS",
+                            "Vary": "Accept-Encoding"})
+            return gz, 200, headers
+        if kind:
+            return _error("bad_url", f"unknown kind {kind!r}")
+        r = fetcher.get(url)
+    except fetch.FetchError as e:
+        return _error(e.code, str(e), e.status)
+    if not 200 <= r.status < 300:
+        return _error("upstream", f"upstream answered HTTP {r.status}", r.status)
+    ctype = r.headers.get("content-type", "").split(";")[0].strip().lower()
+    headers = dict(SAFE_HEADERS)
+    headers["Content-Type"] = (r.headers["content-type"] if ctype in PASSTHROUGH_TYPES
+                               else "application/octet-stream")
+    headers["X-Source-URL"] = _header_url(r.url)
+    return r.body, 200, headers
 
 
 @app.get("/healthz")

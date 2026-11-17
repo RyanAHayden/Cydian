@@ -286,3 +286,34 @@ test("native/bridge.js: postMessage ids, stream events, error codes, cydianApp",
   vm.runInContext(src.replace("})(globalThis);", "})(this);"), bare);
   assert.equal(bare.cydianNative, undefined);
 });
+
+test("F49: Add Source tries Telesphoreo's dists/ios/<cf>/ from app.info's CoreFoundation number", async (t) => {
+  const fx = makeFixture();
+  t.after(fx.cleanup);
+  const net = {
+    "https://tele.test/": "<html>a landing page</html>",
+    "https://tele.test/dists/ios/1854.10/Release": "Origin: Tele\nComponents: main\nArchitectures: iphoneos-arm64\n",
+    "https://tele.test/dists/ios/1854.10/main/binary-iphoneos-arm64/Packages": "Package: a\nVersion: 1\nArchitecture: iphoneos-arm64\n",
+  };
+  const make = (info) => {
+    const native = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net });
+    const inner = native.call;
+    native.call = (method, params, onEvent) => {
+      if (method === "app.info") return info ? Promise.resolve(info) : Promise.reject(new Error("unknown method app.info"));
+      return inner(method, params, onEvent);
+    };
+    return { native, backend: createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB() } }) };
+  };
+  const { native, backend } = make({ ios: "17.0", jailbreak: "rootless", cf: 1854.1 });
+  const added = await backend.addSource("https://tele.test/");
+  assert.equal(added.key, "deb:https://tele.test/:ios/1854.10");
+  assert.ok(native.calls.some((c) => c.method === "net.fetch" && c.params.url === "https://tele.test/dists/ios/1854.10/Release"));
+  assert.deepEqual(native.calls.filter((c) => c.method === "helper.run").map((c) => c.params.words),
+    [["addsource", "https://tele.test/", "ios/1854.10", "main"]]);
+  // A shell without `cf` (or without app.info at all) still adds sources, just not from that suite.
+  for (const info of [{ ios: "17.0" }, null]) {
+    const other = make(info);
+    await assert.rejects(other.backend.addSource("https://tele.test/"), (e) => e.kind === "not_source");
+    assert.ok(!other.native.calls.some((c) => /dists\/ios\//.test(c.params?.url ?? "")));
+  }
+});

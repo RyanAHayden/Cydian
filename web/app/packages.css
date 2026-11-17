@@ -235,3 +235,79 @@ html[data-theme="dark"] .scope-segment + .scope-segment, html[data-theme="dark"]
   background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
   box-shadow: inset 0 3px 3px -2px rgba(0,0,0,.35);
 }
+
+/* ---- The action sheet (nav/actionsheet.js, F29): UIActionSheet's default style, from the 4S's UIAlertSheet* art.
+   Panel (UIAlertSheetDefaultBackground, 84% opaque): a 1pt #3f4347 top edge, half a point of white, then
+   #acb1b9 -> #5c626d over 33pt and flat below. Buttons (UIAlertSheetDefaultButton): 44pt, 10pt corners, a dark
+   edge that fades inward, white -> #c2c3c5 (69%) -> #e3e3e3 face and a faint light line under the button (all
+   in the art); pressed (…ButtonPressed) #91a2f0 -> #022bdc -> #3252e3 with white text. Cancel
+   (…CancelButton) #7e8288 -> #2b3038 -> #383f46, white text, after a wider gap. Black style in the dark theme. ---- */
+.action-scrim { position: fixed; inset: 0; z-index: 30; }
+.action-dim { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
+.action-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 11px;
+  padding: 21px 21px calc(22px + env(safe-area-inset-bottom));
+  max-height: calc(100% - 20px - env(safe-area-inset-top)); overflow-y: auto; overscroll-behavior: contain;
+  background:
+    linear-gradient(#3f4347, #3f4347) top / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.84), rgba(255,255,255,.84)) 0 1px / 100% .5px no-repeat,
+    linear-gradient(rgba(172,177,185,.84) 1.5px, rgba(142,148,158,.84) 12px, rgba(107,113,123,.84) 26px, rgba(92,98,109,.84) 33px);
+  will-change: transform;
+}
+.action-title {
+  margin: -6px 0 2px; font-size: 13px; line-height: 17px; text-align: center; color: #fff;
+  text-shadow: 0 -1px 0 rgba(0,0,0,.5); white-space: pre-line; overflow-wrap: anywhere;
+}
+.action-button {
+  flex: none; height: 44px; min-height: 44px; padding: 0 12px; margin: 0; cursor: pointer; touch-action: manipulation;
+  font: inherit; font-size: 20px; font-weight: bold; line-height: 40px; color: #000; text-shadow: 0 1px 0 rgba(255,255,255,.6);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border: 1px solid rgba(0,0,0,.8); border-radius: 10px;
+  box-shadow: inset 0 0 1.5px 1px rgba(0,0,0,.35), 0 1px 0 rgba(211,211,211,.23);
+  background: linear-gradient(#fff, #fafafa 7%, #ebebec 23%, #d9d9db 38%, #c9cacc 54%, #c2c3c5 69%, #c5c6c7 77%, #cdcdcf 85%, #dcdcdd 92%, #e3e3e3);
+  background-origin: border-box;
+}
+.action-button:active {
+  color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4);
+  background: linear-gradient(#91a2f0, #7a90ec 7%, #6a82ea 23%, #4c69e6 38%, #2d4fe1 54%, #1036de 69%, #022bdc 77%, #0c33dd 85%, #2649df 92%, #3252e3);
+  background-origin: border-box;
+}
+.action-button.destructive {
+  color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4); /* UIAlertSheetDefaultDestroyButton: Cydia's Remove isn't one */
+  background: linear-gradient(#f59a9a, #e45c5c 30%, #cf1f1f 69%, #d52f2f); background-origin: border-box;
+}
+.action-button.cancel {
+  margin-top: 14px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.5);
+  background: linear-gradient(#7e8288, #65676d 7%, #565a60 23%, #484b52 38%, #3b3f47 54%, #2e333b 69%, #2b3038 77%, #2c3139 85%, #333941 92%, #383f46);
+  background-origin: border-box;
+}
+.action-button.cancel:active { background: linear-gradient(#5f6268, #3a3d43 50%, #1c2027); background-origin: border-box; }
+html[data-theme="dark"] .action-sheet { /* UIAlertSheetBlackBackground: #232323 edge, #6a6a6a -> #040404 */
+  background:
+    linear-gradient(rgba(35,35,35,.89), rgba(35,35,35,.89)) top / 100% 1px no-repeat,
+    linear-gradient(rgba(167,167,167,.82), rgba(167,167,167,.82)) 0 1px / 100% .5px no-repeat,
+    linear-gradient(rgba(106,106,106,.73) 1.5px, rgba(81,81,81,.7) 12px, rgba(44,44,44,.65) 24px, rgba(9,9,9,.62) 36px, rgba(1,1,1,.6));
+}
+html[data-theme="dark"] .action-button:not(.cancel):not(.destructive):not(:active) { /* UIAlertSheetBlackButton */
+  background: linear-gradient(#fbfbfb, #f5f5f5 15%, #f0f0f0 38%, #eee 46%, #e4e4e4 54%, #e4e4e4); background-origin: border-box;
+}
+html[data-theme="dark"] .action-button.cancel { /* UIAlertSheetBlackCancelButton */
+  background: linear-gradient(#878787, #686868 7%, #545454 23%, #383838 38%, #1a1a1a 54%, #020202 69%, #000 77%, #131313); background-origin: border-box;
+}
+
+/* ---- The package page's head (F29): the author under the name, as a link to their packages ---- */
+.pkg-head-author { font-size: 14px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-decoration: none; }
+
+/* ---- Version History (F29, browse.js renderVersions): one cell per version, version and marks on top, sources or
+   date and size beside, release notes under; versions this iPhone can't run are greyed ---- */
+.version-row .cell-inner { flex-direction: column; align-items: stretch; gap: 2px; padding-top: 9px; padding-bottom: 9px; }
+.version-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.version-top .cell-label { flex: 0 1 auto; min-width: 0; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.version-top .cell-detail { margin-left: auto; font-size: 14px; }
+.version-tag {
+  flex: none; padding: 0 4px; border: 1px solid currentColor; border-radius: 4px;
+  font-size: 10px; font-weight: bold; line-height: 13px; color: var(--detail); white-space: nowrap;
+}
+.version-sub { font-size: 14px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.version-notes { margin: 2px 0 0; font-size: 14px; line-height: 18px; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; }
+.version-row.unavailable .cell-label, .version-row.unavailable .version-notes { color: var(--subtitle); }

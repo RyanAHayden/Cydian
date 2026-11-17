@@ -1,0 +1,32 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+Architectures: iphoneos-arm64
+Codename: 1800
+Components: main testing
+Date: Mon, 27 Jul 2026 11:52:04 +0000
+Description: Distribution of essential tools for iPhoneOS
+Label: Procursus
+Origin: Procursus
+Suite: stable
+Version: 1.0a1
+MD5Sum:
+ 7ab5dac8e98807525a4b82be12416d11          1403916 main/binary-iphoneos-arm64/Packages
+ d09e815c34632bd864361d8daab98f23           333548 main/binary-iphoneos-arm64/Packages.xz
+ 5919b202a44185f91481d65f14fbc9a8           343148 main/binary-iphoneos-arm64/Packages.zst
+SHA1:
+ 5fd5a62eea463bf086f7beaa166467767146c847          1403916 main/binary-iphoneos-arm64/Packages
+ 696b60a4975427a2ae3b3a74d6f4dc6a344604d5           333548 main/binary-iphoneos-arm64/Packages.xz
+ 27a40179db33ba38edbd733cdc54d55f4868c359           343148 main/binary-iphoneos-arm64/Packages.zst
+SHA256:
+ 3976968ecb1fde0a74c77f02f5d1a8d7e2fd1edab641924a95270f7172c7f722          1403916 main/binary-iphoneos-arm64/Packages
+ 4641db14a37465b64fad3abb7e22bfc5215cc9c244c8e0cf90b389aa3f2cb6a9           333548 main/binary-iphoneos-arm64/Packages.xz
+ 4b3cc8576c0d8dd5ec25006005bfa0849cfbbbbae6df2166d4c068e02673b854           343148 main/binary-iphoneos-arm64/Packages.zst
+SHA512:
+ cc9386c2ff7adf78ac4c294787521e743096ecc47ff4198695b89b7d7e8f62acc4b33bdd2380642c86f84dda3fe343ce059e51b3cfe06edc7c2559c09d55cd3c          1403916 main/binary-iphoneos-arm64/Packages
+ 8c2bc82717d839b4f04cc4eadb5a63eb38f6e02781ce70f98a4f379b0c26d19ffd5e39dc2099fbccfe7414ef3c30b44beebb13dbafb5f90f1151d65764a0dc7e           333548 main/binary-iphoneos-arm64/Packages.xz
+ cab5a06be4ae8beed255a085fe2440a379ab51ae711321fd09704d6efcf10f7f457dcf365b8d204e913a617b0afaa0d53909651b5df5fc42d3c063c36db83dd0           343148 main/binary-iphoneos-arm64/Packages.zst
+-----BEGIN PGP SIGNATURE-----
+
+(signature trimmed for the fixture)
+-----END PGP SIGNATURE-----

@@ -1,0 +1,123 @@
+{
+  "name": "LiveContainer",
+  "identifier": "com.livecontainer.source",
+  "website": "https://github.com/LiveContainer/LiveContainer",
+  "subtitle": "LiveContainer official AltStore Source.",
+  "description": "This is the official AltStore Source for LiveContainer.\n\n Run iOS apps without actually installing them!",
+  "tintColor": "#0784FC",
+  "iconURL": "https://raw.githubusercontent.com/LiveContainer/LiveContainer/main/screenshots/AppIcon1024.png",
+  "headerURL": "https://raw.githubusercontent.com/LiveContainer/LiveContainer/main/screenshots/header.png",
+  "apps": [
+    {
+      "beta": false,
+      "name": "LiveContainer",
+      "bundleIdentifier": "com.kdt.livecontainer",
+      "developerName": "LiveContainer Team",
+      "subtitle": "Run iOS apps without actually installing them!",
+      "version": "3.8.0",
+      "versionDate": "2026-07-17T07:44:20Z",
+      "versionDescription": "LiveContainer 3.8.0\r \n> [!Warning]\r\n> The standalone version requires SideStore 0.6.2+ or AltStore 2.2.1+ for installation.\r\n> To install LiveContainer with built-in SideStore (\"LiveContainer+SideStore.ipa\"), please use [Impactor](https://github.com/khcrysalis/Impactor) or [iloader](https://github.com/nab138/iloader). See [our installation guide](https://livecontainer.github.io/docs/installation/l…",
+      "downloadURL": "https://github.com/LiveContainer/LiveContainer/releases/download/3.8.0/LiveContainer.ipa",
+      "localizedDescription": "Run iOS apps without actually installing them!",
+      "iconURL": "https://raw.githubusercontent.com/LiveContainer/LiveContainer/main/screenshots/AppIcon1024.png",
+      "tintColor": "#0784FC",
+      "category": "utilities",
+      "size": 4707271,
+      "screenshotURLs": [
+        "https://raw.githubusercontent.com/LiveContainer/LiveContainer/main/screenshots/1.png"
+      ],
+      "appPermissions": {
+        "entitlements": [
+          "application-identifier",
+          "com.apple.security.application-groups",
+          "get-task-allow",
+          "keychain-access-groups",
+          "com.apple.developer.kernel.extended-virtual-addressing",
+          "com.apple.developer.kernel.increased-memory-limit",
+          "com.apple.developer.healthkit.background-delivery",
+          "com.apple.developer.healthkit",
+          "com.apple.developer.healthkit.access"
+        ],
+        "privacy": {
+          "LSRequiresIPhoneOS": "The guest app is requesting for this permission.",
+          "NFCReaderUsageDescription": "The guest app is requesting for this permission.",
+          "NSAppleMusicUsageDescription": "The guest app is requesting for this permission.",
+          "NSBluetoothAlwaysUsageDescription": "The guest app is requesting for this permission.",
+          "NSBluetoothPeripheralUsageDescription": "The guest app is requesting for this permission.",
+          "NSCalendarsFullAccessUsageDescription": "The guest app is requesting for this permission.",
+          "NSCalendarsWriteOnlyAccessUsageDescription": "The guest app is requesting for this permission.",
+          "NSCameraUsageDescription": "The guest app is requesting for this permission.",
+          "NSContactsUsageDescription": "The guest app is requesting for this permission.",
+          "NSFaceIDUsageDescription": "The guest app is requesting for this permission.",
+          "NSFallDetectionUsageDescription": "The guest app is requesting for this permission.",
+          "NSGKFriendListUsageDescription": "The guest app is requesting for this permission.",
+          "NSHealthClinicalHealthRecordsShareUsageDescription": "The guest app is requesting for this permission.",
+          "NSHealthRequiredReadAuthorizationTypeIdentifiers": "The guest app is requesting for this permission.",
+          "NSHomeKitUsageDescription": "The guest app is requesting for this permission.",
+          "NSIdentityUsageDescription": "The guest app is requesting for this permission.",
+          "NSLocalNetworkUsageDescription": "The guest app is requesting for this permission.",
+          "NSLocationDefaultAccuracyReduced": "The guest app is requesting for this permission.",
+          "NSLocationTemporaryUsageDescriptionDictionary": "The guest app is requesting for this permission.",
+          "NSLocationUsageDescription": "The guest app is requesting for this permission.",
+          "NSLocationWhenInUseUsageDescription": "The guest app is requesting for this permission.",
+          "NSMicrophoneUsageDescription": "The guest app is requesting for this permission.",
+          "NSMotionUsageDescription": "The guest app is requesting for this permission.",
+          "NSNearbyInteractionAllowOnceUsageDescription": "The guest app is requesting for this permission.",
+          "NSNearbyInteractionUsageDescription": "The guest app is requesting for this permission.",
+          "NSPhotoLibraryAddUsageDescription": "The guest app is requesting for this permission.",
+          "NSPhotoLibraryUsageDescription": "The guest app is requesting for this permission.",
+          "NSRemindersFullAccessUsageDescription": "The guest app is requesting for this permission.",
+          "NSSensorKitUsageDescription": "The guest app is requesting for this permission.",
+          "NSSiriUsageDescription": "The guest app is requesting for this permission.",
+          "NSSpeechRecognitionUsageDescription": "The guest app is requesting for this permission.",
+          "NSUserTrackingUsageDescription": "The guest app is requesting for this permission.",
+          "SBAppUsesLocalNotifications": "The guest app is requesting for this permission.",
+          "UIApplicationSceneManifest": "The guest app is requesting for this permission.",
+          "NSHealthUpdateUsageDescription": "The guest app is requesting for this permission.",
+          "NSHealthShareUsageDescription": "The guest app is requesting for this permission.",
+          "NSLocationAlwaysAndWhenInUseUsageDescription": "The guest app is requesting for this permission."
+        }
+      },
+      "versions": [
+        {
+          "version": "3.8.0",
+          "date": "2026-07-17T07:44:20Z",
+          "localizedDescription": "LiveContainer 3.8.0\r \n> [!Warning]\r\n> The standalone version requires SideStore 0.6.2+ or AltStore 2.2.1+ for installation.\r\n> To install LiveContainer with built-in SideStore (\"LiveContainer+SideStore.ipa\"), please use [Impactor](https://github.com/khcrysalis/Impactor) or [iloader](https://github.com/nab138/iloader). See [our installation guide](https://livecontainer.github.io/docs/installation/l…",
+          "downloadURL": "https://github.com/LiveContainer/LiveContainer/releases/download/3.8.0/LiveContainer.ipa",
+          "size": 4707271
+        },
+        {
+          "version": "3.7.2",
+          "date": "2026-02-27T04:18:41Z",
+          "localizedDescription": "> [!Warning]\r\n> The standalone version requires SideStore 0.6.2+ or AltStore 2.2.1+ for installation.\r\n> To install LiveContainer with built-in SideStore (LiveContainer+SideStore.ipa), please use [Impactor](https://github.com/khcrysalis/Impactor) or [iloader](https://github.com/nab138/iloader). See [our installation guide](https://livecontainer.github.io/docs/installation/lc_sidestore) for details…",
+          "downloadURL": "https://github.com/LiveContainer/LiveContainer/releases/download/3.7.2/LiveContainer.ipa",
+          "size": 4523860
+        }
+      ]
+    }
+  ],
+  "news": [
+    {
+      "appID": "com.kdt.livecontainer",
+      "caption": "Update of LiveContainer just got released!",
+      "date": "2024-08-15T08:24:55Z",
+      "identifier": "release-2.1.2",
+      "imageURL": "https://raw.githubusercontent.com/LiveContainer/LiveContainer/main/screenshots/release.png",
+      "notify": true,
+      "tintColor": "#0784FC",
+      "title": "2.1.2 - LiveContainer  15/08/24",
+      "url": "https://github.com/LiveContainer/LiveContainer/releases/tag/2.1.2"
+    },
+    {
+      "appID": "com.kdt.livecontainer",
+      "caption": "Update of LiveContainer just got released!",
+      "date": "2024-12-16T11:15:27Z",
+      "identifier": "release-3.0.0",
+      "imageURL": "https://raw.githubusercontent.com/LiveContainer/LiveContainer/main/screenshots/release.png",
+      "notify": true,
+      "tintColor": "#0784FC",
+      "title": "3.0.0 - LiveContainer  16/12/24",
+      "url": "https://github.com/LiveContainer/LiveContainer/releases/tag/3.0.0"
+    }
+  ]
+}

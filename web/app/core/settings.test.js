@@ -92,17 +92,17 @@ test("holds: per package, sorted, stored on the device", () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["appearance", "arch", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
+    ["appearance", "allowZoom", "arch", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
   assert.deepEqual(show("jailbreak"),
-    ["appearance", "arch", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge",
+    ["appearance", "allowZoom", "arch", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge",
       "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
-    ["appearance", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge", "resignReminder"]);
+    ["appearance", "allowZoom", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge", "resignReminder"]);
 });
 
 test("rows wait for their feature: today only Appearance and the sources settings", () => {
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.deepEqual(keysOf(s), ["appearance", "arch", "refreshOnLaunch"]);
+  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "arch", "refreshOnLaunch"]);
   assert.equal(s.isShown("autoInstall"), false);
   assert.ok(FEATURES.has("appearance"));
   assert.deepEqual(createSettings({ storage: memStorage(), mode: "site", features: new Set(["appearance"]) })

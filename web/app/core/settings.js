@@ -50,6 +50,10 @@ export const SETTINGS = [
     footer: "Automatic follows the iPhone's own Light or Dark setting.",
   },
   {
+    key: "allowZoom", section: "appearance", kind: "toggle", feature: "appearance", modes: ALL, default: false,
+    label: "Allow Zoom", options: onOff, footer: "Lets you pinch to zoom, for screenshots. Off, the app stays at its own size.",
+  },
+  {
     key: "arch", section: "sources", kind: "list", feature: "sources", modes: ["site", "jailbreak"], default: DEFAULT_ARCH,
     label: "Architecture",
     options: [

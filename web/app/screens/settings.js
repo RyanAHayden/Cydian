@@ -16,7 +16,7 @@ export const title = "Settings";
 export const settings = createSettings({ mode: detectMode() });
 
 // Light: the top of the blue status bar under the nav bar; dark: "Status Bar (Black)".
-export const THEME_COLORS = { light: "#4f698b", dark: "#000000" };
+export const THEME_COLORS = { light: "#4f698b", dark: "#5f656f" }; // dark: the gunmetal bar's top
 
 const defOf = (key) => SETTINGS.find((d) => d.key === key);
 const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? String(v);
@@ -139,8 +139,25 @@ export function applyTheme(doc = document, win = window) {
   }
 }
 
+// Zoom is off unless Settings > Allow Zoom is on. iOS Safari ignores user-scalable=no, so besides the viewport and
+// touch-action (html.no-zoom in ios6.css) the pinch gesture itself is cancelled while zoom is off.
+export function applyZoom(doc = document) {
+  const allow = settings.get("allowZoom") === true || settings.get("allowZoom") === "true";
+  doc.documentElement.classList.toggle("no-zoom", !allow);
+  const vp = doc.querySelector('meta[name="viewport"]');
+  if (vp) vp.content = "width=device-width, initial-scale=1, viewport-fit=cover" +
+    (allow ? "" : ", maximum-scale=1, user-scalable=no");
+  return allow;
+}
+function stopPinch(e) { if (document.documentElement.classList.contains("no-zoom")) e.preventDefault(); }
+
 export function init() {
   applyTheme();
+  applyZoom();
+  for (const type of ["gesturestart", "gesturechange"]) document.addEventListener(type, stopPinch, { passive: false });
   window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => applyTheme());
-  settings.onChange((key) => { if (key === "appearance") applyTheme(); });
+  settings.onChange((key) => {
+    if (key === "appearance") applyTheme();
+    if (key === "allowZoom") applyZoom();
+  });
 }

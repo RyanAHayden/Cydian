@@ -5,6 +5,7 @@ import {
   parseAltSource, runsOn, appStanza, installOptions, newsToNotify, normalizeAltUrl, looksLikeAltUrl, tintOf,
   withAltSources, altKey, isAltKey, appSection, compareOS, sideloaderLink,
 } from "./altstore.js";
+import { sourceFilter } from "./sources.js";
 import { createCatalog, ALL } from "./catalog.js";
 import { newRecords, changeGroups, recordKey } from "./changes.js";
 import { compat } from "./compat.js";
@@ -245,6 +246,17 @@ test("altstore: sources sit beside the APT list: add, list, refresh, remove", as
   await s.refreshSources((x) => seen.push(x.key));
   assert.deepEqual(seen.sort(), [apt[0].key, KEY].sort());
   assert.equal((await s.sources())[1].name, "Renamed");
+  // F41: a filter that keeps no APT source never asks the wrapped calls; AltStore ones still refresh.
+  let aptRefreshes = 0;
+  const wrapped = calls.refreshSources;
+  calls.refreshSources = async (...a) => { aptRefreshes++; return wrapped(...a); };
+  const onlyAlt = [];
+  await s.refreshSources((x) => onlyAlt.push(x.key), { filter: sourceFilter("none") });
+  assert.equal(aptRefreshes, 0);
+  assert.deepEqual(onlyAlt, [KEY]);
+  await s.refreshSources(() => {}, { filter: sourceFilter("iphoneos-arm64") });
+  assert.equal(aptRefreshes, 1, "a jailbroken type refreshes APT too");
+  calls.refreshSources = wrapped;
   // A broken source keeps its record with an error.
   json = "oops";
   await s.refreshSources();

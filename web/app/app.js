@@ -22,6 +22,7 @@ import * as changes from "./screens/changes.js";
 import * as installed from "./screens/installed.js";
 import * as search from "./screens/search.js";
 import * as settingsScreen from "./screens/settings.js";
+import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
 import { startPush } from "./push-client.js";
 import { launchURL } from "./launch.js";
@@ -275,7 +276,7 @@ if (startAt) history.replaceState(null, "", startAt);
 router.start();
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.
-if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch")) getBackend().refreshSources().catch(() => {});
+if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch")) getBackend().refreshSources(undefined, { filter: sourceFilter(settingsScreen.settings.deviceType()) }).catch(() => {});
 
 // Upgrade alerts (F10): register the service worker and, if opted in, re-subscribe (iOS drops subscriptions now
 // and then). After first paint, so it never competes with the launch.

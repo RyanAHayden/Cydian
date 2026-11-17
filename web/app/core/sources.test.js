@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_SOURCES, DEFAULT_ALT_SOURCES, normalizeSourceUrl, sourceKey, sourceIconUrl, sourceIconUrls, displayName, sortSources, verifySource,
-  refreshSource, releaseDepiction, openSourceStore, sourceCalls, SourceError, sourcesFor,
+  refreshSource, releaseDepiction, openSourceStore, sourceCalls, SourceError, sourcesFor, sourceFilter,
 } from "./sources.js";
 import { createHttpBackend, BackendError } from "../backend-http.js";
 import { createParser } from "./parser.js";
@@ -244,6 +244,16 @@ test("refreshSources saves each source's count and reports it", async () => {
   assert.ok(list.find((s) => s.name === "Havoc").error);
   await calls.removeSource(list[0].key);
   assert.equal((await calls.sources()).length, DEFAULT_SOURCES.length - 1);
+});
+
+test("F41: Refresh while Not Jailbroken fetches no APT source; a jailbroken type keeps them all", async () => {
+  const b = fakeBackend({});
+  const calls = sourceCalls(b, { indexedDB: fakeIndexedDB() });
+  assert.deepEqual(await calls.refreshSources(() => {}, { filter: sourceFilter("none") }), []);
+  assert.deepEqual(b.calls, []);
+  assert.equal(sourceFilter("iphoneos-arm64"), null);
+  assert.equal(sourceFilter("none")({ key: "alt:https://a.example/apps.json" }), true);
+  assert.equal(sourceFilter("none")({ key: "deb:https://repo.example/:./" }), false);
 });
 
 test("Release Depiction: kept on the source by add and refresh, * becomes the package id, http(s) only", async () => {

@@ -398,11 +398,15 @@ export function withAltSources(calls, backend, opts = {}) {
       if (isAltKey(key)) return (await store()).remove(key);
       return calls.removeSource(key);
     },
-    async refreshSources(onEach = () => {}) {
+    // `filter` (F41, core/sources.js sourceFilter): only the sources it keeps are fetched. When it keeps no APT
+    // source the wrapped calls aren't asked at all (no proxy fetches, no apt-get update in the app).
+    async refreshSources(onEach = () => {}, { filter } = {}) {
+      const keep = filter ?? (() => true);
       const db = await store().catch(() => null);
-      const alt = db ? await db.list().catch(() => []) : [];
+      const alt = (db ? await db.list().catch(() => []) : []).filter(keep);
+      const aptWanted = !filter || (await calls.sources().catch(() => [])).some(keep);
       const [apt, alts] = await Promise.all([
-        calls.refreshSources(onEach),
+        aptWanted ? calls.refreshSources(onEach, filter ? { filter } : undefined) : [],
         Promise.all(alt.map(async (s) => {
           const next = await db.put({ ...s, ...(await refreshAltSource(backend, s)) });
           onEach(next);

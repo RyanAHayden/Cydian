@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { stateTile, nav, CURATED_SOURCES, deviceHint, DEVICE_HINT } from "./home.js";
+import { stateTile, nav, CURATED_SOURCES, deviceHint, DEVICE_HINT, showsThemes } from "./home.js";
 
 const src = (extra = {}) => ({ key: "deb:https://a/:./", uri: "https://a/", ...extra });
 
@@ -36,4 +36,10 @@ test("F37: Home's hint shows while Not Jailbroken and taps through to Settings >
   assert.equal(deviceHint("iphoneos-arm64"), null);
   assert.equal(deviceHint("iphoneos-arm"), null);
   assert.equal(deviceHint("none", "sideload"), null, "the sideload build has no choice to make");
+});
+
+test("F41: Home offers Themes only on a jailbroken type", () => {
+  assert.equal(showsThemes("none"), false);
+  assert.equal(showsThemes("iphoneos-arm64"), true);
+  assert.equal(showsThemes("iphoneos-arm"), true);
 });

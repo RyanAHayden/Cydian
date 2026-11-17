@@ -23,6 +23,13 @@ export const title = "Search";
 // segments and a button don't fit a 320-point bar).
 export const SCOPES = ["All", ...SECTION_GROUPS.slice(0, 3)];
 
+// F41: the segments a device type shows. Not Jailbroken lists apps only (F37), so Tweaks and Themes would only
+// ever find nothing: just All and Apps then.
+const JAILBREAK_ONLY = ["Tweaks", "Themes"];
+export function scopesFor(type) {
+  return type === "none" ? SCOPES.filter((n) => !JAILBREAK_ONLY.includes(n)) : SCOPES;
+}
+
 // The filters, kept for the session like the query: section (a section name or "group:<kind>"), source (a key),
 // installed ("installed" | "not"), price ("free" | "paid"); null is any.
 const EMPTY = { section: null, source: null, installed: null, price: null };
@@ -116,6 +123,10 @@ export function render(body, route, ctx) {
   });
   scope.append(seg, filterButton);
   function drawScope() {
+    const shown = scopesFor(settings.deviceType());
+    // A Tweaks or Themes scope left from Jailbroken goes back to All once those segments are hidden.
+    if (scopeIndex(state.filters.section) > 0 && !shown.includes(SCOPES[scopeIndex(state.filters.section)])) state.filters.section = null;
+    segButtons.forEach((b, i) => { b.hidden = !shown.includes(SCOPES[i]); });
     const sel = scopeIndex(state.filters.section);
     segButtons.forEach((b, i) => { b.classList.toggle("selected", i === sel); b.setAttribute("aria-selected", String(i === sel)); });
     // While the panel is open the button is a blue Done that puts it away.
@@ -137,6 +148,7 @@ export function render(body, route, ctx) {
   const off = settings.onChange((key) => {
     if (!["worksOnMyPhone", "iosVersion", "arch", "device"].includes(key)) return;
     if (!body.isConnected) { off(); return; }
+    if (key === "device") drawScope();
     run();
   });
 

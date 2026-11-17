@@ -3,9 +3,12 @@ itms-services:// link the phone installs from. docs/signing.md is the long versi
 
   POST /sign                      JSON {url, p12, profile (both base64), password}
                                   -> {itms, manifest, expiresIn, bundleId, name, version}
+  POST /sign  with "async": true  -> 202 {job, status, poll} at once, once the certificate checks pass (F47)
+  GET  /sign/job/<job>            {status: downloading | signing | done (+ the fields above) | error (+ error, code,
+                                  httpStatus)}: the phone polls it, so no one request outlasts a proxy's timeout
   GET  /sign/<token>/manifest.plist   the install manifest iOS reads (until the token expires)
   GET  /sign/<token>/app.ipa          the signed IPA, once: deleted when that download ends
-  GET  /sign/status                   {ok, zsign, maxBytes, ttl}: Settings > Signing asks if this server signs
+  GET  /sign/status                   {ok, zsign, maxBytes, ttl, jobs}: Settings > Signing asks if this server signs
 
 The certificate, its key, the password and the profile live in this request's memory and go to zsign through
 memfd (signer/zsign.py): never a file, never a log line. The downloaded and the signed IPA are on disk in
@@ -60,6 +63,55 @@ class Held:
     version: str
     size: int
     taken: bool = False
+
+
+@dataclass
+class Job:
+    status: str                 # downloading, signing, done, error
+    finished: float | None = None
+    answer: dict | None = None  # done: what a synchronous POST answers; error: {error, code, httpStatus}
+
+
+class Jobs:
+    """job id -> Job, for asynchronous signing (F47). Ids are secrets.token_urlsafe(32), like the tokens: a done job
+    holds the install link. A finished job is kept for `ttl` seconds (the signed IPA's own lifetime) so a poll that
+    missed the end still reads it; a running one is kept until it ends."""
+
+    def __init__(self, ttl: float = TTL, clock=time.monotonic):
+        self.ttl, self.clock = ttl, clock
+        self._jobs: dict[str, Job] = {}
+        self._lock = threading.Lock()
+
+    def new(self) -> str:
+        job_id = secrets.token_urlsafe(32)
+        with self._lock:
+            self._jobs[job_id] = Job("downloading")
+        return job_id
+
+    def set(self, job_id: str, status: str, answer: dict | None = None):
+        with self._lock:
+            j = self._jobs.get(job_id)
+            if not j:
+                return
+            j.status, j.answer = status, answer
+            if status in ("done", "error"):
+                j.finished = self.clock()
+
+    def get(self, job_id: str) -> Job | None:
+        self.sweep()
+        with self._lock:
+            j = self._jobs.get(job_id)
+            return Job(j.status, j.finished, j.answer) if j else None
+
+    def sweep(self):
+        now = self.clock()
+        with self._lock:
+            for k in [k for k, j in self._jobs.items() if j.finished is not None and j.finished + self.ttl <= now]:
+                del self._jobs[k]
+
+    def __len__(self):
+        with self._lock:
+            return len(self._jobs)
 
 
 class Store:
@@ -148,9 +200,10 @@ def _b64(value, what: str) -> bytes:
 
 
 def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter: fetch.RateLimiter | None = None,
-                     binary: str | None = None) -> Blueprint:
+                     binary: str | None = None, jobs_registry: Jobs | None = None) -> Blueprint:
     bp = Blueprint("signer", __name__)
     state = {"store": store}
+    registry = jobs_registry or Jobs()
     limiter = limiter or fetch.RateLimiter(rate=int(os.environ.get("CYDIAN_SIGN_RATE", "10")), per=600.0)
     jobs = threading.BoundedSemaphore(JOBS)
 
@@ -188,12 +241,14 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
 
     @bp.route("/sign", methods=["OPTIONS"])
     @bp.route("/sign/status", methods=["OPTIONS"])
-    def preflight():
+    @bp.route("/sign/job/<job_id>", methods=["OPTIONS"])
+    def preflight(job_id=None):
         return Response(status=204, headers=CORS)
 
     @bp.get("/sign/status")
     def status():
-        return answer({"ok": True, "zsign": bool(zsign_path()), "maxBytes": MAX_BYTES, "ttl": int(db().ttl)})
+        return answer({"ok": True, "zsign": bool(zsign_path()), "maxBytes": MAX_BYTES, "ttl": int(db().ttl),
+                       "jobs": True})
 
     @bp.post("/sign")
     def sign():
@@ -220,6 +275,22 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
                 raise SignError("busy", "This server is holding too many signed apps: try again in a few minutes.", 503)
             if not jobs.acquire(blocking=False):
                 raise SignError("busy", "This server is signing other apps: try again in a minute.", 503)
+            base = base_url()
+            if body.get("async") is True:
+                # F47: answer now and sign in a thread, so a big IPA's download and zsign outlast no proxy's
+                # timeout (Cloudflare 100 s, Nginx 60 s). The checks above already ran, so a bad pair still fails
+                # in this response. The thread owns the job slot from here.
+                job_id = registry.new()
+                args = (db(), fetcher, binary_path, url, identity, profile, profile_bytes, base, job_id)
+                try:
+                    threading.Thread(target=background, args=args, name="cydian-sign-job", daemon=True).start()
+                except BaseException:
+                    jobs.release()
+                    registry.set(job_id, "error", {"error": "The server couldn't start the job.", "code": "busy",
+                                                   "httpStatus": 503})
+                    raise
+                return answer({"job": job_id, "status": "downloading", "poll": 1}, 202,
+                              Location=f"{base}/sign/job/{job_id}")
             try:
                 token, app = _run(db(), fetcher, binary_path, url, identity, profile, profile_bytes)
             finally:
@@ -228,10 +299,30 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
             return err(e)
         finally:
             body = identity = None  # noqa: F841 - drop the references to the key and password at once
-        manifest = f"{base_url()}/sign/{token}/manifest.plist"
-        return answer({"itms": "itms-services://?action=download-manifest&url=" + quote(manifest, safe=""),
-                       "manifest": manifest, "expiresIn": int(db().ttl), "bundleId": app.bundle_id,
-                       "name": app.name, "version": app.version})
+        return answer(_done(base, token, app, db().ttl))
+
+    def background(store_, fetcher_, binary_path, url, identity, profile, profile_bytes, base, job_id):
+        end = ("error", {"error": "The signing server failed while signing this app.", "code": "internal",
+                         "httpStatus": 500})  # a crash must still end the job, without echoing anything secret
+        try:
+            token, app = _run(store_, fetcher_, binary_path, url, identity, profile, profile_bytes,
+                              on_phase=lambda phase: registry.set(job_id, phase))
+            end = ("done", _done(base, token, app, store_.ttl))
+        except SignError as e:
+            end = ("error", {"error": str(e), "code": e.code, "httpStatus": e.status})
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            identity = None  # noqa: F841
+            jobs.release()  # before the job says it ended: a poll that sees "done" may sign again at once
+            registry.set(job_id, *end)
+
+    @bp.get("/sign/job/<job_id>")
+    def job_status(job_id):
+        j = registry.get(job_id)
+        if not j:
+            return answer({"error": "This signing job is unknown or expired: sign the app again.", "code": "gone"}, 404)
+        return answer({"job": job_id, "status": j.status, **(j.answer or {})})
 
     @bp.get("/sign/<token>/manifest.plist")
     def manifest(token):
@@ -266,13 +357,22 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
     return bp
 
 
-def _run(store: Store, fetcher, binary, url, identity, profile, profile_bytes):
+def _done(base: str, token: str, app, ttl: float) -> dict:
+    manifest = f"{base}/sign/{token}/manifest.plist"
+    return {"itms": "itms-services://?action=download-manifest&url=" + quote(manifest, safe=""),
+            "manifest": manifest, "expiresIn": int(ttl), "bundleId": app.bundle_id,
+            "name": app.name, "version": app.version}
+
+
+def _run(store: Store, fetcher, binary, url, identity, profile, profile_bytes, on_phase=lambda phase: None):
     work = store.workdir()
     try:
         src, out = os.path.join(work, "in.ipa"), os.path.join(work, "out.ipa")
+        on_phase("downloading")
         ipa_mod.download(fetcher, url, src, MAX_BYTES, DOWNLOAD_TIMEOUT)
         app = ipa_mod.inspect(src, MAX_UNZIPPED)
         bundle_id = target_bundle_id(profile, app.bundle_id)
+        on_phase("signing")
         zsign.sign(binary, src, out, identity.unlocked_p12(), profile_bytes, work,
                    bundle_id=bundle_id if bundle_id != app.bundle_id else None, timeout=SIGN_TIMEOUT)
         app.bundle_id = bundle_id

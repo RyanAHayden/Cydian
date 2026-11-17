@@ -46,10 +46,23 @@ image from a pinned commit of tag v1.1.3, its tarball checked by SHA-256; licenc
    - runs zsign with the profile's entitlements (zsign takes them from the profile);
    - keeps the signed IPA under a random 256-bit token and answers
      `{itms, manifest, expiresIn, bundleId, name, version}`.
+
+   **Asynchronous jobs (F47).** The page adds `"async": true` to the JSON. The server then does the checks above
+   that need no IPA (rate limit, `.p12`, password, profile, certificate, a free job slot) in the request, so a bad
+   pair still fails at once, and answers **202** `{job, status: "downloading", poll: 1}` (and a `Location` header)
+   while a thread downloads, inspects and signs. The page polls **GET `<server>/sign/job/<job>`** every `poll`
+   seconds under the same "Signing" HUD; it answers `{job, status}` with `status` one of `downloading`, `signing`,
+   `done` (plus the fields above) or `error` (plus `error`, `code` and `httpStatus`, the status the synchronous
+   POST would have answered). The job id is another random 256-bit secret, as it leads to the install link. A
+   finished job is kept for the signed IPA's 10 minutes; an unknown or expired one answers 404 `gone` (a server
+   restart forgets them all). Without `"async"` the POST answers when signing is done, as before (curl, older
+   pages); a server from before F47 ignores `"async"` and answers 200 with the link, which the page takes as well
+   (`web/app/signing-client.js`, `pollJob`). The page gives up after five failed polls in a row or 15 minutes.
 4. The phone opens `itms-services://?action=download-manifest&url=<server>/sign/<token>/manifest.plist`; iOS reads
    the manifest and downloads `<server>/sign/<token>/app.ipa`. That first download deletes the file and the token.
 
-`GET <server>/sign/status` answers `{ok, zsign, maxBytes, ttl}`; Settings > Signing's Check Server row asks it.
+`GET <server>/sign/status` answers `{ok, zsign, maxBytes, ttl, jobs}` (`jobs`: it takes `"async"`, F47); Settings >
+Signing's Check Server row asks it.
 
 ## What is stored where
 
@@ -57,8 +70,9 @@ image from a pinned commit of tag v1.1.3, its tarball checked by SHA-256; licenc
 | --- | --- | --- |
 | `.p12`, its password, `.mobileprovision`, their file names | The phone: IndexedDB `cydian-signing` of the site's origin, in that browser | Until Remove Certificate (or the browser's site data is cleared) |
 | Signing server address | The phone: `localStorage["cydian.signingServer"]` (absent = cydian.dev) | Until changed |
-| Certificate, key, password, profile on the server | That request's memory only. zsign gets an unencrypted copy of the key and the profile through anonymous in-memory files (`memfd_create`, opened as `/dev/fd/N`): no file on disk, no password on a command line | The request |
+| Certificate, key, password, profile on the server | That request's memory only (with `"async"`, its job thread's, until the job ends). zsign gets an unencrypted copy of the key and the profile through anonymous in-memory files (`memfd_create`, opened as `/dev/fd/N`): no file on disk, no password on a command line | The request |
 | The downloaded IPA and zsign's unpacked copy | The server's job folder in `CYDIAN_SIGN_DIR` | Deleted when the job ends, signed or not |
+| A job's status and, once done, its install link | The server process's memory, under the job id | 10 minutes after the job ends; a restart forgets it |
 | The signed IPA | `CYDIAN_SIGN_DIR`, named by the token's SHA-256 (a directory listing gives no token away) | 10 minutes or its first download, whichever is first; after a restart none can be fetched, and the first signing request deletes them |
 
 Nothing about a signing request is logged by Cydian: no URL parameters carry secrets (it's a JSON body), errors
@@ -86,13 +100,14 @@ signed by you, on a device your profile lists. Treat the link like a password; i
 | `CYDIAN_PUBLIC_URL` | the request's host, over https | The base of the manifest and IPA links (set it when the server's own host name isn't the one the phone uses) |
 | `CYDIAN_ZSIGN` | `zsign` on `PATH` | The zsign binary |
 
-- **One worker.** Tokens live in the server process's memory; run one gunicorn worker (threads are fine), as the
-  image does.
+- **One worker.** Tokens and signing jobs live in the server process's memory (a poll another worker answers finds
+  no job); run one gunicorn worker (threads are fine), as the image does.
 - **HTTPS.** iOS only installs `itms-services` links whose manifest and IPA are on https with a certificate it
   trusts. The links are built https unless the request's host is localhost.
-- **Proxy timeouts.** The POST answers when signing is done: download plus zsign, seconds for most apps, longer for
-  a big game. Cloudflare's proxy gives up after 100 seconds and Nginx after 60 by default (`proxy_read_timeout`);
-  raise Nginx's to 300 for big IPAs. A response past Cloudflare's limit can't be raised on its free plan.
+- **Proxy timeouts.** Cloudflare's proxy gives up after 100 seconds and Nginx after 60 by default
+  (`proxy_read_timeout`). The page signs as an asynchronous job (F47): every request it makes answers at once and
+  the job runs as long as the download and zsign caps allow, so a big game signs behind either. Only a synchronous
+  POST (no `"async"`: curl, a page from before F47) still waits for the whole job and meets those limits.
 - **What iOS still checks.** zsign signs whatever you give it; the phone decides whether it runs. The device must
   be in the profile (Development and Ad Hoc), the certificate not revoked, and the profile's entitlements must
   cover what the app needs (an app with extensions needs a wildcard profile or one per extension; Cydian signs
@@ -133,12 +148,16 @@ Running the signer outside Docker: `zsign` on `PATH` (build it from
 
 - `web/test_signer.py`: a throwaway CA, certificate, `.p12` and profile and a tiny hand-built IPA
   (`web/signer/testkit.py`). The checks (wrong password, expired certificate and profile, a certificate the profile
-  doesn't list, app ID fit), the token store (expiry, first download only, a restart's cleanup), POST /sign's guards
+  doesn't list, app ID fit), the token store (expiry, first download only, a restart's cleanup), asynchronous jobs
+  (202 at once, the phases, done with the link, a download error and a crash in the poll, a bad pair still in the
+  POST, the job slot held until the job ends, expiry; zsign replaced by a copy so they run everywhere), POST /sign's guards
   (SSRF: loopback, private, IPv6 loopback, `file:`, `ftp:`, credentials, a redirect to loopback; the size cap with
   and without Content-Length; not an IPA; a path that leaves the folder; the rate limit; CORS) and, where zsign is
   installed (`CYDIAN_ZSIGN` or `PATH`), real signing: the manifest, one download, the CodeDirectory's identifier and
   team (the profile's), every code page's hash, and the CMS signature over the CodeDirectory checked with
   `openssl cms -verify`. Without zsign those tests skip and say so.
+- `web/app/signing-client.test.js`: the page's poll of a job (phases, error status, a gone job, network errors
+  and proxy hiccups, the poll interval).
 - `web/app/core/signing.test.js`: the profile's fields, its certificates, the plist parser, the `.p12` password
   (SHA-256 and SHA-1 MACs), the summary rows. Fixtures in `web/app/core/fixtures/signing/` come from
   `web/signer/make_fixtures.py` (throwaway keys, fixed dates).

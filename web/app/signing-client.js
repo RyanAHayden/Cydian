@@ -8,6 +8,10 @@
 //   await serverStatus()         what GET <server>/sign/status says
 //   await signAndInstall({ url, name, onInstalled })   HUD "Signing", POST /sign, HUD "Installing", itms-services
 //
+// POST /sign asks for an asynchronous job (F47): the server answers 202 {job} at once and the HUD polls
+// GET /sign/job/<job> every second under the same "Signing" HUD until done or error, so a big IPA outlasts no proxy's timeout. A server from
+// before F47 ignores the ask and answers 200 with the link, which works the same.
+//
 // The certificate, key and password leave the phone only inside the POST to the signing server, over HTTPS, for
 // that one request. Nothing goes to localStorage but the server's address.
 import { DEFAULT_SERVER, normalizeServer, signBody, errorText } from "./core/signing.js";
@@ -95,21 +99,23 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {} })
   }
   const server = getServer();
   let hide = showHUD("Signing");
-  let res, body = null;
+  let status, body = null;
   try {
-    res = await fetch(`${server}/sign`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
-      body: signBody({ url, p12: id.p12, profile: id.profile, password: id.password }),
+    const json = JSON.stringify({ ...JSON.parse(signBody({ url, p12: id.p12, profile: id.profile, password: id.password })), async: true });
+    const res = await fetch(`${server}/sign`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: json,
     });
+    status = res.status;
     body = await res.json().catch(() => null);
+    if (status === 202 && typeof body?.job === "string") ({ status, body } = await pollJob(server, body));
   } catch {
     hide();
     await showAlert({ title: "Couldn't Sign", message: `The signing server (${new URL(server).host}) can't be reached.`, buttons: ["OK"] });
     return false;
   }
-  if (!res.ok || !body?.itms) {
+  if (status !== 200 || !body?.itms) {
     hide();
-    await showAlert({ title: name ? `Couldn't Sign ${name}` : "Couldn't Sign", message: errorText(res.status, body), buttons: ["OK"] });
+    await showAlert({ title: name ? `Couldn't Sign ${name}` : "Couldn't Sign", message: errorText(status, body), buttons: ["OK"] });
     return false;
   }
   // The same HUD, relabelled: a second one fading in over the first would show both labels for a moment.
@@ -120,4 +126,38 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {} })
   location.href = body.itms;
   setTimeout(hide, 2500); // iOS asks "Install …?" over the page; the HUD only bridges the wait for it
   return true;
+}
+
+const POLL_LIMIT_MS = 15 * 60 * 1000; // the server's own caps (download 300 s, zsign 300 s) end a job long before
+const POLL_MISSES = 5;                 // polls in a row that may fail (a phone between networks) before giving up
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Polls GET <server>/sign/job/<job> until the job is done or failed. Resolves { status, body } as a synchronous
+// POST would have answered: 200 and the link, or the error's own HTTP status and {error, code}. Throws (the
+// caller says "can't be reached") after POLL_MISSES failed polls in a row.
+export async function pollJob(server, first, { wait = sleep } = {}) {
+  const started = Date.now();
+  const every = Math.min(5, Math.max(0.5, Number(first.poll) || 1)) * 1000;
+  let misses = 0;
+  while (Date.now() - started < POLL_LIMIT_MS) {
+    await wait(every);
+    let r, b;
+    try {
+      r = await fetch(`${server}/sign/job/${encodeURIComponent(first.job)}`, { cache: "no-store" });
+      b = await r.json().catch(() => null);
+    } catch (e) {
+      if (++misses >= POLL_MISSES) throw e;
+      continue;
+    }
+    if (r.status >= 500 && !b?.status) {          // a proxy's hiccup, not the job's answer
+      if (++misses >= POLL_MISSES) return { status: r.status, body: b };
+      continue;
+    }
+    misses = 0;
+    if (!r.ok) return { status: r.status, body: b };          // 404: the job is gone (a server restart)
+    if (b?.status === "done") return { status: 200, body: b };
+    if (b?.status === "error") return { status: Number(b.httpStatus) || 500, body: b };
+    // downloading or signing: the "Signing" HUD stays up
+  }
+  return { status: 504, body: { error: "Signing took too long: try again later." } };
 }

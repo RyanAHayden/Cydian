@@ -508,9 +508,17 @@ export function createCatalog() {
   const has = (names) => names.filter((n) => entries(ALL).has(n) || statusById.has(n));
 
   // Every (source, id, candidate version) loaded: what the Changes tab files on a refresh (core/changes.js).
+  // F51: AltStore apps add every runnable versions[] entry with its date, [key, id, version, date], so the tab
+  // files them under the day they came out (and an app with an older version shows as Updated).
   function versions() {
     const out = [];
-    for (const [k, { byId }] of sources) for (const [id, e] of byId) out.push([k, id, e.stanza.version ?? ""]);
+    for (const [k, { byId }] of sources) {
+      for (const [id, e] of byId) {
+        const vs = e.stanza.ipa?.versions;
+        if (!Array.isArray(vs) || !vs.length) { out.push([k, id, e.stanza.version ?? ""]); continue; }
+        for (const v of vs) out.push([k, id, v.version ?? "", v.date ?? null]);
+      }
+    }
     return out;
   }
 

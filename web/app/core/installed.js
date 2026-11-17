@@ -178,3 +178,12 @@ export function onAppsChange(f) {
   appListeners.add(f);
   return () => appListeners.delete(f);
 }
+
+// F51: the ids of everything the user has installed, for the Changes tab's Installed scope: dpkg's packages
+// (parseStatus rows, or null without a status file) and the apps recorded on the device (appRecord records).
+export function installedIds(dpkgRows, appRecords) {
+  const ids = new Set();
+  for (const r of dpkgRows ?? []) if (r?.id) ids.add(r.id);
+  for (const r of appRecords ?? []) if (r?.id) ids.add(r.id);
+  return ids;
+}

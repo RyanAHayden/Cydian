@@ -4,7 +4,7 @@ A Swift shell around one WKWebView that shows `web/app/` from the app bundle (do
 
 - `Sources/App.swift`: app, scene and the web view. Navigation is web/app/'s own JS stack and edge swipe (R3 (a)).
   The shell switches off WebKit's `PreferPageRenderingUpdatesNear60FPSEnabled` and WebKit's history swipe.
-- `Sources/Bridge.swift`: the `cydian` message handler (`ping`, `app.info` so far), the `cydian://app/` scheme
+- `Sources/Bridge.swift`: the `cydian` message handler (`ping`, `app.info`, `app.theme`: the Appearance setting drives the window's interface style, F23), the `cydian://app/` scheme
   serving `Cydian.app/web/`, and the private WebKit feature switch.
 - `Info.plist` (with `CADisableMinimumFrameDurationOnPhone`), `entitlements.plist`, `VERSION`, `icon/` (`icon.svg`
   and the PNGs made from it with `rsvg-convert -w 120|180`), `deb/` (control, postinst, prerm).

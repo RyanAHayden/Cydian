@@ -28,6 +28,14 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             c.reply(["version": info["CFBundleShortVersionString"] ?? "", "build": info["CFBundleVersion"] ?? "",
                      "ios": UIDevice.current.systemVersion], nil)
         }
+        // The Appearance setting (F23, from screens/settings.js applyTheme): {style: auto|light|dark, theme}.
+        on("app.theme") { c in
+            DispatchQueue.main.async {
+                if let w = c.web?.window { Theme.apply(style: c.params["style"] as? String ?? "auto",
+                                                       theme: c.params["theme"] as? String ?? "light", to: w) }
+                c.reply(nil, nil)
+            }
+        }
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }
@@ -102,5 +110,17 @@ enum WebKitFeature {
         typealias F = @convention(c) (WKPreferences, Selector, Bool, NSObject) -> Void
         let f = unsafeBitCast(method_getImplementation(m), to: F.self)
         return all().filter { match(key($0)) }.map { f(prefs, sel, on, $0); return key($0) }
+    }
+}
+
+// What the shell draws itself follows the page's theme: the keyboard, <select> pickers, alerts and menus through the
+// window's interface style. Automatic leaves the style to the system, so the
+// page's prefers-color-scheme (which follows the window's traits) keeps tracking it. The status bar stays light
+// text in both themes: it sits on the blue nav bar in light and on the gunmetal "Status Bar (Black)" in dark.
+// The bars themselves are web/app/'s (R3 (a)): the shell draws no UINavigationBar or UITabBar.
+enum Theme {
+    static func apply(style: String, theme: String, to window: UIWindow) {
+        window.overrideUserInterfaceStyle = style == "dark" ? .dark : style == "light" ? .light : .unspecified
+        window.rootViewController?.setNeedsStatusBarAppearanceUpdate()
     }
 }

@@ -46,6 +46,19 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
     scrim.append(box);
     document.body.append(scrim);
 
+    // Locked in place, as on iOS 6: nothing behind it scrolls, and with the keyboard up it stays centred in the part of
+    // the screen that's still showing (iOS pans the page when a field takes focus; the visual viewport says where to).
+    const noScroll = (e) => { if (e.cancelable) e.preventDefault(); };
+    scrim.addEventListener("touchmove", noScroll, { passive: false });
+    scrim.addEventListener("wheel", noScroll, { passive: false });
+    const vv = globalThis.visualViewport;
+    const fit = () => {
+      scrim.style.top = vv.offsetTop + "px";
+      scrim.style.height = vv.height + "px";
+      scrim.style.bottom = "auto";
+    };
+    if (vv) { fit(); vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit); }
+
     const onKey = (e) => {
       if (e.key === "Escape") { e.preventDefault(); close(cancel); }
       if (e.key === "Enter" && field && document.activeElement === field) { e.preventDefault(); close(buttons.length - 1); }
@@ -65,6 +78,7 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
       if (done) return;
       done = true;
       document.removeEventListener("keydown", onKey);
+      if (vv) { vv.removeEventListener("resize", fit); vv.removeEventListener("scroll", fit); }
       const value = field ? field.value : undefined;
       field?.blur();
       const a = scrim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: "ease-in", fill: "forwards" });

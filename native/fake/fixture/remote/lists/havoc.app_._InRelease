@@ -1,0 +1,13 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+Origin: Havoc
+Label: Havoc
+Suite: stable
+Architectures: iphoneos-arm iphoneos-arm64
+Components: main
+Description: Havoc (fixture)
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEfixturefixturefixture
+-----END PGP SIGNATURE-----

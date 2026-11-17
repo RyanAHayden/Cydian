@@ -1,0 +1,4 @@
+Types: deb
+URIs: https://disabled.example/
+Suites: ./
+Enabled: no

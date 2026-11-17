@@ -59,15 +59,25 @@ ln -sfn "$tc/usr/lib/swift/clang" "$rd/clang"
 "$swiftc" -parse-as-library -O -wmo -swift-version 5 -runtime-compatibility-version none \
   -target "$target" -sdk "$sdk" -resource-dir "$rd" -I "$rd/shims" -module-cache-path "$out/modules" \
   -Xcc -Wno-nullability-completeness -Xcc -Wno-nullability-inferred-on-nested-type \
+  -import-objc-header Sources/Cydian-Bridging-Header.h \
   -module-name Cydian -c Sources/*.swift -o "$out/Cydian.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/availability.c -o "$out/availability.o"
+# The app's half of the root helper (cydian_helper_spawn), and the helper itself (N2's native/helper/).
+hflags=(-target "$target" -isysroot "$sdk" -std=c11 -Wall -Wextra -Werror -O2)
+clang "${hflags[@]}" -c helper/spawn.c -o "$out/spawn.o"
 
 root=$out/root
 app=$root/var/jb/Applications/Cydian.app
 rm -rf "$root" "$out/debian"
 mkdir -p "$app/web" "$out/debian"
-clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/Cydian.o" "$out/availability.o" \
+clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/Cydian.o" "$out/availability.o" "$out/spawn.o" \
   -L "$sdk/usr/lib/swift" -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign -o "$app/Cydian"
+
+# cydian-helper: plain 0755, no setuid (the app spawns it as root through the persona attributes); ad hoc signed.
+libexec=$root/var/jb/usr/libexec/cydian
+mkdir -p "$libexec"
+clang "${hflags[@]}" -fuse-ld=lld --ld-path="$lld" -Wl,-adhoc_codesign -o "$libexec/cydian-helper" helper/main.c helper/policy.c
+chmod 0755 "$libexec/cydian-helper"
 
 # Sign with the entitlements (the jailbreak trusts ad hoc code).
 ents=entitlements.plist
@@ -75,6 +85,7 @@ rcodesign=${RCODESIGN:-$(command -v rcodesign || true)}
 ldid=${LDID:-$(command -v ldid || true)}
 if [ -z "$rcodesign$ldid" ] && [ -x "$HOME/.cargo/bin/rcodesign" ]; then rcodesign=$HOME/.cargo/bin/rcodesign; fi
 if [ -n "$ldid" ]; then
+  "$ldid" -S "$libexec/cydian-helper"
   "$ldid" -S"$ents" "$app/Cydian"
 elif [ -n "$rcodesign" ]; then
   "$rcodesign" sign --entitlements-xml-file "$ents" "$app/Cydian" >/dev/null 2>"$out/rcodesign.log" ||
@@ -87,6 +98,7 @@ fi
 (cd ../web/app && find . -type f ! -name '*.test.js' ! -name '.*' -print0) |
   while IFS= read -r -d '' f; do mkdir -p "$app/web/$(dirname "$f")" && cp "../web/app/$f" "$app/web/$f"; done
 cp icon/AppIcon60x60@2x.png icon/AppIcon60x60@3x.png "$app/"
+cp bridge.js "$app/bridge.js"
 sed -e "s/@VERSION@/$version/" -e "s/@BUILD@/$build/" -e "s/@MIN@/$min/" Info.plist > "$app/Info.plist"
 printf 'APPL????' > "$app/PkgInfo"
 

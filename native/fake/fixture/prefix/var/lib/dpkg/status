@@ -1,0 +1,35 @@
+Package: apt
+Status: install ok installed
+Priority: important
+Section: Packaging
+Installed-Size: 4000
+Maintainer: Procursus Team <support@procurs.us>
+Architecture: iphoneos-arm64
+Version: 2.6.0
+Description: commandline package manager
+
+Package: com.example.tweak
+Status: install ok installed
+Section: Tweaks
+Installed-Size: 100
+Maintainer: Example Dev <dev@example.com>
+Architecture: iphoneos-arm64
+Version: 1.0
+Name: Example Tweak
+Description: an example tweak
+
+Package: com.example.held
+Status: hold ok installed
+Section: Tweaks
+Installed-Size: 10
+Maintainer: Example Dev <dev@example.com>
+Architecture: iphoneos-arm64
+Version: 1.0
+Name: Held Tweak
+Description: a held tweak
+
+Package: com.example.gone
+Status: deinstall ok config-files
+Architecture: iphoneos-arm64
+Version: 0.9
+Description: removed, config files left

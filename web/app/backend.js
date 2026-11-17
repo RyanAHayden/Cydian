@@ -1,6 +1,7 @@
-// The one backend the screens use. On the site that's backend-http.js; the app build will hand back
-// backend-native.js here instead (docs/native.md), and nothing above this file changes.
+// The one backend the screens use. On the site that's backend-http.js; in the app it's
+// backend-native.js (docs/native.md), and nothing above this file changes.
 import { createHttpBackend } from "./backend-http.js";
+import { createNativeBackend } from "./backend-native.js";
 import { createParser } from "./core/parser.js";
 import { DEFAULT_ARCH, ARCHES } from "./core/apt.js";
 
@@ -22,6 +23,10 @@ export function getParser() {
   return (parser ??= createParser());
 }
 
+// In the app the shell has put `cydianNative` in place before any module ran (native/bridge.js).
 export function getBackend() {
-  return (backend ??= createHttpBackend({ sourceOptions: { arch: getArch, count: (t, a) => getParser().count(t, a) } }));
+  const sourceOptions = { arch: getArch, count: (t, a) => getParser().count(t, a) };
+  return (backend ??= globalThis.cydianNative?.call
+    ? createNativeBackend({ sourceOptions })
+    : createHttpBackend({ sourceOptions }));
 }

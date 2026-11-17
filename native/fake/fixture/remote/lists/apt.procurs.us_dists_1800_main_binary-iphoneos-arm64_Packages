@@ -1,0 +1,17 @@
+Package: apt
+Version: 2.7.0
+Architecture: iphoneos-arm64
+Maintainer: Procursus Team <support@procurs.us>
+Section: Packaging
+Filename: pool/main/iphoneos-arm64/apt_2.7.0_iphoneos-arm64.deb
+Size: 1000
+Description: commandline package manager
+
+Package: bash
+Version: 5.2
+Architecture: iphoneos-arm64
+Maintainer: Procursus Team <support@procurs.us>
+Section: Terminal_Support
+Filename: pool/main/iphoneos-arm64/bash_5.2_iphoneos-arm64.deb
+Size: 1000
+Description: GNU Bourne Again SHell

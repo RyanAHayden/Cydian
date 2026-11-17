@@ -16,6 +16,7 @@ import tarfile
 
 PREFIX = "./var/jb/"
 APP = PREFIX + "Applications/Cydian.app/"
+HELPER = PREFIX + "usr/libexec/cydian/cydian-helper"
 SCRIPTS = ("postinst", "prerm", "postrm", "preinst")
 
 
@@ -204,6 +205,22 @@ def check(path):
             summary = "arm64 iOS %s, %d KB executable" % (minos, len(data) // 1024)
         except (ValueError, struct.error) as e:
             problems.append("executable: %s" % e)
+
+    # N3: the root helper the app spawns with the persona attributes: plain 0755, never setuid (docs/native.md "3. Root").
+    if HELPER not in files:
+        problems.append("no helper at %s" % HELPER[1:])
+    else:
+        i, data = files[HELPER]
+        if i.mode & 0o7777 != 0o755:
+            problems.append("helper mode is %o, want 755 (no setuid)" % (i.mode & 0o7777))
+        try:
+            cpu, sub, ftype, platform, minos, signed = macho_info(data)
+            if (cpu, sub, ftype, platform) != (0x0100000C, 0, 2, 2) or not signed:
+                problems.append("helper is not a signed arm64 iOS executable")
+        except (ValueError, struct.error) as e:
+            problems.append("helper: %s" % e)
+    if APP + "bridge.js" not in files:
+        problems.append("no Cydian.app/bridge.js (the script that sets up cydianNative)")
 
     web = {n[len(APP + "web/"):] for n in files if n.startswith(APP + "web/")}
     for need in ("index.html", "app.js", "style.css", "router.js"):

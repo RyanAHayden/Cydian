@@ -12,7 +12,7 @@ import { getBackend } from "../backend.js";
 import { mediaUrl } from "./depiction.js";
 import { installOptions, sideloaderLink } from "../core/altstore.js";
 import { settings } from "./settings.js";
-import { displayName } from "../core/sources.js";
+import { displayName, githubAvatarUrl } from "../core/sources.js";
 import { compat } from "../core/compat.js";
 import { currentDevice, compatBadge } from "../device.js";
 import { detectMode } from "../core/settings.js";
@@ -113,7 +113,7 @@ export async function renderAltSource(body, route, key) {
   const banner = img(meta.headerURL, "alt-banner");
   if (banner) head.append(banner);
   const id = el("div", "alt-id");
-  const icon = img(meta.iconURL, "alt-icon");
+  const icon = img(meta.iconURL || (source && githubAvatarUrl(source)), "alt-icon"); // F44: GitHub avatar fallback
   if (icon) id.append(icon);
   const names = el("div", "alt-names");
   names.append(el("span", "alt-name", meta.name || (source ? displayName(source) : key)));

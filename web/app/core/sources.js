@@ -108,7 +108,60 @@ export function sourceIconUrls(source) {
 export function displayName(source) {
   if (source.name) return source.name;
   if (source.origin) return source.origin;
+  const gh = githubRepo(source.uri);
+  if (gh) return gh.user;
   try { return new URL(source.uri).hostname.toLowerCase(); } catch { return source.uri; }
+}
+
+// F44: the GitHub user and repo a source URL is hosted under, or null. The four shapes:
+//   github.com/<user>/<repo>/raw/...  and  github.com/<user>/<repo>/releases/.../download/...
+//   raw.githubusercontent.com/<user>/<repo>/...
+//   <user>.github.io/<repo>/...  (repo null for a file at the root: the user's <user>.github.io site)
+// The user keeps the case the URL has (FIZL0 on github.com; a github.io host is always lower case).
+const GH_RESERVED = new Set(["orgs", "settings", "marketplace", "sponsors", "topics", "features", "login", "apps"]);
+export function githubRepo(url) {
+  let u;
+  try { u = new URL(String(url ?? "").trim()); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  const host = u.hostname.toLowerCase();
+  const parts = u.pathname.split("/").filter(Boolean).map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
+  const name = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+  if (host === "github.com" || host === "www.github.com" || host === "raw.githubusercontent.com") {
+    const [user, repo] = parts;
+    if (!user || !repo || !name.test(user) || (host !== "raw.githubusercontent.com" && GH_RESERVED.has(user.toLowerCase()))) return null;
+    return { user, repo: repo.replace(/\.git$/, "") };
+  }
+  const io = /^([a-z0-9][a-z0-9-]{0,38})\.github\.io$/.exec(host);
+  if (io) {
+    // A first segment that is the file itself (fizl0.github.io/source.json) is no repo.
+    const repo = parts.length > 1 ? parts[0] : null;
+    return { user: io[1], repo };
+  }
+  return null;
+}
+
+// F44: the row's subtitle: "github.com/<user>/<repo>" for a GitHub-hosted source (just "<user>.github.io" for a
+// user site's root), else the URL as given.
+export function sourceSubtitle(source) {
+  const gh = githubRepo(source?.uri);
+  if (!gh) return source?.uri ?? "";
+  return gh.repo ? `github.com/${gh.user}/${gh.repo}` : `${gh.user.toLowerCase()}.github.io`;
+}
+
+// F44: the GitHub avatar for a GitHub-hosted source (github.com redirects to avatars.githubusercontent.com), or
+// null. It goes through backend.assetUrl like every other icon, so the site's proxy caches it.
+export function githubAvatarUrl(source) {
+  const gh = githubRepo(source?.uri);
+  return gh ? `https://github.com/${encodeURIComponent(gh.user)}.png?size=120` : null;
+}
+
+// F44: where a source's icon may be, in order: an AltStore source's own iconURL, an APT source's CydiaIcon.png
+// places (sourceIconUrls), then the GitHub avatar when the source is hosted there. An AltStore source that names
+// an icon gets no avatar after it; a CydiaIcon.png that 404s does (the 404 is the "no icon of its own").
+export function sourceIcons(source) {
+  const avatar = githubAvatarUrl(source);
+  if (isAltKey(source?.key)) return source.iconURL ? [source.iconURL] : avatar ? [avatar] : [];
+  return [...sourceIconUrls(source), ...(avatar ? [avatar] : [])];
 }
 
 // Cydia's order: names that start with a letter first, then a compare without case or diacritics.

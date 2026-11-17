@@ -22,3 +22,6 @@
 
 ### Parked
 - [x] **F12** (follow-up, later) Widget-only IPA (WidgetKit 'n upgrades' + local notifications), only if F10's Web Push proves unreliable on real phones. Needs an explicit App ID with Push/App Groups and its own ad hoc profile in sidedrop. See docs/ipa.md | files: ipa/** — dropped: superseded: the IPA build (I2-I3) and N8's widget cover it
+
+### Native jailbreak app (shape decided: docs/native.md)
+- [x] **T3** Cydian's own iOS SDK setup, so the build depends on no other project: tools/ios-sdk.sh of our own design that extracts iPhoneOS.sdk from an Xcode .xip on Linux (xar/pbzx or equivalent) and fixes what lld needs (arm64e slices in .tbd stubs, per docs/native.md '2. Building on Linux'). The native build finds the SDK only through $IOS_SDK and says how to get one when it's missing; no default path into another project's folders. t: the script's steps on a small fixture archive; the build fails with a clear message when $IOS_SDK is unset. | files: tools/ios-sdk.sh, tools/test_ios_sdk.py

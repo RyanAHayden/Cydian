@@ -28,8 +28,8 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // Still to come, by the setting that waits on it: "update-check" (Check for updates), "cellular" (Use cellular
 // data, app only), "notifications" (Notifications), "badge" (App icon badge), "auto-install" (the three
 // automatic-install rows), "rollback" (Keep previous versions), "resign" (Re-sign reminder, F14).
-// "compat": Works on My Phone (F17).
-export const FEATURES = new Set(["appearance", "sources", "holds", "compat"]);
+// "compat": Works on My Phone (F17). "device": Device type and Sideloader (F37).
+export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device"]);
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
@@ -37,6 +37,7 @@ const onOff = [{ value: false, label: "Off" }, { value: true, label: "On" }];
 
 export const SECTIONS = [
   { id: "appearance", title: "Appearance" },
+  { id: "device", title: "Device" },
   { id: "sources", title: "Sources" },
   { id: "compat", title: "Works on My Phone" },
   { id: "updates", title: "Updates" },
@@ -59,19 +60,46 @@ export const SETTINGS = [
     label: "Allow Zoom", options: onOff, footer: "Lets you pinch to zoom, for screenshots. Off, the app stays at its own size.",
   },
   {
-    key: "arch", section: "sources", kind: "list", feature: "sources", modes: ["site", "jailbreak"], default: DEFAULT_ARCH,
+    // F37: what kind of iPhone this is. The site only: the jailbreak app takes it from the bridge (deviceType) and
+    // the sideload build is always Not Jailbroken. Not Jailbroken hides APT sources, tweaks and themes everywhere
+    // and lists AltStore-style apps (F9); an arch here is also written to `arch`, where backend.js getArch() reads it.
+    key: "device", section: "device", kind: "list", feature: "device", modes: ["site"], default: "none",
+    label: "Device",
+    options: [
+      { value: "none", label: "Not Jailbroken", subtitle: "Apps from AltStore-style sources" },
+      { value: "iphoneos-arm64", label: "Jailbroken (Rootless)", subtitle: "iphoneos-arm64: Dopamine, palera1n rootless" },
+      { value: "iphoneos-arm", label: "Jailbroken (Rootful)", subtitle: "iphoneos-arm: palera1n rootful, older jailbreaks" },
+    ],
+    footer: "Not Jailbroken lists apps from AltStore-style sources. Jailbroken also lists tweaks and themes from APT sources, built for this architecture.",
+  },
+  {
+    // F37: where an app's GET goes on a phone without a jailbreak. Never through a server of ours. The site only:
+    // the sideload build signs and installs on the phone itself (F14).
+    key: "sideloader", section: "device", kind: "list", feature: "device", modes: ["site"], default: "feather",
+    label: "Sideloader",
+    options: [
+      { value: "feather", label: "Feather", subtitle: "Signs on the phone with your certificate" },
+      { value: "altstore", label: "AltStore", subtitle: "Signs with your Apple ID" },
+      { value: "sidestore", label: "SideStore", subtitle: "Signs with your Apple ID, no computer" },
+      { value: "download", label: "Download .ipa", subtitle: "Save the file and open it yourself" },
+    ],
+    footer: "GET on an app opens it in this app, which signs and installs it on your iPhone.",
+  },
+  {
+    // The architecture APT packages are listed for, kept for backend.js getArch() (`cydian.arch`). No row of its
+    // own since F37: Device sets it on the site, the bridge in the jailbreak app.
+    key: "arch", section: "sources", kind: "list", feature: "sources", modes: [], default: DEFAULT_ARCH,
     label: "Architecture",
     options: [
       { value: "iphoneos-arm64", label: "Rootless", subtitle: "iphoneos-arm64: Dopamine, palera1n rootless" },
       { value: "iphoneos-arm", label: "Rootful", subtitle: "iphoneos-arm: palera1n rootful, older jailbreaks" },
     ],
-    footer: "Packages are listed for this architecture.",
   },
   {
     key: "worksOnMyPhone", section: "compat", kind: "toggle", feature: "compat", modes: ALL, default: true,
     label: "Works on My Phone", options: onOff,
     footer: (mode) => "Hides packages that say they don't work on this iPhone's iOS version or jailbreak type"
-      + (mode === "jailbreak" ? "." : " (Sources > Architecture).") + " Packages that don't say are kept.",
+      + (mode === "site" ? " (set under Device)." : ".") + " Packages that don't say are kept.",
   },
   {
     // F35: the check, X or ? beside every package in lists, Search and the package page.
@@ -154,6 +182,18 @@ const byKey = new Map(SETTINGS.map((d) => [d.key, d]));
 
 // The architecture list in core/apt.js is the source of truth; the options above must cover it.
 for (const a of ARCHES) if (!byKey.get("arch").options.some((o) => o.value === a)) throw new Error(`arch ${a} has no option`);
+for (const a of ARCHES) if (!byKey.get("device").options.some((o) => o.value === a)) throw new Error(`arch ${a} has no device type`);
+
+// F37: the device types. "none" is an iPhone without a jailbreak; the others are the APT architecture it installs.
+export const NOT_JAILBROKEN = "none";
+export const DEVICE_TYPES = byKey.get("device").options.map((o) => o.value);
+
+// The jailbreak app's type from its bridge: `cydianNative.arch` ("iphoneos-arm64" | "iphoneos-arm") or
+// `cydianNative.jailbreak` ("rootless" | "rootful"), whichever the shell detected; null when it says neither.
+export function bridgeArch(native) {
+  if (ARCHES.includes(native?.arch)) return native.arch;
+  return { rootless: "iphoneos-arm64", rootful: "iphoneos-arm" }[native?.jailbreak] ?? null;
+}
 
 // The mode: the app's bridge says which build is running (I2 sets `cydianNative.mode`); a bridge without one is
 // the N1 jailbreak shell; no bridge is the site.
@@ -184,9 +224,17 @@ function safeStorage(storage) {
 // `helper` (jailbreak mode only): runs cydian-helper with the given words and resolves to { code, stdout }, e.g.
 // helper(["hold", "com.foo"]). The app's bridge provides it as `cydianNative.helper` (N3); without one the holds
 // stay a list on the device, as in the other modes.
-export function createSettings({ storage = globalThis.localStorage, mode = "site", features = FEATURES, helper } = {}) {
+// `native` (jailbreak mode): the bridge, for the detected jailbreak type (bridgeArch).
+export function createSettings({ storage = globalThis.localStorage, mode = "site", features = FEATURES, helper, native = null } = {}) {
   if (!MODES.includes(mode)) throw new Error(`unknown mode ${mode}`);
   const store = safeStorage(storage);
+  // F37: a site visitor who picked an Architecture before Device existed keeps it as their device type; the app's
+  // detected type becomes `arch` for getArch().
+  const detected = mode === "jailbreak" ? bridgeArch(native) : null;
+  if (detected) store.set(PREFIX + "arch", detected);
+  if (mode === "site" && store.get(PREFIX + "device") == null && ARCHES.includes(store.get(PREFIX + "arch"))) {
+    store.set(PREFIX + "device", store.get(PREFIX + "arch"));
+  }
   const listeners = new Set();
 
   function def(key) {
@@ -211,6 +259,16 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     if (!hit) throw new Error(`${key}: ${JSON.stringify(value)} is not one of its options`);
     store.set(PREFIX + key, String(value));
     notify(key, value);
+    // Device (F37) carries the architecture: getArch() and everything listening for "arch" follow it.
+    if (key === "device" && ARCHES.includes(value) && get("arch") !== value) set("arch", value);
+  }
+
+  // F37: "none" (no jailbreak) or the architecture APT packages are listed for. Site: the Device setting. Jailbreak
+  // app: what the bridge detected, else the stored architecture. Sideload build: always "none".
+  function deviceType() {
+    if (mode === "sideload") return NOT_JAILBROKEN;
+    if (mode === "jailbreak") return detected ?? get("arch");
+    return get("device");
   }
 
   function readHolds() {
@@ -302,6 +360,8 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     set,
     holds,
     hiddenSections,
+    deviceType,
+    jailbroken: () => deviceType() !== NOT_JAILBROKEN,
     defaultOf: (key) => defaultOf(def(key)),
     onChange(f) { listeners.add(f); return () => listeners.delete(f); },
     isShown: (key) => { const d = byKey.get(key); return Boolean(d && shown(d)); },

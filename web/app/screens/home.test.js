@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { stateTile, nav, CURATED_SOURCES } from "./home.js";
+import { stateTile, nav, CURATED_SOURCES, deviceHint, DEVICE_HINT } from "./home.js";
 
 const src = (extra = {}) => ({ key: "deb:https://a/:./", uri: "https://a/", ...extra });
 
@@ -28,4 +28,12 @@ test("Home pages: titles below the root, and curated sources are flat repos with
     assert.match(s.uri, /^https:\/\/.+\/$/);
     assert.equal(s.key, `deb:${s.uri}:./`);
   }
+});
+
+test("F37: Home's hint shows while Not Jailbroken and taps through to Settings > Device", () => {
+  assert.deepEqual(deviceHint("none"), { text: DEVICE_HINT, href: "#/settings/device" });
+  assert.equal(DEVICE_HINT, "Showing apps for iPhones without a jailbreak. Jailbroken? Settings > Device.");
+  assert.equal(deviceHint("iphoneos-arm64"), null);
+  assert.equal(deviceHint("iphoneos-arm"), null);
+  assert.equal(deviceHint("none", "sideload"), null, "the sideload build has no choice to make");
 });

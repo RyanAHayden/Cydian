@@ -15,6 +15,7 @@ import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { sourceKey } from "../core/sources.js";
+import { settings } from "./settings.js";
 
 export const title = "Home";
 
@@ -46,6 +47,15 @@ export function stateTile({ sources = null, upgrades = null } = {}) {
   }
   if (upgrades === 0) return { kind: "current", label: "Everything Up to Date", href: format({ tab: "changes" }) };
   return { kind: "changes", label: "See What's New", href: format({ tab: "changes" }) };
+}
+
+// F37: the one-line hint Home shows while Settings > Device is Not Jailbroken, or null. `type` is deviceType().
+export const DEVICE_HINT = "Showing apps for iPhones without a jailbreak. Jailbroken? Settings > Device.";
+export function deviceHint(type, mode = "site") {
+  if (type !== "none") return null;
+  // The sideload build is always Not Jailbroken: nothing to change there, so no hint.
+  if (mode === "sideload") return null;
+  return { text: DEVICE_HINT, href: format({ tab: "settings", path: ["device"] }) };
 }
 
 export function nav(route, ctx) {
@@ -180,6 +190,20 @@ function renderRoot(body) {
   nod.append(cydia);
   words.append(nod);
   head.append(icon, words);
+  const hintBox = el("div", "home-hint-box");
+  const drawHint = () => {
+    const h = deviceHint(settings.deviceType(), settings.mode);
+    if (!h) { hintBox.replaceChildren(); return; }
+    const a = el("a", "home-hint", h.text);
+    a.href = h.href;
+    hintBox.replaceChildren(a);
+  };
+  drawHint();
+  const offHint = settings.onChange((key) => {
+    if (key !== "device") return;
+    if (!hintBox.isConnected) { offHint(); return; }
+    drawHint();
+  });
 
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));
   state.tile = stateRow.querySelector("a");
@@ -187,6 +211,7 @@ function renderRoot(body) {
 
   home.append(
     head,
+    hintBox,
     tileRow("pair",
       tile({ label: "GitHub", href: REPO_URL, glyph: "github", external: true }),
       tile({ label: "Sources", href: format({ tab: "sources" }), glyph: "sources" })),
@@ -215,9 +240,11 @@ function renderHelp(body) {
   body.append(wrap(grouped([
     {
       header: "Which Jailbreak",
-      rows: [{ label: "Rootless", detail: "iOS 15 and later" }, { label: "Rootful", detail: "older, or palera1n" }],
-      footer: "Cydian lists packages built for rootless jailbreaks (iphoneos-arm64) unless Settings says the "
-        + "phone is rootful (iphoneos-arm). A package built for the other kind will not install.",
+      rows: [{ label: "Not Jailbroken", detail: "apps only" }, { label: "Rootless", detail: "iOS 15 and later" },
+        { label: "Rootful", detail: "older, or palera1n" }],
+      footer: "On a phone without a jailbreak Cydian lists apps from AltStore-style sources, installed with a "
+        + "sideloader. Set Settings > Device to Jailbroken to list tweaks and themes built for rootless "
+        + "(iphoneos-arm64) or rootful (iphoneos-arm) jailbreaks. A package built for the other kind will not install.",
     },
     {
       header: "Upgrading",

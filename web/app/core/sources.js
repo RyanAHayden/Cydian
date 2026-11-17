@@ -292,3 +292,12 @@ export function sourceCalls(backend, opts = {}) {
     },
   };
 }
+
+// F37: the sources a device type shows. Not Jailbroken ("none") sees AltStore-style sources only (keys `alt:`,
+// core/altstore.js); a jailbroken type sees every source. Returns { shown, hidden: count of APT sources left out }.
+export function sourcesFor(list, type) {
+  const all = Array.isArray(list) ? list : [];
+  if (type !== "none") return { shown: all, hidden: 0 };
+  const shown = all.filter((s) => String(s?.key ?? "").startsWith("alt:"));
+  return { shown, hidden: all.length - shown.length };
+}

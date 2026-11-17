@@ -10,7 +10,8 @@ import { format } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
 import { getBackend } from "../backend.js";
 import { mediaUrl } from "./depiction.js";
-import { installOptions } from "../core/altstore.js";
+import { installOptions, sideloaderLink } from "../core/altstore.js";
+import { settings } from "./settings.js";
 import { displayName } from "../core/sources.js";
 import { compat } from "../core/compat.js";
 import { currentDevice, compatBadge } from "../device.js";
@@ -70,10 +71,18 @@ function card(children, cls = "") {
 // The install rows for a version: itms-services where the source gives a signed link, else open the source in a
 // sideloader, and the raw IPA. `opener` opens a URL outside the app (window.open on the site). `onInstall` runs
 // first on any of them (F30: the Installed tab's record).
-export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {}) {
+// F37: `sideloader` (Settings > Sideloader; null in the jailbreak app) puts a Get row first, handing the IPA to it.
+export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {},
+  sideloader = settings.isShown("sideloader") ? settings.get("sideloader") : null) {
   const o = installOptions(version, sourceUrl);
   const rows = [];
   if (o.itms) rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
+  const get = !o.itms && sideloader ? sideloaderLink(version, sideloader) : null;
+  if (get) {
+    rows.push(get.name
+      ? { label: "Get", subtitle: `Opens in ${get.name}, which signs and installs it`, onClick: () => { onInstall(); location.href = get.url; } }
+      : { label: "Get", subtitle: "Downloads the .ipa", onClick: () => { onInstall(); opener(get.url); } });
+  }
   for (const s of o.open) rows.push({ label: `Open in ${s.name}`, onClick: () => { onInstall(); location.href = s.url; } });
   if (o.download) rows.push({ label: "Download IPA", subtitle: decodeURIComponent(o.download.split("/").pop() || ""), onClick: () => { onInstall(); opener(o.download); } });
   return { rows, options: o };

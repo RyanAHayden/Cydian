@@ -10,7 +10,8 @@ import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
-import { displayName, sourceIconUrls } from "../core/sources.js";
+import { displayName, sourceIconUrls, sourcesFor } from "../core/sources.js";
+import { settings } from "./settings.js";
 import { isAltKey } from "../core/altstore.js";
 
 export const title = "Sources";
@@ -43,6 +44,9 @@ function grabButtons(e) {
   state.right = item.querySelector(".nav-right .bar-button");
 }
 
+// Device (F37) changes which sources show: redraw the list if it is on screen.
+settings.onChange((key) => { if (key === "device" && state.body?.isConnected) draw(); });
+
 export function render(el, route, ctx) {
   if (route.path.length) {
     browse.render(el, route, ctx);
@@ -74,7 +78,8 @@ function draw() {
     return;
   }
   const backend = getBackend();
-  const list = state.sources;
+  // F37: Not Jailbroken shows AltStore sources only; the APT ones stay in the list, out of sight.
+  const { shown: list, hidden } = sourcesFor(state.sources, settings.deviceType());
   const ul = plain([{
     rows: [{
       label: "All Sources",
@@ -100,6 +105,11 @@ function draw() {
   el.replaceChildren(ul);
   if (!list.length) {
     el.append(Object.assign(document.createElement("p"), { className: "empty", textContent: "No sources. Tap Edit, then Add." }));
+  }
+  if (hidden) {
+    const n = `${hidden} APT ${hidden === 1 ? "source is" : "sources are"}`;
+    el.append(Object.assign(document.createElement("p"), { className: "group-footer sources-hidden",
+      textContent: `${n} hidden: they list tweaks and themes for jailbroken iPhones. Jailbroken? Settings > Device.` }));
   }
 }
 

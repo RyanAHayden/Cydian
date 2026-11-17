@@ -63,3 +63,12 @@ html[data-theme="dark"] .home-links .table.grouped { background: var(--table); b
 .home-links .cell + .cell { border-top-color: #999; }
 .home-links .cell + .cell > .cell-inner { box-shadow: none; }
 html[data-theme="dark"] .home-links .cell + .cell { border-top-color: var(--divider); }
+
+/* F37: the Not Jailbroken hint under the welcome, in the grouped footer's type (ios6.css .group-footer); a tap opens
+   Settings > Device. Empty box when jailbroken. */
+.home-hint-box:empty { display: none; }
+.home-hint-box { margin: -3px 20px 10px; text-align: center; }
+.home-hint {
+  font-size: 15px; line-height: 19px; color: var(--head); text-shadow: var(--emboss);
+  text-decoration: none; -webkit-tap-highlight-color: transparent;
+}

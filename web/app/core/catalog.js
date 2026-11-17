@@ -25,13 +25,16 @@
 //                                             featured: [row], ... } or null
 //   c.setDevice(device, { filter })        -> "Works on my phone" (F17, core/compat.js): every row gets `compat`,
 //                                             its code for `device`; with filter on (the default) rows that can't
-//                                             work drop out of sections, list, search and author like hidden ones
+//                                             work drop out of sections, list, search and author like hidden ones.
+//                                             A device with jailbreak "none" (F37, Not Jailbroken) sees AltStore
+//                                             sources only: APT sources' packages drop out of everything, filter or
+//                                             not (lists, Search, package pages, installed rows and upgrades)
 //
 // A row is the slim record lists draw: { id, name, short, version, section, icon, key, author, compat }.
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
 import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
 import { compat, compatCode, isIncompatible, normalizeDevice, needText } from "./compat.js";
-import { parseAltSource, appStanza } from "./altstore.js";
+import { parseAltSource, appStanza, isAltKey } from "./altstore.js";
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -150,6 +153,8 @@ export function createCatalog() {
   let device = null;         // F17: the device rows are judged for (core/compat.js), or null before one is set
   let fitFilter = false;     // and whether rows that can't work on it are left out
   const fitting = new Map(); // key -> sorted rows that can work on the device (cache)
+  let appsOnly = false;       // F37: the device isn't jailbroken: only AltStore sources (`alt:` keys) count
+  const counts = (key) => !appsOnly || isAltKey(key);
   const judge = (e) => { e.row.compat = device ? compatCode(e.stanza, device) : null; };
 
   function load(key, text, root, arch = DEFAULT_ARCH) {
@@ -214,6 +219,8 @@ export function createCatalog() {
   function setDevice(next, { filter = true } = {}) {
     device = next ? normalizeDevice(next) : null;
     fitFilter = Boolean(device && filter);
+    const apps = device?.jailbreak === "none";
+    if (apps !== appsOnly) { appsOnly = apps; merged = null; sorted.clear(); }
     let no = 0;
     for (const { byId } of sources.values()) for (const e of byId.values()) { judge(e); if (isIncompatible(e.row.compat)) no++; }
     shown.clear();
@@ -230,10 +237,11 @@ export function createCatalog() {
   // id -> entry for a source, or the merge of all of them: the newest version wins; on a tie, the first source
   // loaded keeps it (apt's default: equal pins, first listed).
   function entries(key) {
-    if (key !== ALL) return sources.get(key)?.byId ?? new Map();
+    if (key !== ALL) return (counts(key) && sources.get(key)?.byId) || new Map();
     if (merged) return merged;
     merged = new Map();
-    for (const { byId } of sources.values()) {
+    for (const [k, { byId }] of sources) {
+      if (!counts(k)) continue;
       for (const [id, e] of byId) {
         const cur = merged.get(id);
         if (!cur || compareVersions(cur.stanza.version, e.stanza.version) < 0) merged.set(id, e);
@@ -341,6 +349,7 @@ export function createCatalog() {
     if (!e) return installedOnly(id);
     const others = [];
     for (const [k, { byId }] of sources) {
+      if (!counts(k)) continue;
       const o = byId.get(id);
       if (o) others.push({ key: k, version: o.stanza.version });
     }

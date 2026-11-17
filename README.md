@@ -47,20 +47,22 @@ One-time setup on the NAS (TrueNAS SCALE, Docker and git are built in):
 2. Create `/mnt/SSD/cydian/.env`:
    ```
    CYDIAN_PORT=8095
-   CYDIAN_PROXY_HOPS=1
+   CYDIAN_PROXY_HOPS=2
    ```
-   `CYDIAN_PORT` is the host port (TrueNAS's own nginx holds 8080). With one proxy (Nginx Proxy Manager) in
-   front, the app trusts only the last `X-Forwarded-For` entry, so a visitor can't spoof it. Add one hop for
-   every further proxy (e.g. Cloudflare's orange cloud).
+   `CYDIAN_PORT` is the host port (TrueNAS's own nginx holds 8080). Two proxies sit in front (Cloudflare's orange
+   cloud, then Nginx Proxy Manager), so the app trusts only the visitor address Cloudflare added to
+   `X-Forwarded-For`. Use `1` without Cloudflare.
 3. First deploy, as root: `/mnt/SSD/cydian/deploy.sh`. It should end with `healthy at <commit>`
    (`curl http://127.0.0.1:8095/healthz` answers `ok`).
 4. Cron: **System → Advanced Settings → Cron Jobs → Add**. Command `/mnt/SSD/cydian/deploy.sh`, user `root`,
    every 5 minutes (`*/5 * * * *`). Leave "Hide Standard Output/Error" unticked so deploys and failures get
    emailed. Quiet runs print nothing.
-5. DNS (Namecheap): A records `@` and `www` → the home IP; the router already forwards 80/443 to the NAS.
+5. DNS (Cloudflare, nameservers set at Namecheap): A records `@` and `www` → the home IP, grey cloud at first;
+   the router already forwards 80/443 to the NAS.
 6. Nginx Proxy Manager (`http://<NAS>:81`): **Proxy Host** `cydian.dev`, `www.cydian.dev` → `http` `<NAS LAN
    IP>` `8095`, Websockets off; **SSL**: request a Let's Encrypt certificate, Force SSL, HTTP/2. `.dev` is
-   HSTS-preloaded, so the site only works over HTTPS.
+   HSTS-preloaded, so the site only works over HTTPS. Then turn both records to Proxied (orange cloud),
+   SSL/TLS mode **Full (strict)**; this hides the home IP.
 7. Check from outside: `https://cydian.dev/healthz` answers `ok`. `./deploy.sh --status` warns if
    `CYDIAN_PROXY_HOPS` is missing from `.env`.
 

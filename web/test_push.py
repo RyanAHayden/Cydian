@@ -213,6 +213,67 @@ class Check(unittest.TestCase):
         self.assertEqual(self.store.expire(1001), 1)
 
 
+class DeviceMode(unittest.TestCase):
+    """F34: the lists stay on the phone; the server sends a bare daily "check" push."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = push.Store(Path(self.tmp.name) / "push.sqlite")
+        self.keys = push.vapid_keys(Path(self.tmp.name))
+        self.fetcher = FakeFetcher({REPO: stanza("foo", "1.1"), DIST_DIR: stanza("bar", "2.0")})
+        self.svc = FakePushService()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_device_subscription_keeps_no_lists(self):
+        c = push.clean_subscription(body(mode="device"))
+        self.assertEqual((c["mode"], c["sources"], c["installed"], c["holds"]), ("device", [], [], []))
+        self.assertEqual(c["endpoint"], ENDPOINT)
+        self.assertEqual(push.clean_subscription(body())["mode"], "server")
+        with self.assertRaises(push.Invalid):
+            push.clean_subscription(body(mode="cloud"))
+
+    def test_daily_run_checks_server_subs_and_nudges_device_subs(self):
+        server, _ = self.store.upsert(None, push.clean_subscription(body()), "https://cydian.example", 1000)
+        device, _ = self.store.upsert(None, push.clean_subscription(body(mode="device")), "https://cydian.example", 1000)
+        res = push.check(self.store, self.fetcher, None, keys=self.keys, poster=self.svc, t=2000)
+        self.assertEqual(list(res), [server["id"]])  # the diff never sees the device subscriber
+        self.assertEqual(len(self.svc.sent), 1)
+        nudged = push.check_device(self.store, keys=self.keys, poster=self.svc, t=2000)
+        self.assertEqual(nudged, {device["id"]: {"count": None, "pushed": True}})
+        self.assertEqual(len(self.svc.sent), 2)
+        # every day, whatever changed: only the phone knows
+        push.check_device(self.store, keys=self.keys, poster=self.svc, t=3000)
+        self.assertEqual(len(self.svc.sent), 3)
+        d = self.store.get(device["id"])
+        self.assertEqual((d["seq"], d["upgrades"], d["push_status"]), (2, None, "201"))
+        self.assertEqual(push.check_message("sid", 3), {"type": "check", "url": "/#/changes", "id": "sid", "seq": 3})
+
+    def test_switching_to_device_forgets_the_server_side_upgrades(self):
+        s, _ = self.store.upsert(None, push.clean_subscription(body()), "https://cydian.example", 1000)
+        push.check(self.store, self.fetcher, None, keys=self.keys, poster=self.svc, t=2000)
+        self.assertEqual(len(self.store.get(s["id"])["upgrades"]), 1)
+        d, changed = self.store.upsert(s["id"], push.clean_subscription(body(mode="device")), "https://cydian.example", 3000)
+        self.assertTrue(changed)
+        self.assertEqual((d["id"], d["mode"], d["upgrades"], d["installed"], d["sources"]), (s["id"], "device", None, [], []))
+        self.assertIn("checks for upgrades on the phone", push.feed_xml(d, "https://x/feed/t", "https://x/"))
+        back, changed = self.store.upsert(s["id"], push.clean_subscription(body()), "https://cydian.example", 4000)
+        self.assertEqual((back["mode"], changed), ("server", True))
+
+    def test_old_database_gets_the_new_columns(self):
+        import sqlite3
+        path = Path(self.tmp.name) / "old.sqlite"
+        db = sqlite3.connect(path)
+        db.executescript(push.SCHEMA)
+        db.execute("INSERT INTO subs (id, feed, arch, sources, installed, holds, created, seen) "
+                   "VALUES ('a', 'f', 'iphoneos-arm64', '[]', '[]', '[]', 1, 1)")
+        db.commit()
+        db.close()
+        old = push.Store(path).get("a")
+        self.assertEqual((old["mode"], old["check_ms"], old["check_outcome"]), ("server", None, None))
+
+
 class Endpoints(unittest.TestCase):
     def setUp(self):
         from flask import Flask
@@ -265,6 +326,27 @@ class Endpoints(unittest.TestCase):
         self.c.post("/api/push/unsubscribe", json={"id": info["id"]})
         self.assertEqual(self.store.count(), 0)
         self.assertEqual(self.c.post("/api/push/status", json={"id": info["id"]}).status_code, 404)
+
+    def test_device_mode_test_push_and_check_ack(self):
+        info = self.c.post("/api/push/subscribe", json=body(mode="device")).get_json()
+        self.assertEqual(info["mode"], "device")
+        self.assertEqual(self.store.get(info["id"])["installed"], [])
+        self.assertEqual(self.c.post("/api/push/test", json={"id": info["id"]}).status_code, 200)
+        self.assertEqual(len(self.svc.sent), 1)
+        self.c.post("/api/push/ack", json={"id": info["id"], "seq": 1, "ms": 3140, "outcome": "ok"})
+        st = self.c.post("/api/push/status", json={"id": info["id"]}).get_json()
+        self.assertEqual((st["checkMs"], st["checkOutcome"]), (3140, "ok"))
+        # junk in an ack is ignored, not stored
+        self.c.post("/api/push/ack", json={"id": info["id"], "ms": "lots", "outcome": "<script>"})
+        st = self.c.post("/api/push/status", json={"id": info["id"]}).get_json()
+        self.assertEqual((st["checkMs"], st["checkOutcome"]), (3140, "ok"))
+        self.assertIsNotNone(st["delivered"])
+
+    def test_app_serves_the_module_worker(self):
+        import app as A
+        with A.app.test_client().get("/sw-device.js") as r:
+            self.assertEqual((r.status_code, r.mimetype), (200, "text/javascript"))
+            self.assertIn(b'import "./sw.js"', r.data)
 
     def test_bad_requests(self):
         self.assertEqual(self.c.post("/api/push/subscribe", json=body(arch="x")).status_code, 400)

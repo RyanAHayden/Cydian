@@ -9,6 +9,12 @@ The upgrade diff and the crypto run in node (push.mjs): the diff with the browse
 crypto because Python's stdlib has no P-256 or AES-GCM. Every repo fetch goes through fetch.py's SSRF guard, and
 pushes only go to the known push services (PUSH_HOSTS).
 
+F34 adds a second mode, "device" (Settings: Check on This Device): the server keeps only the push subscription,
+no sources and no installed list, and the daily run sends those subscribers a bare {"type": "check"} push
+(check_message); the phone's service worker (app/sw-device.js, app/device-check.js) fetches and diffs on the
+device and shows the notification itself. Its delivery ack reports how long that took (check_ms), which is how
+iOS's push-handler time limit gets measured in the field.
+
     python push.py run       check everyone now and push "n upgrades" where something new showed up
     python push.py daemon    run once a day at CYDIAN_PUSH_HOUR (UTC); compose runs this as its own service
 
@@ -113,6 +119,13 @@ def clean_subscription(body: dict) -> dict:
     if arch not in ("iphoneos-arm64", "iphoneos-arm"):
         raise Invalid("unknown arch")
     out["arch"] = arch
+    mode = body.get("mode", "server")
+    if mode not in MODES:
+        raise Invalid("unknown mode")
+    out["mode"] = mode
+    if mode == "device":  # the lists stay on the phone: nothing of them is kept here, whatever was sent
+        out["sources"], out["installed"], out["holds"] = [], [], []
+        return out
     sources = body.get("sources")
     if not isinstance(sources, list) or len(sources) > MAX_SOURCES:
         raise Invalid(f"sources must be a list of at most {MAX_SOURCES}")
@@ -155,6 +168,10 @@ CREATE TABLE IF NOT EXISTS subs (
 );
 """
 JSON_COLS = ("sources", "installed", "holds", "upgrades", "notified")
+MODES = ("server", "device")
+ACK_OUTCOMES = ("ok", "timeout", "error", "unsupported")  # how an on-device check ended (app/device-check.js)
+# Columns added after F10's schema, added to an existing push.sqlite on open.
+ADDED_COLS = {"mode": "TEXT NOT NULL DEFAULT 'server'", "check_ms": "INTEGER", "check_outcome": "TEXT"}
 
 
 class Store:
@@ -164,6 +181,10 @@ class Store:
         with self._db() as db:
             db.execute("PRAGMA journal_mode=WAL")
             db.executescript(SCHEMA)
+            have = {r[1] for r in db.execute("PRAGMA table_info(subs)")}
+            for col, decl in ADDED_COLS.items():
+                if col not in have:
+                    db.execute(f"ALTER TABLE subs ADD COLUMN {col} {decl}")
 
     @contextlib.contextmanager
     def _db(self):
@@ -207,24 +228,29 @@ class Store:
 
     def upsert(self, sub_id: str | None, fields: dict, origin: str, t: float):
         """Saves a subscription; returns (row, changed): changed when the check's inputs differ from last time."""
-        inputs = hashlib.sha256(json.dumps([fields["arch"], fields["sources"], fields["installed"], fields["holds"]],
-                                           sort_keys=True).encode()).hexdigest()
+        mode = fields.get("mode", "server")
+        inputs = hashlib.sha256(json.dumps([fields["arch"], fields["sources"], fields["installed"], fields["holds"]]
+                                           + ([mode] if mode != "server" else []), sort_keys=True).encode()).hexdigest()
         enc = {k: json.dumps(v) if k in JSON_COLS else v for k, v in fields.items()}
+        enc["mode"] = mode
         with self._db() as db:
             cur = db.execute("SELECT inputs FROM subs WHERE id = ?", (sub_id,)).fetchone() if sub_id else None
             if cur is None:
                 sub_id = secrets.token_urlsafe(24)
                 db.execute("INSERT INTO subs (id, feed, endpoint, p256dh, auth, origin, arch, sources, installed, "
-                           "holds, inputs, created, seen) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                           "holds, inputs, created, seen, mode) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                            (sub_id, secrets.token_urlsafe(24), enc["endpoint"], enc["p256dh"], enc["auth"], origin,
-                            enc["arch"], enc["sources"], enc["installed"], enc["holds"], inputs, t, t))
+                            enc["arch"], enc["sources"], enc["installed"], enc["holds"], inputs, t, t, enc["mode"]))
                 changed = True
             else:
                 changed = cur["inputs"] != inputs
                 db.execute("UPDATE subs SET endpoint=?, p256dh=?, auth=?, origin=?, arch=?, sources=?, installed=?, "
-                           "holds=?, inputs=?, seen=? WHERE id=?",
+                           "holds=?, inputs=?, seen=?, mode=? WHERE id=?",
                            (enc["endpoint"], enc["p256dh"], enc["auth"], origin, enc["arch"], enc["sources"],
-                            enc["installed"], enc["holds"], inputs, t, sub_id))
+                            enc["installed"], enc["holds"], inputs, t, enc["mode"], sub_id))
+            if mode == "device":  # nothing about the packages stays from a server-mode past either
+                db.execute("UPDATE subs SET upgrades=NULL, notified=NULL, checked=NULL, check_error=NULL WHERE id=?",
+                           (sub_id,))
         return self.get(sub_id), changed
 
     def update(self, sub_id: str, **fields):
@@ -278,6 +304,12 @@ def message(upgrades: list, sub_id: str, seq: int) -> dict:
     n = len(upgrades)
     return {"title": "1 Upgrade" if n == 1 else f"{n} Upgrades", "body": notification_text(upgrades), "count": n,
             "url": "/#/changes", "tag": "cydian-upgrades", "id": sub_id, "seq": seq}
+
+
+def check_message(sub_id: str, seq: int) -> dict:
+    """F34's bare push for a "device" subscriber: no upgrade in it (the server doesn't know them). app/sw.js hands
+    it to sw-device.js, which checks on the phone and shows the notification itself."""
+    return {"type": "check", "url": "/#/changes", "id": sub_id, "seq": seq}
 
 
 # ---- node ---------------------------------------------------------------------------------------------------
@@ -394,7 +426,7 @@ def check(store: Store, fetcher, cache, ids=None, notify: bool = True, keys: dic
     """Checks subscribers (all, or `ids`) for upgrades and files them for the feed. With `notify`, pushes to
     those with something new (decide()). Returns {id: {"count", "pushed"}}."""
     t = now() if t is None else t
-    subs = store.all(ids)
+    subs = [s for s in store.all(ids) if s.get("mode") != "device"]  # those check on the phone (check_device)
     if not subs:
         return {}
     by_arch: dict[str, list] = {}
@@ -435,11 +467,28 @@ def check(store: Store, fetcher, cache, ids=None, notify: bool = True, keys: dic
     return out
 
 
+def check_device(store: Store, keys: dict | None = None, poster=post, t: float | None = None) -> dict:
+    """The daily push for "device" subscribers: a bare check_message to each with an endpoint, every day (only the
+    phone knows whether anything is new). Returns {id: {"count": None, "pushed"}}."""
+    t = now() if t is None else t
+    subs = [s for s in store.all() if s.get("mode") == "device" and s.get("endpoint")]
+    if not subs:
+        return {}
+    items = []
+    for s in subs:
+        store.update(s["id"], seq=s["seq"] + 1)
+        items.append(({**s, "seq": s["seq"] + 1}, check_message(s["id"], s["seq"] + 1)))
+    status = send(store, items, keys or vapid_keys(), poster, t)
+    return {s["id"]: {"count": None, "pushed": isinstance(status.get(s["id"]), int) and 200 <= status[s["id"]] < 300}
+            for s, _ in items}
+
+
 def run_daily(store: Store, fetcher, cache, log=print):
     expired = store.expire(now() - float(os.environ.get("CYDIAN_PUSH_EXPIRE_DAYS", "180")) * 86400)
     if expired:
         log(f"push: expired {expired} subscribers")
     res = check(store, fetcher, cache, notify=True, log=log)
+    res.update(check_device(store))
     log(f"push: pushed {sum(1 for r in res.values() if r['pushed'])} of {len(res)}")
     return res
 
@@ -467,7 +516,8 @@ def feed_xml(sub: dict, self_url: str, site_url: str) -> str:
             f"<content type=\"text\">{escape(name)} ({escape(u['id'])}): {escape(u['installed'])} is installed, "
             f"{escape(u['version'])} is available.</content>"
             "</entry>")
-    status = "Not checked yet." if not sub.get("checked") else (
+    status = "This subscription checks for upgrades on the phone; the server doesn't know them." \
+        if sub.get("mode") == "device" else "Not checked yet." if not sub.get("checked") else (
         f"{len(ups)} upgrade{'s' if len(ups) != 1 else ''} as of {_iso(sub['checked'])}.")
     return ('<?xml version="1.0" encoding="utf-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom">'
             f"<id>{escape(self_url)}</id><title>Cydian Upgrades</title><subtitle>{escape(status)}</subtitle>"
@@ -517,7 +567,8 @@ def create_blueprint(fetcher, cache, store: Store | None = None, background: boo
     def describe(s):
         return {"id": s["id"], "feed": url_for("push.feed", token=s["feed"], _external=True), "push": bool(s["endpoint"]),
                 "checked": s["checked"], "count": None if s["upgrades"] is None else len(s["upgrades"]),
-                "pushed": s["pushed"], "pushStatus": s["push_status"], "delivered": s["delivered"]}
+                "pushed": s["pushed"], "pushStatus": s["push_status"], "delivered": s["delivered"],
+                "mode": s.get("mode") or "server", "checkMs": s.get("check_ms"), "checkOutcome": s.get("check_outcome")}
 
     @bp.get("/api/push/key")
     def key():
@@ -537,7 +588,7 @@ def create_blueprint(fetcher, cache, store: Store | None = None, background: boo
         if (not sub_id or not db().get(sub_id)) and db().count() >= int(os.environ.get("CYDIAN_PUSH_MAX", "10000")):
             return err("this server has all the subscribers it can take", 503)
         s, changed = db().upsert(sub_id, fields, request.host_url.rstrip("/"), now())
-        if changed and background:
+        if changed and background and s.get("mode") != "device":
             threading.Thread(target=_quiet_check, args=(db(), fetcher, cache, s["id"]), daemon=True).start()
         return ok(describe(s))
 
@@ -558,7 +609,14 @@ def create_blueprint(fetcher, cache, store: Store | None = None, background: boo
         s = db().get(str(b.get("id", "")))
         if not s:
             return err("no such subscription", 404)
-        db().update(s["id"], delivered=now())
+        fields = {"delivered": now()}
+        # F34: an on-device check reports how long it ran and how it ended (the push-handler time measurement).
+        ms, outcome = b.get("ms"), b.get("outcome")
+        if isinstance(ms, (int, float)) and not isinstance(ms, bool) and 0 <= ms <= 3_600_000:
+            fields["check_ms"] = int(ms)
+        if outcome in ACK_OUTCOMES:
+            fields["check_outcome"] = outcome
+        db().update(s["id"], **fields)
         return ok({"ok": True})
 
     @bp.post("/api/push/test")
@@ -574,8 +632,11 @@ def create_blueprint(fetcher, cache, store: Store | None = None, background: boo
         seq = s["seq"] + 1
         db().update(s["id"], seq=seq)
         n = len(s["upgrades"] or [])
-        payload = {"title": "Cydian", "body": "Notifications are on. You'll hear about new upgrades once a day.",
-                   "count": n, "url": "/#/settings", "tag": "cydian-test", "id": s["id"], "seq": seq}
+        if s.get("mode") == "device":  # the test is a real on-device check, so it also measures one
+            payload = check_message(s["id"], seq)
+        else:
+            payload = {"title": "Cydian", "body": "Notifications are on. You'll hear about new upgrades once a day.",
+                       "count": n, "url": "/#/settings", "tag": "cydian-test", "id": s["id"], "seq": seq}
         try:
             res = send(db(), [(s, payload)], vapid_keys(), poster)
         except NodeError as e:

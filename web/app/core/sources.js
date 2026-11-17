@@ -37,9 +37,6 @@ export const DEFAULT_ALT_SOURCES = dedupeUrls([
   "https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json",
   "https://source.ryuksign.com/source.json",
   "https://repo.unbound.rip/app-repo.json",
-  "https://github.com/FIZL0/opentennis/releases/latest/download/altstore-source.json",
-  "https://github.com/FIZL0/partyboard/releases/latest/download/altstore-source.json",
-  "https://github.com/FIZL0/openmx/releases/latest/download/altstore-source.json",
 ]);
 
 // URLs -> their parsed hrefs (host lower-cased, a bare host gets its "/"), first of each kept, in order.

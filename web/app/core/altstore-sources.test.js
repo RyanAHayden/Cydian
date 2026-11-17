@@ -25,9 +25,6 @@ const SOURCES = {
   "https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json": ["mountainofpenguin", "YouMod Repo", 1],
   "https://source.ryuksign.com/source.json": ["ryuksign", "RyukSign Source", 2],
   "https://repo.unbound.rip/app-repo.json": ["unbound", "Unbound App Repo", 2],
-  "https://github.com/FIZL0/opentennis/releases/latest/download/altstore-source.json": ["opentennis", "OpenTennis", 1],
-  "https://github.com/FIZL0/partyboard/releases/latest/download/altstore-source.json": ["partyboard", "Party Board", 1],
-  "https://github.com/FIZL0/openmx/releases/latest/download/altstore-source.json": ["openmx", "openMX", 1],
 };
 const parse = (name) => parseAltSource(fixture(name));
 const ids = (p) => p.apps.map((a) => a.bundleIdentifier);
@@ -206,11 +203,11 @@ test("F28: the site seeds the 13 sources once; refresh reads each one's apps; a 
   }
 
   // A source that changes shows it on the next refresh.
-  const { fetchFn: fetch2 } = fakeProxy({ openmx: JSON.stringify({ ...JSON.parse(fixture("openmx")), name: "openMX 2" }) });
+  const { fetchFn: fetch2 } = fakeProxy({ "fizl0-apps": JSON.stringify({ ...JSON.parse(fixture("fizl0-apps")), name: "FIZL0 2" }) });
   b = createHttpBackend({ fetchFn: fetch2, sourceOptions: { indexedDB: idb } });
   await b.refreshSources();
-  const openmx = "https://github.com/FIZL0/openmx/releases/latest/download/altstore-source.json";
-  assert.equal(altOnly(await b.sources()).find((s) => s.uri === openmx).name, "openMX 2");
+  const fizl0 = "https://fizl0.github.io/apps/source.json";
+  assert.equal(altOnly(await b.sources()).find((s) => s.uri === fizl0).name, "FIZL0 2");
 
   await b.removeSource(altKey("https://repository.apptesters.org/"));
   b = createHttpBackend({ fetchFn, sourceOptions: { indexedDB: idb } });

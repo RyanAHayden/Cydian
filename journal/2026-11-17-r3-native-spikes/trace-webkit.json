@@ -1,0 +1,45 @@
+{
+ "webkitgtk 2.54.1 A": {
+  "idleRafHz": 240,
+  "push": {
+   "n": 966,
+   "p50": 4,
+   "p95": 5,
+   "max": 22
+  },
+  "pop": {
+   "n": 668,
+   "p50": 4,
+   "p95": 17,
+   "max": 21
+  },
+  "swipe": {
+   "n": 513,
+   "p50": 16,
+   "p95": 17,
+   "max": 18
+  },
+  "depthAfterSwipes": 2,
+  "autoscroll": {
+   "n": 184,
+   "p50": 17,
+   "p95": 18,
+   "max": 18
+  }
+ },
+ "webkitgtk 2.54.1 B": {
+  "idleRafHz": 240,
+  "showToSecondFrame": {
+   "n": 20,
+   "p50": 17,
+   "p95": 40,
+   "max": 40
+  },
+  "autoscroll": {
+   "n": 180,
+   "p50": 17,
+   "p95": 17,
+   "max": 17
+  }
+ }
+}

@@ -228,10 +228,13 @@ export function appStanza(app, source, ios = null) {
 // manifest, so that is offered only where the source gives one: a downloadURL that already is itms-services://,
 // or a manifestURL (an https .plist). Otherwise the app opens in a sideloader that signs on the phone (AltStore,
 // SideStore, Feather) by adding the source there; `download` is the raw IPA for doing it by hand.
+// AltStore and SideStore take <scheme>://source?url=<encoded url>; Feather takes feather://source/<url>, the URL
+// unencoded after the path (FeatherApp.swift, `validatedScheme(after: "/source/")`), as for /install/ (B6).
+const sourceQuery = (scheme) => (u) => `${scheme}://source?url=${encodeURIComponent(u)}`;
 export const SIDELOADERS = [
-  { name: "AltStore", scheme: "altstore" },
-  { name: "SideStore", scheme: "sidestore" },
-  { name: "Feather", scheme: "feather" },
+  { name: "AltStore", scheme: "altstore", source: sourceQuery("altstore") },
+  { name: "SideStore", scheme: "sidestore", source: sourceQuery("sidestore") },
+  { name: "Feather", scheme: "feather", source: (u) => `feather://source/${u}` },
 ];
 
 export function installOptions(version, sourceUrl) {
@@ -241,7 +244,7 @@ export function installOptions(version, sourceUrl) {
   else if (version?.manifestURL) itms = `itms-services://?action=download-manifest&url=${encodeURIComponent(version.manifestURL)}`;
   const download = httpUrl(dl);
   const url = httpUrl(sourceUrl);
-  const open = url ? SIDELOADERS.map(({ name, scheme }) => ({ name, url: `${scheme}://source?url=${encodeURIComponent(url)}` })) : [];
+  const open = url ? SIDELOADERS.map(({ name, source }) => ({ name, url: source(url) })) : [];
   return { itms, download, open };
 }
 

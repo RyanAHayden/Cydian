@@ -158,7 +158,7 @@ test("altstore: itms-services only where a signed link exists, else sideloader l
   assert.deepEqual(plain.open.map((o) => o.url), [
     "altstore://source?url=https%3A%2F%2Fexample.dev%2Fapps.json",
     "sidestore://source?url=https%3A%2F%2Fexample.dev%2Fapps.json",
-    "feather://source?url=https%3A%2F%2Fexample.dev%2Fapps.json",
+    "feather://source/https://example.dev/apps.json",
   ]);
   assert.equal(installOptions({ downloadURL: "itms-services://?action=download-manifest&url=x" }, URL_).itms, "itms-services://?action=download-manifest&url=x");
 });

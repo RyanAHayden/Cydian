@@ -291,11 +291,13 @@ const alertOK = (title, message) => showAlert({ title, message, buttons: ["OK"] 
 
 // Everything picked at once: the .p12 and profile are checked and saved as if picked alone, then the password is
 // found among any text files (or the empty password), unless the saved one already opens the certificate.
-async function chooseFiles(el, files) {
+async function chooseFiles(el, files, slot) {
   const hide = showHUD("Reading");
   let found;
   try { found = await sortCertFiles(files); } catch { found = { p12: null, profile: null, passwords: [] }; }
   hide();
+  // One file on a button that sorting didn't place: that button's file (its checks below say if it's wrong).
+  if (files.length === 1 && !found.p12 && !found.profile && !found.passwords.length) found[slot] = files[0];
   if (!found.p12 && !found.profile && !found.passwords.length) {
     await alertOK("No Certificate Files", "Choose your .p12, its .mobileprovision and (if you have one) a .txt with the password, or the .zip they came in.");
     return;
@@ -416,16 +418,12 @@ function certificateBlock(el, id) {
   const box = document.createElement("div");
   box.className = "sign-files";
   const head = Object.assign(document.createElement("h3"), { className: "group-header", textContent: "Certificate" });
-  // One pick for all of it: select the .p12, the .mobileprovision and a password .txt together, or the .zip they came
-  // in; each goes where it belongs and the password is found if a text file holds it (core/certfiles.js).
-  const label = id?.p12 && id?.profile ? "Choose Different Files" : "Choose Certificate Files";
-  box.append(head, fileButton(label, ".p12,.pfx,.mobileprovision,.txt,.zip,application/x-pkcs12,application/zip,text/plain", (files) => chooseFiles(el, files)));
-  const names = grouped([{ rows: [
-    { label: "Certificate", detail: id?.p12Name ? "" : "None", subtitle: id?.p12Name ?? null },
-    { label: "Profile", detail: id?.profileName ? "" : "None", subtitle: id?.profileName ?? null },
-  ] }]);
-  names.firstChild.classList.add("sign-names");
-  box.append(names);
+  // A button each, showing the file it holds. Either takes several files at once (or the .zip they came in): each
+  // goes where it belongs and the password is found if a text file holds it (core/certfiles.js), so one pick can do all.
+  const accept = ".p12,.pfx,.mobileprovision,.txt,.zip,application/x-pkcs12,application/zip,text/plain";
+  box.append(head,
+    fileButton(id?.p12Name ? `.p12: ${id.p12Name}` : "Choose .p12 Certificate", accept, (files) => chooseFiles(el, files, "p12")),
+    fileButton(id?.profileName ? `.mobileprovision: ${id.profileName}` : "Choose .mobileprovision", accept, (files) => chooseFiles(el, files, "profile")));
   const ul = document.createElement("ul");
   ul.className = "table grouped";
   const li = document.createElement("li");

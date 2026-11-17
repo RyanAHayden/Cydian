@@ -6,6 +6,9 @@
 //   cydianNative.emit(id, events)                            Swift pushes a batch of stream events here
 //   cydianNative.helper(words, onEvent) -> { code, stdout, stderr }   cydian-helper <words> (core/settings.js holds)
 //   cydianNative.dpkgStatus() -> text | null                 dpkg's status file (catalog.js, F7)
+//   cydianNative.jailbreak: "rootless" | "rootful"           the jailbreak type the shell found (F40), read by
+//                                                            core/settings.js bridgeArch(); Apt.swift fills in
+//                                                            @JAILBREAK@ below, and left as it is it stays unset
 //
 // Request/response is postMessage({ id, method, params, stream }) on the WKScriptMessageHandlerWithReply named
 // "cydian"; its promise resolves with the reply or rejects with Error(message). A message "<code>: <text>" (the
@@ -15,6 +18,7 @@
   const handler = g.webkit && g.webkit.messageHandlers && g.webkit.messageHandlers.cydian;
   if (!handler || g.cydianNative) return;
   let nextId = 1;
+  const jailbreak = "@JAILBREAK@";
   const streams = new Map();
 
   function withCode(e) {
@@ -55,4 +59,5 @@
     helper: (words, onEvent) => call("helper.run", { words: [...words].map(String), stream: Boolean(onEvent) }, onEvent),
     dpkgStatus: () => call("apt.dpkgStatus"),
   };
+  if (jailbreak === "rootless" || jailbreak === "rootful") g.cydianNative.jailbreak = jailbreak;
 })(globalThis);

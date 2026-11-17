@@ -20,6 +20,9 @@ enum Jailbreak {
     }()
 
     static func path(_ p: String) -> String { prefix + p }
+    // F40: what native/bridge.js tells the page as cydianNative.jailbreak. A prefix (/var/jb, or roothide's
+    // jbroot) is rootless; none is rootful.
+    static var kind: String { prefix.isEmpty ? "rootful" : "rootless" }
     static var helper: String { path("/usr/libexec/cydian/cydian-helper") }
 }
 
@@ -27,9 +30,11 @@ enum Apt {
     static let maxBody = 64 << 20 // the proxy's cap is smaller; BigBoss' plain Packages is ~20 MB
 
     // native/bridge.js, before any page script runs: it defines cydianNative, which modules read as they load.
+    // Its @JAILBREAK@ becomes the detected jailbreak type (F40).
     static func installScript(_ ucc: WKUserContentController) {
         guard let url = Bundle.main.url(forResource: "bridge", withExtension: "js"),
-              let src = try? String(contentsOf: url, encoding: .utf8) else { return }
+              let raw = try? String(contentsOf: url, encoding: .utf8) else { return }
+        let src = raw.replacingOccurrences(of: "@JAILBREAK@", with: Jailbreak.kind)
         ucc.addUserScript(WKUserScript(source: src, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
     }
 

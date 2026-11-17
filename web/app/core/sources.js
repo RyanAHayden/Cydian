@@ -223,7 +223,14 @@ async function releaseOf(backend, base) {
 // the app tries each), Release/InRelease, Packages.zst or Packages.lzma is there. Returns the source to save,
 // with its package count when the index could be read (null for .zst/.lzma-only repos), or throws SourceError:
 // invalid_url, not_repository, or verification (with the backend's `code`, e.g. "refused" by the proxy).
+//
+// F48: `input` may also be a repo as an object, { uri, dist, components } (Import's `deb <uri> <suite> <components>`
+// lines): a flat dist ("./") is checked as above, any other through verifyDistSource.
 export async function verifySource(backend, input, { arch = DEFAULT_ARCH, count = countInline } = {}) {
+  if (input && typeof input === "object") {
+    if (!isFlatDist(input.dist)) return verifyDistSource(backend, input, { arch, count });
+    input = input.uri;
+  }
   const uri = normalizeSourceUrl(input);
   const source = { uri, dist: "./", components: [] };
   source.key = sourceKey(source);
@@ -257,6 +264,42 @@ export async function verifySource(backend, input, { arch = DEFAULT_ARCH, count 
   source.count = text == null ? null : await count(text, arch);
   source.updated = Date.now();
   return source;
+}
+
+const isFlatDist = (dist) => !dist || String(dist).endsWith("/");
+
+// A suite as apt takes it on a `deb` line: a relative path, no spaces, no `..` (it goes into URI/dists/<dist>/).
+const DIST_RE = /^[A-Za-z0-9._~+-]+(\/[A-Za-z0-9._~+-]+)*$/;
+const COMPONENT_RE = /^[A-Za-z0-9._~+-]+(\/[A-Za-z0-9._~+-]+)*$/;
+const badPath = (p) => p.split("/").some((part) => part === "." || part === "..");
+
+// F48: the Add Source check for a dist repo, { uri, dist, components }: its Release (or InRelease) must be under
+// URI/dists/<dist>/. No components given: the Release's Components. Then every component's Packages is counted
+// (refreshSource), so a wrong suite or component is turned away here rather than failing apt-get update later. A
+// Release whose Architectures leave ours out (Telesphoreo, rootful only) is still added, with count 0, as Refresh
+// would show it. Throws SourceError: invalid_url, not_repository (no Release there), verification.
+export async function verifyDistSource(backend, { uri: rawUri, dist, components } = {}, { arch = DEFAULT_ARCH, count = countInline } = {}) {
+  const uri = normalizeSourceUrl(rawUri);
+  dist = String(dist ?? "").trim();
+  if (!DIST_RE.test(dist) || badPath(dist)) throw new SourceError("invalid_url", `"${dist}" is not a valid suite.`);
+  let comps = (Array.isArray(components) ? components : String(components ?? "").split(/\s+/))
+    .map((c) => String(c).trim()).filter(Boolean);
+  for (const c of comps) if (!COMPONENT_RE.test(c) || badPath(c)) throw new SourceError("invalid_url", `"${c}" is not a valid component.`);
+  const source = { uri, dist, components: comps };
+  let release;
+  try {
+    release = await releaseOf(backend, repoLayout(source).base);
+  } catch (e) {
+    throw verificationError(e);
+  }
+  if (!release) throw new SourceError("not_repository");
+  if (!comps.length) comps = source.components = release.components.filter((c) => COMPONENT_RE.test(c) && !badPath(c));
+  if (!comps.length) throw new SourceError("verification", `The Release under dists/${dist}/ names no components.`);
+  source.key = sourceKey(source);
+  const fields = await refreshSource(backend, source, { arch, count });
+  if (fields.error) throw new SourceError("verification", fields.error);
+  const { error, ...rest } = fields;
+  return { ...source, ...rest };
 }
 
 // A package's fallback depiction: the source's Release Depiction: template with every `*` replaced by the
@@ -363,8 +406,8 @@ export function sourceCalls(backend, opts = {}) {
   const count = opts.count;
   return {
     sources: async () => (await store()).list(),
-    // Checks the repo, then saves it. Throws SourceError (see verifySource). An already-listed source is
-    // refreshed in place rather than added twice.
+    // Checks the repo (a URL, or a dist repo { uri, dist, components }, F48), then saves it. Throws SourceError
+    // (see verifySource). An already-listed source is refreshed in place rather than added twice.
     async addSource(input) {
       const s = await verifySource(backend, input, { arch: arch(), count });
       const db = await store();

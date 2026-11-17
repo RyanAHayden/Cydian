@@ -36,11 +36,13 @@ test("export and import round trip: every exported source comes back as already 
   for (const s of ALL) assert.ok(entries.some((e) => entryKeys(e).includes(s.key)), s.key);
 });
 
-test("import into an empty list: flat repos and AltStore sources are new, dist repos can't be added", () => {
+test("import into an empty list: every source is new, dist repos too (F48)", () => {
   const reviewed = reviewImport(parseImport(exportText(ALL)).entries, []);
   const by = (st) => reviewed.filter((e) => e.status === st).map((e) => e.uri);
-  assert.deepEqual(by("unsupported").sort(), ["http://apt.saurik.com/", "http://apt.thebigboss.org/repofiles/cydia/", "https://apt.procurs.us/"]);
-  assert.equal(by("new").length, ALL.length - 3);
+  assert.deepEqual(by("unsupported"), []);
+  assert.equal(by("new").length, ALL.length);
+  const procursus = reviewed.find((e) => e.uri === "https://apt.procurs.us/");
+  assert.deepEqual(procursus.input, { uri: "https://apt.procurs.us/", dist: "1800", components: ["main"] });
   for (const e of reviewed.filter((x) => x.status === "new")) assert.ok(e.input);
 });
 
@@ -76,7 +78,7 @@ test("Cydia's sources.list.d/cydia.list", () => {
   ].join("\n"));
   assert.equal(format, "list");
   assert.deepEqual(entries.map((e) => [e.uri, e.dist, e.components, e.input]), [
-    ["http://apt.saurik.com/", "ios/1800.00", ["main"], null],
+    ["http://apt.saurik.com/", "ios/1800.00", ["main"], { uri: "http://apt.saurik.com/", dist: "ios/1800.00", components: ["main"] }],
     ["https://repo.chariz.com/", "./", [], "https://repo.chariz.com/"],
     ["https://havoc.app/", "./", [], "https://havoc.app/"],
   ]);
@@ -103,7 +105,7 @@ test("Sileo's sileo.sources (deb822)", () => {
   ].join("\n"));
   assert.equal(format, "deb822");
   assert.deepEqual(entries.map((e) => [e.uri, e.dist]), [["https://repo.chariz.com/", "./"], ["https://apt.procurs.us/", "1800"]]);
-  assert.deepEqual(reviewImport(entries, []).map((e) => e.status), ["new", "unsupported"]);
+  assert.deepEqual(reviewImport(entries, []).map((e) => e.status), ["new", "new"]);
 });
 
 test("AltStore, SideStore and Feather JSON lists", () => {

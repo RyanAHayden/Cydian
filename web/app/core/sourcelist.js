@@ -9,7 +9,8 @@
 //
 // entry: { kind: "altstore" | "apt" | "any", uri, dist, components, input }. `input` is what Add Source gets
 // (backend.addSource); `kind` "any" is a bare URL that could be either (Add Source tries APT, then AltStore).
-// A dist repo (`deb uri 1800 main`) has no `input`: Add Source only takes flat repos and AltStore sources.
+// A dist repo (`deb uri 1800 main`) gets `{ uri, dist, components }` as its input (F48): addSource checks its
+// Release under dists/<dist>/ (core/sources.js verifyDistSource). "unsupported" is left for an entry with no input.
 import { parseListFile, parseDeb822File } from "./aptsources.js";
 import { normalizeSourceUrl, sourceKey } from "./sources.js";
 import { altKey, isAltKey, normalizeAltUrl, looksLikeAltUrl } from "./altstore.js";
@@ -36,7 +37,8 @@ function aptEntry({ uri, dist, components }) {
   let u;
   try { u = normalizeSourceUrl(uri); } catch { return null; }
   const flat = isFlat(dist);
-  return { kind: "apt", uri: u, dist: flat ? "./" : dist, components: flat ? [] : components ?? [], input: flat ? u : null };
+  const comps = flat ? [] : [...(components ?? [])];
+  return { kind: "apt", uri: u, dist: flat ? "./" : dist, components: comps, input: flat ? u : { uri: u, dist, components: comps } };
 }
 
 // An AltStore source. Its `input` is a sideloader link, so Add Source goes straight to AltStore even for a URL

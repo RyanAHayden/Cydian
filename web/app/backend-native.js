@@ -166,6 +166,8 @@ function nativeSourceCalls(backend, call, opts) {
 
   return {
     sources: list,
+    // `input`: a URL, or a dist repo { uri, dist, components } (F48, Import's `deb` lines): verifySource checks its
+    // Release under dists/<dist>/, and writeSource puts the suite and components on the cydian.sources line.
     async addSource(input) {
       const s = await verifySource(backend, input, { arch: arch(), count });
       const db = await store();

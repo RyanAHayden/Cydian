@@ -388,7 +388,7 @@ function renderReview(body) {
   if (listed.length) sections.push({ header: `Already Listed (${listed.length})`, rows: listed.map(row) });
   if (unsupported.length) {
     sections.push({ header: `Can't Add (${unsupported.length})`, rows: unsupported.map(row),
-      footer: "Repos with a dist (deb URL suite components) can't be added here yet: Add Source takes flat repos and AltStore sources." });
+      footer: "These lines name no source Cydian can add." });
   }
   body.replaceChildren(grouped(sections));
   body.classList.add("manage-review");

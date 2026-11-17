@@ -177,6 +177,23 @@ test("addSource checks the repo and writes it into apt's sources (cydian.sources
   assert.equal(readOrNull(cydianSources(fx)), "Types: deb\nURIs: https://new.test/\nSuites: ./\n");
 });
 
+test("F48: addSource takes a dist repo { uri, dist, components }: Release under dists/<suite>/, suite and components to apt", async (t) => {
+  const net = {
+    "https://dist.test/dists/stable/Release": "Origin: Dist Repo\nComponents: main\nArchitectures: iphoneos-arm64\n",
+    "https://dist.test/dists/stable/main/binary-iphoneos-arm64/Packages": "Package: a\nVersion: 1\nArchitecture: iphoneos-arm64\n",
+  };
+  const { backend, native, fx } = setup(t, { net });
+  const added = await backend.addSource({ uri: "https://dist.test/", dist: "stable", components: ["main"] });
+  assert.equal(added.key, "deb:https://dist.test/:stable");
+  assert.equal(added.origin, "Dist Repo");
+  assert.equal(added.count, 1);
+  assert.deepEqual(native.calls.filter((c) => c.method === "helper.run").map((c) => c.params.words),
+    [["addsource", "https://dist.test/", "stable", "main"]]);
+  assert.match(readOrNull(cydianSources(fx)), /URIs: https:\/\/dist\.test\/\nSuites: stable\nComponents: main\n/);
+  // no Release there: APT's "Did not Find Repository", not an AltStore attempt with the object
+  await assert.rejects(backend.addSource({ uri: "https://dist.test/", dist: "nope", components: ["main"] }), { kind: "not_repository" });
+});
+
 test("removeSource takes a source out of cydian.sources; apt's other files are left alone", async (t) => {
   const { backend, native, fx } = setup(t, { net: NEW_NET });
   await backend.addSource("new.test");

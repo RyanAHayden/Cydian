@@ -2,6 +2,7 @@
  *
  *   cydian-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
  *   cydian-helper hold <pkg>... | unhold <pkg>... | showhold
+ *   cydian-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
  *
  * No setuid bit: Cydian spawns it as root with the persona spawn attributes (spawn.c), which the kernel allows
  * only because Cydian is signed with com.apple.private.persona-mgmt. Run by anything else it is plain mobile and
@@ -9,7 +10,9 @@
  * dpkg --configure -a from the rootless
  * prefix, with fixed options; the caller only picks the verb and package names ([a-z0-9][a-z0-9.+-]+, known to
  * dpkg or apt). If fd 3 is open, apt's/dpkg's status lines go there (pmstatus:pkg:percent:text); stdout and stderr
- * are apt's own. Exit: 64 refused arguments, 77 refused caller, 126 exec failed, else apt's/dpkg's status.
+ * are apt's own. addsource/removesource (F33) run nothing: they edit <prefix>/etc/apt/sources.list.d/cydian.sources
+ * (temp file + rename) and print what they did. Exit: 64 refused arguments, 77 refused caller, 74 cydian.sources
+ * couldn't be written, 126 exec failed, else apt's/dpkg's status.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later */
 #include "policy.h"
@@ -87,6 +90,18 @@ int main(int argc, char *argv[]) {
     sigprocmask(SIG_SETMASK, &none, NULL);
     umask(022);
     if (chdir("/")) { perror("cydian-helper: chdir"); return HELPER_EX_EXEC; }
+
+    if (plan.verb == HV_ADDSOURCE || plan.verb == HV_REMOVESOURCE) {
+        int changed;
+        errno = 0;
+        if (helper_sources_apply(&plan, &changed, &err)) {
+            fprintf(stderr, "cydian-helper: %s%s%s\n", err, errno ? ": " : "", errno ? strerror(errno) : "");
+            return HELPER_EX_IOERR;
+        }
+        printf("%s %s %s: %s\n", plan.verb == HV_ADDSOURCE ? "Added" : "Removed", plan.argv[1], plan.argv[2],
+               changed ? "cydian.sources updated" : "nothing to change");
+        return 0;
+    }
 
     static char path_env[PATH_MAX * 2];
     snprintf(path_env, sizeof path_env,

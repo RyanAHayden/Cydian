@@ -1,6 +1,7 @@
 #!/bin/sh
 # A stand-in for cydian-helper (native/helper/) for tests without a device (N3, and N4's queue and console).
-# Same words, same allowlist and exit codes; instead of apt it works on a fixture tree:
+# Same words, same allowlist and exit codes; instead of apt it works on a fixture tree (addsource/removesource
+# edit $CYDIAN_PREFIX/etc/apt/sources.list.d/cydian.sources like the real one, F33):
 #   CYDIAN_PREFIX  the fake rootless prefix (etc/apt, var/lib/apt/lists, var/lib/dpkg/status)
 #   FAKE_REMOTE    what "the repos" hold: FAKE_REMOTE/lists/* is what apt-get update writes into the lists dir
 #   FAKE_FAIL      a verb that fails like apt does (exit 100, "E: ..." on stderr)
@@ -12,12 +13,87 @@ status=$prefix/var/lib/dpkg/status
 st() { { printf '%s\n' "$1" >&3; } 2>/dev/null || true; }
 refuse() { echo "cydian-helper: $1" >&2; exit 64; }
 verb=${1:-}
-[ -n "$verb" ] || refuse "no verb (update, install, remove, upgrade, configure, hold, unhold, showhold)"
+[ -n "$verb" ] || refuse "no verb (update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource)"
 shift
+sources=$prefix/etc/apt/sources.list.d/cydian.sources
+# F33: the same checks as policy.c's helper_uri_ok, helper_suite_ok and helper_component_ok. grep -x matches a
+# line, so a value with a newline in it ("https://r/\nTrusted: yes") is refused first.
+one_line() { case $1 in *"
+"*) return 1 ;; esac; }
+uri_ok() {
+  one_line "$1" && [ ${#1} -le 1024 ] && printf '%s' "$1" | grep -Eqx 'https?://[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]{1,5})?/([A-Za-z0-9._~%+/:=,-]*/)?' &&
+    ! printf '%s' "${1#*://}" | grep -Eq '/\.\.?/'
+}
+suite_ok() {
+  [ "$1" = ./ ] && return 0
+  one_line "$1" && [ ${#1} -le 255 ] && printf '%s' "$1" | grep -Eqx '[A-Za-z0-9._+][A-Za-z0-9._+/-]*' &&
+    ! printf '%s' "$1" | grep -Eq '(^|/)\.\.?(/|$)'
+}
+component_ok() {
+  one_line "$1" && [ ${#1} -le 64 ] && printf '%s' "$1" | grep -Eqx '[A-Za-z0-9]([A-Za-z0-9._+/-]*[A-Za-z0-9._+-])?' &&
+    ! printf '%s' "$1" | grep -Eq '(^|/)\.\.?(/|$)'
+}
 case $verb in
+  addsource|removesource)
+    [ $# -ge 2 ] || refuse "needs a URI and a suite"
+    uri_ok "$1" || refuse "bad URI (http(s)://host[:port]/path/, ending in /, no user, spaces or . segments)"
+    suite_ok "$2" || refuse "bad suite"
+    uri=$1 suite=$2
+    shift 2
+    if [ "$verb" = removesource ]; then
+      [ $# -eq 0 ] || refuse "removesource takes a URI and a suite only"
+    else
+      case $suite in
+        */) [ $# -eq 0 ] || refuse "a flat suite (ending in /) takes no components" ;;
+        *) [ $# -ge 1 ] || refuse "a suite that isn't flat needs components" ;;
+      esac
+      [ $# -le 16 ] || refuse "too many components"
+      for c in "$@"; do component_ok "$c" || refuse "bad component"; done
+    fi
+    if [ "${FAKE_FAIL:-}" = "$verb" ]; then
+      echo "cydian-helper: can't create a temp file in sources.list.d: Permission denied (fake)" >&2
+      exit 74
+    fi
+    mine=
+    if [ "$verb" = addsource ]; then
+      mine="Types: deb
+URIs: $uri
+Suites: $suite"
+      [ $# -gt 0 ] && mine="$mine
+Components: $*"
+    fi
+    mkdir -p "${sources%/*}"
+    tmp="${sources%/*}/.cydian.sources.$$"
+    # One stanza per paragraph; the first naming exactly this URI and suite becomes ours, the rest go.
+    { cat "$sources" 2>/dev/null || true; } | awk -v uri="$uri" -v suite="$suite" -v mine="$mine" '
+      BEGIN { RS = ""; placed = (mine == "") }
+      {
+        u = ""; s = ""
+        n = split($0, l, "\n")
+        for (i = 1; i <= n; i++) {
+          if (tolower(l[i]) ~ /^uris:/) { u = l[i]; sub(/^[^:]*:[ \t]*/, "", u); sub(/[ \t\r]*$/, "", u) }
+          if (tolower(l[i]) ~ /^suites:/) { s = l[i]; sub(/^[^:]*:[ \t]*/, "", s); sub(/[ \t\r]*$/, "", s) }
+        }
+        out = $0
+        if (u == uri && s == suite) { if (placed) next; placed = 1; out = mine }
+        printf "%s%s\n", (k++ ? "\n" : ""), out
+      }
+      END { if (!placed) printf "%s%s\n", (k ? "\n" : ""), mine }' > "$tmp"
+    if cmp -s "$tmp" "$sources" || { [ ! -s "$tmp" ] && [ ! -e "$sources" ]; }; then
+      rm -f "$tmp"
+      what="nothing to change"
+    elif [ -s "$tmp" ]; then
+      chmod 644 "$tmp" && mv "$tmp" "$sources"
+      what="cydian.sources updated"
+    else
+      rm -f "$tmp" "$sources"
+      what="cydian.sources updated"
+    fi
+    echo "$([ "$verb" = addsource ] && echo Added || echo Removed) $uri $suite: $what"
+    exit 0 ;;
   update|upgrade|configure|showhold) [ $# -eq 0 ] || refuse "this verb takes no arguments" ;;
   install|remove|hold|unhold) [ $# -ge 1 ] || refuse "no package names" ;;
-  *) refuse "unknown verb (update, install, remove, upgrade, configure, hold, unhold, showhold)" ;;
+  *) refuse "unknown verb (update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource)" ;;
 esac
 for p in "$@"; do
   printf '%s' "$p" | grep -Eqx '[a-z0-9][a-z0-9.+-]+' || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"

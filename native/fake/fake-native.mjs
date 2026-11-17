@@ -73,7 +73,9 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       return fail(`not_found: no Packages index in ${dir}`);
     },
     "helper.run"({ words, stream }, onEvent) {
-      return new Promise((resolve) => {
+      // Like Helper.run in Apt.swift: no helper at its path, or one that can't start, is a "helper:" error.
+      if (!existsSync(helper)) return fail(`helper: cydian-helper is not installed at ${helper}`);
+      return new Promise((resolve, reject) => {
         const child = spawn(helper, words, {
           env: { PATH: process.env.PATH, CYDIAN_PREFIX: prefix, FAKE_REMOTE: remote, ...env },
           stdio: ["ignore", "pipe", "pipe", "pipe"],
@@ -91,7 +93,7 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
         child.stdout.on("data", feed("out"));
         child.stderr.on("data", feed("err"));
         child.stdio[3].on("data", feed("status"));
-        child.on("error", (e) => resolve({ code: 126, stdout: "", stderr: `cydian-helper: ${e.message}\n` }));
+        child.on("error", (e) => reject(new Error(`helper: can't start cydian-helper: ${e.message}`)));
         child.on("close", (code) => {
           if (stream && onEvent) for (const fd of ["out", "err", "status"]) if (pending[fd]) onEvent({ fd, line: pending[fd] });
           resolve({ code: code ?? 128, stdout: text.out, stderr: text.err });

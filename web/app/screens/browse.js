@@ -31,6 +31,7 @@ import { installOptions } from "../core/altstore.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
 import { openInGroup } from "./handoff.js";
+import { healthOf } from "../core/health.js";
 import { addSource } from "./manage.js";
 
 export const ROW_HEIGHT = 58;
@@ -176,7 +177,10 @@ async function drawSections(page) {
   // F8: Open In, this source in another package manager, under the sections.
   if (!editing && key !== ALL) {
     const source = await getBackend().sources().then((l) => l.find((x) => x.key === key)).catch(() => null);
-    if (source && turn === page.draw && body.isConnected) body.append(openInGroup(source));
+    if (source && turn === page.draw && body.isConnected) {
+      body.append(openInGroup(source));
+      body.append(grouped([{ footer: healthOf(source).label }])); // F19: last reached, last Release, Not Responding
+    }
   }
 }
 

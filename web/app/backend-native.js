@@ -24,6 +24,7 @@
 import { BackendError } from "./backend-http.js";
 import { verifySource, refreshSource, openSourceStore, sortSources } from "./core/sources.js";
 import { parseAptSources, listNamesFor } from "./core/aptsources.js";
+import { healthFields } from "./core/health.js";
 import { DEFAULT_ARCH } from "./core/apt.js";
 import { withAltSources } from "./core/altstore.js";
 
@@ -98,6 +99,8 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
     // cydian-helper <words>; onEvent({ fd, line }) sees its output as it comes. Resolves { code, stdout, stderr }.
     helper: (words, onEvent) => call("helper.run", { words, stream: Boolean(onEvent) }, onEvent),
     dpkgStatus: async () => (await call("apt.dpkgStatus")) ?? null,
+    // F19: apt's source files ([{ path, text }]): which jailbreak wrote them tells Recommended what to offer.
+    aptSourceFiles: async () => (await call("apt.sources")) ?? [],
     // apt-get update through the helper; throws BackendError("helper") with apt's last error line when it fails.
     async update(onEvent) {
       const r = await backend.helper(["update"], onEvent);
@@ -220,7 +223,7 @@ function nativeSourceCalls(backend, call, opts) {
         const fields = await refreshSource(backend, s, { arch: arch(), count });
         const cur = await db.get(s.key);
         const { file, ...rest } = s;
-        const next = { ...cur, ...rest, ...fields };
+        const next = { ...cur, ...rest, ...fields, ...healthFields(cur, fields) }; // F19: reachedAt, failures
         await db.put(next);
         const shown = file ? { ...next, file } : next;
         onEach(shown);

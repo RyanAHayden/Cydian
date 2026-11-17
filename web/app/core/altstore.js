@@ -24,6 +24,7 @@
 // record with `format`; parseSource(format, json) reads any of them into parseAltSource's shape (plus `extra`) through
 // core/sources/ipa.js parseIpaSource. A record with `unsupported` (an encrypted GBox source) has a reason and no
 // apps: its page shows the reason and the Open in row (F8).
+import { pool, withTimeout, healthFields, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 import { parseIpaSource } from "./sources/ipa.js";
 
 export const ALT_PREFIX = "alt:";
@@ -513,11 +514,18 @@ export function withAltSources(calls, backend, opts = {}) {
       const aptWanted = !filter || (await calls.sources().catch(() => [])).some(keep);
       const [apt, alts] = await Promise.all([
         aptWanted ? calls.refreshSources(onEach, filter ? { filter } : undefined) : [],
-        Promise.all(alt.map(async (s) => {
-          const next = await db.put({ ...s, ...(await refreshAltSource(backend, s)) });
+        // F19: in waves, each with a time limit, and the health fields (core/health.js) saved with the result.
+        pool(alt, opts.concurrency ?? REFRESH_CONCURRENCY, async (s) => {
+          let fields;
+          try {
+            fields = await withTimeout(refreshAltSource(backend, s), opts.timeout ?? REFRESH_TIMEOUT);
+          } catch (e) {
+            fields = { updated: Date.now(), error: e?.message || String(e) };
+          }
+          const next = await db.put({ ...s, ...fields, ...healthFields(s, fields) });
           onEach(next);
           return next;
-        })),
+        }),
       ]);
       return [...(apt ?? []), ...alts];
     },

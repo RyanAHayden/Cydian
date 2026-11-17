@@ -26,6 +26,8 @@ import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
 import { renderAltSource, renderApp, installRows, formatDate, osRange } from "./altstore.js";
 import { showActionSheet } from "../nav/actionsheet.js";
+import { signingReady, signingAvailable, signAndInstall } from "../signing-client.js";
+import { installOptions } from "../core/altstore.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
 
@@ -543,10 +545,13 @@ async function packageActions(route, button) {
   const actions = [];
   if (st.kind === "ipa" && st.ipa) {
     const v = st.ipa.versions[0];
+    // I5: with the user's own certificate (Settings > Signing), Install signs this app and installs it.
+    if (await signIfReady(st.ipa, v, recordApp(pkg, source, v))) return;
     const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v));
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });
     if (many) actions.push({ label: "Version History", run: () => go(versionsHref(route, id)) });
-    return sheet(options.itms ? "" : "A sideloader signs this app on the iPhone with your Apple ID.", actions);
+    if (!options.itms && signingAvailable()) actions.push({ label: "Sign with My Certificate", run: () => go(format({ tab: "settings", path: ["signing"] })) });
+    return sheet(options.itms ? "" : "This app needs signing: a sideloader signs it on the iPhone with your Apple ID, or add your own certificate in Settings > Signing.", actions);
   }
   const queue = queueOf();
   const installed = installedOf(history);
@@ -568,6 +573,15 @@ async function packageActions(route, button) {
     ? "Packages install on the iPhone, from Cydian's jailbreak app or another package manager."
     : "Installing from Cydian comes with its install queue, which this build doesn't have yet.";
   return sheet(title, actions);
+}
+
+// I5: sign `v` with the saved certificate and install it, when one is saved and the version has an IPA. True when
+// signing took over (whatever its outcome: errors are shown in an alert).
+async function signIfReady(app, v, record) {
+  const url = installOptions(v, app.sourceUrl).download;
+  if (!url || !(await signingReady())) return false;
+  await signAndInstall({ url, name: app.name, onInstalled: () => record?.() });
+  return true;
 }
 
 // The package page's row to its Version History: how many versions are on offer.
@@ -633,7 +647,8 @@ async function renderVersions(body, route, key, id) {
         sub: [formatSize(v.size), v.runs ? osRange(v) : `Needs ${osRange(v) ?? "another iOS version"}`].filter(Boolean).join(" · ") || null,
         notes: v.localizedDescription || null,
         unavailable: !can,
-        onClick: can ? () => {
+        onClick: can ? async () => {
+          if (await signIfReady(pkg.stanza.ipa ?? { name: history.name, sourceUrl: history.sourceUrl }, v, recordApp(pkg, source, v))) return;
           const { rows, options } = installRows(v, history.sourceUrl, undefined, recordApp(pkg, source, v));
           sheet(options.itms ? `${history.name} ${v.version}` : `${history.name} ${v.version}\nA sideloader signs it on the iPhone with your Apple ID.`,
             rows.map((r) => ({ label: r.label, run: r.onClick })));

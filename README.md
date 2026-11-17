@@ -28,9 +28,19 @@ Not affiliated with Cydia or SaurikIT. No Apple or Cydia artwork is included; th
   | `CYDIAN_PUSH_MAX` | `10000` | Most opted-in subscribers the server keeps |
   | `CYDIAN_PUSH_EXPIRE_DAYS` | `180` | A subscriber whose Cydian hasn't been opened this long is deleted |
 
+  Signing with your own certificate (I5, `web/signer/`, zsign in the image) has its own limits (`CYDIAN_SIGN_*`)
+  and, behind a proxy, wants `CYDIAN_PUBLIC_URL=https://<your host>`: `docs/signing.md`.
+
   Upgrade alerts (F10) keep their SQLite file and VAPID key in the `cydian-data` volume. The key is made on first
   use; losing it means every subscriber has to turn alerts off and on again. Run a check by hand with
   `docker compose -p cydian exec cydian-push python push.py run`.
+
+## Your own signing server
+
+Settings > Signing signs AltStore apps with your certificate on a signing server: cydian.dev, or your own, so you
+don't rely on anyone else's. `docker compose up -d --build cydian` runs one on port 8080 (`CYDIAN_PORT`); the
+phone needs it over HTTPS, e.g. `tailscale serve --bg 8080` or Caddy in front. Put its address in Settings >
+Signing > Signing Server. Details, what is stored where, and limits: `docs/signing.md`.
 
 ## Deploy (TrueNAS + Nginx Proxy Manager, https://cydian.dev)
 

@@ -12,6 +12,8 @@ import { createSettings, detectMode, themeFor, SETTINGS } from "../core/settings
 import { drawSection as drawPushSection } from "../push-client.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
+import { parseProfile, checkP12Password, summary, profileKind, DEFAULT_SERVER } from "../core/signing.js";
+import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus } from "../signing-client.js";
 
 export const title = "Settings";
 
@@ -28,6 +30,7 @@ const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? Str
 export function nav(route) {
   const key = route.path[0];
   if (key === "holds") return { title: "Ignored Upgrades" };
+  if (key === "signing") return { title: "Signing" };
   if (key && defOf(key)) return { title: defOf(key).label };
   return { title: "Settings" };
 }
@@ -56,8 +59,9 @@ function draw({ el, route }) {
   const key = route.path[0];
   const top = el.scrollTop;
   if (key === "holds") el.replaceChildren(holdsPage());
+  else if (key === "signing") drawSigning(el);
   else if (key) el.replaceChildren(listPage(key));
-  else el.replaceChildren(rootPage(), pushSection());
+  else el.replaceChildren(rootPage(), signingSection(), pushSection());
   el.scrollTop = top;
 }
 
@@ -248,4 +252,165 @@ export function init() {
     if (key === "appearance") applyTheme();
     if (key === "allowZoom") applyZoom();
   });
+}
+
+// ---- Signing (I5) --------------------------------------------------------------------------------------------
+// Settings > Signing: the user's .p12, its password and a .mobileprovision, kept in IndexedDB on this phone only
+// (signing-client.js), and the signing server. With them, Install on an AltStore app's page signs the app with
+// this certificate and installs it (browse.js packageActions). The site only: the jailbreak app has no need, and
+// the sideload build signs on the phone itself (F14, I6).
+
+// The root page's row: the certificate's name once one is set.
+function signingSection() {
+  const box = document.createElement("div");
+  if (!signingAvailable()) return box;
+  const fill = (detail) => box.replaceChildren(grouped([{ header: "Signing",
+    rows: [{ label: "Certificate", detail, href: format({ tab: "settings", path: ["signing"] }) }],
+    footer: "Your own certificate: Install signs AltStore apps with it." }]));
+  fill("");
+  loadIdentity().then((id) => {
+    let name = "None";
+    if (id?.profile) {
+      try { name = summary({ profile: parseProfile(id.profile) }).rows[0].detail; } catch { name = "Unreadable"; }
+    } else if (id?.p12) name = "Incomplete";
+    fill(name);
+  });
+  return box;
+}
+
+// After a change on the Signing page: redraw every Settings page on screen (the root's Certificate row too).
+function redrawAll() {
+  for (const p of pages) {
+    if (p.el.isConnected) draw(p);
+    else pages.delete(p);
+  }
+}
+
+// A file picker; resolves with { name, bytes } or null.
+function pickFile() {
+  return new Promise((resolve) => {
+    const input = Object.assign(document.createElement("input"), { type: "file" });
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      resolve(file ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : null);
+    });
+    input.addEventListener("cancel", () => resolve(null));
+    input.click();
+  });
+}
+
+const alertOK = (title, message) => showAlert({ title, message, buttons: ["OK"] });
+
+async function chooseP12(el) {
+  const f = await pickFile();
+  if (!f) return;
+  if (f.bytes[0] !== 0x30 || f.bytes.length > 256 * 1024) {
+    await alertOK("Not a Certificate", `${f.name} is not a .p12 file. Export your certificate and its key from Keychain as .p12.`);
+    return;
+  }
+  await saveIdentity({ p12: f.bytes, p12Name: f.name, passwordOk: null });
+  redrawAll();
+  const id = await loadIdentity();
+  if (!id.password) await askPassword(el);
+  else await recheckPassword(el);
+}
+
+async function chooseProfile(el) {
+  const f = await pickFile();
+  if (!f) return;
+  try {
+    if (f.bytes.length > 1024 * 1024) throw new Error("too large");
+    parseProfile(f.bytes);
+  } catch {
+    await alertOK("Not a Profile", `${f.name} is not a provisioning profile (.mobileprovision).`);
+    return;
+  }
+  await saveIdentity({ profile: f.bytes, profileName: f.name });
+  redrawAll();
+}
+
+async function recheckPassword(el) {
+  const id = await loadIdentity();
+  if (!id?.p12) return;
+  const ok = await checkP12Password(id.p12, id.password ?? "");
+  await saveIdentity({ passwordOk: ok });
+  redrawAll();
+  if (ok === false) await alertOK("Wrong Password", "That password doesn't open this certificate.");
+}
+
+async function askPassword(el) {
+  const { index, value } = await showAlert({ title: "Certificate Password", message: "The password you set when you exported the .p12.",
+    input: { type: "password", placeholder: "Password" }, buttons: ["Cancel", "Save"], cancel: 0 });
+  if (index !== 1) return;
+  await saveIdentity({ password: value });
+  await recheckPassword(el);
+}
+
+async function askServer(el) {
+  const { index, value } = await showAlert({ title: "Signing Server", message: `Where apps are signed. Empty for ${new URL(DEFAULT_SERVER).host}.`,
+    input: { type: "url", placeholder: DEFAULT_SERVER, value: getServer() === DEFAULT_SERVER ? "" : getServer() }, buttons: ["Cancel", "Save"], cancel: 0 });
+  if (index !== 1) return;
+  setServer(value.trim() || DEFAULT_SERVER);
+  redrawAll();
+}
+
+async function checkServer() {
+  const hide = showHUD("Checking");
+  try {
+    const st = await serverStatus();
+    hide();
+    await alertOK(st.zsign ? "Server Signs Apps" : "Server Can't Sign",
+      st.zsign ? `${new URL(getServer()).host} signs IPAs up to ${Math.round(st.maxBytes / 1048576)} MB and keeps each signed app for ${Math.round(st.ttl / 60)} minutes.`
+        : `${new URL(getServer()).host} answers but has no signer (zsign) installed.`);
+  } catch (e) {
+    hide();
+    await alertOK("Server Not Reachable", `${new URL(getServer()).host}: ${e.message || "no answer"}.`);
+  }
+}
+
+async function removeCertificate(el) {
+  const { index } = await showAlert({ title: "Remove Certificate?", message: "The .p12, its password and the profile are deleted from this iPhone.",
+    buttons: ["Cancel", "Remove"], cancel: 0 });
+  if (index !== 1) return;
+  await clearIdentity();
+  redrawAll();
+}
+
+async function drawSigning(el) {
+  const id = await loadIdentity();
+  if (!signingAvailable()) {
+    el.replaceChildren(grouped([{ footer: "Signing with your own certificate is on the website. This app signs on the iPhone itself." }]));
+    return;
+  }
+  const top = el.scrollTop;
+  let profile = null;
+  try { profile = id?.profile ? parseProfile(id.profile) : null; } catch { /* checked when picked */ }
+  const info = summary({ profile, passwordOk: id?.passwordOk ?? null });
+  const sections = [{
+    header: "Certificate",
+    rows: [
+      { label: "Certificate", subtitle: id?.p12Name ?? null, detail: id?.p12 ? "" : "Choose", onClick: () => chooseP12(el), chevron: true },
+      { label: "Password", detail: id?.password ? "\u2022".repeat(8) : "None", onClick: () => askPassword(el), chevron: true },
+      { label: "Provisioning Profile", subtitle: id?.profileName ?? null, detail: id?.profile ? "" : "Choose", onClick: () => chooseProfile(el), chevron: true },
+    ],
+    footer: "Your .p12 (the certificate and its key), its password and a .mobileprovision made for it. They're kept on this iPhone only, in this browser's storage.",
+  }];
+  if (profile) {
+    sections.push({ header: profile.name ? `${profileKind(profile)} Profile: ${profile.name}` : `${profileKind(profile)} Profile`,
+      // Long values (a certificate's name, a team) go under the label, where they wrap, not cut off on the right.
+      rows: info.rows.map((r) => (r.detail.length > 16 ? { label: r.label, subtitle: r.detail } : r)),
+      footer: info.problems.length ? info.problems.join(" ") : null });
+  }
+  const server = getServer();
+  sections.push({
+    header: "Signing Server",
+    rows: [{ label: new URL(server).host, subtitle: server === DEFAULT_SERVER ? "Default" : server, onClick: () => askServer(el), chevron: true },
+      { label: "Check Server", onClick: () => checkServer() }],
+    footer: "Install sends the app's link, the certificate, its password and the profile to this server over HTTPS. "
+      + "The server uses them in memory for that one request and never writes them to disk or logs; the signed app is deleted after 10 minutes or its first download. "
+      + "Run your own with docker compose up (docs/signing.md) and put its address here.",
+  });
+  if (id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeCertificate(el) }] });
+  el.replaceChildren(grouped(sections));
+  el.scrollTop = top;
 }

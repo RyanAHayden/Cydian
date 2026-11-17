@@ -79,3 +79,102 @@ export function findUpgrades(installed, candidateOf, holds = [], { dpkgHolds = t
   }
   return { available: available.sort(compareNames), ignored: ignored.sort(compareNames) };
 }
+
+// ---- Apps installed without a jailbreak (F30) ----------------------------------------------------------------
+// On the site and in the sideload build there is no dpkg to ask, so tapping Install on an app page (an AltStore
+// app, screens/altstore.js) records it here, on the device (IndexedDB, nothing uploaded). The Installed tab lists
+// the records newest first, marks the ones a source now has a newer version of, and Edit or a swipe removes one
+// the user deleted from the phone. Jailbreak mode doesn't record: it reads dpkg's status file as above.
+//
+//   appRecord(app, now)                 -> { id, name, version, key, source, sourceName, icon, date }
+//   recordInstall(store, app, now)      -> the record, put in the store (one per app id: a reinstall replaces it)
+//   removeInstall(store, id)
+//   appRows(records)                    -> newest first (then by name)
+//   appUpgrades(rows, candidateOf)      -> each row with `upgrade`: the candidate's version when it is newer, else null
+//   openAppStore({ indexedDB, name })   -> Promise of { all, put, remove }; memoryAppStore() is the same in memory
+//   apps()                              -> the device's store, opened once; onAppsChange(f) after record/remove
+
+export const APP_DB = "cydian-installed";
+const APP_STORE = "apps";
+
+const text = (v) => (v == null ? "" : String(v).trim());
+
+export function appRecord(app, now = Date.now()) {
+  const id = text(app?.id);
+  if (!id) throw new Error("An app needs an id to be recorded");
+  return {
+    id, name: text(app.name) || id, version: text(app.version), key: app.key ?? null, source: text(app.source) || null,
+    sourceName: text(app.sourceName) || null, icon: app.icon ?? null, date: now,
+  };
+}
+
+export async function recordInstall(store, app, now = Date.now()) {
+  const rec = appRecord(app, now);
+  await store.put(rec);
+  for (const f of appListeners) f();
+  return rec;
+}
+
+export async function removeInstall(store, id) {
+  await store.remove(id);
+  for (const f of appListeners) f();
+}
+
+export function appRows(records) {
+  return [...(records ?? [])].sort((a, b) => (b.date ?? 0) - (a.date ?? 0) || compareNames(a, b));
+}
+
+// `candidateOf(id)`: the newest version on any source (a row with `version`), or null when no source has the app.
+export function appUpgrades(rows, candidateOf) {
+  return rows.map((r) => {
+    const cand = candidateOf(r.id);
+    const upgrade = cand?.version && r.version && compareVersions(cand.version, r.version) > 0 ? cand.version : null;
+    return { ...r, upgrade };
+  });
+}
+
+export function memoryAppStore(initial = []) {
+  const m = new Map(initial.map((r) => [r.id, r]));
+  return {
+    all: async () => [...m.values()],
+    put: async (rec) => { m.set(rec.id, rec); return rec; },
+    remove: async (id) => { m.delete(id); },
+  };
+}
+
+export function openAppStore({ indexedDB: idb = globalThis.indexedDB, name = APP_DB } = {}) {
+  if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
+  return new Promise((resolve, reject) => {
+    const req = idb.open(name, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(APP_STORE)) db.createObjectStore(APP_STORE, { keyPath: "id" });
+    };
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      const run = (mode, f) => new Promise((res, rej) => {
+        const tx = db.transaction(APP_STORE, mode);
+        const r = f(tx.objectStore(APP_STORE));
+        tx.oncomplete = () => res(r?.result);
+        tx.onerror = () => rej(tx.error ?? r?.error);
+        tx.onabort = () => rej(tx.error ?? new Error("transaction aborted"));
+      });
+      resolve({
+        all: () => run("readonly", (s) => s.getAll()),
+        put: (rec) => run("readwrite", (s) => s.put(rec)).then(() => rec),
+        remove: (id) => run("readwrite", (s) => s.delete(id)).then(() => undefined),
+      });
+    };
+  });
+}
+
+let shared = null;
+// Where IndexedDB is missing (Safari private mode can refuse it) the records last for this session only.
+export const apps = () => (shared ??= openAppStore().catch(() => memoryAppStore()));
+
+const appListeners = new Set();
+export function onAppsChange(f) {
+  appListeners.add(f);
+  return () => appListeners.delete(f);
+}

@@ -14,6 +14,8 @@ import { installOptions } from "../core/altstore.js";
 import { displayName } from "../core/sources.js";
 import { compat } from "../core/compat.js";
 import { currentDevice, compatBadge } from "../device.js";
+import { detectMode } from "../core/settings.js";
+import { apps, recordInstall } from "../core/installed.js";
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -66,13 +68,14 @@ function card(children, cls = "") {
 }
 
 // The install rows for a version: itms-services where the source gives a signed link, else open the source in a
-// sideloader, and the raw IPA. `opener` opens a URL outside the app (window.open on the site).
-export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener")) {
+// sideloader, and the raw IPA. `opener` opens a URL outside the app (window.open on the site). `onInstall` runs
+// first on any of them (F30: the Installed tab's record).
+export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {}) {
   const o = installOptions(version, sourceUrl);
   const rows = [];
-  if (o.itms) rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { location.href = o.itms; } });
-  for (const s of o.open) rows.push({ label: `Open in ${s.name}`, onClick: () => { location.href = s.url; } });
-  if (o.download) rows.push({ label: "Download IPA", subtitle: decodeURIComponent(o.download.split("/").pop() || ""), onClick: () => opener(o.download) });
+  if (o.itms) rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
+  for (const s of o.open) rows.push({ label: `Open in ${s.name}`, onClick: () => { onInstall(); location.href = s.url; } });
+  if (o.download) rows.push({ label: "Download IPA", subtitle: decodeURIComponent(o.download.split("/").pop() || ""), onClick: () => { onInstall(); opener(o.download); } });
   return { rows, options: o };
 }
 
@@ -187,7 +190,13 @@ export function renderApp(body, route, pkg, source) {
     body.append(grouped([{ header: "Permissions", rows, footer: "What this app asks for, as its source lists it." }]));
   }
 
-  const { rows, options } = installRows(v, app.sourceUrl);
+  // F30: without a jailbreak (the site, the sideload build) nothing can ask the phone what it has, so tapping an
+  // install row records the app on the device for the Installed tab. Jailbreak mode reads dpkg instead.
+  const record = detectMode() === "jailbreak" ? undefined : () => {
+    apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: v.version, key: pkg.key,
+      source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
+  };
+  const { rows, options } = installRows(v, app.sourceUrl, undefined, record);
   body.append(grouped([{ header: "Install", rows,
     footer: options.itms ? "Installs over the air with the source's signed link."
       : "This app isn't signed for your iPhone: a sideloader signs it on the phone with your Apple ID. Adding the source there lists this app." }]));

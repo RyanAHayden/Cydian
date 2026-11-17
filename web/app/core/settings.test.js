@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createSettings, detectMode, themeFor, SETTINGS, FEATURES } from "./settings.js";
+import { createSettings, detectMode, themeFor, SETTINGS, FEATURES, bridgeArch } from "./settings.js";
 import { DEFAULT_ARCH } from "./apt.js";
 
 function memStorage(init = {}) {
@@ -267,7 +267,7 @@ test("the Device row shows on the site only; the app hides the choice", () => {
   const site = createSettings({ storage: memStorage(), mode: "site" });
   assert.deepEqual(site.sections().map((x) => x.id).slice(0, 2), ["appearance", "device"]);
   assert.deepEqual(SETTINGS.find((d) => d.key === "device").options.map((o) => o.label),
-    ["Not Jailbroken", "Jailbroken (Rootless)", "Jailbroken (Rootful)"]);
+    ["Not Jailbroken", "Jailbroken (Rootless)", "Jailbroken (Rootful)", "Jailbroken (Roothide)"]);
 });
 
 test("picking a jailbroken type on the site sets the architecture too, and listeners hear both", () => {
@@ -284,7 +284,7 @@ test("picking a jailbroken type on the site sets the architecture too, and liste
   assert.equal(s.deviceType(), "none");
   assert.equal(storage.map.get("cydian.arch"), "iphoneos-arm", "Not Jailbroken leaves the architecture alone");
   assert.deepEqual(heard, [["device", "none"]]);
-  assert.throws(() => s.set("device", "iphoneos-arm64e"));
+  assert.throws(() => s.set("device", "iphoneos-armv7"));
 });
 
 test("a site visitor who had picked an Architecture keeps it as their device type", () => {
@@ -300,4 +300,15 @@ test("Sideloader: Feather by default, on the site only", () => {
   assert.equal(s.get("sideloader"), "sidestore");
   assert.equal(createSettings({ storage: memStorage(), mode: "sideload" }).isShown("sideloader"), false);
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak" }).isShown("sideloader"), false);
+});
+
+test("F38: Roothide is a device type on the site and a bridge type in the app (iphoneos-arm64e)", () => {
+  const storage = memStorage();
+  const s = createSettings({ storage, mode: "site" });
+  s.set("device", "iphoneos-arm64e");
+  assert.equal(s.deviceType(), "iphoneos-arm64e");
+  assert.equal(storage.map.get("cydian.arch"), "iphoneos-arm64e");
+  assert.equal(bridgeArch({ jailbreak: "roothide" }), "iphoneos-arm64e");
+  assert.equal(bridgeArch({ jailbreak: "none" }), null);
+  assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", native: { jailbreak: "roothide" } }).deviceType(), "iphoneos-arm64e");
 });

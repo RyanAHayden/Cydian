@@ -69,6 +69,7 @@ export const SETTINGS = [
       { value: "none", label: "Not Jailbroken", subtitle: "Apps from AltStore-style sources" },
       { value: "iphoneos-arm64", label: "Jailbroken (Rootless)", subtitle: "iphoneos-arm64: Dopamine, palera1n rootless" },
       { value: "iphoneos-arm", label: "Jailbroken (Rootful)", subtitle: "iphoneos-arm: palera1n rootful, older jailbreaks" },
+      { value: "iphoneos-arm64e", label: "Jailbroken (Roothide)", subtitle: "iphoneos-arm64e: Dopamine roothide, Bootstrap" },
     ],
     footer: "Not Jailbroken lists apps from AltStore-style sources. Jailbroken also lists tweaks and themes from APT sources, built for this architecture.",
   },
@@ -93,6 +94,7 @@ export const SETTINGS = [
     options: [
       { value: "iphoneos-arm64", label: "Rootless", subtitle: "iphoneos-arm64: Dopamine, palera1n rootless" },
       { value: "iphoneos-arm", label: "Rootful", subtitle: "iphoneos-arm: palera1n rootful, older jailbreaks" },
+      { value: "iphoneos-arm64e", label: "Roothide", subtitle: "iphoneos-arm64e: Dopamine roothide, Bootstrap" },
     ],
   },
   {
@@ -188,11 +190,12 @@ for (const a of ARCHES) if (!byKey.get("device").options.some((o) => o.value ===
 export const NOT_JAILBROKEN = "none";
 export const DEVICE_TYPES = byKey.get("device").options.map((o) => o.value);
 
-// The jailbreak app's type from its bridge: `cydianNative.arch` ("iphoneos-arm64" | "iphoneos-arm") or
-// `cydianNative.jailbreak` ("rootless" | "rootful"), whichever the shell detected; null when it says neither.
+// The jailbreak app's type from its bridge: `cydianNative.arch` (one of ARCHES) or `cydianNative.jailbreak`
+// ("rootless" | "rootful" | "roothide", also what Bridge.swift app.info reports, F38), whichever the shell
+// detected; null when it says neither (or "none").
 export function bridgeArch(native) {
   if (ARCHES.includes(native?.arch)) return native.arch;
-  return { rootless: "iphoneos-arm64", rootful: "iphoneos-arm" }[native?.jailbreak] ?? null;
+  return { rootless: "iphoneos-arm64", rootful: "iphoneos-arm", roothide: "iphoneos-arm64e" }[native?.jailbreak] ?? null;
 }
 
 // The mode: the app's bridge says which build is running (I2 sets `cydianNative.mode`); a bridge without one is

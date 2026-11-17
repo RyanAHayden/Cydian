@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   parseControl, description, parseRelations, stripClearsign, parseRelease, repoLayout, parseSourceLine,
   resolveFilename, resolveIcon, isLocalUrl, parsePackages, parseVersion, compareVersions, satisfies,
-  matchesArch, filterArch, DEFAULT_ARCH,
+  matchesArch, filterArch, DEFAULT_ARCH, ARCHES,
 } from "./apt.js";
 import { handle, reply } from "./worker.js";
 import { createParser } from "./parser.js";
@@ -273,4 +273,11 @@ test("architecture filter: rootless by default, plus all; no Architecture is dro
   assert.deepEqual(filterArch(st).map((p) => p.package), ["a", "c"]);
   assert.deepEqual(filterArch(st, "iphoneos-arm").map((p) => p.package), ["b", "c"]);
   assert.equal(matchesArch({}), false);
+});
+
+test("F38: roothide lists iphoneos-arm64e packages and all", () => {
+  const st = parseControl("Package: a\nArchitecture: iphoneos-arm64\n\nPackage: e\nArchitecture: iphoneos-arm64e\n\n"
+    + "Package: c\nArchitecture: all\n");
+  assert.ok(ARCHES.includes("iphoneos-arm64e"));
+  assert.deepEqual(filterArch(st, "iphoneos-arm64e").map((p) => p.package), ["e", "c"]);
 });

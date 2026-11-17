@@ -26,7 +26,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         on("app.info") { c in
             let info = Bundle.main.infoDictionary ?? [:]
             c.reply(["version": info["CFBundleShortVersionString"] ?? "", "build": info["CFBundleVersion"] ?? "",
-                     "ios": UIDevice.current.systemVersion], nil)
+                     "ios": UIDevice.current.systemVersion, "jailbreak": Jailbreak.type], nil)
         }
         // The Appearance setting (F23, from screens/settings.js applyTheme): {style: auto|light|dark, theme}.
         on("app.theme") { c in
@@ -50,6 +50,17 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         h(Call(id: (body["id"] as? NSNumber)?.intValue ?? 0, params: body["params"] as? [String: Any] ?? [:],
                web: message.webView, reply: replyHandler))
     }
+}
+
+// The jailbreak type for app.info (F38; web/app/device.js turns it into Settings' device type): "roothide" when
+// libroothide's jbroot is loaded (Apt.swift's Jailbreak.prefix then comes from it), "rootless" under /var/jb,
+// "rootful" when dpkg lives at / and "none" when there is no dpkg at all (the sideload build on a stock iPhone).
+extension Jailbreak {
+    static let type: String = {
+        if dlsym(UnsafeMutableRawPointer(bitPattern: -2), "jbroot") != nil { return "roothide" } // RTLD_DEFAULT
+        if prefix == "/var/jb" { return "rootless" }
+        return FileManager.default.fileExists(atPath: "/var/lib/dpkg/status") ? "rootful" : "none"
+    }()
 }
 
 // Serves Bundle/web/* as cydian://app/*. A real origin (unlike file://), so ES modules, module workers and

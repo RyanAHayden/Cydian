@@ -321,6 +321,10 @@ export function seedRecord(url) {
     updated: null, error: null };
 }
 
+// F43: a source nothing has been read from yet (a seedRecord: no refresh, not even a failed one, has saved
+// `updated`), so its row would show the bare host and a letter icon.
+export const neverLoaded = (source) => Boolean(source) && source.updated == null && !source.error;
+
 // The AltStore source list: its own IndexedDB database, so the APT list, apt's sources.list in the app (F33) and
 // its helper never see these. `defaults` (URLs, core/sources.js DEFAULT_ALT_SOURCES on the site) go in once, the
 // first time a store with a "meta" store opens (version 2), so a default the user deletes stays deleted.

@@ -31,6 +31,12 @@ Shortcuts recipes live in `docs/shortcuts.md`.
 - Cydian is its own project, with its own patterns: don't copy or depend on the user's other projects (code,
   CSS, deploy scripts, signing or hosting). Sideload installs happen on the phone, Feather-style (docs/sideload.md, R5).
 - Bundle ID and package name: `com.ryha.cydian` (extensions and spikes add a suffix: `com.ryha.cydian.share`).
+- Drawing iOS 6 controls: take colours and shapes from the 4S's UIKit art (`ref/4s/artwork/Shared@2x/`, sample the
+  pixels), pressed states from its `*Pressed` images. Never add highlights, glows or bottom lines the phone doesn't
+  draw. A gradient on an element with a border needs `background-origin: border-box` (repeat it after any
+  `background:` shorthand), or it tiles into the border and shows a light line at the bottom. The bar buttons, back
+  arrow and switch in `web/app/ios6.css` are the reference: copy their approach for new controls, and check a 3x
+  render zoomed in before calling it done.
 - Never commit Apple artwork (UIKit `.artwork` extracts, system icons) or Cydia's logo. Pulled device files go in
   `ref/` (gitignored). Use them as a reference and redraw in CSS/SVG. Don't name the product or pages "Cydia".
   `ref/` exists only in the main checkout. In a worktree, link it first:

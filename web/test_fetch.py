@@ -405,3 +405,202 @@ class RouteTest(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def conditional(body, etag=None, last_modified=None, headers=None):
+    """A route that answers 304 to a matching If-None-Match (else If-Modified-Since), like a static file server."""
+    def handle(h):
+        inm, ims = h.headers.get("If-None-Match"), h.headers.get("If-Modified-Since")
+        hit = (inm == etag) if inm is not None and etag else bool(ims and ims == last_modified)
+        h.send_response(304 if hit else 200)
+        for k, v in (headers or {}).items():
+            h.send_header(k, v)
+        if etag:
+            h.send_header("ETag", etag)
+        if last_modified:
+            h.send_header("Last-Modified", last_modified)
+        if hit:
+            h.end_headers()
+            return
+        h.send_header("Content-Length", str(len(body)))
+        h.end_headers()
+        h.wfile.write(body)
+    return 200, {}, handle
+
+
+class UpstreamRevalidateTest(Base):
+    """F55: the fetcher keeps each URL's ETag/Last-Modified and body, asks the repo conditionally, serves 304s from
+    what it kept; PackagesCache entries past their TTL are revalidated the same way."""
+
+    def setUp(self):
+        super().setUp()
+        self.f.upstream_cache = fetch.UpstreamCache()
+
+    def sent(self, path):
+        return [h for p, h in Handler.seen if p == path]
+
+    def test_etag_revalidated(self):
+        Handler.routes = {"/Release": conditional(b"Origin: X\n", etag='"v1"', headers={"Content-Type": "text/plain"})}
+        r = self.f.get(self.url("/Release"))
+        self.assertEqual((r.status, r.body, r.revalidated), (200, b"Origin: X\n", False))
+        self.assertNotIn("If-None-Match", self.sent("/Release")[0])
+        r = self.f.get(self.url("/Release"))
+        self.assertEqual(self.sent("/Release")[1].get("If-None-Match"), '"v1"')
+        self.assertEqual((r.status, r.body, r.revalidated), (200, b"Origin: X\n", True))
+        self.assertEqual(r.headers.get("content-type"), "text/plain")
+
+    def test_last_modified_revalidated(self):
+        lm = "Tue, 17 Nov 2026 10:00:00 GMT"
+        Handler.routes = {"/i.png": conditional(b"\x89PNG", last_modified=lm)}
+        self.f.get(self.url("/i.png"))
+        r = self.f.get(self.url("/i.png"))
+        self.assertEqual(self.sent("/i.png")[1].get("If-Modified-Since"), lm)
+        self.assertTrue(r.revalidated)
+        self.assertEqual(r.body, b"\x89PNG")
+
+    def test_changed_body_replaces_kept(self):
+        Handler.routes = {"/f": conditional(b"one", etag='"1"')}
+        self.f.get(self.url("/f"))
+        Handler.routes = {"/f": conditional(b"two", etag='"2"')}
+        r = self.f.get(self.url("/f"))
+        self.assertEqual((r.body, r.revalidated), (b"two", False))
+        self.f.get(self.url("/f"))
+        self.assertEqual(self.sent("/f")[2].get("If-None-Match"), '"2"')
+
+    def test_no_validators_not_kept(self):
+        Handler.routes = {"/plain": (200, {}, b"x")}
+        self.f.get(self.url("/plain"))
+        self.f.get(self.url("/plain"))
+        self.assertEqual(len(self.f.upstream_cache), 0)
+        self.assertNotIn("If-None-Match", self.sent("/plain")[1])
+        self.assertNotIn("If-Modified-Since", self.sent("/plain")[1])
+
+    def test_without_cache_nothing_sent(self):
+        self.f.upstream_cache = None
+        Handler.routes = {"/f": conditional(b"one", etag='"1"')}
+        self.f.get(self.url("/f"))
+        r = self.f.get(self.url("/f"))
+        self.assertNotIn("If-None-Match", self.sent("/f")[1])
+        self.assertEqual((r.status, r.body), (200, b"one"))
+
+    def test_redirect_hops_rechecked_and_target_revalidated(self):
+        Handler.routes = {"/r": (302, {"Location": "/f"}, b""), "/f": conditional(b"one", etag='"1"')}
+        self.f.get(self.url("/r"))
+        r = self.f.get(self.url("/r"))
+        self.assertEqual(len(self.sent("/r")), 2)  # the redirect itself is always asked again
+        self.assertEqual(self.sent("/f")[1].get("If-None-Match"), '"1"')
+        self.assertTrue(r.revalidated)
+        self.assertEqual(r.url, self.url("/f"))
+
+    def test_cache_bounded(self):
+        c = fetch.UpstreamCache(max_bytes=10, entry_max=8, max_entries=2)
+        c.put("a", {"etag": '"a"'}, b"123456")
+        c.put("b", {"etag": '"b"'}, b"123456")
+        self.assertIsNone(c.get("a"))
+        self.assertIsNotNone(c.get("b"))
+        c.put("big", {"etag": '"x"'}, b"123456789")
+        self.assertIsNone(c.get("big"))
+        c.put("c", {"etag": '"c"'}, b"1")
+        c.put("d", {"etag": '"d"'}, b"1")
+        self.assertEqual(len(c), 2)
+
+    def test_kept_body_over_call_cap_not_used(self):
+        Handler.routes = {"/f": conditional(b"0123456789", etag='"1"')}
+        self.f.get(self.url("/f"))
+        with self.assertRaises(fetch.FetchError):
+            self.f.get(self.url("/f"), max_bytes=5)
+        self.assertNotIn("If-None-Match", self.sent("/f")[1])
+
+    def test_strange_validator_not_sent(self):
+        c = self.f.upstream_cache
+        c.put(self.url("/f"), {"etag": '"a"\r\nX-Evil: 1'}, b"kept")
+        Handler.routes = {"/f": (200, {}, b"fresh")}
+        r = self.f.get(self.url("/f"))
+        self.assertNotIn("X-Evil", self.sent("/f")[0])
+        self.assertEqual(r.body, b"fresh")
+
+    def test_packages_stale_revalidated(self):
+        now = [1000.0]
+        cache = fetch.PackagesCache(clock=lambda: now[0])
+        Handler.routes = {"/r/Packages.bz2": conditional(bz2.compress(PACKAGES), etag='"p1"')}
+        fetch.fetch_packages(self.f, self.url("/r"), cache)
+        now[0] += 31 * 60
+        n = len(Handler.seen)
+        src, gz, cached = fetch.fetch_packages(self.f, self.url("/r"), cache)
+        self.assertTrue(cached)
+        self.assertEqual(gzip.decompress(gz), PACKAGES)
+        self.assertEqual(src, self.url("/r/Packages.bz2"))
+        self.assertEqual([p for p, _ in Handler.seen[n:]], ["/r/Packages.bz2"])  # no Packages.xz probe
+        self.assertEqual(Handler.seen[-1][1].get("If-None-Match"), '"p1"')
+        # refreshed: a fresh hit again, no request
+        n = len(Handler.seen)
+        self.assertTrue(fetch.fetch_packages(self.f, self.url("/r"), cache)[2])
+        self.assertEqual(len(Handler.seen), n)
+        # Packages bodies are kept by PackagesCache only, not twice
+        self.assertIsNone(self.f.upstream_cache.get(self.url("/r/Packages.bz2")))
+
+    def test_packages_stale_changed(self):
+        now = [1000.0]
+        cache = fetch.PackagesCache(clock=lambda: now[0])
+        Handler.routes = {"/r/Packages.gz": conditional(gzip.compress(PACKAGES), etag='"p1"')}
+        fetch.fetch_packages(self.f, self.url("/r"), cache)
+        now[0] += 31 * 60
+        new = PACKAGES + b"Package: com.example.two\nVersion: 2\n\n"
+        Handler.routes = {"/r/Packages.gz": conditional(gzip.compress(new), etag='"p2"')}
+        n = len(Handler.seen)
+        _, gz, cached = fetch.fetch_packages(self.f, self.url("/r"), cache)
+        self.assertFalse(cached)
+        self.assertEqual(gzip.decompress(gz), new)
+        self.assertEqual([p for p, _ in Handler.seen[n:]], ["/r/Packages.gz"])  # decoded, not fetched twice
+        now[0] += 31 * 60
+        fetch.fetch_packages(self.f, self.url("/r"), cache)
+        self.assertEqual(Handler.seen[-1][1].get("If-None-Match"), '"p2"')
+
+    def test_packages_stale_gone_searches_again(self):
+        now = [1000.0]
+        cache = fetch.PackagesCache(clock=lambda: now[0])
+        Handler.routes = {"/r/Packages.xz": conditional(lzma.compress(PACKAGES), etag='"p1"')}
+        fetch.fetch_packages(self.f, self.url("/r"), cache)
+        now[0] += 31 * 60
+        Handler.routes = {"/r/Packages": (200, {}, PACKAGES)}
+        src, gz, cached = fetch.fetch_packages(self.f, self.url("/r"), cache)
+        self.assertFalse(cached)
+        self.assertEqual(src, self.url("/r/Packages"))
+        self.assertEqual(gzip.decompress(gz), PACKAGES)
+
+    def test_packages_without_validators_expire(self):
+        now = [1000.0]
+        cache = fetch.PackagesCache(clock=lambda: now[0])
+        cache.put("k", "s", b"gz")
+        now[0] += 31 * 60
+        self.assertIsNone(cache.get("k"))
+        self.assertIsNone(cache.stale("k"))
+        cache.put("k", "s", b"gz", {"If-None-Match": '"1"'})
+        self.assertIsNone(cache.stale("k"))  # fresh: not stale
+        now[0] += 31 * 60
+        self.assertIsNone(cache.get("k"))
+        self.assertEqual(cache.stale("k"), ("s", b"gz", {"If-None-Match": '"1"'}))
+
+    def test_route_serves_kept_body(self):
+        import app as A
+        saved = (A.fetcher, A.asset_limiter)
+        A.fetcher, A.asset_limiter = self.f, fetch.RateLimiter(rate=1000)
+        try:
+            c = A.app.test_client()
+            Handler.routes = {"/Release": conditional(b"Origin: X\n", etag='"v1"')}
+            r1 = c.get("/api/fetch", query_string={"url": self.url("/Release")})
+            r2 = c.get("/api/fetch", query_string={"url": self.url("/Release")})
+            self.assertEqual((r1.status_code, r2.status_code), (200, 200))
+            self.assertEqual(r2.data, b"Origin: X\n")
+            self.assertEqual(r2.headers.get("X-Cache"), "REVALIDATED")
+            self.assertEqual(self.sent("/Release")[1].get("If-None-Match"), '"v1"')
+            # the phone's own revalidation still gets its 304 (F19), on top of the repo's
+            r3 = c.get("/api/fetch", query_string={"url": self.url("/Release")},
+                       headers={"If-None-Match": r2.headers["ETag"]})
+            self.assertEqual((r3.status_code, r3.data), (304, b""))
+        finally:
+            A.fetcher, A.asset_limiter = saved
+
+    def test_app_fetcher_has_upstream_cache(self):
+        import app as A
+        self.assertIsInstance(A.fetcher.upstream_cache, fetch.UpstreamCache)

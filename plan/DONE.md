@@ -10,3 +10,6 @@
 
 ### IPA (only if R4 says build)
 - [x] **I1** IPA shell (WKWebView over the site plus native local notifications from a BGAppRefreshTask upgrade check), signed through sidedrop's ad hoc profile. BLOCKED: (after R4) R4 decides whether this exists — dropped: R4 (docs/ipa.md): no IPA. F10 Web Push + F11 Shortcuts cover non-jailbroken update checks; an IPA adds only an unreliable BGAppRefreshTask, a widget and no install ability, at sidedrop signing cost (wildcard ad hoc: no push, no App Groups)
+
+### Follow-ups
+- [x] **D1** (follow-up, low) AGENTS.md and README: R4 decided no IPA (docs/ipa.md). Remove 'ipa/' as the third front door and the 'IPA builds' gate line; point to docs/ipa.md | files: AGENTS.md, README.md

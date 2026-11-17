@@ -4,6 +4,8 @@ A package manager with the iOS 6 Cydia look, for modern iPhones.
 
 - **Web**: browse APT repos and AltStore sources, add sources, check for upgrades. Public, no login.
 - **Jailbreak app**: installs `.deb`s through a root helper, with background upgrade checks.
+  The same app also builds as a sideload IPA for AltStore-style sources; why there is no separate
+  non-jailbroken app: `docs/ipa.md`.
 - **Shortcuts**: daily upgrade checks and auto-updating.
 
 Work is planned in `plan/TODO.md` and run with [agent-runner](https://github.com/FIZL0/agent-runner):

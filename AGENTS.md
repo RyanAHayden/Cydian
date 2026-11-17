@@ -1,6 +1,6 @@
 # Agent rules
 
-Cydian: a package manager with the iOS 6 Cydia look, for modern iPhones. Three front doors, one brain:
+Cydian: a package manager with the iOS 6 Cydia look, for modern iPhones. Two front doors, one brain:
 
 1. `web/app/`: **the one frontend** (HTML, CSS, vanilla JS modules, no build step). It runs on the public site and
    inside the jailbreak app. `core/` is pure JS (parsing, versions, Changes, upgrades), tested with `node --test`.
@@ -9,13 +9,15 @@ Cydian: a package manager with the iOS 6 Cydia look, for modern iPhones. Three f
 2. `native/`: jailbreak app, a Swift shell around a WKWebView running `web/app/`, plus a root helper for apt.
    Rootless iOS 15+ up to the coming iOS 27 jailbreak. Shape and feel rules: `docs/native.md`. It must hold
    120 Hz: animate only transform/opacity, virtualise long lists, parse in a Web Worker.
-3. `ipa/`: non-jailbroken app for on-device update checks and notifications, only if R4 decides the PWA can't
-   do it.
+
+There is no separate `ipa/`. R4 found a standalone non-jailbroken IPA not worth it (`docs/ipa.md`); the user then
+chose one app, two builds: the `native/` shell also builds as a sideload IPA with no helper (plan section "IPA:
+sideload management", I2-I4).
 
 Shortcuts recipes live in `docs/shortcuts.md`.
 
-- Gate: `tools/check.sh` (every `test_*.py`). It must pass before `done`. Add the native and IPA builds to it once
-  they exist.
+- Gate: `tools/check.sh` (every `test_*.py`). It must pass before `done`. Add the `native/` builds (jailbreak and
+  sideload) to it once they exist.
 - Python: stdlib first (`bz2`, `lzma`, `gzip`, `email`-style parsing), then what `web/requirements.txt` already
   has. Ask in the journal before adding a dependency.
 - Look and feel: **iOS 6 is the base style, 100%**. iOS 5 elements only where the user asks for one. Source of

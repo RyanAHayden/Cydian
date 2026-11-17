@@ -32,6 +32,11 @@ button { font: inherit; color: inherit; margin: 0; }
   padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right);
 }
 .page-shade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+/* Every tab has its own nav and screen stack, all in the same spot; the inactive ones (later in the DOM) would
+   paint over the active one and take its taps even with their contents hidden. The stacks themselves never take
+   taps; only their pages and nav items do, and hidden ones can't. */
+.nav-stack, .tab-stack { pointer-events: none; }
+.nav-item, .page { pointer-events: auto; }
 .tab-stack.is-active > .page.is-top, .tab-stack.is-active > .page.is-moving,
 .nav-stack.is-active > .nav-item.is-top, .nav-stack.is-active > .nav-item.is-moving { visibility: visible; }
 /* Always on their own compositor layers: toggling will-change at the start and end of a slide would re-lay out

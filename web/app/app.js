@@ -233,6 +233,20 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
   router.selectTab(a.dataset.tab);
 });
 
+// Pressed look while a finger is down, like Cydia's: .is-pressed on the bar button or row under it, off when the
+// finger lifts, leaves, or the touch turns into a scroll (pointercancel). :active alone is unreliable on iOS.
+const PRESSABLE = ".bar-button, a.cell-inner, button.cell-inner";
+let pressed = null;
+const unpress = () => { if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; } };
+document.addEventListener("pointerdown", (e) => {
+  unpress();
+  const el = e.target.closest?.(PRESSABLE);
+  if (el && !el.disabled) { pressed = el; el.classList.add("is-pressed"); }
+}, { passive: true });
+for (const type of ["pointerup", "pointercancel", "pointerleave"]) document.addEventListener(type, unpress, { passive: true });
+document.addEventListener("pointermove", (e) => {
+  if (pressed && !pressed.contains(document.elementFromPoint(e.clientX, e.clientY))) unpress();
+}, { passive: true });
 // iOS only applies :active to elements when a touch listener exists somewhere on the page.
 document.addEventListener("touchstart", () => {}, { passive: true });
 

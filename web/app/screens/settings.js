@@ -92,12 +92,46 @@ function makeSwitch(d) {
   b.type = "button";
   b.className = "switch";
   b.setAttribute("role", "switch");
-  b.setAttribute("aria-checked", String(settings.get(d.key) === true));
   b.setAttribute("aria-label", d.label);
-  b.addEventListener("click", () => {
-    const on = settings.get(d.key) !== true;
+  const TRAVEL = 50; // px the knob moves: track 75 inside the border, knob 25
+  const set = (on) => {
+    b.style.removeProperty("--x");
     b.setAttribute("aria-checked", String(on));
-    settings.set(d.key, on);
+    if ((settings.get(d.key) === true) !== on) settings.set(d.key, on);
+  };
+  b.setAttribute("aria-checked", String(settings.get(d.key) === true));
+  // Hold, drag and tap like iOS: the knob darkens while held and follows the finger; letting go settles it on the
+  // side it's nearer, or flips it if it hardly moved. Keyboard and VoiceOver activation come through click.
+  let drag = null;
+  b.addEventListener("pointerdown", (e) => {
+    const on = b.getAttribute("aria-checked") === "true";
+    drag = { id: e.pointerId, x0: e.clientX, start: on ? TRAVEL : 0, x: on ? TRAVEL : 0, moved: false };
+    b.setPointerCapture?.(e.pointerId);
+    b.classList.add("is-held");
+  });
+  b.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x0;
+    if (!drag.moved && Math.abs(dx) < 4) return;
+    drag.moved = true;
+    drag.x = Math.max(0, Math.min(TRAVEL, drag.start + dx));
+    b.classList.add("is-dragging");
+    b.style.setProperty("--x", drag.x + "px");
+  });
+  const end = (e, cancelled) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const { moved, x, start } = drag;
+    drag = null;
+    b.classList.remove("is-held", "is-dragging");
+    if (cancelled) { set(b.getAttribute("aria-checked") === "true"); return; }
+    set(moved ? x > TRAVEL / 2 : start === 0);
+    b.dataset.handled = "1"; // the click that follows this pointerup is already done
+  };
+  b.addEventListener("pointerup", (e) => end(e, false));
+  b.addEventListener("pointercancel", (e) => end(e, true));
+  b.addEventListener("click", () => {
+    if (b.dataset.handled) { delete b.dataset.handled; return; }
+    set(b.getAttribute("aria-checked") !== "true");
   });
   return b;
 }

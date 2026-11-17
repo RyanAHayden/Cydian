@@ -84,7 +84,9 @@ def healthz():
 
 @app.get("/")
 def index():
-    return send_from_directory(APP_DIR, "index.html")
+    resp = send_from_directory(APP_DIR, "index.html")
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 @app.get("/<path:path>")
@@ -93,6 +95,7 @@ def static_file(path):
     resp = send_from_directory(APP_DIR, path)
     if path.endswith(".js"):
         resp.mimetype = "text/javascript"  # ES modules need a JS MIME type in every browser
+    resp.headers["Cache-Control"] = "no-cache"  # revalidate (cheap: ETag) so a phone never keeps an old CSS/JS
     return resp
 
 

@@ -213,23 +213,30 @@ a.cell-inner.chevron:active::after, button.cell-inner.chevron:active::after, .ce
    #878787), track #007fe9 or #ededed with an inner shadow, ON in white or OFF in grey, and the 27px handle
    (#fbfbfb to #cfcfcf, black edge at 49%) that slides across by transform. Same in both themes, as the kit's. */
 .cell-inner.has-switch { padding-right: 9px; }
+/* "switch (off|on)" from the kit: 77x27 track, 1px border dark at the top (#878787) and light at the bottom (#ccc),
+   inner shadow; a 25px knob inside the border (#cfcfcf to #fbfbfb, white inner edge, soft side shadow). The knob
+   follows the finger while held (--x, set by settings.js) and settles on release. No white emboss on the label. */
 .switch {
+  --x: 0px;
   position: relative; flex: none; width: 77px; height: 27px; padding: 0; overflow: hidden; cursor: pointer;
-  border: 1px solid #878787; border-top-color: #ccc; border-radius: 13.5px;
-  background: #ededed; box-shadow: inset 0 2px 3px rgba(0,0,0,.28);
-  font-size: 17px; font-weight: bold; line-height: 25px; touch-action: manipulation;
+  border: 1px solid; border-color: #878787 #a6a6a6 #ccc; border-radius: 13.5px;
+  background: #ededed; box-shadow: inset 0 2px 3px rgba(0,0,0,.22);
+  font-size: 17px; font-weight: bold; line-height: 25px;
+  touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
 }
-.switch::before {
-  content: "OFF"; position: absolute; top: 0; right: 11px; color: #808080; text-shadow: 0 1px 0 rgba(255,255,255,.75);
-}
-.switch[aria-checked="true"] { background: #007fe9; border-color: #255985; border-top-color: #819fb9; }
-.switch[aria-checked="true"]::before { content: "ON"; right: auto; left: 15px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.25); }
+.switch::before { content: "OFF"; position: absolute; top: 0; right: 10px; color: #7f7f7f; }
+.switch[aria-checked="true"] { --x: 50px; background: #007fe9; border-color: #255985 #3c74a3 #819fb9; }
+.switch[aria-checked="true"]::before { content: "ON"; right: auto; left: 14px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.2); }
 .switch::after {
-  content: ""; position: absolute; top: -1px; left: -1px; width: 27px; height: 27px; border-radius: 50%;
-  background: linear-gradient(#fbfbfb, #cfcfcf); border: 1px solid rgba(0,0,0,.49);
-  box-shadow: 0 1px 2px rgba(0,0,0,.4); transition: transform .2s ease;
+  content: ""; position: absolute; top: 0; left: 0; width: 25px; height: 25px; box-sizing: border-box;
+  border-radius: 50%; border: 1px solid rgba(0,0,0,.45);
+  background: linear-gradient(#cfcfcf, #fbfbfb);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 1.5px 0 2px rgba(0,0,0,.25);
+  transform: translateX(var(--x)); transition: transform .18s ease;
 }
-.switch[aria-checked="true"]::after { transform: translateX(50px); }
+.switch[aria-checked="true"]::after { box-shadow: inset 0 1px 0 rgba(255,255,255,.45), -1.5px 0 2px rgba(0,0,0,.25); }
+.switch.is-held::after { background: linear-gradient(#b9b9b9, #e4e4e4); } /* pressed knob */
+.switch.is-dragging::after { transition: none; }
 @media (prefers-reduced-motion: reduce) { .switch::after { transition: none; } }
 
 /* ---- Plain tables: "Scroll pane" ---- */

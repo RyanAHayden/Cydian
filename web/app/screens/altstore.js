@@ -241,24 +241,8 @@ export function renderApp(body, route, pkg, source) {
   body.append(grouped([{ header: "Details", rows: details }]));
   body.append(grouped([{ header: "Works on My Phone", rows: [{ label: compatBadge(fitCode) }], footer: fit.detail }]));
 
-  // Version history: every version this phone runs (core/altstore.js hides the rest), each with its notes.
-  if (app.versions.length > 1) {
-    const g = el("div", "group");
-    g.append(el("h2", "group-header", "Version History"));
-    const ul = el("ul", "table grouped alt-history");
-    for (const ver of app.versions) {
-      const li = el("li", "cell");
-      const inner = el("div", "cell-inner alt-history-item");
-      const top = el("div", "alt-history-top");
-      top.append(el("span", "cell-label", ver.version), el("span", "cell-detail", [formatDate(ver.date), formatSize(ver.size)].filter(Boolean).join(" · ")));
-      inner.append(top);
-      if (ver.localizedDescription) inner.append(el("p", "alt-history-notes", ver.localizedDescription));
-      li.append(inner);
-      ul.append(li);
-    }
-    g.append(ul);
-    body.append(g);
-  }
+  // Version History (F29): its own page (browse.js renderVersions), every versions[] entry, older ones installable.
+  body.append(grouped([{ rows: [{ label: "Version History", href: deeper(route, `versions:${pkg.row.id}`) }] }]));
 
   // Which source it came from: opens that source's page.
   const sourceName = app.sourceName || (source ? displayName(source) : "") || app.sourceUrl;

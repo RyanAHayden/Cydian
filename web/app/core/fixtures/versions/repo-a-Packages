@@ -1,0 +1,45 @@
+Package: com.example.flip
+Name: Flip
+Version: 1.0.16
+Architecture: iphoneos-arm64
+Section: System
+Author: Ryan Example <ryan@example.com>
+Maintainer: Big Repo <repo@example.com>
+Depends: mobilesubstrate, firmware (>= 15.0)
+Conflicts: com.example.oldflip
+Size: 2465792
+Filename: debs/flip_1.0.16.deb
+Description: Centralized toggles
+
+Package: com.example.flip
+Name: Flip
+Version: 1.0.16~rc3
+Architecture: iphoneos-arm64
+Section: System
+Size: 2400000
+Filename: debs/flip_1.0.16~rc3.deb
+Description: Centralized toggles
+
+Package: com.example.flip
+Name: Flip
+Version: 1.0.16~rc2
+Architecture: iphoneos-arm64
+Section: System
+Filename: debs/flip_1.0.16~rc2.deb
+Description: Centralized toggles
+
+Package: com.example.flip
+Name: Flip
+Version: 1.0.9
+Architecture: iphoneos-arm
+Section: System
+Filename: debs/flip_1.0.9_rootful.deb
+Description: Centralized toggles (rootful build)
+
+Package: com.example.single
+Name: Single
+Version: 2
+Architecture: iphoneos-arm64
+Section: Tweaks
+Filename: debs/single_2.deb
+Description: Only one version

@@ -6,6 +6,7 @@
 //   section:<name>   the packages in that section ("section:*" = All Packages)
 //   package:<id>     a package's page, in the source of the route (the newest version for All Sources/Search)
 //   author:<name>    every package whose Author or Maintainer is <name>
+//   versions:<id>    a package's Version History (F29): every version the sources offer, or an app's versions[]
 // e.g. #/sources/deb%3Ahttps%3A%2F%2Frepo.chariz.com%2F%3A.%2F/section%3ATweaks/package%3Acom.example.tweak
 //
 // Lists come from the catalog in the parse worker (catalog.js); long ones are virtualised (nav/vlist.js).
@@ -16,14 +17,17 @@ import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { catalog, ALL } from "../catalog.js";
 import { NO_SECTION, indexLetter, parseAuthor, simpleSection } from "../core/catalog.js";
-import { description, parseRelations } from "../core/apt.js";
+import { description, parseRelations, compareVersions } from "../core/apt.js";
 import { displayName, releaseDepiction } from "../core/sources.js";
 import { renderSileo, mediaUrl } from "./depiction.js";
 import { settings, createSwitch } from "./settings.js";
 import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js";
 import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
-import { renderAltSource, renderApp } from "./altstore.js";
+import { renderAltSource, renderApp, installRows, formatDate, osRange } from "./altstore.js";
+import { showActionSheet } from "../nav/actionsheet.js";
+import { detectMode } from "../core/settings.js";
+import { apps, recordInstall } from "../core/installed.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -56,7 +60,7 @@ export function parseToken(seg) {
   const s = String(seg ?? "");
   const i = s.indexOf(":");
   const kind = i > 0 ? s.slice(0, i) : "";
-  return ["section", "package", "author"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
+  return ["section", "package", "author", "versions"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
 }
 
 export const token = (kind, value) => `${kind}:${value}`;
@@ -88,7 +92,10 @@ export function nav(route, sourceName = () => null) {
     };
     case "section": return { title: p.value === ALL ? "All Packages" : p.value, style: "plain" };
     case "author": return { title: p.value || "Author", style: "plain" };
-    case "package": return { title: names.get(p.value) || p.value };
+    // F29: Install (Modify once the page knows it's installed) opens the action sheet of what can be done here.
+    case "package": return { title: names.get(p.value) || p.value,
+      right: { label: "Install", onClick: (e) => packageActions(route, e.currentTarget) } };
+    case "versions": return { title: "Versions" };
     default: return { title: "Not Found" };
   }
 }
@@ -100,6 +107,7 @@ export function render(body, route, ctx) {
     case "section": return renderList(body, route, () => catalog.list(p.key, p.value), true);
     case "author": return renderList(body, route, () => catalog.author(p.value), true);
     case "package": return renderPackage(body, route, p.key, p.value, ctx);
+    case "versions": return renderVersions(body, route, p.key, p.value);
     default:
       body.append(Object.assign(document.createElement("p"), { className: "empty", textContent: "Nothing here." }));
   }
@@ -332,7 +340,10 @@ async function renderPackage(body, route, key, id, ctx) {
   if (st.kind === "ipa" && st.ipa) { // F9: an AltStore app
     names.set(id, st.name);
     setTitle(body, st.name);
-    return renderApp(body, route, pkg, sources.find((s) => s.key === pkg.key));
+    const altSrc = sources.find((s) => s.key === pkg.key);
+    renderApp(body, route, pkg, altSrc);
+    rememberPackage(body, route, { id, pkg, source: altSrc, history: await catalog.history(id, key).catch(() => null) });
+    return;
   }
   const sourceOf = (k) => sources.find((s) => s.key === k);
   const source = sourceOf(pkg.key);
@@ -365,7 +376,14 @@ async function renderPackage(body, route, key, id, ctx) {
   const headMark = el("span", "compat-mark large");
   setMark(headMark, fitCode);
   nameLine.append(el("span", "pkg-head-name", name), headMark);
-  ht.append(nameLine, el("span", "pkg-head-version", st.version ?? ""));
+  ht.append(nameLine);
+  const headAuthor = parseAuthor(st.author) || parseAuthor(st.maintainer);
+  if (headAuthor) { // F29: who made it, under the name; opens their packages
+    const a = el("a", "pkg-head-author", headAuthor.name);
+    a.href = deeper(route, token("author", headAuthor.name));
+    ht.append(a);
+  }
+  ht.append(el("span", "pkg-head-version", st.version ?? ""));
   const fitBadge = el("span", "pkg-compat", fit.label);
   fitBadge.dataset.compat = fitCode;
   ht.append(fitBadge);
@@ -405,6 +423,10 @@ async function renderPackage(body, route, key, id, ctx) {
   const inst = Number(st["installed-size"]);
   if (inst > 0) details.push({ label: "Installed Size", detail: formatSize(inst * 1024) });
   details.push({ label: "Section", detail: pkg.row.section === NO_SECTION ? "—" : pkg.row.section });
+  if (!pkg.installedOnly) {
+    details.push({ label: "Source", detail: sourceName || "Unknown",
+      href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) });
+  }
   details.push({ label: "Identifier", detail: st.package });
   if (st.architecture) details.push({ label: "Architecture", detail: st.architecture });
 
@@ -441,6 +463,10 @@ async function renderPackage(body, route, key, id, ctx) {
   }
   if (more.length) body.append(grouped([{ rows: more.map((r) => ({ ...r, chevron: true })) }]));
   body.append(grouped([{ header: "Details", rows: details }]));
+  // F29: Version History, every version the sources offer (Downgrade's list); and Modify once it's installed.
+  const history = await catalog.history(id, key).catch(() => null);
+  rememberPackage(body, route, { id, pkg, source, history });
+  if (history?.versions.length) body.append(versionHistoryRow(route, id, history));
   body.append(grouped([{ header: "Works on My Phone", rows: [{ label: compatBadge(fitCode) }],
     footer: fit.detail }]));
   const installedEl = await installedGroup(st.package || id);
@@ -457,6 +483,202 @@ async function renderPackage(body, route, key, id, ctx) {
   body.append(grouped([{ footer: `${st.package}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
 
   if (sileo) loadSileo(depictionSlot, sileo, { fallback: descText });
+}
+
+// ---- Install / Modify and Version History (F29) ------------------------------------------------------------
+//
+// Cydia's nav bar button: Install, or Modify when the package is installed (ref/4s/screens/cydia-package-top.png),
+// opening an action sheet (cydia-package-modify.png: Reinstall, Remove, Downgrade; Downgrade then lists the
+// older versions, cydia-package-downgrade.png). The install queue is N4's: a backend that has one exposes
+// `queue({ op: "install" | "remove", id, version })` and the sheet offers those; until then it offers what works
+// here: the Version History page, the .deb on the site, and an AltStore app's install rows.
+
+// Package pages on screen, by route, for their nav bar button: { body, route, id, pkg, source, history }.
+const packagePages = new Map();
+
+function rememberPackage(body, route, page) {
+  for (const [k, p] of packagePages) if (!p.body.isConnected) packagePages.delete(k);
+  packagePages.set(format(route), { body, route, ...page });
+  const installed = page.pkg.stanza.kind !== "ipa" && page.history?.versions.some((v) => v.installed);
+  setRightLabel(body, installed ? "Modify" : "Install");
+}
+
+const installedOf = (history) => history?.versions.find((v) => v.installed)?.version ?? null;
+const queueOf = () => { const b = getBackend(); return typeof b.queue === "function" ? (job) => b.queue(job) : null; };
+const isPaid = (st) => /(^|,)\s*cydia::commercial\s*(,|$)/.test(st?.tag ?? "");
+const versionsHref = (route, id) => deeper(route, token("versions", id));
+const go = (href) => { location.hash = href.replace(/^#/, ""); };
+
+function downloadDeb(url, name) {
+  const a = document.createElement("a");
+  a.href = getBackend().assetUrl(url);
+  a.download = decodeURIComponent(url.split("/").pop() || `${name}.deb`);
+  document.body.append(a);
+  a.click();
+  a.remove();
+}
+
+// F30's record of an app installed without a jailbreak (as renderApp does for its Install rows).
+function recordApp(pkg, source, v) {
+  if (detectMode() === "jailbreak") return undefined;
+  const app = pkg.stanza.ipa;
+  return () => {
+    apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: v.version, key: pkg.key,
+      source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
+  };
+}
+
+// An action sheet over [{ label, run }]; runs the tapped one.
+async function sheet(title, actions) {
+  const i = await showActionSheet({ title, buttons: actions.map((a) => a.label) });
+  if (i >= 0) actions[i].run();
+}
+
+async function packageActions(route, button) {
+  const page = packagePages.get(format(route));
+  if (!page || !page.body.isConnected) return;
+  const { id, pkg, source, history } = page;
+  const st = pkg.stanza;
+  const many = (history?.versions.length ?? 0) > 1;
+  const actions = [];
+  if (st.kind === "ipa" && st.ipa) {
+    const v = st.ipa.versions[0];
+    const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v));
+    for (const r of rows) actions.push({ label: r.label, run: r.onClick });
+    if (many) actions.push({ label: "Version History", run: () => go(versionsHref(route, id)) });
+    return sheet(options.itms ? "" : "A sideloader signs this app on the iPhone with your Apple ID.", actions);
+  }
+  const queue = queueOf();
+  const installed = installedOf(history);
+  const older = installed ? history.versions.filter((v) => v.keys.length && compareVersions(v.version, installed) < 0) : [];
+  if (queue) {
+    if (installed) {
+      actions.push({ label: "Reinstall", run: () => queue({ op: "install", id, version: installed }) });
+      actions.push({ label: "Remove", run: () => queue({ op: "remove", id }) });
+      if (older.length) actions.push({ label: "Downgrade", run: () => sheet("", older.map((v) => ({ label: v.version, run: () => queue({ op: "install", id, version: v.version }) }))) });
+    } else {
+      actions.push({ label: "Install", run: () => queue({ op: "install", id, version: st.version }) });
+    }
+  } else if (installed && older.length) {
+    actions.push({ label: "Downgrade", run: () => go(versionsHref(route, id)) });
+  }
+  if (many && !(installed && older.length)) actions.push({ label: "Other Versions", run: () => go(versionsHref(route, id)) });
+  if (st.debUrl && getBackend().kind === "http" && !isPaid(st)) actions.push({ label: "Download .deb", run: () => downloadDeb(st.debUrl, st.package) });
+  const title = queue ? "" : getBackend().kind === "http"
+    ? "Packages install on the iPhone, from Cydian's jailbreak app or another package manager."
+    : "Installing from Cydian comes with its install queue, which this build doesn't have yet.";
+  return sheet(title, actions);
+}
+
+// The package page's row to its Version History: how many versions are on offer.
+function versionHistoryRow(route, id, history) {
+  const n = history.versions.filter((v) => (history.kind === "ipa" ? true : v.keys.length)).length;
+  return grouped([{ rows: [{ label: "Version History", detail: n === 1 ? "1 version" : `${n} versions`, href: versionsHref(route, id) }] }]);
+}
+
+// One version's cell: version (and build), its tags, the detail on the right, a line under it, release notes.
+function versionCell({ label, tags = [], detail = null, sub = null, notes = null, onClick = null, unavailable = false }) {
+  const li = el("li", "cell version-row");
+  if (unavailable) li.classList.add("unavailable");
+  const inner = el(onClick ? "button" : "div", "cell-inner");
+  if (onClick) { inner.type = "button"; inner.addEventListener("click", onClick); }
+  const top = el("div", "version-top");
+  top.append(el("span", "cell-label", label));
+  for (const t of tags) top.append(el("span", "version-tag", t));
+  if (detail) top.append(el("span", "cell-detail", detail));
+  inner.append(top);
+  if (sub) inner.append(el("span", "version-sub", sub));
+  if (notes) inner.append(el("p", "version-notes", notes));
+  li.append(inner);
+  return li;
+}
+
+function versionsGroup(cells, footer) {
+  const g = el("div", "group");
+  const ul = el("ul", "table grouped versions");
+  ul.append(...cells);
+  g.append(ul);
+  if (footer) g.append(el("p", "group-footer", footer));
+  return g;
+}
+
+// The Version History page. APT: every version any source offers, newest first, with the sources that carry it;
+// tapping one offers installing it (N4's queue: Downgrade) or, on the site, its .deb. AltStore: every versions[]
+// entry with its date, size, iOS range and notes; one this iPhone runs installs from its own row when it has an
+// IPA (or a signed link); the others are greyed.
+async function renderVersions(body, route, key, id) {
+  body.append(spinner("Loading"));
+  let history, pkg, sources;
+  try {
+    await catalog.ensure();
+    [history, pkg, sources] = await Promise.all([catalog.history(id, key), catalog.package(id, key), getBackend().sources()]);
+  } catch (e) {
+    body.replaceChildren(el("p", "empty", e.message));
+    return;
+  }
+  if (!history || !pkg) {
+    body.replaceChildren(grouped([{ rows: [{ label: "Package not found" }], footer: id }]));
+    return;
+  }
+  const sourceLabel = (k) => { const s = sources.find((x) => x.key === k); return s ? displayName(s) : k; };
+  body.replaceChildren();
+  if (history.kind === "ipa") {
+    const source = sources.find((s) => s.key === history.key);
+    const cells = history.versions.map((v) => {
+      const can = v.runs && v.installable;
+      return versionCell({
+        label: `Version ${v.version}${v.buildVersion ? ` (${v.buildVersion})` : ""}`,
+        tags: v.candidate ? ["Latest"] : [],
+        detail: formatDate(v.date),
+        sub: [formatSize(v.size), v.runs ? osRange(v) : `Needs ${osRange(v) ?? "another iOS version"}`].filter(Boolean).join(" · ") || null,
+        notes: v.localizedDescription || null,
+        unavailable: !can,
+        onClick: can ? () => {
+          const { rows, options } = installRows(v, history.sourceUrl, undefined, recordApp(pkg, source, v));
+          sheet(options.itms ? `${history.name} ${v.version}` : `${history.name} ${v.version}\nA sideloader signs it on the iPhone with your Apple ID.`,
+            rows.map((r) => ({ label: r.label, run: r.onClick })));
+        } : null,
+      });
+    });
+    const off = history.versions.filter((v) => !(v.runs && v.installable)).length;
+    body.append(versionsGroup(cells, `Every version ${history.name}'s source lists.${off ? " Greyed ones don't run on this iPhone or have no download." : ""}`));
+    return;
+  }
+  const queue = queueOf();
+  const st = pkg.stanza;
+  const site = getBackend().kind === "http";
+  const installed = installedOf(history);
+  const cells = history.versions.map((v) => {
+    const tags = [];
+    if (v.candidate) tags.push("Latest");
+    if (v.installed) tags.push("Installed");
+    const actions = [];
+    if (queue && v.keys.length) {
+      const label = v.version === installed ? "Reinstall" : installed && compareVersions(v.version, installed) < 0 ? "Downgrade" : "Install";
+      actions.push({ label, run: () => queue({ op: "install", id, version: v.version }) });
+    }
+    if (site && v.debUrl && !isPaid(st)) actions.push({ label: "Download .deb", run: () => downloadDeb(v.debUrl, id) });
+    return versionCell({
+      label: v.version, tags,
+      detail: formatSize(v.size),
+      sub: v.keys.length ? v.keys.map(sourceLabel).join(", ") : "No source offers it any more",
+      unavailable: !v.keys.length,
+      onClick: actions.length ? () => sheet(`${history.name} ${v.version}`, actions) : null,
+    });
+  });
+  const how = queue ? "Tap one to install it." : site ? "Tap one for its .deb. Installing an older one is Downgrade, in the jailbreak app." : "Installing an older one is Downgrade, which comes with the install queue.";
+  body.append(versionsGroup(cells, `Every version of ${history.name} your sources offer. ${how}`));
+}
+
+// The nav bar's right button on this page (Install / Modify), found the way setTitle finds the title.
+function setRightLabel(body, label) {
+  const page = body.closest(".page");
+  const stack = page?.parentElement;
+  if (!stack) return;
+  const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
+  const item = document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i];
+  const b = item?.querySelector(".nav-right .bar-button");
+  if (b && b.textContent !== label) b.textContent = label;
 }
 
 // Installed Package (F7, Cydia's Installed Details): the version on the device and the Ignore Upgrades switch

@@ -1,0 +1,16 @@
+Package: com.example.flip
+Name: Flip
+Version: 1.0.16~rc3
+Architecture: iphoneos-arm64
+Section: System
+Size: 2400000
+Filename: pool/flip-rc3.deb
+Description: Centralized toggles
+
+Package: com.example.flip
+Name: Flip
+Version: 1.0.15
+Architecture: iphoneos-arm64
+Section: System
+Filename: pool/flip-1.0.15.deb
+Description: Centralized toggles

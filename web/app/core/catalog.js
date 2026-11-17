@@ -15,6 +15,9 @@
 //   c.package(id, key | "*")               -> { stanza, key, others: [{ key, version }] } or null; a package
 //                                             no source carries but dpkg has installed comes from its status
 //                                             stanza: { stanza, key: null, row, others: [], installedOnly: true }
+//   c.history(id, key | "*")               -> Version History (F29): { kind: "apt", id, name, versions:
+//                                             aptVersionList } or { kind: "ipa", id, name, key, sourceUrl,
+//                                             versions: altVersionList }; null when unknown
 //   c.versions()                           -> [[key, id, version]] for every source (Changes, core/changes.js)
 //   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
 //   c.installed()                          -> [row] installed, sorted by name, each with `installed` (its version)
@@ -34,7 +37,7 @@
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
 import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
 import { compat, compatCode, isIncompatible, normalizeDevice, needText } from "./compat.js";
-import { parseAltSource, appStanza, isAltKey } from "./altstore.js";
+import { parseAltSource, appStanza, isAltKey, runsOn, installOptions } from "./altstore.js";
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -144,6 +147,47 @@ function sectionTest(section) {
   return (r) => r.section === s;
 }
 
+// ---- Version History (F29) ---------------------------------------------------------------------------------
+
+// APT: `offers` [{ key, stanza }] (every version every source lists) -> one entry per version, newest first:
+// { version, keys: [source keys carrying it], size, debUrl, filename, candidate, installed }. `candidate` is the
+// version the page shows; `installed` dpkg's. An installed version no source still offers is listed too (keys []),
+// so Downgrade (N4) sees where the phone stands.
+export function aptVersionList(offers, { candidate = null, installed = null } = {}) {
+  const byVersion = new Map();
+  for (const { key, stanza } of offers) {
+    const v = String(stanza?.version ?? "");
+    if (!v) continue;
+    let o = byVersion.get(v);
+    if (!o) {
+      o = { version: v, keys: [], size: Number(stanza.size) > 0 ? Number(stanza.size) : null, debUrl: stanza.debUrl ?? null,
+        filename: stanza.filename ?? null, candidate: v === candidate, installed: v === installed };
+      byVersion.set(v, o);
+    }
+    if (!o.keys.includes(key)) o.keys.push(key);
+    if (!o.debUrl && stanza.debUrl) o.debUrl = stanza.debUrl;
+  }
+  if (installed && !byVersion.has(installed)) {
+    byVersion.set(installed, { version: installed, keys: [], size: null, debUrl: null, filename: null, candidate: installed === candidate, installed: true });
+  }
+  return [...byVersion.values()].sort((a, b) => compareVersions(b.version, a.version));
+}
+
+// AltStore: every versions[] entry of a parsed app (core/altstore.js parseApp), in the source's order (newest
+// first), each with `runs` (this iOS is inside its min/maxOSVersion; ios null: true), `candidate` (the newest
+// that runs: the one the page shows) and `installable` (it has an IPA or a signed link to install from).
+export function altVersionList(app, ios = null) {
+  const list = Array.isArray(app?.versions) ? app.versions : [];
+  let candidate = false;
+  return list.map((v) => {
+    const runs = runsOn(v, ios);
+    const isCandidate = runs && !candidate;
+    if (isCandidate) candidate = true;
+    const o = installOptions(v, null);
+    return { ...v, runs, candidate: isCandidate, installable: Boolean(o.itms || o.download) };
+  });
+}
+
 export function createCatalog() {
   const sources = new Map(); // key -> { byId: Map(id -> { row, stanza }) }
   let merged = null;         // "All Sources": id -> { row, stanza, key }, built when first asked, dropped on load
@@ -162,11 +206,12 @@ export function createCatalog() {
     for (const st of parseControl(text)) {
       if (!st.package || !matchesArch(st, arch) || !isVisible(st)) continue;
       const cur = byId.get(st.package);
-      // One source can list several versions of a package: the newest is the candidate, as in apt.
-      if (cur && compareVersions(cur.stanza.version, st.version) >= 0) continue;
       st.debUrl = root ? resolveFilename(root, st.filename) : null;
+      // One source can list several versions of a package: the newest is the candidate, as in apt. The others
+      // stay in `older` for the Version History page (F29, history()).
+      if (cur && compareVersions(cur.stanza.version, st.version) >= 0) { cur.older.push(st); continue; }
       st.iconUrl = resolveIcon(root, st.icon);
-      byId.set(st.package, { stanza: st, row: makeRow(st, key) });
+      byId.set(st.package, { stanza: st, row: makeRow(st, key), older: cur ? [cur.stanza, ...cur.older] : [] });
     }
     for (const e of byId.values()) judge(e);
     sources.set(key, { byId });
@@ -185,7 +230,8 @@ export function createCatalog() {
     const byId = new Map();
     for (const app of parsed.apps) {
       const st = appStanza(app, { url: key.replace(/^alt:/, ""), name: parsed.name }, ios);
-      if (st) byId.set(st.package, { stanza: st, row: makeRow(st, key) });
+      // `app` keeps every versions[] entry (the stanza only those that run here) for Version History (F29).
+      if (st) byId.set(st.package, { stanza: st, row: makeRow(st, key), app, ios });
     }
     for (const e of byId.values()) judge(e);
     const { apps, ...meta } = parsed;
@@ -356,6 +402,26 @@ export function createCatalog() {
     return { stanza: e.stanza, key: e.row.key, row: slim(e.row), others };
   }
 
+  // Version History (F29): every version of `id` on offer. APT: each version any source carries (the candidate
+  // and the older ones a Packages file also lists), merged by version (aptVersionList); AltStore: every versions[]
+  // entry of the app in the source of the page (altVersionList). Null when the package isn't in the catalog.
+  function history(id, key = ALL) {
+    const e = entries(key).get(id);
+    if (!e) {
+      const st = statusById.get(id);
+      return st ? { kind: "apt", id, name: st.name || id, versions: aptVersionList([], { installed: st.version }) } : null;
+    }
+    if (e.app) return { kind: "ipa", id, name: e.row.name, key: e.row.key, sourceUrl: e.stanza.ipa?.sourceUrl ?? null,
+      versions: altVersionList(e.app, e.ios) };
+    const offers = [];
+    for (const [k, { byId }] of sources) {
+      if (!counts(k) || isAltKey(k)) continue;
+      const o = byId.get(id);
+      if (o) for (const st of [o.stanza, ...(o.older ?? [])]) offers.push({ key: k, stanza: st });
+    }
+    return { kind: "apt", id, name: e.row.name, versions: aptVersionList(offers, { candidate: e.stanza.version, installed: statusById.get(id)?.version }) };
+  }
+
   // Which of `names` the catalog has (for linking Depends on the package page): on a source, or installed (its
   // page then comes from the status stanza).
   const has = (names) => names.filter((n) => entries(ALL).has(n) || statusById.has(n));
@@ -414,14 +480,14 @@ export function createCatalog() {
     return findUpgrades(installedPkgs, (id) => { const e = all.get(id); return e ? slim(e.row) : null; }, holds, opts);
   }
 
-  return { load, loadAlt, altSource, remove, setHidden, sections, list, search, author, package: pkg, has, versions, keys: () => [...sources.keys()],
+  return { load, loadAlt, altSource, remove, setHidden, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
     setInstalled, installed, upgrades, setDevice };
 }
 
 // Runs a catalog operation by name: the worker's entry point. Unknown ops throw.
 export function runCatalog(catalog, op, args = []) {
   const f = { load: catalog.load, loadAlt: catalog.loadAlt, altSource: catalog.altSource, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
-    search: catalog.search, author: catalog.author, package: catalog.package, has: catalog.has, keys: catalog.keys,
+    search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys,
     versions: catalog.versions, setHidden: catalog.setHidden, setInstalled: catalog.setInstalled,
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);

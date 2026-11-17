@@ -87,6 +87,32 @@ test("ESign: its source and app fields are kept, AltStore's are read", () => {
   assert.equal(made.iconURL, "https://e.dev/i.png");
 });
 
+test("B7: ESign entries repeating an id and name merge into one history; variants keep their own extra", () => {
+  // AppTesters: one ESign entry per version, same bundle id and name.
+  const at = parseIpaSource("esign", { name: "AppTesters", apps: [
+    { name: "Camera", bundleIdentifier: "com.andyworks.camera", version: "2", versionDate: "2026-02-01",
+      downloadURL: "https://e.dev/c2.ipa", lock: 0 },
+    { name: "Camera", bundleIdentifier: "com.andyworks.camera", version: "1", versionDate: "2026-01-01",
+      downloadURL: "https://e.dev/c1.ipa", lock: 1 },
+    { name: "Other", version: "1", downloadURL: "https://e.dev/o1.ipa" },
+    { name: "Other", version: "2", downloadURL: "https://e.dev/o2.ipa" },
+  ] });
+  assert.deepEqual(at.apps.map((a) => a.id), ["com.andyworks.camera", "esign.other"]);
+  assert.deepEqual(at.apps[0].versions.map((v) => v.version), ["2", "1"]);
+  assert.equal(at.apps[0].extra.lock, 0);
+  assert.equal(at.apps[1].versions.length, 2);
+  // RyukSign: variants under one bundle id with different names; each keeps its own entry's extra.
+  const ry = parseIpaSource("altstore", { name: "RyukSign", apps: [
+    { name: "RyukGram", bundleIdentifier: "com.burbn.instagram", flavour: "a",
+      versions: [{ version: "1", downloadURL: "https://e.dev/a.ipa", sha256: "aa" }] },
+    { name: "RyukGram (Duplicate)", bundleIdentifier: "com.burbn.instagram", flavour: "b",
+      versions: [{ version: "1", downloadURL: "https://e.dev/b.ipa", sha256: "bb" }] },
+  ] });
+  assert.deepEqual(ry.apps.map((a) => a.id), ["com.burbn.instagram", "com.burbn.instagram~ryukgram-duplicate"]);
+  assert.deepEqual(ry.apps.map((a) => a.extra.flavour), ["a", "b"]);
+  assert.deepEqual(ry.apps.map((a) => a.versions[0].extra?.sha256), ["aa", "bb"]);
+});
+
 test("Scarlet: groups become categories, bundleID the id, changelog the what's new; Scylla's variant reads too", () => {
   const p = parseIpaSource("scarlet", JSON.parse(text("scarlet-locus.json")));
   assert.equal(p.name, "Locus");

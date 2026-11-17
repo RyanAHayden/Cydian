@@ -5,6 +5,7 @@ How root works and why: docs/native.md, "3. Root". In short: no setuid bit. Cydi
 attributes; the helper checks its words and `execve`s one apt command.
 
     cydian-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
+    cydian-helper hold <pkg>... | unhold <pkg>... | showhold
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
@@ -13,12 +14,15 @@ attributes; the helper checks its words and `execve`s one apt command.
 | `remove`    | same options, `remove <pkg>...`                                                             |
 | `upgrade`   | same options, `upgrade`                                                                     |
 | `configure` | `dpkg --force-confdef --force-confold [--status-fd 3] --configure -a`                       |
+| `hold`      | `apt-mark hold <pkg>...` (F22: Settings > Ignored Upgrades in jailbreak mode)               |
+| `unhold`    | `apt-mark unhold <pkg>...`                                                                  |
+| `showhold`  | `apt-mark showhold`: the held packages on stdout, one per line                              |
 
 - **Arguments:** only the verb and package names. A name matches `[a-z0-9][a-z0-9.+-]+` (so never an option), is
   at most 255 bytes, at most 256 of them, and must be known: for `install` a `Package:` line in dpkg's status or an
-  apt `*_Packages` list, for `remove` in dpkg's status. The last rule stops apt from reading an unknown name as a
-  regex (`com.foo.bar` would match `com.foo.bar2`) or a modifier (`foo-` removes, `foo+` installs). Virtual
-  packages (only in `Provides:`) are refused for that reason; install the real one.
+  apt `*_Packages` list, for `remove`, `hold` and `unhold` in dpkg's status. The last rule stops apt from reading
+  an unknown name as a regex (`com.foo.bar` would match `com.foo.bar2`) or a modifier (`foo-` removes, `foo+`
+  installs). Virtual packages (only in `Provides:`) are refused for that reason; install the real one.
 - **Caller:** real and effective uid 0 (only the entitled app can arrange that), and the parent's executable
   (`proc_pidpath(getppid())`) is the same device + inode as `/var/jb/Applications/Cydian.app/Cydian`.
 - **Process:** stdin `/dev/null`, cwd `/`, fds above 2 closed (3 kept when open, for status), signals default,

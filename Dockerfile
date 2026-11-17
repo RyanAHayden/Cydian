@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends nodejs && rm -r
 WORKDIR /app
 COPY web/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY web/app.py ./
+COPY web/app.py web/fetch.py ./
 COPY web/app ./app
 USER 568:568
 EXPOSE 8080

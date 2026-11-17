@@ -12,8 +12,9 @@ import { createSettings, detectMode, themeFor, SETTINGS } from "../core/settings
 
 export const title = "Settings";
 
-// The one store the app uses (both modes and the site read it through here).
-export const settings = createSettings({ mode: detectMode() });
+// The one store the app uses (both modes and the site read it through here). In the jailbreak app the bridge's
+// helper makes Ignored Upgrades real dpkg holds (F22); the bridge itself is N3's.
+export const settings = createSettings({ mode: detectMode(), helper: globalThis.cydianNative?.helper });
 
 // Light: the top of the blue status bar under the nav bar; dark: "Status Bar (Black)".
 export const THEME_COLORS = { light: "#4f698b", dark: "#5f656f" }; // dark: the gunmetal bar's top
@@ -43,6 +44,9 @@ export function render(el, route) {
   const p = { el, route };
   pages.add(p);
   draw(p);
+  // Holds can change outside the app (another package manager, apt-mark by hand): ask dpkg each time Settings
+  // opens a page; a change redraws through onChange. Without a helper this does nothing.
+  settings.holds.sync().catch(() => {});
 }
 
 function draw({ el, route }) {

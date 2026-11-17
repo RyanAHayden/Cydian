@@ -20,7 +20,8 @@ Not affiliated with Cydia or SaurikIT. No Apple or Cydia artwork is included; th
 
   | Variable | Default | What it does |
   | --- | --- | --- |
-  | `CYDIAN_PROXY_HOPS` | `0` | Number of proxies in front of the app. Set it to `1` behind Cloudflare Tunnel, or every visitor shares one rate-limit bucket (the server would see the tunnel's address) |
+  | `CYDIAN_PORT` | `8080` | Host port compose publishes the app on (deploy.sh health-checks it) |
+  | `CYDIAN_PROXY_HOPS` | `0` | Number of proxies in front of the app. Set it to `1` behind Nginx Proxy Manager, or every visitor shares one rate-limit bucket (the server would see the proxy's address) |
   | `CYDIAN_FETCH_RATE` | `60` | Repo fetches per visitor per minute |
   | `CYDIAN_PUSH_HOUR` | `16` | Hour (UTC) of the daily upgrade check and push (`cydian-push` service, `web/push.py`) |
   | `CYDIAN_VAPID_SUBJECT` | the site's origin | The `sub` push services see in the VAPID token (`https://…` or `mailto:…`) |
@@ -31,7 +32,7 @@ Not affiliated with Cydia or SaurikIT. No Apple or Cydia artwork is included; th
   use; losing it means every subscriber has to turn alerts off and on again. Run a check by hand with
   `docker compose -p cydian exec cydian-push python push.py run`.
 
-## Deploy (TrueNAS + Cloudflare Tunnel)
+## Deploy (TrueNAS + Nginx Proxy Manager, https://cydian.dev)
 
 `deploy.sh` runs from a cron job on the server, in a clone used only for deploying. Each run fetches `main`. If
 `main` moved, it checks out the new commit, runs `docker compose build` and `up -d`, and waits for `/healthz`. If
@@ -42,24 +43,26 @@ so cron only emails you when something happened. `./deploy.sh --status` shows wh
 
 One-time setup on the NAS (TrueNAS SCALE, Docker and git are built in):
 
-1. Make a dataset for the clone (e.g. `tank/apps/cydian`) and clone into it:
-   `git clone https://github.com/RyanAHayden/Cydian.git /mnt/tank/apps/cydian`.
-   If the repo is private, add a read-only deploy key and clone over ssh.
-2. Create `/mnt/tank/apps/cydian/.env` with `CYDIAN_PROXY_HOPS=1`. Cloudflare's edge puts the visitor's
-   address last in `X-Forwarded-For`, and cloudflared passes it through unchanged. With one hop the app trusts
-   only that last entry, so a visitor can't spoof it. Add one more for every reverse proxy you put between
-   cloudflared and the app.
-3. First deploy, as root (or a user in the `docker` group): `/mnt/tank/apps/cydian/deploy.sh`. It should end with
-   `healthy at <commit>`. Check with `curl http://127.0.0.1:8080/healthz` (it answers `ok`).
-4. Cron: **System → Advanced Settings → Cron Jobs → Add**. Command `/mnt/tank/apps/cydian/deploy.sh`, user
-   `root`, schedule every 5 minutes (`*/5 * * * *`). Leave both "Hide Standard Output" and "Hide Standard Error"
-   unticked so deploys and failures get emailed. Quiet runs print nothing.
-5. Cloudflare Tunnel: in the Cloudflare dashboard go to **Zero Trust → Networks → Tunnels → Create a tunnel**
-   (Cloudflared) and copy the tunnel token. On TrueNAS, install the **Cloudflared** app from Apps with that
-   token. Back in the tunnel, add a **Public Hostname** (e.g. `cydian.example.com`) with service
-   `HTTP` → `http://<NAS LAN IP>:8080`.
-6. Check from outside: `https://cydian.example.com/healthz` answers `ok`. Then add a repo in the web UI.
-   `./deploy.sh --status` warns if `CYDIAN_PROXY_HOPS` is missing from `.env`.
+1. Clone into a folder used only for deploying: `git clone https://github.com/RyanAHayden/Cydian.git /mnt/SSD/cydian`.
+2. Create `/mnt/SSD/cydian/.env`:
+   ```
+   CYDIAN_PORT=8095
+   CYDIAN_PROXY_HOPS=1
+   ```
+   `CYDIAN_PORT` is the host port (TrueNAS's own nginx holds 8080). With one proxy (Nginx Proxy Manager) in
+   front, the app trusts only the last `X-Forwarded-For` entry, so a visitor can't spoof it. Add one hop for
+   every further proxy (e.g. Cloudflare's orange cloud).
+3. First deploy, as root: `/mnt/SSD/cydian/deploy.sh`. It should end with `healthy at <commit>`
+   (`curl http://127.0.0.1:8095/healthz` answers `ok`).
+4. Cron: **System → Advanced Settings → Cron Jobs → Add**. Command `/mnt/SSD/cydian/deploy.sh`, user `root`,
+   every 5 minutes (`*/5 * * * *`). Leave "Hide Standard Output/Error" unticked so deploys and failures get
+   emailed. Quiet runs print nothing.
+5. DNS (Namecheap): A records `@` and `www` → the home IP; the router already forwards 80/443 to the NAS.
+6. Nginx Proxy Manager (`http://<NAS>:81`): **Proxy Host** `cydian.dev`, `www.cydian.dev` → `http` `<NAS LAN
+   IP>` `8095`, Websockets off; **SSL**: request a Let's Encrypt certificate, Force SSL, HTTP/2. `.dev` is
+   HSTS-preloaded, so the site only works over HTTPS.
+7. Check from outside: `https://cydian.dev/healthz` answers `ok`. `./deploy.sh --status` warns if
+   `CYDIAN_PROXY_HOPS` is missing from `.env`.
 
 ## License
 

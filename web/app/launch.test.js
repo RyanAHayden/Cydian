@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { launchURL, isStandaloneWeb, navigationType } from "./launch.js";
 
-function win({ standalone = "media", type = "navigate", url = "https://cydian.app/#/sources/x", native = false } = {}) {
+function win({ standalone = "media", type = "navigate", url = "https://cydian.dev/#/sources/x", native = false } = {}) {
   const u = new URL(url);
   return {
     location: { pathname: u.pathname, search: u.search, hash: u.hash },
@@ -16,8 +16,8 @@ function win({ standalone = "media", type = "navigate", url = "https://cydian.ap
 test("fresh standalone launch opens Home, whatever page it was added from", () => {
   assert.equal(launchURL(win()), "/#/home");
   assert.equal(launchURL(win({ standalone: "apple" })), "/#/home"); // older iOS: navigator.standalone only
-  assert.equal(launchURL(win({ url: "https://cydian.app/" })), "/#/home");
-  assert.equal(launchURL(win({ url: "https://cydian.app/#/home" })), null); // already there
+  assert.equal(launchURL(win({ url: "https://cydian.dev/" })), "/#/home");
+  assert.equal(launchURL(win({ url: "https://cydian.dev/#/home" })), null); // already there
 });
 
 test("a reload or back/forward in the standalone app keeps the route", () => {
@@ -26,8 +26,8 @@ test("a reload or back/forward in the standalone app keeps the route", () => {
 });
 
 test("resume from the background keeps the route", () => {
-  assert.equal(launchURL(win({ url: "https://cydian.app/#/changes" }), { resumed: true }), null);
-  assert.equal(launchURL(win({ url: "https://cydian.app/#/sources/x" }), { resumed: true }), null);
+  assert.equal(launchURL(win({ url: "https://cydian.dev/#/changes" }), { resumed: true }), null);
+  assert.equal(launchURL(win({ url: "https://cydian.dev/#/sources/x" }), { resumed: true }), null);
 });
 
 test("Safari tabs and the native app keep the URL", () => {
@@ -36,8 +36,8 @@ test("Safari tabs and the native app keep the URL", () => {
 });
 
 test("a notification tap keeps its page and drops the mark", () => {
-  assert.equal(launchURL(win({ url: "https://cydian.app/?launch=push#/changes" })), "/#/changes");
-  assert.equal(launchURL(win({ standalone: false, url: "https://cydian.app/?launch=push&a=1#/settings" })), "/?a=1#/settings");
+  assert.equal(launchURL(win({ url: "https://cydian.dev/?launch=push#/changes" })), "/#/changes");
+  assert.equal(launchURL(win({ standalone: false, url: "https://cydian.dev/?launch=push&a=1#/settings" })), "/?a=1#/settings");
 });
 
 test("navigationType falls back to performance.navigation", () => {

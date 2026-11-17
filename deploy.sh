@@ -8,13 +8,14 @@
 #   ./deploy.sh --force    rebuild and restart even if nothing moved
 #   ./deploy.sh --status   say what's running and whether an update is waiting; change nothing
 #
-# Environment: CYDIAN_BRANCH (main), CYDIAN_HEALTH_URL (http://127.0.0.1:8080/healthz),
+# Environment: CYDIAN_BRANCH (main), CYDIAN_HEALTH_URL (http://127.0.0.1:$CYDIAN_PORT/healthz, port from .env, 8080),
 # CYDIAN_HEALTH_WAIT seconds (90). Settings for the app itself go in .env next to compose.yaml (see README.md).
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
 BRANCH=${CYDIAN_BRANCH:-main}
-HEALTH_URL=${CYDIAN_HEALTH_URL:-http://127.0.0.1:8080/healthz}
+PORT=$(sed -n 's/^CYDIAN_PORT=//p' .env 2>/dev/null | tail -1)
+HEALTH_URL=${CYDIAN_HEALTH_URL:-http://127.0.0.1:${PORT:-8080}/healthz}
 HEALTH_WAIT=${CYDIAN_HEALTH_WAIT:-90}
 PROJECT=cydian
 
@@ -80,7 +81,7 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 fi
 
 grep -qs '^CYDIAN_PROXY_HOPS=[1-9]' .env ||
-  log "warning: CYDIAN_PROXY_HOPS is not set in .env; behind the tunnel every visitor shares one rate limit"
+  log "warning: CYDIAN_PROXY_HOPS is not set in .env; behind the proxy every visitor shares one rate limit"
 
 log "deploying $(git log -1 --format='%h %s' "$there") (was ${here:0:7})"
 git checkout -q --detach "$there"

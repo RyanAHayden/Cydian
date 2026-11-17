@@ -135,7 +135,7 @@ export function render(body, route, ctx) {
   // Show Incompatible, the iOS version or the Architecture changed (here, in the sheet or in Settings): search
   // again. A page left behind unsubscribes.
   const off = settings.onChange((key) => {
-    if (!["worksOnMyPhone", "iosVersion", "arch"].includes(key)) return;
+    if (!["worksOnMyPhone", "iosVersion", "arch", "device"].includes(key)) return;
     if (!body.isConnected) { off(); return; }
     run();
   });

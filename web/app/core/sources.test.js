@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_SOURCES, normalizeSourceUrl, sourceKey, sourceIconUrl, sourceIconUrls, displayName, sortSources, verifySource,
-  refreshSource, releaseDepiction, openSourceStore, sourceCalls, SourceError,
+  refreshSource, releaseDepiction, openSourceStore, sourceCalls, SourceError, sourcesFor,
 } from "./sources.js";
 import { createHttpBackend, BackendError } from "../backend-http.js";
 import { createParser } from "./parser.js";
@@ -269,4 +269,12 @@ test("Release Depiction: kept on the source by add and refresh, * becomes the pa
   assert.equal(releaseDepiction({ depiction: "cydia://package/*" }, "x"), null);
   assert.equal(releaseDepiction({}, "x"), null);
   assert.equal(releaseDepiction(undefined, "x"), null);
+});
+
+test("F37: Not Jailbroken shows AltStore sources only; a jailbroken type shows them all", () => {
+  const list = [{ key: "https://repo.chariz.com/|./" }, { key: "alt:https://apps.example/source.json" }, { key: "https://havoc.app/|./" }];
+  assert.deepEqual(sourcesFor(list, "none"), { shown: [list[1]], hidden: 2 });
+  assert.deepEqual(sourcesFor(list, "iphoneos-arm64"), { shown: list, hidden: 0 });
+  assert.deepEqual(sourcesFor(list, "iphoneos-arm"), { shown: list, hidden: 0 });
+  assert.deepEqual(sourcesFor(null, "none"), { shown: [], hidden: 0 });
 });

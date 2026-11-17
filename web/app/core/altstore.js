@@ -245,6 +245,23 @@ export function installOptions(version, sourceUrl) {
   return { itms, download, open };
 }
 
+// F37: GET on a phone without a jailbreak: the IPA handed to the sideloader Settings > Sideloader picks, straight
+// from the source's own URL (never through a server of ours). Feather takes feather://install/<url> (FeatherApp.swift,
+// `validatedScheme(after: "/install/")`); AltStore and SideStore take <scheme>://install?url=<encoded url>.
+// "download" is the IPA itself. Returns { name, url } or null when the version has no http(s) IPA.
+export const SIDELOADER_INSTALL = {
+  feather: { name: "Feather", link: (u) => `feather://install/${u}` },
+  altstore: { name: "AltStore", link: (u) => `altstore://install?url=${encodeURIComponent(u)}` },
+  sidestore: { name: "SideStore", link: (u) => `sidestore://install?url=${encodeURIComponent(u)}` },
+  download: { name: null, link: (u) => u },
+};
+export function sideloaderLink(version, sideloader = "feather") {
+  const ipa = httpUrl(version?.downloadURL);
+  if (!ipa) return null;
+  const s = SIDELOADER_INSTALL[sideloader] ?? SIDELOADER_INSTALL.feather;
+  return { name: s.name, url: s.link(ipa) };
+}
+
 // News items flagged notify: true that haven't been pushed (sentIds: identifiers already sent), newest first.
 export function newsToNotify(source, sentIds = []) {
   const sent = new Set(sentIds);

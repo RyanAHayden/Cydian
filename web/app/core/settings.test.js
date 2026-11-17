@@ -162,9 +162,9 @@ test("holds: the helper is only used in jailbreak mode", async () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["appearance", "allowZoom", "arch", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
+    ["appearance", "allowZoom", "device", "sideloader", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
   assert.deepEqual(show("jailbreak"),
-    ["appearance", "allowZoom", "arch", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge",
+    ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge",
       "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
     ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge", "resignReminder"]);
@@ -172,7 +172,7 @@ test("rows each mode shows once every feature exists", () => {
 
 test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone and Ignored Upgrades", () => {
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "arch", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds"]);
+  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds"]);
   assert.equal(s.isShown("autoInstall"), false);
   assert.ok(FEATURES.has("appearance"));
   assert.deepEqual(createSettings({ storage: memStorage(), mode: "site", features: new Set(["appearance"]) })
@@ -237,4 +237,67 @@ test("Works on My Phone (F17): on by default everywhere; the site picks an iOS v
   assert.equal(site.get("iosVersion"), "16.5");
   assert.throws(() => site.set("iosVersion", "99.9"));
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak" }).isShown("iosVersion"), false); // the bridge says
+});
+
+// ---- F37: Device type ----
+
+test("device type defaults: Not Jailbroken on the site and in the sideload build, the bridge's in the jailbreak app", () => {
+  assert.equal(createSettings({ storage: memStorage(), mode: "site" }).deviceType(), "none");
+  assert.equal(createSettings({ storage: memStorage(), mode: "site" }).jailbroken(), false);
+  assert.equal(createSettings({ storage: memStorage(), mode: "sideload" }).deviceType(), "none");
+  assert.equal(createSettings({ storage: memStorage({ "cydian.device": "iphoneos-arm" }), mode: "sideload" }).deviceType(), "none");
+  // jailbreak app: the detected type, never the site's choice
+  const storage = memStorage({ "cydian.device": "none" });
+  const jb = createSettings({ storage, mode: "jailbreak", native: { jailbreak: "rootful" } });
+  assert.equal(jb.deviceType(), "iphoneos-arm");
+  assert.equal(jb.jailbroken(), true);
+  assert.equal(storage.map.get("cydian.arch"), "iphoneos-arm", "the detected type is where getArch() reads it");
+  assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", native: { arch: "iphoneos-arm64" } }).deviceType(), "iphoneos-arm64");
+  // a shell that doesn't say: the stored architecture, else rootless
+  assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", native: {} }).deviceType(), DEFAULT_ARCH);
+  assert.equal(createSettings({ storage: memStorage({ "cydian.arch": "iphoneos-arm" }), mode: "jailbreak" }).deviceType(), "iphoneos-arm");
+});
+
+test("the Device row shows on the site only; the app hides the choice", () => {
+  const shown = (mode) => createSettings({ storage: memStorage(), mode }).isShown("device");
+  assert.equal(shown("site"), true);
+  assert.equal(shown("jailbreak"), false);
+  assert.equal(shown("sideload"), false);
+  assert.equal(createSettings({ storage: memStorage(), mode: "site" }).isShown("arch"), false);
+  const site = createSettings({ storage: memStorage(), mode: "site" });
+  assert.deepEqual(site.sections().map((x) => x.id).slice(0, 2), ["appearance", "device"]);
+  assert.deepEqual(SETTINGS.find((d) => d.key === "device").options.map((o) => o.label),
+    ["Not Jailbroken", "Jailbroken (Rootless)", "Jailbroken (Rootful)"]);
+});
+
+test("picking a jailbroken type on the site sets the architecture too, and listeners hear both", () => {
+  const storage = memStorage();
+  const s = createSettings({ storage, mode: "site" });
+  const heard = [];
+  s.onChange((k, v) => heard.push([k, v]));
+  s.set("device", "iphoneos-arm");
+  assert.equal(s.deviceType(), "iphoneos-arm");
+  assert.equal(storage.map.get("cydian.arch"), "iphoneos-arm");
+  assert.deepEqual(heard, [["device", "iphoneos-arm"], ["arch", "iphoneos-arm"]]);
+  heard.length = 0;
+  s.set("device", "none");
+  assert.equal(s.deviceType(), "none");
+  assert.equal(storage.map.get("cydian.arch"), "iphoneos-arm", "Not Jailbroken leaves the architecture alone");
+  assert.deepEqual(heard, [["device", "none"]]);
+  assert.throws(() => s.set("device", "iphoneos-arm64e"));
+});
+
+test("a site visitor who had picked an Architecture keeps it as their device type", () => {
+  assert.equal(createSettings({ storage: memStorage({ "cydian.arch": "iphoneos-arm" }), mode: "site" }).deviceType(), "iphoneos-arm");
+  assert.equal(createSettings({ storage: memStorage({ "cydian.arch": "iphoneos-arm", "cydian.device": "none" }), mode: "site" }).deviceType(), "none");
+  assert.equal(createSettings({ storage: memStorage({ "cydian.arch": "x86" }), mode: "site" }).deviceType(), "none");
+});
+
+test("Sideloader: Feather by default, on the site only", () => {
+  const s = createSettings({ storage: memStorage(), mode: "site" });
+  assert.equal(s.get("sideloader"), "feather");
+  s.set("sideloader", "sidestore");
+  assert.equal(s.get("sideloader"), "sidestore");
+  assert.equal(createSettings({ storage: memStorage(), mode: "sideload" }).isShown("sideloader"), false);
+  assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak" }).isShown("sideloader"), false);
 });

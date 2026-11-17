@@ -292,3 +292,67 @@ test("Search (F35): incompatible packages are hidden by default, except an exact
   c.setDevice({ ios: "14.2", jailbreak: "rootless" });
   assert.equal(c.search("flex")[0].exact, undefined);
 });
+
+// ---- F37: Device type. Not Jailbroken sees AltStore apps only; a jailbroken type sees its arch's debs and apps. ----
+
+const ALT_KEY = "alt:https://apps.example/source.json";
+const ALT_JSON = JSON.stringify({
+  name: "Apps", identifier: "com.example.apps",
+  apps: [
+    { name: "Delta", bundleIdentifier: "com.example.delta", developerName: "Riley", localizedDescription: "a springboard-free emulator",
+      versions: [{ version: "1.5", date: "2026-01-01", downloadURL: "https://apps.example/Delta.ipa", size: 1000, minOSVersion: "14.0" }] },
+  ],
+});
+const STATUS = "Package: com.a.tweak\nStatus: install ok installed\nVersion: 1.0\nArchitecture: iphoneos-arm64\n\n";
+
+function withApps(arch) {
+  const c = createCatalog();
+  c.load("A", REPO_A, "https://a.example/", arch);
+  c.load("B", REPO_B, "https://b.example/", arch);
+  c.loadAlt(ALT_KEY, ALT_JSON, "16.5");
+  c.setInstalled(STATUS);
+  return c;
+}
+
+test("Not Jailbroken: only AltStore apps, everywhere, whatever the Works on My Phone switch says", () => {
+  for (const filter of [true, false]) {
+    const c = withApps("iphoneos-arm64");
+    c.setDevice({ ios: "16.5", jailbreak: "none" }, { filter });
+    assert.deepEqual(ids(c.list(ALL, ALL)), ["com.example.delta"], `filter ${filter}`);
+    assert.deepEqual(c.sections(ALL).sections.map((s) => s.name), [c.list(ALL, ALL)[0].section]);
+    assert.deepEqual(ids(c.list("A", ALL)), [], "an APT source's own list is empty");
+    assert.deepEqual(ids(c.search("alpha")), [], "search finds no debs");
+    assert.deepEqual(ids(c.search("com.a.tweak")), [], "not even an exact id match");
+    assert.deepEqual(ids(c.search("springboard")), ["com.example.delta"]);
+    assert.deepEqual(ids(c.search("alpha", { source: "A" })), []);
+    assert.deepEqual(ids(c.author("jane dev")), []);
+    assert.equal(c.package("com.a.tweak", ALL)?.key ?? null, null, "no deb page through the merge");
+    assert.deepEqual(c.upgrades().available, [], "installed upgrades hide debs");
+    assert.equal(c.package("com.example.delta", ALL).key, ALT_KEY);
+  }
+});
+
+test("Jailbroken (Rootless): arm64 debs and apps; Rootful: arm debs and apps", () => {
+  const rootless = withApps("iphoneos-arm64");
+  rootless.setDevice({ ios: "16.5", jailbreak: "rootless" });
+  assert.deepEqual(ids(rootless.list(ALL, ALL)).sort(),
+    ["com.a.nosection", "com.a.theme", "com.a.tweak", "com.a.util", "com.b.springy", "com.example.delta"]);
+  assert.deepEqual(ids(rootless.upgrades().available), ["com.a.tweak"]);
+  assert.deepEqual(ids(rootless.search("alpha")), ["com.a.tweak"]);
+
+  const rootful = withApps("iphoneos-arm");
+  rootful.setDevice({ ios: "16.5", jailbreak: "rootful" });
+  assert.deepEqual(ids(rootful.list(ALL, ALL)).sort(), ["com.a.rootful", "com.a.util", "com.example.delta"]);
+});
+
+test("switching back from Not Jailbroken brings the debs back (caches dropped)", () => {
+  const c = withApps("iphoneos-arm64");
+  c.setDevice({ ios: "16.5", jailbreak: "rootless" });
+  assert.equal(c.list(ALL, ALL).length, 6);
+  c.setDevice({ ios: "16.5", jailbreak: "none" });
+  assert.equal(c.list(ALL, ALL).length, 1);
+  assert.equal(c.sections("A").total, 0);
+  c.setDevice({ ios: "16.5", jailbreak: "rootless" });
+  assert.equal(c.list(ALL, ALL).length, 6);
+  assert.equal(c.sections("A").total, 4);
+});

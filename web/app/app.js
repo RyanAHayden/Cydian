@@ -14,6 +14,7 @@ import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transitio
 import { attachEdgeSwipe } from "./nav/swipe.js";
 import { createTabbar } from "./nav/tabbar.js";
 import { showHUD } from "./nav/hud.js";
+import { showAlert } from "./nav/alert.js";
 import * as home from "./screens/home.js";
 import * as sources from "./screens/sources.js";
 import * as changes from "./screens/changes.js";
@@ -43,6 +44,7 @@ const ctx = {
   back: () => goBack(),
   setBadge: (tab, n) => tabbar.setBadge(tab, n),
   showHUD,
+  showAlert,
 };
 
 const stacks = createStacks({ tabs: TABS, create: makePage });
@@ -235,7 +237,7 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
 
 // Pressed look while a finger is down, like Cydia's: .is-pressed on the bar button or row under it, off when the
 // finger lifts, leaves, or the touch turns into a scroll (pointercancel). :active alone is unreliable on iOS.
-const PRESSABLE = ".bar-button, a.cell-inner, button.cell-inner";
+const PRESSABLE = ".bar-button, a.cell-inner, button.cell-inner, .alert-button";
 let pressed = null;
 const unpress = () => { if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; } };
 document.addEventListener("pointerdown", (e) => {

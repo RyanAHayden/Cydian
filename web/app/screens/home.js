@@ -4,9 +4,19 @@ import { format } from "../router.js";
 
 export const title = "Home";
 
-export function nav(route) {
+export function nav(route, ctx) {
   if (route.path[0] === "about") return { title: "About" };
-  return { title: "Cydian" };
+  return { title: "Cydian", left: { label: "About", onClick: () => showAbout(ctx) } };
+}
+
+// Cydia-style About popup from the nav bar's About button (nav/alert.js, the same UIAlertView as Add Source).
+async function showAbout(ctx) {
+  const { index } = await ctx.showAlert({
+    title: "About Cydian",
+    message: "A package manager with the iOS 6 look, for modern iPhones. Free and open source (GPL-3.0).",
+    buttons: ["Settings", "OK"], cancel: 0,
+  });
+  if (index === 0) ctx.go({ tab: "settings", path: [] });
 }
 
 export function render(el, route) {

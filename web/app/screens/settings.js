@@ -94,7 +94,7 @@ function makeSwitch(d) {
   b.setAttribute("role", "switch");
   b.setAttribute("aria-label", d.label);
   b.innerHTML = '<span class="sw-track"></span><span class="sw-knob"></span>';
-  const TRAVEL = 52; // px the knob moves (79px track, 29px knob over the border)
+  const TRAVEL = 50; // px the knob moves: 77px track, 25px knob 1px inside it (the kit's switch)
   const set = (on) => {
     b.style.removeProperty("--x");
     b.setAttribute("aria-checked", String(on));

@@ -16,7 +16,7 @@
 .vlist { position: relative; contain: layout; }
 .vlist-row, .vlist-header { position: absolute; top: 0; left: 0; right: 0; }
 .vlist-header { z-index: 1; }
-.vlist-sticky { position: sticky; top: 0; z-index: 2; margin-bottom: -23px; }
+.vlist-sticky { position: sticky; top: 0; z-index: 2; margin-bottom: -23px; } /* top: 0 is just under the nav: sticky offsets count from inside the scroller's padding */
 
 /* Package rows: 58px, the 32px icon, name in bold with the version beside it, the short description under. */
 .pkg-row { height: 58px; contain: strict; background: var(--plain); border-bottom: 1px solid var(--keyline); }

@@ -45,7 +45,10 @@ export function createStacks({ tabs, create }) {
       else if (!added.length) kind = "pop";
       else kind = "replace";
       // A pushed entry has its parent right behind it in the browser history, so back can be history.back().
+      // Switching tabs adds history entries in between, so after one no entry can trust history any more: the back
+      // button then goes straight to the parent (Sources > BigBoss, Search, Sources, Back went to Search).
       if (kind === "push") to.pushed = true;
+      if (kind === "tab") for (const t of tabs) for (const e of stacks[t]) e.pushed = false;
       return { kind, tab: route.tab, from, to, added, removed };
     },
   };

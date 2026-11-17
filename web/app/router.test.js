@@ -182,3 +182,13 @@ test("edge swipe commits past half or on a rightward flick", () => {
   assert.equal(swipeCommits(40, 0.5, 390), true);   // flick
   assert.equal(swipeCommits(300, -0.5, 390), false); // flicked back
 });
+
+test("after a tab switch, Back goes to the parent, not back through history (Sources > BigBoss, Search, Sources, Back)", () => {
+  const h = stackHarness("#/sources");
+  h.router.go({ tab: "sources", path: ["bigboss"] });
+  assert.equal(h.stacks.top().pushed, true); // right after the push, history.back() is the parent
+  h.router.selectTab("search");
+  h.router.selectTab("sources");
+  assert.deepEqual(h.stacks.top().path, ["bigboss"]);
+  assert.equal(h.stacks.top().pushed, false); // the entry behind is Search now: Back must replace with the parent
+});

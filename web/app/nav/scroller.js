@@ -14,8 +14,13 @@ export function initScroller(screens) {
   let hideTimer = 0;
   let grab = null;   // finger offset inside the indicator while held
 
+  const navbar = document.getElementById("navbar");
+  const tabbar = document.getElementById("tabbar");
   const geom = () => {
-    const r = screens.getBoundingClientRect();
+    // The track runs between the fixed bars (the scroller itself fills the window under them).
+    const top0 = navbar ? navbar.getBoundingClientRect().bottom : screens.getBoundingClientRect().top;
+    const bottom0 = tabbar ? tabbar.getBoundingClientRect().top : screens.getBoundingClientRect().bottom;
+    const r = { top: top0, height: bottom0 - top0 };
     const track = r.height - 6;
     const h = body.scrollHeight - body.clientHeight;
     const th = Math.max(36, track * body.clientHeight / body.scrollHeight);

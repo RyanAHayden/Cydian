@@ -300,5 +300,6 @@ html.no-zoom, html.no-zoom body { touch-action: pan-x pan-y; }
 .scroll-indicator.grab { width: 7px; right: 1px; border-radius: 4px; }
 
 /* Short pages still rubber-band like iOS: a scroller only bounces when it can scroll, so every page is at least
-   1px taller than its box. */
-.page-body > :first-child { min-height: calc(100% + 1px); }
+   1px taller than its box. A zero-width float does it without changing any element's size (stretching the first
+   child pushed Search's results off the screen). */
+.page-body::before { content: ""; float: left; width: 1px; margin-right: -1px; height: calc(100% + 1px); }

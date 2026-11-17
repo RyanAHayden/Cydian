@@ -55,7 +55,13 @@ export function nav(route, ctx) {
     case "featured": return { title: "Featured" };
     case "sources": return { title: "More Sources" };
   }
-  return { title: "Cydian", left: { label: "About", onClick: () => showAbout(ctx) } };
+  return {
+    title: "Cydian",
+    left: { label: "About", onClick: () => showAbout(ctx) },
+    // Reload, as on Cydia's Home: the Reloading Data HUD, then a fresh load of the app, which picks up newer
+    // versions (the server sends every file with no-cache, so the phone re-checks each one).
+    right: { label: "Reload", onClick: () => { ctx.showHUD("Reloading Data"); setTimeout(() => location.reload(), 350); } },
+  };
 }
 
 // About, laid out like Cydia's on the 4S (ref/4s/screens/cydia-about.png): centred lines in groups with a blank line

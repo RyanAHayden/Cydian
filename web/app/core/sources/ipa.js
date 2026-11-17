@@ -25,14 +25,20 @@ export const slug = (s) => str(s).normalize("NFKD").replace(/[̀-ͯ]/g, "").toLo
 const realId = (v) => { const s = str(v); return /^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(s) ? s : ""; };
 
 // Ids must be unique in a source; Scarlet repos list tweaked builds under the original app's bundle id (two
-// Pokémon GO builds), so a repeat gets the app's name after it.
+// Pokémon GO builds), so a repeat gets the app's name after it. An entry with the same id and the same name is the
+// same app (AppTesters lists one ESign entry per version, B7): it keeps that id, so parseAltSource merges the
+// entries into one version history (F42).
 function idMaker(format) {
   const used = new Set();
+  const given = new Map(); // id + name -> the id handed out
   return (id, name) => {
+    const key = `${id}\n${str(name).toLowerCase()}`;
+    if (given.has(key)) return given.get(key);
     let out = id || `${format}.${slug(name)}`;
     if (used.has(out)) out = `${out}.${slug(name)}`;
     for (let n = 2; used.has(out); n++) out = `${out.replace(/~\d+$/, "")}~${n}`;
     used.add(out);
+    given.set(key, out);
     return out;
   };
 }
@@ -178,16 +184,26 @@ export function toAltSource(format, json) {
 
 const sameVersion = (raw, v) => str(raw?.version ?? raw?.marketingVersion) === v.version && (str(raw?.downloadURL) || null) === v.downloadURL;
 
+const rawKey = (id, name) => `${id}\n${name.toLowerCase()}`;
+
 export function parseIpaSource(format, json) {
   const alt = toAltSource(format, json);
   const parsed = parseAltSource(alt);
   const native = format === "altstore" || format === "esign";
-  const rawApps = new Map(alt.apps.filter(isObj).map((a) => [str(a.bundleIdentifier), a]));
+  // The raw entries behind each parsed app, keyed the way parseAltSource groups them (bundle id + name, F42):
+  // RyukSign-style variants share a bundle id but not a name, and an AppTesters app is many entries (B7).
+  const rawApps = new Map();
+  for (const a of alt.apps.filter(isObj)) {
+    const k = rawKey(str(a.bundleIdentifier), str(a.name) || str(a.bundleIdentifier));
+    if (!rawApps.has(k)) rawApps.set(k, []);
+    rawApps.get(k).push(a);
+  }
   for (const app of parsed.apps) {
-    const raw = rawApps.get(app.bundleIdentifier) ?? {};
+    const raws = rawApps.get(rawKey(app.bundleIdentifier, app.name)) ?? [];
+    const raw = raws[0] ?? {};
     app.extra = native ? pick(raw, ALT_APP_KEYS) : { ...(raw.extra ?? {}) };
     delete app.extra.extra;
-    const rawVersions = Array.isArray(raw.versions) ? raw.versions : [];
+    const rawVersions = raws.flatMap((r) => (Array.isArray(r.versions) ? r.versions : []));
     for (const v of app.versions) {
       const rv = rawVersions.find((r) => sameVersion(r, v));
       const extra = rv && native ? pick(rv, ALT_VERSION_KEYS) : {};

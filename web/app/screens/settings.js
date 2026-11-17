@@ -418,7 +418,7 @@ async function drawSigning(el) {
 // password is found if a text file holds it (core/certfiles.js), so one pick can fill all three.
 function certificateBlock(el, id) {
   const box = document.createElement("div");
-  box.className = "sign-files";
+  box.className = "group sign-files"; // a .group, like every grouped section: its 10px side margins
   const head = Object.assign(document.createElement("h3"), { className: "group-header", textContent: "Certificate" });
   const ul = document.createElement("ul");
   ul.className = "table grouped";

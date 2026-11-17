@@ -1,0 +1,21 @@
+const top = (sel) => `document.querySelector('.tab-stack.is-active .page.is-top ${sel}')`;
+const total = () => q(`${top(".section-row .folder-count")}?.textContent`);
+await go("#/sources/*", 1500); await waitFor(top(".section-row"), 120000); await sleep(1000);
+console.log("All Packages, filter on, iOS 16.5:", await total());
+await q(`localStorage.setItem("cydian.iosVersion", "13.0")`); await p.send("Page.reload"); await sleep(1500);
+await go("#/sources/*", 1500); await waitFor(top(".section-row"), 120000); await sleep(1500);
+console.log("filter on, iOS 13.0:", await total());
+await q(`${top(".compat-filter .switch")}.click()`); await sleep(1500);
+console.log("filter off:", await total(), await q(`localStorage.getItem("cydian.worksOnMyPhone")`));
+await go("#/sources/*/" + encodeURIComponent("section:*"), 2500); await waitFor(top(".pkg-row"), 60000); await sleep(800);
+await shot("all-off-13");
+const id = await q(`(() => { const r = [...document.querySelectorAll('.tab-stack.is-active .page.is-top .pkg-row')].find(r => r.querySelector('.pkg-compat[data-compat="ios"]')); return r && decodeURIComponent(r.querySelector('a').href.split('package%3A')[1] || ''); })()`);
+console.log("an incompatible one:", id);
+await go("#/search", 800);
+await q(`(() => { const i = ${top("input")}; i.value = "tweak"; i.dispatchEvent(new Event("input")); })()`);
+await sleep(1500); await shot("search");
+if (id) { await go("#/search/" + encodeURIComponent("package:" + id), 300); await waitFor(top(".pkg-head"), 60000); await sleep(1500); await shot("package"); await q(`${top("")}.closest('.page').querySelector('.page-body').scrollTop = 9999`); await sleep(300); await shot("package-bottom"); }
+await q(`${top(".compat-filter .switch")}?.click()`);
+await go("#/settings", 1000); await shot("settings");
+await go("#/settings/iosVersion", 1000); await shot("settings-ios");
+await q(`localStorage.removeItem("cydian.iosVersion"); localStorage.removeItem("cydian.worksOnMyPhone")`);

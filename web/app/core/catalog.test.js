@@ -203,3 +203,34 @@ test("the worker takes setHidden as a catalog op", () => {
   reply({ id: 4, type: "catalog", op: "setHidden", args: [[]] });
   reply({ id: 5, type: "catalog", op: "remove", args: ["H"] });
 });
+
+test("Works on my phone (F17): rows carry their code; the filter drops what can't work, keeps unknown", () => {
+  const c = createCatalog();
+  c.load("k", packages(
+    { Package: "fits", Name: "Fits", Version: "1", Architecture: "iphoneos-arm64", Section: "Tweaks", Depends: "firmware (>= 15.0)" },
+    { Package: "old", Name: "Old Only", Version: "1", Architecture: "iphoneos-arm64", Section: "Tweaks", Depends: "firmware (<< 15.0)" },
+    { Package: "says-nothing", Name: "Says Nothing", Version: "1", Architecture: "all", Section: "Themes" },
+    { Package: "too-new", Name: "Too New", Version: "1", Architecture: "iphoneos-arm64", Section: "Lonely", Depends: "firmware (>= 18.0)" },
+  ), null);
+  // before a device is set: no codes, nothing filtered
+  assert.deepEqual(c.list().map((r) => [r.id, r.compat]), [["fits", null], ["old", null], ["says-nothing", null], ["too-new", null]]);
+  assert.equal(c.setDevice({ ios: "16.5", jailbreak: "rootless" }), 2);
+  assert.deepEqual(ids(c.list()), ["fits", "says-nothing"]);
+  assert.deepEqual(c.list().map((r) => r.compat), ["works", "unknown"]);
+  assert.deepEqual(ids(c.search("o")), ["says-nothing"]); // "Old Only" and "Too New" match but can't work
+  // a section with nothing that fits drops out, and counts follow the filter
+  assert.deepEqual(c.sections(), { total: 2, sections: [{ name: "Themes", count: 1 }, { name: "Tweaks", count: 1 }] });
+  // the package page still finds what the filter hides
+  assert.equal(c.package("old").stanza.package, "old");
+  // filter off: everything back, each with its code
+  c.setDevice({ ios: "16.5", jailbreak: "rootless" }, { filter: false });
+  assert.deepEqual(c.list().map((r) => [r.id, r.compat]), [["fits", "works"], ["old", "ios"], ["says-nothing", "unknown"], ["too-new", "ios"]]);
+  // through the worker's entry point too, and rows loaded later are judged on load
+  assert.equal(reply({ id: 1, type: "catalog", op: "setDevice", args: [{ ios: "14.2", jailbreak: "rootless" }] }).ok, true);
+  c.setDevice({ ios: "14.2", jailbreak: "rootless" });
+  c.load("k2", packages({ Package: "later", Version: "1", Architecture: "iphoneos-arm64", Depends: "firmware (>= 15.0)" }), null);
+  assert.equal(c.package("later").row.compat, "ios");
+  assert.deepEqual(ids(c.list()), ["old", "says-nothing"]);
+  c.setDevice(null);
+  assert.equal(c.list().length, 5);
+});

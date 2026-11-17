@@ -13,6 +13,7 @@ export function initScroller(screens) {
   let body = null;   // the .page-body being shown
   let hideTimer = 0;
   let grab = null;   // finger offset inside the indicator while held
+  let held = null;   // the scroller whose native momentum is stopped while held
 
   const navbar = document.getElementById("navbar");
   const tabbar = document.getElementById("tabbar");
@@ -97,6 +98,10 @@ export function initScroller(screens) {
     stopGlide();
     grab = e.clientY - sb.getBoundingClientRect().top;
     samples = [];
+    // Stop the page's own momentum: a quick grab during a fling otherwise fights it (iOS keeps gliding the scroller
+    // while we set scrollTop). overflow hidden ends a native fling at once; scrollTop still works while it's hidden.
+    held = body;
+    held.style.overflowY = "hidden";
     sb.setPointerCapture?.(e.pointerId);
     sb.classList.add("grab");
     clearTimeout(hideTimer);
@@ -115,11 +120,13 @@ export function initScroller(screens) {
     if (grab === null) return;
     grab = null;
     sb.classList.remove("grab");
+    if (held) { held.style.overflowY = ""; held = null; }
     // Safari plays its switch haptic only inside a finished touch (pointerup counts, pointerdown doesn't).
     if (e?.type === "pointerup" && !globalThis.cydianApp) haptic();
     const [a, z] = [samples[0], samples.at(-1)];
     if (e?.type === "pointerup" && a && z && z[0] - a[0] > 10) {
-      const v = (z[1] - a[1]) / (z[0] - a[0]);
+      // ponytail: capped at 6 px/ms; a quick flick on the bar moves the content ~50x as far and flew off the end
+      const v = Math.max(-6, Math.min(6, (z[1] - a[1]) / (z[0] - a[0])));
       if (Math.abs(v) > 0.3) fling(v);
     }
     draw();

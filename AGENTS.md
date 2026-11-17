@@ -2,9 +2,13 @@
 
 Cydian: a package manager with the iOS 6 Cydia look, for modern iPhones. Three front doors, one brain:
 
-1. `web/`: public site (Flask, one file until it hurts). Browse APT repos and AltStore sources, add sources,
-   check for upgrades. No login. Visitors use modern Safari; the iOS 6 look is drawn in CSS, not images.
-2. `native/`: jailbreak app (Theos) that installs `.deb`s through a root helper. Design: `docs/native.md` (R3).
+1. `web/app/`: **the one frontend** (HTML, CSS, vanilla JS modules, no build step). It runs on the public site and
+   inside the jailbreak app. `core/` is pure JS (parsing, versions, Changes, upgrades), tested with `node --test`.
+   The UI only talks to a backend interface: `backend-http.js` on the site, `backend-native.js` in the app.
+   `web/app.py` (Flask) is thin: it serves `web/app/`, runs the SSRF-safe fetch proxy and cache, and Web Push.
+2. `native/`: jailbreak app, a Swift shell around a WKWebView running `web/app/`, plus a root helper for apt.
+   Rootless iOS 15+ up to the coming iOS 27 jailbreak. Shape and feel rules: `docs/native.md`. It must hold
+   120 Hz: animate only transform/opacity, virtualise long lists, parse in a Web Worker.
 3. `ipa/`: non-jailbroken app for on-device update checks and notifications, only if R4 decides the PWA can't
    do it.
 
@@ -14,8 +18,13 @@ Shortcuts recipes live in `docs/shortcuts.md`.
   they exist.
 - Python: stdlib first (`bz2`, `lzma`, `gzip`, `email`-style parsing), then what `web/requirements.txt` already
   has. Ask in the journal before adding a dependency.
-- Look and feel reference: `~/repos/sidedrop/app.py` (its CSS already has the iOS 6 nav bar, tab bar, grouped
-  tables and Reloading Data HUD). Cydia's behaviour: `docs/cydia.md` (R2) and Cydia's GPLv3 source at
+- Look and feel: **iOS 6 is the base style, 100%**. iOS 5 elements only where the user asks for one. Source of
+  truth: the Teehan+Lax GUI PSDs, converted in `ref/teehanlax/ios6/` (and `ios5/`): `sheet.svg` (vector, layer
+  names as `<title>`), `original-2x.png` (Photoshop's composite), `img/` (bitmaps) and `img-hd/` (bitmaps upscaled
+  with 4xHDcube4). Take exact colours, gradients and sizes from the SVG. Text is real Helvetica Neue (the system
+  font on iPhones); never use upscaled text. Artwork pulled off the 4S (`ref/4s/artwork/`, from `tools/artwork.py`) is the
+  original for comparison only: use its HD counterpart from the kit (`ref/4s/hd/`, from `tools/kitmatch.py`;
+  `ref/4s/kitmatch.html` flips HD/Original). `~/repos/sidedrop/app.py` has a first pass at the CSS. Cydia's behaviour: `docs/cydia.md` (R2) and Cydia's GPLv3 source at
   https://git.saurik.com/cydia.git.
 - Never commit Apple artwork (UIKit `.artwork` extracts, system icons) or Cydia's logo. Pulled device files go in
   `ref/` (gitignored). Use them as a reference and redraw in CSS/SVG. Don't name the product or pages "Cydia".

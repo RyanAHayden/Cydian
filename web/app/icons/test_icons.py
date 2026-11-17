@@ -56,12 +56,12 @@ class Icons(unittest.TestCase):
     def test_references_exist(self):
         app = HERE.parent
         manifest = json.loads((app / "manifest.json").read_text())
-        srcs = [i["src"] for i in manifest["icons"]]
+        srcs = [i["src"].split("?")[0] for i in manifest["icons"]]  # ?v=N makes iOS fetch a changed icon afresh
         self.assertIn("icons/icon-192.png", srcs)
         self.assertIn("icons/icon-512.png", srcs)
         for s in srcs:
             self.assertTrue((app / s).is_file(), s)
-        self.assertIn('href="icons/icon-180.png"', (app / "index.html").read_text())
+        self.assertIn('href="icons/icon-180.png?v=', (app / "index.html").read_text())
         self.assertIn('"icons/icon-glossy-76.png"', (app / "screens/home.js").read_text())  # Home header: 1x/2x/3x PNGs
 
 

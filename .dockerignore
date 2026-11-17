@@ -1,0 +1,7 @@
+.git
+.venv
+.runner
+ref
+journal
+plan
+**/__pycache__

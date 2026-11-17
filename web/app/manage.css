@@ -1,0 +1,42 @@
+/* Sources > Manage (F45, screens/manage.js). The edit list reuses sources.css's .editing/.source-row (red minus,
+   Delete); this adds the reorder grabber, the paste box, the QR sheet and wrapping subtitles. */
+
+/* UITableGrabber (ref/4s/artwork/Shared@2x/UITableGrabber.png, 19 x 17pt): three bars, each a 1pt dark top
+   rgba(0,0,0,.31), 3pt grey rgba(190,190,190,.68) and 1pt white rgba(255,255,255,.51), 1pt apart. */
+.manage-list .source-row .cell-inner { padding-right: 52px; }
+.editing.manage-list .source-row .cell-inner { width: calc(100% - 37px); }
+.editing.manage-list .source-row.armed .cell-inner { width: calc(100% - 37px - 76px - 44px); }
+.manage-list .reorder {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 52px; touch-action: none; cursor: grab;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.manage-list .reorder::before {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 19px; height: 17px; margin: -8.5px 0 0 -9.5px;
+  background: linear-gradient(rgba(0,0,0,.31) 0 1px, rgba(190,190,190,.68) 1px 4px, rgba(255,255,255,.51) 4px 5px, transparent 5px 6px)
+    0 0 / 19px 6px repeat-y;
+}
+.manage-list .source-row.armed .reorder { display: none; }
+.manage-list .source-row { transition: transform .2s ease; background: var(--plain); }
+.manage-list.is-reordering .source-row.dragging { transition: none; z-index: 2; opacity: .9; box-shadow: 0 0 6px rgba(0,0,0,.4); }
+
+.manage-foot { padding: 10px 0 20px; text-align: center; }
+.manage-link {
+  border: 0; background: none; padding: 8px 12px; font: inherit; font-size: 17px; font-weight: bold;
+  color: var(--head); text-shadow: var(--emboss); cursor: pointer;
+}
+
+/* Recommended and Import: the reason under each name wraps instead of ellipsizing. */
+.manage-why .cell-subtitle, .manage-review .cell-label { white-space: normal; overflow-wrap: anywhere; }
+.manage-why .cell-inner { padding-top: 6px; padding-bottom: 6px; }
+.manage-review .cell-label { font-size: 15px; }
+
+/* The paste box: a grouped-table outline around a text area. */
+.manage-paste {
+  display: block; box-sizing: border-box; width: 100%; min-height: 220px; margin-top: 10px; padding: 9px 10px;
+  border: 1px solid var(--table-edge); border-radius: 9.5px; background: var(--table); color: var(--text);
+  font: 15px/20px "Helvetica Neue", Helvetica, sans-serif; resize: vertical;
+  box-shadow: inset 0 .5px .5px var(--table-inset);
+}
+
+.manage-qr { text-align: center; }
+.manage-qr img { display: block; width: 100%; max-width: 320px; margin: 20px auto 10px; image-rendering: pixelated; background: #fff; }

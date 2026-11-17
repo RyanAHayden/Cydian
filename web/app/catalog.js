@@ -19,7 +19,7 @@ import { getBackend, getParser, getArch } from "./backend.js";
 import { repoLayout } from "./core/apt.js";
 import { openIndexCache } from "./core/cache.js";
 import { ALL } from "./core/catalog.js";
-import { openSeenStore, recordRefresh, changeGroups } from "./core/changes.js";
+import { openSeenStore, recordRefresh, dayGroups } from "./core/changes.js";
 import { looksLikeStatus } from "./core/installed.js";
 import { isAltKey } from "./core/altstore.js";
 
@@ -258,11 +258,12 @@ export const catalog = {
   altSource: (key) => ask("altSource", [key]),
   has: (names) => ask("has", [names]),
   deps: (id, key = ALL) => ask("deps", [id, key]), // F18: plain-language dependency problems (core/deps.js)
-  // The Changes tab: [{ seen, rows: [{ ...row, change: "new" | "updated" }] }], newest first (core/changes.js).
-  changes: async () => {
+  // The Changes tab (F51): the last 7 days, [{ day, rows: [{ ...row, change: "new" | "updated", seen }] }],
+  // newest day first (core/changes.js dayGroups).
+  changes: async (now = Date.now()) => {
     const rows = await ask("list", [ALL, ALL]);
     const store = await seen();
-    return store ? changeGroups(await store.all(), rows) : [];
+    return store ? dayGroups(await store.all(), rows, { now }) : [];
   },
   // The installed packages as rows (each with `installed`, its version), or null before a status file came.
   installed: () => ask("installed", []),

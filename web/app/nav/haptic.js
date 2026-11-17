@@ -1,0 +1,23 @@
+// A light haptic tick. In the app: the bridge's "haptic.tap" (UIImpactFeedbackGenerator). In Safari there's no
+// vibration API, but toggling a hidden <input type=checkbox switch> plays the system switch haptic (iOS 18+). Other
+// browsers: navigator.vibrate. Must be called from a user gesture (pointerdown/touchstart), or iOS stays silent.
+
+export function haptic() {
+  const bridge = globalThis.webkit?.messageHandlers?.cydian;
+  if (bridge && globalThis.cydianApp) {
+    try { bridge.postMessage({ method: "haptic.tap" })?.catch?.(() => {}); return; } catch { /* fall through */ }
+  }
+  if (typeof navigator !== "undefined" && navigator.vibrate) { navigator.vibrate(10); return; }
+  if (typeof document === "undefined") return;
+  const label = document.createElement("label");
+  label.setAttribute("aria-hidden", "true");
+  label.style.cssText = "position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.setAttribute("switch", "");
+  input.tabIndex = -1;
+  label.append(input);
+  document.body.append(label);
+  label.click();
+  label.remove();
+}

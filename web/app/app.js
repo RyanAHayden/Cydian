@@ -15,6 +15,7 @@ import { attachEdgeSwipe } from "./nav/swipe.js";
 import { createTabbar } from "./nav/tabbar.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
+import { initScroller } from "./nav/scroller.js";
 import * as home from "./screens/home.js";
 import * as sources from "./screens/sources.js";
 import * as changes from "./screens/changes.js";
@@ -252,6 +253,7 @@ document.addEventListener("pointermove", (e) => {
 // iOS only applies :active to elements when a touch listener exists somewhere on the page.
 document.addEventListener("touchstart", () => {}, { passive: true });
 
+initScroller(document.getElementById("screens"));
 for (const tab of TABS) if (SCREENS[tab].init) SCREENS[tab].init(ctx);
 router.start();
 

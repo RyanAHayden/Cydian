@@ -3,6 +3,7 @@
 // I/O; the worker's catalog (core/catalog.js) holds the parsed list and answers `installed` and `upgrades`.
 //
 //   parseStatus(text)                         -> [pkg]: the installed packages, sorted by name
+//   installedStanzas(text)                    -> [stanza]: their status stanzas, file order (the package page, F27)
 //   findUpgrades(installed, candidateOf, holds, { dpkgHolds }) -> { available: [row], ignored: [row] }
 //
 // Cydia's rule (docs/cydia.md "Changes and metadata.cb0"): a package is upgradable when it is installed and its
@@ -36,17 +37,23 @@ function installedRow(st) {
   };
 }
 
-// The packages dpkg has on disk, sorted by name. A file that isn't a status file (no Status fields) gives [].
-export function parseStatus(text) {
+// The status stanzas of the packages dpkg has on disk, first stanza per package, in file order.
+export function installedStanzas(text) {
   const out = [];
   const seen = new Set();
   for (const st of parseControl(text)) {
     if (!st.package || !st.version || seen.has(st.package)) continue;
     if (!ON_DISK.has(parseStatusField(st.status).state)) continue;
     seen.add(st.package);
-    out.push(installedRow(st));
+    out.push(st);
   }
-  return out.sort(compareNames);
+  return out;
+}
+
+// The packages dpkg has on disk, sorted by name. A file that isn't a status file (no Status fields) gives [].
+// `stanzas` (installedStanzas' result) saves parsing the text again.
+export function parseStatus(text, stanzas = installedStanzas(text)) {
+  return stanzas.map(installedRow).sort(compareNames);
 }
 
 // Whether text looks like a dpkg status file: at least one stanza with Package and Status. For the upload, so a

@@ -96,3 +96,28 @@ test("upgrades: dpkgHolds off (the app) trusts the holds list over the status fi
   assert.deepEqual(u.available.map((r) => r.id), ["cydia", "winterboard"]);
   assert.deepEqual(u.ignored.map((r) => r.id), ["bash"]);
 });
+
+test("package page of an installed package no source carries comes from its status stanza (F27)", () => {
+  const c = createCatalog();
+  c.load("r1", fixture("upgrades-Packages"), "https://r1.example/", ARM);
+  assert.equal(c.package("org.herf.flux"), null, "no status file yet");
+  c.setInstalled(fixture("dpkg-status"));
+  const p = c.package("org.herf.flux");
+  assert.equal(p.installedOnly, true);
+  assert.equal(p.key, null);
+  assert.deepEqual(p.others, []);
+  assert.equal(p.stanza.name, "f.lux");
+  assert.equal(p.stanza.version, "0.998");
+  assert.equal(p.stanza.author, "F.lux Software LLC <justgetflux@gmail.com>");
+  assert.match(p.stanza.depends, /preferenceloader/);
+  assert.deepEqual([p.row.name, p.row.section, p.row.author], ["f.lux", "Tweaks", "F.lux Software LLC"]);
+  // a package a source carries still comes from the source
+  assert.equal(c.package("bash").key, "r1");
+  assert.ok(!c.package("bash").installedOnly);
+  // Depends links reach installed packages too; leftovers (config-files) don't count
+  assert.deepEqual(c.has(["org.herf.flux", "nope"]), ["org.herf.flux"]);
+  assert.equal(runCatalog(c, "package", ["org.herf.flux"]).stanza.package, "org.herf.flux");
+  c.setInstalled(null);
+  assert.equal(c.package("org.herf.flux"), null);
+  assert.deepEqual(c.has(["org.herf.flux"]), []);
+});

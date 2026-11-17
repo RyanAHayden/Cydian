@@ -248,7 +248,8 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
   e.preventDefault();
   // A second tap at the root runs the screen's reselect() (Search focuses its field), in this handler (F36).
   const tab = a.dataset.tab;
-  tapTab(tab, router.current(), { selectTab: (t) => router.selectTab(t), reselect: SCREENS[tab].reselect });
+  // Back to the root of the tab you are on is our own pop, so it slides like Back (not a jump).
+  tapTab(tab, router.current(), { selectTab: (t) => { ownBack = true; router.selectTab(t); }, reselect: SCREENS[tab].reselect });
 });
 
 // Pressed look while a finger is down, like Cydia's: .is-pressed on the bar button or row under it, off when the

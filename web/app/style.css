@@ -34,7 +34,8 @@ button { font: inherit; color: inherit; margin: 0; }
 .page-body {
   position: absolute; inset: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch; touch-action: pan-y; /* horizontal moves are the edge swipe's */
-  padding: var(--nav-h) env(safe-area-inset-right) var(--tab-h) env(safe-area-inset-left);
+  /* 20px under the last thing on every page, so a closing note never sits against the tab bar */
+  padding: var(--nav-h) env(safe-area-inset-right) calc(var(--tab-h) + 20px) env(safe-area-inset-left);
 }
 .page-shade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
 /* Every tab has its own nav and screen stack, all in the same spot; the inactive ones (later in the DOM) would

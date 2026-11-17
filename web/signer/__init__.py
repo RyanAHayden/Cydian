@@ -39,7 +39,7 @@ import fetch
 
 from . import ipa as ipa_mod
 from . import zsign
-from .identity import SignError, check, load_p12, parse_profile, target_bundle_id
+from .identity import SignError, app_entitlements, check, load_p12, parse_profile, target_bundle_id
 
 TTL = int(os.environ.get("CYDIAN_SIGN_TTL", "600"))                         # seconds a signed IPA is kept
 MAX_BYTES = int(os.environ.get("CYDIAN_SIGN_MAX_BYTES", str(1024 * 2**20)))  # IPA download cap
@@ -374,7 +374,8 @@ def _run(store: Store, fetcher, binary, url, identity, profile, profile_bytes, o
         bundle_id = target_bundle_id(profile, app.bundle_id)
         on_phase("signing")
         zsign.sign(binary, src, out, identity.unlocked_p12(), profile_bytes, work,
-                   bundle_id=bundle_id if bundle_id != app.bundle_id else None, timeout=SIGN_TIMEOUT)
+                   bundle_id=bundle_id if bundle_id != app.bundle_id else None, timeout=SIGN_TIMEOUT,
+                   entitlements=app_entitlements(profile, bundle_id))
         app.bundle_id = bundle_id
         return store.put(out, app.bundle_id, app.name, app.version), app
     finally:

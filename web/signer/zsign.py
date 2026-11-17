@@ -8,6 +8,7 @@ zsign into the job's own work folder, is on disk, and the caller removes that fo
 from __future__ import annotations
 
 import os
+import plistlib
 import re
 import shutil
 import subprocess
@@ -35,7 +36,7 @@ def _memfd(name: str, data: bytes) -> int:
 
 
 def sign(binary: str, ipa_in: str, ipa_out: str, p12: bytes, profile: bytes, workdir: str,
-         bundle_id: str | None = None, timeout: float = 300.0) -> None:
+         bundle_id: str | None = None, timeout: float = 300.0, entitlements: dict | None = None) -> None:
     """Sign `ipa_in` into `ipa_out` with the profile's entitlements (zsign takes them from -m). Raises SignError."""
     if not hasattr(os, "memfd_create"):
         raise SignError("unsupported", "This server can't sign: it needs Linux (memfd_create).", 501)
@@ -47,6 +48,9 @@ def sign(binary: str, ipa_in: str, ipa_out: str, p12: bytes, profile: bytes, wor
                "-z", "6", "-o", ipa_out]
         if bundle_id:
             cmd += ["-b", bundle_id]
+        if entitlements is not None:  # the app's own entitlements (identity.app_entitlements), not the profile's raw ones
+            fds.append(_memfd("cydian-entitlements", plistlib.dumps(entitlements)))
+            cmd += ["-e", f"/dev/fd/{fds[-1]}"]
         cmd.append(ipa_in)
         try:
             r = subprocess.run(cmd, cwd=workdir, pass_fds=fds, stdin=subprocess.DEVNULL, capture_output=True,

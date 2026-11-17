@@ -159,3 +159,19 @@ def target_bundle_id(profile: Profile, bundle_id: str) -> str:
     if not app_id:
         raise SignError("bad_profile", "The provisioning profile has no app ID.")
     return app_id
+
+
+def app_entitlements(profile: Profile, bundle_id: str) -> dict:
+    """The profile's entitlements narrowed to the app being signed, the way Xcode signs. zsign otherwise copies a
+    wildcard profile's application-identifier (TEAM.com.you.*) and keychain group (TEAM.*) into the app verbatim,
+    and iOS then refuses to install it ("Unable to Install ... try again later")."""
+    ents = dict(profile.entitlements)
+    team = ents.get("com.apple.developer.team-identifier") or profile.team
+    if team:
+        ents["application-identifier"] = f"{team}.{bundle_id}"
+        if "keychain-access-groups" in ents:
+            ents["keychain-access-groups"] = [f"{team}.{bundle_id}"]
+    # Never debuggable: an ad hoc or distribution profile forbids it, and with it iOS can match the app to a
+    # development profile on the phone and demand Developer Mode.
+    ents["get-task-allow"] = False
+    return ents

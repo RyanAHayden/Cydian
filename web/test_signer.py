@@ -164,6 +164,15 @@ class IdentityTest(unittest.TestCase):
             I.check(ident, I.parse_profile(T.profile(other_key, other_cert)))
         self.assertEqual(cm.exception.code, "cert_not_in_profile")
 
+    def test_entitlements_narrowed_to_the_app(self):
+        prof = I.parse_profile(T.profile(KEY, CERT, app_id="com.ryha.*"))
+        ents = I.app_entitlements(prof, "com.ryha.io.github.fizl0.openmx")
+        team = prof.entitlements["com.apple.developer.team-identifier"]
+        self.assertEqual(ents["application-identifier"], f"{team}.com.ryha.io.github.fizl0.openmx")
+        self.assertFalse(ents["get-task-allow"])
+        if "keychain-access-groups" in prof.entitlements:
+            self.assertEqual(ents["keychain-access-groups"], [f"{team}.com.ryha.io.github.fizl0.openmx"])
+
     def test_app_id_fit(self):
         prof = lambda app_id: I.parse_profile(T.profile(KEY, CERT, app_id=app_id))  # noqa: E731
         self.assertEqual(I.target_bundle_id(prof("*"), "dev.cydian.fixture"), "dev.cydian.fixture")
@@ -283,7 +292,7 @@ class AsyncJobTest(Base):
         self.gate = threading.Event()
         self.phases = []
 
-        def fake_sign(binary, src, out, p12, profile, work, bundle_id=None, timeout=300.0):
+        def fake_sign(binary, src, out, p12, profile, work, bundle_id=None, timeout=300.0, entitlements=None):
             self.phases.append("zsign")
             if not self.gate.wait(10):
                 raise AssertionError("gate never opened")

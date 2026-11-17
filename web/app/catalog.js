@@ -209,7 +209,7 @@ export const catalog = {
   setHidden,
   setDevice,
   list: (key = ALL, section = ALL) => ask("list", [key, section]),
-  search: (q) => ask("search", [q]),
+  search: (q, filters) => ask("search", filters ? [q, filters] : [q]), // F35: core/catalog.js search filters
   author: (name) => ask("author", [name]),
   package: (id, key = ALL) => ask("package", [id, key]),
   has: (names) => ask("has", [names]),

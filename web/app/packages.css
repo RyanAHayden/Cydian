@@ -158,3 +158,63 @@ html.native .navbar.sheet-bar { display: block; } /* the app hides the web nav b
 :root[data-theme="dark"] .pkg-compat[data-compat="jailbreak"], :root[data-theme="dark"] .pkg-compat[data-compat="arch"] { color: #ff7b6b; }
 .pkg-head-text .pkg-compat { align-self: flex-start; }
 .compat-filter .cell-inner { min-height: 50px; }
+
+/* ---- Search's scope bar (F35): iOS 6's UISearchBar scope buttons under the field. The bar runs on in the search
+   bar's grey and takes its bottom line; the segments are UISegmentBar's (UISegmentBarButton*.png, 30pt): a
+   #3b4046 top edge, #abbacd -> #6581a4 inside (selected #97a9c1 -> #41618e), #586f8f under, 30% white below. ---- */
+.search-bar.has-scope { background: linear-gradient(#b5b9bd, #d3dbdf 7%, #b3bdc5); }
+.search-scope {
+  display: flex; gap: 6px; height: 44px; padding: 7px 5px; align-items: flex-start;
+  background: linear-gradient(#81919f, #81919f) bottom / 100% 1px no-repeat, linear-gradient(#b3bdc5, #aab5be);
+}
+.scope-segments { flex: 1; min-width: 0; display: flex; border-radius: 5px; box-shadow: 0 1px 0 rgba(255,255,255,.3); }
+.scope-segment, .scope-filter {
+  flex: 1; min-width: 0; height: 30px; padding: 0 4px; margin: 0; cursor: pointer; touch-action: manipulation;
+  font: inherit; font-size: 12px; font-weight: bold; line-height: 28px; color: #fff; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; text-shadow: 0 -1px 0 rgba(0,0,0,.45);
+  border: 1px solid #505e70; border-top-color: #3b4046; border-bottom-color: #586f8f; border-radius: 0;
+  background: linear-gradient(#abbacd, #6581a4); background-origin: border-box;
+}
+.scope-segment + .scope-segment { border-left-color: #5e7597; }
+.scope-segment:first-child { border-radius: 5px 0 0 5px; }
+.scope-segment:last-child { border-radius: 0 5px 5px 0; }
+.scope-segment.selected, .scope-segment:active, .scope-filter.selected, .scope-filter:active {
+  border-color: #3e4e64; border-top-color: #343a42; border-bottom-color: #38547b;
+  background: linear-gradient(#97a9c1, #41618e); background-origin: border-box;
+}
+.scope-segment.selected + .scope-segment { border-left-color: #43597b; }
+.scope-filter { flex: none; padding: 0 10px; border-radius: 5px; box-shadow: 0 1px 0 rgba(255,255,255,.3); }
+html[data-theme="dark"] .search-bar.has-scope { background: linear-gradient(#4c4c4c, #2a2a2a 7%, #1a1a1a); }
+html[data-theme="dark"] .search-scope { background: linear-gradient(#000, #000) bottom / 100% 1px no-repeat, #1a1a1a; }
+html[data-theme="dark"] .scope-segment, html[data-theme="dark"] .scope-filter {
+  border-color: #111; background: linear-gradient(#4a4f58, #24272c); background-origin: border-box;
+}
+html[data-theme="dark"] .scope-segment.selected, html[data-theme="dark"] .scope-segment:active,
+html[data-theme="dark"] .scope-filter.selected, html[data-theme="dark"] .scope-filter:active {
+  border-color: #000; background: linear-gradient(#2a2d32, #121316); background-origin: border-box;
+}
+html[data-theme="dark"] .scope-segments, html[data-theme="dark"] .scope-filter { box-shadow: 0 1px 0 rgba(255,255,255,.08); }
+.filter-sheet .filter-clear .cell-label { color: var(--detail); }
+
+/* ---- Compatibility marks (F35): a small round mark beside every package, like the old Cydia tweak that drew a
+   check or an X: green check works, red X doesn't, grey ? the package doesn't say. Drawn as SVG; Settings > Show
+   Compatibility Marks hides them (html[data-compat-marks="off"], browse.js). ---- */
+.compat-mark { flex: none; align-self: center; width: 14px; height: 14px; background: center / contain no-repeat; }
+.compat-mark:not([data-mark]) { display: none; }
+html[data-compat-marks="off"] .compat-mark { display: none; }
+.compat-mark.large { width: 18px; height: 18px; }
+.compat-mark[data-mark="works"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2384d65e'/%3E%3Cstop offset='1' stop-color='%23329c1c'/%3E%3C/linearGradient%3E%3Ccircle cx='14' cy='14' r='13' fill='url(%23g)' stroke='%23267a16' stroke-width='1.5'/%3E%3Cpath d='M8 14.5l4 4 8-9' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.compat-mark[data-mark="no"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f2675c'/%3E%3Cstop offset='1' stop-color='%23c3211a'/%3E%3C/linearGradient%3E%3Ccircle cx='14' cy='14' r='13' fill='url(%23g)' stroke='%238f1610' stroke-width='1.5'/%3E%3Cpath d='M9.5 9.5l9 9M18.5 9.5l-9 9' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.compat-mark[data-mark="unknown"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23c3c7cc'/%3E%3Cstop offset='1' stop-color='%238c929a'/%3E%3C/linearGradient%3E%3Ccircle cx='14' cy='14' r='13' fill='url(%23g)' stroke='%23707780' stroke-width='1.5'/%3E%3Cpath d='M10.4 11.2a3.6 3.6 0 1 1 5.4 3.1c-1.2.7-1.8 1.3-1.8 2.7' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='14' cy='20.6' r='1.8' fill='%23fff'/%3E%3C/svg%3E");
+}
+/* An exact match that can't work (Search, F35): the name in red, the reason under it. */
+.pkg-name.incompatible { color: #c0392b; }
+html[data-theme="dark"] .pkg-name.incompatible { color: #ff7b6b; }
+.pkg-head-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pkg-head-top .pkg-head-name { min-width: 0; }
+html[data-theme="dark"] .scope-segment + .scope-segment, html[data-theme="dark"] .scope-segment.selected + .scope-segment { border-left-color: #000; }

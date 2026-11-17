@@ -162,17 +162,17 @@ test("holds: the helper is only used in jailbreak mode", async () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["appearance", "allowZoom", "arch", "worksOnMyPhone", "iosVersion", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
+    ["appearance", "allowZoom", "arch", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
   assert.deepEqual(show("jailbreak"),
-    ["appearance", "allowZoom", "arch", "worksOnMyPhone", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge",
+    ["appearance", "allowZoom", "arch", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge",
       "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
-    ["appearance", "allowZoom", "worksOnMyPhone", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge", "resignReminder"]);
+    ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge", "resignReminder"]);
 });
 
 test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone and Ignored Upgrades", () => {
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "arch", "worksOnMyPhone", "refreshOnLaunch", "holds"]);
+  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "arch", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds"]);
   assert.equal(s.isShown("autoInstall"), false);
   assert.ok(FEATURES.has("appearance"));
   assert.deepEqual(createSettings({ storage: memStorage(), mode: "site", features: new Set(["appearance"]) })
@@ -229,6 +229,7 @@ test("hidden sections: sorted, stored on the device, listeners told only on a ch
 test("Works on My Phone (F17): on by default everywhere; the site picks an iOS version, Automatic by default", () => {
   for (const mode of ["site", "jailbreak", "sideload"]) {
     assert.equal(createSettings({ storage: memStorage(), mode }).get("worksOnMyPhone"), true);
+    assert.equal(createSettings({ storage: memStorage(), mode }).get("compatMarks"), true); // F35
   }
   const site = createSettings({ storage: memStorage(), mode: "site" });
   assert.equal(site.get("iosVersion"), "auto");

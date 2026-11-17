@@ -19,10 +19,14 @@
 //   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
 //   c.installed()                          -> [row] installed, sorted by name, each with `installed` (its version)
 //   c.upgrades(holds, { dpkgHolds })       -> { available: [row], ignored: [row] } (Changes, core/installed.js)
+//   c.setDevice(device, { filter })        -> "Works on my phone" (F17, core/compat.js): every row gets `compat`,
+//                                             its code for `device`; with filter on (the default) rows that can't
+//                                             work drop out of sections, list, search and author like hidden ones
 //
-// A row is the slim record lists draw: { id, name, short, version, section, icon, key, author }.
+// A row is the slim record lists draw: { id, name, short, version, section, icon, key, author, compat }.
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
 import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
+import { compatCode, isIncompatible, normalizeDevice } from "./compat.js";
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -106,7 +110,7 @@ function makeRow(st, key) {
   };
 }
 
-const slim = ({ id, name, short, version, section, icon, key, author }) => ({ id, name, short, version, section, icon, key, author });
+const slim = ({ id, name, short, version, section, icon, key, author, compat }) => ({ id, name, short, version, section, icon, key, author, compat });
 
 export function createCatalog() {
   const sources = new Map(); // key -> { byId: Map(id -> { row, stanza }) }
@@ -114,6 +118,10 @@ export function createCatalog() {
   const sorted = new Map();  // key -> rows sorted by name (cache)
   let hidden = new Set();    // Section Visibility (Cydia's CydiaSections Hidden): section names left out of lists
   const shown = new Map();   // key -> sorted rows outside hidden sections (cache)
+  let device = null;         // F17: the device rows are judged for (core/compat.js), or null before one is set
+  let fitFilter = false;     // and whether rows that can't work on it are left out
+  const fitting = new Map(); // key -> sorted rows that can work on the device (cache)
+  const judge = (e) => { e.row.compat = device ? compatCode(e.stanza, device) : null; };
 
   function load(key, text, root, arch = DEFAULT_ARCH) {
     const byId = new Map();
@@ -126,10 +134,12 @@ export function createCatalog() {
       st.iconUrl = resolveIcon(root, st.icon);
       byId.set(st.package, { stanza: st, row: makeRow(st, key) });
     }
+    for (const e of byId.values()) judge(e);
     sources.set(key, { byId });
     merged = null;
     sorted.clear();
     shown.clear();
+    fitting.clear();
     return byId.size;
   }
 
@@ -138,6 +148,18 @@ export function createCatalog() {
     merged = null;
     sorted.clear();
     shown.clear();
+    fitting.clear();
+  }
+
+  // F17: judge every row for `device` ({ ios, jailbreak }; null clears it). Returns how many rows can't work on it.
+  function setDevice(next, { filter = true } = {}) {
+    device = next ? normalizeDevice(next) : null;
+    fitFilter = Boolean(device && filter);
+    let no = 0;
+    for (const { byId } of sources.values()) for (const e of byId.values()) { judge(e); if (isIncompatible(e.row.compat)) no++; }
+    shown.clear();
+    fitting.clear();
+    return no;
   }
 
   function setHidden(names) {
@@ -170,12 +192,23 @@ export function createCatalog() {
     return rows;
   }
 
-  // rowsOf without the hidden sections: what every list, Search and Changes draw from.
+  // rowsOf without what can't work on the device (F17), when that filter is on.
+  function fitOf(key) {
+    if (!fitFilter) return rowsOf(key);
+    let rows = fitting.get(key);
+    if (!rows) {
+      rows = rowsOf(key).filter((r) => !isIncompatible(r.compat));
+      fitting.set(key, rows);
+    }
+    return rows;
+  }
+
+  // fitOf without the hidden sections: what every list, Search and Changes draw from.
   function visibleOf(key) {
-    if (!hidden.size) return rowsOf(key);
+    if (!hidden.size) return fitOf(key);
     let rows = shown.get(key);
     if (!rows) {
-      rows = rowsOf(key).filter((r) => !hidden.has(r.section));
+      rows = fitOf(key).filter((r) => !hidden.has(r.section));
       shown.set(key, rows);
     }
     return rows;
@@ -185,7 +218,7 @@ export function createCatalog() {
   // are listed too, each marked; without it they are left out.
   function sections(key = ALL, { hidden: withHidden = false } = {}) {
     const counts = new Map();
-    for (const r of rowsOf(key)) counts.set(r.section, (counts.get(r.section) ?? 0) + 1);
+    for (const r of fitOf(key)) counts.set(r.section, (counts.get(r.section) ?? 0) + 1);
     const list = [...counts].filter(([name]) => withHidden || !hidden.has(name))
       .map(([name, count]) => (withHidden ? { name, count, hidden: hidden.has(name) } : { name, count }))
       .sort((a, b) => collator.compare(a.name, b.name));
@@ -291,7 +324,7 @@ export function createCatalog() {
   }
 
   return { load, remove, setHidden, sections, list, search, author, package: pkg, has, versions, keys: () => [...sources.keys()],
-    setInstalled, installed, upgrades };
+    setInstalled, installed, upgrades, setDevice };
 }
 
 // Runs a catalog operation by name: the worker's entry point. Unknown ops throw.
@@ -299,7 +332,7 @@ export function runCatalog(catalog, op, args = []) {
   const f = { load: catalog.load, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
     search: catalog.search, author: catalog.author, package: catalog.package, has: catalog.has, keys: catalog.keys,
     versions: catalog.versions, setHidden: catalog.setHidden, setInstalled: catalog.setInstalled,
-    installed: catalog.installed, upgrades: catalog.upgrades }[op];
+    installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);
 }

@@ -162,17 +162,17 @@ test("holds: the helper is only used in jailbreak mode", async () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["appearance", "allowZoom", "arch", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
+    ["appearance", "allowZoom", "arch", "worksOnMyPhone", "iosVersion", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
   assert.deepEqual(show("jailbreak"),
-    ["appearance", "allowZoom", "arch", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge",
+    ["appearance", "allowZoom", "arch", "worksOnMyPhone", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge",
       "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
-    ["appearance", "allowZoom", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge", "resignReminder"]);
+    ["appearance", "allowZoom", "worksOnMyPhone", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge", "resignReminder"]);
 });
 
-test("rows wait for their feature: today Appearance, the sources settings and Ignored Upgrades", () => {
+test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone and Ignored Upgrades", () => {
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "arch", "refreshOnLaunch", "holds"]);
+  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "arch", "worksOnMyPhone", "refreshOnLaunch", "holds"]);
   assert.equal(s.isShown("autoInstall"), false);
   assert.ok(FEATURES.has("appearance"));
   assert.deepEqual(createSettings({ storage: memStorage(), mode: "site", features: new Set(["appearance"]) })
@@ -181,7 +181,7 @@ test("rows wait for their feature: today Appearance, the sources settings and Ig
 
 test("sections come in order, Appearance first, empty ones dropped", () => {
   const s = createSettings({ storage: memStorage(), mode: "sideload", features: everything });
-  assert.deepEqual(s.sections().map((x) => x.id), ["appearance", "sources", "updates", "notifications", "signing"]);
+  assert.deepEqual(s.sections().map((x) => x.id), ["appearance", "sources", "compat", "updates", "notifications", "signing"]);
   assert.equal(s.sections()[0].settings[0].key, "appearance");
 });
 
@@ -224,4 +224,16 @@ test("hidden sections: sorted, stored on the device, listeners told only on a ch
   s.hiddenSections.replace(["b", "a", "a", 3]);
   assert.deepEqual(s.hiddenSections.list(), ["a", "b"]);
   assert.deepEqual(createSettings({ storage: memStorage({ "cydian.hiddenSections": "{bad" }) }).hiddenSections.list(), []);
+});
+
+test("Works on My Phone (F17): on by default everywhere; the site picks an iOS version, Automatic by default", () => {
+  for (const mode of ["site", "jailbreak", "sideload"]) {
+    assert.equal(createSettings({ storage: memStorage(), mode }).get("worksOnMyPhone"), true);
+  }
+  const site = createSettings({ storage: memStorage(), mode: "site" });
+  assert.equal(site.get("iosVersion"), "auto");
+  site.set("iosVersion", "16.5");
+  assert.equal(site.get("iosVersion"), "16.5");
+  assert.throws(() => site.set("iosVersion", "99.9"));
+  assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak" }).isShown("iosVersion"), false); // the bridge says
 });

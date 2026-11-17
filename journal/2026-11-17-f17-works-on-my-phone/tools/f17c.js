@@ -1,0 +1,16 @@
+const top = (sel) => `document.querySelector('.tab-stack.is-active .page.is-top ${sel}')`;
+await go("#/search", 800);
+await q(`(() => { const i = ${top("input")}; i.value = "tweak"; i.dispatchEvent(new Event("input")); })()`);
+await sleep(2500);
+const n = () => q(`JSON.stringify([...new Set([...document.querySelectorAll('.tab-stack[data-tab="search"] .pkg-compat')].map(e=>e.textContent))]) + " " + document.querySelector('.tab-stack[data-tab="search"] .compat-filter').textContent + " " + document.querySelector('.tab-stack[data-tab="search"] .compat-filter .switch').getAttribute("aria-checked")`);
+console.log("search before:", await n());
+await go("#/settings/iosVersion", 1000);
+await q(`[...document.querySelectorAll('.tab-stack.is-active .page.is-top .cell-inner')].find(c => c.textContent.trim() === "iOS 12.0").click()`);
+await sleep(2500);
+console.log("search after iOS 12.0:", await n());
+await go("#/settings", 800);
+await q(`[...document.querySelectorAll('.tab-stack.is-active .page.is-top .cell-inner')].find(c => c.textContent.includes("Works on My Phone")).querySelector('.switch').click()`);
+await sleep(2500);
+console.log("search after switch off in Settings:", await n());
+await go("#/search/" + encodeURIComponent("package:com.pitroytech.5rowpro"), 300); await waitFor(top(".pkg-head"), 60000); await sleep(1500); await shot("package2");
+await q(`localStorage.removeItem("cydian.iosVersion"); localStorage.removeItem("cydian.worksOnMyPhone")`);

@@ -20,6 +20,8 @@ import { description, parseRelations } from "../core/apt.js";
 import { displayName, releaseDepiction } from "../core/sources.js";
 import { renderSileo, mediaUrl } from "./depiction.js";
 import { settings, createSwitch } from "./settings.js";
+import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js";
+import { compat } from "../core/compat.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -28,6 +30,8 @@ export const SECTION_ROW_HEIGHT = 46;
 // the worker's catalog before its next answer, so every list, Search and Changes leave them out.
 catalog.setHidden(settings.hiddenSections.list());
 settings.onChange((key, value) => { if (key === "hiddenSections") catalog.setHidden(value); });
+// Works on My Phone (F17): the device and the filter reach the worker the same way.
+initDevice();
 
 export function parseToken(seg) {
   const s = String(seg ?? "");
@@ -132,6 +136,7 @@ async function drawSections(page) {
     for (const s of data.sections) ul.append(sectionRow(s.name, s.count, deeper(route, token("section", s.name))));
   }
   body.replaceChildren(ul);
+  if (!editing) body.prepend(filterRow(() => drawSections(page)));
   if (status?.error) body.append(el("p", "empty", status.error));
   else if (editing ? !data.sections.length : !data.total) {
     body.append(el("p", "empty", data.sections.length ? "Every section is hidden. Tap Edit to show them." : "No packages for this device."));
@@ -203,11 +208,12 @@ function createRow() {
   icon.append(letter, img);
   const text = el("span", "pkg-text");
   const top = el("span", "pkg-top");
-  top.append(el("span", "pkg-name"), el("span", "pkg-version"));
+  const compatEl = el("span", "pkg-compat");
+  top.append(el("span", "pkg-name"), compatEl, el("span", "pkg-version"));
   text.append(top, el("span", "pkg-desc"));
   a.append(icon, text);
   row.append(a);
-  row._ = { a, icon, letter, img, name: top.firstChild, version: top.lastChild, desc: text.lastChild };
+  row._ = { a, icon, letter, img, name: top.firstChild, compat: compatEl, version: top.lastChild, desc: text.lastChild };
   return row;
 }
 
@@ -221,6 +227,9 @@ function bindRow(row, item, route) {
   r.a.href = deeper(route, token("package", item.id));
   r.name.textContent = item.name;
   r.version.textContent = item.version;
+  // Works on my phone (F17): the worker's code for this row; rows it never judged (installed lists) get none.
+  r.compat.textContent = compatBadge(item.compat);
+  if (item.compat) r.compat.dataset.compat = item.compat; else delete r.compat.dataset.compat;
   r.desc.textContent = item.short;
   r.letter.textContent = indexLetter(item.name) === "#" ? item.name.charAt(0) : indexLetter(item.name);
   r.icon.style.background = tint(item.section);
@@ -323,6 +332,12 @@ async function renderPackage(body, route, key, id, ctx) {
   }
   const ht = el("div", "pkg-head-text");
   ht.append(el("span", "pkg-head-name", name), el("span", "pkg-head-version", st.version ?? ""));
+  // Works on my phone (F17): judged here from the stanza, so an installed-only page gets one too.
+  const fit = compat(st, currentDevice());
+  const fitCode = fit.status === "no" ? fit.reason : fit.status;
+  const fitBadge = el("span", "pkg-compat", fit.label);
+  fitBadge.dataset.compat = fitCode;
+  ht.append(fitBadge);
   const size = formatSize(st.size);
   head.append(icon, ht);
   if (size) head.append(el("span", "pkg-head-size", size));
@@ -395,6 +410,8 @@ async function renderPackage(body, route, key, id, ctx) {
   }
   if (more.length) body.append(grouped([{ rows: more.map((r) => ({ ...r, chevron: true })) }]));
   body.append(grouped([{ header: "Details", rows: details }]));
+  body.append(grouped([{ header: "Works on My Phone", rows: [{ label: compatBadge(fitCode) }],
+    footer: fit.detail }]));
   const installedEl = await installedGroup(st.package || id);
   if (installedEl) body.append(installedEl);
   if (depRows.length) body.append(grouped([{ header: "Depends", rows: depRows }]));

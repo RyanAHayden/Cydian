@@ -19,6 +19,7 @@
 // that builds a feature adds its name here, and its row appears. Each def names its `feature`.
 
 import { ARCHES, DEFAULT_ARCH } from "./apt.js";
+import { IOS_VERSIONS } from "./compat.js";
 
 export const MODES = ["site", "jailbreak", "sideload"];
 
@@ -27,7 +28,8 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // Still to come, by the setting that waits on it: "update-check" (Check for updates), "cellular" (Use cellular
 // data, app only), "notifications" (Notifications), "badge" (App icon badge), "auto-install" (the three
 // automatic-install rows), "rollback" (Keep previous versions), "resign" (Re-sign reminder, F14).
-export const FEATURES = new Set(["appearance", "sources", "holds"]);
+// "compat": Works on My Phone (F17).
+export const FEATURES = new Set(["appearance", "sources", "holds", "compat"]);
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
@@ -36,6 +38,7 @@ const onOff = [{ value: false, label: "Off" }, { value: true, label: "On" }];
 export const SECTIONS = [
   { id: "appearance", title: "Appearance" },
   { id: "sources", title: "Sources" },
+  { id: "compat", title: "Works on My Phone" },
   { id: "updates", title: "Updates" },
   { id: "notifications", title: "Notifications" },
   { id: "automatic", title: "Automatic Installs" },
@@ -63,6 +66,20 @@ export const SETTINGS = [
       { value: "iphoneos-arm", label: "Rootful", subtitle: "iphoneos-arm: palera1n rootful, older jailbreaks" },
     ],
     footer: "Packages are listed for this architecture.",
+  },
+  {
+    key: "worksOnMyPhone", section: "compat", kind: "toggle", feature: "compat", modes: ALL, default: true,
+    label: "Works on My Phone", options: onOff,
+    footer: (mode) => "Hides packages that say they don't work on this iPhone's iOS version or jailbreak type"
+      + (mode === "jailbreak" ? "." : " (Sources > Architecture).") + " Packages that don't say are kept.",
+  },
+  {
+    // The site's picker (F17): the app knows its iOS version from the bridge.
+    key: "iosVersion", section: "compat", kind: "list", feature: "compat", modes: ["site"], default: "auto",
+    label: "iOS Version",
+    options: [{ value: "auto", label: "Automatic", subtitle: "From this browser" },
+      ...IOS_VERSIONS.map((v) => ({ value: v, label: `iOS ${v}` }))],
+    footer: "Packages are checked against this version. Automatic reads it from this browser.",
   },
   {
     key: "refreshOnLaunch", section: "sources", kind: "toggle", feature: "sources", modes: ALL,

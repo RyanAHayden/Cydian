@@ -141,3 +141,20 @@ html.native .navbar.sheet-bar { display: block; } /* the app hides the web nav b
 /* ---- Changes tab (screens/changes.js): the version reads "New 1.0" or "Updated 1.2" (Cydian's addition) ---- */
 .pkg-row[data-change="new"] .pkg-version::before { content: "New "; font-weight: bold; }
 .pkg-row[data-change="updated"] .pkg-version::before { content: "Updated "; font-weight: bold; }
+
+/* ---- Works on my phone (F17): a small outlined tag beside the name and on the package page; the switch row above
+   the Sections list and Search's results ---- */
+.pkg-compat {
+  flex: none; padding: 0 4px; border: 1px solid currentColor; border-radius: 4px;
+  font-size: 10px; font-weight: bold; line-height: 13px; white-space: nowrap; color: var(--subtitle);
+}
+.pkg-compat:empty { display: none; }
+.pkg-compat[data-compat="works"] { color: #3e8e2f; }
+.pkg-compat[data-compat="ios"], .pkg-compat[data-compat="rootful"], .pkg-compat[data-compat="rootless"],
+.pkg-compat[data-compat="roothide"], .pkg-compat[data-compat="jailbreak"], .pkg-compat[data-compat="arch"] { color: #c0392b; }
+:root[data-theme="dark"] .pkg-compat[data-compat="works"] { color: #7fcf6f; }
+:root[data-theme="dark"] .pkg-compat[data-compat="ios"], :root[data-theme="dark"] .pkg-compat[data-compat="rootful"],
+:root[data-theme="dark"] .pkg-compat[data-compat="rootless"], :root[data-theme="dark"] .pkg-compat[data-compat="roothide"],
+:root[data-theme="dark"] .pkg-compat[data-compat="jailbreak"], :root[data-theme="dark"] .pkg-compat[data-compat="arch"] { color: #ff7b6b; }
+.pkg-head-text .pkg-compat { align-self: flex-start; }
+.compat-filter .cell-inner { min-height: 50px; }

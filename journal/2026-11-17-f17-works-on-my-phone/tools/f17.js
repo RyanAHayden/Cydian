@@ -1,0 +1,13 @@
+const top = (sel) => `document.querySelector('.tab-stack.is-active .page.is-top ${sel}')`;
+await go("#/sources/*", 1500);
+await waitFor(top(".compat-filter"), 120000); await sleep(1500);
+await shot("sections");
+console.log("sections:", await q(`${top(".compat-filter")}.textContent + " | " + [...document.querySelectorAll('.tab-stack.is-active .page.is-top .section-row')].slice(0,4).map(e=>e.textContent).join(", ")`));
+await go("#/sources/*/" + encodeURIComponent("section:*"), 2500);
+await waitFor(top(".pkg-row"), 60000); await sleep(800);
+await shot("all-packages");
+console.log("badges:", await q(`JSON.stringify([...document.querySelectorAll('.pkg-compat')].slice(0,12).map(e=>e.dataset.compat+":"+e.textContent))`));
+await go("#/search", 800);
+await q(`(() => { const i = ${top("input")}; i.value = "firmware"; i.dispatchEvent(new Event("input")); })()`);
+await sleep(1500); await shot("search");
+console.log("search:", await q(`JSON.stringify([...document.querySelectorAll('.tab-stack.is-active .page.is-top .pkg-row')].slice(0,6).map(e=>e.textContent))`));

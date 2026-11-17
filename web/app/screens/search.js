@@ -4,6 +4,7 @@
 // Below the root, the routes are screens/browse.js tokens (package:<id>, author:<name>).
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
+import { filterRow } from "../device.js";
 
 export const title = "Search";
 
@@ -48,7 +49,8 @@ export function render(body, route, ctx) {
   bar.append(field);
   const note = document.createElement("p");
   note.className = "empty search-note";
-  body.append(bar, note);
+  // Works on My Phone (F17): the same switch as the Sections page; flipping it searches again.
+  body.append(bar, filterRow(() => run()), note);
 
   const list = browse.packageList(body, route, [], { letters: false });
   body.append(list.el);

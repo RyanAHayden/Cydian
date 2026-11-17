@@ -6,6 +6,9 @@
 //   const c = createCatalog();
 //   c.load(key, packagesText, root, arch)  -> number of packages kept
 //   c.sections(key | "*")                  -> { total, sections: [{ name, count }] }
+//   c.sections(key, { hidden: true })      -> every section, hidden ones too, each with `hidden` (edit mode)
+//   c.setHidden(names)                     -> Section Visibility: these sections drop out of sections, list,
+//                                             search and author (and so Changes); package() and has() still see them
 //   c.list(key | "*", section | "*")       -> [row], sorted by name ("*": All Sources / All Packages)
 //   c.search(query)                        -> [row], best matches first
 //   c.author(name)                         -> [row]: every package whose Author or Maintainer is `name`
@@ -103,6 +106,8 @@ export function createCatalog() {
   const sources = new Map(); // key -> { byId: Map(id -> { row, stanza }) }
   let merged = null;         // "All Sources": id -> { row, stanza, key }, built when first asked, dropped on load
   const sorted = new Map();  // key -> rows sorted by name (cache)
+  let hidden = new Set();    // Section Visibility (Cydia's CydiaSections Hidden): section names left out of lists
+  const shown = new Map();   // key -> sorted rows outside hidden sections (cache)
 
   function load(key, text, root, arch = DEFAULT_ARCH) {
     const byId = new Map();
@@ -118,6 +123,7 @@ export function createCatalog() {
     sources.set(key, { byId });
     merged = null;
     sorted.clear();
+    shown.clear();
     return byId.size;
   }
 
@@ -125,6 +131,13 @@ export function createCatalog() {
     sources.delete(key);
     merged = null;
     sorted.clear();
+    shown.clear();
+  }
+
+  function setHidden(names) {
+    hidden = new Set((Array.isArray(names) ? names : []).filter((n) => typeof n === "string"));
+    shown.clear();
+    return hidden.size;
   }
 
   // id -> entry for a source, or the merge of all of them: the newest version wins; on a tie, the first source
@@ -151,17 +164,30 @@ export function createCatalog() {
     return rows;
   }
 
-  function sections(key = ALL) {
+  // rowsOf without the hidden sections: what every list, Search and Changes draw from.
+  function visibleOf(key) {
+    if (!hidden.size) return rowsOf(key);
+    let rows = shown.get(key);
+    if (!rows) {
+      rows = rowsOf(key).filter((r) => !hidden.has(r.section));
+      shown.set(key, rows);
+    }
+    return rows;
+  }
+
+  // `total` counts visible packages only. With { hidden: true } (Section Visibility's edit mode) hidden sections
+  // are listed too, each marked; without it they are left out.
+  function sections(key = ALL, { hidden: withHidden = false } = {}) {
     const counts = new Map();
-    const rows = rowsOf(key);
-    for (const r of rows) counts.set(r.section, (counts.get(r.section) ?? 0) + 1);
-    const list = [...counts].map(([name, count]) => ({ name, count }))
+    for (const r of rowsOf(key)) counts.set(r.section, (counts.get(r.section) ?? 0) + 1);
+    const list = [...counts].filter(([name]) => withHidden || !hidden.has(name))
+      .map(([name, count]) => (withHidden ? { name, count, hidden: hidden.has(name) } : { name, count }))
       .sort((a, b) => collator.compare(a.name, b.name));
-    return { total: rows.length, sections: list };
+    return { total: visibleOf(key).length, sections: list };
   }
 
   function list(key = ALL, section = ALL) {
-    const rows = rowsOf(key);
+    const rows = visibleOf(key);
     return (section === ALL ? rows : rows.filter((r) => r.section === section)).map(slim);
   }
 
@@ -172,7 +198,7 @@ export function createCatalog() {
     if (!q) return [];
     const words = q.split(/\s+/);
     const hits = [];
-    for (const r of rowsOf(ALL)) {
+    for (const r of visibleOf(ALL)) {
       if (!words.every((w) => r._hay.includes(w))) continue;
       let rank = 4;
       if (r._n === q || r._id === q) rank = 0;
@@ -188,7 +214,7 @@ export function createCatalog() {
   function author(name) {
     const n = String(name ?? "").trim().toLowerCase();
     if (!n) return [];
-    return rowsOf(ALL).filter((r) => r._a === n || r._m === n).map(slim);
+    return visibleOf(ALL).filter((r) => r._a === n || r._m === n).map(slim);
   }
 
   function pkg(id, key = ALL) {
@@ -212,14 +238,14 @@ export function createCatalog() {
     return out;
   }
 
-  return { load, remove, sections, list, search, author, package: pkg, has, versions, keys: () => [...sources.keys()] };
+  return { load, remove, setHidden, sections, list, search, author, package: pkg, has, versions, keys: () => [...sources.keys()] };
 }
 
 // Runs a catalog operation by name: the worker's entry point. Unknown ops throw.
 export function runCatalog(catalog, op, args = []) {
   const f = { load: catalog.load, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
     search: catalog.search, author: catalog.author, package: catalog.package, has: catalog.has, keys: catalog.keys,
-    versions: catalog.versions }[op];
+    versions: catalog.versions, setHidden: catalog.setHidden }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);
 }

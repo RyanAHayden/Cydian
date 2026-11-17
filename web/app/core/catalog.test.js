@@ -166,3 +166,40 @@ test("versions lists every source's candidate per id, for the Changes tab", () =
   assert.ok(!v.some(([, id]) => id === "com.a.rootful"));
   assert.deepEqual(reply({ id: 1, type: "catalog", op: "versions" }).ok, true);
 });
+
+test("Section Visibility: hidden sections leave sections, lists, search and author; package and has still see them", () => {
+  const c = loaded();
+  const before = c.sections(ALL);
+  assert.equal(c.setHidden(["Tweaks", 42]), 1);
+  const after = c.sections(ALL);
+  assert.equal(after.sections.some((s) => s.name === "Tweaks"), false);
+  assert.equal(after.total, before.total - 2); // com.a.tweak and com.b.springy
+  const edit = c.sections(ALL, { hidden: true });
+  assert.deepEqual(edit.sections.map((s) => s.name), before.sections.map((s) => s.name));
+  assert.equal(edit.sections.find((s) => s.name === "Tweaks").hidden, true);
+  assert.equal(edit.sections.find((s) => s.name === "Utilities").hidden, false);
+  assert.equal(edit.total, after.total);
+  assert.deepEqual(c.list(ALL, "Tweaks"), []);
+  assert.equal(ids(c.list(ALL)).includes("com.a.tweak"), false);
+  assert.equal(ids(c.list("B")).length, 0);
+  assert.deepEqual(c.search("alpha"), []);
+  assert.deepEqual(ids(c.author("Jane Dev")), ["com.a.theme"]); // her tweaks are hidden, her theme isn't
+  assert.equal(ids(c.author("Sam Packager")).length, 1);
+  assert.equal(c.package("com.a.tweak").row.id, "com.a.tweak");
+  assert.deepEqual(c.has(["com.a.tweak"]), ["com.a.tweak"]);
+  assert.equal(c.versions().some(([, id]) => id === "com.b.springy"), true, "Changes still files what it sees");
+  // a reload keeps the hidden set; clearing it brings everything back
+  c.load("B", REPO_B, "https://b.example/");
+  assert.equal(ids(c.list("B")).length, 0);
+  c.setHidden([]);
+  assert.deepEqual(c.sections(ALL), before);
+  assert.equal(c.search("alpha")[0].id, "com.a.tweak");
+});
+
+test("the worker takes setHidden as a catalog op", () => {
+  reply({ id: 1, type: "catalog", op: "load", args: ["H", null, "https://b.example/"], text: REPO_B });
+  assert.equal(reply({ id: 2, type: "catalog", op: "setHidden", args: [["Tweaks"]] }).result, 1);
+  assert.deepEqual(reply({ id: 3, type: "catalog", op: "search", args: ["bouncy"] }).result, []);
+  reply({ id: 4, type: "catalog", op: "setHidden", args: [[]] });
+  reply({ id: 5, type: "catalog", op: "remove", args: ["H"] });
+});

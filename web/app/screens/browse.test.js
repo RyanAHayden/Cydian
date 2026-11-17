@@ -23,6 +23,8 @@ test("routes below Sources and Search name their page", () => {
 test("titles: source name, All Packages, section, author", () => {
   assert.equal(nav({ tab: "sources", path: [KEY] }, () => "Example").title, "Example");
   assert.equal(nav({ tab: "sources", path: ["*"] }).title, "Sections");
+  assert.equal(nav({ tab: "sources", path: ["*"] }).right.label, "Edit"); // Section Visibility (F24)
+  assert.equal(nav({ tab: "sources", path: ["*", "section:*"] }).right, undefined);
   assert.equal(nav({ tab: "sources", path: ["*", "section:*"] }).title, "All Packages");
   assert.equal(nav({ tab: "sources", path: ["*", "section:Tweaks"] }).title, "Tweaks");
   assert.equal(nav({ tab: "search", path: ["author:Jane"] }).title, "Jane");

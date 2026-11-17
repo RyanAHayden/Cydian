@@ -206,3 +206,22 @@ test("themeFor: Automatic follows the system", () => {
   assert.equal(themeFor("dark", false), "dark");
   assert.equal(themeFor("light", true), "light");
 });
+
+test("hidden sections: sorted, stored on the device, listeners told only on a change", () => {
+  const storage = memStorage();
+  const s = createSettings({ storage, mode: "site" });
+  const heard = [];
+  s.onChange((k, v) => heard.push([k, v]));
+  s.hiddenSections.set("Themes", true);
+  s.hiddenSections.set("Addons", true);
+  s.hiddenSections.set("Themes", true); // already hidden: no news
+  assert.deepEqual(s.hiddenSections.list(), ["Addons", "Themes"]);
+  assert.equal(s.hiddenSections.has("Themes"), true);
+  assert.deepEqual(heard, [["hiddenSections", ["Themes"]], ["hiddenSections", ["Addons", "Themes"]]]);
+  assert.deepEqual(createSettings({ storage }).hiddenSections.list(), ["Addons", "Themes"]);
+  s.hiddenSections.set("Themes", false);
+  assert.deepEqual(s.hiddenSections.list(), ["Addons"]);
+  s.hiddenSections.replace(["b", "a", "a", 3]);
+  assert.deepEqual(s.hiddenSections.list(), ["a", "b"]);
+  assert.deepEqual(createSettings({ storage: memStorage({ "cydian.hiddenSections": "{bad" }) }).hiddenSections.list(), []);
+});

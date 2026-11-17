@@ -9,6 +9,7 @@
 //   s.sections();                   // [{ id, title, footer, settings: [def…] }], only the rows this mode shows
 //   s.holds.set("com.example.tweak", true);  // Ignore upgrades, kept on the device (jailbreak: also a dpkg hold)
 //   await s.holds.sync();                    // jailbreak: take dpkg's holds (apt-mark showhold) as the list
+//   s.hiddenSections.set("Themes", true);    // Section Visibility (F24): listeners hear ("hiddenSections", list)
 //
 // Every value is stored as a string under `cydian.<key>`, so backend.js getArch() keeps reading `cydian.arch`.
 // A stored value that is not one of the setting's options reads as the default (a hand-edited or older value
@@ -125,6 +126,7 @@ export const SETTINGS = [
 
 const PREFIX = "cydian.";
 const HOLDS_KEY = PREFIX + "holds";
+const HIDDEN_SECTIONS_KEY = PREFIX + "hiddenSections";
 const byKey = new Map(SETTINGS.map((d) => [d.key, d]));
 
 // The architecture list in core/apt.js is the source of truth; the options above must cover it.
@@ -244,11 +246,39 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     },
   };
 
+  // Section Visibility (Cydia's Sections edit mode, F24): section names whose packages drop out of every list,
+  // Search and Changes. Kept on this device only, as a sorted JSON list; core/catalog.js setHidden does the filtering.
+  function readHidden() {
+    try {
+      const list = JSON.parse(store.get(HIDDEN_SECTIONS_KEY) || "[]");
+      return Array.isArray(list) ? [...new Set(list.filter((n) => typeof n === "string"))].sort() : [];
+    } catch {
+      return [];
+    }
+  }
+  function writeHidden(list) {
+    const sorted = [...new Set(list)].sort();
+    if (JSON.stringify(sorted) === JSON.stringify(readHidden())) return;
+    store.set(HIDDEN_SECTIONS_KEY, JSON.stringify(sorted));
+    notify("hiddenSections", sorted);
+  }
+  const hiddenSections = {
+    list: readHidden,
+    has: (name) => readHidden().includes(name),
+    set(name, hide) {
+      const list = new Set(readHidden());
+      if (hide) list.add(name); else list.delete(name);
+      writeHidden([...list]);
+    },
+    replace: (names) => writeHidden((Array.isArray(names) ? names : []).filter((n) => typeof n === "string")),
+  };
+
   return {
     mode,
     get,
     set,
     holds,
+    hiddenSections,
     defaultOf: (key) => defaultOf(def(key)),
     onChange(f) { listeners.add(f); return () => listeners.delete(f); },
     isShown: (key) => { const d = byKey.get(key); return Boolean(d && shown(d)); },

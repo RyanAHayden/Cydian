@@ -102,9 +102,16 @@ async function altText(source) {
 
 async function loadSource(source, arch, sig) {
   if (isAltKey(source.key)) {
+    // F16a: a source only its own app can read (an encrypted GBox one) has no apps to load: its page says why.
+    if (source.unsupported) {
+      await getParser().catalog("remove", [source.key]);
+      loaded.set(source.key, { sig, count: 0, error: source.unsupported });
+      return;
+    }
     // The candidate is the newest version this phone's iOS runs (core/altstore.js), so the iOS is in the signature.
+    // F16a: the record's `format` (Scarlet, ESign, GBox…) picks the reader in the worker.
     try {
-      const count = await getParser().catalog("loadAlt", [source.key, undefined, device?.device.ios ?? null], await altText(source));
+      const count = await getParser().catalog("loadAlt", [source.key, undefined, device?.device.ios ?? null, source.format ?? null], await altText(source));
       loaded.set(source.key, { sig, count, error: null });
     } catch (e) {
       loaded.set(source.key, { sig, count: loaded.get(source.key)?.count ?? 0, error: e?.message || String(e) });

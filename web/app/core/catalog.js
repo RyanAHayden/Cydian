@@ -27,7 +27,7 @@
 //   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
 //   c.installed()                          -> [row] installed, sorted by name, each with `installed` (its version)
 //   c.upgrades(holds, { dpkgHolds })       -> { available: [row], ignored: [row] } (Changes, core/installed.js)
-//   c.loadAlt(key, json, ios)              -> an AltStore source (F9, core/altstore.js): each app a row, its
+//   c.loadAlt(key, json, ios, format)      -> an AltStore source (F9, core/altstore.js): each app a row, its
 //                                             candidate the newest version iOS `ios` runs; apps none runs on left out
 //   c.altSource(key)                       -> the AltStore source's page data: { name, tintColor, headerURL, news,
 //                                             featured: [row], ... } or null
@@ -42,7 +42,7 @@
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
 import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
 import { compat, compatCode, isIncompatible, normalizeDevice, needText } from "./compat.js";
-import { parseAltSource, appStanza, isAltKey, runsOn, installOptions } from "./altstore.js";
+import { parseSource, appStanza, isAltKey, runsOn, installOptions } from "./altstore.js";
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -283,10 +283,11 @@ export function createCatalog() {
   }
 
   // F9: an AltStore source's JSON (text or parsed). Its apps go in like packages; the rest (news, header, tint,
-  // featured apps) is kept for its source page.
+  // featured apps) is kept for its source page. F16a: `format` (the source record's: altstore, esign, scarlet,
+  // gbox; none is AltStore) picks the reader (core/altstore.js parseSource), so each app's `extra` comes along.
   const altMeta = new Map(); // key -> parsed source without apps
-  function loadAlt(key, json, ios = null) {
-    const parsed = parseAltSource(json);
+  function loadAlt(key, json, ios = null, format = null) {
+    const parsed = parseSource(format, json);
     const byId = new Map();
     for (const app of parsed.apps) {
       const st = appStanza(app, { url: key.replace(/^alt:/, ""), name: parsed.name }, ios);

@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  createCatalog, sectionName, simpleSection, parseAuthor, isVisible, indexLetter, NO_SECTION, ALL,
+  createCatalog, sectionName, simpleSection, parseAuthor, isVisible, indexLetter, NO_SECTION, ALL, runCatalog,
 } from "./catalog.js";
 import { reply } from "./worker.js";
 import { createParser } from "./parser.js";
+import { readFileSync } from "node:fs";
 
 const stanza = (f) => Object.entries(f).map(([k, v]) => `${k}: ${v}`).join("\n");
 const packages = (...list) => list.map(stanza).join("\n\n") + "\n";
@@ -355,4 +356,26 @@ test("switching back from Not Jailbroken brings the debs back (caches dropped)",
   c.setDevice({ ios: "16.5", jailbreak: "rootless" });
   assert.equal(c.list(ALL, ALL).length, 6);
   assert.equal(c.sections("A").total, 4);
+});
+
+// F16a: the worker's loadAlt takes the source record's format as args[3], so Scarlet, ESign and GBox sources are
+// rows like AltStore ones, with their own fields kept as `extra`; no format is AltStore (records from before F16a).
+test("F16a: loadAlt reads each IPA format by the record's format", async () => {
+  const { parseIpaSource } = await import("./sources/ipa.js");
+  const src = (f) => readFileSync(new URL(`./fixtures/sources/${f}`, import.meta.url), "utf8");
+  const c = createCatalog();
+  for (const [file, format] of [["scarlet-locus.json", "scarlet"], ["gbox-qoli.json", "gbox"], ["esign-zeeho.json", "esign"], ["altstore-classic.json", null]]) {
+    const key = `alt:https://x.dev/${file}`;
+    const want = parseIpaSource(format ?? "altstore", JSON.parse(src(file)));
+    const n = runCatalog(c, "loadAlt", [key, src(file), null, format]);
+    assert.equal(n, new Set(want.apps.map((a) => a.id)).size, file);
+    const app = want.apps[0];
+    const p = c.package(app.id, key);
+    assert.equal(p.stanza.kind, "ipa", file);
+    assert.deepEqual(p.stanza.ipa.extra, app.extra, file);
+    assert.equal(c.altSource(key).format, format ?? "altstore", file);
+  }
+  assert.equal(c.list(ALL).filter((r) => r.kind === "ipa").length > 0, true);
+  // Scarlet JSON read as AltStore has no apps list: refused, not loaded empty.
+  assert.throws(() => runCatalog(c, "loadAlt", ["alt:https://x.dev/wrong", src("scarlet-locus.json"), null, null]), /AltStore/);
 });

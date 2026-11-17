@@ -102,6 +102,13 @@ export async function renderAltSource(body, route, key) {
     return;
   }
   const status = catalog.status(key);
+  // F16a: a source in a format only its own app reads (an encrypted GBox source): the reason, and Open in (F8).
+  if (source?.unsupported) {
+    body.replaceChildren(grouped([{ header: displayName(source), rows: [{ label: "Can't List Apps", subtitle: source.uri }],
+      footer: source.unsupported }]));
+    body.append(openInGroup(source));
+    return;
+  }
   if (!meta) {
     body.replaceChildren(el("p", "empty", status?.error || source?.error || "This source could not be loaded. Tap Refresh on Sources."));
     return;

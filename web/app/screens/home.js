@@ -221,11 +221,17 @@ function renderRoot(body) {
     a.href = h.href;
     hintBox.replaceChildren(a);
   };
-  // The Themes tile hides while Not Jailbroken (F41); Featured then fills the row.
+  // Themes beside Featured when jailbroken; while Not Jailbroken (F41) a Signing tile takes its place, the way to
+  // the user's own certificate (Settings > Signing), which is what installs apps without a jailbreak.
   const halves = tileRow("halves",
     tile({ label: "Featured", href: format({ tab: "home", path: ["featured"] }), glyph: "featured" }),
-    tile({ label: "Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }), glyph: "themes" }));
-  const drawThemes = () => { halves.lastChild.hidden = !showsThemes(settings.deviceType()); };
+    tile({ label: "Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }), glyph: "themes" }),
+    tile({ label: "Signing", href: format({ tab: "settings", path: ["signing"] }), glyph: "signing" }));
+  const drawThemes = () => {
+    const themes = showsThemes(settings.deviceType());
+    halves.children[1].hidden = !themes;
+    halves.children[2].hidden = themes;
+  };
   drawHint();
   drawThemes();
   const offHint = settings.onChange((key) => {

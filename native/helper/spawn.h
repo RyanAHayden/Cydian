@@ -1,0 +1,14 @@
+/* The app's side: run cydian-helper as root (docs/native.md, "3. Root"). SPDX-License-Identifier: GPL-3.0-or-later */
+#ifndef CYDIAN_HELPER_SPAWN_H
+#define CYDIAN_HELPER_SPAWN_H
+
+#include <sys/types.h>
+
+/* Spawn helper with args (NULL-terminated, not counting argv[0]) as root through the persona spawn attributes
+ * (Apple; on Linux, for tests, as the current user). stdin is /dev/null; *out_fd, *err_fd and *status_fd get the
+ * read ends of pipes on the child's fds 1, 2 and 3 (close-on-exec in this process). The caller reads them to EOF
+ * and waitpid()s *pid. Returns 0, or an errno value with nothing left open. */
+int cydian_helper_spawn(const char *helper, const char *const args[], pid_t *pid, int *out_fd, int *err_fd,
+                        int *status_fd);
+
+#endif

@@ -399,7 +399,8 @@ async function renderPackage(body, route, key, id, ctx) {
   if (installedEl) body.append(installedEl);
   if (depRows.length) body.append(grouped([{ header: "Depends", rows: depRows }]));
   if (conflicts.length) body.append(grouped([{ header: "Conflicts", rows: conflicts }]));
-  body.append(grouped([{ header: pkg.others.length > 1 ? "Sources" : "Source", rows: srcRows }]));
+  // An installed package no source carries (F27) has no source to name: its page is the status stanza alone.
+  if (!pkg.installedOnly) body.append(grouped([{ header: pkg.others.length > 1 ? "Sources" : "Source", rows: srcRows }]));
   if (st.debUrl && getBackend().kind === "http") {
     // Paid packages (cydia::commercial) only download for a buyer's device: the repo refuses the proxy.
     if (/(^|,)\s*cydia::commercial\s*(,|$)/.test(st.tag ?? "")) body.append(grouped([{ footer: "A paid package: buy and install it from a package manager on the phone." }]));

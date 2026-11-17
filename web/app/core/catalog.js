@@ -12,7 +12,9 @@
 //   c.list(key | "*", section | "*")       -> [row], sorted by name ("*": All Sources / All Packages)
 //   c.search(query)                        -> [row], best matches first
 //   c.author(name)                         -> [row]: every package whose Author or Maintainer is `name`
-//   c.package(id, key | "*")               -> { stanza, key, others: [{ key, version }] } or null
+//   c.package(id, key | "*")               -> { stanza, key, others: [{ key, version }] } or null; a package
+//                                             no source carries but dpkg has installed comes from its status
+//                                             stanza: { stanza, key: null, row, others: [], installedOnly: true }
 //   c.versions()                           -> [[key, id, version]] for every source (Changes, core/changes.js)
 //   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
 //   c.installed()                          -> [row] installed, sorted by name, each with `installed` (its version)
@@ -20,7 +22,7 @@
 //
 // A row is the slim record lists draw: { id, name, short, version, section, icon, key, author }.
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
-import { parseStatus, findUpgrades } from "./installed.js";
+import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -223,7 +225,7 @@ export function createCatalog() {
 
   function pkg(id, key = ALL) {
     const e = entries(key).get(id);
-    if (!e) return null;
+    if (!e) return installedOnly(id);
     const others = [];
     for (const [k, { byId }] of sources) {
       const o = byId.get(id);
@@ -232,8 +234,9 @@ export function createCatalog() {
     return { stanza: e.stanza, key: e.row.key, row: slim(e.row), others };
   }
 
-  // Which of `names` the catalog has (for linking Depends on the package page).
-  const has = (names) => names.filter((n) => entries(ALL).has(n));
+  // Which of `names` the catalog has (for linking Depends on the package page): on a source, or installed (its
+  // page then comes from the status stanza).
+  const has = (names) => names.filter((n) => entries(ALL).has(n) || statusById.has(n));
 
   // Every (source, id, candidate version) loaded: what the Changes tab files on a refresh (core/changes.js).
   function versions() {
@@ -244,10 +247,28 @@ export function createCatalog() {
 
   // ---- installed packages (F7): dpkg's status file, matched against every source's candidate ----
   let installedPkgs = null; // parseStatus rows, or null before a status file came
+  let statusById = new Map(); // id -> status stanza, for the package page of packages no source carries (F27)
 
   function setInstalled(text) {
-    installedPkgs = text == null ? null : parseStatus(text);
-    return installedPkgs ? installedPkgs.length : -1;
+    if (text == null) {
+      installedPkgs = null;
+      statusById = new Map();
+      return -1;
+    }
+    const stanzas = installedStanzas(text);
+    statusById = new Map(stanzas.map((st) => [st.package, st]));
+    installedPkgs = parseStatus(text, stanzas);
+    return installedPkgs.length;
+  }
+
+  // The package page's answer for an installed package no source carries: the status stanza itself (name,
+  // version, description, Author, Depends...), with no source, no other versions and nothing to download.
+  function installedOnly(id) {
+    const st = statusById.get(id);
+    if (!st) return null;
+    const p = installedPkgs.find((r) => r.id === id);
+    const row = { id: p.id, name: p.name, short: p.short, version: p.version, section: p.section, icon: null, key: null, author: p.author };
+    return { stanza: st, key: null, row, others: [], installedOnly: true };
   }
 
   // The installed list as rows: the status file's own fields (name, version, description), with the source's

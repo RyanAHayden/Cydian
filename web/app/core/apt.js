@@ -116,12 +116,27 @@ export function parseRelease(text) {
 
 // ---- repo layout and URLs ---------------------------------------------------------------------------------
 
+// Cydian targets rootless jailbreaks; "iphoneos-arm" (rootful, palera1n rootful) stays available as a setting.
+export const DEFAULT_ARCH = "iphoneos-arm64";
+export const ARCHES = ["iphoneos-arm64", "iphoneos-arm"];
+
+// Whether a stanza is installable on `arch`: its Architecture is that arch or "all". Flat repos list rootful and
+// rootless builds in one Packages file, so every package list goes through this. A stanza with no Architecture
+// is dropped: apt needs the field for binary packages, and old repos that leave it out are rootful.
+export function matchesArch(stanza, arch = DEFAULT_ARCH) {
+  const a = stanza?.architecture;
+  return a === arch || a === "all";
+}
+
+export const filterArch = (stanzas, arch = DEFAULT_ARCH) => stanzas.filter((s) => matchesArch(s, arch));
+
 // Where a source's index files live. `source` is a sources.list line ("deb URI DIST [COMPONENT…]") or
 // {uri, dist, components}. A dist ending in "/" ("./", the usual Cydia repo) is a flat repo: Release and
 // Packages sit in that directory and no components are allowed. Otherwise it's a dist repo:
 // URI/dists/DIST/Release and URI/dists/DIST/COMPONENT/binary-ARCH/Packages. Either way `root` is the URI with a
-// trailing slash, which Filename (and a relative Icon) resolve against, as apt does.
-export function repoLayout(source, arch = "iphoneos-arm") {
+// trailing slash, which Filename (and a relative Icon) resolve against, as apt does. `arch` defaults to rootless
+// (iphoneos-arm64); pass "iphoneos-arm" for rootful jailbreaks.
+export function repoLayout(source, arch = DEFAULT_ARCH) {
   let { uri, dist, components } = typeof source === "string" ? parseSourceLine(source) : source;
   if (!uri) throw new Error("repo source has no URI");
   const root = new URL(String(uri).replace(/\/*$/, "/")).href;

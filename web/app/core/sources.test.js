@@ -1,0 +1,238 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  DEFAULT_SOURCES, normalizeSourceUrl, sourceKey, sourceIconUrl, displayName, sortSources, verifySource,
+  refreshSource, openSourceStore, sourceCalls, SourceError,
+} from "./sources.js";
+import { createHttpBackend, BackendError } from "../backend-http.js";
+import { createParser } from "./parser.js";
+
+// The slice of IndexedDB that sources.js uses, in memory: several keyPath stores, get/getAll/put/delete, async
+// requests and transaction completion.
+function fakeIndexedDB() {
+  const dbs = new Map();
+  const later = (f) => setTimeout(f, 0);
+  return {
+    open(name) {
+      const req = {};
+      later(() => {
+        let db = dbs.get(name);
+        const fresh = !db;
+        if (fresh) {
+          const stores = new Map();
+          db = {
+            objectStoreNames: { contains: (n) => stores.has(n) },
+            createObjectStore(n, { keyPath }) { stores.set(n, { keyPath, rows: new Map() }); },
+            transaction(n, mode) {
+              const s = stores.get(n);
+              const tx = {};
+              const request = (f) => {
+                const r = {};
+                later(() => { r.result = f(); later(() => tx.oncomplete?.()); });
+                return r;
+              };
+              const write = (f) => { if (mode !== "readwrite") throw new Error("read-only"); return request(f); };
+              tx.objectStore = () => ({
+                get: (k) => request(() => structuredClone(s.rows.get(k))),
+                getAll: () => request(() => [...s.rows.values()].map((v) => structuredClone(v))),
+                put: (v) => write(() => { s.rows.set(v[s.keyPath], structuredClone(v)); return v[s.keyPath]; }),
+                delete: (k) => write(() => { s.rows.delete(k); }),
+              });
+              return tx;
+            },
+            close() {},
+          };
+          dbs.set(name, db);
+        }
+        req.result = db;
+        if (fresh) req.onupgradeneeded?.();
+        req.onsuccess?.();
+      });
+      return req;
+    },
+  };
+}
+
+// A backend whose repos are a map of URL -> body (string or Uint8Array). Missing URLs fail as the proxy does:
+// "upstream" 404 for plain fetches, "not_found" when packages() finds no Packages file. `refuse` hosts fail
+// with "refused", as the SSRF guard does for private addresses.
+function fakeBackend(files = {}, { refuse = [] } = {}) {
+  const calls = [];
+  const guard = (url) => {
+    if (refuse.some((h) => new URL(url).hostname === h)) {
+      throw new BackendError("refused", `refused: ${new URL(url).hostname} is a private address`);
+    }
+  };
+  const get = (url) => {
+    calls.push(url);
+    guard(url);
+    if (!(url in files)) throw new BackendError("upstream", "upstream answered HTTP 404", 404);
+    return files[url];
+  };
+  return {
+    calls,
+    async packages(dir) {
+      calls.push("packages " + dir);
+      guard(dir);
+      for (const n of ["Packages.xz", "Packages.bz2", "Packages.gz", "Packages"]) {
+        if (dir + n in files) return { text: files[dir + n], source: dir + n, cached: false };
+      }
+      throw new BackendError("not_found", "no Packages file");
+    },
+    text: async (url) => String(get(url)),
+    fetch: async (url) => new Response(get(url)),
+  };
+}
+
+const PACKAGES = [
+  "Package: com.example.rootless\nArchitecture: iphoneos-arm64\nVersion: 1\n",
+  "Package: com.example.rootful\nArchitecture: iphoneos-arm\nVersion: 1\n",
+  "Package: com.example.theme\nArchitecture: all\nVersion: 1\n",
+  "Package: com.example.both\nArchitecture: iphoneos-arm64\nVersion: 2\n",
+].join("\n");
+
+test("URL check: Cydia's rule, https:// added to a bare host, trailing slash added", () => {
+  assert.equal(normalizeSourceUrl("https://repo.example.com"), "https://repo.example.com/");
+  assert.equal(normalizeSourceUrl("  http://r.example/cydia/  "), "http://r.example/cydia/");
+  assert.equal(normalizeSourceUrl("repo.chariz.com"), "https://repo.chariz.com/");
+  for (const bad of ["", "   ", "ftp://r.example/", "file:///var/repo/", "https://r.example/a b/", "https://r.example/#x",
+    "https://", "https://r.example/?q=1", "https://user:pw@r.example/", "javascript:alert(1)"]) {
+    assert.throws(() => normalizeSourceUrl(bad), (e) => e instanceof SourceError && e.kind === "invalid_url" &&
+      e.title === "Invalid URL", bad);
+  }
+});
+
+test("add: a good flat repo is saved with its rootless package count and Release Origin", async () => {
+  const b = fakeBackend({
+    "https://repo.example.com/Packages.bz2": PACKAGES,
+    "https://repo.example.com/Release": "Origin: Example Repo\nLabel: Example\nArchitectures: iphoneos-arm64 iphoneos-arm\n",
+  });
+  const s = await verifySource(b, "repo.example.com");
+  assert.equal(s.key, "deb:https://repo.example.com/:./");
+  assert.equal(s.uri, "https://repo.example.com/");
+  assert.equal(s.dist, "./");
+  assert.equal(s.count, 3); // two arm64 and one "all"; the rootful one is not ours
+  assert.equal(s.origin, "Example Repo");
+  assert.equal(displayName(s), "Example Repo");
+  assert.equal((await verifySource(b, "https://repo.example.com/", { arch: "iphoneos-arm" })).count, 2);
+});
+
+test("add: the count can come from the worker parser", async () => {
+  const b = fakeBackend({ "https://r.example/Packages": PACKAGES });
+  const parser = createParser({ Worker: null });
+  const s = await verifySource(b, "https://r.example/", { count: parser.count });
+  assert.equal(s.count, 3);
+  assert.equal(displayName(s), "r.example");
+});
+
+test("add: repos Cydia's check misses (Release only, .zst only) still pass", async () => {
+  const rel = await verifySource(fakeBackend({ "https://r.example/Release": "Origin: R\nSuite: stable\n" }), "https://r.example/");
+  assert.equal(rel.count, null);
+  const zst = fakeBackend({ "https://z.example/Packages.zst": new Uint8Array([0x28, 0xb5, 0x2f, 0xfd, 1, 2]) });
+  assert.equal((await verifySource(zst, "https://z.example/")).count, null);
+  // an HTML page served for every path is not a Release, and wrong magic is not a .zst
+  const html = fakeBackend({ "https://h.example/Release": "<!doctype html><title>x</title>",
+    "https://h.example/Packages.zst": new Uint8Array([60, 104, 116, 109]) });
+  await assert.rejects(verifySource(html, "https://h.example/"), { kind: "not_repository" });
+});
+
+test("add: a URL that isn't a repo is 'Did not Find Repository'", async () => {
+  const b = fakeBackend({});
+  await assert.rejects(verifySource(b, "https://example.org/"), (e) => e instanceof SourceError &&
+    e.kind === "not_repository" && e.title === "Did not Find Repository" && /legacy Installer/.test(e.message));
+  assert.deepEqual(b.calls, ["packages https://example.org/", "https://example.org/Release",
+    "https://example.org/InRelease", "https://example.org/Packages.zst", "https://example.org/Packages.lzma"]);
+});
+
+test("add: a bad URL never reaches the backend", async () => {
+  const b = fakeBackend({});
+  await assert.rejects(verifySource(b, "ftp://r.example/"), { kind: "invalid_url" });
+  await assert.rejects(verifySource(b, "not a url"), { kind: "invalid_url" });
+  assert.deepEqual(b.calls, []);
+});
+
+test("add: refused by the proxy is a Verification Error with the proxy's reason, and stops at once", async () => {
+  const b = fakeBackend({ "http://10.0.0.1/Packages": PACKAGES }, { refuse: ["10.0.0.1"] });
+  await assert.rejects(verifySource(b, "http://10.0.0.1/"), (e) => e instanceof SourceError &&
+    e.kind === "verification" && e.title === "Verification Error" && e.code === "refused" && /private/.test(e.message));
+  assert.deepEqual(b.calls, ["packages http://10.0.0.1/"]);
+});
+
+test("add through the HTTP backend: the proxy's 403 refused reaches the alert; nothing is saved", async () => {
+  const fetchFn = async (url) => {
+    const u = new URL(url, "http://site.test");
+    if (u.searchParams.get("url").startsWith("http://192.168.")) {
+      return Response.json({ error: "refused: 192.168.1.1 is not a public address", code: "refused" }, { status: 403 });
+    }
+    if (u.searchParams.get("kind") === "packages") return new Response(PACKAGES);
+    return Response.json({ error: "upstream answered HTTP 404", code: "upstream", status: 404 }, { status: 502 });
+  };
+  const b = createHttpBackend({ fetchFn, sourceOptions: { indexedDB: fakeIndexedDB() } });
+  await assert.rejects(b.addSource("http://192.168.1.1/repo/"), { kind: "verification", code: "refused" });
+  const before = await b.sources();
+  assert.equal(before.length, DEFAULT_SOURCES.length);
+  const added = await b.addSource("https://good.example/");
+  assert.equal(added.count, 3);
+  const after = await b.sources();
+  assert.equal(after.length, DEFAULT_SOURCES.length + 1);
+  assert.ok(after.some((s) => s.key === "deb:https://good.example/:./" && s.count === 3));
+  await b.addSource("https://good.example");  // the same source again: updated, not doubled
+  assert.equal((await b.sources()).length, DEFAULT_SOURCES.length + 1);
+});
+
+test("store: seeded once with the defaults, sorted by name; deletes stick", async () => {
+  const idb = fakeIndexedDB();
+  let st = await openSourceStore({ indexedDB: idb });
+  assert.deepEqual((await st.list()).map(displayName), ["BigBoss", "Chariz", "Havoc", "Procursus", "Telesphoreo"]);
+  await st.remove(sourceKey({ uri: "https://havoc.app/", dist: "./" }));
+  await st.put({ key: "deb:https://9.example/:./", uri: "https://9.example/", dist: "./", components: [] });
+  st = await openSourceStore({ indexedDB: idb }); // reopen: the defaults don't come back
+  assert.deepEqual((await st.list()).map(displayName), ["BigBoss", "Chariz", "Procursus", "Telesphoreo", "9.example"]);
+  assert.equal(await st.update("deb:nope:./", { count: 1 }), undefined);
+});
+
+test("sorting: letters first, then without case or diacritics", () => {
+  const s = (name) => ({ name, uri: "https://x/" });
+  assert.deepEqual(sortSources([s("zeta"), s("_x"), s("Élan"), s("alpha"), s("2nd")]).map(displayName),
+    ["alpha", "Élan", "zeta", "_x", "2nd"]);
+});
+
+test("icon URL: flat dir, or dists/<dist>/ for dist repos", () => {
+  assert.equal(sourceIconUrl(DEFAULT_SOURCES.find((s) => s.name === "Chariz")), "https://repo.chariz.com/CydiaIcon.png");
+  assert.equal(sourceIconUrl(DEFAULT_SOURCES.find((s) => s.name === "BigBoss")),
+    "http://apt.thebigboss.org/repofiles/cydia/dists/stable/CydiaIcon.png");
+});
+
+test("refresh: dist repo counts every component for our arch; rootful-only Release counts 0 without fetching", async () => {
+  const bigboss = DEFAULT_SOURCES.find((s) => s.name === "BigBoss");
+  const base = "http://apt.thebigboss.org/repofiles/cydia/dists/stable/";
+  const b = fakeBackend({
+    [base + "Release"]: "Origin: BigBoss\nArchitectures: iphoneos-arm iphoneos-arm64\n",
+    [base + "main/binary-iphoneos-arm64/Packages.bz2"]: PACKAGES,
+  });
+  const r = await refreshSource(b, bigboss);
+  assert.equal(r.count, 3);
+  assert.equal(r.error, null);
+
+  const tele = DEFAULT_SOURCES.find((s) => s.name === "Telesphoreo");
+  const t = fakeBackend({ "http://apt.saurik.com/dists/ios/1800.00/Release": "Origin: Telesphoreo\nArchitectures: darwin-arm iphoneos-arm\n" });
+  assert.equal((await refreshSource(t, tele)).count, 0);
+  assert.ok(!t.calls.some((c) => c.startsWith("packages")));
+
+  const gone = await refreshSource(fakeBackend({}), { key: "k", uri: "https://gone.example/", dist: "./" });
+  assert.equal(gone.count, undefined);
+  assert.match(gone.error, /no Packages/);
+});
+
+test("refreshSources saves each source's count and reports it", async () => {
+  const b = fakeBackend({ "https://repo.chariz.com/Packages.bz2": PACKAGES });
+  const calls = sourceCalls(b, { indexedDB: fakeIndexedDB() });
+  const seen = [];
+  await calls.refreshSources((s) => seen.push(s.name));
+  assert.equal(seen.length, DEFAULT_SOURCES.length);
+  const list = await calls.sources();
+  assert.equal(list.find((s) => s.name === "Chariz").count, 3);
+  assert.ok(list.find((s) => s.name === "Havoc").error);
+  await calls.removeSource(list[0].key);
+  assert.equal((await calls.sources()).length, DEFAULT_SOURCES.length - 1);
+});

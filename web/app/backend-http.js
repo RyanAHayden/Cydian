@@ -5,8 +5,12 @@
 //   const { text, source, cached } = await backend.packages("https://repo.example.com/");
 //   const res = await backend.fetch("https://repo.example.com/CydiaIcon.png");  // a Response
 //
+//   await backend.sources();  backend.addSource(url);  backend.removeSource(key);  backend.refreshSources(onEach)
+//
 // Failures throw BackendError with the proxy's `code` (bad_url, refused, too_large, timeout, upstream,
 // not_found, network, rate_limited) and, for code "upstream", the repo's HTTP `status`.
+
+import { sourceCalls } from "./core/sources.js";
 
 export class BackendError extends Error {
   constructor(code, message, status) {
@@ -17,7 +21,9 @@ export class BackendError extends Error {
   }
 }
 
-export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(globalThis) } = {}) {
+// `sourceOptions` go to core/sources.js sourceCalls (indexedDB, arch, count): the source list lives in this
+// browser's IndexedDB, the same code the app runs.
+export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(globalThis), sourceOptions = {} } = {}) {
   const endpoint = (params) => `${base}/api/fetch?${new URLSearchParams(params)}`;
 
   async function call(params) {
@@ -40,10 +46,12 @@ export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(g
     return res;
   }
 
-  return {
+  const backend = {
     kind: "http",
     // The raw Response for any http(s) URL. HTML and other active types come back as application/octet-stream.
     fetch: (url) => call({ url }),
+    // A URL an <img> can load the remote image through (repo icons): the proxy, since it's on our origin.
+    assetUrl: (url) => endpoint({ url }),
     async text(url) {
       return (await call({ url })).text();
     },
@@ -58,4 +66,5 @@ export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(g
       };
     },
   };
+  return Object.assign(backend, sourceCalls(backend, sourceOptions));
 }

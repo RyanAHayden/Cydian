@@ -23,8 +23,8 @@ export function createParser({ Worker: W = globalThis.Worker, url = new URL("./w
     };
   }
 
-  function call(type, input, root) {
-    const msg = { id: next++, type, root };
+  function call(type, input, root, arch) {
+    const msg = { id: next++, type, root, arch };
     const transfer = [];
     if (typeof input === "string") msg.text = input;
     else { msg.bytes = input; if (input instanceof ArrayBuffer) transfer.push(input); }
@@ -43,6 +43,8 @@ export function createParser({ Worker: W = globalThis.Worker, url = new URL("./w
     packages: (input, root) => call("packages", input, root),
     release: (input) => call("release", input),
     control: (input) => call("control", input),
+    // Packages that install on `arch` (core/apt.js matchesArch), as a number.
+    count: (input, arch) => call("count", input, undefined, arch),
     inWorker: Boolean(worker),
     close() { worker?.terminate(); worker = null; },
   };

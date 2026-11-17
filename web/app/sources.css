@@ -1,0 +1,94 @@
+/* The Sources tab's pieces (F4): the UIAlertView (nav/alert.js), table edit mode and swipe-to-delete, source
+   icons and the Done bar button. Sizes are the kit's @2x halved; colours from its layers as named. */
+
+/* ---- "Alert diaglog": 272px wide, 10px corners, #0b1b43 at 80%, a 2px #b1b7c1 -> #e1e3e3 rim, 8px/19px shadow,
+   a white gloss over the top 31px that dips in a curve. ---- */
+.alert-scrim {
+  position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.25), rgba(0,0,0,.6) 70%);
+}
+.alert {
+  position: relative; width: 272px; max-width: 100%; padding: 16px 12px 11px; border-radius: 10px;
+  color: #fff; text-align: center; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
+  background: rgba(11,27,67,.8); border: 2px solid #b1b7c1; border-bottom-color: #e1e3e3;
+  box-shadow: 0 8px 19px rgba(0,0,0,.9);
+}
+.alert::before { /* "gloss" */
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 31px; border-radius: 8px 8px 0 0;
+  background: radial-gradient(ellipse 150% 100% at 50% 0, rgba(255,255,255,.5), rgba(255,255,255,.25) 99%, transparent 100%);
+  pointer-events: none;
+}
+.alert-title { position: relative; margin: 0 0 6px; font-size: 18px; line-height: 22px; font-weight: bold; }
+.alert-message { position: relative; margin: 0 0 10px; font-size: 16px; line-height: 20px; overflow-wrap: anywhere; }
+.alert-field {
+  display: block; width: 100%; height: 31px; margin: 6px 0 12px; padding: 0 8px; border-radius: 4px;
+  font: inherit; font-size: 16px; color: #000; text-shadow: none; -webkit-user-select: text; user-select: text;
+  background: #fff; border: 1px solid #3c4c6d; box-shadow: inset 0 2px 3px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.2);
+  outline: none;
+}
+.alert-buttons { position: relative; display: flex; gap: 8px; margin-top: 4px; }
+.alert-buttons.stacked { flex-direction: column; }
+/* "Button (continue)": 127 x 42, 5px corners, 1px #131d39 edge, a 1px #d9dde3 inner highlight at the top. The
+   kit screens its grey gradient over the alert's navy at 80%; these are the results. */
+.alert-button {
+  flex: 1; min-width: 0; height: 43px; padding: 0 6px; border-radius: 5px; cursor: pointer;
+  font-size: 18px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  border: 1px solid rgba(19,29,57,.9);
+  background: linear-gradient(#aeb4c1, #616b85 49%, #43506e 51%, #58637f);
+  box-shadow: inset 0 1px 0 #d9dde3, 0 1px 0 rgba(255,255,255,.2);
+}
+.alert-button.cancel { /* "Button (Cancel)": darker, no inner highlight */
+  background: linear-gradient(#707a91, #283659 49%, #0b1b43 50%, #182747);
+  box-shadow: 0 1px 0 rgba(255,255,255,.2);
+}
+.alert-button:active { background: linear-gradient(#6d7da3, #3c4e7d 49%, #22325e 51%, #2f3f6c); }
+
+/* ---- Done: "Button (Gloss Blue)" ---- */
+.bar-button.done {
+  border-color: #1f3f86; border-top-color: #30363e;
+  background: linear-gradient(#79a1f3, #3b71e1 49%, #215fdd 51%, #2361dd);
+}
+.bar-button.done:active { background: linear-gradient(#5f86d6, #2a5bc0 49%, #164bb8 51%, #184db9); }
+
+/* ---- source rows ---- */
+.source-row .cell-inner { min-height: 53px; } /* Cydia's 53pt rows */
+.source-row .cell-icon { position: relative; overflow: hidden; }
+.source-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; }
+.source-row .cell-icon img:not(.loaded) { opacity: 0; }
+.source-row .cell-error { color: #b0262a; }
+.source-row { position: relative; overflow: hidden; }
+
+/* ---- edit mode and swipe-to-delete. Rows slide by transform; the red minus turns 90deg when armed. ---- */
+.del-toggle {
+  position: absolute; left: 9px; top: 50%; width: 29px; height: 29px; margin-top: -14.5px; padding: 0; border: 0;
+  background: none; cursor: pointer; opacity: 0; transform: translateX(-40px);
+  transition: transform .3s ease, opacity .3s ease;
+}
+.del-toggle::before { /* red disc, white rim, white bar */
+  content: ""; position: absolute; inset: 3px; border-radius: 50%;
+  background: linear-gradient(#f5979b, #d5494d 50%, #cf2b2d 50%, #c2181b);
+  box-shadow: 0 0 0 2px #fff, 0 1px 3px 2px rgba(0,0,0,.35);
+}
+.del-toggle::after {
+  content: ""; position: absolute; left: 8px; right: 8px; top: 13px; height: 3px; border-radius: 1px; background: #fff;
+  box-shadow: 0 -1px 0 rgba(0,0,0,.25); transition: transform .25s ease;
+}
+.source-row .cell-inner { transition: transform .3s ease; }
+.editing .source-row .del-toggle { opacity: 1; transform: none; }
+.editing .source-row .cell-inner { transform: translateX(38px); width: calc(100% - 38px); }
+.editing .source-row .cell-inner.chevron::after { opacity: 0; }
+.source-row.armed .del-toggle::after { transform: rotate(-90deg); }
+/* "Button (Email Delete)": red, 28px, 5px corners, darker edge. */
+.del-confirm {
+  position: absolute; right: 10px; top: 50%; height: 30px; margin-top: -15px; padding: 0 10px; border-radius: 5px;
+  font-size: 14px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4); cursor: pointer;
+  border: 1px solid #30363e; border-bottom-color: #3f3f3f;
+  background: linear-gradient(#f5979b, #d5494d 50%, #cf2b2d 50%, #cf2b2d);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.3), 0 1px 0 rgba(255,255,255,.6);
+  opacity: 0; transform: translateX(16px); pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+}
+.source-row.armed .del-confirm { opacity: 1; transform: none; pointer-events: auto; }
+.source-row.armed .cell-detail, .source-row.armed .cell-count, .source-row.armed .cell-inner.chevron::after { opacity: 0; }
+.source-row.removing { opacity: 0; transition: opacity .25s ease; }
+.source-row { touch-action: pan-y; }

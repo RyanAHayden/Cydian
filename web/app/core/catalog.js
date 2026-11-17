@@ -24,6 +24,8 @@
 //   c.browse(category)                     -> [row] in that Browse category, sorted by name
 //   c.popular({ limit })                   -> [row] ranked by how many sources list it, then newest (rankPopular),
 //                                             each with `sources` (that count)
+//   c.deps(id, key | "*")                  -> F18 (core/deps.js explain): { ok, problems, targets } for an APT
+//                                             package, against every source and the installed list; null if unknown
 //   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
 //   c.installed()                          -> [row] installed, sorted by name, each with `installed` (its version)
 //   c.upgrades(holds, { dpkgHolds })       -> { available: [row], ignored: [row] } (Changes, core/installed.js)
@@ -43,6 +45,7 @@ import { parseControl, description, resolveFilename, resolveIcon, matchesArch, c
 import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
 import { compat, compatCode, isIncompatible, normalizeDevice, needText } from "./compat.js";
 import { parseSource, appStanza, isAltKey, runsOn, installOptions } from "./altstore.js";
+import { depIndex, explain } from "./deps.js";
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -507,6 +510,25 @@ export function createCatalog() {
   // page then comes from the status stanza).
   const has = (names) => names.filter((n) => entries(ALL).has(n) || statusById.has(n));
 
+  // F18: what stops `id` installing, in plain words (core/deps.js explain), resolved against every APT source's
+  // packages (older versions too) and dpkg's status. The index is rebuilt when a source or the status file changes.
+  let depCache = null; // { all, status, index }
+  function deps(id, key = ALL) {
+    const e = entries(key).get(id);
+    const st = e?.stanza ?? statusById.get(id);
+    if (!st || st.kind === "ipa") return null;
+    const all = entries(ALL);
+    if (!depCache || depCache.all !== all || depCache.status !== statusById) {
+      const available = [];
+      for (const [k, { byId }] of sources) {
+        if (!counts(k) || isAltKey(k)) continue;
+        for (const o of byId.values()) for (const s of [o.stanza, ...(o.older ?? [])]) available.push({ stanza: s, key: k });
+      }
+      depCache = { all, status: statusById, index: depIndex({ available, installed: [...statusById.values()] }) };
+    }
+    return explain(st, { device, index: depCache.index });
+  }
+
   // Every (source, id, candidate version) loaded: what the Changes tab files on a refresh (core/changes.js).
   function versions() {
     const out = [];
@@ -563,7 +585,8 @@ export function createCatalog() {
 
   return { load, loadAlt, altSource, remove, setHidden, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
     categories, browse, popular,
-    setInstalled, installed, upgrades, setDevice };
+    setInstalled, installed, upgrades, setDevice,
+    deps };
 }
 
 // Runs a catalog operation by name: the worker's entry point. Unknown ops throw.
@@ -572,7 +595,8 @@ export function runCatalog(catalog, op, args = []) {
     search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys,
     versions: catalog.versions, setHidden: catalog.setHidden, setInstalled: catalog.setInstalled,
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice,
-    categories: catalog.categories, browse: catalog.browse, popular: catalog.popular }[op];
+    categories: catalog.categories, browse: catalog.browse, popular: catalog.popular,
+    deps: catalog.deps }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);
 }

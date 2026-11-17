@@ -160,7 +160,7 @@ const router = createRouter({
     if (r.kind === "push" && r.from) {
       setTop(r.to, true);
       slide(r.to, r.from, 0, 1, () => setTop(r.from, false));
-    } else if (r.kind === "pop" && !swipedBack && !(standaloneWeb && !ownBack)) {
+    } else if (r.kind === "pop" && !swipedBack && !(webBack && !ownBack)) {
       const [old, ...deeper] = r.removed;
       drop(deeper);
       setTop(r.to, true);
@@ -178,11 +178,12 @@ const router = createRouter({
 
 // Back: history.back() when the parent is right behind us in history (we pushed here), so the browser's back and
 // forward stay in step; on a deep link there is nothing behind, so replace the route with the parent instead.
-// iOS 26 home-screen web apps have their own edge swipe back (it walks history with its own animation), so there
-// ours would play a second slide on top: there, our edge strip stays off and a pop we didn't start isn't animated.
-// The native app's WKWebView has no such gesture (N1 turns it off), so it keeps ours.
-const standaloneWeb = !globalThis.cydianApp &&
-  (window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true);
+// Outside the native app, iOS has its own edge swipe back: Safari's in a tab, and the system's in an iOS 26 home-screen
+// web app. Both walk the browser history with their own animation. Ours on top made one swipe go back twice (theirs,
+// then ours finishing and calling history.back() again), landing somewhere else. So on the web our edge strip stays
+// off and a pop we didn't start isn't animated; we just show the page history lands on. The native app's WKWebView
+// has no such gesture (N1 turns it off), so it keeps ours.
+const webBack = !(globalThis.cydianApp || globalThis.cydianNative);
 let ownBack = false; // the pop under way came from our back button or our swipe
 
 function goBack() {
@@ -202,12 +203,12 @@ edgeEl.className = "edge-swipe";
 screensEl.append(edgeEl);
 function updateEdge() {
   // pointer-events, not display: switching it costs no layout.
-  edgeEl.classList.toggle("off", standaloneWeb || stacks.stack(stacks.activeTab()).length < 2);
+  edgeEl.classList.toggle("off", webBack || stacks.stack(stacks.activeTab()).length < 2);
 }
 
 let gesture = null; // the edge swipe in progress: { pair, top, below, width }
 attachEdgeSwipe(edgeEl, {
-  canStart: () => !standaloneWeb && !running && !gesture && stacks.stack(stacks.activeTab()).length > 1,
+  canStart: () => !webBack && !running && !gesture && stacks.stack(stacks.activeTab()).length > 1,
   begin() {
     const all = stacks.stack(stacks.activeTab());
     const [top, below] = [all.at(-1), all.at(-2)];

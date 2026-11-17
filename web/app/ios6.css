@@ -159,7 +159,7 @@ html[data-theme="dark"] .bar-button.back:active, html[data-theme="dark"] .bar-bu
 /* ---- Grouped tables: "Grouped Tables" ---- */
 .page-body.grouped {
   background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
-  padding-bottom: 20px;
+  padding-bottom: calc(var(--tab-h) + 20px); /* clear the fixed tab bar, then the table's own 20px; the last hint must scroll into view */
 }
 .group { margin: 10px 10px 0; }
 .group + .group { margin-top: 23px; }
@@ -303,3 +303,8 @@ html.no-zoom, html.no-zoom body { touch-action: pan-x pan-y; }
    1px taller than its box. A zero-width float does it without changing any element's size (stretching the first
    child pushed Search's results off the screen). */
 .page-body::before { content: ""; float: left; width: 1px; margin-right: -1px; height: calc(100% + 1px); }
+
+/* What's behind the page (Safari samples it for its top bar, and it shows in overscroll): the nav bar's colour for each
+   theme, so switching theme repaints the top too. */
+html { background: #bdcbdc; }
+html[data-theme="dark"] { background: #5f656f; }

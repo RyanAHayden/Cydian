@@ -197,9 +197,14 @@ export function applyTheme(doc = document, win = window) {
   doc.documentElement.dataset.theme = theme;
   // Both metas keep their media query so the browser picks one before any script runs; a fixed choice paints
   // both with its own colour.
+  // A fresh meta element, not a changed one: Safari doesn't always repaint its top bar when only `content` changes.
   for (const m of doc.querySelectorAll('meta[name="theme-color"]')) {
     const own = m.media.includes("dark") ? "dark" : "light";
-    m.content = THEME_COLORS[appearance === "auto" ? own : theme];
+    const color = THEME_COLORS[appearance === "auto" ? own : theme];
+    if (m.content === color) continue;
+    const fresh = m.cloneNode();
+    fresh.content = color;
+    m.replaceWith(fresh);
   }
   tellShell(appearance, theme, win);
 }

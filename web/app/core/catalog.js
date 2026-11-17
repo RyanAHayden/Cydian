@@ -19,6 +19,11 @@
 //                                             aptVersionList } or { kind: "ipa", id, name, key, sourceUrl,
 //                                             versions: altVersionList }; null when unknown
 //   c.versions()                           -> [[key, id, version]] for every source (Changes, core/changes.js)
+//   c.categories()                         -> Browse (F46): [{ name, count }] in BROWSE_CATEGORIES order, empty
+//                                             ones and (Not Jailbroken) tweak categories left out
+//   c.browse(category)                     -> [row] in that Browse category, sorted by name
+//   c.popular({ limit })                   -> [row] ranked by how many sources list it, then newest (rankPopular),
+//                                             each with `sources` (that count)
 //   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
 //   c.installed()                          -> [row] installed, sorted by name, each with `installed` (its version)
 //   c.upgrades(holds, { dpkgHolds })       -> { available: [row], ignored: [row] } (Changes, core/installed.js)
@@ -145,6 +150,61 @@ function sectionTest(section) {
   const s = String(section);
   if (s.startsWith("group:")) { const g = s.slice(6); return (r) => sectionGroup(r.section) === g; }
   return (r) => r.section === s;
+}
+
+// ---- Browse (F46) ------------------------------------------------------------------------------------------
+
+// Home's Browse: AltStore app categories and APT sections merged into one short list. A row's category comes from
+// its section: AltStore's "Apps (Games)" by the category inside, an APT section by its full lower-cased name, then
+// by its simple name ("Themes (SpringBoard)" -> themes). APT sections with no category here (Libraries, System
+// packages, Packaging...) stay out of Browse; All Packages still lists them.
+export const BROWSE_CATEGORIES = ["Games", "Emulators", "Entertainment", "Photo & Video", "Social", "Lifestyle",
+  "Utilities", "Developer", "Themes", "Tweaks", "Other"];
+// Categories only a jailbroken phone can install: hidden while Not Jailbroken (F37).
+export const JAILBREAK_CATEGORIES = new Set(["Themes", "Tweaks"]);
+const BROWSE_OF = {
+  games: "Games", game: "Games", emulators: "Emulators", emulator: "Emulators",
+  entertainment: "Entertainment", multimedia: "Entertainment", books: "Entertainment", music: "Entertainment",
+  "photo & video": "Photo & Video", social: "Social", messaging: "Social", lifestyle: "Lifestyle",
+  utilities: "Utilities", productivity: "Utilities", networking: "Utilities", navigation: "Utilities",
+  developer: "Developer", development: "Developer", "terminal support": "Developer", scripting: "Developer",
+  administration: "Developer",
+  themes: "Themes", theme: "Themes", wallpaper: "Themes", fonts: "Themes", ringtones: "Themes",
+  tweaks: "Tweaks", addons: "Tweaks", widgets: "Tweaks", keyboards: "Tweaks",
+  other: "Other", apps: "Other",
+};
+// Neither AltStore nor APT has an emulator category: a game, utility or app whose name or subtitle says
+// "emulator" (or "emulation") goes under Emulators instead.
+const EMULATED = new Set(["Games", "Utilities", "Entertainment", "Other"]);
+const EMULATOR_WORD = /\bemulat(?:or|ors|ion)\b/i;
+
+// A row ({ section, name, short }) -> its Browse category, or null when it has none.
+export function browseCategory(row) {
+  const s = String(row?.section ?? "").trim().toLowerCase();
+  const inner = s.match(/^apps \((.*)\)$/);
+  const cat = BROWSE_OF[inner ? inner[1] : s] ?? (inner ? "Other" : BROWSE_OF[simpleSection(s)]) ?? null;
+  if (cat && EMULATED.has(cat) && (EMULATOR_WORD.test(row.name ?? "") || EMULATOR_WORD.test(row.short ?? ""))) return "Emulators";
+  return cat;
+}
+
+// Rows -> the Browse list: [{ name, count }] in BROWSE_CATEGORIES order, empty ones left out, and Themes and
+// Tweaks too unless `jailbroken`.
+export function mergeCategories(rows, { jailbroken = true } = {}) {
+  const counts = new Map();
+  for (const r of rows) {
+    const c = browseCategory(r);
+    if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  return BROWSE_CATEGORIES.filter((c) => counts.has(c) && (jailbroken || !JAILBREAK_CATEGORIES.has(c)))
+    .map((name) => ({ name, count: counts.get(name) }));
+}
+
+// Popular, until real install counts exist: [{ row, sources, date }] -> rows, most sources first (what most
+// sources list), then the newest update (`date`, epoch ms; AltStore versions carry one, APT packages don't), then
+// by name. At most `limit`.
+export function rankPopular(items, limit = 50) {
+  return [...items].sort((a, b) => b.sources - a.sources || (b.date ?? 0) - (a.date ?? 0) || compareNames(a.row, b.row))
+    .slice(0, limit);
 }
 
 // ---- Version History (F29) ---------------------------------------------------------------------------------
@@ -422,6 +482,26 @@ export function createCatalog() {
     return { kind: "apt", id, name: e.row.name, versions: aptVersionList(offers, { candidate: e.stanza.version, installed: statusById.get(id)?.version }) };
   }
 
+  // ---- Browse (F46): over what every list shows (hidden sections and, with the filter on, misfits left out) ----
+  function categories() {
+    return mergeCategories(visibleOf(ALL), { jailbroken: !appsOnly });
+  }
+
+  function browse(category) {
+    if (appsOnly && JAILBREAK_CATEGORIES.has(category)) return [];
+    return visibleOf(ALL).filter((r) => browseCategory(r) === category).map(slim);
+  }
+
+  function popular({ limit = 50 } = {}) {
+    const lists = [...sources].filter(([k]) => counts(k)).map(([, { byId }]) => byId);
+    const all = entries(ALL);
+    const items = visibleOf(ALL).map((row) => ({
+      row, sources: lists.reduce((n, byId) => n + (byId.has(row.id) ? 1 : 0), 0),
+      date: all.get(row.id)?.stanza.ipa?.versions?.[0]?.date ?? null,
+    }));
+    return rankPopular(items, limit).map(({ row, sources: n }) => ({ ...slim(row), sources: n }));
+  }
+
   // Which of `names` the catalog has (for linking Depends on the package page): on a source, or installed (its
   // page then comes from the status stanza).
   const has = (names) => names.filter((n) => entries(ALL).has(n) || statusById.has(n));
@@ -481,6 +561,7 @@ export function createCatalog() {
   }
 
   return { load, loadAlt, altSource, remove, setHidden, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
+    categories, browse, popular,
     setInstalled, installed, upgrades, setDevice };
 }
 
@@ -489,7 +570,8 @@ export function runCatalog(catalog, op, args = []) {
   const f = { load: catalog.load, loadAlt: catalog.loadAlt, altSource: catalog.altSource, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
     search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys,
     versions: catalog.versions, setHidden: catalog.setHidden, setInstalled: catalog.setInstalled,
-    installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice }[op];
+    installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice,
+    categories: catalog.categories, browse: catalog.browse, popular: catalog.popular }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);
 }

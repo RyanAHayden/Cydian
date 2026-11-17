@@ -9,13 +9,17 @@
 // Every tile and row is a .cell-inner link, so it gets the table cells' held look (blue selection) from ios6.css
 // and app.js. Featured banners from sources' sileo-featured.json go above the tiles once F20 lands.
 //
-// Routes below the tab: help, featured, sources (More Package Sources), about.
+// Routes below the tab: help, featured, sources (More Package Sources), about, and browse (F46): Browse's list
+// (Popular, then the categories), browse/popular, browse/category:<name>, and below those browse.js's tokens
+// (package:<id>, author:<name>, versions:<id>), as in the Search tab.
 import { grouped } from "../nav/ui.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { sourceKey } from "../core/sources.js";
 import { settings } from "./settings.js";
+import * as browse from "./browse.js";
+import { catalog } from "../catalog.js";
 
 export const title = "Home";
 
@@ -61,7 +65,23 @@ export function deviceHint(type, mode = "site") {
 // F41: whether Home offers Themes (the tile, Featured's Browse Themes). Not Jailbroken lists apps only (F37).
 export const showsThemes = (type) => type !== "none";
 
+// F46: what a route under browse/ shows: { page: "root" | "popular" | "category" | "package" (browse.js's own
+// pages, below a list), value }.
+export function browsePage(path) {
+  if (path.length === 1) return { page: "root" };
+  if (path.length === 2 && path[1] === "popular") return { page: "popular" };
+  if (path.length === 2 && path[1].startsWith("category:")) return { page: "category", value: path[1].slice(9) };
+  return { page: "browse" };
+}
+
 export function nav(route, ctx) {
+  if (route.path[0] === "browse") {
+    const b = browsePage(route.path);
+    if (b.page === "root") return { title: "Browse" };
+    if (b.page === "popular") return { title: "Popular", style: "plain" };
+    if (b.page === "category") return { title: b.value || "Browse", style: "plain" };
+    return browse.nav(route);
+  }
   switch (route.path[0]) {
     case "about": return { title: "About" };
     case "help": return { title: "Help" };
@@ -215,6 +235,9 @@ function renderRoot(body) {
     drawThemes();
   });
 
+  // F46: Browse, full width under Featured and Themes.
+  const browseRow = tileRow("halves", tile({ label: "Browse", href: format({ tab: "home", path: ["browse"] }), glyph: "browse" }));
+
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));
   state.tile = stateRow.querySelector("a");
   paintTile(stateTile());
@@ -226,6 +249,7 @@ function renderRoot(body) {
       tile({ label: "GitHub", href: REPO_URL, glyph: "github", external: true }),
       tile({ label: "Sources", href: format({ tab: "sources" }), glyph: "sources" })),
     halves,
+    browseRow,
     stateRow,
   );
   body.append(home);
@@ -276,6 +300,46 @@ function renderFeatured(body) {
       { label: "All Packages", href: format({ tab: "sources", path: ["*", "section:*"] }) }],
     footer: "Featured packages appear here when your sources publish them.",
   }]));
+}
+
+// ---- Browse (F46) ----------------------------------------------------------------------------------------
+
+// Browse's own page: Popular, then the merged categories (core/catalog.js mergeCategories) with their counts. The
+// catalog leaves Themes and Tweaks out while Settings > Device is Not Jailbroken.
+async function renderBrowse(body) {
+  const box = el("div");
+  const spin = el("div", "loading");
+  spin.append(el("span", "loading-spinner"), el("span", null, "Loading Packages"));
+  box.append(spin);
+  body.append(box);
+  let cats;
+  try {
+    await catalog.ensure();
+    cats = await catalog.categories();
+  } catch (e) {
+    box.replaceChildren(el("p", "empty", e.message));
+    return;
+  }
+  box.replaceChildren(grouped(browseGroups(cats)));
+}
+
+// The groups of Browse's page for `cats` ([{ name, count }]).
+export function browseGroups(cats) {
+  const popular = { rows: [{ label: "Popular", href: format({ tab: "home", path: ["browse", "popular"] }) }],
+    footer: "Packages the most sources list, then the newest updates." };
+  if (!cats.length) return [popular, { footer: "Add a source to browse its packages." }];
+  return [popular, {
+    header: "Categories",
+    rows: cats.map((c) => ({ label: c.name, detail: String(c.count), href: format({ tab: "home", path: ["browse", `category:${c.name}`] }) })),
+  }];
+}
+
+function renderBrowseRoute(body, route, ctx) {
+  const b = browsePage(route.path);
+  if (b.page === "root") return renderBrowse(body);
+  if (b.page === "popular") return browse.renderList(body, route, () => catalog.popular(), false);
+  if (b.page === "category") return browse.renderList(body, route, () => catalog.browse(b.value), true);
+  return browse.render(body, route, ctx);
 }
 
 // More Package Sources: one row per curated repo; a tap asks, checks the repo and adds it. Listed ones are ticked.
@@ -336,6 +400,7 @@ export function render(el, route, ctx) {
     case "help": return renderHelp(el);
     case "featured": return renderFeatured(el);
     case "sources": return renderSources(el, ctx);
+    case "browse": return renderBrowseRoute(el, route, ctx);
     default: return renderRoot(el);
   }
 }

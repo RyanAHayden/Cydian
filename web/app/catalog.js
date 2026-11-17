@@ -243,6 +243,9 @@ export const catalog = {
   list: (key = ALL, section = ALL) => ask("list", [key, section]),
   search: (q, filters) => ask("search", filters ? [q, filters] : [q]), // F35: core/catalog.js search filters
   author: (name) => ask("author", [name]),
+  categories: () => ask("categories"), // F46: Home's Browse (core/catalog.js)
+  browse: (category) => ask("browse", [category]),
+  popular: (opts) => ask("popular", opts ? [opts] : []),
   package: (id, key = ALL) => ask("package", [id, key]),
   history: (id, key = ALL) => ask("history", [id, key]), // F29: Version History (core/catalog.js history)
   altSource: (key) => ask("altSource", [key]),

@@ -296,7 +296,8 @@ export function packageList(body, route, rows, { letters = true, decorate = null
   return list;
 }
 
-async function renderList(body, route, fetchRows, letters) {
+// Exported for Home's Browse (F46).
+export async function renderList(body, route, fetchRows, letters) {
   body.append(spinner());
   let rows;
   try {

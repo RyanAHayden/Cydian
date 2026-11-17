@@ -9,14 +9,14 @@ export function nav(route, ctx) {
   return { title: "Cydian", left: { label: "About", onClick: () => showAbout(ctx) } };
 }
 
-// Cydia-style About popup from the nav bar's About button (nav/alert.js, the same UIAlertView as Add Source).
+// About, laid out like Cydia's on the 4S (ref/4s/screens/cydia-about.png): centred lines in groups with a blank line
+// between them, and one wide Close button.
 async function showAbout(ctx) {
-  const { index } = await ctx.showAlert({
+  await ctx.showAlert({
     title: "About Cydian",
-    message: "A package manager with the iOS 6 look, for modern iPhones. Free and open source (GPL-3.0).",
-    buttons: ["Settings", "OK"], cancel: 0,
+    message: "Version 0.1\nFree and open source (GPL-3.0)\n\nA package manager with the\niOS 6 look, for modern iPhones\ngithub.com/RyanAHayden/Cydian",
+    buttons: ["Close"],
   });
-  if (index === 0) ctx.go({ tab: "settings", path: [] });
 }
 
 export function render(el, route) {

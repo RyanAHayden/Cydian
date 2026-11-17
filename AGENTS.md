@@ -28,6 +28,8 @@ Shortcuts recipes live in `docs/shortcuts.md`.
   original for comparison only: use its HD counterpart from the kit (`ref/4s/hd/`, from `tools/kitmatch.py`;
   `ref/4s/kitmatch.html` flips HD/Original). `~/repos/sidedrop/app.py` has a first pass at the CSS. Cydia's behaviour: `docs/cydia.md` (R2) and Cydia's GPLv3 source at
   https://git.saurik.com/cydia.git.
+- Cydian is its own project: never route anything through sidedrop (signing, installing, hosting). Sideload installs
+  happen on the phone, Feather-style (docs/sideload.md, R5).
 - Never commit Apple artwork (UIKit `.artwork` extracts, system icons) or Cydia's logo. Pulled device files go in
   `ref/` (gitignored). Use them as a reference and redraw in CSS/SVG. Don't name the product or pages "Cydia".
   `ref/` exists only in the main checkout. In a worktree, link it first:

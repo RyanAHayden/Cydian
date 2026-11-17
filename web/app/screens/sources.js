@@ -8,6 +8,7 @@
 import { plain } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
+import { showMenu, longPress, copyText } from "../nav/menu.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor, sourceFilter, loadNeverLoaded } from "../core/sources.js";
@@ -165,6 +166,7 @@ function decorate(li, source, backend) {
   confirm.textContent = "Delete";
   confirm.addEventListener("click", () => remove(li, source));
   li.append(toggle, confirm);
+  li.dataset.url = source.uri; // Copy URL (hold the row)
 }
 
 function arm(li, on) {
@@ -175,6 +177,11 @@ function arm(li, on) {
 // While editing, or while a row shows Delete, a tap on a row doesn't open it: it only puts the Delete away.
 // A left swipe on a row shows its Delete; a right swipe hides it.
 function attachRowGestures(ul) {
+  // Hold a source: iOS 6's black menu with Copy URL.
+  longPress(ul, ".source-row", (li, e) => {
+    if (state.editing || li.classList.contains("armed") || !li.dataset.url) return;
+    showMenu(li, [{ label: "Copy URL", onClick: () => copyText(li.dataset.url) }], { x: e.clientX });
+  });
   let start = null;   // the pointer that may become a swipe
   let swiped = false; // the click that ends a swipe opens nothing
   ul.addEventListener("click", (e) => {

@@ -100,7 +100,7 @@ html[data-theme="dark"] .bar-button:not(.back):not(.done):active, html[data-them
   background: linear-gradient(#2a2d32, #121316); background-origin: border-box;
 }
 .bar-button.back {
-  height: 30px; min-width: 0; max-width: calc(100% - 12px); padding: 0 5px 0 1px; line-height: 28px; /* room before the title */
+  height: 30px; min-width: 0; max-width: 100%; padding: 0 5px 0 1px; line-height: 28px;
   border: solid transparent; border-width: 0 5px 0 13px; border-radius: 0;
   background: none; box-shadow: none;
   border-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzM1M2E0MyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzJkNDE1YiIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzk5YWFjMiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzQxNjE4ZSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=") 0 10 0 26 fill / 0 5px 0 13px;
@@ -309,3 +309,24 @@ html.no-zoom, html.no-zoom body { touch-action: pan-x pan-y; }
    theme, so switching theme repaints the top too. */
 html { background: #bdcbdc; }
 html[data-theme="dark"] { background: #5f656f; }
+
+/* UIMenuController (nav/menu.js): a black glossy callout with an arrow, white bold items split by hairlines. */
+.menu { position: fixed; z-index: 40; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
+.menu-items {
+  display: flex; height: 38px; border-radius: 7px; overflow: hidden; border: 1px solid #000;
+  background: linear-gradient(rgba(255,255,255,.28), rgba(255,255,255,.08) 50%, transparent 51%) , linear-gradient(#3c3c3c, #0d0d0d);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+}
+.menu-item {
+  padding: 0 12px; border: 0; margin: 0; background: none; cursor: pointer; font: inherit; font-size: 14px; font-weight: bold;
+  line-height: 36px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.8); white-space: nowrap;
+}
+.menu-item + .menu-item { border-left: 1px solid rgba(0,0,0,.9); box-shadow: inset 1px 0 0 rgba(255,255,255,.18); }
+.menu-item:active { background: linear-gradient(#4a8cf0, #1d5fd9); }
+.menu-arrow {
+  position: absolute; top: 100%; width: 0; height: 0; margin: -1px 0 0 -10px;
+  border: 10px solid transparent; border-bottom: 0; border-top-color: #0d0d0d;
+}
+.menu.below .menu-arrow { top: auto; bottom: 100%; margin: 0 0 -1px -10px; border: 10px solid transparent; border-top: 0; border-bottom-color: #3c3c3c; }
+.cell.is-held > .cell-inner, .cell.is-held > .cell-inner * { background-color: transparent; color: #fff; }
+.cell.is-held > .cell-inner { background: var(--select); }

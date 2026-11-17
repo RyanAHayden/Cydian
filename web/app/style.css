@@ -22,7 +22,7 @@ button { font: inherit; color: inherit; margin: 0; }
   display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 4px;
   padding: 0 max(5px, env(safe-area-inset-right)) 0 max(5px, env(safe-area-inset-left));
 }
-.nav-left { justify-self: start; min-width: 0; max-width: 100%; display: flex; } /* capped to its column: a long Back label ends in "…" */
+.nav-left { justify-self: start; min-width: 0; max-width: calc(100% - 8px); display: flex; } /* room before the title (not on the button: a % of a shrink-to-fit box truncated every label) */ /* capped to its column: a long Back label ends in "…" */
 .nav-right { justify-self: end; min-width: 0; max-width: 100%; display: flex; }
 .nav-title { margin: 0; max-width: calc(100vw - 180px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 

@@ -41,4 +41,4 @@ Files:
   `POSIX_SPAWN_CLOEXEC_DEFAULT` and the persona attributes (99, override, uid/gid 0) on Apple. For the Swift shell
   to call (N3); on Linux it spawns as the current user, for the tests.
 - `test_driver.c`, `test_helper.py`: unit tests and the whole chain on Linux (stand-in Cydian → helper → stand-in
-  apt-get). `make host` / `make ios` build by hand; packaging into the .deb is N3's.
+  apt-get). `make host` / `make ios` build by hand; `../build.sh` builds both into the .deb (N3).

@@ -36,6 +36,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
                 c.reply(nil, nil)
             }
         }
+        Apt.register(self) // N3: apt's files, the network, cydian-helper, haptic.tap (Apt.swift)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }

@@ -1,0 +1,7 @@
+Origin: Procursus
+Label: Procursus
+Suite: 1800
+Codename: 1800
+Architectures: iphoneos-arm64 darwin-arm64
+Components: main
+Description: Procursus (fixture)

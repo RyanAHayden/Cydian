@@ -51,6 +51,7 @@ enum Web {
         let c = WKWebViewConfiguration()
         c.setURLSchemeHandler(AppScheme(), forURLScheme: AppScheme.scheme)
         c.userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "cydian")
+        Apt.installScript(c.userContentController) // cydianNative, before any page script (native/bridge.js)
         // WebKit holds requestAnimationFrame near 60 Hz by default on iOS; the JS edge swipe needs 120 (R3).
         WebKitFeature.set({ $0 == "PreferPageRenderingUpdatesNear60FPSEnabled" }, false, c.preferences)
         let w = WKWebView(frame: .zero, configuration: c)

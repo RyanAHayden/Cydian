@@ -1,0 +1,3 @@
+# Havoc, flat
+deb https://havoc.app/ ./
+deb-src https://havoc.app/ ./

@@ -38,6 +38,9 @@ class Deb(unittest.TestCase):
         os.makedirs(self.debian)
         self.write(self.app, "Cydian", fake_macho(), 0o755)
         self.write(self.app, "Info.plist", plist())
+        self.write(self.app, "bridge.js", b"x")
+        os.makedirs(os.path.join(self.root, "var/jb/usr/libexec/cydian"))
+        self.write(self.root, mkdeb.HELPER[len("./"):], fake_macho(), 0o755)
         for name in ("AppIcon60x60@2x.png", "AppIcon60x60@3x.png"):
             shutil.copy(os.path.join(HERE, "icon", name), self.app)
         for name in ("index.html", "app.js", "style.css", "router.js", "nav/stack.js"):
@@ -97,6 +100,19 @@ class Deb(unittest.TestCase):
         self.assertTrue(any("CFBundleVersion" in p for p in self.problems()))
 
 
+    def test_helper_flagged(self):
+        """N3: the helper ships at its rootless path, 0755 and an arm64 iOS executable."""
+        helper = os.path.join(self.root, mkdeb.HELPER[len("./"):])
+        os.remove(helper)
+        self.assertTrue(any("no helper" in p for p in self.problems()))
+        self.write(self.root, mkdeb.HELPER[len("./"):], fake_macho(cpu=0x01000007), 0o755)
+        self.assertTrue(any("helper is not" in p for p in self.problems()))
+
+    def test_bridge_script_flagged(self):
+        os.remove(os.path.join(self.app, "bridge.js"))
+        self.assertTrue(any("bridge.js" in p for p in self.problems()))
+
+
 class Plists(unittest.TestCase):
     def test_info_plist(self):
         p = plistlib.loads(plist())
@@ -110,6 +126,7 @@ class Plists(unittest.TestCase):
             e = plistlib.load(f)
         self.assertTrue(e["platform-application"])
         self.assertTrue(e["com.apple.private.security.no-container"])
+        self.assertTrue(e["com.apple.private.persona-mgmt"])  # N3: spawning cydian-helper as root
 
     def test_version_file(self):
         with open(os.path.join(HERE, "VERSION")) as f:

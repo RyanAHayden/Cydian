@@ -1,0 +1,37 @@
+// IndexedDB cache for parsed repo indexes, so a cold start shows the last known packages without a fetch or a
+// parse. One record per key (use the index file's URL), with the validators to revalidate it later:
+// {key, value, etag, lastModified, savedAt}. The IDBFactory is passed in so node tests can hand it a fake.
+const STORE = "indexes";
+
+export function openIndexCache({ indexedDB: idb = globalThis.indexedDB, name = "cydian-index" } = {}) {
+  if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
+  return new Promise((resolve, reject) => {
+    const req = idb.open(name, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "key" });
+    };
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => resolve(wrap(req.result));
+  });
+}
+
+function wrap(db) {
+  const run = (mode, f) => new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, mode);
+    const req = f(tx.objectStore(STORE));
+    tx.oncomplete = () => resolve(req.result);
+    tx.onerror = () => reject(tx.error ?? req.error);
+    tx.onabort = () => reject(tx.error ?? new Error("transaction aborted"));
+  });
+  return {
+    // The whole record, or undefined.
+    get: (key) => run("readonly", (s) => s.get(key)),
+    put: (key, value, { etag = null, lastModified = null } = {}) =>
+      run("readwrite", (s) => s.put({ key, value, etag, lastModified, savedAt: Date.now() })).then(() => undefined),
+    delete: (key) => run("readwrite", (s) => s.delete(key)).then(() => undefined),
+    keys: () => run("readonly", (s) => s.getAllKeys()),
+    clear: () => run("readwrite", (s) => s.clear()).then(() => undefined),
+    close: () => db.close(),
+  };
+}

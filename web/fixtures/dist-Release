@@ -1,0 +1,14 @@
+Origin: Cydia/Telesphoreo
+Label: Cydia/Telesphoreo
+Suite: stable
+Version: 1.0r282
+Codename: ios
+Architectures: darwin-arm iphoneos-arm
+Components: main
+Description: Distribution of Unix Software for iOS
+Support: https://cydia.saurik.com/api/support/*
+MD5Sum:
+ 671f24ee138fc9dc7ac46de6c3a61783 12466 main/binary-darwin-arm/Packages.bz2
+ 00275af41594d7ceddee649dba37bbef 68886 main/binary-darwin-arm/Packages
+ f47d278bd5082b0ede1d6d439afb62b0 27614 main/binary-iphoneos-arm/Packages.bz2
+ b77b80d3f47650ab67d4d384a8868668 174237 main/binary-iphoneos-arm/Packages

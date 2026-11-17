@@ -176,6 +176,25 @@ export function applyTheme(doc = document, win = window) {
     const own = m.media.includes("dark") ? "dark" : "light";
     m.content = THEME_COLORS[appearance === "auto" ? own : theme];
   }
+  tellShell(appearance, theme, win);
+}
+
+// The jailbreak/sideload shell (F23): native parts the page can't style (keyboard, <select> pickers, alerts,
+// the window behind the web view) follow the theme through the bridge's app.theme. Automatic sends "auto" so the
+// shell lets the system decide; pinning a style there would also pin prefers-color-scheme inside the web view and
+// Automatic would stop following the system. On the site there is no handler and this does nothing.
+export function themeMessage(appearance, theme) {
+  return { id: 0, method: "app.theme", params: { style: appearance === "auto" ? "auto" : theme, theme } };
+}
+let lastSent = "";
+function tellShell(appearance, theme, win) {
+  const h = win.webkit?.messageHandlers?.cydian;
+  if (!h) return;
+  const msg = themeMessage(appearance, theme);
+  const key = JSON.stringify(msg.params);
+  if (key === lastSent) return;
+  lastSent = key;
+  try { Promise.resolve(h.postMessage(msg)).catch(() => {}); } catch { /* an older shell without app.theme */ }
 }
 
 // Zoom is off unless Settings > Allow Zoom is on. iOS Safari ignores user-scalable=no, so besides the viewport and

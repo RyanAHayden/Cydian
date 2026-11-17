@@ -3,6 +3,19 @@ services:
     build: .
     restart: unless-stopped
     ports: ["8080:8080"]
+    volumes: ["cydian-data:/data"]
     env_file:
       - path: .env
         required: false
+  # The daily upgrade check and Web Push (F10, web/push.py): same image, same data volume.
+  cydian-push:
+    build: .
+    restart: unless-stopped
+    command: ["python", "push.py", "daemon"]
+    healthcheck: { disable: true }  # the image's check is for the web server, which this service doesn't run
+    volumes: ["cydian-data:/data"]
+    env_file:
+      - path: .env
+        required: false
+volumes:
+  cydian-data:

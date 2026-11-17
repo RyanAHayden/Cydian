@@ -9,6 +9,9 @@
 import { grouped } from "../nav/ui.js";
 import { format } from "../router.js";
 import { createSettings, detectMode, themeFor, SETTINGS } from "../core/settings.js";
+import { drawSection as drawPushSection } from "../push-client.js";
+import { showAlert } from "../nav/alert.js";
+import { showHUD } from "../nav/hud.js";
 
 export const title = "Settings";
 
@@ -54,7 +57,7 @@ function draw({ el, route }) {
   const top = el.scrollTop;
   if (key === "holds") el.replaceChildren(holdsPage());
   else if (key) el.replaceChildren(listPage(key));
-  else el.replaceChildren(rootPage());
+  else el.replaceChildren(rootPage(), pushSection());
   el.scrollTop = top;
 }
 
@@ -89,6 +92,15 @@ function rootPage() {
     }
   });
   return frag;
+}
+
+// Upgrade Alerts (F10, push-client.js): the site only; the app's alerts are native.
+function pushSection() {
+  const box = document.createElement("div");
+  if (detectMode() === "site") {
+    drawPushSection(box, { grouped, createSwitch, showAlert, showHUD, holds: () => settings.holds.list() });
+  }
+  return box;
 }
 
 function makeSwitch(d) {

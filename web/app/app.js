@@ -23,6 +23,7 @@ import * as installed from "./screens/installed.js";
 import * as search from "./screens/search.js";
 import * as settingsScreen from "./screens/settings.js";
 import { getBackend } from "./backend.js";
+import { startPush } from "./push-client.js";
 
 const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
 
@@ -259,3 +260,7 @@ router.start();
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.
 if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch")) getBackend().refreshSources().catch(() => {});
+
+// Upgrade alerts (F10): register the service worker and, if opted in, re-subscribe (iOS drops subscriptions now
+// and then). After first paint, so it never competes with the launch.
+if (!globalThis.cydianNative) setTimeout(() => startPush({ holds: () => settingsScreen.settings.holds.list() }).catch(() => {}), 3000);

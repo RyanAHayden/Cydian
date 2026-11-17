@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test gate for agent-runner: every test_*.py under the repo, then `node --test web/app`.
-# Native (Theos) and IPA builds join here once they exist.
+# Then the native jailbreak build when its toolchain is there; the sideload IPA build joins later.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -28,3 +28,11 @@ git ls-files --cached --others --exclude-standard | grep -E '(^|/)test_[^/]*\.py
   done
 
 node --test web/app
+
+# Jailbreak build (native/, N1): only where its toolchain is set up (SWIFT_TOOLCHAIN or swiftc on PATH, IOS_SDK,
+# ld64.lld). build.sh builds native/build/Cydian.deb and checks its contents (mkdeb.py check).
+if native/build.sh --probe 2>/dev/null; then
+  make -s -C native package
+else
+  echo "check: native build skipped: $(native/build.sh --probe 2>&1 | tr '\n' ' ')"
+fi

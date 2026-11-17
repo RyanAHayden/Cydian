@@ -1,0 +1,6 @@
+#!/bin/sh
+# Unregister the app before its files go, so no dead icon is left on the home screen.
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+  uicache -u /var/jb/Applications/Cydian.app || true
+fi
+exit 0

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Register the app with SpringBoard (rootless: the jailbreak maps /var/jb).
+uicache -p /var/jb/Applications/Cydian.app || true
+exit 0

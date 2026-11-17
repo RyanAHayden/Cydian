@@ -1,0 +1,10 @@
+Package: io.github.fizl0.cydian
+Name: Cydian
+Version: @VERSION@
+Architecture: iphoneos-arm64
+Description: Package manager with the iOS 6 look, for modern iPhones
+Maintainer: Cydian
+Author: Cydian
+Section: Packaging
+Depends: firmware (>= 15.0), uikittools
+Installed-Size: @SIZE@

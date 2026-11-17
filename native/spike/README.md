@@ -14,10 +14,11 @@ frame meter. The meter records the page's rAF intervals (`web/meter.js`) and the
 
 ## Build (Linux)
 
-    SWIFT_TOOLCHAIN=~/swift-6.4.2 native/spike/build.sh    # → native/spike/build/CydianSpike.ipa
+    SWIFT_TOOLCHAIN=~/swift-6.4.2 IOS_SDK=/path/to/iPhoneOS.sdk native/spike/build.sh    # → native/spike/build/CydianSpike.ipa
 
 What it needs and why each flag is there: the comments in `build.sh` and docs/native.md, "Building on Linux".
-The IPA is unsigned and runs on a stock phone (no jailbreak needed): sign it through sidedrop.
+The IPA is unsigned and runs on a stock phone (no jailbreak needed): sideload it with any signer, e.g. Feather,
+AltStore or SideStore.
 
 ## Trace on a desktop
 

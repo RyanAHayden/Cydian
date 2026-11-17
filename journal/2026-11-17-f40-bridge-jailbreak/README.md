@@ -17,6 +17,6 @@
 Nothing.
 
 ## Not verified
-- The Swift change was not run on a phone (no rootless device here; the 4S is iOS 6, not the shell's target). Whether
-  it compiles depends on the gate's native build running: if `tools/check.sh` skips it for lack of the
-  toolchain, the Swift is compiled by nobody in this task. The change is one `let` and a `replacingOccurrences`.
+- Not run on a phone: there is no rootless device here, and the 4S runs iOS 6, which the shell doesn't target. So the
+  injected value on a real Dopamine/roothide/rootful device is unchecked. The Swift does compile: `native/build.sh
+  --probe` passes on this machine, so the gate's `make -C native package` built it.

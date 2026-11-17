@@ -1,25 +1,58 @@
-/* Placeholder layout only: the iOS 6 look comes in F1 (ios6.css). */
+/* Layout only: bars, the per-tab navigation stacks and their scrollers. The iOS 6 skin is ios6.css. */
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 body {
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: column; overscroll-behavior: none;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  background: #c5ccd4; color: #000;
-  -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
-.navbar { flex: none; height: 44px; padding-top: env(safe-area-inset-top); background: #6d84a2; color: #fff; text-align: center; }
-.navbar h1 { margin: 0; font-size: 20px; line-height: 44px; }
-#screens { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.screen[hidden] { display: none; }
-.empty { margin: 40px 20px; text-align: center; color: #4c566c; }
+button { font: inherit; color: inherit; margin: 0; }
+
+/* Nav bar: 44px below the status bar (or the notch). */
+.navbar { flex: none; position: relative; z-index: 3; height: calc(44px + env(safe-area-inset-top)); }
+.nav-stack { position: absolute; left: 0; right: 0; top: env(safe-area-inset-top); height: 44px; }
+.nav-item {
+  position: absolute; inset: 0; visibility: hidden;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 4px;
+  padding: 0 max(5px, env(safe-area-inset-right)) 0 max(5px, env(safe-area-inset-left));
+}
+.nav-left { justify-self: start; min-width: 0; display: flex; }
+.nav-right { justify-self: end; min-width: 0; display: flex; }
+.nav-title { margin: 0; max-width: calc(100vw - 180px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Screens: one .tab-stack per tab, its .pages stacked root first; each page scrolls on its own. */
+#screens { flex: 1; position: relative; z-index: 1; overflow: hidden; min-height: 0; }
+.tab-stack, .page { position: absolute; inset: 0; }
+.page { visibility: hidden; } /* later pages paint over earlier ones: the top is always the last child */
+.page-body {
+  position: absolute; inset: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch; touch-action: pan-y; /* horizontal moves are the edge swipe's */
+  padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right);
+}
+.page-shade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+.tab-stack.is-active > .page.is-top, .tab-stack.is-active > .page.is-moving,
+.nav-stack.is-active > .nav-item.is-top, .nav-stack.is-active > .nav-item.is-moving { visibility: visible; }
+/* Always on their own compositor layers: toggling will-change at the start and end of a slide would re-lay out
+   the screens (it changes their containing block), which is the one thing a slide must not do. Hidden pages
+   cost no tiles. */
+.page, .nav-item { will-change: transform; }
+.nav-item, .page-shade { will-change: transform, opacity; }
+.edge-swipe { position: absolute; z-index: 2; left: 0; top: 0; bottom: 0; width: 20px; touch-action: none; }
+.edge-swipe.off { pointer-events: none; }
+html.nav-moving #screens, html.nav-moving .navbar { pointer-events: none; } /* no taps mid-slide */
+
+/* Tab bar: 49px above the home indicator. */
 .tabbar {
-  flex: none; display: flex; height: calc(49px + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom); background: #141414;
+  flex: none; position: relative; z-index: 3; display: flex;
+  height: calc(49px + env(safe-area-inset-bottom));
+  padding: 0 max(2px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(2px, env(safe-area-inset-left));
 }
-.tab {
-  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-  padding-bottom: 3px; color: #999; text-decoration: none; font-size: 10px; font-weight: bold;
-  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
-}
-.tab.active { color: #fff; background: rgba(255, 255, 255, .15); }
-.tab-icon { width: 30px; height: 30px; margin-bottom: 2px; border-radius: 6px; background: currentColor; opacity: .5; }
+.tab { flex: 1; min-width: 0; position: relative; touch-action: manipulation; text-decoration: none; }
+
+/* The app draws its own UINavigationBar/UITabBar (R3): hide ours and give the screens the whole web view. */
+html.native .navbar, html.native .tabbar { display: none; }
+
+.empty { margin: 40px 20px; text-align: center; }
+[hidden] { display: none !important; }

@@ -1,0 +1,180 @@
+/* iOS 6, after the Teehan+Lax iOS 6 GUI kit (ref/teehanlax/ios6/sheet.svg). Colours, gradients and sizes are the
+   kit's, read off the layer named in each comment; the kit is drawn at 2x, so its numbers are halved here.
+   No Apple images: every shape is CSS or an inline SVG redrawn from the kit's vectors. Layout lives in style.css. */
+
+:root {
+  --pin-dark: #c9ced8;  /* "Stripe (light grey)" bitmap: 2.5px dark, 5.5px light, 8px period */
+  --pin-light: #ccd1da;
+  --head: #4c566c;      /* "Table Label" */
+  --detail: #385487;
+  --select: linear-gradient(#85a7e9, #2765db); /* cell selection: the kit's "Button (Matte Blue)" gradient */
+}
+body { color: #000; background: #000; }
+
+/* ---- Nav bar: "Menu Bar (Blue)" and, under the notch, "Status Bar (Blue)" ---- */
+.navbar {
+  background:
+    linear-gradient(#3f5b7f, #3f5b7f) bottom / 100% 1px no-repeat,              /* bottom dark shadow */
+    linear-gradient(rgba(255,255,255,.6) 50%, rgba(255,255,255,.35) 50%)        /* top highlight, 1px */
+      0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#bdcbdd, #577397) bottom / 100% 44px no-repeat,              /* background */
+    linear-gradient(#4f698b, #3f5b7f);                                           /* status bar */
+}
+.navbar::after { /* Shadow: 2.5px of black at 18% fading down over the screen */
+  content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 2.5px; pointer-events: none;
+  background: linear-gradient(rgba(0,0,0,.18), rgba(0,0,0,0));
+}
+.nav-title {
+  font-size: 20px; font-weight: bold; line-height: 44px; color: #fff; text-align: center;
+  text-shadow: 0 -1px 0 rgba(0,0,0,.5);
+}
+
+/* "blue button": 29px tall, 5px corners, 0.5px border darker at the top, inner shadow at the top edge and a
+   half-pixel white line under it. */
+.bar-button {
+  height: 29px; min-width: 50px; max-width: 100%; padding: 0 9px; overflow: hidden; white-space: nowrap;
+  text-overflow: ellipsis; cursor: pointer; touch-action: manipulation;
+  font-size: 12px; font-weight: bold; line-height: 28px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.5);
+  border: .5px solid #375074; border-top-color: #30363e; border-radius: 5px;
+  background: linear-gradient(#889fbd, #41618d);
+  box-shadow: inset 0 1px 1px rgba(0,0,0,.35), 0 .5px .5px rgba(255,255,255,.5);
+}
+.bar-button:active { background: linear-gradient(#6f86a6, #2d4a74); }
+/* "back button": the kit's arrow path, stretched through the middle by border-image; 30px with its shadow. */
+.bar-button.back {
+  height: 30px; min-width: 0; max-width: 42vw; padding: 0 3px 1px 0; line-height: 29px;
+  border-style: solid; border-color: transparent; border-width: 0 6px 0 15px; border-radius: 0;
+  background: none; box-shadow: none;
+  border-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='60' viewBox='0 0 100 60'%3E%3Cdefs%3E%3ClinearGradient id='f' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23889fbd'/%3E%3Cstop offset='1' stop-color='%2341618d'/%3E%3C/linearGradient%3E%3ClinearGradient id='s' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2330363e'/%3E%3Cstop offset='.31' stop-color='%23375074'/%3E%3C/linearGradient%3E%3Cfilter id='i'%3E%3CfeOffset in='SourceAlpha' dy='2'/%3E%3CfeGaussianBlur stdDeviation='1' result='o'/%3E%3CfeFlood flood-color='%23000' flood-opacity='.7'/%3E%3CfeComposite operator='out' in2='o'/%3E%3CfeComposite operator='in' in2='SourceAlpha'/%3E%3C/filter%3E%3Cpath id='p' d='M25.7,0.52 C26.87,0.52 89.49,0.52 89.49,0.52 95.01,0.52 99.49,5 99.49,10.52 99.49,10.52 99.49,48.55 99.49,48.55 99.49,54.08 95.01,58.55 89.49,58.55 89.49,58.55 27.37,58.55 25.87,58.55 24.37,58.55 22.04,57.24 17.71,52.22 17.71,52.22 0.61,30.41 0.61,30.41 0.61,30.41 15.87,8.85 15.87,8.85 21.54,1.17 24.54,0.52 25.7,0.52Z'/%3E%3C/defs%3E%3Cuse href='%23p' fill='%23fff' opacity='.5' y='1'/%3E%3Cuse href='%23p' fill='url(%23f)'/%3E%3Cuse href='%23p' filter='url(%23i)'/%3E%3Cuse href='%23p' fill='none' stroke='url(%23s)'/%3E%3C/svg%3E") 0 12 0 30 fill / 0 6px 0 15px stretch;
+}
+.bar-button.back:active { filter: brightness(.8); }
+
+/* ---- Tab bar: "Tab bar" ---- */
+.tabbar {
+  background:
+    linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) top / 100% 1px no-repeat,          /* top dark highlight */
+    linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,.1)) 0 1px / 100% 1px no-repeat, /* top highlight */
+    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% 48px no-repeat,  /* background */
+    #000;
+}
+.tabbar::before { /* Shadow above: 2.5px, black at 18% */
+  content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 2.5px; pointer-events: none;
+  background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.18));
+}
+.tab {
+  display: flex; flex-direction: column; align-items: center;
+  height: 44px; margin: 3px 2px 0; padding-top: 3.5px; border-radius: 2.5px;
+  color: #a8a8a8; font-size: 10px; font-weight: bold; line-height: 12px;
+}
+.tab.active { /* "selected highlight": white at 15% with a soft inner edge */
+  color: #fff; background: rgba(255,255,255,.15); box-shadow: inset 0 0 1px rgba(0,0,0,.31);
+}
+.tab-label { margin-top: 1px; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tab-icon { width: 28px; height: 28px; filter: drop-shadow(0 -1px 0 rgba(0,0,0,.75)); }
+.tab-icon::before { /* "icon (off)": a grey gradient through the glyph */
+  content: ""; display: block; width: 100%; height: 100%;
+  background: linear-gradient(#9d9d9d, #595959);
+  -webkit-mask: var(--glyph) center / contain no-repeat; mask: var(--glyph) center / contain no-repeat;
+}
+.tab.active .tab-icon { filter: drop-shadow(0 2.5px 2.5px rgba(0,0,0,.4)); }
+.tab.active .tab-icon::before { /* "2 (active)": the glossy blue, split just under half */
+  background: linear-gradient(165deg, #d9e5f9, #77b5eb 47.3%, #0091e5 48.8%, #0fbff7);
+}
+.tab[data-tab="home"]      { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M14 3 1.5 14H5v11h7v-7h4v7h7V14h3.5z'/%3E%3C/svg%3E"); }
+.tab[data-tab="sources"]   { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect x='3' y='3' width='22' height='6' rx='2'/%3E%3Crect x='3' y='11' width='22' height='6' rx='2'/%3E%3Crect x='3' y='19' width='22' height='6' rx='2'/%3E%3C/svg%3E"); }
+.tab[data-tab="changes"]   { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath fill-rule='evenodd' d='M14 2a12 12 0 1 0 0 24 12 12 0 1 0 0-24zm0 3a9 9 0 1 1 0 18 9 9 0 1 1 0-18z'/%3E%3Cpath d='M12.6 7h2.8v6.3l4.4 3.1-1.6 2.3-5.6-4z'/%3E%3C/svg%3E"); }
+.tab[data-tab="installed"] { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M11 2h6v8h5l-8 8-8-8h5z'/%3E%3Cpath d='M2 17h6l2 3h8l2-3h6v9H2z'/%3E%3C/svg%3E"); }
+.tab[data-tab="search"]    { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath fill-rule='evenodd' d='M11.5 2a9.5 9.5 0 1 0 0 19 9.5 9.5 0 1 0 0-19zm0 3a6.5 6.5 0 1 1 0 13 6.5 6.5 0 1 1 0-13z'/%3E%3Cpath d='m17.6 19.7 2.1-2.1 6.6 6.6-2.1 2.1z'/%3E%3C/svg%3E"); }
+
+/* "# indicator": red gloss pill, 2px white ring, shadow under it. Scaled to the tab bar (the kit's is 23px). */
+.badge {
+  min-width: 20px; height: 20px; padding: 0 5px; border: 2px solid #fff; border-radius: 10px;
+  font-size: 13px; font-weight: bold; line-height: 16px; letter-spacing: -.02em; color: #fff; text-align: center;
+  background: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103);
+  box-shadow: 0 2px 2.5px rgba(0,0,0,.6);
+}
+.tab .badge { position: absolute; top: -2px; left: calc(50% + 5px); }
+
+/* ---- Grouped tables: "Grouped Tables" ---- */
+.page-body.grouped {
+  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
+  padding-bottom: 20px;
+}
+.group { margin: 10px 10px 0; }
+.group + .group { margin-top: 23px; }
+.group-header { /* "Table Label": 17px bold slate, white emboss */
+  margin: 0 9px 7px; font-size: 17px; font-weight: bold; line-height: 21px; letter-spacing: -.01em;
+  color: var(--head); text-shadow: 0 1px 0 rgba(255,255,255,.75);
+}
+.group:first-child > .group-header { margin-top: 10px; }
+.group-footer {
+  margin: 7px 9px 0; font-size: 15px; line-height: 19px; text-align: center;
+  color: var(--head); text-shadow: 0 1px 0 rgba(255,255,255,.75);
+}
+.table { list-style: none; margin: 0; padding: 0; }
+.table.grouped { /* "Grouped Table": #f7f7f7, 1px #b7b9bd, 9.5px corners, white drop shadow, faint inner shadow */
+  overflow: hidden; background: #f7f7f7; border: 1px solid #b7b9bd; border-radius: 9.5px;
+  box-shadow: 0 1.5px 1px #fff, inset 0 .5px .5px rgba(0,0,0,.2);
+}
+.cell-inner {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 43px; padding: 0 10px;
+  border: 0; background: none; text-align: left; color: #000; text-decoration: none; cursor: default;
+}
+a.cell-inner, button.cell-inner { cursor: pointer; }
+.grouped .cell + .cell { border-top: 1px solid #c9c9c9; }                 /* "divider": shadow, */
+.grouped .cell + .cell > .cell-inner { box-shadow: inset 0 1px 0 #fff; }  /* then highlight */
+.cell-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cell-label { font-size: 17px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cell-subtitle { font-size: 14px; color: #7f7f7f; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cell-detail { flex: none; max-width: 50%; font-size: 17px; color: var(--detail); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cell-count {
+  flex: none; min-width: 26px; height: 20px; padding: 0 7px; border-radius: 10px; text-align: center;
+  font-size: 14px; font-weight: bold; line-height: 20px; color: #fff; background: #8c99b3;
+}
+.cell-icon {
+  flex: none; width: 29px; height: 29px; border-radius: 6px; display: grid; place-items: center;
+  font-size: 15px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.3);
+  background: #8c99b3; box-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+/* "arrows copy": 8.75 x 13.2 chevron, #7f7f7f, its right edge 10.5px in from the cell's */
+.cell-inner.chevron::after {
+  content: ""; flex: none; width: 9px; height: 13px; margin-right: .5px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%237f7f7f' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.cell-check::after { content: "✓"; font-size: 20px; font-weight: bold; color: var(--detail); }
+/* Tap: the blue selection, white text, as UITableViewCell does on touch down. */
+a.cell-inner:active, button.cell-inner:active { background: var(--select); color: #fff; }
+a.cell-inner:active *, button.cell-inner:active * { color: #fff; }
+a.cell-inner.chevron:active::after, button.cell-inner.chevron:active::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+}
+
+/* ---- Plain tables: "Scroll pane" ---- */
+.page-body.plain { background: #fff; }
+.table.plain { background: #fff; }
+.plain .cell { border-bottom: 1px solid #dfdfdf; } /* "keyline" */
+.plain .cell-inner { padding-top: 4px; padding-bottom: 4px; }
+.plain .cell-label { font-size: 20px; line-height: 24px; }
+.section-header { /* "category bar": 23px, the kit's gradient at 90%, 18px bold white, dark emboss; sticks */
+  position: sticky; top: 0; z-index: 1; height: 23px; padding: 0 12px;
+  font-size: 18px; font-weight: bold; line-height: 23px; color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.42);
+  background: linear-gradient(rgba(109,123,133,.9), rgba(133,145,153,.9) 2%, rgba(177,187,195,.9) 5%,
+    rgba(140,154,165,.9) 8%, rgba(173,182,188,.9) 94%, rgba(137,149,158,.9) 96%);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+
+/* ---- "Reloading Data" HUD: our own box, in the kit's terms: black at 75% like its translucent bars, 10px
+   corners, a 36px white spinner (the kit's "White Large"), bold white label with the kit's -1px text emboss. ---- */
+.hud-scrim { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; }
+.hud {
+  width: 180px; padding: 28px 12px 22px; border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  background: rgba(0,0,0,.75); color: #fff; text-align: center; text-shadow: 0 -1px 0 rgba(0,0,0,.5);
+  font-size: 24px; font-weight: bold; line-height: 28px;
+}
+.hud-spinner { width: 36px; height: 36px; animation: hud-spin .96s steps(12) infinite; }
+@keyframes hud-spin { to { transform: rotate(360deg); } }
+
+.empty { color: var(--head); text-shadow: 0 1px 0 rgba(255,255,255,.75); font-size: 17px; }
+
+@media (prefers-reduced-motion: reduce) { .hud-spinner { animation-duration: 3s; } }

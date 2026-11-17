@@ -16,6 +16,17 @@ export function format({ tab, path = [] }) {
   return "#/" + [tab, ...path].map(encodeURIComponent).join("/");
 }
 
+// The pages a route stands on, root first: ["a", "b"] -> [[], ["a"], ["a", "b"]]. Each one is a screen in its tab's
+// navigation stack, so a deep link builds the whole stack and back walks it.
+export function prefixes(path) {
+  return Array.from({ length: path.length + 1 }, (_, i) => path.slice(0, i));
+}
+
+// The route one level up, or null at a tab's root.
+export function parent(route) {
+  return route.path.length ? { tab: route.tab, path: route.path.slice(0, -1) } : null;
+}
+
 function safeDecode(s) {
   try { return decodeURIComponent(s); } catch { return s; }
 }
@@ -47,6 +58,13 @@ export function createRouter({ win, onRoute }) {
       const hash = format(route);
       if (win.location.hash === hash) return;
       win.location.hash = hash; // fires hashchange -> sync
+    },
+    // Like go, but without a history entry (the back button on a deep link that has no history behind it).
+    replace(route) {
+      const hash = format(route);
+      if (win.location.hash === hash) return;
+      win.history.replaceState(null, "", hash);
+      sync();
     },
     // Tab bar tap: switch to the tab where the user left it; tapping the tab you are on pops it to its root.
     selectTab(tab) {

@@ -1,0 +1,208 @@
+{
+ "checks": [
+  [
+   "installed keeps scrollTop across a tab switch",
+   true,
+   180
+  ],
+  [
+   "home keeps scrollTop through push and pop",
+   true,
+   120
+  ],
+  [
+   "push: two pages in the stack, title is the source",
+   true,
+   {
+    "hash": "#/sources/http%3A%2F%2Fapt.saurik.com%2F",
+    "pages": 2,
+    "top": "Telesphoreo"
+   }
+  ],
+  [
+   "pop (back button): one page left, back on Sources",
+   true,
+   {
+    "hash": "#/sources",
+    "pages": 1,
+    "top": "Sources"
+   }
+  ],
+  [
+   "swipe: the top page follows the finger mid-swipe",
+   true,
+   "matrix(1, 0, 0, 1, 102, 0)"
+  ],
+  [
+   "swipe back: one page left, back on Sources",
+   true,
+   {
+    "hash": "#/sources",
+    "pages": 1,
+    "top": "Sources"
+   }
+  ],
+  [
+   "short swipe cancels: still on the source",
+   true,
+   {
+    "hash": "#/sources/http%3A%2F%2Fapt.saurik.com%2F",
+    "pages": 2,
+    "top": "Telesphoreo"
+   }
+  ]
+ ],
+ "report": {
+  "push": {
+   "windowMs": 578,
+   "layoutsTotal": 1,
+   "layoutsDuringSlide": 0,
+   "tasksOver8ms": 0,
+   "maxTaskMs": "3.1",
+   "styleRecalcsAfterFirstFrame": 21,
+   "paintsAfterFirstFrame": 39,
+   "framesReported": 29,
+   "layoutsAtMs": [
+    2
+   ],
+   "layoutDetail": [
+    {
+     "dirtyObjects": 28,
+     "frame": "2DD824BA9A32571F41235D8489DAC1EC",
+     "partialLayout": false,
+     "totalObjects": 266
+    }
+   ],
+   "paintedNodes": [
+    [
+     "<!DOCTYPE html><html lang=\"en\" class=\"\"><head>\n  <meta charset=\"utf-8\">\n  <meta ",
+     18
+    ],
+    [
+     "<html lang=\"en\" class=\"\"><head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\"",
+     17
+    ],
+    [
+     "<main id=\"screens\"><div class=\"tab-stack\" data-tab=\"home\"><section class=\"page i",
+     1
+    ],
+    [
+     "<section class=\"page\" style=\"\"><div class=\"page-body grouped\"><div class=\"group\"",
+     1
+    ],
+    [
+     "<header class=\"navbar\" id=\"navbar\"><div class=\"nav-stack\" data-tab=\"home\"><div c",
+     1
+    ],
+    [
+     "<div class=\"nav-item\" style=\"\"><div class=\"nav-left\"><button type=\"button\" class",
+     1
+    ]
+   ]
+  },
+  "pop": {
+   "windowMs": 583,
+   "layoutsTotal": 1,
+   "layoutsDuringSlide": 0,
+   "tasksOver8ms": 0,
+   "maxTaskMs": "2.3",
+   "styleRecalcsAfterFirstFrame": 22,
+   "paintsAfterFirstFrame": 39,
+   "framesReported": 28,
+   "layoutsAtMs": [
+    377
+   ],
+   "layoutDetail": [
+    {
+     "dirtyObjects": 7,
+     "frame": "2DD824BA9A32571F41235D8489DAC1EC",
+     "partialLayout": false,
+     "totalObjects": 245
+    }
+   ],
+   "paintedNodes": [
+    [
+     "<!DOCTYPE html><html lang=\"en\" class=\"\"><head>\n  <meta charset=\"utf-8\">\n  <meta ",
+     19
+    ],
+    [
+     "<html lang=\"en\" class=\"\"><head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\"",
+     18
+    ],
+    [
+     "<section class=\"page is-top\" style=\"\"><div class=\"page-body plain\"><ul class=\"ta",
+     1
+    ],
+    [
+     "<div class=\"nav-item is-top\" style=\"\"><div class=\"nav-left\"><button type=\"button",
+     1
+    ]
+   ]
+  },
+  "swipe": {
+   "windowMs": 1115,
+   "layoutsTotal": 1,
+   "layoutsDuringSlide": 0,
+   "tasksOver8ms": 0,
+   "maxTaskMs": "2.7",
+   "styleRecalcsAfterFirstFrame": 51,
+   "paintsAfterFirstFrame": 110,
+   "framesReported": 73,
+   "layoutsAtMs": [
+    923
+   ],
+   "liftAtMs": 724,
+   "layoutDetail": [
+    {
+     "dirtyObjects": 7,
+     "frame": "2DD824BA9A32571F41235D8489DAC1EC",
+     "partialLayout": false,
+     "totalObjects": 245
+    }
+   ],
+   "paintedNodes": [
+    [
+     "<!DOCTYPE html><html lang=\"en\" class=\"\"><head>\n  <meta charset=\"utf-8\">\n  <meta ",
+     51
+    ],
+    [
+     "<section class=\"page is-top\" style=\"\"><div class=\"page-body plain\"><ul class=\"ta",
+     3
+    ],
+    [
+     "<div class=\"page-shade\" style=\"\"></div>",
+     1
+    ],
+    [
+     "<div class=\"nav-item is-top\" style=\"\"><div class=\"nav-left\"><button type=\"button",
+     3
+    ],
+    [
+     "<html lang=\"en\" class=\"\"><head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\"",
+     47
+    ],
+    [
+     "<main id=\"screens\"><div class=\"tab-stack\" data-tab=\"home\"><section class=\"page i",
+     1
+    ],
+    [
+     "<section class=\"page\" style=\"\"><div class=\"page-body grouped\"><div class=\"group\"",
+     1
+    ],
+    [
+     "<header class=\"navbar\" id=\"navbar\"><div class=\"nav-stack\" data-tab=\"home\"><div c",
+     1
+    ],
+    [
+     "<div class=\"nav-item\" style=\"\"><div class=\"nav-left\"><button type=\"button\" class",
+     1
+    ],
+    [
+     "<div class=\"edge-swipe off\"></div>",
+     1
+    ]
+   ]
+  }
+ },
+ "errs": []
+}

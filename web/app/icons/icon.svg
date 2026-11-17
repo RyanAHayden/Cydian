@@ -1,35 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- Cydian app icon: an open parcel on iOS 6 nav-bar blue. Original artwork; iOS masks the corners. -->
+  <!-- Cydian's app icon, the master: an open shipping box with an arrow going in, in a ring, on a warm amber
+       gradient. Our own drawing (GPL-3.0-or-later), in the spirit of the iOS 6 era's package-manager icons.
+       Flat: iOS 7+ masks the corners and adds nothing. tools/icons.sh makes the PNGs and the glossy
+       iOS 6 variant (icon-glossy.svg) from this file; edit only this one. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#8aa4c8"/>
-      <stop offset="0.5" stop-color="#5c7aa3"/>
-      <stop offset="1" stop-color="#3a557c"/>
+      <stop offset="0" stop-color="#f6b25c"/>
+      <stop offset="0.55" stop-color="#d97a33"/>
+      <stop offset="1" stop-color="#9a4518"/>
     </linearGradient>
-    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.45"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0.08"/>
-    </linearGradient>
-    <linearGradient id="left" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f4f6fa"/>
-      <stop offset="1" stop-color="#cfd8e6"/>
-    </linearGradient>
-    <linearGradient id="right" x1="1" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#dfe6f0"/>
-      <stop offset="1" stop-color="#aebcd2"/>
+    <radialGradient id="glow" cx="0.5" cy="0.52" r="0.5">
+      <stop offset="0" stop-color="#ffe2b0" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ffe2b0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="inside" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6e2f0e"/>
+      <stop offset="1" stop-color="#8f4419"/>
     </linearGradient>
   </defs>
   <rect width="1024" height="1024" fill="url(#bg)"/>
-  <g stroke="#2c4566" stroke-width="14" stroke-linejoin="round">
-    <!-- box: left face, right face, open top -->
-    <path d="M232 400 L512 532 L512 852 L232 720 Z" fill="url(#left)"/>
-    <path d="M792 400 L512 532 L512 852 L792 720 Z" fill="url(#right)"/>
-    <path d="M232 400 L512 268 L792 400 L512 532 Z" fill="#33507a"/>
-    <!-- flaps -->
-    <path d="M232 400 L132 308 L412 176 L512 268 Z" fill="#e9eef5"/>
-    <path d="M792 400 L892 308 L612 176 L512 268 Z" fill="#d3dcea"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+  <circle cx="512" cy="512" r="360" fill="none" stroke="#fff" stroke-width="44"/>
+  <g transform="translate(512 516) scale(1.05) translate(-512 -500)">
+  <g stroke="#8a3d14" stroke-width="14" stroke-linejoin="round">
+    <!-- inside of the box, then the back flap leaning away -->
+    <path d="M344 540 L680 540 L638 462 L386 462 Z" fill="url(#inside)"/>
+    <path d="M386 462 L638 462 L612 372 L412 372 Z" fill="#fff4e6"/>
+    <!-- side flaps folded out -->
+    <path d="M344 540 L386 462 L296 424 L250 506 Z" fill="#fff"/>
+    <path d="M680 540 L638 462 L728 424 L774 506 Z" fill="#fff"/>
   </g>
-  <!-- arrow going in -->
-  <path d="M452 140 H572 V330 H652 L512 470 L372 330 H452 Z" fill="#fff" stroke="#2c4566" stroke-width="14" stroke-linejoin="round"/>
-  <path d="M0 0 H1024 V430 Q512 560 0 430 Z" fill="url(#gloss)"/>
+  <!-- the arrow dropping in -->
+  <path d="M470 236 H554 V398 H616 L512 512 L408 398 H470 Z" fill="#fff" stroke="#8a3d14" stroke-width="14"
+        stroke-linejoin="round"/>
+  <g stroke="#8a3d14" stroke-width="14" stroke-linejoin="round">
+    <!-- front of the box, with a strip of tape and a label -->
+    <path d="M344 540 L680 540 L664 764 L360 764 Z" fill="#fff"/>
+    <path d="M478 540 L546 540 L545 610 L479 610 Z" fill="#f7d3a6" stroke-width="10"/>
+    <path d="M412 668 L500 668 L500 716 L412 716 Z" fill="none" stroke-width="10"/>
+  </g>
+  </g>
 </svg>

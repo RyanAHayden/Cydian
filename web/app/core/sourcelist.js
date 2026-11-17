@@ -12,8 +12,8 @@
 // A dist repo (`deb uri 1800 main`) gets `{ uri, dist, components }` as its input (F48): addSource checks its
 // Release under dists/<dist>/ (core/sources.js verifyDistSource). "unsupported" is left for an entry with no input.
 import { parseListFile, parseDeb822File } from "./aptsources.js";
-import { normalizeSourceUrl, sourceKey } from "./sources.js";
-import { altKey, isAltKey, normalizeAltUrl, looksLikeAltUrl } from "./altstore.js";
+import { normalizeSourceUrl, sourceKey, sourceIcons, sourceSubtitle } from "./sources.js";
+import { altKey, isAltKey, normalizeAltUrl, looksLikeAltUrl, seedRecord } from "./altstore.js";
 
 export const EXPORT_FILENAME = "cydian-sources.txt";
 
@@ -29,6 +29,12 @@ export function exportText(sources, { date = new Date() } = {}) {
   const lines = [...new Set((sources ?? []).filter((s) => s?.uri).map(exportLine))];
   const day = date.toISOString().slice(0, 10);
   return [`# Cydian sources (${lines.length}), ${day}`, ...lines].join("\n") + "\n";
+}
+
+// F52: Export > Copy to Clipboard: the same lines without the header comment, one URL (or deb line) per line, for
+// pasting into another package manager or a note.
+export function clipboardText(sources) {
+  return [...new Set((sources ?? []).filter((s) => s?.uri).map(exportLine))].join("\n");
 }
 
 // ---- import ------------------------------------------------------------------------------------------------
@@ -180,4 +186,45 @@ export function saveOrder(keys, storage = globalThis.localStorage) {
     if (keys) storage?.setItem(ORDER_KEY, JSON.stringify(keys));
     else storage?.removeItem(ORDER_KEY);
   } catch { /* private mode: the order lasts this visit */ }
+}
+
+// ---- Recommended (F52) ---------------------------------------------------------------------------------------
+//
+//   recommendedRows(recs, sources, { jailbroken, previews }) -> one row per entry, as Sources draws its rows:
+//     { rec, key, record, label, subtitle, icons, count, added, input }
+//   `previews` (Map key -> record) holds what a fetch read before adding (an AltStore source's name, iconURL and
+//   app count). The record a row draws from: the listed source if added, else the preview, else a seed (the URL
+//   alone), so the icon falls back as Sources' does (core/sources.js sourceIcons): the source's own icon, then for a
+//   GitHub-hosted source its owner's avatar (F44), then the letter.
+
+// The record a recommended entry would be stored as before anything is read from it.
+export function recommendedSeed(rec) {
+  if (!rec.jailbreak) return seedRecord(normalizeAltUrl(rec.url));
+  const uri = normalizeSourceUrl(rec.url);
+  return { key: sourceKey({ uri, dist: "./" }), uri, dist: "./", components: [] };
+}
+
+// What Add Source gets: an APT URL, or an AltStore link so it isn't tried as an APT repo first.
+export const recommendedInput = (rec) => (rec.jailbreak ? rec.url : altLink(normalizeAltUrl(rec.url)));
+
+// The listed source an entry already is, or null (a trailing-slash twin counts, as in reviewImport).
+export function listedSource(rec, sources) {
+  const seed = recommendedSeed(rec);
+  const entry = rec.jailbreak ? parseImport(rec.url).entries[0] : null;
+  const keys = entry ? entryKeys(entry) : [seed.key];
+  const slashless = (k) => String(k).replace(/\/$/, "");
+  const want = new Set(keys.map(slashless));
+  return (sources ?? []).find((s) => want.has(slashless(s.key))) ?? null;
+}
+
+export function recommendedRows(recs, sources, { jailbroken = true, previews = new Map() } = {}) {
+  return (recs ?? []).filter((r) => jailbroken || !r.jailbreak).map((rec) => {
+    const seed = recommendedSeed(rec);
+    const listed = listedSource(rec, sources);
+    const record = listed ? { ...seed, ...listed } : { ...seed, ...(previews.get(seed.key) ?? {}) };
+    return {
+      rec, key: record.key, record, label: rec.name, subtitle: sourceSubtitle(record), icons: sourceIcons(record),
+      count: typeof record.count === "number" ? record.count : null, added: Boolean(listed), input: recommendedInput(rec),
+    };
+  });
 }

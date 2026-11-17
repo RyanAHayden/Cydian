@@ -6,10 +6,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   exportText, exportLine, parseImport, reviewImport, entryKeys, orderSources, loadOrder, saveOrder, altLink, ORDER_KEY,
+  clipboardText, recommendedRows, recommendedSeed, recommendedInput, listedSource,
 } from "./sourcelist.js";
 import { DEFAULT_SOURCES, DEFAULT_ALT_SOURCES } from "./sources.js";
 import { seedRecord, normalizeAltUrl, looksLikeAltUrl } from "./altstore.js";
-import { RECOMMENDED_SOURCES, RECOMMENDED_GAMES } from "./recommended.js";
+import * as recommended from "./recommended.js";
+
+const { RECOMMENDED_SOURCES } = recommended;
 import { qrMatrix, qrSvg } from "./qr.js";
 
 const ALT = DEFAULT_ALT_SOURCES.map(seedRecord);
@@ -143,13 +146,75 @@ test("orderSources: saved keys first in their order, newer sources after", () =>
   assert.equal(mem.has(ORDER_KEY), false);
 });
 
-test("the recommended list: each entry has a reason and an addable URL", () => {
-  for (const r of [...RECOMMENDED_SOURCES, ...RECOMMENDED_GAMES]) {
+test("the recommended list: each entry has a reason and an addable URL, and no games (F52)", () => {
+  for (const r of RECOMMENDED_SOURCES) {
     assert.ok(r.why && r.why.length > 10, r.name);
     assert.ok(normalizeAltUrl(r.url), r.url);
+    assert.equal(r.kind, "source", r.name);
   }
-  const srcUrls = new Set(RECOMMENDED_SOURCES.map((s) => s.url));
-  for (const g of RECOMMENDED_GAMES) assert.ok(g.bundleId && srcUrls.has(g.url), `${g.name}'s source is recommended too`);
+  assert.equal(recommended.RECOMMENDED_GAMES, undefined);
+});
+
+test("Copy to Clipboard: one URL (or deb line) per line, no header, each source once (F52)", () => {
+  const text = clipboardText([...ALL, ALL[0], { key: "x" }]);
+  const lines = text.split("\n");
+  assert.equal(lines.length, ALL.length);
+  assert.ok(lines.every((l) => /^(https?:\/\/|deb )/.test(l)), text);
+  assert.ok(lines.includes("https://repo.chariz.com/"));
+  assert.ok(lines.includes("deb https://apt.procurs.us/ 1800 main"));
+  assert.deepEqual(clipboardText([]), "");
+  // It reads back as an import of the same sources.
+  assert.equal(reviewImport(parseImport(text).entries, ALL).filter((e) => e.status !== "listed").length, 0);
+});
+
+const REC = [
+  { kind: "source", name: "FIZL0", url: "https://fizl0.github.io/apps/source.json", why: "x" },
+  { kind: "source", name: "Plain", url: "https://example.com/apps.json", why: "x" },
+  { kind: "source", name: "Chariz", url: "https://repo.chariz.com/", jailbreak: true, why: "x" },
+];
+
+test("recommended rows: icon falls back to the source's own, then the GitHub avatar, then none (the letter)", () => {
+  const rows = recommendedRows(REC, []);
+  const by = (n) => rows.find((r) => r.label === n);
+  assert.deepEqual(by("FIZL0").icons, ["https://github.com/fizl0.png?size=120"]); // no iconURL yet: avatar
+  assert.equal(by("FIZL0").subtitle, "github.com/fizl0/apps");
+  assert.deepEqual(by("Plain").icons, []); // not on GitHub, nothing read: the letter
+  assert.equal(by("Plain").subtitle, "https://example.com/apps.json");
+  assert.deepEqual(by("Chariz").icons, ["https://repo.chariz.com/CydiaIcon.png"]);
+  for (const r of rows) { assert.equal(r.added, false); assert.equal(r.count, null); }
+  // Once its JSON is read (a preview), the source's own icon wins and the app count shows.
+  const previews = new Map([["alt:https://fizl0.github.io/apps/source.json", { iconURL: "https://fizl0.github.io/icon.png", count: 3 }],
+    ["alt:https://example.com/apps.json", { iconURL: null, count: 0 }]]);
+  const loaded = recommendedRows(REC, [], { previews });
+  assert.deepEqual(loaded[0].icons, ["https://fizl0.github.io/icon.png"]);
+  assert.equal(loaded[0].count, 3);
+  assert.deepEqual(loaded[1].icons, []);
+  assert.equal(loaded[1].count, 0);
+});
+
+test("recommended rows: Added once the source is listed, drawn from the listed record", () => {
+  const sources = [
+    { key: "alt:https://fizl0.github.io/apps/source.json", kind: "altstore", uri: "https://fizl0.github.io/apps/source.json",
+      name: "FIZL0", iconURL: "https://fizl0.github.io/own.png", count: 7 },
+    { key: "deb:https://repo.chariz.com/:./", uri: "https://repo.chariz.com/", dist: "./", count: 412 },
+  ];
+  const rows = recommendedRows(REC, sources);
+  assert.deepEqual(rows.map((r) => r.added), [true, false, true]);
+  assert.deepEqual(rows[0].icons, ["https://fizl0.github.io/own.png"]);
+  assert.equal(rows[0].count, 7);
+  assert.equal(rows[2].count, 412);
+  assert.equal(rows[2].key, "deb:https://repo.chariz.com/:./");
+  // A trailing-slash twin counts as listed.
+  assert.ok(listedSource({ url: "https://example.com/apps.json/" }, [{ key: "alt:https://example.com/apps.json", uri: "https://example.com/apps.json" }]));
+  // Not Jailbroken: tweak repos are left out.
+  assert.deepEqual(recommendedRows(REC, [], { jailbroken: false }).map((r) => r.label), ["FIZL0", "Plain"]);
+});
+
+test("recommended input and seed: AltStore entries go straight to AltStore, APT ones as a URL", () => {
+  assert.equal(recommendedInput(REC[0]), altLink("https://fizl0.github.io/apps/source.json"));
+  assert.equal(recommendedInput(REC[2]), "https://repo.chariz.com/");
+  assert.equal(recommendedSeed(REC[2]).key, "deb:https://repo.chariz.com/:./");
+  for (const r of RECOMMENDED_SOURCES) assert.ok(recommendedSeed(r).key.includes(":"), r.name);
 });
 
 test("QR: sizes grow with the text, and a list too long for version 40 throws", () => {

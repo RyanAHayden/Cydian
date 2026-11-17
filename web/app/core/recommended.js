@@ -1,9 +1,9 @@
-// Recommended (F45, Sources > Manage > Recommended): the curated sources and games, one tap to add. This is the
+// Recommended (F45, Sources > Manage > Recommended): the curated sources, one tap to add. F52 dropped the games: this
+// page lists sources; a recommended game is a package and belongs on Home's Browse/Featured. This is the
 // one place the list lives: add, drop or reword an entry here and nothing else changes. Every entry says why it
 // is on the list. Each URL answered with a working source on 2026-11-17 (checked with curl).
 //
 //   source: { kind: "source", url, name, why, jailbreak? }   jailbreak: an APT repo (hidden on Not Jailbroken)
-//   game:   { kind: "game", url, bundleId, name, why }        url: the AltStore source that lists it
 
 export const RECOMMENDED_SOURCES = [
   { kind: "source", name: "FIZL0", url: "https://fizl0.github.io/apps/source.json",
@@ -24,19 +24,4 @@ export const RECOMMENDED_SOURCES = [
     why: "The tweak injection library rootless jailbreaks use, from its own repo." },
   { kind: "source", name: "palera1n", url: "https://repo.palera.in/", jailbreak: true,
     why: "palera1n's official repo, for phones jailbroken with it." },
-];
-
-export const RECOMMENDED_GAMES = [
-  { kind: "game", name: "openMX", bundleId: "io.github.fizl0.openmx", url: "https://fizl0.github.io/apps/source.json",
-    why: "A motocross game, from the FIZL0 source." },
-  { kind: "game", name: "OpenTennis", bundleId: "io.github.fizl0.hst", url: "https://fizl0.github.io/apps/source.json",
-    why: "A tennis game, from the FIZL0 source." },
-  { kind: "game", name: "Party Board", bundleId: "com.mariopartyrd.partyboard", url: "https://fizl0.github.io/apps/source.json",
-    why: "A party board game, from the FIZL0 source." },
-  { kind: "game", name: "Delta", bundleId: "com.rileytestut.Delta", url: "https://apps.altstore.io/",
-    why: "The best-known classic console emulator for iPhone." },
-  { kind: "game", name: "PPSSPP", bundleId: "org.ppsspp.ppsspp", url: "https://community-apps.sidestore.io/sidecommunity.json",
-    why: "The PSP emulator, mature and fast." },
-  { kind: "game", name: "RetroArch", bundleId: "com.libretro.RetroArchiOS11", url: "https://community-apps.sidestore.io/sidecommunity.json",
-    why: "Many emulators (cores) behind one front end." },
 ];

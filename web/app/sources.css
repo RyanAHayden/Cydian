@@ -102,3 +102,17 @@
 .source-row.armed .cell-detail, .source-row.armed .cell-count, .source-row.armed .cell-inner.chevron::after { opacity: 0; }
 .source-row.removing { opacity: 0; transition: opacity .2s ease-out; }
 .source-row { touch-action: pan-y; }
+
+/* ---- Recommended (F52, screens/manage.js): Sources' rows with a round Add on the right instead of Delete.
+   sidedrop's GET look as the user asked for it: a white pill with blue bold text and a thin blue rim, filled blue
+   with white text while held; "Added" greyed and inert once the source is in the list. No gloss or shadow. ---- */
+.rec-row .cell-inner { padding-right: 84px; }
+.rec-get {
+  position: absolute; right: 10px; top: 50%; min-width: 58px; height: 26px; margin-top: -13px; padding: 0 12px;
+  border-radius: 13px; border: 1px solid #2f7de1; background: #fff; color: #2f7de1; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: bold; line-height: 24px; text-align: center; text-shadow: none;
+  box-shadow: none; -webkit-tap-highlight-color: transparent;
+}
+.rec-get:active:not(:disabled), .rec-get.is-pressed { background: #2f7de1; color: #fff; }
+.rec-get.added, .rec-get:disabled { border-color: #c4c4c9; color: #9a9aa0; background: #fff; cursor: default; }
+.rec-apps { margin-top: 10px; } /* a preview's apps under its grouped head */

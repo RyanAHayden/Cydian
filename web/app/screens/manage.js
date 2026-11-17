@@ -5,7 +5,8 @@
 //   #/sources/manage/io                  Export (share text, save a file, QR code) and Import (file or pasted text)
 //   #/sources/manage/io/paste            a text box for a pasted list; Next checks it
 //   #/sources/manage/io[/paste]/review   what an import found: new ones (ticked), already listed, can't add; Add
-//   #/sources/manage/recommended         core/recommended.js: sources and games, one tap to add
+//   #/sources/manage/recommended         core/recommended.js: sources as Sources draws them, a round Add on each
+//   #/sources/manage/recommended/<key>   one not added yet, read from its URL: its apps, and Add (F52)
 //
 // Source keys always hold a ':' (deb:..., alt:...), so "manage" can't be one. The parsing, export text and order
 // live in core/sourcelist.js; the QR code in core/qr.js. A change here (add, delete, reorder) tells sources.js
@@ -16,12 +17,14 @@ import { showSheet } from "../nav/sheet.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor } from "../core/sources.js";
-import { altKey, normalizeAltUrl } from "../core/altstore.js";
+import { altRecord, parseSource } from "../core/altstore.js";
 import {
-  exportText, parseImport, reviewImport, orderSources, loadOrder, saveOrder, altLink, EXPORT_FILENAME,
+  exportText, clipboardText, parseImport, reviewImport, orderSources, loadOrder, saveOrder, recommendedRows, recommendedSeed,
+  EXPORT_FILENAME,
 } from "../core/sourcelist.js";
 import { qrSvg } from "../core/qr.js";
-import { RECOMMENDED_SOURCES, RECOMMENDED_GAMES } from "../core/recommended.js";
+import { RECOMMENDED_SOURCES } from "../core/recommended.js";
+import { copyText } from "../nav/menu.js";
 import { settings } from "./settings.js";
 
 export const SEGMENT = "manage";
@@ -40,6 +43,7 @@ function page(route) {
   if (!p.length) return "root";
   if (p[0] === "sources" && p.length === 1) return "sources";
   if (p[0] === "recommended" && p.length === 1) return "recommended";
+  if (p[0] === "recommended" && p.length === 2) return "preview";
   if (p[0] === "io") {
     if (p.length === 1) return "io";
     if (p.at(-1) === "review") return "review";
@@ -50,12 +54,14 @@ function page(route) {
 
 export function nav(route, ctx) {
   switch (page(route)) {
-    case "root": return { title: "Manage" };
+    case "root": return { title: "Manage", right: { label: "Add", onClick: () => addSource(ctx) } }; // F52
     case "sources": return { title: "Sources", style: "plain", right: { label: "Add", onClick: () => addSource(ctx) } };
     case "io": return { title: "Import & Export" };
     case "paste": return { title: "Paste List", right: { label: "Next", onClick: () => pasteNext(route, ctx) } };
     case "review": return { title: "Import", right: { label: "Add", onClick: () => addPicked(ctx) } };
-    case "recommended": return { title: "Recommended" };
+    case "recommended": return { title: "Recommended", style: "plain" };
+    case "preview": return { title: RECOMMENDED_SOURCES.find((r) => recommendedSeed(r).key === route.path[2])?.name || "Source",
+      right: { label: "Add", onClick: () => addFromPreview(route, ctx) } };
     default: return { title: "Not Found" };
   }
 }
@@ -68,6 +74,7 @@ export function render(body, route, ctx) {
     case "paste": return renderPaste(body);
     case "review": return renderReview(body);
     case "recommended": return renderRecommended(body, ctx);
+    case "preview": return renderPreview(body, route);
     default: body.append(el("p", "empty", "Nothing here."));
   }
 }
@@ -284,6 +291,7 @@ function renderIO(body, route, ctx) {
   body.replaceChildren(grouped([
     { header: "Export", rows: [
       { label: "Share List", onClick: () => shareList() },
+      { label: "Copy to Clipboard", onClick: () => copyList() },
       { label: "Save as File", onClick: () => saveFile() },
       { label: "Show QR Code", onClick: () => showQR() },
     ], footer: "Every source's URL, one per line. Another phone's Cydian reads it back (Import), and so do most "
@@ -299,6 +307,13 @@ function renderIO(body, route, ctx) {
 async function exportNow() {
   const { all } = await shownSources();
   return { text: exportText(all), count: all.length };
+}
+
+// F52: the URLs alone, one per line (no header comment), for pasting anywhere.
+async function copyList() {
+  const { all } = await shownSources();
+  await copyText(clipboardText(all));
+  await showAlert({ title: "Copied", message: `${plural(all.length, "source")} on the clipboard, one URL per line.`, buttons: ["OK"] });
 }
 
 async function shareList() {
@@ -421,47 +436,172 @@ async function addPicked(ctx) {
   ctx.go({ tab: "sources", path: [SEGMENT, "sources"] });
 }
 
-// ---- Recommended -----------------------------------------------------------------------------------------------
+// ---- Recommended (F52) ----------------------------------------------------------------------------------------
+// Rows as the Sources tab draws them (icon, name, URL, app count once loaded; core/sourcelist.js recommendedRows),
+// with a round Get-style Add on the right instead of Delete. A row opens the source: an added one its real page,
+// one not added yet a preview here (#/sources/manage/recommended/<key>) read straight from its URL. No Games: this
+// page lists sources; a game is a package and belongs on Home.
 
-const recKey = (r) => (r.jailbreak ? null : altKey(normalizeAltUrl(r.url)));
-const recInput = (r) => (r.jailbreak ? r.url : altLink(r.url));
-const listedFor = (r, keys) => {
-  if (r.jailbreak) return reviewImport(parseImport(r.url).entries, [...keys].map((key) => ({ key })))[0]?.status === "listed";
-  return keys.has(recKey(r));
+const previews = new Map(); // key -> { record fields read before adding (name, iconURL, count), apps }
+
+const recRows = async () => {
+  const sources = await getBackend().sources().catch(() => []);
+  return recommendedRows(RECOMMENDED_SOURCES, sources, { jailbroken: settings.deviceType() !== "none", previews });
 };
 
-async function addRecommended(r, ctx) {
+// An AltStore source's JSON, read once per visit, so its row gets a name, icon and count and its preview its apps.
+async function loadPreview(row) {
+  if (row.rec.jailbreak) return null;
+  if (previews.has(row.key)) return previews.get(row.key);
+  const text = await getBackend().text(row.record.uri);
+  const parsed = parseSource("altstore", text);
+  const p = { ...altRecord(row.record.uri, parsed), updated: null, apps: parsed.apps };
+  previews.set(row.key, p);
+  return p;
+}
+
+async function addRecommended(row, ctx) {
   const hide = ctx.showHUD("Verifying URL");
+  let error = null;
   try {
-    await getBackend().addSource(recInput(r));
-    changed();
-    return true;
+    await getBackend().addSource(row.input);
   } catch (e) {
-    hide();
-    await showAlert({ title: e.title || "Verification Error", message: e.message, buttons: ["OK"] });
-    return false;
+    error = e;
   } finally {
     hide();
   }
+  if (error) {
+    await showAlert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
+    return false;
+  }
+  changed();
+  return true;
 }
 
+// sidedrop's GET look: a white pill with blue text, blue while held; "Added", greyed, once the source is listed.
+function getButton(row, onAdd) {
+  const b = el("button", "rec-get" + (row.added ? " added" : ""), row.added ? "Added" : "Add");
+  b.type = "button";
+  b.disabled = row.added;
+  b.setAttribute("aria-label", (row.added ? "Added: " : "Add ") + row.label);
+  const up = () => b.classList.remove("is-pressed");
+  b.addEventListener("pointerdown", () => { if (!b.disabled) b.classList.add("is-pressed"); });
+  for (const t of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(t, up);
+  b.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!b.disabled) onAdd(b);
+  });
+  return b;
+}
+
+function recIcon(li, row) {
+  const backend = getBackend();
+  li.querySelector(".cell-icon img")?.remove();
+  const img = new Image();
+  img.alt = "";
+  img.decoding = "async";
+  img.onload = () => img.classList.add("loaded");
+  const urls = row.icons.map((u) => (backend.assetUrl ? backend.assetUrl(u) : u));
+  img.onerror = () => (urls.length ? (img.src = urls.shift()) : img.remove());
+  if (urls.length) img.src = urls.shift();
+  li.querySelector(".cell-icon").append(img);
+}
+
+const recHref = (row) => (row.added ? format({ tab: "sources", path: [row.key] }) : here("recommended", row.key));
+
 async function renderRecommended(body, ctx) {
-  const keys = new Set((await getBackend().sources().catch(() => [])).map((s) => s.key));
-  const jailbroken = settings.deviceType() !== "none";
-  const sources = RECOMMENDED_SOURCES.filter((r) => jailbroken || !r.jailbreak);
-  const sourceRow = (r) => {
-    const added = listedFor(r, keys);
-    return { label: r.name, subtitle: r.why, detail: added ? "Added" : "Add", chevron: false,
-      onClick: added ? undefined : async () => { if (await addRecommended(r, ctx)) renderRecommended(body, ctx); } };
-  };
-  const gameRow = (g) => ({ label: g.name, subtitle: g.why, href: undefined, chevron: true, onClick: async () => {
-    if (!keys.has(recKey(g)) && !(await addRecommended(g, ctx))) return;
-    ctx.go({ tab: "sources", path: [recKey(g), `package:${g.bundleId}`] });
-  } });
-  body.replaceChildren(grouped([
-    { header: "Sources", rows: sources.map(sourceRow),
-      footer: jailbroken ? "" : "Tweak repos show here once Settings > Device says this iPhone is jailbroken." },
-    { header: "Games", rows: RECOMMENDED_GAMES.map(gameRow), footer: "A game's source is added with it, then its page opens." },
-  ]));
+  const rows = await recRows();
+  const ul = plain([{ rows: rows.map((r) => ({
+    label: r.label, subtitle: r.subtitle, icon: { text: r.label[0]?.toUpperCase() ?? "?" },
+    badge: r.count != null ? r.count.toLocaleString() : undefined, href: recHref(r), chevron: false,
+  })) }]);
+  ul.classList.add("rec-list");
+  const cells = [...ul.querySelectorAll(":scope > .cell")];
+  rows.forEach((r, i) => {
+    const li = cells[i];
+    li.classList.add("source-row", "rec-row");
+    li.dataset.key = r.key;
+    recIcon(li, r);
+    li.append(getButton(r, async () => { if (await addRecommended(r, ctx)) renderRecommended(body, ctx); }));
+  });
+  body.replaceChildren(ul);
+  if (settings.deviceType() === "none") {
+    body.append(el("p", "group-footer", "Tweak repos show here once Settings > Device says this iPhone is jailbroken."));
+  }
+  // Fill in icons and app counts as each AltStore source answers: those not added, and added ones nothing has been
+  // read from yet (a default the Sources tab hasn't loaded). Tweak repos wait for Refresh (their Packages is big).
+  rows.forEach((r, i) => {
+    if (r.rec.jailbreak || r.count != null) return;
+    loadPreview(r).then((p) => {
+      const li = cells[i];
+      if (!p || !li.isConnected) return;
+      const record = { ...r.record, iconURL: r.record.iconURL || p.iconURL };
+      const next = { ...r, record, icons: sourceIcons(record), count: p.count };
+      recIcon(li, next);
+      const inner = li.querySelector(".cell-inner");
+      if (!inner.querySelector(".cell-count")) inner.append(el("span", "cell-count", p.count.toLocaleString()));
+    }).catch(() => {});
+  });
+}
+
+// A recommended source before it is added: its apps as read from its URL (an AltStore source), or what it is
+// (a tweak repo, whose Packages only Refresh reads, after it is added). Add in the nav bar adds it and opens
+// its real page.
+async function previewRow(route) {
+  const key = route.path[2];
+  return (await recRows()).find((r) => r.key === key) ?? null;
+}
+
+async function addFromPreview(route, ctx) {
+  const row = await previewRow(route);
+  if (!row) return;
+  if (!row.added && !(await addRecommended(row, ctx))) return;
+  ctx.go({ tab: "sources", path: [row.key] });
+}
+
+async function renderPreview(body, route) {
+  const row = await previewRow(route);
+  if (!row) {
+    body.replaceChildren(el("p", "empty", "Nothing here."));
+    return;
+  }
+  const head = { header: row.label, rows: [{ label: row.subtitle, subtitle: row.rec.why }],
+    footer: row.added ? "This source is in your list." : "Tap Add to put it in your Sources." };
+  if (row.rec.jailbreak) {
+    body.replaceChildren(grouped([head, { rows: [], footer: "A tweak repo: its packages show under Sources once it is "
+      + "added and refreshed." }]));
+    body.classList.add("manage-why");
+    return;
+  }
+  body.replaceChildren(el("p", "empty", "Loading Source"));
+  let p;
+  try {
+    p = await loadPreview(row);
+  } catch (e) {
+    body.replaceChildren(grouped([head]), el("p", "empty", e.message));
+    body.classList.add("manage-why");
+    return;
+  }
+  const apps = p.apps.map((a) => ({ label: a.name, subtitle: a.subtitle || a.developerName || a.id,
+    icon: { text: a.name?.[0]?.toUpperCase() ?? "?" }, iconURL: a.iconURL }));
+  body.replaceChildren(grouped([head]));
+  const ul = plain([{ header: `${plural(apps.length, "App")}`, rows: apps }]);
+  ul.classList.add("rec-apps");
+  const backend = getBackend();
+  [...ul.querySelectorAll(":scope > .cell")].forEach((li, i) => {
+    const url = apps[i].iconURL;
+    if (!url) return;
+    li.classList.add("source-row");
+    const img = new Image();
+    img.alt = "";
+    img.decoding = "async";
+    img.loading = "lazy";
+    img.onload = () => img.classList.add("loaded");
+    img.onerror = () => img.remove();
+    img.src = backend.assetUrl ? backend.assetUrl(url) : url;
+    li.querySelector(".cell-icon").append(img);
+  });
+  body.append(ul);
   body.classList.add("manage-why");
 }

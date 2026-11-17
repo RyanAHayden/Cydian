@@ -229,9 +229,23 @@ async function remove(li, source) {
   }
   state.sources = state.sources.filter((s) => s.key !== source.key);
   setTimeout(() => {
-    li.remove();
-    if (!state.sources.length) draw();
-  }, 250);
+    if (!state.sources.length) { li.remove(); draw(); return; }
+    collapse(li);
+  }, 200);
+}
+
+// UITableView's delete: the row goes and everything under it slides up into its place. FLIP, by transform only:
+// remove the row, then start everything that was below it one row lower and let it ease up.
+function collapse(li) {
+  const h = li.getBoundingClientRect().height;
+  const below = [];
+  for (let n = li; n && !n.classList?.contains("page-body"); n = n.parentElement) {
+    for (let s = n.nextElementSibling; s; s = s.nextElementSibling) below.push(s);
+  }
+  li.remove();
+  for (const el of below) {
+    el.animate([{ transform: `translateY(${h}px)` }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
+  }
 }
 
 // ---- Refresh and Add -------------------------------------------------------------------------------------

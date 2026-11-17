@@ -4,8 +4,20 @@
 // transferred) is decoded here as UTF-8, with U+FFFD for bad bytes (BigBoss's list has some), so the decode is
 // off the UI thread too. Messages out: {id, ok: true, result} or {id, ok: false, error}.
 import { parseControl, parsePackages, parseRelease, matchesArch } from "./apt.js";
+import { createCatalog, runCatalog } from "./catalog.js";
+
+// The package catalog (core/catalog.js) lives here, so sections, lists and search never run on the UI thread.
+// {type: "catalog", op, args}; for op "load" the Packages file comes as text or bytes and goes in as args[1].
+const catalog = createCatalog();
 
 export function handle(msg) {
+  if (msg.type === "catalog") {
+    const args = msg.args ?? [];
+    if (msg.op === "load" && (msg.bytes != null || msg.text != null)) {
+      args[1] = msg.bytes != null ? new TextDecoder("utf-8").decode(msg.bytes) : msg.text;
+    }
+    return runCatalog(catalog, msg.op, args);
+  }
   const text = msg.bytes != null ? new TextDecoder("utf-8").decode(msg.bytes) : msg.text;
   switch (msg.type) {
     case "packages": return parsePackages(text, msg.root);

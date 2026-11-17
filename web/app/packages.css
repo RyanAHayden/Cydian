@@ -1,0 +1,139 @@
+/* F5: Sections, package lists, Search, the package page, depictions and the modal sheet. Sizes are the kit's @2x
+   halved, or Cydia's points (docs/cydia.md); colours from the kit's layers as named, else the theme's variables. */
+
+/* ---- "folder.png", redrawn: a #8e8e93 rounded square with a white folder; Cydia puts the section's count in it
+   (12pt bold, in the folder's grey). ---- */
+.folder {
+  position: relative; flex: none; width: 32px; height: 32px; display: grid; place-items: center;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%238e8e93'/%3E%3Cpath d='M5.5 10V7.2c0-.7.5-1.2 1.2-1.2h7.6c.5 0 .9.3 1.1.7L16.2 8H25c.7 0 1.2.5 1.2 1.2V10z' fill='%23eaeaeb'/%3E%3Crect x='3' y='9.5' width='26' height='17.5' rx='1.6' fill='%23fff'/%3E%3C/svg%3E") center / 32px 32px no-repeat;
+}
+.folder-count { margin-top: 5px; font-size: 12px; font-weight: bold; line-height: 1; color: #8e8e93; letter-spacing: -.02em; }
+.all-sources-row .cell-inner { min-height: 53px; }
+.sections .cell-inner { min-height: 46px; padding-left: 7px; gap: 9px; } /* folder at (7,7), name at x 48 */
+.sections .cell-label { flex: 1; min-width: 0; font-size: 18px; line-height: 22px; }
+
+/* ---- the virtualised list (nav/vlist.js) ---- */
+.vlist { position: relative; contain: layout; }
+.vlist-row, .vlist-header { position: absolute; top: 0; left: 0; right: 0; }
+.vlist-header { z-index: 1; }
+.vlist-sticky { position: sticky; top: 0; z-index: 2; margin-bottom: -23px; }
+
+/* Package rows: 58px, the 32px icon, name in bold with the version beside it, the short description under. */
+.pkg-row { height: 58px; contain: strict; background: var(--plain); border-bottom: 1px solid var(--keyline); }
+.pkg-row > .cell-inner { height: 100%; min-height: 0; gap: 10px; padding: 0 12px 0 9px; }
+.pkg-row > .cell-inner::after { /* the disclosure chevron, as on every Cydia package cell */
+  content: ""; flex: none; width: 9px; height: 13px; background: var(--chevron) center / contain no-repeat;
+}
+.pkg-row > .cell-inner:active::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+}
+.pkg-icon {
+  position: relative; flex: none; width: 32px; height: 32px; border-radius: 7px; overflow: hidden;
+  display: grid; place-items: center; background: #8c99b3; box-shadow: 0 1px 2px rgba(0,0,0,.3);
+}
+.pkg-letter { font-size: 16px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.3); }
+.pkg-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; background: #fff; }
+.pkg-icon img.loaded { opacity: 1; }
+.pkg-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pkg-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.pkg-name { flex: 0 1 auto; min-width: 0; font-size: 17px; font-weight: bold; line-height: 21px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pkg-version { flex: none; margin-left: auto; max-width: 45%; font-size: 13px; color: var(--subtitle); text-align: right; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pkg-desc { font-size: 14px; line-height: 17px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* ---- loading ---- */
+.loading { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 40px 20px; font-size: 17px; color: var(--head); text-shadow: var(--emboss); }
+.loading-spinner {
+  width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid rgba(127,127,127,.3); border-top-color: #7f7f7f;
+  animation: hud-spin .8s linear infinite;
+}
+.depiction-slot .loading { margin: 20px; }
+
+/* ---- "grey search bar": 44px, #b5b9bd -> #d3dbdf (7%) -> #b3bdc5, a 1px #81919f line under it; the field is
+   30px, 15px corners, white, a #7b8fa3 -> #a3afb9 edge and a soft inner shadow; the #93979d magnifier. ---- */
+.search-bar {
+  height: 44px; margin: 0; padding: 7px 5px; display: flex;
+  background: linear-gradient(#81919f, #81919f) bottom / 100% 1px no-repeat, linear-gradient(#b5b9bd, #d3dbdf 7%, #b3bdc5);
+}
+.search-field {
+  flex: 1; display: flex; align-items: center; height: 30px; padding: 0 10px 0 29px; border-radius: 15px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%2393979d' fill-rule='evenodd' d='M6.5 0a6.5 6.5 0 0 1 5.3 10.3l4 4-1.5 1.5-4-4A6.5 6.5 0 1 1 6.5 0zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z'/%3E%3C/svg%3E") 10px 50% / 14px 14px no-repeat;
+  border: 1px solid #a3afb9; border-top-color: #7b8fa3;
+  box-shadow: inset 0 1.5px 2px rgba(35,31,32,.45);
+}
+.search-field input {
+  flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: none;
+  font: inherit; font-size: 16px; color: #000; -webkit-user-select: text; user-select: text; -webkit-appearance: none; appearance: none;
+}
+.search-field input::placeholder { color: #b4b3b4; }
+.search-field input::-webkit-search-decoration { -webkit-appearance: none; }
+html[data-theme="dark"] .search-bar {
+  background: linear-gradient(#000, #000) bottom / 100% 1px no-repeat, linear-gradient(#4c4c4c, #2a2a2a 7%, #1a1a1a);
+}
+html[data-theme="dark"] .search-field { background-color: #2b2e33; border-color: #15171a; }
+html[data-theme="dark"] .search-field input { color: #fff; }
+.search-note:empty { display: none; }
+.search-note { margin: 30px 20px; }
+
+/* ---- the package page ---- */
+.group-footer { white-space: pre-line; }
+.pkg-head-table { display: block; }
+.pkg-head { display: flex; align-items: center; gap: 12px; padding: 10px; position: relative; min-height: 84px; }
+.pkg-icon.large { width: 64px; height: 64px; border-radius: 12px; }
+.pkg-icon.large .pkg-letter { font-size: 30px; }
+.pkg-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding-right: 40px; }
+.pkg-head-name { font-size: 17px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pkg-head-version { font-size: 14px; color: var(--detail); }
+.pkg-head-size { position: absolute; right: 10px; bottom: 8px; font-size: 12px; color: var(--subtitle); }
+.pkg-description { padding: 10px 12px; font-size: 15px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+a.cell-inner.download .cell-label { color: var(--detail); }
+
+/* ---- Sileo depictions, drawn natively (screens/depiction.js) ---- */
+.dep-card { padding: 4px 0; overflow: hidden; }
+.dep { --dep-tint: var(--detail); font-size: 15px; line-height: 20px; color: var(--text); overflow-wrap: anywhere; }
+.dep-header-image { display: block; width: 100%; max-height: 180px; object-fit: cover; }
+.dep-stack { display: flex; flex-direction: column; }
+.dep-stack.row { flex-direction: row; align-items: center; }
+.dep-stack.row > * { flex: 1; min-width: 0; }
+.dep-layer { display: grid; } .dep-layer > * { grid-area: 1 / 1; }
+.dep-header { margin: 10px 12px 4px; font-size: 19px; line-height: 23px; font-weight: bold; }
+.dep-subheader { margin: 2px 12px 6px; font-size: 15px; color: var(--subtitle); } .dep-subheader.bold { font-weight: bold; color: var(--text); }
+.dep-label { margin: 4px 12px; }
+.dep-markdown { padding: 2px 12px; -webkit-user-select: text; user-select: text; }
+.dep-markdown p { margin: 6px 0; }
+.dep-markdown h3, .dep-markdown h4, .dep-markdown h5, .dep-markdown h6 { margin: 10px 0 4px; font-size: 16px; }
+.dep-markdown ul, .dep-markdown ol { margin: 6px 0; padding-left: 22px; }
+.dep-markdown img { max-width: 100%; height: auto; }
+.dep-markdown code { font-family: Menlo, Courier, monospace; font-size: 13px; }
+.dep a { color: var(--dep-tint); text-decoration: none; }
+.dep-image { padding: 6px 12px; } .dep-image img { max-width: 100%; height: auto; }
+.dep-shots { display: flex; gap: 10px; padding: 8px 12px; overflow-x: auto; touch-action: pan-x pan-y; overscroll-behavior-x: contain; }
+.dep-shots img { flex: none; object-fit: cover; background: rgba(127,127,127,.15); }
+.dep-row { display: flex; align-items: center; gap: 8px; min-height: 43px; padding: 0 12px; border-top: 1px solid var(--divider); }
+.dep-row-title { flex: 1; font-weight: bold; } .dep-row-text { color: var(--detail); text-align: right; }
+.dep-button-row { font-weight: bold; }
+.dep-button-row::after { content: ""; margin-left: auto; flex: none; width: 9px; height: 13px; background: var(--chevron) center / contain no-repeat; }
+.dep-button { display: block; margin: 6px 12px; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; color: #fff !important; background: var(--dep-tint); }
+.dep-button-row.disabled, .dep-button.disabled { opacity: .5; pointer-events: none; }
+.dep-separator { margin: 6px 12px; border: 0; border-top: 1px solid var(--divider); }
+
+/* Segmented control (DepictionTabView): grey segments, the selected one in the kit's matte blue. */
+.segmented { display: flex; margin: 8px 12px; border: 1px solid #8e8e8e; border-radius: 6px; overflow: hidden; }
+.segment {
+  flex: 1; height: 30px; padding: 0 6px; border: 0; cursor: pointer; font-size: 13px; font-weight: bold; color: #6b6b6b;
+  text-shadow: 0 1px 0 rgba(255,255,255,.75); background: linear-gradient(#fdfdfd, #e2e2e2);
+}
+.segment + .segment { border-left: 1px solid #8e8e8e; }
+.segment.selected { color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); background: var(--select); }
+
+/* ---- the modal sheet (nav/sheet.js): its own blue nav bar with Done, slid up by transform ---- */
+.sheet { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; background: var(--plain); will-change: transform; }
+html.native .navbar.sheet-bar { display: block; } /* the app hides the web nav bar, not a sheet's */
+.sheet-bar-row {
+  position: absolute; left: 0; right: 0; top: env(safe-area-inset-top); height: 44px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 4px;
+  padding: 0 max(5px, env(safe-area-inset-right)) 0 max(5px, env(safe-area-inset-left));
+}
+.sheet-right { justify-self: end; display: flex; }
+.sheet-body { flex: 1; position: relative; min-height: 0; padding-bottom: env(safe-area-inset-bottom); }
+.sheet-body > .sheet-scroll { position: absolute; inset: 0; }
+.depiction-frame { display: block; width: 100%; height: 100%; border: 0; background: #fff; }

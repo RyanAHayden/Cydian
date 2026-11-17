@@ -38,7 +38,25 @@ export function createParser({ Worker: W = globalThis.Worker, url = new URL("./w
     });
   }
 
+  // A catalog operation in the worker (core/catalog.js runCatalog). For "load", pass the Packages file as
+  // `input` (string or ArrayBuffer, transferred) and the other arguments in `args`, with args[1] left out.
+  function catalog(op, args = [], input) {
+    const msg = { id: next++, type: "catalog", op, args };
+    const transfer = [];
+    if (typeof input === "string") msg.text = input;
+    else if (input != null) { msg.bytes = input; if (input instanceof ArrayBuffer) transfer.push(input); }
+    if (!worker) {
+      const r = reply(msg);
+      return r.ok ? Promise.resolve(r.result) : Promise.reject(new Error(r.error));
+    }
+    return new Promise((resolve, reject) => {
+      pending.set(msg.id, { resolve, reject });
+      worker.postMessage(msg, transfer);
+    });
+  }
+
   return {
+    catalog,
     // `input`: the file as a string, or its bytes (ArrayBuffer, transferred to the worker).
     packages: (input, root) => call("packages", input, root),
     release: (input) => call("release", input),

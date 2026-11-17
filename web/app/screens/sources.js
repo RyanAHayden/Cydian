@@ -3,7 +3,10 @@
 // Nav bar: Refresh (HUD, refetch every source) and Edit; in edit mode Add (an alert that checks the repo before
 // saving it) and Done, and a red minus per row. A left swipe on a row shows Delete too. The list lives on the
 // device and comes through the backend (core/sources.js sourceCalls), so the app runs this file unchanged.
-import { grouped, plain } from "../nav/ui.js";
+// Above the sources, Cydia's "All Sources" row; a source (or All Sources) opens its Sections, and everything
+// below that is screens/browse.js.
+import { plain } from "../nav/ui.js";
+import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
@@ -24,8 +27,7 @@ const byKey = (key) => state.sources?.find((s) => s.key === key);
 
 export function nav(route, ctx) {
   if (route.path.length) {
-    const s = byKey(route.path[0]);
-    return { title: s ? displayName(s) : "Source" };
+    return browse.nav(route, (key) => { const s = byKey(key); return s ? displayName(s) : null; });
   }
   return {
     title: "Sources", style: "plain",
@@ -40,9 +42,9 @@ function grabButtons(e) {
   state.right = item.querySelector(".nav-right .bar-button");
 }
 
-export function render(el, route) {
+export function render(el, route, ctx) {
   if (route.path.length) {
-    renderDetail(el, route.path[0]);
+    browse.render(el, route, ctx);
     return;
   }
   state.body = el;
@@ -73,6 +75,12 @@ function draw() {
   const backend = getBackend();
   const list = state.sources;
   const ul = plain([{
+    rows: [{
+      label: "All Sources",
+      subtitle: "combined package list for below sources",
+      href: format({ tab: "sources", path: ["*"] }),
+    }],
+  }, {
     header: "Individual Sources",
     rows: list.map((s) => ({
       label: displayName(s),
@@ -84,7 +92,9 @@ function draw() {
   }]);
   ul.classList.toggle("editing", state.editing);
   const cells = ul.querySelectorAll(":scope > .cell");
-  list.forEach((s, i) => decorate(cells[i], s, backend));
+  cells[0].classList.add("all-sources-row");
+  cells[0].querySelector(".cell-inner").prepend(Object.assign(document.createElement("span"), { className: "folder" }));
+  list.forEach((s, i) => decorate(cells[i + 1], s, backend));
   attachRowGestures(ul);
   el.replaceChildren(ul);
   if (!list.length) {
@@ -227,24 +237,4 @@ async function addSource(ctx) {
     state.busy = false;
   }
   if (error) await showAlert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
-}
-
-// ---- a source's page: Cydia opens its Sections; until that lands, what we know about it --------------------
-
-async function renderDetail(el, key) {
-  if (!state.sources) await load();
-  const s = byKey(key);
-  if (!s) {
-    el.append(grouped([{ rows: [{ label: "Source not found" }], footer: key }]));
-    return;
-  }
-  const rows = [
-    { label: "Name", detail: displayName(s) },
-    { label: "URL", detail: s.uri },
-    { label: "Distribution", detail: s.dist },
-  ];
-  if (s.components?.length) rows.push({ label: "Components", detail: s.components.join(" ") });
-  rows.push({ label: "Packages", detail: typeof s.count === "number" ? s.count.toLocaleString() : "—" });
-  if (s.updated) rows.push({ label: "Updated", detail: new Date(s.updated).toLocaleString() });
-  el.append(grouped([{ header: "Source Information", rows, footer: s.error || undefined }]));
 }

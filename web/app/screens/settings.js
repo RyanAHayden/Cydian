@@ -17,7 +17,7 @@ export const title = "Settings";
 
 // The one store the app uses (both modes and the site read it through here). In the jailbreak app the bridge's
 // helper makes Ignored Upgrades real dpkg holds (F22); the bridge itself is N3's.
-export const settings = createSettings({ mode: detectMode(), helper: globalThis.cydianNative?.helper });
+export const settings = createSettings({ mode: detectMode(), helper: globalThis.cydianNative?.helper, native: globalThis.cydianNative });
 
 // Light: the top of the blue status bar under the nav bar; dark: "Status Bar (Black)".
 export const THEME_COLORS = { light: "#4f698b", dark: "#5f656f" }; // dark: the gunmetal bar's top

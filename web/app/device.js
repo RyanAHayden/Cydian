@@ -1,6 +1,6 @@
 // This iPhone, for "Works on my phone" (F17; the rules are core/compat.js). The iOS version comes from the bridge in
 // the app (Bridge.swift app.info `ios`) and on the site from the user agent, unless Settings > iOS Version picks one;
-// the jailbreak type is the Architecture setting's. Both stay on the device (core/settings.js). The worker's catalog
+// the jailbreak type is Settings > Device's (F37: core/settings.js deviceType(), "none" when not jailbroken). Both stay on the device (core/settings.js). The worker's catalog
 // hears every change (catalog.setDevice), so lists, Search and Changes follow the Works on My Phone switch.
 //
 //   currentDevice()          -> { ios: "16.5" | null, jailbreak: "rootless" | "rootful" | "none" (sideload build) }
@@ -13,12 +13,17 @@ import { catalog } from "./catalog.js";
 import { settings, createSwitch } from "./screens/settings.js";
 import { iosFromUserAgent, jailbreakOfArch, badge, normalizeDevice } from "./core/compat.js";
 
+// The settings that change who the rows are judged for (F37 adds Device, which also sets "arch").
+export const DEVICE_KEYS = ["worksOnMyPhone", "iosVersion", "arch", "device"];
+
 let nativeIos = null; // the app's own answer, once app.info came back
 
 // The sideload build runs on phones without a jailbreak: debs never fit there, apps do (core/compat.js).
-export function deviceFrom({ setting = "auto", nativeIos: fromBridge = null, userAgent = "", arch, mode = "site" } = {}) {
+// `type` (F37): the device type, "none" or an architecture; without one, `arch` decides (always jailbroken).
+export function deviceFrom({ setting = "auto", nativeIos: fromBridge = null, userAgent = "", arch, type, mode = "site" } = {}) {
   const ios = setting && setting !== "auto" ? setting : fromBridge || iosFromUserAgent(userAgent);
-  return normalizeDevice({ ios, jailbreak: mode === "sideload" ? "none" : jailbreakOfArch(arch) });
+  const none = mode === "sideload" || type === "none";
+  return normalizeDevice({ ios, jailbreak: none ? "none" : jailbreakOfArch(type ?? arch) });
 }
 
 export function currentDevice() {
@@ -27,6 +32,7 @@ export function currentDevice() {
     nativeIos,
     userAgent: globalThis.navigator?.userAgent ?? "",
     arch: getArch(),
+    type: settings.deviceType(),
     mode: settings.mode,
   });
 }
@@ -45,7 +51,7 @@ const send = () => catalog.setDevice(currentDevice(), { filter: compatFilterOn()
 
 // The switch row: a one-row plain table with the device under the label, above the Sections list and Search's
 // results. `onChange()` runs after the setting changed and the catalog heard it, for the page to redraw its list.
-// The version and jailbreak type are changed in Settings (Works on My Phone, Sources > Architecture).
+// The version and jailbreak type are changed in Settings (Works on My Phone, Device).
 export function filterRow(onChange = () => {}) {
   const ul = document.createElement("ul");
   ul.className = "table plain compat-filter";
@@ -60,7 +66,7 @@ export function filterRow(onChange = () => {}) {
   cell.append(sw);
   // Any change (this switch, Settings, the Architecture) redraws the page; a row left behind unsubscribes.
   const off = settings.onChange((key) => {
-    if (!["worksOnMyPhone", "iosVersion", "arch"].includes(key)) return;
+    if (!DEVICE_KEYS.includes(key)) return;
     if (!ul.isConnected) { off(); return; }
     ul.querySelector(".cell-subtitle").textContent = deviceLabel();
     if ((sw.getAttribute("aria-checked") === "true") !== compatFilterOn()) { const next = makeSwitch(); sw.replaceWith(next); sw = next; }
@@ -74,7 +80,7 @@ export function initDevice() {
   if (wired) return;
   wired = true;
   send();
-  settings.onChange((key) => { if (["worksOnMyPhone", "iosVersion", "arch"].includes(key)) send(); });
+  settings.onChange((key) => { if (DEVICE_KEYS.includes(key)) send(); });
   const n = globalThis.cydianNative;
   if (n?.call) {
     n.call("app.info", {}).then((info) => {

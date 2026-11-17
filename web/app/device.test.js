@@ -21,3 +21,11 @@ test("the switch row's line under the label", () => {
   assert.equal(deviceLabel({ ios: null, jailbreak: "rootful" }), "iOS unknown · Rootful");
   assert.equal(deviceLabel({ ios: "17.0", jailbreak: "none" }), "iOS 17.0 · Not Jailbroken");
 });
+
+test("F37: the device type decides the jailbreak; Not Jailbroken is 'none' whatever the arch", () => {
+  const UA16 = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1";
+  assert.deepEqual(deviceFrom({ userAgent: UA16, arch: "iphoneos-arm64", type: "none" }), { ios: "16.5", jailbreak: "none" });
+  assert.deepEqual(deviceFrom({ userAgent: UA16, arch: "iphoneos-arm64", type: "iphoneos-arm" }), { ios: "16.5", jailbreak: "rootful" });
+  assert.deepEqual(deviceFrom({ userAgent: UA16, arch: "iphoneos-arm", type: "iphoneos-arm64" }), { ios: "16.5", jailbreak: "rootless" });
+  assert.deepEqual(deviceFrom({ userAgent: UA16, type: "iphoneos-arm64", mode: "sideload" }), { ios: "16.5", jailbreak: "none" });
+});

@@ -134,7 +134,10 @@ async function run() {
     }
   }
   let reloaded = false;
+  // F37: a phone without a jailbreak sees AltStore sources only; APT ones aren't fetched until the type changes.
+  const appsOnly = device?.device.jailbreak === "none";
   await Promise.all(sources.map((s) => {
+    if (appsOnly && !isAltKey(s.key)) return null;
     const sig = signature(s, arch) + (isAltKey(s.key) ? `|${device?.device.ios ?? ""}` : "");
     if (loaded.get(s.key)?.sig === sig) return null;
     reloaded = true;
@@ -172,6 +175,8 @@ let deviceSent = true;
 function setDevice(next, { filter = true } = {}) {
   const v = next ? { device: { ios: next.ios ?? null, jailbreak: next.jailbreak }, filter: Boolean(filter) } : null;
   if (JSON.stringify(v) === JSON.stringify(device)) return;
+  // F37: leaving Not Jailbroken: the APT sources skipped so far load before the next question.
+  if (device?.device.jailbreak === "none" && v?.device.jailbreak !== "none") first = null;
   device = v;
   deviceSent = false;
   for (const f of changeListeners) f();

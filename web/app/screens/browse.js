@@ -21,7 +21,7 @@ import { displayName, releaseDepiction } from "../core/sources.js";
 import { renderSileo, mediaUrl } from "./depiction.js";
 import { settings, createSwitch } from "./settings.js";
 import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js";
-import { compat } from "../core/compat.js";
+import { compat, markOf, isIncompatible } from "../core/compat.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -32,6 +32,23 @@ catalog.setHidden(settings.hiddenSections.list());
 settings.onChange((key, value) => { if (key === "hiddenSections") catalog.setHidden(value); });
 // Works on My Phone (F17): the device and the filter reach the worker the same way.
 initDevice();
+
+// Compatibility marks (F35): Settings > Show Compatibility Marks hides them all with one attribute, so rows bound
+// while scrolling never read the setting.
+function applyMarks() {
+  if (globalThis.document?.documentElement) document.documentElement.dataset.compatMarks = settings.get("compatMarks") ? "on" : "off";
+}
+applyMarks();
+settings.onChange((key) => { if (key === "compatMarks") applyMarks(); });
+
+const MARK_LABEL = { works: "Works on this iPhone", no: "Doesn't work on this iPhone", unknown: "Compatibility unknown" };
+
+// The mark for a row's compat code: data-mark works | no | unknown (packages.css draws it); none when unjudged.
+export function setMark(span, code) {
+  const m = markOf(code);
+  if (m) { span.dataset.mark = m; span.setAttribute("aria-label", MARK_LABEL[m]); span.setAttribute("role", "img"); }
+  else { delete span.dataset.mark; span.removeAttribute("aria-label"); span.removeAttribute("role"); }
+}
 
 export function parseToken(seg) {
   const s = String(seg ?? "");
@@ -208,7 +225,7 @@ function createRow() {
   icon.append(letter, img);
   const text = el("span", "pkg-text");
   const top = el("span", "pkg-top");
-  const compatEl = el("span", "pkg-compat");
+  const compatEl = el("span", "compat-mark"); // F35: the check, X or ? (F17's text badge is on the package page)
   top.append(el("span", "pkg-name"), compatEl, el("span", "pkg-version"));
   text.append(top, el("span", "pkg-desc"));
   a.append(icon, text);
@@ -227,10 +244,12 @@ function bindRow(row, item, route) {
   r.a.href = deeper(route, token("package", item.id));
   r.name.textContent = item.name;
   r.version.textContent = item.version;
-  // Works on my phone (F17): the worker's code for this row; rows it never judged (installed lists) get none.
-  r.compat.textContent = compatBadge(item.compat);
-  if (item.compat) r.compat.dataset.compat = item.compat; else delete r.compat.dataset.compat;
-  r.desc.textContent = item.short;
+  // Works on my phone (F17): the worker's code for this row, drawn as a mark (F35); rows never judged get none.
+  setMark(r.compat, item.compat);
+  // Search's exact match that can't work (F35): its name in red, the reason in place of the description.
+  const flagged = Boolean(item.exact && isIncompatible(item.compat));
+  r.name.classList.toggle("incompatible", flagged);
+  r.desc.textContent = flagged && item.why ? item.why : item.short;
   r.letter.textContent = indexLetter(item.name) === "#" ? item.name.charAt(0) : indexLetter(item.name);
   r.icon.style.background = tint(item.section);
   const src = iconSrc(item);
@@ -331,10 +350,14 @@ async function renderPackage(body, route, key, id, ctx) {
     icon.append(img);
   }
   const ht = el("div", "pkg-head-text");
-  ht.append(el("span", "pkg-head-name", name), el("span", "pkg-head-version", st.version ?? ""));
   // Works on my phone (F17): judged here from the stanza, so an installed-only page gets one too.
   const fit = compat(st, currentDevice());
   const fitCode = fit.status === "no" ? fit.reason : fit.status;
+  const nameLine = el("span", "pkg-head-top");
+  const headMark = el("span", "compat-mark large");
+  setMark(headMark, fitCode);
+  nameLine.append(el("span", "pkg-head-name", name), headMark);
+  ht.append(nameLine, el("span", "pkg-head-version", st.version ?? ""));
   const fitBadge = el("span", "pkg-compat", fit.label);
   fitBadge.dataset.compat = fitCode;
   ht.append(fitBadge);

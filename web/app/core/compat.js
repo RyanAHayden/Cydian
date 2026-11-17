@@ -166,3 +166,24 @@ export function normalizeDevice(d) {
   const ios = typeof d?.ios === "string" && /^\d+(\.\d+){0,2}$/.test(d.ios.trim()) ? d.ios.trim() : null;
   return { ios, jailbreak: JAILBREAKS.includes(d?.jailbreak) ? d.jailbreak : "rootless" };
 }
+
+// F35: the mark drawn beside every package (a green check, a red X, a grey ?) for a row's code; null when the row
+// was never judged (no device yet).
+export function markOf(code) {
+  if (code == null) return null;
+  if (code === "works") return "works";
+  return isIncompatible(code) ? "no" : "unknown";
+}
+
+// F35: the reason under an incompatible package's name, for Search's exact-match exception: "Needs iOS 15 or
+// earlier", "Needs a rootful jailbreak". `v` is compat()'s verdict; null when it can work.
+export function needText(v) {
+  if (!v || v.status !== "no") return null;
+  switch (v.reason) {
+    case "ios": return v.range && v.range !== "some iOS versions" ? `Needs ${v.range.replace(/^iOS below /, "iOS older than ")}` : v.detail;
+    case "rootful": case "rootless": case "roothide": return `Needs a ${v.reason} jailbreak`;
+    case "jailbreak": return "Needs a jailbroken iPhone";
+    case "arch": return `Built for ${v.need}, not an iPhone`;
+    default: return v.label;
+  }
+}

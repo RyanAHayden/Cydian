@@ -234,3 +234,61 @@ test("Works on my phone (F17): rows carry their code; the filter drops what can'
   c.setDevice(null);
   assert.equal(c.list().length, 5);
 });
+
+test("Search filters (F35): section and group, source, installed, paid", async () => {
+  const { SECTION_GROUPS, sectionGroup } = await import("./catalog.js");
+  assert.deepEqual(SECTION_GROUPS, ["Tweaks", "Themes", "Apps", "Utilities"]);
+  assert.equal(sectionGroup("Themes (LockScreen)"), "Themes");
+  assert.equal(sectionGroup("Tweaks"), "Tweaks");
+  assert.equal(sectionGroup("Utilities"), "Utilities");
+  assert.equal(sectionGroup("Applications"), "Apps");
+  assert.equal(sectionGroup("Addons (SBSettings)"), null);
+  const c = loaded();
+  c.load("P", packages(
+    { Package: "com.p.paid", Name: "Paid Alpha", Version: "1", Architecture: "iphoneos-arm64", Section: "Tweaks", Tag: "cydia::commercial" },
+  ), null);
+  assert.deepEqual(ids(c.search("a", { section: "group:Themes" })), ["com.a.theme"]);
+  assert.deepEqual(ids(c.search("a", { section: "Utilities" })), ["com.a.util"]);
+  assert.deepEqual(ids(c.search("alpha", { section: "group:Tweaks" })), ["com.a.tweak", "com.p.paid"]);
+  assert.deepEqual(ids(c.search("alpha", { price: "paid" })), ["com.p.paid"]);
+  assert.deepEqual(ids(c.search("alpha", { price: "free" })), ["com.a.tweak"]);
+  assert.equal(c.search("paid")[0].paid, true);
+  // source: that source's own rows (its own version), and nothing for a source that isn't loaded
+  assert.deepEqual(c.search("alpha", { source: "A" }).map((r) => [r.id, r.version, r.key]), [["com.a.tweak", "1.2", "A"]]);
+  assert.deepEqual(c.search("alpha", { source: "nope" }), []);
+  // installed / not installed: from dpkg's status file; before one came, nothing is installed
+  assert.deepEqual(ids(c.search("alpha", { installed: "installed" })), []);
+  c.setInstalled(stanza({ Package: "com.a.tweak", Status: "install ok installed", Version: "1.0", Architecture: "iphoneos-arm64" }) + "\n");
+  assert.deepEqual(ids(c.search("alpha", { installed: "installed" })), ["com.a.tweak"]);
+  assert.deepEqual(ids(c.search("alpha", { installed: "not" })), ["com.p.paid"]);
+  // hidden sections stay out of a filtered search too
+  c.setHidden(["Tweaks"]);
+  assert.deepEqual(ids(c.search("alpha")), []);
+});
+
+test("Search (F35): incompatible packages are hidden by default, except an exact name or id match, which says why", () => {
+  const c = createCatalog();
+  c.load("k", packages(
+    { Package: "com.old.flex", Name: "Flex", Version: "1", Architecture: "iphoneos-arm64", Section: "Tweaks", Depends: "firmware (<= 15)" },
+    { Package: "com.new.flexall", Name: "FlexAll", Version: "1", Architecture: "iphoneos-arm64", Section: "Tweaks", Depends: "firmware (>= 14.0)" },
+    { Package: "com.old.flexer", Name: "Flexer", Version: "1", Architecture: "iphoneos-arm64", Section: "Tweaks", Depends: "firmware (<< 15.0)" },
+  ), null);
+  c.setDevice({ ios: "16.5", jailbreak: "rootless" });
+  // "flex" is Flex's exact name: it stays, first, with the reason; Flexer can't work and only starts with it
+  const rows = c.search("flex");
+  assert.deepEqual(ids(rows), ["com.old.flex", "com.new.flexall"]);
+  assert.equal(rows[0].exact, true);
+  assert.equal(rows[0].compat, "ios");
+  assert.equal(rows[0].why, "Needs iOS 15 or earlier");
+  assert.equal(rows[1].exact, undefined);
+  // an exact id works the same way
+  assert.deepEqual(ids(c.search("com.old.flexer")), ["com.old.flexer"]);
+  assert.equal(c.search("com.old.flexer")[0].why, "Needs iOS older than 15.0");
+  // Show Incompatible (the filter off): everything, the exact match still flagged
+  c.setDevice({ ios: "16.5", jailbreak: "rootless" }, { filter: false });
+  assert.deepEqual(ids(c.search("flex")), ["com.old.flex", "com.new.flexall", "com.old.flexer"]);
+  assert.equal(c.search("flex")[0].exact, true);
+  // a package that works is never flagged, exact or not
+  c.setDevice({ ios: "14.2", jailbreak: "rootless" });
+  assert.equal(c.search("flex")[0].exact, undefined);
+});

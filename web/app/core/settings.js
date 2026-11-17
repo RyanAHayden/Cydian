@@ -74,6 +74,12 @@ export const SETTINGS = [
       + (mode === "jailbreak" ? "." : " (Sources > Architecture).") + " Packages that don't say are kept.",
   },
   {
+    // F35: the check, X or ? beside every package in lists, Search and the package page.
+    key: "compatMarks", section: "compat", kind: "toggle", feature: "compat", modes: ALL, default: true,
+    label: "Show Compatibility Marks", options: onOff,
+    footer: "A green check beside packages that work on this iPhone, a red X beside those that don't, a grey ? where the package doesn't say.",
+  },
+  {
     // The site's picker (F17): the app knows its iOS version from the bridge.
     key: "iosVersion", section: "compat", kind: "list", feature: "compat", modes: ["site"], default: "auto",
     label: "iOS Version",

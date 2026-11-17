@@ -26,7 +26,7 @@
 // A row is the slim record lists draw: { id, name, short, version, section, icon, key, author, compat }.
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
 import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
-import { compatCode, isIncompatible, normalizeDevice } from "./compat.js";
+import { compat, compatCode, isIncompatible, normalizeDevice, needText } from "./compat.js";
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -103,14 +103,37 @@ function makeRow(st, key) {
   const desc = description(st);
   return {
     id: st.package, name, short: desc.short, version: st.version ?? "", section: sectionName(st.section),
-    icon: st.iconUrl ?? null, key, author: author || maint,
+    icon: st.iconUrl ?? null, key, author: author || maint, paid: tagsOf(st).includes("cydia::commercial"),
     // search fields, lower-cased once at load; dropped before rows leave the worker
     _hay: [name, st.package, desc.short, desc.long, author, maint].join("\n").toLowerCase(),
     _n: name.toLowerCase(), _id: st.package.toLowerCase(), _a: author.toLowerCase(), _m: maint.toLowerCase(),
   };
 }
 
-const slim = ({ id, name, short, version, section, icon, key, author, compat }) => ({ id, name, short, version, section, icon, key, author, compat });
+const slim = ({ id, name, short, version, section, icon, key, author, compat, paid }) => ({ id, name, short, version, section, icon, key, author, compat, paid });
+
+// Search's segmented control (F35): a few broad kinds over Cydia's sections. A section belongs to a group by its
+// simple name (simpleSection): "Themes (SpringBoard)" is a Theme, "Tweaks" a Tweak.
+export const SECTION_GROUPS = ["Tweaks", "Themes", "Apps", "Utilities"];
+const GROUP_NAMES = {
+  Tweaks: ["tweaks", "tweak"],
+  Themes: ["themes", "theme", "wallpaper", "ringtones", "fonts"],
+  Apps: ["applications", "apps", "app", "games"],
+  Utilities: ["utilities", "system", "terminal support", "networking", "development", "administration", "scripting"],
+};
+export function sectionGroup(section) {
+  const s = simpleSection(section).toLowerCase();
+  for (const [g, names] of Object.entries(GROUP_NAMES)) if (names.includes(s)) return g;
+  return null;
+}
+
+// A section filter value -> a row test: "group:Tweaks" (sectionGroup), a section's name, or null/"*" for any.
+function sectionTest(section) {
+  if (section == null || section === "" || section === ALL) return null;
+  const s = String(section);
+  if (s.startsWith("group:")) { const g = s.slice(6); return (r) => sectionGroup(r.section) === g; }
+  return (r) => r.section === s;
+}
 
 export function createCatalog() {
   const sources = new Map(); // key -> { byId: Map(id -> { row, stanza }) }
@@ -232,22 +255,43 @@ export function createCatalog() {
 
   // Every word must appear somewhere (name, id, description, author or maintainer). Ranked: exact name or id,
   // then name or id starting with the query, then the query inside the name or id, then the rest; by name within.
-  function search(query, { limit = 2000 } = {}) {
+  // Search's filters (F35, all optional): `section` a section name or a SECTION_GROUPS group ("group:Tweaks"),
+  // `source` a source key, `installed` "installed" | "not", `price` "free" | "paid". With the Works on My Phone
+  // filter on, what can't work drops out, except an exact name or id match: that one stays, marked `exact`, with
+  // `why` ("Needs iOS 15 or earlier") for the row's subtitle.
+  function search(query, { limit = 2000, section = null, source = null, installed = null, price = null } = {}) {
     const q = String(query ?? "").trim().toLowerCase();
     if (!q) return [];
     const words = q.split(/\s+/);
+    const key = source && sources.has(source) ? source : ALL;
+    if (source && key === ALL) return []; // a source that isn't loaded has nothing
+    const inSection = sectionTest(section);
     const hits = [];
-    for (const r of visibleOf(ALL)) {
+    for (const r of rowsOf(key)) {
+      if (hidden.has(r.section)) continue;
       if (!words.every((w) => r._hay.includes(w))) continue;
+      if (inSection && !inSection(r)) continue;
+      if (installed === "installed" && !statusById.has(r.id)) continue;
+      if (installed === "not" && statusById.has(r.id)) continue;
+      if (price === "paid" && !r.paid) continue;
+      if (price === "free" && r.paid) continue;
       let rank = 4;
       if (r._n === q || r._id === q) rank = 0;
       else if (r._n.startsWith(q) || r._id.startsWith(q)) rank = 1;
       else if (r._n.includes(q) || r._id.includes(q)) rank = 2;
       else if (r._a.includes(q) || r._m.includes(q)) rank = 3;
+      if (fitFilter && rank !== 0 && isIncompatible(r.compat)) continue;
       hits.push([rank, r]);
     }
     hits.sort((a, b) => a[0] - b[0] || compareNames(a[1], b[1]));
-    return hits.slice(0, limit).map((h) => slim(h[1]));
+    return hits.slice(0, limit).map(([rank, r]) => {
+      const out = slim(r);
+      if (rank === 0 && isIncompatible(r.compat)) {
+        out.exact = true;
+        out.why = needText(compat(entries(key).get(r.id).stanza, device));
+      }
+      return out;
+    });
   }
 
   function author(name) {
@@ -300,7 +344,8 @@ export function createCatalog() {
     const st = statusById.get(id);
     if (!st) return null;
     const p = installedPkgs.find((r) => r.id === id);
-    const row = { id: p.id, name: p.name, short: p.short, version: p.version, section: p.section, icon: null, key: null, author: p.author };
+    const row = { id: p.id, name: p.name, short: p.short, version: p.version, section: p.section, icon: null, key: null, author: p.author,
+      compat: device ? compatCode(st, device) : null };
     return { stanza: st, key: null, row, others: [], installedOnly: true };
   }
 
@@ -312,7 +357,8 @@ export function createCatalog() {
     return installedPkgs.map((p) => {
       const e = all.get(p.id);
       return { id: p.id, name: p.name, short: p.short, version: p.version, section: p.section,
-        icon: e?.row.icon ?? null, key: e?.row.key ?? null, author: p.author, installed: p.version, held: p.held };
+        icon: e?.row.icon ?? null, key: e?.row.key ?? null, author: p.author, installed: p.version, held: p.held,
+        compat: e ? e.row.compat : (device && statusById.has(p.id) ? compatCode(statusById.get(p.id), device) : null) };
     });
   }
 

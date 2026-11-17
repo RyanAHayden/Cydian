@@ -146,3 +146,21 @@ test("normalizeDevice and jailbreakOfArch", () => {
   assert.equal(jailbreakOfArch("iphoneos-arm64"), "rootless");
   assert.equal(jailbreakOfArch(undefined), "rootless");
 });
+
+test("F35: the mark per verdict, and the reason under an incompatible name", async () => {
+  const { markOf, needText } = await import("./compat.js");
+  assert.equal(markOf("works"), "works");
+  for (const code of ["ios", "rootful", "rootless", "roothide", "jailbreak", "arch"]) assert.equal(markOf(code), "no", code);
+  assert.equal(markOf("unknown"), "unknown");
+  assert.equal(markOf(null), null, "a row never judged gets no mark");
+  assert.equal(markOf(undefined), null);
+  const v = (fields, device) => needText(compat(deb(fields), device));
+  assert.equal(v({ Architecture: "iphoneos-arm64", Depends: "firmware (<= 15)" }, rootless("16.5")), "Needs iOS 15 or earlier");
+  assert.equal(v({ Architecture: "iphoneos-arm64", Depends: "firmware (>= 17.0)" }, rootless("16.5")), "Needs iOS 17.0 or later");
+  assert.equal(v({ Architecture: "iphoneos-arm64", Depends: "firmware (<< 15.0)" }, rootless("16.5")), "Needs iOS older than 15.0");
+  assert.equal(v({ Architecture: "iphoneos-arm" }, rootless("16.5")), "Needs a rootful jailbreak");
+  assert.equal(v({ Architecture: "iphoneos-arm64" }, { ios: "16.5", jailbreak: "none" }), "Needs a jailbroken iPhone");
+  assert.equal(v({ Architecture: "darwin-arm64" }, rootless("16.5")), "Built for darwin-arm64, not an iPhone");
+  assert.equal(v({ Architecture: "iphoneos-arm64", Depends: "firmware (>= 15.0)" }, rootless("16.5")), null, "works: no reason");
+  assert.equal(v({ Architecture: "iphoneos-arm64" }, rootless("16.5")), null, "unknown: no reason");
+});

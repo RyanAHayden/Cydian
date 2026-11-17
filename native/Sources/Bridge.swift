@@ -26,7 +26,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         on("app.info") { c in
             let info = Bundle.main.infoDictionary ?? [:]
             c.reply(["version": info["CFBundleShortVersionString"] ?? "", "build": info["CFBundleVersion"] ?? "",
-                     "ios": UIDevice.current.systemVersion], nil)
+                     "ios": UIDevice.current.systemVersion, "mode": AppMode.current.rawValue], nil)
         }
     }
 

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Keys the sideload IPA adds to Info.plist (docs/sideload.md, "What I2 needs"). mkipa.py merges them in. -->
+<plist version="1.0">
+<dict>
+	<key>UIBackgroundModes</key><array><string>audio</string></array>
+	<key>CFBundleDocumentTypes</key><array>
+		<dict>
+			<key>CFBundleTypeName</key><string>iOS App</string>
+			<key>CFBundleTypeRole</key><string>Viewer</string>
+			<key>LSHandlerRank</key><string>Alternate</string>
+			<key>LSItemContentTypes</key><array><string>com.apple.itunes.ipa</string></array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key><string>Signing certificate</string>
+			<key>CFBundleTypeRole</key><string>Viewer</string>
+			<key>LSHandlerRank</key><string>Alternate</string>
+			<key>LSItemContentTypes</key><array><string>com.rsa.pkcs-12</string></array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key><string>Provisioning profile</string>
+			<key>CFBundleTypeRole</key><string>Viewer</string>
+			<key>LSHandlerRank</key><string>Alternate</string>
+			<key>LSItemContentTypes</key><array><string>com.apple.mobileprovision</string></array>
+		</dict>
+	</array>
+	<key>CFBundleURLTypes</key><array>
+		<dict>
+			<key>CFBundleURLName</key><string>io.github.fizl0.cydian</string>
+			<key>CFBundleURLSchemes</key><array><string>cydian</string></array>
+		</dict>
+	</array>
+	<!-- No system type for .mobileprovision: declare it, so the document type above has something to match. -->
+	<key>UTImportedTypeDeclarations</key><array>
+		<dict>
+			<key>UTTypeIdentifier</key><string>com.apple.mobileprovision</string>
+			<key>UTTypeDescription</key><string>Provisioning profile</string>
+			<key>UTTypeConformsTo</key><array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key><dict>
+				<key>public.filename-extension</key><array><string>mobileprovision</string></array>
+			</dict>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key><array><string>apple-magnifier</string></array>
+</dict>
+</plist>

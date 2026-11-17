@@ -51,6 +51,10 @@ enum Web {
         let c = WKWebViewConfiguration()
         c.setURLSchemeHandler(AppScheme(), forURLScheme: AppScheme.scheme)
         c.userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "cydian")
+        // The mode is there before app.js runs, so web/app/ can drop apt-only tabs synchronously (web/app/mode.js).
+        c.userContentController.addUserScript(WKUserScript(
+            source: "globalThis.cydianApp = Object.freeze({ mode: \"\(AppMode.current.rawValue)\" });",
+            injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
         // WebKit holds requestAnimationFrame near 60 Hz by default on iOS; the JS edge swipe needs 120 (R3).
         WebKitFeature.set({ $0 == "PreferPageRenderingUpdatesNear60FPSEnabled" }, false, c.preferences)
         let w = WKWebView(frame: .zero, configuration: c)

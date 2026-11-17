@@ -1,0 +1,17 @@
+# agent-runner (https://github.com/FIZL0/agent-runner): `tmux new -s cydian agent-runner run 3`
+[plan]
+dir = "plan"
+journal = "journal"
+
+[run]
+test = "tools/check.sh"
+slots = 3
+mode = "d"
+rules = "AGENTS.md"
+notes = ".runner"
+joinable = ["plan/TODO.md", "plan/DONE.md", "journal/*/*.md"]
+untested = ["*.md", "docs/*", "journal/*", "LICENSE*"]
+
+[git]
+push = "origin"
+push_merge = true

@@ -1,0 +1,6 @@
+.runner/
+__pycache__/
+ref/
+*.deb
+*.ipa
+.env

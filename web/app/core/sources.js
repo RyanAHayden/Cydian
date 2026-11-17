@@ -9,6 +9,7 @@
 // and throws errors with a `code` (BackendError: bad_url, refused, too_large, timeout, upstream, not_found,
 // network, rate_limited). Cydia's behaviour this follows: docs/cydia.md, "Fetching a source" and "Sources tab".
 import { repoLayout, parseRelease, parseControl, matchesArch, DEFAULT_ARCH } from "./apt.js";
+import { isAltKey, neverLoaded } from "./altstore.js";
 
 // A source: { key, uri, dist, components, name?, origin?, depiction?, count?, updated?, error? }. `name` is ours
 // (the defaults), `origin` comes from the repo's Release; the row shows the first there is, else the host.
@@ -351,4 +352,29 @@ export function sourcesFor(list, type) {
 export function sourceFilter(type) {
   if (type !== "none") return null;
   return (s) => String(s?.key ?? "").startsWith("alt:");
+}
+
+// F43: the sources a first visit loads by itself: AltStore sources (the F28 defaults are seeded as bare URLs) that
+// have never loaded, among those the device type shows (sourceFilter). APT sources are left to Refresh: their rows
+// already have a name and CydiaIcon.png, and refreshing one means Packages through the proxy, or apt-get update in
+// the app, where it would fight Refresh on Launch for apt's lock.
+export function firstLoadFilter(type) {
+  const shown = sourceFilter(type) ?? (() => true);
+  return (s) => isAltKey(s?.key) && neverLoaded(s) && shown(s);
+}
+
+// F43: refreshes the never-loaded sources in `list` (firstLoadFilter), once each per `tried` (a Set of keys the
+// caller keeps, so a source whose fetch throws isn't asked again on every visit). `begin()` runs before the fetch
+// and returns what ends it (the screen's HUD). Resolves to the refreshed records, or null when nothing needed it.
+export async function loadNeverLoaded(backend, list, type, { tried = new Set(), begin = () => () => {} } = {}) {
+  const want = firstLoadFilter(type);
+  const keys = new Set((Array.isArray(list) ? list : []).filter((s) => want(s) && !tried.has(s.key)).map((s) => s.key));
+  if (!keys.size) return null;
+  for (const k of keys) tried.add(k);
+  const end = begin();
+  try {
+    return await backend.refreshSources(undefined, { filter: (s) => keys.has(s?.key) });
+  } finally {
+    end();
+  }
 }

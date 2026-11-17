@@ -10,7 +10,7 @@ import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
-import { displayName, sourceIconUrls, sourcesFor, sourceFilter } from "../core/sources.js";
+import { displayName, sourceIconUrls, sourcesFor, sourceFilter, loadNeverLoaded } from "../core/sources.js";
 import { settings } from "./settings.js";
 import { isAltKey } from "../core/altstore.js";
 
@@ -23,6 +23,7 @@ const state = {
   busy: false,     // a refresh or an add is running
   left: null,      // the nav bar's buttons, found on first tap
   right: null,
+  tried: new Set(), // F43: keys first-loaded this session (core/sources.js loadNeverLoaded)
 };
 
 const byKey = (key) => state.sources?.find((s) => s.key === key);
@@ -54,10 +55,10 @@ export function render(el, route, ctx) {
   }
   state.body = el;
   draw();
-  load();
+  load(ctx);
 }
 
-async function load() {
+async function load(ctx) {
   try {
     state.sources = await getBackend().sources();
   } catch (e) {
@@ -65,6 +66,30 @@ async function load() {
     state.loadError = e.message;
   }
   draw();
+  if (!state.loadError) firstLoad(ctx);
+}
+
+// F43: sources seeded by default (F28) hold only their URL until something reads them: refresh those once, with
+// Refresh's HUD, so a first visit shows names, icons and counts without a tap.
+async function firstLoad(ctx) {
+  if (state.busy) return;
+  state.busy = true;
+  let hide = () => {};
+  try {
+    const done = await loadNeverLoaded(getBackend(), state.sources, settings.deviceType(), {
+      tried: state.tried,
+      begin: () => (hide = ctx?.showHUD ? ctx.showHUD("Reloading Data") : () => {}),
+    });
+    if (done) {
+      state.sources = await getBackend().sources();
+      draw();
+    }
+  } catch {
+    // a failed first load leaves the rows as they were; Refresh shows the error
+  } finally {
+    hide();
+    state.busy = false;
+  }
 }
 
 // ---- the list --------------------------------------------------------------------------------------------

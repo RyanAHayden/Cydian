@@ -1,0 +1,64 @@
+/* Home (screens/home.js), after Cydia's on the 4S (ref/4s/screens/cydia-home.png). Sizes are the 4S shot's pixels
+   halved; colours sampled from it: tile edges #999 with 8px corners, white tiles, the account tile #eefff0, by-line
+   #586c90 with a white emboss. Tiles are .cell-inner links, so the held look (blue selection, white text and
+   chevron) is the table cells' from ios6.css. No highlights or bottom lines: the phone draws none. */
+.home {
+  --tile: #fff;
+  --tile-edge: #999;
+  --tile-green: #eefff0;
+  --by: #586c90;
+}
+html[data-theme="dark"] .home {
+  --tile: var(--table);
+  --tile-edge: var(--table-edge);
+  --tile-green: #2f4a36;
+  --by: #a9c4f2;
+}
+
+/* Icon and welcome: a 58px icon 16px in from the tiles, the words beside it. */
+.home-head { margin: 0 10px; display: flex; align-items: center; gap: 22px; padding: 11px 0 11px 16px; }
+.home-icon { flex: none; width: 58px; height: 58px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.home-words { min-width: 0; }
+.home-title { margin: 0; font-size: 21px; font-weight: normal; line-height: 26px; color: var(--text); text-shadow: var(--emboss); }
+.home-by { margin: 2px 0 0; font-size: 17px; line-height: 21px; color: var(--text); text-shadow: var(--emboss); }
+.home-by a { color: var(--by); font-weight: bold; text-decoration: none; }
+
+/* Tile rows: 43px tiles, 10px apart; two halves 9px apart, or one outlined pair split by a line. */
+.home-row { margin: 0 10px; display: flex; gap: 9px; }
+.home-row + .home-row { margin-top: 10px; }
+.home-row > .table {
+  flex: 1; min-width: 0; overflow: hidden; border: 1px solid var(--tile-edge); border-radius: 8px;
+  background: var(--tile); box-shadow: none;
+}
+.home-row.pair > .table { display: flex; background: none; } /* Cydia: no fill, the pinstripes show through */
+.home-pair > .cell { flex: 1; min-width: 0; }
+.home-pair > .cell + .cell { border-top: 0; border-left: 1px solid var(--tile-edge); }
+.home-pair > .cell + .cell > .cell-inner { box-shadow: none; } /* not a table's divider highlight */
+.home-row.green > .table { background: var(--tile-green); }
+.home-tile { padding: 0 10px 0 6px; gap: 8px; }
+.home-tile .cell-label { flex: 1; min-width: 0; }
+
+/* Glyphs: 29px rounded squares with a white symbol, drawn here (original art, no logos). */
+.home-glyph { box-shadow: none; background-position: center; background-repeat: no-repeat; background-size: 21px 21px; }
+.glyph-github { background-color: #333; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6 2 12l6 6M16 6l6 6-6 6M14 4l-4 16'/%3E%3C/svg%3E"); }
+.glyph-sources { background-color: #5c7aa3; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M3 4h18v4H3zM4 9h16v11H4zm5 3v2h6v-2z' fill-rule='evenodd'/%3E%3C/svg%3E"); }
+.glyph-featured { background-color: #fc0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='m12 1.5 3.2 6.9 7.3.8-5.4 5 1.5 7.3L12 17.8l-6.6 3.7 1.5-7.3-5.4-5 7.3-.8z'/%3E%3C/svg%3E"); }
+.glyph-themes { background-color: #1a82fb; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M2 4h20v13H2zm2 2v9h16V6zM9 18h6l1 3H8z' fill-rule='evenodd'/%3E%3C/svg%3E"); }
+.home-row.green .home-glyph { background-color: #37a94a; }
+html[data-theme="dark"] .glyph-github { background-color: #4a4d52; }
+.glyph-add { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z'/%3E%3C/svg%3E"); }
+.glyph-upgrades { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M12 2 3 11h6v10h6V11h6z'/%3E%3C/svg%3E"); }
+.glyph-failed { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M10 3h4l-.6 12h-2.8zm0 15h4v3h-4z'/%3E%3C/svg%3E"); }
+.glyph-current { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 12.5 5 5L20 6.5'/%3E%3C/svg%3E"); }
+.glyph-changes, .glyph-loading { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3.5 2.5'/%3E%3C/svg%3E"); }
+.glyph-loading { opacity: .6; }
+
+/* The help links: a white list with #999 edges like Cydia's, taller rows whose text may wrap. */
+.group.home-links { margin-top: 10px; }
+.home-links .table.grouped { background: #fff; border-color: #999; border-radius: 8px; box-shadow: none; }
+html[data-theme="dark"] .home-links .table.grouped { background: var(--table); border-color: var(--table-edge); }
+.home-links .cell-inner { min-height: 43px; padding: 9px 10px 9px 15px; }
+.home-links .cell-label { white-space: normal; line-height: 21px; }
+.home-links .cell + .cell { border-top-color: #999; }
+.home-links .cell + .cell > .cell-inner { box-shadow: none; }
+html[data-theme="dark"] .home-links .cell + .cell { border-top-color: var(--divider); }

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_SOURCES, normalizeSourceUrl, sourceKey, sourceIconUrl, displayName, sortSources, verifySource,
-  refreshSource, openSourceStore, sourceCalls, SourceError,
+  refreshSource, releaseDepiction, openSourceStore, sourceCalls, SourceError,
 } from "./sources.js";
 import { createHttpBackend, BackendError } from "../backend-http.js";
 import { createParser } from "./parser.js";
@@ -235,4 +235,29 @@ test("refreshSources saves each source's count and reports it", async () => {
   assert.ok(list.find((s) => s.name === "Havoc").error);
   await calls.removeSource(list[0].key);
   assert.equal((await calls.sources()).length, DEFAULT_SOURCES.length - 1);
+});
+
+test("Release Depiction: kept on the source by add and refresh, * becomes the package id, http(s) only", async () => {
+  const flat = "https://repo.example/";
+  const b = fakeBackend({
+    [flat + "Packages"]: PACKAGES,
+    [flat + "Release"]: "Origin: Example\nDepiction: https://repo.example/depiction/*.html?id=*\n",
+  });
+  const added = await verifySource(b, flat);
+  assert.equal(added.depiction, "https://repo.example/depiction/*.html?id=*");
+  assert.equal(releaseDepiction(added, "com.example.a"),
+    "https://repo.example/depiction/com.example.a.html?id=com.example.a");
+
+  const r = await refreshSource(b, added);
+  assert.equal(r.depiction, added.depiction);
+
+  // A Release without the field clears it; no Release at all (flat repo) leaves the stored one alone.
+  const none = fakeBackend({ [flat + "Packages"]: PACKAGES, [flat + "Release"]: "Origin: Example\n" });
+  assert.equal((await refreshSource(none, added)).depiction, null);
+  const noRelease = fakeBackend({ [flat + "Packages"]: PACKAGES });
+  assert.ok(!("depiction" in (await refreshSource(noRelease, added))));
+
+  assert.equal(releaseDepiction({ depiction: "cydia://package/*" }, "x"), null);
+  assert.equal(releaseDepiction({}, "x"), null);
+  assert.equal(releaseDepiction(undefined, "x"), null);
 });

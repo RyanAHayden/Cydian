@@ -10,8 +10,9 @@
 // network, rate_limited). Cydia's behaviour this follows: docs/cydia.md, "Fetching a source" and "Sources tab".
 import { repoLayout, parseRelease, parseControl, matchesArch, DEFAULT_ARCH } from "./apt.js";
 
-// A source: { key, uri, dist, components, name?, origin?, count?, updated?, error? }. `name` is ours (the
-// defaults), `origin` comes from the repo's Release; the row shows the first there is, else the host.
+// A source: { key, uri, dist, components, name?, origin?, depiction?, count?, updated?, error? }. `name` is ours
+// (the defaults), `origin` comes from the repo's Release; the row shows the first there is, else the host.
+// `depiction` is the Release's Depiction: template (see releaseDepiction), null when the Release has none.
 export const DEFAULT_SOURCES = [
   { name: "Telesphoreo", uri: "http://apt.saurik.com/", dist: "ios/1800.00", components: ["main"] },
   { name: "BigBoss", uri: "http://apt.thebigboss.org/repofiles/cydia/", dist: "stable", components: ["main"] },
@@ -151,12 +152,24 @@ export async function verifySource(backend, input, { arch = DEFAULT_ARCH, count 
   }
   if (!found) throw new SourceError("not_repository");
   if (release?.origin) source.origin = release.origin;
+  if (release) source.depiction = release.fields.depiction || null;
   source.count = text == null ? null : await count(text, arch);
   source.updated = Date.now();
   return source;
 }
 
-// Refetches a source and returns the fields to store: { count, origin?, updated, error }. A dist repo whose
+// A package's fallback depiction: the source's Release Depiction: template with every `*` replaced by the
+// package id (Cydia's `Package -depiction`, docs/cydia.md "Package page and depictions"). Only http(s) URLs
+// count; anything else (or no template) is null. The package's own Depiction: always wins over this.
+export function releaseDepiction(source, id) {
+  const tpl = String(source?.depiction ?? "").trim();
+  if (!tpl || !id) return null;
+  const url = tpl.split("*").join(id);
+  return /^https?:\/\//i.test(url) ? url : null;
+}
+
+// Refetches a source and returns the fields to store: { count, origin?, depiction?, updated, error }. `depiction`
+// is only set when a Release was read, so a refresh that can't reach it keeps the stored template. A dist repo whose
 // Release lists Architectures without ours has nothing for us (Telesphoreo is rootful only): count 0, no index
 // fetched. Errors don't throw: they come back as `error` so one bad source doesn't stop the others.
 export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, count = countInline } = {}) {
@@ -170,6 +183,7 @@ export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, coun
       if (!layout.flat) throw e;
     }
     if (release?.origin) out.origin = release.origin;
+    if (release) out.depiction = release.fields.depiction || null;
     if (!layout.flat && release?.architectures.length && !release.architectures.includes(arch)) {
       out.count = 0;
       return out;

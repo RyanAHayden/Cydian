@@ -17,7 +17,7 @@ import { getBackend } from "../backend.js";
 import { catalog, ALL } from "../catalog.js";
 import { NO_SECTION, indexLetter, parseAuthor, simpleSection } from "../core/catalog.js";
 import { description, parseRelations } from "../core/apt.js";
-import { displayName } from "../core/sources.js";
+import { displayName, releaseDepiction } from "../core/sources.js";
 import { renderSileo, mediaUrl } from "./depiction.js";
 
 export const ROW_HEIGHT = 58;
@@ -282,9 +282,11 @@ async function renderPackage(body, route, key, id, ctx) {
   }
   if (people.length) groups.push({ rows: people });
 
-  // Depiction: Sileo JSON drawn natively below; else an HTML depiction in a sheet, and the description.
+  // Depiction: Sileo JSON drawn natively below; else an HTML depiction in a sheet, and the description. A package
+  // with no Depiction: of its own gets the source's Release template (Cydia's fallback; an own non-http one
+  // still counts as having one, so it gets neither).
   const sileo = httpUrl(st.sileodepiction);
-  const html = httpUrl(st.depiction);
+  const html = st.depiction?.trim() ? httpUrl(st.depiction) : releaseDepiction(source, st.package || id);
   const depictionSlot = el("div", "depiction-slot");
   const more = [];
   if (html) more.push({ label: "Depiction", onClick: () => openHtmlDepiction(html, name) });

@@ -257,12 +257,19 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
 // Pressed look while a finger is down, like Cydia's: .is-pressed on the bar button or row under it, off when the
 // finger lifts, leaves, or the touch turns into a scroll (pointercancel). :active alone is unreliable on iOS.
 const PRESSABLE = ".bar-button, a.cell-inner, button.cell-inner, .alert-button, .del-confirm";
-let pressed = null;
-const unpress = () => { if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; } };
+let pressed = null, pressedAt = 0;
+// A quick tap still shows the held look for a moment, as UIKit does: otherwise a button that opens something (Browse's
+// file picker) never visibly goes down.
+const unpress = () => {
+  const el = pressed;
+  if (!el) return;
+  pressed = null;
+  setTimeout(() => { if (pressed !== el) el.classList.remove("is-pressed"); }, Math.max(0, 140 - (performance.now() - pressedAt)));
+};
 document.addEventListener("pointerdown", (e) => {
   unpress();
   const el = e.target.closest?.(PRESSABLE);
-  if (el && !el.disabled) { pressed = el; el.classList.add("is-pressed"); }
+  if (el && !el.disabled) { pressed = el; pressedAt = performance.now(); el.classList.add("is-pressed"); }
 }, { passive: true });
 for (const type of ["pointerup", "pointercancel", "pointerleave"]) document.addEventListener(type, unpress, { passive: true });
 document.addEventListener("pointermove", (e) => {

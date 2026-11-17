@@ -47,6 +47,5 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **D1** (follow-up, low) AGENTS.md and README: R4 decided no IPA (docs/ipa.md). Remove 'ipa/' as the third front door and the 'IPA builds' gate line; point to docs/ipa.md | files: AGENTS.md, README.md
 ### Parked
 - [ ] **F12** (follow-up, later) Widget-only IPA (WidgetKit 'n upgrades' + local notifications), only if F10's Web Push proves unreliable on real phones. Needs an explicit App ID with Push/App Groups and its own ad hoc profile in sidedrop. See docs/ipa.md | files: ipa/**

@@ -1,6 +1,6 @@
 // The Home Screen web app can't hand an https link to the app that claims it (a universal link): iOS gives a web page
 // no way to, and x-safari- (app.js) lands in Safari. For sites whose app has its own URL scheme, open that instead;
-// app.js falls back to Safari when the app doesn't come up. X, YouTube, Discord, GitHub. The native shell needs none of this (LinkOut.open asks iOS
+// app.js falls back to Safari when the app doesn't come up. X, YouTube, GitHub. The native shell needs none of this (LinkOut.open asks iOS
 // for the universal link first).
 // ponytail: only schemes known to take these paths; add a site here when iFizBox links to it.
 
@@ -16,9 +16,7 @@ export function appSchemeFor(href) {
     return null;
   }
   if (host === "youtube.com" || host === "youtu.be") return `youtube://${u.host}${u.pathname}${u.search}`;
-  // Discord: an invite, either domain, as the app's own link (user 2026-11-18: reliable).
-  if (host === "discord.gg" && parts.length === 1) return `discord://discord.com/invite/${parts[0]}`;
-  if ((host === "discord.com" || host === "discordapp.com") && parts.length) return `discord://discord.com${u.pathname}`;
+  // Discord stays https: a re-signed Unbound opens on discord:// but drops the invite (user 2026-11-18).
   if (host === "github.com" && parts.length) return `github://github.com${u.pathname}`; // the GitHub app (user 2026-11-18)
   return null;
 }

@@ -409,7 +409,7 @@ if (standalone) {
   }, true);
 }
 // The app's shell: LinkOut asks iOS for the universal link, which only reaches the app signed by its own team. A
-// re-signed sideload (Unbound for Discord) still claims the scheme, so try that first; else the https link as before.
+// re-signed sideload (Unbound for Discord, though it drops the invite, so Discord stays https) still claims the scheme, so try that first; else the https link as before.
 if (globalThis.ifizboxNative) {
   document.addEventListener("click", (e) => {
     const a = e.target.closest?.("a[href]");

@@ -25,6 +25,7 @@ import { signAndInstall, signingReady, getBring } from "../signing-client.js";
 import { homeFeatured } from "./extras.js";
 import { homeOffer, debUrl, debAlert, APP_LABEL, APP_NAME, REPO_URL, APP_IPA_URL } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
+import { refreshInBackground } from "./sources.js";
 
 const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
 
@@ -105,9 +106,10 @@ export function nav(route, ctx) {
   return {
     title: "Cydian",
     left: { label: "About", onClick: () => showAbout(ctx) },
-    // Reload: a fresh load of the app straight away (the loading screen shows while it comes back), which picks up
-    // newer versions: the server sends every file with no-cache. (The HUD first could freeze the Home Screen app.)
-    right: { label: "Reload", onClick: () => location.reload() },
+    // F82 Reload, as Cydia's: the button turns into the small white spinner in its own spot while the sources and
+    // Home's content reload, then back to Reload. The page keeps its content and swaps the new in place: no Loading
+    // screen, no flash (it used to be location.reload()).
+    right: { label: "Reload", onClick: (e) => reloadHome(e?.currentTarget, ctx) },
   };
 }
 
@@ -121,9 +123,62 @@ async function showAbout(ctx) {
   });
 }
 
+// ---- Reload (F82) -----------------------------------------------------------------------------------------
+
+// The nav button while `work` runs: Cydia's small white spinner in the button's spot (home.css .is-reloading), not
+// tappable; then the button again, whether `work` ended well or not. A tap while it spins does nothing (false).
+export async function withReloadSpinner(button, work) {
+  if (!button || button.classList.contains("is-reloading")) return false;
+  const label = button.getAttribute("aria-label");
+  button.classList.add("is-reloading");
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  button.setAttribute("aria-label", "Reloading");
+  try {
+    await work();
+  } catch {
+    // a source that failed shows on Sources and in the tile; the button still comes back
+  } finally {
+    button.classList.remove("is-reloading");
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+    if (label == null) button.removeAttribute("aria-label");
+    else button.setAttribute("aria-label", label);
+  }
+  return true;
+}
+
+// Resolves once no source is refreshing (screens/sources.js announce: globalThis.cydianRefreshing and the
+// cydian:refreshing event), or after `ms` at most, so a refresh that never says it ended can't keep the spinner.
+export function untilRefreshed(ms = 120000) {
+  return new Promise((resolve) => {
+    if (!(globalThis.cydianRefreshing > 0)) { resolve(); return; }
+    let timer = null;
+    const check = () => {
+      if (globalThis.cydianRefreshing > 0) return;
+      clearTimeout(timer);
+      globalThis.removeEventListener?.("cydian:refreshing", check);
+      resolve();
+    };
+    timer = setTimeout(() => { globalThis.removeEventListener?.("cydian:refreshing", check); resolve(); }, ms);
+    globalThis.addEventListener?.("cydian:refreshing", check);
+  });
+}
+
+// What Reload does, each step injectable for the test: refresh the sources (Settings' Refresh on Launch's way: the
+// Sources tab's spinning badge, no HUD; when a refresh already runs, wait for that one), then redraw Home in place.
+export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ctx), settled = untilRefreshed, redraw = () => state.redraw?.() } = {}) {
+  return withReloadSpinner(button, async () => {
+    await refresh();
+    await settled();
+    await redraw();
+  });
+}
+
 // ---- state shared by the root page and the pages that change it ------------------------------------------
 
-const state = { tile: null, seq: 0 };
+// redraw: set by the root page, Reload's in-place update of its content (renderRoot).
+const state = { tile: null, seq: 0, redraw: null };
 
 export function init() {
   // Sources tells when a refresh starts and each time one ends (screens/sources.js markLoading): repaint the tile.
@@ -321,11 +376,12 @@ function renderRoot(body) {
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));
   state.tile = stateRow.querySelector("a");
   paintTile(stateTile());
+  const featured = { box: homeFeatured() }; // F20: sources' sileo-featured.json banners, a couple from each
 
   home.append(
     head,
     hintBox,
-    homeFeatured(), // F20: sources' sileo-featured.json banners, a couple from each
+    featured.box,
     tileRow("pair",
       tile({ label: "GitHub", href: REPO_URL, glyph: "github", external: true }),
       // Cydia's pair was Facebook | Twitter: here GitHub | Discord (the community)
@@ -353,6 +409,19 @@ function renderRoot(body) {
   home.append(foot);
   globalThis.cydianNative?.call?.("app.info", {}).then((i) => { foot.textContent = footLine(i ?? {}); }, () => {});
   refreshState();
+  // F82: Reload's redraw. Everything stays on screen; each part is updated where it is: the green tile and the
+  // Install Cydian App offer at once, the featured banners swapped for the new ones only once those are drawn.
+  state.redraw = async () => {
+    if (!home.isConnected) return;
+    drawHint();
+    drawThemes();
+    drawApp();
+    await refreshState();
+    const box = homeFeatured();
+    await box.ready; // extras.js homeFeatured: its banners are drawn (or there are none)
+    if (featured.box.isConnected) featured.box.replaceWith(box);
+    featured.box = box;
+  };
 }
 
 // The Home footer: "iPhone17,3, iOS 26.1, Cydian 0.1.1 (en-us)"; on the website "iPhone, iOS 26.1, Cydian Web (en-us)".

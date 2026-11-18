@@ -88,8 +88,9 @@ export function featuredStrip(source) {
 
 export function homeFeatured() {
   const box = el("div", "featured-box home-featured");
+  box.ready = Promise.resolve(); // F82: settles once the banners are drawn (or there are none), for Home's Reload
   if (settings.deviceType() === "none") return box; // Not Jailbroken: APT sources (and their tweaks) are hidden
-  getBackend().sources().then((list) => featuredStore().forHome(list)).then((banners) => {
+  box.ready = getBackend().sources().then((list) => featuredStore().forHome(list)).then((banners) => {
     if (banners.length) box.append(bannerRow(banners));
   }, () => {});
   return box;

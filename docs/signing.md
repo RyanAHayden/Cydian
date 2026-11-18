@@ -57,7 +57,7 @@ WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for i
   (`web/transfer.link`, which `app.js` imports once on first launch). Both files go in before zsign seals the
   bundle. Without a certificate it opens Settings > Signing. Jailbroken visitors get the release's `.deb`.
 - **Send Settings** (Open in iFizBox App): sources, travelling settings, Ignored Upgrades and the certificate.
-- The app's own Essential Upgrade, when it can't sign iFizBox itself (no bridge), opens cydian.dev in Safari for Home's
+- iFizBox's own upgrade row in Changes, when the app can't sign iFizBox itself (no bridge), opens cydian.dev in Safari for Home's
   Install iFizBox App (`core/essential.js installSelf`).
 
 What leaves the browser: the IPA's address (to `/api/fetch`) and the signed app (to `/sign/upload`, for 10 minutes).

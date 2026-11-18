@@ -1,12 +1,11 @@
-// F72: iFizBox's built-in source (always there, first, not removable, not exported), the essential detection, the
-// minimum version, the alert and each of its buttons, and iFizBox's own sideload install path.
+// F72: iFizBox's built-in source (always there, first, not removable, not exported), the minimum version, iFizBox's
+// own Changes row and its sideload install path. F183: the Essential Upgrade alert is gone.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   builtinSources, withBuiltins, withBuiltinRecords, builtinFirst, exportable, isBuiltin, BuiltinError,
-  minimumOf, belowMinimum, selfFromAltSource, essentialIds, essentialUpgrades, selfUpgradeRow, withSelfUpgrade,
-  essentialAlert, runEssential, queueEssential, installSelf, loadInfo, saveInfo,
-  SELF_ID, SELF_APT_URI, SELF_ALT_URL, SELF_SITE, TITLE, MESSAGE, COMPLETE, ESSENTIAL_ONLY, IGNORE,
+  minimumOf, selfFromAltSource, selfUpgradeRow, withSelfUpgrade, selfInfoWith, lookForSelfUpdate, installSelf, loadInfo, saveInfo,
+  SELF_ID, SELF_APT_URI, SELF_ALT_URL, SELF_SITE,
 } from "./essential.js";
 import { altKey } from "./altstore.js";
 import { sourceKey, refreshSource } from "./sources.js";
@@ -130,15 +129,6 @@ test("minimumOf: AltStore minimumVersion, a Release's X-Cydian-Minimum-Version, 
   assert.equal(minimumOf(null), null);
 });
 
-test("belowMinimum: the version compare", () => {
-  assert.equal(belowMinimum("0.1.2", "0.1.3"), true);
-  assert.equal(belowMinimum("0.1.3", "0.1.3"), false);
-  assert.equal(belowMinimum("0.2.0", "0.1.3"), false);
-  assert.equal(belowMinimum("0.1.10", "0.1.9"), false); // numbers, not strings
-  assert.equal(belowMinimum("0.1.1", null), false);
-  assert.equal(belowMinimum("", "0.1.3"), false); // unknown (the site): never forced
-});
-
 test("refreshSource keeps the Release's minimum on the record (iFizBox's own repo)", async () => {
   const release = "Origin: iFizBox\nLabel: iFizBox\nArchitectures: iphoneos-arm64\nX-Cydian-Minimum-Version: 0.1.3\n";
   const backend = {
@@ -193,144 +183,6 @@ test("saveInfo / loadInfo keep what the last launch read", () => {
   assert.deepEqual(loadInfo(st), { version: "0.1.3" });
 });
 
-// ---- essential detection -------------------------------------------------------------------------------------
-
-test("essentialIds / essentialUpgrades: iFizBox, apt, dpkg and installed Essential: yes packages; nothing else", () => {
-  const ids = essentialIds([{ id: "base", essential: true }, { id: "tweak", essential: false }]);
-  for (const id of [SELF_ID, "apt", "dpkg", "base"]) assert.ok(ids.has(id), id);
-  assert.ok(!ids.has("tweak"));
-  const available = [{ id: "tweak", version: "2" }, { id: "dpkg", version: "1.22" }, { id: SELF_ID, version: "0.1.3" }];
-  assert.deepEqual(essentialUpgrades(available, ids).map((r) => r.id), ["dpkg", SELF_ID]);
-  assert.deepEqual(essentialUpgrades([{ id: "tweak" }], ids), []);
-});
-
-// ---- the alert and its buttons -------------------------------------------------------------------------------
-
-test("essentialAlert: Cydia's buttons; below the minimum there is no Ignore", () => {
-  const a = essentialAlert();
-  assert.equal(a.title, TITLE);
-  assert.equal(a.title, "Essential Upgrade");
-  assert.equal(a.message, MESSAGE);
-  assert.equal(a.message, "iFizBox needs to upgrade itself before it can do anything else.");
-  assert.deepEqual(a.buttons, ["Complete Upgrade", "Essential Only", "Ignore (Temporary)"]);
-  assert.equal(a.buttons[a.cancel], IGNORE);
-  const f = essentialAlert({ forced: true, minimum: "0.1.3" });
-  assert.deepEqual(f.buttons, [COMPLETE, ESSENTIAL_ONLY]);
-  assert.ok(!f.buttons.includes(IGNORE));
-  assert.equal(f.buttons[f.cancel], undefined); // Escape taps nothing
-  assert.match(f.message, /0\.1\.3/);
-});
-
-function runDeps(info, answers) {
-  const log = [];
-  const queue = [...answers];
-  return {
-    log,
-    deps: {
-      gather: async () => info,
-      alert: async (spec) => { log.push(["alert", spec.buttons]); return { index: queue.shift() ?? 2 }; },
-      complete: async (all) => log.push(["complete", all.map((r) => r.id)]),
-      essentialOnly: async (rows) => log.push(["essential", rows.map((r) => r.id)]),
-      lock: () => log.push(["lock"]),
-    },
-  };
-}
-
-const INFO = { current: "0.1.1", minimum: null,
-  essential: [{ id: SELF_ID, version: "0.1.3" }], all: [{ id: SELF_ID, version: "0.1.3" }, { id: "tweak", version: "2" }] };
-
-test("runEssential: nothing to read, or nothing essential: no alert", async () => {
-  let r = runDeps(null, []);
-  assert.equal(await runEssential(r.deps), "unknown");
-  r = runDeps({ ...INFO, essential: [] }, []);
-  assert.equal(await runEssential(r.deps), "none");
-  assert.deepEqual(r.log, []);
-  r = runDeps(INFO, []);
-  r.deps.gather = async () => { throw new Error("offline"); };
-  assert.equal(await runEssential(r.deps), "unknown");
-});
-
-test("runEssential: Complete Upgrade takes every upgrade in Changes", async () => {
-  const r = runDeps(INFO, [0]);
-  assert.equal(await runEssential(r.deps), "complete");
-  assert.deepEqual(r.log, [["alert", [COMPLETE, ESSENTIAL_ONLY, IGNORE]], ["complete", [SELF_ID, "tweak"]]]);
-});
-
-test("runEssential: Essential Only takes just the essential ones", async () => {
-  const r = runDeps(INFO, [1]);
-  assert.equal(await runEssential(r.deps), "essential");
-  assert.deepEqual(r.log.at(-1), ["essential", [SELF_ID]]);
-});
-
-test("runEssential: Ignore (Temporary) does nothing and keeps nothing (the next launch asks again)", async () => {
-  const r = runDeps(INFO, [2]);
-  assert.equal(await runEssential(r.deps), "ignored");
-  assert.deepEqual(r.log, [["alert", [COMPLETE, ESSENTIAL_ONLY, IGNORE]]]);
-  const again = runDeps(INFO, [2]);
-  assert.equal(await runEssential(again.deps), "ignored"); // asks again
-});
-
-test("runEssential: below the minimum the UI is locked, the alert has no Ignore, and a dismissal asks again", async () => {
-  const r = runDeps({ ...INFO, minimum: "0.1.2" }, [-1, 1]);
-  assert.equal(await runEssential(r.deps), "essential");
-  assert.deepEqual(r.log, [["lock"], ["alert", [COMPLETE, ESSENTIAL_ONLY]], ["alert", [COMPLETE, ESSENTIAL_ONLY]], ["essential", [SELF_ID]]]);
-  // At the minimum: Ignore is back.
-  const ok = runDeps({ ...INFO, current: "0.1.2", minimum: "0.1.2" }, [2]);
-  assert.equal(await runEssential(ok.deps), "ignored");
-});
-
-// ---- F86: both buttons queue and open Confirm ---------------------------------------------------------------
-
-// The alert's buttons as essential-ui.js binds them: queueEssential over a fake queue whose first add opens a fake
-// Confirm sheet; `endings` are how each Confirm goes away ("confirm" | "cancel" | "closed").
-function queueDeps(info, answers, endings) {
-  const r = runDeps(info, answers);
-  const queued = [], opened = [];
-  const ends = [...endings];
-  const button = (name) => (rows) => queueEssential(rows, {
-    queue: async (list) => { queued.push([name, list.map((x) => x.id)]); opened.push(name); r.log.push(["confirm", name]); return list.length; },
-    confirmed: async () => { const how = ends.shift() ?? "confirm"; r.log.push([how]); return how; },
-    fallback: async () => { r.log.push(["fallback"]); return "failed"; },
-  });
-  r.deps.complete = button("complete");
-  r.deps.essentialOnly = button("essential");
-  return { ...r, queued, opened };
-}
-
-test("F86: Complete Upgrade queues every upgrade and opens Confirm", async () => {
-  const r = queueDeps(INFO, [0], ["confirm"]);
-  assert.equal(await runEssential(r.deps), "complete");
-  assert.deepEqual(r.queued, [["complete", [SELF_ID, "tweak"]]]);
-  assert.deepEqual(r.log, [["alert", [COMPLETE, ESSENTIAL_ONLY, IGNORE]], ["confirm", "complete"], ["confirm"]]);
-});
-
-test("F86: Essential Only queues just the essential ones and opens Confirm", async () => {
-  const r = queueDeps(INFO, [1], ["confirm"]);
-  assert.equal(await runEssential(r.deps), "essential");
-  assert.deepEqual(r.queued, [["essential", [SELF_ID]]]);
-  assert.deepEqual(r.opened, ["essential"]);
-});
-
-test("F86: Confirm's Cancel: forced, the alert comes back; not forced, it's over", async () => {
-  const forced = queueDeps({ ...INFO, minimum: "0.1.2" }, [0, 1], ["cancel", "confirm"]);
-  assert.equal(await runEssential(forced.deps), "essential");
-  assert.deepEqual(forced.log, [["lock"], ["alert", [COMPLETE, ESSENTIAL_ONLY]], ["confirm", "complete"], ["cancel"],
-    ["alert", [COMPLETE, ESSENTIAL_ONLY]], ["confirm", "essential"], ["confirm"]]);
-  const free = queueDeps(INFO, [1], ["cancel"]);
-  assert.equal(await runEssential(free.deps), "cancelled");
-  assert.equal(free.log.filter((e) => e[0] === "alert").length, 1);
-});
-
-test("F86: Continue Queuing keeps the queue and doesn't ask again; nothing queuable falls back", async () => {
-  const r = queueDeps({ ...INFO, minimum: "0.1.2" }, [1], ["closed"]);
-  assert.equal(await runEssential(r.deps), "essential");
-  assert.equal(r.log.filter((e) => e[0] === "alert").length, 1);
-  const none = await queueEssential([{ id: SELF_ID }], { queue: async () => 0, confirmed: async () => assert.fail("no Confirm"),
-    fallback: async () => "no-asset" });
-  assert.equal(none, "no-asset");
-  assert.equal(await queueEssential([], { queue: async () => { throw new Error("x"); }, confirmed: async () => "confirm" }), "failed");
-});
-
 // ---- iFizBox's own IPA in the sideload app ---------------------------------------------------------------------
 
 function selfDeps({ answers = [] } = {}) {
@@ -370,30 +222,61 @@ test("the committed web/app/source.json reads as iFizBox's own source", async ()
   assert.match(info.ipa, /^https:\/\/github\.com\/RyanAHayden\/iFizBox\/releases\/download\/v[\d.]+\/(?:Cydian|iFizBox)\.ipa$/);
 });
 
-test("F61's sideload install takes installSelf when given (never the local server for iFizBox itself)", async () => {
-  const { runInstall } = await import("./selfupdate.js");
-  const log = [];
-  const deps = {
-    status: async () => { log.push("status"); return { identity: null }; },
-    installOnDevice: async () => { log.push("local"); return true; },
-    installSelf: async (row) => { log.push(["self", row.version, row.ipa]); return "site"; },
-    alert: async () => ({ index: 0 }), go: () => {},
-  };
-  assert.equal(await runInstall({ version: "0.1.3", ipa: ROW.ipa }, "sideload", deps), "installed");
-  assert.deepEqual(log, [["self", "0.1.3", ROW.ipa]]);
-  deps.installSelf = async () => "cancelled";
-  assert.equal(await runInstall({ version: "0.1.3", ipa: ROW.ipa }, "sideload", deps), "failed");
+test("F183: no Essential Upgrade alert is left to show", async () => {
+  const mod = await import("./essential.js");
+  for (const name of ["runEssential", "essentialAlert", "queueEssential", "belowMinimum", "TITLE", "MESSAGE"]) assert.equal(mod[name], undefined, name);
 });
 
-test("a iFizBox update above the minimum: a banner (notify) instead of the alert; below it, the alert still blocks", async () => {
-  const { runEssential } = await import("./essential.js");
-  const row = { id: "com.ryha.cydian", version: "0.4.0" };
-  let notified = null, alerts = 0, queued = null;
-  const deps = (minimum) => ({ gather: async () => ({ current: "0.3.5", minimum, essential: [row], all: [row] }),
-    alert: async () => { alerts++; return { index: 1 }; }, complete: async () => {}, essentialOnly: async (r) => { queued = r; },
-    notify: (rows, upgrade) => { notified = rows; upgrade(); } });
-  assert.equal(await runEssential(deps("0.3.0")), "notified");
-  assert.deepEqual([notified, queued, alerts], [[row], [row], 0]); // Upgrade on the banner queues it
-  assert.equal(await runEssential(deps("0.4.0")), "essential");
-  assert.equal(alerts, 1);
+// F183: Home's Reload (and every launch) with a newer release on GitHub: no alert of any kind, and iFizBox's row on
+// top of Changes, built as essential-ui.js upgradesWithSelf builds it.
+test("F183: a reload with a newer release calls no alert and adds the iFizBox row to Changes", async () => {
+  const { checkForUpdates, parseRelease, newerRelease } = await import("./selfupdate.js");
+  const storage = memStorage();
+  const alert = () => assert.fail("an update popup");
+  const gh = parseRelease({ tag_name: "v0.5.0", body: "- Silent updates", assets: [
+    { name: "Cydian.ipa", browser_download_url: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.5.0/Cydian.ipa" }] });
+  let changed = 0;
+  const r = await lookForSelfUpdate({
+    mode: "sideload",
+    readSource: async () => { saveInfo(storage, { version: "0.4.0", ipa: "https://x/0.4.0.ipa", notes: [] }); },
+    checkRelease: () => checkForUpdates({ mode: "sideload", storage, current: async () => "0.3.0", release: async () => gh, alert }),
+    changed: () => { changed++; },
+    alert,
+  });
+  assert.equal(r, "checked");
+  assert.equal(changed, 1);
+  const info = selfInfoWith(loadInfo(storage), newerRelease(storage, "0.3.0"));
+  const u = withSelfUpgrade({ available: [{ id: "tweak", version: "2" }], ignored: [] }, selfUpgradeRow(info, "0.3.0"));
+  assert.deepEqual(u.available.map((x) => [x.id, x.version]), [[SELF_ID, "0.5.0"], ["tweak", "2"]]);
+  assert.equal(u.available[0].ipa, gh.ipa);
+  assert.equal(u.available[0].short, "Silent updates");
+});
+
+test("F183: selfInfoWith takes the newer of the source and GitHub (GitHub only with an IPA)", () => {
+  const src = { version: "0.4.0", ipa: "s.ipa", notes: ["src"] };
+  assert.equal(selfInfoWith(src, null), src);
+  assert.equal(selfInfoWith(src, { version: "0.3.9", ipa: "g.ipa" }), src);
+  assert.equal(selfInfoWith(src, { version: "0.4.1", ipa: null }), src);
+  assert.equal(selfInfoWith(src, { version: "0.4.1", ipa: "g.ipa" }).ipa, "g.ipa");
+  assert.equal(selfInfoWith(null, { version: "0.4.1", ipa: "g.ipa" }).version, "0.4.1");
+  assert.equal(selfInfoWith(null, null), null);
+});
+
+test("F183: lookForSelfUpdate is silent on failures, reads no source in the jailbreak build, nothing on the site", async () => {
+  const log = [];
+  const deps = (mode) => ({ mode, readSource: async () => { log.push([mode, "source"]); throw new Error("offline"); },
+    checkRelease: async () => { log.push([mode, "github"]); throw new Error("rate limit"); }, changed: () => log.push([mode, "changed"]) });
+  assert.equal(await lookForSelfUpdate(deps("sideload")), "checked");
+  assert.equal(await lookForSelfUpdate(deps("jailbreak")), "checked");
+  assert.equal(await lookForSelfUpdate(deps("site")), "site");
+  assert.deepEqual(log, [["sideload", "source"], ["sideload", "github"], ["sideload", "changed"], ["jailbreak", "github"], ["jailbreak", "changed"]]);
+});
+
+test("F183: app.js's launch, Reload and return check runs lookForUpdates and nothing that pops up", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
+  const ui = await readFile(new URL("../essential-ui.js", import.meta.url), "utf8");
+  assert.match(app, /addEventListener\("cydian:reloaded", lookForSelf\)/);
+  for (const gone of ["startEssential", "checkUpdates", "showBanner", "Updated to"]) assert.equal(app.includes(gone), false, gone);
+  for (const gone of ["showBanner", "runEssential", "lock("]) assert.equal(ui.includes(gone), false, gone);
 });

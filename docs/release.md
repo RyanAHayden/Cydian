@@ -48,17 +48,16 @@ Like Cydia's apt.saurik.com, iFizBox has a source of its own that is built in an
   and the versions already listed kept below it (at most 20). Commit it after the release.
 
 `--minimum X.Y.Z` sets iFizBox's own field in both: `X-Cydian-Minimum-Version` in the Release (and in iFizBox's
-Packages stanza), `"minimumVersion"` on the app in the AltStore JSON. apt and other AltStore clients ignore it. A
-running iFizBox older than that gets the Essential Upgrade alert without Ignore (Temporary), and nothing else in the
-app works until it upgrades. Without `--minimum` the field is left out and the alert can always be ignored. The
-script refuses a minimum newer than the release itself.
+Packages stanza), `"minimumVersion"` on the app in the AltStore JSON. apt and other AltStore clients ignore it, and
+since F183 so does iFizBox: the field is still read (`core/essential.js minimumOf`) but nothing blocks or pops up on
+it. Without `--minimum` the field is left out. The script refuses a minimum newer than the release itself.
 
-The Essential Upgrade alert (Cydia's) runs on every launch in the app: when iFizBox (or, jailbroken, apt, dpkg or an
-installed `Essential: yes` package) has an upgrade on the built-in source, it shows Complete Upgrade, Essential Only and
-Ignore (Temporary). It replaces F61's GitHub popup. F61's check still runs when the built-in source can't be read,
-and Settings > About > Check for Updates still works. In the sideload app iFizBox's own IPA never goes through the
-local install server, because iOS closes iFizBox, and the server with it, when it starts installing. Instead it is
-signed on the phone and held on the Signing Server (worker/, `POST /sign/host`) for iOS to install from, or, with no
+F183: the app checks for a new iFizBox on every launch, Home's Reload and return, silently: the sideload app reads
+its own AltStore source and GitHub's latest release, the jailbreak app reads GitHub's release (its row comes from apt
+and the built-in repo). A newer iFizBox is only an upgrade row on top of Changes, counted in its badge, installed from
+there; there is no popup, no Essential Upgrade alert and no Settings > About. In the sideload app iFizBox's own IPA
+never goes through the local install server, because iOS closes iFizBox, and the server with it, when it starts
+installing. Instead it is signed on the phone and held on the Signing Server (worker/, `POST /sign/host`) for iOS to install from, or, with no
 bridge to sign with, the user is sent to cydian.dev's Install iFizBox App (AltStore, SideStore, Feather or the IPA: F89).
 
 ## Cutting one

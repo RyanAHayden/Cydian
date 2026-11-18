@@ -1,25 +1,26 @@
 // Settings (F13; at the bottom of Home since F123), laid out like iOS 6's Settings app (F128, docs/settings.md):
-// the root is one list of short rows (iFizBox Account; General, Display, Updates; Signing; Console Logs; About), each
+// the root is one list of short rows (iFizBox Account; General, Display, Updates; Signing; Console Logs), each
 // opening its own page. The settings' rows come from core/settings.js (which ones this mode shows, defaults,
 // storage, which page they're on); this file only draws them:
 //   choice  one row per option, the chosen one checked (Display > Appearance: Automatic / Light / Dark)
 //   toggle  the iOS 6 switch (ios6.css .switch)
 //   list    the current value as detail; pushes <page>/<key>, a page of checked options
 //   holds   the ignored packages' count; pushes <page>/holds
-// Routes below Settings: <page> (general, display, updates), <page>/<key>, signing[/<key>], account, about,
-// logs[/<id>], and the older <key> and holds, which links from elsewhere use.
+// Routes below Settings: <page> (general, display, updates), <page>/<key>, signing[/<key>], account,
+// logs[/<id>], and the older <key> and holds, which links from elsewhere use. F183: the root ends with Home's
+// version line (version-foot.js); there is no About page and no manual update check (every launch and Reload checks).
 // It also owns the theme: init() puts the Appearance setting on <html data-theme> and the theme-color metas, and
 // follows the system while Appearance is Automatic. theme-boot.js does the same before first paint.
 import { grouped } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { createSettings, detectMode, themeFor, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
 import { showAlert } from "../nav/alert.js";
-import { showHUD, liveHUD } from "../nav/hud.js";
+import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind } from "../core/signing.js";
 import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, serverStatus,
-  localSigning, deviceStatus, importToDevice, removeFromDevice, installOnDevice, statusReady, defaultServer,
+  localSigning, deviceStatus, importToDevice, removeFromDevice, statusReady, defaultServer,
   browserSigning, getBring, setBring, signAndInstall } from "../signing-client.js";
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { drawWalkthrough, walkOpen, offerInstall, missingStep, siteReady } from "./signing.js";
@@ -28,8 +29,7 @@ import { accountSection, drawAccount, startAccountSync } from "./account.js";
 import { signingExtras } from "./signed-apps.js";
 import { syncReminder } from "../core/signing.js";
 import { websiteSection } from "./website-settings.js";
-import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installPath, isNewer, compareVersions } from "../core/selfupdate.js";
-import { getArch } from "../backend.js";
+import { versionLines } from "./version-foot.js";
 import { ipaSection } from "./ipa-install.js";
 import { otherLinksOn, setOtherLinks } from "../core/otherlinks.js";
 import { NAME, GITHUB_REPO } from "../brand.js";
@@ -57,7 +57,7 @@ const THEME_COLORS = { light: "#4f698b", dark: "#5f656f" }; // dark: the gunmeta
 const defOf = (key) => SETTINGS.find((d) => d.key === key);
 const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? String(v);
 
-const TITLES = { holds: "Ignored Upgrades", signing: "Signing", account: `${NAME} Account`, about: "About" };
+const TITLES = { holds: "Ignored Upgrades", signing: "Signing", account: `${NAME} Account` };
 export function nav(route) {
   const [first, second] = route.path;
   if (first === LOGS) return { title: logsTitle(second) }; // N4: Console Logs
@@ -96,7 +96,6 @@ function draw({ el, route }) {
   const top = el.scrollTop;
   if (first === LOGS) el.replaceChildren(logsPage(second, () => draw({ el, route })));
   else if (first === "account") drawAccount(el); // F97
-  else if (first === "about") el.replaceChildren(aboutPage());
   else if ((second ?? first) === "holds") el.replaceChildren(holdsPage());
   else if (first === "signing" && second === HELP) drawSigningHelp(el); // F134
   else if (second) el.replaceChildren(listPage(second));
@@ -107,13 +106,13 @@ function draw({ el, route }) {
   el.scrollTop = top;
 }
 
-// The root, like iOS 6's: short rows, each opening a page; no footers.
+// The root, like iOS 6's: short rows, each opening a page; no footers. F183: Home's version line at the bottom.
 function rootPage() {
   const frag = document.createDocumentFragment();
   const pageRows = settings.pages().filter((p) => p.id !== "signing")
     .map((p) => ({ label: p.title, href: format(settingsRoute([p.id])) }));
   frag.append(accountSection(), grouped([{ rows: pageRows }]), signingSection(), openInAppSection(), ipaSection(),
-    logsSection(detectMode()), aboutRow());
+    logsSection(detectMode()), ...versionLines());
   return frag;
 }
 
@@ -825,38 +824,8 @@ function showSigningPage(el, layout, parts) {
   el.scrollTop = top;
 }
 
-// ---- About and updates (F61) ---------------------------------------------------------------------------------
-// The app only (sideload and jailbreak builds): Settings > About shows the app's version, Check for Updates and,
-// once a newer release is known, Skip This Version. core/selfupdate.js does the work; this binds it to the bridge,
-// the signer, the alerts and the HUD. app.js runs the automatic check at launch (checkUpdates()).
-
-const appVersion = () => globalThis.cydianNative?.call
-  ? globalThis.cydianNative.call("app.info", {}).then((i) => String(i?.version ?? ""))
-  : Promise.resolve("");
-
-let checking = null;
-// The automatic launch check, or Check for Updates (manual, with a Checking HUD until the first alert). One at a time.
-export function checkUpdates({ manual = false, always = false } = {}) {
-  if (checking) return checking;
-  const mode = detectMode();
-  if (!installPath(mode)) return Promise.resolve("site");
-  const native = globalThis.cydianNative;
-  const go = (path) => { location.hash = format(settingsRoute(path)).replace(/^#/, ""); };
-  const hide = manual ? showHUD("Checking") : () => {};
-  const alert = (spec) => { hide(); return showAlert(spec); };
-  checking = checkForUpdates({
-    mode, storage: globalThis.localStorage,
-    current: appVersion,
-    release: () => fetchRelease({ native }),
-    alert,
-    install: (release) => runInstall(release, mode, {
-      status: () => deviceStatus(), installOnDevice: (o) => installOnDevice(o), alert, go,
-      installSelf: (row) => import("../essential-ui.js").then((m) => m.installSelfNow(row)), // F72
-      native, arch: getArch(), hud: liveHUD,
-    }),
-  }, { manual, always }).catch(() => "error").finally(() => { hide(); checking = null; redrawAll(); });
-  return checking;
-}
+// ---- Update Alerts (I3) ---------------------------------------------------------------------------------------
+// iFizBox's own update check has no page (F183): essential-ui.js lookForUpdates runs on every launch and Reload.
 
 // The sideload app: what iOS lets iFizBox do for update alerts (badges, notifications, Background App Refresh) and
 // when the background check last ran. A "no" given once can only be changed in iOS Settings: the row opens it.
@@ -912,37 +881,6 @@ function notifySection() {
     });
     box.replaceChildren(frag);
   }, () => {});
-  return box;
-}
-
-// The root's About row (the app builds), and its page: the version, Check for Updates, Skip This Version.
-function aboutRow() {
-  if (!installPath(detectMode())) return document.createDocumentFragment();
-  return grouped([{ rows: [{ label: "About", href: format(settingsRoute(["about"])) }] }]);
-}
-function aboutPage() {
-  const box = document.createElement("div");
-  if (!installPath(detectMode())) {
-    box.append(grouped([{ footer: `This page is in the ${NAME} app.` }]));
-    return box;
-  }
-  const fill = (version) => {
-    const st = loadState(globalThis.localStorage);
-    const latest = st.latest?.version;
-    const rows = [{ label: "Version", detail: version || "Unknown" },
-      { label: "Check for Updates", onClick: () => checkUpdates({ manual: true }) }];
-    let footer = latest && version && !isNewer(latest, version) ? `${NAME} is up to date.` : `${NAME} looks for a new version on GitHub once a day.`;
-    if (latest && isNewer(latest, version)) {
-      const skipped = st.skip && compareVersions(st.skip, latest) === 0;
-      rows.push({ label: "Skip This Version", subtitle: `${NAME} ${latest}`, checked: skipped,
-        onClick: () => { setSkip(globalThis.localStorage, skipped ? null : latest); redrawAll(); } });
-      footer = skipped ? `${NAME} won't ask about ${latest} again. Check for Updates still offers it.`
-        : `${NAME} ${latest} is available. Check for Updates installs it.`;
-    }
-    box.replaceChildren(grouped([{ rows, footer }]));
-  };
-  fill(loadState(globalThis.localStorage).current ?? "");
-  appVersion().then(fill, () => {});
   return box;
 }
 

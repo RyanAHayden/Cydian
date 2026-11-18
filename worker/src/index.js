@@ -101,7 +101,10 @@ export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promis
   const cf = releaseFile(url) ? { cacheEverything: true, cacheTtl: 86400 } : { cacheTtl: 0 };
   let r;
   for (let attempt = 0; attempt < 3; attempt++) {
-    r = await fetcher(url, { headers: CYDIA, redirect: "follow", cf, signal: AbortSignal.timeout(30000) });
+    // 30 s for the answer to start, not for the whole body: a 40 MB IPA streams for longer than that ("Load failed")
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 30000);
+    try { r = await fetcher(url, { headers: CYDIA, redirect: "follow", cf, signal: ctl.signal }); } finally { clearTimeout(timer); }
     if (r.status !== 429 && r.status < 500) return r;
     const after = Number(r.headers.get("retry-after"));
     await wait(Number.isFinite(after) && after > 0 && after <= 5 ? after * 1000 : 600 * (attempt + 1));
@@ -128,7 +131,7 @@ async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null) {
       }
       return fetchErr("not_found", "This repo has no Packages.gz or Packages file.", 404);
     }
-    if (kind === "ipa") return ipaFetch(target, maxBytes);
+    if (kind === "ipa") return ipaFetch(target, maxBytes, token);
     if (kind) return fetchErr("bad_url", `unknown kind ${kind}`, 400);
     const r = await upstream(target.href, { token });
     if (!r.ok) return fetchErr("upstream", `upstream answered HTTP ${r.status}`, r.status >= 400 && r.status < 600 ? r.status : 502);
@@ -148,12 +151,10 @@ const tooBig = (max) => `Apps up to ${Math.round(max / 1024 / 1024)} MB can be s
 
 // The IPA, streamed through (no buffering: a Worker has 128 MB): headers within 30 s, then as long as the body takes,
 // cut at maxBytes.
-async function ipaFetch(target, maxBytes) {
+async function ipaFetch(target, maxBytes, token = null) {
   if (!maxBytes) return fetchErr("refused", "This server doesn't sign on the website.", 403);
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 30000);
-  let r;
-  try { r = await fetch(target.href, { headers: { "User-Agent": "Cydian" }, redirect: "follow", signal: ctl.signal }); } finally { clearTimeout(timer); }
+  // The same download as everything else: retries, a day's edge cache for GitHub release files, the token on a 429.
+  const r = await upstream(target.href, { token });
   if (!r.ok) return fetchErr("upstream", `upstream answered HTTP ${r.status}`, r.status >= 400 && r.status < 600 ? r.status : 502);
   const len = Number(r.headers.get("content-length") || 0);
   if (len > maxBytes) { r.body?.cancel(); return fetchErr("too_large", tooBig(maxBytes), 413); }

@@ -23,7 +23,7 @@ import { openInAppSection } from "./importlink.js";
 import { accountSection, drawAccount, startAccountSync } from "./account.js";
 import { signingExtras } from "./signed-apps.js";
 import { syncReminder } from "../core/signing.js";
-import { websiteInstallsOn, setWebsiteInstalls, acceptWebsiteInstalls } from "../websign-gate.js";
+import { websiteInstallsOn, setWebsiteInstalls, acceptWebsiteInstalls, firstVisitState, setFirstVisit } from "../websign-gate.js";
 import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installPath, isNewer, compareVersions } from "../core/selfupdate.js";
 import { getArch } from "../backend.js";
 import { ipaSection } from "./ipa-install.js";
@@ -801,6 +801,15 @@ export function websiteInstallsSection({ on = websiteInstallsOn, set = setWebsit
   } });
   cell?.append(sw);
   cell?.classList.add("has-switch");
+  // Home's lock (rows below the Cydian App card until Cydian is installed): on again after an Ignore.
+  const lockFrag = grouped([{ rows: [{ label: "Lock Home Until Cydian Is Installed" }],
+    footer: "Home's rows below Install Cydian App stay locked, and ask to install Cydian first, until you tap Ignore." }]);
+  const lockCell = lockFrag.querySelector(".cell-inner");
+  const lockSw = createSwitch({ label: "Lock Home Until Cydian Is Installed", checked: firstVisitState() === "ask",
+    onToggle: (want) => setFirstVisit(want ? "ask" : "later") });
+  lockCell?.append(lockSw);
+  lockCell?.classList.add("has-switch");
+  frag.append(lockFrag);
   return frag;
 }
 

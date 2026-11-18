@@ -397,3 +397,8 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
 .dep-review-body { padding: 0; }
 .dep-web { padding: 6px 12px; line-height: 0; }
 .dep-web iframe { display: inline-block; max-width: 100%; height: auto; border: 0; background: #fff; }
+
+/* F125: Installed's Wish List page (screens/installed.js): package rows with sources.css's Edit and swipe Delete
+   (.source-row's red minus and Delete); the chevron and the version make room as they do on a source row. */
+.wish-row > .cell-inner::after, .wish-row .pkg-version { transition: opacity .2s ease; }
+.editing .wish-row > .cell-inner::after, .wish-row.armed > .cell-inner::after, .wish-row.armed .pkg-version { opacity: 0; }

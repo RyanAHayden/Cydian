@@ -153,3 +153,40 @@ test("F104: Hide Packages by <author> on the author page, Hidden in Manage", asy
     [["Sections", ["section:Themes"]], ["Authors", ["author:Jane"]]]);
   assert.deepEqual(hiddenGroups([], []), []);
 });
+
+// ---- F125: the Wish List in Installed ----------------------------------------------------------------------------
+import { WISH, wishListRow } from "./installed.js";
+import { wishCount, createWishlist } from "../core/wishlist.js";
+
+test("F125: #installed/wishlist is the Wish List page in every mode; its package pages are browse.js's", () => {
+  for (const mode of ["site", "sideload", "jailbreak"]) {
+    assert.equal(pageKind(r(WISH), mode), "wishlist");
+    assert.equal(pageKind(r(WISH, "package:x"), mode), "browse");
+  }
+  assert.equal(pageKind(r(), "jailbreak"), "dpkg"); // the root is unchanged
+  assert.equal(pageKind(r(), "site"), "apps");
+});
+
+test("F125: Installed's Wish List row opens the page and counts the wished packages not installed", () => {
+  const row = wishListRow(r(), 3);
+  assert.equal(row.label, "Wish List");
+  assert.equal(row.href, "#/installed/wishlist");
+  assert.equal(row.badge, "3");
+  assert.equal(wishListRow(r(), 0).badge, undefined); // no badge for an empty list
+  assert.equal(wishListRow(r(APPS), 1).href, "#/installed/wishlist"); // the page sits under the root whatever page draws it
+  assert.equal(wishCount(["a", "b", "c"], ["b"]), 2);
+  assert.equal(wishCount(["a", "a"], []), 1);
+  assert.equal(wishCount([], ["x"]), 0);
+});
+
+test("F125: the page's Delete takes a package off the list, and the count follows", () => {
+  const w = createWishlist({ storage: null });
+  const seen = [];
+  w.onChange((list) => seen.push(list.length));
+  w.set("a", true); w.set("b", true);
+  assert.equal(wishListRow(r(), wishCount(w.list(), [])).badge, "2");
+  w.set("a", false); // what removeWish does
+  assert.deepEqual(w.list(), ["b"]);
+  assert.deepEqual(seen, [1, 2, 1], "each change tells Installed to redraw the row and the page");
+  assert.equal(wishListRow(r(), wishCount(w.list(), [])).badge, "1");
+});

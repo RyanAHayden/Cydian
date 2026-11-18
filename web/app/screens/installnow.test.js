@@ -141,5 +141,6 @@ test("every Signing page offers it as it draws (app and website, page and walkth
     assert.match(body, /offerInstall\(/, fn);
   }
   const client = readFileSync(new URL("../signing-client.js", import.meta.url), "utf8");
-  assert.equal((client.match(/rememberInstall\(/g) ?? []).length, 2, "the app's first Install and the website's No Certificate");
+  assert.equal((client.match(/rememberInstall\(/g) ?? []).length, 3,
+    "the app's first Install, My IPAs' Install (B39) and the website's No Certificate");
 });

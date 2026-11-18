@@ -39,6 +39,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             }
         }
         Apt.register(self) // N3: apt's files, the network, cydian-helper, haptic.tap (Apt.swift)
+        SignBridge.register(self) // I6: sign and install IPAs on the phone, sideload build (SignBridge.swift)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }

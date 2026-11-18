@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tweak Roulette</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ios6.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#385487}a:hover{color:#1f3b6e}
+.picker{position:relative;margin:0 10px;height:220px;border-radius:9px;overflow:hidden;display:flex;gap:6px;padding:0 9px;box-sizing:border-box;
+ background:linear-gradient(#7b818c,#3a3f48 8%,#2b2f36 50%,#3a3f48 92%,#7b818c);border:1px solid #1c1f24;box-shadow:0 1px 0 rgba(255,255,255,.7),inset 0 1px 0 rgba(255,255,255,.3)}
+.wheel{position:relative;flex:1;margin:10px 0;overflow:hidden;border-radius:3px;background:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.55)}
+.wheel::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(rgba(40,40,46,.85),rgba(255,255,255,0) 30%,rgba(255,255,255,0) 70%,rgba(40,40,46,.85))}
+.reel{position:absolute;left:0;right:0;top:0}
+.slot{height:40px;display:flex;align-items:center;gap:6px;padding:0 8px;box-sizing:border-box;font-size:15px;font-weight:bold;color:#111;white-space:nowrap}
+.slot img{width:22px;height:22px;border-radius:5px}
+.band{position:absolute;left:4px;right:4px;top:90px;height:40px;pointer-events:none;border-radius:3px;border:1px solid rgba(40,60,110,.75);
+ background:linear-gradient(rgba(220,228,245,.55),rgba(160,178,220,.35) 50%,rgba(120,145,205,.4) 51%,rgba(170,188,228,.45));box-shadow:0 1px 3px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.6)}
+.spin{display:flex;align-items:center;justify-content:center;height:46px;margin:14px 10px 0;border-radius:9px;box-sizing:border-box;font:bold 20px/1 "Helvetica Neue",Helvetica,sans-serif;color:#fff;
+ text-shadow:0 -1px 0 rgba(0,0,0,.4);border:1px solid #1d6a19;background:linear-gradient(#8fd96f,#3bab2f 50%,#2b9b21 51%,#35a52a);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 1px 0 rgba(255,255,255,.7);cursor:pointer;width:calc(100% - 20px)}
+.spin.off{border-color:#8c8c8c;color:#8c8c8c;text-shadow:0 1px 0 #fff;background:linear-gradient(#fdfdfd,#e3e3e3 50%,#d8d8d8 51%,#e4e4e4);cursor:default}
+.stat{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px}
+.stat b{font-size:20px;color:#4c566c;text-shadow:0 1px 0 rgba(255,255,255,.75)}
+.stat span{font-size:12px;color:#4c566c;text-shadow:0 1px 0 rgba(255,255,255,.75)}
+</style>
+</helmet>
+<div class="screen">
+  <header class="navbar">
+    <a class="bar-button back nav-left" href="Main.dc.html">Browse</a>
+    <span class="nav-title">Roulette</span>
+    <a class="bar-button nav-right" href="Deck.dc.html">Deck</a>
+  </header>
+
+  <main class="body">
+    <div style="display: flex; margin: 12px 10px 10px">
+      <div class="stat"><b>{{spinsLeft}}</b><span>spins left today</span></div>
+      <div class="stat"><b>4</b><span>day streak</span></div>
+      <div class="stat"><b>{{found}}</b><span>in your Deck</span></div>
+    </div>
+
+    <div class="picker" aria-label="Roulette wheels">
+      <div class="wheel"><div class="reel" style="{{r1}}">
+        <sc-for list="{{types}}" as="t" hint-placeholder-count="6"><div class="slot"><img src="{{t.icon}}" alt="">{{t.label}}</div></sc-for>
+      </div></div>
+      <div class="wheel"><div class="reel" style="{{r2}}">
+        <sc-for list="{{vibes}}" as="v" hint-placeholder-count="6"><div class="slot">{{v}}</div></sc-for>
+      </div></div>
+      <div class="wheel" style="flex: .75"><div class="reel" style="{{r3}}">
+        <sc-for list="{{prices}}" as="v" hint-placeholder-count="6"><div class="slot">{{v}}</div></sc-for>
+      </div></div>
+      <div class="band"></div>
+    </div>
+
+    <button class="{{spinClass}}" type="button" onClick="{{spin}}">{{spinLabel}}</button>
+
+    <sc-if value="{{hasResult}}" hint-placeholder-val="{{ false }}">
+      <div class="group">
+        <div class="group-header"><span>You landed on</span></div>
+        <div class="table">
+          <div class="cell" style="min-height: 74px; gap: 12px">
+            <img class="icon big" src="{{pick.icon}}" alt="">
+            <div class="cell-text" style="gap: 2px">
+              <span class="cell-label">{{pick.name}}</span>
+              <span class="cell-sub" style="white-space: normal; line-height: 16px">{{pick.desc}}</span>
+            </div>
+          </div>
+          <div class="cell" style="justify-content: flex-end; gap: 8px">
+            <a class="pill grey" href="#">Wish List</a>
+            <button class="pill" type="button" onClick="{{keep}}">{{keepLabel}}</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{noResult}}" hint-placeholder-val="{{ true }}">
+      <div class="group-footer" style="margin-top: 12px">Each spin lands on a real package from your sources. Keep the ones you like; your streak grows with one spin a day.</div>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":320,"height":568}}'>
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = { spins: 3, a: 0, b: 0, c: 0, pick: null, spinning: false, kept: [], found: 12 };
+  }
+  data() {
+    const I = {
+      tweaks: '/_blob/4df1eab5cb0393d2a13f89fa4170f2d2', themes: '/_blob/7a44963c6f56ec4a08d426d38e24b442',
+      toys: '/_blob/f9489cf19fdfd7f246d83d1704f3d849', utilities: '/_blob/0a2ceb66de3c5d5b50ea28a7c02dec4d'
+    };
+    const types = [
+      { label: 'Tweak', icon: I.tweaks }, { label: 'Theme', icon: I.themes },
+      { label: 'Toy', icon: I.toys }, { label: 'Utility', icon: I.utilities }
+    ];
+    const vibes = ['Useful', 'Pretty', 'Silly', 'Tiny', 'Clever', 'Hidden Gem'];
+    const prices = ['Free', 'Paid', 'Free', 'Free', 'Paid', 'Free'];
+    const pool = {
+      Tweak: [
+        { name: 'Cylinder Reborn', desc: 'Animated effects when you swipe between Home Screen pages.', icon: I.tweaks },
+        { name: 'Choicy', desc: 'Turn tweaks on or off for each app.', icon: I.tweaks }
+      ],
+      Theme: [{ name: 'SnowBoard', desc: 'Theme engine for icons and system UI.', icon: I.themes }],
+      Toy: [{ name: 'Oneko', desc: 'The classic desktop cat chases your finger around the screen.', icon: I.toys }],
+      Utility: [
+        { name: 'Cr4shed', desc: 'Readable crash logs for when a tweak misbehaves.', icon: I.utilities },
+        { name: 'betterAlarm', desc: 'More alarm and snooze options than the Clock app gives you.', icon: I.utilities }
+      ]
+    };
+    return { types, vibes, prices, pool };
+  }
+  renderVals() {
+    const { types, vibes, prices, pool } = this.data();
+    const s = this.state;
+    const ROW = 40, COPIES = 24;
+    const rep = (xs) => Array.from({ length: COPIES }, () => xs).flat();
+    const reel = (i, slow) => `transform: translateY(${90 - i * ROW}px); transition: transform ${slow}s cubic-bezier(.15,.7,.2,1)`;
+    const spin = () => {
+      if (s.spinning || s.spins <= 0) return;
+      const pickIn = (len, from) => from + len * 3 + Math.floor(Math.random() * len);
+      const a = pickIn(types.length, s.a - (s.a % types.length));
+      const b = pickIn(vibes.length, s.b - (s.b % vibes.length));
+      let c = pickIn(prices.length, s.c - (s.c % prices.length));
+      while (prices[c % prices.length] !== 'Free') c += 1; // every pick is free to try
+      const kind = types[a % types.length].label;
+      const options = pool[kind];
+      const pick = options[Math.floor(Math.random() * options.length)];
+      this.setState({ a, b, c, spinning: true, pick: null, spins: s.spins - 1 });
+      setTimeout(() => this.setState({ spinning: false, pick }), 2300);
+    };
+    const kept = s.pick && s.kept.includes(s.pick.name);
+    return {
+      types: rep(types), vibes: rep(vibes), prices: rep(prices),
+      r1: reel(s.a, 1.6), r2: reel(s.b, 1.9), r3: reel(s.c, 2.2),
+      spin,
+      spinLabel: s.spinning ? 'Spinning…' : s.spins > 0 ? 'Spin' : 'Back Tomorrow',
+      spinClass: s.spins > 0 || s.spinning ? 'spin' : 'spin off',
+      spinsLeft: String(s.spins),
+      found: String(s.found),
+      hasResult: Boolean(s.pick), noResult: !s.pick,
+      pick: s.pick || { name: '', desc: '', icon: '' },
+      keepLabel: kept ? 'In Your Deck' : 'Keep',
+      keep: () => { if (s.pick && !kept) this.setState({ kept: s.kept.concat(s.pick.name), found: s.found + 1 }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

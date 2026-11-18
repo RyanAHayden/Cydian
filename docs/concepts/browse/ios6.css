@@ -1,0 +1,59 @@
+/* iOS 6 pieces for the concept, values from Cydian's web/app/ios6.css (Teehan+Lax iOS 6 kit, sampled on the 4S). */
+.screen { width: 320px; height: 568px; display: flex; flex-direction: column; overflow: hidden; position: relative;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #000; -webkit-font-smoothing: antialiased;
+  background: repeating-linear-gradient(90deg, #cbd0da 0 2.5px, #ced3dc 2.5px 8px) #ced3dc; }
+.navbar { flex: none; height: 44px; position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; padding: 0 6px;
+  background: linear-gradient(#eff2f7, #eff2f7) top / 100% 1px no-repeat, linear-gradient(#2d3642, #2d3642) bottom / 100% 1px no-repeat, linear-gradient(#bdcbdc, #597498); }
+.navbar::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 2.5px; background: linear-gradient(rgba(0,0,0,.18), rgba(0,0,0,0)); }
+.nav-title { font-size: 20px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.45); letter-spacing: -.01em; }
+.nav-left { position: absolute; left: 6px; top: 7px; }
+.nav-right { position: absolute; right: 6px; top: 7px; }
+.bar-button { display: inline-flex; align-items: center; height: 30px; padding: 0 10px; border-radius: 5px; box-sizing: border-box;
+  border: 1px solid #2f4363; font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #fff; text-decoration: none;
+  text-shadow: 0 -1px 0 rgba(0,0,0,.45); background: linear-gradient(#90a4c1, #5b78a1 50%, #4b6a96 51%, #4f6e99);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 1px 0 rgba(255,255,255,.3); cursor: pointer; }
+.bar-button.back { padding-left: 14px; border-radius: 4px 5px 5px 4px; clip-path: polygon(11px 0, 100% 0, 100% 100%, 11px 100%, 0 50%); border-left: 0; }
+.bar-button.done { border-color: #1b3a73; background: linear-gradient(#7fa6f1, #3b70dc 50%, #2a62d8 51%, #3267d6); }
+.segmented { display: flex; height: 30px; border: 1px solid #2f4363; border-radius: 5px; overflow: hidden; box-shadow: 0 1px 0 rgba(255,255,255,.3); }
+.segment { min-width: 72px; padding: 0 8px; display: flex; align-items: center; justify-content: center; border: 0; margin: 0;
+  font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.45); cursor: pointer;
+  background: linear-gradient(#90a4c1, #5b78a1 50%, #4b6a96 51%, #4f6e99); box-shadow: inset 0 1px 0 rgba(255,255,255,.3); }
+.segment + .segment { border-left: 1px solid #2f4363; }
+.segment.on { background: linear-gradient(#3e5878, #2b4566); box-shadow: inset 0 1px 3px rgba(0,0,0,.45); }
+.body { flex: 1; overflow-y: auto; padding-bottom: 14px; scrollbar-width: none; }
+.body::-webkit-scrollbar { display: none; }
+.group { margin: 10px 10px 0; }
+.group + .group { margin-top: 20px; }
+.group-header { margin: 0 9px 7px; font-size: 17px; font-weight: bold; line-height: 21px; color: #4c566c; text-shadow: 0 1px 0 rgba(255,255,255,.75); display: flex; justify-content: space-between; align-items: baseline; }
+.group-header a { font-size: 14px; color: #385487; text-decoration: none; }
+.group-footer { margin: 7px 9px 0; font-size: 14px; line-height: 18px; text-align: center; color: #4c566c; text-shadow: 0 1px 0 rgba(255,255,255,.75); }
+.table { overflow: hidden; background: #f7f7f7; border: 1px solid #b7b9bd; border-radius: 9.5px; box-shadow: inset 0 .5px .5px rgba(0,0,0,.2); }
+.cell + .cell { border-top: 1px solid #c9c9c9; box-shadow: inset 0 1px 0 #fff; }
+.cell { display: flex; align-items: center; gap: 9px; min-height: 43px; padding: 0 10px; box-sizing: border-box; color: #000; text-decoration: none; }
+.cell.tall { min-height: 58px; }
+.cell-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cell-label { font-size: 17px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell-sub { font-size: 13px; color: #7f7f7f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell-detail { font-size: 15px; color: #385487; flex: none; }
+.chev { flex: none; width: 9px; height: 13px; }
+.rank { flex: none; width: 18px; font-size: 15px; font-weight: bold; color: #7f7f7f; text-align: right; }
+.icon { flex: none; width: 29px; height: 29px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.icon.big { width: 57px; height: 57px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.pill { flex: none; height: 24px; padding: 0 10px; border-radius: 4px; display: inline-flex; align-items: center; box-sizing: border-box;
+  font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); text-decoration: none; cursor: pointer;
+  border: 1px solid #1d6a19; background: linear-gradient(#8fd96f, #3bab2f 50%, #2b9b21 51%, #35a52a); box-shadow: inset 0 1px 0 rgba(255,255,255,.35); }
+.pill.grey { border-color: #8c8c8c; color: #385487; text-shadow: 0 1px 0 #fff; background: linear-gradient(#fdfdfd, #e3e3e3 50%, #d8d8d8 51%, #e4e4e4); }
+.tabbar { flex: none; height: 49px; display: flex; padding: 0 2px; position: relative;
+  background: linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,.1)) 0 1px / 100% 1px no-repeat, linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% 48px no-repeat, #000; border-top: 1px solid rgba(0,0,0,.7); }
+.tab { flex: 1; height: 44px; margin: 3px 2px 0; border-radius: 2.5px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 3px; box-sizing: border-box;
+  color: #a8a8a8; font-size: 10px; font-weight: bold; text-decoration: none; }
+.tab svg { width: 28px; height: 28px; margin-bottom: 1px; }
+.tab.on { color: #fff; background: rgba(255,255,255,.15); box-shadow: inset 0 0 1px rgba(0,0,0,.31); }
+/* The hero: one package a day on brushed slate, the App Store banner of 2012 without the carousel. */
+.hero { margin: 10px 10px 0; border-radius: 9.5px; overflow: hidden; border: 1px solid #3a4450;
+  background: linear-gradient(rgba(255,255,255,.12), rgba(255,255,255,0) 45%), repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, rgba(0,0,0,.03) 1px 2px), linear-gradient(#56657a, #2c3644);
+  box-shadow: 0 1px 0 rgba(255,255,255,.7), inset 0 1px 0 rgba(255,255,255,.25); color: #fff; }
+.hero-kicker { padding: 9px 12px 0; font-size: 11px; font-weight: bold; letter-spacing: .08em; color: #c9d4e3; text-shadow: 0 -1px 0 rgba(0,0,0,.5); }
+.hero-row { display: flex; gap: 12px; align-items: center; padding: 8px 12px 12px; }
+.hero-name { font-size: 20px; font-weight: bold; text-shadow: 0 -1px 0 rgba(0,0,0,.5); }
+.hero-desc { font-size: 13px; line-height: 17px; color: #dfe6ef; text-shadow: 0 -1px 0 rgba(0,0,0,.4); }

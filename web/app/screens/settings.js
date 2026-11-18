@@ -16,7 +16,9 @@ import { parseProfile, checkP12Password, summary, profileKind, DEFAULT_SERVER, d
 import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus,
-  localSigning, deviceStatus, importToDevice, removeFromDevice, setUpTrust } from "../signing-client.js";
+  localSigning, deviceStatus, importToDevice, removeFromDevice, setUpTrust, installOnDevice } from "../signing-client.js";
+import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installPath, isNewer, compareVersions } from "../core/selfupdate.js";
+import { getArch } from "../backend.js";
 
 export const title = "Settings";
 
@@ -66,7 +68,7 @@ function draw({ el, route }) {
   else if (key === "signing") drawSigning(el);
   else if (key === LOGS) el.replaceChildren(logsPage(route.path[1], () => draw({ el, route })));
   else if (key) el.replaceChildren(listPage(key));
-  else el.replaceChildren(rootPage(), signingSection(), pushSection(), logsSection(detectMode()));
+  else el.replaceChildren(rootPage(), signingSection(), pushSection(), logsSection(detectMode()), aboutSection());
   el.scrollTop = top;
 }
 
@@ -597,4 +599,66 @@ async function drawDeviceSigning(el) {
   if (kept || id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeDeviceCertificate() }] });
   el.replaceChildren(certificateBlock(el, id, status ?? { identity: null }), grouped(sections));
   el.scrollTop = top;
+}
+
+// ---- About and updates (F61) ---------------------------------------------------------------------------------
+// The app only (sideload and jailbreak builds): Settings > About shows the app's version, Check for Updates and,
+// once a newer release is known, Skip This Version. core/selfupdate.js does the work; this binds it to the bridge,
+// the signer, the alerts and the HUD. app.js runs the automatic check at launch (checkUpdates()).
+
+const appVersion = () => globalThis.cydianNative?.call
+  ? globalThis.cydianNative.call("app.info", {}).then((i) => String(i?.version ?? ""))
+  : Promise.resolve("");
+
+// A HUD whose label can change (Downloading, then Installing): { set(text), hide() }.
+function updateHUD(text) {
+  const hide = showHUD(text);
+  const label = [...document.querySelectorAll(".hud-label")].at(-1);
+  return { set: (t) => { if (label) label.textContent = t; }, hide };
+}
+
+let checking = null;
+// The automatic launch check, or Check for Updates (manual, with a Checking HUD until the first alert). One at a time.
+export function checkUpdates({ manual = false } = {}) {
+  if (checking) return checking;
+  const mode = detectMode();
+  if (!installPath(mode)) return Promise.resolve("site");
+  const native = globalThis.cydianNative;
+  const go = (path) => { location.hash = format({ tab: "settings", path }).replace(/^#/, ""); };
+  const hide = manual ? showHUD("Checking") : () => {};
+  const alert = (spec) => { hide(); return showAlert(spec); };
+  checking = checkForUpdates({
+    mode, storage: globalThis.localStorage,
+    current: appVersion,
+    release: () => fetchRelease({ native }),
+    alert,
+    install: (release) => runInstall(release, mode, {
+      status: () => deviceStatus(), installOnDevice: (o) => installOnDevice(o), alert, go,
+      native, arch: getArch(), hud: updateHUD,
+    }),
+  }, { manual }).catch(() => "error").finally(() => { hide(); checking = null; redrawAll(); });
+  return checking;
+}
+
+function aboutSection() {
+  const box = document.createElement("div");
+  if (!installPath(detectMode())) return box;
+  const fill = (version) => {
+    const st = loadState(globalThis.localStorage);
+    const latest = st.latest?.version;
+    const rows = [{ label: "Version", detail: version || "Unknown" },
+      { label: "Check for Updates", onClick: () => checkUpdates({ manual: true }) }];
+    let footer = latest && version && !isNewer(latest, version) ? "Cydian is up to date." : "Cydian looks for a new version on GitHub once a day.";
+    if (latest && isNewer(latest, version)) {
+      const skipped = st.skip && compareVersions(st.skip, latest) === 0;
+      rows.push({ label: "Skip This Version", subtitle: `Cydian ${latest}`, checked: skipped,
+        onClick: () => { setSkip(globalThis.localStorage, skipped ? null : latest); redrawAll(); } });
+      footer = skipped ? `Cydian won't ask about ${latest} again. Check for Updates still offers it.`
+        : `Cydian ${latest} is available. Check for Updates installs it.`;
+    }
+    box.replaceChildren(grouped([{ header: "About", rows, footer }]));
+  };
+  fill(loadState(globalThis.localStorage).current ?? "");
+  appVersion().then(fill, () => {});
+  return box;
 }

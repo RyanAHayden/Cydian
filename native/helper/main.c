@@ -7,6 +7,7 @@
  *                                                                        name=version or -name)
  *   cydian-helper install-ipa <path>            (F59: an IPA the app downloaded, installed through installd as
  *                                                AppSync's appinst does; ipa.c. Exit 69: can't install ad hoc)
+ *   cydian-helper selfupdate <path.deb>                                 (F61: dpkg -i of Cydian's own update)
  *
  * No setuid bit: Cydian spawns it as root with the persona spawn attributes (spawn.c), which the kernel allows
  * only because Cydian is signed with com.apple.private.persona-mgmt. Run by anything else it is plain mobile and

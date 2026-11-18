@@ -9,6 +9,10 @@
 // Either way the click goes to what is under the finger, and only once: a native click on top of ours is cancelled
 // (touchend's preventDefault, or dropped within DOUBLE ms), and ours is skipped if a native one just came. A drag
 // (more movement, or longer) still only scrolls.
+// The website (iOS Safari) has no fix, by choice (R17, journal/2026-11-18-r17-safari-momentum-tap): touch-action
+// and document scrolling don't help. Only a JS-driven coast (kill UIKit's momentum at touchend, drive scrollTop by
+// rAF) lets the tap reach this file's touch path, and that runs every fling at Safari's 60 fps rAF instead of 120 Hz,
+// with a hitch at release.
 
 export const TAP_MS = 300;   // longer than this is a hold, not a tap
 export const SLOP = 10;      // px; UIKit's tap allowance is about 10 pt

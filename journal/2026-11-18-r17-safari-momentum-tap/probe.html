@@ -1,0 +1,60 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<style>
+html,body{margin:0;height:100%;font:17px -apple-system,Helvetica Neue,sans-serif}
+#hud{position:fixed;left:0;right:0;top:0;height:120px;background:#222;color:#0f0;font:12px monospace;z-index:9;overflow:hidden;white-space:pre}
+#box{position:fixed;left:0;right:0;top:120px;bottom:0;overflow-y:auto;background:#fff}
+body.doc #box{position:static;overflow:visible;padding-top:120px}
+.row{height:88px;line-height:88px;border-bottom:1px solid #ccc;padding-left:16px;font-size:28px}
+.row.hit{background:#f80}
+body.ta .row{touch-action:pan-y}
+body.tm .row{touch-action:manipulation}
+</style></head><body>
+<div id="hud"></div><div id="box"></div>
+<script type="module">
+import { initMomentumTap } from "./momentum-tap.js"; // copy web/app/nav/momentum-tap.js beside this file
+const q = new URLSearchParams(location.search), M = q.get("m") || "native", LOAD = q.get("load") === "1";
+document.body.classList.add(M);
+const box = document.getElementById("box"), hud = document.getElementById("hud");
+const scroller = M === "doc" ? document.scrollingElement : box;
+for (let i = 0; i < 400; i++) { const d = document.createElement("div"); d.className = "row cell-inner"; d.textContent = "row " + i; d.dataset.i = i; box.append(d); }
+const t0 = performance.now(), lines = [], ev = [];
+const log = (s) => { const t = (performance.now() - t0).toFixed(0); ev.push(t + " " + s); lines.push(t + " " + s); while (lines.length > 9) lines.shift(); hud.textContent = M + (LOAD ? "+load" : "") + "\n" + lines.join("\n"); };
+const send = (o) => fetch("/log", { method: "POST", body: JSON.stringify(Object.assign({ m: M, load: LOAD, ua: navigator.userAgent }, o)) });
+// Every event type the window can hear, captured
+const types = new Set(); for (const k in window) if (k.startsWith("on")) types.add(k.slice(2)); for (const k in document) if (k.startsWith("on")) types.add(k.slice(2));
+for (const t of ["touchstart","touchend","touchcancel","gesturestart","gestureend","mousedown","mouseup"]) types.add(t);
+for (const t of ["scroll", "mousemove", "pointermove", "touchmove", "pointerrawupdate", "selectionchange", "message"]) types.delete(t);
+for (const t of types) window.addEventListener(t, (e) => { if (t === "click") { const r = e.target.closest?.(".row"); if (r) { r.classList.add("hit"); setTimeout(() => r.classList.remove("hit"), 600); } log("click " + (r ? r.dataset.i : e.target.nodeName) + (e.isTrusted ? "" : " (ours)")); } else log(t + (e.touches ? " n=" + e.touches.length : "") + (e.cancelable === false && t.startsWith("touch") ? " uncancelable" : "")); }, { capture: true, passive: true });
+// frame trace: every rAF while something scrolls
+let frames = [], lastTop = scroller.scrollTop, lastScrollAt = -1e9, tracing = false;
+function trace(now) { const top = scroller.scrollTop; frames.push([+now.toFixed(1), +top.toFixed(1)]); if (now - lastScrollAt < 300 || glide) requestAnimationFrame(trace); else { tracing = false; } }
+(M === "doc" ? window : box).addEventListener("scroll", () => { lastScrollAt = performance.now(); if (!tracing) { tracing = true; requestAnimationFrame(trace); }
+  if (LOAD) { // vlist-like work: rewrite the visible rows' text
+    const first = Math.floor(scroller.scrollTop / 89); for (let i = first; i < first + 12 && i < 400; i++) box.children[i].textContent = "row " + i + (i % 2 ? " ·" : ""); }
+}, { passive: true });
+// JS coast: native drag, then our own momentum (m=js keeps overflow hidden while coasting; m=js2 hides it for one frame only)
+let samples = [], glide = 0, v = 0;
+function stopGlide(why) { if (glide) { cancelAnimationFrame(glide); glide = 0; log("glide stopped: " + why); } if (M === "js") box.style.overflowY = ""; }
+if (M === "js" || M === "js2") {
+  box.addEventListener("touchstart", () => { samples = []; stopGlide("touchstart"); }, { passive: true });
+  box.addEventListener("touchmove", () => { const n = performance.now(); samples.push([n, box.scrollTop]); while (samples.length > 2 && n - samples[0][0] > 80) samples.shift(); }, { passive: true });
+  box.addEventListener("touchend", (e) => {
+    const a = samples[0], z = samples.at(-1); if (!a || z[0] - a[0] < 10) return;
+    v = (z[1] - a[1]) / (z[0] - a[0]); if (Math.abs(v) < 0.2) return;
+    box.style.overflowY = "hidden"; // kills UIKit's deceleration
+    if (M === "js2") requestAnimationFrame(() => { box.style.overflowY = ""; });
+    log("js glide v=" + v.toFixed(2));
+    let last = performance.now();
+    const step = (now) => { const dt = Math.min(34, now - last); last = now; v *= Math.pow(0.998, dt); // UIScrollViewDecelerationRateNormal per ms
+      const max = box.scrollHeight - box.clientHeight, next = Math.max(0, Math.min(max, box.scrollTop + v * dt)); box.scrollTop = next;
+      if (next <= 0 || next >= max || Math.abs(v) < 0.02) { glide = 0; if (M === "js") box.style.overflowY = ""; log("glide end"); return; }
+      glide = requestAnimationFrame(step); };
+    glide = requestAnimationFrame(step);
+  }, { passive: true });
+}
+window.flush = () => { send({ ev, frames }); ev.length = 0; frames = []; };
+setInterval(() => { if (ev.length || (!tracing && frames.length)) if (!tracing) flush(); }, 1500);
+if (q.get("mt") === "1") initMomentumTap();
+log("ready " + navigator.userAgent.match(/OS [\d_]+/));
+</script></body></html>

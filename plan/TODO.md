@@ -15,7 +15,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Native jailbreak app (shape decided: docs/native.md)
 
-- [~] **N6** Hand test on a modern jailbroken phone (the 4S never runs Cydian): add source, install, upgrade, remove, notification. — reopened: N5 landed BLOCKED: Needs a person with a rootless-jailbroken iPhone (iOS 15+): the only reachable device is the 4S (iOS 6), which can't run Cydian, and the user said there's no test phone. Unblock: run the checklist in journal/2026-11-17-n6-hand-test/README.md on a phone and record the results. — N8 (App Intents, widget, controls) is also untested on a device: on the hand-test phone, check that Shortcuts lists Cydian's actions (Check for Updates, Add Source, Install All Updates, Respring, Userspace Reboot, Export/Restore My Packages), the Updates widget shows a count, and the Respring/Userspace Reboot controls work in Control Center. List: journal/2026-11-17-n8-app-intents/README.md, Not verified.
+- [ ] **N6** Hand test on a modern jailbroken phone (the 4S never runs Cydian): add source, install, upgrade, remove, notification. — reopened: N5 landed — Unblocked 2026-11-18: test phone is an iPhone 7, iOS 15.8.8, palera1n rootless: `ssh 7` (mobile; sudo for root, password from the user). Has Sileo, apt, dpkg, uicache, unzip, ldid, ElleKit, curl. Not jailbroken after a reboot: ask the user to re-jailbreak.
 
 ### IPA: sideload management (same shell as the jailbreak app)
 

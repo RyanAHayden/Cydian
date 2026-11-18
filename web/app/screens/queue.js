@@ -170,11 +170,12 @@ export function openConfirm() {
       m.scroll.append(grouped([{ header: "Modifications", rows: [{ label: "Nothing to change" }],
         footer: "apt says everything queued is already as asked." }]));
     } else {
-      m.scroll.append(statistics(r.plan), modifications(r.plan, names));
+      m.scroll.append(continueGroup(close), statistics(r.plan), modifications(r.plan, names));
       ready = { jobs, plan: r.plan, ids: planIds(r.plan) };
       ok.hidden = false;
     }
-    m.scroll.append(queueGroup(jobs, names), continueGroup(close));
+    // Cydia on the 4S (docs/cydia-4s/queue-81.png, queue-83.png): Continue Queuing, Statistics, Modifications and no
+    // list of the queue; a package comes out of it from its own page (Modify > Clear).
     if (r && (!r.ok || r.plan.essential.length)) m.scroll.append(rawOutput(r.output));
   }
 
@@ -219,20 +220,11 @@ function modifications(plan, names) {
   return frag;
 }
 
-// The queue as the user asked it; tapping a package offers to take it out (the sheet asks apt again).
-function queueGroup(jobs, names) {
-  return grouped([{ header: "Queue", rows: jobs.map((j) => ({
-    label: names[j.id] || j.name || j.id,
-    detail: MODE_LABEL[j.mode] + (j.version && j.mode !== "remove" ? ` ${j.version}` : ""),
-    onClick: async () => {
-      const i = await showActionSheet({ title: names[j.id] || j.id, buttons: ["Clear"], destructive: 0 });
-      if (i === 0) installQueue.clear(j.id);
-    },
-  })), footer: "Tap a package to take it out of the queue." }]);
-}
 
 function continueGroup(close) {
-  return grouped([{ rows: [{ label: "Continue Queuing", onClick: () => close() }] }]);
+  const g = grouped([{ rows: [{ label: "Continue Queuing", chevron: true, onClick: () => close() }] }]);
+  g.querySelector(".group")?.classList.add("confirm-continue"); // centred, Cydia's blue-grey (queue.css)
+  return g;
 }
 
 // Cannot Comply: F18's sentences (and actions) first, then what Cydia would also call an issue: essentials.
@@ -327,27 +319,14 @@ export function openAppConfirm(queue = appQueue) {
       if (j.name) names[j.id] = j.name;
       for (const d of j.deps ?? []) if (d?.name) names[d.id] = d.name;
     }
-    m.scroll.replaceChildren(statistics(appPlan(jobs)), modifications(appPlan(jobs), names), appQueueGroup(jobs, queue), continueGroup(close));
+    // As Cydia's (docs/cydia-4s/queue-81.png): Continue Queuing first, then Statistics and Modifications.
+    m.scroll.replaceChildren(continueGroup(close), statistics(appPlan(jobs)), modifications(appPlan(jobs), names));
   }
   const sheet = { refresh, close };
   appConfirm = sheet;
   refresh();
 }
 
-// The queue as asked: mode and version on the right, the download size under the name; a tap offers Clear.
-function appQueueGroup(jobs, queue) {
-  return grouped([{ header: "Queue", rows: jobs.map((j) => ({
-    label: j.name || j.id,
-    subtitle: [sizeText(j.size), customLabel(j)].filter(Boolean).join(" · ") || null,
-    detail: MODE_LABEL[j.mode] + (j.version ? ` ${j.version}` : ""),
-    onClick: async () => {
-      const i = await showActionSheet({ title: j.name || j.id, buttons: ["Clear"], destructive: 0 });
-      if (i === 0) queue.clear(j.id);
-    },
-  })), footer: jobs.some((j) => j.id === SELF_ID)
-    ? "Tap an app to take it out of the queue. Cydian installs last: iOS closes it while it installs."
-    : "Tap an app to take it out of the queue." }]);
-}
 
 // One app: signed on the phone in the sideload app (installOnDevice; Cydian's own IPA through signAndInstall, which
 // hosts it on the Signing Server), on the Signing Server on the website (signAndInstall). True once iOS was asked.

@@ -50,3 +50,10 @@ html[data-theme="dark"] .confirm-problem .table { background: #5a3434; }
   color: #fff; font-size: 22px; font-weight: bold; touch-action: manipulation;
 }
 .console-finish:active { background: rgba(255,255,255,.2); }
+
+/* Continue Queuing as on the 4S (docs/cydia-4s/queue-81.png): the label centred in Cydia's blue-grey, the chevron
+   at the right. */
+.confirm-continue .cell-inner { justify-content: center; position: relative; }
+.confirm-continue .cell-label { flex: none; color: #385487; font-weight: bold; text-align: center; }
+html[data-theme="dark"] .confirm-continue .cell-label { color: #8fb0e8; }
+.confirm-continue .cell-inner:active .cell-label, .confirm-continue .cell-inner.is-pressed .cell-label { color: #fff; }

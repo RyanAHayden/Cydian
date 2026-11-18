@@ -49,11 +49,12 @@ export function initScroller(screens) {
   };
   // Like UIScrollView: a page that fits on screen still shows a full-length indicator while it bounces, and pulling
   // past either end squashes the indicator against that end.
+  let bounceOver = 0; // how far a thrown indicator's bounce has carried the content past the end (bounce below)
   const place = () => {
     if (!body || !body.isConnected) return false;
     const m = geom();
     const top = body.scrollTop;
-    const over = top < 0 ? -top : top > m.h ? top - m.h : 0;
+    const over = bounceOver || (top < 0 ? -top : top > m.h ? top - m.h : 0);
     const base = m.h <= 1 ? m.track : m.th;
     const th = Math.max(7, base - over);
     const y = m.h <= 1 ? (top > 0 ? 1 : 0) : Math.min(Math.max(top / m.h, 0), 1);
@@ -110,10 +111,21 @@ export function initScroller(screens) {
     // Out quickly (the speed it hit with), then UIKit's slow settle back (user 2026-11-17: 520 ms snapped too fast).
     // The content inside moves, not the scroller: the gap it opens shows the page's own background (pinstripes or
     // white), not the black behind the page (user 2026-11-17).
+    let first = null;
     for (const c of el.children) {
-      c.animate([{ transform: "none", easing: "cubic-bezier(.15,.6,.35,1)" }, { transform: `translateY(${d}px)`, offset: 0.2,
+      const a = c.animate([{ transform: "none", easing: "cubic-bezier(.15,.6,.35,1)" }, { transform: `translateY(${d}px)`, offset: 0.2,
         easing: "cubic-bezier(.3,0,.15,1)" }, { transform: "none" }], { duration: 950 });
+      first ??= { a, c };
     }
+    // The indicator squashes against that end as the content runs past it, as a native bounce does.
+    if (!first) return;
+    const follow = () => {
+      bounceOver = Math.abs(new DOMMatrixReadOnly(getComputedStyle(first.c).transform).m42) || 0.001;
+      draw();
+      if (first.a.playState === "running") requestAnimationFrame(follow);
+      else { bounceOver = 0; draw(); }
+    };
+    requestAnimationFrame(follow);
   }
 
   function fling(v) {

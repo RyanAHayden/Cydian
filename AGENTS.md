@@ -63,7 +63,7 @@ Shortcuts recipes live in `docs/shortcuts.md`.
 
 ## The main checkout
 
-agent-runner merges every task into `~/repos/Cydian` (the main checkout). Don't leave uncommitted work there:
+agent-runner merges every task into `~/repos/iFizBox` (the main checkout). Don't leave uncommitted work there:
 commit and push it, or work in a worktree or a clone of your own. Edits left in files a merge changes are moved to
 a `wip/main-checkout-<time>` branch (and a stash) after 3 minutes so the merge can land (`runner.toml`
 `land_edited = "wip"`); get them back with `git checkout wip/main-checkout-…` or `git stash pop`.

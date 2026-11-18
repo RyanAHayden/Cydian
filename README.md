@@ -32,8 +32,8 @@ cydian.dev is a single Cloudflare Worker, with no server of our own:
 - `/sign/upload`: holds an app the website signed in the browser for iOS's install prompt (F93).
 
 Deploys: Cloudflare builds every push to `main` itself (Workers Builds, connected to this repo; deploy command
-`tools/buildinfo.sh && cd worker && npx wrangler deploy -c wrangler.cydian.toml`). By hand, from a clean checkout:
-the same command (needs `npx wrangler login` on the cydian.dev Cloudflare account once). Anyone can run their own copy for free and point Cydian at it:
+`tools/buildinfo.sh && cd worker && npx wrangler deploy -c wrangler.ifizbox.toml`). By hand, from a clean checkout:
+the same command (needs `npx wrangler login` on the ifizbox.com Cloudflare account once). Anyone can run their own copy for free and point Cydian at it:
 `worker/README.md` (a Deploy to Cloudflare button).
 
 Signing happens on the user's own device: in the app on the iPhone, or on the website in the browser (F93: zsign as

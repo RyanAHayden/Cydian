@@ -1,5 +1,5 @@
 // The same server as the Cloudflare Worker (src/index.js), on any machine with Node 22: the website (web/app/),
-// /api/fetch and /sign/*. For people who'd rather run it on their own PC or in Docker than on Cloudflare.
+// /api/fetch, /api/applookup and /sign/*. For people who'd rather run it on their own PC or in Docker than on Cloudflare.
 //   node worker/node.mjs            PORT (8787), HOST (0.0.0.0), WEB (../web/app), HOST_IDS, TTL as in wrangler.toml
 // iOS takes the install manifest only over HTTPS with a trusted certificate: put it behind Tailscale
 // (`tailscale serve --bg 8787`), a Cloudflare Tunnel or Caddy with a domain (worker/README.md).
@@ -40,7 +40,18 @@ const ASSETS = {
   },
 };
 
-const env = { HOSTED, ASSETS, HOST_IDS: process.env.HOST_IDS ?? "*.cydian", TTL: process.env.TTL ?? "600", MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB };
+// F161: /api/applookup's day-long cache, as Cloudflare's edge cache keeps it (caches.default isn't in Node).
+const looked = new Map();
+const LOOKUP_CACHE = {
+  async match(req) { const e = looked.get(req.url); if (!e || e.until < Date.now()) { looked.delete(req.url); return undefined; } return new Response(e.body, e.init); },
+  async put(req, res) {
+    const ttl = Number(/max-age=(\d+)/.exec(res.headers.get("Cache-Control") ?? "")?.[1] ?? 0);
+    if (ttl > 0) looked.set(req.url, { body: await res.text(), init: { status: res.status, headers: Object.fromEntries(res.headers) }, until: Date.now() + ttl * 1000 });
+  },
+};
+setInterval(() => { const now = Date.now(); for (const [k, e] of looked) if (e.until < now) looked.delete(k); }, 3_600_000).unref();
+
+const env = { HOSTED, ASSETS, LOOKUP_CACHE, HOST_IDS: process.env.HOST_IDS ?? "*.cydian", TTL: process.env.TTL ?? "600", MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB };
 const server = http.createServer(async (inc, out) => {
   try {
     const proto = inc.headers["x-forwarded-proto"] ?? "http";

@@ -331,3 +331,43 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   assert.equal(site.status, 404);
   console.log("worker repo: ok");
 }
+
+// F161: /api/applookup asks Apple once per bundle ID and country a day (the cache), answers its first result only.
+import { appLookup } from "./src/index.js";
+{
+  const FIXTURE = { resultCount: 2, results: [
+    { bundleId: "com.example.flight", trackName: "FlightTracker", artistName: "Example Ltd", primaryGenreName: "Travel",
+      trackViewUrl: "https://apps.apple.com/gb/app/flighttracker/id123?uo=4", averageUserRating: 4.6, userRatingCount: 812,
+      screenshotUrls: ["https://is1-ssl.mzstatic.com/a.jpg", "https://is1-ssl.mzstatic.com/b.jpg"], description: "Track flights.",
+      version: "3.2", minimumOsVersion: "15.0" },
+    { bundleId: "com.example.other", trackName: "Other" }] };
+  const asked = [];
+  const fetcher = async (url, o) => { asked.push({ url, ttl: o.cf.cacheTtl }); return new Response(JSON.stringify(FIXTURE), { headers: { "Content-Type": "text/javascript" } }); };
+  const kept = new Map();
+  const cache = { match: async (k) => kept.get(k.url)?.clone(), put: async (k, r) => { kept.set(k.url, r); } };
+  const at = (q, f = fetcher) => appLookup(new URL("https://cydian.example/api/applookup?" + q), {}, { fetcher: f, cache });
+  let r = await at("bundleId=com.example.flight&country=GB");
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get("Cache-Control"), /max-age=86400/);
+  assert.equal(r.headers.get("Access-Control-Allow-Origin"), "*");
+  const j = await r.json();
+  assert.equal(j.resultCount, 1);
+  assert.equal(j.results[0].trackName, "FlightTracker");
+  assert.deepEqual(asked, [{ url: "https://itunes.apple.com/lookup?bundleId=com.example.flight&country=gb", ttl: 86400 }]);
+  r = await at("bundleId=com.example.flight&country=gb"); // cached: Apple isn't asked again
+  assert.equal((await r.json()).results[0].trackName, "FlightTracker");
+  assert.equal(asked.length, 1);
+  assert.equal((await at("bundleId=a/b")).status, 400);
+  assert.equal((await at("bundleId=com.a&country=usa")).status, 400);
+  assert.equal(asked.length, 1); // bad input never reaches Apple
+  r = await at("bundleId=com.none", async () => new Response(JSON.stringify({ resultCount: 0, results: [] })));
+  assert.deepEqual(await r.json(), { resultCount: 0, results: [] });
+  assert.equal((await at("bundleId=com.down", async () => new Response("x", { status: 503 }))).status, 502);
+  assert.equal((await at("bundleId=com.bad", async () => new Response("<html>"))).status, 502);
+  assert.equal((await at("bundleId=com.gone", async () => { throw new Error("offline"); })).status, 502);
+  assert.equal((await at("bundleId=com.down")).status, 200); // a failure isn't cached
+  // through the router, with node.mjs's kind of cache in env
+  const routed = await w.fetch(new Request("https://cydian.example/api/applookup?bundleId=a/b"), { LOOKUP_CACHE: cache });
+  assert.equal(routed.status, 400);
+  console.log("worker applookup: ok");
+}

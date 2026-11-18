@@ -1,0 +1,211 @@
+// F161: an IPA app's App Store details, looked up by bundle ID on Apple's public iTunes Search API, and the app
+// page's Links group. Pure JS, no DOM: screens/altstore.js renderApp draws them. Only an app page that is opened
+// looks up (never a list). SPDX-License-Identifier: GPL-3.0-or-later
+//
+//   lookupUrl(bundleId, country)          -> https://itunes.apple.com/lookup?bundleId=…&country=… (null: bad input)
+//   workerLookupUrl(bundleId, country)    -> /api/applookup?… (the website asks the Worker: cached at the edge a day)
+//   regionOf(locale)                      -> "gb" from "en-GB", else "us"
+//   parseLookup(json | text)              -> { trackViewUrl, developer, category, rating, ratingCount, screenshots,
+//                                              description, version, minimumOs, trackName } or null (not found)
+//   lookupNeed(app, ownLinks)             -> "none" | "link" | "full": "none" when the source gives screenshots,
+//                                              developer and the app's own page; "link" when it gives screenshots and
+//                                              developer (only the App Store link is used); else "full"
+//   mergeDetails(app, store, need)        -> what the page shows from the App Store; the source's fields win
+//   pageLinks({ ownLinks, store, source, sourceWebsite, appUrls })
+//                                         -> [{ kind, label, detail, url? }] never two rows to one page:
+//                                              1) the app's own page (its GitHub/website, else the App Store page)
+//                                              2) the source (kind "source": opens its page in Cydian)
+//                                              3) the source's website, only when it isn't a page already listed
+//   ownPageLinks(app, links)              -> appLinks(app) without a GitHub repo found only through the IPA's download
+//                                              URL and not named for the app (a source's many-app repo: AppTesters_Repo)
+//   shortText(text, max)                  -> the first paragraphs up to about `max` characters, or null when it all fits
+//   lookupApp(bundleId, { country, get, store, now }) -> Promise<parsed | null>, cached per bundle ID for a week
+//                                              in `store` (localStorage-like); a failed fetch is not cached
+
+const str = (v) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
+const httpsUrl = (u) => (/^https?:\/\//i.test(str(u)) ? str(u).replace(/^http:/i, "https:") : null);
+const BUNDLE = /^[A-Za-z0-9.-]{1,155}$/;
+
+export const LOOKUP_TTL = 7 * 24 * 3600 * 1000;
+const PREFIX = "cydian.applookup.";
+
+const country = (c) => (/^[a-z]{2}$/.test(str(c).toLowerCase()) ? str(c).toLowerCase() : "us");
+
+export function lookupUrl(bundleId, c = "us") {
+  if (!BUNDLE.test(str(bundleId))) return null;
+  return `https://itunes.apple.com/lookup?${new URLSearchParams({ bundleId: str(bundleId), country: country(c) })}`;
+}
+
+export function workerLookupUrl(bundleId, c = "us", base = "") {
+  if (!BUNDLE.test(str(bundleId))) return null;
+  return `${base}/api/applookup?${new URLSearchParams({ bundleId: str(bundleId), country: country(c) })}`;
+}
+
+// The device's region from its locale ("en-GB" -> "gb", "zh-Hant-TW" -> "tw"); "us" when it names none.
+export function regionOf(locale) {
+  const parts = str(locale).replace(/_/g, "-").split("-").slice(1);
+  const r = parts.find((p) => /^[A-Za-z]{2}$/.test(p));
+  return r ? r.toLowerCase() : "us";
+}
+
+export function parseLookup(input) {
+  let json = input;
+  if (typeof input === "string") { try { json = JSON.parse(input); } catch { return null; } }
+  const r = Array.isArray(json?.results) ? json.results.find((x) => x && (x.trackViewUrl || x.bundleId)) : null;
+  if (!r) return null;
+  const rating = Number(r.averageUserRating);
+  return {
+    trackName: str(r.trackName),
+    trackViewUrl: httpsUrl(r.trackViewUrl),
+    developer: str(r.artistName) || str(r.sellerName),
+    category: str(r.primaryGenreName),
+    rating: Number.isFinite(rating) && rating > 0 ? Math.min(5, rating) : null,
+    ratingCount: Number.isFinite(Number(r.userRatingCount)) && Number(r.userRatingCount) > 0 ? Number(r.userRatingCount) : null,
+    screenshots: (Array.isArray(r.screenshotUrls) ? r.screenshotUrls : []).map(httpsUrl).filter(Boolean),
+    description: str(r.description),
+    version: str(r.version),
+    minimumOs: str(r.minimumOsVersion),
+  };
+}
+
+const hasShots = (app) => (Array.isArray(app?.screenshots) && app.screenshots.length > 0)
+  || (Array.isArray(app?.screenshotURLs) && app.screenshotURLs.length > 0);
+
+export function lookupNeed(app, ownLinks = []) {
+  const full = hasShots(app) && Boolean(str(app?.developerName));
+  if (!full) return "full";
+  return ownLinks.length ? "none" : "link";
+}
+
+// AltStore's category ids as the source gives them ("photo-video"), else null.
+const sourceCategory = (app) => str(app?.category) || null;
+const sameText = (a, b) => str(a).replace(/\s+/g, " ").toLowerCase() === str(b).replace(/\s+/g, " ").toLowerCase();
+
+// What the page adds from the App Store, each only where the source has nothing of its own:
+//   developer (source developerName wins), category (source category wins), rating (the App Store's own),
+//   screenshots (only when the source lists none), description (under the source's, unless it's the same text),
+//   version and minimumOs (facts: the App Store's, beside the source's own version).
+// need "link": nothing but the App Store link (the source gave screenshots and developer).
+export function mergeDetails(app, store, need = "full") {
+  const out = { developer: null, category: null, rating: null, ratingCount: null, screenshots: [], description: null,
+    version: null, minimumOs: null, trackViewUrl: store?.trackViewUrl ?? null };
+  if (!store || need !== "full") return out;
+  if (!str(app?.developerName) && store.developer) out.developer = store.developer;
+  if (!sourceCategory(app) && store.category) out.category = store.category;
+  if (store.rating != null) { out.rating = store.rating; out.ratingCount = store.ratingCount; }
+  if (!hasShots(app)) out.screenshots = store.screenshots;
+  if (store.description && !sameText(store.description, app?.localizedDescription)) out.description = store.description;
+  out.version = store.version || null;
+  out.minimumOs = store.minimumOs || null;
+  return out;
+}
+
+// One page, however it is spelled: http/https, www., trailing slash, case, and a query only Apple's links carry.
+export function pageKey(url) {
+  try {
+    const u = new URL(str(url));
+    const host = u.hostname.toLowerCase().replace(/^www\./, "");
+    const path = u.pathname.replace(/\/+$/, "").toLowerCase();
+    // github.com/o/r and github.com/o/r/releases/… are one repo's page for this purpose
+    if (host === "github.com" || host === "raw.githubusercontent.com") {
+      const [o, r] = path.split("/").filter(Boolean);
+      if (o && r) return `github.com/${o}/${r.replace(/\.git$/, "")}`;
+    }
+    if (host === "apps.apple.com" || host === "itunes.apple.com") {
+      const id = /\/id(\d+)/.exec(path);
+      if (id) return `apps.apple.com/id${id[1]}`;
+    }
+    return host + path;
+  } catch { return null; }
+}
+
+// ownLinks: core/previews.js appLinks(app) ({ kind, label, detail, url }); store: parseLookup's; source:
+// { label, subtitle, href } (href null when the page came from that source's page); sourceWebsite: the source's
+// website (its JSON's website); appUrls: other URLs that are the source's, never the app's (its JSON's URL).
+export function pageLinks({ ownLinks = [], store = null, source = null, sourceWebsite = null, appUrls = [] } = {}) {
+  const out = [];
+  const seen = new Set();
+  const sourceKeys = new Set([sourceWebsite, ...appUrls].map(pageKey).filter(Boolean));
+  const add = (row, url) => {
+    const k = url ? pageKey(url) : null;
+    if (url && (!k || seen.has(k))) return false;
+    if (k) seen.add(k);
+    out.push(row);
+    return true;
+  };
+  // 1) the app's own page: a link of its own that isn't the source's page; else the App Store page.
+  let own = 0;
+  for (const l of ownLinks) {
+    const k = pageKey(l.url);
+    if (!k || sourceKeys.has(k)) continue;
+    if (add({ kind: l.kind, label: l.label, detail: l.detail || l.url, url: l.url }, l.url)) own++;
+  }
+  if (!own && store?.trackViewUrl) add({ kind: "appstore", label: "App Store", detail: store.developer || "apps.apple.com", url: store.trackViewUrl }, store.trackViewUrl);
+  // 2) the source, as a page in Cydian (its other apps)
+  if (source) out.push({ kind: "source", label: source.label, detail: source.subtitle || null, href: source.href ?? null });
+  // 3) its website, only when it is a page not listed yet
+  const site = httpsUrl(sourceWebsite);
+  if (site) add({ kind: "website", label: "Source Website", detail: hostOf(site), url: site }, site);
+  return out;
+}
+
+function hostOf(u) {
+  try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; }
+}
+
+const squash = (v) => str(v).toLowerCase().replace(/[^a-z0-9]/g, "");
+const repoOf = (url) => /^https:\/\/github\.com\/([^/]+)\/([^/?#]+)/i.exec(str(url));
+
+export function ownPageLinks(app, links = []) {
+  const x = app?.extra ?? {};
+  // the app's link fields only: not its icon, pictures or download (they live in the source's repo), nor sourceUrl
+  // (the source's own JSON; sourceURL, a code link, does count)
+  const linkField = ([k, v]) => typeof v === "string" && k !== "sourceUrl" && !/icon|image|header|screenshot|download/i.test(k);
+  const named = [...Object.entries(x), ...Object.entries(app ?? {})].filter(linkField).map(([, v]) => v.toLowerCase());
+  return links.filter((l) => {
+    if (l.kind !== "github") return true;
+    const m = repoOf(l.url);
+    if (!m) return true;
+    const path = `github.com/${m[1]}/${m[2]}`.toLowerCase();
+    // the app's own fields link the repo page (not a file in it: a release download, a raw icon, ESign's `down`)
+    if (named.some((v) => v.includes(path) && !/\/(releases\/download|raw|blob)\//.test(v))) return true;
+    const r = squash(m[2]), n = squash(app?.name);
+    return r.length > 2 && n.length > 2 && (r.includes(n) || n.includes(r)); // a release repo named for the app
+  });
+}
+
+export function shortText(text, max = 320) {
+  const t = str(text);
+  if (t.length <= max * 1.3) return null;
+  const paras = t.split(/\n+/);
+  let out = "";
+  for (const p of paras) {
+    if (out && out.length + p.length > max) break;
+    out = out ? `${out}\n\n${p}` : p;
+  }
+  if (out.length > max * 1.3) out = `${out.slice(0, max).replace(/\s+\S*$/, "")}…`;
+  return out.length < t.length ? out : null;
+}
+
+// ---- Loading (cached per bundle ID for a week) -----------------------------------------------------------------
+
+const memory = new Map();
+export function clearLookupMemory() { memory.clear(); }
+
+// get(bundleId, country) -> Promise<text>: the Worker's /api/applookup on the site, Apple directly in the app.
+export async function lookupApp(bundleId, { country: c = "us", get, store = null, now = Date.now() } = {}) {
+  if (!BUNDLE.test(str(bundleId)) || typeof get !== "function") return null;
+  const key = `${PREFIX}${country(c)}.${str(bundleId)}`;
+  const m = memory.get(key);
+  if (m && now - m.at < LOOKUP_TTL) return m.app;
+  try {
+    const raw = store?.getItem(key);
+    const v = raw ? JSON.parse(raw) : null;
+    if (v && typeof v.at === "number" && now - v.at < LOOKUP_TTL && "app" in v) { memory.set(key, v); return v.app; }
+  } catch { /* unreadable: look it up again */ }
+  const app = parseLookup(await get(str(bundleId), country(c)));
+  const v = { at: now, app };
+  memory.set(key, v);
+  try { store?.setItem(key, JSON.stringify(v)); } catch { /* full or private: memory only */ }
+  return app;
+}

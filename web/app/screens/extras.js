@@ -192,8 +192,10 @@ async function offer(r, ctx) {
 // Confirm as usual. When the refreshed source doesn't list it (Canister's data is stale, or the package isn't
 // built for this device), an alert says so and the source stays added. Every outside call comes in `deps`
 // ({ backend, catalog, showHUD, showAlert, go }), so the steps can be tested without a page.
-// Resolves to what happened: "error" | "missing" | "queued".
-export async function addSourceAndInstall(r, { backend, catalog, showHUD: hud, showAlert: alert, go }) {
+// Resolves to what happened: "error" | "missing" | "queued" | "paid" (B19).
+// B19: a paid package the source's vendor sells (`sold`, soldByVendor) is not queued (apt can't fetch it): its page
+// opens on the Purchase group and nav bar price (B11), and the answer is "paid".
+export async function addSourceAndInstall(r, { backend, catalog, showHUD: hud, showAlert: alert, go, sold = soldByVendor }) {
   let hide = hud("Verifying URL");
   let added;
   try {
@@ -228,6 +230,7 @@ export async function addSourceAndInstall(r, { backend, catalog, showHUD: hud, s
     return "missing";
   }
   go(pkgHref(key, r.id));
+  if (await Promise.resolve().then(() => sold(pkg.stanza, { key, uri: added?.uri || r.repo.uri })).catch(() => false)) return "paid";
   backend.queue({ op: "install", id: r.id, version: pkg.stanza?.version ?? r.version, name: pkg.row?.name || pkg.stanza?.name || r.name });
   return "queued";
 }
@@ -470,6 +473,18 @@ async function drawApp(st, source, base, draw, ctx, box, publish = () => {}) {
 export async function soldByVendor(st, source) {
   if (!isCommercial(st) || !source) return false;
   return (await vendorOf(source).catch(() => null)) != null;
+}
+
+// B19: the ids among catalog rows (`paid`: tagged cydia::commercial; `key`: their source) that the source's vendor
+// sells (payment_endpoint), which apt can't fetch: Changes' Upgrade (N) leaves them out (their pages offer Download
+// & Install). `sources`: the backend's list; `sells(source)` -> whether it has a vendor. Failures count as not sold.
+export async function vendorSoldIds(rows = [], sources = [], { sells = (s) => vendorOf(s).then((b) => b != null, () => false) } = {}) {
+  const byKey = new Map((sources ?? []).map((s) => [s?.key, s]));
+  const out = new Set();
+  await Promise.all((rows ?? []).filter((r) => r?.id && r.paid && byKey.has(r.key)).map(async (r) => {
+    if (await Promise.resolve().then(() => sells(byKey.get(r.key))).catch(() => false)) out.add(r.id);
+  }));
+  return out;
 }
 
 // F74: authorize (under a HUD: the vendor can refuse), then paid.install in the install queue's console, streamed

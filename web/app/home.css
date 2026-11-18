@@ -27,7 +27,6 @@ html[data-theme="dark"] .home {
 .home-title { margin: 0; font-size: 21px; font-weight: normal; line-height: 26px; color: var(--text); text-shadow: var(--emboss); }
 .home-by { margin: 2px 0 0; font-size: 17px; line-height: 21px; color: var(--text); text-shadow: var(--emboss); }
 .home-by a { color: var(--by); font-weight: bold; text-decoration: none; }
-.home-nod { margin-top: 0; font-size: 15px; line-height: 19px; }
 
 /* Tile rows: 43px tiles, 10px apart; two halves 9px apart, or one outlined pair split by a line. */
 .home-row { margin: 0 10px; display: flex; gap: 9px; }

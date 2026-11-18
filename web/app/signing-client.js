@@ -361,10 +361,22 @@ async function answerError(res) {
   return signFail(b?.code ?? "network", b?.error ?? `The server answered HTTP ${res.status}.`);
 }
 
+// A request that failed for want of a connection (Safari: "Load failed") is tried again, up to `tries` times with a
+// pause, as phones drop a request now and then mid-upload (user 2026-11-18: an upload stopped after its second part).
+// An answer from the server, even an error, is final.
+export async function retrying(send, { tries = 3, wait = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  for (let i = 1; ; i++) {
+    try { return await send(); } catch (e) {
+      if (i >= tries) throw e;
+      await wait(800 * i);
+    }
+  }
+}
+
 // The IPA's bytes through /api/fetch, the label following the download ("Downloading 40%").
-export async function downloadIpa(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, max = IPA_MAX } = {}) {
+export async function downloadIpa(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, max = IPA_MAX, wait = undefined } = {}) {
   let res;
-  try { res = await fetcher(`${base}/api/fetch?${new URLSearchParams({ url, kind: "ipa" })}`, { cache: "no-store" }); } catch {
+  try { res = await retrying(() => fetcher(`${base}/api/fetch?${new URLSearchParams({ url, kind: "ipa" })}`, { cache: "no-store" }), { wait }); } catch {
     throw signFail("network", "The app couldn't be downloaded: no connection to the server.");
   }
   if (!res.ok) throw await answerError(res);
@@ -386,11 +398,11 @@ export async function downloadIpa(url, { base = "", fetcher = globalThis.fetch, 
 }
 
 // The signed IPA to the Worker (POST /sign/upload, each part, done): the install link's answer { itms, ... }.
-export async function uploadSigned(bytes, { bundleId, name, version }, { base = "", fetcher = globalThis.fetch, onProgress = () => {} } = {}) {
+export async function uploadSigned(bytes, { bundleId, name, version }, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, wait = undefined } = {}) {
   const q = new URLSearchParams({ bundleid: bundleId, version: String(version || "1.0").slice(0, 64), title: String(name || bundleId).slice(0, 200), size: String(bytes.length) });
   const call = async (path, init) => {
     let res;
-    try { res = await fetcher(`${base}${path}`, { cache: "no-store", ...init }); } catch {
+    try { res = await retrying(() => fetcher(`${base}${path}`, { cache: "no-store", ...init }), { wait }); } catch {
       throw signFail("network", "The signed app couldn't be uploaded: no connection to the server.");
     }
     if (!res.ok) throw await answerError(res);

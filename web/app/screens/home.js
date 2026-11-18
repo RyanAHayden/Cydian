@@ -563,6 +563,19 @@ export function footLine({ machine = "", ios = "", version = "", web = false } =
   return [machine || "iPhone", ios ? `iOS ${ios}` : "", app].filter(Boolean).join(", ") + ` (${String(lang).toLowerCase()})`;
 }
 
+// Which Jailbreak's footer. F144: the sideload build lists apps only and has no Settings > Device, so it names no
+// way to tweaks there; the website and the jailbreak app keep the Device hint.
+export function helpJailbreakFooter(mode = "site") {
+  if (mode === "sideload") {
+    return "On a phone without a jailbreak Cydian lists apps from AltStore-style sources, signed and installed on "
+      + "the phone. Tweaks and themes need a jailbroken iPhone and Cydian's jailbreak app.";
+  }
+  return "On a phone without a jailbreak Cydian lists apps from AltStore-style sources, installed with a "
+    + "sideloader. Set Settings > Device to Jailbroken to list tweaks and themes built for rootless "
+    + "(iphoneos-arm64), rootful (iphoneos-arm) or roothide (iphoneos-arm64e) jailbreaks. A package built for "
+    + "another kind will not install.";
+}
+
 // Our own help page: what Cydian lists, for which jailbreaks, and how upgrades reach the phone.
 function renderHelp(body) {
   body.append(wrap(grouped([
@@ -571,10 +584,7 @@ function renderHelp(body) {
       rows: [{ label: "Not Jailbroken", detail: "apps only" }, { label: "Rootless", detail: "iOS 15 and later" },
         { label: "Rootful", detail: "older, or palera1n" },
         { label: "Roothide", detail: "Dopamine roothide, Bootstrap" }],
-      footer: "On a phone without a jailbreak Cydian lists apps from AltStore-style sources, installed with a "
-        + "sideloader. Set Settings > Device to Jailbroken to list tweaks and themes built for rootless "
-        + "(iphoneos-arm64), rootful (iphoneos-arm) or roothide (iphoneos-arm64e) jailbreaks. A package built for "
-        + "another kind will not install.",
+      footer: helpJailbreakFooter(settings.mode),
     },
     {
       header: "Upgrading",

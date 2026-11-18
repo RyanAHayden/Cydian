@@ -30,7 +30,7 @@ export function openInGroup(source, { pkg = null, jailbroken = settings.jailbrok
 }
 
 function footerFor(source, pkg, shown) {
-  if (!shown) return "Cydia, Sileo, Zebra and Irisin run on jailbroken iPhones. Jailbroken? Settings > Device.";
+  if (!shown) return undefined; // F144: no hint pointing at Settings > Device
   if (isIpaFormat(formatOf(source))) {
     return pkg ? "Adds this app's source to that app, where it can install it." : "Adds this source to that app.";
   }

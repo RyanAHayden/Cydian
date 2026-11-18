@@ -271,10 +271,10 @@ function draw() {
   }
   const box = state.box;
   const backend = getBackend();
-  // F37: Not Jailbroken shows AltStore sources only; the APT ones stay in the list, out of sight.
+  // F37: Not Jailbroken shows AltStore sources only. F144: and says nothing of APT ones (no count, no hint).
   // F45: in the order set in Manage > Sources (none set: by name).
   // F72: Cydian's own source (built in) stays first whatever the order.
-  const { shown, hidden } = sourcesFor(builtinFirst(orderSources(state.sources, loadOrder())), settings.deviceType());
+  const { shown } = sourcesFor(builtinFirst(orderSources(state.sources, loadOrder())), settings.deviceType());
   const searching = Boolean(state.query.trim());
   const list = filterSources(shown, state.query, displayName);
   const rec = searching ? null : recommendedRow();
@@ -315,11 +315,6 @@ function draw() {
   if (!list.length) {
     box.append(Object.assign(document.createElement("p"), { className: "empty",
       textContent: searching ? "No sources match." : "No sources. Tap Manage, then Sources." }));
-  }
-  if (hidden && !searching) {
-    const n = `${hidden} APT ${hidden === 1 ? "source is" : "sources are"}`;
-    box.append(Object.assign(document.createElement("p"), { className: "group-footer sources-hidden",
-      textContent: `${n} hidden: they list tweaks and themes for jailbroken iPhones. Jailbroken? Settings > Device.` }));
   }
 }
 

@@ -28,8 +28,9 @@ cydian.dev is a single Cloudflare Worker, with no server of our own:
 - `/api/fetch`: the website's fetch proxy (APT and AltStore sources don't let a page read them);
 - `/sign/manifest`, `/sign/host`: what iOS needs when the app signs on the phone (also at sign.cydian.dev).
 
-Deploy after a change: `cd worker && npx wrangler deploy -c wrangler.cydian.toml` (needs `npx wrangler login` on
-the cydian.dev Cloudflare account once). Anyone can run their own copy for free and point Cydian at it:
+Deploys: Cloudflare builds every push to `main` itself (Workers Builds, connected to this repo; deploy command
+`tools/buildinfo.sh && cd worker && npx wrangler deploy -c wrangler.cydian.toml`). By hand, from a clean checkout:
+the same command (needs `npx wrangler login` on the cydian.dev Cloudflare account once). Anyone can run their own copy for free and point Cydian at it:
 `worker/README.md` (a Deploy to Cloudflare button).
 
 Signing happens only in the app, on the iPhone. The website signs nothing: it browses, and hands apps to Cydian or

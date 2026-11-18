@@ -34,6 +34,8 @@
 //   GET/POST/DELETE /reviews/<package id>[/<review id>[/report]]   F182: user reviews in D1 (src/reviews.js)
 //   GET  /repo/<file>                       B17: iFizBox's own flat APT repo (Release, Packages, Packages.gz, *.deb),
 //                                           the latest release's asset fetched here, redirects followed here
+//   GET  /repo/source.json                  F178: iFizBox's AltStore source (the deployed web/app/source.json, else the
+//                                           latest release's source.json asset), the sideload app's built-in source
 //
 // Settings (wrangler.toml [vars]): HOST_IDS, the bundle IDs /sign/host takes ("*.ifizbox" = any ending in .ifizbox);
 // TTL (seconds, 600); MAX_UPLOAD_MB (512), the largest IPA /sign/upload and kind=ipa take ("0": no uploads). KV
@@ -161,11 +163,35 @@ export function repoFile(pathname) {
   if (REPO_TYPES[name]) return { name, type: REPO_TYPES[name] };
   return /^[A-Za-z0-9][A-Za-z0-9.+~_-]{0,200}\.deb$/.test(name) ? { name, type: "application/vnd.debian.binary-package" } : null;
 }
+// F178: /repo/source.json, iFizBox's AltStore source beside its APT repo (the sideload app's and the site's built-in
+// source, core/essential.js SELF_ALT_URL): the deployed web/app/source.json (ASSETS, updated by tools/release.sh
+// and committed), else the latest release's source.json asset. JSON with CORS, kept 5 minutes like Release.
+const SOURCE_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff", ...CORS };
+export async function selfSource(req, u, env = {}, { fetcher = fetch, wait } = {}) {
+  if (!["GET", "HEAD"].includes(req.method)) return new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+  let r = null;
+  if (env.ASSETS) {
+    try { r = await env.ASSETS.fetch(new Request(`${u.origin}/source.json`)); } catch { r = null; }
+    if (r && !r.ok) { r.body?.cancel?.(); r = null; }
+  }
+  if (!r) {
+    const name = /^[\w.-]+\/[\w.-]+$/.test(env.IFIZBOX_REPO ?? "") ? env.IFIZBOX_REPO : SELF_REPO;
+    try { r = await upstream(`https://github.com/${name}/releases/latest/download/source.json`, { fetcher, token: env.GITHUB_TOKEN ?? null, ...(wait ? { wait } : {}) }); } catch { r = null; }
+    if (!r?.ok) {
+      r?.body?.cancel?.();
+      return new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+    }
+  }
+  if (req.method === "HEAD") { r.body?.cancel?.(); return new Response(null, { headers: SOURCE_HEADERS }); }
+  return new Response(r.body, { headers: SOURCE_HEADERS });
+}
+
 export async function repo(req, u, env = {}, { fetcher = fetch, wait } = {}) {
   if (u.pathname === "/repo" || u.pathname === "/repo/") {
     if (u.pathname === "/repo") return Response.redirect(`${u.origin}/repo/`, 301);
-    return new Response(`${NAME}'s own APT repo: add this address in ${NAME}, Sileo or Zebra.\n`, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=300" } });
+    return new Response(`${NAME}'s own APT repo: add this address in ${NAME}, Sileo or Zebra.\n${NAME}'s AltStore source (the app without a jailbreak): ${u.origin}/repo/source.json\n`, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=300" } });
   }
+  if (u.pathname === "/repo/source.json") return selfSource(req, u, env, { fetcher, wait });
   const f = repoFile(u.pathname);
   if (!f || !["GET", "HEAD"].includes(req.method)) return new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
   const name = /^[\w.-]+\/[\w.-]+$/.test(env.IFIZBOX_REPO ?? "") ? env.IFIZBOX_REPO : SELF_REPO;
@@ -187,10 +213,22 @@ export async function repo(req, u, env = {}, { fetcher = fetch, wait } = {}) {
   return new Response(r.body, { headers, encodeBody: "manual" });
 }
 
-async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null) {
+// F178: a proxied URL that is this Worker's own /repo/ file (the site's built-in source, https://<DOMAIN>/repo/source.json)
+// is answered here, not fetched: a Worker's fetch of its own custom domain doesn't come back to it.
+export function ownRepoUrl(target, u) {
+  const hosts = new Set([DOMAIN, `www.${DOMAIN}`, u.host]);
+  return target.protocol === "https:" && hosts.has(target.host) && /^\/repo(\/|$)/.test(target.pathname) ? target : null;
+}
+
+async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null, env = {}) {
   const target = httpUrl(u.searchParams.get("url") ?? "");
   if (!target) return fetchErr("bad_url", "Only http(s) URLs can be fetched.", 400);
   const kind = u.searchParams.get("kind") ?? "";
+  if (!kind && ownRepoUrl(target, u)) {
+    const r = await repo(new Request(target.href), target, env);
+    if (!r.ok) return fetchErr("upstream", `upstream answered HTTP ${r.status}`, r.status >= 400 && r.status < 600 ? r.status : 502);
+    return new Response(r.body, { headers: { ...SAFE, "Content-Type": r.headers.get("content-type") ?? "application/octet-stream", "X-Source-URL": encodeURI(target.href) } });
+  }
   try {
     if (kind === "packages") {
       const dir = target.href.endsWith("/") ? target.href : target.href + "/";
@@ -533,7 +571,7 @@ export default {
     if (isReviewsPath(u.pathname)) return reviews(req, env); // F182: user reviews (src/reviews.js)
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
-    if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null);
+    if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null, env);
     if (u.pathname === "/api/applookup" && req.method === "GET") return appLookup(u, env);
     if (u.pathname === "/api/appreviews" && req.method === "GET") return appReviews(u, env); // B37
     if (u.pathname === "/api/ipainfo" && req.method === "GET") return ipaInfo(u, env); // F160

@@ -63,7 +63,7 @@ class Release(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.assets(r.stdout),
                          ["iFizBox.ipa", "iFizBox.deb", "com.ryha.ifizbox_%s-7_iphoneos-arm64.deb" % VERSION,
-                          "Packages", "Packages.gz", "Release"])
+                          "Packages", "Packages.gz", "Release", "source.json"])
         self.assertIn("RyanAHayden/iFizBox v%s " % VERSION, r.stdout)
         self.assertIn("nothing published", r.stdout)
         self.assertNotIn("is not native/VERSION", r.stderr)

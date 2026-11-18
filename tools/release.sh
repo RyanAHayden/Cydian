@@ -9,6 +9,8 @@
 #   Packages, Packages.gz, Release   iFizBox's own flat APT repo over those .debs (F72, tools/selfrepo.py): the
 #                                    jailbreak app's built-in source, https://$BRAND_DOMAIN/repo/ (the Worker
 #                                    serves releases/latest/download/ of RyanAHayden/iFizBox without the redirect)
+#   source.json                      F178: the updated AltStore source below, the Worker's fallback for
+#                                    https://$BRAND_DOMAIN/repo/source.json
 # Then it points iFizBox's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new iFizBox.ipa, the
 # sideload app's and the site's built-in source (F72), versions[] newest first: commit web/app/source.json afterwards.
 # Run it only when a person asks for a release. How to cut one: docs/release.md.
@@ -155,13 +157,20 @@ else
   } > "$stage/notes.md"
 fi
 
+altargs=(--notes "$stage/notes.md" ${minimum:+--minimum "$minimum"})
+# F178: the updated AltStore source is an asset too: https://$BRAND_DOMAIN/repo/source.json (the Worker) serves the
+# deployed web/app/source.json, and this release's source.json when the site has none.
+cp web/app/source.json "$stage/source.json"
+python3 tools/altsource.py update "$version" "$ipa" "${altargs[@]}" --source "$stage/source.json" >/dev/null ||
+  die "couldn't write the AltStore source"
+
 echo "release: $repo $tag at $sha"
-echo "release: assets: $BRAND_NAME.ipa $BRAND_NAME.deb $debname ${extra[*]:+${extra[*]} }${repofiles[*]}"
+echo "release: assets: $BRAND_NAME.ipa $BRAND_NAME.deb $debname ${extra[*]:+${extra[*]} }${repofiles[*]} source.json"
 if [ "$repo" = "$BRAND_GITHUB_REPO" ]; then aptrepo=https://$BRAND_DOMAIN/repo/; else aptrepo="https://github.com/$repo/releases/latest/download/ (a Worker with IFIZBOX_REPO=$repo serves it at /repo/)"; fi
 echo "release: apt repo: $aptrepo, from https://github.com/$repo/releases/latest/download/${minimum:+ (minimum $minimum)}"
+echo "release: AltStore source: https://$BRAND_DOMAIN/repo/source.json (the sideload app's; the jailbreak app uses the apt repo only)"
 echo "release: notes:"
 sed 's/^/  /' "$stage/notes.md"
-altargs=(--notes "$stage/notes.md" ${minimum:+--minimum "$minimum"})
 if [ -n "$out" ]; then
   mkdir -p "$out"
   cp "$stage/notes.md" "$out/notes.md"
@@ -169,8 +178,7 @@ if [ -n "$out" ]; then
 fi
 if [ $dry = 1 ]; then
   if [ -n "$out" ]; then
-    cp web/app/source.json "$out/source.json"
-    python3 tools/altsource.py update "$version" "$ipa" "${altargs[@]}" --source "$out/source.json" >/dev/null
+    cp "$stage/source.json" "$out/source.json"
     echo "release: dry run: the AltStore source it would write is $out/source.json"
   fi
   echo "release: dry run, nothing published"
@@ -180,11 +188,12 @@ fi
 assets=("$stage/$BRAND_NAME.ipa" "$stage/$BRAND_NAME.deb" "$stage/$debname")
 for b in "${extra[@]}"; do assets+=("$stage/$b"); done
 for f in "${repofiles[@]}"; do assets+=("$stage/$f"); done
+assets+=("$stage/source.json")
 gh release create "$tag" --repo "$repo" --target "$sha" --title "$BRAND_NAME $version" --notes-file "$stage/notes.md" \
   "${draft[@]}" "${assets[@]}"
 git fetch -q origin "refs/tags/$tag:refs/tags/$tag" || true
 echo "release: published https://github.com/$repo/releases/tag/$tag"
-python3 tools/altsource.py update "$version" "$ipa" "${altargs[@]}"
+cp "$stage/source.json" web/app/source.json
 python3 tools/altsource.py check
 [ -z "$out" ] || cp web/app/source.json "$out/source.json"
 echo "release: web/app/source.json now names $tag's $BRAND_NAME.ipa: commit it"

@@ -7,16 +7,34 @@
 //                                         installed (screens/home.js installApp), or Settings > Signing first
 //     jailbroken (rootless, ...)          downloads the release's .deb for that architecture, to open in Sileo or
 //                                         Filza; an architecture with no .deb yet is told so
-//   iFizBox's own package page: its AltStore source (web/app/source.json, first in DEFAULT_ALT_SOURCES).
-import { NAME, GITHUB_REPO } from "../brand.js";
+//   iFizBox's own package page: its AltStore source (web/app/source.json, first in DEFAULT_ALT_SOURCES), in the
+//   site and the sideload app only (F178 ownBuilds: the jailbreak app hides it).
+import { NAME, GITHUB_REPO, DOMAIN, BUNDLE_ID } from "../brand.js";
 
 export const REPO_URL = `https://github.com/${GITHUB_REPO}`;
 // The release assets native/build.sh makes (tools/release.sh uploads them): latest/download always names the newest.
 export const APP_IPA_URL = `${REPO_URL}/releases/latest/download/${NAME}.ipa`;
 export const APP_DEB_URL = `${REPO_URL}/releases/latest/download/${NAME}.deb`; // rootless, iphoneos-arm64
-// iFizBox's own AltStore source, kept current with native/VERSION by test_release.py.
-export const APP_SOURCE_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/web/app/source.json`;
+// iFizBox's own AltStore source, kept current with native/VERSION by test_release.py. F178: at the site, beside the
+// APT repo (https://<DOMAIN>/repo/): the Worker's /repo/source.json serves the deployed web/app/source.json.
+export const APP_SOURCE_URL = `https://${DOMAIN}/repo/source.json`;
+export const APP_APT_REPO = `https://${DOMAIN}/repo/`;
 export const APP_NAME = NAME;
+export const APP_ID = BUNDLE_ID;
+
+// F178: lite and full kept apart (user 2026-11-18: "not show one app the other's"). Which iFizBox a build shows:
+//   sideload (lite)   the IPA only, from the AltStore source: no .deb, no Install Full iFizBox, no APT repo
+//   jailbreak (full)  the .deb only, from its APT repo: the lite IPA in any AltStore source is hidden
+//   site              both tiles (Install iFizBox App, Install Full iFizBox)
+export function ownBuilds(mode = "site") {
+  if (mode === "sideload") return { ipa: true, deb: false, aptRepo: false };
+  if (mode === "jailbreak") return { ipa: false, deb: true, aptRepo: true };
+  return { ipa: true, deb: true, aptRepo: true };
+}
+
+// The bundle IDs AltStore sources must not list in this build (core/catalog.js loadAlt `hide`): iFizBox's own IPA in
+// the jailbreak app, which is the .deb from its APT repo.
+export const hiddenAltApps = (mode = "site") => (ownBuilds(mode).ipa ? [] : [APP_ID]);
 
 const NOT_JAILBROKEN = "none";
 

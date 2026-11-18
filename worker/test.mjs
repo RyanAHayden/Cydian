@@ -678,3 +678,55 @@ import { d1 } from "./src/d1-sqlite.js";
   assert.equal((await at(`/sign/up/xyz/status`)).status, 404);
   console.log("worker ios status: ok");
 }
+
+// F178: iFizBox's AltStore source at https://<DOMAIN>/repo/source.json: the deployed web/app/source.json (ASSETS),
+// else the latest release's source.json; and the site's proxy answers its own /repo/ URLs without fetching itself.
+{
+  const { repo, selfSource, ownRepoUrl } = await import("./src/index.js");
+  const { DOMAIN } = await import("../web/app/brand.js");
+  const body = '{"name":"iFizBox","apps":[]}';
+  const assetsAsked = [];
+  const ASSETS = { fetch: async (req) => { assetsAsked.push(new URL(req.url).pathname); return new Response(body, { headers: { "content-type": "application/json" } }); } };
+  const none = async () => { throw new Error("GitHub must not be asked"); };
+  const at = (path, e = {}, fetcher = none, init) => { const req = new Request(`https://${DOMAIN}${path}`, init); return repo(req, new URL(req.url), e, { fetcher, wait: async () => {} }); };
+  let r = await at("/repo/source.json", { ASSETS });
+  assert.equal(r.status, 200);
+  assert.equal(await r.text(), body);
+  assert.equal(r.headers.get("content-type"), "application/json; charset=utf-8");
+  assert.equal(r.headers.get("access-control-allow-origin"), "*");
+  assert.deepEqual(assetsAsked, ["/source.json"]);
+  assert.equal((await at("/repo/source.json", { ASSETS }, none, { method: "HEAD" })).status, 200);
+  assert.equal((await at("/repo/source.json", { ASSETS }, none, { method: "POST" })).status, 404);
+  // no ASSETS (or no source.json there): the latest release's asset
+  const seen = [];
+  const gh = async (url) => { seen.push(url); return url.endsWith("/source.json") ? new Response(body) : new Response("no", { status: 404 }); };
+  r = await at("/repo/source.json", {}, gh);
+  assert.equal(await r.text(), body);
+  assert.equal(seen.pop(), "https://github.com/RyanAHayden/iFizBox/releases/latest/download/source.json");
+  const missing = { fetch: async () => new Response("nope", { status: 404 }) };
+  r = await at("/repo/source.json", { ASSETS: missing, IFIZBOX_REPO: "me/fork" }, gh);
+  assert.equal(r.status, 200);
+  assert.equal(seen.pop(), "https://github.com/me/fork/releases/latest/download/source.json");
+  assert.equal((await at("/repo/source.json", {}, async () => new Response("no", { status: 404 }))).status, 404);
+  assert.equal(typeof selfSource, "function");
+  // the whole Worker: /repo/source.json before the website's assets
+  r = await w.fetch(new Request(`https://${DOMAIN}/repo/source.json`), { ...env, ASSETS });
+  assert.equal(r.status, 200);
+  assert.equal(await r.text(), body);
+  // /api/fetch of the Worker's own /repo/ URL: answered here (a Worker can't fetch its own custom domain)
+  const u = new URL(`https://${DOMAIN}/api/fetch`);
+  assert.ok(ownRepoUrl(new URL(`https://${DOMAIN}/repo/source.json`), u));
+  assert.ok(ownRepoUrl(new URL(`https://www.${DOMAIN}/repo/source.json`), u));
+  assert.equal(ownRepoUrl(new URL(`https://${DOMAIN}/source.json`), u), null);
+  assert.equal(ownRepoUrl(new URL("https://example.com/repo/source.json"), u), null);
+  assert.equal(ownRepoUrl(new URL(`http://${DOMAIN}/repo/source.json`), u), null);
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = none;
+  try {
+    r = await w.fetch(new Request(`https://${DOMAIN}/api/fetch?url=${encodeURIComponent(`https://${DOMAIN}/repo/source.json`)}`), { ...env, ASSETS });
+  } finally { globalThis.fetch = realFetch; }
+  assert.equal(r.status, 200);
+  assert.equal(await r.text(), body);
+  assert.equal(r.headers.get("content-type"), "application/json; charset=utf-8");
+  console.log("worker self source: ok");
+}

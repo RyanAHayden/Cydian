@@ -3,7 +3,8 @@
   "identifier": "com.ryha.ifizbox",
   "subtitle": "A package manager with the iOS 6 look",
   "description": "iFizBox's own source: the iFizBox app for iPhones without a jailbreak.",
-  "iconURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/main/web/app/icons/icon-180.png",
+  "sourceURL": "https://ifizbox.com/repo/source.json",
+  "iconURL": "https://ifizbox.com/icons/icon-180.png",
   "website": "https://github.com/RyanAHayden/iFizBox",
   "tintColor": "#37a94a",
   "apps": [
@@ -13,7 +14,7 @@
       "developerName": "Ryan Hayden",
       "subtitle": "Packages and apps with the iOS 6 look",
       "localizedDescription": "iFizBox lists apps from AltStore-style sources and, on a jailbroken iPhone, tweaks and themes from APT repos, with the iOS 6 look. The app signs apps on your iPhone with your own certificate (no server) and scrolls at 120Hz. Free and open source (GPL-3.0-or-later).",
-      "iconURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/main/web/app/icons/icon-180.png",
+      "iconURL": "https://ifizbox.com/icons/icon-180.png",
       "tintColor": "#37a94a",
       "category": "utilities",
       "versions": [

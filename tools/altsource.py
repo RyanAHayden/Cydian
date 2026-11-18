@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """iFizBox's own AltStore source (I7): web/app/source.json, the package page iFizBox's default sources show for the
-app itself (core/sources.js DEFAULT_ALT_SOURCES, core/appoffer.js APP_SOURCE_URL).
+app itself (core/sources.js DEFAULT_ALT_SOURCES, core/appoffer.js APP_SOURCE_URL). F178: published at
+https://<BRAND_DOMAIN>/repo/source.json (SOURCE_URL; the Worker's /repo route serves the deployed web/app/source.json),
+beside iFizBox's APT repo at https://<BRAND_DOMAIN>/repo/.
 
   tools/altsource.py update VERSION IPA [DATE] [--notes FILE] [--minimum X.Y.Z]
         point the source at release vVERSION's iFizBox.ipa (its size from IPA), newest first in versions[], the
@@ -24,7 +26,11 @@ sys.path.insert(0, os.path.join(ROOT, "native"))
 from brand import BRAND, NAME  # noqa: E402  (F170: native/brand.env)
 SOURCE = os.path.join(ROOT, "web", "app", "source.json")
 REPO = f"https://github.com/{BRAND['BRAND_GITHUB_REPO']}"
-RAW = f"https://raw.githubusercontent.com/{BRAND['BRAND_GITHUB_REPO']}/main"
+# F178: the source and its icon at the site (brand.env BRAND_DOMAIN): the Worker's /repo/source.json answers with the
+# deployed web/app/source.json, and web/app/icons/ are the site's own assets.
+SITE = f"https://{BRAND['BRAND_DOMAIN']}"
+SOURCE_URL = f"{SITE}/repo/source.json"
+ICON_URL = f"{SITE}/icons/icon-180.png"
 BUNDLE_ID = BRAND["BRAND_BUNDLE_ID"]
 MIN_OS = "15.0"  # native/mkipa.py's MinimumOSVersion
 KEEP = 20  # versions[] entries kept (newest first)
@@ -80,7 +86,8 @@ def source_entry(app):
         "identifier": BUNDLE_ID,
         "subtitle": "A package manager with the iOS 6 look",
         "description": f"{NAME}'s own source: the {NAME} app for iPhones without a jailbreak.",
-        "iconURL": f"{RAW}/web/app/icons/icon-180.png",
+        "sourceURL": SOURCE_URL,
+        "iconURL": ICON_URL,
         "website": REPO,
         "tintColor": "#37a94a",
         "apps": [app],
@@ -98,7 +105,7 @@ def app_entry(versions):
             f"{NAME} lists apps from AltStore-style sources and, on a jailbroken iPhone, tweaks and themes from "
             "APT repos, with the iOS 6 look. The app signs apps on your iPhone with your own certificate (no "
             "server) and scrolls at 120Hz. Free and open source (GPL-3.0-or-later)."),
-        "iconURL": f"{RAW}/web/app/icons/icon-180.png",
+        "iconURL": ICON_URL,
         "tintColor": "#37a94a",
         "category": "utilities",
         "versions": versions,
@@ -124,6 +131,8 @@ def check(data):
     if not isinstance(apps, list) or len(apps) != 1:
         return ["one app expected"]
     app = apps[0]
+    if data.get("sourceURL") != SOURCE_URL:
+        problems.append(f"sourceURL is not {SOURCE_URL}")
     if app.get("bundleIdentifier") != BUNDLE_ID:
         problems.append(f"bundleIdentifier is not {BUNDLE_ID}")
     versions = app.get("versions") or []

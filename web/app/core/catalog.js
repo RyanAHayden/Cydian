@@ -37,8 +37,9 @@
 //   c.installed()                          -> [row] installed, sorted by name, each with `installed` (its version)
 //                                             and `size` (F104: Installed-Size in bytes, or null)
 //   c.upgrades(holds, { dpkgHolds })       -> { available: [row], ignored: [row] } (Changes, core/installed.js)
-//   c.loadAlt(key, json, ios, format)      -> an AltStore source (F9, core/altstore.js): each app a row, its
-//                                             candidate the newest version iOS `ios` runs; apps none runs on left out
+//   c.loadAlt(key, json, ios, format, hide) -> an AltStore source (F9, core/altstore.js): each app a row, its
+//                                             candidate the newest version iOS `ios` runs; apps none runs on left out,
+//                                             and (F178) apps whose bundle ID is in `hide`
 //   c.altSource(key)                       -> the AltStore source's page data: { name, tintColor, headerURL, news,
 //                                             featured: [row], ... } or null
 //   c.setDevice(device, { filter })        -> "Works on my phone" (F17, core/compat.js): every row gets `compat`,
@@ -519,8 +520,16 @@ export function createCatalog() {
   // featured apps) is kept for its source page. F16a: `format` (the source record's: altstore, esign, scarlet,
   // gbox; none is AltStore) picks the reader (core/altstore.js parseSource), so each app's `extra` comes along.
   const altMeta = new Map(); // key -> parsed source without apps
-  function loadAlt(key, json, ios = null, format = null) {
+  // F178: `hide`, bundle IDs left out of this source (core/appoffer.js hiddenAltApps: the lite iFizBox IPA in the
+  // jailbreak app); the source's count and page leave them out too.
+  function loadAlt(key, json, ios = null, format = null, hide = []) {
     const parsed = parseSource(format, json);
+    const skip = new Set(Array.isArray(hide) ? hide : []);
+    if (skip.size) {
+      parsed.apps = parsed.apps.filter((a) => !skip.has(a.bundleIdentifier));
+      const kept = new Set(parsed.apps.map((a) => a.id));
+      parsed.featuredApps = (parsed.featuredApps ?? []).filter((id) => kept.has(id));
+    }
     const byId = new Map();
     for (const app of parsed.apps) {
       const st = appStanza(app, { url: key.replace(/^alt:/, ""), name: parsed.name }, ios);

@@ -27,6 +27,7 @@
 //                                           app page's App Store details), its first result only; cached a day
 //   GET  /api/ipainfo?url=<IPA URL>          F160: MinimumOSVersion, UIDeviceFamily, bundle ID and version from the IPA's
 //                                           own Info.plist, read with Range requests (src/ipainfo.js); cached 30 days
+//   GET/POST/DELETE /reviews/<package id>[/<review id>[/report]]   F182: user reviews in D1 (src/reviews.js)
 //   GET  /repo/<file>                       B17: iFizBox's own flat APT repo (Release, Packages, Packages.gz, *.deb),
 //                                           the latest release's asset fetched here, redirects followed here
 //
@@ -36,6 +37,7 @@
 
 import { account, isAccountPath } from "./account.js";
 import { readIpaInfo, IpaError } from "./ipainfo.js";
+import { reviews, isReviewsPath } from "./reviews.js";
 import { NAME, GITHUB_REPO } from "../../web/app/brand.js";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -455,6 +457,7 @@ export default {
     const u = new URL(req.url);
     const ttl = Math.max(60, Number(env.TTL) || 600);
     if (isAccountPath(u.pathname)) return account(req, env); // F97: iFizBox Account (src/account.js)
+    if (isReviewsPath(u.pathname)) return reviews(req, env); // F182: user reviews (src/reviews.js)
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null);

@@ -53,6 +53,7 @@ import { detectMode } from "./core/settings.js";
 import { queueWords, parseSimulation, mergePlans } from "./core/queue.js";
 import { installQueue } from "./queue.js";
 import { NAME } from "./brand.js";
+import { reviewsApi, reviewsBase } from "./core/reviews.js";
 
 // The one apt source file iFizBox writes (cydian-helper addsource/removesource, F33).
 const CYDIAN_SOURCES = /(^|\/)sources\.list\.d\/cydian\.sources$/;
@@ -148,6 +149,8 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
     const add = sources.addSource;
     sources.addSource = async (input) => { await cf.ready(); return add(input); };
   }
+  // F182: user reviews on the app's server (core/reviews.js), straight from the web view (CORS), as Account does.
+  backend.reviews = reviewsApi({ base: reviewsBase("app") });
   return Object.assign(backend, sources);
 }
 

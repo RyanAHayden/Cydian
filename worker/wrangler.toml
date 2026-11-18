@@ -2,7 +2,7 @@
 name = "cydian-sign"
 main = "src/index.js"
 # The website: web/app/ served as static assets (index.html for app routes like /add).
-assets = { directory = "../web/app", binding = "ASSETS", not_found_handling = "single-page-application", run_worker_first = ["/sign/*", "/api/*", "/healthz", "/repo", "/repo/*"] }
+assets = { directory = "../web/app", binding = "ASSETS", not_found_handling = "single-page-application", run_worker_first = ["/sign/*", "/api/*", "/healthz", "/repo", "/repo/*", "/reviews/*"] }
 compatibility_date = "2026-11-01"
 
 [vars]
@@ -26,3 +26,17 @@ simple = { limit = 60, period = 60 }
 name = "ACCOUNT_WRITE_LIMIT"
 namespace_id = "9802"
 simple = { limit = 12, period = 60 }
+
+# F182: user reviews (src/reviews.js) in D1, free on the Workers Free plan (5 GB, 100,000 rows written a day). Wrangler
+# makes the database on the first deploy, like HOSTED (or: `npx wrangler d1 create cydian-reviews`, and its
+# database_id here); the Worker makes its tables itself. Owner-only delete: `npx wrangler secret put REVIEWS_ADMIN`.
+# Optional: REVIEWS_SALT (a secret) salts the stored token and address hashes.
+[[d1_databases]]
+binding = "REVIEWS"
+database_name = "cydian-reviews"
+
+# F182: review writes (posts, reports) per address across isolates; keep limit at REVIEW_WRITES.
+[[ratelimits]]
+name = "REVIEW_RATE_LIMIT"
+namespace_id = "9803"
+simple = { limit = 6, period = 60 }

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- cydian-helper's entitlements (F59): AppSync Unified's appinst_entitlements.plist (GPL-3.0), so install-ipa may
+     ask installd through LSApplicationWorkspace installApplication:withOptions:error:. build.sh signs the helper
+     with these (ldid -S or rcodesign). -->
+<plist version="1.0">
+<dict>
+	<key>platform-application</key><true/>
+	<key>com.apple.private.mobileinstall.allowedSPI</key>
+	<array>
+		<string>Install</string>
+		<string>InstallForLaunchServices</string>
+	</array>
+	<key>com.apple.security.exception.mach-lookup.global-name</key>
+	<array>
+		<string>com.apple.mobile.installd</string>
+	</array>
+</dict>
+</plist>

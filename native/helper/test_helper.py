@@ -13,6 +13,9 @@ FLAGS = ["-std=c11", "-Wall", "-Wextra", "-Werror", "-D_DEFAULT_SOURCE", "-O1"]
 
 
 def build(out, sources, defs=()):
+    # F59: main.c calls ipa.c's install-ipa, test_driver.c its checks.
+    if ("main.c" in sources or "test_driver.c" in sources) and "ipa.c" not in sources:
+        sources = [*sources, "ipa.c"]
     subprocess.run([CC, *FLAGS, *defs, "-o", out, *(os.path.join(HERE, s) for s in sources)], check=True,
                    capture_output=True)
 
@@ -485,11 +488,213 @@ class Helper(unittest.TestCase):
             self.skipTest("IOS_SDK not set: iOS build of the helper not checked")
         out = os.path.join(self.tmp, "ios")
         os.makedirs(out, exist_ok=True)
-        for src, args in (("main.c", ["-c"]), ("policy.c", ["-c"]), ("spawn.c", ["-c"])):
+        for src, args in (("main.c", ["-c"]), ("policy.c", ["-c"]), ("spawn.c", ["-c"]), ("ipa.c", ["-c"])):
             r = subprocess.run(["clang", "-target", "arm64-apple-ios15.0", "-isysroot", sdk, *FLAGS[:4], *args,
                                 os.path.join(HERE, src), "-o", os.path.join(out, src + ".o")],
                                capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
+
+IPA_DIR = "/var/mobile/Library/Caches/com.ryha.cydian/ipa"
+PLIST = ('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n'
+         '\t<key>CFBundleExecutable</key><string>Demo</string>\n'
+         '\t<key>CFBundleIdentifier</key>\n\t<string>{}</string>\n</dict>\n</plist>\n')
+
+
+@unittest.skipUnless(CC, "no C compiler on this machine")
+class InstallIpa(unittest.TestCase):
+    """F59: install-ipa <path>: the path allowlist, and the whole chain on Linux (unzip, ldid and installd stand-ins;
+    ipa.c's installd step only prints off iOS)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp()
+        cls.driver = os.path.join(cls.tmp, "test_driver")
+        build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"])
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp)
+
+    def run_driver(self, *args, driver=None):
+        r = subprocess.run([driver or self.driver, *args], capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout.splitlines()
+
+    def test_paths(self):
+        d = IPA_DIR
+        good = [d + "/a.ipa", d + "/3F2A-11.ipa", d + "/My_App-1.2.ipa", d + "/" + "a" * 251 + ".ipa"]
+        bad = ["", d, d + "/", d + "/.ipa", d + "/.x.ipa", d + "/a.IPA", d + "/a.ipa/", d + "/sub/a.ipa",
+               d + "/../a.ipa", d + "/a..ipa", "/tmp/a.ipa", d + "x/a.ipa", d + "/a b.ipa", d + "/a\n.ipa",
+               d + "/-a.ipa", d + "/_a.ipa", d + "/" + "a" * 252 + ".ipa", d + "/a.ipa\n", "/var/jb/etc/passwd",
+               d.replace("/ipa", "") + "/a.ipa", "a.ipa", "./a.ipa"]
+        self.assertEqual(self.run_driver("ipapath", d, *good), ["ok"] * len(good))
+        self.assertEqual(self.run_driver("ipapath", d, *bad), ["bad"] * len(bad))
+
+    def test_plan(self):
+        ipa = IPA_DIR + "/0A1B.ipa"
+        self.assertEqual(self.run_driver("plan", "/var/jb", "3", "install-ipa", ipa), [ipa, "install-ipa", ipa])
+        cases = {
+            ("install-ipa",): "takes one path",
+            ("install-ipa", ipa, ipa): "takes one path",
+            ("install-ipa", "/var/jb/etc/master.passwd"): "bad IPA path",
+            ("install-ipa", IPA_DIR + "/../../../../root/x.ipa"): "bad IPA path",
+            ("install-ipa", "-o"): "bad IPA path",
+            ("Install-ipa", ipa): "unknown verb",
+        }
+        for words, msg in cases.items():
+            with self.subTest(words=words):
+                out = self.run_driver("plan", "/var/jb", "3", *words)
+                self.assertEqual(len(out), 1, out)
+                self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
+        self.assertEqual(self.run_driver("known", "/nonexistent", "install-ipa", ipa), ["all known"])
+
+    def test_plist_id(self):
+        cases = {PLIST.format("com.example.demo"): "com.example.demo",
+                 PLIST.format("Com.Example-2"): "Com.Example-2",
+                 PLIST.format("a b"): "bad", PLIST.format("-x"): "bad", PLIST.format(""): "bad",
+                 PLIST.format("a/../b"): "bad", PLIST.format("x" * 256): "bad",
+                 "<plist><dict><key>CFBundleName</key><string>x</string></dict></plist>": "bad",
+                 "<key>CFBundleIdentifier</key><integer>1</integer>": "bad", "": "bad"}
+        for text, want in cases.items():
+            with self.subTest(text=text[-60:]):
+                f = os.path.join(self.tmp, "Info.plist")
+                with open(f, "w") as fh:
+                    fh.write(text)
+                self.assertEqual(self.run_driver("plistid", f), [want])
+
+    def test_appsync(self):
+        p = tempfile.mkdtemp(dir=self.tmp)
+        self.assertEqual(self.run_driver("appsync", p), ["no"])
+        for rel in ("Library/MobileSubstrate/DynamicLibraries", "usr/lib/TweakInject"):
+            q = tempfile.mkdtemp(dir=self.tmp)
+            os.makedirs(os.path.join(q, rel))
+            open(os.path.join(q, rel, "AppSyncUnified-installd.dylib"), "w").close()
+            self.assertEqual(self.run_driver("appsync", q), ["yes"], rel)
+
+    def test_entitlements(self):
+        """appinst's entitlements on the helper, and build.sh signs the helper with them."""
+        import plistlib
+        with open(os.path.join(HERE, "entitlements.plist"), "rb") as f:
+            e = plistlib.load(f)
+        self.assertTrue(e["platform-application"])
+        self.assertEqual(e["com.apple.private.mobileinstall.allowedSPI"], ["Install", "InstallForLaunchServices"])
+        self.assertEqual(e["com.apple.security.exception.mach-lookup.global-name"], ["com.apple.mobile.installd"])
+        with open(os.path.join(HERE, "..", "build.sh")) as f:
+            build_sh = f.read()
+        self.assertIn('-Shelper/entitlements.plist "$libexec/cydian-helper"', build_sh)
+        self.assertIn('--entitlements-xml-file helper/entitlements.plist "$libexec/cydian-helper"', build_sh)
+        self.assertIn("helper/ipa.c", build_sh)
+
+    # --- the chain
+
+    def chain(self, ldid=False, appsync=False):
+        base = tempfile.mkdtemp(dir=self.tmp)
+        p, ipa_dir, work = (os.path.join(base, n) for n in ("prefix", "ipa", "work"))
+        for d in ("Applications/Cydian.app", "usr/bin"):
+            os.makedirs(os.path.join(p, d))
+        os.makedirs(ipa_dir)
+        os.makedirs(work)
+        app = os.path.join(p, "Applications/Cydian.app/Cydian")
+        shutil.copy(self.driver, app)
+        unzip = os.path.join(p, "usr/bin/unzip")  # unzip -qq -o <zip> -d <dir>
+        with open(unzip, "w") as f:
+            f.write('#!/bin/sh\necho "unzip as $(id -u) in $(pwd)" >&2\npython3 -I -m zipfile -e "$3" "$5" || exit 9\n')
+        os.chmod(unzip, 0o755)
+        if ldid:
+            path = os.path.join(p, "usr/bin/ldid")
+            with open(path, "w") as f:
+                f.write('#!/bin/sh\necho "ldid $*"\n[ -f "$2/Info.plist" ] || exit 1\n')
+            os.chmod(path, 0o755)
+        if appsync:
+            d = os.path.join(p, "usr/lib/TweakInject")
+            os.makedirs(d)
+            open(os.path.join(d, "AppSyncUnified-installd.dylib"), "w").close()
+        helper = os.path.join(base, "cydian-helper")
+        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"', f"-DCYDIAN_ROOT_UID={os.getuid()}",
+                                                f'-DHELPER_IPA_DIR="{ipa_dir}"', f'-DHELPER_IPA_WORK="{work}"'])
+        return p, app, helper, ipa_dir, work
+
+    def ipa(self, ipa_dir, bundle_id="com.example.demo", name="A1.ipa", app="Demo.app"):
+        import zipfile
+        path = os.path.join(ipa_dir, name)
+        with zipfile.ZipFile(path, "w") as z:
+            if app:
+                z.writestr(f"Payload/{app}/Info.plist", PLIST.format(bundle_id))
+                z.writestr(f"Payload/{app}/Demo", b"\xcf\xfa\xed\xfe")
+        return path
+
+    def spawn(self, app, helper, *words):
+        return self.run_driver("spawn", helper, *words, driver=app)
+
+    def assert_clean(self, work):
+        self.assertEqual(os.listdir(work), [])  # the work directory goes, whatever happened
+
+    def test_chain_adhoc(self):
+        """No AppSync: ldid -s on the unpacked .app, then installd gets the .app (PackageType Developer)."""
+        p, app, helper, ipa_dir, work = self.chain(ldid=True)
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir))
+        self.assertEqual(out[-1], "exit: 0", out)
+        self.assertTrue(any(l.startswith("1: ldid -s ") and l.endswith("/pkg/Payload/Demo.app") for l in out), out)
+        self.assertIn("1: install app com.example.demo (PackageType Developer)", out)
+        self.assertIn("1: Installed com.example.demo", out)
+        self.assertIn("3: pmstatus:com.example.demo:100:Installed", out)
+        # unzip runs in the root-owned work directory's pkg/ (as mobile on the phone; here the test's own user)
+        self.assertTrue(any(l.startswith(f"2: unzip as {os.getuid()} in {work}/cydian-ipa.") and l.endswith("/pkg")
+                            for l in out), out)
+        self.assert_clean(work)
+
+    def test_chain_appsync(self):
+        """AppSync Unified: the IPA itself goes to installd, as appinst does; nothing is signed."""
+        p, app, helper, ipa_dir, work = self.chain(ldid=True, appsync=True)
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir))
+        self.assertEqual(out[-1], "exit: 0", out)
+        self.assertIn("1: install ipa com.example.demo", out)
+        self.assertFalse(any("ldid" in l for l in out), out)
+        self.assert_clean(work)
+
+    def test_chain_cant_adhoc(self):
+        """Exit 69 says the jailbreak can't install ad hoc apps: no AppSync and no ldid, or installd refuses."""
+        p, app, helper, ipa_dir, work = self.chain()
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir))
+        self.assertEqual(out[-1], "exit: 69", out)
+        self.assertTrue(any("AppSync Unified isn't installed and there's no ldid" in l for l in out), out)
+        self.assertFalse(any(l.startswith("1: install ") for l in out), out)
+        self.assert_clean(work)
+        p, app, helper, ipa_dir, work = self.chain(ldid=True)
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, bundle_id="com.example.refused"))
+        self.assertEqual(out[-1], "exit: 69", out)
+        self.assertTrue(any("can't install ad hoc apps without AppSync" in l for l in out), out)
+        self.assertIn("2: cydian-helper: installd: test installd refused it", out)
+        self.assert_clean(work)
+
+    def test_chain_refuses(self):
+        p, app, helper, ipa_dir, work = self.chain(ldid=True)
+        good = self.ipa(ipa_dir)
+        link = os.path.join(ipa_dir, "link.ipa")
+        os.symlink(good, link)
+        hard = os.path.join(ipa_dir, "hard.ipa")
+        os.link(self.ipa(ipa_dir, name="H.ipa"), hard)
+        junk = os.path.join(ipa_dir, "junk.ipa")
+        with open(junk, "w") as f:
+            f.write("not a zip")
+        cases = [
+            (app, os.path.join(ipa_dir, "missing.ipa"), "can't open the IPA", 64),
+            (app, link, "can't open the IPA", 64),
+            (app, hard, "isn't a plain file", 64),
+            (app, junk, "unzip couldn't unpack", 64),
+            (app, self.ipa(ipa_dir, name="E.ipa", app=None), "no single Payload", 64),
+            (app, self.ipa(ipa_dir, name="B.ipa", bundle_id="bad id"), "no usable CFBundleIdentifier", 64),
+            (app, os.path.join(p, "x.ipa"), "bad IPA path", 64),
+            (app, ipa_dir + "/../ipa/" + os.path.basename(good), "bad IPA path", 64),
+            (self.driver, good, "isn't Cydian", 77),
+        ]
+        for parent, path, msg, code in cases:
+            with self.subTest(path=os.path.basename(path), msg=msg):
+                out = self.spawn(parent, helper, "install-ipa", path)
+                self.assertTrue(any(l.startswith("2: cydian-helper: ") and msg in l for l in out), out)
+                self.assertEqual(out[-1], f"exit: {code}")
+                self.assertFalse(any(l.startswith("1: install ") for l in out), out)
+                self.assert_clean(work)
 
 
 if __name__ == "__main__":

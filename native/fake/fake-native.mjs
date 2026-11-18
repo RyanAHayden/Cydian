@@ -9,9 +9,11 @@
 //
 // `net`: URL -> string | { status, body, headers } for net.fetch / net.packages (a missing URL answers 404;
 // net: null means offline, every request fails with "network: ..."). `env` goes to the helper (FAKE_FAIL=update).
+// F59: ipa.install downloads into `ipaDir` (default: beside the prefix, ipa-cache/) and runs install-ipa there.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { spawn } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,7 +30,8 @@ export function makeFixture() {
 
 const read = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null);
 
-export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = FAKE_HELPER } = {}) {
+export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = FAKE_HELPER, mode = "jailbreak",
+  ipaDir = join(dirname(prefix ?? "."), "ipa-cache") } = {}) {
   const calls = [];
   const fail = (msg) => Promise.reject(new Error(msg));
 
@@ -77,7 +80,7 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       if (!existsSync(helper)) return fail(`helper: cydian-helper is not installed at ${helper}`);
       return new Promise((resolve, reject) => {
         const child = spawn(helper, words, {
-          env: { PATH: process.env.PATH, CYDIAN_PREFIX: prefix, FAKE_REMOTE: remote, ...env },
+          env: { PATH: process.env.PATH, CYDIAN_PREFIX: prefix, FAKE_REMOTE: remote, CYDIAN_IPA_DIR: ipaDir, ...env },
           stdio: ["ignore", "pipe", "pipe", "pipe"],
         });
         const text = { out: "", err: "" };
@@ -99,6 +102,32 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
           resolve({ code: code ?? 128, stdout: text.out, stderr: text.err });
         });
       });
+    },
+    // F59: like IPAInstall.run in Apt.swift: download as <UUID>.ipa into ipaDir, cydian-helper install-ipa, remove
+    // the download; the helper's exit code picks the error code.
+    async "ipa.install"({ url, stream }, onEvent) {
+      if (mode !== "jailbreak") return fail("sideload: the sideload build installs IPAs through signing.install");
+      if (!/^https?:\/\//i.test(url ?? "")) return fail("bad_url: not an http(s) URL");
+      mkdirSync(ipaDir, { recursive: true, mode: 0o700 });
+      if (stream && onEvent) onEvent({ fd: "status", line: "dlstatus:ipa:0:Downloading" });
+      const r = netGet(url);
+      if (!r) return fail("network: The Internet connection appears to be offline.");
+      if (r.status >= 400) return fail(`not_found: HTTP ${r.status} for ${url}`);
+      const path = join(ipaDir, `${randomUUID().toUpperCase()}.ipa`);
+      writeFileSync(path, Buffer.from(r.body));
+      let res;
+      try {
+        res = await call("helper.run", { words: ["install-ipa", path], stream }, onEvent);
+      } finally {
+        rmSync(path, { force: true });
+      }
+      if (res.code === 0) {
+        const id = res.stdout.split("\n").filter((l) => l.startsWith("Installed ")).pop();
+        return { code: 0, stdout: res.stdout, stderr: res.stderr, bundleId: id ? id.slice(10) : "" };
+      }
+      const why = res.stderr.split("\n").filter((l) => l.startsWith("cydian-helper: ")).pop();
+      const kind = { 64: "bad_ipa", 69: "no_adhoc", 77: "helper" }[res.code] ?? "install";
+      return fail(`${kind}: ${why ? why.slice(15) : `cydian-helper exited with ${res.code}`}`);
     },
   };
 

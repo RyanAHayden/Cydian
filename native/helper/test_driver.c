@@ -5,9 +5,13 @@
  *   test_driver apply <prefix> <verb> [args]...  F33: addsource/removesource on the prefix; "changed",
  *                                              "unchanged" or "error: ..."
  *   test_driver uri|suite|component <s>...     print "ok" or "bad" per string <uid> <euid> <root_uid> <parent_exe> <expected>   print "ok" or "error: ..."
+ *   test_driver ipapath <dir> <path>...        F59: print "ok" or "bad" per path (helper_ipa_path_ok)
+ *   test_driver plistid <file>                 F59: the Info.plist's CFBundleIdentifier, or "bad"
+ *   test_driver appsync <prefix>               F59: "yes" or "no"
  *   test_driver spawn <helper> [args]...       spawn helper, print its streams as "1: ...", "2: ...", "3: ..."
  *                                              lines, then "exit: <code>"
  * SPDX-License-Identifier: GPL-3.0-or-later */
+#include "ipa.h"
 #include "policy.h"
 #include "spawn.h"
 
@@ -88,6 +92,17 @@ int main(int argc, char **argv) {
         if (helper_caller_ok((uid_t)atol(argv[2]), (uid_t)atol(argv[3]), (uid_t)atol(argv[4]), argv[5], argv[6], &err))
             printf("error: %s\n", err);
         else printf("ok\n");
+    } else if (!strcmp(cmd, "ipapath") && argc >= 3) {
+        for (int i = 3; i < argc; i++) printf("%s\n", helper_ipa_path_ok(argv[2], argv[i]) ? "ok" : "bad");
+    } else if (!strcmp(cmd, "plistid") && argc == 3) {
+        static char buf[1 << 20];
+        char id[HELPER_NAME_MAX + 1];
+        FILE *f = fopen(argv[2], "rb");
+        size_t n = f ? fread(buf, 1, sizeof buf, f) : 0;
+        if (f) fclose(f);
+        printf("%s\n", helper_ipa_plist_id(buf, n, id, sizeof id) ? "bad" : id);
+    } else if (!strcmp(cmd, "appsync") && argc == 3) {
+        printf("%s\n", helper_ipa_appsync(argv[2]) ? "yes" : "no");
     } else if (!strcmp(cmd, "spawn") && argc >= 3) {
         return spawn(argc - 2, argv + 2);
     } else return 2;

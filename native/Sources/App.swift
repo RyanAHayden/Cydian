@@ -51,6 +51,18 @@ final class WebController: UIViewController, WKNavigationDelegate {
         web.load(URLRequest(url: AppScheme.url("index.html")))
     }
 
+    // Links the web view isn't for go straight to iOS: an itms-services install link (Install signed on the Signing
+    // Server, or a source's own signed link) then shows only iOS's "Install …?" prompt, not WebKit's "Open in
+    // iTunes?" first; sideloader schemes (altstore://, feather://...) open their apps. The app's own pages, https and
+    // about:blank stay in the web view.
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = action.request.url, let scheme = url.scheme?.lowercased() else { return decisionHandler(.allow) }
+        if ["http", "https", "about", "data", "blob", AppScheme.scheme].contains(scheme) { return decisionHandler(.allow) }
+        decisionHandler(.cancel)
+        UIApplication.shared.open(url)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { dropCover() }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { dropCover() }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {

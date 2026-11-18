@@ -9,11 +9,20 @@
    "name": "Cydian",
    "bundleIdentifier": "com.ryha.cydian",
    "developerName": "Ryan Hayden",
-   "subtitle": "Test: an essential update to Cydian",
+   "subtitle": "Test: an update to Cydian (0.2.2.1)",
    "localizedDescription": "Test build of Cydian marked 0.1.1.1 (the v0.1.1 app with a higher version number). Installing it is a real update over Cydian.",
    "iconURL": "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/icons/icon-180.png",
    "category": "utilities",
    "versions": [
+    {
+     "version": "0.2.2.1",
+     "buildVersion": "9002",
+     "date": "2026-11-17",
+     "size": 2613290,
+     "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/test-fixtures/cydian-0.2.2.1.ipa",
+     "localizedDescription": "Test update: the 0.2.2 app marked one step higher. Installing it is a real update over Cydian 0.2.2.",
+     "minOSVersion": "15.0"
+    },
     {
      "version": "0.1.1.1",
      "buildVersion": "9001",

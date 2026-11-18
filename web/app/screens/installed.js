@@ -190,7 +190,6 @@ function drawApps(rows, cands, site, hasStatus) {
       href: cands.has(r.id) ? format({ tab: route.tab, path: [...route.path, `package:${r.id}`] }) : null,
     })),
   }];
-  sections.push({ header: "Your Own IPAs", rows: [myIpasRow(route, site)] });
   if (site) {
     sections.push({ header: "Jailbroken iPhone", rows: [hasStatus
       ? { label: "dpkg Status File", subtitle: "Packages installed with apt", href: format({ tab: route.tab, path: [DPKG] }) }
@@ -202,9 +201,9 @@ function drawApps(rows, cands, site, hasStatus) {
   rows.forEach((r, i) => decorateApp(cells[i], r));
   attachRowGestures(ul);
   body.classList.replace("grouped", "plain");
-  body.replaceChildren(ul);
+  body.replaceChildren(myIpasTile(route, site), ul);
   if (!rows.length) {
-    body.prepend(note("No apps yet. Apps you install from an app's page are listed here, on this device."));
+    body.firstChild.after(note("No apps yet. Apps you install from an app's page are listed here, on this device.")); // under My IPAs
   }
 }
 
@@ -212,6 +211,20 @@ function drawApps(rows, cands, site, hasStatus) {
 export function myIpasRow(route, site) {
   return { label: "My IPAs", subtitle: site ? "Links to IPAs, signed by the Signing Server" : "IPAs you add, signed on this iPhone",
     href: format({ tab: route.tab, path: [myipas.MYIPAS] }) };
+}
+
+// My IPAs as a button above the list, Home's tile look (home.css), not a row like an installed app (user 2026-11-17).
+function myIpasTile(route, site) {
+  const r = myIpasRow(route, site);
+  const row = document.createElement("div");
+  row.className = "home-row installed-myipas";
+  row.innerHTML = `<ul class="table grouped home-tiles"><li class="cell"><a class="cell-inner chevron home-tile">
+    <span class="cell-icon home-glyph glyph-install"></span><span class="home-tile-text"><span class="cell-label"></span>
+    <span class="cell-subtitle"></span></span></a></li></ul>`;
+  row.querySelector("a").href = r.href;
+  row.querySelector(".cell-label").textContent = r.label;
+  row.querySelector(".cell-subtitle").textContent = r.subtitle;
+  return row;
 }
 
 // Delete controls as on the Sources tab (sources.css styles .source-row: the red minus, Delete, the swipe).

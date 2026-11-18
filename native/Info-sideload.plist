@@ -51,6 +51,14 @@
 	<!-- No system type for .mobileprovision: declare it, so the document type above has something to match. -->
 	<key>UTImportedTypeDeclarations</key><array>
 		<dict>
+			<key>UTTypeIdentifier</key><string>com.apple.itunes.ipa</string>
+			<key>UTTypeDescription</key><string>iOS App</string>
+			<key>UTTypeConformsTo</key><array><string>public.data</string><string>public.zip-archive</string></array>
+			<key>UTTypeTagSpecification</key><dict>
+				<key>public.filename-extension</key><array><string>ipa</string><string>tipa</string></array>
+			</dict>
+		</dict>
+		<dict>
 			<key>UTTypeIdentifier</key><string>com.apple.mobileprovision</string>
 			<key>UTTypeDescription</key><string>Provisioning profile</string>
 			<key>UTTypeConformsTo</key><array><string>public.data</string></array>

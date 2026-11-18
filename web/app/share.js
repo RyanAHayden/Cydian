@@ -2,9 +2,8 @@
 // already picked the route for this build (native/share/Share.swift); sources came as cydian://add?url=… instead.
 //   helper-ipa  jailbreak: "Install <name>?", then the Install IPA console (screens/ipa-install.js) over
 //               share.ipaInstall (a staged file) or ipa.install (a link); the app is remembered for I3's updates
-//   sign-ipa    sideload: the IPA in My IPAs (a link is added there first, library.add), its page, then "Install
-//               <name>?": signed on the phone with your certificate and installed through the in-app server
-//               (screens/myipas.js installLibraryFile, which also remembers it)
+//   sign-ipa    sideload: the IPA in My IPAs (a link is added there first, library.add) and its page, where
+//               Install signs it on the phone and installs it
 //   deb         jailbreak: the Confirm sheet and console for that file (screens/sharedeb.js); a link is fetched first
 //   refuse      an alert saying why (a .deb in the sideload app, no AppSync Unified, something iFizBox can't open)
 //
@@ -55,13 +54,8 @@ export async function handleShared(url, { native = globalThis.cydianNative, aler
       h();
       if (!file) return s.route;
     }
+    // Straight to its page in Install IPAs, no "Install?" over it: the page has Install (user 2026-11-18).
     location.hash = format({ tab: "installed", path: ["myipas", `ipa:${file}`] }).replace(/^#/, "");
-    const { index } = await alert({ title: `Install ${name}?`, message: `${NAME} signs it on this iPhone with your certificate and installs it. It stays in My IPAs.`,
-      buttons: ["Not Now", "Install"], cancel: 0 });
-    if (index === 1) {
-      const { installLibraryFile } = await import("./screens/myipas.js");
-      await installLibraryFile(file);
-    }
     return s.route;
   }
   if (s.route === "deb") {

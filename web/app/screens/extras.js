@@ -341,6 +341,29 @@ function markExternal() {
   }
 }
 
+// B12: what a busy row's job answers when the user closed the vendor's sheet: no alert, and nothing to draw again.
+export const CANCELLED = Symbol("cancelled");
+
+// A Purchase row's action: the HUD while the job runs, then the page drawn again; an error goes to `fail` (the
+// Purchase alert). A job that answers CANCELLED just takes the HUD down and leaves the page as it was (Sileo does).
+export function busyAction(label, job, { hud, fail, refresh }) {
+  return async () => {
+    const hide = hud(label);
+    let r;
+    try { r = await job(); } catch (e) { hide(); await fail(e); return; }
+    hide();
+    if (r !== CANCELLED) refresh();
+  };
+}
+
+// Sign In: the vendor's page in ASWebAuthenticationSession. auth.session answers null when the user tapped Cancel
+// (Paid.swift, canceledLogin): CANCELLED, silently. A callback finishSignIn can't read is still an error.
+export async function vendorSignIn(client, call = shell) {
+  const cb = await call("auth.session", { url: await client.authenticateUrl(), callbackScheme: "sileo" });
+  if (cb == null) return CANCELLED;
+  if (!(await client.finishSignIn(cb))) throw new Error("The vendor sent nothing back that Cydian could read.");
+}
+
 async function drawApp(st, source, base, draw, ctx, box) {
   const client = clientFor(base);
   const id = st.package;
@@ -351,12 +374,7 @@ async function drawApp(st, source, base, draw, ctx, box) {
     if (index === 1) window.open(e.recoveryUrl, "_blank", "noopener");
     if (e.invalidate) refresh();
   };
-  const busy = (label, job) => async () => {
-    const hide = (ctx?.showHUD ?? showHUD)(label);
-    try { await job(); } catch (e) { hide(); await fail(e); return; }
-    hide();
-    refresh();
-  };
+  const busy = (label, job) => busyAction(label, job, { hud: ctx?.showHUD ?? showHUD, fail, refresh });
   let info = null, vendor = null, signedIn = false;
   try {
     [vendor, signedIn] = await Promise.all([client.info().catch(() => null), client.signedIn()]);
@@ -367,10 +385,7 @@ async function drawApp(st, source, base, draw, ctx, box) {
   }
   const name = vendor?.name || new URL(base).hostname;
   const rows = [{ label: "Price", detail: info.purchased ? "Purchased" : info.price ?? "Paid" }];
-  const signIn = busy("Signing In", async () => {
-    const cb = await shell("auth.session", { url: await client.authenticateUrl(), callbackScheme: "sileo" });
-    if (!(await client.finishSignIn(cb))) throw new Error("Sign-in was cancelled or the vendor sent nothing back.");
-  });
+  const signIn = busy("Signing In", () => vendorSignIn(client));
   if (!info.available) rows.push({ label: "Not available to buy" });
   else if (!signedIn) rows.push({ label: vendor?.banner?.button || `Sign In to ${name}`, onClick: signIn });
   else if (!info.purchased) {

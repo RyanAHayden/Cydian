@@ -434,14 +434,16 @@ if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 const refreshOnLaunch = () => settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch");
 if (refreshOnLaunch()) SCREENS.sources.refreshInBackground?.(ctx);
 
-// In the app, back from the background after more than 2 minutes counts as a fresh open (user 2026-11-18): Home's
-// root, and the launch refresh again. iOS rarely cold-launches it, so without this it opens wherever it was left.
+// Back from the background after Settings' Return to Home After (2 minutes unless changed; Never: 0) counts as a
+// fresh open (user 2026-11-18): Home's root, and the launch refresh again. iOS rarely cold-launches the app or a
+// Home Screen web app, so without this it opens wherever it was left.
 // ponytail: an alert or sheet left open stays over Home; close them here if that turns out to bother.
-if (globalThis.ifizboxNative) {
+{
   let hiddenAt = 0;
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
-    if (!hiddenAt || Date.now() - hiddenAt < 2 * 60 * 1000) return;
+    const after = Number(settingsScreen.settings.get("returnHome")) * 60 * 1000;
+    if (!hiddenAt || !after || Date.now() - hiddenAt < after) return;
     hiddenAt = 0;
     // Home's root at its top, not where it was scrolled (user 2026-11-18). go's hashchange is async: scroll after it.
     const toTop = () => { const b = stacks.top()?.page.body; if (b) b.scrollTop = 0; };

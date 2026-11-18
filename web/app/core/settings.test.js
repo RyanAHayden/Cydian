@@ -32,7 +32,7 @@ test("defaults with nothing stored", () => {
 // F128: the settings audit. What's left, and the ones that went (docs/settings.md).
 test("F128: exactly these settings remain, and the retired ones are gone", () => {
   assert.deepEqual(SETTINGS.map((d) => d.key), ["appearance", "device", "arch", "worksOnMyPhone", "compatMarks",
-    "iosVersion", "refreshOnLaunch", "holds", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
+    "iosVersion", "refreshOnLaunch", "returnHome", "holds", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
     "keepVersions", "showExpiry", "resignReminder"]);
   assert.deepEqual(RETIRED, ["sideloader", "checkUpdates", "cellular", "notifications", "badge", "allowZoom"]);
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
@@ -73,17 +73,17 @@ test("F128: pages like iOS 6's Settings: General, Display, Updates (Signing in t
     .map((p) => [p.id, p.title, p.sections.map((x) => x.settings.map((d) => d.key))]);
   const display = ["display", "Display", [["appearance"], ["compatMarks"]]];
   assert.deepEqual(layout("site"), [
-    ["general", "General", [["device", "iosVersion"], ["worksOnMyPhone"], ["refreshOnLaunch"]]],
+    ["general", "General", [["device", "iosVersion"], ["worksOnMyPhone"], ["refreshOnLaunch", "returnHome"]]],
     display,
     ["updates", "Updates", [["holds"]]],
   ]);
   assert.deepEqual(layout("jailbreak"), [
-    ["general", "General", [["worksOnMyPhone"], ["refreshOnLaunch"]]],
+    ["general", "General", [["worksOnMyPhone"], ["refreshOnLaunch", "returnHome"]]],
     display,
     ["updates", "Updates", [["holds"], ["upgradeNotifications"], ["autoInstall", "autoInstallIdle", "respring", "keepVersions"]]],
   ]);
   assert.deepEqual(layout("sideload"), [
-    ["general", "General", [["worksOnMyPhone"], ["refreshOnLaunch"]]],
+    ["general", "General", [["worksOnMyPhone"], ["refreshOnLaunch", "returnHome"]]],
     display,
     ["updates", "Updates", [["holds"]]],
     ["signing", "Signing", [["showExpiry", "resignReminder"]]],
@@ -240,17 +240,17 @@ test("holds: the helper is only used in jailbreak mode", async () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["appearance", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "holds"]);
+    ["appearance", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "returnHome", "holds"]);
   assert.deepEqual(show("jailbreak"),
-    ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds",
+    ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds",
       "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
-    ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds", "showExpiry", "resignReminder"]);
+    ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "showExpiry", "resignReminder"]);
 });
 
 test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone, Ignored Upgrades and Automatic Installs", () => {
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.deepEqual(keysOf(s), ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds", "upgradeNotifications",
+  assert.deepEqual(keysOf(s), ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "upgradeNotifications",
     "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.equal(s.isShown("autoInstall"), true);
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", features: new Set(["appearance"]) }).isShown("autoInstall"), false);
@@ -474,4 +474,13 @@ test("F134: Show Expiry Dates is a switch on Settings > Signing, on by default, 
   s.set("showExpiry", false);
   assert.equal(s.get("showExpiry"), false);
   for (const mode of ["site", "jailbreak"]) assert.equal(createSettings({ storage: memStorage(), mode }).isShown("showExpiry"), false, mode);
+});
+
+test("Return to Home After: 2 minutes unless changed, Never is 0, in every mode", () => {
+  for (const mode of ["site", "jailbreak", "sideload"]) {
+    const s = createSettings({ storage: memStorage(), mode });
+    assert.equal(s.get("returnHome"), 2);
+    s.set("returnHome", 0);
+    assert.equal(s.get("returnHome"), 0);
+  }
 });

@@ -136,6 +136,15 @@ export const SETTINGS = [
     footer: `Looks for new packages in every source each time ${NAME} opens.`,
   },
   {
+    // Back from the background after this long counts as a fresh open: Home's root, and Refresh on Launch again
+    // (app.js). Was a fixed 2 minutes in the app (user 2026-11-18: a setting for it).
+    key: "returnHome", section: "sources", kind: "list", feature: "sources", modes: ALL, default: 2,
+    label: "Return to Home After",
+    options: [{ value: 0, label: "Never" }, { value: 1, label: "1 Minute" }, { value: 2, label: "2 Minutes" },
+      { value: 5, label: "5 Minutes" }, { value: 15, label: "15 Minutes" }, { value: 60, label: "1 Hour" }],
+    footer: `Back after this long, ${NAME} opens on Home as if just launched.`,
+  },
+  {
     key: "holds", section: "updates", kind: "holds", feature: "holds", modes: ALL, label: "Ignored Upgrades",
     footer: (mode) => mode === "jailbreak"
       ? "Held with dpkg, so other package managers leave them alone too."

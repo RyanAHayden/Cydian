@@ -75,3 +75,9 @@ html[data-theme="dark"] .home-links .cell + .cell { border-top-color: var(--divi
   font-size: 15px; line-height: 19px; color: var(--head); text-shadow: var(--emboss);
   text-decoration: none; -webkit-tap-highlight-color: transparent;
 }
+
+/* I7: Settings > Signing's Install Cydian App row, once the certificate works: Home's green tile (the account tile's
+   #eefff0, its green glyph) as a grouped row. */
+.app-offer .table.grouped { background: #eefff0; }
+html[data-theme="dark"] .app-offer .table.grouped { background: #2f4a36; }
+.app-offer .home-glyph { background-color: #37a94a; }

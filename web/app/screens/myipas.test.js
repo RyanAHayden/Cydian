@@ -35,3 +35,55 @@ test("an .ipa another app sent opens its page in My IPAs", async () => {
   assert.deepEqual(myIpasPath("cydian://myipas"), ["myipas"]);
   assert.equal(await handleIncoming("cydian://myipas?file=A.ipa"), "myipas");
 });
+
+// F79: My IPAs became Install IPAs: Browse (AltStore apps) first, then the user's own IPAs.
+test("Install IPAs: the page's title, Add, and Browse's pages below it", async () => {
+  const { PAGE_TITLE } = await import("./myipas.js");
+  globalThis.cydianNative = { mode: "sideload", call: async () => null };
+  assert.equal(PAGE_TITLE, "Install IPAs");
+  assert.equal(nav(r("myipas")).title, "Install IPAs");
+  assert.equal(nav(r("myipas")).right.label, "Add");
+  assert.deepEqual(pageOf(r("myipas", "search")), { page: "search" });
+  assert.deepEqual(pageOf(r("myipas", "apps")), { page: "apps" });
+  assert.deepEqual(pageOf(r("myipas", "category:Games")), { page: "category", value: "Games" });
+  assert.deepEqual(pageOf(r("myipas", "category:Games", "package:com.a")), { page: "browse" });
+  assert.deepEqual(pageOf(r("myipas", "search", "package:com.a")), { page: "browse" });
+  assert.equal(nav(r("myipas", "search")).title, "Search Apps");
+  assert.equal(nav(r("myipas", "apps")).title, "All Apps");
+  assert.equal(nav(r("myipas", "category:Photo & Video")).title, "Photo & Video");
+  assert.equal(nav(r("myipas", "apps", "package:com.a")).right.label, "Install"); // browse.js's app page
+  // an IPA's own pages are unchanged
+  assert.deepEqual(pageOf(r("myipas", "ipa:A.ipa")), { page: "ipa", file: "A.ipa" });
+  // the website has the same Browse
+  delete globalThis.cydianNative;
+  assert.equal(nav(r("myipas")).title, "Install IPAs");
+  assert.deepEqual(pageOf(r("myipas", "search")), { page: "search" });
+});
+
+test("Install IPAs' Browse section: Search, All Apps and the categories of the AltStore apps only", async () => {
+  const { browseGroups, appsOf, libraryEmptyText } = await import("./myipas.js");
+  const rows = [
+    { id: "a", name: "Delta", short: "Game emulator", section: "Apps (Games)", kind: "ipa" },
+    { id: "b", name: "Provenance", section: "Apps (Games)", kind: "ipa" },
+    { id: "c", name: "UTM", section: "Apps (Developer)", kind: "ipa" },
+    { id: "d", name: "A Tweak", section: "Tweaks" }, // APT: not an IPA
+  ];
+  const apps = appsOf(rows);
+  assert.deepEqual(apps.map((x) => x.id), ["a", "b", "c"]);
+  assert.deepEqual(appsOf(null), []);
+  const [top, cats] = browseGroups(apps);
+  assert.equal(top.header, "Browse");
+  assert.deepEqual(top.rows.map((x) => x.label), ["Search Apps", "All Apps"]);
+  assert.equal(top.rows[0].href, "#/installed/myipas/search");
+  assert.equal(top.rows[1].detail, "3");
+  assert.equal(top.rows[1].href, "#/installed/myipas/apps");
+  assert.deepEqual(cats.rows.map((x) => [x.label, x.detail]), [["Games", "1"], ["Emulators", "1"], ["Developer", "1"]]);
+  assert.equal(cats.rows[0].href, "#/installed/myipas/category%3AGames");
+  // loading, and no AltStore source
+  assert.deepEqual(browseGroups(null)[0].rows.map((x) => x.label), ["Search Apps", "Loading Apps"]);
+  const none = browseGroups([]);
+  assert.equal(none.length, 1);
+  assert.match(none[0].footer, /AltStore source/);
+  assert.match(libraryEmptyText(true), /Signing Server/);
+  assert.match(libraryEmptyText(false), /On My iPhone > Cydian/);
+});

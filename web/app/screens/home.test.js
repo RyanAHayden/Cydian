@@ -43,3 +43,10 @@ test("F41: Home offers Themes only on a jailbroken type", () => {
   assert.equal(showsThemes("iphoneos-arm64"), true);
   assert.equal(showsThemes("iphoneos-arm"), true);
 });
+
+test("F79: Home links to Install IPAs, except in the jailbreak app", async () => {
+  const { ipasTile } = await import("./home.js");
+  assert.deepEqual(ipasTile("site"), { label: "Install IPAs", href: "#/installed/myipas" });
+  assert.deepEqual(ipasTile("sideload"), { label: "Install IPAs", href: "#/installed/myipas" });
+  assert.equal(ipasTile("jailbreak"), null);
+});

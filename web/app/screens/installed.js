@@ -207,13 +207,13 @@ function drawApps(rows, cands, site, hasStatus) {
   }
 }
 
-// F77: the row that opens My IPAs.
+// F77: the row that opens My IPAs; F79: the page is Install IPAs (Browse, then My IPAs).
 export function myIpasRow(route, site) {
-  return { label: "My IPAs", subtitle: site ? "Links to IPAs, signed by the Signing Server" : "IPAs you add, signed on this iPhone",
+  return { label: myipas.PAGE_TITLE, subtitle: site ? "Browse apps, or add links to IPAs" : "Browse apps, or sign your own IPAs",
     href: format({ tab: route.tab, path: [myipas.MYIPAS] }) };
 }
 
-// My IPAs as a button above the list, Home's tile look (home.css), not a row like an installed app (user 2026-11-17).
+// Install IPAs as a button above the list, Home's tile look (home.css), not a row like an installed app (user 2026-11-17).
 function myIpasTile(route, site) {
   const r = myIpasRow(route, site);
   const row = document.createElement("div");

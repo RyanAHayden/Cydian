@@ -85,9 +85,8 @@ function card(children, cls = "") {
 //   - a source's own signed link (itms-services): Install, signed by the source
 //   - the sideload app: Install, signed with the user's certificate on the phone (signing-client signAndInstall;
 //     without one it opens the Signing walkthrough)
-//   - the website: Install, signed in the browser with the user's certificate (F93). Until that lands it says the
-//     certificate is needed (siteCertificateAlert, which offers Download IPA). F92 (user 2026-11-18): no hand-offs to
-//     Cydian / AltStore / SideStore / Feather here; Share keeps those.
+//   - the website: F93's Install, signed in the browser with the user's certificate (signing-client signAndInstall).
+//     F92 (user 2026-11-18): no hand-offs to Cydian / AltStore / SideStore / Feather here; Share keeps those.
 //   - always: Download IPA, to keep the file
 // `opener` opens a URL outside the app (window.open on the site). `onInstall` runs first on any of them (F30: the
 // Installed tab's record). F80: `queue`, when given, is what "Signed with your certificate" does instead (the app page
@@ -107,9 +106,10 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   } else if (o.itms) {
     rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
   } else if (o.download && site) {
-    const download = o.download;
-    rows.push({ label: "Install", subtitle: SITE_INSTALL_SUBTITLE, needsCertificate: true,
-      onClick: () => needsCertificate({ download: () => opener(download) }) });
+    // F93: Install signs in the browser with the certificate in Settings > Signing (signing-client.js
+    // signInBrowser). F92: no hand-offs follow it.
+    rows.push({ label: "Install", subtitle: SITE_INSTALL_SUBTITLE,
+      onClick: () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() }) });
   } else if (o.download) {
     const direct = () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() });
     rows.push({ label: "Install", subtitle: "Signed with your certificate",
@@ -316,16 +316,17 @@ export async function appPageCustom(pkg, source, opts, { queue = appQueue, add =
   return custom({ url: job.url, name: opts?.name || job.name || "", queue: (options) => add({ ...job, options }, { queue }) });
 }
 
-// F92: the website's Install, until it signs in the browser (F93): it says the certificate is needed, and Download IPA
-// keeps the file.
-export const SITE_INSTALL_SUBTITLE = "Needs your certificate";
-export const SITE_INSTALL_FOOTER = "Install signs the app with your own certificate in the browser, which is coming to the website. "
-  + "Until then Download IPA keeps the file.";
+// The website's Install group (F93: it signs in the browser; F92: only Install and Download IPA).
+export const SITE_INSTALL_SUBTITLE = "Signed in the browser with your certificate";
+export const SITE_INSTALL_FOOTER = "Install signs the app here in the browser with your certificate (Settings > Signing). "
+  + "Download IPA keeps the file.";
+// F95: My IPAs' website Install (screens/myipas.js siteInstallSheet) still says the certificate is needed, with
+// Download IPA beside OK.
 export const SITE_CERT_TITLE = "Certificate Needed";
 export const SITE_CERT_MESSAGE = "Installing from the website signs the app with your own certificate in the browser. "
   + "That isn't here yet: Download IPA keeps the file for now.";
 
-// The website's Install row: an alert saying so, with Download IPA beside OK. -> whether it downloaded.
+// The certificate alert, with Download IPA beside OK. -> whether it downloaded.
 export async function siteCertificateAlert({ download = () => {}, alert = showAlert } = {}) {
   const { index } = await alert({ title: SITE_CERT_TITLE, message: SITE_CERT_MESSAGE, buttons: ["OK", "Download IPA"], cancel: 0 });
   if (index !== 1) return false;

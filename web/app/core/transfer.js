@@ -1,15 +1,15 @@
 // F75: Send Settings (Open in Cydian App) on the website: its sources, settings and Ignored Upgrades into the
 // sideload app, as one cydian://import link. Pure JS (CompressionStream is a global in Safari and in node), so node
-// tests cover both ends. F89: the website keeps no certificate and no Signing Server any more, so neither travels
-// (Import from Safari and the certificate inside Cydian's IPA went with the website's signer).
+// tests cover both ends. F93: the website keeps a certificate again (Settings > Signing, signing in the browser), so
+// it travels too, as before F89; the Signing Server doesn't (the app keeps its own).
 //
-//   await encodeLink({ sources, settings, holds })     cydian://import?d=<base64url of gzipped JSON>
+//   await encodeLink({ sources, settings, holds, identity })   cydian://import?d=<base64url of gzipped JSON>
 //   await decodeLink(url, { gunzip })                  the payload, or null for anything else
 //   reviewLink(payload, { have, get, shown, holds })   what's new: { sources, settings, holds, empty }
 //
 // The payload: { v: 1, sources: [line] (core/sourcelist.js exportLine: a URL, or `deb <uri> <dist> <components>`),
-// settings: { key: value } (core/settings.js TRAVELS), holds: [package] }. A link from before F89 may also carry
-// server and identity: they are left out.
+// settings: { key: value } (core/settings.js TRAVELS), holds: [package], identity?: { p12, profile (base64url),
+// password, p12Name, profileName } }. A link's server is left out.
 import { parseImport, reviewImport } from "./sourcelist.js";
 
 export function toB64url(bytes) {
@@ -28,6 +28,13 @@ export function fromB64url(text) {
   return out;
 }
 
+// F93: a certificate in a link: both files as base64url text, or null.
+function identityOf(id) {
+  if (!id || typeof id !== "object" || typeof id.p12 !== "string" || typeof id.profile !== "string" || !id.p12 || !id.profile) return null;
+  const str = (v) => (typeof v === "string" ? v : "");
+  return { p12: id.p12, profile: id.profile, password: str(id.password), p12Name: str(id.p12Name), profileName: str(id.profileName) };
+}
+
 // ---- Open in Cydian App ----------------------------------------------------------------------------------------
 
 async function pipe(data, stream) {
@@ -35,9 +42,9 @@ async function pipe(data, stream) {
   return new Uint8Array(await out.arrayBuffer());
 }
 
-export async function encodeLink({ sources = [], settings = {}, holds = [] } = {}) {
+export async function encodeLink({ sources = [], settings = {}, holds = [], identity = null } = {}) {
   const payload = { v: 1, sources: [...new Set(sources.filter((s) => typeof s === "string" && s))], settings,
-    holds: [...new Set(holds.filter((p) => typeof p === "string" && p))] };
+    holds: [...new Set(holds.filter((p) => typeof p === "string" && p))], ...(identityOf(identity) ? { identity: identityOf(identity) } : {}) };
   const gz = await pipe(new TextEncoder().encode(JSON.stringify(payload)), new CompressionStream("gzip"));
   return "cydian://import?d=" + toB64url(gz);
 }
@@ -59,6 +66,7 @@ export async function decodeLink(url, { gunzip = null } = {}) {
       sources: Array.isArray(p.sources) ? p.sources.filter((s) => typeof s === "string") : [],
       settings: p.settings && typeof p.settings === "object" && !Array.isArray(p.settings) ? p.settings : {},
       holds: Array.isArray(p.holds) ? p.holds.filter((s) => typeof s === "string") : [],
+      ...(identityOf(p.identity) ? { identity: identityOf(p.identity) } : {}),
     };
   } catch {
     return null;

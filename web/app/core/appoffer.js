@@ -3,9 +3,8 @@
 //
 // Where the offer shows (the website only: nothing inside the app, which is already installed):
 //   Home, the Install Cydian App tile
-//     Not Jailbroken                      Install signs Cydian with your certificate in the browser (F93); until
-//                                         that lands it says the certificate is needed and offers the release's
-//                                         Cydian.ipa (F92, screens/home.js installAppSheet). No sideloader hand-offs
+//     Not Jailbroken                      F93: Cydian's IPA signed in the browser with the user's certificate and
+//                                         installed (screens/home.js installApp), or Settings > Signing first
 //     jailbroken (rootless, ...)          downloads the release's .deb for that architecture, to open in Sileo or
 //                                         Filza; an architecture with no .deb yet is told so
 //   Cydian's own package page: its AltStore source (web/app/source.json, first in DEFAULT_ALT_SOURCES).
@@ -22,7 +21,7 @@ export const APP_LABEL = "Install App"; // half of Home's split button: Install 
 const NOT_JAILBROKEN = "none";
 
 // Home's tile: null (no tile), or { action }:
-//   "sideloaders"  Install with your certificate, or the IPA (screens/home.js installAppSheet; the name is F89's)
+//   "sideloaders"  Not Jailbroken: sign Cydian in the browser and install it (F93; the name is F89's)
 //   "deb"          download the .deb for `deviceType` (an APT arch): { action: "deb", arch }
 // mode: core/settings.js detectMode(); deviceType: settings.deviceType() ("none" or an arch).
 export function homeOffer({ mode = "site", deviceType = NOT_JAILBROKEN } = {}) {

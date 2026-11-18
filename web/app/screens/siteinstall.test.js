@@ -1,47 +1,40 @@
 // The website's Install (F92, user 2026-11-18: "the webpage install still shows open in and get in all these apps. we
-// shouldnt"): an app page offers only Install and Download IPA. Install signs in the browser (F93); until then it says
-// the certificate is needed, with Download IPA beside OK. Home's Install Cydian App and My IPAs' links (F95) do the
-// same. Share keeps the sideloaders.
+// shouldnt"): an app page offers only Install and Download IPA. F93: Install signs in the browser
+// (signing-client.js signInBrowser), and Home's Install Cydian App signs Cydian (home.js installApp). My IPAs' links
+// (F95) still say the certificate is needed, with Download IPA beside OK. Share keeps the sideloaders.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { installRows, SITE_INSTALL_FOOTER, SITE_INSTALL_SUBTITLE, SITE_CERT_TITLE, siteCertificateAlert } from "./altstore.js";
 import * as handoff from "./handoff.js";
-import { installAppSheet, APP_INSTALL_SUBTITLE, showsSigningTile } from "./home.js";
+import { installApp, showsSigningTile } from "./home.js";
 import { siteInstallSheet } from "./myipas.js";
-import { APP_IPA_URL } from "../core/appoffer.js";
+import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 
 const V = { version: "1.2", downloadURL: "https://example.com/My-Delta.ipa" };
 const labels = (rows) => rows.map((r) => r.label);
 
 const SITE = { site: true, jailbreak: false, custom: false };
 
-test("the website's Install rows: only Install and Download IPA, no hand-offs", () => {
+test("the website's Install rows: Install (in the browser) and Download IPA, no hand-offs", () => {
   const { rows } = installRows(V, "https://example.com/apps.json", () => {}, () => {}, null, "Delta", SITE);
   assert.deepEqual(labels(rows), ["Install", "Download IPA"]);
   assert.equal(rows[0].subtitle, SITE_INSTALL_SUBTITLE);
-  assert.equal(rows[0].needsCertificate, true);
   assert.ok(!rows.some((r) => r.handoff), "no hand-off rows");
   assert.ok(!rows.some((r) => /Open in|Get in|AltStore|SideStore|Feather/.test(`${r.label} ${r.subtitle}`)), labels(rows).join());
   assert.doesNotMatch(SITE_INSTALL_FOOTER, /AltStore|SideStore|Feather|Open in/);
+  assert.ok(!rows.some((r) => r.label === "Custom Install"), "no Custom Install on the website");
 });
 
-test("the website's Install says the certificate is needed and offers Download IPA; nothing is recorded", async () => {
+test("the website's Download IPA opens the file; nothing is recorded", async () => {
   const opened = [];
-  const asked = [];
   let recorded = 0;
-  const { rows } = installRows(V, null, (u) => opened.push(u), () => { recorded++; }, null, "Delta",
-    { ...SITE, needsCertificate: (o) => { asked.push(o); return o; } });
-  rows[0].onClick();
-  assert.equal(asked.length, 1);
-  assert.deepEqual(opened, []);
-  asked[0].download(); // the alert's Download IPA
+  const { rows } = installRows(V, null, (u) => opened.push(u), () => { recorded++; }, null, "Delta", SITE);
+  rows[1].onClick(); // Download IPA; Install signs (signing-client.test.js covers it)
   assert.deepEqual(opened, [V.downloadURL]);
-  rows[1].onClick(); // Download IPA
-  assert.deepEqual(opened, [V.downloadURL, V.downloadURL]);
-  assert.equal(recorded, 0, "nothing installed, so nothing on the Installed tab");
+  assert.equal(recorded, 0, "Download IPA installs nothing, so nothing on the Installed tab");
 });
 
-test("siteCertificateAlert: OK does nothing, Download IPA downloads", async () => {
+test("siteCertificateAlert (My IPAs on the website): OK does nothing, Download IPA downloads", async () => {
   let downloads = 0;
   let shown = null;
   const alert = (index) => async (o) => { shown = o; return { index } };
@@ -68,14 +61,13 @@ test("the sideload app still signs: Install, no hand-offs", () => {
   assert.equal(rows[0].needsCertificate, undefined);
 });
 
-test("by default (no bridge: the website in node) the rows are the website's Install and Download IPA", () => {
+test("by default (no bridge: the website in node) the rows are Install in the browser and Download IPA", () => {
   const saved = globalThis.cydianNative;
   try {
     delete globalThis.cydianNative;
-    const { rows } = installRows(V, null);
-    assert.deepEqual(labels(rows), ["Install", "Download IPA"]);
-    assert.equal(rows[0].needsCertificate, true);
+    assert.deepEqual(labels(installRows(V, null).rows), ["Install", "Download IPA"]);
   } finally { if (saved) globalThis.cydianNative = saved; }
+  assert.match(SITE_INSTALL_FOOTER, /signs the app here in the browser/);
 });
 
 test("the install hand-offs are gone (F95): nothing builds Open in Cydian / Get in links", () => {
@@ -83,17 +75,15 @@ test("the install hand-offs are gone (F95): nothing builds Open in Cydian / Get 
   assert.equal(handoff.HANDOFF_APPS, undefined);
 });
 
-test("Home's Install Cydian App: the certificate alert with Download IPA, no sideloaders", async () => {
-  const opened = [];
-  let shown = null;
-  assert.equal(await installAppSheet({ alert: async (o) => { shown = o; return { index: 1 }; }, open: (u) => opened.push(u) }), true);
-  assert.deepEqual(shown.buttons, ["OK", "Download IPA"]);
-  assert.deepEqual(opened, [APP_IPA_URL]);
-  assert.equal(await installAppSheet({ alert: async () => ({ index: 0 }), open: (u) => opened.push(u) }), false);
-  assert.deepEqual(opened, [APP_IPA_URL]);
-  assert.doesNotMatch(APP_INSTALL_SUBTITLE, /AltStore|SideStore|Feather/);
-  assert.equal(showsSigningTile("site"), false);
+test("Home's Install Cydian App (F93): signs Cydian with the certificate, or opens Settings > Signing; no sideloaders", async () => {
+  const calls = [];
+  const deps = (ready, bring) => ({ ready: async () => ready, bring: () => bring, install: (o) => calls.push(["install", o]), go: (h) => calls.push(["go", h]) });
+  assert.equal(await installApp(deps(false, true)), "signing");
+  assert.equal(await installApp(deps(true, false)), "install");
+  assert.deepEqual(calls, [["go", "/settings/signing"], ["install", { url: APP_IPA_URL, name: APP_NAME, bring: false }]]);
+  assert.equal(showsSigningTile("site"), true);
   assert.equal(showsSigningTile("sideload"), true);
+  assert.equal(showsSigningTile("jailbreak"), false);
 });
 
 test("My IPAs on the website: a link's Install is the certificate alert, whose Download IPA opens the link", async () => {

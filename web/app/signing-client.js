@@ -1,19 +1,25 @@
 // Signing in the sideload build (F58, I6): the phone signs every app itself, through the shell's signing.* bridge
 // calls; the Signing Server (worker/, sign.cydian.dev unless the user runs their own) only hands iOS the install
-// manifest and holds Cydian's own update. The website signs nothing (F89: its server and signer are gone): an app
-// page there hands the app to Cydian or another sideloader (screens/handoff.js). docs/signing.md has the picture.
+// manifest and holds Cydian's own update. F93: the website signs in the browser again, zsign as WebAssembly in a Web
+// Worker (signInBrowser, at the end), and the Worker only hosts the signed IPA for iOS. docs/signing.md has the picture.
 //
 //   await loadIdentity()         the picks on Settings > Signing ({ p12, p12Name, password, profile, profileName }),
-//                                in memory until signing.import puts them into the Keychain, or null
+//                                in memory until signing.import puts them into the Keychain (the app), or kept in
+//                                this browser's IndexedDB (the website, F93), or null
 //   await saveIdentity(patch)    merges into them;  await clearIdentity()
 //   await signingReady()         true when the Keychain holds an identity (statusReady(signing.status), as Settings
-//                                shows it); false where nothing signs (the website, the jailbreak app)
+//                                shows it), or on the website when a .p12 and a profile are saved; false in the
+//                                jailbreak app
+//   getBring() / setBring(on)    the website's Bring My Certificate switch (on unless turned off): Install Cydian
+//                                App puts the certificate inside Cydian's IPA
 //   getServer() / setServer(s)   Settings > Signing's server, https://sign.cydian.dev unless the user set another
 //   await serverStatus()         what GET <server>/sign/status says
-//   await signAndInstall({ url, name, onInstalled })   signs on the phone and installs (installOnDevice)
+//   await signAndInstall({ url, name, onInstalled, bring })   signs on the phone and installs (installOnDevice), or
+//                                on the website signs in the browser (signInBrowser)
 import { showBanner } from "./nav/banner.js";
 import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError } from "./core/signing.js";
 import { format } from "./router.js";
+import { IPA_MAX } from "./core/websign.js";
 import { detectMode } from "./core/settings.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
@@ -21,25 +27,72 @@ import { showAlert } from "./nav/alert.js";
 const SERVER_KEY = "cydian.signingServer";
 
 // The picks wait in memory only, until signing.import puts them into the Keychain; then only their names stay (the
-// .p12 itself never goes to the web view's storage).
+// .p12 itself never goes to the web view's storage). F93: the website keeps them in IndexedDB (this browser only:
+// they never leave it but inside Cydian's own IPA with Bring My Certificate), as it did before F89.
 let staged = null;
+const DB = "cydian-signing", STORE = "identity", KEY = "current", BRING_KEY = "cydian.bringCertificate";
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    if (!globalThis.indexedDB) { reject(new Error("This browser can't keep files (no IndexedDB).")); return; }
+    const req = indexedDB.open(DB, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error ?? new Error("IndexedDB failed"));
+  });
+}
+
+async function tx(mode, fn) {
+  const db = await openDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const t = db.transaction(STORE, mode);
+      const req = fn(t.objectStore(STORE));
+      t.oncomplete = () => resolve(req?.result);
+      t.onerror = () => reject(t.error ?? new Error("IndexedDB failed"));
+      t.onabort = () => reject(t.error ?? new Error("IndexedDB aborted"));
+    });
+  } finally { db.close(); }
+}
 
 export async function loadIdentity() {
+  if (browserSigning()) { try { return (await tx("readonly", (st) => st.get(KEY))) ?? null; } catch { return null; } }
   return staged ? { ...staged } : null;
 }
 
 export async function saveIdentity(patch) {
+  if (browserSigning()) {
+    const next = { ...((await loadIdentity()) ?? {}), ...patch, savedAt: Date.now() };
+    await tx("readwrite", (st) => st.put(next, KEY));
+    return next;
+  }
   staged = { ...(staged ?? {}), ...patch, savedAt: Date.now() };
   return { ...staged };
 }
 
 export async function clearIdentity() {
+  if (browserSigning()) { await tx("readwrite", (st) => st.delete(KEY)); return; }
   staged = null;
 }
 
 export async function signingReady({ native, wait = sleep } = {}) {
+  if (browserSigning()) {
+    const id = await loadIdentity();
+    return Boolean(id?.p12 && id?.profile && id.passwordOk !== false);
+  }
   if (!localSigning()) return false;
   return statusReady(await readyStatus(native, wait));
+}
+
+// F93 (F75's switch, back): on unless the user turned it off.
+export function getBring() {
+  try { return localStorage.getItem(BRING_KEY) !== "off"; } catch { return true; }
+}
+export function setBring(on) {
+  try {
+    if (on) localStorage.removeItem(BRING_KEY);
+    else localStorage.setItem(BRING_KEY, "off");
+  } catch { /* private mode: this session only */ }
 }
 
 // A saved cydian.dev (the website's old signer, an older default) means the default too.
@@ -73,9 +126,10 @@ export const isSelfIpa = (url) => /^https:\/\/github\.com\/RyanAHayden\/Cydian\/
   .test(String(url ?? ""));
 
 // Signs `url` (an IPA) on the phone and installs it. Resolves true once iOS was asked to install; false after an
-// error, which it shows in an alert; false where nothing signs (the website, the jailbreak app: their pages offer
-// hand-offs and the helper instead, so this is only a guard).
-export async function signAndInstall({ url, name = "", onInstalled = () => {} }) {
+// error, which it shows in an alert; false in the jailbreak app (its pages use the helper, so this is only a guard).
+// F93: on the website, signs it in the browser (signInBrowser); `bring` (Install Cydian App) carries the certificate.
+export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false }) {
+  if (browserSigning()) return signInBrowser({ url, name, onInstalled, bring });
   if (!localSigning()) {
     await showAlert({ title: "Can't Install Here", message: "Apps are signed in the Cydian app. Open this one in Cydian, AltStore, SideStore or Feather.", buttons: ["OK"] });
     return false;
@@ -264,4 +318,131 @@ export async function installFromLibrary({ file, name = "", onInstalled = () => 
   if (result?.bundleId) followInstall(bridge(native), result.bundleId, h, { later });
   else later(() => (h.done ? h.done("Done") : h.hide()), 1200);
   return "installed";
+}
+
+// ---- the website (F93): signed in the browser ----------------------------------------------------------------
+//
+//   browserSigning()                   true on the website
+//   await signInBrowser({ url, name, onInstalled, bring }, deps)
+//       HUD "Downloading" (the IPA through the Worker's /api/fetch?kind=ipa: most hosts send no CORS headers),
+//       "Signing" (signing-worker.js: zsign as WebAssembly, with the certificate from IndexedDB), "Uploading" (the
+//       signed IPA to the Worker's /sign/upload, in parts, kept 10 minutes), then iOS's install prompt
+//       (itms-services). true once iOS was asked; false after an error, shown in an alert (zsign's own reason when
+//       it can't sign the app). bring: Cydian's own IPA carries the certificate (cydian-identity.plist), and always
+//       the website's sources and settings (web/transfer.link): the app imports both on its first launch.
+//
+// The .p12, password and profile go only into the Web Worker (this browser), and with bring into Cydian's signed
+// IPA, which waits on the Worker for those 10 minutes as the old server signer's copy did.
+
+export const browserSigning = () => detectMode() === "site";
+
+const signFail = (code, message) => Object.assign(new Error(message), { code });
+
+// The Web Worker, as one call: resolves the worker's answer ({ ipa, bundleId, name, version }), or throws its error.
+export function runInWorker(job, { make = () => new Worker(new URL("./signing-worker.js", import.meta.url), { type: "module" }), onProgress = () => {} } = {}) {
+  return new Promise((resolve, reject) => {
+    let w;
+    try { w = make(); } catch (e) { reject(signFail("unsupported", `This browser can't sign apps (${e?.message ?? e}).`)); return; }
+    w.onmessage = (e) => {
+      const m = e.data ?? {};
+      if (m.progress) { onProgress(m.progress); return; }
+      w.terminate?.();
+      if (m.ok) resolve(m); else reject(signFail(m.code ?? "sign_failed", m.error ?? "Signing failed."));
+    };
+    w.onerror = (e) => { w.terminate?.(); reject(signFail("sign_failed", `The signer stopped: ${e?.message ?? "no reason given"}.`)); };
+    const t = [job.ipa, job.p12, job.profile].filter((b) => b instanceof ArrayBuffer);
+    w.postMessage(job, t);
+  });
+}
+
+async function answerError(res) {
+  let b = null;
+  try { b = await res.json(); } catch { /* not JSON */ }
+  return signFail(b?.code ?? "network", b?.error ?? `The server answered HTTP ${res.status}.`);
+}
+
+// The IPA's bytes through /api/fetch, the label following the download ("Downloading 40%").
+export async function downloadIpa(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, max = IPA_MAX } = {}) {
+  let res;
+  try { res = await fetcher(`${base}/api/fetch?${new URLSearchParams({ url, kind: "ipa" })}`, { cache: "no-store" }); } catch {
+    throw signFail("network", "The app couldn't be downloaded: no connection to the server.");
+  }
+  if (!res.ok) throw await answerError(res);
+  const total = Number(res.headers?.get?.("content-length") || 0);
+  if (total > max) throw signFail("too_large", `Apps up to ${Math.round(max / 1048576)} MB can be signed on the website.`);
+  if (!res.body?.getReader) return new Uint8Array(await res.arrayBuffer());
+  const reader = res.body.getReader();
+  let buf = new Uint8Array(total || 1 << 20), n = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (n + value.length > max) { reader.cancel?.(); throw signFail("too_large", `Apps up to ${Math.round(max / 1048576)} MB can be signed on the website.`); }
+    if (n + value.length > buf.length) { const b = new Uint8Array(Math.max(buf.length * 2, n + value.length)); b.set(buf.subarray(0, n)); buf = b; }
+    buf.set(value, n);
+    n += value.length;
+    if (total) onProgress(Math.min(99, Math.floor((n / total) * 100)));
+  }
+  return buf.length === n ? buf : buf.slice(0, n);
+}
+
+// The signed IPA to the Worker (POST /sign/upload, each part, done): the install link's answer { itms, ... }.
+export async function uploadSigned(bytes, { bundleId, name, version }, { base = "", fetcher = globalThis.fetch, onProgress = () => {} } = {}) {
+  const q = new URLSearchParams({ bundleid: bundleId, version: String(version || "1.0").slice(0, 64), title: String(name || bundleId).slice(0, 200), size: String(bytes.length) });
+  const call = async (path, init) => {
+    let res;
+    try { res = await fetcher(`${base}${path}`, { cache: "no-store", ...init }); } catch {
+      throw signFail("network", "The signed app couldn't be uploaded: no connection to the server.");
+    }
+    if (!res.ok) throw await answerError(res);
+    return res.json();
+  };
+  const up = await call(`/sign/upload?${q}`, { method: "POST" });
+  for (let i = 0; i < up.parts; i++) {
+    await call(`/sign/upload/${up.token}/${i}`, { method: "PUT", body: bytes.subarray(i * up.partSize, Math.min(bytes.length, (i + 1) * up.partSize)) });
+    onProgress(Math.floor(((i + 1) / up.parts) * 100));
+  }
+  return call(`/sign/upload/${up.token}/done`, { method: "POST" });
+}
+
+const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof ArrayBuffer ? b.slice(0) : new Uint8Array(b ?? []).buffer);
+
+export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false },
+  { hud = liveHUD, alert = showAlert, banner = showBanner, open = (u) => { location.href = u; }, go = openRoute,
+    identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "", later = setTimeout } = {}) {
+  const id = await identity();
+  if (!id?.p12 || !id?.profile) {
+    await alert({ title: "No Certificate", message: "Add your certificate, its password and provisioning profile in Settings > Signing.", buttons: ["OK"] });
+    go(["signing"]);
+    return false;
+  }
+  const h = hud("Downloading");
+  const pct = (label) => (p) => h.set(`${label} ${p}%`);
+  try {
+    const ipa = await downloadIpa(url, { base, fetcher, onProgress: pct("Downloading") });
+    h.set("Signing");
+    const self = isSelfIpa(url) || bring;
+    const carry = self ? { identity: Boolean(bring), transfer: await transfer().catch(() => null) } : null;
+    const signed = await worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(id.profile), password: id.password ?? "", bring: carry },
+      { onProgress: (t) => h.set(t) });
+    h.set("Uploading");
+    const ipaBytes = signed.ipa instanceof Uint8Array ? signed.ipa : new Uint8Array(signed.ipa);
+    const body = await uploadSigned(ipaBytes, signed, { base, fetcher, onProgress: pct("Uploading") });
+    h.set("Installing");
+    onInstalled({ ...body, bundleId: signed.bundleId, name: signed.name, version: signed.version });
+    // Safari asks first ("… would like to install …"): say which button to press.
+    banner({ title: "Cydian", message: `Press Install to put ${name || signed.name || "the app"} on your iPhone.`, duration: 5000 });
+    open(body.itms);
+    later(() => (h.done ? h.done("Done") : h.hide()), 1200);
+    return true;
+  } catch (e) {
+    h.hide();
+    await alert({ title: name ? `Couldn't Install ${name}` : "Couldn't Install", message: String(e?.message ?? e), buttons: ["OK"] });
+    return false;
+  }
+}
+
+// What Cydian's own IPA carries for its first launch: the website's sources and settings (Send Settings' link).
+async function websiteTransfer() {
+  const [{ websitePayload }, { encodeLink }] = await Promise.all([import("./screens/importlink.js"), import("./core/transfer.js")]);
+  return encodeLink(await websitePayload({ identity: false })); // the certificate goes as cydian-identity.plist (bring)
 }

@@ -105,8 +105,8 @@ bundle() {
   else
     echo "native build: WARNING no ldid or rcodesign; $app/Cydian is ad hoc signed without entitlements" >&2
   fi
-  # web/app/ goes in as it is, minus the tests.
-  (cd ../web/app && find . -type f ! -name '*.test.js' ! -name '.*' -print0) |
+  # web/app/ goes in as it is, minus the tests and the website's zsign WebAssembly (F93: the app signs natively).
+  (cd ../web/app && find . -type f ! -name '*.test.js' ! -name '.*' ! -path './vendor/zsign/*' -print0) |
     while IFS= read -r -d '' f; do mkdir -p "$app/web/$(dirname "$f")" && cp "../web/app/$f" "$app/web/$f"; done
   ../tools/buildinfo.sh "$(cd "$app/web" && pwd)" >/dev/null # version and commit for Home's footer
   cp icon/AppIcon60x60@2x.png icon/AppIcon60x60@3x.png "$app/"

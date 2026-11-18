@@ -51,3 +51,8 @@
 }
 .featured-title.no-shadow { background: none; text-shadow: none; }
 .featured-box:empty, .payment-box:empty, .discovery:empty { display: none; }
+
+/* F135: placeholder cards while the banners load (extras.js featuredPlaceholder): the banners' own size and corners,
+   grey and pulsing as nav/ui.js placeholder()'s bars (ios6.css .ph-box). */
+.featured-ph { pointer-events: none; }
+.featured-ph .featured-banner { flex-basis: min(263px, calc(100% - 40px)); }

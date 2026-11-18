@@ -104,10 +104,13 @@ export async function signingSetUp(mode, { ready = signingReady, status = () => 
   return false;
 }
 
-// F123: Home's list below the tiles, as Cydia's: the help links, User Guides, then Settings in its own group (it left
-// the tab bar; its pages open on Home's stack, router.js settingsRoute) above Credits / Thank You.
+// F123: Home's list below the tiles, as Cydia's: the help links, User Guides, then Credits / Thank You. Settings (it left
+// the tab bar; its pages open on Home's stack, router.js settingsRoute) is its own group, F135: first, directly under
+// the tiles (user 2026-11-18: "move settings up on the main page and give it an icon"), with our grey gear
+// (icons/settings.svg) at its left as iOS 6's Settings rows have.
+export const SETTINGS_ICON = "icons/settings.svg";
 export function homeLinks() {
-  return [{
+  return [{ rows: [{ label: "Settings", href: format(settingsRoute()), icon: { src: SETTINGS_ICON }, cls: "home-settings-row" }] }, {
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
       { label: "Find Extensions for Applications", href: format({ tab: "search" }), chevron: true },
@@ -115,9 +118,14 @@ export function homeLinks() {
       { label: "More Package Sources", href: format({ tab: "sources", path: ["manage"] }) },
     ],
   }, { header: "User Guides", rows: guideRows(format) },
-  { rows: [{ label: "Settings", href: format(settingsRoute()) }] },
   { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }];
 }
+
+// F135: the jailbreak app's Home has no featured banners above the tiles (user 2026-11-18: "on jailbroken remove the
+// horizontal scroll of apps. That can be there if you go browse"); its Browse page shows them at the top instead.
+// The website and the sideload app keep them on Home (they draw nothing while Not Jailbroken anyway).
+export const homeShowsFeatured = (mode = "site") => mode !== "jailbreak";
+export const browseShowsFeatured = (mode = "site") => !homeShowsFeatured(mode);
 
 export function ipasTile(mode = "site") {
   if (mode === "jailbreak") return null;
@@ -469,7 +477,8 @@ function renderRoot(body) {
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));
   state.tile = stateRow.querySelector("a");
   paintTile(stateTile());
-  const featured = { box: homeFeatured() }; // F20: sources' sileo-featured.json banners, a couple from each
+  // F20: sources' sileo-featured.json banners, a couple from each. F135: not in the jailbreak app (Browse has them).
+  const featured = { box: homeShowsFeatured(settings.mode) ? homeFeatured() : el("div", "featured-box home-featured") };
   // Locked Home (the website before Cydian is installed): Signing full width where Featured | Signing was, and
   // Featured down among the locked rows (user 2026-11-18). Ignore puts the usual row back.
   const lockedFeatured = lockedNow ? [tileRow("halves", tile({ label: "Featured", href: format({ tab: "home", path: ["browse", "popular"] }), glyph: "featured" }))] : [];
@@ -493,7 +502,7 @@ function renderRoot(body) {
     stateRow,
   );
   body.append(home);
-  // Cydia's list below the tiles: the help links, User Guides, then Credits / Thank You (About is the nav button).
+  // Cydia's list below the tiles: Settings (F135), the help links, User Guides, then Credits / Thank You (About is the nav button).
   const links = homeLinks();
   const list = grouped(links);
   const groups = [...list.children]; // the fragment empties once appended
@@ -540,6 +549,7 @@ function renderRoot(body) {
     drawApp();
     checkSigning();
     await refreshState();
+    if (!homeShowsFeatured(settings.mode)) return;
     const box = homeFeatured();
     await box.ready; // extras.js homeFeatured: its banners are drawn (or there are none)
     if (featured.box.isConnected) featured.box.replaceWith(box);
@@ -639,6 +649,8 @@ function renderFeatured(body) {
 // merged categories (core/catalog.js mergeCategories) with their counts. The catalog leaves Themes and Tweaks out
 // while Settings > Device is Not Jailbroken, and so do the lists (browseListsFor).
 async function renderBrowse(body) {
+  // F135: in the jailbreak app the featured banners Home dropped open Browse's page (placeholder cards until they load).
+  if (browseShowsFeatured(settings.mode)) body.append(homeFeatured());
   const box = el("div");
   const spin = el("div", "loading");
   spin.append(el("span", "loading-spinner"), el("span", null, "Loading Packages"));

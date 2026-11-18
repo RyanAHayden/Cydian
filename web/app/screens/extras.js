@@ -1,7 +1,8 @@
 // Repo extras Sileo users expect (F20), as pieces the screens drop in:
 //
 //   featuredStrip(source)       the source page's banners (sileo-featured.json), filled in when they land
-//   homeFeatured()              Home's banners: a couple from each source
+//   homeFeatured()              Home's banners (Browse's in the jailbreak app): a couple from each source,
+//                               placeholder cards while they load (F135)
 //   paymentGroup(st, source)    a paid package's Price row; in the app Sign In / Buy / Download & Install
 //   paidStateOf(box)            B11: what the package page's nav bar button does for that paid package
 //   discoveryGroup()            Search's "Other Sources" list (Canister), with Add Source; .search(q). In the
@@ -81,13 +82,27 @@ export function featuredStrip(source) {
   return box;
 }
 
-export function homeFeatured() {
+// F135: the scroller while its banners load: grey cards the banners' size, pulsing like nav/ui.js placeholder()'s bars.
+export const FEATURED_PLACEHOLDERS = 2; // one whole card and the next one peeking in, as the banners sit
+export function featuredPlaceholder(n = FEATURED_PLACEHOLDERS) {
+  const row = el("div", "featured-row featured-ph");
+  row.setAttribute("aria-busy", "true");
+  row.setAttribute("aria-label", "Loading");
+  for (let i = 0; i < n; i++) row.append(el("span", "featured-banner ph-box"));
+  return row;
+}
+
+// Home's banners (Browse's in the jailbreak app, F135): placeholder cards until they land, then the banners, or
+// nothing when the sources have none. `deviceType`, `sources` and `forHome` are for the tests.
+export function homeFeatured({ deviceType = () => settings.deviceType(), sources = () => getBackend().sources(),
+  forHome = (list) => featuredStore().forHome(list) } = {}) {
   const box = el("div", "featured-box home-featured");
   box.ready = Promise.resolve(); // F82: settles once the banners are drawn (or there are none), for Home's Reload
-  if (settings.deviceType() === "none") return box; // Not Jailbroken: APT sources (and their tweaks) are hidden
-  box.ready = getBackend().sources().then((list) => featuredStore().forHome(list)).then((banners) => {
-    if (banners.length) box.append(bannerRow(banners));
-  }, () => {});
+  if (deviceType() === "none") return box; // Not Jailbroken: APT sources (and their tweaks) are hidden
+  box.append(featuredPlaceholder());
+  box.ready = Promise.resolve().then(sources).then(forHome).then((banners) => {
+    box.replaceChildren(...(banners?.length ? [bannerRow(banners)] : []));
+  }, () => { box.replaceChildren(); });
   return box;
 }
 

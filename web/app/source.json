@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.1.6",
+          "date": "2026-11-18T02:05:47Z",
+          "localizedDescription": "The app opens on Home loading (title, the Loading spinner, the tab bar), like Cydia, instead of a black screen.\nInstalls in the app: the manifest request gets past the server proxy (0.1.5), and Cydian's built-in source names the newest version.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.6",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.6/Cydian.ipa",
+          "size": 2495422,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.5",
           "date": "2026-11-17",
           "localizedDescription": "Installs in the app work: the manifest request no longer trips the server proxy.\nInstall signs straight away; Signing walkthrough; built-in Cydian source and Essential Upgrade.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.5",

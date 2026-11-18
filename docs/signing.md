@@ -3,12 +3,12 @@
 The iFizBox app's sideload build signs every app **on the iPhone** with your certificate, which never leaves the phone
 for other apps, and needs a server only for iOS's install manifest and iFizBox's own update; the website signs in the
 browser (F93, below). That
-server is the Signing Server: `https://sign.cydian.dev` by default, a Cloudflare Worker anyone can deploy for
+server is the Signing Server: `https://sign.ifizbox.com` by default, a Cloudflare Worker anyone can deploy for
 themselves (`worker/`, `worker/README.md`). [On the phone (I6)](#on-the-phone-i6) has the whole picture.
 
 ## The website signs in the browser (F93)
 
-cydian.dev is one Cloudflare Worker with no server of its own (F89: the NAS that ran I5's zsign signer and Web Push
+ifizbox.com is one Cloudflare Worker with no server of its own (F89: the NAS that ran I5's zsign signer and Web Push
 is gone), and a Worker can't run zsign. So the website signs **in the browser** (user 2026-11-18): zsign compiled to
 WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for iOS's install prompt.
 
@@ -57,7 +57,7 @@ WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for i
   (`web/transfer.link`, which `app.js` imports once on first launch). Both files go in before zsign seals the
   bundle. Without a certificate it opens Settings > Signing. Jailbroken visitors get the release's `.deb`.
 - **Send Settings** (Open in iFizBox App): sources, travelling settings, Ignored Upgrades and the certificate.
-- iFizBox's own upgrade row in Changes, when the app can't sign iFizBox itself (no bridge), opens cydian.dev in Safari for Home's
+- iFizBox's own upgrade row in Changes, when the app can't sign iFizBox itself (no bridge), opens ifizbox.com in Safari for Home's
   Install iFizBox App (`core/essential.js installSelf`).
 
 What leaves the browser: the IPA's address (to `/api/fetch`) and the signed app (to `/sign/upload`, for 10 minutes).
@@ -73,7 +73,7 @@ A browser that registered the old push service worker drops it at the next visit
 
 The iFizBox app's sideload build (I2) signs IPAs by itself and serves the signed IPA from the phone; the certificate
 never leaves it when installing other apps (the one exception, iFizBox updating itself, is F73 below). Only the
-install manifest comes from a server: the Signing Server (sign.cydian.dev by default, or the user's own deployment of
+install manifest comes from a server: the Signing Server (sign.ifizbox.com by default, or the user's own deployment of
 `worker/`), which sees the app's bundle ID, version and name. User 2026-11-17 first asked for it all
 local ("so they dont rely on me"); F75 removed the fully local mode because iOS refused it (below). In the jailbreak build none of this runs: the N2 helper installs IPAs directly, and the `signing.*` calls answer
 code `jailbreak`.
@@ -88,7 +88,7 @@ relies on it). What could serve a trusted manifest:
 | Option | Trusted how | Needs | Verdict |
 | --- | --- | --- | --- |
 | **A. backloop.dev** (Feather's Fully Local): `*.backloop.dev` resolves to 127.0.0.1, served with a public CA's wildcard certificate whose private key is published | a public CA | backloop's pack fetched, public DNS | **No.** A CA must revoke a certificate whose key is public, so the pack lives on borrowed time: on 2026-11-17 it had expired 19 days earlier (docs/sideload.md). Shipping our own such key breaks CA rules; using theirs makes installs depend on a third party re-issuing it. |
-| **B. A manifest from a server, IPA from the phone** (Feather's Semi Local, **built**, 0.1.4): `GET <server>/sign/manifest?bundleid=&version=&title=&port=&path=` answers a manifest whose IPA URL is `http://127.0.0.1:<port>/<path>` | the server's own certificate | the Signing Server (sign.cydian.dev by default, or the user's own), which sees the app's bundle ID, name and version on every install | **Used.** Nothing to set up on the phone; the certificate and the IPA stay there. |
+| **B. A manifest from a server, IPA from the phone** (Feather's Semi Local, **built**, 0.1.4): `GET <server>/sign/manifest?bundleid=&version=&title=&port=&path=` answers a manifest whose IPA URL is `http://127.0.0.1:<port>/<path>` | the server's own certificate | the Signing Server (sign.ifizbox.com by default, or the user's own), which sees the app's bundle ID, name and version on every install | **Used.** Nothing to set up on the phone; the certificate and the IPA stay there. |
 | C. A CA made on the phone: the user installs iFizBox's own root as a profile and turns on full trust; an HTTPS server on 127.0.0.1 uses a certificate it issues | the user's own trust setting | a one-time setup in Settings | **Removed (F75).** Built in I6, but it never worked: iOS's installer ignores a hand-trusted root. The user's test page on that server opened fine in Safari while every install through it failed. |
 | D. A pairing file + LocalDevVPN (idevice, Feather's third mode) | lockdownd, no TLS | a computer once to make the pairing file, an App Store VPN app | Works without any certificate, but it needs a computer and keeps a full lockdown credential on the phone. Later, maybe, behind an advanced switch (docs/sideload.md). |
 | E. A `data:` URL or a file URL as the manifest | – | – | Not accepted: the manifest URL must be https. |
@@ -106,7 +106,7 @@ server step.
    Keychain generic-password item (service `com.ryha.ifizbox.signing.p12`, also `...ThisDeviceOnly`), for iFizBox's own
    update (below); nothing else reads it. The checks are I5's: a wrong password, an expired certificate or profile, a certificate the profile
    doesn't list.
-2. **A Signing Server**: sign.cydian.dev unless the user enters their own (a saved cydian.dev, the website's old
+2. **A Signing Server**: sign.ifizbox.com unless the user enters their own (a saved ifizbox.com, the website's old
    signer, counts as the default). That's all (F75): no profile to install, nothing
    to trust. A phone that ran 0.1.x drops the old local CA's keys and files at launch
    (`SignStore.removeOldInstallCA`); its old profile stays in iOS Settings until the user deletes it.

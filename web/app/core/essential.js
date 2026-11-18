@@ -4,7 +4,7 @@
 //
 // The built-in source, like Cydia's apt.saurik.com: always in the list, first, with a lock instead of Delete; Manage
 // can't remove it and Export skips it. Which one, by build (builtinSources):
-//   jailbreak   iFizBox's flat APT repo, https://cydian.dev/repo/ (Packages, Release and the .debs are assets of
+//   jailbreak   iFizBox's flat APT repo, https://<DOMAIN>/repo/ (Packages, Release and the .debs are assets of
 //               every release, tools/release.sh and tools/selfrepo.py; the Worker serves the latest one's, B17)
 //   sideload    iFizBox's AltStore source, web/app/source.json on GitHub (tools/altsource.py)
 //   site        the same AltStore source (the site only installs IPAs)
@@ -18,13 +18,15 @@
 // For IPAs only iFizBox itself (com.ryha.ifizbox from its own source) is ever essential.
 import { compareVersions, isNewer, parseVersion } from "./selfupdate.js";
 import { altKey, seedRecord } from "./altstore.js";
-import { NAME, GITHUB_REPO } from "../brand.js";
+import { NAME, GITHUB_REPO, DOMAIN } from "../brand.js";
 
 export const SELF_ID = "com.ryha.ifizbox";
 const SELF_NAME = NAME;
-export const SELF_APT_URI = "https://cydian.dev/repo/";
+// F172: brand.js DOMAIN. A phone that still lists the old host's repo keeps it as an ordinary source (it is no longer
+// the built-in, so it can be swiped away); nothing rewrites it (user 2026-11-18: no support for the old name).
+export const SELF_APT_URI = `https://${DOMAIN}/repo/`;
 export const SELF_ALT_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/web/app/source.json`;
-export const SELF_SITE = "https://cydian.dev/";
+export const SELF_SITE = `https://${DOMAIN}/`;
 export const MIN_FIELD = "x-ifizbox-minimum-version"; // the Release field, lower-cased as core/apt.js keeps them
 const LOCKED_TEXT = `${NAME}'s own source is built in and can't be removed.`;
 export const STORE_KEY = "ifizbox.essential";
@@ -203,7 +205,7 @@ export function saveInfo(storage, info, now = Date.now()) {
 // ---- iFizBox's own IPA (sideload) -----------------------------------------------------------------------------
 // The sideload app signs its own update on the phone and hosts it on the Signing Server (essential-ui.js
 // installSelfNow, signing.install host: true). Only without that (no bridge, no IPA) does this answer: the user
-// opens cydian.dev's Install iFizBox App in Safari, which hands iFizBox's source to AltStore, SideStore or Feather (F89:
+// opens the site's (brand.js DOMAIN) Install iFizBox App in Safari, which hands iFizBox's source to AltStore, SideStore or Feather (F89:
 // the website signs nothing).
 
 // row: { version, ipa } (selfUpgradeRow). deps: { alert(spec) -> { index }, open(url) }   open: outside the app.
@@ -216,7 +218,7 @@ export async function installSelf(row, deps) {
     return "no-asset";
   }
   const { index } = await alert({ title: `Install ${v}`,
-    message: "Install it from cydian.dev in Safari: AltStore, SideStore or Feather, or the IPA.",
+    message: `Install it from ${DOMAIN} in Safari: AltStore, SideStore or Feather, or the IPA.`,
     buttons: ["Cancel", "Open Safari"], cancel: 0 });
   if (index !== 1) return "cancelled";
   await open(SELF_SITE);

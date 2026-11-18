@@ -10,7 +10,7 @@ server for two things, and this Worker is that server:
 - **Apps the website signed in the browser** (F93): the website signs with zsign as WebAssembly in your browser and
   leaves the signed app here for the same 10 minutes, for iOS's install prompt.
 
-It stores nothing else and logs nothing. iFizBox uses `https://sign.cydian.dev` unless you set your own.
+It stores nothing else and logs nothing. iFizBox uses `https://sign.ifizbox.com` unless you set your own.
 
 ## Host your own (free, about a minute)
 
@@ -74,7 +74,7 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 | `GET /sign/host/<token>/manifest.plist`, `/app.ipa` | what that link fetches |
 | `GET /repo/<file>` | iFizBox's own APT repo (`Release`, `Packages`, `Packages.gz`, `*.deb`): the latest GitHub release's asset, fetched here so clients get no redirect (Zebra can't take GitHub's). `IFIZBOX_REPO` (owner/name) for another repo's releases |
 
-`node test.mjs` checks them against an in-memory KV. cydian.dev's own deploy: `npx wrangler deploy -c wrangler.ifizbox.toml`.
+`node test.mjs` checks them against an in-memory KV. ifizbox.com's own deploy: `npx wrangler deploy -c wrangler.ifizbox.toml` (Workers Builds runs it on every push to main).
 
 The website's **Install** (no app to sign on) signs in the browser (F93: zsign as WebAssembly, `web/app/vendor/zsign`)
 and uploads the signed IPA to `/sign/upload` (in parts, kept 10 minutes) for iOS's install prompt.

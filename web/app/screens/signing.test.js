@@ -6,7 +6,7 @@ import { stepStates, allDone, STEPS, missingStep, serverReady, openAt, walkOpen 
 
 const ident = { name: "Apple Development: Ryan (ABCDE12345)", team: "ABCDE12345" };
 const st = (identity, extra = {}) => ({ mode: "sideload", identity, ...extra });
-const SERVER = "https://cydian.dev";
+const SERVER = "https://ifizbox.com";
 const done = (states) => Object.fromEntries(states.map((s) => [s.id, s.done]));
 const opened = (states) => states.filter((s) => s.open).map((s) => s.id);
 const current = (states) => states.find((s) => s.current)?.id ?? null;
@@ -17,7 +17,7 @@ test("two numbered steps in order: the certificate, then the server", () => {
   assert.deepEqual(STEPS.map((x) => x.id), ["certificate", "server"]);
 });
 
-test("with the default server set (cydian.dev): only the certificate is needed", () => {
+test("with the default server set (ifizbox.com): only the certificate is needed", () => {
   for (const status of [null, undefined, st(null), st(null, { identityProblem: "gone" })]) {
     const s = stepStates(status, { server: SERVER });
     assert.deepEqual(done(s), { certificate: false, server: true });

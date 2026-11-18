@@ -192,12 +192,18 @@ class NoOldName(unittest.TestCase):
 class NoOldIds(unittest.TestCase):
     """F171: the old name is gone from every tracked text file but plan/, journal/ and docs/concepts (the record)."""
     SKIP = ("plan/", "journal/", "docs/concepts/")
-    # F172 moves these (the domain, the old worker's name) and then drops them from here. Assets already published under
-    # the old name keep their URLs: the test-fixtures pre-release's files, and source.json's current release IPA
-    # (release.sh rewrites it with the next release's iFizBox.ipa).
-    F172 = re.compile(OLD_WORD + r"\\?\.dev\b|releases/download/test-fixtures/[\w.-]+"
-                      r"|^name = \"" + OLD_WORD.lower() + r"-sign\"$|releases/download/v[\d.]+/" + OLD_WORD + r"\.(?:ipa|deb)\b",
+    # F172 moved the domain and the worker's name to the brand. Only assets already published under the old name keep
+    # their URLs: the test-fixtures pre-release's files, and source.json's release IPAs (release.sh adds the next
+    # release's iFizBox.ipa).
+    F172 = re.compile(r"releases/download/test-fixtures/[\w.-]+|releases/download/v[\d.]+/" + OLD_WORD + r"\.(?:ipa|deb)\b",
                       re.I | re.M)
+
+    def test_no_old_domain(self):
+        """F172: the old domain is gone from every tracked file but the record (no fallback to it, user 2026-11-18)."""
+        import subprocess
+        out = subprocess.run(["git", "grep", "-lIi", OLD_WORD + r"\.dev", "--", ".", ":!plan", ":!journal",
+                              ":!docs/concepts"], cwd=ROOT, capture_output=True, text=True).stdout.split()
+        self.assertEqual(out, [], "files that still name the old domain (use brand.js DOMAIN)")
 
     def test_no_file_says_the_old_name(self):
         import subprocess

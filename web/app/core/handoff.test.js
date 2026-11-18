@@ -84,7 +84,7 @@ test("AltStore app: its source's add links", () => {
 });
 
 test("add link: the URL, and a dist repo's suite and components", () => {
-  assert.equal(addLink(FLAT, "https://cydian.dev"), "https://cydian.dev/add?url=https%3A%2F%2Frepo.chariz.com%2F");
+  assert.equal(addLink(FLAT, "https://ifizbox.com"), "https://ifizbox.com/add?url=https%3A%2F%2Frepo.chariz.com%2F");
   assert.equal(addLink(DIST, "http://localhost:8080/"),
     "http://localhost:8080/add?url=https%3A%2F%2Fapt.procurs.us%2F&suite=1800&component=main&component=extra");
   assert.equal(addLink(ALT), `${PUBLIC_SITE}/add?url=https%3A%2F%2Fexample.com%2Fapps.json`);

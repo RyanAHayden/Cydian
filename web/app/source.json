@@ -28,7 +28,7 @@
         {
           "version": "0.9.2",
           "date": "2026-11-18T17:43:13Z",
-          "localizedDescription": "Installing works again: the default Signing Server is now sign.ifizbox.com (cydian.dev is gone).\nIf you set a server by hand, set it to https://sign.ifizbox.com in Settings > Signing.\niFizBox's own updates now show in Changes, without a popup.\nUser reviews on package pages.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.2",
+          "localizedDescription": "Installing works again: the default Signing Server is now sign.ifizbox.com (the old domain is gone).\nIf you set a server by hand, set it to https://sign.ifizbox.com in Settings > Signing.\niFizBox's own updates now show in Changes, without a popup.\nUser reviews on package pages.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.2",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.2/Cydian.ipa",
           "size": 5087397,
           "minOSVersion": "15.0"
@@ -100,7 +100,7 @@
         {
           "version": "0.3.4",
           "date": "2026-11-18T05:55:21Z",
-          "localizedDescription": "Alerts stack two long buttons (the Essential Upgrade popup).\nHome: Reload like Cydia's (spinner in the button); the lower list like Cydia's (User Guides and more).\nJailbreak app: installed apps show their real versions and are recorded when installed.\ncydian.dev is now one Cloudflare Worker: the website, its source proxy and the install server; anyone can run their own (worker/README.md).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.4",
+          "localizedDescription": "Alerts stack two long buttons (the Essential Upgrade popup).\nHome: Reload like Cydia's (spinner in the button); the lower list like Cydia's (User Guides and more).\nJailbreak app: installed apps show their real versions and are recorded when installed.\nThe website is now one Cloudflare Worker: the website, its source proxy and the install server; anyone can run their own (worker/README.md).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.4",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.4/Cydian.ipa",
           "size": 3297003,
           "minOSVersion": "15.0"
@@ -108,7 +108,7 @@
         {
           "version": "0.3.3",
           "date": "2026-11-18T05:23:13Z",
-          "localizedDescription": "Essential: iFizBox now uses its new install server, sign.cydian.dev (a Cloudflare Worker anyone can host for free: worker/README.md). Signing still happens on your iPhone.\nAfter iFizBox updates itself it closes, with a notification to open the new version.\nReload works like Cydia's (spinner in the button, no flash).\nMore from the runner (I4, F87).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.3",
+          "localizedDescription": "Essential: iFizBox now uses its new install server (a Cloudflare Worker anyone can host for free: worker/README.md). Signing still happens on your iPhone.\nAfter iFizBox updates itself it closes, with a notification to open the new version.\nReload works like Cydia's (spinner in the button, no flash).\nMore from the runner (I4, F87).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.3",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.3/Cydian.ipa",
           "size": 2885049,
           "minOSVersion": "15.0"

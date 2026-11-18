@@ -1,5 +1,5 @@
 // F97: Settings > Account (iOS 6 grouped tables). iFizBox Account keeps this device's sources, the settings that
-// travel, Ignored Upgrades, the Wish List, installed-app records and the signing certificate on cydian.dev, encrypted with an account
+// travel, Ignored Upgrades, the Wish List, installed-app records and the signing certificate on the site (brand.js DOMAIN), encrypted with an account
 // key only the user's devices have (core/account.js has the rules; worker/src/account.js the storage).
 //
 //   accountSection()          the root Settings page's row: iFizBox Account, Signed In / Off; pushes #/settings/account
@@ -29,7 +29,7 @@ import { apps, recordInstall, removeInstall } from "../core/installed.js";
 import { getBackend } from "../backend.js";
 import { loadIdentity, saveIdentity } from "../signing-client.js";
 import { settings, createSwitch } from "./settings.js";
-import { NAME } from "../brand.js";
+import { NAME, DOMAIN } from "../brand.js";
 
 const STATE_KEY = "ifizbox.account";
 
@@ -189,10 +189,10 @@ export function accountSection() {
   return box;
 }
 
-const ACCOUNT_FOOTER = "Keeps your sources, settings, Ignored Upgrades, installed apps and certificate on cydian.dev, "
+const ACCOUNT_FOOTER = `Keeps your sources, settings, Ignored Upgrades, installed apps and certificate on ${DOMAIN}, `
   + "so a new iPhone, a reinstall or the website gets them back. No email, no password: your account key is the account.";
-const KEY_WARNING = "Save this key somewhere safe. It is the only way into your account: if you lose it, nobody can get your data back, cydian.dev included.";
-const CERT_FOOTER = "Your certificate is encrypted with your account key before it leaves this device: cydian.dev can't read it. Off takes it out of your account.";
+const KEY_WARNING = `Save this key somewhere safe. It is the only way into your account: if you lose it, nobody can get your data back, ${DOMAIN} included.`;
+const CERT_FOOTER = `Your certificate is encrypted with your account key before it leaves this device: ${DOMAIN} can't read it. Off takes it out of your account.`;
 
 let reveal = false; // Show Account Key: the key's group stays open until the page is left
 
@@ -290,7 +290,7 @@ async function syncNow(el) {
 }
 
 async function deleteFlow(el) {
-  const { index } = await showAlert({ title: "Delete Account?", message: "Your saved sources, settings, apps and certificate are deleted from cydian.dev, and every device is signed out. What's on this device stays.",
+  const { index } = await showAlert({ title: "Delete Account?", message: `Your saved sources, settings, apps and certificate are deleted from ${DOMAIN}, and every device is signed out. What's on this device stays.`,
     buttons: ["Cancel", "Delete"], cancel: 0 });
   if (index !== 1) return;
   const hide = showHUD("Deleting");

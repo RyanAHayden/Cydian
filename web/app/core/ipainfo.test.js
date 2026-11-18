@@ -24,7 +24,7 @@ test("which versions need a check, and the Worker's URL", () => {
   assert.equal(needsCheck({ downloadURL: "itms-services://?action=download-manifest&url=x" }), false);
   assert.equal(needsCheck({}), false);
   assert.equal(ipaInfoUrl(IPA), `/api/ipainfo?url=${encodeURIComponent(IPA)}`);
-  assert.equal(ipaInfoUrl(IPA, "https://cydian.dev"), `https://cydian.dev/api/ipainfo?url=${encodeURIComponent(IPA)}`);
+  assert.equal(ipaInfoUrl(IPA, "https://ifizbox.com"), `https://ifizbox.com/api/ipainfo?url=${encodeURIComponent(IPA)}`);
   assert.equal(ipaInfoUrl("javascript:x"), null);
 });
 
@@ -142,13 +142,13 @@ test("the queue runs a few checks at a time", async () => {
   assert.equal(await run(async () => 7), 7, "a failure doesn't stop the queue");
 });
 
-test("the website asks its own Worker, the app asks cydian.dev", async () => {
+test("the website asks its own Worker, the app asks ifizbox.com", async () => {
   clearIpaMemory();
   const seen = [];
   const fetchFn = async (u) => { seen.push(u); return { json: async () => ({ minOSVersion: "15.0", deviceFamily: [1] }) }; };
   assert.equal((await ipaCheck("https://x/6.ipa", { backend: { kind: "http" }, fetchFn })).minOSVersion, "15.0");
   await ipaCheck("https://x/7.ipa", { backend: { kind: "native" }, fetchFn });
-  assert.deepEqual(seen, [`/api/ipainfo?url=${encodeURIComponent("https://x/6.ipa")}`, `https://cydian.dev/api/ipainfo?url=${encodeURIComponent("https://x/7.ipa")}`]);
+  assert.deepEqual(seen, [`/api/ipainfo?url=${encodeURIComponent("https://x/6.ipa")}`, `https://ifizbox.com/api/ipainfo?url=${encodeURIComponent("https://x/7.ipa")}`]);
 });
 
 test("the catalog judges rows with what IPAs said (setIpaInfo), only apps whose source gives no range", () => {

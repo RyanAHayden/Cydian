@@ -632,7 +632,7 @@ function localStore() {
 }
 
 // F160: read an IPA's Info.plist through the Worker's /api/ipainfo (core/ipainfo.js checkIpa): the website asks its
-// own origin, the app asks cydian.dev (the Worker answers any origin). The answer's JSON, error codes included.
+// own origin, the app asks PUBLIC_SITE (the Worker answers any origin). The answer's JSON, error codes included.
 export function ipaCheck(url, { backend = getBackend(), fetchFn = globalThis.fetch, store = null, text = "", fallback = null } = {}) {
   const get = (u) => fetchFn(ipaInfoUrl(u, backend.kind === "http" ? "" : PUBLIC_SITE)).then((r) => r.json());
   return checkIpa(url, { get, store, text, fallback }).catch(() => null);

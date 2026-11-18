@@ -5,7 +5,7 @@
 //   failureFor(source, failures)    -> the failure naming this source ({ uri, dist }), or null
 //
 // What counts (from apt 2.x on the iPhone 7, journal/2026-11-18-b23-*):
-//   stdout  "Err:21 https://cydian.dev/repo ./ Packages" then an indented "  525  <none> [IP: 1.2.3.4 443]". Only an
+//   stdout  "Err:21 https://dead.example/repo ./ Packages" then an indented "  525  <none> [IP: 1.2.3.4 443]". Only an
 //           item whose last line is Err counts: apt reports an optional file's 404 as Err and then gives up on it with
 //           "Ign:<same n>" (Translation-en). Translation-* is optional anyway and never counts.
 //   stderr  "E: Failed to fetch <url>  <reason>" (W: in older apt), and "E: The repository '<uri> <suite> Release' ..."

@@ -37,7 +37,7 @@ Like Cydia's apt.saurik.com, iFizBox has a source of its own that is built in an
 (`web/app/core/essential.js` `builtinSources`). The release script regenerates both on every release:
 
 - **APT repo** (the jailbreak app, and what the website's Install Full iFizBox sheet adds to Sileo and Zebra):
-  `https://cydian.dev/repo/`, a flat repo (`dist ./`). Its files are the latest release's assets: the Worker's
+  `https://ifizbox.com/repo/`, a flat repo (`dist ./`). Its files are the latest release's assets: the Worker's
   `/repo/<file>` fetches `https://github.com/RyanAHayden/iFizBox/releases/latest/download/<file>`, follows GitHub's
   redirect itself and answers with the file (B17; only `Release`, `Packages`, `Packages.gz` and `*.deb`). Zebra
   can't take GitHub's address directly: the redirect ends at a signed `release-assets.githubusercontent.com` URL,
@@ -64,7 +64,7 @@ and the built-in repo). A newer iFizBox is only an upgrade row on top of Changes
 there; there is no popup, no Essential Upgrade alert and no Settings > About. In the sideload app iFizBox's own IPA
 never goes through the local install server, because iOS closes iFizBox, and the server with it, when it starts
 installing. Instead it is signed on the phone and held on the Signing Server (worker/, `POST /sign/host`) for iOS to install from, or, with no
-bridge to sign with, the user is sent to cydian.dev's Install iFizBox App (AltStore, SideStore, Feather or the IPA: F89).
+bridge to sign with, the user is sent to ifizbox.com's Install iFizBox App (AltStore, SideStore, Feather or the IPA: F89).
 
 ## Cutting one
 

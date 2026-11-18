@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { shareItems, sourceUrlOf, APP_TILES, SIDELOAD_TOOLS, headerShareButton } from "./handoff.js";
 
-const ORIGIN = "https://cydian.dev";
+const ORIGIN = "https://ifizbox.com";
 const APT = { key: "deb:https://repo.example/:./", uri: "https://repo.example/", dist: "./" };
 const ALT = { key: "alt:https://alt.example/apps.json", kind: "altstore", uri: "https://alt.example/apps.json" };
 const kinds = (items) => items.map((i) => (i.kind === "open" ? i.label : i.kind));

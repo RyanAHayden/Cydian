@@ -35,7 +35,7 @@ import { refreshInBackground } from "./sources.js";
 import { markiFizBoxInstalled, browsingLocked, askToBrowse } from "../websign-gate.js";
 import * as guides from "./guides.js";
 import { guideRows, JAILBREAK_INFO_URL } from "./guides.js";
-import { NAME } from "../brand.js";
+import { NAME, DOMAIN } from "../brand.js";
 
 const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
 
@@ -862,9 +862,9 @@ export function render(el, route, ctx) {
 // browsers), else the rootless iFizBox.deb. Safari downloads it to Files, where Sileo or Filza installs it.
 // "Jailbroken? Get iFizBox.deb": iFizBox's own APT repo (tools/release.sh: a flat repo beside each release's assets)
 // added in Sileo or Zebra, which then keep iFizBox updated; or the URL to paste elsewhere; or the .deb itself.
-// B17: cydian.dev/repo/ (the Worker serves the release assets itself): GitHub's latest/download redirect ends at a
+// B17: <DOMAIN>/repo/ (the Worker serves the release assets itself): GitHub's latest/download redirect ends at a
 // signed URL too long for Zebra's cache file name.
-export const IFIZBOX_APT_REPO = "https://cydian.dev/repo/";
+export const IFIZBOX_APT_REPO = `https://${DOMAIN}/repo/`;
 export const JAILBROKEN_SHEET = { title: `Install ${NAME} with your jailbreak's package manager: it keeps ${NAME} updated.`,
   buttons: ["Add to Sileo", "Add to Zebra", "Copy Repo URL", "Download .deb"] };
 const IFIZBOX_PACKAGE = "com.ryha.ifizbox";

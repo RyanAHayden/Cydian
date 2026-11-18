@@ -198,10 +198,10 @@ function selfDeps({ answers = [] } = {}) {
 }
 const ROW = { version: "0.1.3", ipa: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.3/iFizBox.ipa" };
 
-test("installSelf (no bridge to sign with): it offers cydian.dev in Safari, which hands iFizBox to a sideloader (F89)", async () => {
+test("installSelf (no bridge to sign with): it offers ifizbox.com in Safari, which hands iFizBox to a sideloader (F89)", async () => {
   const s = selfDeps({ answers: [1] });
   assert.equal(await installSelf(ROW, s.deps), "site");
-  assert.match(s.log[0][2], /cydian\.dev/);
+  assert.match(s.log[0][2], /ifizbox\.com/);
   assert.match(s.log[0][2], /AltStore, SideStore or Feather/);
   assert.deepEqual(s.log[1], ["open", SELF_SITE]);
   const no = selfDeps({ answers: [0] });

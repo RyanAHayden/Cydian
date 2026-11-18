@@ -314,7 +314,7 @@ export async function checkP12Password(buf, password, subtle = globalThis.crypto
 // ---- what the page shows --------------------------------------------------------------------------------------
 
 // The app signs on the phone and needs only manifests and iFizBox's update hand-off: the Cloudflare Worker (worker/).
-// B22: from brand.js (the old sign.cydian.dev no longer resolves).
+// B22: from brand.js (the old domain's sign host no longer resolves).
 export const APP_SERVER = `https://${SIGN_HOST}`;
 // The website itself (its own signer before F89, gone with its server): a saved one means the default now.
 export const LEGACY_SERVER = `https://${DOMAIN}`;

@@ -1,7 +1,7 @@
 # iFizBox Account (F97)
 
 A free, minimal account that keeps a device's sources, the settings that travel (`core/settings.js` TRAVELS),
-Ignored Upgrades, installed-app records (`core/installed.js`) and the signing certificate on cydian.dev, so a new
+Ignored Upgrades, installed-app records (`core/installed.js`) and the signing certificate on ifizbox.com, so a new
 phone, a reinstall or the website gets them back.
 
 ## The key

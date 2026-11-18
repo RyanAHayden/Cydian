@@ -47,11 +47,15 @@ def swift(brand=BRAND):
             "}\n")
 
 
-def html(text, name=NAME):
-    """index.html's title and Open Graph names (crawlers read them without running JS)."""
+def html(text, name=NAME, domain=None):
+    """index.html's title, Open Graph names and the site's URLs (crawlers read them without running JS)."""
+    domain = domain or BRAND["BRAND_DOMAIN"]
     text = re.sub(r"<title>[^<]*</title>", f"<title>{name}</title>", text, count=1)
     for prop in ("og:site_name", "og:title"):
         text = re.sub(rf'(<meta property="{prop}" content=")[^"]*(")', rf"\g<1>{name}\g<2>", text, count=1)
+    # F172: og:url and og:image on brand.env's BRAND_DOMAIN.
+    for prop in ("og:url", "og:image"):
+        text = re.sub(rf'(<meta property="{prop}" content="https://)[^/"]+', rf"\g<1>{domain}", text, count=1)
     return re.sub(r'(<meta property="og:image:alt" content=")[^"\']*(\'s glossy icon)', rf"\g<1>{name}\g<2>", text, count=1)
 
 

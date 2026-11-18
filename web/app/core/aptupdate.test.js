@@ -1,5 +1,5 @@
 // B23: which sources apt-get update failed on, from its own output. The fixture is the iPhone 7's real update of
-// 2026-11-18 (fixtures/apt-update-525.*): the old https://cydian.dev/repo answering 525, with mineek's Translation-en
+// 2026-11-18 (fixtures/apt-update-525.*): the old host's repo answering 525 (F172 renamed that host to dead.example in the fixture), with mineek's Translation-en
 // 404 (Err, then Ign: apt gave up on it) and the usual unsigned-repo warnings beside it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -13,10 +13,10 @@ const STDERR = fx("apt-update-525.stderr");
 test("B23: the iPhone 7's update names only the 525 source, not the warnings or an ignored Translation-en", () => {
   const f = updateFailures(STDOUT, STDERR);
   assert.ok(f.length >= 1);
-  for (const x of f) assert.match(x.uri, /^https:\/\/cydian\.dev\/repo/, JSON.stringify(x));
+  for (const x of f) assert.match(x.uri, /^https:\/\/dead\.example\/repo/, JSON.stringify(x));
   assert.equal(f[0].message, "apt-get update couldn't fetch Packages (525)");
   const sources = [
-    { uri: "https://cydian.dev/repo/", dist: "./" },
+    { uri: "https://dead.example/repo/", dist: "./" },
     { uri: "https://mineek.github.io/tweaks/", dist: "./" },
     { uri: "https://kittymaxine.com/repo/", dist: "./" },
     { uri: "http://apt.thebigboss.org/repofiles/cydia/", dist: "stable", components: ["main"] },
@@ -62,8 +62,8 @@ test("B23: Err lines and E: lines map to sources by URI and suite", () => {
 test("B23: the banner names the failed sources and opens Sources", () => {
   assert.equal(failedBanner([]), null);
   assert.equal(failedBanner(undefined), null);
-  assert.deepEqual(failedBanner([{ name: null, uri: "https://cydian.dev/repo/" }]),
-    { title: "Source Failed to Refresh", message: "cydian.dev/repo: tap to see Sources." });
+  assert.deepEqual(failedBanner([{ name: null, uri: "https://dead.example/repo/" }]),
+    { title: "Source Failed to Refresh", message: "dead.example/repo: tap to see Sources." });
   assert.equal(failedBanner([{ name: "A" }, { name: "B" }]).message, "A and B: tap to see Sources.");
   assert.equal(failedBanner([{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }]).message, "A, B and 2 more: tap to see Sources.");
   assert.equal(failedBanner([{ name: "A" }, { name: "B" }]).title, "Sources Failed to Refresh");

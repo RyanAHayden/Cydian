@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { launchURL, isStandaloneWeb, navigationType } from "./launch.js";
 
-function win({ standalone = "media", type = "navigate", url = "https://cydian.dev/#/sources/x", native = false } = {}) {
+function win({ standalone = "media", type = "navigate", url = "https://ifizbox.com/#/sources/x", native = false } = {}) {
   const u = new URL(url);
   return {
     location: { pathname: u.pathname, search: u.search, hash: u.hash },
@@ -16,8 +16,8 @@ function win({ standalone = "media", type = "navigate", url = "https://cydian.de
 test("fresh standalone launch opens Home, whatever page it was added from", () => {
   assert.equal(launchURL(win()), "/#/home");
   assert.equal(launchURL(win({ standalone: "apple" })), "/#/home"); // older iOS: navigator.standalone only
-  assert.equal(launchURL(win({ url: "https://cydian.dev/" })), "/#/home");
-  assert.equal(launchURL(win({ url: "https://cydian.dev/#/home" })), null); // already there
+  assert.equal(launchURL(win({ url: "https://ifizbox.com/" })), "/#/home");
+  assert.equal(launchURL(win({ url: "https://ifizbox.com/#/home" })), null); // already there
 });
 
 test("a reload or back/forward in the standalone app keeps the route", () => {
@@ -26,8 +26,8 @@ test("a reload or back/forward in the standalone app keeps the route", () => {
 });
 
 test("resume from the background keeps the route", () => {
-  assert.equal(launchURL(win({ url: "https://cydian.dev/#/changes" }), { resumed: true }), null);
-  assert.equal(launchURL(win({ url: "https://cydian.dev/#/sources/x" }), { resumed: true }), null);
+  assert.equal(launchURL(win({ url: "https://ifizbox.com/#/changes" }), { resumed: true }), null);
+  assert.equal(launchURL(win({ url: "https://ifizbox.com/#/sources/x" }), { resumed: true }), null);
 });
 
 test("Safari tabs and the native app keep the URL", () => {

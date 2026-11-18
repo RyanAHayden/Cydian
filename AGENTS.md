@@ -5,7 +5,7 @@ iFizBox: a package manager with the iOS 6 Cydia look, for modern iPhones. Two fr
 1. `web/app/`: **the one frontend** (HTML, CSS, vanilla JS modules, no build step). It runs on the public site and
    inside the jailbreak app. `core/` is pure JS (parsing, versions, Changes, upgrades), tested with `node --test`.
    The UI only talks to a backend interface: `backend-http.js` on the site, `backend-native.js` in the app.
-   cydian.dev is one Cloudflare Worker (`worker/`): `web/app/` as static assets, the fetch proxy (`/api/fetch`)
+   ifizbox.com (brand.js `DOMAIN`) is one Cloudflare Worker (`worker/`): `web/app/` as static assets, the fetch proxy (`/api/fetch`)
    and the install server (`/sign/*`). No server of our own: the app signs on the phone, the website in the browser
    (F93: zsign as WebAssembly, `web/app/vendor/zsign`, built by `tools/build-zsign-wasm.sh`).
 2. `native/`: jailbreak app, a Swift shell around a WKWebView running `web/app/`, plus a root helper for apt.

@@ -56,3 +56,13 @@ test("F142: every repo deps.js names as a library's home is also on the list", (
   assert.ok(homes.length >= 4);
   for (const url of homes) assert.ok(apt.some((r) => r.url === url), url);
 });
+
+test("matchRecommendedApps: every word, across sources, capped", async () => {
+  const { matchRecommendedApps } = await import("./recommended.js");
+  const a = { row: { key: "a" }, apps: [{ name: "YouMod", subtitle: "YouTube with YouMod tweaks" }, { name: "Delta" }] };
+  const b = { row: { key: "b" }, apps: [{ name: "RyukGram", developerName: "faroukbmiled" }] };
+  assert.deepEqual(matchRecommendedApps([a, b], "youtube tweaks").map((m) => m.app.name), ["YouMod"]);
+  assert.deepEqual(matchRecommendedApps([a, b], "FAROUK").map((m) => m.row.key), ["b"]);
+  assert.deepEqual(matchRecommendedApps([a, b], "  "), []);
+  assert.equal(matchRecommendedApps([a, a, a], "delta", 2).length, 2);
+});

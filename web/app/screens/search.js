@@ -21,6 +21,9 @@ import { orderSources, loadOrder } from "../core/sourcelist.js";
 import { getBackend } from "../backend.js";
 import { grouped, el } from "../nav/ui.js";
 import { discoveryGroup } from "./extras.js";
+import { recommendedApps, addRecommended } from "./manage.js";
+import { matchRecommendedApps } from "../core/recommended.js";
+import { showAlert } from "../nav/alert.js";
 
 export const title = "Search";
 
@@ -162,7 +165,8 @@ export function render(body, route, ctx) {
   results.append(list.el);
   // F20: packages from sources the user hasn't added (Canister), under the local results.
   const others = discoveryGroup(ctx);
-  results.append(others.el);
+  const recs = recommendedGroup(ctx);
+  results.append(recs.el, others.el);
 
   // Show Incompatible, the iOS version or the Architecture changed (here, in the sheet or in Settings): search
   // again. A page left behind unsubscribes.
@@ -205,6 +209,7 @@ export function render(body, route, ctx) {
     const seq = ++state.seq;
     // F101: one Latin character searches nothing, here or on Canister (one CJK character does: Zebra's rule).
     others.search(searchable(q) && settings.deviceType() !== "none" ? q : ""); // jailbreak packages only
+    recs.search(searchable(q) ? q : "");
     drawRecent();
     if (!searchable(q)) {
       list.setItems([]);
@@ -228,6 +233,41 @@ export function render(body, route, ctx) {
   input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 120); });
   bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); settings.recentSearches.add(input.value); run(); input.blur(); });
   run();
+}
+
+// ---- apps in recommended sources not added yet ---------------------------------------------------------------
+// Under the local results: apps whose source Recommended lists (core/recommended.js) but the user hasn't added.
+// A tap offers Add Source, then opens the source's page, where the app installs as usual.
+function recommendedGroup(ctx) {
+  const box = el("div", "discovery");
+  let seq = 0;
+  async function search(q) {
+    const turn = ++seq;
+    box.replaceChildren();
+    if (!q) return;
+    await new Promise((r) => setTimeout(r, 450)); // once typing stops, as Other Sources does
+    if (turn !== seq) return;
+    const found = matchRecommendedApps(await recommendedApps().catch(() => []), q);
+    if (turn !== seq || !found.length) return;
+    box.replaceChildren(grouped([{
+      header: "Recommended Sources",
+      rows: found.map(({ row, app }) => ({
+        label: app.name,
+        subtitle: [row.label, app.subtitle || app.developerName].filter(Boolean).join(" · "),
+        icon: { text: app.name?.[0]?.toUpperCase() ?? "?" },
+        onClick: () => offer(row, app, ctx),
+      })),
+      footer: "From recommended sources you haven't added. Add the source to install.",
+    }]));
+  }
+  return { el: box, search };
+}
+
+async function offer(row, app, ctx) {
+  const { index } = await showAlert({ title: app.name, message: `In ${row.label} (${row.record.uri}). Add this source?`,
+    buttons: ["Cancel", "Add Source"], cancel: 0 });
+  if (index !== 1 || !(await addRecommended(row, ctx))) return;
+  ctx.go({ tab: "sources", path: [row.key] });
 }
 
 // ---- the Filter sheet ----------------------------------------------------------------------------------------

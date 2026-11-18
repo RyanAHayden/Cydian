@@ -579,7 +579,15 @@ async function loadPreview(row) {
   return p;
 }
 
-async function addRecommended(row, ctx) {
+// Search's "Recommended Sources" group: the AltStore sources Recommended lists that aren't added yet, each with its
+// apps (read once per visit, as above). A source that doesn't answer is left out.
+export async function recommendedApps() {
+  const rows = (await recRows()).filter((r) => !r.added && !r.rec.jailbreak);
+  const read = await Promise.all(rows.map((row) => loadPreview(row).then((p) => ({ row, apps: p?.apps ?? [] }), () => null)));
+  return read.filter(Boolean);
+}
+
+export async function addRecommended(row, ctx) {
   const hide = ctx.showHUD("Verifying URL");
   let error = null;
   try {

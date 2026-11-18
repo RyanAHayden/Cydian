@@ -60,6 +60,13 @@ export const RECOMMENDED_SOURCES = [
     why: "UTM and UTM SE: virtual machines on the iPhone, for Windows, Linux and classic Mac OS." },
   { kind: "source", name: "Amethyst", url: "https://alt.crystall1ne.dev",
     why: "Angel Aura Amethyst and PojavLauncher: launchers that run Minecraft: Java Edition." },
+  // Asked for by the user (2026-11-18): tweaked-app sources, each from the app's own maintainer or its README.
+  { kind: "source", name: "YouMod", url: "https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json",
+    why: "YouMod: YouTube with ad blocking, background play, Return YouTube Dislike and YTUHD built in." },
+  { kind: "source", name: "Unbound", url: "https://repo.unbound.rip/app-repo.json",
+    why: "Unbound: a Discord client mod with plugins and themes, plus its TestFlight builds." },
+  { kind: "source", name: "RyukGram", url: "https://source.ryuksign.com/",
+    why: "RyukGram: Instagram with downloads, a built-in gallery and privacy options, with no-plugin builds too." },
   { kind: "source", name: "PokeMMO", url: "https://pokemmo.com/altstore",
     why: "PokeMMO: a free-to-play online multiplayer monster-catching RPG." },
 ];
@@ -137,4 +144,19 @@ export function recommendedSeen(storage = globalThis.localStorage) {
 }
 export function markRecommendedSeen(storage = globalThis.localStorage) {
   try { storage?.setItem(FIRST_RUN_KEY, "1"); } catch { /* private mode */ }
+}
+
+// Search's "Recommended Sources" group: apps in recommended sources not added yet whose name, subtitle or developer
+// holds every word of the query. sources: [{ row, apps }] (manage.js recommendedApps). -> [{ row, app }]
+export function matchRecommendedApps(sources, q, limit = 25) {
+  const words = String(q ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const out = [];
+  for (const { row, apps } of sources ?? []) {
+    for (const app of apps ?? []) {
+      const hay = [app?.name, app?.subtitle, app?.developerName].filter(Boolean).join(" ").toLowerCase();
+      if (words.every((w) => hay.includes(w))) out.push({ row, app });
+    }
+  }
+  return out.slice(0, limit);
 }

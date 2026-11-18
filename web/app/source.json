@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.2.2",
+          "date": "2026-11-18T02:57:28Z",
+          "localizedDescription": "The Installed tab is back in the app: your apps, and Cydian itself at its real version.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.2",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.2/Cydian.ipa",
+          "size": 2613286,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.2.1",
           "date": "2026-11-18T02:55:38Z",
           "localizedDescription": "Cydian shows itself in Installed at its real version, so its updates appear in Changes like any app.\nAutomatic appearance follows iOS, dark mode included (Light stays the default).\nFeatured opens Popular; the share sheet with Copy Link; the Reloading popup lasts as long as loading.\nFixes: the Add button's Paste state, the page shifting when typing in a popup.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.1",

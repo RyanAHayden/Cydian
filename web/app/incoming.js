@@ -2,8 +2,9 @@
 // "cydian:url" on window, and the page takes it with app.takeURL (also once at start, for a link that launched the
 // app before the page was there).
 //   cydian://import?d=<gzipped JSON>   Open in Cydian App on the website: the review alert (screens/importlink.js)
-//   cydian://install?url=<ipa>[&name=…]  F89: Open in Cydian on the website's app page (screens/handoff.js
-//                                      installLinks): the Install IPA alert, then Install (signAndInstall)
+//   cydian://install?url=<ipa>[&name=…]  F89: the Install IPA alert, then Install (signAndInstall). The website's app
+//                                      page sent it (Open in Cydian) until F92/F95 dropped the hand-offs; kept for
+//                                      links already out there and anyone's own pages
 //   cydian://myipas?file=<name>        F77: an .ipa another app sent, already in My IPAs (MyIPAs.swift): its page
 //   cydian://add?url=<url>[&suite=…]   N8: the Add Source intent: Add Source's alert, filled in (core/handoff.js);
 //                                      N9: also an APT repo or AltStore source shared with Cydian

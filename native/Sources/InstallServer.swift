@@ -74,6 +74,23 @@ final class InstallServer {
 
     func remove(_ path: String) { queue.async { self.routes.removeValue(forKey: path) } }
 
+    // F196: the progress page's Cancel: `path` stops being served, a transfer of it under way is cut off, and the
+    // listener (with its background task) ends when nothing else is served.
+    func cancel(_ path: String) {
+        queue.async {
+            self.routes.removeValue(forKey: path)
+            self.cut.insert(path)
+            if self.routes.isEmpty {
+                self.idle?.cancel()
+                self.idle = nil
+                self.listener?.cancel()
+                self.listener = nil
+                self.endBackground()
+            }
+        }
+    }
+    private var cut = Set<String>() // F196: paths cancelled; their transfers stop at the next chunk
+
     var base: String { "http://127.0.0.1:\(port)" }
 
     // ---- connections
@@ -143,18 +160,20 @@ final class InstallServer {
         case .file(let u):
             guard let fh = try? FileHandle(forReadingFrom: u) else { return send(c, HTTPResponse.head(404, [("Content-Length", "0")]), close: true) }
             fh.seek(toFileOffset: r!.lowerBound)
-            send(c, head, close: false) { self.stream(c, fh, left: r!.upperBound - r!.lowerBound + 1, then: finished) }
+            let path = req.path
+            send(c, head, close: false) { self.stream(c, fh, left: r!.upperBound - r!.lowerBound + 1, path: path, then: finished) }
         }
     }
 
-    private func stream(_ c: NWConnection, _ fh: FileHandle, left: UInt64, then: (() -> Void)?) {
+    private func stream(_ c: NWConnection, _ fh: FileHandle, left: UInt64, path: String = "", then: (() -> Void)?) {
+        if cut.contains(path) { fh.closeFile(); return c.cancel() } // F196: cancelled
         if left == 0 { fh.closeFile(); return send(c, Data(), close: true, then: then) }
         let d = fh.readData(ofLength: Int(min(left, 1 << 20)))
         if d.isEmpty { fh.closeFile(); return c.cancel() }
         c.send(content: d, completion: .contentProcessed { [weak self] err in
             if err != nil { fh.closeFile(); return c.cancel() }
             self?.touch()
-            self?.stream(c, fh, left: left - UInt64(d.count), then: then)
+            self?.stream(c, fh, left: left - UInt64(d.count), path: path, then: then)
         })
     }
 

@@ -18,6 +18,7 @@
 //        iFizBox has no record of that app (by installed or original bundle ID)
 //   signing.checkCertificate     -> {status: "good" | "revoked" | "unknown", checked, revokedAt?}
 //   signing.remind {days}        -> {at | null}: the re-sign reminder, 0 = off
+//   signing.cancel               -> {cancelled}: F196, stops the running install job (cancel below, SignJob)
 // F77: My IPAs' library.* calls are MyIPAs.swift; they install through serveAndOpen, and Re-sign All signs an app
 // recorded from there (url "library:<file>") from the library's file.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -128,6 +129,7 @@ enum Sideload {
         hostServer = (c.params["host"] as? Bool ?? false) ? manifestServer : nil
         let options: SignOptions
         do { options = try SignOptions(json: c.params) } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
+        let job = SignJob.begin() // F196: what signing.cancel stops
         let throttle = Throttle()
         let emit = { (phase: String, p: Double) in
             if throttle.pass(phase, p) { c.emitOnMain([["phase": phase, "progress": p]]) }
@@ -136,7 +138,9 @@ enum Sideload {
         let log = { (s: String) in c.emitOnMain([["log": s]]) }
         let finish = { (r: Result<(SignedApp, SignedRecord), Error>) in
             switch r {
-            case .failure(let e): Apt.reply(c, nil, SignBridge.text(e))
+            case .failure(let e):
+                job.end()
+                Apt.reply(c, nil, SignBridge.text(job.cancelled ? SignJob.cancelledError : e))
             case .success(let (app, rec)):
                 var j: [String: Any] = ["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": app.name,
                                         "version": app.version, "removed": app.removed, "fixedArm64e": app.fixedArm64e]
@@ -147,22 +151,40 @@ enum Sideload {
         if let tok = c.params["token"] as? String {
             SignBridge.queue.async {
                 guard let p = prepared.removeValue(forKey: tok) else {
+                    job.end()
                     return Apt.reply(c, nil, "gone: that IPA was looked at more than 15 minutes ago; start again")
                 }
                 log("Using the IPA downloaded for the look-first sheet (\(p.url))")
-                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, emit: emit, log: log, opened: finish)
+                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, emit: emit, log: log, job: job, opened: finish)
             }
             return
         }
-        guard let url = Apt.httpURL(c.params["url"]) else { return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
+        guard let url = Apt.httpURL(c.params["url"]) else { job.end(); return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
         log("Downloading \(url.absoluteString)")
-        download(url, emit: emit) { res in
+        let d = download(url, emit: emit) { res in
             switch res {
             case .failure(let e): finish(.failure(e))
             case .success(let file):
                 log("Downloaded \(Sideload.size(file))")
-                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, emit: emit, log: log, opened: finish)
+                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, emit: emit, log: log, job: job, opened: finish)
             }
+        }
+        job.onCancel { d.cancel() }
+    }
+
+    // ---- F196: the progress page's Cancel (web/app/signing-client.js stopNative)
+
+    // Bumped by signing.cancel; a signing.progress watch started before it ends (main queue only).
+    static var watchCancels = 0
+
+    // Stops the running job: its download, its signing (at the signer's next step), the IPA's serving to iOS (the
+    // install server's route and listener, KeepAlive), and any signing.progress watch. The job's own call answers
+    // "cancelled: Cancelled" if it hasn't answered yet. iOS's own install, once it has the whole IPA, goes on.
+    static func cancel(_ c: Bridge.Call) {
+        guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
+        DispatchQueue.main.async {
+            watchCancels += 1
+            c.reply(["cancelled": SignJob.cancelCurrent()], nil)
         }
     }
 
@@ -174,10 +196,11 @@ enum Sideload {
 
     struct Failed: LocalizedError { let text: String; var errorDescription: String? { text } } // the text, not "Sideload.Failed error 1"
 
-    static func download(_ url: URL, emit: @escaping (String, Double) -> Void, done: @escaping (Result<URL, Error>) -> Void) {
+    @discardableResult
+    static func download(_ url: URL, emit: @escaping (String, Double) -> Void, done: @escaping (Result<URL, Error>) -> Void) -> Download {
         let file = SignBridge.work.appendingPathComponent("\(SignBridge.token())-in.ipa")
-        Download.start(url, to: file, max: SignBridge.maxIPA, progress: { emit("downloading", $0) }) { err in
-            if let e = err { return done(.failure(Failed(text: e))) }
+        return Download.start(url, to: file, max: SignBridge.maxIPA, progress: { emit("downloading", $0) }) { err in
+            if let e = err { try? FileManager.default.removeItem(at: file); return done(.failure(Failed(text: e))) }
             SignBridge.queue.async { done(.success(file)) }
         }
     }
@@ -188,7 +211,7 @@ enum Sideload {
     // unfetched: false). Runs on SignBridge.queue.
     // iFizBox's own update: upload the IPA signed here to the server, which holds it for its 10 minutes and answers the
     // itms-services link; then iOS installs from the server, unaffected by iFizBox closing.
-    static func hostAndOpen(_ output: URL, server: String, app: SignedApp, record: SignedRecord,
+    static func hostAndOpen(_ output: URL, server: String, app: SignedApp, record: SignedRecord, job: SignJob? = nil,
                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void, served: ((Bool) -> Void)?) {
         // The Worker (worker/src/index.js) doesn't open the IPA: the app says what it is.
         var q = URLComponents(string: server + "/sign/host")!
@@ -198,8 +221,10 @@ enum Sideload {
         req.httpMethod = "POST"
         req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
         req.timeoutInterval = 300
-        URLSession.shared.uploadTask(with: req, fromFile: output) { data, resp, error in
+        let upload = URLSession.shared.uploadTask(with: req, fromFile: output) { data, resp, error in
             try? FileManager.default.removeItem(at: output)
+            job?.end()
+            if job?.cancelled == true { opened(.failure(SignJob.cancelledError)); served?(false); return } // F196
             let json = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any]
             guard error == nil, (resp as? HTTPURLResponse)?.statusCode == 200, let itms = json?["itms"] as? String,
                   let link = URL(string: itms) else {
@@ -217,11 +242,13 @@ enum Sideload {
                 opened(.success((app, record)))
                 served?(true)
             }
-        }.resume()
+        }
+        job?.onCancel { upload.cancel() } // F196
+        upload.resume()
     }
 
     static func signAndOpen(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions,
-                            emit: @escaping (String, Double) -> Void, log: ((String) -> Void)? = nil,
+                            emit: @escaping (String, Double) -> Void, log: ((String) -> Void)? = nil, job: SignJob? = nil,
                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
                             served: ((Bool) -> Void)? = nil) {
         let tok = SignBridge.token()
@@ -237,11 +264,14 @@ enum Sideload {
                     + (profile.expires.map { ", expires \(ISO8601DateFormatter().string(from: $0))" } ?? ""))
             }
             if let p = profile.problem(with: identity.certificate) { throw p }
+            try job?.check() // F196: Cancel while it downloaded
             let signer = IPASigner(profile: profile, identity: identity)
             signer.options = options
+            if let job = job { signer.stop = { job.cancelled } }
             if let log = log { let nslog = signer.log; signer.log = { nslog($0); log($0) } }
             app = try signer.sign(input, to: output) { emit($0, $1) }
             log?("Signed \(app.name) \(app.version) as \(app.bundleID), \(Sideload.size(output))")
+            try job?.check()
         } catch {
             try? FileManager.default.removeItem(at: output)
             opened(.failure(error)); served?(false)
@@ -253,15 +283,17 @@ enum Sideload {
         emit("installing", 0)
         if let host = hostServer {
             log?("Uploading to \(host)/sign/host (\(app.name) replaces this app, so iOS installs it from the server)")
-            hostAndOpen(output, server: host, app: app, record: record, opened: opened, served: served)
+            hostAndOpen(output, server: host, app: app, record: record, job: job, opened: opened, served: served)
             return
         }
-        serveAndOpen(output, app: app, record: record, log: log, opened: opened, served: served)
+        serveAndOpen(output, app: app, record: record, log: log, job: job, opened: opened, served: served)
     }
 
     // F77: the second half of signAndOpen, for an IPA signed already (My IPAs' signed copy): serves `output` (deleted
     // after) on the local HTTP server, records it and opens the itms-services link with the manifestServer's manifest.
-    static func serveAndOpen(_ output: URL, app: SignedApp, record: SignedRecord, log: ((String) -> Void)? = nil,
+    // F196: `job` (signing.install's, library.install's) stays the one signing.cancel stops until iOS has fetched the
+    // IPA or the link expired; Cancel then stops serving it at once and releases KeepAlive.
+    static func serveAndOpen(_ output: URL, app: SignedApp, record: SignedRecord, log: ((String) -> Void)? = nil, job: SignJob? = nil,
                              opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
                              served: ((Bool) -> Void)? = nil) {
         let ipaPath = "/\(SignBridge.token())/app.ipa"
@@ -277,6 +309,11 @@ enum Sideload {
                 try? FileManager.default.removeItem(at: output)
                 opened(.failure(Failed(text: "server: \(e.localizedDescription)"))); served?(false)
             case .success:
+                if job?.cancelled == true { // F196: Cancel while the server started
+                    try? FileManager.default.removeItem(at: output)
+                    opened(.failure(SignJob.cancelledError)); served?(false)
+                    return
+                }
                 guard var q = URLComponents(string: remote + "/sign/manifest") else {
                     try? FileManager.default.removeItem(at: output)
                     opened(.failure(Failed(text: noServer))); served?(false)
@@ -294,6 +331,7 @@ enum Sideload {
                 KeepAlive.shared.begin()
                 let end = { (ok: Bool) in
                     guard once.first() else { return }
+                    job?.end()
                     server.remove(ipaPath)
                     SignBridge.queue.asyncAfter(deadline: .now() + 60) {
                         try? FileManager.default.removeItem(at: output)
@@ -302,6 +340,17 @@ enum Sideload {
                     served?(ok)
                 }
                 server.serve(ipaPath, .init(type: "application/octet-stream", body: .file(output)) { end(true) })
+                // F196: Cancel: no more serving, no minute's grace, the listener ends when nothing else is served.
+                job?.onCancel {
+                    guard once.first() else { return }
+                    log?("Cancelled: the IPA is no longer served")
+                    server.cancel(ipaPath)
+                    SignBridge.queue.async {
+                        try? FileManager.default.removeItem(at: output)
+                        KeepAlive.shared.end()
+                    }
+                    served?(false)
+                }
                 SignBridge.queue.asyncAfter(deadline: .now() + 15 * 60) { end(false) }
                 SignBridge.queue.async {
                     saveRecords(SignedRecords.adding(record, to: records()))
@@ -340,9 +389,12 @@ enum Sideload {
     static func watch(_ bid: String, onProgress: @escaping (Double) -> Void, done: @escaping (Bool?) -> Void) {
         guard Workspace.available else { return done(nil) }
         let start = Date()
+        var cancels: Int?
         var seen = false, last = -1
         var nilSince: Date?
         func tick() {
+            if cancels == nil { cancels = watchCancels }
+            if cancels != watchCancels { return done(nil) } // F196: signing.cancel
             if let p = Workspace.installProgress(bid) {
                 seen = true
                 nilSince = nil

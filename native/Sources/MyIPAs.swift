@@ -11,6 +11,8 @@
 //                                   -> signing.install's reply + {file}; the signed copy stays either way
 //   library.export {file}           the share sheet (Save to Files, AirDrop...) for the signed copy -> {shared: bool}
 //   library.delete {file}           the IPA, its signed copy and options -> {ipas}
+// F196: signing.cancel (Sideload.cancel) stops library.sign and library.install too: the signer at its next step
+// (the earlier signed copy, if any, stays), and an install's serving to iOS.
 //
 // Other apps' .ipa (Open in iFizBox, AirDrop, Files: the document type in Info-sideload.plist) land in the library
 // too: MyIPAs.receive copies the file in and hands the page cydian://myipas?file=<name> (web/app/incoming.js).
@@ -43,12 +45,14 @@ enum MyIPAs {
         b.on("library.sign") { c in
             guard let (id, profile) = Sideload.ready(c) else { return }
             let emit = emitter(c)
+            let job = SignJob.begin() // F196
             SignBridge.queue.async {
+                defer { job.end() }
                 do {
                     let file = c.params["file"] as? String ?? ""
-                    _ = try signIfNeeded(file, id: id, profile: profile, emit: emit)
+                    _ = try signIfNeeded(file, id: id, profile: profile, emit: emit, job: job)
                     Apt.reply(c, library.json(file, certificate: certificate()), nil)
-                } catch { Apt.reply(c, nil, SignBridge.text(error)) }
+                } catch { Apt.reply(c, nil, SignBridge.text(job.cancelled ? SignJob.cancelledError : error)) }
             }
         }
         b.on("library.install") { c in install(c) }
@@ -75,12 +79,17 @@ enum MyIPAs {
     }
 
     // The signed copy, signed now when there is none that fits. Runs on SignBridge.queue.
-    static func signIfNeeded(_ file: String, id: SecIdentity, profile: Profile, emit: @escaping (String, Double) -> Void) throws -> IPALibrary.Signed {
+    // F196: `job` stops the signer at its next step (SignJob).
+    static func signIfNeeded(_ file: String, id: SecIdentity, profile: Profile, emit: @escaping (String, Double) -> Void,
+                             job: SignJob? = nil) throws -> IPALibrary.Signed {
         let identity = try KeychainIdentity(id)
         if let s = library.signed(file, certificate: identity.certificate) { return s }
         if let p = profile.problem(with: identity.certificate) { throw p }
         if let why = try library.details(file).error { throw SignError("bad_ipa", why) }
-        return try library.sign(file, signer: IPASigner(profile: profile, identity: identity), certificate: identity.certificate,
+        try job?.check()
+        let signer = IPASigner(profile: profile, identity: identity)
+        if let job = job { signer.stop = { job.cancelled } }
+        return try library.sign(file, signer: signer, certificate: identity.certificate,
                                 expires: profile.signatureExpiry(certificate: identity.certificate), work: SignBridge.work,
                                 progress: { emit($0, $1) })
     }
@@ -169,20 +178,27 @@ enum MyIPAs {
         Sideload.hostServer = nil
         let emit = emitter(c)
         let file = c.params["file"] as? String ?? ""
+        let job = SignJob.begin() // F196: until iOS has the IPA (serveAndOpen ends it)
         SignBridge.queue.async {
             let s: IPALibrary.Signed
-            do { s = try signIfNeeded(file, id: id, profile: profile, emit: emit) } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
+            do { s = try signIfNeeded(file, id: id, profile: profile, emit: emit, job: job); try job.check() } catch {
+                job.end()
+                return Apt.reply(c, nil, SignBridge.text(job.cancelled ? SignJob.cancelledError : error))
+            }
             // The server deletes what it served: it gets a copy, and the signed copy stays for next time.
             let out = SignBridge.work.appendingPathComponent("\(SignBridge.token())-lib.ipa")
             do { try FileManager.default.copyItem(at: library.signedURL(file), to: out) } catch {
+                job.end()
                 return Apt.reply(c, nil, "internal: \(error.localizedDescription)")
             }
             let record = SignedRecord(bundleID: s.bundleID, originalBundleID: s.originalBundleID, name: s.name, version: s.version,
                                       url: libraryURL(file), signed: s.signed, expires: s.expires, options: s.options)
             emit("installing", 0)
-            Sideload.serveAndOpen(out, app: s.app, record: record, opened: { r in
+            Sideload.serveAndOpen(out, app: s.app, record: record, job: job, opened: { r in
                 switch r {
-                case .failure(let e): Apt.reply(c, nil, (e as? Sideload.Failed)?.text ?? SignBridge.text(e))
+                case .failure(let e):
+                    job.end()
+                    Apt.reply(c, nil, job.cancelled ? SignBridge.text(SignJob.cancelledError) : (e as? Sideload.Failed)?.text ?? SignBridge.text(e))
                 case .success(let (app, rec)):
                     var j: [String: Any] = ["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": app.name,
                                             "version": app.version, "removed": app.removed, "fixedArm64e": app.fixedArm64e, "file": file]

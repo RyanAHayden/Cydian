@@ -156,6 +156,32 @@ test("sign with the user's edits") {
     check(p.bundleID == "dev.cydian.fixture" && p.name == "Fixture" && p.fixedArm64e.isEmpty && p.removed.isEmpty, "plain")
 }
 
+test("F196: Cancel stops the signing job") {
+    let j = SignJob.begin()
+    check(SignJob.current === j, "the running job")
+    var ran = 0
+    j.onCancel { ran += 1 }
+    check(!j.cancelled && (try? j.check()) != nil, "not cancelled yet")
+    check(SignJob.cancelCurrent(), "cancelled")
+    check(ran == 1 && j.cancelled && SignJob.current == nil, "stops ran once, no current job")
+    check(throwsCode("cancelled") { try j.check() }, "check throws cancelled")
+    j.onCancel { ran += 1 }
+    check(ran == 2, "a stop added after Cancel runs at once")
+    check(!SignJob.cancelCurrent() && !j.cancel(), "nothing more to cancel")
+    let a = SignJob.begin(), b = SignJob.begin()
+    a.end()
+    check(SignJob.current === b, "an older job ending leaves the newer one")
+    b.end()
+    check(SignJob.current == nil && !SignJob.cancelCurrent(), "ended")
+    // the signer stops at its next step with code "cancelled" and writes nothing
+    let s = IPASigner(profile: try Profile(fixture("profile.mobileprovision")), identity: identity)
+    var steps = 0
+    s.stop = { steps += 1; return steps > 1 }
+    let out = work.appendingPathComponent("cancelled.ipa")
+    check(throwsCode("cancelled") { _ = try s.sign(fixtures.appendingPathComponent("edit.ipa"), to: out) }, "signer cancelled")
+    check(!FileManager.default.fileExists(atPath: out.path), "no output")
+}
+
 test("OCSP") {
     let ca = try fixture("ca.der")
     let req = try OCSP.request(certificate: cert, issuer: ca)

@@ -155,3 +155,27 @@ export async function askToBrowse({ install, alert = showAlert, storage = store(
   if (index === 0) { await install?.(); return "install"; }
   return null;
 }
+
+// ---- ?install (F184) -------------------------------------------------------------------------------------------
+
+// fizl0.github.io/apps' Add to iFizBox button tries cydian://add and, when the app isn't there, opens the site at
+// /?install (user 2026-11-18). Website only: on launch, Home, the param gone from the URL, then the Install iFizBox
+// First popup a locked row shows, whatever firstVisitState is (they came because the app isn't installed).
+
+// Before the router starts: true when the URL carries ?install in site mode; then it's replaced (history, no reload)
+// by the same URL without the param, on Home. The app and native shells never take it.
+export function takeInstallParam(win = globalThis, { mode = "site" } = {}) {
+  if (mode !== "site" || win.cydianApp || win.cydianNative) return false;
+  const { pathname = "/", search = "" } = win.location ?? {};
+  const params = new URLSearchParams(search);
+  if (!params.has("install")) return false;
+  params.delete("install");
+  const rest = params.toString();
+  try { win.history?.replaceState(null, "", pathname + (rest ? "?" + rest : "") + "#/home"); } catch { /* keeps the URL */ }
+  return true;
+}
+
+// After the router started: asks when takeInstallParam took the param. -> askToBrowse's answer, or null.
+export async function askFromInstallLink(took, { install, alert = showAlert, storage = store() } = {}) {
+  return took ? askToBrowse({ install, alert, storage }) : null;
+}

@@ -41,6 +41,7 @@ import { catalog } from "./catalog.js";
 import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
 import { NAME } from "./brand.js";
+import { takeInstallParam, askFromInstallLink } from "./websign-gate.js";
 
 const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
 
@@ -379,6 +380,9 @@ initIpaLinks(); // F67: a tapped .ipa link offers Install IPA (jailbreak build o
 // Home Screen launches open on Home (F32, launch.js); a return from the background runs none of this.
 const startAt = launchURL(window);
 if (startAt) history.replaceState(null, "", startAt);
+// F184: ifizbox.com/?install (a site's Add to iFizBox button, when the app isn't installed) opens Home without the
+// param, then asks Install iFizBox First (below, once the router started). Website only.
+const installLink = takeInstallParam(window, { mode: detectMode() });
 // F8: a /add?url=… link (core/handoff.js) opens Sources > Manage > Sources with Add Source's alert filled in.
 const addFrom = isAddPath(location.pathname) ? parseAddLink(location.search) : null;
 if (isAddPath(location.pathname)) {
@@ -406,6 +410,7 @@ if (standalone) {
   }, true);
 }
 router.start();
+askFromInstallLink(installLink, { install: () => home.installCydian() }).catch(() => {});
 // F93 (as before F89): first launch of a iFizBox installed from the website: its signed copy carries the website's
 // sources and settings as web/transfer.link (signed in the browser, websign-job.js); import them once, no question.
 // Only on the very first launch (user 2026-11-17: the website is rarely used after that).

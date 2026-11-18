@@ -217,3 +217,70 @@ import { account, MAX_ACCOUNT, rateLimiter, kvKey, bindingLimiter } from "./src/
   assert.equal((await w.fetch(new Request(`https://cydian.example/api/account/${id}`), aenv)).headers.get("Access-Control-Expose-Headers"), "ETag");
   console.log("worker account: ok");
 }
+
+// F121: the website's own token, opened as an install link inside the Install tap before it signs: the manifest waits
+// for the reservation, app.ipa until the upload's done (waits scaled down: WAIT_SCALE).
+import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
+{
+  assert.ok(MANIFEST_WAIT <= 20000 && IPA_WAIT >= 60000);
+  // held requests get room (POLL 75 ms, manifest 0.75 s, app.ipa 6 s) so a loaded machine can't time them out;
+  // the give-up cases are fast (POLL 3 ms, manifest 30 ms, app.ipa 240 ms)
+  const at = (path, init) => w.fetch(new Request("https://sign.example" + path, init), { ...env, WAIT_SCALE: "0.05" });
+  const quick = (path, init) => w.fetch(new Request("https://sign.example" + path, init), { ...env, WAIT_SCALE: "0.002" });
+  const tok = "ab".repeat(24), app = new Uint8Array([0x50, 0x4b, 9, 8, 7, 6]);
+  assert.equal((await at(`/sign/upload?bundleid=com.a&token=xyz`, { method: "POST" })).status, 400);
+  // iOS asks for the manifest before the reservation lands: it waits, then answers with the reserved app
+  const early = at(`/sign/up/${tok}/manifest.plist`);
+  await new Promise((r) => setTimeout(r, 5));
+  let r = await at(`/sign/upload?bundleid=com.ryha.cydian&version=0.4&title=Cydian&token=${tok}`, { method: "POST" });
+  assert.deepEqual(await r.json(), { token: tok, reserved: true, expiresIn: 600 });
+  r = await early;
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), new RegExp(`<string>com\\.ryha\\.cydian</string>[\\s\\S]*/sign/up/${tok}/app\\.ipa|/sign/up/${tok}/app\\.ipa[\\s\\S]*<string>com\\.ryha\\.cydian</string>`));
+  // a reserved token can't be taken for another app, nor its parts sent before its size
+  assert.equal((await at(`/sign/upload?bundleid=com.other&size=6&token=${tok}`, { method: "POST" })).status, 409);
+  assert.equal((await at(`/sign/upload/${tok}/0`, { method: "PUT", body: app })).status, 409);
+  // app.ipa holds while the website signs; its headers come once the upload starts, its body once it's done
+  const held = at(`/sign/up/${tok}/app.ipa`);
+  r = await at(`/sign/upload?bundleid=com.ryha.cydian&version=0.4&title=Cydian&token=${tok}&size=${app.length}`, { method: "POST" });
+  assert.equal((await r.json()).parts, 1);
+  r = await held;
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("content-length"), String(app.length));
+  const ranged = at(`/sign/up/${tok}/app.ipa`, { headers: { Range: "bytes=2-3" } }); // a Range waits for done
+  let answered = false;
+  const whole = r.arrayBuffer().then((b) => { answered = true; return b; });
+  assert.equal((await at(`/sign/upload/${tok}/0`, { method: "PUT", body: app })).status, 200);
+  await new Promise((res) => setTimeout(res, 200));
+  assert.equal(answered, false);
+  const done = await (await at(`/sign/upload/${tok}/done`, { method: "POST" })).json();
+  assert.equal(new URL(done.manifest).pathname, `/sign/up/${tok}/manifest.plist`);
+  assert.deepEqual(new Uint8Array(await whole), app);
+  r = await ranged;
+  assert.equal(r.status, 206);
+  assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [9, 8]);
+  // started once: the token is taken now
+  assert.equal((await at(`/sign/upload?bundleid=com.ryha.cydian&size=6&token=${tok}`, { method: "POST" })).status, 409);
+  // the link's own query: the manifest answers at once, before any reservation
+  const t3 = "ef".repeat(24), t3s = Date.now();
+  r = await go(`/sign/up/${t3}/manifest.plist?bundleid=com.you.delta&version=1.2&title=Delta`);
+  assert.equal(r.status, 200);
+  assert.ok(Date.now() - t3s < 1000);
+  assert.match(await r.text(), /<string>com\.you\.delta<\/string>/);
+  // nothing reserved: the manifest gives up after its wait; a reservation never uploaded: app.ipa gives up after its
+  const t2 = "cd".repeat(24);
+  assert.equal((await quick(`/sign/up/${t2}/manifest.plist`)).status, 404);
+  await quick(`/sign/upload?bundleid=com.a&token=${t2}`, { method: "POST" });
+  r = await quick(`/sign/up/${t2}/app.ipa`);
+  assert.equal(r.status, 404);
+  assert.match((await r.json()).error, /in time/);
+  // a plain upload's link still doesn't wait: 404 at once while it isn't done
+  const plainUp = await (await go(`/sign/upload?bundleid=com.a&size=4`, { method: "POST" })).json();
+  const t0 = Date.now();
+  assert.equal((await go(`/sign/up/${plainUp.token}/app.ipa`)).status, 404);
+  assert.ok(Date.now() - t0 < 1000);
+  // waitFor: looks until ok or out of time
+  let n = 0;
+  assert.equal(await waitFor(async () => ++n, (v) => v === 3, 60000, {}, async () => {}), 3);
+  console.log("worker reserved link: ok");
+}

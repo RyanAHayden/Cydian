@@ -55,7 +55,7 @@ const one = (n, c) => byClass(n, c)[0];
 
 const sp = await import("./storepage.js");
 
-test("F181: the header without a rating: name, author, Version · size · price, and no stars row", () => {
+test("F181: the header without a rating: name, author, Version · size · price, and a placeholder stars row", () => {
   const art = document.createElement("span");
   const h = sp.storeHeader({ art, name: "Velvet", author: "Sample Dev", authorHref: "#/sources/x/author%3ASample%20Dev",
     line: sp.headerLine({ version: "2.1.3", size: "412 kB", price: "Free" }) });
@@ -64,13 +64,38 @@ test("F181: the header without a rating: name, author, Version · size · price,
   assert.equal(author.textContent, "Sample Dev");
   assert.equal(author.tagName, "A");
   assert.equal(one(h.head, "store-head-line").textContent, "Version 2.1.3 · 412 kB · Free");
-  assert.equal(one(h.head, "store-head-rating").hidden, true, "no rating, no stars row");
-  assert.equal(byClass(h.head, "store-stars").length, 0);
+  // F206: the stars row is there from the first paint, grey empty stars, and filled in place.
+  const row = one(h.head, "store-head-rating");
+  assert.equal(row.hidden, false, "the row's place is kept while the reviews load");
+  assert.equal(row.dataset.state, "pending");
+  assert.equal(one(row, "store-stars-fill").style.width, "0%", "grey empty stars");
+  assert.equal(byClass(row, "store-head-count").length, 0);
   assert.ok(one(h.head, "store-icon").children.includes(art), "the icon in the glossy frame");
   assert.ok(one(h.head, "store-icon-gloss"), "with its gloss");
-  // A count alone is not a rating.
+  // A count alone is not a rating: "No Ratings", the row kept.
   h.setRating({ average: null, count: 12 });
-  assert.equal(one(h.head, "store-head-rating").hidden, true);
+  assert.equal(one(h.head, "store-head-rating"), row);
+  assert.equal(row.hidden, false);
+  assert.equal(row.dataset.state, "none");
+  assert.equal(one(row, "store-head-count").textContent, "No Ratings");
+  assert.equal(one(row, "store-stars-fill").style.width, "0%");
+});
+
+test("F206: the header's stars row: placeholder, then filled in the same element; no ratings never removes it", () => {
+  const h = sp.storeHeader({ name: "Delta", line: "Version 1.6" });
+  const text = one(h.head, "store-head-text");
+  const before = text.children.map((c) => c.className);
+  const row = one(h.head, "store-head-rating");
+  h.setRating({ average: 5, count: 1 });
+  assert.deepEqual(text.children.map((c) => c.className), before, "nothing added or moved: filled in place");
+  assert.equal(one(h.head, "store-head-rating"), row);
+  assert.equal(row.dataset.state, "rated");
+  assert.equal(one(row, "store-head-count").textContent, "(1)");
+  h.setRating(null);
+  assert.deepEqual(text.children.map((c) => c.className), before);
+  assert.equal(one(row, "store-head-count").textContent, "No Ratings");
+  const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
+  assert.match(css, /\.store-head-rating \{[^}]*height: 15px/s, "one height for every state");
 });
 
 test("F181: the header with a rating: stars filled to it and the count; a lookup without a count shows no (0)", () => {
@@ -80,6 +105,7 @@ test("F181: the header with a rating: stars filled to it and the count; a lookup
   h.setRating({ average: 4.3, count: 212, noun: "Ratings" });
   const row = one(h.head, "store-head-rating");
   assert.equal(row.hidden, false);
+  assert.equal(byClass(row, "store-stars").length, 1, "the placeholder's stars replaced, not added to");
   assert.equal(one(row, "store-stars").attrs["aria-label"], "4.3 out of 5 stars");
   assert.equal(one(row, "store-stars-fill").style.width, "86%");
   assert.equal(one(row, "store-head-count").textContent, "(212)");
@@ -165,8 +191,11 @@ test("F181: the tile row keeps Rating, Works On, Size, Section, Updated in order
   t.set("works", sp.worksOnTile({ status: "no", reason: "ios", range: "iOS 17.0 or later" }));
   assert.deepEqual(t.row.children.map((c) => c.dataset.key), ["rating", "works", "size", "section", "updated"]);
   assert.equal(one(label("works"), "store-tile-sub").dataset.ok, "false");
+  // F206: no rating keeps the tile: a dash with "No Ratings" under it.
   t.set("rating", sp.ratingTile(null));
-  assert.deepEqual(t.row.children.map((c) => c.dataset.key), ["works", "size", "section", "updated"]);
+  assert.deepEqual(t.row.children.map((c) => c.dataset.key), ["rating", "works", "size", "section", "updated"]);
+  assert.equal(one(label("rating"), "store-tile-value").textContent, "—");
+  assert.equal(one(label("rating"), "store-tile-sub").textContent, "No Ratings");
   assert.equal(sp.sizeTile(null), null);
   assert.equal(sp.updatedTile(null), null);
   assert.equal(sp.sectionTile(null), null);
@@ -176,14 +205,39 @@ test("F181: the ratings card: the average, the count, and the 5-to-1 bars only w
   const plain = sp.ratingsCard({ average: 4.5, count: 1200, noun: "Ratings", from: "App Store" });
   assert.equal(one(plain, "store-ratings-big").textContent, "4.5");
   assert.equal(one(plain, "store-ratings-count").textContent, "1,200 Ratings");
-  assert.equal(byClass(plain, "store-bars").length, 0, "Apple's lookup gives no per-star counts");
+  // F206: the bars are always drawn; Apple's lookup gives no per-star counts and no reviews here: all zero.
+  assert.deepEqual(byClass(plain, "store-bar-n").map((n) => n.textContent), ["0", "0", "0", "0", "0"]);
+  assert.equal(one(plain, "store-ratings-from").textContent, "App Store. No reviews to count yet.");
   const bars = sp.ratingsCard({ average: 4.3, count: 212, histogram: [131, 42, 17, 9, 13] });
   const rows = byClass(bars, "store-bar");
   assert.equal(rows.length, 5);
-  assert.equal(one(rows[0], "store-bar-stars").textContent, "★★★★★");
+  assert.equal(byClass(rows[0], "store-bar-star").length, 5);
+  assert.equal(byClass(rows[3], "store-bar-star").filter((s) => s._cls.has("on")).length, 2, "2 stars dark, 3 light");
   assert.equal(one(rows[0], "store-bar-fill").style.transform, "scaleX(1)", "scaled, not resized (120 Hz)");
   assert.equal(one(rows[4], "store-bar-n").textContent, "13");
-  assert.equal(one(sp.ratingsCard(null), "store-ratings-none").textContent, "No Ratings");
+  assert.equal(one(rows[4], "store-bar-n").tagName, "B", "the count in bold");
+  assert.equal(rows[0].disabled, true, "no onPick: nothing to filter");
+  assert.equal(one(bars, "store-ratings-from").textContent, "Bars from 212 ratings.");
+  const none = sp.ratingsCard(null);
+  assert.equal(one(none, "store-ratings-count").textContent, "No Ratings", "F206: no ratings keeps the card");
+  assert.equal(byClass(none, "store-bar").length, 5);
+  // Counted from the reviews when there's no histogram; half stars round.
+  const counted = sp.ratingsCard({ average: 4, count: 3 }, { reviews: [{ rating: 4.5 }, { rating: 4 }, { rating: null }, { stars: 1 }] });
+  assert.deepEqual(byClass(counted, "store-bar-n").map((n) => n.textContent), ["1", "1", "0", "0", "1"]);
+  assert.equal(one(counted, "store-ratings-from").textContent, "Bars from 3 reviews.");
+  let picked = null;
+  const tap = sp.ratingsCard({ average: 4, count: 1 }, { reviews: [{ rating: 4 }], onPick: (n) => { picked = n; }, selected: 2 });
+  assert.equal(byClass(tap, "store-bar")[3].classList.contains("selected"), true);
+  assert.equal(one(tap, "store-ratings-hint").textContent, "Showing 2-star reviews. Tap the row again for all.");
+  byClass(tap, "store-bar")[1].click();
+  assert.equal(picked, 4);
+  const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
+  assert.match(css, /\.store-bar \{[^}]*min-height: 32px/s, "a 32pt target");
+  assert.match(css, /\.store-bar \+ \.store-bar \{[^}]*border-top: 1px solid var\(--divider\)/s);
+  assert.match(css, /\.store-bar\.selected[^{]*\{[^}]*var\(--select\)/s, "iOS 6 selection blue");
+  assert.match(css, /\.store-bar:not\(:disabled\):active/, "a pressed state");
+  assert.match(css, /\.store-bar-star\.on \{ color: #6d6d6d; \}/);
+  assert.doesNotMatch(css.match(/\.store-bar-fill \{[^}]*\}/s)[0], /transition: (?!transform)/, "only transform animates");
   assert.equal(one(sp.ratingsCard({ average: 3, count: 1, noun: "Reviews" }), "store-ratings-count").textContent, "1 Review");
 });
 
@@ -253,7 +307,7 @@ test("F194: storeHeader's action goes on the header's right edge, after the text
 test("F195: Size keeps its unit in the value, the price under it; the row counts its columns; ONE card in the CSS", () => {
   assert.deepEqual(sp.sizeTile("48 kB", "Free"), { label: "Size", value: "48 kB", sub: "Free" });
   assert.deepEqual(sp.sizeTile("4.7 MB"), { label: "Size", value: "4.7 MB", sub: null });
-  const t = sp.tileRow();
+  const t = sp.tileRow({ rating: false });
   t.set("works", sp.worksOnTile({ status: "works", range: "iOS 15.0 or later" }));
   t.set("size", sp.sizeTile("48 kB", "Free"));
   assert.equal(t.row.dataset.count, "2");
@@ -305,4 +359,31 @@ test("B41: the header's sides are inset like the grouped rows' contents (10px ma
   const ios6 = readFileSync(new URL("../ios6.css", import.meta.url), "utf8");
   assert.match(ios6, /\.group \{ margin: 10px 10px 0; \}/, "the group margin the 21px is built from");
   assert.match(ios6, /\.cell-inner \{[^}]*padding: 0 10px/s);
+});
+
+test("F206: the Rating tile holds its place from the first paint and is filled in place; the others never shift", () => {
+  const t = sp.tileRow();
+  assert.deepEqual(t.row.children.map((c) => c.dataset.key), ["rating"], "the placeholder before anything else");
+  const pending = t.row.children[0];
+  assert.equal(pending.dataset.pending, "true");
+  assert.equal(one(pending, "store-tile-value").textContent, "—");
+  assert.equal(one(pending, "store-stars-fill").style.width, "0%", "grey empty stars");
+  t.set("works", sp.worksOnTile({ status: "works", range: "iOS 15.0 or later" }));
+  t.set("size", sp.sizeTile("412 kB"));
+  assert.equal(t.row.dataset.count, "3");
+  const shape = (tile) => tile.children.map((c) => c.className);
+  t.set("rating", sp.ratingTile({ average: 4.6, count: 9 }));
+  const filled = t.row.children[0];
+  assert.deepEqual(t.row.children.map((c) => c.dataset.key), ["rating", "works", "size"]);
+  assert.equal(t.row.dataset.count, "3", "the count (and so the column widths) unchanged");
+  assert.deepEqual(shape(filled), shape(pending), "label, value, stars: the same parts, so the same height");
+  assert.equal(filled.dataset.pending, undefined);
+  assert.equal(one(filled, "store-tile-value").textContent, "4.6");
+  t.set("rating", sp.ratingTile(null));
+  assert.equal(t.row.dataset.count, "3");
+  assert.deepEqual(shape(t.row.children[0]), ["store-tile-label", "store-tile-value", "store-tile-sub"]);
+  const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
+  assert.match(css, /\.store-tile-sub \{ line-height: 12px; \}/);
+  assert.match(css, /\.store-tile > \.store-stars\.small \{ margin: 1px 0; \}/, "stars 10px + 2px = the sub line's 12px");
+  assert.deepEqual(sp.tileRow({ rating: false }).row.children, []);
 });

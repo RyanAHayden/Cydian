@@ -589,6 +589,8 @@ html[data-theme="dark"] .store-head { text-shadow: var(--emboss); background: va
 .store-head-author { font-size: 13px; color: var(--head); text-decoration: none; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 a.store-head-author:active { color: var(--detail); }
 .store-head-rating { margin-top: 3px; display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--subtitle); }
+/* F206: the row is there from the first paint (grey empty stars), the same height filled, empty or "No Ratings". */
+.store-head-rating { height: 15px; line-height: 15px; white-space: nowrap; }
 .store-head-rating[hidden] { display: none; }
 .store-head-line { font-size: 11px; color: var(--subtitle); }
 
@@ -633,6 +635,11 @@ html[data-theme="dark"] .store-stars { --star: var(--dk-star-off); }
 html[data-theme="dark"] .store-tile-sub[data-ok="true"] { color: var(--dk-ok); }
 html[data-theme="dark"] .store-tile-sub[data-ok="false"] { color: var(--dk-bad); }
 .store-tiles + .group { margin-top: 20px; }
+/* F206: the Rating tile's placeholder (a dash over grey stars) and its filled and "No Ratings" forms are one height:
+   the stars (10px + 1px above and below) take the sub line's 12px. */
+.store-tile-sub { line-height: 12px; }
+.store-tile > .store-stars.small { margin: 1px 0; }
+.store-tile[data-pending="true"] .store-tile-value { color: var(--subtitle); }
 
 /* The screenshot strip's page dots (altstore.js galleryGroup): 7px, 7px apart, the one in view dark. */
 .shot-dots { display: flex; justify-content: center; gap: 7px; margin-top: 8px; }
@@ -669,13 +676,43 @@ html[data-theme="dark"] .shot-dot.on { background: var(--head); }
 .store-ratings-from, .store-ratings-none { padding: 11px 12px; font-size: 13px; color: var(--subtitle); }
 .store-ratings-from { border-top: 1px solid var(--divider); box-shadow: inset 0 1px 0 var(--divider-hi); }
 .store-ratings-none { text-align: center; font-size: 15px; padding: 14px 12px; }
-.store-bars { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 10px; color: var(--subtitle); }
-.store-bar { display: flex; align-items: center; gap: 6px; }
-.store-bar-stars { flex: none; width: 54px; text-align: right; letter-spacing: 0; white-space: nowrap; }
+/* F206: the five bars are always drawn, each a real button (32px + its 1px divider), iOS 6 style: five small stars
+   (the rating's dark #6d6d6d, the rest light grey), the grey bar, the count in bold, a chevron. Pressed: a grey wash;
+   the row filtering the list: iOS 6's selection blue. Only the fill's transform animates. */
+.store-ratings-top { padding: 0 0 0 12px; gap: 10px; }
+.store-ratings-avg { padding: 10px 0; }
+.store-ratings-count { min-height: 15px; text-align: center; }
+.store-bars { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 10px; color: var(--subtitle); border-left: 1px solid var(--divider); }
+.store-bar {
+  display: flex; align-items: center; gap: 6px; width: 100%; min-height: 32px; box-sizing: border-box; padding: 0 10px 0 8px;
+  margin: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.store-bar + .store-bar { border-top: 1px solid var(--divider); }
+.store-bar:disabled { cursor: default; color: inherit; }
+.store-bar:not(:disabled):active, .store-bar.is-pressed { background: rgba(0,0,0,.09); }
+.store-bar.selected, .store-bar.selected:active { background: var(--select); color: #fff; }
+.store-bar-stars { flex: none; display: flex; gap: 1px; font-size: 10px; line-height: 10px; letter-spacing: 0; white-space: nowrap; }
+.store-bar-star { color: #cfcfcf; }
+.store-bar-star.on { color: #6d6d6d; }
+.store-bar.selected .store-bar-star { color: rgba(255,255,255,.45); }
+.store-bar.selected .store-bar-star.on { color: #fff; }
 .store-bar-track { position: relative; flex: 1; height: 7px; border-radius: 4px; overflow: hidden; background: #dcdcdc; box-shadow: inset 0 1px 1px rgba(0,0,0,.2); }
-.store-bar-fill { position: absolute; inset: 0; transform-origin: left center; background: linear-gradient(#9a9a9a, #6d6d6d); }
-.store-bar-n { width: 22px; }
-html[data-theme="dark"] .store-bar-track { background: var(--dk-track); box-shadow: inset 0 1px 1px rgba(0,0,0,.6); }
+.store-bar-fill { position: absolute; inset: 0; transform-origin: left center; background: linear-gradient(#9a9a9a, #6d6d6d); transition: transform .3s ease-out; }
+.store-bar.selected .store-bar-track { background: rgba(255,255,255,.35); box-shadow: none; }
+.store-bar.selected .store-bar-fill { background: #fff; }
+.store-bar-n { flex: none; min-width: 18px; text-align: right; font-size: 12px; font-weight: bold; color: var(--text); }
+.store-bar.selected .store-bar-n { color: #fff; }
+.store-bar-chevron { flex: none; width: 7px; height: 10px; background: var(--chevron) center / contain no-repeat; }
+.store-bar:disabled .store-bar-chevron { opacity: .4; }
+.store-bar.selected .store-bar-chevron {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+}
+html[data-theme="dark"] .store-bar-star { color: var(--dk-dot); }
+html[data-theme="dark"] .store-bar-star.on { color: var(--dk-index); }
+html[data-theme="dark"] .store-bar:not(:disabled):active, html[data-theme="dark"] .store-bar.is-pressed { background: rgba(255,255,255,.15); }
+.store-ratings-hint { margin-bottom: 0; }
+.store-reviews-none { padding: 14px 12px; text-align: center; font-size: 15px; color: var(--subtitle); }html[data-theme="dark"] .store-bar-track { background: var(--dk-track); box-shadow: inset 0 1px 1px rgba(0,0,0,.6); }
 html[data-theme="dark"] .store-bar-fill { background: var(--dk-bar-fill); }
 .store-review { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; }
 .store-review + .store-review { border-top: 1px solid var(--divider); box-shadow: inset 0 1px 0 var(--divider-hi); }

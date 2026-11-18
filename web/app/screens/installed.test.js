@@ -47,27 +47,11 @@ test("F87: the jailbreak app's Apps page: the phone's versions, I4's notes, no u
 });
 
 // ---- F104: Installed sort, Hide by Author ----------------------------------------------------------------------
-import { sortScopes, sortInstalled, sortDetail, installDates } from "./installed.js";
+import { installDates } from "./installed.js";
 import { createCatalog, installedBytes } from "../core/catalog.js";
 import { createSettings } from "../core/settings.js";
 
-test("F104: the scope bar is Name, Recent, Size; no Recent without install dates", () => {
-  assert.deepEqual(sortScopes(true), ["name", "recent", "size"]);
-  assert.deepEqual(sortScopes(false), ["name", "size"]);
-});
-
-test("F104: Recent sorts newest install first, Size largest first; unknowns last, by name", () => {
-  const rows = [{ id: "a", name: "A", size: 2048 }, { id: "b", name: "B", size: null }, { id: "c", name: "C", size: 10240 },
-    { id: "d", name: "D", size: 2048 }];
-  assert.equal(sortInstalled(rows, "name"), rows);
-  assert.deepEqual(sortInstalled(rows, "size").map((r) => r.id), ["c", "a", "d", "b"]);
-  assert.deepEqual(sortInstalled(rows, "recent", { b: 300, d: 100, a: 300 }).map((r) => r.id), ["a", "b", "d", "c"]);
-  assert.deepEqual(sortInstalled(rows, "recent", null).map((r) => r.id), ["a", "b", "c", "d"]);
-  assert.equal(sortDetail(rows[2], "size"), "10 kB");
-  assert.equal(sortDetail(rows[1], "size"), null);
-  assert.equal(sortDetail(rows[0], "recent", { a: Date.UTC(2026, 10, 17, 12) / 1000 }, "en-US"), "Nov 17, 2026");
-  assert.equal(sortDetail(rows[0], "recent", {}), null);
-});
+// F127 replaced F104's Name/Recent/Size bar with Cydia's User | Expert | Recent (tests at the end of this file).
 
 test("F104: install dates come from the jailbreak app's apt.installDates, else none", async () => {
   const native = { dpkgStatus: () => "", call: async (m) => (m === "apt.installDates" ? { a: 5 } : null) };
@@ -189,4 +173,76 @@ test("F125: the page's Delete takes a package off the list, and the count follow
   assert.deepEqual(w.list(), ["b"]);
   assert.deepEqual(seen, [1, 2, 1], "each change tells Installed to redraw the row and the page");
   assert.equal(wishListRow(r(), wishCount(w.list(), [])).badge, "1");
+});
+
+// ---- F127: Installed like Cydia's: User | Expert | Recent, kinds, search -----------------------------------------
+import { dpkgModes, APP_MODES, dpkgItems, appSections, canReadDates } from "./installed.js";
+
+const STATUS_F127 = [
+  "Package: activator\nName: Activator\nStatus: install ok installed\nVersion: 1.9\nSection: Tweaks\nDepends: mobilesubstrate, preferenceloader\nDescription: Gestures",
+  "Package: mobilesubstrate\nName: Substrate\nStatus: install ok installed\nVersion: 0.9\nSection: System\nDescription: hooks",
+  "Package: preferenceloader\nName: PreferenceLoader\nStatus: install ok installed\nVersion: 2.2\nSection: Tweaks\nDescription: settings",
+  "Package: bash\nStatus: install ok installed\nVersion: 5.2\nEssential: yes\nSection: Terminal Support\nDescription: shell",
+  "Package: base\nStatus: install ok installed\nVersion: 1\nPriority: required\nSection: System\nDescription: base",
+  "Package: zebra-theme\nName: Zebra Theme\nStatus: install ok installed\nVersion: 1\nSection: Themes\nDescription: a theme",
+  "Package: myapp\nName: My App\nStatus: install ok installed\nVersion: 1\nSection: Applications\nAuthor: Jane Doe <j@x>\nDescription: an app",
+  "Package: gcc\nStatus: install ok installed\nVersion: 1\nTag: role::developer\nSection: Development\nDescription: compiler",
+  "Package: cydia-lproj\nStatus: install ok installed\nVersion: 1\nTag: purpose::x, role::cydia\nSection: System\nDescription: hidden",
+  "Package: odd\nStatus: install ok installed\nVersion: 1\nTag: role::leaper\nSection: Tweaks\nDescription: other role",
+].join("\n\n") + "\n";
+
+function f127Rows() {
+  const c = createCatalog();
+  c.setInstalled(STATUS_F127);
+  return c.installed();
+}
+
+test("F127: User leaves out dependencies and Essential packages; Expert lists every package Cydia would", () => {
+  const rows = f127Rows();
+  assert.deepEqual(dpkgItems(rows, { mode: "user" }).map((r) => r.id), ["activator", "myapp", "zebra-theme"]);
+  assert.deepEqual(dpkgItems(rows, { mode: "expert" }).map((r) => r.id),
+    ["activator", "base", "bash", "gcc", "myapp", "preferenceloader", "mobilesubstrate", "zebra-theme"]);
+});
+
+test("F127: Recent lists installs and upgrades newest first, in day sections, without undated packages", () => {
+  const rows = f127Rows();
+  const day = (d, h) => Date.UTC(2026, 10, d, h) / 1000;
+  const dates = { activator: day(16, 12), gcc: day(18, 9), myapp: day(18, 11), odd: day(16, 13), "cydia-lproj": day(18, 12) };
+  const items = dpkgItems(rows, { mode: "recent", dates, locale: "en-US" });
+  // role::cydia never shows; role::leaper only here; undated packages drop out
+  assert.deepEqual(items.map((x) => x.header ?? x.id), ["November 18, 2026", "myapp", "gcc", "November 16, 2026", "odd", "activator"]);
+  assert.deepEqual(dpkgItems(rows, { mode: "recent", dates: null }), []);
+});
+
+test("F127: the kinds (Search's segments) and the search narrow any mode", () => {
+  const rows = f127Rows();
+  assert.deepEqual(dpkgItems(rows, { mode: "expert", type: "Tweaks" }).map((r) => r.id), ["activator", "preferenceloader"]);
+  assert.deepEqual(dpkgItems(rows, { mode: "user", type: "Themes" }).map((r) => r.id), ["zebra-theme"]);
+  assert.deepEqual(dpkgItems(rows, { mode: "user", type: "Apps" }).map((r) => r.id), ["myapp"]);
+  assert.deepEqual(dpkgItems(rows, { mode: "user", type: "All", query: "gest" }).map((r) => r.id), ["activator"]); // description
+  assert.deepEqual(dpkgItems(rows, { mode: "user", query: "JANE" }).map((r) => r.id), ["myapp"]); // author, any case
+  assert.deepEqual(dpkgItems(rows, { mode: "expert", query: "pref zzz" }).map((r) => r.id), []); // every word
+  assert.deepEqual(dpkgItems(rows, { mode: "expert", query: "  substrate " }).map((r) => r.id), ["mobilesubstrate"]);
+  assert.deepEqual(dpkgItems(rows, { mode: "user", type: "Tweaks", query: "zzz" }), []);
+});
+
+test("F127: Recent is offered where install dates can be read (the jailbreak app)", () => {
+  assert.deepEqual(dpkgModes(true), ["user", "expert", "recent"]);
+  assert.deepEqual(dpkgModes(false), ["user", "expert"]); // the site's uploaded status file has no dates
+  assert.equal(canReadDates({ call() {}, dpkgStatus() {} }), true);
+  assert.equal(canReadDates({ call() {} }), false); // the sideload build
+  assert.equal(canReadDates(undefined), false);
+  assert.deepEqual(APP_MODES, ["user", "recent"]);
+});
+
+test("F127: the apps list: User A–Z, Recent newest first by day, both searchable", () => {
+  const t = (d) => Date.UTC(2026, 10, d, 12);
+  const recs = [{ id: "b", name: "Beta", date: t(17), sourceName: "AltStore" }, { id: "a", name: "alpha", date: t(16) },
+    { id: "c", name: "Cydian", date: 0, self: true }, { id: "d", name: "Delta", date: t(17) }];
+  const shape = (secs) => secs.map((s) => [s.header, s.rows.map((r) => r.id)]);
+  assert.deepEqual(shape(appSections(recs, { mode: "user" })), [["A", ["a"]], ["B", ["b"]], ["C", ["c"]], ["D", ["d"]]]);
+  assert.deepEqual(shape(appSections(recs, { mode: "recent", locale: "en-US" })),
+    [["November 17, 2026", ["b", "d"]], ["November 16, 2026", ["a"]], ["Cydian", ["c"]]]);
+  assert.deepEqual(shape(appSections(recs, { mode: "recent", query: "ta", locale: "en-US" })), [["November 17, 2026", ["b", "d"]]]);
+  assert.deepEqual(appSections(recs, { query: "nothing" }), []);
 });

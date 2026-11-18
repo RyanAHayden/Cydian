@@ -129,3 +129,44 @@ test("the sideload app lists itself at its own version, ahead of any recorded co
   const all = await store.all();
   assert.deepEqual(all.map((r) => [r.id, r.version]), [[SELF_ID, "0.2.0"], ["a.b", "1"]]);
 });
+
+// ---- F127: Installed's modes ----------------------------------------------------------------------------------
+import { dependedOn, packageTier, roleRank, modeRows, typeRows, queryRows } from "./installed.js";
+
+test("F127: dependencies count by name, alternative and Provides; never a package's own name", () => {
+  const st = [
+    { package: "tweak", depends: "libfoo (>= 1) | libbar, virtual-x, tweak", "pre-depends": "firmware" },
+    { package: "libfoo" }, { package: "libbar" }, { package: "provider", provides: "virtual-x (= 2)" }, { package: "loner" },
+  ];
+  assert.deepEqual([...dependedOn(st)].sort(), ["libbar", "libfoo", "provider"]); // firmware isn't installed
+});
+
+test("F127: Cydia's role tiers: none/enduser User, hacker/developer Expert, other roles Recent only, cydia never", () => {
+  assert.equal(roleRank({}), 0);
+  assert.equal(roleRank({ tag: "purpose::extension, role::enduser" }), 1);
+  assert.equal(roleRank({ tag: "role::hacker, role::enduser" }), 2); // the first role:: tag decides
+  assert.equal(roleRank({ tag: "role::developer" }), 3);
+  assert.equal(roleRank({ tag: "role::leaper" }), 4);
+  assert.equal(roleRank({ tag: "role::cydia" }), 7);
+  assert.equal(packageTier({ package: "a" }), 1);
+  assert.equal(packageTier({ package: "a", tag: "role::enduser" }, new Set(["a"])), 3); // a dependency
+  assert.equal(packageTier({ package: "a", essential: "yes" }), 3);
+  assert.equal(packageTier({ package: "a", tag: "cydia::essential" }), 3);
+  assert.equal(packageTier({ package: "a", priority: "required" }), 3);
+  assert.equal(packageTier({ package: "a", tag: "role::hacker" }), 3);
+  assert.equal(packageTier({ package: "a", tag: "role::leaper" }), 6);
+  assert.equal(packageTier({ package: "a", tag: "role::cydia" }), 7);
+});
+
+test("F127: modeRows, typeRows and queryRows", () => {
+  const rows = [{ id: "a", name: "A", tier: 1, section: "Tweaks" }, { id: "b", name: "B", tier: 3, section: "Themes" },
+    { id: "c", name: "C", tier: 6, section: "Tweaks" }, { id: "d", name: "D", section: "Applications" }]; // d: no tier, User
+  assert.deepEqual(modeRows(rows, "user").map((r) => r.id), ["a", "d"]);
+  assert.deepEqual(modeRows(rows, "expert").map((r) => r.id), ["a", "b", "d"]);
+  assert.deepEqual(modeRows(rows, "recent", { a: 5, c: 9, d: 5 }).map((r) => r.id), ["c", "a", "d"]); // ties by name
+  assert.deepEqual(typeRows(rows, "Tweaks").map((r) => r.id), ["a", "c"]);
+  assert.equal(typeRows(rows, "All"), rows);
+  assert.equal(typeRows(rows, "Nonsense"), rows);
+  assert.deepEqual(queryRows(rows, "b").map((r) => r.id), ["b"]);
+  assert.equal(queryRows(rows, "   "), rows);
+});

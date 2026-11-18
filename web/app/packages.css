@@ -402,3 +402,14 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
    (.source-row's red minus and Delete); the chevron and the version make room as they do on a source row. */
 .wish-row > .cell-inner::after, .wish-row .pkg-version { transition: opacity .2s ease; }
 .editing .wish-row > .cell-inner::after, .wish-row.armed > .cell-inner::after, .wish-row.armed .pkg-version { opacity: 0; }
+
+/* F127: Installed's User | Expert | Recent in the nav bar, as Cydia's bar-style UISegmentedControl on the 4S
+   (ref/4s/screens/cydia-installed-user.png: 167pt wide, 30pt high, centred in place of the title), drawn with
+   Search's segments. */
+.nav-title.nav-title-view { display: flex; justify-content: center; line-height: normal; overflow: visible; max-width: none; }
+.nav-segments { display: flex; width: 167px; }
+.nav-segments .scope-segments { box-shadow: 0 1px 0 rgba(255,255,255,.25); }
+/* With the A–Z index down the right edge (User, Expert), the rows and the search bar above the list stop short of it,
+   as UISearchBar does over an indexed table on iOS 6. */
+.page-body[data-section-index] > .installed-search, .page-body[data-section-index] > .installed-scope { padding-right: 24px; }
+.page-body[data-section-index] > .installed-top { margin-right: 24px; }

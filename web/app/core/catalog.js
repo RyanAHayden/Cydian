@@ -663,7 +663,7 @@ export function createCatalog() {
     return installedPkgs.map((p) => {
       const e = all.get(p.id);
       return { id: p.id, name: p.name, short: p.short, version: p.version, section: p.section,
-        icon: e?.row.icon ?? null, key: e?.row.key ?? null, author: p.author, installed: p.version, held: p.held,
+        icon: e?.row.icon ?? null, key: e?.row.key ?? null, author: p.author, installed: p.version, held: p.held, tier: p.tier, // F127
         size: installedBytes(statusById.get(p.id)),
         compat: e ? e.row.compat : (device && statusById.has(p.id) ? compatCode(statusById.get(p.id), device) : null) };
     });

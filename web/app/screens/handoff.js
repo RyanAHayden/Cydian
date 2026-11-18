@@ -14,7 +14,10 @@ import { settings } from "./settings.js";
 // apps that read their format to everyone.
 export function openInGroup(source, { pkg = null, jailbroken = settings.jailbroken() } = {}) {
   const apt = formatOf(source) === "apt";
-  const links = apt && !jailbroken ? [] : pkg ? packageLinks(pkg, source) : sourceLinks(source);
+  // An app's page offers no hand-off to other sideloaders: Cydian installs it itself (Install, with the user's
+  // certificate) or Download IPA keeps the file (user 2026-11-17).
+  const appPage = pkg && isIpaFormat(formatOf(source));
+  const links = appPage || (apt && !jailbroken) ? [] : pkg ? packageLinks(pkg, source) : sourceLinks(source);
   const add = addLink(source, siteOrigin(globalThis.location));
   if (!links.length && !add) return document.createDocumentFragment();
   const rows = links.map((l) => ({ label: `Open in ${l.app}`, onClick: () => { location.href = l.url; } }));

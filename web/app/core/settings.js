@@ -77,7 +77,7 @@ export const SETTINGS = [
   {
     // F37: where an app's GET goes on a phone without a jailbreak. Never through a server of ours. The site only:
     // the sideload build signs and installs on the phone itself (F14).
-    key: "sideloader", section: "device", kind: "list", feature: "device", modes: ["site"], default: "feather",
+    key: "sideloader", section: "device", kind: "list", feature: "device", modes: [], default: "feather", // hidden: app pages no longer hand apps to other sideloaders (user 2026-11-17)
     label: "Sideloader",
     options: [
       { value: "feather", label: "Feather", subtitle: "Signs on the phone with your certificate" },

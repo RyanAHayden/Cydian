@@ -162,7 +162,7 @@ test("holds: the helper is only used in jailbreak mode", async () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["appearance", "allowZoom", "device", "sideloader", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
+    ["appearance", "allowZoom", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
   assert.deepEqual(show("jailbreak"),
     ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge",
       "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);

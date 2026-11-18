@@ -10,13 +10,14 @@ import { format } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
 import { getBackend } from "../backend.js";
 import { mediaUrl } from "./depiction.js";
-import { installOptions, sideloaderLink } from "../core/altstore.js";
+import { installOptions } from "../core/altstore.js";
 import { settings } from "./settings.js";
 import { displayName, githubAvatarUrl } from "../core/sources.js";
 import { compat } from "../core/compat.js";
 import { currentDevice, compatBadge } from "../device.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall } from "../core/installed.js";
+import { signAndInstall } from "../signing-client.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { openInGroup } from "./handoff.js";
 import { openIpaInstall } from "./ipa-install.js";
@@ -73,28 +74,26 @@ function card(children, cls = "") {
   return g;
 }
 
-// The install rows for a version: itms-services where the source gives a signed link, else open the source in a
-// sideloader, and the raw IPA. `opener` opens a URL outside the app (window.open on the site). `onInstall` runs
-// first on any of them (F30: the Installed tab's record).
-// F37: `sideloader` (Settings > Sideloader; null in the jailbreak app) puts a Get row first, handing the IPA to it.
-// F67: the jailbreak build puts Install first: the IPA installed through the helper (screens/ipa-install.js), the
-// console titled with `name`.
+// The install rows for a version (user 2026-11-17: Cydian's own signing is the way, no hand-offs to other sideloaders):
+//   - jailbreak build: Install through the helper (F67, screens/ipa-install.js), the console titled with `name`
+//   - a source's own signed link (itms-services): Install, signed by the source
+//   - otherwise: Install, signed with the user's certificate (signing-client signAndInstall: the Signing Server on
+//     the site, the phone itself in the sideload app; without a certificate it says how to add one)
+//   - always: Download IPA, to keep the file
+// `opener` opens a URL outside the app (window.open on the site). `onInstall` runs first on any of them (F30: the
+// Installed tab's record).
 export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {},
-  sideloader = settings.isShown("sideloader") ? settings.get("sideloader") : null, name = "") {
+  _unused = null, name = "") {
   const o = installOptions(version, sourceUrl);
   const rows = [];
   if (o.download && ipaInstallAvailable()) {
     rows.push({ label: o.itms ? "Install IPA" : "Install", subtitle: "With the jailbreak", onClick: () => { onInstall(); openIpaInstall({ url: o.download, name }); } });
+  } else if (o.itms) {
+    rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
+  } else if (o.download) {
+    rows.push({ label: "Install", subtitle: "Signed with your certificate", onClick: () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() }) });
   }
-  if (o.itms) rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
-  const get = !o.itms && sideloader ? sideloaderLink(version, sideloader) : null;
-  if (get) {
-    rows.push(get.name
-      ? { label: "Get", subtitle: `Opens in ${get.name}, which signs and installs it`, onClick: () => { onInstall(); location.href = get.url; } }
-      : { label: "Get", subtitle: "Downloads the .ipa", onClick: () => { onInstall(); opener(get.url); } });
-  }
-  for (const s of o.open) rows.push({ label: `Open in ${s.name}`, onClick: () => { onInstall(); location.href = s.url; } });
-  if (o.download) rows.push({ label: "Download IPA", subtitle: decodeURIComponent(o.download.split("/").pop() || ""), onClick: () => { onInstall(); opener(o.download); } });
+  if (o.download) rows.push({ label: "Download IPA", subtitle: decodeURIComponent(o.download.split("/").pop() || ""), onClick: () => opener(o.download) });
   return { rows, options: o };
 }
 
@@ -249,7 +248,7 @@ export function renderApp(body, route, pkg, source) {
   body.append(grouped([{ header: "Install", rows,
     footer: options.download && ipaInstallAvailable() ? IPA_FOOTER
       : options.itms ? "Installs over the air with the source's signed link."
-      : "This app isn't signed for your iPhone: a sideloader signs it on the phone with your Apple ID. Adding the source there lists this app." }]));
+      : "Install signs it with your own certificate (Settings > Signing) and installs it. Download IPA keeps the file." }]));
 
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on
   // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.

@@ -111,3 +111,5 @@ html[data-theme="dark"] .app-offer .table.grouped { background: #2f4a36; }
   animation: hud-spin .96s steps(12) infinite;
 }
 @media (prefers-reduced-motion: reduce) { .bar-button.is-reloading::after { animation-duration: 3s; } }
+.home-version.home-commit { margin-top: -10px; font-size: 13px; opacity: .8; }
+.home-commit:empty { display: none; }

@@ -22,7 +22,7 @@ test("F82: Reload spins in the button's spot, keeps the page's content, and give
   const shown = body.children;
   const seen = [];
   let finishRefresh;
-  const done = reloadHome(button, {}, {
+  const done = reloadHome(button, {}, { web: false,
     refresh: () => new Promise((r) => { finishRefresh = r; seen.push("refresh"); }),
     settled: async () => { seen.push("settled"); },
     reload: async () => { seen.push("reload"); }, // the new package lists, dpkg, Cydian's own update
@@ -38,7 +38,7 @@ test("F82: Reload spins in the button's spot, keeps the page's content, and give
   assert.equal(body.children, shown, "nothing is cleared while the sources reload: no Loading screen");
   assert.deepEqual(body.children, ["head", "tiles", "links"]);
   // A second tap while it spins does nothing.
-  assert.equal(await reloadHome(button, {}, { refresh: () => assert.fail("no second reload") }), false);
+  assert.equal(await reloadHome(button, {}, { web: false, refresh: () => assert.fail("no second reload") }), false);
   finishRefresh();
   assert.equal(await done, true);
   assert.deepEqual(seen, ["refresh", "settled", "reload", "redraw"], "new versions load before Home redraws");
@@ -97,4 +97,16 @@ test("F82: Reload waits for a refresh already running, and never for ever", asyn
     globalThis.addEventListener = had.add;
     globalThis.removeEventListener = had.remove;
   }
+});
+
+test("the website's Reload re-downloads every listed file past the browser's cache, then reloads; the footer shows the build", async () => {
+  const { refreshWebFiles, footLine } = await import("./home.js");
+  const got = [];
+  let reloaded = false;
+  const fetcher = async (u, o) => { got.push([u, o?.cache]); return { ok: true, json: async () => ({ files: ["app.js", "nav/ui.js"] }) }; };
+  assert.equal(await refreshWebFiles({ fetcher, reloadPage: () => { reloaded = true; } }), true);
+  assert.deepEqual(got, [["build.json", "no-store"], ["app.js", "reload"], ["nav/ui.js", "reload"]]);
+  assert.ok(reloaded);
+  assert.equal(await refreshWebFiles({ fetcher: async () => ({ ok: false }), reloadPage: () => assert.fail() }), false); // no build.json
+  assert.equal(footLine({ ios: "26.1", version: "0.3.5", web: true }, "en-US"), "iPhone, iOS 26.1, Cydian Web 0.3.5 (en-us)");
 });

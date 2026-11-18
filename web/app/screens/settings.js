@@ -388,6 +388,8 @@ async function askServer(el) {
   redrawAll();
 }
 
+const RUN_YOUR_OWN = "https://github.com/RyanAHayden/Cydian/tree/main/worker#host-your-own-free-about-a-minute";
+
 async function checkServer() {
   const hide = showHUD("Checking");
   try {
@@ -605,7 +607,10 @@ async function drawDeviceSigning(el) {
   const server = getServer();
   const serverRows = grouped([{ rows: [
     { label: new URL(server).host, subtitle: server === defaultServer() ? "Default" : server, onClick: () => askServer(el), chevron: true },
-    { label: "Check Server", onClick: () => checkServer() }] }]);
+    { label: "Check Server", onClick: () => checkServer() },
+    // Nothing depends on cydian.dev: anyone can run their own, free (worker/README.md's Deploy to Cloudflare).
+    { label: "Run Your Own", subtitle: "Free on Cloudflare, about a minute", chevron: true,
+      onClick: () => window.open(RUN_YOUR_OWN, "_blank", "noopener") }] }]);
   drawWalkthrough(el, {
     status, failure: failure ? deviceError(failure).message : "",
     certificate: certificateBlock(el, id, status ?? { identity: null }),

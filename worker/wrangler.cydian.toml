@@ -1,4 +1,4 @@
-# cydian.dev's own deploy: npx wrangler deploy -c wrangler.cydian.toml (yours: wrangler.toml, README.md).
+# cydian.dev's own deploy: tools/buildinfo.sh && npx wrangler deploy -c wrangler.cydian.toml (yours: wrangler.toml, README.md).
 name = "cydian-sign"
 main = "src/index.js"
 # The website: web/app/ served as static assets (index.html for app routes like /add).

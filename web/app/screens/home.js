@@ -197,7 +197,27 @@ const loadNew = async () => {
   if (catalog.statusSource() === "native") await catalog.reloadInstalled();
   globalThis.dispatchEvent?.(new Event("cydian:reloaded"));
 };
-export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ctx), settled = untilRefreshed, reload = loadNew, redraw = () => state.redraw?.() } = {}) {
+// build.json (tools/buildinfo.sh), never from the browser's cache; null where there is none (a local checkout).
+export async function buildInfo(fetcher = globalThis.fetch) {
+  try { const r = await fetcher("build.json", { cache: "no-store" }); return r.ok ? await r.json() : null; } catch { return null; }
+}
+
+// The website's Reload first re-downloads every file of the site (build.json lists them), which replaces whatever
+// copy the browser kept, then loads the page again: a phone holding stale files gets the new version (user
+// 2026-11-18). True when it reloaded the page.
+export async function refreshWebFiles({ fetcher = globalThis.fetch, info = buildInfo, reloadPage = () => location.reload(), batch = 12 } = {}) {
+  const b = await info(fetcher);
+  if (!b?.files?.length) return false;
+  for (let i = 0; i < b.files.length; i += batch) {
+    await Promise.all(b.files.slice(i, i + batch).map((f) => fetcher(f, { cache: "reload" }).catch(() => null)));
+  }
+  reloadPage();
+  return true;
+}
+
+export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ctx), settled = untilRefreshed, reload = loadNew, redraw = () => state.redraw?.(),
+  web = !globalThis.cydianNative } = {}) {
+  if (web) return withReloadSpinner(button, async () => { if (!(await refreshWebFiles())) location.reload(); });
   return withReloadSpinner(button, async () => {
     await refresh();
     await settled();
@@ -427,9 +447,17 @@ function renderRoot(body) {
   home.append(list);
   // Cydia's line at the bottom of Home: the device, iOS, the installed version and the language
   // ("iPhone4,1, iOS 6.1.3, Cydia 1.1.9 (en-us)").
-  const foot = el("p", "home-version", footLine({ ios: currentDevice().ios }));
-  home.append(foot);
+  const foot = el("p", "home-version", footLine({ ios: currentDevice().ios, web: !globalThis.cydianNative }));
+  const commit = el("p", "home-version home-commit");
+  home.append(foot, commit);
   globalThis.cydianNative?.call?.("app.info", {}).then((i) => { foot.textContent = footLine(i ?? {}); }, () => {});
+  // The build under it (tools/buildinfo.sh's build.json, in the app's bundle and on the website): its commit, and on
+  // the website the version it was deployed from.
+  buildInfo().then((b) => {
+    if (!b) return;
+    commit.textContent = b.commit;
+    if (!globalThis.cydianNative) foot.textContent = footLine({ ios: currentDevice().ios, version: b.version, web: true });
+  });
   refreshState();
   // F82: Reload's redraw. Everything stays on screen; each part is updated where it is: the green tile and the
   // Install Cydian App offer at once, the featured banners swapped for the new ones only once those are drawn.
@@ -447,8 +475,8 @@ function renderRoot(body) {
 }
 
 // The Home footer: "iPhone17,3, iOS 26.1, Cydian 0.1.1 (en-us)"; on the website "iPhone, iOS 26.1, Cydian Web (en-us)".
-export function footLine({ machine = "", ios = "", version = "" } = {}, lang = globalThis.navigator?.language ?? "en") {
-  const app = version ? `Cydian ${version}` : "Cydian Web";
+export function footLine({ machine = "", ios = "", version = "", web = false } = {}, lang = globalThis.navigator?.language ?? "en") {
+  const app = web ? `Cydian Web${version ? ` ${version}` : ""}` : version ? `Cydian ${version}` : "Cydian Web";
   return [machine || "iPhone", ios ? `iOS ${ios}` : "", app].filter(Boolean).join(", ") + ` (${String(lang).toLowerCase()})`;
 }
 

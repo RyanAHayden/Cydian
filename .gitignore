@@ -7,3 +7,4 @@ __pycache__/
 .venv/
 /outreach.md
 /web/data/
+web/app/build.json

@@ -13,6 +13,7 @@
 //   signing.installed            -> {apps: [record], next: {expires, apps} | null}
 //   signing.openApp {bundleId}   -> {opened: true | false}: F155, launches an installed app (the progress page's Open)
 //   signing.forget {bundleId}    -> {apps}
+//   signing.isInstalled {bundleIds} -> {installed: {bundleId: true | false | null}}: B46, what iOS has now
 //   signing.resignAll (stream: {index, count, name, phase, progress}) -> {done: [bundleId], failed: [{bundleId, name, error}]}
 //   signing.resign {bundleId} (stream and reply as resignAll, one app) -> F91's queue job "resign"; not_signed: when
 //        iFizBox has no record of that app (by installed or original bundle ID)
@@ -45,6 +46,16 @@ enum Sideload {
                 saveRecords(records().filter { $0.bundleID != id })
                 reschedule()
                 return installedJSON()
+            }
+        }
+        // B46: whether iOS has each app now (LSApplicationWorkspace applicationIsInstalled:), so Installed's Remove
+        // from List never hides a row for an app that is still on the phone. null where iOS can't be asked.
+        b.on("signing.isInstalled") { c in
+            SignBridge.run(c) {
+                let ids = (c.params["bundleIds"] as? [String] ?? []).prefix(512)
+                var out = [String: Any]()
+                for id in ids { out[id] = Workspace.isInstalled(id).map { $0 as Any } ?? NSNull() }
+                return ["installed": out]
             }
         }
         b.on("signing.resignAll") { c in resignAll(c) }

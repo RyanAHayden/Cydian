@@ -43,4 +43,14 @@ int helper_plist_string(const char *data, size_t len, const char *key, char *out
 /* 1 if s is a value app-versions prints: 1-255 bytes, no control characters (so no tab or newline). */
 int helper_app_value_ok(const char *s);
 
+/* B46: the container under dir (HELPER_APPS_DIR) whose one .app has CFBundleIdentifier id, read as app-versions reads
+ * them, into box; 0, 1 when no app there has that id, or -1 + *err when dir can't be read. */
+int helper_app_find(const char *dir, const char *id, char *box, size_t size, const char **err);
+/* B46: uninstall-app. The app must be in dir (helper_app_find: only apps installd put in the containers, never a
+ * system app or one in the jailbreak's /Applications); then installd uninstalls it (LSApplicationWorkspace
+ * uninstallApplication:withOptions:; off iOS a stand-in prints "uninstall <id>", and an id ending in ".refused"
+ * fails). fd3 >= 0 gets pmstatus:<id>:<percent>:<text> lines. Returns 0 ("Uninstalled <id>" on stdout), or an exit
+ * code with *err: HELPER_EX_USAGE not an installed app, HELPER_EX_IOERR dir unreadable, 1 installd refused. */
+int helper_uninstall_app(const char *dir, const char *id, int fd3, const char **err);
+
 #endif

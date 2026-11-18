@@ -1,5 +1,6 @@
 /* ifizbox-helper's checks: see policy.h. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "policy.h"
+#include "ipa.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -605,6 +606,19 @@ static int app_versions_plan(int argc, struct helper_plan *p, const char **err) 
     return 0;
 }
 
+/* B46: uninstall-app <bundle id>. Runs nothing from here: main.c hands the id to ipa.c helper_uninstall_app, which
+ * only takes an app it finds in installd's containers (HELPER_APPS_DIR). */
+static int uninstall_app_plan(int argc, char *const argv[], struct helper_plan *p, const char **err) {
+    if (argc != 2) { *err = "uninstall-app takes one bundle id"; return -1; }
+    if (!helper_ipa_bundle_id_ok(argv[1])) { *err = "bad bundle id (allowed: [A-Za-z0-9.-])"; return -1; }
+    snprintf(p->path, sizeof p->path, "%s", HELPER_APPS_DIR);
+    p->argv[0] = argv[0];
+    p->argv[1] = argv[1];
+    p->argv[2] = NULL;
+    p->argc = 2;
+    return 0;
+}
+
 int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
                 const char **err) {
     static char status_apt[64], status_dpkg[16];
@@ -636,6 +650,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "simulate-deb")) { p->verb = HV_SIMULATE_DEB; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "install-deb")) { p->verb = HV_INSTALL_DEB; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "app-versions")) { p->verb = HV_APP_VERSIONS; return app_versions_plan(argc, p, err); }
+    else if (!strcmp(verb, "uninstall-app")) { p->verb = HV_UNINSTALL_APP; return uninstall_app_plan(argc, argv, p, err); }
     else { *err = "unknown verb (" HELPER_VERBS ")"; return -1; }
 
     int n = argc - 1;

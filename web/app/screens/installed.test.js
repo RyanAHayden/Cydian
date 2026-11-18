@@ -489,5 +489,114 @@ test("B36: the installed-app page shows version, bundle ID, source and signature
   assert.deepEqual(secs[2].rows.map((x) => x.label), [REMOVE]);
   const extra = appPageSections({ id: "com.example.mine", name: "Mine", version: "2", signedOnly: true, signed: { bundleId: "com.example.mine" } }, { mode: "site" });
   assert.match(extra[0].footer, /No source lists it/);
-  assert.match(extra.at(-1).footer, /stays on your iPhone/);
+  assert.match(extra.at(-1).footer, /done from the Home Screen/); // B46
+});
+
+// ---- B46: Delete uninstalls where it can; Remove from List where it can't ----------------------------------------
+
+import { deleteAction, confirmDelete, withInstalled, statusText, DELETE, HOME_SCREEN } from "./installed.js";
+import { uninstallError } from "../backend-native.js";
+
+test("B46: which label and action each mode gets", () => {
+  const rec = { id: "com.example.delta", name: "Delta", version: "1.6" };
+  // The jailbreak app with the helper seeing the app installed (I4 `actual`): Delete uninstalls, 'Delete Delta' red.
+  assert.deepEqual(deleteAction({ ...rec, actual: "1.6" }, { mode: "jailbreak" }),
+    { kind: "uninstall", label: DELETE, button: "Delete Delta", note: null });
+  // A record of an app that is gone: nothing to uninstall, so Remove from List, saying so.
+  const gone = deleteAction({ ...rec, actual: null }, { mode: "jailbreak" });
+  assert.equal(gone.kind, "forget");
+  assert.equal(gone.label, REMOVE);
+  assert.equal(REMOVE, "Remove from List");
+  assert.match(gone.note, /Delta is no longer on your iPhone/);
+  // The helper's versions unreadable (no `actual`): it can't be uninstalled from here; don't pretend.
+  assert.equal(deleteAction(rec, { mode: "jailbreak" }).kind, "forget");
+  assert.equal(deleteAction(rec, { mode: "jailbreak" }).note, HOME_SCREEN);
+  // The site and the sideload app never uninstall: Remove from List, with the Home Screen line.
+  for (const mode of ["site", "sideload"]) {
+    const a = deleteAction(rec, { mode });
+    assert.deepEqual(a, { kind: "forget", label: REMOVE, button: REMOVE, note: HOME_SCREEN }, mode);
+    assert.equal(deleteAction({ ...rec, actual: "1.6" }, { mode }).kind, "forget", mode);
+  }
+  assert.match(HOME_SCREEN, /^Deleting the app itself is done from the Home Screen\.$/);
+  // The sideload app's shell says iOS still has it: the row isn't hidden; Remove from List only explains.
+  const still = deleteAction({ ...rec, installed: true }, { mode: "sideload" });
+  assert.equal(still.kind, "installed");
+  assert.equal(still.label, REMOVE);
+  assert.match(still.note, /still on your iPhone/);
+  assert.equal(deleteAction({ ...rec, installed: false }, { mode: "sideload" }).kind, "forget");
+  // A signed app the list doesn't remember forgets its signature record; iFizBox's own row has none.
+  assert.equal(deleteAction({ ...rec, signedOnly: true, actual: "1" }, { mode: "jailbreak" }).kind, "forget");
+  assert.match(deleteAction({ ...rec, signedOnly: true }, { mode: "sideload" }).note, /Home Screen/);
+  assert.equal(deleteAction({ ...rec, self: true }, { mode: "jailbreak" }), null);
+  // The hold sheet and the app page carry the same label.
+  assert.deepEqual(appActions({ ...rec, actual: "1.6" }, { mode: "jailbreak" }), [DELETE]);
+  assert.deepEqual(appActions(rec, { mode: "site" }), [REMOVE]);
+  const page = appPageSections({ ...rec, actual: "1.6" }, { mode: "jailbreak" });
+  assert.deepEqual(page.at(-1).rows.map((x) => x.label), [DELETE]);
+  assert.match(page.at(-1).footer, /Deletes Delta/);
+  assert.equal(appPageSections(rec, { mode: "sideload" }).at(-1).footer, HOME_SCREEN);
+});
+
+test("B46: Delete is confirmed by an iOS 6 action sheet; Cancel does nothing", async () => {
+  const sheets = [];
+  const ran = [];
+  const run = async (a, r) => ran.push([a.kind, r.id]);
+  const rec = { id: "com.example.delta", name: "Delta", version: "1.6", actual: "1.6" };
+  assert.equal(await confirmDelete(rec, { mode: "jailbreak", run, sheet: async (o) => { sheets.push(o); return -1; } }), false);
+  assert.deepEqual(sheets[0], { title: "", buttons: ["Delete Delta"], destructive: 0 });
+  assert.deepEqual(ran, []);
+  assert.equal(await confirmDelete(rec, { mode: "jailbreak", run, sheet: async () => 0 }), true);
+  assert.deepEqual(ran, [["uninstall", "com.example.delta"]]);
+  // Remove from List: the one line as the sheet's title.
+  await confirmDelete(rec, { mode: "site", run, sheet: async (o) => { sheets.push(o); return 0; } });
+  assert.deepEqual(sheets[1], { title: HOME_SCREEN, buttons: [REMOVE], destructive: 0 });
+  assert.deepEqual(ran.at(-1), ["forget", "com.example.delta"]);
+  // Still installed (sideload): an alert, nothing dropped.
+  const alerts = [];
+  assert.equal(await confirmDelete({ ...rec, installed: true }, { mode: "sideload", run, sheet: () => assert.fail(),
+    alert: async (o) => alerts.push(o) }), false);
+  assert.equal(alerts[0].title, "Still Installed");
+  assert.equal(ran.length, 2);
+  // iFizBox's own row: nothing.
+  assert.equal(await confirmDelete({ ...rec, self: true }, { mode: "jailbreak", run, sheet: () => assert.fail() }), false);
+});
+
+test("B46: the sideload shell's word on what is installed wins; the helper's progress and errors read", async () => {
+  const rows = [{ id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }, { id: "me", name: "Me", self: true }];
+  const calls = [];
+  const native = { call: async (m, p) => { calls.push([m, p]); return { installed: { a: true, b: false, c: null } }; } };
+  const out = await withInstalled(rows, { mode: "sideload", native });
+  assert.deepEqual(calls, [["signing.isInstalled", { bundleIds: ["a", "b", "c"] }]]);
+  assert.deepEqual(out.map((r) => r.installed), [true, false, undefined, undefined]);
+  assert.equal(await withInstalled(rows, { mode: "jailbreak", native }), rows);
+  assert.equal(await withInstalled(rows, { mode: "site", native }), rows);
+  assert.equal(await withInstalled(rows, { mode: "sideload", native: { call: async () => { throw new Error("old shell"); } } }), rows);
+  assert.equal(statusText("pmstatus:com.example.delta:10:Removing"), "Removing");
+  assert.equal(statusText("Uninstalled com.example.delta"), null);
+  assert.equal(uninstallError({ code: 64, stderr: "ifizbox-helper: not an app installed in the app containers (system and jailbreak apps aren't removed here)\n" }),
+    "Not an app installed in the app containers (system and jailbreak apps aren't removed here).");
+  assert.equal(uninstallError({ code: 1, stderr: "" }), "The app couldn't be deleted (1).");
+  assert.match(uninstallError({ code: 64, stderr: "ifizbox-helper: unknown verb (update, ...)" }), /Update the helper/);
+});
+
+test("B46: the native backend's uninstallApp runs the helper's uninstall-app and fails loudly", async () => {
+  const { createNativeBackend } = await import("../backend-native.js");
+  const words = [];
+  let reply = { code: 0, stdout: "Uninstalled com.example.delta\n", stderr: "" };
+  const call = async (method, params, onEvent) => {
+    if (method === "helper.run") {
+      words.push(params.words);
+      onEvent?.({ fd: "status", line: "pmstatus:com.example.delta:10:Removing" });
+      return reply;
+    }
+    return null;
+  };
+  const b = createNativeBackend({ native: { call }, sourceOptions: { mode: "jailbreak" } });
+  const seen = [];
+  await b.uninstallApp("com.example.delta", (ev) => seen.push(ev.line));
+  assert.deepEqual(words, [["uninstall-app", "com.example.delta"]]);
+  assert.deepEqual(seen, ["pmstatus:com.example.delta:10:Removing"]);
+  reply = { code: 1, stdout: "", stderr: "ifizbox-helper: test installd refused it\n" };
+  await assert.rejects(b.uninstallApp("com.example.delta"), /Test installd refused it/);
+  assert.equal(typeof createNativeBackend({ native: { call }, sourceOptions: { mode: "sideload" } }).uninstallApp, "undefined");
 });

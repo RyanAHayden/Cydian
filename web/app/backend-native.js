@@ -250,6 +250,13 @@ function queueCalls(backend, q, call) {
     async installedApps(records) {
       return withRealVersions(records, await backend.appVersions());
     },
+    // B46: Installed's Delete. ifizbox-helper uninstall-app has installd take the app off the phone (only an app in
+    // installd's containers: never a system app or iFizBox); onEvent sees its pmstatus lines for the progress.
+    // Resolves once it is gone; any failure is a BackendError("helper") with the helper's last line.
+    async uninstallApp(id, onEvent) {
+      const r = await backend.helper(["uninstall-app", id], onEvent);
+      if (r.code !== 0) throw new BackendError("helper", uninstallError(r));
+    },
     async respring() {
       const r = await run(["respring"]);
       if (r.code !== 0) throw new BackendError("helper", `Couldn't restart SpringBoard (${r.code}): ${lastLine(r.stderr) || "no output"}`);
@@ -360,6 +367,14 @@ export function parseRollbacks(text) {
     out.push({ version: m[1], file: m[2] });
   }
   return out.sort((a, b) => compareVersions(b.version, a.version));
+}
+
+// B46: the sentence for a failed ifizbox-helper uninstall-app ({ code, stderr }): the helper's reason without its
+// "ifizbox-helper: " prefix; an older helper without the verb says it needs updating.
+export function uninstallError(r) {
+  const why = lastLine(r?.stderr).replace(/^ifizbox-helper:\s*/, "");
+  if (r?.code === 64 && /unknown verb/.test(why)) return "Update the helper (reinstall the package) to delete apps.";
+  return why ? why.charAt(0).toUpperCase() + why.slice(1) + "." : `The app couldn't be deleted (${r?.code}).`;
 }
 
 // I4: ifizbox-helper app-versions' "<id>\t<short>\t<build>\t<store>" lines -> [{ id, version, build, store }], each

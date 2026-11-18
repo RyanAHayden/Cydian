@@ -18,10 +18,11 @@
 enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, HV_HOLD, HV_UNHOLD, HV_SHOWHOLD,
                    HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA, HV_SELFUPDATE,
                    HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK, HV_INSTALL_PAID, HV_NOTIFICATIONS,
-                   HV_USERSPACE_REBOOT, HV_SIMULATE_DEB, HV_INSTALL_DEB };
+                   HV_USERSPACE_REBOOT, HV_SIMULATE_DEB, HV_INSTALL_DEB,
+                   HV_APP_VERSIONS };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
                      "simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid, " \
-                     "notifications, userspace-reboot, simulate-deb, install-deb"
+                     "notifications, userspace-reboot, simulate-deb, install-deb, app-versions"
 
 /* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
  * Downgrade and Reinstall pick theirs), "-name" removes. apt gets "name", "name=version" and "name-" in one
@@ -133,6 +134,13 @@ int helper_paid_path_ok(const char *dir, const char *path);
  * their own -DHELPER_DEB_DIR. */
 #ifndef HELPER_DEB_DIR
 #define HELPER_DEB_DIR "/var/mobile/Library/Caches/com.ryha.cydian/deb"
+#endif
+
+/* I4: app-versions (no arguments) runs nothing: ipa.c helper_app_versions lists the version of every app installd
+ * put in HELPER_APPS_DIR, for the jailbreak app's Installed apps (the real version, not the one Cydian remembers).
+ * path is the folder, argv the verb. Tests build with their own -DHELPER_APPS_DIR. */
+#ifndef HELPER_APPS_DIR
+#define HELPER_APPS_DIR "/var/containers/Bundle/Application"
 #endif
 
 /* 1 if s is a package name the helper passes on: [a-z0-9][a-z0-9.+-]+, at most HELPER_NAME_MAX bytes. */

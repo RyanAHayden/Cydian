@@ -619,6 +619,16 @@ static int rollback_plan(int argc, char *const argv[], const char *prefix, int s
     return 0;
 }
 
+/* I4: app-versions. Reads installd's containers (main.c prints ipa.c helper_app_versions); nothing is executed. */
+static int app_versions_plan(int argc, struct helper_plan *p, const char **err) {
+    if (argc != 1) { *err = "app-versions takes no arguments"; return -1; }
+    snprintf(p->path, sizeof p->path, "%s", HELPER_APPS_DIR);
+    p->argv[0] = "app-versions";
+    p->argv[1] = NULL;
+    p->argc = 1;
+    return 0;
+}
+
 int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
                 const char **err) {
     static char status_apt[64], status_dpkg[16];
@@ -648,6 +658,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "notifications")) { p->verb = HV_NOTIFICATIONS; return notify_plan(argc, argv, prefix, p, err); }
     else if (!strcmp(verb, "simulate-deb")) { p->verb = HV_SIMULATE_DEB; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "install-deb")) { p->verb = HV_INSTALL_DEB; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
+    else if (!strcmp(verb, "app-versions")) { p->verb = HV_APP_VERSIONS; return app_versions_plan(argc, p, err); }
     else if (!strcmp(verb, "selfupdate")) { p->verb = HV_SELFUPDATE; return selfupdate_plan(argc, argv, prefix, status_fd, p, err); }
     else { *err = "unknown verb (" HELPER_VERBS ")"; return -1; }
 

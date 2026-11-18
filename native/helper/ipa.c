@@ -331,3 +331,119 @@ int helper_install_ipa(const char *prefix, const char *ipa, int fd3, char *const
     remove_tree(work);
     return rc;
 }
+
+/* ---- I4: app-versions (ipa.h). Runs nothing; reads installd's containers so the app can show the real versions. */
+
+#ifndef HELPER_PLIST_MAX
+#define HELPER_PLIST_MAX IPA_PLIST_MAX
+#endif
+
+int helper_app_value_ok(const char *s) {
+    size_t n = strlen(s);
+    if (n < 1 || n > 255) return 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++)
+        if (*p < 0x20 || *p == 0x7f) return 0;
+    return 1;
+}
+
+int helper_plist_string(const char *data, size_t len, const char *key, char *out, size_t size) {
+    out[0] = 0;
+#ifdef __APPLE__
+    CFDataRef d = CFDataCreateWithBytesNoCopy(NULL, (const UInt8 *)data, (CFIndex)len, kCFAllocatorNull);
+    CFPropertyListRef pl = d ? CFPropertyListCreateWithData(NULL, d, kCFPropertyListImmutable, NULL, NULL) : NULL;
+    if (d) CFRelease(d);
+    CFStringRef k = CFStringCreateWithCString(NULL, key, kCFStringEncodingUTF8);
+    int ok = -1;
+    if (pl && k && CFGetTypeID(pl) == CFDictionaryGetTypeID()) {
+        CFTypeRef v = CFDictionaryGetValue((CFDictionaryRef)pl, k);
+        if (v && CFGetTypeID(v) == CFStringGetTypeID() &&
+            CFStringGetCString((CFStringRef)v, out, (CFIndex)size, kCFStringEncodingUTF8))
+            ok = 0;
+    }
+    if (k) CFRelease(k);
+    if (pl) CFRelease(pl);
+    if (ok) { out[0] = 0; return -1; }
+    return 0;
+#else
+    char pat[300];
+    int pn = snprintf(pat, sizeof pat, "<key>%s</key>", key);
+    if (pn < 0 || (size_t)pn >= sizeof pat) return -1;
+    const char *end = data + len, *k = NULL;
+    for (const char *p = data; p + pn <= end; p++)
+        if (!memcmp(p, pat, (size_t)pn)) { k = p + pn; break; }
+    if (!k) return -1;
+    while (k < end && (*k == ' ' || *k == '\t' || *k == '\n' || *k == '\r')) k++;
+    if (end - k < 8 || memcmp(k, "<string>", 8)) return -1;
+    k += 8;
+    const char *e = k;
+    while (e < end && *e != '<') e++;
+    if (e == end || (size_t)(e - k) >= size) return -1;
+    memcpy(out, k, (size_t)(e - k));
+    out[e - k] = 0;
+    return 0;
+#endif
+}
+
+/* A regular file (not a link) of 1..HELPER_PLIST_MAX bytes, read whole into a malloc'd *buf; 0 or -1. */
+static int read_small(const char *path, char **buf, size_t *len) {
+    int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (fd < 0) return -1;
+    struct stat st;
+    int rc = -1;
+    *buf = NULL;
+    if (!fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_size > 0 && st.st_size <= HELPER_PLIST_MAX &&
+        (*buf = malloc((size_t)st.st_size))) {
+        size_t got = 0;
+        ssize_t n;
+        while (got < (size_t)st.st_size && (n = read(fd, *buf + got, (size_t)st.st_size - got)) > 0) got += (size_t)n;
+        if (got == (size_t)st.st_size) { *len = got; rc = 0; }
+        else { free(*buf); *buf = NULL; }
+    }
+    close(fd);
+    return rc;
+}
+
+/* key's value from a plist's bytes into out, or "" when it's missing or not helper_app_value_ok. */
+static void plist_value(const char *data, size_t len, const char *key, char *out, size_t size) {
+    if (!data || helper_plist_string(data, len, key, out, size) || !helper_app_value_ok(out)) out[0] = 0;
+}
+
+int helper_app_versions(const char *dir, FILE *out, const char **err) {
+    DIR *d = opendir(dir);
+    if (!d) {
+        if (errno == ENOENT) return 0;
+        *err = "can't read the app containers folder";
+        return -1;
+    }
+    int count = 0;
+    struct dirent *de;
+    while ((de = readdir(d)) && count < HELPER_APPS_MAX) {
+        if (de->d_name[0] == '.') continue;
+        char box[PATH_MAX], app[PATH_MAX], p[PATH_MAX];
+        struct stat st;
+        if ((size_t)snprintf(box, sizeof box, "%s/%s", dir, de->d_name) >= sizeof box) continue;
+        if (lstat(box, &st) || !S_ISDIR(st.st_mode)) continue;
+        if (find_app(box, app, sizeof app)) continue;
+        if ((size_t)snprintf(p, sizeof p, "%s/Info.plist", app) >= sizeof p) continue;
+        char *info = NULL, *meta = NULL;
+        size_t ilen = 0, mlen = 0;
+        if (read_small(p, &info, &ilen)) continue;
+        char id[HELPER_NAME_MAX + 1], shortv[256], build[256], store[256];
+        if (helper_plist_string(info, ilen, "CFBundleIdentifier", id, sizeof id) || !helper_ipa_bundle_id_ok(id)) {
+            free(info);
+            continue;
+        }
+        plist_value(info, ilen, "CFBundleShortVersionString", shortv, sizeof shortv);
+        plist_value(info, ilen, "CFBundleVersion", build, sizeof build);
+        free(info);
+        store[0] = 0;
+        if ((size_t)snprintf(p, sizeof p, "%s/iTunesMetadata.plist", box) < sizeof p && !read_small(p, &meta, &mlen)) {
+            plist_value(meta, mlen, "bundleShortVersionString", store, sizeof store);
+            free(meta);
+        }
+        fprintf(out, "%s\t%s\t%s\t%s\n", id, shortv, build, store);
+        count++;
+    }
+    closedir(d);
+    return count;
+}

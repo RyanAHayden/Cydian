@@ -1,12 +1,15 @@
 // "Open in" (F8): a grouped section on a source's page and a package's page with one row per package manager that
 // takes that format (core/handoff.js builds the links), and a QR code of Cydian's /add link for adding the source
-// from another device. Used by browse.js (APT) and altstore.js (AltStore). In the jailbreak app the real install
-// queue takes this place (N4).
+// from another device. Since F76 only an APT package's page keeps the group; a source's page and an app's page
+// have Share in the nav bar instead (shareItems below). In the jailbreak app the real install queue takes this
+// place (N4).
 import { grouped } from "../nav/ui.js";
 import { showSheet } from "../nav/sheet.js";
 import { qrSvg } from "../core/qr.js";
 import { sourceLinks, packageLinks, addLink, siteOrigin, formatOf, isIpaFormat } from "../core/handoff.js";
 import { settings } from "./settings.js";
+import { showShareSheet, setShare } from "../nav/sharesheet.js";
+import { showHUD } from "../nav/hud.js";
 
 // pkg: an id for a package's page; leave it out on a source's page.
 // Only the visitor's format: APT managers run on jailbroken iPhones, so a phone set to Not Jailbroken (Settings >
@@ -58,4 +61,85 @@ export function showAddQR(link) {
   url.textContent = link;
   box.append(img, note, url);
   showSheet({ title: "Add Source", body: box });
+}
+
+// ---- Share (F76): the nav bar's Share button on a source's page and an app's page ---------------------------------
+//
+// The iOS 6 share sheet (nav/sharesheet.js) takes the Open In group's place there: Copy Link (the source's URL), Add
+// on Another Device (the QR code of the /add link), then the apps that take the source (core/handoff.js
+// sourceLinks), under the same rule as openInGroup: APT managers only for a phone set to Jailbroken. An app's page
+// gets the first two only: Cydian installs the app itself.
+
+// Each app's tile: its initial on a colour close to its own icon's (no copied icons).
+export const APP_TILES = {
+  Cydia: { letter: "C", color: "#8b5a2b" },
+  Sileo: { letter: "S", color: "#5e5ce6" },
+  Zebra: { letter: "Z", color: "#2b2b2e" },
+  Irisin: { letter: "I", color: "#7d4fd0" },
+  "AltStore Classic": { letter: "A", color: "#0f8c78" },
+  AltStore: { letter: "A", color: "#1cc0a0" },
+  SideStore: { letter: "S", color: "#8445e8" },
+  Feather: { letter: "F", color: "#e2547c" },
+  LiveContainer: { letter: "L", color: "#2f7cf6" },
+  StikStore: { letter: "S", color: "#f08a24" },
+  TrollApps: { letter: "T", color: "#d63f8c" },
+  Scarlet: { letter: "S", color: "#c8102e" },
+  ESign: { letter: "E", color: "#2a6be0" },
+  GBox: { letter: "G", color: "#22a45d" },
+};
+const tileOf = (app) => APP_TILES[app] ?? { letter: app.charAt(0).toUpperCase(), color: "#5a6270" };
+
+// The source's own URL, the one a person would paste into Add Source.
+export function sourceUrlOf(source) {
+  const u = isIpaFormat(formatOf(source)) ? source?.uri || String(source?.key ?? "").replace(/^alt:/, "") : source?.uri;
+  return /^https?:\/\/\S+$/i.test(String(u ?? "")) ? String(u) : null;
+}
+
+// Pure: what the sheet lists. [{ kind: "copy", label, text } | { kind: "qr", label, link } | { kind: "open", label,
+// url, letter, color }]. app: true on an app's page.
+export function shareItems(source, { app = false, jailbroken = settings.jailbroken(), origin = siteOrigin(globalThis.location) } = {}) {
+  if (!source) return [];
+  const items = [];
+  const url = sourceUrlOf(source);
+  if (url) items.push({ kind: "copy", label: "Copy Link", text: url });
+  const add = addLink(source, origin);
+  if (add) items.push({ kind: "qr", label: "Add on Another Device", link: add });
+  if (app) return items;
+  const apt = formatOf(source) === "apt";
+  if (apt && !jailbroken) return items;
+  for (const l of sourceLinks(source)) items.push({ kind: "open", label: l.app, url: l.url, ...tileOf(l.app) });
+  return items;
+}
+
+export function showShareFor(source, opts) {
+  const items = shareItems(source, opts).map((it) => {
+    if (it.kind === "copy") return { label: it.label, glyph: "copy", onSelect: () => copyText(it.text) };
+    if (it.kind === "qr") return { label: it.label, glyph: "qr", onSelect: () => showAddQR(it.link) };
+    return { label: it.label, letter: it.letter, color: it.color, onSelect: () => { location.href = it.url; } };
+  });
+  return showShareSheet({ items });
+}
+
+// From a page's render: shows the nav bar's Share button (screens' nav() puts nav/sharesheet.js shareButton there)
+// once there is something to share.
+export function setSourceShare(body, source, opts) {
+  setShare(body, source && shareItems(source, opts).length ? () => showShareFor(source, opts) : null);
+}
+
+function copyText(text) {
+  const ok = () => showHUD("Copying").done("Copied");
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(ok, () => { if (legacyCopy(text)) ok(); });
+  } else if (legacyCopy(text)) ok();
+}
+
+function legacyCopy(text) {
+  const t = Object.assign(document.createElement("textarea"), { value: text, readOnly: true });
+  t.style.cssText = "position:fixed;opacity:0;top:0;left:0";
+  document.body.append(t);
+  t.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch { /* not allowed */ }
+  t.remove();
+  return ok;
 }

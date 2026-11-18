@@ -2,7 +2,7 @@
 // phone runs, how an app installs) are core/altstore.js; the apps are catalog rows (core/catalog.js loadAlt), so
 // lists, Search and Changes draw them with screens/browse.js like any package. browse.js hands this file:
 //   the Sources tab's `alt:<url>` page  -> renderAltSource: header in the source's tint, news, featured apps,
-//                                         All Apps, and the sideloader links
+//                                         All Apps, Website; Share in the nav bar (F76)
 //   a package page whose stanza is an app (kind "ipa") -> renderApp
 // Styles: altstore.css. Every remote image goes through mediaUrl (http ones through the proxy on the site).
 import { grouped } from "../nav/ui.js";
@@ -19,7 +19,7 @@ import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall } from "../core/installed.js";
 import { signAndInstall } from "../signing-client.js";
 import { showActionSheet } from "../nav/actionsheet.js";
-import { openInGroup } from "./handoff.js";
+import { setSourceShare } from "./handoff.js";
 import { openIpaInstall } from "./ipa-install.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
@@ -114,7 +114,7 @@ export async function renderAltSource(body, route, key) {
   if (source?.unsupported) {
     body.replaceChildren(grouped([{ header: displayName(source), rows: [{ label: "Can't List Apps", subtitle: source.uri }],
       footer: source.unsupported }]));
-    body.append(openInGroup(source));
+    setSourceShare(body, source); // F76: Share in the nav bar (screens/handoff.js)
     return;
   }
   if (!meta) {
@@ -167,8 +167,9 @@ export async function renderAltSource(body, route, key) {
   body.append(grouped([{ rows: [{ label: "All Apps", detail: String(meta.count), href: deeper(route, `section:${ALL}`) }],
     footer: meta.count ? null : "No app on this source runs on this iPhone's iOS version." }]));
 
-  // F8: Open In, every sideloader that takes AltStore sources, and the add link's QR code (screens/handoff.js).
-  body.append(openInGroup(source ?? { key }));
+  // F76: Share in the nav bar: Copy Link, the add link's QR code and every sideloader that takes the source
+  // (the iOS 6 share sheet, screens/handoff.js), in place of F8's Open In group.
+  setSourceShare(body, source ?? { key });
   if (meta.website) body.append(grouped([{ rows: [{ label: "Website", subtitle: meta.website, onClick: () => window.open(meta.website, "_blank", "noopener") }] }]));
   if (status?.error) body.append(el("p", "empty", status.error));
 }
@@ -292,6 +293,6 @@ export function renderApp(body, route, pkg, source) {
   const sourceName = app.sourceName || (source ? displayName(source) : "") || app.sourceUrl;
   body.append(grouped([{ header: "Source", rows: [{ label: sourceName, subtitle: app.sourceUrl,
     href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) }] }]));
-  body.append(openInGroup(source ?? { key: pkg.key }, { pkg: app.bundleIdentifier || pkg.row.id })); // F8
+  setSourceShare(body, source ?? { key: pkg.key }, { app: true }); // F76: Copy Link and Add on Another Device only
   body.append(grouped([{ footer: `${app.bundleIdentifier}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
 }

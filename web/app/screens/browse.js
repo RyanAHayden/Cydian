@@ -33,7 +33,7 @@ import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
-import { openInGroup } from "./handoff.js";
+import { openInGroup, setSourceShare } from "./handoff.js";
 import { healthOf } from "../core/health.js";
 import { addSource } from "./manage.js";
 import { featuredStrip, paymentGroup } from "./extras.js";
@@ -181,12 +181,13 @@ async function drawSections(page) {
   else if (editing ? !data.sections.length : !data.total) {
     body.append(el("p", "empty", data.sections.length ? "Every section is hidden. Tap Edit to show them." : "No packages for this device."));
   }
-  // F8: Open In, this source in another package manager, under the sections.
+  // F76: Share in the nav bar (the iOS 6 share sheet: Copy Link, Add on Another Device, the APT managers) took the
+  // place of F8's Open In group under the sections.
   if (!editing && key !== ALL) {
     const source = await getBackend().sources().then((l) => l.find((x) => x.key === key)).catch(() => null);
     if (source && turn === page.draw && body.isConnected) {
       body.prepend(featuredStrip(source)); // F20: the source's sileo-featured.json banners, above its sections
-      body.append(openInGroup(source));
+      setSourceShare(body, source);
       body.append(grouped([{ footer: healthOf(source).label }])); // F19: last reached, last Release, Not Responding
     }
   }
@@ -766,7 +767,7 @@ function setRightLabel(body, label) {
   if (!stack) return;
   const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
   const item = document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i];
-  const b = item?.querySelector(".nav-right .bar-button");
+  const b = item?.querySelector(".nav-right .bar-button:not(.share-button)"); // F76: not the Share icon
   if (b && b.textContent !== label) b.textContent = label;
 }
 

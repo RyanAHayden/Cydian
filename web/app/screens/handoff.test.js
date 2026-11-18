@@ -140,3 +140,10 @@ test("F194: the app page puts Share on its header (storeHeader's action), not in
   assert.match(app, /storeHeader\(\{[^]*?action: headerShareButton\(source \?\? \{ key: pkg\.key \}, \{ app: true \}\)/);
   assert.doesNotMatch(app, /setSourceShare\(/, "one Share, on the header");
 });
+
+test("a tweak page has Share on its header too, opening the row menu's package sheet", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("./browse.js", import.meta.url), "utf8");
+  const page = src.slice(src.indexOf("async function renderPackage("));
+  assert.match(page, /storeHeader\(\{[^]*?action: shareHeadButton\(\(\) => showPackageShare\(/);
+});

@@ -41,7 +41,7 @@ import { IPA_FOOTER } from "../core/ipainstall.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
 import { rememberedApps } from "../app-updates.js";
-import { openInGroup, setSourceShare } from "./handoff.js";
+import { openInGroup, setSourceShare, shareHeadButton } from "./handoff.js";
 import { healthOf } from "../core/health.js";
 import { addSource } from "./manage.js";
 import { featuredStrip, paymentGroup, paidStateOf, soldByVendor } from "./extras.js";
@@ -454,11 +454,15 @@ async function runRowMenuItem(it, item, { installed, name }) {
   if (it.kind === "source") return go(format({ tab: "sources", path: [it.key] }));
   if (it.kind === "share") {
     const source = item.key ? (await getBackend().sources().catch(() => [])).find((s) => s.key === item.key) : null;
-    const items = packageShareItems(item, source).map((s) => s.kind === "copy"
-      ? { label: s.label, glyph: "copy", onSelect: () => copyText(s.text).then(() => showHUD("Copying").done("Copied")) }
-      : { label: s.label, letter: s.letter, color: s.color, onSelect: () => { location.href = s.url; } });
-    return showShareSheet({ items });
+    return showPackageShare(item, source);
   }
+}
+
+function showPackageShare(item, source) {
+  const items = packageShareItems(item, source).map((s) => s.kind === "copy"
+    ? { label: s.label, glyph: "copy", onSelect: () => copyText(s.text).then(() => showHUD("Copying").done("Copied")) }
+    : { label: s.label, letter: s.letter, color: s.color, onSelect: () => { location.href = s.url; } });
+  return showShareSheet({ items });
 }
 
 // ---- F193: swipe a package row left to queue it ---------------------------------------------------------------
@@ -738,7 +742,7 @@ async function renderPackage(body, route, key, id, ctx) {
   setTitle(body, name);
 
   // F181: the iOS 6 App Store's header (screens/storepage.js): the large glossy icon, name, author, stars once a
-  // rating is known, and "Version · size · price". Install / Modify stays the nav bar's right button.
+  // rating is known, "Version · size · price" and Share. Install / Modify stays the nav bar's right button.
   const art = createArt(true);
   paintArt(art, { ...pkg.row, icon: st.iconUrl ?? pkg.row.icon });
   const src = st.iconUrl && mediaUrl(st.iconUrl);
@@ -756,7 +760,9 @@ async function renderPackage(body, route, key, id, ctx) {
   const size = formatSize(st.size);
   const header = storeHeader({ art: art.art, name, mark: headMark, author: headAuthor?.name ?? null,
     authorHref: headAuthor ? deeper(route, token("author", headAuthor.name)) : null, // F29: opens their packages
-    line: headerLine({ version: st.version, size, price: pkg.installedOnly ? null : isPaid(st) ? "Paid" : "Free" }) });
+    line: headerLine({ version: st.version, size, price: pkg.installedOnly ? null : isPaid(st) ? "Paid" : "Free" }),
+    // Share on the header, as an app page's (F194); the row hold menu's sheet (F192)
+    action: shareHeadButton(() => showPackageShare({ id, key: pkg.key, kind: st.kind }, source)) });
 
   // Depiction: Sileo JSON drawn natively in Details; else an HTML depiction in a sheet, and the description. A package
   // with no Depiction: of its own gets the source's Release template (Cydia's fallback; an own non-http one

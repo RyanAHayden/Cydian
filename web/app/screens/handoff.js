@@ -146,12 +146,17 @@ export function setSourceShare(body, source, opts) {
 export function headerShareButton(source, opts) {
   const items = source ? shareItems(source, opts) : [];
   if (!items.length) return null;
+  loadAppIcons(items.filter((it) => it.kind === "open").map((it) => it.label));
+  return shareHeadButton(() => showShareFor(source, opts));
+}
+
+// The bare header Share button (also a tweak page's, screens/browse.js renderPackage).
+export function shareHeadButton(onClick) {
   const b = document.createElement("button");
   b.type = "button";
   b.className = "bar-button bar-icon share-button store-head-share";
   b.setAttribute("aria-label", "Share");
-  b.addEventListener("click", () => showShareFor(source, opts));
-  loadAppIcons(items.filter((it) => it.kind === "open").map((it) => it.label));
+  b.addEventListener("click", onClick);
   return b;
 }
 

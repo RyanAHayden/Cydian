@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 function fakeDom() {
   const make = (tag) => {
     const e = {
-      tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, style: {}, parentNode: null, _text: "",
+      tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, style: {}, dataset: {}, parentNode: null, _text: "",
       _cls: new Set(), hidden: false, disabled: false, value: "", type: "", placeholder: "", maxLength: -1,
       get className() { return [...e._cls].join(" "); },
       set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
@@ -130,7 +130,7 @@ test("the Reviews tab: ours and the depiction's in one list, Tap to Rate keeps y
   assert.equal(all(pane).some((x) => x.textContent === "md:**md**"), true, "the depiction's go through renderText");
   assert.equal(find(pane, "review-report").length, 1, "Report on someone else's review written here, not yours or the depiction's");
   assert.match(find(pane, "store-review-by")[0].textContent, /^by N – Version 1\.0 – Nov 1[67]$/);
-  assert.equal(one(pane, "store-ratings-from").textContent, "2 from users here, 1 in the depiction.");
+  assert.equal(one(pane, "store-ratings-from").textContent, "2 from users here, 1 in the depiction. Bars from 3 reviews.");
   assert.equal(one(pane, "review-tap-label").textContent, "Your Rating:");
   assert.equal(byText(pane, "Edit Your Review").textContent, "Edit Your Review");
   assert.equal(api.log.filter((l) => l[0] === "list").length, 1);
@@ -175,7 +175,8 @@ test("a server without reviews: no Tap to Rate or Write a Review, the others' ra
   const api2 = fakeApi([{ enabled: true, average: null, count: 0, histogram: [0, 0, 0, 0, 0], reviews: [], more: false, mine: null }]);
   const sheets = [];
   await reviewsTab(fresh, { id: "com.example.new", api: api2, now, sheet: (o) => sheets.push(o) });
-  assert.equal(one(fresh, "store-ratings-none").textContent, "No Ratings");
+  assert.equal(one(fresh, "store-ratings-count").textContent, "No Ratings");
+  assert.equal(find(fresh, "store-bar").length, 5, "F206: no ratings still draws the five bars, so nothing moves");
   assert.equal(one(fresh, "review-tap-label").textContent, "Tap to Rate:");
   await byText(fresh, "Write a Review").click();
   assert.equal(sheets[0].initial, null);
@@ -195,4 +196,76 @@ test("B37: the App Store's written reviews as their own group after ours, plain 
   assert.equal(one(g, "store-review-by").textContent, "by Deltatusigma – Version 2.0.1 – Nov 17");
   assert.equal(one(g, "store-review-text").textContent, "<b>not markup</b>", "drawn as text, never markup");
   assert.equal(one(pane, "store-reviews-footer").textContent, "Ratings and reviews from the App Store.");
+});
+
+test("F206: the bars count the reviews we have (no histogram), a row filters the list, again or Show All clears it", async () => {
+  const pane = document.createElement("div");
+  const api = fakeApi([], { enabled: false });
+  const depiction = { average: 4, count: 3, noun: "Reviews", reviews: [
+    { title: "Four A", author: "a", rating: 4, text: "x" }, { title: "Five", author: "b", rating: 5, text: "x" },
+    { title: "Four B", author: "c", rating: 4, text: "x" }] };
+  const store = { average: 4.5, count: 100, noun: "Ratings", reviews: [{ title: "Store four", rating: 4, at: now, text: "y" }, { title: "Store one", rating: 1, at: now, text: "z" }] };
+  const tab = await reviewsTab(pane, { id: "x", api, depiction, appStore: Promise.resolve(store), now });
+  const rows = find(pane, "store-bar");
+  assert.deepEqual(rows.map((r) => r.dataset.stars), ["5", "4", "3", "2", "1"]);
+  assert.deepEqual(rows.map((r) => one(r, "store-bar-n").textContent), ["1", "3", "0", "0", "1"], "ours, the depiction's and the App Store's counted");
+  assert.equal(rows.every((r) => r.tagName === "BUTTON" && !r.disabled), true, "each row a real button");
+  assert.equal(one(rows[1], "store-bar-fill").style.transform, "scaleX(1)", "scaled, not resized (120 Hz)");
+  assert.equal(find(rows[1], "store-bar-star").filter((s) => s._cls.has("on")).length, 4, "the rating's stars dark");
+  assert.ok(one(rows[1], "store-bar-chevron"));
+  assert.match(one(pane, "store-ratings-from").textContent, /Bars from 5 reviews\.$/);
+  assert.equal(one(pane, "store-ratings-hint").textContent, "Tap a row to see only those reviews.");
+  assert.ok(one(pane, "store-reviews-appstore"), "unfiltered: the lists as before");
+
+  await rows[1].click(); // 4 stars
+  assert.equal(tab.filter(), 4);
+  assert.equal(rows[1]._cls.has("selected"), true);
+  assert.equal(rows[1].attrs["aria-pressed"], "true");
+  assert.equal(rows.filter((r) => r._cls.has("selected")).length, 1);
+  const g = one(pane, "store-reviews-filtered");
+  assert.equal(one(g, "group-header").textContent, "4-Star Reviews (3)");
+  assert.deepEqual(find(g, "store-review-title").map((t) => t.textContent), ["1. Four A", "2. Four B", "3. Store four"]);
+  assert.equal(one(pane, "store-reviews-appstore"), undefined, "one filtered list");
+  assert.equal(one(pane, "store-ratings-hint").textContent, "Showing 4-star reviews. Tap the row again for all.");
+  assert.ok(byText(pane, "Show All 5 Reviews"));
+
+  await rows[1].click(); // the same row again: all
+  assert.equal(tab.filter(), null);
+  assert.equal(rows[1]._cls.has("selected"), false);
+  assert.equal(one(pane, "store-reviews-filtered"), undefined);
+  assert.equal(find(pane, "store-review-title").length, 5);
+  assert.equal(one(pane, "store-ratings-hint").textContent, "Tap a row to see only those reviews.");
+
+  await rows[2].click(); // 3 stars: none
+  assert.equal(one(one(pane, "store-reviews-filtered"), "group-header").textContent, "3-Star Reviews (0)");
+  assert.equal(one(pane, "store-reviews-none").textContent, "No reviews with this rating.");
+  await rows[4].click(); // another row switches straight to it
+  assert.equal(one(one(pane, "store-reviews-filtered"), "group-header").textContent, "1-Star Reviews (1)");
+  await byText(pane, "Show All 5 Reviews").click();
+  assert.equal(tab.filter(), null);
+  assert.equal(rows.some((r) => r._cls.has("selected")), false);
+  assert.equal(byText(pane, "Show All 5 Reviews"), undefined);
+});
+
+test("F206: the card's skeleton while the reviews load has the filled card's shape; no ratings keeps the card", async () => {
+  const pane = document.createElement("div");
+  let answer;
+  const api = { list: () => new Promise((r) => { answer = r; }) };
+  const done = reviewsTab(pane, { id: "x", api, now });
+  const shape = (n) => all(n).filter((x) => x._cls?.size).map((x) => [...x._cls].filter((c) => c !== "selected").join("."));
+  const skeleton = one(pane, "store-ratings-group");
+  assert.ok(skeleton, "the card from the start, not a spinner");
+  assert.equal(one(pane, "loading-spinner"), undefined);
+  assert.equal(one(skeleton, "store-ratings").dataset.pending, "true");
+  assert.equal(find(skeleton, "store-bar").length, 5);
+  assert.equal(find(skeleton, "store-bar").every((r) => r.disabled), true, "nothing to filter yet");
+  assert.equal(one(skeleton, "store-ratings-big").textContent, "—");
+  answer({ enabled: false, count: 0, reviews: [] });
+  await done;
+  const filled = one(pane, "store-ratings-group");
+  assert.notEqual(filled, skeleton);
+  const cardShape = (g) => shape(one(g, "store-ratings"));
+  assert.deepEqual(cardShape(filled), cardShape(skeleton), "the same rows and parts, so the same height");
+  assert.equal(one(filled, "store-ratings-count").textContent, "No Ratings");
+  assert.equal(one(filled, "store-ratings-from").textContent, "No reviews to count yet.");
 });

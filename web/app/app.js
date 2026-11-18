@@ -34,8 +34,7 @@ import { isAddPath, parseAddLink } from "./core/handoff.js";
 import { addSource } from "./screens/manage.js";
 import { initQueue } from "./screens/queue.js";
 import { initIpaLinks } from "./screens/ipa-install.js";
-import { startEssential, appVersion } from "./essential-ui.js";
-import { showBanner } from "./nav/banner.js";
+import { lookForUpdates, appVersion } from "./essential-ui.js";
 import { showReloadBar } from "./nav/reloadbar.js";
 import { catalog } from "./catalog.js";
 import { createUpgradeNotices } from "./settings.js";
@@ -449,9 +448,6 @@ if (globalThis.cydianNative) {
   });
 }
 
-// F72: in the app, once the launch has settled, the Essential Upgrade alert when iFizBox (or, jailbroken, apt, dpkg or
-// another Essential: yes package) has an upgrade on iFizBox's built-in source. It replaces F61's own popup: only when
-// that source couldn't be read does F61 look on GitHub (at most once a day).
 // F75: cydian:// links from the website (Send Settings, Home's Open in iFizBox App) and elsewhere (incoming.js).
 // cydian://install (F89) is no longer sent by the website since F92/F95: only for links already out there.
 if (globalThis.cydianNative) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
@@ -468,21 +464,18 @@ globalThis.cydianShortcut = async (type) => {
 if (globalThis.cydianPendingShortcut) { globalThis.cydianShortcut(globalThis.cydianPendingShortcut); globalThis.cydianPendingShortcut = null; }
 
 if (globalThis.cydianNative) {
-  // Every launch (Home's Reload is one) and every return: iFizBox's source first (the Essential Upgrade alert); when
-  // that found nothing to say, GitHub's release, without the once-a-day wait (user 2026-11-17: only Settings' Check
-  // for Updates showed it).
-  const lookForUpdates = () => startEssential()
-    .then((r) => (["complete", "essential", "ignored", "notified"].includes(r) ? r : settingsScreen.checkUpdates({ always: true })))
-    .catch(() => {});
-  setTimeout(lookForUpdates, 2000);
-  globalThis.addEventListener("cydian:reloaded", lookForUpdates); // Home's Reload (screens/home.js reloadHome)
-  // The first launch after iFizBox updated itself (iOS closed the old one as it installed this one): say so.
+  // F183: every launch, Home's Reload and every return check iFizBox's own source and GitHub's latest release, with
+  // no wait between checks and never a popup: a newer iFizBox is a row in Changes and its badge (essential-ui.js).
+  const lookForSelf = () => lookForUpdates().catch(() => {});
+  setTimeout(lookForSelf, 2000);
+  globalThis.addEventListener("cydian:reloaded", lookForSelf); // Home's Reload (screens/home.js reloadHome)
+  // The first launch after iFizBox updated itself (iOS closed the old one as it installed this one). F183: no note
+  // pops up (the banner went with the update popups); the version line at the bottom of Home and Settings shows it.
   appVersion().then((v) => {
     if (!v) return;
     let last = null;
     try { last = localStorage.getItem("cydian.lastVersion"); localStorage.setItem("cydian.lastVersion", v); } catch { return; }
     if (last && last !== v) {
-      showBanner({ title: NAME, message: `Updated to ${v}.`, duration: 4000 });
       // The icon badge counted this very update: clear it; Changes sets it again with what's still waiting (user 2026-11-18).
       Promise.resolve(globalThis.cydianNative.call("app.badge", { count: 0 })).catch(() => {});
     }
@@ -493,7 +486,7 @@ if (globalThis.cydianNative) {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible" || Date.now() - lastEssential < 60 * 1000) return; // every return, once a minute at most
     lastEssential = Date.now();
-    lookForUpdates();
+    lookForSelf();
   });
 }
 

@@ -20,7 +20,7 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 | Open in iFizBox App | website, not jailbroken | an action, not a setting (screens/importlink.js) |
 | Install from URL | where Install IPA works | an action (screens/ipa-install.js) |
 | Console Logs | jailbreak, or wherever there are logs | screens/queue.js |
-| About | jailbreak, sideload | Version, Check for Updates, Skip This Version |
+| (version line) | all | Home's footer line (device, iOS, version, language) and the build's commit, at the bottom of the root (F183: no About page) |
 
 - Switches sit in their rows (`createSwitch`). Choices are checkmark lists on their own page (Device, iOS Version, Install Updates Automatically, After a Respring Update, Keep Previous Versions,
   Re-sign Reminder). Appearance's three options are checked inline, like iOS 6's.
@@ -55,7 +55,7 @@ of the apps it signs, so it shows no dates and the switch would do nothing there
 | Setting | Was | Why it went | Now |
 |---|---|---|---|
 | `sideloader` (Sideloader) | Hidden since 2026-11-17 (`modes: []`) | Nothing read it after app pages stopped handing apps to other sideloaders | iFizBox always signs and installs itself |
-| `checkUpdates` (Check for Updates: Off / On Launch / Every 6 Hours / Daily) | Never shown (its feature, `update-check`, never shipped) | The app has its own check (About > Check for Updates, once a day), and N5's daemon checks daily | The daemon's default (Daily). A full `daemonPrefs()` sends `cydian.checkUpdates: null` so the shell removes any old value |
+| `checkUpdates` (Check for Updates: Off / On Launch / Every 6 Hours / Daily) | Never shown (its feature, `update-check`, never shipped) | The app checks for its own updates on every launch and Reload (F183, silent: a row in Changes), and N5's daemon checks daily | The daemon's default (Daily). A full `daemonPrefs()` sends `cydian.checkUpdates: null` so the shell removes any old value |
 | `cellular` (Use Cellular Data) | Never shown (feature `cellular` never shipped) | No row, and nobody could set it | The daemon's default (cellular data on). Sent as null like `checkUpdates` |
 | `notifications` (Off / Summary / One per Package) | Never shown (feature `notifications` never shipped) | Nothing read it. Upgrade Notifications (jailbreak) and Update Alerts (sideload) are the real controls | none |
 | `badge` (App Icon Badge) | Never shown (feature `badge` never shipped) | Nothing read it. The icon always shows the upgrade count (Update Alerts > Icon Badge is iOS's own switch in the sideload build) | none |
@@ -80,7 +80,7 @@ of the apps it signs, so it shows no dates and the switch would do nothing there
 | Lock Home Until iFizBox Is Installed, Install on the Website (website) | Settings > Signing | General > Website (F145), with Lock Home's F134 short name; Install on the Website is padlocked while Home is locked |
 | Re-sign Reminder (sideload) | Root, Signing group | Settings > Signing, in the options group with Show Expiry Dates (F134) |
 | Certificate row (website, sideload) | Root, Signing group with a footer | Root row **Signing**, with the certificate's name as its detail |
-| About (app builds) | Root group with the version | Root row **About**, which opens the version, Check for Updates and Skip This Version |
+| About (app builds) | Root group with the version | Gone (F183): Home's version line at the bottom of the root; updates are checked on every launch and Reload |
 
 ## What stays and why
 

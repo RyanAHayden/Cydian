@@ -22,7 +22,7 @@ import { settings } from "./settings.js";
 import * as browse from "./browse.js";
 import * as roulette from "./roulette.js";
 import { catalog } from "../catalog.js";
-import { currentDevice } from "../device.js";
+import { footLine, versionLines, buildInfo } from "./version-foot.js";
 import { signAndInstall, signingReady, getBring, deviceStatus, getServer } from "../signing-client.js";
 import { rememberInstall } from "./signing.js";
 import { featuredRefs } from "./extras.js";
@@ -300,11 +300,6 @@ const loadNew = async () => {
   if (catalog.statusSource() === "native") await catalog.reloadInstalled();
   globalThis.dispatchEvent?.(new Event("cydian:reloaded"));
 };
-// build.json (tools/buildinfo.sh), never from the browser's cache; null where there is none (a local checkout).
-async function buildInfo(fetcher = globalThis.fetch) {
-  try { const r = await fetcher("build.json", { cache: "no-store" }); return r.ok ? await r.json() : null; } catch { return null; }
-}
-
 // The website's Reload first re-downloads every file of the site (build.json lists them), which replaces whatever
 // copy the browser kept, then loads the page again: a phone holding stale files gets the new version (user
 // 2026-11-18). True when it reloaded the page.
@@ -593,19 +588,8 @@ function renderRoot(body) {
       renderRoot(body);
       body.scrollTop = top;
     } });
-  // Cydia's line at the bottom of Home: the device, iOS, the installed version and the language
-  // ("iPhone4,1, iOS 6.1.3, Cydia 1.1.9 (en-us)").
-  const foot = el("p", "home-version", footLine({ ios: currentDevice().ios, web: !globalThis.cydianNative }));
-  const commit = el("p", "home-version home-commit");
-  home.append(foot, commit);
-  globalThis.cydianNative?.call?.("app.info", {}).then((i) => { foot.textContent = footLine(i ?? {}); }, () => {});
-  // The build under it (tools/buildinfo.sh's build.json, in the app's bundle and on the website): its commit, and on
-  // the website the version it was deployed from.
-  buildInfo().then((b) => {
-    if (!b) return;
-    commit.textContent = b.commit;
-    if (!globalThis.cydianNative) foot.textContent = footLine({ ios: currentDevice().ios, version: b.version, web: true });
-  });
+  // Cydia's line at the bottom of Home (and of Settings' root, F183): device, iOS, version, language, and the build.
+  home.append(...versionLines());
   refreshState();
   // F82: Reload's redraw. Everything stays on screen; each part is updated where it is: the green tile and the
   // Install iFizBox App offer at once.
@@ -619,11 +603,8 @@ function renderRoot(body) {
   };
 }
 
-// The Home footer: "iPhone17,3, iOS 26.1, iFizBox 0.1.1 (en-us)"; on the website "iPhone, iOS 26.1, iFizBox Web (en-us)".
-export function footLine({ machine = "", ios = "", version = "", web = false } = {}, lang = globalThis.navigator?.language ?? "en") {
-  const app = web ? `${NAME} Web${version ? ` ${version}` : ""}` : version ? `${NAME} ${version}` : `${NAME} Web`;
-  return [machine || "iPhone", ios ? `iOS ${ios}` : "", app].filter(Boolean).join(", ") + ` (${String(lang).toLowerCase()})`;
-}
+// The Home footer's text (version-foot.js; Settings' root shows it too, F183).
+export { footLine };
 
 // Which Jailbreak's footer. F144: the sideload build lists apps only and has no Settings > Device, so it names no
 // way to tweaks there; the website and the jailbreak app keep the Device hint.

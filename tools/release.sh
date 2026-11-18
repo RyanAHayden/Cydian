@@ -20,8 +20,8 @@
 #     --dist DIR  publish DIR/Cydian.deb and DIR/Cydian.ipa as they are instead of running `make -C native package`
 #     --draft     create the release as a draft (the app ignores drafts until it is published on GitHub)
 #     --minimum V the oldest iFizBox that may keep running without upgrading first (F72): X-Cydian-Minimum-Version in
-#                 the Release and iFizBox's stanza, "minimumVersion" in the AltStore source. Older ones get the
-#                 Essential Upgrade alert without Ignore. Default: none (the alert can always be ignored)
+#                 the Release and iFizBox's stanza, "minimumVersion" in the AltStore source. Recorded only: since
+#                 F183 the app never blocks or pops up on it. Default: none
 #     --out DIR   also leave the repo files, the notes and the updated AltStore source (source.json) in DIR; a dry
 #                 run writes the source there only, never into web/app/source.json
 #   CYDIAN_RELEASE_REPO  owner/name to publish on (default RyanAHayden/iFizBox)

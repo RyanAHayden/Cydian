@@ -92,7 +92,10 @@ export const SETTINGS = [
     // colour over ground colour), from ios6.css's palette blocks. Stored at ifizbox.lightTheme.
     key: "lightTheme", section: "themes", kind: "list", feature: "appearance", modes: ALL, default: "classic",
     label: "Light", tone: "light",
-    options: [{ value: "classic", label: "Classic", swatch: ["#6f88a8", "#c5ccd4"] }],
+    // F200: Sepia and Solarized Light (palettes.css).
+    options: [{ value: "classic", label: "Classic", swatch: ["#6f88a8", "#c5ccd4"] },
+      { value: "sepia", label: "Sepia", swatch: ["#a5865a", "#ebdfc5"] },
+      { value: "solarized", label: "Solarized Light", swatch: ["#4b93c8", "#eee8d5"] }],
     footer: "The theme in Light mode, and in Automatic while the iPhone is light.",
   },
   {
@@ -100,7 +103,12 @@ export const SETTINGS = [
     key: "darkTheme", section: "themes", kind: "list", feature: "appearance", modes: ALL, default: "oled",
     label: "Dark", tone: "dark",
     options: [{ value: "oled", label: "OLED Black", swatch: ["#000", "#0e0e0f"] },
-      { value: "gunmetal", label: "Gunmetal", swatch: ["#5f656f", "#3b3f46"] }],
+      { value: "gunmetal", label: "Gunmetal", swatch: ["#5f656f", "#3b3f46"] },
+      // F200: palettes.css.
+      { value: "midnight", label: "Midnight", swatch: ["#18253e", "#121d31"] },
+      { value: "linen", label: "Linen", swatch: ["#262626", "#36383d"] },
+      { value: "nord", label: "Nord", swatch: ["#3b4252", "#2e3440"] },
+      { value: "dracula", label: "Dracula", swatch: ["#383b4c", "#282a36"] }],
     footer: "The theme in Dark mode, and in Automatic while the iPhone is dark.",
   },
   {

@@ -60,6 +60,16 @@ import { settings } from "./settings.js";
 import { wishRows, wishCount, WISH_EMPTY } from "../core/wishlist.js";
 import { compareNames, indexLetter } from "../core/catalog.js";
 import { NAME } from "../brand.js";
+import { showActionSheet } from "../nav/actionsheet.js";
+import { longPress } from "../nav/menu.js";
+import { libraryCall } from "../signing-client.js";
+import { resignJob } from "../core/appqueue.js";
+import { deviceError } from "../core/signing.js";
+
+// B36: every row on the apps list opens a page (the source's package page, else an installed-app page for the record,
+// #installed/app:<id>), a hold opens an action sheet (Open, Re-sign, Save Signed IPA, Remove: what applies) and a left
+// swipe shows Delete on every row but iFizBox's own: Delete on a signed app the list doesn't remember (F91's extra
+// rows) forgets it as Settings > Signed Apps does (signing.forget), on a remembered one removeInstall as before.
 
 export const title = "Installed";
 
@@ -166,6 +176,7 @@ export const recordsApps = (mode = detectMode()) => mode !== "jailbreak";
 // Which page a route is: "apps" (F30's list), "dpkg" (the status file's packages), "myipas" (F77) or a browse.js page.
 export function pageKind(route, mode = detectMode()) {
   if (route.path.length === 1 && route.path[0] === WISH) return "wishlist"; // F125, in every mode
+  if (isAppPage(route, mode)) return "app"; // B36
   if (!recordsApps(mode)) return !route.path.length ? "dpkg" : route.path.length === 1 && route.path[0] === APPS ? "apps" : "browse";
   if (!route.path.length) return "apps";
   if (route.path[0] === myipas.MYIPAS) return "myipas";
@@ -198,6 +209,7 @@ function navInfo(route) {
   const kind = pageKind(route);
   if (kind === "browse") return browse.nav(route);
   if (kind === "myipas") return myipas.nav(route);
+  if (kind === "app") return { title: appNames.get(appIdOf(route.path.at(-1))) || appIdOf(route.path.at(-1)) };
   if (kind === "wishlist") {
     return { title: "Wish List", style: "plain",
       right: { label: wishView.editing ? "Done" : "Edit", onClick: (e) => setWishEditing(!wishView.editing, e.currentTarget) } };
@@ -228,6 +240,10 @@ export function render(body, route, ctx) {
   }
   if (kind === "myipas") {
     myipas.render(body, route, ctx);
+    return;
+  }
+  if (kind === "app") {
+    renderAppPage(body, route, ctx);
     return;
   }
   if (kind === "wishlist") {
@@ -513,28 +529,11 @@ function drawAppList() {
   const appSecs = recordsApps() ? appSections(signed.rows, { mode: appView.mode, query: appView.query }) : [{ rows: signed.rows }];
   const extra = recordsApps() ? queryRows(signed.extra, appView.query) : signed.extra;
   const rows = appSecs.flatMap((sec) => sec.rows);
-  const appRow = (r) => ({
-    label: r.name, subtitle: r.sig && !r.upgrade && r.version ? [`Version ${r.version}`, appSubtitle(r)].filter(Boolean).join(" · ") : appSubtitle(r),
-    detail: r.sig && !r.upgrade ? r.sig.text : r.upgrade || r.actual === null ? undefined : r.version,
-    badge: r.upgrade ? "Upgrade" : undefined, icon: { text: r.name.charAt(0).toUpperCase() },
-    // The app page, while a source still has the app.
-    href: cands.has(r.id) ? format({ tab: route.tab, path: [...route.path, `package:${r.id}`] }) : null,
-  });
-  const sections = appSecs.map((sec) => ({ header: sec.header, rows: sec.rows.map(appRow) }));
-  sections.push({ rows: extra.map((r) => ({ label: r.name, subtitle: [r.version ? `Version ${r.version}` : null, `Signed by ${NAME}`].filter(Boolean).join(" · "),
-    detail: r.sig?.text, icon: { text: r.name.charAt(0).toUpperCase() } })) });
-  if (site) {
-    sections.push({ header: "Jailbroken iPhone", rows: [hasStatus
-      ? { label: "dpkg Status File", subtitle: "Packages installed with apt", href: format({ tab: route.tab, path: [DPKG] }) }
-      : { label: "Choose Status File", subtitle: "See the packages a jailbroken iPhone has", onClick: () => chooseStatus() }] });
-  }
+  const more = site ? [{ header: "Jailbroken iPhone", rows: [hasStatus
+    ? { label: "dpkg Status File", subtitle: "Packages installed with apt", href: format({ tab: route.tab, path: [DPKG] }) }
+    : { label: "Choose Status File", subtitle: "See the packages a jailbroken iPhone has", onClick: () => chooseStatus() }] }] : [];
   updateWishButton(); // F147 (F125's Packages section with the Wish List row is gone)
-  const ul = plain(sections);
-  ul.classList.toggle("editing", appView.editing);
-  const cells = ul.querySelectorAll(":scope > .cell");
-  rows.forEach((r, i) => decorateApp(cells[i], r));
-  [...rows, ...extra].forEach((r, i) => { if (r.sig && !r.upgrade) sigPill(cells[i], r.sig); });
-  attachRowGestures(ul);
+  const ul = appListElement(appSecs, extra, { route, cands, signed: appView.signed, more });
   appView.tail = [ul];
   if (!listRows.length) {
     appView.tail.unshift(note("No apps yet. Apps you install from an app's page are listed here, on this device.")); // under My IPAs
@@ -542,6 +541,30 @@ function drawAppList() {
     appView.tail.unshift(note("No matches."));
   }
   body.append(...appView.tail);
+}
+
+// The apps list's table: the sections' rows, F91's extra rows, then `more` (the site's dpkg row). B36: every app row
+// is a link (the package page or the installed-app page, so it highlights on press), carries its signing.installed
+// record, swipes to Delete (not iFizBox's own) and holds for the sheet (`hold`: attachRowHold's options).
+export function appListElement(appSecs, extra, { route, cands = new Map(), signed = null, more = [], editing = appView.editing, hold = {} } = {}) {
+  const rows = appSecs.flatMap((sec) => sec.rows);
+  const appRow = (r) => ({
+    label: r.name, subtitle: r.sig && !r.upgrade && r.version ? [`Version ${r.version}`, appSubtitle(r)].filter(Boolean).join(" · ") : appSubtitle(r),
+    detail: r.sig && !r.upgrade ? r.sig.text : r.upgrade || r.actual === null ? undefined : r.version,
+    badge: r.upgrade ? "Upgrade" : undefined, icon: { text: r.name.charAt(0).toUpperCase() },
+    href: appRowHref(r, cands, route),
+  });
+  const sections = appSecs.map((sec) => ({ header: sec.header, rows: sec.rows.map(appRow) }));
+  sections.push({ rows: extra.map(extraRow(route)) }, ...more);
+  const ul = plain(sections);
+  ul.classList.toggle("editing", editing);
+  const cells = ul.querySelectorAll(":scope > .cell");
+  const index = signedIndex(signed);
+  [...rows, ...extra].forEach((r, i) => decorateApp(cells[i], withSigned(r, index)));
+  [...rows, ...extra].forEach((r, i) => { if (r.sig && !r.upgrade) sigPill(cells[i], r.sig); });
+  attachRowGestures(ul);
+  attachRowHold(ul, hold);
+  return ul;
 }
 
 // F91: the row's detail drawn as the signature pill.
@@ -588,6 +611,9 @@ function decorateApp(li, r) {
     img.src = src;
     li.querySelector(".cell-icon").append(img);
   }
+  li._app = r; // B36: what a hold or Delete acts on
+  appNames.set(r.id, r.name);
+  if (!canDelete(r)) { li.dataset.self = "1"; return; } // iFizBox's own row: no Delete
   const toggle = Object.assign(document.createElement("button"), { type: "button", className: "del-toggle" });
   toggle.setAttribute("aria-label", "Delete " + r.name);
   toggle.addEventListener("click", () => arm(li, !li.classList.contains("armed")));
@@ -617,7 +643,7 @@ function attachRowGestures(ul) {
   ul.addEventListener("pointerdown", (e) => {
     const li = e.target.closest(".installed-app");
     swiped = false;
-    start = li && !appView.editing && !e.target.closest(".del-confirm") ? { li, x: e.clientX, y: e.clientY } : null;
+    start = li && !li.dataset.self && !appView.editing && !e.target.closest(".del-confirm") ? { li, x: e.clientX, y: e.clientY } : null;
   });
   ul.addEventListener("pointermove", (e) => {
     if (!start) return;
@@ -649,12 +675,165 @@ function removeApp(li, r) {
   li.classList.add("removing");
   setTimeout(async () => {
     try {
-      await removeInstall(await apps(), r.id);
+      await forgetApp(r);
     } catch (e) {
       li.classList.remove("removing");
-      await showAlert({ title: "Error", message: e.message, buttons: ["OK"] });
+      await showAlert({ title: "Error", message: r.signedOnly ? deviceError(e).message : e.message, buttons: ["OK"] });
     }
   }, 250);
+}
+
+// ---- B36: every row opens, holds and swipes ---------------------------------------------------------------------
+
+const appNames = new Map(); // id -> name, for the installed-app page's title before it loads
+
+// The installed-app page's path segment for an app id, and back.
+export const appToken = (id) => `app:${id}`;
+export const appIdOf = (seg) => (typeof seg === "string" && seg.startsWith("app:") && seg.length > 4 ? seg.slice(4) : null);
+
+// The page is under the apps list: Installed's root without a jailbreak, the Apps page (#installed/apps) in the app.
+export function isAppPage(route, mode = detectMode()) {
+  const p = route.path;
+  if (appIdOf(p.at(-1)) == null) return false;
+  return recordsApps(mode) ? p.length === 1 : p.length === 2 && p[0] === APPS;
+}
+
+// Where a row goes: the source's package page when a source still lists the app, else its installed-app page.
+export function appRowHref(r, cands, route) {
+  const seg = cands?.has?.(r.id) ? `package:${r.id}` : appToken(r.id);
+  return format({ tab: route.tab, path: [...route.path, seg] });
+}
+
+// F91's extra row (a signed app the list doesn't remember), now with its page.
+export function extraRow(route) {
+  return (r) => ({ label: r.name, subtitle: [r.version ? `Version ${r.version}` : null, `Signed by ${NAME}`].filter(Boolean).join(" · "),
+    detail: r.sig?.text, icon: { text: r.name.charAt(0).toUpperCase() }, href: appRowHref(r, null, route) });
+}
+
+// The row with its signing.installed record (`signed`, null when iFizBox didn't sign it), by bundle ID.
+export const withSigned = (r, index) => ({ ...r, signed: index?.get?.(r.id) ?? null });
+
+// iFizBox's own row is never removed (it is the app showing the list).
+export const canDelete = (r) => !r?.self;
+
+export const OPEN = "Open", RESIGN = "Re-sign", SAVE_IPA = "Save Signed IPA", REMOVE = "Remove";
+
+// The hold sheet's buttons for a row, in order. Open and Re-sign need the sideload app (signing.openApp,
+// signing.resign); Re-sign only for an app iFizBox signed; Save Signed IPA when My IPAs keeps a signed copy (`ipa`).
+export function appActions(r, { mode = detectMode(), ipa = null } = {}) {
+  const out = [];
+  if (mode === "sideload" && !r.self && r.actual !== null) out.push(OPEN);
+  if (mode === "sideload" && r.signed) out.push(RESIGN);
+  if (ipa) out.push(SAVE_IPA);
+  if (canDelete(r)) out.push(REMOVE);
+  return out;
+}
+
+// My IPAs' entry with a signed copy of this app (by bundle ID, as signed or as in the IPA), or null.
+export function keptIpaOf(r, entries) {
+  const ids = new Set([r.id, r.signed?.bundleId, r.signed?.originalBundleId].filter(Boolean));
+  return (entries ?? []).find((e) => e?.file && e.signed && (ids.has(e.signed.bundleId) || ids.has(e.bundleId))) ?? null;
+}
+
+async function keptIpa(r) {
+  if (detectMode() !== "sideload" || typeof globalThis.ifizboxNative?.call !== "function") return null;
+  try { return keptIpaOf(r, (await libraryCall("list", {}))?.ipas); } catch { return null; }
+}
+
+// Forgets the row's app: a signed app the list doesn't remember through signing.forget (it stays installed, as on
+// Settings > Signed Apps; the list draws again), a remembered one through removeInstall (onAppsChange redraws).
+async function forgetApp(r, native = globalThis.ifizboxNative) {
+  if (r.signedOnly) {
+    await native.call("signing.forget", { bundleId: r.id });
+    if (appView.body) loadApps();
+    return;
+  }
+  await removeInstall(await apps(), r.id);
+}
+
+// What a sheet button does. `li`: the row, when the sheet came from the list (Remove fades it out).
+async function runAppAction(label, r, { ipa = null, li = null, after = null } = {}) {
+  const native = globalThis.ifizboxNative;
+  try {
+    if (label === OPEN) {
+      const res = await native.call("signing.openApp", { bundleId: r.signed?.bundleId ?? r.id });
+      if (!res?.opened) await showAlert({ title: "Couldn't Open", message: `iOS didn't open ${r.name}.`, buttons: ["OK"] });
+    } else if (label === RESIGN) {
+      const job = resignJob(r.signed);
+      if (job) (await import("./queue.js")).queueApp(job);
+    } else if (label === SAVE_IPA) {
+      await libraryCall("export", { file: ipa.file });
+    } else if (label === REMOVE) {
+      if (li) { removeApp(li, r); return; }
+      await forgetApp(r);
+      after?.();
+    }
+  } catch (e) {
+    await showAlert({ title: "Error", message: deviceError(e).message, buttons: ["OK"] });
+  }
+}
+
+// The hold's action sheet for a row -> the button chosen, or null (Cancel, or nothing applies).
+export async function appSheet(r, { mode = detectMode(), sheet = showActionSheet, findIpa = keptIpa, act = runAppAction, li = null, after = null } = {}) {
+  const ipa = mode === "sideload" ? await findIpa(r) : null;
+  const buttons = appActions(r, { mode, ipa });
+  if (!buttons.length) return null;
+  const i = await sheet({ title: r.name, buttons, destructive: buttons.indexOf(REMOVE) });
+  if (!(i >= 0)) return null;
+  await act(buttons[i], r, { ipa, li, after });
+  return buttons[i];
+}
+
+// A hold on a row (500 ms, nav/menu.js longPress) opens its sheet; not while editing or while it shows Delete.
+export function attachRowHold(ul, opts = {}) {
+  longPress(ul, ".installed-app", (li) => {
+    if (appView.editing || li.classList.contains("armed") || !li._app) return;
+    li.querySelector(".cell-inner")?.classList.remove("is-pressed");
+    appSheet(li._app, { li, ...opts });
+  });
+}
+
+// The installed-app page (#installed/app:<id>): what iFizBox knows of an app no source lists any more, or one it
+// signed but doesn't remember: version (browse.js installedAppSection, with I4's note in the jailbreak app), bundle ID,
+// source, install date and the signature's days left; then the sheet's actions as rows.
+async function renderAppPage(body, route, ctx) {
+  const id = appIdOf(route.path.at(-1));
+  body.append(placeholder("page"));
+  let rec = null;
+  let signed = null;
+  try {
+    const [records, installed] = await Promise.all([rememberedApps().catch(() => []), signedApps()]);
+    signed = signedIndex(installed).get(id) ?? null;
+    rec = (records ?? []).find((x) => x?.id === id) ?? null;
+  } catch { /* drawn from what there is */ }
+  const r = rec ? { ...rec, signed } : signed ? { id, name: signed.name || id, version: signed.version || "", signedOnly: true, signed } : null;
+  if (!r) { body.replaceChildren(note("This app isn't installed.")); return; }
+  appNames.set(id, r.name);
+  const ipa = detectMode() === "sideload" ? await keptIpa(r) : null;
+  const back = () => (ctx?.back ? ctx.back() : history.back());
+  body.replaceChildren(grouped(appPageSections(r, { ipa, onAction: (label) => runAppAction(label, r, { ipa, after: back }) })));
+}
+
+// The page's sections for a row `r` (with `signed`), testable without a page.
+export function appPageSections(r, { ipa = null, mode = detectMode(), now = new Date(), window, onAction = () => {} } = {}) {
+  const sec = browse.installedAppSection(r);
+  const rows = [...sec.rows, { label: "Bundle ID", detail: r.signed?.bundleId || r.id }];
+  if (r.signed?.bundleId && r.signed.bundleId !== r.id) rows.push({ label: "Original ID", detail: r.id });
+  if (r.sourceName || r.source) rows.push({ label: "Source", detail: r.sourceName || r.source });
+  if (r.date) rows.push({ label: "Installed", detail: new Date(r.date).toLocaleDateString(undefined, { dateStyle: "medium" }) });
+  if (r.signed) {
+    const sig = signatureState(r.signed.expires, { now, window: window ?? resignWindow((k) => settings.get(k)) });
+    rows.push({ label: "Signature", detail: sig?.long || "Signed by " + NAME });
+  }
+  const out = [{ header: sec.header, rows, footer: sec.footer || (r.signedOnly ? `Signed by ${NAME}. No source lists it.` : null) }];
+  const acts = appActions(r, { mode, ipa });
+  const main = acts.filter((a) => a !== REMOVE);
+  if (main.length) out.push({ rows: main.map((label) => ({ label, onClick: () => onAction(label) })) });
+  if (acts.includes(REMOVE)) {
+    out.push({ rows: [{ label: REMOVE, onClick: () => onAction(REMOVE) }],
+      footer: r.signedOnly ? "Forgets the app here; it stays on your iPhone." : "Takes the app off this list. Delete it from the Home Screen yourself." });
+  }
+  return out;
 }
 
 // ---- F125: the Wish List page --------------------------------------------------------------------------------

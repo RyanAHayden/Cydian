@@ -56,3 +56,30 @@ enum HTTPResponse {
         return Data((s + "\r\n").utf8)
     }
 }
+
+// B29: which bytes of a served file have gone out in full, over every request. iOS's installer may ask for parts
+// (the zip's end first, a resume after a dropped connection), so a request that reaches the last byte doesn't mean
+// iOS has the whole IPA: the file counts as served only once every byte was sent at least once.
+struct ByteCoverage {
+    private(set) var ranges = [ClosedRange<UInt64>]() // sorted, merged (touching ranges joined)
+
+    mutating func add(_ r: ClosedRange<UInt64>) {
+        var lo = r.lowerBound, hi = r.upperBound
+        var kept = [ClosedRange<UInt64>]()
+        for x in ranges {
+            let apart = (x.upperBound < lo && lo - x.upperBound > 1) || (hi < x.lowerBound && x.lowerBound - hi > 1)
+            if apart { kept.append(x); continue }
+            lo = min(lo, x.lowerBound); hi = max(hi, x.upperBound)
+        }
+        kept.append(lo...hi)
+        ranges = kept.sorted { $0.lowerBound < $1.lowerBound }
+    }
+
+    // Bytes covered, each counted once.
+    var count: UInt64 { ranges.reduce(0) { $0 + ($1.upperBound - $1.lowerBound + 1) } }
+
+    // Every byte of a file of `size` bytes sent (an empty file: once anything was asked for).
+    func covers(size: UInt64) -> Bool {
+        size == 0 || (ranges.count == 1 && ranges[0].lowerBound == 0 && ranges[0].upperBound >= size - 1)
+    }
+}

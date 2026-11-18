@@ -329,17 +329,28 @@ enum Sideload {
                 log?("Manifest: \(q.url!.absoluteString)")
                 let once = Once()
                 KeepAlive.shared.begin()
+                // B29: the bundle ID iOS is told to install (the manifest's, the signed Info.plist's) and what the
+                // server sends, in the install log; the server's lines reach the page through signing.progress.
+                InstallLog.reset(app.bundleID)
+                log?("Bundle ID: \(app.bundleID)" + (app.bundleID == app.originalBundleID ? "" : " (the app's own: \(app.originalBundleID))")
+                     + ", version \(app.version); serving \(Sideload.size(output))")
+                let bid = app.bundleID
+                let serverLog = { (s: String) in InstallLog.say(bid, s) }
                 let end = { (ok: Bool) in
                     guard once.first() else { return }
                     job?.end()
-                    server.remove(ipaPath)
-                    SignBridge.queue.asyncAfter(deadline: .now() + 60) {
+                    if !ok { serverLog("iOS didn't fetch the whole IPA within 15 minutes; it is no longer served"); server.remove(ipaPath) }
+                    // B29: served: the route stays for the grace too. iOS's installer may ask again for parts, and
+                    // a route removed the moment one request reached the last byte answered those with 404.
+                    SignBridge.queue.asyncAfter(deadline: .now() + servedGrace) {
+                        if ok { server.remove(ipaPath) }
                         try? FileManager.default.removeItem(at: output)
-                        KeepAlive.shared.end() // a minute more: iOS may ask again for the last bytes
+                        KeepAlive.shared.end()
                     }
                     served?(ok)
                 }
-                server.serve(ipaPath, .init(type: "application/octet-stream", body: .file(output)) { end(true) })
+                server.serve(ipaPath, .init(type: "application/octet-stream", body: .file(output), log: serverLog,
+                                            onServed: { serverLog("iOS has the whole IPA"); end(true) }))
                 // F196: Cancel: no more serving, no minute's grace, the listener ends when nothing else is served.
                 job?.onCancel {
                     guard once.first() else { return }
@@ -366,13 +377,19 @@ enum Sideload {
     }
 
     // iOS's own install progress for an app, until it is done: at most 15 minutes, or 45 s with no progress seen.
+    // B29: meanwhile the install server's lines for it (InstallLog) go to the page's console as {log} events.
     static func progress(_ c: Bridge.Call) {
         guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: not in the jailbreak app") }
         guard let bid = c.params["bundleId"] as? String, !bid.isEmpty else { return Apt.reply(c, nil, "bad_request: bundleId") }
+        DispatchQueue.main.async { InstallLog.attach(bid) { c.emitOnMain([["log": $0]]) } }
         watch(bid, onProgress: { c.emitOnMain([["phase": "installing", "progress": $0]]) }) { installed in
+            DispatchQueue.main.async { InstallLog.detach(bid) }
             Apt.reply(c, ["installed": installed.map { $0 as Any } ?? NSNull()], nil)
         }
     }
+
+    // B29: how long a fully fetched IPA stays served (and KeepAlive held) for iOS's late or repeated requests.
+    static let servedGrace: TimeInterval = 120
 
     // F155: the progress page's "Open <app>" once iOS says it installed it. False when iOS refuses (or lacks the call).
     static func openApp(_ c: Bridge.Call) {
@@ -696,4 +713,33 @@ enum CloseForUpdate {
             }
         }
     }
+}
+
+// B29: the install server's lines (each request iOS makes for the IPA, the bytes it got, a 404 after serving ended)
+// for the progress page's console. They come after signing.install (or library.install) has answered, when its
+// stream is closed, so they wait here per bundle ID until signing.progress (the page's follow of iOS's install)
+// attaches and emits them. Also in the device log. say() from any queue; the rest on the main queue.
+enum InstallLog {
+    private static var waiting = [String: [String]]()
+    private static var sinks = [String: (String) -> Void]()
+
+    static func say(_ bundleID: String, _ line: String) {
+        NSLog("\(Brand.name) install \(bundleID): " + line.replacingOccurrences(of: "%", with: "%%"))
+        DispatchQueue.main.async {
+            if let sink = sinks[bundleID] { return sink(line) }
+            var w = waiting[bundleID] ?? []
+            w.append(line)
+            waiting[bundleID] = Array(w.suffix(200))
+        }
+    }
+
+    static func attach(_ bundleID: String, _ sink: @escaping (String) -> Void) {
+        sinks[bundleID] = sink
+        for l in waiting.removeValue(forKey: bundleID) ?? [] { sink(l) }
+    }
+
+    static func detach(_ bundleID: String) { sinks.removeValue(forKey: bundleID) }
+
+    // A new install of the app: lines left from an earlier one are dropped.
+    static func reset(_ bundleID: String) { DispatchQueue.main.async { waiting.removeValue(forKey: bundleID) } }
 }

@@ -45,13 +45,13 @@ class Release(unittest.TestCase):
             plistlib.dump({"CFBundleShortVersionString": ipa_version, "CFBundleIdentifier": "com.ryha.cydian"}, f)
         mkipa.build(app, os.path.join(self.dist, "Cydian.ipa"), mtime=0)
 
-    def dry_run(self):
+    def dry_run(self, *extra):
         notes = os.path.join(self.tmp, "notes.md")
         with open(notes, "w") as f:
             f.write("- A test release\n")
         env = {k: v for k, v in os.environ.items() if k != "CYDIAN_RELEASE_REPO"}
-        return subprocess.run([SCRIPT, "--dry-run", "--dist", self.dist, "--notes", notes], cwd=ROOT, env=env,
-                              capture_output=True, text=True, timeout=60)
+        return subprocess.run([SCRIPT, "--dry-run", "--dist", self.dist, "--notes", notes, *extra], cwd=ROOT,
+                              env=env, capture_output=True, text=True, timeout=60)
 
     def assets(self, out):
         line = next(l for l in out.splitlines() if l.startswith("release: assets: "))
@@ -62,7 +62,8 @@ class Release(unittest.TestCase):
         r = self.dry_run()
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.assets(r.stdout),
-                         ["Cydian.ipa", "Cydian.deb", "com.ryha.cydian_%s-7_iphoneos-arm64.deb" % VERSION])
+                         ["Cydian.ipa", "Cydian.deb", "com.ryha.cydian_%s-7_iphoneos-arm64.deb" % VERSION,
+                          "Packages", "Packages.gz", "Release"])
         self.assertIn("RyanAHayden/Cydian v%s " % VERSION, r.stdout)
         self.assertIn("nothing published", r.stdout)
         self.assertNotIn("is not native/VERSION", r.stderr)
@@ -94,6 +95,64 @@ class Release(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)  # a dry run reports; a real run would stop
         self.assertIn("is not native/VERSION %s" % VERSION, r.stderr)
         self.assertIn("a real run would stop here", r.stderr)
+
+
+    def test_repo_and_source(self):
+        """F72: the APT repo files (Packages naming the Debian-named .deb beside it, hashes that match, the minimum
+        field) and the AltStore source with the new version first and the old ones kept."""
+        import gzip
+        import hashlib
+        self.fake_build("%s-7" % VERSION, VERSION)
+        out = os.path.join(self.tmp, "out")
+        r = self.dry_run("--minimum", VERSION, "--out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        debname = "com.ryha.cydian_%s-7_iphoneos-arm64.deb" % VERSION
+        with open(os.path.join(out, "Packages")) as f:
+            packages = f.read()
+        self.assertIn("Package: com.ryha.cydian\n", packages)
+        self.assertIn("Filename: %s\n" % debname, packages)
+        self.assertIn("X-Cydian-Minimum-Version: %s\n" % VERSION, packages)
+        with open(os.path.join(self.dist, "Cydian.deb"), "rb") as f:
+            deb = f.read()
+        self.assertIn("SHA256: %s\n" % hashlib.sha256(deb).hexdigest(), packages)
+        with open(os.path.join(out, "Packages.gz"), "rb") as f:
+            self.assertEqual(gzip.decompress(f.read()).decode(), packages)
+        with open(os.path.join(out, "Release")) as f:
+            release = f.read()
+        self.assertIn("Origin: Cydian\n", release)
+        self.assertIn("Architectures: iphoneos-arm64\n", release)
+        self.assertIn("X-Cydian-Minimum-Version: %s\n" % VERSION, release)
+        self.assertIn(" %s %d Packages\n" % (hashlib.sha256(packages.encode()).hexdigest(), len(packages)), release)
+        self.assertIn("releases/latest/download/", r.stdout)
+        with open(os.path.join(out, "source.json")) as f:
+            src = json.load(f)
+        with open(os.path.join(ROOT, "web", "app", "source.json")) as f:
+            before = json.load(f)
+        app = src["apps"][0]
+        self.assertEqual(app["minimumVersion"], VERSION)
+        self.assertEqual(app["versions"][0]["version"], VERSION)
+        self.assertTrue(app["versions"][0]["localizedDescription"].startswith("A test release\n"))
+        old = [v["version"] for v in before["apps"][0]["versions"] if v["version"] != VERSION]
+        self.assertEqual([v["version"] for v in app["versions"][1:]], old)
+        # A dry run never writes the repo's own source.json.
+        with open(os.path.join(ROOT, "web", "app", "source.json")) as f:
+            self.assertEqual(json.load(f), before)
+
+    def test_minimum_checked(self):
+        self.fake_build("%s-7" % VERSION, VERSION)
+        self.assertNotEqual(self.dry_run("--minimum", "1.2").returncode, 0)
+        self.assertNotEqual(self.dry_run("--minimum", "99.0.0").returncode, 0)
+
+    def test_other_arch_rides_along(self):
+        self.fake_build("%s-7" % VERSION, VERSION)
+        other = "com.ryha.cydian_%s-7_iphoneos-arm64e.deb" % VERSION
+        shutil.copy(os.path.join(self.dist, "Cydian.deb"), os.path.join(self.dist, other))
+        out = os.path.join(self.tmp, "out")
+        r = self.dry_run("--out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(other, self.assets(r.stdout))
+        with open(os.path.join(out, "Packages")) as f:
+            self.assertIn("Filename: %s\n" % other, f.read())
 
 
 if __name__ == "__main__":

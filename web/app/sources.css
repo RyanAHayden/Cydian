@@ -117,3 +117,14 @@
 .rec-get.added, .rec-get:disabled { border-color: #c4c4c9; color: #9a9aa0; background: #fff; cursor: default; }
 .rec-apps { margin-top: 10px; } /* a preview's apps under its grouped head */
 .rec-packages .pkg-row > .cell-inner::after { content: none; } /* F54: a repo not added yet has no package pages: no chevron */
+
+/* F72: Cydian's own source is built in: a lock where Delete's minus would be (Manage's edit list), and a small one
+   after its name (nav/lock.js). It never shows Delete. */
+.source-lock {
+  position: absolute; left: 7px; top: 50%; width: 29px; height: 29px; margin-top: -14.5px; display: flex;
+  align-items: center; justify-content: center; pointer-events: none; transform: translateX(-40px);
+  transition: transform .3s ease-in-out;
+}
+.editing .source-row .source-lock { transform: none; }
+.name-lock { display: inline-block; margin-left: 5px; vertical-align: -1px; line-height: 0; }
+.name-lock svg, .source-lock svg { display: block; }

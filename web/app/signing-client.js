@@ -101,9 +101,19 @@ export async function serverStatus(server = getServer()) {
   return r.json();
 }
 
+// F72: an IPA of Cydian itself (its GitHub releases, where Cydian's own source points).
+export const isSelfIpa = (url) => /^https:\/\/github\.com\/RyanAHayden\/Cydian\/releases\//i.test(String(url ?? ""));
+
 // Signs `url` (an IPA) on the server and opens the install link it answers with. Resolves true once the link is
 // opened; false after an error, which it shows in an alert.
 export async function signAndInstall({ url, name = "", onInstalled = () => {} }) {
+  // F72: Cydian's own IPA never goes through the local install server (iOS closes Cydian, and the server with it,
+  // as it starts installing): essential-ui.js signs it on the Signing Server or sends the user to cydian.dev.
+  if (localSigning() && isSelfIpa(url)) {
+    const { installSelfNow } = await import("./essential-ui.js");
+    const version = /\/download\/v(\d+(?:\.\d+)*)\//.exec(url)?.[1] ?? null;
+    return ["installing", "site"].includes(await installSelfNow({ ipa: url, version }));
+  }
   if (localSigning()) return installOnDevice({ url, name, onInstalled });
   const id = await loadIdentity();
   if (!id?.p12 || !id?.profile) {

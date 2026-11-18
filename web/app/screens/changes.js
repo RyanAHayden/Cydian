@@ -22,6 +22,7 @@ import { apps, installedIds, onAppsChange } from "../core/installed.js";
 import { settings } from "./settings.js";
 import { sourceFilter } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
+import { upgradesWithSelf } from "../essential-ui.js";
 
 export const title = "Changes";
 
@@ -46,7 +47,7 @@ export function init(ctx) {
 // The tab badge: how many upgrades are available (ignored ones don't count).
 async function badge(upgrades) {
   try {
-    upgrades ??= await catalog.upgrades(settings.holds.list());
+    upgrades ??= await upgradesWithSelf(await catalog.upgrades(settings.holds.list())); // F72: Cydian's own (sideload)
     state.ctx?.setBadge("changes", upgrades.available.length);
   } catch {
     // no catalog yet: no badge
@@ -218,6 +219,7 @@ async function load() {
   try {
     await catalog.ensure();
     [groups, upgrades, installed] = await Promise.all([catalog.changes(), catalog.upgrades(settings.holds.list()), installedNow()]);
+    upgrades = await upgradesWithSelf(upgrades); // F72: the sideload build lists Cydian's own upgrade here
   } catch (e) {
     if (seq === state.seq && state.note) { state.note.textContent = e.message; state.note.hidden = false; }
     return;

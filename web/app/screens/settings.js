@@ -16,7 +16,8 @@ import { parseProfile, checkP12Password, summary, profileKind, DEFAULT_SERVER, d
 import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus,
-  localSigning, deviceStatus, importToDevice, removeFromDevice, setUpTrust, installOnDevice, signAndInstall } from "../signing-client.js";
+  localSigning, deviceStatus, importToDevice, removeFromDevice, setUpTrust, installOnDevice, signAndInstall, statusReady } from "../signing-client.js";
+import { drawWalkthrough } from "./signing.js";
 import { signingRowShows, offerAfterImport, IMPORT_ALERT, APP_IPA_URL, APP_NAME, APP_LABEL } from "../core/appoffer.js";
 import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installPath, isNewer, compareVersions } from "../core/selfupdate.js";
 import { getArch } from "../backend.js";
@@ -448,7 +449,7 @@ async function drawSigning(el) {
 // the tap). Any Browse takes several files at once, or the .zip they came in: each goes where it belongs and the
 // password is found if a text file holds it (core/certfiles.js), so one pick can fill all three.
 function certificateBlock(el, id, status = null) {
-  const kept = status?.identity ?? null; // F58: what the sideload build's Keychain holds
+  const kept = statusReady(status) ? status.identity : null; // F58: what the sideload build's Keychain holds
   const box = document.createElement("div");
   box.className = "group sign-files"; // a .group, like every grouped section: its 10px side margins
   const head = Object.assign(document.createElement("h3"), { className: "group-header", textContent: "Certificate" });
@@ -493,8 +494,12 @@ function certificateBlock(el, id, status = null) {
     await save(true);
   });
 
-  ul.append(fileRow(".p12", id?.p12Name ?? (kept ? "In Keychain" : null), "p12"),
-    fileRow(".mobileprovision", id?.profileName ?? kept?.profile?.name, "profile"), signRow("Password", input, pwBrowse));
+  // F69: in the sideload build a name stays on the row only while its file is picked (in memory) or the Keychain
+  // holds the identity (statusReady), never as a leftover of an import the signer can't see.
+  const p12Shown = !status || id?.p12 ? id?.p12Name ?? (kept ? "In Keychain" : null) : kept ? id?.p12Name ?? "In Keychain" : null;
+  const profShown = !status || id?.profile ? id?.profileName ?? kept?.profile?.name : kept ? id?.profileName ?? kept.profile?.name : null;
+  ul.append(fileRow(".p12", p12Shown, "p12"),
+    fileRow(".mobileprovision", profShown, "profile"), signRow("Password", input, pwBrowse));
   const state = id?.p12 && id?.password != null ? (id.passwordOk === false ? " The password doesn't open this certificate." : id.passwordOk ? " The password opens it." : "") : "";
   const kind = status ? "Once all three are here, they go into this iPhone's Keychain, where only Cydian can use them; the password isn't kept. To change one, choose the .p12 and the profile again."
     : "They're kept on this iPhone only, in this browser's storage.";
@@ -541,7 +546,8 @@ function deviceSigningSection(box) {
     footer: "Your own certificate: Install signs AltStore apps with it on this iPhone." }]));
   fill("");
   Promise.all([deviceStatus().catch(() => null), loadIdentity()]).then(([st, id]) => {
-    fill(st?.identity ? (st.identity.name || "In Keychain") : id?.p12 || id?.profile ? "Incomplete" : "None");
+    // F69: statusReady, the rule Install goes by: the row names a certificate only when Install will use it
+    fill(statusReady(st) ? (st.identity.name || "In Keychain") : id?.p12 || id?.profile ? "Incomplete" : "None");
   });
   return box;
 }
@@ -552,8 +558,9 @@ async function importIfComplete(el, typing) {
   const id = await loadIdentity();
   if (!id?.p12 || !id?.profile || id.password == null || id.passwordOk === false) return false;
   const hide = showHUD("Importing");
+  let after;
   try {
-    await importToDevice(id);
+    after = await importToDevice(id);
   } catch (e) {
     hide();
     if (e?.code === "wrong_password") {
@@ -568,6 +575,14 @@ async function importIfComplete(el, typing) {
     return false;
   }
   hide();
+  // F69: the status the import answers must show the identity, as Install will look for it; if it doesn't, say why
+  // instead of leaving the names on the rows as if it worked.
+  if (after && !statusReady(after)) {
+    await clearIdentity();
+    await alertOK("Couldn't Import", after.identityProblem || "The certificate went into the Keychain but Cydian can't find it there. Remove it and import it again.");
+    redrawAll();
+    return false;
+  }
   // In the Keychain now: only the names stay in memory, for the rows.
   await clearIdentity();
   await saveIdentity({ p12Name: id.p12Name, profileName: id.profileName });
@@ -578,7 +593,7 @@ async function importIfComplete(el, typing) {
 async function setUpLocalInstall() {
   const hide = showHUD("Setting Up");
   try {
-    await setUpTrust(); // Safari opens the profile; iOS says "Profile Downloaded"
+    await setUpTrust(); // Safari opens the profile; iOS says "Profile Downloaded" (F69: Verified, with the user's name)
     hide();
   } catch (e) {
     hide();
@@ -623,30 +638,40 @@ function watchReturn() {
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") redrawAll(); });
 }
 
+// F69: the page is the walkthrough (screens/signing.js): import, download the profile, install it, trust it, Check.
+// The Keychain's details and Remove Certificate go under the steps. `walkOpen` keeps the user's expand/collapse taps
+// across redraws (back from Settings, after Check).
+const walkOpen = {};
 async function drawDeviceSigning(el) {
   watchReturn();
   const id = await loadIdentity();
   let status = null, failure = null;
   try { status = await deviceStatus(); } catch (e) { failure = e; }
-  const top = el.scrollTop;
+  const kept = statusReady(status) ? status.identity : null;
   const sections = [];
-  const kept = status?.identity ?? null;
   if (kept) {
     const info = deviceSummary(kept);
     sections.push({ header: "In This iPhone's Keychain",
       rows: info.rows.map((r) => (r.detail.length > 16 ? { label: r.label, subtitle: r.detail } : r)),
       footer: info.problems.length ? info.problems.join(" ") : null });
   }
-  if (status) {
-    const local = localInstallSection(status.trust);
-    const act = { trust: () => setUpLocalInstall(), refresh: () => redrawAll(), test: () => testInstallServer() };
-    sections.push({ ...local, rows: local.rows.map(({ action, ...r }) => (action ? { ...r, onClick: act[action] } : r)) });
-  } else {
-    sections.push({ header: "Local Install", footer: `The signer didn't answer: ${deviceError(failure).message}` });
-  }
   if (kept || id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeDeviceCertificate() }] });
-  el.replaceChildren(certificateBlock(el, id, status ?? { identity: null }), grouped(sections));
-  el.scrollTop = top;
+  drawWalkthrough(el, {
+    status, failure: failure ? deviceError(failure).message : "",
+    certificate: certificateBlock(el, id, status ?? { identity: null }),
+    actions: { download: () => setUpLocalInstall(), check: () => checkSigning(), test: () => testInstallServer() },
+    open: walkOpen,
+    extra: sections.length ? [grouped(sections)] : [],
+  });
+}
+
+// Check: signing.status again under a HUD, then the page redraws with a tick per finished step.
+async function checkSigning() {
+  const hide = showHUD("Checking");
+  try { await deviceStatus(); } catch { /* the redraw says the signer didn't answer */ }
+  hide();
+  for (const k of Object.keys(walkOpen)) delete walkOpen[k]; // the next step to do opens by itself
+  redrawAll();
 }
 
 // ---- About and updates (F61) ---------------------------------------------------------------------------------

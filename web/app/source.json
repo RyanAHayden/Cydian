@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.9.2",
+          "date": "2026-11-18T17:43:13Z",
+          "localizedDescription": "Installing works again: the default Signing Server is now sign.ifizbox.com (cydian.dev is gone).\nIf you set a server by hand, set it to https://sign.ifizbox.com in Settings > Signing.\niFizBox's own updates now show in Changes, without a popup.\nUser reviews on package pages.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.2",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.2/Cydian.ipa",
+          "size": 5087397,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.9.1",
           "date": "2026-11-18T17:25:13Z",
           "localizedDescription": "Signing no longer fails on apps with an executable-less bundle (\"bundle missing\" errors, e.g. YTUHD.bundle).\nPackage pages redone as the iOS 6 App Store's: big icon, stars, screenshots, Details / Reviews / Related.\nInstall Now right after setting up Signing, and the Signing Server row works again.\nReload shows Cydia's four steps; coming back after a few minutes refreshes sources.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.1",
@@ -167,14 +175,6 @@
           "localizedDescription": "Share sheet: Open in \u2026 apps on app pages too.\nThe A\u2013Z index no longer fights a list that is still gliding.\nCydian updates itself in one step (signed on the phone, held on the signing server, then iOS's Install prompt).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.4",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.4/Cydian.ipa",
           "size": 2621516,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.2.3",
-          "date": "2026-11-18T03:02:42Z",
-          "localizedDescription": "Cydian updates itself in one step: it signs the update on the phone, the signing server holds it for a few minutes, and iOS asks Install right away.\nInstall at the top right installs straight away (Download IPA is on the page).\nThe test apps (Test Alpha, Test Beta...) are no longer mistaken for Cydian.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.3",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.3/Cydian.ipa",
-          "size": 2621218,
           "minOSVersion": "15.0"
         }
       ]

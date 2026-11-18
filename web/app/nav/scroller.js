@@ -91,7 +91,7 @@ export function initScroller(screens) {
     const at = t.scrollTop <= 0 ? "top" : t.scrollTop >= max - 1 ? "bottom" : "";
     const was = edges.get(t);
     edges.set(t, at);
-    const flung = fingers === 0 || glide !== 0; // the page's own momentum, or our indicator's
+    const flung = fingers === 0 || glide !== 0 || grab !== null; // momentum, or the indicator held (its scrub ticks too)
     if (at && was === "" && flung && globalThis.cydianApp) haptic();
   }
 

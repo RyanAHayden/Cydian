@@ -171,7 +171,7 @@ test("F157: Copying Files: three segments when jailbroken, the no-jailbreak page
   assert.ok(all(panes[1]).some((x) => x.href === "#/home/guides/openssh"));
   const lite = draw(["guides", "copying"], { lite: true });
   assert.equal(byClass(lite, "segmented").length, 0);
-  for (const v of ["Files", "AirDrop", "LocalSend", "Finder", "iTunes File Sharing"]) assert.ok(lite.textContent.includes(v), v);
+  for (const v of ["Files", "AirDrop", "LocalSend", "Finder", "Apple Devices", "PairDrop"]) assert.ok(lite.textContent.includes(v), v);
 });
 
 // Everything the lite build can render under guides/: no jailbreak guide, and no jailbreak-only word.
@@ -194,4 +194,62 @@ test("F157: the lite build's rendered guides name nothing jailbreak-only", () =>
   assert.ok(g.faqFor(true).some((f) => f.q === "An app won't install"));
   assert.ok(g.faqFor(true).some((f) => f.q === "My certificate expired"));
   assert.ok(g.faqFor(true).some((f) => f.q === "Adding a source"));
+});
+
+// F176: Copying Files' rows that name an app or a computer each carry an icon (our own SVG glyph), iTunes File
+// Sharing is gone, and both builds have a Mac, a Windows and a Linux row. Exempt, as they're not apps: the SFTP
+// fields (Protocol, Server, User, Port), Filza Can's feature list and the OpenSSH How-To link.
+const NOT_APPS = /^(Protocol|Server|User|Port|OpenSSH Access How-To)$/;
+const cellsOf = (n) => byClass(n, "cell").filter((c) => !c._cls.has("guide-plain-row"));
+const labelOf = (c) => byClass(c, "cell-label")[0].textContent;
+const iconOf = (c) => byClass(c, "cell-icon")[0];
+const systemRows = (n) => cellsOf(n).filter((c) => ["Mac", "Windows", "Linux"].includes(labelOf(c)));
+
+test("F176: every Copying Files app row has an icon, our own glyph", () => {
+  const pages = [draw(["guides", "copying"]), draw(["guides", "copying"], { lite: true })];
+  let n = 0;
+  for (const page of pages) {
+    for (const c of cellsOf(page)) {
+      if (NOT_APPS.test(labelOf(c))) continue;
+      const icon = iconOf(c);
+      assert.ok(icon, `${labelOf(c)} has an icon`);
+      const img = all(icon).find((x) => x.tagName === "IMG");
+      assert.ok(img?.src.startsWith("data:image/svg+xml"), `${labelOf(c)}: an SVG glyph`);
+      assert.ok(icon.textContent.length, `${labelOf(c)}: a letter under it`);
+      n++;
+    }
+  }
+  assert.ok(n >= 15, `counted ${n}`);
+  for (const id of ["Files", "AirDrop", "LocalSend"]) {
+    const c = cellsOf(pages[1]).find((x) => labelOf(x) === id);
+    assert.ok(c && iconOf(c), id);
+  }
+  // each glyph is a whole SVG tile: no outside images, no text in it
+  for (const id of g.GLYPH_IDS) {
+    const svg = g.glyphSvg(id);
+    assert.match(svg, /^<svg [^>]*viewBox='0 0 58 58'>.*<\/svg>$/s, id);
+    assert.doesNotMatch(svg, /href|<text|<image/, id);
+  }
+});
+
+test("F176: no iTunes File Sharing; Mac, Windows and Linux rows in both builds", () => {
+  const full = draw(["guides", "copying"]);
+  const lite = draw(["guides", "copying"], { lite: true });
+  for (const page of [full, lite]) assert.doesNotMatch(page.textContent, /iTunes File Sharing/i);
+  const sub = (page, label, i = 0) => byClass(systemRows(page).filter((c) => labelOf(c) === label)[i], "cell-subtitle")[0].textContent;
+  // lite: From a Computer, one row per system
+  assert.deepEqual(systemRows(lite).map(labelOf), ["Mac", "Windows", "Linux"]);
+  assert.match(sub(lite, "Mac"), /Finder.*sidebar.*Files.*10\.15/);
+  assert.match(sub(lite, "Windows"), /Apple Devices.*Microsoft Store.*Files.*LocalSend/);
+  assert.match(sub(lite, "Linux"), /LocalSend.*PairDrop.*ifuse --documents <bundle id> <dir>/);
+  assert.match(lite.textContent, /pairdrop\.net/);
+  assert.match(lite.textContent, /On Every System/);
+  assert.match(lite.textContent, /only apps that share their documents/);
+  // jailbroken: the Computer segment's SFTP apps per system, then the No Jailbreak segment's own three
+  assert.deepEqual(systemRows(full).map(labelOf), ["Mac", "Windows", "Linux", "Mac", "Windows", "Linux"]);
+  assert.match(sub(full, "Mac"), /Cyberduck.*FileZilla/);
+  assert.match(sub(full, "Windows"), /WinSCP.*FileZilla/);
+  assert.match(sub(full, "Linux"), /sftp:\/\/.*FileZilla/);
+  assert.match(sub(full, "Windows", 1), /Apple Devices/);
+  for (const v of ["SFTP", "iPhone's IP", "mobile", "22"]) assert.ok(full.textContent.includes(v), v);
 });

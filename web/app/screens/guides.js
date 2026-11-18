@@ -10,7 +10,7 @@
 //   password     a yellow warning row, the whole session as a terminal transcript, then the steps with Copy
 // Lite (Not Jailbroken: the sideload IPA, and the website while Settings > Device says so, as F144): no OpenSSH or
 // Root Password guide, an FAQ about apps, signing and sources only, and Copying Files as the no-jailbreak page
-// (Files, AirDrop, LocalSend, Finder/iTunes File Sharing). Nothing jailbreak-only is named there (guides.test.js).
+// (Files, AirDrop, LocalSend; From a Computer per system, F176). Nothing jailbreak-only is named there (guides.test.js).
 // Cydia's Storage Information and Developers Only are left out: there's no storage page to show.
 import { el, grouped, row } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
@@ -144,31 +144,85 @@ export function faqSections(lite) {
 }
 
 // ---- Copying Files --------------------------------------------------------------------------------------------
+// F176: every app and system row has a 29px icon: our own glyphs, drawn here as SVG in iOS 6's style (a top-lit
+// gradient tile, a white glyph with a dark drop, the gloss over the top half). Never Apple's, Microsoft's or
+// LocalSend's artwork (AGENTS.md): a folder, radio waves, swap arrows, a monitor, a window, a penguin of our own.
+const GLYPHS = {
+  files: ["#7cc0fb", "#1a6fd8", "<path d='M11 18h13l4 4h19v22H11z'/><path d='M11 25h36' stroke='#1a6fd8' stroke-width='2' fill='none' opacity='.35'/>"],
+  airdrop: ["#7fd0f7", "#1f8fd6", "<circle cx='29' cy='38' r='4.5'/><g fill='none' stroke='#fff' stroke-width='4' stroke-linecap='round'><path d='M20 31a12 12 0 0 1 18 0'/><path d='M14 25a20 20 0 0 1 30 0'/><path d='M9 19a28 28 0 0 1 40 0'/></g>"],
+  localsend: ["#6fe0bf", "#14916f", "<g fill='none' stroke='#fff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'><path d='M21 44V15m-8 8 8-8 8 8'/><path d='M37 14v29m-8-8 8 8 8-8'/></g>"],
+  pairdrop: ["#b9a3f7", "#5b3fc9", "<rect x='9' y='15' width='16' height='28' rx='3'/><rect x='33' y='15' width='16' height='28' rx='3'/><g fill='none' stroke='#5b3fc9' stroke-width='3' stroke-linecap='round'><path d='M17 37h0M41 37h0'/></g><path d='M27 29h4' stroke='#fff' stroke-width='3.5' stroke-linecap='round'/>"],
+  mac: ["#d9dde3", "#7c8592", "<rect x='9' y='12' width='40' height='27' rx='3'/><rect x='12' y='15' width='34' height='21' fill='#5e7fa8'/><path d='M24 39h10l2 7H22z'/><rect x='18' y='45' width='22' height='3' rx='1.5'/>"],
+  windows: ["#74b6f2", "#1d5fc0", "<rect x='9' y='13' width='40' height='32' rx='3'/><rect x='12' y='20' width='34' height='22' fill='#2f74d0'/><g fill='#1d5fc0'><circle cx='14' cy='16.5' r='1.5'/><circle cx='19' cy='16.5' r='1.5'/></g><path d='M15 24h12v7H15zM30 24h13v15H30zM15 34h12v5H15z' fill='#bcd8f6'/>"],
+  linux: ["#5d5d5d", "#1d1d1d", "<ellipse cx='29' cy='34' rx='13' ry='15'/><ellipse cx='29' cy='35' rx='8.5' ry='11' fill='#1d1d1d'/><circle cx='29' cy='19' r='9'/><g fill='#1d1d1d'><circle cx='25.5' cy='18' r='1.6'/><circle cx='32.5' cy='18' r='1.6'/></g><path d='M25 22h8l-4 4z' fill='#f6b73c'/><path d='M17 48h9l-2-4h-6zM32 48h9l-1-4h-6z' fill='#f6b73c'/>"],
+  filza: ["#ffc66b", "#e07e14", "<path d='M11 16h12l4 4h20v24H11z'/><g fill='none' stroke='#e07e14' stroke-width='3' stroke-linecap='round'><path d='M19 27v11h8M19 32h8'/></g><rect x='29' y='25' width='10' height='5' rx='1' fill='#e07e14'/><rect x='29' y='35' width='10' height='5' rx='1' fill='#e07e14'/>"],
+};
+export const glyphSvg = (id) => {
+  const [top, bottom, body] = GLYPHS[id];
+  return "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 58 58'>"
+    + `<defs><linearGradient id='b-${id}' x2='0' y2='1'><stop offset='0' stop-color='${top}'/><stop offset='1' stop-color='${bottom}'/></linearGradient>`
+    + `<linearGradient id='g-${id}' x2='0' y2='1'><stop offset='0' stop-color='#fff' stop-opacity='.45'/><stop offset='1' stop-color='#fff' stop-opacity='.08'/></linearGradient></defs>`
+    + `<rect width='58' height='58' fill='url(#b-${id})'/>`
+    + `<g fill='#fff' transform='translate(0 1)' opacity='.35'><g fill='#000'>${body}</g></g><g fill='#fff'>${body}</g>`
+    + `<path d='M0 0h58v24C40 30 18 30 0 27z' fill='url(#g-${id})'/></svg>`;
+};
+// A row's icon: the glyph as a picture over its tile colour and letter (shown if the picture can't load).
+export const glyph = (id, text) => ({
+  text, color: GLYPHS[id][1], cls: "guide-glyph", src: "data:image/svg+xml;charset=utf-8," + encodeURIComponent(glyphSvg(id)),
+});
+export const GLYPH_IDS = Object.keys(GLYPHS);
+
 export const FILZA_CAN = ["Browse the whole file system", "Unzip and zip archives", "Edit plists and text files",
   "Open files shared from other apps", "Install .deb files"];
 export const SFTP_ROWS = [["Protocol", "SFTP"], ["Server", "iPhone's IP"], ["User", "mobile"], ["Port", "22"]];
-export const SFTP_APPS = [["Cyberduck", "Mac"], ["WinSCP", "Windows"], ["FileZilla", "Mac, Windows, Linux"]];
+// One row per computer: [system, its SFTP apps].
+export const SFTP_APPS = [
+  ["Mac", "Cyberduck, or FileZilla"],
+  ["Windows", "WinSCP, or FileZilla"],
+  ["Linux", "The file manager's sftp:// address, or FileZilla"],
+];
+export const SYSTEMS = ["Mac", "Windows", "Linux"];
+const systemGlyph = (s) => glyph(s.toLowerCase(), s[0]);
 export const COPYING_SEGMENTS = ["On iPhone", "Computer", "No Jailbreak"];
+export const IFUSE_EXAMPLE = "ifuse --documents <bundle id> <dir>";
+export const PAIRDROP_URL = "pairdrop.net";
 
-// The no-jailbreak page: the whole Copying Files in lite, and its third segment otherwise.
+// The no-jailbreak page: the whole Copying Files in lite, and its third segment otherwise. F176 (user 2026-11-18):
+// Windows lost iTunes' sharing tab to the Apple Devices app, so From a Computer has one row per system, as of 2026.
 export function noJailbreakSections() {
+  const wrap = "guide-wrap-row";
   return [
     {
       header: "On iPhone",
       rows: [
-        { label: "Files", subtitle: "Browse, unzip and share files", icon: { text: "F", color: "#3d8bea" } },
-        { label: "AirDrop", subtitle: "To and from nearby Apple devices", icon: { text: "A", color: "#4aa5e8" } },
-        { label: "LocalSend", subtitle: "To any phone or computer on your Wi-Fi", icon: { text: "L", color: "#2fae8a" } },
+        { label: "Files", subtitle: "Browse, unzip and share files", icon: glyph("files", "F") },
+        { label: "AirDrop", subtitle: "To and from nearby Apple devices", icon: glyph("airdrop", "A") },
+        { label: "LocalSend", subtitle: "To any phone or computer on Wi-Fi", icon: glyph("localsend", "L") },
       ],
       footer: "Files reaches the documents of apps that share them. Share > Save to Files keeps anything you're sent.",
     },
     {
       header: "From a Computer",
       rows: [
-        { label: "Finder", detail: "Mac" },
-        { label: "iTunes File Sharing", detail: "Windows" },
+        { label: "Mac", subtitle: "Finder: the iPhone in the sidebar, then its Files tab (macOS 10.15 or later)",
+          icon: systemGlyph("Mac"), cls: wrap },
+        { label: "Windows", subtitle: "Apple Devices app from the Microsoft Store, then Files: it replaced iTunes on "
+          + "Windows 10 and 11. Or LocalSend.", icon: systemGlyph("Windows"), cls: wrap },
+        { label: "Linux", subtitle: `LocalSend, or PairDrop in a browser. App documents over USB: libimobiledevice's `
+          + `${IFUSE_EXAMPLE}`, icon: systemGlyph("Linux"), cls: wrap },
       ],
-      footer: "Connect the iPhone with a cable, then open its Files tab: drag files to and from apps that share them.",
+      footer: `Finder, Apple Devices and ifuse need a cable, and reach only apps that share their documents (apps you `
+        + `installed with ${NAME} too, if they do).`,
+    },
+    {
+      header: "On Every System",
+      rows: [
+        { label: "LocalSend", subtitle: "Free app for iPhone, Mac, Windows, Linux and Android", icon: glyph("localsend", "L"),
+          cls: wrap },
+        { label: "PairDrop", subtitle: `${PAIRDROP_URL} in any browser, both on the same Wi-Fi: nothing to install`,
+          icon: glyph("pairdrop", "P"), cls: wrap },
+      ],
+      footer: "Both send straight from one device to the other over your Wi-Fi.",
     },
   ];
 }
@@ -176,7 +230,7 @@ export function noJailbreakSections() {
 export function onIphoneSections() {
   return [
     {
-      rows: [{ label: "Filza File Manager", subtitle: "Install it from your sources", icon: { text: "F", color: "#e8a23a" },
+      rows: [{ label: "Filza File Manager", subtitle: "Install it from your sources", icon: glyph("filza", "F"),
         href: packageHref(PACKAGES.filza), cls: "guide-icon-row" }],
     },
     { header: "Filza Can", rows: FILZA_CAN.map((label) => ({ label, cls: "guide-plain-row" })),
@@ -189,7 +243,8 @@ export function computerSections() {
     { header: "Connect With", rows: SFTP_ROWS.map(([label, detail]) => ({ label, detail })),
       footer: "OpenSSH must be installed first. Find the IP in Settings > Wi-Fi, ⓘ beside your network." },
     { rows: [linkRow("openssh")] },
-    { header: "Apps", rows: SFTP_APPS.map(([label, detail]) => ({ label, detail })) },
+    { header: "Apps", rows: SFTP_APPS.map(([label, subtitle]) => ({ label, subtitle, icon: systemGlyph(label), cls: "guide-wrap-row" })),
+      footer: "Linux: type sftp://mobile@ and the IP in Files' Other Locations (or Dolphin's address bar)." },
   ];
 }
 

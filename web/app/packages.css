@@ -504,6 +504,7 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
 .roulette-wheel { position: relative; flex: 1; min-width: 0; margin: 10px 0; overflow: hidden; border-radius: 3px; background: #fff;
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.55); }
 .roulette-wheel.w2 { flex: .75; }
+.roulette-wheel { touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; } /* turned by finger (screens/roulette.js dragWheel) */
 .roulette-wheel::after { content: ""; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(rgba(40,40,46,.85), rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(40,40,46,.85)); }
 .roulette-reel { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }

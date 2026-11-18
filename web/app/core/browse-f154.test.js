@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createCatalog, runCatalog, dayKey, dayBefore, dailyPick, browseKind, COLLECTIONS, collection, collectionsFor,
-  ROULETTE_TYPES, ROULETTE_PRICES, roulettePool, spinPick } from "./catalog.js";
+  ROULETTE_TYPES, ROULETTE_PRICES, roulettePool, spinPick, choosePick } from "./catalog.js";
 
 const stanza = (f) => Object.entries(f).map(([k, v]) => `${k}: ${v}`).join("\n");
 const packages = (...list) => list.map(stanza).join("\n\n") + "\n";
@@ -98,13 +98,14 @@ test("Collections: Lock Screen, Home Screen, Keyboard, Make It Yours for the jai
   assert.deepEqual(ids(n.collection("connect")), ["com.example.chat"]);
 });
 
-test("roulettePool: the wheel's types with their free packages; paid ones never", () => {
+test("roulettePool: the wheel's types with their free packages, the paid ones apart", () => {
   const c = loaded();
   const pool = c.roulette();
   assert.deepEqual(pool.map((t) => t.label), ROULETTE_TYPES.jailbreak.map((t) => t.label));
   const of = (label) => ids(pool.find((t) => t.label === label).rows);
   assert.ok(of("Tweak").includes("com.x.dock"));
-  assert.ok(!pool.some((t) => t.rows.some((r) => r.id === "com.x.paid")), "every pick is free");
+  assert.ok(!pool.some((t) => t.rows.some((r) => r.id === "com.x.paid")), "Spin's rows are free");
+  assert.ok(pool.some((t) => t.paid.some((r) => r.id === "com.x.paid")), "paid ones kept for the price wheel");
   assert.deepEqual(of("Theme"), ["com.x.theme", "com.x.walls"]);
   assert.deepEqual(of("Toy"), ["com.x.cat"]);
   assert.deepEqual(of("Utility"), ["com.x.util"]);
@@ -143,4 +144,14 @@ test("spinPick: every spin lands on a package the catalog has, on a type that ha
   assert.equal(spinPick([{ label: "A", rows: [] }]), null);
   assert.equal(spinPick(null), null);
   assert.ok(ROULETTE_PRICES.includes("Free"));
+});
+
+test("choosePick: the wheels turned by hand pick that type at that price, not the one shown before", () => {
+  const pool = [{ label: "Tweak", rows: [{ id: "a" }, { id: "b" }], paid: [{ id: "p" }] }, { label: "Theme", rows: [], paid: [] }];
+  assert.equal(choosePick(pool, "Tweak", { rand: () => 0 }).id, "a");
+  assert.equal(choosePick(pool, "Tweak", { last: "a", rand: () => 0 }).id, "b", "a new one each time");
+  assert.equal(choosePick(pool, "Tweak", { paid: true, last: "p" }).id, "p", "the only one is shown again");
+  assert.equal(choosePick(pool, "Theme"), null, "none of that kind");
+  assert.equal(choosePick(pool, "Nope"), null);
+  assert.equal(choosePick(null, "Tweak"), null);
 });

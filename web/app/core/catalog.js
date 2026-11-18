@@ -346,8 +346,8 @@ export const COLLECTIONS = [
 export const collection = (id) => COLLECTIONS.find((c) => c.id === id) ?? null;
 export const collectionsFor = (jailbroken = true) => COLLECTIONS.filter((c) => Boolean(c.jailbreak) === Boolean(jailbroken));
 
-// Tweak Roulette's wheels: type (what kind of package, with its section icon), vibe (for fun), price (it always
-// rests on Free: every pick is free to try). The apps builds spin app categories.
+// Tweak Roulette's wheels: type (what kind of package, with its section icon), vibe (for fun: no data says what's
+// "silly"), price (Spin always rests on Free; turned by hand, Paid picks a paid one). The apps builds spin app categories.
 export const ROULETTE_TYPES = {
   jailbreak: [
     { label: "Tweak", icon: "Tweaks", test: (r) => browseCategory(r) === "Tweaks" },
@@ -368,16 +368,27 @@ export const ROULETTE_VIBES = ["Useful", "Pretty", "Silly", "Tiny", "Clever", "H
 export const ROULETTE_PRICES = ["Free", "Paid", "Free", "Free", "Paid", "Free"];
 const ROULETTE_PER = 150;
 
-// Rows -> the wheels' pool: [{ label, icon, rows }] per type, free rows only, at most `per` each (spread evenly
-// over the type's rows, by name, so the pool is the same between spins). An empty type stays on the wheel; a spin
-// never rests on it (spinPick).
+// Rows -> the wheels' pool: [{ label, icon, rows, paid }] per type, rows the free ones and paid the paid ones, at most
+// `per` each (spread evenly over the type's rows, by name, so the pool is the same between spins). An empty type
+// stays on the wheel; a spin never rests on it (spinPick).
 export function roulettePool(rows, { jailbroken = true, per = ROULETTE_PER } = {}) {
-  return ROULETTE_TYPES[jailbroken ? "jailbreak" : "apps"].map(({ label, icon, test }) => {
-    const all = rows.filter((r) => !r.paid && test(r));
+  const spread = (all) => {
     const step = all.length > per ? all.length / per : 1;
-    const picked = step === 1 ? all : Array.from({ length: per }, (_, i) => all[Math.floor(i * step)]);
-    return { label, icon, rows: picked };
+    return step === 1 ? all : Array.from({ length: per }, (_, i) => all[Math.floor(i * step)]);
+  };
+  return ROULETTE_TYPES[jailbroken ? "jailbreak" : "apps"].map(({ label, icon, test }) => {
+    const all = rows.filter((r) => test(r));
+    return { label, icon, rows: spread(all.filter((r) => !r.paid)), paid: spread(all.filter((r) => r.paid)) };
   });
+}
+
+// The wheels turned by hand: a package of type `label`, paid or free as the price wheel says, by `rand`; not `last`
+// (the id shown before) when there's another. null when the sources have none of that kind.
+export function choosePick(pool, label, { paid = false, last = null, rand = Math.random } = {}) {
+  const t = (pool ?? []).find((x) => x.label === label);
+  const rows = (paid ? t?.paid : t?.rows) ?? [];
+  const fresh = rows.length > 1 ? rows.filter((r) => r.id !== last) : rows;
+  return fresh.length ? fresh[Math.min(fresh.length - 1, Math.floor(rand() * fresh.length))] : null;
 }
 
 // One spin: a type that has packages, then one of its packages, both by `rand` (0 <= x < 1). -> { type, row }

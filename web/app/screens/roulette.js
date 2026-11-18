@@ -3,7 +3,9 @@
 // List (core/wishlist.js) and View (the package's page). No daily limit (user 2026-11-18: "don't limit the
 // spins"): Spin always works. A day streak counts the days in a row with at least one spin, kept on the device
 // beside the settings (localStorage["cydian.roulette"]). The apps builds spin app categories (core/catalog.js
-// ROULETTE_TYPES). A haptic tick as rows pass the band, where the native bridge has haptics.
+// ROULETTE_TYPES). A haptic tick as rows pass the band, where the native bridge has haptics. The wheels also turn
+// by hand, like UIPickerView's (user 2026-11-18): drag one, it glides on and snaps to a row, and once they rest a
+// package of the type and price they show comes up (core/catalog.js choosePick).
 //
 // Route: home browse/roulette (screens/home.js); the package below it is browse.js's (browse/roulette/package:<id>).
 // Wheels move by transform only (docs/native.md: 120 Hz).
@@ -11,7 +13,7 @@ import { grouped, el } from "../nav/ui.js";
 import { format } from "../router.js";
 import { catalog } from "../catalog.js";
 import { haptic } from "../nav/haptic.js";
-import { ROULETTE_TYPES, ROULETTE_VIBES, ROULETTE_PRICES, spinPick, dayKey, dayBefore } from "../core/catalog.js";
+import { ROULETTE_TYPES, ROULETTE_VIBES, ROULETTE_PRICES, spinPick, choosePick, dayKey, dayBefore } from "../core/catalog.js";
 import { wishlist, iconBox, rememberNames, token } from "./browse.js";
 
 export const ROULETTE_KEY = "cydian.roulette";
@@ -20,6 +22,7 @@ const CENTER = 80;     // the band's top inside a wheel: the third of five rows
 const COPIES = 14;     // each wheel's list repeated, so a spin of several turns never runs off the end
 const TURNS = [3, 4, 5]; // whole turns per wheel: the right one stops last
 const SECONDS = [1.6, 1.9, 2.2];
+const MID = 7;         // a dragged wheel starts from this copy, so a drag either way and a spin after stay inside the reel
 
 // ---- the streak (pure) -------------------------------------------------------------------------------------
 
@@ -70,6 +73,10 @@ export function nextPos(pos, len, target, turns) {
   return pos - (pos % len) + len * turns + target;
 }
 
+// The row a wheel let go at `pos` (rows, fractional) moving `v` rows/ms comes to rest on: on by the glide, rounded.
+export const restRow = (pos, v) => Math.round(pos + Math.max(-12, Math.min(12, v * 250)));
+const mod = (a, n) => ((a % n) + n) % n;
+
 // ---- the page ----------------------------------------------------------------------------------------------
 
 export const nav = () => ({ title: "Roulette" });
@@ -112,7 +119,7 @@ export function render(body, route, { jailbroken = true, storage = globalThis.lo
   const spin = el("button", "roulette-spin", "Spin");
   spin.type = "button";
   const result = el("div", "roulette-result");
-  result.append(grouped([{ footer: "Each spin lands on a real free package from your sources. Spin once a day and your streak grows." }]));
+  result.append(grouped([{ footer: "Each spin lands on a real free package from your sources. Or turn the wheels yourself: you get a package of the type and price they show. Spin once a day and your streak grows." }]));
   body.append(stats, picker, spin, result);
 
   let pool = null;
@@ -133,6 +140,8 @@ export function render(body, route, { jailbroken = true, storage = globalThis.lo
     spinning = true;
     spin.disabled = true;
     spin.textContent = "Spinning…";
+    clearTimeout(landTimer);
+    for (const wh of wheels) { wh.pos = wh.len + mod(Math.round(wh.pos), wh.len); place(wh, false); } // a wheel let go mid-glide
     const p = await loadPool();
     const pick = spinPick(p);
     if (!pick) {
@@ -156,9 +165,81 @@ export function render(body, route, { jailbroken = true, storage = globalThis.lo
     spinning = false;
     spin.disabled = false;
     spin.textContent = "Spin";
-    if (body.isConnected) result.replaceChildren(resultCard(pick.row, route));
+    if (body.isConnected) { last = pick.row.id; result.replaceChildren(resultCard(pick.row, route)); }
   });
+
+  // By hand: each wheel follows the finger, glides on when let go and snaps to a row; once all rest a moment, the
+  // package for what they show.
+  let last = null;
+  let landTimer = 0;
+  const land = async () => {
+    const p = await loadPool();
+    if (spinning || !body.isConnected) return;
+    const type = lists[0][mod(Math.round(wheels[0].pos), wheels[0].len)].label;
+    const paid = ROULETTE_PRICES[mod(Math.round(wheels[2].pos), wheels[2].len)] === "Paid";
+    const row = choosePick(p, type, { paid, last });
+    if (!row) {
+      result.replaceChildren(grouped([{ footer: `No ${paid ? "paid" : "free"} ${type.toLowerCase()} packages in your sources. Turn the wheels or Spin.` }]));
+      return;
+    }
+    last = row.id;
+    saveSpins(recordSpin(readSpins(storage)), storage);
+    paintStats();
+    result.replaceChildren(resultCard(row, route));
+  };
+  wheels.forEach((wh) => dragWheel(wh, {
+    busy: () => spinning,
+    start: () => clearTimeout(landTimer),
+    rest: () => { clearTimeout(landTimer); landTimer = setTimeout(land, 350); },
+  }));
   return { spin, wheels };
+}
+
+// A wheel turned by finger (pointer events; the wheel has touch-action: none): rows follow it, the last ~80 ms give
+// the speed it glides on with, and it eases onto the row restRow picks. A tick per row passing the band, in the app.
+function dragWheel(wh, { busy, start, rest }) {
+  const wheel = wh.reel.parentElement;
+  let drag = null; // { id, y, pos, samples, row }
+  wheel.addEventListener("pointerdown", (e) => {
+    if (busy() || drag) return;
+    start();
+    // Stop where it is now (mid-glide too), moved to the middle copy so it can turn far either way.
+    const m = new DOMMatrixReadOnly(getComputedStyle(wh.reel).transform);
+    const now = (CENTER - m.m42) / ROW;
+    wh.pos = MID * wh.len + mod(now, wh.len);
+    place(wh, false);
+    drag = { id: e.pointerId, y: e.clientY, pos: wh.pos, samples: [[e.timeStamp, wh.pos]], row: Math.round(wh.pos) };
+    wheel.setPointerCapture(e.pointerId);
+  });
+  wheel.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    wh.pos = drag.pos - (e.clientY - drag.y) / ROW;
+    wh.reel.style.transform = `translate3d(0, ${CENTER - wh.pos * ROW}px, 0)`;
+    drag.samples.push([e.timeStamp, wh.pos]);
+    while (drag.samples.length > 2 && e.timeStamp - drag.samples[0][0] > 80) drag.samples.shift();
+    const row = Math.round(wh.pos);
+    if (row !== drag.row) { drag.row = row; if (hasHaptics()) haptic(); }
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const [a, z] = [drag.samples[0], drag.samples.at(-1)];
+    const v = z[0] - a[0] > 5 ? (z[1] - a[1]) / (z[0] - a[0]) : 0;
+    drag = null;
+    const to = restRow(wh.pos, v);
+    const seconds = Math.min(1.2, Math.max(0.25, Math.abs(to - wh.pos) * 0.08));
+    const stopTicks = hasHaptics() && Math.abs(to - wh.pos) > 0.5 ? ticking([wh]) : () => {};
+    wh.pos = to;
+    place(wh, seconds);
+    setTimeout(() => {
+      stopTicks();
+      if (drag || wh.pos !== to) return;
+      wh.pos = wh.len + mod(to, wh.len); // back to the second copy, unseen, where Spin starts from
+      place(wh, false);
+    }, seconds * 1000);
+    rest();
+  };
+  wheel.addEventListener("pointerup", end);
+  wheel.addEventListener("pointercancel", end);
 }
 
 // A wheel's rows: its list `COPIES` times over.

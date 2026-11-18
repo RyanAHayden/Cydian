@@ -81,6 +81,16 @@ export function initScroller(screens) {
   let glide = 0;
   const stopGlide = () => { cancelAnimationFrame(glide); glide = 0; };
   document.addEventListener("pointerdown", (e) => { if (e.target !== sb) stopGlide(); }, { capture: true, passive: true });
+  // Hitting an end with speed left: the page runs on past it and springs back, like UIScrollView's bounce. A
+  // scroller can't scroll past its ends from script, so the page body itself moves (transform only), showing the
+  // background behind it as the rubber band does. Farther the faster, up to 80 px.
+  function bounce(el, v) {
+    const d = Math.min(80, Math.abs(v) * 22) * (v < 0 ? 1 : -1);
+    if (Math.abs(d) < 4) return;
+    el.animate([{ transform: "none" }, { transform: `translateY(${d}px)`, offset: 0.28, easing: "cubic-bezier(.25,.1,.25,1)" },
+      { transform: "none" }], { duration: 520, easing: "cubic-bezier(.33,0,.2,1)" });
+  }
+
   function fling(v) {
     let last = performance.now();
     const step = (now) => {
@@ -89,7 +99,8 @@ export function initScroller(screens) {
       const max = body.scrollHeight - body.clientHeight;
       const next = Math.max(0, Math.min(max, body.scrollTop + v * dt));
       body.scrollTop = next;
-      if (Math.abs(v) < 0.02 || next <= 0 || next >= max) { glide = 0; return; }
+      if ((next <= 0 && v < 0) || (next >= max && v > 0)) { glide = 0; bounce(body, v); return; }
+      if (Math.abs(v) < 0.02) { glide = 0; return; }
       glide = requestAnimationFrame(step);
     };
     glide = requestAnimationFrame(step);

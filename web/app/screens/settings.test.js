@@ -43,14 +43,15 @@ test("Update Alerts: what iOS allows, the last background check, and a way to Se
   assert.equal(quiet.rows.some((r) => r.open), false);
 });
 
-// F128: Settings' pages and their titles, like iOS 6's (the root, General, Display, Updates, a list page under one),
+// F128: Settings' pages and their titles, like iOS 6's (the root, General, Theme, Updates, a list page under one),
 // and the older one-segment routes other screens still link to.
 test("F128: page titles for the iOS 6-style routes and the old ones", async () => {
   const { nav } = await import("./settings.js");
   const t = (...path) => nav({ tab: "home", path }).title;
   assert.equal(t(), "Settings");
   assert.equal(t("general"), "General");
-  assert.equal(t("display"), "Display");
+  assert.equal(t("theme"), "Theme"); // F205: was Display
+  assert.equal(t("display"), "Theme"); // the old route still opens it
   assert.equal(t("updates"), "Updates");
   assert.notEqual(t("about"), "About"); // F183: no About page
   assert.equal(t("general", "device"), "Device");
@@ -224,4 +225,55 @@ test("F183: settings.js has no About page or update check left", async () => {
   for (const gone of ["aboutPage", "aboutRow", "checkUpdates", "setSkip", "Check for Updates", "Skip This Version", '"about"']) {
     assert.equal(src.includes(gone), false, gone);
   }
+});
+
+// F205: iOS 6 Settings' row tiles. The root's page rows and General's settings carry one; Theme's Appearance choices
+// (Automatic / Light / Dark) stay bare, as iOS 6 leaves option rows. Compatibility Marks is on General now.
+test("F205: Settings root, General and Theme rows carry iOS 6 tiles where iOS 6 would", async () => {
+  // fakeElement with querySelector(All) for one class (".group", ".cell-inner"): the pages put switches in by them.
+  const find = (n, cls, out = []) => {
+    for (const c of n.children ?? []) {
+      if (String(c.className).split(" ").includes(cls)) out.push(c);
+      find(c, cls, out);
+    }
+    return out;
+  };
+  const rich = (tag) => {
+    const e = fakeElement(tag);
+    e.querySelectorAll = (sel) => (/^\.[\w-]+$/.test(sel) ? find(e, sel.slice(1)) : []);
+    e.querySelector = (sel) => e.querySelectorAll(sel)[0] ?? null;
+    return e;
+  };
+  globalThis.document = { createElement: rich, createTextNode: (t) => ({ textContent: t }), createDocumentFragment: () => rich("#frag"),
+    head: null, body: rich("body"), documentElement: rich("html"), querySelector: () => null, querySelectorAll: () => [],
+    addEventListener() {}, removeEventListener() {} };
+  const { render } = await import("./settings.js");
+  const cells = (n, out = []) => {
+    if (n.className === "cell") out.push(n);
+    for (const c of n.children ?? []) cells(c, out);
+    return out;
+  };
+  const rows = (path) => {
+    const root = fakeElement("div");
+    render(root, { tab: "home", path });
+    return cells(root).map((li) => {
+      const inner = li.children[0];
+      const icon = inner.children.find((c) => String(c.className).startsWith("cell-icon"));
+      const label = texts(inner.children.find((c) => c.className === "cell-text"))[0];
+      return [label, icon ? icon.className : null, icon?.children[0]?.src?.slice(0, 19) ?? null];
+    });
+  };
+  const root = rows([]);
+  for (const name of ["General", "Theme", "Updates"]) {
+    assert.deepEqual(root.find((r) => r[0] === name), [name, "cell-icon row-icon", "data:image/svg+xml,"], name);
+  }
+  assert.equal(root.some((r) => r[0] === "Display"), false);
+  const general = rows(["general"]);
+  const at = (label) => general.findIndex((r) => r[0] === label);
+  assert.equal(at("Compatibility Marks"), at("Works on My Phone") + 1);
+  for (const r of general) assert.equal(r[1], "cell-icon row-icon", r[0]);
+  const theme = rows(["theme"]);
+  assert.deepEqual(theme.map((r) => r[0]), ["Automatic", "Light", "Dark"]);
+  for (const r of theme) assert.equal(r[1], null, r[0]);
+  assert.deepEqual(rows(["display"]).map((r) => r[0]), ["Automatic", "Light", "Dark"]); // the old route
 });

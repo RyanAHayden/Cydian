@@ -13,8 +13,8 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 | Root row | Builds | Page |
 |---|---|---|
 | iFizBox Account | all | sign in, create an account (screens/account.js) |
-| General | all | Device and iOS Version (website only); Works on My Phone; Refresh Sources on Launch; Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only, F145) |
-| Display | all | Appearance (Automatic / Light / Dark as checkmarks); Compatibility Marks |
+| General | all | Device and iOS Version (website only); Works on My Phone and Compatibility Marks; Refresh Sources on Launch; Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only, F145) |
+| Theme | all | Appearance (Automatic / Light / Dark as checkmarks) |
 | Updates | all | Ignored Upgrades; Upgrade Notifications (jailbreak only); Automatic Installs (jailbreak only: Install Updates Automatically, When Charging and Locked, After a Respring Update, Keep Previous Versions); Update Alerts (sideload only) |
 | Signing | website, sideload | see "Settings > Signing" below |
 | Open in iFizBox App | website, not jailbroken | an action, not a setting (screens/importlink.js) |
@@ -68,9 +68,11 @@ of the apps it signs, so it shows no dates and the switch would do nothing there
 
 | Setting | Before | After |
 |---|---|---|
-| Appearance | Root, first group | Display |
+| Appearance | Root, first group | Display (Theme since F205) |
 | Allow Zoom | Root, under Appearance | Display, renamed **Zoom**; retired by F134 (see What went) |
 | Show Compatibility Marks | Root, Works on My Phone group | Display, renamed **Compatibility Marks** |
+| Display page | Root row **Display** (route `display`) | F205: renamed **Theme** (route `theme`), holds Appearance only |
+| Compatibility Marks | Display | F205: General, beside Works on My Phone |
 | Device, iOS Version (website) | Root, two separate groups | General, one group |
 | Works on My Phone, Refresh Sources on Launch | Root | General |
 | Open Other Apps' Links (sideload) | Root, Sideloading group | General, Sideloading group (shorter footer) |

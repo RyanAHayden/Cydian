@@ -68,28 +68,33 @@ test("F128: the migration drops the retired settings' stored values and keeps ev
   assert.doesNotThrow(() => createSettings({ storage: broken }));
 });
 
-test("F128: pages like iOS 6's Settings: General, Display, Updates (Signing in the sideload build), by mode", () => {
+// F205: Display became Theme (Appearance only); Compatibility Marks moved to General, beside Works on My Phone.
+test("F128: pages like iOS 6's Settings: General, Theme, Updates (Signing in the sideload build), by mode", () => {
   const layout = (mode) => createSettings({ storage: memStorage(), mode }).pages()
     .map((p) => [p.id, p.title, p.sections.map((x) => x.settings.map((d) => d.key))]);
-  const display = ["display", "Display", [["appearance"], ["compatMarks"]]];
+  const theme = ["theme", "Theme", [["appearance"]]];
+  const compat = ["worksOnMyPhone", "compatMarks"];
   assert.deepEqual(layout("site"), [
-    ["general", "General", [["device", "iosVersion"], ["worksOnMyPhone"], ["refreshOnLaunch", "returnHome"]]],
-    display,
+    ["general", "General", [["device", "iosVersion"], compat, ["refreshOnLaunch", "returnHome"]]],
+    theme,
     ["updates", "Updates", [["holds"]]],
   ]);
   assert.deepEqual(layout("jailbreak"), [
-    ["general", "General", [["worksOnMyPhone"], ["refreshOnLaunch", "returnHome"]]],
-    display,
+    ["general", "General", [compat, ["refreshOnLaunch", "returnHome"]]],
+    theme,
     ["updates", "Updates", [["holds"], ["upgradeNotifications"], ["autoInstall", "autoInstallIdle", "respring", "keepVersions"]]],
   ]);
   assert.deepEqual(layout("sideload"), [
-    ["general", "General", [["worksOnMyPhone"], ["refreshOnLaunch", "returnHome"]]],
-    display,
+    ["general", "General", [compat, ["refreshOnLaunch", "returnHome"]]],
+    theme,
     ["updates", "Updates", [["holds"]]],
     ["signing", "Signing", [["showExpiry", "resignReminder"]]],
   ]);
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.equal(s.pageOf("display").title, "Display");
+  assert.equal(s.pageOf("theme").title, "Theme");
+  assert.equal(s.pageOf("display"), null); // the old id is the screen's alias (screens/settings.js OLD_PAGES)
+  assert.equal(s.sections().find((x) => x.id === "compat").footer,
+    "Hides packages that say they don't work on this iPhone. Marks put a check, an X or a ? by each package.");
   assert.equal(s.pageOf("appearance"), null); // a section, not a page
   // every group's footer is one or two short sentences
   for (const mode of ["site", "jailbreak", "sideload"]) {
@@ -261,7 +266,7 @@ test("rows wait for their feature: today Appearance, the sources settings, Works
 
 test("sections come in page order, empty ones dropped", () => {
   const s = createSettings({ storage: memStorage(), mode: "sideload", features: everything });
-  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "sources", "appearance", "display", "updates", "signing"]);
+  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "sources", "appearance", "updates", "signing"]);
   assert.equal(s.sections().find((x) => x.id === "appearance").settings[0].key, "appearance");
 });
 

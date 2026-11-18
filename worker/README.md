@@ -24,6 +24,25 @@ npx wrangler deploy        # makes the KV storage on the first deploy and prints
 
 Then in Cydian: **Settings > Signing > Signing Server**, paste that address, and **Check Server**.
 
+### On your own PC or in Docker
+
+The same code runs on Node 22 (`worker/node.mjs`): the website, `/api/fetch` and `/sign/*`, with held updates in
+memory.
+
+```sh
+git clone https://github.com/RyanAHayden/Cydian && cd Cydian
+node worker/node.mjs                       # http://0.0.0.0:8787 (PORT, HOST, HOST_IDS, TTL as below)
+# or Docker:
+docker build -f worker/Dockerfile -t cydian . && docker run -d --restart unless-stopped -p 8787:8787 cydian
+```
+
+iOS takes the install manifest **only over HTTPS with a trusted certificate**, so put it behind one of:
+
+- **Tailscale** (phone on your tailnet): `tailscale serve --bg 8787` gives `https://<machine>.<tailnet>.ts.net`;
+- **Cloudflare Tunnel** (`cloudflared tunnel --url http://localhost:8787`) or **Caddy** with your own domain.
+
+Then put that `https://` address in **Settings > Signing > Signing Server**.
+
 ### Settings (`wrangler.toml`)
 
 - `HOST_IDS`: the bundle IDs it holds updates for. `*.cydian` (any ID ending in `.cydian`) covers Cydian signed

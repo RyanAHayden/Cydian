@@ -24,6 +24,7 @@ export function showActionSheet({ title = "", buttons = [], cancel = "Cancel", d
     // The choices scroll in their own list; the title and Cancel stay put, so Cancel is always a tap away.
     const list = document.createElement("div");
     list.className = "action-list";
+    list.dataset.scroller = ""; // nav/scroller.js draws its iOS 6 indicator in the list's box
     sheet.append(list);
     const make = (label, cls, index, parent = list) => {
       const b = document.createElement("button");

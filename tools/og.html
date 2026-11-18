@@ -1,0 +1,41 @@
+<!doctype html>
+<!-- The cydian.dev link-preview card (web/app/icons/og.png): the app itself on the right (a live iframe), the icon
+     and name on Cydian's pinstripes on the left. Render from the repo root:
+     python3 -m http.server 8000 & chromium --headless --hide-scrollbars --force-device-scale-factor=2 --window-size=1200,630 \
+       --virtual-time-budget=4000 --user-agent="Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148" \
+       --screenshot=og.png http://localhost:8000/tools/og.html && magick og.png -strip web/app/icons/og.png -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cydian card</title>
+<link rel="stylesheet" href="../web/app/ios6.css">
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    display: flex; align-items: center; font-family: "Helvetica Neue", Helvetica, sans-serif;
+    background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
+  }
+  .side { flex: 1; padding: 0 30px 0 80px; color: var(--head); text-shadow: var(--emboss); }
+  .side img { width: 152px; height: 152px; display: block; filter: drop-shadow(0 3px 5px rgba(0,0,0,.35)); }
+  h1 { margin: 22px 0 6px; font-size: 92px; line-height: 1; letter-spacing: -1.5px; }
+  p { margin: 0 0 26px; font-size: 29px; line-height: 36px; }
+  .bar-button { display: inline-block; height: 44px; padding: 0 18px; font-size: 21px; line-height: 42px; border-radius: 8px; text-decoration: none; }
+  .phone {
+    flex: none; align-self: flex-end; width: 414px; height: 590px; margin-right: 70px; padding: 12px 12px 0;
+    border-radius: 54px 54px 0 0; background: linear-gradient(#2a2b2e, #111214);
+    box-shadow: 0 0 0 2px #55575c, 0 -6px 30px rgba(0,0,0,.35);
+  }
+  .phone iframe { display: block; width: 390px; height: 844px; border: 0; border-radius: 42px 42px 0 0; background: #fff; }
+  .phone div { height: 100%; overflow: hidden; border-radius: 42px 42px 0 0; }
+</style>
+</head>
+<body>
+<div class="side">
+  <img src="../web/app/icons/icon-glossy-228.png" alt="">
+  <h1>Cydian</h1>
+  <p>The iOS 6 package manager,<br>for modern iPhones.</p>
+  <span class="bar-button">cydian.dev</span>
+</div>
+<div class="phone"><div><iframe src="../web/app/index.html" scrolling="no"></iframe></div></div>
+</body>
+</html>

@@ -6,7 +6,7 @@
 // top page of the active tab is visible; the one below shows during a slide or swipe.
 //
 // Screens (screens/*.js) export `title`, `render(body, route, ctx)` and optionally `nav(route, ctx)` returning
-// { title, style: "grouped" | "plain", left: { label, onClick }, right: { label, onClick } } and `init(ctx)`,
+// { title, style: "grouped" | "plain", left: { label, onClick }, right: { label, onClick } | [several] } and `init(ctx)`,
 // run once at start (e.g. to set the tab's badge). ctx: { go, back, setBadge, showHUD }.
 import { TABS, createRouter, format, parent } from "./router.js";
 import { createStacks, swipeCommits } from "./nav/stack.js";
@@ -96,7 +96,8 @@ function makePage(tab, path) {
   h1.textContent = title;
   const right = document.createElement("div");
   right.className = "nav-right";
-  if (info.right) right.append(button(info.right, "bar-button"));
+  // `right` may be one button or several side by side (Sources: Add and Manage).
+  for (const b of [info.right].flat().filter(Boolean)) right.append(button(b, "bar-button"));
   item.append(left, h1, right);
   navStacks[tab].append(item);
 

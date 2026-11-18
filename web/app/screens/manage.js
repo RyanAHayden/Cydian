@@ -11,6 +11,7 @@
 // Source keys always hold a ':' (deb:..., alt:...), so "manage" can't be one. The parsing, export text and order
 // live in core/sourcelist.js; the QR code in core/qr.js. A change here (add, delete, reorder) tells sources.js
 // through onSourcesChanged, so the tab's list is right when the user goes back.
+import { cleanSourceUrl } from "../core/sources.js";
 import { grouped, plain, collapse } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showSheet } from "../nav/sheet.js";
@@ -260,7 +261,9 @@ export async function addSource(ctx, prefill = null) {
     cancel: 0,
   });
   if (index !== 1) return;
-  const input = dist && value.trim() === prefill.url ? { uri: prefill.url, dist: prefill.dist, components: prefill.components } : value;
+  // A pasted https://… into the field's own https:// would read https://https://…: cleanSourceUrl fixes it.
+  const typed = cleanSourceUrl(value) || value.trim();
+  const input = dist && typed === prefill.url ? { uri: prefill.url, dist: prefill.dist, components: prefill.components } : typed;
   if (!(await confirmWarning(input))) return;
   const hide = ctx.showHUD("Verifying URL");
   let error = null;

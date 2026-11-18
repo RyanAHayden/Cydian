@@ -507,3 +507,17 @@ export async function loadNeverLoaded(backend, list, type, { tried = new Set(), 
     end();
   }
 }
+
+
+// What the user typed or pasted as a source, as one clean URL, or "" when it isn't one: the first URL-looking word,
+// repeated schemes collapsed to the last one (the Add field starts with https://, so pasting https://repo.x gave
+// https://https://repo.x; https://http://x keeps http), https:// added to a bare host, spaces and <> trimmed.
+export function cleanSourceUrl(text) {
+  const word = String(text ?? "").trim().split(/\s+/).find((w) => /[a-z0-9-]\.[a-z]{2,}|localhost/i.test(w)) ?? "";
+  let u = word.replace(/^[<("']+|[>)"',.;]+$/g, "");
+  if (!u) return "";
+  u = u.replace(/^(?:(?:https?|cydia|sileo|zbra|altstore):\/{0,2}\/?)+(https?:\/\/)/i, "$1"); // the last scheme wins
+  u = u.replace(/^(?:(?:https?):\/{0,2})+(?=https?:\/\/)/i, "");
+  if (!/^https?:\/\//i.test(u)) u = "https://" + u.replace(/^\/+/, "");
+  try { return new URL(u).href; } catch { return ""; }
+}

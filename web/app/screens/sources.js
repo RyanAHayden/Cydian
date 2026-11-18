@@ -5,6 +5,7 @@
 // device and comes through the backend (core/sources.js sourceCalls), so the app runs this file unchanged.
 // Above the sources, Cydia's "All Sources" row; a source (or All Sources) opens its Sections, and everything
 // below that is screens/browse.js.
+import { cleanSourceUrl } from "../core/sources.js";
 import { plain, collapse } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
@@ -32,6 +33,14 @@ const state = {
 
 const byKey = (key) => state.sources?.find((s) => s.key === key);
 
+// A source URL on the clipboard, as { url }, or null (nothing there, not a URL, or reading refused).
+async function clipboardSource() {
+  let text = "";
+  try { text = await navigator.clipboard.readText(); } catch { return null; }
+  const url = cleanSourceUrl(text);
+  return url ? { url } : null;
+}
+
 export function nav(route, ctx) {
   if (manage.isManage(route)) return manage.nav(route, ctx);
   if (route.path.length) {
@@ -40,7 +49,12 @@ export function nav(route, ctx) {
   return {
     title: "Sources", style: "plain",
     left: { label: "Refresh", onClick: () => refresh(ctx) },
-    right: { label: "Manage", onClick: () => ctx.go({ tab: "sources", path: [manage.SEGMENT] }) },
+    right: [
+      // Add: the Enter APT URL alert, filled with a source URL on the clipboard when there is one (iOS asks first:
+      // its Paste bubble).
+      { label: "Add", onClick: async () => manage.addSource(ctx, await clipboardSource()) },
+      { label: "Manage", onClick: () => ctx.go({ tab: "sources", path: [manage.SEGMENT] }) },
+    ],
   };
 }
 

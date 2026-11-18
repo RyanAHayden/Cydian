@@ -1,5 +1,8 @@
 # R10: paid packages on a modern jailbroken iPhone (F57 device check)
 
+> 2026-11-18: a device exists now: the iPhone 7 (`ssh 7`, iOS 15.8.8, palera1n rootless). How to use it, drive its
+> screen (`tools/ui-7.sh`) and install Cydian on it: `docs/iphone7.md`. The "no device" notes below are from before.
+
 ## What happened
 
 Unattended run, no person present. The check needs a modern jailbroken iPhone (iOS 15+, Dopamine or palera1n) and

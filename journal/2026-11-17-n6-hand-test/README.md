@@ -1,5 +1,8 @@
 # N6: hand test on a modern jailbroken phone (blocked)
 
+> 2026-11-18: a device exists now: the iPhone 7 (`ssh 7`, iOS 15.8.8, palera1n rootless). How to use it, drive its
+> screen (`tools/ui-7.sh`) and install Cydian on it: `docs/iphone7.md`. The "no device" notes below are from before.
+
 ## What I did
 - Looked for a device this run can reach. `~/.ssh/config` has only `Host 4s`, and the 4S (iOS 6) never runs Cydian
   (rootless, iOS 15+). The N5 note records it: "User 2026-11-17: no jailbroken test phone."

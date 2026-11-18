@@ -1,5 +1,8 @@
 # N8: App Intents, widget and controls in the native shell
 
+> 2026-11-18: a device exists now: the iPhone 7 (`ssh 7`, iOS 15.8.8, palera1n rootless). How to use it, drive its
+> screen (`tools/ui-7.sh`) and install Cydian on it: `docs/iphone7.md`. The "no device" notes below are from before.
+
 Brief: Shortcuts / Siri / Spotlight / Action button / Control Center get Cydian's actions with nothing built by hand.
 Both modes: Check for Updates, Add Source (URL), the widget with the update count. Jailbreak: Install All Updates,
 Respring and Userspace Reboot (also controls), Export / Restore My Packages (sideload restores sources only). The

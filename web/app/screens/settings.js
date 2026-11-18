@@ -386,7 +386,7 @@ export function applyTheme(doc = document, win = window) {
     m.replaceWith(fresh);
   }
   // A preview pins the shell to the tone on screen (its status bar and keyboard follow the page) until it ends.
-  tellShell(preview ? theme : appearance, theme, win, darkPalette);
+  tellShell(preview ? theme : appearance, theme, win, darkPalette, paletteFor("light", darkPalette, lightTheme));
 }
 
 // The jailbreak/sideload shell (F23): native parts the page can't style (keyboard, <select> pickers, alerts,
@@ -395,14 +395,16 @@ export function applyTheme(doc = document, win = window) {
 // Automatic would stop following the system. On the site there is no handler and this does nothing.
 // F198: darkPalette is the dark palette chosen (oled or gunmetal), sent in light too: the shell keeps it to paint its
 // window at the next launch before the page runs (black for OLED Black), whichever way Automatic then goes.
-export function themeMessage(appearance, theme, darkPalette = "oled") {
-  return { id: 0, method: "app.theme", params: { style: appearance === "auto" ? "auto" : theme, theme, darkPalette } };
+// F214: lightPalette (classic, sepia or solarized) likewise, so a light launch paints Sepia's or Solarized Light's
+// pinstripes, not the kit's blue-grey.
+export function themeMessage(appearance, theme, darkPalette = "oled", lightPalette = "classic") {
+  return { id: 0, method: "app.theme", params: { style: appearance === "auto" ? "auto" : theme, theme, darkPalette, lightPalette } };
 }
 let lastSent = "";
-function tellShell(appearance, theme, win, darkPalette) {
+function tellShell(appearance, theme, win, darkPalette, lightPalette) {
   const h = win.webkit?.messageHandlers?.ifizbox;
   if (!h) return;
-  const msg = themeMessage(appearance, theme, darkPalette);
+  const msg = themeMessage(appearance, theme, darkPalette, lightPalette);
   const key = JSON.stringify(msg.params);
   if (key === lastSent) return;
   lastSent = key;

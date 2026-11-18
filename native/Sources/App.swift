@@ -277,9 +277,46 @@ enum Launch {
         }
         return Ground(pattern: UIColor(patternImage: tile), plain: light)
     }()
-    static func ground(dark: Bool, palette: String) -> Ground {
-        guard dark else { return light }
-        return palette == "gunmetal" ? gunmetal : oled
+    // F214: F200's palettes (web/app/palettes.css): their --pin-dark/--pin-light pinstripes, the overscroll their
+    // --pin-light, except Linen's, which is the base of its --weave (#36383d) the grouped pages show.
+    static func rgb(_ hex: UInt32) -> UIColor {
+        UIColor(red: CGFloat(hex >> 16 & 0xff) / 255, green: CGFloat(hex >> 8 & 0xff) / 255, blue: CGFloat(hex & 0xff) / 255, alpha: 1)
+    }
+    static func striped(_ dark: UInt32, _ light: UInt32, plain: UInt32? = nil) -> Ground {
+        let d = rgb(dark), l = rgb(light)
+        let tile = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 1)).image { ctx in
+            l.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 8, height: 1))
+            d.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 2.5, height: 1))
+        }
+        return Ground(pattern: UIColor(patternImage: tile), plain: plain.map(rgb) ?? l)
+    }
+    static let midnight = striped(0x0a1424, 0x0c172a)
+    static let linen = striped(0x34363b, 0x383a3f, plain: 0x36383d)
+    static let nord = striped(0x2e3440, 0x313744)
+    static let dracula = striped(0x282a36, 0x2b2d3a)
+    static let sepia = striped(0xe6d9bd, 0xebdfc5)
+    static let solarized = striped(0xe9e2cd, 0xeee8d5)
+
+    // The ground for a tone and its palette: the light one (F214: Classic, Sepia or Solarized Light) or the dark
+    // one; a name this build doesn't know takes the tone's default (Classic, OLED Black).
+    static func ground(dark: Bool, palette: String, lightPalette: String = "classic") -> Ground {
+        guard dark else {
+            switch lightPalette {
+            case "sepia": return sepia
+            case "solarized": return solarized
+            default: return light
+            }
+        }
+        switch palette {
+        case "gunmetal": return gunmetal
+        case "midnight": return midnight
+        case "linen": return linen
+        case "nord": return nord
+        case "dracula": return dracula
+        default: return oled
+        }
     }
 
     // The web view's backgrounds: behind a page that hasn't painted yet, and behind its edges.

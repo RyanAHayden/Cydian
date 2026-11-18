@@ -129,8 +129,9 @@ export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promis
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 30000);
     try { r = await fetcher(url, { headers: CYDIA, redirect: "follow", cf, signal: ctl.signal }); } finally { clearTimeout(timer); }
-    // A 404 the edge kept from before RELEASE_CACHE (or from a file uploaded since): ask GitHub itself once.
-    if (r.status === 404 && cf === RELEASE_CACHE) r = await fetcher(url, { headers: CYDIA, redirect: "follow", cache: "no-store" });
+    // A 404 the edge kept (from before RELEASE_CACHE, or a redirect's hop, as releases/latest/download's to the
+    // tagged file): ask the server itself once.
+    if (r.status === 404) r = await fetcher(url, { headers: CYDIA, redirect: "follow", cache: "no-store" });
     if (r.status !== 429 && r.status < 500) return r;
     const after = Number(r.headers.get("retry-after"));
     await wait(Number.isFinite(after) && after > 0 && after <= 5 ? after * 1000 : 600 * (attempt + 1));

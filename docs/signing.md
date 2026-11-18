@@ -167,7 +167,8 @@ Running the signer outside Docker: `zsign` on `PATH` (build it from
 ## On the phone (I6)
 
 The Cydian app's sideload build (I2) signs and installs IPAs by itself: no signing server, no install server
-anywhere but the phone, and the certificate never leaves it. User 2026-11-17: "do it all local so they dont rely on
+anywhere but the phone, and the certificate never leaves it when installing other apps (the one exception, Cydian
+updating itself, is F73 below). User 2026-11-17: "do it all local so they dont rely on
 me". In the jailbreak build none of this runs: the N2 helper installs IPAs directly, and the `signing.*` calls answer
 code `jailbreak`.
 
@@ -196,8 +197,9 @@ Cydian, see journal/2026-11-17-i6-on-device-signing **Not verified**), B with th
 1. **Settings > Signing**, as on the site: the `.p12`, its password and the `.mobileprovision`. In the app they go
    to `signing.import`: the `.p12` is opened with `SecPKCS12Import` and its identity (certificate and private key)
    is added to the iOS Keychain, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` (never synced to iCloud, never in
-   a backup that restores to another phone). The password isn't kept: once the identity is in the Keychain it isn't
-   needed. The checks are I5's: a wrong password, an expired certificate or profile, a certificate the profile
+   a backup that restores to another phone). F73: the `.p12` file as picked and its password are kept too, as one
+   Keychain generic-password item (service `com.ryha.cydian.signing.p12`, also `...ThisDeviceOnly`), for Cydian's own
+   update (below); nothing else reads it. The checks are I5's: a wrong password, an expired certificate or profile, a certificate the profile
    doesn't list.
 2. **Local Install** (`signing.trust`): Cydian makes an ECDSA P-256 key in the Keychain and a root certificate
    "Cydian Local Install CA (iPhone XXXX)" (ten years, CA, `keyCertSign`, critical name constraints: permitted
@@ -209,7 +211,24 @@ Cydian, see journal/2026-11-17-i6-on-device-signing **Not verified**), B with th
 4. `signing.status` then says `trust.trusted: true`: Cydian checks with `SecTrustEvaluateWithError` that iOS trusts
    its TLS certificate for 127.0.0.1.
 
-Remove Certificate (`signing.remove`) deletes the identity from the Keychain and the profile file.
+Remove Certificate (`signing.remove`) deletes the identity and the kept `.p12` from the Keychain, and the profile
+file.
+
+### What leaves the phone, and when (F73)
+
+Installing other apps sends nothing anywhere: they are signed on the phone and served from 127.0.0.1. Cydian itself
+can't be installed that way (iOS closes Cydian while it installs, which stops its install server), so Cydian's own
+update (Essential Only / Complete, and Changes' self-upgrade: `installSelf` in `web/app/core/essential.js`) signs on
+the Signing Server instead. For that it calls `signing.export`, which answers `{p12, profile, password}` (the files
+base64, as imported) or `null`; installSelf first asks the user, saying the certificate and key go to the server,
+and only then posts them to `<server>/sign` exactly as the site's Install does (I5's rules on the server: memory
+only, the request's or its job's lifetime). That is the only time the `.p12` and its password leave the phone, and
+only to the Signing Server set in Settings (cydian.dev by default, or the user's own).
+
+`signing.export` answers `null`, and installSelf falls back to opening cydian.dev in Safari, when there is no
+certificate, when its profile file is gone, or when the certificate was imported before F73 (the `.p12` wasn't kept
+then: Remove Certificate and import it again). The kept item also records the certificate's SHA-256 and is only
+handed out while that certificate is the one in use.
 `signing.resetTrust` throws away the CA and its keys; the old profile stays in Settings until the user deletes it.
 
 ### The page's side (F58)
@@ -365,6 +384,8 @@ constraints), the mobileconfig, the manifest and itms link, and the HTTP parsing
 also passed on the signed fixture and the signed Cydian.ipa (by hand, not in the gate).
 
 The phone half (Keychain, `NWListener`, opening the links) compiles in the native build but runs only on an iPhone.
+F73: `test_sign.py` also checks that `signing.export` is registered and answers `p12`, `profile` and `password`
+from the kept item, and that `signing.remove` deletes that item.
 
 `native/test_sideload.py` (F14) builds the same way with `native/sign/tests/sideload/main.swift`: profile kinds,
 signature expiry, the bridge's options and their refusals, `.strings` parsing (UTF-8 and UTF-16), the arm64e fix-up

@@ -271,5 +271,36 @@ class OnDeviceSigner(unittest.TestCase):
         self.assertIn("IP:127.0.0.1/255.255.255.255", text)
 
 
+class BridgeSourceTest(unittest.TestCase):
+    """F73: the phone half can't run here, so read the sources: signing.export is registered, answers the three
+    fields from the kept Keychain item, and the item is written on import and deleted on remove."""
+
+    @classmethod
+    def setUpClass(cls):
+        src = os.path.join(HERE, "Sources")
+        with open(os.path.join(src, "SignBridge.swift")) as f:
+            cls.bridge = f.read()
+        with open(os.path.join(src, "SignStore.swift")) as f:
+            cls.store = f.read()
+
+    def test_export_handler(self):
+        self.assertIn('b.on("signing.export")', self.bridge)
+        start = self.bridge.index("static func export()")
+        body = self.bridge[start:self.bridge.index("\n    }\n", start)]
+        for key in ('"p12"', '"profile"', '"password"', "SignStore.exportP12()", "NSNull()"):
+            self.assertIn(key, body)
+
+    def test_kept_p12(self):
+        self.assertIn("kSecClassGenericPassword", self.store)
+        keep = self.store[self.store.index("static func keepP12"):]
+        keep = keep[:keep.index("\n    }\n")]
+        self.assertIn("kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly", keep)
+        imp = self.store[self.store.index("static func importIdentity"):self.store.index("static func identity()")]
+        self.assertIn("try keepP12(", imp)
+        rm = self.store[self.store.index("static func removeIdentity"):]
+        rm = rm[:rm.index("\n    }\n")]
+        self.assertIn("deleteP12()", rm)
+
+
 if __name__ == "__main__":
     unittest.main()

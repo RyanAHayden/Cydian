@@ -4,7 +4,10 @@
 //   signing.status              {mode, identity: {name, team, expires, profile: {...}} | null, trust: {ca, trusted, name},
 //                               identityProblem?}: F69, why a certificate that was imported doesn't show
 //   signing.import {p12, password, profile}   (both files base64) -> status; the .p12 goes into the Keychain
-//   signing.remove              forgets the identity and the profile -> status
+//   signing.remove              forgets the identity, the kept .p12 and the profile -> status
+//   signing.export              F73: {p12, profile, password} (files base64) as imported, for the Signing Server when
+//                               Cydian updates itself (essential-ui.js installSelf, which asks the user first) | null
+//                               when there is no certificate or it was imported before F73
 //   signing.trust               makes the local CA if needed and opens its profile in Safari -> {url, signed}; F69:
 //                               the profile is CMS-signed with the user's certificate when one is imported
 //   signing.resetTrust          throws the local CA away (the user removes the old profile in Settings) -> status
@@ -45,6 +48,7 @@ enum SignBridge {
                 return status()
             }
         }
+        b.on("signing.export") { c in run(c) { export() } } // F73
         b.on("signing.remove") { c in run(c) { SignStore.removeIdentity(); return status() } }
         b.on("signing.resetTrust") { c in run(c) { InstallServer.secure.stop(); LocalTrust.reset(); return status() } }
         b.on("signing.trust") { c in
@@ -131,6 +135,15 @@ enum SignBridge {
         out["trust"] = ["ca": LocalTrust.ca() != nil, "trusted": LocalTrust.ca() != nil && LocalTrust.trusted(),
                         "name": LocalTrust.label() ?? ""] as [String: Any]
         return out
+    }
+
+    // ---- F73: the certificate for the Signing Server
+
+    // Only when the identity in use is readable and its profile is there: the same certificate status() shows.
+    static func export() -> Any {
+        guard SignStore.identity() != nil, let kept = SignStore.exportP12(),
+              let prof = try? Data(contentsOf: SignStore.profileURL) else { return NSNull() }
+        return ["p12": kept.p12.base64EncodedString(), "profile": prof.base64EncodedString(), "password": kept.password]
     }
 
     // ---- F69: an import that status() can see

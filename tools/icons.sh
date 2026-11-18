@@ -49,20 +49,9 @@ png() { rsvg-convert -w "$2" -h "$2" "$1" -o "$3"; }
 
 for n in 180 192 512 1024; do png "$master" "$n" "$dir/icon-$n.png"; done
 
-# Launch images for the home-screen app (apple-touch-startup-image), one per current iPhone screen: the pinstripe
-# background with the glossy icon, 120pt, centred. Without them iOS scales an icon up for its launch screen, which
-# looked stretched. Sizes are device pixels, portrait: WxH@scale for the media queries in index.html.
-glossy1024=$(mktemp --suffix=.png)
-png "$dir/icon-glossy.svg" 1024 "$glossy1024"
-mkdir -p "$dir/launch"
-for spec in 393x852@3 430x932@3 390x844@3 428x926@3 375x812@3 414x896@2 375x667@2 402x874@3 440x956@3; do
-  pt=${spec%@*}; scale=${spec#*@}; w=$(( ${pt%x*} * scale )); h=$(( ${pt#*x} * scale )); icon=$(( 120 * scale ))
-  magick -size "${w}x${h}" "pattern:verticalsaw" -fill "#ced3dc" -colorize 100 \
-    \( -size $(( 8 * scale ))x$h xc:"#ced3dc" -fill "#cbd0da" -draw "rectangle 0,0 $(( 5 * scale / 2 - 1 )),$h" -write mpr:stripe +delete \) \
-    -fill mpr:stripe -draw "color 0,0 reset" \
-    \( "$glossy1024" -resize "${icon}x${icon}" \) -gravity center -composite -strip "$dir/launch/launch-${w}x${h}.png"
-done
-rm -f "$glossy1024"
+# Launch images for the home-screen app (apple-touch-startup-image), one per current iPhone screen: like Cydia's
+# Default.png, the app's empty frame (nav bar, pinstripes, tab bar), drawn from the app's own CSS.
+python3 tools/launch_images.py "$dir/launch" >/dev/null
 # The Home header shows the glossy icon at 76pt: PNGs at 1x/2x/3x (Safari can draw an SVG <img> with an embedded
 # picture at low resolution, which looked blurry and smeared on the phone).
 for n in 76 152 228; do png "$dir/icon-glossy.svg" "$n" "$dir/icon-glossy-$n.png"; done

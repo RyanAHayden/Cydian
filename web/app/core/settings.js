@@ -142,7 +142,7 @@ export const SETTINGS = [
     label: "Return to Home After",
     options: [{ value: 0, label: "Never" }, { value: 1, label: "1 Minute" }, { value: 2, label: "2 Minutes" },
       { value: 5, label: "5 Minutes" }, { value: 15, label: "15 Minutes" }, { value: 60, label: "1 Hour" }],
-    footer: `Back after this long, ${NAME} opens on Home as if just launched.`,
+    footer: `Back after this long, ${NAME} opens on Home as if just launched, unless a popup or an install is still up.`,
   },
   {
     key: "holds", section: "updates", kind: "holds", feature: "holds", modes: ALL, label: "Ignored Upgrades",

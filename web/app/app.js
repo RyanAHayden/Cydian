@@ -437,13 +437,16 @@ if (refreshOnLaunch()) SCREENS.sources.refreshInBackground?.(ctx);
 // Back from the background after Settings' Return to Home After (2 minutes unless changed; Never: 0) counts as a
 // fresh open (user 2026-11-18): Home's root, and the launch refresh again. iOS rarely cold-launches the app or a
 // Home Screen web app, so without this it opens wherever it was left.
-// ponytail: an alert or sheet left open stays over Home; close them here if that turns out to bother.
+// Never while something is up (user 2026-11-18): an alert, action sheet, HUD, share sheet or any sheet (Confirm,
+// the install console and progress page, signing), so a popup or an install in progress is where the user left it.
+const OVERLAYS = ".alert-scrim, .action-scrim, .hud-scrim, .share-scrim, .sheet, .filter-drop, .menu";
 {
   let hiddenAt = 0;
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
     const after = Number(settingsScreen.settings.get("returnHome")) * 60 * 1000;
     if (!hiddenAt || !after || Date.now() - hiddenAt < after) return;
+    if (document.querySelector(OVERLAYS)) { hiddenAt = 0; return; }
     hiddenAt = 0;
     // Home's root at its top, not where it was scrolled (user 2026-11-18). go's hashchange is async: scroll after it.
     const toTop = () => { const b = stacks.top()?.page.body; if (b) b.scrollTop = 0; };

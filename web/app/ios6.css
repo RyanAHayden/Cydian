@@ -474,4 +474,3 @@ input.sign-value { border: 0; padding: 0; margin: 0; background: none; font: inh
 html.has-banner #navbar, html.has-banner #screens { transform: translateY(var(--banner-h, 44px)); }
 
 /* A bar button iOS left stuck in :active (Sources' Add after the Paste bubble): drawn as normal until touched again. */
-.bar-button.unpressed:active { background: linear-gradient(#99aac2, #41618e); background-origin: border-box; border-color: #2f4769; border-top-color: #343a42; }

@@ -36,18 +36,28 @@ const state = {
 
 const byKey = (key) => state.sources?.find((s) => s.key === key);
 
-async function addFromClipboard(ctx, button) {
-  // iOS's Paste bubble takes the touch, so the pointerup that would clear the held look never comes: clear it here.
+// iOS keeps a button in :active after its Paste bubble took the touch, and no class can win over that in every theme:
+// taking the button out and putting it back (listeners kept) drops it from WebKit's active chain.
+function reset(button) {
   button.classList.remove("is-pressed");
+  const parent = button.parentNode, next = button.nextSibling;
+  if (!parent) return;
+  button.remove();
+  parent.insertBefore(button, next);
+}
+
+async function addFromClipboard(ctx, button) {
+  reset(button);
   button.textContent = "Paste";
   button.classList.add("paste-wait");
-  let text = "";
-  try { text = await navigator.clipboard.readText(); } catch { /* refused, or nothing to read */ }
+  let text = "", refused = false;
+  try { text = await navigator.clipboard.readText(); } catch { refused = true; }
   button.textContent = "Add";
-  button.classList.remove("paste-wait", "is-pressed");
-  // iOS can leave the button in :active after its Paste bubble took the touch: draw it unpressed until it's touched
-  button.classList.add("unpressed");
-  button.addEventListener("pointerdown", () => button.classList.remove("unpressed"), { once: true });
+  button.classList.remove("paste-wait");
+  reset(button);
+  // The bubble dismissed (a tap elsewhere, Manage included) or the page left Sources: that tap wins, no popup.
+  if (refused && navigator.clipboard?.readText) return;
+  if (!button.isConnected || !/^#\/sources\/?$/.test(location.hash)) return;
   const url = cleanSourceUrl(text);
   manage.addSource(ctx, url ? { url } : null);
 }

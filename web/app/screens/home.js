@@ -14,7 +14,7 @@
 // (core/catalog.js BROWSE_LISTS: new, updated, popular, featured, free-apps...), browse/category:<name>, and below those browse.js's tokens
 // (package:<id>, author:<name>, versions:<id>), as in the Search tab.
 import { grouped, el } from "../nav/ui.js";
-import { format, settingsRoute } from "../router.js";
+import { format, settingsRoute, parse } from "../router.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { sourceKey, sourcesFor } from "../core/sources.js";
@@ -119,6 +119,40 @@ export function homeLinks() {
     ],
   }, { header: "User Guides", rows: guideRows(format) },
   { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }];
+}
+
+// F156: Home's link rows that stay open on the locked website (user 2026-11-18: "dont lock credits and thank you or
+// jailbreaking help"): Settings (F123), Upgrading & Jailbreaking Help, the User Guides and Credits / Thank You. They
+// need no install and help people get to one. Find Extensions and More Package Sources stay locked.
+const OPEN_WHILE_LOCKED = new Set(["settings", "help", "guides", "credits"]);
+export function openWhileLocked(href) {
+  if (!href?.startsWith?.("#/")) return false;
+  const route = parse(href);
+  if (route.tab !== "home") return false;
+  const first = route.path[0];
+  return first === settingsRoute().path[0] ? true : OPEN_WHILE_LOCKED.has(first);
+}
+// Marks Home's locked link rows (.home-locked on the row's li; a group whose rows are all locked gets it too) and
+// returns what it marked. links is homeLinks(), groups the .group boxes grouped(links) drew, in the same order.
+export function lockHomeLinks(groups, links) {
+  const marked = [];
+  links.forEach((section, i) => {
+    const group = groups[i];
+    const cells = group?.querySelectorAll(".cell") ?? [];
+    const shut = section.rows.map((r) => !openWhileLocked(r.href));
+    if (shut.length && shut.every(Boolean)) { group.classList.add("home-locked"); marked.push(group); return; }
+    shut.forEach((s, j) => { if (s && cells[j]) { cells[j].classList.add("home-locked"); marked.push(cells[j]); } });
+  });
+  return marked;
+}
+// A tap on anything in box marked .home-locked asks (askToBrowse) instead of opening; other taps go through.
+export function askOnLocked(box, ask) {
+  box.addEventListener("click", async (e) => {
+    if (!e.target.closest?.(".home-locked")) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    await ask();
+  }, true);
 }
 
 // F135: the jailbreak app's Home has no featured banners above the tiles (user 2026-11-18: "on jailbroken remove the
@@ -524,17 +558,12 @@ function renderRoot(body) {
   for (const group of groups) group.classList.add("home-links");
   home.append(list);
   // The website before Cydian is installed: everything below the Cydian App card is locked; a tap asks first. Not
-  // Settings (F123: unlocked like Home, as its tab was).
+  // Settings (F123: unlocked like Home, as its tab was), nor help, guides and credits (F156, lockHomeLinks).
   if (browsingLocked({ mode: settings.mode })) {
-    const settingsGroup = groups[links.findIndex((g) => g.rows[0]?.label === "Settings")];
-    const locked = [...lockedFeatured, browseRow, ...(ipasRow ? [ipasRow] : []), stateRow, ...groups.filter((g) => g !== settingsGroup)];
+    const locked = [...lockedFeatured, browseRow, ...(ipasRow ? [ipasRow] : []), stateRow];
     for (const box of locked) box.classList.add("home-locked");
-    home.addEventListener("click", async (e) => {
-      if (!e.target.closest?.(".home-locked")) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      await askToBrowse({ install: installCydian }); // Browse Anyway redraws Home (followBrowseLock below)
-    }, true);
+    lockHomeLinks(groups, links);
+    askOnLocked(home, () => askToBrowse({ install: installCydian })); // Browse Anyway redraws Home (followBrowseLock below)
   }
   // F145: Browse Anyway (here, on a locked tab or in Settings) and Settings' Lock Home switch redraw Home at once.
   followBrowseLock({ wasLocked: lockedNow, locked: () => browsingLocked({ mode: settings.mode }), alive: () => home.isConnected,

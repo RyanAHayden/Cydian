@@ -363,6 +363,11 @@ html[data-theme="dark"] .action-button.cancel { /* UIAlertSheetBlackCancelButton
   align-items: center; padding: 4px 0; border-radius: 9px; touch-action: none; -webkit-user-select: none; user-select: none;
   font-size: 11px; font-weight: bold; line-height: 1; color: #59657a; cursor: pointer;
 }
+/* B51: while the reload bar shows (html.has-reload, ios6.css), the index ends above the strip, not behind it: UIKit's
+   index spans the table's visible part (Cydia has no strip, so its index is never covered). Only the index's letters
+   close up; the list and its scroll position stay where they are. Over a sheet the strip leaves the tab bar, but
+   then the sheet covers the index anyway. */
+html.has-reload .section-index { bottom: calc(var(--tab-h) + 44px + 6px); }
 .section-index.held { background: rgba(0,0,0,.18); }
 html[data-theme="dark"] .section-index { color: var(--dk-index); }
 html[data-theme="dark"] .section-index.held { background: rgba(255,255,255,.15); }

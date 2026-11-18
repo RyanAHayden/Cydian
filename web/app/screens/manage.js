@@ -18,7 +18,8 @@ import { grouped, plain, collapse, placeholder, el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showSheet } from "../nav/sheet.js";
 import { format } from "../router.js";
-import { getBackend, getParser, getArch } from "../backend.js";
+import { getBackend, getParser, getArch, siteJailbroken } from "../backend.js";
+import { detectMode } from "../core/settings.js";
 import { repoLayout } from "../core/apt.js";
 import { packageList } from "./browse.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor } from "../core/sources.js";
@@ -294,14 +295,21 @@ async function saveFullOrder(shownKeys) {
   changed();
 }
 
+// F144: where APT repos aren't kept (the sideload app; the site while Settings > Device says Not Jailbroken), Add
+// takes app sources only, so the alert doesn't ask for an APT URL.
+export const aptKept = (mode = detectMode(), site = siteJailbroken) => (mode === "site" ? site() : mode !== "sideload");
+export const addSourceText = (apt = aptKept()) => apt
+  ? { title: "Enter APT URL", message: "Or an app source (.json): AltStore, ESign, Scarlet or GBox." }
+  : { title: "Enter Source URL", message: "An app source (.json): AltStore, ESign, Scarlet or GBox." };
+
 // Add Source, as the Sources tab's Edit mode had it (docs/cydia.md "Sources tab").
 // F8: `prefill` ({ url, dist?, components? }, from a /add?url= link, core/handoff.js parseAddLink) fills the field;
 // a dist repo's suite and components are named in the message and go along while the URL is left as it was.
 export async function addSource(ctx, prefill = null) {
   const dist = prefill?.dist ? `Suite ${prefill.dist}${prefill.components?.length ? `, ${prefill.components.join(" ")}` : ""}.` : "";
   const { index, value } = await showAlert({
-    title: "Enter APT URL",
-    message: dist || "Or an app source (.json): AltStore, ESign, Scarlet or GBox.",
+    ...addSourceText(),
+    ...(dist ? { message: dist } : {}),
     input: { placeholder: "https://", value: prefill?.url || "https://", type: "url", paste: cleanSourceUrl },
     buttons: ["Cancel", "Add Source"],
     cancel: 0,

@@ -86,7 +86,7 @@ final class IPASigner {
         // An explicit profile covers one app ID: extensions (and Watch apps) would need their own, so they go.
         var cut = [String]()
         if !profile.isWildcard {
-            for dir in bundles.keys.sorted() where dir != appDir && (dir.hasSuffix(".appex/") || dir.hasSuffix(".app/")) {
+            for dir in bundles.keys.sorted() where dir != appDir && (dir.hasSuffix(".appex/") || dir.hasSuffix(".app/")) { // sorted: a Dictionary's order changes per run
                 cut.append(dir)
             }
         }

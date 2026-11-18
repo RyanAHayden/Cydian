@@ -77,3 +77,17 @@ test("progressHUD: finish ends on the caller's button (F155's Open <app>), its a
   assert.equal(page.calls.filter(([k]) => k === "finish").length, 1);
   page.close();
 });
+
+test("progressHUD (B27): two jobs on one page: it completes when the last one ends, on that one's button", () => {
+  const page = fakePage();
+  const open = () => page;
+  const a = progressHUD("Downloading", { open });
+  const b = progressHUD("Downloading", { open });
+  b.done("Done");
+  assert.equal(page.calls.filter(([k]) => k === "finish").length, 0);
+  a.set("Installing 72%");
+  assert.deepEqual(page.calls.at(-1), ["progress", 72]);
+  a.finish({ label: "Open A", status: "Installed" });
+  assert.deepEqual(page.calls.at(-1), ["finish", "Open A", "Installed"]);
+  page.close();
+});

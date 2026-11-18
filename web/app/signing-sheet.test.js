@@ -5,6 +5,7 @@ import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { inspectAndInstall, followInstall, openLabel, openInstalled } from "./signing-sheet.js";
 import { installOnDevice } from "./signing-client.js";
+import { progressHUD } from "./nav/progress.js";
 import {
   installParams, inspectGroups, isCgBI, fromBase64, certificateWarnings, revocationLabel, resignLabel, signedAppRows,
   syncReminder, installedId, validBundleId, entitlementName,
@@ -256,4 +257,87 @@ test("Re-sign Reminder: shown in the sideload build, and its value goes to signi
   assert.deepEqual(native.calls.map((c) => c.params), [{ days: 2 }, { days: 7 }, { days: 0 }]);
   assert.equal(await syncReminder(s.get, null), null);
   assert.equal(await syncReminder(s.get, async () => { throw new Error("unknown method"); }), null);
+});
+
+// B27: a progress page as nav/progress.js openProgress draws it, keeping what the tests look at.
+function fakePage() {
+  const p = {
+    title: "Running", statusText: "", finished: null, closed: false, closers: [],
+    line() {}, step() {}, error() {}, raw() {}, progress() {},
+    status(t) { p.statusText = t; },
+    finish(o) { p.title = "Complete"; p.finished = o; },
+    reopen() { p.title = "Running"; p.finished = null; },
+    onClose(f) { p.closers.push(f); },
+    close() { p.closed = true; p.closers.forEach((f) => f()); },
+  };
+  return p;
+}
+
+// signing.progress whose stream the test drives: emit(fraction), then end(answer).
+function streamingProgress() {
+  const s = { rounds: 0 };
+  s.native = { async call(method, params, onEvent) {
+    assert.equal(method, "signing.progress");
+    s.rounds++;
+    return new Promise((resolve) => { s.emit = (f) => onEvent({ phase: "installing", progress: f }); s.end = resolve; });
+  } };
+  return s;
+}
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+test("B27: a queue run's next job ending doesn't complete the page while the last app's signing.progress still streams", async () => {
+  const page = fakePage();
+  const open = () => page;
+  const s = streamingProgress();
+  const h1 = progressHUD("Downloading", { open });
+  const following = followInstall(s.native, "com.a", h1, { later: () => assert.fail("no timer"), name: "A" });
+  await tick();
+  s.emit(0.3);
+  const h2 = progressHUD("Downloading", { open }); // the queue's next app, on the same page
+  assert.equal(page.title, "Running");
+  h2.done("Done"); // it was handed to iOS (or it failed): the first app is still installing
+  s.emit(0.72);
+  assert.equal(page.title, "Running");
+  assert.equal(page.finished, null);
+  assert.equal(page.statusText, "Installing 72%");
+  s.end({ installed: true });
+  assert.equal(await following, true);
+  assert.equal(page.title, "Complete");
+  assert.equal(page.finished.label, "Open A");
+  assert.equal(page.finished.status, "Installed");
+  page.close();
+});
+
+test("B27: signing.progress answering not-installed mid-install (iOS between stages) is followed again, not ended", async () => {
+  const page = fakePage();
+  const s = streamingProgress();
+  const h = progressHUD("Installing", { open: () => page });
+  const following = followInstall(s.native, "com.a", h, { later: () => assert.fail("no timer"), name: "A" });
+  await tick();
+  s.emit(0.72);
+  s.end({ installed: false }); // the shell's watch saw no Progress for a moment
+  await tick();
+  assert.equal(s.rounds, 2);
+  assert.equal(page.title, "Running");
+  assert.equal(page.statusText, "Installing 72%");
+  s.emit(0.9);
+  s.end({ installed: true });
+  assert.equal(await following, true);
+  assert.equal(page.finished.label, "Open A");
+  page.close();
+
+  // a round with no progress at all ends it as before; so does an install that never streamed
+  const p2 = fakePage();
+  const s2 = streamingProgress();
+  const f2 = followInstall(s2.native, "com.a", progressHUD("Installing", { open: () => p2 }), { later: () => {} });
+  await tick();
+  s2.emit(0.5);
+  s2.end({ installed: false });
+  await tick();
+  s2.end({ installed: false });
+  assert.equal(await f2, false);
+  assert.equal(s2.rounds, 2);
+  assert.equal(p2.title, "Complete");
+  assert.equal(p2.finished.label, "Return to iFizBox");
+  p2.close();
 });

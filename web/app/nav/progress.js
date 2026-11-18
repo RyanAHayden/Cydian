@@ -20,7 +20,8 @@
 //                                          each label a step, its percent on the bar; a job started while the page
 //                                          is still up continues on it. Beyond liveHUD's: finish({ label, action,
 //                                          status }) ends it on another button, F155's "Open <app>" (signing-sheet.js
-//                                          followInstall) once iOS says the app is installed.
+//                                          followInstall) once iOS says the app is installed. With several
+//                                          on the page (a queue run), it completes when the last one ends (B27).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "./ui.js";
 import { createFollow, hudLine } from "../core/progress.js";
@@ -186,6 +187,10 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
 // ---- the HUD interface on the page ------------------------------------------------------------------------------
 
 let hudPage = null; // the page progressHUD drew last, while it is up
+// B27: the HUDs still running on each page. A queue run starts the next app's job while the last one's
+// signing.progress still streams on the same page, so the page completes only once every one of them has ended
+// (the last to end gives the button); before, the first to end said Complete over the other's "Installing 72%".
+const running = new WeakMap();
 
 // `open` stands in for openProgress (tests).
 export function progressHUD(label = "Preparing", { open = openProgress, done: doneLabel = `Return to ${NAME}` } = {}) {
@@ -196,6 +201,9 @@ export function progressHUD(label = "Preparing", { open = openProgress, done: do
     hudPage = page;
     page.onClose?.(() => { if (hudPage === page) hudPage = null; });
   }
+  if (!running.has(page)) running.set(page, new Set());
+  const mine = {};
+  running.get(page).add(mine);
   let last = null;
   let ended = false;
   const set = (t) => {
@@ -211,6 +219,9 @@ export function progressHUD(label = "Preparing", { open = openProgress, done: do
   const end = (status, { label = doneLabel, action = null } = {}) => {
     if (ended) return;
     ended = true;
+    const open = running.get(page);
+    open?.delete(mine);
+    if (open?.size) return; // another job still runs on the page: it stays Running
     page.finish({ label, action, status });
   };
   return {

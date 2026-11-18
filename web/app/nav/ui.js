@@ -28,7 +28,7 @@ function cell(row) {
   if (row.href) inner.href = row.href;
   if (row.onClick) { if (!row.href) inner.type = "button"; inner.addEventListener("click", row.onClick); }
   if (row.icon) {
-    const icon = el("span", "cell-icon", row.icon.text || "");
+    const icon = el("span", row.icon.cls ? `cell-icon ${row.icon.cls}` : "cell-icon", row.icon.text || "");
     if (row.icon.color) icon.style.background = row.icon.color;
     if (row.icon.src) {
       const img = el("img");

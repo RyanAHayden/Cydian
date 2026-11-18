@@ -106,11 +106,11 @@ export async function signingSetUp(mode, { ready = signingReady, status = () => 
 
 // F123: Home's list below the tiles, as Cydia's: the help links, User Guides, then Credits / Thank You. Settings (it left
 // the tab bar; its pages open on Home's stack, router.js settingsRoute) is its own group, F135: first, directly under
-// the tiles (user 2026-11-18: "move settings up on the main page and give it an icon"), with our grey gear
-// (icons/settings.svg) at its left as iOS 6's Settings rows have.
-export const SETTINGS_ICON = "icons/settings.svg";
+// the tiles (user 2026-11-18: "move settings up on the main page and give it an icon"). F159: its gear is a tile glyph
+// (.home-glyph.glyph-settings, home.css) with the tiles' inset, so it lines up with Featured/Signing above.
+export const SETTINGS_ICON = "home-glyph glyph-settings";
 export function homeLinks() {
-  return [{ rows: [{ label: "Settings", href: format(settingsRoute()), icon: { src: SETTINGS_ICON }, cls: "home-settings-row" }] }, {
+  return [{ rows: [{ label: "Settings", href: format(settingsRoute()), icon: { cls: SETTINGS_ICON }, cls: "home-settings-row" }] }, {
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
       { label: "Find Extensions for Applications", href: format({ tab: "search" }), chevron: true },

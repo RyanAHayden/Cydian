@@ -48,6 +48,8 @@ import { autoMarkShown, AUTO_MARK_LABEL, AUTO_MARK_FOOTER } from "../core/automa
 import { createWishlist, wishLabel, wishRows, WISH_EMPTY } from "../core/wishlist.js";
 import { filterRows } from "../core/changes.js";
 import { sizeText as formatSize } from "../core/appqueue.js";
+import { dailyPick, browseKind, collectionsFor, dayKey } from "../core/catalog.js";
+import { readSpins, currentStreak, rouletteRow } from "./roulette.js";
 
 const ROW_HEIGHT = 58;
 
@@ -1191,4 +1193,238 @@ export function escapeHtml(s) {
 export function withBase(html, url) {
   const base = `<base href="${escapeHtml(url)}" target="_blank">`;
   return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + base) : base + html;
+}
+
+// ---- Browse (F154) -----------------------------------------------------------------------------------------
+//
+// Home's Browse page, rebuilt from the approved concept (docs/concepts/browse/browse.dc.html): the nav bar's title
+// is a filter drop-down ("Featured ▾": a tap opens an action sheet with Featured, New, Top 25; the title shows the
+// choice). Featured: the Tweak of the Day card, the Tweak Roulette row, New This Week, Collections, All Categories.
+// New: F124's New list; Top 25: F124's Popular, ranked. No horizontal scroller. Placeholders while loading.
+// home.js routes browse/ here (and the pages below it: collection:<id>, categories, roulette).
+
+export const BROWSE_FILTERS = [
+  { id: "featured", label: "Featured" },
+  { id: "new", label: "New" },
+  { id: "top", label: "Top 25" },
+];
+export const browseFilter = (id) => BROWSE_FILTERS.find((f) => f.id === id) ?? BROWSE_FILTERS[0];
+export const TOP_LIMIT = 25;
+export const WEEK_DAYS = 7;
+const SECTION_ICON = (name) => `icons/sections/${name}.png`;
+
+// The choice lives for the session (the drop-down's title and the page draw from it); the page and its button on screen.
+const browseHome = { filter: "featured", button: null, page: null };
+export const browseFilterNow = () => browseHome.filter;
+
+// The Browse page's nav bar: "Browse" (the back button of the pages above it) and the drop-down in the title's place.
+export function browseHomeNav() {
+  return { title: "Browse", titleView: globalThis.document ? filterButton() : undefined };
+}
+
+function filterButton() {
+  const b = el("button", "browse-filter");
+  b.type = "button";
+  b.setAttribute("aria-haspopup", "menu");
+  paintFilter(b);
+  b.addEventListener("click", () => chooseFilter());
+  browseHome.button = b;
+  return b;
+}
+
+function paintFilter(b) {
+  const label = browseFilter(browseHome.filter).label;
+  b.replaceChildren(el("span", "browse-filter-label", label), el("span", "browse-filter-arrow"));
+  b.setAttribute("aria-label", `Showing ${label}. Change`);
+}
+
+// The title's tap: the action sheet of the three; -> the index picked, or -1 (Cancel).
+export async function chooseFilter({ sheet = showActionSheet } = {}) {
+  const i = await sheet({ buttons: BROWSE_FILTERS.map((f) => f.label) });
+  if (i >= 0) setBrowseFilter(BROWSE_FILTERS[i].id);
+  return i;
+}
+
+// Shows filter `id` (unknown ids: Featured): the title says it and the page on screen redraws in place.
+export function setBrowseFilter(id) {
+  const f = browseFilter(id);
+  browseHome.filter = f.id;
+  if (browseHome.button) paintFilter(browseHome.button);
+  if (browseHome.page?.body.isConnected) drawBrowseHome(browseHome.page);
+  return f.id;
+}
+
+// What each filter draws: the rows' source and how they read. Top 25 is ranked (rank on every row).
+export function filterView(id, { fresh, popular }) {
+  const f = browseFilter(id);
+  if (f.id === "new") return { id: "new", rows: () => fresh("new"), ranked: false, empty: "Nothing new lately. Packages your sources add show up here after a refresh." };
+  if (f.id === "top") return { id: "top", rows: async () => (await popular({ limit: TOP_LIMIT })).slice(0, TOP_LIMIT), ranked: true,
+    empty: "Add a source to see what's popular.", footer: "Ranked by how many of your sources list each package." };
+  return { id: "featured" };
+}
+
+// `opts`: { jailbroken, featured: () => rows (the sources' featured packages), headers: rows -> items (New's days) }.
+export function renderBrowseHome(body, route, opts = {}) {
+  const page = { body, route, turn: 0, list: null, ...opts };
+  browseHome.page = page;
+  return drawBrowseHome(page);
+}
+
+function drawBrowseHome(page) {
+  const turn = ++page.turn;
+  page.list?.destroy();
+  page.list = null;
+  const { body } = page;
+  const featured = browseHome.filter === "featured";
+  body.classList.toggle("grouped", featured);
+  body.classList.toggle("plain", !featured);
+  body.replaceChildren();
+  body.scrollTop = 0;
+  return featured ? drawFeatured(page, turn) : drawFilterList(page, turn);
+}
+
+async function drawFilterList(page, turn) {
+  const { body, route } = page;
+  const v = filterView(browseHome.filter, { fresh: catalog.fresh, popular: catalog.popular });
+  body.append(placeholder("list", 8));
+  let rows;
+  try {
+    await catalog.ensure();
+    rows = await v.rows();
+  } catch (e) {
+    if (turn === page.turn) body.replaceChildren(el("p", "empty", e.message));
+    return;
+  }
+  if (turn !== page.turn || !body.isConnected) return;
+  body.replaceChildren();
+  if (!rows.length) { body.append(el("p", "empty", v.empty)); return; }
+  const items = v.ranked ? rows.map((r, i) => ({ ...r, rank: i + 1 })) : page.headers ? page.headers(rows) : rows;
+  page.list = packageList(body, route, items, { letters: false, decorate: v.ranked ? rankRow : null });
+  page.list.el.classList.add(v.ranked ? "browse-ranked" : "browse-new");
+  body.append(page.list.el);
+  if (v.footer) body.append(el("p", "browse-list-footer", v.footer));
+}
+
+// Top 25: the rank at the row's left (packages.css .pkg-rank).
+function rankRow(row, item) {
+  let r = row._.rank;
+  if (!r) { r = row._.rank = el("span", "pkg-rank"); row._.a.prepend(r); }
+  r.textContent = item.rank ? String(item.rank) : "";
+}
+
+const pkgHref = (route, id) => format({ tab: route.tab, path: [...route.path, token("package", id)] });
+
+async function drawFeatured(page, turn) {
+  const { body, route } = page;
+  const jailbroken = page.jailbroken ?? true;
+  const heroSlot = el("div", "browse-hero-slot");
+  heroSlot.append(heroCard(null, { jailbroken }));
+  const freshGroup = el("div", "group browse-fresh");
+  const head = el("h2", "group-header browse-head");
+  const seeAll = el("button", "browse-see-all", "See All");
+  seeAll.type = "button";
+  seeAll.addEventListener("click", () => setBrowseFilter("new"));
+  head.append(el("span", null, "New This Week"), seeAll);
+  const freshList = el("ul", "table grouped");
+  freshList.append(...phCells(3));
+  freshGroup.append(head, freshList);
+  const roulette = grouped([rouletteRow({ jailbroken, streak: currentStreak(readSpins(), dayKey()) })]);
+  for (const g of roulette.children) g.classList.add("browse-roulette");
+  const collections = grouped([{ header: "Collections", rows: collectionsFor(jailbroken).map((c) => ({
+    label: c.title, subtitle: c.subtitle, href: format({ tab: route.tab, path: [...route.path, `collection:${c.id}`] }),
+    icon: { src: SECTION_ICON(c.icon) }, cls: "browse-icon-row" })) }]);
+  const all = grouped([{ rows: [{ label: "All Categories", href: format({ tab: route.tab, path: [...route.path, "categories"] }) }] }]);
+  body.append(heroSlot, roulette, freshGroup, collections, all);
+
+  let popular = [], featured = [], fresh = [];
+  try {
+    await catalog.ensure();
+    [popular, featured, fresh] = await Promise.all([
+      catalog.popular({ limit: 60 }).catch(() => []),
+      (page.featured ? page.featured() : Promise.resolve([])).catch(() => []),
+      catalog.fresh("new").catch(() => []),
+    ]);
+  } catch (e) {
+    if (turn === page.turn) heroSlot.replaceChildren(el("p", "empty", e.message));
+  }
+  if (turn !== page.turn || !body.isConnected) return;
+  // Tweak of the Day: the sources' featured packages and the popular ones, of this build's kind when there are any.
+  const pool = [...featured, ...popular];
+  const kind = pool.filter((r) => browseKind(r, jailbroken));
+  const pick = dailyPick(kind.length ? kind : pool, dayKey());
+  heroSlot.replaceChildren(pick ? heroCard(pick, { jailbroken, href: pkgHref(route, pick.id) }) : "");
+  if (pick) rememberNames([pick]);
+  const week = fresh.filter((r) => r.seen >= Date.now() - WEEK_DAYS * 86400000).slice(0, 3);
+  rememberNames(week);
+  if (week.length) freshList.replaceChildren(...week.map((r) => pkgCell(r, pkgHref(route, r.id))));
+  else {
+    freshList.remove();
+    freshGroup.append(el("p", "group-footer", "Nothing new this week. New packages show up here after a refresh."));
+  }
+}
+
+// Grey pulsing rows the shape of a package cell (nav/ui.js placeholder's look), for a grouped table.
+function phCells(n) {
+  return Array.from({ length: n }, (_, i) => {
+    const li = el("li", "cell");
+    const inner = el("div", "cell-inner browse-ph");
+    const lines = el("span", "ph-lines");
+    lines.append(el("span", `ph-bar ${["ph-w50", "ph-w35", "ph-w60"][i % 3]}`), el("span", "ph-bar ph-sub ph-w70"));
+    inner.append(el("span", "ph-box ph-icon"), lines);
+    li.append(inner);
+    return li;
+  });
+}
+
+// A package as a grouped cell: its icon (the section's until its own loads), name, short description, chevron.
+function pkgCell(row, href) {
+  const li = el("li", "cell browse-icon-row");
+  const a = el("a", "cell-inner chevron");
+  a.href = href;
+  a.append(iconBox(row, "cell-icon"));
+  const text = el("span", "cell-text");
+  text.append(el("span", "cell-label", row.name), el("span", "cell-subtitle", row.short || row.section || ""));
+  a.append(text);
+  li.append(a);
+  return li;
+}
+
+// The package's icon over its section's (core/sectionicons.js packageIcon), dropped when it fails to load.
+export function iconBox(row, cls) {
+  const look = packageIcon(row);
+  const box = el("span", cls);
+  box.style.backgroundImage = `url("${look.fallback}")`;
+  const src = iconSrc(row);
+  if (src) {
+    const img = el("img");
+    img.alt = "";
+    img.decoding = "async";
+    img.onload = () => img.classList.add("loaded");
+    img.onerror = () => img.remove();
+    img.src = src;
+    box.append(img);
+  }
+  return box;
+}
+
+// The Tweak of the Day card (null: its placeholder while the lists load). The whole card opens the package.
+function heroCard(row, { jailbroken = true, href = null } = {}) {
+  const card = el(row ? "a" : "div", "browse-hero");
+  if (!row) { card.classList.add("is-loading"); card.setAttribute("aria-busy", "true"); card.setAttribute("aria-label", "Loading"); }
+  card.append(el("span", "browse-hero-kicker", jailbroken ? "TWEAK OF THE DAY" : "APP OF THE DAY"));
+  const main = el("span", "browse-hero-row");
+  const words = el("span", "browse-hero-words");
+  if (row) {
+    card.href = href;
+    main.append(iconBox(row, "browse-hero-icon"));
+    words.append(el("span", "browse-hero-name", row.name), el("span", "browse-hero-desc", row.short || ""));
+  } else {
+    main.append(el("span", "browse-hero-icon ph-box"));
+    words.append(el("span", "ph-bar ph-w60"), el("span", "ph-bar ph-sub ph-w70"));
+  }
+  main.append(words);
+  const foot = el("span", "browse-hero-foot");
+  if (row) foot.append(el("span", "browse-hero-meta", [row.paid ? "Paid" : "Free", row.section].filter(Boolean).join(" · ")), el("span", "browse-hero-view", "View"));
+  card.append(main, foot);
+  return card;
 }

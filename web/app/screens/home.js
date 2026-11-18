@@ -7,24 +7,25 @@
 //   - a grouped list like Cydia's help links: Upgrading & Jailbreaking Help (our page), Find Extensions for
 //     Applications (Search), More Package Sources (a curated list, one tap adds a source); User Guides (screens/guides.js); Credits
 // Every tile and row is a .cell-inner link, so it gets the table cells' held look (blue selection) from ios6.css
-// and app.js. Featured banners from sources' sileo-featured.json sit above the tiles (F20, screens/extras.js).
+// and app.js. No featured banners above the tiles (F154: Browse's Tweak of the Day card instead).
 //
 // Routes below the tab: help, featured, sources (More Package Sources), guides/<id>, credits, wishlist (F102), and browse (F46): Browse's list
 // (F124: New, Recently Updated, Popular, Featured, Free Apps / Tweaks / Themes, then the categories), browse/<list id>
 // (core/catalog.js BROWSE_LISTS: new, updated, popular, featured, free-apps...), browse/category:<name>, and below those browse.js's tokens
 // (package:<id>, author:<name>, versions:<id>), as in the Search tab.
-import { grouped, el } from "../nav/ui.js";
+import { grouped, el, placeholder } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { sourceKey, sourcesFor } from "../core/sources.js";
 import { settings } from "./settings.js";
 import * as browse from "./browse.js";
+import * as roulette from "./roulette.js";
 import { catalog } from "../catalog.js";
 import { currentDevice } from "../device.js";
 import { signAndInstall, signingReady, getBring, deviceStatus, getServer } from "../signing-client.js";
-import { homeFeatured, featuredRefs } from "./extras.js";
-import { browseList, browseListsFor, FRESH_DAYS } from "../core/catalog.js";
+import { featuredRefs } from "./extras.js";
+import { browseList, browseListsFor, FRESH_DAYS, collection } from "../core/catalog.js";
 import { dayOf, dayTitle } from "../core/changes.js";
 import { isAltKey } from "../core/altstore.js";
 import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
@@ -121,11 +122,11 @@ export function homeLinks() {
   { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }];
 }
 
-// F135: the jailbreak app's Home has no featured banners above the tiles (user 2026-11-18: "on jailbroken remove the
-// horizontal scroll of apps. That can be there if you go browse"); its Browse page shows them at the top instead.
-// The website and the sideload app keep them on Home (they draw nothing while Not Jailbroken anyway).
-export const homeShowsFeatured = (mode = "site") => mode !== "jailbreak";
-export const browseShowsFeatured = (mode = "site") => !homeShowsFeatured(mode);
+// F154: no horizontal scroller of featured banners on Home or Browse, in any build (user 2026-11-18, the Browse
+// concept). F135 had moved them from the jailbreak app's Home to Browse's top; Browse's Tweak of the Day card took
+// their place. A source's own page still shows its banners (browse.js drawSections, F20).
+export const homeShowsFeatured = () => false;
+export const browseShowsFeatured = () => false;
 
 export function ipasTile(mode = "site") {
   if (mode === "jailbreak") return null;
@@ -147,8 +148,13 @@ export const showsThemes = (type) => type !== "none";
 
 // F46: what a route under browse/ shows: { page: "root" | "list" | "category" | "browse" (browse.js's own pages,
 // below a list), value }. F124: "list" is one of Browse's lists, by id (core/catalog.js BROWSE_LISTS).
+// F154: also "roulette" (Tweak Roulette, screens/roulette.js), "categories" (All Categories) and "collection"
+// (browse/collection:<id>, core/catalog.js COLLECTIONS).
 export function browsePage(path) {
   if (path.length === 1) return { page: "root" };
+  if (path.length === 2 && path[1] === "roulette") return { page: "roulette" };
+  if (path.length === 2 && path[1] === "categories") return { page: "categories" };
+  if (path.length === 2 && path[1].startsWith("collection:") && collection(path[1].slice(11))) return { page: "collection", value: path[1].slice(11) };
   if (path.length === 2 && browseList(path[1])) return { page: "list", value: path[1] };
   if (path.length === 2 && path[1].startsWith("category:")) return { page: "category", value: path[1].slice(9) };
   return { page: "browse" };
@@ -157,7 +163,10 @@ export function browsePage(path) {
 export function nav(route, ctx) {
   if (route.path[0] === "browse") {
     const b = browsePage(route.path);
-    if (b.page === "root") return { title: "Browse" };
+    if (b.page === "root") return browse.browseHomeNav(); // F154: "Browse", the Featured / New / Top 25 drop-down as its title
+    if (b.page === "roulette") return roulette.nav();
+    if (b.page === "categories") return { title: "All Categories" };
+    if (b.page === "collection") return { title: collection(b.value).title, style: "plain" };
     if (b.page === "list") return { title: browseList(b.value).title, style: "plain" };
     if (b.page === "category") return { title: b.value || "Browse", style: "plain" };
     return browse.nav(route);
@@ -492,8 +501,6 @@ function renderRoot(body) {
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));
   state.tile = stateRow.querySelector("a");
   paintTile(stateTile());
-  // F20: sources' sileo-featured.json banners, a couple from each. F135: not in the jailbreak app (Browse has them).
-  const featured = { box: homeShowsFeatured(settings.mode) ? homeFeatured() : el("div", "featured-box home-featured") };
   // Locked Home (the website before Cydian is installed): Signing full width where Featured | Signing was, and
   // Featured down among the locked rows (user 2026-11-18). Ignore puts the usual row back.
   const lockedFeatured = lockedNow ? [tileRow("halves", tile({ label: "Featured", href: format({ tab: "home", path: ["browse", "popular"] }), glyph: "featured" }))] : [];
@@ -502,7 +509,6 @@ function renderRoot(body) {
   home.append(
     head,
     hintBox,
-    featured.box,
     tileRow("pair",
       tile({ label: "GitHub", href: REPO_URL, glyph: "github", external: true }),
       // Cydia's pair was Facebook | Twitter: here GitHub | Discord (the community)
@@ -559,7 +565,7 @@ function renderRoot(body) {
   });
   refreshState();
   // F82: Reload's redraw. Everything stays on screen; each part is updated where it is: the green tile and the
-  // Install Cydian App offer at once, the featured banners swapped for the new ones only once those are drawn.
+  // Install Cydian App offer at once.
   state.redraw = async () => {
     if (!home.isConnected) return;
     drawHint();
@@ -567,11 +573,6 @@ function renderRoot(body) {
     drawApp();
     checkSigning();
     await refreshState();
-    if (!homeShowsFeatured(settings.mode)) return;
-    const box = homeFeatured();
-    await box.ready; // extras.js homeFeatured: its banners are drawn (or there are none)
-    if (featured.box.isConnected) featured.box.replaceWith(box);
-    featured.box = box;
   };
 }
 
@@ -663,7 +664,6 @@ function renderCredits(body) {
 }
 
 function renderFeatured(body) {
-  body.append(homeFeatured()); // F20
   body.append(grouped([{
     rows: [...(showsThemes(settings.deviceType()) ? [{ label: "Browse Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }) }] : []),
       { label: "All Packages", href: format({ tab: "sources", path: ["*", "section:*"] }) }],
@@ -676,13 +676,11 @@ function renderFeatured(body) {
 // Browse's own page: F124's lists (New, Recently Updated, Popular, Featured, Free Apps / Tweaks / Themes), then the
 // merged categories (core/catalog.js mergeCategories) with their counts. The catalog leaves Themes and Tweaks out
 // while Settings > Device is Not Jailbroken, and so do the lists (browseListsFor).
-async function renderBrowse(body) {
-  // F135: in the jailbreak app the featured banners Home dropped open Browse's page (placeholder cards until they load).
-  if (browseShowsFeatured(settings.mode)) body.append(homeFeatured());
+// F154: Browse's page is browse.js renderBrowseHome now; this is its All Categories row's page: the categories first,
+// then F124's lists. Placeholder rows while the catalog answers.
+async function renderCategories(body) {
   const box = el("div");
-  const spin = el("div", "loading");
-  spin.append(el("span", "loading-spinner"), el("span", null, "Loading Packages"));
-  box.append(spin);
+  box.append(placeholder("page", 8));
   body.append(box);
   let cats;
   try {
@@ -692,11 +690,12 @@ async function renderBrowse(body) {
     box.replaceChildren(el("p", "empty", e.message));
     return;
   }
-  box.replaceChildren(grouped(browseGroups(cats, { jailbroken: showsThemes(settings.deviceType()) })));
+  const [lists, rest] = browseGroups(cats, { jailbroken: showsThemes(settings.deviceType()) });
+  box.replaceChildren(grouped([rest, { ...lists, header: "Lists" }]));
 }
 
 // Home's Browse tile's second line.
-export const BROWSE_SUBTITLE = "New, Updated, Popular, Categories";
+export const BROWSE_SUBTITLE = "Featured, New, Top 25, Roulette";
 
 // The groups of Browse's page for `cats` ([{ name, count }]): the lists (Free Tweaks and Themes only `jailbroken`),
 // then the categories.
@@ -745,7 +744,16 @@ const LIST_VIEW = {
 
 function renderBrowseRoute(body, route, ctx) {
   const b = browsePage(route.path);
-  if (b.page === "root") return renderBrowse(body);
+  if (b.page === "root") {
+    return browse.renderBrowseHome(body, route, { jailbroken: showsThemes(settings.deviceType()), featured: featuredRows, headers: dayHeaders });
+  }
+  if (b.page === "roulette") return roulette.render(body, route, { jailbroken: showsThemes(settings.deviceType()) });
+  if (b.page === "categories") return renderCategories(body);
+  if (b.page === "collection") {
+    const c = collection(b.value);
+    return browse.renderSearchableList(body, route, () => catalog.collection(c.id), { letters: true, label: `Search ${c.title}`,
+      empty: `None of your sources' packages fit ${c.title} yet.` });
+  }
   if (b.page === "list") {
     const v = LIST_VIEW[b.value];
     return browse.renderSearchableList(body, route, v.rows, { letters: Boolean(v.letters), headers: v.headers ?? null,

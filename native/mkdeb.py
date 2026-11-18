@@ -17,6 +17,11 @@ import tarfile
 PREFIX = "./var/jb/"
 APP = PREFIX + "Applications/Cydian.app/"
 HELPER = PREFIX + "usr/libexec/cydian/cydian-helper"
+# N5: the background upgrade check, a launchd daemon that posts "n upgrades" as the app (jailbreak only).
+DAEMON = PREFIX + "usr/libexec/cydian/cydian-upgrades"
+DAEMON_JOB = PREFIX + "Library/LaunchDaemons/com.ryha.cydian.upgrades.plist"
+DAEMON_LABEL = "com.ryha.cydian.upgrades"
+NOTIFY_ENTITLEMENT = "com.apple.private.usernotifications.bundle-identifiers"
 SCRIPTS = ("postinst", "prerm", "postrm", "preinst")
 
 
@@ -154,6 +159,13 @@ def check(path):
     if not post or not post[0].mode & 0o111 or b"uicache -p /var/jb/Applications/Cydian.app" not in post[1]:
         problems.append("postinst missing, not executable, or not running uicache -p on the app")
 
+    job = "/" + DAEMON_JOB[len("./"):]
+    if not post or b"launchctl load " + job.encode() not in post[1]:
+        problems.append("postinst does not launchctl load %s" % job)
+    pre = ctl.get("prerm")
+    if not pre or not pre[0].mode & 0o111 or b"launchctl unload " + job.encode() not in pre[1]:
+        problems.append("prerm missing, not executable, or not running launchctl unload on %s" % job)
+
     with tarfile.open(fileobj=io.BytesIO(m["data.tar.xz"])) as t:
         infos = t.getmembers()
         files = {i.name: (i, t.extractfile(i).read()) for i in infos if i.isfile()}
@@ -219,6 +231,7 @@ def check(path):
                 problems.append("helper is not a signed arm64 iOS executable")
         except (ValueError, struct.error) as e:
             problems.append("helper: %s" % e)
+    problems += _check_daemon(files)
     if APP + "bridge.js" not in files:
         problems.append("no Cydian.app/bridge.js (the script that sets up cydianNative)")
 
@@ -232,6 +245,45 @@ def check(path):
     summary = "%s %s (%s): %d web files, %s" % (fields.get("Package"), fields.get("Version"),
                                                fields.get("Architecture"), len(web), summary)
     return problems, summary
+
+
+def _check_daemon(files):
+    """T5: N5's daemon, signed with the notification entitlement, and its launchd job pointing at it."""
+    from mkipa import macho_entitlements  # mkipa imports this module; import it here, not at the top
+    problems = []
+    if DAEMON not in files:
+        problems.append("no upgrade daemon at %s" % DAEMON[1:])
+    else:
+        i, data = files[DAEMON]
+        if i.mode & 0o7777 != 0o755:
+            problems.append("daemon mode is %o, want 755" % (i.mode & 0o7777))
+        try:
+            cpu, sub, ftype, platform, minos, signed = macho_info(data)
+            if (cpu, sub, ftype, platform) != (0x0100000C, 0, 2, 2) or not signed:
+                problems.append("daemon is not a signed arm64 iOS executable")
+            else:
+                ids = (macho_entitlements(data) or {}).get(NOTIFY_ENTITLEMENT)
+                if not isinstance(ids, list) or "com.ryha.cydian" not in ids:
+                    problems.append("daemon has no %s entitlement for com.ryha.cydian (it can't post notifications)"
+                                    % NOTIFY_ENTITLEMENT)
+        except (ValueError, struct.error, plistlib.InvalidFileException) as e:
+            problems.append("daemon: %s" % e)
+    if DAEMON_JOB not in files:
+        problems.append("no launchd job at %s" % DAEMON_JOB[1:])
+    else:
+        i, data = files[DAEMON_JOB]
+        if i.mode & 0o7777 != 0o644:
+            problems.append("launchd job mode is %o, want 644 (launchd skips writable jobs)" % (i.mode & 0o7777))
+        try:
+            job = plistlib.loads(data)
+        except plistlib.InvalidFileException as e:
+            job = {}
+            problems.append("launchd job: %s" % e)
+        if job.get("Label") != DAEMON_LABEL:
+            problems.append("launchd job Label is %r, want %r" % (job.get("Label"), DAEMON_LABEL))
+        if (job.get("ProgramArguments") or [None])[0] != DAEMON[1:]:
+            problems.append("launchd job does not run %s" % DAEMON[1:])
+    return problems
 
 
 def main(argv):

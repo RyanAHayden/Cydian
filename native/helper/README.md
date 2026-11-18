@@ -10,7 +10,6 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper simulate <item>... | apply <item>... | respring          (N4: the install queue)
     cydian-helper apply-ask <item>...                                      (F63: apply that asks about conffiles)
     cydian-helper install-ipa <path>                                      (F59: an IPA, through installd)
-    cydian-helper selfupdate <path.deb>                                    (F61: iFizBox updates itself)
     cydian-helper rollbacks <pkg> | rollback <pkg> <version>              (F71: Roll Back to a kept .deb)
     cydian-helper install-paid <path.deb> <pkg> <version>                 (F57: a paid package's .deb)
     cydian-helper simulate-deb <path.deb> | install-deb <path.deb>         (N9: a .deb shared with iFizBox)
@@ -35,7 +34,6 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `apply`     | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --reinstall --allow-downgrades --allow-unauthenticated [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <items>`, with `CYDIA=3 1` in its environment when fd 3 is open (N4) |
 | `apply-ask` | `apt-get -y --reinstall --allow-downgrades --allow-unauthenticated -o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install <items>` (no conffile options; refused without fd 3), `CYDIA=3 1`, as a child whose stdin is a pipe the helper feeds (F63; below) |
 | `install-ipa` | runs no apt: installs one IPA through `LSApplicationWorkspace installApplication:withOptions:error:` as AppSync's `appinst` does (`ipa.c`, F59; below) |
-| `selfupdate` | `dpkg --force-confdef --force-confold [--status-fd 3] -i <path>`: iFizBox's own update (F61). The path is absolute, `[A-Za-z0-9._/-]`, no `.`/`..` segment, ends in `.deb`, at most 1024 bytes, and a regular file (not a symlink). Any .deb is accepted: the caller check is the boundary, and iFizBox can already install anything through `addsource` + `install` |
 | `rollbacks` | runs nothing: `<version> <file>` per line for each .deb of the package N7's daemon kept in `/var/jb/var/cache/cydian/rollback/<pkg>/` that `rollback` would take (F71; below) |
 | `notifications` | runs nothing: `off` creates `/var/jb/var/lib/cydian/upgrades.off` (empty, 0644; the folder 0755 if missing), `on` deletes it (F65, Settings' Upgrade Notifications; N5's daemon reads it, `../daemon/quiet.h`). A symlink or anything but a regular file there is refused (exit 74), never followed. Prints `Upgrade notifications on\|off` |
 | `app-versions` | runs nothing: `<id>\t<short>\t<build>\t<store>` per app installd put in `/var/containers/Bundle/Application` (`HELPER_APPS_DIR`): `<UUID>/<the one>.app/Info.plist`'s CFBundleIdentifier, CFBundleShortVersionString and CFBundleVersion, and `<UUID>/iTunesMetadata.plist`'s bundleShortVersionString (App Store apps). Real directories and regular files only (`lstat`, `O_NOFOLLOW`, at most 4 MiB), a bundle id `[A-Za-z0-9.-]`, a value with a control character or over 255 bytes printed empty, at most 4096 apps. A missing folder lists nothing (exit 0), an unreadable one is exit 74 (I4; `ipa.c`) |
@@ -129,7 +127,7 @@ a refused path, file or control, 74 couldn't copy, else apt's.
 **Shared .debs (N9):** `simulate-deb <path>` and `install-deb <path>` take one file,
 `/var/mobile/Library/Caches/com.ryha.cydian/deb/<name>.deb` (`HELPER_DEB_DIR`, where the shell stages a .deb another
 app shared, `../share/App/ShareBridge.swift`; name as install-paid's). `paid.c` copies it as install-paid does into a
-root-owned `/var/tmp/cydian-deb.XXXXXX/deb.deb`, with no control check (any .deb, as `selfupdate`: the caller check is
+root-owned `/var/tmp/cydian-deb.XXXXXX/deb.deb`, with no control check (any .deb: the caller check is
 the boundary), then runs `apt-get -s --reinstall --allow-downgrades install <copy>` (the Confirm sheet's plan) or
 `apt-get -y` (conffile options) `--reinstall --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install
 <copy>` with `CYDIA=3 1` (the console), so apt pulls dependencies from the sources (`apt install ./file.deb`). Exit 64

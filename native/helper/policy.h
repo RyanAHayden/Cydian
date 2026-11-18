@@ -16,12 +16,12 @@
 #define HELPER_EX_IOERR 74  /* F33: cydian.sources couldn't be read or written */
 
 enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, HV_HOLD, HV_UNHOLD, HV_SHOWHOLD,
-                   HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA, HV_SELFUPDATE,
+                   HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA,
                    HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK, HV_INSTALL_PAID, HV_NOTIFICATIONS,
                    HV_USERSPACE_REBOOT, HV_SIMULATE_DEB, HV_INSTALL_DEB,
                    HV_APP_VERSIONS, HV_UICACHE };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
-                     "simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid, " \
+                     "simulate, apply, apply-ask, respring, install-ipa, rollbacks, rollback, install-paid, " \
                      "notifications, userspace-reboot, simulate-deb, install-deb, app-versions, uicache"
 
 /* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
@@ -75,12 +75,6 @@ struct helper_plan {
     char deb[PATH_MAX]; /* F71 rollback: the stored .deb apt-get installs (also in argv) */
 };
 
-/* F61: selfupdate <path>: dpkg -i of the one .deb the app downloaded (iFizBox's own update). The path is absolute,
- * of [A-Za-z0-9._/-], with no "." or ".." segment, ends in ".deb", at most HELPER_DEB_PATH_MAX bytes, and is a
- * regular file (not a symlink) when the plan is made. */
-#define HELPER_DEB_PATH_MAX 1024
-int helper_deb_path_ok(const char *s);
-
 /* F71: Roll Back. N7's daemon keeps .debs in <prefix>HELPER_ROLLBACK_DIR/<id>/, named as apt's archive cache
  * names them: <id>_<version>_<arch>.deb, the epoch's ':' as "%3a".
  *   rollbacks <id>            runs nothing: prints "<version> <file>" for each stored .deb of id the helper would
@@ -130,7 +124,7 @@ int helper_paid_path_ok(const char *dir, const char *path);
  *   simulate-deb  apt-get -s --reinstall --allow-downgrades install <copy>       (the Confirm sheet's plan)
  *   install-deb   apt-get -y (conffile options) --reinstall --allow-downgrades [-o APT::Keep-Fds::=3 -o
  *                 APT::Status-Fd=3] install <copy>, CYDIA=3 1 as for apply           (the console)
- * No control check: any .deb is accepted, as selfupdate does; the caller check is the boundary. Tests build with
+ * No control check: any .deb is accepted; the caller check is the boundary. Tests build with
  * their own -DHELPER_DEB_DIR. */
 #ifndef HELPER_DEB_DIR
 #define HELPER_DEB_DIR "/var/mobile/Library/Caches/com.ryha.cydian/deb"

@@ -49,7 +49,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         on("clipboard.read") { c in
             DispatchQueue.main.async { ClipboardRead.read(auto: c.params["auto"] as? Bool ?? false) { c.reply($0, nil) } }
         }
-        SelfUpdate.register(self) // F61: selfupdate.download, app.quit (below)
+        SelfUpdate.register(self) // F72: app.openURL (below)
         Apt.register(self) // N3: apt's files, the network, cydian-helper, haptic.tap (Apt.swift)
         Paid.register(self) // F57: vendors' calls, UDID, Keychain, sign-in sheet, paid installs (Paid.swift)
         SignBridge.register(self) // I6: sign and install IPAs on the phone, sideload build (SignBridge.swift)
@@ -176,35 +176,10 @@ enum Theme {
     }
 }
 
-// F61: iFizBox updates itself (web/app/core/selfupdate.js). The jailbreak build downloads its release's .deb here and
-// installs it with `cydian-helper selfupdate <path>` (dpkg -i, native/helper/README.md); the sideload build signs
-// its Cydian.ipa through signing.install and needs nothing from here.
-//   selfupdate.download {url} -> {path, bytes}   the .deb (an ar archive) in this app's temp folder
-//   app.quit                                      to the Home Screen, then exit, so the next launch runs the new build
+// F72: links outside the web view. (F61's selfupdate.download and app.quit went with F183's silent update, C8.)
+//   app.openURL {url} -> {opened}
 enum SelfUpdate {
     static func register(_ b: Bridge) {
-        b.on("selfupdate.download") { c in
-            guard let url = Apt.httpURL(c.params["url"]), url.scheme?.lowercased() == "https" else {
-                return Apt.reply(c, nil, "bad_url: not an https URL")
-            }
-            Apt.get(url) { res in
-                switch res {
-                case .failure(let e): Apt.reply(c, nil, e.text)
-                case .success(let (status, _, data)):
-                    guard status < 400 else { return Apt.reply(c, nil, "upstream: HTTP \(status)") }
-                    guard data.starts(with: Array("!<arch>\n".utf8)) else { return Apt.reply(c, nil, "upstream: not a .deb") }
-                    // The helper takes only [A-Za-z0-9._/-] paths: the temp folder's path is a container UUID or /tmp.
-                    let file = FileManager.default.temporaryDirectory.appendingPathComponent("Cydian-update.deb")
-                    do {
-                        try? FileManager.default.removeItem(at: file)
-                        try data.write(to: file, options: .atomic)
-                        Apt.reply(c, ["path": file.standardizedFileURL.path, "bytes": data.count], nil)
-                    } catch {
-                        Apt.reply(c, nil, "network: couldn't save the .deb: \(error.localizedDescription)")
-                    }
-                }
-            }
-        }
         // F72: open a link outside the web view (iFizBox's own update: the Signing Server's itms-services link, or
         // cydian.dev in Safari). B8: any scheme iOS can hand to an app (feather://, altstore://, sileo://…), not
         // the bundle's own, javascript:, file: or data: (LinkOut.canOpen).
@@ -213,14 +188,6 @@ enum SelfUpdate {
                 return Apt.reply(c, nil, "bad_url: not a URL another app can open")
             }
             LinkOut.open(url) { ok in c.reply(["opened": ok], nil) }
-        }
-        b.on("app.quit") { c in
-            DispatchQueue.main.async {
-                c.reply(nil, nil)
-                // Cydia's "Close Cydia" (finish:reopen): suspend to the Home Screen, then end the process.
-                UIApplication.shared.perform(#selector(NSXPCConnection.suspend))
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { exit(0) }
-            }
         }
     }
 }

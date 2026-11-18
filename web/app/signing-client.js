@@ -150,7 +150,11 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {}, b
   // iOS closes iFizBox, and its install server, while it installs over it. Straight to iOS's Install prompt.
   if (isSelfIpa(url)) return installOnDevice({ url, name: name || NAME, onInstalled, host: true });
   // F75: the first Install with something missing opens the Signing walkthrough at that step, not an alert.
-  if (await firstInstallCheck()) return false;
+  if (await firstInstallCheck()) {
+    // F177: Signing offers Install Now for this app once it's set up.
+    (await import("./screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version }) });
+    return false;
+  }
   // F81: one tap: Install signs and installs straight away. The look-first sheet (F68, signing-sheet.js) is the app
   // page's Custom Install row (signing-sheet.js customInstall).
   return installOnDevice({ url, name, onInstalled });
@@ -500,6 +504,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   const id = await identity();
   if (!id?.p12 || !id?.profile) {
     await alert({ title: "No Certificate", message: "Add your certificate, its password and provisioning profile in Settings > Signing.", buttons: ["OK"] });
+    (await import("./screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version }) }); // F177
     go(["signing"]);
     return false;
   }

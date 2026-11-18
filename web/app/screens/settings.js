@@ -22,7 +22,7 @@ import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, server
   localSigning, deviceStatus, importToDevice, removeFromDevice, installOnDevice, statusReady, defaultServer,
   browserSigning, getBring, setBring, signAndInstall } from "../signing-client.js";
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
-import { drawWalkthrough, walkOpen } from "./signing.js";
+import { drawWalkthrough, walkOpen, offerInstall, missingStep, siteReady } from "./signing.js";
 import { openInAppSection } from "./importlink.js";
 import { accountSection, drawAccount, startAccountSync } from "./account.js";
 import { signingExtras } from "./signed-apps.js";
@@ -700,6 +700,7 @@ async function drawDeviceSigning(el) {
   };
   showSigningPage(el, signingLayout({ mode: "sideload", certificate: Boolean(kept), staged, profile: split.profile.length > 0,
     options: settings.sections().some((s) => s.page === "signing") }), parts);
+  offerInstall(missingStep(status, getServer()) == null); // F177: Install sent the user here: Install Now once ready
 }
 
 // The walkthrough (F69, F75): Import Your Certificate (Select All Files, the rows, the Files picker's picture), then
@@ -715,6 +716,7 @@ async function drawSigningHelp(el) {
       certificate: certificateBlock(el, id, status ?? { identity: null }),
       server: serverGroup(el), serverUrl: server, open: walkOpen,
     });
+    offerInstall(missingStep(status, server) == null); // F177
     return;
   }
   if (!browserSigning()) return drawSigning(el);
@@ -731,6 +733,7 @@ async function drawSigningHelp(el) {
       footer: "Install downloads the app, signs it in this browser with your certificate, and leaves the signed app on "
         + `${location.host} for 10 minutes so iOS can install it. Your certificate, key and password stay in this browser.` }])],
   });
+  offerInstall(siteReady(id)); // F177
 }
 
 export const HELP = "help";
@@ -982,4 +985,5 @@ async function drawSiteSigning(el) {
   };
   showSigningPage(el, signingLayout({ mode: "site", certificate: ready, staged, profile: split.profile.length > 0, ready,
     options: settings.sections().some((s) => s.page === "signing") }), parts);
+  offerInstall(siteReady(id)); // F177: Install sent the user here: Install Now once ready
 }

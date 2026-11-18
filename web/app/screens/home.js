@@ -24,6 +24,7 @@ import * as roulette from "./roulette.js";
 import { catalog } from "../catalog.js";
 import { currentDevice } from "../device.js";
 import { signAndInstall, signingReady, getBring, deviceStatus, getServer } from "../signing-client.js";
+import { rememberInstall } from "./signing.js";
 import { featuredRefs } from "./extras.js";
 import { browseList, browseListsFor, FRESH_DAYS, collection } from "../core/catalog.js";
 import { dayOf, dayTitle } from "../core/changes.js";
@@ -76,10 +77,17 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
 // iFizBox's IPA signed in the browser and installed, carrying the certificate (Bring My Certificate), sources and
 // settings into its first launch; without one, Settings > Signing first. -> "install" | "signing"
 // F96: once iOS was asked to install it, the website stops asking "Install iFizBox First" (websign-gate.js).
+// F177: on the way to Signing it remembers this install (signing.js rememberInstall), so Signing offers Install Now
+// once the certificate is in.
 export async function installApp({ ready = signingReady, install = signAndInstall, bring = getBring, go = (h) => { location.hash = h; },
-  installed = markCydianInstalled } = {}) {
-  if (!(await ready())) { go(format(settingsRoute(["signing"])).replace(/^#/, "")); return "signing"; }
-  install({ url: APP_IPA_URL, name: APP_NAME, bring: bring(), onInstalled: () => installed() });
+  installed = markCydianInstalled, remember = rememberInstall } = {}) {
+  const run = () => install({ url: APP_IPA_URL, name: APP_NAME, bring: bring(), onInstalled: () => installed() });
+  if (!(await ready())) {
+    remember({ name: APP_NAME, run });
+    go(format(settingsRoute(["signing"])).replace(/^#/, ""));
+    return "signing";
+  }
+  run();
   return "install";
 }
 

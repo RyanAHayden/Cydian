@@ -615,7 +615,13 @@ async function packageActions(route, button) {
     const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v));
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });
     if (many) actions.push({ label: "Version History", run: () => go(versionsHref(route, id)) });
-    if (!options.itms && (signingAvailable() || localSigning())) actions.push({ label: "Sign with My Certificate", run: () => go(format({ tab: "settings", path: ["signing"] })) });
+    // Sign with My Certificate tries the signing itself: if the certificate isn't usable the signer's own error says
+    // why (and opens Settings > Signing), rather than going there with no word (seen on the sideload app).
+    if (!options.itms && (signingAvailable() || localSigning())) {
+      const url = installOptions(v, st.ipa.sourceUrl).download;
+      actions.push({ label: "Sign with My Certificate", run: () => (url ? signAndInstall({ url, name: st.ipa.name, onInstalled: () => recordApp(pkg, source, v)?.() })
+        : go(format({ tab: "settings", path: ["signing"] }))) });
+    }
     return sheet(options.itms ? "" : "This app needs signing: a sideloader signs it on the iPhone with your Apple ID, or add your own certificate in Settings > Signing.", actions);
   }
   const installed = installedOf(history);

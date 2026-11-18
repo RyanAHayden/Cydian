@@ -649,7 +649,7 @@ async function renderPackage(body, route, key, id, ctx) {
   // F181: the sideways info tiles: Rating (once known), Works On, Size, Section.
   const tiles = tileRow();
   tiles.set("works", worksOnTile(fit));
-  tiles.set("size", sizeTile(size));
+  tiles.set("size", sizeTile(size, pkg.installedOnly ? null : isPaid(st) ? "Paid" : "Free"));
   tiles.set("section", sectionTile(pkg.row.section === NO_SECTION ? null : pkg.row.section, { rootless: "Rootless", rootful: "Rootful", roothide: "Roothide" }[fit.need] ?? null));
   details.append(tiles.row);
   ratingTiles = tiles; // the Rating tile: showRating above, once the depiction and reviews written here are both in

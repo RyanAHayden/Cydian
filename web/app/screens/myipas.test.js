@@ -60,7 +60,7 @@ test("Install IPAs: the page's title, Add, and Browse's pages below it", async (
   assert.deepEqual(pageOf(r("myipas", "search")), { page: "search" });
 });
 
-test("Install IPAs' Browse section: Search, All Apps and the categories of the AltStore apps only", async () => {
+test("Install IPAs' Browse section: All Apps and the categories of the AltStore apps only", async () => {
   const { browseGroups, appsOf, libraryEmptyText } = await import("./myipas.js");
   const rows = [
     { id: "a", name: "Delta", short: "Game emulator", section: "Apps (Games)", kind: "ipa" },
@@ -73,17 +73,23 @@ test("Install IPAs' Browse section: Search, All Apps and the categories of the A
   assert.deepEqual(appsOf(null), []);
   const [top, cats] = browseGroups(apps);
   assert.equal(top.header, "Browse");
-  assert.deepEqual(top.rows.map((x) => x.label), ["Search Apps", "All Apps"]);
-  assert.equal(top.rows[0].href, "#/installed/myipas/search");
-  assert.equal(top.rows[1].detail, "3");
-  assert.equal(top.rows[1].href, "#/installed/myipas/apps");
+  assert.deepEqual(top.rows.map((x) => x.label), ["All Apps"]); // the page's search bar replaced Search Apps
+  assert.equal(top.rows[0].detail, "3");
+  assert.equal(top.rows[0].href, "#/installed/myipas/apps");
   assert.deepEqual(cats.rows.map((x) => [x.label, x.detail]), [["Games", "1"], ["Emulators", "1"], ["Developer", "1"]]);
   assert.equal(cats.rows[0].href, "#/installed/myipas/category%3AGames");
   // loading, and no AltStore source
-  assert.deepEqual(browseGroups(null)[0].rows.map((x) => x.label), ["Search Apps", "Loading Apps"]);
+  assert.deepEqual(browseGroups(null)[0].rows.map((x) => x.label), ["Loading Apps"]);
   const none = browseGroups([]);
   assert.equal(none.length, 1);
   assert.match(none[0].footer, /AltStore source/);
   assert.match(libraryEmptyText(true), /Signing Server/);
   assert.match(libraryEmptyText(false), /On My iPhone > Cydian/);
+});
+
+test("Install IPAs: a list's search bar matches name, description, developer or ID", async () => {
+  const { matchApp } = await import("./myipas.js");
+  const r = { id: "com.x.delta", name: "Delta", short: "Game emulator", author: "Riley" };
+  assert.ok(matchApp(r, "delt") && matchApp(r, "EMUL") && matchApp(r, "riley") && matchApp(r, "com.x"));
+  assert.equal(matchApp(r, "utm"), false);
 });

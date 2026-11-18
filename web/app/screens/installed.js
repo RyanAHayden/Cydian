@@ -290,7 +290,7 @@ function attachRowGestures(ul) {
 
 function setEditing(on, button) {
   appView.editing = on;
-  appView.body?.querySelector(".table")?.classList.toggle("editing", on);
+  appView.body?.querySelector(":scope > .table")?.classList.toggle("editing", on); // the apps, not My IPAs' tile (inside .home-row)
   for (const li of appView.body?.querySelectorAll(".installed-app.armed") ?? []) li.classList.remove("armed");
   if (button) {
     button.textContent = on ? "Done" : "Edit";

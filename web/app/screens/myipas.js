@@ -21,7 +21,8 @@
 import { grouped } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { catalog, ALL } from "../catalog.js";
-import { mergeCategories } from "../core/catalog.js";
+import { mergeCategories, indexLetter } from "../core/catalog.js";
+import { withLetterHeaders } from "../nav/vlist.js";
 import { format } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
@@ -93,15 +94,34 @@ export function render(body, route, ctx) {
     view.route = route;
     view.browse.append(grouped(browseGroups(null)));
     view.body.append(note("Loading"));
-    page.append(view.browse, view.body);
+    // The search bar on top (user 2026-11-17): empty, Browse and My IPAs show; typed, every app on the sources.
+    const results = el("div", "install-ipas-results");
+    results.hidden = true;
+    const hint = el("p", "empty search-note");
+    const list = browse.packageList(results, route, [], { letters: false });
+    results.append(hint, list.el);
+    let seq = 0;
+    const bar = searchBar("Search Apps", async (q) => {
+      const mine = ++seq;
+      results.hidden = !q;
+      view.browse.hidden = view.body.hidden = Boolean(q);
+      if (!q) return list.setItems([]);
+      let rows;
+      try { await catalog.ensure(); rows = appsOf(await catalog.search(q)); } catch (e) { if (mine === seq) hint.textContent = e.message; return; }
+      if (mine !== seq) return;
+      browse.rememberNames(rows);
+      list.setItems(rows);
+      hint.textContent = rows.length ? "" : "No Results";
+    });
+    page.append(bar, view.browse, view.body, results);
     body.append(page);
     loadBrowse();
     load();
     return;
   }
   if (p?.page === "search") return renderSearch(body, route);
-  if (p?.page === "apps") return browse.renderList(body, route, async () => appsOf(await catalog.list(ALL, ALL)), true);
-  if (p?.page === "category") return browse.renderList(body, route, async () => appsOf(await catalog.browse(p.value)), true);
+  if (p?.page === "apps") return renderFiltered(body, route, async () => appsOf(await catalog.list(ALL, ALL)), "Search All Apps");
+  if (p?.page === "category") return renderFiltered(body, route, async () => appsOf(await catalog.browse(p.value)), `Search ${p.value}`);
   if (p?.page === "browse") return browse.render(body, route, ctx);
   if (p?.page === "ipa") return renderIpa(body, route, p.file);
   if (p?.page === "options") return renderOptions(body, route, p.file);
@@ -185,7 +205,7 @@ const browseHref = (seg) => format({ tab: "installed", path: [MYIPAS, seg] });
 // Install IPAs' Browse groups for `apps` (AltStore app rows), or null while the catalog loads: Search and All Apps,
 // then the categories with their counts. No apps: a line saying where they come from.
 export function browseGroups(apps) {
-  const top = [{ label: "Search Apps", href: browseHref("search") }];
+  const top = []; // the page's search bar searches (Search Apps' own page stays for older links)
   if (apps == null) {
     return [{ header: "Browse", rows: [...top, { label: "Loading Apps", chevron: false }] }];
   }
@@ -214,7 +234,45 @@ async function loadBrowse() {
   view.browse.replaceChildren(grouped(browseGroups(apps)));
 }
 
-// Search Apps: Search's bar (packages.css) over the AltStore apps only, results as browse.js rows.
+// Search's bar (packages.css); onQuery(trimmed text) runs as the user types (debounced) and on Search.
+function searchBar(placeholder, onQuery) {
+  const bar = el("form", "search-bar");
+  bar.setAttribute("role", "search");
+  const field = el("label", "search-field");
+  const input = Object.assign(el("input"), { type: "search", placeholder, autocomplete: "off", spellcheck: false });
+  input.setAttribute("autocapitalize", "off");
+  input.setAttribute("autocorrect", "off");
+  input.setAttribute("aria-label", placeholder);
+  input.enterKeyHint = "search";
+  field.append(input);
+  bar.append(field);
+  let timer = 0;
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => onQuery(input.value.trim()), 120); });
+  bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); onQuery(input.value.trim()); input.blur(); });
+  return bar;
+}
+
+// All Apps and a category: their list with a search bar that narrows this list only.
+export const matchApp = (r, q) => [r.name, r.short, r.author, r.id].some((v) => String(v ?? "").toLowerCase().includes(q.toLowerCase()));
+async function renderFiltered(body, route, fetchRows, placeholder) {
+  const wait = el("p", "empty", "Loading");
+  body.append(wait);
+  let rows;
+  try { await catalog.ensure(); rows = await fetchRows(); } catch (e) { wait.textContent = e.message; return; }
+  if (!rows.length) { wait.textContent = "No apps."; return; }
+  wait.remove();
+  const lettered = (list) => withLetterHeaders(list, (r) => indexLetter(r.name));
+  const none = el("p", "empty", "No Results");
+  none.hidden = true;
+  const list = browse.packageList(body, route, rows, { letters: true });
+  body.append(searchBar(placeholder, (q) => {
+    const shown = q ? rows.filter((r) => matchApp(r, q)) : rows;
+    list.setItems(q ? shown : lettered(shown));
+    none.hidden = shown.length > 0;
+  }), none, list.el);
+}
+
+// Search Apps (older links): Search's bar (packages.css) over the AltStore apps only, results as browse.js rows.
 function renderSearch(body, route) {
   const bar = el("form", "search-bar");
   bar.setAttribute("role", "search");

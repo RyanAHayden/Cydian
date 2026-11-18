@@ -1,0 +1,11 @@
+insets: true
+added apt deb:https://repo.example/:./
+changes before {"navbar":"0,0,390,91","row":null,"back":null,"scrollTop":0,"scrollHeight":845,"banner":null,"reload":null,"tabbar":"0,761,390,83"}
+changes after  {"navbar":"0,0,390,91","row":null,"back":null,"scrollTop":0,"scrollHeight":889,"banner":"0,91,390,49","reload":"0,717,390,44","tabbar":"0,761,390,83"}
+pushed to #/home/settings/account
+pushed before {"navbar":"0,0,390,91","row":"11,102,368,43","back":"5,54,71,30","scrollTop":0,"scrollHeight":845,"banner":null,"reload":null,"tabbar":"0,761,390,83"}
+pushed after  {"navbar":"0,0,390,91","row":"11,102,368,43","back":"5,54,71,30","scrollTop":0,"scrollHeight":889,"banner":"0,91,390,49","reload":"0,717,390,44","tabbar":"0,761,390,83"}
+sheet before {"navbar":"0,0,390,91","row":"10,101,370,43","back":"5,54,71,30","scrollTop":0,"scrollHeight":845,"banner":null,"reload":null,"tabbar":"0,761,390,83"}
+sheet after  {"navbar":"0,0,390,91","row":"10,101,370,43","back":"5,54,71,30","scrollTop":0,"scrollHeight":889,"banner":"0,91,390,49","reload":"0,766,390,44","tabbar":"0,761,390,83"}
+banner parent in sheet: true
+errors: none

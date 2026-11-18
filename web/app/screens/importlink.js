@@ -58,7 +58,7 @@ async function openInApp() {
   }
   hide();
   // Safari's own "Open in iFizBox?" can't be reworded: the banner says which button to press.
-  showBanner({ title: NAME, message: `Press Open to bring your certificate, sources and settings into ${NAME}.` });
+  showBanner({ title: NAME, message: `Press Open to bring your certificate, sources and settings into ${NAME}.`, wait: true });
   location.href = link;
 }
 

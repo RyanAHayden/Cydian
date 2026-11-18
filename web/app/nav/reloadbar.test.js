@@ -102,7 +102,7 @@ test("F150: the bar drops down with the text, changes it, and slides back up; on
   assert.equal(el.querySelector(".reload-text").textContent, "Updating Sources");
   assert.equal(cancelButton(el).textContent, "Cancel");
   assert.ok(cancelButton(el).classList.contains("done"), "the blue bar button");
-  assert.ok(doc.documentElement.classList.contains("has-reload"), "the nav bar and screens move down");
+  assert.ok(doc.documentElement.classList.contains("has-reload"), "the scrollers get room for the strip");
   clock.advance(MIN_STEP_MS);
   bar.set("Loading Data");
   assert.equal(el.querySelector(".reload-text").textContent, "Loading Data");
@@ -129,20 +129,26 @@ test("F150: Cancel hides the bar and calls onCancel once; showing another bar re
   two.hide();
 });
 
-test("F150: nothing blocks input: no full-screen layer, no pointer-events trick, the page moves rather than is covered", () => {
+test("F150/F204: nothing blocks input or moves: a 44 pt strip on the tab bar, no pointer-events trick, no push", () => {
   const css = readFileSync(new URL("../ios6.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, decl]) => ({ sel: sel.trim(), decl }));
   const bar = rules.find((r) => r.sel === ".reload-bar");
   assert.ok(bar, ".reload-bar missing");
-  assert.doesNotMatch(bar.decl, /inset\s*:\s*0|bottom\s*:|height\s*:\s*100/, "the strip is only as tall as a bar");
-  assert.match(bar.decl, /height\s*:\s*calc\(44px \+ env\(safe-area-inset-top\)\)/);
+  assert.doesNotMatch(bar.decl, /inset\s*:\s*0|top\s*:|height\s*:\s*100/, "the strip is only as tall as a bar");
+  assert.match(bar.decl, /(^|;)\s*height\s*:\s*44px/);
+  assert.match(bar.decl, /bottom\s*:\s*var\(--tab-h\)/, "it sits on top of the tab bar");
+  assert.ok(Number(/z-index\s*:\s*(\d+)/.exec(bar.decl)[1]) < 3, "below the tab bar (3), so it slides out from behind it");
   for (const r of rules.filter((x) => /reload/.test(x.sel))) {
     assert.doesNotMatch(r.decl, /pointer-events\s*:\s*none/, r.sel);
-    assert.doesNotMatch(r.decl, /transition\s*:(?![^;]*transform)/, `${r.sel}: transform/opacity only`);
-  }
-  const push = rules.find((r) => r.sel === "html.has-reload #navbar, html.has-reload #screens");
-  assert.ok(push, "the nav bar and screens move down while it shows");
-  assert.match(push.decl, /transform\s*:\s*translateY\(44px\)/);
+    assert.doesNotMatch(r.decl, /transition\s*:(?![^;]*\b(transform|translate|opacity)\b)/, `${r.sel}: transform/opacity only`);  }
+  assert.ok(!rules.some((r) => /has-reload[^,{]*(#navbar|#screens|\.sheet)\b/.test(r.sel)), "the nav bar, screens and sheets no longer move");
+  const room = rules.find((r) => /^html\.has-reload :is\([^)]*\.page-body[^)]*\.sheet-scroll[^)]*\)::after$/.test(r.sel));
+  assert.ok(room, "the scrollers get room at their end while it shows");
+  assert.match(room.decl, /height\s*:\s*44px/);
+  const over = rules.find((r) => r.sel === "body:has(.sheet) .reload-bar");
+  assert.ok(over && Number(/z-index\s*:\s*(\d+)/.exec(over.decl)[1]) > 25, "over a sheet it comes above it");
+  assert.match(over.decl, /translate\s*:/, "and moves by translate, composited");
+  assert.doesNotMatch(readFileSync(new URL("./reloadbar.js", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""), /translateY\(-/, "it slides up from behind the tab bar, not down from the top");
   // and the bar's own module makes no scrim (the HUD's .hud-scrim is what used to eat taps)
   assert.doesNotMatch(readFileSync(new URL("./reloadbar.js", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""), /scrim|inset/);
 });
@@ -215,7 +221,7 @@ test("F179: a slow step changes at once when the next comes; Cancel and a new ba
   one.hide();                                   // still lingering for its minimum
   const two = showReloadBar("Updating Sources", { doc, clock });
   assert.ok(!doc.body.children.includes(one.el) || one.el.animations.length === 2, "the first slides away now");
-  assert.ok(doc.documentElement.classList.contains("has-reload"), "the new bar holds the page down");
+  assert.ok(doc.documentElement.classList.contains("has-reload"), "the new bar keeps the scrollers' extra room");
   clock.advance(MIN_STEP_MS * 2);
   assert.ok(doc.documentElement.classList.contains("has-reload"), "the old bar's timer does not take the new one's room");
   two.dismiss();

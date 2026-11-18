@@ -1,6 +1,7 @@
 // Table views as iOS 6 draws them (styles in ios6.css). Screens describe sections as data and get DOM back:
 //
-//   grouped([{ header, footer, rows: [{ label, detail, subtitle, href, onClick, chevron, checked, icon }] }])
+//   grouped([{ header, footer, rows: [{ label, detail, subtitle, href, onClick, chevron, checked, icon, cls }] }])
+//   icon: { text, color, src } (src: a picture over the letter, dropped if it fails to load); cls: a class on the cell
 //   plain([{ header, rows: [...] }])   white list, sticky gradient section headers
 //
 // A row with an href is a link (pushes when it points deeper into the tab); `chevron` defaults to on for links.
@@ -15,12 +16,21 @@ function el(tag, cls, text) {
 
 function cell(row) {
   const li = el("li", "cell");
+  if (row.cls) li.classList.add(row.cls);
   const inner = row.href || row.onClick ? el(row.href ? "a" : "button", "cell-inner") : el("div", "cell-inner");
   if (row.href) inner.href = row.href;
   if (row.onClick) { if (!row.href) inner.type = "button"; inner.addEventListener("click", row.onClick); }
   if (row.icon) {
     const icon = el("span", "cell-icon", row.icon.text || "");
     if (row.icon.color) icon.style.background = row.icon.color;
+    if (row.icon.src) {
+      const img = el("img");
+      img.alt = "";
+      img.onload = () => img.classList.add("loaded");
+      img.onerror = () => img.remove();
+      img.src = row.icon.src;
+      icon.append(img);
+    }
     inner.append(icon);
   }
   const text = el("span", "cell-text");

@@ -476,6 +476,16 @@ function renderHelp(body) {
   ])));
 }
 
+// Who Special Thanks thanks: [name, handle, their page, GitHub account for the picture, what for].
+const THANKS = [
+  ["Jay Freeman", "@saurik", "https://x.com/saurik", "saurik", "For Cydia, whose look and GPLv3 source Cydian follows."],
+  ["Teehan+Lax", "@teehanlax", "https://x.com/teehanlax", "teehanlax", "For the iOS 6 GUI kit."],
+  ["Riley Testut", "@rileytestut", "https://x.com/rileytestut", "rileytestut", "For AltStore and its source format."],
+  ["Procursus", "GitHub", "https://github.com/ProcursusTeam", "ProcursusTeam", "For the bootstrap today's jailbreaks run on."],
+  ["Dopamine", "@opa334dev", "https://x.com/opa334dev", "opa334", "opa334 and team, for the iOS 15 and 16 jailbreak."],
+  ["palera1n", "@palera1n", "https://x.com/palera1n", "palera1n", "For the checkm8 jailbreak."],
+];
+
 // Credits / Thank You (Cydia's credits.html: who it thanks), with what Cydian is and its version.
 function renderCredits(body) {
   const rows = [{ label: "Version", detail: "Cydian Web" }, { label: "License", detail: "GPL-3.0+" },
@@ -484,9 +494,12 @@ function renderCredits(body) {
     { header: "Cydian", rows, footer: "A package manager with the iOS 6 look, for modern iPhones, by Ryan Hayden (Fizlo)." },
     {
       header: "Special Thanks",
-      footer: "Jay Freeman (saurik), for Cydia, whose look and GPLv3 source Cydian follows. Not affiliated with "
-        + "SaurikIT. Teehan+Lax, for the iOS 6 GUI kit. Riley Testut, for AltStore's source format. The Procursus, "
-        + "Dopamine and palera1n teams, for today's jailbreaks.",
+      rows: THANKS.map(([label, handle, url, gh, why]) => ({
+        label, subtitle: `${handle}\n${why}`, chevron: true, cls: "thanks-row",
+        icon: { text: label.charAt(0), color: "#7a8a99", src: `https://github.com/${gh}.png?size=128` },
+        onClick: () => window.open(url, "_blank", "noopener"),
+      })),
+      footer: "Cydian is not affiliated with SaurikIT or any of the above.",
     },
   ])));
   globalThis.cydianNative?.call?.("app.info", {}).then((i) => {

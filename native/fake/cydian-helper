@@ -31,7 +31,7 @@ status=$prefix/var/lib/dpkg/status
 st() { { printf '%s\n' "$1" >&3; } 2>/dev/null || true; }
 refuse() { echo "cydian-helper: $1" >&2; exit 64; }
 verb=${1:-}
-VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid"
+VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid, userspace-reboot"
 [ -n "$verb" ] || refuse "no verb ($VERBS)"
 shift
 sources=$prefix/etc/apt/sources.list.d/cydian.sources
@@ -114,6 +114,7 @@ Components: $*"
   install|remove|hold|unhold) [ $# -ge 1 ] || refuse "no package names" ;;
   simulate|apply|apply-ask) [ $# -ge 1 ] || refuse "no packages" ;;
   respring) [ $# -eq 0 ] || refuse "this verb takes no arguments"; echo "sbreload (fake)"; exit 0 ;;
+  userspace-reboot) [ $# -eq 0 ] || refuse "this verb takes no arguments"; echo "launchctl reboot userspace (fake)"; exit 0 ;;
   install-ipa)
     # F59: policy.c's helper_ipa_path_ok, then ipa.c's steps without installd.
     [ $# -eq 1 ] || refuse "install-ipa takes one path"

@@ -325,6 +325,7 @@ class Helper(unittest.TestCase):
             ("apply", "ab=1", "ab=2"): "named twice",
             ("simulate", "ab/stable"): "bad package name",
             ("respring", "now"): "takes no arguments",
+            ("userspace-reboot", "now"): "takes no arguments",
             ("apply", *[f"p{i:03d}" for i in range(257)]): "too many",
         }
         for words, msg in cases.items():
@@ -342,6 +343,12 @@ class Helper(unittest.TestCase):
             f.write("#!/bin/sh\n")
         os.chmod(sb, 0o755)
         self.assertEqual(self.run_driver("plan", p, "3", "respring"), [sb, "sbreload"])
+
+    def test_userspace_reboot_plan(self):
+        # N8: launchctl from the prefix, fixed words.
+        p = tempfile.mkdtemp(dir=self.tmp)
+        self.assertEqual(self.run_driver("plan", p, "3", "userspace-reboot"),
+                         [f"{p}/usr/bin/launchctl", "launchctl", "reboot", "userspace"])
 
     # --- F61: selfupdate <path.deb>, dpkg -i of Cydian's own update
 

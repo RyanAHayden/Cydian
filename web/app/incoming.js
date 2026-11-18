@@ -4,15 +4,17 @@
 //   cydian://signing-import#<sealed>   Import from Safari coming back: into the Keychain, then Settings > Signing
 //   cydian://import?d=<gzipped JSON>   Open in Cydian App on the website: the review alert (screens/importlink.js)
 //   cydian://myipas?file=<name>        F77: an .ipa another app sent, already in My IPAs (MyIPAs.swift): its page
+//   cydian://add?url=<url>[&suite=…]   N8: the Add Source intent: Add Source's alert, filled in (core/handoff.js)
 //
 //   startIncoming({ native })          once, in the app
-//   await handleIncoming(url, deps)    -> "signing-import" | "import" | "myipas" | null (not one of ours)
+//   await handleIncoming(url, deps)    -> "signing-import" | "import" | "myipas" | "add" | null (not one of ours)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showAlert } from "./nav/alert.js";
 import { showHUD } from "./nav/hud.js";
 import { format } from "./router.js";
 import { finishSafariImport, statusReady } from "./signing-client.js";
 import { deviceError } from "./core/signing.js";
+import { parseAddLink } from "./core/handoff.js";
 
 const openSigning = () => { location.hash = format({ tab: "settings", path: ["signing"] }).replace(/^#/, ""); };
 
@@ -36,7 +38,7 @@ export function startIncoming({ native = globalThis.cydianNative } = {}) {
 }
 
 export async function handleIncoming(url, { native = globalThis.cydianNative, alert = showAlert, hud = showHUD, go = openSigning,
-  finish = finishSafariImport, review = null } = {}) {
+  finish = finishSafariImport, review = null, add = null } = {}) {
   const u = String(url ?? "");
   if (/^cydian:\/\/signing-import\b/i.test(u)) {
     const hide = hud("Importing");
@@ -63,12 +65,26 @@ export async function handleIncoming(url, { native = globalThis.cydianNative, al
     if (typeof location !== "undefined") location.hash = hash;
     return "myipas";
   }
+  if (/^cydian:\/\/add\b/i.test(u)) {
+    const prefill = addPrefill(u);
+    if (!prefill) return "add";
+    const run = add ?? (await import("./screens/manage.js")).addSource;
+    await run({ showHUD: hud }, prefill);
+    return "add";
+  }
   if (/^cydian:\/\/import\b/i.test(u)) {
     const run = review ?? (await import("./screens/importlink.js")).reviewAndImport;
     await run(u, { native });
     return "import";
   }
   return null;
+}
+
+// N8: cydian://add?url=…[&suite=…&component=…] -> Add Source's prefill ({ url, dist?, components? }), or null.
+export function addPrefill(url) {
+  let search = "";
+  try { search = new URL(String(url)).search; } catch { return null; }
+  return parseAddLink(search);
 }
 
 // F77: the Installed path for cydian://myipas?file=<name>: the IPA's page, or the library when the name is missing.

@@ -172,6 +172,8 @@ def check(path):
         except (ValueError, struct.error, plistlib.InvalidFileException) as e:
             problems.append("executable: %s" % e)
 
+    problems += intents_problems(files)
+
     if APP + "bridge.js" not in files:
         problems.append("bridge.js missing (cydianNative and the mode come from it)")
     web = {n[len(APP + "web/"):] for n in files if n.startswith(APP + "web/")}
@@ -184,6 +186,37 @@ def check(path):
     summary = "%s %s (%s): %d web files, %s" % (info.get("CFBundleIdentifier"), info.get("CFBundleShortVersionString"),
                                                info.get("CFBundleVersion"), len(web), summary)
     return problems, summary
+
+
+# N8: the IPA carries the intents that work without a jailbreak (native/build.sh SIDELOAD_INTENTS), and a widget
+# extension without controls (no intents of its own) and without jailbreak entitlements.
+SIDELOAD_INTENTS = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent"}
+WIDGET = APP + "PlugIns/CydianWidget.appex/"
+
+
+def intents_problems(files):
+    import json
+    problems = []
+    meta = files.get(APP + "Metadata.appintents/extract.actionsdata")
+    if not meta:
+        return ["no Metadata.appintents/extract.actionsdata (App Intents, N8)"]
+    try:
+        actions = set(json.loads(meta[1]).get("actions", {}))
+    except ValueError as e:
+        return ["Metadata.appintents: %s" % e]
+    if actions != SIDELOAD_INTENTS:
+        problems.append("App Intents %s, want the both-modes %s" % (sorted(actions), sorted(SIDELOAD_INTENTS)))
+    if WIDGET + "Metadata.appintents/extract.actionsdata" in files:
+        problems.append("the widget extension carries intents (the controls are the .deb's)")
+    exe = files.get(WIDGET + "CydianWidget")
+    if not exe or WIDGET + "Info.plist" not in files:
+        problems.append("no widget extension (PlugIns/CydianWidget.appex)")
+    else:
+        ents = macho_entitlements(exe[1]) or {}
+        bad = sorted(k for k in ents if k.startswith(PRIVATE))
+        if bad:
+            problems.append("jailbreak entitlements in the widget extension: %s" % ", ".join(bad))
+    return problems
 
 
 def main(argv):

@@ -43,7 +43,15 @@ class Ipa(unittest.TestCase):
         for name in ("index.html", "app.js", "style.css", "router.js", "mode.js", "nav/stack.js"):
             self.write("web/" + name, b"x")
         self.write("bridge.js", b"x")
+        # N8: the both-modes App Intents and a widget extension without controls.
+        self.intents(sorted(mkipa.SIDELOAD_INTENTS))
+        self.write("PlugIns/CydianWidget.appex/CydianWidget", signed_macho({"get-task-allow": True}), 0o755)
+        self.write("PlugIns/CydianWidget.appex/Info.plist", plist())
         self.ipa = os.path.join(self.tmp, "Cydian.ipa")
+
+    def intents(self, names, where="Metadata.appintents"):
+        import json
+        self.write(where + "/extract.actionsdata", json.dumps({"version": 1, "actions": {n: {} for n in names}}).encode())
 
     def write(self, rel, data, mode=0o644):
         p = os.path.join(self.app, rel)
@@ -97,6 +105,21 @@ class Ipa(unittest.TestCase):
                                            "com.apple.private.usernotifications.bundle-identifiers": ["x"]}), 0o755)
         self.assertTrue(any("usernotifications" in p for p in self.problems()))
 
+    def test_intents_checked(self):
+        # N8: only the both-modes intents; the widget's controls and its jailbreak entitlements are the .deb's.
+        self.intents(sorted(mkipa.SIDELOAD_INTENTS) + ["RespringIntent"])
+        self.assertTrue(any("App Intents" in p and "RespringIntent" in p for p in self.problems()))
+        self.intents(sorted(mkipa.SIDELOAD_INTENTS))
+        self.intents(["RespringIntent"], "PlugIns/CydianWidget.appex/Metadata.appintents")
+        self.assertTrue(any("widget extension carries intents" in p for p in self.problems()))
+        os.remove(os.path.join(self.app, "PlugIns/CydianWidget.appex/Metadata.appintents/extract.actionsdata"))
+        self.write("PlugIns/CydianWidget.appex/CydianWidget", signed_macho({"com.apple.private.persona-mgmt": True}), 0o755)
+        self.assertTrue(any("entitlements in the widget" in p for p in self.problems()))
+        shutil.rmtree(os.path.join(self.app, "PlugIns"))
+        os.remove(os.path.join(self.app, "Metadata.appintents/extract.actionsdata"))
+        p = " | ".join(self.problems())
+        self.assertIn("no Metadata.appintents", p)
+
     def test_jailbreak_entitlements_flagged(self):
         self.write("Cydian", signed_macho({"platform-application": True, "com.apple.private.security.no-sandbox": True}),
                    0o755)
@@ -133,7 +156,9 @@ class Ipa(unittest.TestCase):
 class SideloadPlists(unittest.TestCase):
     def test_entitlements_get_task_allow_only(self):
         with open(os.path.join(HERE, "entitlements-sideload.plist"), "rb") as f:
-            self.assertEqual(plistlib.load(f), {"get-task-allow": True})
+            # N8: plus the App Group the widget reads the count from (signers such as AltStore register it).
+            self.assertEqual(plistlib.load(f), {"get-task-allow": True,
+                                                "com.apple.security.application-groups": ["group.com.ryha.cydian"]})
 
     def test_overlay_keeps_base_keys(self):
         tmp = tempfile.mkdtemp()

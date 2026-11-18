@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs><image id="bg" width="1024" height="1024" href="bg-1.jpg"/><filter id="blue" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".2126 .7152 .0722 0 0  .2126 .7152 .0722 0 0  .2126 .7152 .0722 0 0  0 0 0 1 0"/><feComponentTransfer><feFuncR type="table" tableValues="0.008 0.013 0.018 0.025 0.035 0.045 0.055 0.065 0.075 0.133 0.224 0.315 0.405 0.496 0.587 0.678 0.769 0.826 0.884 0.942 1.000"/><feFuncG type="table" tableValues="0.102 0.154 0.207 0.268 0.335 0.402 0.470 0.537 0.604 0.654 0.691 0.728 0.765 0.802 0.839 0.877 0.914 0.935 0.957 0.978 1.000"/><feFuncB type="table" tableValues="0.212 0.307 0.401 0.495 0.589 0.682 0.776 0.869 0.963 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000"/></feComponentTransfer></filter></defs><use href="#bg" filter="url(#blue)"/><defs>
+  <radialGradient id="sph" cx="38%" cy="30%" r="75%"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#e9edf2"/><stop offset="1" stop-color="#b3bdc9"/></radialGradient>
+  <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cdd4dc"/></linearGradient>
+  <filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="16"/></filter>
+  <clipPath id="gclip"><circle cx="512" cy="512" r="318.2"/></clipPath></defs>
+<circle cx="512" cy="534" r="370" fill="#001a33" opacity=".45" filter="url(#sh)"/>
+<circle cx="512" cy="512" r="370" fill="url(#rim)"/>
+<circle cx="512" cy="512" r="368" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="3"/>
+<circle cx="512" cy="512" r="321.2" fill="#7c8898"/>
+<circle cx="512" cy="512" r="318.2" fill="url(#sph)"/>
+<g clip-path="url(#gclip)"><g transform="rotate(-18 512 512)" fill="none" stroke="#3b4656" stroke-width="22.9" stroke-linecap="round"><line x1="512" y1="193.8" x2="512" y2="830.2"/><line x1="193.8" y1="512" x2="830.2" y2="512"/><ellipse cx="512" cy="512" rx="143.2" ry="318.2"/><ellipse cx="512" cy="512" rx="260.9" ry="318.2"/><path d="M252.8 327.4 Q512 282.9 771.2 327.4"/><path d="M252.8 696.6 Q512 741.1 771.2 696.6"/></g></g>
+<circle cx="512" cy="512" r="318.2" fill="none" stroke="#000" stroke-opacity=".18" stroke-width="5"/></svg>

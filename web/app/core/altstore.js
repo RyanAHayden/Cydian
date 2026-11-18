@@ -288,6 +288,7 @@ export function appStanza(app, source, ios = null) {
     description: long && long !== short ? `${short}\n ${long.replace(/\n/g, "\n ")}` : short,
     author: app.developerName, size: v.size ?? undefined, iconUrl: app.iconURL,
     minOSVersion: v.minOSVersion ?? undefined, maxOSVersion: v.maxOSVersion ?? undefined,
+    downloadURL: v.downloadURL ?? undefined, // F160: the IPA core/ipainfo.js reads when the source gives no iOS range
     kind: "ipa",
     ipa: { ...app, versions, sourceUrl: source?.url ?? null, sourceName: source?.name ?? "" },
   };

@@ -3,8 +3,8 @@
 // the package page asks for the full verdict. No other manager or index does this (Sileo #249, #222, #312).
 //
 //   const device = { ios: "16.5", jailbreak: "rootless" };  // ios null: not known; jailbreak: JAILBREAKS
-//   compat(stanza, device)  -> { status: "works" | "no" | "unknown", reason, need, label, detail }
-//   compatCode(stanza, device) -> "works" | "unknown" | "ios" | "rootful" | "rootless" | "roothide" | "jailbreak" | "arch"
+//   compat(stanza, device)  -> { status: "works" | "no" | "unknown" | "unchecked", reason, need, label, detail }
+//   compatCode(stanza, device) -> "works" | "unknown" | "unchecked" | "ios" | "rootful" | "rootless" | "roothide" | "jailbreak" | "arch" | "ipad"
 //   badge(code, device)     -> the row badge's text: "Works", "Not on iOS 16.5", "Rootful only", "Unknown"
 //   iosFromUserAgent(ua)    -> "16.5" | null
 //
@@ -16,6 +16,9 @@
 //                  (>= 14.0)`, ANDed across groups; an alternative group counts only when every alternative is
 //                  firmware. `Conflicts`/`Breaks: firmware (>= 17.0)` rule iOS versions out.
 //   min/maxOSVersion  AltStore's app fields (minOSVersion/maxOSVersion, any case).
+//   deviceFamily   F160: the IPA's own UIDeviceFamily (core/ipainfo.js withIpaInfo): without 1 it is iPad-only, "ipad".
+// F160: an app whose source states no iOS range, with an IPA that can be read (downloadURL) and not read yet on this
+// device (no ipaChecked), is "unchecked": its page reads the IPA (core/ipainfo.js), and the row is judged again.
 // A package that says nothing about the iOS version is "unknown", never hidden: most of every repo is like that.
 import { parseRelations, satisfies, compareVersions } from "./apt.js";
 
@@ -135,9 +138,14 @@ export function compat(st, device = {}) {
     if (ONLY[need]) return no(need, need, ONLY[need], `Built for ${need} jailbreaks; this iPhone is ${jb}.`);
     return no("arch", need, "Not for iPhone", `Built for ${need}, not an iPhone.`);
   }
+  const fam = Array.isArray(st?.deviceFamily) ? st.deviceFamily.map(Number) : null;
+  if (isApp(st) && fam?.length && !fam.includes(1)) return no("ipad", need, "Not for iPhone", "Made for iPad only.");
   const ok = iosOk(req, ios);
   if (ok === false) return no("ios", need, `Not on iOS ${ios}`, range ? `Made for ${range}.` : `Not for iOS ${ios}.`);
   if (ok === true) return { status: "works", reason: null, need, label: "Works", detail: `Made for ${range}; this iPhone runs iOS ${ios}.`, range };
+  if (!req.stated && isApp(st) && !st?.ipaChecked && /^https?:\/\//i.test(field(st, "downloadURL") ?? "")) {
+    return { status: "unchecked", reason: null, need, label: "Not Checked", detail: "Its source doesn't say which iOS versions it runs on. Opening its page reads that from the app itself.", range };
+  }
   const detail = req.stated ? "This iPhone's iOS version isn't known: set it in Settings." : "The package doesn't say which iOS versions it supports.";
   return { status: "unknown", reason: null, need, label: "Unknown", detail, range };
 }
@@ -148,7 +156,7 @@ export function compatCode(st, device) {
   return v.status === "no" ? v.reason : v.status;
 }
 
-export const isIncompatible = (code) => code != null && code !== "works" && code !== "unknown";
+export const isIncompatible = (code) => code != null && code !== "works" && code !== "unknown" && code !== "unchecked";
 
 // The row badge's text for a code.
 export function badge(code, device = {}) {
@@ -156,7 +164,8 @@ export function badge(code, device = {}) {
     case "works": return "Works";
     case "ios": return device?.ios ? `Not on iOS ${device.ios}` : "Not on this iOS";
     case "jailbreak": return "Jailbreak only";
-    case "arch": return "Not for iPhone";
+    case "arch": case "ipad": return "Not for iPhone";
+    case "unchecked": return "Not Checked";
     case "unknown": case undefined: case null: return "Unknown";
     default: return ONLY[code] ?? "Unknown";
   }
@@ -169,10 +178,11 @@ export function normalizeDevice(d) {
 }
 
 // F35: the mark drawn beside every package (a green check, a red X, a grey ?) for a row's code; null when the row
-// was never judged (no device yet).
+// was never judged (no device yet). F160: "unchecked", a grey outlined ?, for an app not read yet.
 export function markOf(code) {
   if (code == null) return null;
   if (code === "works") return "works";
+  if (code === "unchecked") return "unchecked";
   return isIncompatible(code) ? "no" : "unknown";
 }
 
@@ -185,6 +195,7 @@ export function needText(v) {
     case "rootful": case "rootless": case "roothide": return `Needs a ${v.reason} jailbreak`;
     case "jailbreak": return "Needs a jailbroken iPhone";
     case "arch": return `Built for ${v.need}, not an iPhone`;
+    case "ipad": return "Made for iPad only";
     default: return v.label;
   }
 }

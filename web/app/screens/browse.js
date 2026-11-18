@@ -72,7 +72,8 @@ function applyMarks() {
 applyMarks();
 settings.onChange((key) => { if (key === "compatMarks") applyMarks(); });
 
-const MARK_LABEL = { works: "Works on this iPhone", no: "Doesn't work on this iPhone", unknown: "Compatibility unknown" };
+const MARK_LABEL = { works: "Works on this iPhone", no: "Doesn't work on this iPhone", unknown: "Compatibility unknown",
+  unchecked: "Not checked yet: open the app to check" }; // F160
 
 // The mark for a row's compat code: data-mark works | no | unknown (packages.css draws it); none when unjudged.
 function setMark(span, code) {

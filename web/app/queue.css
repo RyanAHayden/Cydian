@@ -1,0 +1,52 @@
+/* The install queue (N4, screens/queue.js): queued rows, the Confirm sheet and the console. Sizes and colours of the
+   console from Cydia's progress page (docs/cydia.md "Running: the console"); the black bar is the kit's
+   "Semi-transparent black bar", opaque (#4c4c4c to black at 52%, a white-at-20% line on top, black-at-70% below). */
+
+/* ---- queued packages in every list: "Queued for <mode>" in the kit's detail blue ---- */
+.pkg-row[data-queued] .pkg-desc { color: var(--detail); font-weight: bold; }
+.pkg-row[data-queued="remove"] .pkg-desc { color: #b22a2a; }
+html[data-theme="dark"] .pkg-row[data-queued="remove"] .pkg-desc { color: #ff8a80; }
+
+/* ---- Confirm ---- */
+.sheet-left { justify-self: start; display: flex; }
+.confirm-mods .cell-inner { align-items: flex-start; padding-top: 11px; padding-bottom: 11px; }
+.confirm-mods .cell-detail { white-space: pre-line; text-align: right; line-height: 20px; }
+.confirm-issues .group-header { color: #704d4d; }
+html[data-theme="dark"] .confirm-issues .group-header { color: #f0b8b8; }
+.confirm-problem .table { background: #ffcccc; }
+html[data-theme="dark"] .confirm-problem .table { background: #5a3434; }
+.confirm-raw, .console-log {
+  margin: 0; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  font: 11px/15px ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text;
+}
+
+/* ---- the console: black page, black bar, grey output, white bold status, red errors ---- */
+.console { background: #000; }
+.console .navbar.sheet-bar {
+  background:
+    linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) bottom / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#4c4c4c, #000 52%) bottom / 100% 44px no-repeat,
+    #000;
+}
+.console .bar-button { border-color: #111; background: linear-gradient(#4a4f58, #24272c); background-origin: border-box; }
+.console .bar-button:active, .console .bar-button.is-pressed { background: linear-gradient(#2a2d32, #121316); background-origin: border-box; }
+.console-scroll {
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: calc(var(--nav-h) + 20px) max(9px, env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) max(9px, env(safe-area-inset-left));
+  display: flex; flex-direction: column; min-height: 100%;
+}
+.console-out { flex: 1; font-size: 12px; line-height: 16px; color: #a9a9a9; -webkit-user-select: text; user-select: text; }
+.console-line { white-space: pre-wrap; overflow-wrap: anywhere; }
+.console-line.status { color: #fff; font-weight: bold; }
+.console-line.error { color: #ff3b30; }
+.console-line.warning { color: #ffd60a; }
+.console-foot { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 20px; }
+.console-status { min-height: 16px; max-width: 100%; color: #fff; font-size: 12px; font-weight: bold; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.console-progress { width: 158px; height: 12px; padding: 3px; border: 1px solid #fff; border-radius: 6px; box-sizing: border-box; }
+.console-fill { height: 4px; width: 100%; border-radius: 2px; background: #eee; transform-origin: left; transform: scaleX(0); transition: transform .2s linear; }
+.console-finish {
+  width: 300px; max-width: 100%; padding: 12px; border: 1px solid #fff; border-radius: 9px; background: none; cursor: pointer;
+  color: #fff; font-size: 22px; font-weight: bold; touch-action: manipulation;
+}
+.console-finish:active { background: rgba(255,255,255,.2); }

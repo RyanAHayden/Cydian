@@ -16,8 +16,15 @@
 #define HELPER_EX_IOERR 74  /* F33: cydian.sources couldn't be read or written */
 
 enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, HV_HOLD, HV_UNHOLD, HV_SHOWHOLD,
-                   HV_ADDSOURCE, HV_REMOVESOURCE };
-#define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource"
+                   HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING };
+#define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
+                     "simulate, apply, respring"
+
+/* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
+ * Downgrade and Reinstall pick theirs), "-name" removes. apt gets "name", "name=version" and "name-" in one
+ * apt-get install, so one run does the whole queue, as Cydia's does. */
+#define HELPER_VERSION_MAX 255
+#define HELPER_ITEM_MAX (HELPER_NAME_MAX + 1 + HELPER_VERSION_MAX)
 
 /* F33: the one file addsource/removesource edit, under the prefix. Nothing else in apt's sources is touched. */
 #define HELPER_SOURCES_FILE "/etc/apt/sources.list.d/cydian.sources"
@@ -33,12 +40,21 @@ struct helper_plan {
                              URI, suite and components as given (nothing is executed) */
     const char *argv[HELPER_MAX_PACKAGES + 24]; /* NULL-terminated */
     int argc;
-    const char *const *packages; /* the caller's package names, inside argv */
+    const char *const *packages; /* the caller's package names, inside argv (simulate/apply: inside names[]) */
     int npackages;
+    /* simulate/apply: each item's package name, whether it is a removal, and apt's spelling of it */
+    const char *names[HELPER_MAX_PACKAGES];
+    char removing[HELPER_MAX_PACKAGES];
+    char name_buf[HELPER_MAX_PACKAGES][HELPER_NAME_MAX + 1];
+    char item_buf[HELPER_MAX_PACKAGES][HELPER_ITEM_MAX + 2];
 };
 
 /* 1 if s is a package name the helper passes on: [a-z0-9][a-z0-9.+-]+, at most HELPER_NAME_MAX bytes. */
 int helper_name_ok(const char *s);
+
+/* N4: 1 if s is a Debian version apt can be asked for: a digit first, then [A-Za-z0-9.+~:-], at most
+ * HELPER_VERSION_MAX bytes (an epoch "1:2.0" included). */
+int helper_version_ok(const char *s);
 
 /* Turn the caller's words (argv[0] is the verb: one of HELPER_VERBS) into the one command the helper may run.
  * status_fd >= 0 adds apt-get's/dpkg's status-fd option on it (apt-mark gets none). Returns 0, or -1 with *err set. */
@@ -61,8 +77,8 @@ int helper_component_ok(const char *s);
  * (an add of a source that is there as is, or a remove of one that isn't, leaves the file alone). 0, or -1 + *err. */
 int helper_sources_apply(const struct helper_plan *plan, int *changed, const char **err);
 
-/* Every package of an install must be named "Package: <name>" in dpkg's status or one of apt's *_Packages lists;
- * of a remove, hold or unhold, in dpkg's status. That keeps apt from reading a name it doesn't know as a regex or a modifier
+/* Every package of an install (and every install item of simulate/apply) must be named "Package: <name>" in dpkg's status or one of apt's *_Packages lists;
+ * of a remove, hold or unhold (and a "-name" item), in dpkg's status. That keeps apt from reading a name it doesn't know as a regex or a modifier
  * ("foo-" removes, "foo+" installs). Returns the index of the first unknown package, or -1 when all are known. */
 int helper_first_unknown(const char *prefix, const struct helper_plan *plan);
 

@@ -4,7 +4,10 @@
 # edit $CYDIAN_PREFIX/etc/apt/sources.list.d/cydian.sources like the real one, F33):
 #   CYDIAN_PREFIX  the fake rootless prefix (etc/apt, var/lib/apt/lists, var/lib/dpkg/status)
 #   FAKE_REMOTE    what "the repos" hold: FAKE_REMOTE/lists/* is what apt-get update writes into the lists dir
-#   FAKE_FAIL      a verb that fails like apt does (exit 100, "E: ..." on stderr)
+#   FAKE_FAIL      a verb that fails like apt does (exit 100, "E: ..." on stderr); simulate fails with an unmet
+#                  dependency of the first item on FAKE_MISSING (default com.example.missing), as apt-get -s does
+#   FAKE_SLOW      seconds apply waits before each package, so a walk-through sees the console mid-run
+#   FAKE_FINISH    apply writes "finish:$FAKE_FINISH" to fd 3, as a maintainer script does through $CYDIA (N4)
 # Status lines go to fd 3 when it is open, like apt's APT::Status-Fd. SPDX-License-Identifier: GPL-3.0-or-later
 set -u
 prefix=${CYDIAN_PREFIX:?}
@@ -13,7 +16,8 @@ status=$prefix/var/lib/dpkg/status
 st() { { printf '%s\n' "$1" >&3; } 2>/dev/null || true; }
 refuse() { echo "cydian-helper: $1" >&2; exit 64; }
 verb=${1:-}
-[ -n "$verb" ] || refuse "no verb (update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource)"
+VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, respring"
+[ -n "$verb" ] || refuse "no verb ($VERBS)"
 shift
 sources=$prefix/etc/apt/sources.list.d/cydian.sources
 # F33: the same checks as policy.c's helper_uri_ok, helper_suite_ok and helper_component_ok. grep -x matches a
@@ -93,8 +97,129 @@ Components: $*"
     exit 0 ;;
   update|upgrade|configure|showhold) [ $# -eq 0 ] || refuse "this verb takes no arguments" ;;
   install|remove|hold|unhold) [ $# -ge 1 ] || refuse "no package names" ;;
-  *) refuse "unknown verb (update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource)" ;;
+  simulate|apply) [ $# -ge 1 ] || refuse "no packages" ;;
+  respring) [ $# -eq 0 ] || refuse "this verb takes no arguments"; echo "sbreload (fake)"; exit 0 ;;
+  *) refuse "unknown verb ($VERBS)" ;;
 esac
+# N4: the versions of package $2 in file(s) $1..., one per line (status: installed ones only).
+versions_in() {
+  p=$1; shift
+  awk -v p="$p" 'BEGIN { RS = "" } {
+    n = split($0, l, "\n"); name = ""; v = ""; st = ""
+    for (i = 1; i <= n; i++) {
+      if (l[i] ~ /^Package:/) { name = l[i]; sub(/^Package:[ \t]*/, "", name) }
+      if (l[i] ~ /^Version:/) { v = l[i]; sub(/^Version:[ \t]*/, "", v) }
+      if (l[i] ~ /^Status:/) st = l[i]
+    }
+    if (name == p && v != "" && (st == "" || st ~ / installed$/)) print v
+  }' "$@" 2>/dev/null
+}
+installed_version() { versions_in "$1" "$status" | head -n 1; }
+# A stanza's Package and Version, by field (names hold "." and "+", so no regexes on them).
+FIELDS='function field(f,   n, l, i, v) { n = split($0, l, "\n"); for (i = 1; i <= n; i++) if (index(l[i], f ":") == 1) { v = substr(l[i], length(f) + 2); sub(/^[ \t]*/, "", v); sub(/[ \t\r]*$/, "", v); return v } return "" }'
+# The stanza of package $1 at version $2 from apt's lists (for apply's new status entry).
+stanza_of() {
+  awk -v p="$1" -v v="$2" "$FIELDS"' BEGIN { RS = "" } field("Package") == p && field("Version") == v { print; exit }' "$lists"/*_Packages 2>/dev/null
+}
+# dpkg's status without package $1.
+drop_pkg() { awk -v p="$1" "$FIELDS"' BEGIN { RS = ""; ORS = "\n\n" } field("Package") != p' "$status"; }
+if [ "$verb" = simulate ] || [ "$verb" = apply ]; then
+  seen=" "
+  for w in "$@"; do
+    one_line "$w" || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"
+    case $w in
+      -*) name=${w#-} ver= ;;
+      *=*) name=${w%%=*} ver=${w#*=}
+        printf '%s' "$ver" | grep -Eqx '[0-9][A-Za-z0-9.+~:-]{0,254}' || refuse "bad version (a digit, then [A-Za-z0-9.+~:-])" ;;
+      *) name=$w ver= ;;
+    esac
+    printf '%s' "$name" | grep -Eqx '[a-z0-9][a-z0-9.+-]+' || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"
+    case $w in -*) ;; *[-+]|*[-+]=*) refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)" ;; esac
+    case $seen in *" $name "*) refuse "a package is named twice" ;; esac
+    seen="$seen$name "
+    case $w in
+      -*) grep -qx "Package: $name" "$status" 2>/dev/null || refuse "unknown package: $name" ;;
+      *) cat "$status" "$lists"/*_Packages 2>/dev/null | grep -qx "Package: $name" || refuse "unknown package: $name" ;;
+    esac
+  done
+  if [ "${FAKE_FAIL:-}" = simulate ] && [ "$verb" = simulate ]; then
+    first=${1#-}; first=${first%%=*}
+    echo "Reading package lists..."
+    echo "Building dependency tree..."
+    echo "Some packages could not be installed. This may mean that you have"
+    echo "requested an impossible situation."
+    echo ""
+    echo "The following packages have unmet dependencies:"
+    echo " $first : Depends: ${FAKE_MISSING:-com.example.missing} but it is not installable"
+    echo "E: Unable to correct problems, you have held broken packages." >&2
+    exit 100
+  fi
+  # What apt would do, item by item (no dependency resolution in the fake).
+  plan=
+  for w in "$@"; do
+    case $w in
+      -*) name=${w#-}; old=$(installed_version "$name")
+        [ -n "$old" ] || { echo "Package '$name' is not installed, so not removed"; continue; }
+        plan="$plan
+R $name $old" ;;
+      *) name=${w%%=*}; ver=; case $w in *=*) ver=${w#*=} ;; esac
+        old=$(installed_version "$name")
+        if [ -n "$ver" ]; then
+          versions_in "$name" "$lists"/*_Packages | grep -qxF "$ver" || { echo "E: Version '$ver' for '$name' was not found" >&2; exit 100; }
+        else
+          ver=$(versions_in "$name" "$lists"/*_Packages | head -n 1)
+          [ -n "$ver" ] || { echo "E: Package '$name' has no installation candidate" >&2; exit 100; }
+        fi
+        plan="$plan
+I $name $ver $old" ;;
+    esac
+  done
+  if [ "$verb" = simulate ]; then
+    echo "Reading package lists..."
+    echo "Building dependency tree..."
+    echo "NOTE: This is only a simulation!"
+    printf '%s\n' "$plan" | while read -r kind name ver old; do
+      case $kind in
+        R) echo "Remv $name [$ver]" ;;
+        I) if [ -n "$old" ]; then echo "Inst $name [$old] ($ver Fake:1.0/stable [iphoneos-arm64])"
+           else echo "Inst $name ($ver Fake:1.0/stable [iphoneos-arm64])"; fi ;;
+      esac
+    done
+    printf '%s\n' "$plan" | while read -r kind name ver old; do
+      [ "$kind" = I ] && echo "Conf $name ($ver Fake:1.0/stable [iphoneos-arm64])"
+    done
+    exit 0
+  fi
+  echo "Reading package lists..."
+  printf '%s\n' "$plan" | while read -r kind name ver old; do
+    [ -n "$kind" ] || continue
+    [ -n "${FAKE_SLOW:-}" ] && sleep "$FAKE_SLOW"
+    if [ "$kind" = R ]; then
+      st "pmstatus:$name:30:Removing $name"
+      echo "Removing $name ($ver) ..."
+      drop_pkg "$name" > "$status.new"
+    else
+      st "dlstatus:$name:20:Retrieving $name"
+      echo "Get:1 https://fake.example ./ $name $ver [100 B]"
+      st "pmstatus:$name:50:Preparing $name"
+      echo "Unpacking $name ($ver)${old:+ over ($old)} ..."
+      new=$(stanza_of "$name" "$ver")
+      { drop_pkg "$name"
+        printf '%s\n' "$new" | awk 'NR == 1 { print; print "Status: install ok installed"; next } { print }'
+        echo; } > "$status.new"
+      echo "Setting up $name ($ver) ..."
+      st "pmstatus:$name:100:Installed $name"
+    fi
+    mv "$status.new" "$status"
+  done
+  if [ "${FAKE_FAIL:-}" = apply ]; then
+    echo "dpkg: error processing package ${1#-} (--configure):"
+    echo "E: Sub-process /usr/bin/dpkg returned an error code (1)" >&2
+    exit 100
+  fi
+  [ -n "${FAKE_FINISH:-}" ] && st "finish:$FAKE_FINISH"
+  exit 0
+fi
 for p in "$@"; do
   # B5: grep -x matches a line, so "ab\n--force-yes" would pass; the real helper refuses it, so refuse it first.
   one_line "$p" && printf '%s' "$p" | grep -Eqx '[a-z0-9][a-z0-9.+-]+' || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"

@@ -10,6 +10,11 @@
 //   helper.run { words, stream } -> { code, stdout, stderr }  cydian-helper <words> as root; stream events
 //                                  { fd: "out" | "err" | "status", line } while it runs
 //
+// The install queue (N4, jailbreak build only: the sideload build has no helper): queue(job) marks a package in the
+// app's one queue (queue.js), which opens the Confirm sheet (screens/queue.js); simulate(jobs) is `apt-get -s` over
+// it, apply(jobs, onEvent) runs it with the console streaming, respring() restarts SpringBoard. All through
+// cydian-helper's simulate | apply | respring verbs (native/helper/README.md).
+//
 // Errors from the shell come as "<code>: <message>" (bridge.js turns them into errors with a `code`); here they
 // become BackendError with the same codes the proxy uses (network, timeout, too_large, upstream, not_found, ...).
 //
@@ -27,6 +32,9 @@ import { parseAptSources, listNamesFor } from "./core/aptsources.js";
 import { healthFields } from "./core/health.js";
 import { DEFAULT_ARCH } from "./core/apt.js";
 import { withAltSources } from "./core/altstore.js";
+import { detectMode } from "./core/settings.js";
+import { queueWords, parseSimulation } from "./core/queue.js";
+import { installQueue } from "./queue.js";
 
 // The one apt source file Cydian writes (cydian-helper addsource/removesource, F33).
 const CYDIAN_SOURCES = /(^|\/)sources\.list\.d\/cydian\.sources$/;
@@ -108,6 +116,7 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
       return r;
     },
   };
+  if ((sourceOptions.mode ?? detectMode()) === "jailbreak") Object.assign(backend, queueCalls(backend, sourceOptions.queue ?? installQueue));
   // AltStore sources (F9) stay on the device, never in apt's sources (core/altstore.js withAltSources).
   // F49: the phone's kCFCoreFoundationVersionNumber (Bridge.swift app.info `cf`) adds Telesphoreo's ios/<cf> suite
   // to the dists Add Source tries, unless sourceOptions brings its own coreFoundation.
@@ -119,6 +128,34 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
     sources.addSource = async (input) => { await cf.ready(); return add(input); };
   }
   return Object.assign(backend, sources);
+}
+
+// N4: the install queue's calls. A helper that can't be run, or refuses, is an error with its message (never
+// silent, Zebra #2052); apt saying no is not: simulate resolves with ok false and apt's output for the Confirm sheet.
+function queueCalls(backend, q) {
+  const run = async (words, onEvent) => {
+    const r = await backend.helper(words, onEvent);
+    if (r.code === 64 || r.code === 77 || r.code === 126) {
+      throw new BackendError("helper", `cydian-helper ${words[0]} failed (${r.code}): ${lastLine(r.stderr) || "no output"}`);
+    }
+    return r;
+  };
+  return {
+    // { op: "install" | "remove", id, version, installed, name }: browse.js's package page and Version History.
+    queue: (job) => q.add(job),
+    // -> { ok, code, plan (core/queue.js parseSimulation), output: apt's stdout then stderr }
+    async simulate(jobs) {
+      const r = await run(["simulate", ...queueWords(jobs)]);
+      const output = [r.stdout, r.stderr].filter(Boolean).join(r.stdout?.endsWith("\n") ? "" : "\n");
+      return { ok: r.code === 0, code: r.code, plan: parseSimulation(r.stdout), output };
+    },
+    // onEvent({ fd: "out" | "err" | "status", line }) as it runs. -> { code, stdout, stderr }
+    apply: (jobs, onEvent) => run(["apply", ...queueWords(jobs)], onEvent),
+    async respring() {
+      const r = await run(["respring"]);
+      if (r.code !== 0) throw new BackendError("helper", `Couldn't restart SpringBoard (${r.code}): ${lastLine(r.stderr) || "no output"}`);
+    },
+  };
 }
 
 // The app.info `cf` number, asked once when first needed: get() is it (or null: an older shell, or no answer) once

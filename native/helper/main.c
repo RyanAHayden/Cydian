@@ -3,6 +3,8 @@
  *   cydian-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
  *   cydian-helper hold <pkg>... | unhold <pkg>... | showhold
  *   cydian-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
+ *   cydian-helper simulate <item>... | apply <item>... | respring      (N4: the install queue; item: name,
+ *                                                                        name=version or -name)
  *
  * No setuid bit: Cydian spawns it as root with the persona spawn attributes (spawn.c), which the kernel allows
  * only because Cydian is signed with com.apple.private.persona-mgmt. Run by anything else it is plain mobile and
@@ -106,8 +108,11 @@ int main(int argc, char *argv[]) {
     static char path_env[PATH_MAX * 2];
     snprintf(path_env, sizeof path_env,
              "PATH=%1$s/usr/bin:%1$s/bin:%1$s/usr/sbin:%1$s/sbin:/usr/bin:/bin:/usr/sbin:/sbin", prefix);
+    /* N4: Cydia's finish protocol. Maintainer scripts write "finish:restart" (and so on) to the fd named in CYDIA;
+     * apply keeps fd 3 open through apt (APT::Keep-Fds) so those lines reach the console beside apt's status. */
+    char *cydia_env = plan.verb == HV_APPLY && status_fd >= 0 ? "CYDIA=3 1" : NULL;
     char *env[] = {path_env, "HOME=/var/root", "USER=root", "LOGNAME=root", "LANG=C", "DEBIAN_FRONTEND=noninteractive",
-                   NULL};
+                   cydia_env, NULL};
     execve(plan.path, (char *const *)plan.argv, env);
     fprintf(stderr, "cydian-helper: %s: %s\n", plan.path, strerror(errno));
     return HELPER_EX_EXEC;

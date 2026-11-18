@@ -7,6 +7,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
     cydian-helper hold <pkg>... | unhold <pkg>... | showhold
     cydian-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
+    cydian-helper simulate <item>... | apply <item>... | respring          (N4: the install queue)
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
@@ -20,6 +21,19 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `showhold`  | `apt-mark showhold`: the held packages on stdout, one per line                              |
 | `addsource` | runs nothing: writes a deb822 stanza (`Types: deb`, `URIs:`, `Suites:`, `Components:`) into `/var/jb/etc/apt/sources.list.d/cydian.sources` (F33) |
 | `removesource` | runs nothing: drops the stanza for that URI and suite from `cydian.sources`              |
+| `simulate`  | `apt-get -s --reinstall --allow-downgrades install <items>`: the Confirm sheet's plan (N4)       |
+| `apply`     | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --reinstall --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <items>`, with `CYDIA=3 1` in its environment when fd 3 is open (N4) |
+| `respring`  | `sbreload`, or `killall -9 backboardd` when the jailbreak has no sbreload (N4: Restart SpringBoard) |
+
+**The queue (N4):** `simulate` and `apply` take items: `name` installs the newest, `name=version` that exact
+version (Reinstall, Downgrade and the Version History pick one), `-name` removes. apt gets `name`, `name=version`
+and `name-` in one `apt-get install`, so one run does the whole queue, as Cydia's does. A name follows the rules
+below (an install's must not end in `-` or `+`, which apt would read as a modifier); a version is a digit, then
+`[A-Za-z0-9.+~:-]`, at most 255 bytes; no package twice. Install items must be known to dpkg's status or apt's lists,
+removals to dpkg's status. `--reinstall` makes an item naming the installed version do something; `--allow-downgrades`
+is what lets `-y` take an older version on purpose. Cydia's finish protocol: maintainer scripts write `finish:restart`
+(and so on) to the fd named in `$CYDIA`; `APT::Keep-Fds` keeps fd 3 open through apt and dpkg, so those lines arrive
+beside apt's status lines and raise the console's finish button.
 
 **Sources (F33):** sources added in the app go into `cydian.sources` and nowhere else, so `apt-get update` and
 installs use them; the app never edits apt's other files. Checks: the URI is `http://` or `https://` (lower case), a

@@ -24,6 +24,8 @@
 //   c.browse(category)                     -> [row] in that Browse category, sorted by name
 //   c.popular({ limit })                   -> [row] ranked by how many sources list it, then newest (rankPopular),
 //                                             each with `sources` (that count)
+//   c.aptProblems(aptOutput)              -> N4: explainApt over the same index as deps (the Confirm sheet)
+//   c.queueInfo([id])                      -> N4: { id: { name, restart } } for the queue's packages
 //   c.deps(id, key | "*")                  -> F18 (core/deps.js explain): { ok, problems, targets } for an APT
 //                                             package, against every source and the installed list; null if unknown
 //   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
@@ -45,7 +47,8 @@ import { parseControl, description, resolveFilename, resolveIcon, matchesArch, c
 import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
 import { compat, compatCode, isIncompatible, normalizeDevice, needText } from "./compat.js";
 import { parseSource, appStanza, isAltKey, runsOn, installOptions } from "./altstore.js";
-import { depIndex, explain } from "./deps.js";
+import { depIndex, explain, explainApt } from "./deps.js";
+import { needsRestart } from "./queue.js";
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -517,6 +520,10 @@ export function createCatalog() {
     const e = entries(key).get(id);
     const st = e?.stanza ?? statusById.get(id);
     if (!st || st.kind === "ipa") return null;
+    return explain(st, { device, index: currentDepIndex() });
+  }
+
+  function currentDepIndex() {
     const all = entries(ALL);
     if (!depCache || depCache.all !== all || depCache.status !== statusById) {
       const available = [];
@@ -526,7 +533,29 @@ export function createCatalog() {
       }
       depCache = { all, status: statusById, index: depIndex({ available, installed: [...statusById.values()] }) };
     }
-    return explain(st, { device, index: depCache.index });
+    return depCache.index;
+  }
+
+  // N4's Confirm sheet: apt's refusal (apt-get -s output) in F18's plain words, against the same index.
+  const aptProblems = (output) => explainApt(output, { device, index: currentDepIndex() });
+
+  // N4: for the queue's package ids, { id: { name, restart } }: the name to show, and whether any version of it
+  // (installed, or any a source offers) depends on mobilesubstrate, so the console ends with Restart SpringBoard.
+  function queueInfo(ids = []) {
+    const all = entries(ALL);
+    const out = {};
+    for (const id of ids) {
+      const e = all.get(id);
+      const st = statusById.get(id);
+      const stanzas = [st, e?.stanza, ...(e?.older ?? [])];
+      for (const [k, { byId }] of sources) {
+        if (isAltKey(k)) continue;
+        const o = byId.get(id);
+        if (o && o !== e) stanzas.push(o.stanza, ...(o.older ?? []));
+      }
+      out[id] = { name: e?.row.name ?? (st ? installedPkgs?.find((r) => r.id === id)?.name : null) ?? null, restart: needsRestart(stanzas) };
+    }
+    return out;
   }
 
   // Every (source, id, candidate version) loaded: what the Changes tab files on a refresh (core/changes.js).
@@ -594,7 +623,7 @@ export function createCatalog() {
   return { load, loadAlt, altSource, remove, setHidden, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
     categories, browse, popular,
     setInstalled, installed, upgrades, setDevice,
-    deps };
+    deps, aptProblems, queueInfo };
 }
 
 // Runs a catalog operation by name: the worker's entry point. Unknown ops throw.
@@ -604,7 +633,7 @@ export function runCatalog(catalog, op, args = []) {
     versions: catalog.versions, setHidden: catalog.setHidden, setInstalled: catalog.setInstalled,
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular,
-    deps: catalog.deps }[op];
+    deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);
 }

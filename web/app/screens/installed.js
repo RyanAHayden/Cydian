@@ -198,7 +198,10 @@ export function init() {
     if (state.body) load();
     if (appView.body) loadApps();
   });
-  onAppsChange(() => { if (appView.body) loadApps(); });
+  onAppsChange(() => {
+    if (appView.body) loadApps();
+    refreshAppCount(); // B52: the root's Apps count, under the Apps page
+  });
   // F125/F147: the count on the Wish List button, and the Wish List page, follow the list (the package page's sheet, a Delete).
   browse.wishlist().onChange(() => {
     if (wishView.body) loadWish();
@@ -369,8 +372,26 @@ async function jailbreakAppCount() {
 }
 
 function appsRow(route, n) {
-  return { label: "Apps", subtitle: n === 1 ? "1 app installed from an app page" : `${n} apps installed from an app page`,
-    href: format({ tab: route.tab, path: [...route.path, APPS] }) };
+  return { label: "Apps", subtitle: appsRowSubtitle(n), href: format({ tab: route.tab, path: [...route.path, APPS] }) };
+}
+
+export function appsRowSubtitle(n) {
+  return n === 1 ? "1 app installed from an app page" : `${n} apps installed from an app page`;
+}
+
+// B52: the root stays in the page stack under the Apps page, so a Delete or Remove there (onAppsChange) counts the
+// apps again for the root's Apps cell: its subtitle in place while the cell stays, the whole page when the cell
+// comes or goes (vlist.js measures where the list starts). Nothing until load() has drawn the root.
+export async function refreshAppCount({ view = state, mode = detectMode(), count = jailbreakAppCount, redraw = draw } = {}) {
+  if (recordsApps(mode) || !view.body || view.rows === undefined) return;
+  const seq = view.seq;
+  const n = await count();
+  if (seq !== view.seq || n === (view.appCount ?? 0)) return; // load() is reading it afresh, or nothing changed
+  const had = view.appCount ?? 0;
+  view.appCount = n;
+  const sub = had && n ? view.body.querySelector(".installed-top")?.querySelector(".cell-subtitle") : null;
+  if (sub) sub.textContent = appsRowSubtitle(n);
+  else redraw();
 }
 
 // ---- F147: the Wish List bar button ---------------------------------------------------------------------------

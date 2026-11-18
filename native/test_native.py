@@ -31,7 +31,9 @@ def signed_fake(entitlements):
     return bytes(head) + sb
 
 
-DAEMON_ENTS = {mkdeb.NOTIFY_ENTITLEMENT: ["com.ryha.cydian"], "platform-application": True}
+DAEMON_ENTS = {mkdeb.NOTIFY_ENTITLEMENT: ["com.ryha.cydian"], "platform-application": True,
+               "com.apple.private.security.no-sandbox": True}
+HELPER_ENTS = {"platform-application": True, "com.apple.private.security.no-container": True}
 
 
 def plist(version="0.1.0", build="7"):
@@ -63,7 +65,7 @@ class Deb(unittest.TestCase):
         self.write(self.app, "Info.plist", plist())
         self.write(self.app, "bridge.js", b"x")
         os.makedirs(os.path.join(self.root, "var/jb/usr/libexec/cydian"))
-        self.write(self.root, mkdeb.HELPER[len("./"):], fake_macho(), 0o755)
+        self.write(self.root, mkdeb.HELPER[len("./"):], signed_fake(HELPER_ENTS), 0o755)
         self.write(self.root, mkdeb.DAEMON[len("./"):], signed_fake(DAEMON_ENTS), 0o755)
         os.makedirs(os.path.join(self.root, "var/jb/Library/LaunchDaemons"))
         shutil.copy(os.path.join(HERE, "daemon/com.ryha.cydian.upgrades.plist"),
@@ -165,6 +167,16 @@ class Deb(unittest.TestCase):
         self.write(self.root, mkdeb.HELPER[len("./"):], fake_macho(cpu=0x01000007), 0o755)
         self.assertTrue(any("helper is not" in p for p in self.problems()))
 
+    def test_unsandboxed_flagged(self):
+        """N6: on a rootless jailbreak the helper and daemon die at launch without no-container or no-sandbox."""
+        self.assertEqual(self.problems(), [])
+        self.write(self.root, mkdeb.HELPER[len("./"):], signed_fake({"platform-application": True}), 0o755)
+        self.assertTrue(any("helper has neither" in p for p in self.problems()))
+        self.write(self.root, mkdeb.HELPER[len("./"):], signed_fake(HELPER_ENTS), 0o755)
+        self.write(self.root, mkdeb.DAEMON[len("./"):], signed_fake({mkdeb.NOTIFY_ENTITLEMENT: ["com.ryha.cydian"]}),
+                   0o755)
+        self.assertTrue(any("daemon has neither" in p for p in self.problems()))
+
     def test_bridge_script_flagged(self):
         os.remove(os.path.join(self.app, "bridge.js"))
         self.assertTrue(any("bridge.js" in p for p in self.problems()))
@@ -262,6 +274,12 @@ class Plists(unittest.TestCase):
         with open(os.path.join(HERE, "daemon/entitlements.plist"), "rb") as f:
             e = plistlib.load(f)
         self.assertEqual(e[mkdeb.NOTIFY_ENTITLEMENT], ["com.ryha.cydian"])
+
+    def test_helper_entitlements(self):
+        """N6: the helper's signing entitlements keep it out of the sandbox (else palera1n SIGKILLs it)."""
+        with open(os.path.join(HERE, "helper/entitlements.plist"), "rb") as f:
+            e = plistlib.load(f)
+        self.assertTrue(any(e.get(k) is True for k in mkdeb.UNSANDBOXED))
 
     def test_version_file(self):
         with open(os.path.join(HERE, "VERSION")) as f:

@@ -43,3 +43,40 @@ test("F53: the Filter panel's Source rows follow the device type, by the Sources
   assert.deepEqual(sourceChoices([{ key: "alt:https://alt.x.dev/a.json", uri: "https://alt.x.dev/a.json" }], "none").map((o) => o.label), ["alt.x.dev"]);
   assert.deepEqual(sourceChoices(null, "none"), []);
 });
+
+test("F100: Recent Searches: last 5, newest first, no duplicates, cleared, stored through core/settings.js", async () => {
+  const { addRecent, RECENT_MAX, createSettings } = await import("../core/settings.js");
+  const { recentRows } = await import("./search.js");
+  assert.equal(RECENT_MAX, 5);
+  assert.deepEqual(addRecent([], "  snowboard "), ["snowboard"], "trimmed");
+  assert.deepEqual(addRecent(["a", "b"], ""), ["a", "b"], "an empty query saves nothing");
+  assert.deepEqual(addRecent(["a", "Snowboard", "b"], "snowboard"), ["snowboard", "a", "b"], "a repeat moves to the top, once");
+  assert.deepEqual(addRecent(["1", "2", "3", "4", "5"], "6"), ["6", "1", "2", "3", "4"], "only the last five");
+  assert.deepEqual(addRecent("junk", "x"), ["x"], "a hand-edited value never breaks it");
+
+  const mem = new Map();
+  const storage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)) };
+  const s = createSettings({ storage, mode: "site" });
+  const heard = [];
+  s.onChange((key, value) => heard.push([key, value]));
+  assert.deepEqual(s.recentSearches.list(), []);
+  for (const q of ["filza", "snowboard", "filza"]) s.recentSearches.add(q);
+  assert.deepEqual(s.recentSearches.list(), ["filza", "snowboard"]);
+  assert.equal(mem.get("cydian.recentSearches"), JSON.stringify(["filza", "snowboard"]), "kept under cydian.recentSearches");
+  assert.deepEqual(createSettings({ storage, mode: "site" }).recentSearches.list(), ["filza", "snowboard"], "survives a reload");
+  heard.length = 0;
+  s.recentSearches.add("filza");
+  assert.deepEqual(heard, [], "no change, no notification");
+  s.recentSearches.clear();
+  assert.deepEqual(s.recentSearches.list(), []);
+  assert.deepEqual(heard, [["recentSearches", []]]);
+  mem.set("cydian.recentSearches", "{not json");
+  assert.deepEqual(s.recentSearches.list(), []);
+
+  const picked = [];
+  const rows = recentRows(["filza", "snowboard"], (q) => picked.push(q));
+  assert.deepEqual(rows.map((r) => r.label), ["filza", "snowboard"]);
+  rows[1].onClick();
+  assert.deepEqual(picked, ["snowboard"], "a tap runs that query again");
+  assert.deepEqual(recentRows(null, () => {}), []);
+});

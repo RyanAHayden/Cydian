@@ -11,6 +11,7 @@
 //   await s.holds.sync();                    // jailbreak: take dpkg's holds (apt-mark showhold) as the list
 //   s.hiddenSections.set("Themes", true);    // Section Visibility (F24): listeners hear ("hiddenSections", list)
 //   s.autoMarked.set("com.example.tweak", true); // Update Automatically, for Only Packages I Mark (F70)
+//   s.recentSearches.add("snowboard");      // Search's Recent table (F100): last 5, newest first
 //   s.daemonPrefs();                         // { "cydian.autoInstall": "marked", … } for N7's daemon (F70)
 //
 // Every value is stored as a string under `cydian.<key>`, so backend.js getArch() keeps reading `cydian.arch`.
@@ -194,6 +195,17 @@ const PREFIX = "cydian.";
 const HOLDS_KEY = PREFIX + "holds";
 const HIDDEN_SECTIONS_KEY = PREFIX + "hiddenSections";
 const AUTO_MARKED_KEY = PREFIX + "autoMarked";
+const RECENT_SEARCHES_KEY = PREFIX + "recentSearches";
+
+// F100: Search's Recent table (from Zebra): the last RECENT_MAX queries, newest first, no duplicates (a query
+// already there moves to the top; case and surrounding spaces don't make a new one). Pure, for the tests.
+export const RECENT_MAX = 5;
+export function addRecent(list, query, max = RECENT_MAX) {
+  const q = String(query ?? "").trim();
+  const old = (Array.isArray(list) ? list : []).filter((s) => typeof s === "string" && s.trim());
+  if (!q) return old.slice(0, max);
+  return [q, ...old.filter((s) => s.trim().toLowerCase() !== q.toLowerCase())].slice(0, max);
+}
 
 // F70: what N7's daemon (native/daemon/README.md "Automatic updates (N7)") reads from the app's preferences
 // (com.ryha.cydian), by the same `cydian.<key>` names: these settings, and the lists in DAEMON_LISTS.
@@ -428,6 +440,26 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     },
   };
 
+  // F100: Search's recent queries, kept on this device as a JSON list, newest first; listeners hear
+  // ("recentSearches", list) on a change.
+  function readRecent() {
+    try {
+      return addRecent(JSON.parse(store.get(RECENT_SEARCHES_KEY) || "[]"), "");
+    } catch {
+      return [];
+    }
+  }
+  function writeRecent(list) {
+    if (JSON.stringify(list) === JSON.stringify(readRecent())) return;
+    store.set(RECENT_SEARCHES_KEY, JSON.stringify(list));
+    notify("recentSearches", list);
+  }
+  const recentSearches = {
+    list: readRecent,
+    add: (query) => writeRecent(addRecent(readRecent(), query)),
+    clear: () => writeRecent([]),
+  };
+
   // F70: the daemon's preferences, { "cydian.<key>": value }: string, bool or number as get() gives them, the lists
   // as arrays of package ids. A setting nobody has picked is null (the shell removes the key), so the daemon keeps
   // its own default: F13's, except Check for Updates, which stays Daily (N5's check) until it is really chosen;
@@ -452,6 +484,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     set,
     holds,
     autoMarked,
+    recentSearches,
     daemonPrefs,
     hiddenSections,
     upgradeNotifications,

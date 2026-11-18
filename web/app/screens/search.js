@@ -8,6 +8,9 @@
 // installed or not, free or paid, and Show Incompatible. Show Incompatible is the Works on My Phone setting turned
 // round (F17), so Search, Sections and Settings agree; an exact name or id match shows even when it can't work, in
 // red with the reason under it (browse.js bindRow).
+//
+// Recent (F100, from Zebra): with the field empty, a grouped Recent table of the last five queries (saved on
+// Search or when a result is opened; core/settings.js recentSearches) with Clear in its header; a tap runs one again.
 import * as browse from "./browse.js";
 import { catalog, ALL } from "../catalog.js";
 import { compatFilterOn } from "../device.js";
@@ -51,6 +54,11 @@ export function sourceChoices(list, type, order = null) {
   return sourcesFor(orderSources(list, order), type).shown.map((s) => ({ label: displayName(s), value: s.key }));
 }
 const triedFirstLoad = new Set(); // F53: never-loaded sources the panel already asked for (loadNeverLoaded `tried`)
+
+// F100: the Recent table's rows (nav/ui.js grouped), one per query, a tap hands it to `pick`.
+export function recentRows(list, pick) {
+  return (list || []).map((q) => ({ label: q, cls: "recent-row", onClick: () => pick(q) }));
+}
 
 // The segment a section filter selects: its index in SCOPES, or -1 (a section picked in the sheet).
 export function scopeIndex(section) {
@@ -153,7 +161,9 @@ export function render(body, route, ctx) {
   results.setAttribute("data-scroller", "");
   body.classList.add("search-root");
   body.append(bar, scope, results);
-  results.append(note);
+  // F100: the Recent table, shown in place of the note while the field is empty.
+  const recent = el("div", "search-recent");
+  results.append(note, recent);
 
   const list = browse.packageList(results, route, [], { letters: false });
   results.append(list.el);
@@ -164,6 +174,7 @@ export function render(body, route, ctx) {
   // Show Incompatible, the iOS version or the Architecture changed (here, in the sheet or in Settings): search
   // again. A page left behind unsubscribes.
   const off = settings.onChange((key) => {
+    if (key === "recentSearches") { if (body.isConnected) drawRecent(); else off(); return; }
     if (!["worksOnMyPhone", "iosVersion", "arch", "device"].includes(key)) return;
     if (!body.isConnected) { off(); return; }
     if (key === "device") drawScope();
@@ -171,11 +182,36 @@ export function render(body, route, ctx) {
   });
 
   let timer = 0;
+  function drawRecent() {
+    const items = input.value.trim() ? [] : settings.recentSearches.list();
+    recent.replaceChildren();
+    recent.hidden = !items.length;
+    note.hidden = !input.value.trim() && items.length > 0;
+    if (!items.length) return;
+    recent.append(grouped([{ header: "Recent", rows: recentRows(items, pick) }]));
+    const clear = el("button", "recent-clear", "Clear");
+    clear.type = "button";
+    clear.addEventListener("click", () => settings.recentSearches.clear());
+    recent.querySelector(".group-header").append(clear);
+  }
+  // A Recent row: search it again, as if typed and Searched (it moves to the top).
+  function pick(q) {
+    input.value = q;
+    clearTimeout(timer);
+    settings.recentSearches.add(q);
+    run();
+    input.blur();
+  }
+  // Opening a result (a package row here or under Other Sources) saves the query that found it.
+  results.addEventListener("click", (e) => {
+    if (e.target.closest?.("a[href]") && !recent.contains(e.target)) settings.recentSearches.add(input.value);
+  });
   async function run() {
     const q = input.value.trim();
     state.query = input.value;
     const seq = ++state.seq;
     others.search(q.length >= 2 && settings.deviceType() !== "none" ? q : ""); // jailbreak packages only
+    drawRecent();
     if (!q) {
       list.setItems([]);
       note.textContent = "Package names, descriptions and authors.";
@@ -196,7 +232,7 @@ export function render(body, route, ctx) {
     note.textContent = rows.length ? "" : "No Results";
   }
   input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 120); });
-  bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); run(); input.blur(); });
+  bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); settings.recentSearches.add(input.value); run(); input.blur(); });
   run();
 }
 

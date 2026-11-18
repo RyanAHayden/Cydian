@@ -81,6 +81,10 @@ html[data-theme="dark"] .search-field { background-color: #2b2e33; border-color:
 html[data-theme="dark"] .search-field input { color: #fff; }
 .search-note:empty { display: none; }
 .search-note { margin: 30px 20px; }
+/* F100: Recent's Clear sits at the right of the group header, in the header's own colour and emboss. */
+.search-recent { padding-bottom: 10px; }
+.search-recent .group-header { display: flex; justify-content: space-between; align-items: baseline; }
+.recent-clear { border: 0; padding: 0 0 0 12px; background: none; font: inherit; font-size: 15px; font-weight: normal; color: var(--head); text-shadow: var(--emboss); }
 
 /* ---- the package page ---- */
 .group-footer { white-space: pre-line; }

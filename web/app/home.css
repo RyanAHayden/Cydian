@@ -120,3 +120,14 @@ html[data-theme="dark"] .app-offer .table.grouped { background: #2f4a36; }
 .thanks-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; background: #fff; }
 .thanks-row .cell-icon img.loaded { opacity: 1; }
 .thanks-row .cell-subtitle { white-space: pre-line; overflow-wrap: anywhere; line-height: 18px; margin-top: 2px; }
+
+/* Website, before Cydian is installed: rows below the Cydian App card are disabled, iOS 6 style: dimmed text and
+   icons, and a small grey padlock where the chevron was (screens/home.js, websign-gate.js askToBrowse). */
+.home-locked .cell-label, .home-locked .cell-detail, .home-locked .cell-subtitle { color: #a3a8af !important; text-shadow: none; }
+.home-locked .home-glyph, .home-locked .cell-icon { filter: grayscale(1); opacity: .45; }
+.home-locked .cell-inner.chevron::after {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 15'%3E%3Cpath fill='%23a3a8af' d='M3 6V4.2a3 3 0 0 1 6 0V6h.6c.8 0 1.4.6 1.4 1.4v5.2c0 .8-.6 1.4-1.4 1.4H2.4C1.6 14 1 13.4 1 12.6V7.4C1 6.6 1.6 6 2.4 6H3zm1.5 0h3V4.2a1.5 1.5 0 0 0-3 0V6z'/%3E%3C/svg%3E") center / 11px 14px no-repeat !important;
+  border: 0 !important; transform: none !important; width: 12px !important; height: 15px !important;
+}
+.home-locked .cell-inner:active, .home-locked .cell-inner.is-pressed { background: none !important; }
+html[data-theme="dark"] .home-locked .cell-label, html[data-theme="dark"] .home-locked .cell-detail { color: #6c7178 !important; }

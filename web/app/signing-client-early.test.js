@@ -8,7 +8,7 @@ const profile = (appId) => new TextEncoder().encode(`junk<?xml version="1.0"?><p
 <key>TeamIdentifier</key><array><string>TEAM1</string></array>
 <key>Entitlements</key><dict><key>application-identifier</key><string>TEAM1.${appId}</string></dict></dict></plist>junk`);
 const idFor = (appId) => ({ p12: new Uint8Array([0x30, 1]), profile: profile(appId), password: "pw", passwordOk: true });
-const SELF = "https://github.com/RyanAHayden/Cydian/releases/latest/download/Cydian.ipa";
+const SELF = "https://github.com/RyanAHayden/iFizBox/releases/latest/download/Cydian.ipa";
 const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
 
 // The Worker: /api/fetch answers an IPA; /sign/upload reserves (token, no size) or starts (size); parts of 4 bytes.

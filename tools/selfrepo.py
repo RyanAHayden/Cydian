@@ -6,7 +6,7 @@
 writes OUT/Packages, OUT/Packages.gz and OUT/Release for a flat repo whose .debs sit beside them under the names
 given (each DEB's base name is its Filename:). tools/release.sh runs it on every release and uploads the three files
 as assets of the release, next to the .debs. GitHub serves them at
-    https://github.com/RyanAHayden/Cydian/releases/latest/download/
+    https://github.com/RyanAHayden/iFizBox/releases/latest/download/
 (latest/download/<name> redirects to the newest release's asset), and the repo's address is
     https://cydian.dev/repo/
 where the Worker (worker/src/index.js `repo`) fetches the same asset and answers with it, no redirect: Zebra names

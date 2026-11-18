@@ -15,7 +15,7 @@ const fixture = (name) => readFileSync(new URL(`../../fixtures/altstore/${name}.
 
 // Each default URL, its fixture, and what the fixture holds: [source name, apps after the parse].
 const SOURCES = {
-  "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json": ["cydian", "iFizBox", 1], // I7
+  "https://raw.githubusercontent.com/RyanAHayden/iFizBox/main/web/app/source.json": ["cydian", "iFizBox", 1], // I7
   "https://provenance-emu.com/apps.json": ["provenance-emu", "Provenance Emulator", 3],
   "https://fizl0.github.io/apps/source.json": ["fizl0-apps", "FIZL0", 3],
   "https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json": ["feather", "Feather Repository", 1],

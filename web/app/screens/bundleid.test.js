@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { installRows, appBundleId } from "./altstore.js";
 
 const V = { version: "1.2", downloadURL: "https://example.com/My-Delta.ipa" };
-const CYDIAN = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.7/Cydian.ipa" };
+const CYDIAN = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.7/Cydian.ipa" };
 
 function rowsWith(version, opts) {
   const calls = [];

@@ -64,7 +64,7 @@ class Release(unittest.TestCase):
         self.assertEqual(self.assets(r.stdout),
                          ["Cydian.ipa", "Cydian.deb", "com.ryha.cydian_%s-7_iphoneos-arm64.deb" % VERSION,
                           "Packages", "Packages.gz", "Release"])
-        self.assertIn("RyanAHayden/Cydian v%s " % VERSION, r.stdout)
+        self.assertIn("RyanAHayden/iFizBox v%s " % VERSION, r.stdout)
         self.assertIn("nothing published", r.stdout)
         self.assertNotIn("is not native/VERSION", r.stderr)
 

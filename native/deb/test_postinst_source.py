@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OLD = "https://github.com/RyanAHayden/Cydian/releases/latest/download/"
+OLD = "https://github.com/RyanAHayden/iFizBox/releases/latest/download/"
 NEW = "https://cydian.dev/repo/"
 REAL = "/var/jb/etc/apt/sources.list.d/cydian.sources"
 

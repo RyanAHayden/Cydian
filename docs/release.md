@@ -6,7 +6,7 @@ for a release.
 
 ## What a release is
 
-- Tag `vX.Y.Z`, where X.Y.Z is `native/VERSION`, on `RyanAHayden/Cydian`, at a commit that is already pushed.
+- Tag `vX.Y.Z`, where X.Y.Z is `native/VERSION`, on `RyanAHayden/iFizBox`, at a commit that is already pushed.
 - Title `iFizBox X.Y.Z`. The app shows the first 4 lines of the notes (Markdown taken off) in its "iFizBox X.Y.Z Is
   Available" alert, so the most important change goes first.
 - Assets, under the names the app looks for:
@@ -32,7 +32,7 @@ Like Cydia's apt.saurik.com, iFizBox has a source of its own that is built in an
 
 - **APT repo** (the jailbreak app, and what the website's Install Full iFizBox sheet adds to Sileo and Zebra):
   `https://cydian.dev/repo/`, a flat repo (`dist ./`). Its files are the latest release's assets: the Worker's
-  `/repo/<file>` fetches `https://github.com/RyanAHayden/Cydian/releases/latest/download/<file>`, follows GitHub's
+  `/repo/<file>` fetches `https://github.com/RyanAHayden/iFizBox/releases/latest/download/<file>`, follows GitHub's
   redirect itself and answers with the file (B17; only `Release`, `Packages`, `Packages.gz` and `*.deb`). Zebra
   can't take GitHub's address directly: the redirect ends at a signed `release-assets.githubusercontent.com` URL,
   and Zebra 1.1.36 names its cache file after it ("the file name is invalid"). The .deb's postinst rewrites the old
@@ -43,7 +43,7 @@ Like Cydia's apt.saurik.com, iFizBox has a source of its own that is built in an
   Drafts and pre-releases don't count as latest, so a draft doesn't change what the app sees. The repo is unsigned,
   like most jailbreak repos.
 - **AltStore source** (the sideload app and the site): `web/app/source.json`, served from
-  `https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json` (I7's URL, unchanged), rewritten by
+  `https://raw.githubusercontent.com/RyanAHayden/iFizBox/main/web/app/source.json` (I7's URL, unchanged), rewritten by
   `tools/altsource.py update`: the new version first in `versions[]`, with its date and the notes' first lines,
   and the versions already listed kept below it (at most 20). Commit it after the release.
 

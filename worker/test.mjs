@@ -99,7 +99,7 @@ import { PART, uploadCap } from "./src/index.js";
 }
 {
   const { upstream, releaseFile } = await import("./src/index.js");
-  assert.ok(releaseFile("https://github.com/RyanAHayden/Cydian/releases/download/v0.3.6/Cydian.ipa"));
+  assert.ok(releaseFile("https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.6/Cydian.ipa"));
   assert.equal(releaseFile("https://raw.githubusercontent.com/o/r/main/source.json"), false);
   const answers = [429, 503, 200];
   const seen = [];
@@ -306,7 +306,7 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   assert.equal(await r.text(), "Origin: iFizBox\n");
   assert.equal(r.headers.get("content-type"), "text/plain; charset=utf-8");
   assert.equal(r.headers.get("last-modified"), "Wed, 18 Nov 2026 10:00:00 GMT");
-  assert.equal(seen.pop(), "https://github.com/RyanAHayden/Cydian/releases/latest/download/Release");
+  assert.equal(seen.pop(), "https://github.com/RyanAHayden/iFizBox/releases/latest/download/Release");
   r = await at("/repo/Packages.gz");
   assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [0x1f, 0x8b, 8]);
   assert.equal(r.headers.get("content-type"), "application/gzip");

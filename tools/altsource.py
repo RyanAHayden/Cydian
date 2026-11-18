@@ -22,8 +22,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "native"))
 from brand import NAME  # noqa: E402  (F170: native/brand.env)
 SOURCE = os.path.join(ROOT, "web", "app", "source.json")
-REPO = "https://github.com/RyanAHayden/Cydian"
-RAW = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main"
+REPO = "https://github.com/RyanAHayden/iFizBox"
+RAW = "https://raw.githubusercontent.com/RyanAHayden/iFizBox/main"
 BUNDLE_ID = "com.ryha.cydian"
 MIN_OS = "15.0"  # native/mkipa.py's MinimumOSVersion
 KEEP = 20  # versions[] entries kept (newest first)

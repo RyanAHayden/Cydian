@@ -155,8 +155,8 @@ const SOURCE = {
   apps: [
     { bundleIdentifier: "com.example.other", versions: [{ version: "9.0", downloadURL: "https://x.example/o.ipa" }] },
     { bundleIdentifier: SELF_ID, minimumVersion: "0.1.2", versions: [
-      { version: "0.1.1", date: "2026-11-01", downloadURL: "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.1/Cydian.ipa" },
-      { version: "0.1.3", date: "2026-11-17", localizedDescription: "Essential Upgrade\nRelease notes: https://x", downloadURL: "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.3/Cydian.ipa", size: 10 },
+      { version: "0.1.1", date: "2026-11-01", downloadURL: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.1/Cydian.ipa" },
+      { version: "0.1.3", date: "2026-11-17", localizedDescription: "Essential Upgrade\nRelease notes: https://x", downloadURL: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.3/Cydian.ipa", size: 10 },
     ] },
   ],
 };
@@ -344,7 +344,7 @@ function selfDeps({ answers = [] } = {}) {
     },
   };
 }
-const ROW = { version: "0.1.3", ipa: "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.3/Cydian.ipa" };
+const ROW = { version: "0.1.3", ipa: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.3/Cydian.ipa" };
 
 test("installSelf (no bridge to sign with): it offers cydian.dev in Safari, which hands iFizBox to a sideloader (F89)", async () => {
   const s = selfDeps({ answers: [1] });
@@ -367,7 +367,7 @@ test("the committed web/app/source.json reads as iFizBox's own source", async ()
   const text = await readFile(new URL("../source.json", import.meta.url), "utf8");
   const info = selfFromAltSource(text);
   assert.ok(info?.version, "a version");
-  assert.match(info.ipa, /^https:\/\/github\.com\/RyanAHayden\/Cydian\/releases\/download\/v[\d.]+\/Cydian\.ipa$/);
+  assert.match(info.ipa, /^https:\/\/github\.com\/RyanAHayden\/iFizBox\/releases\/download\/v[\d.]+\/(?:Cydian|iFizBox)\.ipa$/);
 });
 
 test("F61's sideload install takes installSelf when given (never the local server for iFizBox itself)", async () => {

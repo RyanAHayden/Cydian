@@ -21,12 +21,12 @@
 // For IPAs only iFizBox itself (com.ryha.cydian from its own source) is ever essential.
 import { compareVersions, isNewer, parseVersion } from "./selfupdate.js";
 import { altKey, seedRecord } from "./altstore.js";
-import { NAME } from "../brand.js";
+import { NAME, GITHUB_REPO } from "../brand.js";
 
 export const SELF_ID = "com.ryha.cydian";
 const SELF_NAME = NAME;
 export const SELF_APT_URI = "https://cydian.dev/repo/";
-export const SELF_ALT_URL = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json";
+export const SELF_ALT_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/web/app/source.json`;
 export const SELF_SITE = "https://cydian.dev/";
 // The .debs that are essential whatever their control says (iFizBox's helper is in iFizBox's own package).
 const ESSENTIAL_IDS = [SELF_ID, "apt", "dpkg"];

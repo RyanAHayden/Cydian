@@ -8,14 +8,14 @@
 //     jailbroken (rootless, ...)          downloads the release's .deb for that architecture, to open in Sileo or
 //                                         Filza; an architecture with no .deb yet is told so
 //   iFizBox's own package page: its AltStore source (web/app/source.json, first in DEFAULT_ALT_SOURCES).
-import { NAME } from "../brand.js";
+import { NAME, GITHUB_REPO } from "../brand.js";
 
-export const REPO_URL = "https://github.com/RyanAHayden/Cydian";
+export const REPO_URL = `https://github.com/${GITHUB_REPO}`;
 // The release assets native/build.sh makes (tools/release.sh uploads them): latest/download always names the newest.
 export const APP_IPA_URL = `${REPO_URL}/releases/latest/download/Cydian.ipa`;
 export const APP_DEB_URL = `${REPO_URL}/releases/latest/download/Cydian.deb`; // rootless, iphoneos-arm64
 // iFizBox's own AltStore source, kept current with native/VERSION by test_release.py.
-export const APP_SOURCE_URL = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json";
+export const APP_SOURCE_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/web/app/source.json`;
 export const APP_NAME = NAME;
 
 const NOT_JAILBROKEN = "none";

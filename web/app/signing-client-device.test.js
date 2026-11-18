@@ -184,7 +184,7 @@ test("Install: no bundleId from the signer ends on Done as before", async () => 
 
 // (host: true too, but its banner needs a DOM, so it isn't run here.)
 test("Install: iFizBox itself (its own IPA, or its ID) isn't followed", async () => {
-  const self = "https://github.com/RyanAHayden/Cydian/releases/latest/download/Cydian.ipa";
+  const self = "https://github.com/RyanAHayden/iFizBox/releases/latest/download/Cydian.ipa";
   for (const [opts, answer] of [
     [{ url: self }, { bundleId: "com.x" }],
     [{ url: "https://e.example/c.ipa" }, { bundleId: CYDIAN_ID }],

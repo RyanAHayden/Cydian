@@ -8,8 +8,8 @@
 - altstore.json: the AltStore test source; its IPAs are the assets of the test-fixtures pre-release (too big for git).
 
 URLs (GitHub serves this repo's files as they are on main):
-  https://raw.githubusercontent.com/RyanAHayden/Cydian/main/testrepo/apt/        (APT, flat: dist ./)
-  https://raw.githubusercontent.com/RyanAHayden/Cydian/main/testrepo/altstore.json  (AltStore)
+  https://raw.githubusercontent.com/RyanAHayden/iFizBox/main/testrepo/apt/        (APT, flat: dist ./)
+  https://raw.githubusercontent.com/RyanAHayden/iFizBox/main/testrepo/altstore.json  (AltStore)
 """
 import gzip, hashlib, io, pathlib, tarfile, time
 

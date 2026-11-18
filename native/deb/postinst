@@ -9,7 +9,7 @@ launchctl load /var/jb/Library/LaunchDaemons/com.ryha.cydian.upgrades.plist || t
 # drop its stanza when the new one is already there, so apt doesn't list iFizBox twice. Plain sh (dash): the phone has
 # no awk. Stanzas are split by blank lines (deb822); every other stanza is copied as it is.
 src=/var/jb/etc/apt/sources.list.d/cydian.sources
-old=https://github.com/RyanAHayden/Cydian/releases/latest/download/
+old=https://github.com/RyanAHayden/iFizBox/releases/latest/download/
 new=https://cydian.dev/repo/
 b17_flush() {
   [ -n "$stanza" ] || return 0

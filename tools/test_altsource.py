@@ -37,8 +37,10 @@ class SourceTest(unittest.TestCase):
         with open(os.path.join(ROOT, "web", "app", "core", "sources.js")) as f:
             js = f.read()
         block = js[js.index("DEFAULT_ALT_SOURCES = dedupeUrls(["):]
-        first = re.search(r'"(https?://[^"]+)"', block).group(1)
-        self.assertEqual(first, "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json")
+        first = re.search(r'["`](https?://[^"`]+)["`]', block).group(1)
+        with open(os.path.join(ROOT, "native", "brand.env")) as f:
+            repo = re.search(r"^BRAND_GITHUB_REPO=(\S+)", f.read(), re.M).group(1)
+        self.assertEqual(first.replace("${GITHUB_REPO}", repo), f"https://raw.githubusercontent.com/{repo}/main/web/app/source.json")
 
 
 class UpdateTest(unittest.TestCase):
@@ -52,7 +54,7 @@ class UpdateTest(unittest.TestCase):
             with open(out) as f:
                 data = json.load(f)
         v = data["apps"][0]["versions"][0]
-        self.assertEqual(v["downloadURL"], "https://github.com/RyanAHayden/Cydian/releases/download/v9.8.7/Cydian.ipa")
+        self.assertEqual(v["downloadURL"], "https://github.com/RyanAHayden/iFizBox/releases/download/v9.8.7/Cydian.ipa")
         self.assertEqual(v["size"], 1002)
         self.assertEqual(altsource.check(data), [])
 

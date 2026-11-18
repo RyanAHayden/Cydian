@@ -14,12 +14,12 @@ It stores nothing else and logs nothing. iFizBox uses `https://sign.cydian.dev` 
 
 ## Host your own (free, about a minute)
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/RyanAHayden/Cydian/tree/main/worker)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/RyanAHayden/iFizBox/tree/main/worker)
 
 Or by hand, with Node installed:
 
 ```sh
-git clone https://github.com/RyanAHayden/Cydian && cd iFizBox/worker
+git clone https://github.com/RyanAHayden/iFizBox && cd iFizBox/worker
 npx wrangler login
 npx wrangler deploy        # makes the KV storage on the first deploy and prints your https://….workers.dev address
 ```
@@ -32,7 +32,7 @@ The same code runs on Node 22 (`worker/node.mjs`): the website, `/api/fetch` and
 memory.
 
 ```sh
-git clone https://github.com/RyanAHayden/Cydian && cd iFizBox
+git clone https://github.com/RyanAHayden/iFizBox && cd iFizBox
 node worker/node.mjs                       # http://0.0.0.0:8787 (PORT, HOST, HOST_IDS, TTL as below)
 # or Docker:
 docker build -f worker/Dockerfile -t cydian . && docker run -d --restart unless-stopped -p 8787:8787 cydian

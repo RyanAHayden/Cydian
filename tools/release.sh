@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Publish a iFizBox release on GitHub (T6), the one F61's self-update reads (web/app/core/selfupdate.js): tag
-# v<native/VERSION> on RyanAHayden/Cydian, with these assets:
+# v<native/VERSION> on RyanAHayden/iFizBox, with these assets:
 #   Cydian.ipa                       the sideload build (parseRelease's `ipa`)
 #   Cydian.deb                       the rootless jailbreak build (debFor's fallback, iphoneos-arm64 only)
 #   <pkg>_<ver>_<arch>.deb           the same .deb under Debian's name (debFor's exact-arch match), e.g.
@@ -8,7 +8,7 @@
 #   <pkg>_<ver>_<arch>.deb           any other arch build found in --dist under that name (roothide, rootful)
 #   Packages, Packages.gz, Release   iFizBox's own flat APT repo over those .debs (F72, tools/selfrepo.py): the
 #                                    jailbreak app's built-in source, https://cydian.dev/repo/ (the Worker
-#                                    serves releases/latest/download/ of RyanAHayden/Cydian without the redirect)
+#                                    serves releases/latest/download/ of RyanAHayden/iFizBox without the redirect)
 # Then it points iFizBox's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new Cydian.ipa, the
 # sideload app's and the site's built-in source (F72), versions[] newest first: commit web/app/source.json afterwards.
 # Run it only when a person asks for a release. How to cut one: docs/release.md.
@@ -24,12 +24,12 @@
 #                 Essential Upgrade alert without Ignore. Default: none (the alert can always be ignored)
 #     --out DIR   also leave the repo files, the notes and the updated AltStore source (source.json) in DIR; a dry
 #                 run writes the source there only, never into web/app/source.json
-#   CYDIAN_RELEASE_REPO  owner/name to publish on (default RyanAHayden/Cydian)
+#   CYDIAN_RELEASE_REPO  owner/name to publish on (default RyanAHayden/iFizBox)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . native/brand.env # F170: BRAND_NAME for the release title and notes
 
-repo=${CYDIAN_RELEASE_REPO:-RyanAHayden/Cydian}
+repo=${CYDIAN_RELEASE_REPO:-RyanAHayden/iFizBox}
 dry=0 notes= dist= draft=() minimum= out=
 while [ $# -gt 0 ]; do
   case $1 in
@@ -156,7 +156,7 @@ fi
 
 echo "release: $repo $tag at $sha"
 echo "release: assets: Cydian.ipa Cydian.deb $debname ${extra[*]:+${extra[*]} }${repofiles[*]}"
-if [ "$repo" = RyanAHayden/Cydian ]; then aptrepo=https://cydian.dev/repo/; else aptrepo="https://github.com/$repo/releases/latest/download/ (a Worker with CYDIAN_REPO=$repo serves it at /repo/)"; fi
+if [ "$repo" = RyanAHayden/iFizBox ]; then aptrepo=https://cydian.dev/repo/; else aptrepo="https://github.com/$repo/releases/latest/download/ (a Worker with CYDIAN_REPO=$repo serves it at /repo/)"; fi
 echo "release: apt repo: $aptrepo, from https://github.com/$repo/releases/latest/download/${minimum:+ (minimum $minimum)}"
 echo "release: notes:"
 sed 's/^/  /' "$stage/notes.md"

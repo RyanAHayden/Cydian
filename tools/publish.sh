@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
     *) die "unknown option $1" ;;
   esac
 done
-repo="${CYDIAN_RELEASE_REPO:-RyanAHayden/Cydian}"
+repo="${CYDIAN_RELEASE_REPO:-RyanAHayden/iFizBox}"
 owner="${repo%%/*}"
 
 # 1. checks

@@ -36,7 +36,7 @@
 
 import { account, isAccountPath } from "./account.js";
 import { readIpaInfo, IpaError } from "./ipainfo.js";
-import { NAME } from "../../web/app/brand.js";
+import { NAME, GITHUB_REPO } from "../../web/app/brand.js";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
@@ -138,8 +138,8 @@ export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promis
 // a URL Zebra 1.1.36 names its cache file after: too long, "the file name is invalid", the source shows red. Here
 // the Worker follows the redirect and answers with the file itself, so https://cydian.dev/repo/ has no redirect.
 // Only the repo's own names are fetched (anything else, InRelease, Packages.xz, icons: 404 without asking GitHub).
-// CYDIAN_REPO (owner/name) picks another GitHub repo's releases (default RyanAHayden/Cydian).
-const SELF_REPO = "RyanAHayden/Cydian";
+// CYDIAN_REPO (owner/name) picks another GitHub repo's releases (default brand.js GITHUB_REPO).
+const SELF_REPO = GITHUB_REPO;
 const REPO_TYPES = { "Release": "text/plain; charset=utf-8", "Packages": "text/plain; charset=utf-8", "Packages.gz": "application/gzip" };
 export function repoFile(pathname) {
   const m = /^\/repo\/([^/]+)$/.exec(pathname);
@@ -513,6 +513,6 @@ export default {
     // keeps an old file). /add?url=… and other app routes fall back to index.html (single-page application).
     // Only /sign and /sign/... are the server's: /signing-client.js and /signing-worker.js are the website's files.
     if (env.ASSETS && !/^\/sign(\/|$)/.test(u.pathname)) return env.ASSETS.fetch(req);
-    return fail("not_found", `Nothing here. This is ${NAME}'s install server (github.com/RyanAHayden/Cydian).`, 404);
+    return fail("not_found", `Nothing here. This is ${NAME}'s install server (github.com/${GITHUB_REPO}).`, 404);
   },
 };

@@ -32,7 +32,7 @@ import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installP
 import { getArch } from "../backend.js";
 import { ipaSection } from "./ipa-install.js";
 import { otherLinksOn, setOtherLinks } from "../core/otherlinks.js";
-import { NAME } from "../brand.js";
+import { NAME, GITHUB_REPO } from "../brand.js";
 
 export const title = "Settings";
 
@@ -436,7 +436,7 @@ async function askServer(el) {
   redrawAll();
 }
 
-const RUN_YOUR_OWN = "https://github.com/RyanAHayden/Cydian/tree/main/worker#host-your-own-free-about-a-minute";
+const RUN_YOUR_OWN = `https://github.com/${GITHUB_REPO}/tree/main/worker#host-your-own-free-about-a-minute`;
 
 async function checkServer() {
   const hide = showHUD("Checking");

@@ -23,7 +23,7 @@ import { IPA_MAX, CYDIAN_ID, profileInfo, targetBundleId } from "./core/websign.
 import { detectMode } from "./core/settings.js";
 import { progressHUD } from "./nav/progress.js";
 import { showAlert } from "./nav/alert.js";
-import { NAME } from "./brand.js";
+import { NAME, GITHUB_REPO } from "./brand.js";
 
 // F151: a job's error on the progress page (the HUD interface's fail, nav/progress.js) before its alert; a HUD
 // without one (liveHUD, the tests') just goes.
@@ -133,8 +133,9 @@ export async function serverStatus(server = getServer()) {
 // F72: an IPA of iFizBox itself (its GitHub releases, where iFizBox's own source points).
 // Only iFizBox's own IPA files count: a release's Cydian.ipa, or the test source's cydian-<version>.ipa. Other files
 // under the same releases (the test-fixtures pre-release's Test Alpha, Test Beta...) are ordinary apps.
-export const isSelfIpa = (url) => /^https:\/\/github\.com\/RyanAHayden\/Cydian\/releases\/(?:latest\/)?download\/(?:[^/]+\/)?(?:Cydian|cydian-[\d.]+)\.ipa$/i
-  .test(String(url ?? ""));
+// ponytail: the asset is still Cydian.ipa until F171 renames it; iFizBox.ipa is accepted already.
+const SELF_IPA = new RegExp(`^https://github\\.com/${GITHUB_REPO.replace(/[.]/g, "\\.")}/releases/(?:latest/)?download/(?:[^/]+/)?(?:cydian|${NAME}|cydian-[\\d.]+)\\.ipa$`, "i");
+export const isSelfIpa = (url) => SELF_IPA.test(String(url ?? ""));
 
 // Signs `url` (an IPA) on the phone and installs it. Resolves true once iOS was asked to install; false after an
 // error, which it shows in an alert; false in the jailbreak app (its pages use the helper, so this is only a guard).

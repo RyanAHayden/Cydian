@@ -8,6 +8,7 @@
 //
 // and throws errors with a `code` (BackendError: bad_url, refused, too_large, timeout, upstream, not_found,
 // network, rate_limited). Cydia's behaviour this follows: docs/cydia.md, "Fetching a source" and "Sources tab".
+import { GITHUB_REPO } from "../brand.js";
 import { repoLayout, parseRelease, parseControl, matchesArch, DEFAULT_ARCH } from "./apt.js";
 import { isAltKey, neverLoaded } from "./altstore.js";
 import { releaseTime, fingerprint, healthFields, withTimeout, pool, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
@@ -32,7 +33,7 @@ export const DEFAULT_SOURCES = [
 // URL kept is the one given. Deduped on the parsed URL.
 export const DEFAULT_ALT_SOURCES = dedupeUrls([
   // I7: iFizBox's own source first, the app's own package page (web/app/source.json, tools/altsource.py).
-  "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json",
+  `https://raw.githubusercontent.com/${GITHUB_REPO}/main/web/app/source.json`,
   "https://provenance-emu.com/apps.json",
   "https://fizl0.github.io/apps/source.json",
   "https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json",

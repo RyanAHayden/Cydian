@@ -15,7 +15,7 @@ const labels = (rows) => rows.map((r) => r.label);
 
 const SITE = { site: true, jailbreak: false, custom: false };
 
-const CYDIAN = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.7/Cydian.ipa" };
+const CYDIAN = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.7/Cydian.ipa" };
 
 test("the website's Install rows: iFizBox installs in the browser; other apps go to iFizBox first (F96), no hand-offs", () => {
   const own = installRows(CYDIAN, "https://example.com/apps.json", () => {}, () => {}, null, "iFizBox", SITE).rows;

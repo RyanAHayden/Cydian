@@ -16,9 +16,9 @@
 //
 // Pure: everything that touches the network, the bridge, storage or the screen comes in through `deps`, so node
 // tests drive every path (selfupdate.test.js). app.js and screens/settings.js wire the real ones.
-import { NAME } from "../brand.js";
+import { NAME, GITHUB_REPO } from "../brand.js";
 
-export const RELEASES_URL = "https://api.github.com/repos/RyanAHayden/Cydian/releases/latest";
+export const RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 export const DAY = 24 * 60 * 60 * 1000;
 export const STORE_KEY = "cydian.selfupdate";
 const NOTE_LINES = 4;

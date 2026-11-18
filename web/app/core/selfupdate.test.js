@@ -14,11 +14,11 @@ function memStorage(init = {}) {
 
 const GH = {
   tag_name: "v0.2.0",
-  html_url: "https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.0",
+  html_url: "https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.0",
   body: "## What's new\n\n- **Updates itself**: a popup when a release is out\n- Settings > About\n\n![shot](x.png)\n* Fixes [#3](https://x)\n1. Line four\n- Line five",
   assets: [
-    { name: "Cydian.ipa", browser_download_url: "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.0/Cydian.ipa" },
-    { name: "Cydian.deb", browser_download_url: "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.0/Cydian.deb" },
+    { name: "Cydian.ipa", browser_download_url: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.0/Cydian.ipa" },
+    { name: "Cydian.deb", browser_download_url: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.0/Cydian.deb" },
     { name: "com.ryha.cydian_0.2.0_iphoneos-arm64e.deb", browser_download_url: "https://example.com/e.deb" },
     { name: "com.ryha.cydian_0.2.0_iphoneos-arm.deb", browser_download_url: "https://example.com/arm.deb" },
   ],

@@ -1,5 +1,5 @@
-// F142: the recommended list per build. The jailbreak build lists APT repos (and FIZL0's own source), the sideload
-// IPA and the website AltStore sources only; every entry says what it carries; deps.js's library homes are all on it.
+// F142: the recommended list per build. The jailbreak build lists APT repos, then every AltStore source (it installs
+// IPAs too); the sideload IPA and the website AltStore sources only; every entry says what it carries; deps.js's library homes are all on it.
 // When each entry was last fetched: CHECKED, re-checked with tools/recommended_check.py (network, so not here).
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -36,12 +36,14 @@ test("F142: the APT repos are flat repos with the jailbreaks they suit; the old 
   assert.ok(alt.length >= 10);
 });
 
-test("F142: the jailbreak build lists APT repos and FIZL0; the IPA and website list AltStore sources", () => {
+test("F142: the jailbreak build lists APT repos, then every AltStore source; the IPA and website AltStore only", () => {
   for (const jb of [...JAILBREAKS.map((j) => j.id), null]) {
     const recs = recommendedFor(RECOMMENDED_SOURCES, jb);
     const rows = recommendedRows(recs, [], { jailbroken: true });
-    assert.ok(rows.every((r) => r.rec.jailbreak || r.rec.own), String(jb));
-    assert.ok(rows.some((r) => r.rec.jailbreak), String(jb));
+    const firstAlt = rows.findIndex((r) => !r.rec.jailbreak);
+    assert.ok(firstAlt > 0 && rows.slice(firstAlt).every((r) => !r.rec.jailbreak), `APT first: ${jb}`);
+    assert.equal(rows[firstAlt].label, "FIZL0");
+    assert.equal(rows.length - firstAlt, alt.length, String(jb));
     assert.ok(rows.every((r) => !r.rec.jailbreak || r.key.startsWith("deb:")), String(jb));
   }
   const ipa = recommendedRows(RECOMMENDED_SOURCES, [], { jailbroken: false });

@@ -6,7 +6,7 @@
 //                                                                 for: the jailbreaks it suits (F19)
 //
 // F142: the list is what today's package managers and sideloaders ship, read from their source (CHECKED is when):
-//   APT (the jailbreak build)  Sileo's first-run repos (Sileo RepoManager.swift: Havoc, Chariz); Zebra's own repo
+//   APT (the jailbreak build, above its AltStore sources)  Sileo's first-run repos (Sileo RepoManager.swift: Havoc, Chariz); Zebra's own repo
 //       (ZBBaseSource zebraSource) and its "utility" sources for palera1n and Dopamine (ElleKit, palera1n; its
 //       community list, api.getzbra.com/sources.json, is gone: 404); Dopamine's default.sources (Chariz, Havoc,
 //       ElleKit). Procursus and BigBoss are dist repos, which Recommended can't add, and every rootless jailbreak's
@@ -115,14 +115,16 @@ export function jailbreakFromMarkers(markers) {
   return null;
 }
 
-// The entries for a jailbroken phone (F142: the jailbreak build lists APT repos): the APT entries whose `for` names
-// the jailbreak (every one for "other"/null), then FIZL0's own source (`own`). Other AltStore sources are for the
-// sideload IPA and the website (recommendedRows' jailbroken: false keeps only those).
+// The entries for a jailbroken phone: the APT entries whose `for` names the jailbreak (every one for "other"/null),
+// then every AltStore source, FIZL0's own first: the jailbreak app installs IPAs too (user 2026-11-18), so
+// Recommended shows both, as two groups (manage.js). The sideload IPA and the website get the AltStore ones only
+// (recommendedRows' jailbroken: false).
 export function recommendedFor(recs, jailbreak) {
   const all = Array.isArray(recs) ? recs : [];
   const any = !jailbreak || jailbreak === "other";
   const apt = all.filter((r) => r.jailbreak && (any || !r.for || r.for.includes(jailbreak)));
-  return [...apt, ...all.filter((r) => !r.jailbreak && r.own)];
+  const alt = all.filter((r) => !r.jailbreak);
+  return [...apt, ...alt.filter((r) => r.own), ...alt.filter((r) => !r.own)];
 }
 
 // The user's pick on Recommended (localStorage), else what was detected.

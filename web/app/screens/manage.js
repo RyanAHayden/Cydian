@@ -639,10 +639,16 @@ const recHref = (row) => (row.added ? format({ tab: "sources", path: [row.key] }
 
 async function renderRecommended(body, ctx) {
   const rows = await recRows();
-  const ul = plain([{ rows: rows.map((r) => ({
+  const toCell = (r) => ({
     label: r.label, subtitle: r.subtitle, icon: { text: r.label[0]?.toUpperCase() ?? "?" },
     badge: r.count != null ? r.count.toLocaleString() : undefined, href: recHref(r), chevron: false,
-  })) }]);
+  });
+  // Jailbroken: tweak repos, then app sources (the jailbreak app installs IPAs too), each under its own header.
+  // Cells stay in `rows` order, so the index lookups below hold.
+  const apt = rows.filter((r) => r.rec.jailbreak);
+  const ul = plain(apt.length
+    ? [{ header: "Tweak Repos", rows: apt.map(toCell) }, { header: "App Sources", rows: rows.filter((r) => !r.rec.jailbreak).map(toCell) }]
+    : [{ rows: rows.map(toCell) }]);
   ul.classList.add("rec-list");
   markRecommendedSeen(); // F19: the Sources tab's first-run row has done its job
   const cells = [...ul.querySelectorAll(":scope > .cell")];

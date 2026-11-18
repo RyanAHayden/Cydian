@@ -455,11 +455,13 @@ export function sourceCalls(backend, opts = {}) {
     // `filter` (F41, sourceFilter): only the sources it keeps are fetched.
     // F19: at most REFRESH_CONCURRENCY at once, each given `timeout` ms (a dead host is marked Not Responding
     // instead of holding the rest), with the health fields (reachedAt, failures) saved beside the result.
+    // F150: `signal` (the reload bar's Cancel) starts no more sources once aborted; those under way finish.
     async refreshSources(onEach = () => {}, { filter, timeout = opts.timeout ?? REFRESH_TIMEOUT,
-      concurrency = opts.concurrency ?? REFRESH_CONCURRENCY } = {}) {
+      concurrency = opts.concurrency ?? REFRESH_CONCURRENCY, signal } = {}) {
       const db = await store();
       const list = (await db.list()).filter(filter ?? (() => true));
       return pool(list, concurrency, async (s) => {
+        if (signal?.aborted) return null;
         const fields = await refreshTimed(backend, s, { arch: arch(), count, timeout });
         const next = await db.update(s.key, { ...fields, ...healthFields(s, fields) });
         if (next) onEach(next);

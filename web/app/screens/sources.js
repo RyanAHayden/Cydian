@@ -1,6 +1,6 @@
 // Sources tab, after Cydia's (docs/cydia.md "Sources tab"): one row per source, sorted by name, with its
 // CydiaIcon.png, name, URL and (Cydian's own addition) how many packages it has for this device's architecture.
-// Nav bar: Refresh (HUD, refetch every source) and Manage (F45, screens/manage.js: the edit list with Add, delete
+// Nav bar: Refresh (F150 reload bar, refetch every source) and Manage (F45, screens/manage.js: the edit list with Add, delete
 // and reorder, Import & Export, Recommended). A left swipe on a row shows Delete. Rows keep the order set there. The list lives on the
 // device and comes through the backend (core/sources.js sourceCalls), so the app runs this file unchanged.
 // Above the sources, Cydia's "All Sources" row; a source (or All Sources) opens its Sections, and everything
@@ -20,6 +20,7 @@ import { healthOf } from "../core/health.js";
 import { recommendedSeen, jailbreakName } from "../core/recommended.js";
 import { builtinFirst, isBuiltin } from "../core/essential.js";
 import { lockMark } from "../nav/lock.js";
+import { reloadSteps } from "../core/reloadsteps.js";
 
 export const title = "Sources";
 
@@ -153,27 +154,26 @@ async function load(ctx) {
 }
 
 // F43: sources seeded by default (F28) hold only their URL until something reads them: refresh those once, with
-// Refresh's HUD, so a first visit shows names, icons and counts without a tap.
+// the reload bar, so a first visit shows names, icons and counts without a tap.
 async function firstLoad(ctx) {
   if (state.busy) return;
   state.busy = true;
-  let hide = () => {};
+  let run = null;
   try {
-    let each = () => {};
+    // F150: the reload bar instead of a HUD, so the list stays usable while the new sources load.
     const done = await loadNeverLoaded(getBackend(), state.sources, settings.deviceType(), {
       tried: state.tried,
-      begin: (keys) => { each = markLoading(ctx, [...(keys ?? [])]); hide = ctx?.showHUD ? ctx.showHUD("Reloading Data") : () => {}; },
-      onEach: (d) => each(d),
+      begin: (keys) => { run = startRun(ctx, [...(keys ?? [])]); },
+      onEach: (d) => run?.onEach(d),
     });
-    if (done) {
+    if (done && !run?.cancelled) {
       state.sources = await getBackend().sources();
       draw();
     }
   } catch {
     // a failed first load leaves the rows as they were; Refresh shows the error
   } finally {
-    clearLoading(ctx);
-    linger(hide);
+    if (!run?.cancelled) { clearLoading(ctx); run?.end(); }
     state.busy = false;
   }
 }
@@ -207,27 +207,75 @@ function clearLoading(ctx) {
 }
 
 // At launch (app.js, Settings > Refresh on Launch): every source the device type shows, behind whatever page is
-// open, with the Sources tab's red spinning badge and the rows spinning if Sources is on screen. No HUD.
+// open, with the Sources tab's red spinning badge and the rows spinning if Sources is on screen. The reload bar (F150) says what is happening.
+// F150: with the reload bar, whose Cancel stops it: resolves to "cancelled" then (Home's Reload stops there too).
 export async function refreshInBackground(ctx) {
   if (state.busy) return;
   state.busy = true;
+  let run = null;
   try {
     state.sources = await getBackend().sources();
     const filter = sourceFilter(settings.deviceType());
-    const onEach = markLoading(ctx, state.sources.filter(filter ?? (() => true)).map((x) => x.key));
-    await getBackend().refreshSources(onEach, { filter });
+    run = startRun(ctx, state.sources.filter(filter ?? (() => true)).map((x) => x.key));
+    if (await run.until(getBackend().refreshSources(run.onEach, { filter, signal: run.signal }))) return "cancelled";
     state.sources = await getBackend().sources();
     if (state.box?.isConnected) draw();
+    if (await run.until(run.data())) return "cancelled";
   } catch {
     // a failed refresh shows per source (its row) once it has failed
   } finally {
-    clearLoading(ctx);
+    if (!run?.cancelled) { clearLoading(ctx); run?.end(); }
     state.busy = false;
   }
 }
 
-// The HUD stays exactly as long as the loading, then a second more before its usual fade.
-const linger = (hide) => setTimeout(hide, 1000);
+// ---- F150: one refresh under the reload bar -----------------------------------------------------------------
+
+// Marks `keys` loading (rows and badge, markLoading) and drops the reload bar (ctx.reloadBar, nav/reloadbar.js;
+// none where ctx has no reloadBar, as in the tests that don't ask for it), its words following the refresh
+// (core/reloadsteps.js). The bar's Cancel ends the run at once: the marks go, the bar goes, `until` resolves true,
+// `signal` aborts (the backend starts no more sources) and the answers still on their way change nothing.
+//   onEach(record)  until(promise) -> true when cancelled first   data()  end()   cancelled   signal
+export function startRun(ctx, keys) {
+  const ac = typeof AbortController === "function" ? new AbortController() : { signal: { aborted: false }, abort() { this.signal.aborted = true; } };
+  const each = markLoading(ctx, keys);
+  const byKey = new Map((state.sources ?? []).map((s) => [s.key, s]));
+  let bar = null;
+  let stop = () => {};
+  const stopped = new Promise((resolve) => { stop = resolve; });
+  const run = {
+    signal: ac.signal,
+    get cancelled() { return ac.signal.aborted; },
+    onEach(d) { if (ac.signal.aborted) return; each(d); steps.each(d); },
+    until: (p) => Promise.race([Promise.resolve(p).then(() => false), stopped.then(() => true)]),
+    // Cydia's last steps: the package lists into the catalog ("Loading Data"), then what is worked out from
+    // them ("Building Searcher Cache"): ctx.loadData and ctx.buildCache (app.js), skipped where ctx has none.
+    async data() {
+      if (ac.signal.aborted) return;
+      steps.load();
+      await ctx?.loadData?.();
+      if (ac.signal.aborted) return;
+      steps.cache();
+      await ctx?.buildCache?.();
+    },
+    end() { bar?.hide(); },
+  };
+  const cancel = () => {
+    if (ac.signal.aborted) return;
+    ac.abort();
+    clearLoading(ctx);
+    bar?.hide();
+    stop();
+  };
+  const steps = reloadSteps(keys.map((k) => byKey.get(k) ?? { key: k }), {
+    apt: Boolean(globalThis.cydianNative) && settings.deviceType() !== "none",
+    name: (s) => (s?.uri || s?.name ? displayName(s) : ""),
+    onText: (t) => bar?.set(t),
+  });
+  bar = ctx?.reloadBar?.(steps.text(), { onCancel: cancel }) ?? null;
+  return run;
+}
+
 
 // ---- the list --------------------------------------------------------------------------------------------
 
@@ -430,22 +478,24 @@ async function remove(li, source) {
 
 // ---- Refresh and Add -------------------------------------------------------------------------------------
 
+// F150: under the reload bar (startRun), not a HUD: nothing is blocked while it runs, and its Cancel stops it.
 async function refresh(ctx) {
   if (state.busy) return;
   state.busy = true;
-  const hide = ctx.showHUD("Reloading Data");
+  let run = null;
   try {
     const filter = sourceFilter(settings.deviceType());
-    const onEach = markLoading(ctx, (state.sources ?? []).filter(filter ?? (() => true)).map((x) => x.key));
-    await getBackend().refreshSources(onEach, { filter }); // F41: only what's shown
+    run = startRun(ctx, (state.sources ?? []).filter(filter ?? (() => true)).map((x) => x.key));
+    if (await run.until(getBackend().refreshSources(run.onEach, { filter, signal: run.signal }))) return; // F41: only what's shown
     state.sources = await getBackend().sources();
     draw();
+    await run.until(run.data());
   } catch (e) {
-    hide();
+    if (run?.cancelled) return;
+    run?.end();
     await showAlert({ title: "Error", message: e.message, buttons: ["OK"] });
   } finally {
-    clearLoading(ctx);
-    linger(hide);
+    if (!run?.cancelled) { clearLoading(ctx); run?.end(); }
     state.busy = false;
   }
 }

@@ -270,6 +270,9 @@ const unpress = () => {
 document.addEventListener("pointerdown", (e) => {
   unpress();
   const el = e.target.closest?.(PRESSABLE);
+  if (!e.isPrimary) return; // one finger's button at a time, as UIKit does
+  // A new press clears any other still showing (a quick tap's lingering 140 ms included): one held look at a time.
+  for (const other of document.querySelectorAll(".is-pressed")) if (other !== el) other.classList.remove("is-pressed");
   if (el && !el.disabled) { pressed = el; pressedAt = performance.now(); el.classList.add("is-pressed"); }
 }, { passive: true });
 for (const type of ["pointerup", "pointercancel", "pointerleave"]) document.addEventListener(type, unpress, { passive: true });

@@ -95,9 +95,9 @@ export function nav(route, ctx) {
   return {
     title: "Cydian",
     left: { label: "About", onClick: () => showAbout(ctx) },
-    // Reload, as on Cydia's Home: the Reloading Data HUD, then a fresh load of the app, which picks up newer
-    // versions (the server sends every file with no-cache, so the phone re-checks each one).
-    right: { label: "Reload", onClick: () => { ctx.showHUD("Reloading Data"); setTimeout(() => location.reload(), 350); } },
+    // Reload: a fresh load of the app straight away (the loading screen shows while it comes back), which picks up
+    // newer versions: the server sends every file with no-cache. (The HUD first could freeze the Home Screen app.)
+    right: { label: "Reload", onClick: () => location.reload() },
   };
 }
 

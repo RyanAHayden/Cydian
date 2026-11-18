@@ -2,6 +2,8 @@
 // Touch or drag along it and the list jumps to that letter's section (or the next one there is); while held it
 // gets iOS 6's grey rounded backing. The iOS 6 scroll indicator stays off on a list that has one, as in Cydia.
 // Styles: packages.css (.section-index).
+import { haptic } from "./haptic.js";
+
 const LETTERS = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
 
 export function createSectionIndex(scroller, list) {
@@ -24,7 +26,9 @@ export function createSectionIndex(scroller, list) {
     // that letter's section, else the next one after it, else the last
     const want = LETTERS.indexOf(last);
     const h = heads.find((x) => LETTERS.indexOf(x.text) >= want) ?? heads[heads.length - 1];
-    scroller.scrollTop = Math.min(h.top, scroller.scrollHeight - scroller.clientHeight);
+    const to = Math.min(h.top, scroller.scrollHeight - scroller.clientHeight);
+    if (to !== scroller.scrollTop) haptic(); // a tick for each new letter the list lands on
+    scroller.scrollTop = to;
   };
   el.addEventListener("pointerdown", (e) => {
     e.preventDefault();

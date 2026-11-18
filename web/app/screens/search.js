@@ -148,7 +148,7 @@ export function render(body, route, ctx) {
 
   const note = document.createElement("p");
   note.className = "empty search-note";
-  // The bar and its scope row stay put, as Cydia's search bar does on the 4S (docs/cydia-4s/search-85.png); only the
+  // The bar and its scope row stay put, as Cydia's search bar does on the 4S (ref/4s/screens/search-85.png); only the
   // results scroll, and bounce, under them (packages.css .search-root).
   const results = el("div", "search-results");
   results.setAttribute("data-scroller", "");

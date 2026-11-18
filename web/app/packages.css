@@ -362,7 +362,7 @@ html[data-theme="dark"] .section-index.held { background: rgba(255,255,255,.15);
   background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
 }
 
-/* The clear button iOS 6 puts in a search field with text in it (Cydia's search on the 4S: docs/cydia-4s/search-85.png):
+/* The clear button iOS 6 puts in a search field with text in it (Cydia's search on the 4S: ref/4s/screens/search-85.png):
    a grey circle with a white x at the field's right end. Drawn here since WebKit on iOS shows none; app.js clears
    the field on a tap there. */
 .search-field input::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }

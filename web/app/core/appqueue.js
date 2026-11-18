@@ -123,7 +123,7 @@ function verb({ installed, newest }) {
 }
 
 // Cydia's nav button: Install when the app isn't installed, Modify once it is or while it's queued (its sheet then
-// says what to do: docs/cydia-4s/queue-82.png, queue-84.png).
+// says what to do: ref/4s/screens/queue-82.png, queue-84.png).
 export function appNavLabel({ queued = false, installed = null, newest = null } = {}) {
   return queued || installed != null ? "Modify" : verb({ installed, newest });
 }

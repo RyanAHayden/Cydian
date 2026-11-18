@@ -179,7 +179,7 @@ function openConfirm() {
       ready = { jobs, plan: r.plan, ids: planIds(r.plan) };
       ok.hidden = false;
     }
-    // Cydia on the 4S (docs/cydia-4s/queue-81.png, queue-83.png): Continue Queuing, Statistics, Modifications and no
+    // Cydia on the 4S (ref/4s/screens/queue-81.png, queue-83.png): Continue Queuing, Statistics, Modifications and no
     // list of the queue; a package comes out of it from its own page (Modify > Clear).
     if (r && (!r.ok || r.plan.essential.length)) m.scroll.append(rawOutput(r.output));
   }
@@ -358,7 +358,7 @@ export function openAppConfirm(queue = appQueue) {
       if (j.name) names[j.id] = j.name;
       for (const d of j.deps ?? []) if (d?.name) names[d.id] = d.name;
     }
-    // As Cydia's (docs/cydia-4s/queue-81.png): Continue Queuing first, then Statistics and Modifications.
+    // As Cydia's (ref/4s/screens/queue-81.png): Continue Queuing first, then Statistics and Modifications.
     m.scroll.replaceChildren(continueGroup(close), statistics(appPlan(jobs)), modifications(appPlan(jobs), names, APP_MODES, APP_MODE_LABEL));
   }
   const sheet = { refresh, close };

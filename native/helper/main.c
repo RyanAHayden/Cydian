@@ -5,6 +5,7 @@
  *   cydian-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
  *   cydian-helper simulate <item>... | apply <item>... | respring      (N4: the install queue; item: name,
  *                                                                        name=version or -name)
+ *   cydian-helper selfupdate <path.deb>                                 (F61: dpkg -i of Cydian's own update)
  *
  * No setuid bit: Cydian spawns it as root with the persona spawn attributes (spawn.c), which the kernel allows
  * only because Cydian is signed with com.apple.private.persona-mgmt. Run by anything else it is plain mobile and

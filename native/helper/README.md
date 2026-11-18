@@ -8,6 +8,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper hold <pkg>... | unhold <pkg>... | showhold
     cydian-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
     cydian-helper simulate <item>... | apply <item>... | respring          (N4: the install queue)
+    cydian-helper selfupdate <path.deb>                                    (F61: Cydian updates itself)
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
@@ -23,6 +24,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `removesource` | runs nothing: drops the stanza for that URI and suite from `cydian.sources`              |
 | `simulate`  | `apt-get -s --reinstall --allow-downgrades install <items>`: the Confirm sheet's plan (N4)       |
 | `apply`     | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --reinstall --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <items>`, with `CYDIA=3 1` in its environment when fd 3 is open (N4) |
+| `selfupdate` | `dpkg --force-confdef --force-confold [--status-fd 3] -i <path>`: Cydian's own update (F61). The path is absolute, `[A-Za-z0-9._/-]`, no `.`/`..` segment, ends in `.deb`, at most 1024 bytes, and a regular file (not a symlink). Any .deb is accepted: the caller check is the boundary, and Cydian can already install anything through `addsource` + `install` |
 | `respring`  | `sbreload`, or `killall -9 backboardd` when the jailbreak has no sbreload (N4: Restart SpringBoard) |
 
 **The queue (N4):** `simulate` and `apply` take items: `name` installs the newest, `name=version` that exact

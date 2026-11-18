@@ -38,6 +38,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
                 c.reply(nil, nil)
             }
         }
+        SelfUpdate.register(self) // F61: selfupdate.download, app.quit (below)
         Apt.register(self) // N3: apt's files, the network, cydian-helper, haptic.tap (Apt.swift)
         SignBridge.register(self) // I6: sign and install IPAs on the phone, sideload build (SignBridge.swift)
     }
@@ -137,5 +138,45 @@ enum Theme {
     static func apply(style: String, theme: String, to window: UIWindow) {
         window.overrideUserInterfaceStyle = style == "dark" ? .dark : style == "light" ? .light : .unspecified
         window.rootViewController?.setNeedsStatusBarAppearanceUpdate()
+    }
+}
+
+// F61: Cydian updates itself (web/app/core/selfupdate.js). The jailbreak build downloads its release's .deb here and
+// installs it with `cydian-helper selfupdate <path>` (dpkg -i, native/helper/README.md); the sideload build signs
+// its Cydian.ipa through signing.install and needs nothing from here.
+//   selfupdate.download {url} -> {path, bytes}   the .deb (an ar archive) in this app's temp folder
+//   app.quit                                      to the Home Screen, then exit, so the next launch runs the new build
+enum SelfUpdate {
+    static func register(_ b: Bridge) {
+        b.on("selfupdate.download") { c in
+            guard let url = Apt.httpURL(c.params["url"]), url.scheme?.lowercased() == "https" else {
+                return Apt.reply(c, nil, "bad_url: not an https URL")
+            }
+            Apt.get(url) { res in
+                switch res {
+                case .failure(let e): Apt.reply(c, nil, e.text)
+                case .success(let (status, _, data)):
+                    guard status < 400 else { return Apt.reply(c, nil, "upstream: HTTP \(status)") }
+                    guard data.starts(with: Array("!<arch>\n".utf8)) else { return Apt.reply(c, nil, "upstream: not a .deb") }
+                    // The helper takes only [A-Za-z0-9._/-] paths: the temp folder's path is a container UUID or /tmp.
+                    let file = FileManager.default.temporaryDirectory.appendingPathComponent("Cydian-update.deb")
+                    do {
+                        try? FileManager.default.removeItem(at: file)
+                        try data.write(to: file, options: .atomic)
+                        Apt.reply(c, ["path": file.standardizedFileURL.path, "bytes": data.count], nil)
+                    } catch {
+                        Apt.reply(c, nil, "network: couldn't save the .deb: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+        b.on("app.quit") { c in
+            DispatchQueue.main.async {
+                c.reply(nil, nil)
+                // Cydia's "Close Cydia" (finish:reopen): suspend to the Home Screen, then end the process.
+                UIApplication.shared.perform(#selector(NSXPCConnection.suspend))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { exit(0) }
+            }
+        }
     }
 }

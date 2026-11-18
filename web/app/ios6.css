@@ -378,6 +378,9 @@ input.sign-value { border: 0; padding: 0; margin: 0; background: none; font: inh
    "Required" hint, a blue caret. */
 input.sign-field { text-align: left; color: var(--field-text); caret-color: #426bf2; cursor: text; }
 input.sign-field::placeholder { color: var(--field-hint); opacity: 1; }
+/* B20: Settings > Signing's Server row reads as a field too: its host in the field blue-grey, the default's in the hint grey. */
+.cell.server-field .cell-detail { color: var(--field-text); }
+.cell.server-field-default .cell-detail { color: var(--field-hint); }
 .sign-browse { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); min-width: 0; display: inline-block; }
 
 /* iOS 6's notification banner (nav/banner.js): black glossy strip over the status bar, the app's icon, a bold white

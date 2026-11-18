@@ -19,3 +19,16 @@ MAX_UPLOAD_MB = "512"    # largest IPA the website signs in the browser (/api/fe
 [[kv_namespaces]]
 binding = "HOSTED"
 id = "34714fc96ca44db29c935c4a68594bcf"
+
+# F98: /api/account's per-address limit across isolates (Cloudflare's Rate Limiting binding, free; src/account.js).
+# Without these it counts in each isolate's memory. period is 10 or 60 seconds; namespace_id is any number,
+# unique in your account. Keep limit at ACCOUNT_RATE / ACCOUNT_WRITES.
+[[ratelimits]]
+name = "ACCOUNT_RATE_LIMIT"
+namespace_id = "9801"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "ACCOUNT_WRITE_LIMIT"
+namespace_id = "9802"
+simple = { limit = 12, period = 60 }

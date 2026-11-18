@@ -147,7 +147,7 @@ export const SETTINGS = [
     key: "holds", section: "updates", kind: "holds", feature: "holds", modes: ALL, label: "Ignored Upgrades",
     footer: (mode) => mode === "jailbreak"
       ? "Held with dpkg, so other package managers leave them alone too."
-      : "Kept on this device.",
+      : "Kept on this device, and synced by a Cydian Account.",
   },
   {
     key: "notifications", section: "notifications", kind: "list", feature: "notifications", modes: ALL, default: "summary",

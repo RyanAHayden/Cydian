@@ -132,7 +132,7 @@ import { PART, uploadCap } from "./src/index.js";
 }
 
 // F97: Cydian Account: the size cap, the version check (409), delete, and KV never keyed by the id itself.
-import { account, MAX_ACCOUNT, rateLimiter, kvKey } from "./src/account.js";
+import { account, MAX_ACCOUNT, rateLimiter, kvKey, bindingLimiter } from "./src/account.js";
 {
   const kv = new Map();
   const aenv = { HOSTED: {
@@ -189,6 +189,27 @@ import { account, MAX_ACCOUNT, rateLimiter, kvKey } from "./src/account.js";
   assert.equal((await send("GET", { limit: lim })).status, 200);
   assert.equal((await send("GET", { limit: lim })).status, 429);
   assert.ok(lim.allow("?", true, Date.now() + 61000), "a new minute");
+  // F98: Cloudflare's Rate Limiting bindings, when bound, count instead of memory (shared across isolates)
+  const fakeRL = (n) => { const used = new Map(); return { keys: used, async limit({ key }) {
+    const k = used.get(key) ?? 0; used.set(key, k + 1); return { success: k < n }; } }; };
+  const all = fakeRL(3), wr = fakeRL(1); // the refused write still took one from all
+  const benv = { ...aenv, ACCOUNT_RATE_LIMIT: all, ACCOUNT_WRITE_LIMIT: wr };
+  const bsend = (method, opts = {}) => account(new Request(`https://cydian.example/api/account/${id}`, { method, ...opts }), benv);
+  assert.equal((await bsend("DELETE")).status, 200);
+  assert.equal((await bsend("DELETE")).status, 429, "writes run out first");
+  assert.equal((await bsend("GET")).status, 404);
+  assert.equal((await bsend("GET")).status, 429);
+  assert.deepEqual([...all.keys.keys()], ["?"]);
+  // one binding only: writes count under "w:<ip>" in it
+  const one = fakeRL(1), solo = bindingLimiter(one, null, rateLimiter({ rate: 0, writes: 0 }));
+  assert.equal(await solo.allow("1.2.3.4", true), true);
+  assert.deepEqual([...one.keys.keys()], ["1.2.3.4", "w:1.2.3.4"]);
+  // a binding that throws falls back to the memory limiter
+  const broken = { async limit() { throw new Error("down"); } };
+  const fb = rateLimiter({ rate: 1, writes: 1 });
+  assert.equal(await bindingLimiter(broken, null, fb).allow("x", false), true);
+  assert.equal(await bindingLimiter(broken, null, fb).allow("x", false), false);
+  assert.equal((await account(new Request(`https://cydian.example/api/account/${id}`), { ...aenv, ACCOUNT_RATE_LIMIT: broken })).status, 404);
   // through the Worker: the route, and CORS for the app's cydian://app page
   const pre = await w.fetch(new Request(`https://cydian.example/api/account/${id}`, { method: "OPTIONS" }), aenv);
   assert.match(pre.headers.get("Access-Control-Allow-Methods"), /PUT/);

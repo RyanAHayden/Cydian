@@ -11,7 +11,7 @@ Err:6 https://mineek.github.io/tweaks ./ Translation-en
 Ign:8 https://ios.jjolano.me ./ InRelease
 Err:6 https://mineek.github.io/tweaks ./ Translation-en
   404  Not Found [IP: 185.199.111.153 443]
-Ign:9 https://cydian.dev/repo ./ InRelease
+Ign:9 https://dead.example/repo ./ InRelease
 Ign:10 https://havoc.app ./ InRelease
 Hit:11 https://ios.jjolano.me ./ Release
 Err:6 https://mineek.github.io/tweaks ./ Translation-en
@@ -27,27 +27,27 @@ Ign:15 https://ios.jjolano.me ./ Release.gpg
 Ign:6 https://mineek.github.io/tweaks ./ Translation-en
 Hit:16 https://repo.chariz.com ./ Release
 Hit:17 https://apt.procurs.us 1800 InRelease
-Ign:18 https://cydian.dev/repo ./ Release
+Ign:18 https://dead.example/repo ./ Release
 Hit:19 http://apt.thebigboss.org/repofiles/cydia stable Release
 Hit:20 https://getzbra.com/repo ./ Release
-Ign:21 https://cydian.dev/repo ./ Packages
+Ign:21 https://dead.example/repo ./ Packages
 Ign:22 https://getzbra.com/repo ./ Release.gpg
-Ign:23 https://cydian.dev/repo ./ Translation-en
-Ign:21 https://cydian.dev/repo ./ Packages
+Ign:23 https://dead.example/repo ./ Translation-en
+Ign:21 https://dead.example/repo ./ Packages
 Get:24 http://apt.thebigboss.org/repofiles/cydia stable Release.gpg [181 B]
-Ign:23 https://cydian.dev/repo ./ Translation-en
-Ign:21 https://cydian.dev/repo ./ Packages
-Ign:23 https://cydian.dev/repo ./ Translation-en
-Ign:21 https://cydian.dev/repo ./ Packages
-Ign:23 https://cydian.dev/repo ./ Translation-en
-Ign:21 https://cydian.dev/repo ./ Packages
-Ign:23 https://cydian.dev/repo ./ Translation-en
+Ign:23 https://dead.example/repo ./ Translation-en
+Ign:21 https://dead.example/repo ./ Packages
+Ign:23 https://dead.example/repo ./ Translation-en
+Ign:21 https://dead.example/repo ./ Packages
+Ign:23 https://dead.example/repo ./ Translation-en
+Ign:21 https://dead.example/repo ./ Packages
+Ign:23 https://dead.example/repo ./ Translation-en
 Get:25 https://repo.palera.in ./ InRelease [16.5 kB]
-Ign:21 https://cydian.dev/repo ./ Packages
-Ign:23 https://cydian.dev/repo ./ Translation-en
-Err:21 https://cydian.dev/repo ./ Packages
+Ign:21 https://dead.example/repo ./ Packages
+Ign:23 https://dead.example/repo ./ Translation-en
+Err:21 https://dead.example/repo ./ Packages
   525  <none> [IP: 104.21.92.245 443]
-Ign:23 https://cydian.dev/repo ./ Translation-en
+Ign:23 https://dead.example/repo ./ Translation-en
 Ign:7 https://kittymaxine.com/repo ./ InRelease
 Ign:24 http://apt.thebigboss.org/repofiles/cydia stable Release.gpg
 Ign:25 https://repo.palera.in ./ InRelease

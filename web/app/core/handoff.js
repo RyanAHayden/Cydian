@@ -11,6 +11,7 @@
 //
 // In the jailbreak app these rows give way to the real install queue (N4).
 import { isAltKey } from "./altstore.js";
+import { DOMAIN } from "../brand.js";
 
 const enc = encodeURIComponent;
 const isFlat = (dist) => !dist || String(dist).endsWith("/");
@@ -137,7 +138,7 @@ export function packageLinks(id, source) {
 
 // iFizBox's own link: opens iFizBox with Add Source's alert filled in. The site's origin where iFizBox runs on the
 // web; the app (file:// or its own scheme) links to the public site.
-export const PUBLIC_SITE = "https://cydian.dev";
+export const PUBLIC_SITE = `https://${DOMAIN}`;
 export function siteOrigin(location) {
   const o = location?.origin;
   return typeof o === "string" && /^https?:\/\//.test(o) ? o : PUBLIC_SITE;

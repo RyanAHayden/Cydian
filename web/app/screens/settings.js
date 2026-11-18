@@ -699,7 +699,7 @@ const serverGroup = (el) => {
   return grouped([{ header: "Signing Server", rows: [
     serverRow({ server, fallback: defaultServer(), ask: () => askServer(el) }),
     { label: "Check Server", onClick: () => checkServer() },
-    // Nothing depends on cydian.dev: anyone can run their own, free (worker/README.md's Deploy to Cloudflare).
+    // Nothing depends on our own server: anyone can run their own, free (worker/README.md's Deploy to Cloudflare).
     { label: "Run Your Own", subtitle: "Free on Cloudflare, about a minute", chevron: true,
       onClick: () => window.open(RUN_YOUR_OWN, "_blank", "noopener") }] }]);
 };

@@ -145,7 +145,7 @@ test("B23: Add Source & Install goes on when apt-get update failed on another so
   const row = { id: "com.ex.tweak", name: "Tweak", version: "1.0",
     repo: { uri: "https://repo.ex.test/", name: "Mineek's Repo", flat: true, dist: "./" } };
   const KEY = "deb:https://repo.ex.test/:./";
-  const DEAD = { key: "deb:https://cydian.dev/repo/:./", uri: "https://cydian.dev/repo/", name: null,
+  const DEAD = { key: "deb:https://dead.example/repo/:./", uri: "https://dead.example/repo/", name: null,
     message: "apt-get update couldn't fetch Packages (525)" };
   function setup(failed) {
     const log = [];
@@ -169,13 +169,13 @@ test("B23: Add Source & Install goes on when apt-get update failed on another so
     return { log, deps };
   }
 
-  // The iPhone 7, 2026-11-18: the added repo refreshed fine, only the old cydian.dev/repo 525'd.
+  // The iPhone 7, 2026-11-18: the added repo refreshed fine, only the old dead.example/repo 525'd.
   let { log, deps } = setup([DEAD]);
   assert.equal(await addSourceAndInstall(row, deps), "queued");
   assert.ok(!log.some((l) => l[0] === "alert"), "no alert for another source's failure");
   const b = log.find((l) => l[0] === "banner")[1];
   assert.equal(b.title, "Source Failed to Refresh");
-  assert.match(b.message, /cydian\.dev\/repo/);
+  assert.match(b.message, /dead\.example\/repo/);
   assert.ok(b.duration > 0, "goes away by itself");
   assert.deepEqual(log.filter((l) => l[0] !== "banner").map((l) => l[0]), ["go", "queue"]);
   b.onTap();
@@ -202,7 +202,7 @@ test("B23: Sources' refresh names apt's failed sources in a banner, never an ale
   assert.equal(bannerFailed([], opts), false, "nothing failed");
   assert.equal(bannerFailed(undefined, opts), false, "the website's refresh has no `failed`");
   assert.equal(shown.length, 0);
-  assert.equal(bannerFailed(Object.assign([], { failed: [{ key: "k", uri: "https://cydian.dev/repo/", name: "Old Repo", message: "x" }] }), opts), true);
+  assert.equal(bannerFailed(Object.assign([], { failed: [{ key: "k", uri: "https://dead.example/repo/", name: "Old Repo", message: "x" }] }), opts), true);
   assert.equal(shown[0].message, "Old Repo: tap to see Sources.");
   shown[0].onTap();
   assert.deepEqual(went, [format({ tab: "sources", path: [] })]);

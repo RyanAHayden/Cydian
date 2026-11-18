@@ -2,7 +2,7 @@ W: The repository 'https://mineek.github.io/tweaks ./ Release' is not signed.
 W: No Hash entry in Release file /var/jb/var/lib/apt/lists/mineek.github.io_tweaks_._Release
 W: Invalid 'Date' entry in Release file /var/jb/var/lib/apt/lists/mineek.github.io_tweaks_._Release
 W: The repository 'https://ios.jjolano.me ./ Release' is not signed.
-W: The repository 'https://cydian.dev/repo ./ Release' does not have a Release file.
+W: The repository 'https://dead.example/repo ./ Release' does not have a Release file.
 W: The repository 'https://getzbra.com/repo ./ Release' is not signed.
 W: GPG error: https://kittymaxine.com/repo ./ InRelease: The following signatures couldn't be verified because the public key is not available: NO_PUBKEY 14860DB664124B67
 W: The repository 'https://kittymaxine.com/repo ./ InRelease' is not signed.
@@ -13,5 +13,5 @@ W: The repository 'http://apt.thebigboss.org/repofiles/cydia stable Release' is 
 W: Invalid 'Date' entry in Release file /var/jb/var/lib/apt/lists/apt.thebigboss.org_repofiles_cydia_dists_stable_Release
 W: GPG error: https://repo.palera.in ./ InRelease: The following signatures couldn't be verified because the public key is not available: NO_PUBKEY 9E7E89B50CCF8DAA
 W: The repository 'https://repo.palera.in ./ InRelease' is not signed.
-E: Failed to fetch https://cydian.dev/repo/./Packages  525  <none> [IP: 104.21.92.245 443]
+E: Failed to fetch https://dead.example/repo/./Packages  525  <none> [IP: 104.21.92.245 443]
 E: Some index files failed to download. They have been ignored, or old ones used instead.

@@ -61,10 +61,10 @@ test("expectedBundleId: explicit profiles, wildcards with a known app ID, else n
 
 test("earlyLink: a fresh 48-hex token and the itms link to its manifest", () => {
   const app = { bundleId: "com.you.ifizbox", name: "iFizBox & Co", version: "0.4" };
-  const a = earlyLink("https://cydian.dev", app), b = earlyLink("https://cydian.dev", app);
+  const a = earlyLink("https://ifizbox.com", app), b = earlyLink("https://ifizbox.com", app);
   assert.match(a.token, /^[0-9a-f]{48}$/);
   assert.notEqual(a.token, b.token);
-  assert.equal(a.manifest, `https://cydian.dev/sign/up/${a.token}/manifest.plist?bundleid=com.you.ifizbox&version=0.4&title=iFizBox+%26+Co`);
+  assert.equal(a.manifest, `https://ifizbox.com/sign/up/${a.token}/manifest.plist?bundleid=com.you.ifizbox&version=0.4&title=iFizBox+%26+Co`);
   assert.equal(a.itms, "itms-services://?action=download-manifest&url=" + encodeURIComponent(a.manifest));
 });
 

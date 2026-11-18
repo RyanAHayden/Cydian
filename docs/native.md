@@ -12,7 +12,7 @@ web/app/            one frontend: HTML, CSS, vanilla JS (ES modules, no build st
   core/             parsing, version compare, sections, Changes, upgrades: pure JS, tested with `node --test`
   backend-http.js   on the site: talks to the Worker (fetch proxy, install server)
   backend-native.js in the app: talks to Swift over window.webkit.messageHandlers
-worker/             the Cloudflare Worker behind cydian.dev: serves web/app/, the SSRF-safe fetch proxy
+worker/             the Cloudflare Worker behind ifizbox.com: serves web/app/, the SSRF-safe fetch proxy
                     (/api/fetch) and the install server (/sign/*). Thin; no server of our own (F89).
 native/             Swift shell, root helper, daemon
 ```

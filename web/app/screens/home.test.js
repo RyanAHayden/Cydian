@@ -62,7 +62,7 @@ test("F79: Home links to Install IPAs, except in the jailbreak app", async () =>
 
 test("Jailbroken? Get iFizBox.deb: iFizBox's APT repo in Sileo and Zebra", async () => {
   const { repoLinks, IFIZBOX_APT_REPO, JAILBROKEN_SHEET } = await import("./home.js");
-  assert.equal(IFIZBOX_APT_REPO, "https://cydian.dev/repo/");
+  assert.equal(IFIZBOX_APT_REPO, "https://ifizbox.com/repo/");
   assert.deepEqual(repoLinks("https://r/"), { sileo: "sileo://source/https://r/", zebra: "zbra://sources/add/https://r/",
     sileoPackage: "sileo://package/com.ryha.ifizbox", zebraPackage: "zbra://packages/com.ryha.ifizbox" });
   assert.deepEqual(JAILBROKEN_SHEET.buttons, ["Add to Sileo", "Add to Zebra", "Copy Repo URL", "Download .deb"]);
@@ -91,8 +91,8 @@ test("F123: the Signing tile shows only while signing isn't set up, where someth
   assert.equal(await signingSetUp("site", { ready: async () => { throw new Error("idb"); } }), false);
   // the sideload app: every walkthrough step (the real signing.js missingStep: certificate, then an https server)
   const id = { identity: { name: "Me" } };
-  assert.equal(await signingSetUp("sideload", { status: async () => id, server: () => "https://cydian.dev" }), true);
-  assert.equal(await signingSetUp("sideload", { status: async () => ({ identity: null }), server: () => "https://cydian.dev" }), false);
+  assert.equal(await signingSetUp("sideload", { status: async () => id, server: () => "https://ifizbox.com" }), true);
+  assert.equal(await signingSetUp("sideload", { status: async () => ({ identity: null }), server: () => "https://ifizbox.com" }), false);
   assert.equal(await signingSetUp("sideload", { status: async () => id, server: () => "" }), false);
   assert.equal(await signingSetUp("sideload", { status: async () => { throw new Error("no bridge"); }, server: () => "https://x" }), false);
   assert.equal(await signingSetUp("jailbreak"), false);

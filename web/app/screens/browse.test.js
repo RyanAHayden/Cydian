@@ -85,15 +85,15 @@ test("a held row's callout: Install / Upgrade / Remove / Cancel, Share, Source",
 test("a held row's Share: Copy Link to the site's package page, the managers only on a jailbroken phone's website", () => {
   const pkg = { id: "com.x y", key: KEY };
   const src = { key: KEY, uri: "https://repo.example/", dist: "./" };
-  const app = packageShareItems(pkg, src, { origin: "https://cydian.dev", mode: "jailbreak", jailbroken: true });
-  assert.deepEqual(app, [{ kind: "copy", label: "Copy Link", text: "https://cydian.dev/#/search/package%3Acom.x%20y" }]);
+  const app = packageShareItems(pkg, src, { origin: "https://ifizbox.com", mode: "jailbreak", jailbroken: true });
+  assert.deepEqual(app, [{ kind: "copy", label: "Copy Link", text: "https://ifizbox.com/#/search/package%3Acom.x%20y" }]);
   assert.deepEqual(parse(app[0].text.replace(/^[^#]*/, "")), { tab: "search", path: ["package:com.x y"] });
-  const site = packageShareItems(pkg, src, { origin: "https://cydian.dev", mode: "site", jailbroken: true });
+  const site = packageShareItems(pkg, src, { origin: "https://ifizbox.com", mode: "site", jailbroken: true });
   assert.deepEqual(site.map((i) => i.label), ["Copy Link", "Cydia", "Sileo", "Zebra", "Irisin"]);
   assert.equal(site[2].url, "sileo://package/com.x%20y");
   assert.match(site[2].color, /^#[0-9a-f]{6}$/);
-  assert.deepEqual(packageShareItems(pkg, src, { origin: "https://cydian.dev", mode: "site", jailbroken: false }).map((i) => i.label), ["Copy Link"]);
-  assert.deepEqual(packageShareItems({}, src, { origin: "https://cydian.dev", mode: "site" }), []);
+  assert.deepEqual(packageShareItems(pkg, src, { origin: "https://ifizbox.com", mode: "site", jailbroken: false }).map((i) => i.label), ["Copy Link"]);
+  assert.deepEqual(packageShareItems({}, src, { origin: "https://ifizbox.com", mode: "site" }), []);
 });
 
 // F193: swiping a row left does F192's queue item, from the same states; the control and the undo bar's line.

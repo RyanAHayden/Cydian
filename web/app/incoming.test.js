@@ -20,7 +20,7 @@ function ui() {
 
 test("not ours: nothing happens", async () => {
   const u = ui();
-  assert.equal(await handleIncoming("https://cydian.dev/", u.deps), null);
+  assert.equal(await handleIncoming("https://ifizbox.com/", u.deps), null);
   assert.equal(await handleIncoming("ifizbox://elsewhere", u.deps), null);
   assert.deepEqual([u.alerts.length, u.huds.length, u.went], [0, 0, 0]);
 });

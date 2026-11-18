@@ -181,7 +181,7 @@ enum Theme {
 enum SelfUpdate {
     static func register(_ b: Bridge) {
         // F72: open a link outside the web view (iFizBox's own update: the Signing Server's itms-services link, or
-        // cydian.dev in Safari). B8: any scheme iOS can hand to an app (feather://, altstore://, sileo://…), not
+        // the site in Safari). B8: any scheme iOS can hand to an app (feather://, altstore://, sileo://…), not
         // the bundle's own, javascript:, file: or data: (LinkOut.canOpen).
         b.on("app.openURL") { c in
             guard let s = c.params["url"] as? String, let url = URL(string: s), LinkOut.canOpen(url) else {

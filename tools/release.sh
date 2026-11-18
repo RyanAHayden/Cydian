@@ -7,7 +7,7 @@
 #                                    com.ryha.ifizbox_0.2.0-412_iphoneos-arm64.deb
 #   <pkg>_<ver>_<arch>.deb           any other arch build found in --dist under that name (roothide, rootful)
 #   Packages, Packages.gz, Release   iFizBox's own flat APT repo over those .debs (F72, tools/selfrepo.py): the
-#                                    jailbreak app's built-in source, https://cydian.dev/repo/ (the Worker
+#                                    jailbreak app's built-in source, https://$BRAND_DOMAIN/repo/ (the Worker
 #                                    serves releases/latest/download/ of RyanAHayden/iFizBox without the redirect)
 # Then it points iFizBox's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new iFizBox.ipa, the
 # sideload app's and the site's built-in source (F72), versions[] newest first: commit web/app/source.json afterwards.
@@ -157,7 +157,7 @@ fi
 
 echo "release: $repo $tag at $sha"
 echo "release: assets: $BRAND_NAME.ipa $BRAND_NAME.deb $debname ${extra[*]:+${extra[*]} }${repofiles[*]}"
-if [ "$repo" = "$BRAND_GITHUB_REPO" ]; then aptrepo=https://cydian.dev/repo/; else aptrepo="https://github.com/$repo/releases/latest/download/ (a Worker with IFIZBOX_REPO=$repo serves it at /repo/)"; fi
+if [ "$repo" = "$BRAND_GITHUB_REPO" ]; then aptrepo=https://$BRAND_DOMAIN/repo/; else aptrepo="https://github.com/$repo/releases/latest/download/ (a Worker with IFIZBOX_REPO=$repo serves it at /repo/)"; fi
 echo "release: apt repo: $aptrepo, from https://github.com/$repo/releases/latest/download/${minimum:+ (minimum $minimum)}"
 echo "release: notes:"
 sed 's/^/  /' "$stage/notes.md"

@@ -373,8 +373,8 @@ test("manifest and itms link") {
     let item = (pl?["items"] as? [[String: Any]])?.first
     check(((item?["assets"] as? [[String: Any]])?.first?["url"] as? String) == "http://127.0.0.1:4242/t/app.ipa", "asset url")
     check((item?["metadata"] as? [String: Any])?["bundle-identifier"] as? String == "dev.ifizbox.fixture", "bundle id")
-    check(InstallManifest.itmsURL(manifest: "https://cydian.dev/sign/manifest?bundleid=a.b&port=4242")
-          == "itms-services://?action=download-manifest&url=https%3A%2F%2Fcydian.dev%2Fsign%2Fmanifest%3Fbundleid%3Da.b%26port%3D4242", "itms link")
+    check(InstallManifest.itmsURL(manifest: "https://ifizbox.com/sign/manifest?bundleid=a.b&port=4242")
+          == "itms-services://?action=download-manifest&url=https%3A%2F%2Fifizbox.com%2Fsign%2Fmanifest%3Fbundleid%3Da.b%26port%3D4242", "itms link")
 }
 
 test("F77: My IPAs signs a local IPA file") {

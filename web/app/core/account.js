@@ -1,5 +1,5 @@
 // F97: iFizBox Account. Settings, sources, Ignored Upgrades, installed-app records and the signing certificate kept on
-// cydian.dev, so a new phone, a reinstall or the website gets them back. No email, no password: the account is a
+// the site (brand.js DOMAIN), so a new phone, a reinstall or the website gets them back. No email, no password: the account is a
 // random 128-bit account key made on the device. Everything is encrypted here (AES-GCM, its key from the account key
 // with HKDF) before it leaves, so the server (worker/src/account.js) only ever holds ciphertext; the URL's id is a
 // second HKDF output, which the server hashes again before using it as a KV key. Pure JS on Web Crypto, no DOM: node
@@ -29,10 +29,10 @@
 // goes to the changed side, or the newer record. Applying never removes a certificate from a device.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { toB64url, fromB64url } from "./transfer.js";
-import { NAME } from "../brand.js";
+import { NAME, DOMAIN } from "../brand.js";
 
 const ACCOUNT_VERSION = 1;
-export const ACCOUNT_BASE = "https://cydian.dev"; // the app's server; the website uses its own origin
+export const ACCOUNT_BASE = `https://${DOMAIN}`; // the app's server; the website uses its own origin
 const SALT = new TextEncoder().encode("ifizbox-account-v1");
 const subtle = () => {
   const s = globalThis.crypto?.subtle;
@@ -113,13 +113,13 @@ export function accountApi({ base = "", id, fetcher = (...a) => globalThis.fetch
   const url = `${base}/api/account/${id}`;
   const ver = (r) => Number(String(r.headers.get("ETag") ?? "").replace(/^W\//, "").replace(/"/g, "")) || null;
   const why = async (r) => {
-    let msg = `cydian.dev answered HTTP ${r.status}.`;
+    let msg = `${DOMAIN} answered HTTP ${r.status}.`;
     try { msg = (await r.json()).error || msg; } catch { /* not JSON */ }
     return new AccountError(r.status === 429 ? "rate_limited" : r.status === 413 ? "too_large" : "server", msg);
   };
   const call = async (init) => {
     try { return await fetcher(url, { cache: "no-store", ...init }); } catch (e) {
-      throw new AccountError("network", "cydian.dev can't be reached. Check the connection.", { cause: e });
+      throw new AccountError("network", `${DOMAIN} can't be reached. Check the connection.`, { cause: e });
     }
   };
   return {
@@ -267,7 +267,7 @@ export const identityFiles = (id) => ({ ...id, p12: fromB64url(id.p12), profile:
 //                              merges again (3 tries)
 //   await acct.save()          the batched write: only when something changed since the last sync (or a read found
 //                              this device ahead). Called when the app goes to the background / the page is hidden
-//   await acct.remove()        deletes the account on cydian.dev and forgets the key here
+//   await acct.remove()        deletes the account on the server and forgets the key here
 //   await acct.status()        { signedIn, code, lastSynced, syncCert }
 export function createAccountSync({ keys, state, collect, apply, api = null, base = "", fetcher, now = () => Date.now() }) {
   let busy = Promise.resolve();

@@ -19,17 +19,17 @@ Cydia's GPLv3 source (credit and details in that folder's README).
 ## Run it
 
 - Locally: `cd worker && npx wrangler dev` → http://127.0.0.1:8787 (the website, its fetch proxy and the install
-  server, as on cydian.dev). Or any static server on `web/app/` for the pages alone.
+  server, as on ifizbox.com). Or any static server on `web/app/` for the pages alone.
 - Tests: `tools/check.sh` (`node --test web/app`, `node worker/test.mjs`, the native Python tests, and the native
   builds where their toolchain is set up).
 
-## cydian.dev: one Cloudflare Worker (`worker/`)
+## ifizbox.com: one Cloudflare Worker (`worker/`)
 
-cydian.dev is a single Cloudflare Worker, with no server of our own:
+ifizbox.com is a single Cloudflare Worker, with no server of our own:
 
 - the website: `web/app/` as static assets, revalidated on every load (a phone never keeps an old file);
 - `/api/fetch`: the website's fetch proxy (APT and AltStore sources don't let a page read them);
-- `/sign/manifest`, `/sign/host`: what iOS needs when the app signs on the phone (also at sign.cydian.dev);
+- `/sign/manifest`, `/sign/host`: what iOS needs when the app signs on the phone (also at sign.ifizbox.com);
 - `/sign/upload`: holds an app the website signed in the browser for iOS's install prompt (F93).
 
 Deploys: Cloudflare builds every push to `main` itself (Workers Builds, connected to this repo; deploy command

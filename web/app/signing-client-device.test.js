@@ -101,7 +101,7 @@ test("status, import (base64) and remove go to their bridge calls", async () => 
 test("first install: no certificate opens Settings > Signing at the certificate step", async () => {
   const went = [];
   const n = fakeNative({ "signing.status": { identity: null } });
-  assert.equal(await firstInstallCheck({ native: n, server: "https://cydian.dev", go: (p) => went.push(p), wait: async () => {} }), "certificate");
+  assert.equal(await firstInstallCheck({ native: n, server: "https://ifizbox.com", go: (p) => went.push(p), wait: async () => {} }), "certificate");
   assert.deepEqual(went, [["signing"]]);
   assert.deepEqual(walkOpen, { certificate: true, server: false });
 });
@@ -119,7 +119,7 @@ test("first install: a certificate but no usable server opens the server step", 
 test("first install: certificate and server there, Install goes on (no wait for anything else)", async () => {
   const went = [];
   const n = fakeNative({ "signing.status": { identity: { name: "X" } } });
-  assert.equal(await firstInstallCheck({ native: n, server: "https://cydian.dev", go: (p) => went.push(p) }), null);
+  assert.equal(await firstInstallCheck({ native: n, server: "https://ifizbox.com", go: (p) => went.push(p) }), null);
   assert.deepEqual(went, []);
   assert.deepEqual(n.calls.map((c) => c.method), ["signing.status"]);
 });
@@ -127,7 +127,7 @@ test("first install: certificate and server there, Install goes on (no wait for 
 test("first install: a signer that doesn't answer counts as no certificate", async () => {
   const went = [];
   const n = fakeNative({ "signing.status": coded("internal", "boom") });
-  assert.equal(await firstInstallCheck({ native: n, server: "https://cydian.dev", go: (p) => went.push(p), wait: async () => {} }), "certificate");
+  assert.equal(await firstInstallCheck({ native: n, server: "https://ifizbox.com", go: (p) => went.push(p), wait: async () => {} }), "certificate");
 });
 
 test("Install: the HUD follows the phases, then Installing, and records the app", async () => {

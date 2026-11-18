@@ -8,7 +8,7 @@ given (each DEB's base name is its Filename:). tools/release.sh runs it on every
 as assets of the release, next to the .debs. GitHub serves them at
     https://github.com/RyanAHayden/iFizBox/releases/latest/download/
 (latest/download/<name> redirects to the newest release's asset), and the repo's address is
-    https://cydian.dev/repo/
+    https://<BRAND_DOMAIN>/repo/   (native/brand.env)
 where the Worker (worker/src/index.js `repo`) fetches the same asset and answers with it, no redirect: Zebra names
 its cache file after the final URL, and GitHub's signed one is too long for it (B17).
 

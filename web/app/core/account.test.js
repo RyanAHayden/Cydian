@@ -1,4 +1,4 @@
-// F97: iFizBox Account's core: the key, encryption, merge rules, and the controller against a fake cydian.dev.
+// F97: iFizBox Account's core: the key, encryption, merge rules, and the controller against a fake ifizbox.com.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { newKey, keyCode, parseKey, keyLink, deriveAccount, seal, unseal, accountApi, mergePayload, summarize, changesFor,

@@ -1,4 +1,4 @@
-// cydian.dev as one Cloudflare Worker: the website (web/app/ as static assets), its fetch proxy (/api/fetch), and
+// The site (brand.js DOMAIN) as one Cloudflare Worker: the website (web/app/ as static assets), its fetch proxy (/api/fetch), and
 // what iOS needs from a server when the app signs on the phone (/sign/*). Nothing here signs, and no key or
 // certificate ever comes here (worker/README.md).
 //
@@ -41,7 +41,7 @@
 import { account, isAccountPath } from "./account.js";
 import { readIpaInfo, IpaError } from "./ipainfo.js";
 import { reviews, isReviewsPath } from "./reviews.js";
-import { NAME, GITHUB_REPO } from "../../web/app/brand.js";
+import { NAME, GITHUB_REPO, DOMAIN } from "../../web/app/brand.js";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
@@ -110,7 +110,7 @@ export function githubRelease(url) {
 async function viaGitHubApi(url, token, { fetcher = fetch } = {}) {
   const g = githubRelease(url);
   if (!g || !token) return null;
-  const api = { Authorization: `Bearer ${token}`, "User-Agent": "cydian.dev", Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
+  const api = { Authorization: `Bearer ${token}`, "User-Agent": DOMAIN, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
   const rel = await fetcher(`https://api.github.com/repos/${g.owner}/${g.repo}/releases/${g.tag ? `tags/${encodeURIComponent(g.tag)}` : "latest"}`, { headers: api });
   if (!rel.ok) return null;
   const asset = ((await rel.json()).assets ?? []).find((a) => a.name === g.file);
@@ -118,7 +118,7 @@ async function viaGitHubApi(url, token, { fetcher = fetch } = {}) {
   const hop = await fetcher(asset.url, { headers: { ...api, Accept: "application/octet-stream" }, redirect: "manual" });
   const where = hop.headers.get("location");
   if (!where) return hop.ok ? hop : null;
-  return fetcher(where, { headers: { "User-Agent": "cydian.dev" }, cf: RELEASE_CACHE });
+  return fetcher(where, { headers: { "User-Agent": DOMAIN }, cf: RELEASE_CACHE });
 }
 
 export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promise((r) => setTimeout(r, ms)), token = null } = {}) {
@@ -147,7 +147,7 @@ export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promis
 // The repo's files are assets of every GitHub release (tools/release.sh, tools/selfrepo.py), and
 // github.com/<repo>/releases/latest/download/<file> redirects to release-assets.githubusercontent.com/...?sig=&jwt=,
 // a URL Zebra 1.1.36 names its cache file after: too long, "the file name is invalid", the source shows red. Here
-// the Worker follows the redirect and answers with the file itself, so https://cydian.dev/repo/ has no redirect.
+// the Worker follows the redirect and answers with the file itself, so https://<DOMAIN>/repo/ has no redirect.
 // Only the repo's own names are fetched (anything else, InRelease, Packages.xz, icons: 404 without asking GitHub).
 // IFIZBOX_REPO (owner/name) picks another GitHub repo's releases (default brand.js GITHUB_REPO).
 const SELF_REPO = GITHUB_REPO;
@@ -448,7 +448,7 @@ export function rangeReader(url, { fetcher = fetch, timeout = 20000, maxRequests
     const timer = setTimeout(() => ctl.abort(), timeout);
     let r;
     try {
-      r = await fetcher(url, { headers: { "User-Agent": "cydian.dev", Range: `bytes=${start}-${end}` },
+      r = await fetcher(url, { headers: { "User-Agent": DOMAIN, Range: `bytes=${start}-${end}` },
         redirect: "follow", signal: ctl.signal });
     } catch { clearTimeout(timer); throw new IpaError("upstream", "The IPA's server didn't answer."); }
     try {

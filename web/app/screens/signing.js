@@ -1,7 +1,7 @@
 // F69, F75: Settings > Signing in the sideload build, as one walkthrough page (Home's Signing tile opens it too, and
 // so does the first Install with something missing): numbered steps, each collapsible, a green tick once done.
 //   1  Import your certificate: Select All Files (or the three rows' own Browse): settings.js certificateBlock
-//   2  A Signing Server: cydian.dev unless the user runs their own; it hands iOS the manifest for the IPA iFizBox
+//   2  A Signing Server: brand.js SIGN_HOST unless the user runs their own; it hands iOS the manifest for the IPA iFizBox
 //      serves at 127.0.0.1 (native/Sources/Sideload.swift). There is no install without one (F75: the old local
 //      HTTPS mode is gone; iOS's installer ignores a hand-trusted certificate).
 //
@@ -23,7 +23,7 @@
 //   siteReady(id)                          the website's saved certificate is ready (.p12, profile, password not wrong)
 import { statusReady } from "../signing-client.js";
 import { normalizeServer } from "../core/signing.js";
-import { NAME } from "../brand.js";
+import { NAME, SIGN_HOST } from "../brand.js";
 
 export const STEPS = [
   { id: "certificate", title: "Import Your Certificate" },
@@ -143,7 +143,7 @@ export function picture() {
 
 const TEXT = {
   certificate: "Tap Select All Files, select your .p12, .mobileprovision and password file (or their .zip), then tap Open.",
-  server: "Keep cydian.dev, or tap it to enter your own Signing Server.",
+  server: `Keep ${SIGN_HOST}, or tap it to enter your own Signing Server.`,
 };
 
 // The page. opts: { status, failure (text when the signer didn't answer), certificate (element: Select All Files and

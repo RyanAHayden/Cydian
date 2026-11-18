@@ -55,6 +55,11 @@ async function addFromClipboard(ctx, button) {
   let elsewhere = false; // a touch on another button while the bubble was up: that button's tap wins
   const watch = (e) => { const b = e.target.closest?.(".bar-button, .tab"); if (b && b !== button) elsewhere = true; };
   document.addEventListener("pointerdown", watch, true);
+  // readText blocks WebKit's main thread while the Paste bubble is up (it waits on the UI process), so nothing set
+  // above would paint: the button stayed pressed and showed Type only a frame after the next touch. Let a frame
+  // paint first; WebKit carries the tap's user gesture into timers under 1 s, so the bubble still comes.
+  // ponytail: 50 ms is a few frames at 60-120 Hz; raise it if Type ever fails to show before the bubble.
+  await new Promise((r) => setTimeout(r, 50));
   let text = "";
   try { text = await navigator.clipboard.readText(); } catch { /* dismissed: type it in */ }
   document.removeEventListener("pointerdown", watch, true);

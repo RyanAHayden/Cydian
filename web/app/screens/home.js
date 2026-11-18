@@ -20,10 +20,13 @@ import { sourceKey } from "../core/sources.js";
 import { settings } from "./settings.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
+import { signAndInstall, signingAvailable, signingReady } from "../signing-client.js";
 
 export const title = "Home";
 
 const REPO_URL = "https://github.com/RyanAHayden/Cydian";
+// The sideload build, published as a release asset (native/build.sh makes it).
+const APP_IPA_URL = `${REPO_URL}/releases/latest/download/Cydian.ipa`;
 
 // More Package Sources: well-known flat repos, added in one tap (core/sources.js addSource takes flat repos only, so
 // the dist ones among the defaults can't be offered here). Each answered with a Release on 2026-11-17.
@@ -239,7 +242,32 @@ function renderRoot(body) {
     if (!hintBox.isConnected) { offHint(); return; }
     drawHint();
     drawThemes();
+    drawApp();
   });
+
+  // Install Cydian App, full width under Featured | Signing, on the website while Not Jailbroken: the sideload build
+  // (I2), signed with the user's own certificate through the signing server. Without a certificate it opens Settings
+  // > Signing first. (Install on a jailbroken phone, the .deb, is I7.)
+  const appRow = tileRow("halves", tile({ label: "Install Cydian App", href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }));
+  const appLink = appRow.querySelector("a");
+  appLink.addEventListener("click", (e) => {
+    // decided synchronously from the last known state, so the link's default (Signing) and the install never both run
+    if (!appLink.dataset.ready) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    signAndInstall({ url: APP_IPA_URL, name: "Cydian" });
+  }, true);
+  const drawApp = () => {
+    appRow.hidden = showsThemes(settings.deviceType()) || !signingAvailable();
+    signingReady().then((ok) => { if (ok) appLink.dataset.ready = "1"; else delete appLink.dataset.ready; });
+  };
+  drawApp();
+  // Back from Settings > Signing with a certificate set: the tile installs now.
+  const onShow = () => {
+    if (!appRow.isConnected) { removeEventListener("hashchange", onShow); return; }
+    if (/^#\/home\/?$/.test(location.hash)) drawApp();
+  };
+  addEventListener("hashchange", onShow);
 
   // F46: Browse, full width under Featured and Themes.
   const browseRow = tileRow("halves", tile({ label: "Browse", href: format({ tab: "home", path: ["browse"] }), glyph: "browse" }));
@@ -255,6 +283,7 @@ function renderRoot(body) {
       tile({ label: "GitHub", href: REPO_URL, glyph: "github", external: true }),
       tile({ label: "Sources", href: format({ tab: "sources" }), glyph: "sources" })),
     halves,
+    appRow,
     browseRow,
     stateRow,
   );

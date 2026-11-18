@@ -193,15 +193,13 @@ enum SelfUpdate {
             }
         }
         // F72: open a link outside the web view (Cydian's own update: the Signing Server's itms-services link, or
-        // cydian.dev in Safari). https and itms-services only.
+        // cydian.dev in Safari). B8: any scheme iOS can hand to an app (feather://, altstore://, sileo://…), not
+        // the bundle's own, javascript:, file: or data: (LinkOut.canOpen).
         b.on("app.openURL") { c in
-            guard let s = c.params["url"] as? String, let url = URL(string: s),
-                  ["https", "itms-services"].contains(url.scheme?.lowercased() ?? "") else {
-                return Apt.reply(c, nil, "bad_url: not an https or itms-services URL")
+            guard let s = c.params["url"] as? String, let url = URL(string: s), LinkOut.canOpen(url) else {
+                return Apt.reply(c, nil, "bad_url: not a URL another app can open")
             }
-            DispatchQueue.main.async {
-                UIApplication.shared.open(url) { ok in c.reply(["opened": ok], nil) }
-            }
+            LinkOut.open(url) { ok in c.reply(["opened": ok], nil) }
         }
         b.on("app.quit") { c in
             DispatchQueue.main.async {

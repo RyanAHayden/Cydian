@@ -364,3 +364,17 @@ lets `cydian:` (`AppScheme.scheme`, the bundle) and `about:`/`blob:` load. Any o
 **Check on a phone once the fix lands:** Home > Source Code opens Safari (or the GitHub app). An AltStore app's
 Get or Open in Feather opens Feather, or iOS says no app opens it. Install with a signed link brings up iOS's
 install prompt. More Information opens Safari, and Cydian stays where it was.
+
+**Fixed in B8 (2026-11-17), not yet tried on a phone.** `WebController` (`native/Sources/App.swift`) is now also
+the web view's `WKUIDelegate`, and `LinkOut` decides:
+
+- `decidePolicyFor`: `cydian:`, `about:`, `blob:` and `data:` load in the web view, and so does any subframe
+  navigation. Any other main-frame navigation (including a new-window one, `targetFrame == nil`) is cancelled and
+  handed to `UIApplication.shared.open`. So `location.href = "https://…"` opens Safari (or the app claiming the
+  link) and Cydian's UI stays put; itms-services and `feather://`, `altstore://`, `cydia://`, `sileo://`… go to iOS.
+- `createWebViewWith` (`window.open`): hands the URL to `UIApplication.shared.open` and returns nil, so
+  `window.open` still returns `null` but the link opens.
+- `app.openURL` takes any scheme except `cydian`, `about`, `blob`, `data`, `javascript` and `file`
+  (`LinkOut.canOpen`); it replies `{opened: false}` when no app claims the scheme.
+
+No JS changed: every call site in the table above works through the delegates.

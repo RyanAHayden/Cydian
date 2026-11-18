@@ -32,7 +32,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 }
 
-final class WebController: UIViewController, WKNavigationDelegate {
+final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     private let bridge = Bridge()
     private lazy var web = Web.make(bridge: bridge)
     private var cover: UIView?
@@ -42,6 +42,7 @@ final class WebController: UIViewController, WKNavigationDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
         web.navigationDelegate = self
+        web.uiDelegate = self // B8: window.open goes out of the app (LinkOut)
         // N10: the launch screen's Home-as-it-loads, exact for this screen, over the web view until the page has
         // drawn its own (index.html's #boot looks the same), so the hand-over from the launch screen shows no jump.
         if let c = Launch.cover(frame: UIScreen.main.bounds) {
@@ -67,6 +68,27 @@ final class WebController: UIViewController, WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { dropCover() }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         dropCover()
+    }
+
+    // B8 (docs/native.md, "Links out of the app"): Cydian's own pages (cydian:, about:, blob:, data:) load in the
+    // web view, and so does anything inside a subframe. Any other main-frame navigation (location.href to https,
+    // itms-services, feather://, altstore://, cydia://, sileo://, a target=_blank link) goes to iOS and is cancelled,
+    // so Cydian's UI stays where it was.
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        let url = navigationAction.request.url
+        let mainFrame = navigationAction.targetFrame?.isMainFrame ?? true // nil: a new window (target=_blank)
+        if !mainFrame || LinkOut.staysInside(url) { return decisionHandler(.allow) }
+        decisionHandler(.cancel)
+        if let url { LinkOut.open(url) }
+    }
+
+    // B8: window.open(url) has no second web view to open into: hand the URL to iOS and return nil (window.open
+    // then returns null, as before, but the link opens).
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if let url = navigationAction.request.url, !LinkOut.staysInside(url) { LinkOut.open(url) }
+        return nil
     }
 
     // The load event has fired; give WebKit a moment to put #boot on screen, then fade out (opacity only).
@@ -104,6 +126,31 @@ enum Web {
         w.scrollView.bounces = false
         if #available(iOS 16.4, *) { w.isInspectable = true }
         return w
+    }
+}
+
+// B8: links out of the app. What loads inside the web view, and how the rest is handed to iOS.
+enum LinkOut {
+    // Schemes the web view keeps: the bundle (AppScheme) and the page's own documents and objects.
+    static let inside: Set<String> = [AppScheme.scheme, "about", "blob", "data"]
+    // Schemes never handed to iOS (app.openURL too): they would mean nothing outside, or reach the file system.
+    static let never: Set<String> = inside.union(["javascript", "file"])
+
+    static func staysInside(_ url: URL?) -> Bool {
+        guard let s = url?.scheme?.lowercased() else { return true } // no URL, no scheme: nothing to open
+        return inside.contains(s)
+    }
+
+    static func canOpen(_ url: URL) -> Bool {
+        guard let s = url.scheme?.lowercased(), !s.isEmpty else { return false }
+        return !never.contains(s)
+    }
+
+    // UIApplication.open: Safari or the app that claims an https link, the app for its scheme, iOS's install
+    // prompt for itms-services. An unclaimed scheme just reports false.
+    static func open(_ url: URL, done: ((Bool) -> Void)? = nil) {
+        guard canOpen(url) else { done?(false); return }
+        DispatchQueue.main.async { UIApplication.shared.open(url, options: [:]) { done?($0) } }
     }
 }
 

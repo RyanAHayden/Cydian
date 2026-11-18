@@ -371,3 +371,97 @@ import { appLookup } from "./src/index.js";
   assert.equal(routed.status, 400);
   console.log("worker applookup: ok");
 }
+
+// F160: /api/ipainfo reads Payload/*.app/Info.plist out of an IPA with Range requests only: a plain zip (deflated XML
+// plist), a zip64 one (binary plist, sizes and offset in the zip64 extra field), a server without Range, a zip with
+// no Info.plist; answers cached (30 days; lasting errors a day, network ones not at all).
+import { ipaInfo } from "./src/index.js";
+import { plistInfo } from "./src/ipainfo.js";
+{
+  const enc = new TextEncoder();
+  const deflate = async (b) => new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer());
+  const le = (n, w) => { const b = new Uint8Array(w); let v = n; for (let i = 0; i < w; i++) { b[i] = v % 256; v = Math.floor(v / 256); } return b; };
+  const cat = (...parts) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return out; };
+  const PK = (a, b) => new Uint8Array([0x50, 0x4b, a, b]);
+  // files: [{ name, data, deflate }]; zip64: every central entry's offset and sizes in the zip64 extra field, and the
+  // end record's fields all ones, pointing at zip64's end record through its locator.
+  async function zip(files, { zip64 = false } = {}) {
+    const locals = [], central = [];
+    let off = 0;
+    for (const f of files) {
+      const data = f.deflate ? await deflate(f.data) : f.data;
+      const name = enc.encode(f.name), method = f.deflate ? 8 : 0;
+      const local = cat(PK(3, 4), le(20, 2), le(0, 2), le(method, 2), le(0, 4), le(0, 4), le(data.length, 4), le(f.data.length, 4),
+        le(name.length, 2), le(0, 2), name, data);
+      const extra = zip64 ? cat(le(1, 2), le(24, 2), le(f.data.length, 8), le(data.length, 8), le(off, 8)) : new Uint8Array(0);
+      const big = (n) => le(zip64 ? 0xffffffff : n, 4);
+      central.push(cat(PK(1, 2), le(45, 2), le(20, 2), le(0, 2), le(method, 2), le(0, 4), le(0, 4), big(data.length), big(f.data.length),
+        le(name.length, 2), le(extra.length, 2), le(0, 2), le(0, 2), le(0, 2), le(0, 4), big(off), name, extra));
+      locals.push(local);
+      off += local.length;
+    }
+    const cd = cat(...central);
+    const n = files.length;
+    if (!zip64) return cat(...locals, cd, PK(5, 6), le(0, 4), le(n, 2), le(n, 2), le(cd.length, 4), le(off, 4), le(0, 2));
+    const rec = cat(PK(6, 6), le(44, 8), le(45, 2), le(45, 2), le(0, 4), le(0, 4), le(n, 8), le(n, 8), le(cd.length, 8), le(off, 8));
+    const loc = cat(PK(6, 7), le(0, 4), le(off + cd.length, 8), le(1, 4));
+    return cat(...locals, cd, rec, loc, PK(5, 6), le(0, 4), le(0xffff, 2), le(0xffff, 2), le(0xffffffff, 4), le(0xffffffff, 4), le(0, 2));
+  }
+  const XML = `<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.example.flight</string>
+<key>CFBundleShortVersionString</key><string>3.2</string><key>MinimumOSVersion</key><string>14.0</string>
+<key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array><key>CFBundleName</key><string>A &amp; B</string></dict></plist>`;
+  const BPLIST = Uint8Array.from(atob("YnBsaXN0MDDWAQIDBAUGBwgJCgsNXxASQ0ZCdW5kbGVJZGVudGlmaWVyXENGQnVuZGxlTmFtZV8QGkNGQnVuZGxlU2hvcnRWZXJzaW9uU3RyaW5nXxAQTWluaW11bU9TVmVyc2lvblZOZXN0ZWReVUlEZXZpY2VGYW1pbHlfEA9jb20uZXhhbXBsZS5wYWRkAFAA5ABkAHlTMi4xVDE2LjDRBAxTMS4woQ4QAggVKjdUZ259j5icoaSoqgAAAAAAAAEBAAAAAAAAAA8AAAAAAAAAAAAAAAAAAACs"), (c) => c.charCodeAt(0));
+  assert.deepEqual(plistInfo(enc.encode(XML)), { minOSVersion: "14.0", deviceFamily: [1, 2], bundleId: "com.example.flight", version: "3.2" });
+  assert.deepEqual(plistInfo(BPLIST), { minOSVersion: "16.0", deviceFamily: [2], bundleId: "com.example.pad", version: "2.1" }); // python plistlib's
+  const filler = { name: "Payload/Flight.app/Assets.car", data: new Uint8Array(100000).map((_, i) => (i * 7919) % 251) }; // pushes Info.plist out of the tail
+  const plain = await zip([{ name: "Payload/", data: new Uint8Array(0) }, { name: "Payload/Flight.app/Info.plist", data: enc.encode(XML), deflate: true }, filler,
+    { name: "Payload/Flight.app/Frameworks/X.framework/Info.plist", data: enc.encode("not this one") }]);
+  const big = await zip([{ name: "Payload/Pad.app/_CodeSignature/CodeResources", data: new Uint8Array(70000) }, { name: "Payload/Pad.app/Info.plist", data: BPLIST }, filler], { zip64: true });
+  const files = { "/plain.ipa": plain, "/big.ipa": big, "/empty.ipa": await zip([filler]), "/text.ipa": enc.encode("<html>not a zip</html>") };
+  const asked = [];
+  // A server that answers Range like GitHub's release assets: 206 with Content-Range, suffix ranges too.
+  const fetcher = async (url, o = {}) => {
+    const { pathname } = new URL(url);
+    if (pathname === "/moved.ipa") return fetcher("https://dl.example/plain.ipa", o); // redirect: "follow" as fetch does it
+    const body = files[pathname];
+    asked.push({ path: pathname, range: o.headers?.Range });
+    if (!body) return new Response("no", { status: pathname === "/down.ipa" ? 503 : 404 });
+    if (pathname === "/full.ipa" || !o.headers?.Range) return new Response(body);
+    const m = /^bytes=(\d*)-(\d*)$/.exec(o.headers.Range);
+    if (m[1] === "") return new Response("no suffix ranges", { status: 501 }); // GitHub's asset store
+    const start = m[1] === "" ? Math.max(0, body.length - Number(m[2])) : Number(m[1]);
+    const end = m[1] === "" || m[2] === "" ? body.length - 1 : Math.min(body.length - 1, Number(m[2]));
+    return new Response(body.slice(start, end + 1), { status: 206, headers: { "Content-Range": `bytes ${start}-${end}/${body.length}` } });
+  };
+  files["/full.ipa"] = plain;
+  const kept = new Map();
+  const cache = { match: async (k) => kept.get(k.url)?.clone(), put: async (k, r) => { kept.set(k.url, r); } };
+  const at = (url, f = fetcher) => ipaInfo(new URL("https://cydian.example/api/ipainfo?" + new URLSearchParams({ url })), {}, { fetcher: f, cache });
+  let r = await at("https://dl.example/plain.ipa");
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get("Cache-Control"), /max-age=2592000/);
+  assert.equal(r.headers.get("Access-Control-Allow-Origin"), "*");
+  assert.deepEqual(await r.json(), { minOSVersion: "14.0", deviceFamily: [1, 2], bundleId: "com.example.flight", version: "3.2" });
+  assert.ok(asked.every((a) => a.range), "every read is a Range request");
+  assert.ok(asked.length <= 4, `${asked.length} reads`);
+  const read = asked.length;
+  assert.equal((await (await at("https://dl.example/plain.ipa")).json()).version, "3.2");
+  assert.equal(asked.length, read, "the second ask comes from the cache");
+  r = await at("https://dl.example/big.ipa");
+  assert.deepEqual(await r.json(), { minOSVersion: "16.0", deviceFamily: [2], bundleId: "com.example.pad", version: "2.1" });
+  assert.equal((await (await at("https://dl.example/moved.ipa")).json()).minOSVersion, "14.0");
+  const code = async (url, f) => { const x = await at(url, f); return [x.status, (await x.json()).code]; };
+  assert.deepEqual(await code("https://dl.example/full.ipa"), [422, "no_range"]);
+  assert.deepEqual(await code("https://dl.example/empty.ipa"), [422, "no_plist"]);
+  assert.deepEqual(await code("https://dl.example/text.ipa"), [422, "not_zip"]);
+  assert.deepEqual(await code("https://dl.example/gone.ipa"), [422, "not_found"]);
+  assert.deepEqual(await code("https://dl.example/down.ipa"), [502, "upstream"]);
+  assert.deepEqual(await code("https://dl.example/off.ipa", async () => { throw new Error("offline"); }), [502, "upstream"]);
+  assert.ok(kept.has(`https://ipainfo.cydian.internal/?${new URLSearchParams({ url: "https://dl.example/full.ipa" })}`), "a lasting error is cached");
+  assert.ok(!kept.has(`https://ipainfo.cydian.internal/?${new URLSearchParams({ url: "https://dl.example/down.ipa" })}`), "a network error isn't");
+  assert.equal((await at("ftp://dl.example/a.ipa")).status, 400);
+  assert.equal((await at("https://user:pw@dl.example/a.ipa")).status, 400);
+  const routed = await w.fetch(new Request("https://cydian.example/api/ipainfo?url=nope"), { LOOKUP_CACHE: cache });
+  assert.equal(routed.status, 400);
+  console.log("worker ipainfo: ok");
+}

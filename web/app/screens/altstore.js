@@ -32,6 +32,8 @@ import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { compareVersions } from "../core/apt.js";
 import { queueApp } from "./queue.js";
 import { descriptionGroup } from "./description.js";
+import { needsCheck, savedInfo, withIpaInfo, checkIpa, ipaInfoUrl } from "../core/ipainfo.js";
+import { PUBLIC_SITE } from "../core/handoff.js";
 import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText } from "../core/applookup.js";
 
 function img(url, cls) {
@@ -404,7 +406,10 @@ export function renderApp(body, route, pkg, source) {
   storeDev.hidden = true;
   ht.append(storeDev);
   ht.append(el("span", "pkg-head-version", `Version ${v.version}${v.buildVersion ? ` (${v.buildVersion})` : ""}`));
-  const fit = compat(st, currentDevice());
+  // F160: no iOS range from the source: what the IPA itself said, kept on this device, else asked below (once).
+  const ipaStore = localStore();
+  const keptInfo = needsCheck(v) ? savedInfo(ipaStore, v.downloadURL) : null;
+  const fit = compat(keptInfo ? withIpaInfo(st, keptInfo) : st, currentDevice());
   const fitCode = fit.status === "no" ? fit.reason : fit.status;
   const badge = el("span", "pkg-compat", fit.label);
   badge.dataset.compat = fitCode;
@@ -530,14 +535,19 @@ export function renderApp(body, route, pkg, source) {
   });
 
   // F161: Details are drawn again once the App Store's facts are in (developer, category, its version and iOS).
+  // F160: and once the IPA has been read (Compatibility: what it says, and where that came from).
   const detailsBox = el("div");
-  const drawDetails = (m = {}) => {
+  let lastStore = {};
+  let ipaRow = keptInfo ? ipaCompatText(withIpaInfo(v, keptInfo), keptInfo) : needsCheck(v) ? "Checking…" : null;
+  const drawDetails = (m = lastStore) => {
+    lastStore = m;
     const details = [{ label: "Version", detail: v.version }];
     if (size) details.push({ label: "Size", detail: size });
     if (v.date) details.push({ label: "Updated", detail: formatDate(v.date) });
     if (app.developerName || m.developer) details.push({ label: "Developer", detail: app.developerName || m.developer });
     details.push({ label: "Category", detail: m.category || pkg.row.section });
     if (osRange(v)) details.push({ label: "Compatibility", detail: osRange(v) });
+    else if (ipaRow) details.push({ label: "Compatibility", detail: ipaRow });
     if (m.version) details.push({ label: "App Store Version", detail: m.version });
     if (m.minimumOs) details.push({ label: "App Store Requires", detail: `iOS ${m.minimumOs} or later` });
     details.push({ label: "Bundle ID", detail: app.bundleIdentifier });
@@ -546,7 +556,28 @@ export function renderApp(body, route, pkg, source) {
   drawDetails();
   body.append(detailsBox);
   merged.then(drawDetails);
-  body.append(grouped([{ header: "Works on My Phone", rows: [{ label: compatBadge(fitCode) }], footer: fit.detail }]));
+  const fitBox = el("div");
+  const drawFit = (f) => {
+    const code = f.status === "no" ? f.reason : f.status;
+    badge.textContent = f.label;
+    badge.dataset.compat = code;
+    fitBox.replaceChildren(grouped([{ header: "Works on My Phone", rows: [{ label: compatBadge(code) }], footer: f.detail }]));
+  };
+  drawFit(fit);
+  body.append(fitBox);
+  if (needsCheck(v) && !keptInfo) {
+    const bundleId = appBundleId(app, pkg.row?.id);
+    ipaCheck(v.downloadURL, { store: ipaStore, text: [app.subtitle, app.localizedDescription, v.localizedDescription].filter(Boolean).join("\n"),
+      fallback: () => (need === "none" ? storeLookup(bundleId) : looked).then((m) => m?.minimumOs ?? null) })
+      .then((info) => {
+        if (!body.isConnected) return;
+        if (!info) { ipaRow = null; drawDetails(); return; }
+        ipaRow = ipaCompatText(withIpaInfo(v, info), info);
+        drawDetails();
+        drawFit(compat(withIpaInfo(st, info), currentDevice()));
+        catalog.setIpaInfo({ [v.downloadURL]: info }); // the rows follow (core/catalog.js setIpaInfo)
+      }, () => {});
+  }
 
   // Version History (F29): its own page (browse.js renderVersions), every versions[] entry, older ones installable.
   body.append(grouped([{ rows: [{ label: "Version History", href: deeper(route, `versions:${pkg.row.id}`) }] }]));
@@ -575,6 +606,27 @@ export function storeLookup(bundleId, { backend = getBackend(), fetchFn = global
     ? (id, c) => fetchFn(workerLookupUrl(id, c)).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
     : (id, c) => backend.text(lookupUrl(id, c));
   return lookupApp(bundleId, { country: regionOf(locale), get, store }).catch(() => null);
+}
+
+// F160: localStorage, or null where it's blocked.
+function localStore() {
+  try { return globalThis.localStorage ?? null; } catch { return null; }
+}
+
+// F160: read an IPA's Info.plist through the Worker's /api/ipainfo (core/ipainfo.js checkIpa): the website asks its
+// own origin, the app asks cydian.dev (the Worker answers any origin). The answer's JSON, error codes included.
+export function ipaCheck(url, { backend = getBackend(), fetchFn = globalThis.fetch, store = null, text = "", fallback = null } = {}) {
+  const get = (u) => fetchFn(ipaInfoUrl(u, backend.kind === "http" ? "" : PUBLIC_SITE)).then((r) => r.json());
+  return checkIpa(url, { get, store, text, fallback }).catch(() => null);
+}
+
+// F160: the Details row for a range the IPA (or a fallback) gave: "iOS 15.0 or later (from the app)", "iPad only".
+function ipaCompatText(v, info) {
+  const where = { ipa: "from the app", appstore: "App Store", text: "from its description" }[info.from];
+  const fam = Array.isArray(info.deviceFamily) && info.deviceFamily.length && !info.deviceFamily.includes(1) ? "iPad only" : null;
+  const range = osRange(v);
+  if (!range && !fam) return "Not known";
+  return [fam, range].filter(Boolean).join(", ") + (where && range ? ` (${where})` : "");
 }
 
 // F161: core/applookup.js pageLinks' rows as the Links group: a link row opens out, the source row opens its page.

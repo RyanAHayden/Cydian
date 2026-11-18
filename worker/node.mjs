@@ -1,5 +1,5 @@
 // The same server as the Cloudflare Worker (src/index.js), on any machine with Node 22: the website (web/app/),
-// /api/fetch, /api/applookup and /sign/*. For people who'd rather run it on their own PC or in Docker than on Cloudflare.
+// /api/fetch, /api/applookup, /api/ipainfo and /sign/*. For people who'd rather run it on their own PC or in Docker than on Cloudflare.
 //   node worker/node.mjs            PORT (8787), HOST (0.0.0.0), WEB (../web/app), HOST_IDS, TTL as in wrangler.toml
 // iOS takes the install manifest only over HTTPS with a trusted certificate: put it behind Tailscale
 // (`tailscale serve --bg 8787`), a Cloudflare Tunnel or Caddy with a domain (worker/README.md).
@@ -40,7 +40,7 @@ const ASSETS = {
   },
 };
 
-// F161: /api/applookup's day-long cache, as Cloudflare's edge cache keeps it (caches.default isn't in Node).
+// F161: /api/applookup's day-long cache (and F160's /api/ipainfo's 30 days), as Cloudflare's edge cache keeps it (caches.default isn't in Node).
 const looked = new Map();
 const LOOKUP_CACHE = {
   async match(req) { const e = looked.get(req.url); if (!e || e.until < Date.now()) { looked.delete(req.url); return undefined; } return new Response(e.body, e.init); },

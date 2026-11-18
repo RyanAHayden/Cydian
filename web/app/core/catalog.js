@@ -47,6 +47,9 @@
 //                                             A device with jailbreak "none" (F37, Not Jailbroken) sees AltStore
 //                                             sources only: APT sources' packages drop out of everything, filter or
 //                                             not (lists, Search, package pages, installed rows and upgrades)
+//   c.setIpaInfo(map)                      -> F160: { downloadURL: info } read from IPAs on this device (core/ipainfo.js);
+//                                             merged into what is kept, and apps whose candidate is one of them are
+//                                             judged with it (the source's own range wins). Returns how many are kept
 //
 // A row is the slim record lists draw: { id, name, short, version, section, icon, key, author, compat, purpose }.
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
@@ -54,6 +57,7 @@ import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
 import { compat, compatCode, isIncompatible, normalizeDevice, needText } from "./compat.js";
 import { parseSource, appStanza, isAltKey, runsOn, installOptions } from "./altstore.js";
 import { depIndex, explain, explainApt } from "./deps.js";
+import { withIpaInfo } from "./ipainfo.js";
 import { needsRestart } from "./queue.js";
 import { packageKind } from "./progress.js";
 
@@ -472,7 +476,9 @@ export function createCatalog() {
   const fitting = new Map(); // key -> sorted rows that can work on the device (cache)
   let appsOnly = false;       // F37: the device isn't jailbroken: only AltStore sources (`alt:` keys) count
   const counts = (key) => !appsOnly || isAltKey(key);
-  const judge = (e) => { e.row.compat = device ? compatCode(e.stanza, device) : null; };
+  const ipaInfo = new Map(); // F160: downloadURL -> what the IPA itself says (core/ipainfo.js), from the UI
+  const judged = (st) => (st?.kind === "ipa" && st.downloadURL && ipaInfo.has(st.downloadURL) ? withIpaInfo(st, ipaInfo.get(st.downloadURL)) : st);
+  const judge = (e) => { e.row.compat = device ? compatCode(judged(e.stanza), device) : null; };
 
   function load(key, text, root, arch = DEFAULT_ARCH) {
     const byId = new Map();
@@ -546,6 +552,19 @@ export function createCatalog() {
     shown.clear();
     fitting.clear();
     return no;
+  }
+
+  // F160: what IPAs said about themselves; only the apps whose candidate is one of them are judged again.
+  function setIpaInfo(map) {
+    const urls = new Set();
+    for (const [url, info] of Object.entries(map && typeof map === "object" ? map : {})) {
+      if (info && typeof info === "object") { ipaInfo.set(url, info); urls.add(url); }
+    }
+    if (!urls.size) return ipaInfo.size;
+    for (const { byId } of sources.values()) for (const e of byId.values()) if (urls.has(e.stanza.downloadURL)) judge(e);
+    shown.clear();
+    fitting.clear();
+    return ipaInfo.size;
   }
 
   function setHidden(names) {
@@ -683,7 +702,7 @@ export function createCatalog() {
       const out = slim(r);
       if (rank === 0 && isIncompatible(r.compat)) {
         out.exact = true;
-        out.why = needText(compat(entries(key).get(r.id).stanza, device));
+        out.why = needText(compat(judged(entries(key).get(r.id).stanza), device));
       }
       return out;
     });
@@ -897,7 +916,7 @@ export function createCatalog() {
 
   return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
     categories, browse, popular, free, featured, collection: collectionRows, roulette,
-    setInstalled, installed, upgrades, setDevice,
+    setInstalled, installed, upgrades, setDevice, setIpaInfo,
     deps, aptProblems, queueInfo };
 }
 
@@ -912,7 +931,7 @@ export function runCatalog(catalog, op, args = []) {
   const f = { load: catalog.load, loadAlt: catalog.loadAlt, altSource: catalog.altSource, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
     search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys,
     versions: catalog.versions, setHidden: catalog.setHidden, setHiddenAuthors: catalog.setHiddenAuthors, setInstalled: catalog.setInstalled,
-    installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice,
+    installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice, setIpaInfo: catalog.setIpaInfo,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular, free: catalog.free, featured: catalog.featured,
     collection: catalog.collection, roulette: catalog.roulette,
     deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo }[op];

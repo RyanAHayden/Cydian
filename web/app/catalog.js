@@ -23,6 +23,7 @@ import { ALL, freshLists } from "./core/catalog.js";
 import { openSeenStore, recordRefresh, dayGroups } from "./core/changes.js";
 import { looksLikeStatus } from "./core/installed.js";
 import { isAltKey } from "./core/altstore.js";
+import { allSaved } from "./core/ipainfo.js";
 
 export { ALL };
 
@@ -201,6 +202,15 @@ function setDevice(next, { filter = true } = {}) {
   for (const f of changeListeners) f();
 }
 
+// F160: what IPAs said about themselves (core/ipainfo.js), kept on this device: all of it with the first question,
+// then each new one as an app page reads it, so its rows show the green check or red X from then on.
+let ipaLoaded = false;
+let ipaPending = {};
+function setIpaInfo(map) {
+  ipaPending = { ...ipaPending, ...map };
+  for (const f of changeListeners) f();
+}
+
 // ---- Installed (F7): dpkg's status file, parsed in the worker beside the catalog. In the app the native
 // backend reads it (N3: `cydianNative.dpkgStatus()` resolves to the text of /var/lib/dpkg/status, or
 // /var/jb/var/lib/dpkg/status rootless; core/installed.js STATUS_PATHS); on the site the visitor uploads it and
@@ -254,6 +264,17 @@ const ask = async (op, args) => {
     deviceSent = true;
     await getParser().catalog("setDevice", device ? [device.device, { filter: device.filter }] : [null]);
   }
+  if (!ipaLoaded) {
+    ipaLoaded = true;
+    let store = null;
+    try { store = globalThis.localStorage ?? null; } catch { /* storage blocked */ }
+    ipaPending = { ...allSaved(store), ...ipaPending };
+  }
+  if (Object.keys(ipaPending).length) {
+    const m = ipaPending;
+    ipaPending = {};
+    await getParser().catalog("setIpaInfo", [m]);
+  }
   return getParser().catalog(op, args);
 };
 
@@ -264,6 +285,7 @@ export const catalog = {
   setHidden,
   setHiddenAuthors,
   setDevice,
+  setIpaInfo, // F160
   list: (key = ALL, section = ALL) => ask("list", [key, section]),
   search: (q, filters) => ask("search", filters ? [q, filters] : [q]), // F35: core/catalog.js search filters
   author: (name) => ask("author", [name]),

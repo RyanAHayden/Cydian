@@ -25,6 +25,8 @@
 //   GET  /api/fetch?url=&kind=ipa           F93: an IPA for the website's signer, streamed, up to MAX_UPLOAD_MB
 //   GET  /api/applookup?bundleId=&country=  F161: Apple's iTunes Search API lookup of one app by bundle ID (the
 //                                           app page's App Store details), its first result only; cached a day
+//   GET  /api/ipainfo?url=<IPA URL>          F160: MinimumOSVersion, UIDeviceFamily, bundle ID and version from the IPA's
+//                                           own Info.plist, read with Range requests (src/ipainfo.js); cached 30 days
 //   GET  /repo/<file>                       B17: Cydian's own flat APT repo (Release, Packages, Packages.gz, *.deb),
 //                                           the latest release's asset fetched here, redirects followed here
 //
@@ -33,6 +35,7 @@
 // namespace binding: HOSTED.
 
 import { account, isAccountPath } from "./account.js";
+import { readIpaInfo, IpaError } from "./ipainfo.js";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
@@ -385,6 +388,65 @@ export async function appLookup(u, env = {}, { fetcher = fetch, cache = env.LOOK
   return res;
 }
 
+// ---- /api/ipainfo: what an IPA's own Info.plist says (F160) ------------------------------------------------------
+// For apps whose source gives no iOS range (AppTesters gives none for 10,000 apps): the app page asks here once, and
+// the answer is cached at the edge for 30 days keyed by the IPA's URL (node.mjs: env.LOOKUP_CACHE), so each IPA is
+// read once for everyone. Only Range requests (src/ipainfo.js readIpaInfo): a server that sends the whole file is
+// answered "no_range" at once. Errors that won't change (no_range, not_zip, no_plist, not_found) are cached a day;
+// "upstream" (timeouts, 5xx, 429) isn't.
+export const IPAINFO_TTL_S = 30 * 86400;
+const PERMANENT = new Set(["no_range", "not_zip", "no_plist", "bad_plist", "too_large", "not_found"]);
+export function rangeReader(url, { fetcher = fetch, timeout = 20000, maxRequests = 6 } = {}) {
+  let asked = 0;
+  return async (start, end) => {
+    if (++asked > maxRequests) throw new IpaError("too_large", "Too many reads for one IPA.");
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), timeout);
+    let r;
+    try {
+      r = await fetcher(url, { headers: { "User-Agent": "cydian.dev", Range: `bytes=${start}-${end}` },
+        redirect: "follow", signal: ctl.signal });
+    } catch { clearTimeout(timer); throw new IpaError("upstream", "The IPA's server didn't answer."); }
+    try {
+      if (r.status === 200) { r.body?.cancel?.(); throw new IpaError("no_range", "The IPA's server doesn't answer Range requests."); }
+      if (r.status === 404 || r.status === 410) { r.body?.cancel?.(); throw new IpaError("not_found", `The IPA's server answered HTTP ${r.status}.`); }
+      if (r.status === 416) { r.body?.cancel?.(); throw new IpaError("not_zip", "The IPA's server refused that range."); }
+      if (r.status !== 206) { r.body?.cancel?.(); throw new IpaError("upstream", `The IPA's server answered HTTP ${r.status}.`); }
+      const m = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(r.headers.get("content-range") ?? "");
+      if (!m) { r.body?.cancel?.(); throw new IpaError("no_range", "The IPA's server sent a part without saying which."); }
+      const bytes = new Uint8Array(await r.arrayBuffer());
+      if (bytes.length !== Number(m[2]) - Number(m[1]) + 1 || Number(m[1]) !== start) {
+        throw new IpaError("no_range", "The IPA's server sent another part than asked.");
+      }
+      return { bytes, total: Number(m[3]) };
+    } catch (e) {
+      if (e instanceof IpaError) throw e;
+      throw new IpaError("upstream", "The IPA's server stopped sending.");
+    } finally { clearTimeout(timer); }
+  };
+}
+export async function ipaInfo(u, env = {}, { fetcher = fetch, cache = env.LOOKUP_CACHE ?? globalThis.caches?.default ?? null, timeout } = {}) {
+  const target = httpUrl(u.searchParams.get("url") ?? "");
+  if (!target) return fail("bad_url", "Send the IPA's http(s) URL as url.");
+  const key = new Request(`https://ipainfo.cydian.internal/?${new URLSearchParams({ url: target.href })}`);
+  const hit = cache ? await cache.match(key).catch(() => null) : null;
+  if (hit) return hit;
+  const answer = (body, status, ttl) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json",
+    "Cache-Control": ttl ? `public, max-age=${ttl}` : "no-store", "X-Content-Type-Options": "nosniff", ...CORS } });
+  let res;
+  try {
+    const info = await readIpaInfo(rangeReader(target.href, { fetcher, ...(timeout ? { timeout } : {}) }));
+    res = answer(info, 200, IPAINFO_TTL_S);
+  } catch (e) {
+    const code = e instanceof IpaError ? e.code : "upstream";
+    const permanent = PERMANENT.has(code);
+    res = answer({ code, error: e instanceof IpaError ? e.message : "The IPA couldn't be read." }, permanent ? 422 : 502, permanent ? 86400 : 0);
+    if (!permanent) return res;
+  }
+  if (cache) await cache.put(key, res.clone()).catch(() => {});
+  return res;
+}
+
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 export default {
@@ -396,6 +458,7 @@ export default {
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null);
     if (u.pathname === "/api/applookup" && req.method === "GET") return appLookup(u, env);
+    if (u.pathname === "/api/ipainfo" && req.method === "GET") return ipaInfo(u, env); // F160
     if (u.pathname === "/repo" || u.pathname.startsWith("/repo/")) return repo(req, u, env);
     if (u.pathname === "/healthz") return new Response("ok\n", { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
     if (u.pathname === "/sign/status") return json({ ok: true, ttl, worker: true, zsign: false, upload: uploadCap(env) });

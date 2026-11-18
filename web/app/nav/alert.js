@@ -60,6 +60,11 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
     box.append(row);
     scrim.append(box);
     document.body.append(scrim);
+    // Two buttons whose titles don't fit side by side stack, as UIAlertView does with long titles (user 2026-11-18:
+    // "Complete Up…").
+    if (!row.classList.contains("stacked") && [...row.children].some((b) => b.scrollWidth > b.clientWidth + 1)) {
+      row.classList.add("stacked");
+    }
 
     // Locked in place, as on iOS 6. Nothing behind it scrolls, and a tap outside the box does nothing (it would
     // otherwise drop the keyboard and scroll the page). The backdrop reaches well past the screen's edges, so

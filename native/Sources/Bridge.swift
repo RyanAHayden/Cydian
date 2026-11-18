@@ -45,11 +45,9 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         // The clipboard for Sources' Add and Import > From Clipboard (nav/menu.js pasteText), so the app shows no WebKit
         // Paste bubble. hasStrings/hasURLs never ask; reading another app's copy may show iOS's own Allow Paste alert,
         // which Settings > Cydian > Paste from Other Apps: Allow turns off.
+        // F146: {auto: true} is Sources' Add filling its field by itself (ClipboardRead below).
         on("clipboard.read") { c in
-            DispatchQueue.main.async {
-                let pb = UIPasteboard.general
-                c.reply(pb.hasStrings || pb.hasURLs ? (pb.string ?? pb.url?.absoluteString ?? "") : "", nil)
-            }
+            DispatchQueue.main.async { ClipboardRead.read(auto: c.params["auto"] as? Bool ?? false) { c.reply($0, nil) } }
         }
         SelfUpdate.register(self) // F61: selfupdate.download, app.quit (below)
         Apt.register(self) // N3: apt's files, the network, cydian-helper, haptic.tap (Apt.swift)
@@ -263,4 +261,47 @@ enum Prefs {
             c.reply(nil, bad.isEmpty ? nil : "bad_params: \(bad.sorted().joined(separator: ", "))")
         }
     }
+}
+
+// F146: the clipboard for Sources' Add (auto) and the alert's Paste button (a tap). The jailbreak build reads without
+// asking: no sandbox, and iOS 15 and older have no paste prompt at all (it may still show iOS 16+'s; no private
+// switch for it is used here). The sideload build asks iOS's Allow Paste at most once per copy and never again after
+// a No: hasStrings/hasURLs/changeCount and detectPatterns never prompt, so an auto read goes ahead only when iOS
+// says a web URL was copied and this copy wasn't read (or refused) before. A tap on Paste always reads, and a read
+// that works clears a remembered No. Answers "" for nothing to read.
+enum ClipboardRead {
+    static let deniedKey = "clipboard.pasteDenied"
+    private static var lastCount = -1, lastText = ""
+
+    // On the main queue; `done` too.
+    static func read(auto: Bool, done: @escaping (String) -> Void) {
+        let pb = UIPasteboard.general
+        guard pb.hasStrings || pb.hasURLs else { return done("") }
+        if AppMode.current == .jailbreak { return done(text(pb) ?? "") }
+        if pb.changeCount == lastCount { return done(lastText) } // this copy was read (or refused): iOS isn't asked again
+        if !auto { return done(readNow(pb)) }
+        if UserDefaults.standard.bool(forKey: deniedKey) { return done("") }
+        if pb.hasURLs { return done(readNow(pb)) }
+        // No prompt: iOS only says whether the copy looks like a web URL (iOS 15's key-path form; the build's floor).
+        let web: PartialKeyPath<UIPasteboard.DetectedValues> = \.probableWebURL
+        pb.detectPatterns(for: [web]) { result in
+            DispatchQueue.main.async {
+                var url = false
+                if case .success(let found) = result { url = found.contains(web) }
+                done(url ? readNow(pb) : "")
+            }
+        }
+    }
+
+    private static func readNow(_ pb: UIPasteboard) -> String {
+        let count = pb.changeCount
+        let got = text(pb)
+        lastCount = count
+        lastText = got ?? ""
+        if #available(iOS 16.0, *), got == nil { UserDefaults.standard.set(true, forKey: deniedKey) } // Don't Allow Paste
+        else if got != nil { UserDefaults.standard.removeObject(forKey: deniedKey) }
+        return lastText
+    }
+
+    private static func text(_ pb: UIPasteboard) -> String? { pb.string ?? pb.url?.absoluteString }
 }

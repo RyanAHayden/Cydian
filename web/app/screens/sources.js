@@ -94,7 +94,9 @@ async function addFromPasteboard(ctx, button, native, open) {
   const start = field?.value;
   let typed = false;
   field?.addEventListener("input", () => { typed = true; }, { once: true });
-  const url = cleanSourceUrl((await nativePaste(native)) ?? "");
+  // F146: `auto`: not a tap on Paste, so the sideload build reads only a copied URL, asks iOS once per copy and
+  // never again after a refusal (Bridge.swift clipboard.read); the jailbreak build reads without asking.
+  const url = cleanSourceUrl((await nativePaste(native, { auto: true })) ?? "");
   // Only an untouched field still on screen: never over what the user started typing.
   if (url && field?.isConnected && !typed && field.value === start) field.value = url;
   return shown;
@@ -111,7 +113,9 @@ export function nav(route, ctx) {
     right: [
       // Add: the clipboard (the app: UIPasteboard; the website: iOS's Paste bubble, the button blue and reading Type
       // while it waits). Then the Enter APT URL alert, filled with a copied source URL.
-      { label: "Add", onPress: (e) => showType(e.currentTarget), onClick: (e) => addFromClipboard(ctx, e.currentTarget) },
+      // F146: the app has no Type switch at all (no onPress): Add opens Enter APT URL and Cydian reads the clipboard.
+      { label: "Add", ...(globalThis.cydianNative ? {} : { onPress: (e) => showType(e.currentTarget) }),
+        onClick: (e) => addFromClipboard(ctx, e.currentTarget) },
       { label: "Manage", onClick: () => ctx.go({ tab: "sources", path: [manage.SEGMENT] }) },
     ],
   };

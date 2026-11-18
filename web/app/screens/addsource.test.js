@@ -3,7 +3,7 @@
 // or text already typed leave the field alone. Never the website's navigator.clipboard, never the blue Type state.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addFromClipboard } from "./sources.js";
+import { addFromClipboard, nav } from "./sources.js";
 
 function fakeButton() {
   const parent = { removed: 0, insertBefore() {} };
@@ -76,4 +76,34 @@ test("F105: a refused read (Allow Paste denied, no clipboard.read) opens the emp
 test("F105: what the user started typing before the read answered is kept", async () => {
   const r = await run(() => "https://repo.test/", { typeFirst: "https://mine.test" });
   assert.equal(r.field.value, "https://mine.test");
+});
+
+// F146: the app's Add asks the bridge with {auto: true} (the sideload build reads only a copied URL, once per copy;
+// the jailbreak build without asking), and has no Type switch: no onPress on the button in the app.
+test("F146: the app's Add reads with auto, a URL fills the field, none leaves https://", async () => {
+  const seen = [];
+  const field = { value: "", isConnected: true, addEventListener() {} };
+  const saved = globalThis.document;
+  globalThis.document = { querySelectorAll: (sel) => (sel === ".alert-field" ? [field] : []) };
+  try {
+    for (const [answer, want] of [["https://ipa.test/apps.json", "https://ipa.test/apps.json"], ["", "https://"]]) {
+      const native = { call: async (method, params) => { seen.push([method, params]); return answer; } };
+      await addFromClipboard({}, fakeButton(), { native, open: () => { field.value = "https://"; } });
+      assert.equal(field.value, want);
+    }
+  } finally { globalThis.document = saved; }
+  assert.deepEqual(seen, [["clipboard.read", { auto: true }], ["clipboard.read", { auto: true }]]);
+});
+
+test("F146: Sources' Add has the Type switch (onPress) only on the website", () => {
+  const add = (n) => n.right.find((b) => b.label === "Add");
+  const saved = globalThis.cydianNative;
+  try {
+    delete globalThis.cydianNative;
+    assert.equal(typeof add(nav({ path: [] }, {})).onPress, "function", "website: Type at touch-down");
+    globalThis.cydianNative = { call: async () => "" };
+    const app = add(nav({ path: [] }, {}));
+    assert.equal(app.onPress, undefined, "app: no Type switch");
+    assert.equal(typeof app.onClick, "function");
+  } finally { if (saved === undefined) delete globalThis.cydianNative; else globalThis.cydianNative = saved; }
 });

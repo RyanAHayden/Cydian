@@ -120,3 +120,6 @@ export function placeholder(kind = "list", rows = kind === "list" ? 9 : 4) {
   wrap.append(ul);
   return wrap;
 }
+
+// F157: one grouped/plain cell on its own, for a screen that builds its own table (screens/guides.js).
+export const row = (r) => cell(r);

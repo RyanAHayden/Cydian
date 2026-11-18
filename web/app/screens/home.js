@@ -31,7 +31,8 @@ import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME } from "..
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 import { refreshInBackground } from "./sources.js";
 import { markCydianInstalled, browsingLocked, askToBrowse } from "../websign-gate.js";
-import { GUIDES, guideRows, JAILBREAK_INFO_URL } from "./guides.js";
+import * as guides from "./guides.js";
+import { guideRows, JAILBREAK_INFO_URL } from "./guides.js";
 
 const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
 
@@ -109,6 +110,9 @@ export async function signingSetUp(mode, { ready = signingReady, status = () => 
 // the tiles (user 2026-11-18: "move settings up on the main page and give it an icon"), with our grey gear
 // (icons/settings.svg) at its left as iOS 6's Settings rows have.
 export const SETTINGS_ICON = "icons/settings.svg";
+// F157: the User Guides' lite set (no jailbreak guides) while Not Jailbroken: the sideload build, and the website
+// while Settings > Device says so (as F144).
+const guidesLite = () => guides.isLite(settings.deviceType());
 export function homeLinks() {
   return [{ rows: [{ label: "Settings", href: format(settingsRoute()), icon: { src: SETTINGS_ICON }, cls: "home-settings-row" }] }, {
     rows: [
@@ -117,7 +121,7 @@ export function homeLinks() {
       // Manage Sources (user 2026-11-18), opened on Home's own stack (router mountLink): Back comes home.
       { label: "More Package Sources", href: format({ tab: "sources", path: ["manage"] }) },
     ],
-  }, { header: "User Guides", rows: guideRows(format) },
+  }, { header: "User Guides", rows: guideRows(format, guidesLite()) },
   { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }];
 }
 
@@ -164,7 +168,7 @@ export function nav(route, ctx) {
   }
   switch (route.path[0]) {
     case "credits": return { title: "Credits" };
-    case "guides": return { title: GUIDES[route.path[1]]?.title ?? "User Guides" };
+    case "guides": return guides.nav(route, guidesLite()); // F157
     case "help": return { title: "Help" };
     case "featured": return { title: "Featured" };
     case "sources": return { title: "More Sources" };
@@ -804,7 +808,7 @@ function renderSources(body, ctx) {
 export function render(el, route, ctx) {
   switch (route.path[0]) {
     case "credits": return renderCredits(el);
-    case "guides": el.append(wrap(grouped(GUIDES[route.path[1]]?.sections ?? [{ rows: guideRows(format) }]))); return;
+    case "guides": guides.render(el, route, { lite: guidesLite() }); return; // F157
     case "help": return renderHelp(el);
     case "featured": return renderFeatured(el);
     case "sources": return renderSources(el, ctx);

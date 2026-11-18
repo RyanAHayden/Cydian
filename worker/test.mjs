@@ -594,3 +594,51 @@ import { d1 } from "./src/d1-sqlite.js";
   assert.match(r.headers.get("Access-Control-Allow-Headers"), /X-Review-Token/);
   console.log("worker reviews: ok");
 }
+
+// F190: iOS's own requests on an upload's link show in /sign/up/<token>/status, each mark written once.
+{
+  const writes = [];
+  const counted = { ...env, WAIT_SCALE: "0.05", HOSTED: { ...env.HOSTED, put: async (k, v, o) => { writes.push(k); return env.HOSTED.put(k, v, o); } } };
+  const at = (path, init) => w.fetch(new Request("https://sign.example" + path, init), counted);
+  const status = async (t) => (await at(`/sign/up/${t}/status`)).json();
+  const tok = "f1".repeat(24), app = new Uint8Array([0x50, 0x4b, 1, 2, 3, 4]);
+  assert.deepEqual(await status(tok), { manifest: false, started: false, finished: false });
+  // the early link: iOS asks for the manifest (from its query) before anything is reserved
+  let r = await at(`/sign/up/${tok}/manifest.plist?bundleid=com.you.cydian&version=1&title=iFizBox`);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await status(tok), { manifest: true, started: false, finished: false });
+  await at(`/sign/up/${tok}/manifest.plist?bundleid=com.you.cydian&version=1&title=iFizBox`); // asked again: no write
+  await at(`/sign/upload?bundleid=com.you.cydian&version=1&title=iFizBox&token=${tok}`, { method: "POST" });
+  await at(`/sign/upload?bundleid=com.you.cydian&version=1&title=iFizBox&token=${tok}&size=${app.length}`, { method: "POST" });
+  // the reservation and size writes leave iOS's mark alone; HEAD is no download
+  assert.equal((await at(`/sign/up/${tok}/app.ipa`, { method: "HEAD" })).status, 200);
+  assert.deepEqual(await status(tok), { manifest: true, started: false, finished: false });
+  // GET held until done, then streamed whole: started, finished
+  const held = at(`/sign/up/${tok}/app.ipa`);
+  await at(`/sign/upload/${tok}/0`, { method: "PUT", body: app });
+  await at(`/sign/upload/${tok}/done`, { method: "POST" });
+  r = await held;
+  const whole = r.arrayBuffer();
+  assert.deepEqual(new Uint8Array(await whole), app);
+  assert.deepEqual(await status(tok), { manifest: true, started: true, finished: true });
+  // a Range short of the end, and the download again: nothing more written
+  const before = writes.filter((k) => k.endsWith(".ios")).length;
+  assert.equal(before, 3);
+  await (await at(`/sign/up/${tok}/app.ipa`, { headers: { Range: "bytes=0-1" } })).arrayBuffer();
+  await (await at(`/sign/up/${tok}/app.ipa`)).arrayBuffer();
+  await at(`/sign/up/${tok}/manifest.plist`);
+  assert.equal(writes.filter((k) => k.endsWith(".ios")).length, 3);
+  // a Range short of the end on a fresh link starts but doesn't finish
+  const t2 = "f2".repeat(24);
+  await at(`/sign/upload?bundleid=com.a&version=1&title=A&token=${t2}`, { method: "POST" });
+  await at(`/sign/upload?bundleid=com.a&version=1&title=A&token=${t2}&size=${app.length}`, { method: "POST" });
+  await at(`/sign/upload/${t2}/0`, { method: "PUT", body: app });
+  await at(`/sign/upload/${t2}/done`, { method: "POST" });
+  await (await at(`/sign/up/${t2}/manifest.plist`)).text();
+  await (await at(`/sign/up/${t2}/app.ipa`, { headers: { Range: "bytes=0-2" } })).arrayBuffer();
+  assert.deepEqual(await status(t2), { manifest: true, started: true, finished: false });
+  await (await at(`/sign/up/${t2}/app.ipa`, { headers: { Range: "bytes=3-" } })).arrayBuffer();
+  assert.deepEqual(await status(t2), { manifest: true, started: true, finished: true });
+  assert.equal((await at(`/sign/up/xyz/status`)).status, 404);
+  console.log("worker ios status: ok");
+}

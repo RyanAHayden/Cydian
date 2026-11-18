@@ -489,7 +489,8 @@ const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof
 export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "" },
   { hud = progressHUD, alert = showAlert, open = (u) => { location.href = u; }, go = openRoute,
     identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "",
-    now = identityNow, origin = () => new URL(base || "/", globalThis.location?.href).origin, clock = Date.now } = {}) {
+    now = identityNow, origin = () => new URL(base || "/", globalThis.location?.href).origin, clock = Date.now,
+    watch = watchInstall } = {}) {
   // F121: before anything waits, while Safari still counts this as the user's tap: iOS's install prompt, for a link
   // whose app comes later. Only when the bundle ID it will be signed as is known now (expectedBundleId).
   const expected = expectedBundleId(now(), { url, bundleId });
@@ -525,8 +526,9 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     onInstalled({ ...body, bundleId: signed.bundleId, name: signed.name, version: signed.version });
     const app = name || signed.name || "The app";
     if (intoEarly && clock() - early.at < EARLY_WINDOW) {
-      // iOS's prompt was asked for at the tap and its download now gets the app: nothing more to tap here
-      if (h.done) h.done("Installing"); else h.hide();
+      // iOS's prompt was asked for at the tap and its download now gets the app: nothing more to tap here.
+      // F190: the log follows iOS's requests on the link from here (watchInstall); not awaited past its first look.
+      await watch(early.token, h, { base, fetcher, app: name || signed.name, itms: early.itms, open, alert }).first;
       return true;
     }
     h.hide();
@@ -541,6 +543,88 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     await alert({ title: name ? `Couldn't Install ${name}` : "Couldn't Install", message: String(e?.message ?? e), buttons: ["OK"] });
     return false;
   }
+}
+
+// ---- F190: what iOS does after "Installing" -------------------------------------------------------------------
+//
+// Safari never hears back from itms-services, but the Worker sees iOS's own requests on the link and keeps them per
+// token: GET /sign/up/<token>/status -> { manifest, started, finished } (worker/src/index.js). watchInstall polls it
+// every `every` ms (KV reads are cheap; only the Worker's 3 marks are writes) and the progress page steps through
+// installSteps, each shown at least `minShow` ms so a fast install still reads as steps. If iOS hasn't begun the
+// download `askWithin` ms in, it says so and offers Retry (the itms link again, from that tap). The final install
+// happens on the Home Screen, which Safari can't see: the last step says so.
+//
+//   const w = watchInstall(token, hud, { base, fetcher, app, itms, open, alert })
+//   await w.first   after the first look: a Worker without /status (or no answer) ends the page on "Installing"
+//   await w.end     "installed" (downloaded) | "not_asked" | "unknown" | "closed" | "timeout"
+
+export const STATUS_EVERY = 500, STATUS_MIN_SHOW = 400, STATUS_ASK_WITHIN = 60 * 1000;
+
+// The log's steps in order, and how far a status got: 0 waiting, 1 downloading, 2 downloaded.
+export const installSteps = (app) => [
+  "Waiting for iOS…",
+  `iOS is downloading ${app || "the app"}…`,
+  "Downloaded. iOS is installing it: watch the Home Screen (Safari can't see the install itself).",
+];
+export const installStage = (s) => (s?.finished ? 2 : s?.started || s?.manifest ? 1 : 0);
+export const notAskedText = "iOS didn't ask for the app. Tap Install again.";
+
+export function watchInstall(token, h, { base = "", fetcher = globalThis.fetch, app = "", itms = "", open = () => {}, alert = showAlert,
+  every = STATUS_EVERY, minShow = STATUS_MIN_SHOW, askWithin = STATUS_ASK_WITHIN, upTo = EARLY_WINDOW,
+  clock = Date.now, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  const steps = installSteps(app), t0 = clock();
+  let shown = -1, shownAt = 0, firstDone;
+  const first = new Promise((r) => { firstDone = r; });
+  const look = async () => {
+    try {
+      const res = await fetcher(`${base}/sign/up/${token}/status`, { cache: "no-store" });
+      return res.ok ? await res.json() : null;
+    } catch { return null; }
+  };
+  const show = async (stage) => { // each step in turn up to `stage`, none for less than minShow
+    while (shown < stage) {
+      if (shown >= 0) { const left = minShow - (clock() - shownAt); if (left > 0) await sleep(left); }
+      shown++;
+      h.set(steps[shown]);
+      shownAt = clock();
+    }
+  };
+  const closed = () => Boolean(h.page?.closed);
+  const end = (async () => {
+    let s = await look();
+    if (!s) { // a Worker without /status: as before F190
+      if (h.done) h.done("Installing"); else h.hide();
+      firstDone();
+      return "unknown";
+    }
+    await show(installStage(s));
+    firstDone();
+    for (;;) {
+      if (closed()) return "closed";
+      if (installStage(s) === 2) {
+        const left = minShow - (clock() - shownAt);
+        if (left > 0) await sleep(left);
+        if (h.done) h.done(steps[2]); else h.hide();
+        return "installed";
+      }
+      if (!s.started && clock() - t0 >= askWithin) {
+        if (h.finish) {
+          h.set(notAskedText);
+          h.finish({ label: "Retry", status: notAskedText, action: () => { open(itms); return true; } });
+        } else {
+          h.hide();
+          await alert({ title: "Not Installed", message: notAskedText, buttons: ["Cancel", "Install"], cancel: 0,
+            onTap: (i) => { if (i === 1) open(itms); } });
+        }
+        return "not_asked";
+      }
+      if (clock() - t0 >= upTo) { if (h.done) h.done(steps[shown]); else h.hide(); return "timeout"; }
+      await sleep(every);
+      s = (await look()) ?? s; // a missed look keeps the last answer
+      await show(installStage(s));
+    }
+  })().catch(() => "unknown").finally(() => firstDone());
+  return { first, end };
 }
 
 // What iFizBox's own IPA carries for its first launch: the website's sources and settings (Send Settings' link).

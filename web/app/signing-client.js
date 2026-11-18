@@ -21,7 +21,7 @@ import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, devic
 import { format, settingsRoute } from "./router.js";
 import { IPA_MAX, CYDIAN_ID, profileInfo, targetBundleId } from "./core/websign.js";
 import { detectMode } from "./core/settings.js";
-import { showHUD } from "./nav/hud.js";
+import { liveHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
 
 const SERVER_KEY = "cydian.signingServer";
@@ -217,12 +217,6 @@ export async function firstInstallCheck({ native, server = getServer(), go = ope
 }
 
 // The HUD whose label follows the install's phases: { set(text), hide() }.
-function liveHUD(text) {
-  const hide = showHUD(text);
-  const label = [...document.querySelectorAll(".hud-label")].at(-1);
-  return { set: (t) => { if (label) label.textContent = t; }, hide, done: (t) => hide.done(t) };
-}
-
 const openRoute = (path) => { location.hash = format(settingsRoute(path)).replace(/^#/, ""); };
 
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an

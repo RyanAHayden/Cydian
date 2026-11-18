@@ -8,7 +8,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, collapse } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
-import { showHUD } from "../nav/hud.js";
+import { liveHUD } from "../nav/hud.js";
 import { certificateWarnings, revocationLabel, resignLabel, signedAppRows, deviceError } from "../core/signing.js";
 import { resignJob } from "../core/appqueue.js";
 import { getServer } from "../signing-client.js";
@@ -21,12 +21,6 @@ function style() {
   link.rel = "stylesheet";
   link.href = new URL("../signsheet.css", import.meta.url).href;
   document.head.append(link);
-}
-
-function liveHUD(text) {
-  const hide = showHUD(text);
-  const label = [...document.querySelectorAll(".hud-label")].at(-1);
-  return { set: (t) => { if (label) label.textContent = t; }, hide };
 }
 
 const alertOK = (alert, title, message) => alert({ title, message, buttons: ["OK"] });

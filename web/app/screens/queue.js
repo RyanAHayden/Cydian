@@ -22,7 +22,7 @@
 import { grouped } from "../nav/ui.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { showAlert } from "../nav/alert.js";
-import { showHUD } from "../nav/hud.js";
+import { showHUD, liveHUD } from "../nav/hud.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
 import { catalog } from "../catalog.js";
@@ -422,12 +422,6 @@ export async function resignApp(job, { sc, native = globalThis.cydianNative, hud
     return false;
   }
   return true;
-}
-
-function liveHUD(text) {
-  const hide = showHUD(text);
-  const label = typeof document === "undefined" ? null : [...document.querySelectorAll(".hud-label")].at(-1);
-  return { set: (t) => { if (label) label.textContent = t; }, hide };
 }
 
 // F30/I3: the version Install put on the phone, so Installed and Changes follow it (Cydian records itself).

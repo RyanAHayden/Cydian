@@ -35,3 +35,10 @@ export function showHUD(text = "Reloading Data") {
   };
   return hide;
 }
+
+// A HUD whose label changes as a job goes on: { set(text), hide, done(label) } (hide and done as showHUD's).
+export function liveHUD(text) {
+  const hide = showHUD(text);
+  const label = typeof document === "undefined" ? null : [...document.querySelectorAll(".hud-label")].at(-1);
+  return { set: (t) => { if (label) label.textContent = t; }, hide, done: (t) => hide.done(t) };
+}

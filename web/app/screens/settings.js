@@ -14,7 +14,7 @@ import { grouped } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { createSettings, detectMode, themeFor, SETTINGS } from "../core/settings.js";
 import { showAlert } from "../nav/alert.js";
-import { showHUD } from "../nav/hud.js";
+import { showHUD, liveHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind } from "../core/signing.js";
 import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
@@ -664,13 +664,6 @@ const appVersion = () => globalThis.cydianNative?.call
   ? globalThis.cydianNative.call("app.info", {}).then((i) => String(i?.version ?? ""))
   : Promise.resolve("");
 
-// A HUD whose label can change (Downloading, then Installing): { set(text), hide() }.
-function updateHUD(text) {
-  const hide = showHUD(text);
-  const label = [...document.querySelectorAll(".hud-label")].at(-1);
-  return { set: (t) => { if (label) label.textContent = t; }, hide };
-}
-
 let checking = null;
 // The automatic launch check, or Check for Updates (manual, with a Checking HUD until the first alert). One at a time.
 export function checkUpdates({ manual = false, always = false } = {}) {
@@ -689,7 +682,7 @@ export function checkUpdates({ manual = false, always = false } = {}) {
     install: (release) => runInstall(release, mode, {
       status: () => deviceStatus(), installOnDevice: (o) => installOnDevice(o), alert, go,
       installSelf: (row) => import("../essential-ui.js").then((m) => m.installSelfNow(row)), // F72
-      native, arch: getArch(), hud: updateHUD,
+      native, arch: getArch(), hud: liveHUD,
     }),
   }, { manual, always }).catch(() => "error").finally(() => { hide(); checking = null; redrawAll(); });
   return checking;

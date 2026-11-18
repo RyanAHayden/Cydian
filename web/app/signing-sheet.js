@@ -17,7 +17,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showSheet } from "./nav/sheet.js";
 import { showAlert } from "./nav/alert.js";
-import { showHUD } from "./nav/hud.js";
+import { liveHUD } from "./nav/hud.js";
 import { grouped } from "./nav/ui.js";
 import { format, settingsRoute } from "./router.js";
 import { installOnDevice } from "./signing-client.js";
@@ -41,12 +41,6 @@ function el(tag, cls, text) {
   if (cls) e.className = cls;
   if (text != null) e.textContent = text;
   return e;
-}
-
-function liveHUD(text) {
-  const hide = showHUD(text);
-  const label = [...document.querySelectorAll(".hud-label")].at(-1);
-  return { set: (t) => { if (label) label.textContent = t; }, hide };
 }
 
 // An older shell answers "unknown method signing.inspect" (Bridge.swift).

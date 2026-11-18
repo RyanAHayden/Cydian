@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.2.4",
+          "date": "2026-11-18T03:06:46Z",
+          "localizedDescription": "Share sheet: Open in \u2026 apps on app pages too.\nThe A\u2013Z index no longer fights a list that is still gliding.\nCydian updates itself in one step (signed on the phone, held on the signing server, then iOS's Install prompt).\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.4",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.4/Cydian.ipa",
+          "size": 2621516,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.2.3",
           "date": "2026-11-18T03:02:42Z",
           "localizedDescription": "Cydian updates itself in one step: it signs the update on the phone, the signing server holds it for a few minutes, and iOS asks Install right away.\nInstall at the top right installs straight away (Download IPA is on the page).\nThe test apps (Test Alpha, Test Beta...) are no longer mistaken for Cydian.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.3",

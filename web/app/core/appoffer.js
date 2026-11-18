@@ -54,7 +54,7 @@ export function offerAfterImport({ mode = "site", before = null, after = null } 
 
 export const IMPORT_ALERT = {
   title: "Install Cydian?",
-  message: "Your certificate works. Install the Cydian app: it signs on your iPhone, no server, smoother scrolling at 120Hz.",
+  message: "Your certificate works. Install the Cydian app: it signs on your iPhone, smoother scrolling at 120Hz. Already have it? Open it and tap Import from Safari in Settings > Signing.",
   buttons: ["Not Now", "Install"],
   cancel: 0,
 };

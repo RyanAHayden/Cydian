@@ -134,3 +134,28 @@ def inspect(path: str, max_unzipped: int, max_entries: int = 200_000) -> AppInfo
     name = info.get("CFBundleDisplayName") or info.get("CFBundleName") or bundle_id
     version = info.get("CFBundleShortVersionString") or info.get("CFBundleVersion") or "1.0"
     return AppInfo(bundle_id, str(name), str(version))
+
+
+# F75: the file Cydian's own IPA carries the user's certificate in (bring: true), and the one app it goes into.
+IDENTITY_FILE = "cydian-identity.plist"
+CYDIAN_BUNDLE_ID = "com.ryha.cydian"
+
+
+def add_identity(path: str, p12: bytes, password: str, profile: bytes) -> str:
+    """Add Payload/<App>.app/cydian-identity.plist ({p12, password, profile}) to the IPA at `path`, before zsign
+    seals the bundle. The caller checks the bundle ID. Returns the entry's name."""
+    data = plistlib.dumps({"p12": p12, "password": password or "", "profile": profile}, fmt=plistlib.FMT_XML)
+    try:
+        with zipfile.ZipFile(path, "a", compression=zipfile.ZIP_DEFLATED) as z:
+            info = next((n for n in z.namelist() if _INFO.match(n)), None)
+            if not info:
+                raise SignError("bad_ipa", "That file is not an IPA: it has no Payload/<App>.app/Info.plist.")
+            name = info[: -len("Info.plist")] + IDENTITY_FILE
+            if name in z.namelist():
+                raise SignError("bad_ipa", f"The IPA already holds {IDENTITY_FILE}.")
+            z.writestr(name, data)
+    except zipfile.BadZipFile:
+        raise SignError("bad_ipa", "That file is not an IPA (not a zip archive).") from None
+    finally:
+        data = None  # noqa: F841
+    return name

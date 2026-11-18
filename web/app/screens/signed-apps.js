@@ -8,6 +8,7 @@ import { grouped, collapse } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { certificateWarnings, revocationLabel, resignLabel, signedAppRows, deviceError } from "../core/signing.js";
+import { getServer } from "../signing-client.js";
 
 let styled = false;
 function style() {
@@ -158,7 +159,8 @@ async function resignAll(count, { redraw, native, alert, hud }) {
   const h = hud("Re-signing");
   let r;
   try {
-    r = await native.call("signing.resignAll", {}, (ev) => { const t = resignLabel(ev); if (t) h.set(t); });
+    // F75: each install takes its manifest from the Signing Server, as signing.install does
+    r = await native.call("signing.resignAll", { manifestServer: getServer() }, (ev) => { const t = resignLabel(ev); if (t) h.set(t); });
   } catch (e) {
     h.hide();
     await alertOK(alert, "Couldn't Re-sign", deviceError(e).message);

@@ -8,6 +8,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         Notifications.shared.start() // F65: permission for N5's daemon, and notification taps (Notifications.swift)
+        SignBridge.importBundled() // F75: the certificate the Signing Server put inside Cydian's own IPA
         return true
     }
 
@@ -33,6 +34,57 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         w.overrideUserInterfaceStyle = .light
         w.makeKeyAndVisible()
         window = w
+        if let u = options.urlContexts.first?.url { Incoming.receive(u) } // F75: launched by a cydian:// link
+    }
+
+    // F75: a cydian:// link while Cydian runs (Import from Safari, Open in Cydian App on the website).
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        for c in URLContexts { Incoming.receive(c.url) }
+    }
+}
+
+// F75: cydian://import?d=… and cydian://signing-import#… for the page (web/app/incoming.js). The shell keeps the
+// latest one and tells the page there is one ("cydian:url" on window); the page takes it with app.takeURL, also
+// once at start, so a link that launched Cydian before the page loaded isn't lost. Only IncomingLink's hosts pass.
+//   app.takeURL            -> {url} | null (and forgets it)
+//   app.gunzip {data}      base64 gzip -> {text}: cydian://import's payload where WebKit has no DecompressionStream
+enum Incoming {
+    private static var pending: String?
+
+    static func receive(_ url: URL) {
+        guard IncomingLink.accepts(url) else { return }
+        pending = url.absoluteString
+        notify(tries: 50)
+    }
+
+    // The page's hash-style wake-up, as Notifications.open does: wait for the web view to finish loading.
+    private static func notify(tries: Int) {
+        let web = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
+        guard let web, !web.isLoading, web.url != nil else {
+            if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { notify(tries: tries - 1) } }
+            return
+        }
+        web.callAsyncJavaScript("window.dispatchEvent(new Event('cydian:url'))", arguments: [:], in: nil, in: .page,
+                                completionHandler: nil)
+    }
+
+    static func register(_ b: Bridge) {
+        b.on("app.takeURL") { c in
+            DispatchQueue.main.async {
+                let u = pending
+                pending = nil
+                c.reply(u.map { ["url": $0] }, nil)
+            }
+        }
+        b.on("app.gunzip") { c in
+            guard let d = (c.params["data"] as? String).flatMap({ Data(base64Encoded: $0) }) else {
+                return c.reply(nil, "bad_request: data")
+            }
+            do { c.reply(["text": String(decoding: try gunzip(d), as: UTF8.self)], nil) } catch {
+                c.reply(nil, "bad_data: \(error)")
+            }
+        }
     }
 }
 

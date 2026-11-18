@@ -244,3 +244,47 @@ class Sideload(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HandoffSourceTest(unittest.TestCase):
+    """F75: the phone half can't run here, so read the sources: cydian:// links reach the page (scene URL contexts,
+    app.takeURL), the certificate inside Cydian's own IPA is imported at launch, and nothing of the old local HTTPS
+    install mode (its CA, TLS server, trust calls) is left."""
+
+    @classmethod
+    def setUpClass(cls):
+        src = os.path.join(HERE, "Sources")
+        cls.files = {}
+        for d in (src, os.path.join(HERE, "sign")):
+            for f in os.listdir(d):
+                if f.endswith(".swift"):
+                    with open(os.path.join(d, f)) as fh:
+                        cls.files[f] = fh.read()
+
+    def test_links_reach_the_page(self):
+        app = self.files["App.swift"]
+        self.assertIn("openURLContexts", app)
+        self.assertIn("options.urlContexts", app)
+        self.assertIn('b.on("app.takeURL")', app)
+        self.assertIn('b.on("app.gunzip")', app)
+        self.assertIn("IncomingLink.accepts(url)", app)
+        self.assertIn("Incoming.register(self)", self.files["Bridge.swift"])
+        with open(os.path.join(HERE, "Info-sideload.plist"), "rb") as f:
+            info = plistlib.load(f)
+        self.assertIn("cydian", [s for t in info["CFBundleURLTypes"] for s in t["CFBundleURLSchemes"]])
+
+    def test_bundled_identity_at_launch(self):
+        self.assertIn("SignBridge.importBundled()", self.files["App.swift"])
+        bridge = self.files["SignBridge.swift"]
+        start = bridge.index("static func importBundled()")
+        body = bridge[start:bridge.index("\n    }\n", start)]
+        for part in ('"cydian-identity"', "BundledIdentity.shouldImport", "SignStore.identity() != nil",
+                     "UserDefaults.standard.set(digest", "SignStore.importIdentity", "confirmImport"):
+            self.assertIn(part, body)
+
+    def test_no_local_trust_left(self):
+        for name, text in self.files.items():
+            for gone in ("LocalTrust", "LocalCA", "ProfileSign", "InstallServer.secure", '"signing.trust"',
+                         '"signing.resetTrust"', '"signing.testServer"', "mobileconfig", "NWProtocolTLS"):
+                self.assertFalse(gone in text, f"{name} still has {gone}")
+        self.assertIn("guard takeServer(c) != nil else { return Apt.reply(c, nil, noServer) }", self.files["Sideload.swift"])

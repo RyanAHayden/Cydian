@@ -3,8 +3,8 @@
 Cydian's site can sign an AltStore app with **your** certificate and install it over the air. You keep a `.p12`
 (certificate and private key), its password and a `.mobileprovision` in Settings > Signing; Install on an app's
 page then signs that app on a signing server and opens the `itms-services://` link it answers with. The server is
-cydian.dev by default, or any server you run yourself (below). Signing on the phone with no server at all is the
-Cydian app's sideload build: [On the phone (I6)](#on-the-phone-i6).
+cydian.dev by default, or any server you run yourself (below). Signing on the phone itself is the Cydian app's
+sideload build, which needs the server only for the install manifest: [On the phone (I6)](#on-the-phone-i6).
 
 This is Cydian's own signer: `web/signer/` (Flask blueprint, Python) driving
 [zsign](https://github.com/zhlynn/zsign) (MIT License, which GPL-3.0-or-later can include; built into the Docker
@@ -71,6 +71,7 @@ Signing's Check Server row asks it.
 | --- | --- | --- |
 | `.p12`, its password, `.mobileprovision`, their file names | The phone: IndexedDB `cydian-signing` of the site's origin, in that browser | Until Remove Certificate (or the browser's site data is cleared) |
 | Signing server address | The phone: `localStorage["cydian.signingServer"]` (absent = cydian.dev) | Until changed |
+| Certificate, key, password, profile inside Cydian's own IPA (F75, `bring: true` from Install Cydian App only) | The signed copy of Cydian the server holds under its token, then the app's bundle on the phone; the app imports it into the Keychain on first launch | 10 minutes on the server; on the phone until the next Cydian update replaces the bundle |
 | Certificate, key, password, profile on the server | That request's memory only (with `"async"`, its job thread's, until the job ends). zsign gets an unencrypted copy of the key and the profile through anonymous in-memory files (`memfd_create`, opened as `/dev/fd/N`): no file on disk, no password on a command line | The request |
 | The downloaded IPA and zsign's unpacked copy | The server's job folder in `CYDIAN_SIGN_DIR` | Deleted when the job ends, signed or not |
 | A job's status and, once done, its install link | The server process's memory, under the job id | 10 minutes after the job ends; a restart forgets it |
@@ -166,10 +167,11 @@ Running the signer outside Docker: `zsign` on `PATH` (build it from
 
 ## On the phone (I6)
 
-The Cydian app's sideload build (I2) signs and installs IPAs by itself: no signing server, no install server
-anywhere but the phone, and the certificate never leaves it when installing other apps (the one exception, Cydian
-updating itself, is F73 below). User 2026-11-17: "do it all local so they dont rely on
-me". In the jailbreak build none of this runs: the N2 helper installs IPAs directly, and the `signing.*` calls answer
+The Cydian app's sideload build (I2) signs IPAs by itself and serves the signed IPA from the phone; the certificate
+never leaves it when installing other apps (the one exception, Cydian updating itself, is F73 below). Only the
+install manifest comes from a server: the Signing Server (cydian.dev by default, or the user's own, "Run your own
+signing server" above), which sees the app's bundle ID, version and name. User 2026-11-17 first asked for it all
+local ("so they dont rely on me"); F75 removed the fully local mode because iOS refused it (below). In the jailbreak build none of this runs: the N2 helper installs IPAs directly, and the `signing.*` calls answer
 code `jailbreak`.
 
 ### The install step: the options
@@ -182,15 +184,14 @@ relies on it). What could serve a trusted manifest:
 | Option | Trusted how | Needs | Verdict |
 | --- | --- | --- | --- |
 | **A. backloop.dev** (Feather's Fully Local): `*.backloop.dev` resolves to 127.0.0.1, served with a public CA's wildcard certificate whose private key is published | a public CA | backloop's pack fetched, public DNS | **No.** A CA must revoke a certificate whose key is public, so the pack lives on borrowed time: on 2026-11-17 it had expired 19 days earlier (docs/sideload.md). Shipping our own such key breaks CA rules; using theirs makes installs depend on a third party re-issuing it. |
-| **B. A manifest from a server, IPA from the phone** (Feather's Semi Local): `https://<server>/manifest?...` answers a manifest whose IPA URL is `http://127.0.0.1:<port>/...` | the server's own certificate | a server on the internet that sees the app's bundle ID, name and version on every install | Works, but it's a server. Feather uses palera1n's `api.palera.in`. If Cydian did this it would be the user's own server (I5's Signing Server), never cydian.dev by default; the signer has no such endpoint yet. Kept as the fallback, not built. |
-| **C. A CA made on the phone** (built): Cydian makes its own root CA in the Keychain, the user installs it once as a profile and turns on full trust; Cydian's HTTPS server on 127.0.0.1 uses a certificate it issues | the user's own trust setting | one-time setup in Settings (below) | **Picked.** No private key is published or shared, so there's nothing for a CA to revoke; nothing leaves the phone. The CA is name-constrained to `localhost` and `127.0.0.1`, so even if its key were taken it couldn't vouch for any real site. |
+| **B. A manifest from a server, IPA from the phone** (Feather's Semi Local, **built**, 0.1.4): `GET <server>/sign/manifest?bundleid=&version=&title=&port=&path=` answers a manifest whose IPA URL is `http://127.0.0.1:<port>/<path>` | the server's own certificate | the Signing Server (cydian.dev by default, or the user's own), which sees the app's bundle ID, name and version on every install | **Used.** Nothing to set up on the phone; the certificate and the IPA stay there. |
+| C. A CA made on the phone: the user installs Cydian's own root as a profile and turns on full trust; an HTTPS server on 127.0.0.1 uses a certificate it issues | the user's own trust setting | a one-time setup in Settings | **Removed (F75).** Built in I6, but it never worked: iOS's installer ignores a hand-trusted root. The user's test page on that server opened fine in Safari while every install through it failed. |
 | D. A pairing file + LocalDevVPN (idevice, Feather's third mode) | lockdownd, no TLS | a computer once to make the pairing file, an App Store VPN app | Works without any certificate, but it needs a computer and keeps a full lockdown credential on the phone. Later, maybe, behind an advanced switch (docs/sideload.md). |
 | E. A `data:` URL or a file URL as the manifest | – | – | Not accepted: the manifest URL must be https. |
 
-So the install is local, and the price is a one-time trust setup. If iOS ever stops honouring a user-trusted root for
-itms-services (enterprise in-house setups with their own CAs rely on it, as far as I know; not yet tried with
-Cydian, see journal/2026-11-17-i6-on-device-signing **Not verified**), B with the user's own server is the next step, and that needs a manifest endpoint in
-`web/signer/` (filed as a follow-up).
+So every install in the app takes its manifest from the Signing Server; with no server set (or one that isn't
+https) `signing.install` and `signing.resignAll` answer `no_server`, and Install opens Settings > Signing at the
+server step.
 
 ### Setting it up (once)
 
@@ -201,22 +202,20 @@ Cydian, see journal/2026-11-17-i6-on-device-signing **Not verified**), B with th
    Keychain generic-password item (service `com.ryha.cydian.signing.p12`, also `...ThisDeviceOnly`), for Cydian's own
    update (below); nothing else reads it. The checks are I5's: a wrong password, an expired certificate or profile, a certificate the profile
    doesn't list.
-2. **Local Install** (`signing.trust`): Cydian makes an ECDSA P-256 key in the Keychain and a root certificate
-   "Cydian Local Install CA (iPhone XXXX)" (ten years, CA, `keyCertSign`, critical name constraints: permitted
-   `DNS:localhost` and `IP:127.0.0.1/32` only), then opens `http://127.0.0.1:<port>/<token>/Cydian-Local-Install.mobileconfig`
-   in Safari, served by Cydian for five minutes. iOS says "Profile Downloaded".
-3. The user installs it in **Settings > General > VPN & Device Management**, then turns it on in **Settings >
-   General > About > Certificate Trust Settings** ("Enable full trust for root certificates"). iOS asks for both
-   because a trusted root is powerful; the name constraints are what keep this one harmless.
-4. `signing.status` then says `trust.trusted: true`: Cydian checks with `SecTrustEvaluateWithError` that iOS trusts
-   its TLS certificate for 127.0.0.1.
+2. **A Signing Server**: cydian.dev unless the user enters their own. That's all (F75): no profile to install, nothing
+   to trust. A phone that ran 0.1.x drops the old local CA's keys and files at launch
+   (`SignStore.removeOldInstallCA`); its old profile stays in iOS Settings until the user deletes it.
+
+Or skip step 1: a certificate added on the website comes over by itself or with one tap ("From the website to the
+app", below).
 
 Remove Certificate (`signing.remove`) deletes the identity and the kept `.p12` from the Keychain, and the profile
 file.
 
 ### What leaves the phone, and when (F73)
 
-Installing other apps sends nothing anywhere: they are signed on the phone and served from 127.0.0.1. Cydian itself
+Installing other apps sends only the app's bundle ID, version and name (to the Signing Server, for the manifest):
+they are signed on the phone and served from 127.0.0.1. Cydian itself
 can't be installed that way (iOS closes Cydian while it installs, which stops its install server), so Cydian's own
 update (Essential Only / Complete, and Changes' self-upgrade: `installSelf` in `web/app/core/essential.js`) signs on
 the Signing Server instead. For that it calls `signing.export`, which answers `{p12, profile, password}` (the files
@@ -229,7 +228,6 @@ only to the Signing Server set in Settings (cydian.dev by default, or the user's
 certificate, when its profile file is gone, or when the certificate was imported before F73 (the `.p12` wasn't kept
 then: Remove Certificate and import it again). The kept item also records the certificate's SHA-256 and is only
 handed out while that certificate is the one in use.
-`signing.resetTrust` throws away the CA and its keys; the old profile stays in Settings until the user deletes it.
 
 ### The page's side (F58)
 
@@ -237,28 +235,61 @@ In the sideload build Settings > Signing has the site's Certificate rows (`.p12`
 with Browse; one pick can fill all three), but the picks wait in memory only (`signing-client.js`: no IndexedDB)
 until all three are there and the password isn't known to be wrong, then go to `signing.import`; after that only the
 file names stay, until the app quits. The rest of the page comes from `signing.status`: the identity and its profile
-(`core/signing.js deviceSummary`, the signer's `problem` as its footer), the **Local Install** group
-(`localInstallSection`: Status, and until `trust.trusted` a Set Up row calling `signing.trust`, the two iOS Settings
-steps and Check Again; the page also redraws when the app comes back to the front) and Remove Certificate
-(`signing.remove`). There is no Signing Server row. Install on an AltStore app's page and Version History's rows call
-`signing.install {url}` once the Keychain holds an identity (`installOnDevice`); the HUD follows its phase events
-(`phaseLabel`: "Downloading 42%", "Reading", "Signing", "Installing") and an error alerts by its code
-(`deviceError`): `untrusted` and `no_identity` then open Settings > Signing. Without an identity the Install sheet
-offers the source's own options plus "Sign with My Certificate". Tests: `web/app/signing-client-device.test.js` and
+(`core/signing.js deviceSummary`, the signer's `problem` as its footer) and Remove Certificate (`signing.remove`).
+F69/F75: the page is a walkthrough (`screens/signing.js`) of two steps, each ticking green once done: **Import Your
+Certificate** (a big Select All Files button over the three rows: one multi-select pick of the `.p12`, the
+`.mobileprovision` and the password file, or their `.zip`, fills whatever is missing; the picture is today's iOS file
+picker, drawn, unless `web/app/icons/steps/select-files.png` holds a real screenshot; and Import from Safari) and
+**Signing Server** (the server row and Check Server). Install on an AltStore app's page and Version History's rows
+first look whether both are there (`firstInstallCheck`: `signing.status` and `getServer()`); the first Install with
+one missing opens this page at that step, with no alert. Then `signing.install {url, manifestServer}`
+(`installOnDevice`); the HUD follows its phase events (`phaseLabel`: "Downloading 42%", "Reading", "Signing",
+"Installing") and an error alerts by its code (`deviceError`): `no_server` and `no_identity` then open Settings >
+Signing. Tests: `web/app/signing-client-device.test.js`, `web/app/screens/signing.test.js` and
 `web/app/core/signing-device.test.js`, against a fake `cydianNative`.
+
+### From the website to the app (F75)
+
+Three ways, none of which puts the certificate in a URL in the clear:
+
+- **Inside Cydian's own IPA.** Install Cydian App on the website sends `bring: true` with the sign request while the
+  Signing page's "Bring My Certificate" switch is on (the default). The server, signing an IPA whose own bundle ID is
+  `com.ryha.cydian` (never any other app), adds `Payload/Cydian.app/cydian-identity.plist` (`{p12, password,
+  profile}`, from the request's memory) before zsign seals the bundle. On its first launch the app imports it into the
+  Keychain (`SignBridge.importBundled`) unless the Keychain already holds one, and remembers the file's SHA-256 so it
+  never looks at it again. **The copy sits in the app's own files until the next update replaces the bundle**, and in
+  the signed IPA the server holds for its 10 minutes. Off: the app comes without it; use Import from Safari.
+- **Import from Safari** (Settings > Signing, step 1). The app makes a random 256-bit key, keeps it for 30 minutes and
+  opens `<server>/#/settings/signing-export.<key>`: the key is in the fragment, which Safari never sends to a server.
+  That page reads the certificate from that origin's IndexedDB (`loadIdentity`), seals it with AES-GCM under the key
+  (WebCrypto, `core/transfer.js sealIdentity`) and opens `cydian://signing-import#<base64url iv ‖ ciphertext>`; the app
+  opens it with its key (one use) and imports it (`signing.import`), then shows the walkthrough ticked. Another app
+  claiming `cydian://` would get only ciphertext. Safari and a Home Screen web app keep separate storage, and every
+  site (cydian.dev, a test site) is its own origin: with no certificate there the page says so and offers the rows to
+  choose the files, then goes on by itself.
+- **Open in Cydian App** (sources and settings, never the certificate). On the website (Settings, and Home beside
+  Install Cydian App; Not Jailbroken only) it opens `cydian://import?d=<base64url of gzipped JSON>`: the source list
+  as export lines, the settings in `core/settings.js TRAVELS`, Ignored Upgrades and the Signing Server, after a banner
+  saying to press Open. The app shows "Import from the Website?" listing only what's new (sources not added yet,
+  settings that differ, holds it lacks, another server) with Cancel / Import; nothing changes on Cancel. Gzip keeps 400
+  sources around 5 kB.
+
+The shell takes only those two `cydian://` hosts (`IncomingLink`, at most 512 kB), keeps the latest and tells the page
+(`cydian:url`), which takes it with `app.takeURL` (also at start, for a link that launched the app). `app.gunzip`
+unpacks the import link where WebKit has no `DecompressionStream` (before iOS 16.4).
 
 ### Installing an app
 
-`signing.install {url}`, with progress events (`downloading`, `reading`, `signing`, `installing`):
+`signing.install {url, manifestServer}`, with progress events (`downloading`, `reading`, `signing`, `installing`):
 
 1. Downloads the IPA to the app's temporary folder (http or https, 4 GB cap).
 2. Signs it on the phone (`native/sign/`, below), into a second file.
-3. Starts the HTTPS server (Network.framework, `NWListener` on the loopback interface only, TLS 1.2+, the leaf
-   certificate the local CA issued: ECDSA P-256, `localhost` and `127.0.0.1` in subjectAltName, serverAuth, one year,
-   renewed a month before it ends), serves `/<token>/manifest.plist` and `/<token>/app.ipa` (ranges supported), and
-   opens `itms-services://?action=download-manifest&url=https%3A%2F%2F127.0.0.1%3A<port>%2F<token>%2Fmanifest.plist`.
-4. iOS asks to install and fetches both from 127.0.0.1. Once the whole IPA has gone out the token is spent and the
-   file is deleted a minute later; unused, both go after 15 minutes. A background task keeps the server alive while
+3. Starts the plain HTTP server (Network.framework, `NWListener` bound to 127.0.0.1 only), serves `/<token>/app.ipa`
+   (ranges supported), and opens `itms-services://?action=download-manifest&url=<server>/sign/manifest?bundleid=…
+   &version=…&title=…&port=<port>&path=<token>/app.ipa` (`InstallManifest`): the Signing Server answers a manifest
+   pointing at `http://127.0.0.1:<port>/<token>/app.ipa`.
+4. iOS asks to install and fetches the IPA from 127.0.0.1. Once the whole IPA has gone out the token is spent and the
+   file is deleted a minute later; unused, it goes after 15 minutes. A background task keeps the server alive while
    the install sheet covers Cydian.
 
 Nothing listens on Wi-Fi or cellular; every path has a random 128-bit token.
@@ -378,12 +409,15 @@ itself. Each signature is read back: identifier, team, every page hash, the Info
 CodeResources and entitlement slots, and the CMS checked by `openssl cms -verify`, also against the test CA. Python
 then reads the signed IPA again on its own (the DER entitlements decode to the XML ones; CodeResources lists exactly
 the bundle's files with their real hashes). Also: SHA vectors, the DER entitlements bytes, a zip round trip, the
-profile rules, refusals (not an IPA, a path out of the folder, an encrypted binary), the local CA and its TLS
-certificate (`openssl verify -x509_strict -purpose sslserver`, the names, the lifetime, the critical name
-constraints), the mobileconfig, the manifest and itms link, and the HTTP parsing and ranges. `rcodesign verify`
+profile rules, refusals (not an IPA, a path out of the folder, an encrypted binary), the manifest and itms link, and
+the HTTP parsing and ranges. F75: `test_sideload.py`'s Swift also covers `BundledIdentity` (parse, the first-launch
+rule), `IncomingLink` and `gunzip`; its `HandoffSourceTest` reads the sources for the URL hand-off, the launch import
+and that nothing of the local CA is left. `web/test_signer.py BringTest`: the identity file goes only into
+`com.ryha.cydian` and only with `bring: true`. Node: `core/transfer.test.js` (Import from Safari's seal/open round
+trip, the import link's encode/decode and review), `incoming.test.js` (the hand-off and the import's merge). `rcodesign verify`
 also passed on the signed fixture and the signed Cydian.ipa (by hand, not in the gate).
 
-The phone half (Keychain, `NWListener`, opening the links) compiles in the native build but runs only on an iPhone.
+The phone half (Keychain, `NWListener`, opening the links, the scene's URL contexts) compiles in the native build but runs only on an iPhone.
 F73: `test_sign.py` also checks that `signing.export` is registered and answers `p12`, `profile` and `password`
 from the kept item, and that `signing.remove` deletes that item.
 

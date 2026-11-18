@@ -12,12 +12,16 @@ import { createSettings, detectMode, themeFor, SETTINGS } from "../core/settings
 import { drawSection as drawPushSection } from "../push-client.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
-import { parseProfile, checkP12Password, summary, profileKind, DEFAULT_SERVER, deviceSummary, localInstallSection, deviceError } from "../core/signing.js";
+import { showBanner } from "../nav/banner.js";
+import { parseProfile, checkP12Password, summary, profileKind, DEFAULT_SERVER, deviceSummary, deviceError } from "../core/signing.js";
 import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus,
-  localSigning, deviceStatus, importToDevice, removeFromDevice, setUpTrust, installOnDevice, signAndInstall, statusReady } from "../signing-client.js";
-import { drawWalkthrough } from "./signing.js";
+  localSigning, deviceStatus, importToDevice, removeFromDevice, installOnDevice, signAndInstall, statusReady,
+  importFromSafari, getBring, setBring, exportToApp } from "../signing-client.js";
+import { drawWalkthrough, walkOpen } from "./signing.js";
+import { exportKey, EXPORT_SEGMENT } from "../core/transfer.js";
+import { openInAppSection } from "./importlink.js";
 import { signingExtras } from "./signed-apps.js";
 import { syncReminder } from "../core/signing.js";
 import { signingRowShows, offerAfterImport, IMPORT_ALERT, APP_IPA_URL, APP_NAME, APP_LABEL } from "../core/appoffer.js";
@@ -41,6 +45,7 @@ export function nav(route) {
   const key = route.path[0];
   if (key === "holds") return { title: "Ignored Upgrades" };
   if (key === "signing") return { title: "Signing" };
+  if (String(key ?? "").startsWith(EXPORT_SEGMENT + ".")) return { title: "Import into Cydian" }; // F75
   if (key === LOGS) return { title: logsTitle(route.path[1]) }; // N4: Console Logs
   if (key && defOf(key)) return { title: defOf(key).label };
   return { title: "Settings" };
@@ -72,9 +77,10 @@ function draw({ el, route }) {
   const top = el.scrollTop;
   if (key === "holds") el.replaceChildren(holdsPage());
   else if (key === "signing") drawSigning(el);
+  else if (String(key ?? "").startsWith(EXPORT_SEGMENT + ".")) drawExport(el, exportKey(key)); // F75: Import from Safari
   else if (key === LOGS) el.replaceChildren(logsPage(route.path[1], () => draw({ el, route })));
   else if (key) el.replaceChildren(listPage(key));
-  else el.replaceChildren(rootPage(), signingSection(), ipaSection(), pushSection(), logsSection(detectMode()), aboutSection());
+  else el.replaceChildren(rootPage(), signingSection(), openInAppSection(), ipaSection(), pushSection(), logsSection(detectMode()), aboutSection());
   el.scrollTop = top;
 }
 
@@ -332,7 +338,7 @@ async function chooseFiles(el, files, slot) {
   try { found = await sortCertFiles(files); } catch { found = { p12: null, profile: null, passwords: [] }; }
   hide();
   // One file on a button that sorting didn't place: that button's file (its checks below say if it's wrong).
-  if (files.length === 1 && !found.p12 && !found.profile && !found.passwords.length) found[slot] = files[0];
+  if (slot && files.length === 1 && !found.p12 && !found.profile && !found.passwords.length) found[slot] = files[0];
   if (!found.p12 && !found.profile && !found.passwords.length) {
     await alertOK("No Certificate Files", "Choose your .p12, its .mobileprovision and (if you have one) a .txt with the password, or the .zip they came in.");
     return;
@@ -352,8 +358,11 @@ async function chooseFiles(el, files, slot) {
 
 // I7: right after an import that made the certificate work (website only), offer Cydian itself: Not Now / Install,
 // which signs the app's IPA with that certificate through the signing server and installs it.
-const installApp = () => signAndInstall({ url: APP_IPA_URL, name: APP_NAME });
+// F75: with "Bring my certificate into the app" on (the default), the Signing Server puts the certificate inside
+// Cydian's own IPA and the app imports it on its first launch.
+const installApp = () => signAndInstall({ url: APP_IPA_URL, name: APP_NAME, bring: getBring() });
 async function offerApp(before) {
+  if (location.hash.includes(EXPORT_SEGMENT)) return; // F75: on Import from Safari's page the app is already there
   if (!offerAfterImport({ mode: detectMode(), before, after: await loadIdentity() })) return;
   const { index } = await showAlert(IMPORT_ALERT);
   if (index === 1) await installApp();
@@ -363,10 +372,21 @@ async function offerApp(before) {
 function appOfferSection(id) {
   if (!signingRowShows({ mode: detectMode(), identity: id })) return [];
   const frag = grouped([{ rows: [{ label: APP_LABEL, onClick: installApp, icon: { text: "" } }],
-    footer: "Cydian as an app on your Home Screen, signed with this certificate: it signs apps on the iPhone itself, no server." }]);
+    footer: "Cydian as an app on your Home Screen, signed with this certificate: it signs apps on the iPhone itself." }]);
   frag.firstChild.classList.add("app-offer");
   frag.querySelector(".cell-icon")?.classList.add("home-glyph", "glyph-install");
-  return [frag];
+  return [frag, bringSection()];
+}
+
+// F75: the website's "Bring my certificate into the app" switch, on by default.
+function bringSection() {
+  const frag = grouped([{ rows: [{ label: "Bring My Certificate" }],
+    footer: "Install Cydian App puts a copy of your certificate inside the app, so Cydian has it on first launch. "
+      + "The copy sits in the app's own files until the next update. Off: use Import from Safari in the app instead." }]);
+  const cell = frag.querySelector(".cell-inner");
+  cell?.append(createSwitch({ label: "Bring my certificate into the app", checked: getBring(), onToggle: (on) => setBring(on) }));
+  cell?.classList.add("has-switch");
+  return frag;
 }
 
 async function chooseP12(el, f, redraw = true) {
@@ -471,8 +491,9 @@ async function drawSigning(el) {
 
 // The certificate, its profile and its password: one group of rows, each with its name on the left, its value in the
 // middle and a Browse button on the right (a <label> over a hidden file input, so iOS opens its picker straight from
-// the tap). Any Browse takes several files at once, or the .zip they came in: each goes where it belongs and the
-// password is found if a text file holds it (core/certfiles.js), so one pick can fill all three.
+// the tap). F75: above them the big Select All Files button, the same multi-select picker: one pick of the .p12, the
+// .mobileprovision and the password file (or their .zip) fills whatever is missing (core/certfiles.js sorts them and
+// finds the password). Any row's Browse takes several files too.
 function certificateBlock(el, id, status = null) {
   const kept = statusReady(status) ? status.identity : null; // F58: what the sideload build's Keychain holds
   const box = document.createElement("div");
@@ -529,8 +550,11 @@ function certificateBlock(el, id, status = null) {
   const kind = status ? "Once all three are here, they go into this iPhone's Keychain, where only Cydian can use them; the password isn't kept. To change one, choose the .p12 and the profile again."
     : "They're kept on this iPhone only, in this browser's storage.";
   const foot = Object.assign(document.createElement("p"), { className: "group-footer",
-    textContent: "Your .p12 (the certificate and its key), its .mobileprovision and the password. Browse can take all of them at once, or their .zip. " + kind + state });
-  box.append(head, ul, foot);
+    textContent: "Your .p12 (the certificate and its key), its .mobileprovision and the password. Each row's Browse picks one. " + kind + state });
+  const [allInput, allLabel] = browseButton(accept, true, (files) => chooseFiles(el, files, null));
+  allLabel.className = "walk-action sign-all";
+  allLabel.textContent = "Select All Files";
+  box.append(head, allInput, allLabel, ul, foot);
   return box;
 }
 
@@ -561,9 +585,9 @@ function browseButton(accept, multiple, onFiles) {
 // ---- Signing on the phone (F58) ------------------------------------------------------------------------------
 // The sideload build: the same Certificate rows, but the picks wait in memory (signing-client.js) until the .p12, the
 // profile and a password are there, then go to the Keychain through signing.import (I6, docs/signing.md "On the
-// phone"). What the page shows comes from signing.status: the identity, its profile and their problem, and Local
-// Install, the one-time trust of Cydian's local certificate that installing needs. No Signing Server: nothing is
-// sent anywhere.
+// phone"). What the page shows comes from signing.status: the identity, its profile and their problem. F75: and the
+// Signing Server, which hands iOS the manifest for the IPA Cydian serves at 127.0.0.1 (the certificate never leaves
+// the phone; the server sees the app's ID, version and name).
 
 function deviceSigningSection(box) {
   // F68: Re-sign Reminder's group just above already says Signing
@@ -617,30 +641,6 @@ async function importIfComplete(el, typing) {
   return true;
 }
 
-async function setUpLocalInstall() {
-  const hide = showHUD("Setting Up");
-  try {
-    await setUpTrust(); // Safari opens the profile; iOS says "Profile Downloaded" (F69: Verified, with the user's name)
-    hide();
-  } catch (e) {
-    hide();
-    await alertOK("Couldn't Set Up", deviceError(e).message);
-  }
-}
-
-// Test Install Server: starts the server and, if asked, opens its test page in Safari with Cydian in the background,
-// as during a real install. (A fetch from the page itself proves nothing: WebKit won't read another origin that way.)
-async function testInstallServer() {
-  const native = globalThis.cydianNative;
-  let url;
-  try { url = (await native.call("signing.testServer", {})).url; } catch (e) {
-    await alertOK("Server Didn't Start", deviceError(e).message); return;
-  }
-  const { index } = await showAlert({ title: "Install Server", message: `${url.replace(/\/[^/]+\/test\.html$/, "")} is running.\n\nOpen it in Safari. Cydian goes to the background as during an install. A page saying it works means installs can reach it; "can't connect" means the server stops in the background; a certificate warning means iOS doesn't trust it.`,
-    buttons: ["Done", "Open in Safari"], cancel: 0 });
-  if (index === 1) { try { await native.call("signing.testServer", { open: true }); } catch (e) { await alertOK("Couldn't Open", deviceError(e).message); } }
-}
-
 async function removeDeviceCertificate() {
   const { index } = await showAlert({ title: "Remove Certificate?", message: "The certificate, its key and the profile are deleted from this iPhone's Keychain.",
     buttons: ["Cancel", "Remove"], cancel: 0 });
@@ -650,11 +650,11 @@ async function removeDeviceCertificate() {
   redrawAll();
 }
 
-// Back from iOS Settings (the profile installed, full trust on): redraw so Local Install says Ready.
+// Back in Cydian (from Safari or the Files app): redraw, and while the Signing page is open look at signing.status
+// every 2 s, so the walkthrough ticks the moment a certificate lands (the launch import of one that came inside the
+// app, an import finished elsewhere). The app's web view doesn't always send visibilitychange, so focus and
+// pageshow count too.
 let watchingReturn = false;
-// The app's web view doesn't always send visibilitychange on the way back from Settings, so focus and pageshow
-// count too, and while the Signing page is open and the certificate isn't trusted yet it looks again every 2 s:
-// the walkthrough moves on by itself the moment iOS trusts it.
 function watchReturn() {
   if (watchingReturn || typeof document === "undefined") return;
   watchingReturn = true;
@@ -664,19 +664,18 @@ function watchReturn() {
   addEventListener("pageshow", again);
   let last = null;
   setInterval(async () => {
-    if (document.visibilityState === "hidden" || !document.querySelector(".page.is-top .walkthrough, .page.is-top .sign-files")) return;
+    if (document.visibilityState === "hidden" || !document.querySelector(".page.is-top .walkthrough")) return;
     let st = null;
     try { st = await deviceStatus(); } catch { return; }
-    const now = JSON.stringify([Boolean(st?.identity), st?.trust?.ca, st?.trust?.trusted]);
+    const now = String(statusReady(st));
     if (last !== null && now !== last) redrawAll();
     last = now;
   }, 2000);
 }
 
-// F69: the page is the walkthrough (screens/signing.js): import, download the profile, install it, trust it, Check.
-// The Keychain's details and Remove Certificate go under the steps. `walkOpen` keeps the user's expand/collapse taps
-// across redraws (back from Settings, after Check).
-const walkOpen = {};
+// F69, F75: the page is the walkthrough (screens/signing.js): the certificate (Select All Files, the rows, Import
+// from Safari), then the Signing Server. The Keychain's details and Remove Certificate go under the steps.
+// walkOpen keeps the user's expand/collapse taps across redraws (and Install's redirect sets it: openAt).
 async function drawDeviceSigning(el) {
   watchReturn();
   const id = await loadIdentity();
@@ -691,22 +690,48 @@ async function drawDeviceSigning(el) {
       footer: info.problems.length ? info.problems.join(" ") : null });
   }
   if (kept || id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeDeviceCertificate() }] });
+  const server = getServer();
+  const serverRows = grouped([{ rows: [
+    { label: new URL(server).host, subtitle: server === DEFAULT_SERVER ? "Default" : server, onClick: () => askServer(el), chevron: true },
+    { label: "Check Server", onClick: () => checkServer() }] }]);
   drawWalkthrough(el, {
     status, failure: failure ? deviceError(failure).message : "",
     certificate: certificateBlock(el, id, status ?? { identity: null }),
-    actions: { download: () => setUpLocalInstall(), check: () => checkSigning(), test: () => testInstallServer() },
+    server: serverRows, serverUrl: server,
+    actions: { importSafari: () => importFromSafari() },
     open: walkOpen,
     extra: [...(sections.length ? [grouped(sections)] : []), signingExtras({ identity: kept, redraw: redrawAll })],
   });
 }
 
-// Check: signing.status again under a HUD, then the page redraws with a tick per finished step.
-async function checkSigning() {
-  const hide = showHUD("Checking");
-  try { await deviceStatus(); } catch { /* the redraw says the signer didn't answer */ }
-  hide();
-  for (const k of Object.keys(walkOpen)) delete walkOpen[k]; // the next step to do opens by itself
-  redrawAll();
+// ---- Import from Safari, the website's half (F75) ---------------------------------------------------------------
+// #/settings/signing-export.<key>: the app opened Safari here with a fresh key in the fragment. The identity this
+// origin keeps (IndexedDB: Safari and a Home Screen web app keep separate storage, and every site is its own origin)
+// is sealed under that key and handed back as cydian://signing-import#<ciphertext>. With none here the page says
+// so and offers the certificate rows, then goes on by itself once they're complete.
+async function drawExport(el, key) {
+  if (detectMode() !== "site") {
+    el.replaceChildren(grouped([{ footer: "This page is for Safari: Import from Safari in Cydian's Settings > Signing opens it." }]));
+    return;
+  }
+  if (!key) {
+    el.replaceChildren(grouped([{ footer: "This link is cut short. In Cydian, tap Import from Safari in Settings > Signing again." }]));
+    return;
+  }
+  const id = await loadIdentity();
+  let link = null;
+  if (id?.passwordOk !== false) { try { link = await exportToApp(key); } catch { /* unreadable: treated as none */ } }
+  if (!link) {
+    el.replaceChildren(grouped([{ header: "No Certificate Here",
+      footer: `${location.host} has no certificate in this browser. Safari and Home Screen apps keep separate files, and so does each site. Choose your files here and Cydian gets them next.` }]),
+    certificateBlock(el, id));
+    return;
+  }
+  const open = () => { showBanner({ title: "Cydian", message: "Press Open to bring your certificate into Cydian." }); location.href = link; };
+  const frag = grouped([{ rows: [{ label: "Open Cydian", onClick: open }],
+    footer: "Your certificate goes to Cydian encrypted with a key only Cydian holds." }]);
+  el.replaceChildren(frag);
+  if (!drawExport.sent?.has(key)) { (drawExport.sent ??= new Set()).add(key); open(); }
 }
 
 // ---- About and updates (F61) ---------------------------------------------------------------------------------

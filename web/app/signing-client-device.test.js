@@ -3,9 +3,10 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  localSigning, signingAvailable, signingReady, deviceStatus, importToDevice, removeFromDevice, setUpTrust,
-  installOnDevice, loadIdentity, saveIdentity, clearIdentity,
+  localSigning, signingAvailable, signingReady, deviceStatus, importToDevice, removeFromDevice,
+  installOnDevice, loadIdentity, saveIdentity, clearIdentity, firstInstallCheck, importFromSafari, finishSafariImport, exportToApp,
 } from "./signing-client.js";
+import { walkOpen } from "./screens/signing.js";
 
 // A fake bridge: `answers[method]` is a value, an Error (rejects) or fn(params, onEvent).
 function fakeNative(answers = {}) {
@@ -46,9 +47,9 @@ test("the sideload build signs locally, not through the server", () => {
 });
 
 test("ready once the Keychain holds an identity", async () => {
-  globalThis.cydianNative = fakeNative({ "signing.status": { identity: null, trust: { ca: false, trusted: false } } });
+  globalThis.cydianNative = fakeNative({ "signing.status": { identity: null } });
   assert.equal(await signingReady(), false);
-  globalThis.cydianNative = fakeNative({ "signing.status": { identity: { name: "X" }, trust: {} } });
+  globalThis.cydianNative = fakeNative({ "signing.status": { identity: { name: "X" } } });
   assert.equal(await signingReady(), true);
   globalThis.cydianNative = fakeNative({ "signing.status": coded("internal", "boom") });
   assert.equal(await signingReady(), false);
@@ -65,17 +66,92 @@ test("the picks stay in memory in the sideload build", async () => {
   assert.equal(await loadIdentity(), null);
 });
 
-test("status, import (base64), remove and trust go to their bridge calls", async () => {
-  const st = { identity: { name: "X" }, trust: { ca: true, trusted: false } };
-  const n = fakeNative({ "signing.status": st, "signing.import": st, "signing.remove": { identity: null }, "signing.trust": { url: "http://127.0.0.1:1/t/p" } });
+test("status, import (base64) and remove go to their bridge calls", async () => {
+  const st = { identity: { name: "X" } };
+  const n = fakeNative({ "signing.status": st, "signing.import": st, "signing.remove": { identity: null } });
   assert.equal(await deviceStatus(n), st);
   await importToDevice({ p12: new Uint8Array([1, 2, 3]), profile: new Uint8Array([4, 5]), password: "pw" }, n);
   await importToDevice({ p12: new Uint8Array([1]), profile: new Uint8Array([2]) }, n);
   await removeFromDevice(n);
-  assert.deepEqual(await setUpTrust(n), { url: "http://127.0.0.1:1/t/p" });
-  assert.deepEqual(n.calls.map((c) => c.method), ["signing.status", "signing.import", "signing.import", "signing.remove", "signing.trust"]);
+  assert.deepEqual(n.calls.map((c) => c.method), ["signing.status", "signing.import", "signing.import", "signing.remove"]);
   assert.deepEqual(n.calls[1].params, { p12: "AQID", profile: "BAU=", password: "pw" });
   assert.equal(n.calls[2].params.password, "");
+});
+
+// F75 (1): the first Install with no certificate (or no server) opens the walkthrough at that step, no alert.
+test("first install: no certificate opens Settings > Signing at the certificate step", async () => {
+  const went = [];
+  const n = fakeNative({ "signing.status": { identity: null } });
+  assert.equal(await firstInstallCheck({ native: n, server: "https://cydian.dev", go: (p) => went.push(p), wait: async () => {} }), "certificate");
+  assert.deepEqual(went, [["signing"]]);
+  assert.deepEqual(walkOpen, { certificate: true, server: false });
+});
+
+test("first install: a certificate but no usable server opens the server step", async () => {
+  const went = [];
+  const n = fakeNative({ "signing.status": { identity: { name: "X" } } });
+  for (const server of [null, "http://plain.example"]) {
+    assert.equal(await firstInstallCheck({ native: n, server, go: (p) => went.push(p), wait: async () => {} }), "server");
+  }
+  assert.deepEqual(walkOpen, { certificate: false, server: true });
+  assert.equal(went.length, 2);
+});
+
+test("first install: certificate and server there, Install goes on (no wait for anything else)", async () => {
+  const went = [];
+  const n = fakeNative({ "signing.status": { identity: { name: "X" } } });
+  assert.equal(await firstInstallCheck({ native: n, server: "https://cydian.dev", go: (p) => went.push(p) }), null);
+  assert.deepEqual(went, []);
+  assert.deepEqual(n.calls.map((c) => c.method), ["signing.status"]);
+});
+
+test("first install: a signer that doesn't answer counts as no certificate", async () => {
+  const went = [];
+  const n = fakeNative({ "signing.status": coded("internal", "boom") });
+  assert.equal(await firstInstallCheck({ native: n, server: "https://cydian.dev", go: (p) => went.push(p), wait: async () => {} }), "certificate");
+});
+
+// F75 (3): Import from Safari end to end: the app's key in the fragment, the website seals, the app opens and imports.
+function memStorage() {
+  const m = new Map();
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
+}
+
+test("Import from Safari: key out in the fragment, ciphertext back, into the Keychain", async () => {
+  const storage = memStorage();
+  let opened = null;
+  const key = await importFromSafari({ server: "https://test.example.ts.net", open: (u) => { opened = u; }, storage });
+  assert.equal(opened, `https://test.example.ts.net/#/settings/signing-export.${key}`);
+  // the website's export page (its own storage: the staged picks here)
+  globalThis.cydianNative = fakeNative();
+  await saveIdentity({ p12: new Uint8Array([0x30, 1, 2]), profile: new Uint8Array([7, 8]), password: "pass word", p12Name: "me.p12" });
+  const link = await exportToApp(key);
+  assert.match(link, /^cydian:\/\/signing-import#[A-Za-z0-9_-]+$/);
+  assert.equal(link.includes("pass word"), false); // a space: never in base64url by chance
+  const n = fakeNative({ "signing.import": { identity: { name: "Me" } } });
+  const st = await finishSafariImport(link, { native: n, storage });
+  assert.deepEqual(st, { identity: { name: "Me" } });
+  assert.deepEqual(n.calls[0], { method: "signing.import", params: { p12: "MAEC", profile: "Bwg=", password: "pass word" } });
+  // one use: the same link again finds no key
+  await assert.rejects(finishSafariImport(link, { native: n, storage }), /Start again/);
+});
+
+test("Import from Safari: nothing on the website, a stale or foreign link", async () => {
+  globalThis.cydianNative = fakeNative();
+  assert.equal(await exportToApp("A".repeat(43)), null); // no certificate in this origin's storage
+  const storage = memStorage();
+  const n = fakeNative({ "signing.import": { identity: { name: "Me" } } });
+  await assert.rejects(finishSafariImport("cydian://import?d=x", { native: n, storage }), /no certificate/);
+  let t = 0;
+  const key = await importFromSafari({ open: () => {}, storage, now: () => t });
+  await saveIdentity({ p12: new Uint8Array([0x30]), profile: new Uint8Array([7]) });
+  const link = await exportToApp(key);
+  t = 31 * 60 * 1000;
+  await assert.rejects(finishSafariImport(link, { native: n, storage, now: () => t }), /Start again/);
+  t = 0;
+  await importFromSafari({ open: () => {}, storage, now: () => t }); // a new key: the old link doesn't open
+  await assert.rejects(finishSafariImport(link, { native: n, storage, now: () => t }), /couldn't be read/);
+  assert.equal(n.calls.length, 0);
 });
 
 test("Install: the HUD follows the phases, then Installing, and records the app", async () => {
@@ -100,7 +176,7 @@ test("Install: the HUD follows the phases, then Installing, and records the app"
   assert.equal(ui.hidden, 1);
 });
 
-for (const code of ["untrusted", "no_identity"]) {
+for (const code of ["no_server", "no_identity"]) {
   test(`Install: ${code} explains and opens Settings > Signing`, async () => {
     const n = fakeNative({ "signing.install": coded(code, "no") });
     const ui = fakeUI();

@@ -110,7 +110,12 @@ export function render(body, route, ctx) {
   rootInput = input;
   input.addEventListener("focus", () => drop?.close()); // typing a search puts the Filter panel away
   field.append(input);
-  bar.append(field);
+  // iOS 6's search bar Cancel: shown while editing or holding text (packages.css), it empties the field and puts
+  // the keyboard away. pointerdown keeps the focus, or the blur would hide it before the click lands.
+  const cancel = el("button", "search-cancel", "Cancel");
+  cancel.type = "button";
+  cancel.addEventListener("pointerdown", (e) => e.preventDefault());
+  bar.append(field, cancel);
 
   // The scope bar: segments, then Filter.
   const scope = el("div", "search-scope");
@@ -231,6 +236,7 @@ export function render(body, route, ctx) {
     list.setItems(rows);
     note.textContent = rows.length ? "" : "No Results";
   }
+  cancel.addEventListener("click", () => { input.value = ""; clearTimeout(timer); run(); input.blur(); });
   input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 120); });
   bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); settings.recentSearches.add(input.value); run(); input.blur(); });
   run();

@@ -79,6 +79,18 @@ html[data-theme="dark"] .search-bar {
 }
 html[data-theme="dark"] .search-field { background-color: #2b2e33; border-color: #15171a; }
 html[data-theme="dark"] .search-field input { color: #fff; }
+/* Its Cancel, from the 4S's UISearchBarCancelButton(Pressed): shown while the field is focused or holds text. */
+.search-cancel {
+  display: none; flex: none; height: 30px; margin: 0 0 0 6px; padding: 0 9px; cursor: pointer; touch-action: manipulation;
+  font: inherit; font-size: 12px; font-weight: bold; line-height: 28px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.45);
+  border: 1px solid #4b5b73; border-top-color: #3c4b61; border-bottom-color: #455872; border-radius: 5px;
+  background: linear-gradient(#8d9baf, #647792); background-origin: border-box;
+  box-shadow: 0 1px 0 rgba(255,255,255,.3);
+}
+.search-cancel:active { background: linear-gradient(#778497, #566780); background-origin: border-box; }
+.search-bar:has(input:focus) .search-cancel, .search-bar:has(input:not(:placeholder-shown)) .search-cancel { display: block; }
+html[data-theme="dark"] .search-cancel { border-color: #111; background: linear-gradient(#4a4f58, #24272c); background-origin: border-box; }
+html[data-theme="dark"] .search-cancel:active { background: linear-gradient(#2a2d32, #121316); background-origin: border-box; }
 .search-note:empty { display: none; }
 .search-note { margin: 30px 20px; }
 /* F100: Recent's Clear sits at the right of the group header, in the header's own colour and emboss. */

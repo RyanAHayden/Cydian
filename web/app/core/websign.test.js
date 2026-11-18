@@ -1,0 +1,55 @@
+// F93: the website signer's rules (core/websign.js), the old server signer's, in JS.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { profileInfo, targetBundleId, appEntitlements, plistXml, identityPlist, zsignArgs, zsignError, appInfo, isZip } from "./websign.js";
+import { parsePlist } from "./signing.js";
+
+const fx = (n) => new Uint8Array(readFileSync(new URL(`./fixtures/signing/${n}`, import.meta.url)));
+
+test("the profile's app ID, team and entitlements", () => {
+  const p = profileInfo(fx("test.mobileprovision"));
+  assert.equal(p.appId, "*");
+  assert.equal(p.teamId, "TESTTEAM42");
+  assert.equal(p.entitlements["application-identifier"], "TESTTEAM42.*");
+  assert.throws(() => profileInfo(new Uint8Array([1, 2, 3])), /not a provisioning profile/);
+});
+
+test("the bundle ID an app is signed as", () => {
+  assert.equal(targetBundleId("*", "io.github.x.delta"), "io.github.x.delta");
+  assert.equal(targetBundleId("com.you.*", "com.you.delta"), "com.you.delta");
+  assert.equal(targetBundleId("com.you.*", "io.github.fizl0.openmx"), "com.you.openmx");
+  assert.equal(targetBundleId("com.you.app", "io.github.x.delta"), "com.you.app");
+  assert.throws(() => targetBundleId("", "a.b"), (e) => e.code === "bad_profile");
+});
+
+test("entitlements narrowed to the app, never debuggable", () => {
+  const e = appEntitlements({ teamId: "T1", entitlements: { "application-identifier": "T1.*", "keychain-access-groups": ["T1.*"], "get-task-allow": true, "aps-environment": "development" } }, "com.you.delta");
+  assert.deepEqual(e, { "application-identifier": "T1.com.you.delta", "keychain-access-groups": ["T1.com.you.delta"], "get-task-allow": false, "aps-environment": "development" });
+  assert.equal(appEntitlements({ entitlements: { "com.apple.developer.team-identifier": "T2" } }, "a.b")["application-identifier"], "T2.a.b");
+});
+
+test("XML plists read back (core/signing.js parsePlist), data and escapes included", () => {
+  const v = { s: "a & <b>", n: 3, r: 1.5, t: true, f: false, a: ["x", 2], d: new Uint8Array([0, 255, 7]), o: {} };
+  assert.deepEqual(parsePlist(plistXml(v)), v);
+  const id = parsePlist(identityPlist({ p12: new Uint8Array([1, 2]), password: "pw", profile: new Uint8Array([3]) }));
+  assert.deepEqual(id, { p12: new Uint8Array([1, 2]), password: "pw", profile: new Uint8Array([3]) });
+});
+
+test("zsign's command line; its errors as one sentence", () => {
+  assert.deepEqual(zsignArgs({ p12: "k", password: "", profile: "m", input: "in", output: "o", temp: "t" }),
+    ["-f", "-k", "k", "-p", "", "-m", "m", "-t", "t", "-z", "6", "-o", "o", "in"]);
+  assert.deepEqual(zsignArgs({ p12: "k", profile: "m", entitlements: "e", bundleId: "a.b", input: "in", output: "o", temp: "t" }).slice(-5),
+    ["-b", "a.b", "-e", "e", "in"]);
+  assert.equal(zsignError([">>> Signing: x", "\x1b[31m>>> Invalid mach-o file!\x1b[0m"]), "zsign: Invalid mach-o file.");
+  assert.match(zsignError(["\x1b[31m>>> Can't load p12 or private key file. Please input the correct file and password!"]), /password/);
+  assert.equal(zsignError([]), "zsign stopped without saying why.");
+});
+
+test("an app's name, version and ID from its Info.plist; zip check", () => {
+  assert.deepEqual(appInfo({ CFBundleIdentifier: "a.b", CFBundleName: "B", CFBundleVersion: "7" }), { bundleId: "a.b", name: "B", version: "7" });
+  assert.deepEqual(appInfo({ CFBundleIdentifier: "a.b", CFBundleDisplayName: "Bee", CFBundleShortVersionString: "1.2", CFBundleVersion: "7" }), { bundleId: "a.b", name: "Bee", version: "1.2" });
+  assert.throws(() => appInfo({}), (e) => e.code === "bad_ipa");
+  assert.equal(isZip(new Uint8Array([0x50, 0x4b, 3, 4])), true);
+  assert.equal(isZip(new Uint8Array([0x50])), false);
+});

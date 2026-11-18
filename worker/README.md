@@ -7,6 +7,8 @@ server for two things, and this Worker is that server:
   Cydian serves the signed app itself at `127.0.0.1`; the Worker hands iOS a manifest pointing there.
 - **Cydian's own updates.** iOS closes Cydian while it installs the new one, and Cydian's local server closes with
   it, so the signed update waits here for 10 minutes (Cloudflare KV) and installs from here.
+- **Apps the website signed in the browser** (F93): the website signs with zsign as WebAssembly in your browser and
+  leaves the signed app here for the same 10 minutes, for iOS's install prompt.
 
 It stores nothing else and logs nothing. Cydian uses `https://sign.cydian.dev` unless you set your own.
 
@@ -47,7 +49,9 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 
 - `HOST_IDS`: the bundle IDs it holds updates for. `*.cydian` (any ID ending in `.cydian`) covers Cydian signed
   with any team's profile. Use `*` to hold any app.
-- `TTL`: seconds a held update stays (600).
+- `TTL`: seconds a held update stays (600), and an app the website signed in the browser.
+- `MAX_UPLOAD_MB`: the largest IPA the website signs in the browser (512): it downloads through `/api/fetch?kind=ipa`
+  and comes back signed to `/sign/upload`, in 20 MB parts, for `TTL` seconds. `0` turns website signing off here.
 
 ## Routes
 

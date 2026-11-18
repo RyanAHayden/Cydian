@@ -84,8 +84,9 @@ function card(children, cls = "") {
 //   - a source's own signed link (itms-services): Install, signed by the source
 //   - the sideload app: Install, signed with the user's certificate on the phone (signing-client signAndInstall;
 //     without one it opens the Signing walkthrough)
-//   - the website (F89: no server, nothing signs there): the hand-offs, screens/handoff.js installLinks: Open in
-//     Cydian, Get in AltStore / SideStore / Feather. Each is marked `handoff: true` (browse.js's nav button lists them)
+//   - the website: F93's Install, signed in the browser with the user's certificate (signing-client signAndInstall),
+//     then F89's hand-offs, screens/handoff.js installLinks: Open in Cydian, Get in AltStore / SideStore / Feather.
+//     Each hand-off is marked `handoff: true` (browse.js's nav button runs Install, the first row)
 //   - always: Download IPA, to keep the file
 // `opener` opens a URL outside the app (window.open on the site). `onInstall` runs first on any of them (F30: the
 // Installed tab's record). F80: `queue`, when given, is what "Signed with your certificate" does instead (the app page
@@ -105,6 +106,10 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   } else if (o.itms) {
     rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
   } else if (o.download && site) {
+    // F93: Install signs in the browser with the certificate in Settings > Signing (signing-client.js
+    // signInBrowser); the hand-offs follow for those who'd rather use the app or another sideloader.
+    rows.push({ label: "Install", subtitle: "Signed in the browser with your certificate",
+      onClick: () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() }) });
     for (const l of installLinks(o.download, { name })) {
       rows.push({ label: l.label, subtitle: l.subtitle, handoff: true, onClick: () => { onInstall(); open(l.url); } });
     }
@@ -298,8 +303,8 @@ export async function appPageCustom(pkg, source, opts, { queue = appQueue, add =
 }
 
 // F89: the website's Install group says why it hands the app on.
-export const SITE_INSTALL_FOOTER = "The website can't install apps itself. Open in Cydian signs it with your certificate in the Cydian app; "
-  + "AltStore, SideStore and Feather install it their own way. Download IPA keeps the file.";
+export const SITE_INSTALL_FOOTER = "Install signs the app here in the browser with your certificate (Settings > Signing). Open in Cydian "
+  + "signs it in the Cydian app; AltStore, SideStore and Feather install it their own way. Download IPA keeps the file.";
 
 export function renderApp(body, route, pkg, source) {
   const st = pkg.stanza;

@@ -1,33 +1,51 @@
 # Signing with your own certificate (I5, I6)
 
-Only the Cydian app's sideload build signs: it signs every app **on the iPhone** with your certificate, which never
-leaves the phone for other apps, and needs a server only for iOS's install manifest and Cydian's own update. That
+The Cydian app's sideload build signs every app **on the iPhone** with your certificate, which never leaves the phone
+for other apps, and needs a server only for iOS's install manifest and Cydian's own update; the website signs in the
+browser (F93, below). That
 server is the Signing Server: `https://sign.cydian.dev` by default, a Cloudflare Worker anyone can deploy for
 themselves (`worker/`, `worker/README.md`). [On the phone (I6)](#on-the-phone-i6) has the whole picture.
 
-## The website signs nothing (F89)
+## The website signs in the browser (F93)
 
-cydian.dev is one Cloudflare Worker with no server of its own (user 2026-11-18: the NAS that ran I5's zsign signer
-and Web Push is gone, and so are `web/signer/`, POST `/sign` and its jobs, Settings > Signing and the certificate on
-the website, Bring My Certificate, Import from Safari and the website's upgrade alerts). What the website does instead:
+cydian.dev is one Cloudflare Worker with no server of its own (F89: the NAS that ran I5's zsign signer and Web Push
+is gone), and a Worker can't run zsign. So the website signs **in the browser** (user 2026-11-18): zsign compiled to
+WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for iOS's install prompt.
 
-- **An app's page** (and Version History's rows, and My IPAs' links): Install offers hand-offs
-  (`web/app/screens/handoff.js installLinks`, `altstore.js installRows`):
-  - **Open in Cydian**: `cydian://install?url=<ipa>&name=<name>`. The app (`incoming.js`) opens Install IPAs, asks
-    "Install IPA", then signs and installs it on the phone (`signAndInstall`). Safari can't tell whether Cydian is
-    installed; without it Safari says the address is invalid.
-  - **Get in AltStore / SideStore / Feather**: their install links (`altstore://install?url=`,
-    `sidestore://install?url=`, `feather://install/<https url>`; the shapes `core/otherlinks.js` reads back).
-  - **Download IPA**.
-  A source's own signed link (`itms-services`) still installs straight away. The nav bar's Install lists the
-  hand-offs in an action sheet. Nothing queues on the website (the F80 queue is the sideload app's).
-- **Home's Install Cydian App** (Not Jailbroken): an action sheet that adds Cydian's own AltStore source
-  (`core/appoffer.js APP_SOURCE_URL`) to AltStore, SideStore or Feather, or downloads the latest `Cydian.ipa`
-  (`home.js appInstallChoices`). Jailbroken visitors get the release's `.deb`, as before. **Send Settings**
-  (Open in Cydian App, `screens/importlink.js`) stays: sources, travelling settings and Ignored Upgrades, never a
-  certificate or a server.
-- The app's own Essential Upgrade, when it can't sign Cydian itself (no bridge), opens cydian.dev in Safari for that
-  same sheet (`core/essential.js installSelf`).
+- **zsign as WebAssembly**: `web/app/vendor/zsign/` (`zsign.js` + `zsign.wasm`, ~2.2 MB), built by
+  `tools/build-zsign-wasm.sh` from zsign at the commit the old signer's Dockerfile pinned and OpenSSL 3.5 (static,
+  legacy provider built in for RC2 `.p12`s), both checked by SHA-256; `SOURCE` and the licences (zsign MIT, OpenSSL
+  Apache-2.0, zlib) sit beside it. `tools/zsign-wasm/cydian.cpp` adds two calls into zsign's own code: unzip, and
+  read a plist (binary or XML) as JSON. The build is reproducible: `tools/check.sh` rebuilds it where emcc is (emsdk
+  on PATH or in `~/emsdk`) and fails when the committed copy differs from what the same emcc builds.
+- **Settings > Signing** (as before F89): the `.p12`, its password and the `.mobileprovision` in this browser's
+  IndexedDB (`signing-client.js`), the profile's details, **Install Cydian App** and **Bring My Certificate**,
+  Remove Certificate. Home has the Signing tile beside Featured again.
+- **Install** (an app's page, first row; the nav bar's Install runs it): `signing-client.js signInBrowser`:
+  1. *Downloading*: the IPA through the Worker's `/api/fetch?url=…&kind=ipa` (most hosts send no CORS headers),
+     streamed, up to 512 MB (`MAX_UPLOAD_MB`).
+  2. *Signing*: `signing-worker.js` (a module Web Worker) runs `websign-job.js`: unzip, read `Info.plist`, the
+     bundle ID the profile allows (`core/websign.js targetBundleId`: a `com.you.*` profile signs any app as
+     `com.you.<last part>`), the profile's entitlements narrowed to that app (`appEntitlements`, never
+     `get-task-allow`), then zsign on the folder. zsign's own last error is what the alert shows.
+  3. *Uploading*: the signed IPA to `POST /sign/upload` in 20 MB parts (KV holds 25 MB a value), kept 10 minutes
+     (`TTL`), served at `/sign/up/<token>/manifest.plist` and `app.ipa` (Range too).
+  4. iOS's install prompt (`itms-services`), with a banner saying to press Install.
+  The hand-offs follow Install (Open in Cydian, Get in AltStore / SideStore / Feather, Download IPA), as F89 made
+  them.
+- **Home's Install Cydian App** (Not Jailbroken; `home.js installApp`): with a certificate, Cydian's IPA signed and
+  installed as above, carrying the certificate (`cydian-identity.plist`, the shell's `BundledIdentity` imports it on
+  first launch) unless Bring My Certificate is off, and always the website's sources and settings
+  (`web/transfer.link`, which `app.js` imports once on first launch). Both files go in before zsign seals the
+  bundle. Without a certificate it opens Settings > Signing. Jailbroken visitors get the release's `.deb`.
+- **Send Settings** (Open in Cydian App): sources, travelling settings, Ignored Upgrades and the certificate.
+
+What leaves the browser: the IPA's address (to `/api/fetch`) and the signed app (to `/sign/upload`, for 10 minutes).
+The certificate, key and password never do, except inside Cydian's own signed IPA with Bring My Certificate (that
+copy waits on the Worker for the same 10 minutes, as the old server signer's did).
+
+Limits: the whole IPA, unpacked, and the signed copy sit in the browser's memory at once (WebAssembly up to 4 GB,
+less on an iPhone), so very large apps may fail with "zsign stopped … too big for this browser".
 
 A browser that registered the old push service worker drops it at the next visit (`app.js`).
 
@@ -107,18 +125,18 @@ one missing opens this page at that step, with no alert. Then `signing.install {
 Signing. Tests: `web/app/signing-client-device.test.js`, `web/app/screens/signing.test.js` and
 `web/app/core/signing-device.test.js`, against a fake `cydianNative`.
 
-### From the website to the app (F75, F89)
+### From the website to the app (F75, F89, F93)
 
 - **Open in Cydian App** (Home's Send Settings, and Settings; Not Jailbroken only): `cydian://import?d=<base64url of
-  gzipped JSON>`, the source list as export lines, the settings in `core/settings.js TRAVELS` and Ignored Upgrades,
-  after a banner saying to press Open. The app adds what's new straight away. Gzip keeps 400 sources around 5 kB.
-  Since F89 neither a certificate nor a Signing Server travels (the website keeps neither); a link from before that
-  still carries them is imported without them.
-- **Open in Cydian** on an app's page: `cydian://install?url=…&name=…` ("The website signs nothing", above).
+  gzipped JSON>`, the source list as export lines, the settings in `core/settings.js TRAVELS`, Ignored Upgrades and
+  (F93, as before F89) the website's certificate, after a banner saying to press Open. The app adds what's new
+  straight away and puts the certificate into the Keychain (`signing.import`). Gzip keeps 400 sources around 5 kB.
+  No Signing Server travels.
+- **Open in Cydian** on an app's page: `cydian://install?url=…&name=…`.
+- **Install Cydian App** on the website: Cydian's IPA, signed in the browser, carries `cydian-identity.plist`
+  (Bring My Certificate) and `web/transfer.link` (sources and settings), imported on first launch.
 
-Gone with the website's signer (F89): the certificate inside Cydian's own IPA (`bring`), Import from Safari
-(`cydian://signing-import`) and the first-launch `transfer.link`. The shell's `BundledIdentity` launch import is still
-compiled in but finds no `cydian-identity.plist` in an IPA from GitHub's releases.
+Gone with the website's old signer (F89) and not back: Import from Safari (`cydian://signing-import`).
 
 The shell keeps the latest `cydian://` link (`IncomingLink`, at most 512 kB) and tells the page (`cydian:url`), which
 takes it with `app.takeURL` (also at start, for a link that launched the app). `app.gunzip` unpacks the import link

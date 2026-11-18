@@ -1,0 +1,4 @@
+zsign (MIT, LICENSE.zsign)   https://github.com/zhlynn/zsign  commit 9299685bab7ef99827e06e5dfda93af747386590  tarball sha256 97bcc2dbbc0dc5f092dc4a33cbe1f9fdbd5c83bdc291da23db45044d4396270e
+OpenSSL (Apache-2.0, LICENSE.openssl)  3.5.9  sha256 603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a
+zlib + minizip (zlib licence, LICENSE.zlib)  as vendored in zsign's src/third-party
+Built by tools/build-zsign-wasm.sh with emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.13 (e13ee988ce3d87a738dd8f3661d02223308c412a)

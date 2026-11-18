@@ -8,3 +8,4 @@ __pycache__/
 /outreach.md
 /web/data/
 web/app/build.json
+!web/app/core/fixtures/signing/*.ipa

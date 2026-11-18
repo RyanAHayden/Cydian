@@ -1,25 +1,26 @@
-// F89: the website has no server of its own, so it signs nothing. An app page's Install there hands the app on:
-// Open in Cydian (cydian://install, incoming.js), Get in AltStore / SideStore / Feather (their install links,
-// screens/handoff.js installLinks), Download IPA; Home's Install Cydian App adds Cydian's source to those sideloaders
-// (home.js appInstallChoices); My IPAs' links get the same hand-offs (myipas.js siteInstallChoices).
+// F89: the website has no server of its own. F93: it signs in the browser again: an app page's Install there signs
+// (signing-client.js signInBrowser), then the hand-offs: Open in Cydian (cydian://install, incoming.js), Get in
+// AltStore / SideStore / Feather (their install links, screens/handoff.js installLinks), Download IPA; Home's
+// Install Cydian App signs Cydian (home.js installApp); My IPAs' links get the hand-offs (myipas.js siteInstallChoices).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { installRows, SITE_INSTALL_FOOTER } from "./altstore.js";
 import { installLinks, sourceHandoffs, HANDOFF_APPS } from "./handoff.js";
-import { appInstallChoices, showsSigningTile } from "./home.js";
+import { installApp, showsSigningTile } from "./home.js";
 import { siteInstallChoices } from "./myipas.js";
 import { installAsk } from "../incoming.js";
 import { parseOtherLink } from "../core/otherlinks.js";
-import { APP_SOURCE_URL, APP_IPA_URL } from "../core/appoffer.js";
+import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 
 const V = { version: "1.2", downloadURL: "https://example.com/My-Delta.ipa" };
 const labels = (rows) => rows.map((r) => r.label);
 
-test("the website's Install rows: Open in Cydian, Get in AltStore / SideStore / Feather, Download IPA", () => {
+test("the website's Install rows: Install (in the browser), Open in Cydian, Get in AltStore / SideStore / Feather, Download IPA", () => {
   const { rows } = installRows(V, "https://example.com/apps.json", () => {}, () => {}, null, "Delta", { site: true, jailbreak: false, custom: false });
-  assert.deepEqual(labels(rows), ["Open in Cydian", "Get in AltStore", "Get in SideStore", "Get in Feather", "Download IPA"]);
-  assert.ok(rows.slice(0, 4).every((r) => r.handoff === true), "hand-offs are marked for the nav button's sheet");
-  assert.ok(!rows.some((r) => r.label === "Install" || r.label === "Custom Install"), "nothing that signs on the website");
+  assert.deepEqual(labels(rows), ["Install", "Open in Cydian", "Get in AltStore", "Get in SideStore", "Get in Feather", "Download IPA"]);
+  assert.ok(!rows[0].handoff, "Install comes first: the nav button runs it straight away (browse.js)");
+  assert.ok(rows.slice(1, 5).every((r) => r.handoff === true), "hand-offs are marked");
+  assert.ok(!rows.some((r) => r.label === "Custom Install"), "no Custom Install on the website");
 });
 
 test("each hand-off opens its app's link and records the app; Download IPA opens the file", () => {
@@ -27,7 +28,7 @@ test("each hand-off opens its app's link and records the app; Download IPA opens
   let recorded = 0;
   const { rows } = installRows(V, null, (u) => opened.push(["download", u]), () => { recorded++; }, null, "Delta",
     { site: true, jailbreak: false, custom: false, open: (u) => opened.push(["open", u]) });
-  for (const r of rows) r.onClick();
+  for (const r of rows.slice(1)) r.onClick(); // Install signs (signing-client.test.js covers it)
   const enc = encodeURIComponent(V.downloadURL);
   assert.deepEqual(opened, [
     ["open", `cydian://install?url=${enc}&name=Delta`],
@@ -53,13 +54,13 @@ test("the sideload app still signs: Install, no hand-offs", () => {
   assert.equal(rows[0].handoff, undefined);
 });
 
-test("by default (no bridge: the website in node) the rows are the hand-offs", () => {
+test("by default (no bridge: the website in node) the rows are Install in the browser, then the hand-offs", () => {
   const saved = globalThis.cydianNative;
   try {
     delete globalThis.cydianNative;
-    assert.equal(installRows(V, null).rows[0].label, "Open in Cydian");
+    assert.deepEqual(labels(installRows(V, null).rows).slice(0, 2), ["Install", "Open in Cydian"]);
   } finally { if (saved) globalThis.cydianNative = saved; }
-  assert.match(SITE_INSTALL_FOOTER, /can't install apps itself/);
+  assert.match(SITE_INSTALL_FOOTER, /signs the app here in the browser/);
 });
 
 test("the hand-off links read back as what they say: Cydian's own and the sideloaders' (core/otherlinks.js)", () => {
@@ -77,18 +78,15 @@ test("the hand-off links read back as what they say: Cydian's own and the sidelo
   assert.deepEqual(installLinks("ftp://x/a.ipa"), []);
 });
 
-test("Home's Install Cydian App: Cydian's source in AltStore, SideStore, Feather, then Download IPA", () => {
-  const c = appInstallChoices();
-  assert.deepEqual(c.map((x) => x.label), ["Add to AltStore", "Add to SideStore", "Add to Feather", "Download IPA"]);
-  for (const x of c.slice(0, 3)) {
-    const o = parseOtherLink(x.url);
-    assert.equal(o?.action, "source", x.url);
-    assert.equal(o.url, APP_SOURCE_URL);
-  }
-  assert.equal(c[3].url, APP_IPA_URL);
-  assert.deepEqual(sourceHandoffs(APP_SOURCE_URL).map((l) => l.app), HANDOFF_APPS);
-  assert.equal(showsSigningTile("site"), false);
+test("Home's Install Cydian App (F93, as before F89): signs Cydian with the certificate, or opens Settings > Signing", async () => {
+  const calls = [];
+  const deps = (ready, bring) => ({ ready: async () => ready, bring: () => bring, install: (o) => calls.push(["install", o]), go: (h) => calls.push(["go", h]) });
+  assert.equal(await installApp(deps(false, true)), "signing");
+  assert.equal(await installApp(deps(true, false)), "install");
+  assert.deepEqual(calls, [["go", "/settings/signing"], ["install", { url: APP_IPA_URL, name: APP_NAME, bring: false }]]);
+  assert.equal(showsSigningTile("site"), true);
   assert.equal(showsSigningTile("sideload"), true);
+  assert.equal(showsSigningTile("jailbreak"), false);
 });
 
 test("My IPAs on the website: a link's Install offers the same hand-offs and Download IPA", () => {

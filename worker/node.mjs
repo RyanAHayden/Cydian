@@ -39,7 +39,7 @@ const ASSETS = {
   },
 };
 
-const env = { HOSTED, ASSETS, HOST_IDS: process.env.HOST_IDS ?? "*.cydian", TTL: process.env.TTL ?? "600" };
+const env = { HOSTED, ASSETS, HOST_IDS: process.env.HOST_IDS ?? "*.cydian", TTL: process.env.TTL ?? "600", MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB };
 const server = http.createServer(async (inc, out) => {
   try {
     const proto = inc.headers["x-forwarded-proto"] ?? "http";

@@ -86,7 +86,7 @@ function fakeBackend(list = []) {
   return { added, sources: async () => list, addSource: async (input) => { if (String(input?.uri ?? input).includes("fail")) throw new Error("no Release"); added.push(input); } };
 }
 
-test("the website's payload: every source as its export line, the travelling settings it shows, holds; no certificate or server", async () => {
+test("the website's payload: every source as its export line, the travelling settings it shows, holds; no server, no certificate when none is saved", async () => {
   const backend = fakeBackend([{ key: "deb:https://a.example/:./", uri: "https://a.example/", dist: "./" },
     { key: "deb:https://apt.procurs.us/:1900", uri: "https://apt.procurs.us/", dist: "1900", components: ["main"] }, { key: "x" }]);
   const store = fakeStore({ appearance: "dark", device: "none", worksOnMyPhone: true }, ["com.x.tweak"]);
@@ -128,7 +128,19 @@ test("review text: five names at most", () => {
     "7 new sources: r0.example, r1.example, r2.example, r3.example, r4.example and 2 more.");
 });
 
-test("Send Settings' import never touches the Keychain (F89: no certificate travels)", async () => {
+test("F93: the website's certificate travels with Send Settings and goes into the Keychain", async () => {
+  const id = { p12: new Uint8Array([0x30, 1, 2]), profile: new Uint8Array([3, 4]), password: "pw", p12Name: "me.p12", profileName: "Me" };
+  const p = await websitePayload({ backend: fakeBackend(), store: fakeStore({}), load: async () => id });
+  assert.deepEqual(p.identity, { p12: "MAEC", profile: "AwQ", password: "pw", p12Name: "me.p12", profileName: "Me" });
+  assert.equal("identity" in await websitePayload({ backend: fakeBackend(), store: fakeStore({}), load: async () => id, identity: false }), false);
+  const calls = [];
+  const native = { call: async (m, params) => { calls.push([m, params]); return {}; } };
+  const u = ui();
+  assert.equal(await reviewAndImport(await encodeLink(p), { native, backend: fakeBackend(), store: fakeStore({}), ...u.deps }), "imported");
+  assert.deepEqual(calls, [["signing.import", { p12: "MAEC", profile: "AwQ=", password: "pw" }]]);
+});
+
+test("Send Settings' import without a certificate never touches the Keychain", async () => {
   const backend = fakeBackend();
   const store = fakeStore({ appearance: "light" });
   const u = ui();

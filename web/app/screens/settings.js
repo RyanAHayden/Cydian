@@ -11,11 +11,13 @@ import { format } from "../router.js";
 import { createSettings, detectMode, themeFor, SETTINGS } from "../core/settings.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
-import { parseProfile, checkP12Password, deviceSummary, deviceError } from "../core/signing.js";
+import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind } from "../core/signing.js";
 import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, serverStatus,
-  localSigning, deviceStatus, importToDevice, removeFromDevice, installOnDevice, statusReady, defaultServer } from "../signing-client.js";
+  localSigning, deviceStatus, importToDevice, removeFromDevice, installOnDevice, statusReady, defaultServer,
+  browserSigning, getBring, setBring, signAndInstall } from "../signing-client.js";
+import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { drawWalkthrough, walkOpen } from "./signing.js";
 import { openInAppSection } from "./importlink.js";
 import { signingExtras } from "./signed-apps.js";
@@ -281,13 +283,14 @@ function remindNow() {
 
 // ---- Signing (I5, F58) ---------------------------------------------------------------------------------------
 // Settings > Signing, in the sideload build only: the user's .p12, its password and a .mobileprovision go into the
-// Keychain, and the Signing Server hands iOS the manifests. The website signs nothing since F89 (its server is
-// gone: an app page there hands the app on, screens/handoff.js), and the jailbreak app installs with its helper.
+// Keychain, and the Signing Server hands iOS the manifests. F93: the website signs in the browser again (its page is
+// at the end of this file), and the jailbreak app installs with its helper.
 
 // The root page's row: the certificate's name once one is set.
 function signingSection() {
   const box = document.createElement("div");
   if (localSigning()) return deviceSigningSection(box);
+  if (browserSigning()) return siteSigningSection(box);
   return box;
 }
 // After a change on the Signing page: redraw every Settings page on screen (the root's Certificate row too).
@@ -407,6 +410,7 @@ async function checkServer() {
 
 async function drawSigning(el) {
   if (localSigning()) return drawDeviceSigning(el);
+  if (browserSigning()) return drawSiteSigning(el);
   el.replaceChildren(grouped([{ footer: "Apps are signed in the Cydian app, on the iPhone itself, with your own certificate." }]));
 }
 
@@ -462,7 +466,8 @@ function certificateBlock(el, id, status = null) {
   ul.append(fileRow(".p12", p12Shown, "p12"),
     fileRow(".mobileprovision", profShown, "profile"), signRow("Password", input, pwBrowse));
   const state = id?.p12 && id?.password != null ? (id.passwordOk === false ? " The password doesn't open this certificate." : id.passwordOk ? " The password opens it." : "") : "";
-  const kind = "Once all three are here, they go into this iPhone's Keychain, where only Cydian can use them; the password isn't kept. To change one, choose the .p12 and the profile again.";
+  const kind = browserSigning() ? "They're kept in this browser only, and apps are signed here in the browser: they go to no server, except inside Cydian's own app with Bring My Certificate."
+    : "Once all three are here, they go into this iPhone's Keychain, where only Cydian can use them; the password isn't kept. To change one, choose the .p12 and the profile again.";
   const foot = Object.assign(document.createElement("p"), { className: "group-footer",
     textContent: "Your .p12 (the certificate and its key), its .mobileprovision and the password. Each row's Browse picks one. " + kind + state });
   const [allInput, allLabel] = browseButton(accept, true, (files) => chooseFiles(el, files, null));
@@ -717,4 +722,70 @@ function aboutSection() {
   fill(loadState(globalThis.localStorage).current ?? "");
   appVersion().then(fill, () => {});
   return box;
+}
+
+// ---- Signing on the website (F93, as before F89) --------------------------------------------------------------
+// The .p12, its password and the .mobileprovision in this browser's IndexedDB (signing-client.js); Install on an app
+// page and Home's Install Cydian App sign in the browser with them (zsign as WebAssembly, signing-worker.js) and the
+// Worker only hosts the signed IPA for iOS's install prompt.
+
+function siteSigningSection(box) {
+  const fill = (detail) => box.replaceChildren(grouped([{ header: "Signing",
+    rows: [{ label: "Certificate", detail, href: format({ tab: "settings", path: ["signing"] }) }],
+    footer: "Your own certificate: Install signs apps with it, here in the browser." }]));
+  fill("");
+  loadIdentity().then((id) => {
+    let name = "None";
+    if (id?.profile) {
+      try { name = summary({ profile: parseProfile(id.profile) }).rows[0].detail; } catch { name = "Unreadable"; }
+    } else if (id?.p12) name = "Incomplete";
+    fill(name);
+  });
+  return box;
+}
+
+// Install Cydian App, green, once the certificate works, with Bring My Certificate under it.
+const installApp = () => signAndInstall({ url: APP_IPA_URL, name: APP_NAME, bring: getBring() });
+function siteAppSection(id) {
+  if (!(id?.p12 && id?.profile && id.passwordOk !== false)) return [];
+  const frag = grouped([{ rows: [{ label: "Install Cydian App", onClick: installApp, icon: { text: "" } }],
+    footer: "Cydian as an app on your Home Screen, signed here with this certificate: it signs apps on the iPhone itself." }]);
+  frag.firstChild.classList.add("app-offer");
+  frag.querySelector(".cell-icon")?.classList.add("home-glyph", "glyph-install");
+  const bring = grouped([{ rows: [{ label: "Bring My Certificate" }],
+    footer: "Install Cydian App puts a copy of your certificate inside the app, so Cydian has it on first launch. "
+      + "The copy sits in the app's own files until the next update, and in the signed app the server holds for iOS's 10 minutes." }]);
+  const cell = bring.querySelector(".cell-inner");
+  cell?.append(createSwitch({ label: "Bring my certificate into the app", checked: getBring(), onToggle: (on) => setBring(on) }));
+  cell?.classList.add("has-switch");
+  return [frag, bring];
+}
+
+async function removeSiteCertificate() {
+  const { index } = await showAlert({ title: "Remove Certificate?", message: "The .p12, its password and the profile are deleted from this browser.",
+    buttons: ["Cancel", "Remove"], cancel: 0 });
+  if (index !== 1) return;
+  await clearIdentity();
+  redrawAll();
+}
+
+async function drawSiteSigning(el) {
+  const id = await loadIdentity();
+  const top = el.scrollTop;
+  let profile = null;
+  try { profile = id?.profile ? parseProfile(id.profile) : null; } catch { /* checked when picked */ }
+  const info = summary({ profile, passwordOk: id?.passwordOk ?? null });
+  const sections = [];
+  if (profile) {
+    sections.push({ header: profile.name ? `${profileKind(profile)} Profile: ${profile.name}` : `${profileKind(profile)} Profile`,
+      // Long values (a certificate's name, a team) go under the label, where they wrap, not cut off on the right.
+      rows: info.rows.map((r) => (r.detail.length > 16 ? { label: r.label, subtitle: r.detail } : r)),
+      footer: info.problems.length ? info.problems.join(" ") : null });
+  }
+  sections.push({ header: "How It Works",
+    footer: "Install downloads the app, signs it in this browser with your certificate, and leaves the signed app on "
+      + `${location.host} for 10 minutes so iOS can install it. Your certificate, key and password stay in this browser.` });
+  if (id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeSiteCertificate() }] });
+  el.replaceChildren(certificateBlock(el, id), ...siteAppSection(id), grouped(sections));
+  el.scrollTop = top;
 }

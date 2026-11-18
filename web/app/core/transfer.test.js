@@ -20,7 +20,9 @@ test("Open in Cydian App: encode/decode round trip, gzip keeps hundreds of sourc
   const p = await decodeLink(url);
   assert.deepEqual(p, { v: 1, sources: SOURCES, settings: { appearance: "dark" }, holds: ["a"] }); // F89: no server
   const withCert = await decodeLink(await encodeLink({ identity: { p12: "MAE", profile: "Ag", password: "pw", p12Name: "c.p12", profileName: "p" } }));
-  assert.equal("identity" in withCert, false); // F89: the certificate never travels
+  // F93: the website's certificate travels again (Settings > Signing in the browser)
+  assert.deepEqual(withCert.identity, { p12: "MAE", profile: "Ag", password: "pw", p12Name: "c.p12", profileName: "p" });
+  assert.equal("identity" in (await decodeLink(await encodeLink({ identity: { p12: "", profile: "Ag" } }))), false);
   const many = Array.from({ length: 400 }, (_, i) => `https://repo${i}.example.com/`);
   const big = await encodeLink({ sources: many });
   assert.ok(big.length < 64 * 1024, `${big.length} characters`);

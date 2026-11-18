@@ -1,12 +1,13 @@
 // F75: Open in Cydian App (Home's Send Settings), like Feather's feather:// links. On the website (Settings, and
 // Home's Install Cydian App area) a row that opens cydian://import?d=<base64url of gzipped JSON> with the visitor's
-// sources, the settings that travel (core/settings.js TRAVELS) and Ignored Upgrades (F89: the website keeps no
-// certificate or Signing Server, so neither goes). In the app, incoming.js hands the link to reviewAndImport, which
-// adds only what's new.
+// sources, the settings that travel (core/settings.js TRAVELS), Ignored Upgrades and, F93, the certificate saved in
+// the website's Settings > Signing (as before F89; no Signing Server). In the app, incoming.js hands the link to
+// reviewAndImport, which adds only what's new and puts the certificate into the Keychain (signing.import).
 //
 //   openInAppSection()                   the website's group, Not Jailbroken (an empty box anywhere else)
 //   await openInApp()                    builds the link, shows the banner, opens it
-//   await websitePayload()               what the link carries (sources as core/sourcelist.js export lines)
+//   await websitePayload({ identity })   what the link carries (sources as core/sourcelist.js export lines; the
+//                                        certificate unless identity: false)
 //   await reviewAndImport(url, deps)     the app's side -> "imported" | "cancelled" | "nothing" | "bad"
 //   reviewText(review, label)            the alert's lines (pure)
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -16,24 +17,34 @@ import { showBanner } from "../nav/banner.js";
 import { showHUD } from "../nav/hud.js";
 import { detectMode, TRAVELS, SETTINGS } from "../core/settings.js";
 import { exportLine } from "../core/sourcelist.js";
-import { encodeLink, decodeLink, reviewLink } from "../core/transfer.js";
+import { encodeLink, decodeLink, reviewLink, toB64url, fromB64url } from "../core/transfer.js";
 import { toBase64 } from "../core/signing.js";
 import { getBackend } from "../backend.js";
+import { loadIdentity, saveIdentity } from "../signing-client.js";
 import { settings } from "./settings.js";
 
 export function openInAppSection() {
   const box = document.createElement("div");
   if (detectMode() !== "site" || settings.deviceType() !== "none") return box; // the sideload app takes the link
   box.append(grouped([{ header: "Cydian App", rows: [{ label: "Open in Cydian App", onClick: () => openInApp() }],
-    footer: "Brings your sources and settings into the Cydian app on this iPhone." }]));
+    footer: "Brings your certificate, sources and settings into the Cydian app on this iPhone." }]));
   return box;
 }
 
-export async function websitePayload({ backend = getBackend(), store = settings } = {}) {
+export async function websitePayload({ backend = getBackend(), store = settings, identity = true, load = loadIdentity } = {}) {
   const sources = (await backend.sources().catch(() => [])).filter((s) => s?.uri).map(exportLine);
   const values = {};
   for (const k of TRAVELS) if (store.isShown(k)) values[k] = store.get(k);
-  return { sources, settings: values, holds: store.holds.list() };
+  // F93: the certificate goes along when this browser has one (Settings > Signing), so the app needs no setup.
+  let id = null;
+  if (identity) {
+    try {
+      const c = await load();
+      if (c?.p12 && c?.profile) id = { p12: toB64url(c.p12), profile: toB64url(c.profile), password: c.password ?? "",
+        p12Name: c.p12Name ?? "", profileName: c.profileName ?? "" };
+    } catch { /* no certificate stored here */ }
+  }
+  return { sources, settings: values, holds: store.holds.list(), ...(id ? { identity: id } : {}) };
 }
 
 export async function openInApp() {
@@ -46,7 +57,7 @@ export async function openInApp() {
   }
   hide();
   // Safari's own "Open in Cydian?" can't be reworded: the banner says which button to press.
-  showBanner({ title: "Cydian", message: "Press Open to bring your sources and settings into Cydian." });
+  showBanner({ title: "Cydian", message: "Press Open to bring your certificate, sources and settings into Cydian." });
   location.href = link;
 }
 
@@ -83,7 +94,16 @@ export async function reviewAndImport(url, { native = globalThis.cydianNative, b
   // Straight away, no question (user 2026-11-17): the user asked for it by opening the link.
   const hide = hud("Importing");
   const failed = [];
-  if (r.empty) {
+  // F93: the website's certificate into the Keychain, as before F89.
+  if (payload.identity && native?.call) {
+    try {
+      const b64 = (t) => toBase64(fromB64url(t));
+      await native.call("signing.import", { p12: b64(payload.identity.p12), profile: b64(payload.identity.profile),
+        password: payload.identity.password ?? "" });
+      await saveIdentity({ p12Name: payload.identity.p12Name, profileName: payload.identity.profileName }).catch(() => {});
+    } catch (err) { failed.push(`Certificate: ${err?.message ?? err}`); }
+  }
+  if (r.empty && !payload.identity) {
     hide();
     await alert({ title: "Nothing New", message: "Cydian already has the website's sources and settings.", buttons: ["OK"] });
     return "nothing";

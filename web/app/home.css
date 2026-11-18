@@ -98,16 +98,15 @@ html[data-theme="dark"] .app-offer .table.grouped { background: #2f4a36; }
 .installed-myipas > .table { border: 1px solid var(--table-edge, #b4b8bf); box-shadow: 0 1px 2px rgba(0,0,0,.12); background: var(--table, #fff); }
 .installed-myipas .home-tile { min-height: 58px; }
 
-/* F82 Home's Reload while it reloads: Cydia's nav button becomes UIKit's small white spinner in the button's own spot
-   (UIActivityIndicatorViewStyleWhite on the 4S: 20pt, 12 spokes from r 4.5 to 9.5, the brightest at 9 o'clock with
-   five fading behind it, the rest at 27%), right-aligned where the button ends. No bezel: the phone draws none. */
-.bar-button.is-reloading, .bar-button.is-reloading:active {
-  position: relative; min-width: 20px; width: 20px; padding: 0; margin-right: 0; color: transparent; text-shadow: none;
-  border-color: transparent; background: none; box-shadow: none; cursor: default;
+/* F82 Home's Reload while it reloads, as Cydia's loadingitem_ (CyteKit/WebViewController.mm): the same bordered nav
+   button titled " " (so UIKit's 50pt minimum width), with UIActivityIndicatorViewStyleWhite (20pt, 12 spokes from
+   r 4.5 to 9.5, the brightest at 9 o'clock with five fading behind it, the rest at 27%) added inside it at x 15, y 5:
+   centred in the bezel. The bezel stays as it is, never pressed or dimmed. */
+.bar-button.is-reloading {
+  position: relative; width: 50px; min-width: 50px; padding: 0; color: transparent; text-shadow: none; cursor: default;
 }
-html[data-theme="dark"] .bar-button.is-reloading { border-color: transparent; background: none; }
 .bar-button.is-reloading::after {
-  content: ""; position: absolute; left: 0; top: 50%; width: 20px; height: 20px; margin-top: -10px;
+  content: ""; position: absolute; left: 14px; top: 4px; width: 20px; height: 20px; /* 15,5 less the 1px border */
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%23fff' stroke-width='2.1' stroke-linecap='round'%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(0 10 10)' opacity='0.27'/%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(30 10 10)' opacity='0.27'/%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(60 10 10)' opacity='0.27'/%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(90 10 10)' opacity='0.27'/%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(120 10 10)' opacity='0.4'/%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(150 10 10)' opacity='0.5'/%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(180 10 10)' opacity='0.6'/%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(210 10 10)' opacity='0.72'/%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(240 10 10)' opacity='0.85'/%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(270 10 10)' opacity='1'/%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(300 10 10)' opacity='0.27'/%3E%3Cline x1='10' y1='1.4' x2='10' y2='5.4' transform='rotate(330 10 10)' opacity='0.27'/%3E%3C/g%3E%3C/svg%3E") center / 20px no-repeat;
   animation: hud-spin .96s steps(12) infinite;
 }

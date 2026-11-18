@@ -25,6 +25,7 @@ test("F82: Reload spins in the button's spot, keeps the page's content, and give
   const done = reloadHome(button, {}, {
     refresh: () => new Promise((r) => { finishRefresh = r; seen.push("refresh"); }),
     settled: async () => { seen.push("settled"); },
+    reload: async () => { seen.push("reload"); }, // the new package lists, dpkg, Cydian's own update
     redraw: async () => {
       seen.push("redraw");
       assert.ok(spinning(button), "still the spinner while Home redraws");
@@ -40,7 +41,7 @@ test("F82: Reload spins in the button's spot, keeps the page's content, and give
   assert.equal(await reloadHome(button, {}, { refresh: () => assert.fail("no second reload") }), false);
   finishRefresh();
   assert.equal(await done, true);
-  assert.deepEqual(seen, ["refresh", "settled", "redraw"]);
+  assert.deepEqual(seen, ["refresh", "settled", "reload", "redraw"], "new versions load before Home redraws");
   assert.equal(body.children, shown, "the same page, updated where it stood");
   assert.deepEqual(body.children, ["head", "tiles, updated", "links"]);
   assert.ok(!button.classList.contains("is-reloading"), "back to Reload");

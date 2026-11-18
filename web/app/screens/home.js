@@ -166,11 +166,19 @@ export function untilRefreshed(ms = 120000) {
 }
 
 // What Reload does, each step injectable for the test: refresh the sources (Settings' Refresh on Launch's way: the
-// Sources tab's spinning badge, no HUD; when a refresh already runs, wait for that one), then redraw Home in place.
-export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ctx), settled = untilRefreshed, redraw = () => state.redraw?.() } = {}) {
+// Sources tab's spinning badge, no HUD; when a refresh already runs, wait for that one), load the new package lists
+// (new versions: Changes' badge and list), re-read dpkg in the app, look for Cydian's own update (app.js listens for
+// cydian:reloaded, as a launch does), then redraw Home in place.
+const loadNew = async () => {
+  await catalog.ensure();
+  if (catalog.statusSource() === "native") await catalog.reloadInstalled();
+  globalThis.dispatchEvent?.(new Event("cydian:reloaded"));
+};
+export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ctx), settled = untilRefreshed, reload = loadNew, redraw = () => state.redraw?.() } = {}) {
   return withReloadSpinner(button, async () => {
     await refresh();
     await settled();
+    await reload();
     await redraw();
   });
 }

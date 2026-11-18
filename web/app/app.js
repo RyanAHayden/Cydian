@@ -287,6 +287,9 @@ for (const type of ["pointerup", "pointercancel", "pointerleave"]) document.addE
 document.addEventListener("pointermove", (e) => {
   if (pressed && !pressed.contains(document.elementFromPoint(e.clientX, e.clientY))) unpress();
 }, { passive: true });
+// A held row lets go the moment its list scrolls (UIKit cancels the cell's highlight when the pan starts); iOS's
+// pointercancel alone can come late or not at all after a long hold.
+document.addEventListener("scroll", () => { if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; } }, { capture: true, passive: true });
 // The search fields' clear button (packages.css .search-field::after): a tap at the field's right end, while it has
 // text, empties it and searches again (the field's own input listener), keeping the keyboard up.
 document.addEventListener("click", (e) => {
@@ -368,6 +371,7 @@ if (globalThis.cydianNative) {
     .then((r) => (["complete", "essential", "ignored"].includes(r) ? r : settingsScreen.checkUpdates({ always: true })))
     .catch(() => {});
   setTimeout(lookForUpdates, 2000);
+  globalThis.addEventListener("cydian:reloaded", lookForUpdates); // Home's Reload (screens/home.js reloadHome)
   // The first launch after Cydian updated itself (iOS closed the old one as it installed this one): say so.
   appVersion().then((v) => {
     if (!v) return;

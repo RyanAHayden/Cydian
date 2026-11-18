@@ -56,4 +56,4 @@ html[data-theme="dark"] .confirm-problem .table { background: #5a3434; }
 .confirm-continue .cell-inner { justify-content: center; position: relative; }
 .confirm-continue .cell-label { flex: none; color: #385487; font-weight: bold; text-align: center; }
 html[data-theme="dark"] .confirm-continue .cell-label { color: #8fb0e8; }
-.confirm-continue .cell-inner:active .cell-label, .confirm-continue .cell-inner.is-pressed .cell-label { color: #fff; }
+.confirm-continue .cell-inner.is-pressed .cell-label { color: #fff; }

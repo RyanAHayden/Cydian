@@ -11,18 +11,19 @@
 //   cydian://shared?route=…            N9: an .ipa or .deb shared with Cydian, or why not (share.js)
 //   cydian://package?id=<id>           F96: the website's Install in Cydian: that app's page (Search's package:<id>)
 //   cydian://account?k=<key>           F97: a Cydian Account's link or QR code: Sign In With Key, filled in
+//   cydian://<tab>                     B14: home, sources, changes, installed, search, settings: that tab, at its root
 //   altstore://source?url=…, feather://install/<ipa>, …   F83: other sideloaders' links (core/otherlinks.js), when
 //                                      Settings > Sideloading > Open Other Apps' Links is on: a source goes to Sources >
 //                                      Manage's Add, filled in; an IPA to Install IPAs, then Install (signAndInstall).
 //                                      Off, or a link Cydian has no use for: handed back (handBack below)
 //
 //   startIncoming({ native })          once, in the app
-//   await handleIncoming(url, deps)    -> "import" | "install" | "myipas" | "add" | "shared" | "package" | "account" | "other-source" |
+//   await handleIncoming(url, deps)    -> "import" | "install" | "myipas" | "add" | "shared" | "package" | "account" | "tab" | "other-source" |
 //                                         "other-install" | "other-app" | null (not one of ours)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showAlert } from "./nav/alert.js";
 import { showHUD } from "./nav/hud.js";
-import { format } from "./router.js";
+import { format, ALL_TABS } from "./router.js";
 import { parseAddLink } from "./core/handoff.js";
 import { parseOtherLink, otherLinksOn } from "./core/otherlinks.js";
 import { packageIdOf } from "./websign-gate.js";
@@ -87,9 +88,21 @@ export async function handleIncoming(url, { native = globalThis.cydianNative, al
     await run(u, { native });
     return "import";
   }
+  const tab = tabOf(u);
+  if (tab) {
+    open(format({ tab, path: [] })); // a tab this build leaves out lands on Home (router.parse)
+    return "tab";
+  }
   const other = parseOtherLink(u);
   if (other) return handleOtherLink(u, other, { native, alert, hud, add, install, on, open, now });
   return null;
+}
+
+// B14: cydian://sources, cydian://changes/, … -> "sources", or null (not a bare tab link).
+export function tabOf(link) {
+  const m = /^cydian:\/\/([a-z]+)\/?(?:[?#].*)?$/i.exec(String(link ?? ""));
+  const t = m?.[1].toLowerCase();
+  return t && ALL_TABS.includes(t) ? t : null;
 }
 
 const goHash = (hash) => { if (typeof location !== "undefined") location.hash = hash.replace(/^#/, ""); };

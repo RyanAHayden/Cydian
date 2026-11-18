@@ -41,7 +41,9 @@ enum IncomingLink {
     // (Import from Safari's signing-import went with the website's signer); package: F96, the website's Install in
     // Cydian (cydian://package?id=…, an app's page)
     // account: F97, a Cydian Account's link (cydian://account?k=…)
-    static let hosts: Set<String> = ["import", "install", "myipas", "add", "shared", "package", "account"]
+    // B14: a tab's own link (cydian://sources, cydian://changes, …) opens that tab: web/app/router.js ALL_TABS
+    static let tabs: Set<String> = ["home", "sources", "changes", "installed", "search", "settings"]
+    static let hosts: Set<String> = Set(["import", "install", "myipas", "add", "shared", "package", "account"]).union(tabs)
     static let maxLength = 512 * 1024
 
     static func accepts(_ url: URL) -> Bool {

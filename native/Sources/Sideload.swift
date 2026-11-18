@@ -209,7 +209,10 @@ enum Sideload {
                     if let remote = remote {
                         var q = URLComponents(string: remote + "/sign/manifest")!
                         q.queryItems = [URLQueryItem(name: "bundleid", value: app.bundleID), URLQueryItem(name: "version", value: app.version),
-                                        URLQueryItem(name: "title", value: app.name), URLQueryItem(name: "url", value: server.base + ipaPath)]
+                                        URLQueryItem(name: "title", value: app.name),
+                                        // port and path, not the URL: proxies refuse queries holding "http://127.0.0.1"
+                                        URLQueryItem(name: "port", value: String(server.port)),
+                                        URLQueryItem(name: "path", value: String(ipaPath.dropFirst()))]
                         link = LocalCA.itmsURL(manifest: q.url!.absoluteString)
                     } else {
                         link = LocalCA.itmsURL(manifest: server.base + manifestPath)

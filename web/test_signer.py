@@ -277,6 +277,10 @@ class GuardTest(Base):
         item = plistlib.loads(ok.data)["items"][0]
         self.assertEqual(item["assets"][0]["url"], "http://127.0.0.1:52344/abc/app.ipa")
         self.assertEqual((item["metadata"]["bundle-identifier"], item["metadata"]["title"]), ("com.ryha.openmx", "openMX"))
+        # what the app sends: port and path only (no "http://127.0.0.1" for a proxy's exploit filter to refuse)
+        pp = self.c.get("/sign/manifest", query_string={"bundleid": "com.ryha.openmx", "port": "52758", "path": "abc123/app.ipa"})
+        self.assertEqual(plistlib.loads(pp.data)["items"][0]["assets"][0]["url"], "http://127.0.0.1:52758/abc123/app.ipa")
+        self.assertEqual(self.c.get("/sign/manifest", query_string={"bundleid": "a.b", "port": "1", "path": "../etc?x"}).status_code, 400)
         for url in ("https://evil.example/x.ipa", "http://10.0.0.5:80/x.ipa", "http://127.0.0.1/x.ipa", "http://u:p@127.0.0.1:1/x", "ftp://127.0.0.1:2/x"):
             r = self.c.get("/sign/manifest", query_string={"bundleid": "a.b", "url": url})
             self.assertEqual(r.status_code, 400, url)

@@ -7,7 +7,7 @@ itms-services:// link the phone installs from. docs/signing.md is the long versi
   GET  /sign/job/<job>            {status: downloading | signing | done (+ the fields above) | error (+ error, code,
                                   httpStatus)}: the phone polls it, so no one request outlasts a proxy's timeout
   GET  /sign/<token>/manifest.plist   the install manifest iOS reads (until the token expires)
-  GET  /sign/manifest?bundleid=&version=&title=&url=http://127.0.0.1:<port>/...   a manifest for an IPA the phone serves
+  GET  /sign/manifest?bundleid=&version=&title=&port=&path=   a manifest for an IPA the phone serves at 127.0.0.1:<port>/<path>
   GET  /sign/<token>/app.ipa          the signed IPA (HEAD and Range too), until the token expires
   GET  /sign/status                   {ok, zsign, maxBytes, ttl, jobs}: Settings > Signing asks if this server signs
 
@@ -258,7 +258,11 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
         manifest, so no certificate has to be trusted on the phone. Only loopback IPA URLs are accepted (this is
         no open redirect), and nothing is stored or logged."""
         q = request.args
+        # port + path is what the app sends: a query holding "http://127.0.0.1" is refused as an exploit by common
+        # proxy filters (Nginx Proxy Manager's "Block Common Exploits" answered iOS's installer 403). url= still works.
         url = q.get("url", "")
+        if not url and q.get("port", "").isdigit() and re.fullmatch(r"[A-Za-z0-9/._-]{1,200}", q.get("path", "")):
+            url = f"http://127.0.0.1:{int(q['port'])}/{q['path'].lstrip('/')}"
         try:
             u = urlsplit(url)
             port = u.port

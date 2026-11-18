@@ -109,3 +109,24 @@ import { PART, uploadCap } from "./src/index.js";
   assert.deepEqual(seen, [86400, 86400, 86400]); // retried twice, cached at the edge
   console.log("worker upstream: ok");
 }
+{
+  const { upstream, githubRelease } = await import("./src/index.js");
+  assert.deepEqual(githubRelease("https://github.com/FIZL0/opentennis/releases/download/v1.7.1/opentennis-ios.ipa"),
+    { owner: "FIZL0", repo: "opentennis", tag: "v1.7.1", file: "opentennis-ios.ipa" });
+  assert.equal(githubRelease("https://github.com/o/r/releases/latest/download/C.ipa").tag, null);
+  assert.equal(githubRelease("https://example.com/a.ipa"), null);
+  const calls = [];
+  const fetcher = async (u, o = {}) => {
+    calls.push([u, o.headers?.Authorization ? "auth" : "anon"]);
+    if (u.startsWith("https://github.com/")) return new Response("slow down", { status: 429 });
+    if (u.includes("/releases/tags/")) return Response.json({ assets: [{ name: "a.ipa", url: "https://api.github.com/repos/o/r/releases/assets/9" }] });
+    if (u.endsWith("/assets/9")) return new Response(null, { status: 302, headers: { location: "https://release-assets.githubusercontent.com/x" } });
+    return new Response("IPA");
+  };
+  const r = await upstream("https://github.com/o/r/releases/download/v1/a.ipa", { fetcher, wait: async () => {}, token: "t" });
+  assert.equal(await r.text(), "IPA");
+  assert.deepEqual(calls.at(-1), ["https://release-assets.githubusercontent.com/x", "anon"]); // the blob store never sees the token
+  const none = await upstream("https://github.com/o/r/releases/download/v1/a.ipa", { fetcher, wait: async () => {} });
+  assert.equal(none.status, 429); // no token: as before
+  console.log("worker github token: ok");
+}

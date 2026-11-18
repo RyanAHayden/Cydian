@@ -74,7 +74,30 @@ export function httpUrl(raw) {
 export const releaseFile = (url) => /^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/download\/[^/]+\/[^/]+$/.test(String(url));
 // GitHub limits requests per address, and Workers share theirs with other sites: a 429 (or a 5xx) is tried again
 // after a short wait, up to 3 times (user 2026-11-18: "upstream answered HTTP 429" installing Cydian).
-export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+// A GitHub release file: { owner, repo, tag (null for latest), file }, or null.
+export function githubRelease(url) {
+  const m = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/releases\/(?:download\/([^/]+)|latest\/download)\/([^/?#]+)$/.exec(String(url));
+  return m ? { owner: m[1], repo: m[2], tag: m[3] ? decodeURIComponent(m[3]) : null, file: decodeURIComponent(m[4]) } : null;
+}
+
+// GitHub limits anonymous downloads per address, and Cloudflare's addresses are shared: when github.com still says
+// 429, the same file comes through GitHub's API with GITHUB_TOKEN (a token with no permissions: public repos only),
+// limited per token instead. The asset's real address (GitHub's blob store) is fetched without the token.
+export async function viaGitHubApi(url, token, { fetcher = fetch } = {}) {
+  const g = githubRelease(url);
+  if (!g || !token) return null;
+  const api = { Authorization: `Bearer ${token}`, "User-Agent": "cydian.dev", Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
+  const rel = await fetcher(`https://api.github.com/repos/${g.owner}/${g.repo}/releases/${g.tag ? `tags/${encodeURIComponent(g.tag)}` : "latest"}`, { headers: api });
+  if (!rel.ok) return null;
+  const asset = ((await rel.json()).assets ?? []).find((a) => a.name === g.file);
+  if (!asset?.url) return null;
+  const hop = await fetcher(asset.url, { headers: { ...api, Accept: "application/octet-stream" }, redirect: "manual" });
+  const where = hop.headers.get("location");
+  if (!where) return hop.ok ? hop : null;
+  return fetcher(where, { headers: { "User-Agent": "cydian.dev" }, cf: { cacheEverything: true, cacheTtl: 86400 } });
+}
+
+export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promise((r) => setTimeout(r, ms)), token = null } = {}) {
   const cf = releaseFile(url) ? { cacheEverything: true, cacheTtl: 86400 } : { cacheTtl: 0 };
   let r;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -83,9 +106,13 @@ export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promis
     const after = Number(r.headers.get("retry-after"));
     await wait(Number.isFinite(after) && after > 0 && after <= 5 ? after * 1000 : 600 * (attempt + 1));
   }
+  if (r.status === 429 && token) {
+    const viaApi = await viaGitHubApi(url, token, { fetcher }).catch(() => null);
+    if (viaApi?.ok) return viaApi;
+  }
   return r;
 }
-async function apiFetch(u, maxBytes = MAX_UPLOAD) {
+async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null) {
   const target = httpUrl(u.searchParams.get("url") ?? "");
   if (!target) return fetchErr("bad_url", "Only http(s) URLs can be fetched.", 400);
   const kind = u.searchParams.get("kind") ?? "";
@@ -103,7 +130,7 @@ async function apiFetch(u, maxBytes = MAX_UPLOAD) {
     }
     if (kind === "ipa") return ipaFetch(target, maxBytes);
     if (kind) return fetchErr("bad_url", `unknown kind ${kind}`, 400);
-    const r = await upstream(target.href);
+    const r = await upstream(target.href, { token });
     if (!r.ok) return fetchErr("upstream", `upstream answered HTTP ${r.status}`, r.status >= 400 && r.status < 600 ? r.status : 502);
     const ctype = (r.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
     return new Response(r.body, { headers: { ...SAFE, "Content-Type": PASS.includes(ctype) ? r.headers.get("content-type") : "application/octet-stream",
@@ -232,7 +259,7 @@ export default {
     const ttl = Math.max(60, Number(env.TTL) || 600);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
-    if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env));
+    if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null);
     if (u.pathname === "/healthz") return new Response("ok\n", { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
     if (u.pathname === "/sign/status") return json({ ok: true, ttl, worker: true, zsign: false, upload: uploadCap(env) });
     if (u.pathname.startsWith("/sign/up")) { const r = await uploads(req, u, env, ttl); if (r) return r; }

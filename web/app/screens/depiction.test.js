@@ -94,3 +94,44 @@ test("F103: MinVersionForceView renders its inner view; an empty one renders not
   const empty = renderSileo(stack({ class: "DepictionMinVersionForceView", minVersion: "2.5" }));
   assert.equal(byClass(empty, "dep-stack")[0].children.length, 0);
 }));
+
+// B18: Chariz's Oneko depiction (https://chariz.com/api/sileo/package/com.pixelomer.oneko/depiction.json), its
+// three DepictionButtonViews as served: isLink with a nested label, and with a nested image.
+test("B18: a ButtonView with isLink and a nested view draws the view inside a plain link, not an empty bar", () => withDom(() => {
+  const opened = [];
+  const root = renderSileo(stack(
+    { class: "DepictionButtonView", action: "https://chariz.com/get/oneko/changelog", openExternal: false, isLink: true,
+      view: { class: "DepictionLabelView", text: "Version History", fontSize: 12, alignment: 2, margins: "{21, 15, 6, 15}" } },
+    { class: "DepictionButtonView", action: "mailto:contact%40pixelomer.com?subject=Oneko%20%E2%80%93%20Chariz%20Support",
+      openExternal: true, isLink: true, view: { class: "DepictionLabelView", text: "Email Support", fontSize: 12, margins: "{4, 15, 10, 15}" } },
+    { class: "DepictionButtonView", action: "https://chariz.com/", isLink: true, yPadding: 8, text: "Chariz",
+      view: { class: "DepictionImageView", URL: "https://chariz.com/img/chariz-logo-head@3x.png", width: 83, height: 30,
+        cornerRadius: 0, alignment: 1, accessibilityText: "Chariz" } },
+    { class: "DepictionButtonView", action: "depiction-https://example.com/sub.json", view: { class: "DepictionLabelView", text: "More" } },
+    { class: "DepictionButtonView", action: "https://example.com/", text: "Plain" },
+  ), { open: (url, title) => opened.push([url, title]) });
+  const [history, email, logo, sub, plain] = byClass(root, "dep-button");
+  for (const b of [history, email, logo]) {
+    assert.ok(b.classList.contains("link"), "isLink: link style, not the filled bar");
+    assert.ok(b.classList.contains("has-view"));
+  }
+  const [label] = byClass(history, "dep-label");
+  assert.equal(label?.textContent, "Version History", "the nested label is inside the button");
+  assert.equal(label.style.textAlign, "right");
+  assert.equal(history.href, "https://chariz.com/get/oneko/changelog");
+  assert.equal(history.textContent, "", "no duplicate text beside the view");
+  assert.equal(history.attrs["aria-label"], "Version History");
+  assert.match(email.href, /^mailto:/);
+  assert.equal(byClass(email, "dep-label")[0].textContent, "Email Support");
+  const [img] = all(logo).filter((n) => n.tagName === "IMG");
+  assert.equal(img?.src, "https://chariz.com/img/chariz-logo-head@3x.png", "the nested image is inside the button");
+  assert.equal(img.alt, "Chariz");
+  assert.equal(logo.attrs["aria-label"], "Chariz");
+  assert.equal(logo.style.paddingBlock, "8px");
+  assert.ok(!sub.classList.contains("link"), "no isLink: still the filled button, with its view inside");
+  assert.equal(byClass(sub, "dep-label")[0].textContent, "More");
+  sub.listeners.click[0]({ preventDefault() {} });
+  assert.deepEqual(opened, [["https://example.com/sub.json", "More"]], "a sub-depiction opens with the label's text as title");
+  assert.equal(plain.textContent, "Plain");
+  assert.ok(!plain.classList.contains("link") && !plain.classList.contains("has-view"));
+}));

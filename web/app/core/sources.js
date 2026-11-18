@@ -28,6 +28,8 @@ export const DEFAULT_SOURCES = [
 // one. Several redirect (github.com/.../raw/..., releases/latest/download/...): the proxy follows each hop, so the
 // URL kept is the one given. Deduped on the parsed URL.
 export const DEFAULT_ALT_SOURCES = dedupeUrls([
+  // I7: Cydian's own source first, the app's own package page (web/app/source.json, tools/altsource.py).
+  "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json",
   "https://provenance-emu.com/apps.json",
   "https://fizl0.github.io/apps/source.json",
   "https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json",

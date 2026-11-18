@@ -5,6 +5,8 @@
 #   Cydian.deb                       the rootless jailbreak build (debFor's fallback, iphoneos-arm64 only)
 #   <pkg>_<ver>_<arch>.deb           the same .deb under Debian's name (debFor's exact-arch match), e.g.
 #                                    com.ryha.cydian_0.2.0-412_iphoneos-arm64.deb
+# Then it points Cydian's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new Cydian.ipa:
+# commit web/app/source.json afterwards.
 # Run it only when a person asks for a release. How to cut one: docs/release.md.
 #
 #   tools/release.sh [--dry-run] [--notes FILE] [--dist DIR] [--draft]
@@ -25,7 +27,7 @@ while [ $# -gt 0 ]; do
     --notes) notes=${2:?--notes needs a file}; shift ;;
     --dist) dist=${2:?--dist needs a directory}; shift ;;
     --draft) draft=(--draft) ;;
-    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "release: unknown argument $1 (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -129,3 +131,6 @@ gh release create "$tag" --repo "$repo" --target "$sha" --title "Cydian $version
   "${draft[@]}" "$stage/Cydian.ipa" "$stage/Cydian.deb" "$stage/$debname"
 git fetch -q origin "refs/tags/$tag:refs/tags/$tag" || true
 echo "release: published https://github.com/$repo/releases/tag/$tag"
+python3 tools/altsource.py update "$version" "$ipa"
+python3 tools/altsource.py check
+echo "release: web/app/source.json now names $tag's Cydian.ipa: commit it"

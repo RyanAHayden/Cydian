@@ -202,7 +202,8 @@ let ownBack = false; // the pop under way came from our back button or our swipe
 function goBack() {
   ownBack = true;
   const top = stacks.top();
-  const up = top && parent({ tab: top.tab, path: top.path });
+  const below = stacks.below();
+  const up = below ? { tab: below.tab, path: below.path } : top && parent({ tab: top.tab, path: top.path });
   if (!up) return;
   if (top.pushed) history.back();
   else router.replace(up);

@@ -5,7 +5,7 @@
 
 import { prefixes } from "../router.js";
 
-const same = (a, b) => a.length === b.length && a.every((s, i) => s === b[i]);
+const isPrefix = (a, b) => a.length <= b.length && a.every((s, i) => s === b[i]);
 
 export function createStacks({ tabs, create }) {
   const stacks = Object.fromEntries(tabs.map((t) => [t, []])); // entries: { tab, path, page, pushed }
@@ -14,6 +14,8 @@ export function createStacks({ tabs, create }) {
   return {
     activeTab: () => activeTab,
     stack: (tab) => stacks[tab].slice(),
+    // Where Back goes from the top: the entry below it (a jump's origin), else the route's parent.
+    below: (tab = activeTab) => (tab && stacks[tab].length > 1 ? stacks[tab][stacks[tab].length - 2] : null),
     top: (tab = activeTab) => (tab && stacks[tab].length ? stacks[tab][stacks[tab].length - 1] : null),
 
     // Bring the stacks in line with a route. Returns
@@ -27,12 +29,19 @@ export function createStacks({ tabs, create }) {
       const want = prefixes(route.path);
       const before = activeTab;
       const from = this.top();
+      // Entries stay while they lead to the route. A jump may have left levels out, so match by prefix, not index.
       let keep = 0;
-      while (keep < stack.length && keep < want.length && same(stack[keep].path, want[keep])) keep++;
+      while (keep < stack.length && isPrefix(stack[keep].path, route.path)) keep++;
       const removed = stack.splice(keep).reverse();
+      const have = stack.length ? stack[stack.length - 1].path.length : -1;
+      let levels = want.filter((p) => p.length > have);
+      // A link that jumps several levels in the tab on screen (Home's Featured: Browse > Popular) adds only its
+      // page, so Back returns to where the link was, as UINavigationController's pushViewController does. A deep
+      // link or another tab's route still builds every level: there is no page it came from.
+      if (before === route.tab && from && levels.length > 1) levels = levels.slice(-1);
       const added = [];
-      for (let i = keep; i < want.length; i++) {
-        const entry = { tab: route.tab, path: want[i], page: create(route.tab, want[i]), pushed: false };
+      for (const path of levels) {
+        const entry = { tab: route.tab, path, page: create(route.tab, path), pushed: false };
         stack.push(entry);
         added.push(entry);
       }
@@ -41,13 +50,12 @@ export function createStacks({ tabs, create }) {
       let kind;
       if (before !== route.tab) kind = "tab";
       else if (!added.length && !removed.length) kind = "none";
-      else if (added.length && !removed.length) kind = "push"; // several at once (Home's Featured: Browse > Popular) slide in as one
+      else if (added.length && !removed.length) kind = "push";
       else if (!added.length) kind = "pop";
       else kind = "replace";
       // A pushed entry has its parent right behind it in the browser history, so back can be history.back().
       // Switching tabs adds history entries in between, so after one no entry can trust history any more: the back
       // button then goes straight to the parent (Sources > BigBoss, Search, Sources, Back went to Search).
-      // One history entry for several pages: back from the top must go to its own parent, not history.back() past it.
       if (kind === "push") to.pushed = added.length === 1;
       if (kind === "tab") for (const t of tabs) for (const e of stacks[t]) e.pushed = false;
       return { kind, tab: route.tab, from, to, added, removed };

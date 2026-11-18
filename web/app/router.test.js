@@ -145,14 +145,21 @@ test("popping several levels at once, and replacing a sibling", () => {
   assert.equal(r.kind, "pop");
   assert.deepEqual(r.removed.map((e) => e.path.join("/")), ["a/b/c", "a/b", "a"]); // top first
   assert.equal(r.to, root);
-  h.router.go({ tab: "sources", path: ["x", "y"] }); // two levels at once slide in as one push (Home's Featured)
+  h.router.go({ tab: "sources", path: ["x", "y"] }); // a jump two levels down (Home's Featured): only its page
   assert.equal(h.last().kind, "push");
-  assert.equal(h.last().to.pushed, false); // one history entry for two pages: Back goes to x, not history.back()
+  assert.equal(h.last().to.pushed, true); // Back is history.back(), to the root it came from
+  assert.deepEqual(h.paths("sources"), ["", "x/y"]);
+  assert.equal(h.stacks.below(), root);
+  h.router.go({ tab: "sources", path: ["x", "y", "p"] });
+  assert.deepEqual(h.paths("sources"), ["", "x/y", "x/y/p"]);
   h.router.go({ tab: "sources", path: ["x", "z"] });
   r = h.last();
   assert.equal(r.kind, "replace");
-  assert.deepEqual(r.removed.map((e) => e.path), [["x", "y"]]);
+  assert.deepEqual(r.removed.map((e) => e.path), [["x", "y", "p"], ["x", "y"]]);
   assert.deepEqual(r.added.map((e) => e.path), [["x", "z"]]);
+  h.win.back("#/sources");
+  assert.equal(h.last().kind, "pop");
+  assert.deepEqual(h.paths("sources"), [""]);
 });
 
 test("switching tabs keeps both stacks and their pages", () => {

@@ -437,7 +437,8 @@ function renderRoot(body) {
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
       { label: "Find Extensions for Applications", href: format({ tab: "search" }), chevron: true },
-      { label: "More Package Sources", href: format({ tab: "home", path: ["sources"] }) },
+      // Manage Sources (user 2026-11-18), opened on Home's own stack (router mountLink): Back comes home.
+      { label: "More Package Sources", href: format({ tab: "sources", path: ["manage"] }) },
     ],
   }, { header: "User Guides", rows: guideRows(format) },
   { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }]);

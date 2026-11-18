@@ -408,6 +408,18 @@ if (standalone) {
     if (href && (a.target === "_blank" || a.rel.includes("noopener"))) { e.preventDefault(); viaSafari(href); }
   }, true);
 }
+// The app's shell: LinkOut asks iOS for the universal link, which only reaches the app signed by its own team. A
+// re-signed sideload (Unbound for Discord) still claims the scheme, so try that first; else the https link as before.
+if (globalThis.ifizboxNative) {
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest?.("a[href]");
+    const app = a && a.target === "_blank" && appSchemeFor(a.href);
+    if (!app) return;
+    e.preventDefault();
+    const out = (url) => globalThis.ifizboxNative.call("app.openURL", { url }).then((r) => r?.opened === true, () => false);
+    out(app).then((ok) => ok || out(a.href));
+  }, true);
+}
 router.start();
 askFromInstallLink(installLink, { install: () => home.installiFizBox() }).catch(() => {});
 // F93 (as before F89): first launch of a iFizBox installed from the website: its signed copy carries the website's

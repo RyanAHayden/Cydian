@@ -103,9 +103,7 @@ async function firstLoad(ctx) {
   try {
     const done = await loadNeverLoaded(getBackend(), state.sources, settings.deviceType(), {
       tried: state.tried,
-      // The HUD shows a moment at most: one slow source must not hold the screen (it eats taps). The refresh goes on
-      // behind the list, which redraws when it's done.
-      begin: () => { hide = ctx?.showHUD ? ctx.showHUD("Reloading Data") : () => {}; setTimeout(() => hide(), 2500); return () => {}; },
+      begin: () => (hide = ctx?.showHUD ? ctx.showHUD("Reloading Data") : () => {}),
     });
     if (done) {
       state.sources = await getBackend().sources();
@@ -114,10 +112,13 @@ async function firstLoad(ctx) {
   } catch {
     // a failed first load leaves the rows as they were; Refresh shows the error
   } finally {
-    hide();
+    linger(hide);
     state.busy = false;
   }
 }
+
+// The HUD stays exactly as long as the loading, then 0.75 s more and its 0.25 s fade: about a second after it's done.
+const linger = (hide) => setTimeout(hide, 750);
 
 // ---- the list --------------------------------------------------------------------------------------------
 
@@ -326,9 +327,6 @@ async function refresh(ctx) {
   if (state.busy) return;
   state.busy = true;
   const hide = ctx.showHUD("Reloading Data");
-  // Long enough to read as Cydia's Refresh, never so long a slow source (or its icons) holds the screen: after 8 s
-  // the HUD goes and the refresh finishes behind the list.
-  const cap = setTimeout(hide, 8000);
   try {
     await getBackend().refreshSources(undefined, { filter: sourceFilter(settings.deviceType()) }); // F41: only what's shown
     state.sources = await getBackend().sources();
@@ -337,8 +335,7 @@ async function refresh(ctx) {
     hide();
     await showAlert({ title: "Error", message: e.message, buttons: ["OK"] });
   } finally {
-    clearTimeout(cap);
-    hide();
+    linger(hide);
     state.busy = false;
   }
 }

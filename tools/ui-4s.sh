@@ -9,8 +9,8 @@
 #   tools/ui-4s.sh unlock ME         release it; always do this when done, even after a failure
 # ME is your task ID. A lock unused for 30 minutes is stale and can be taken over.
 set -eu
-lock=${XDG_RUNTIME_DIR:-/tmp}/cydian-4s-ui.lock  # outside the repo: shared by every worktree on this machine
-host=${CYDIAN_4S_HOST:-4s}
+lock=${XDG_RUNTIME_DIR:-/tmp}/ifizbox-4s-ui.lock  # outside the repo: shared by every worktree on this machine
+host=${IFIZBOX_4S_HOST:-4s}
 stale=30
 
 holder() { cat "$lock/owner" 2>/dev/null || echo '?'; }

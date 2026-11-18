@@ -80,12 +80,12 @@ test("sideload Upgrade (N) (F80): every app upgrade with an IPA queued for Confi
     sourceUrl: "https://s/", versions: [{ version: "2", downloadURL: `https://x/${id}.ipa`, size: 10 }, { version: "1", downloadURL: `https://x/${id}-1.ipa` }] } } });
   const added = [];
   const jobs = await queueUpgrades([
-    { id: "com.ryha.cydian", name: "iFizBox", version: "0.9", installed: "0.8", ipa: "https://github.com/x/Cydian.ipa" },
+    { id: "com.ryha.ifizbox", name: "iFizBox", version: "0.9", installed: "0.8", ipa: "https://github.com/x/iFizBox.ipa" },
     { id: "a", version: "2", installed: "1" }, { id: "gone", version: "3", installed: "1" }, null],
   { pkgOf: async (id) => (id === "a" ? pkg(id) : null), add: (job) => added.push(job) });
   assert.deepEqual(added, jobs);
   assert.deepEqual(jobs.map((j) => `${j.id}=${j.version} from ${j.installed} ${j.url}`),
-    ["com.ryha.cydian=0.9 from 0.8 https://github.com/x/Cydian.ipa", "a=2 from 1 https://x/a.ipa"]);
+    ["com.ryha.ifizbox=0.9 from 0.8 https://github.com/x/iFizBox.ipa", "a=2 from 1 https://x/a.ipa"]);
   assert.equal(jobs[1].name, "A");
   assert.deepEqual(await queueUpgrades(undefined, { add: () => assert.fail("nothing to queue") }), []);
 });

@@ -314,7 +314,7 @@ export function dailyPick(rows, day = dayKey()) {
   const byId = new Map();
   for (const r of rows ?? []) if (r?.id && !byId.has(r.id)) byId.set(r.id, r);
   const ids = [...byId.keys()].sort();
-  return ids.length ? byId.get(ids[hash32(`cydian:${day}`) % ids.length]) : null;
+  return ids.length ? byId.get(ids[hash32(`ifizbox:${day}`) % ids.length]) : null;
 }
 
 // What a build's Browse is about: tweaks and themes where the phone is jailbroken, else apps (F37).

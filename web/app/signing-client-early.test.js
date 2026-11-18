@@ -8,14 +8,14 @@ const profile = (appId) => new TextEncoder().encode(`junk<?xml version="1.0"?><p
 <key>TeamIdentifier</key><array><string>TEAM1</string></array>
 <key>Entitlements</key><dict><key>application-identifier</key><string>TEAM1.${appId}</string></dict></dict></plist>junk`);
 const idFor = (appId) => ({ p12: new Uint8Array([0x30, 1]), profile: profile(appId), password: "pw", passwordOk: true });
-const SELF = "https://github.com/RyanAHayden/iFizBox/releases/latest/download/Cydian.ipa";
+const SELF = "https://github.com/RyanAHayden/iFizBox/releases/latest/download/iFizBox.ipa";
 const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
 
 // The Worker: /api/fetch answers an IPA; /sign/upload reserves (token, no size) or starts (size); parts of 4 bytes.
 function fakeServer({ reserveStatus = 200 } = {}) {
   const calls = [];
   const fetcher = async (url, init = {}) => {
-    const u = new URL(url, "https://cydian.example");
+    const u = new URL(url, "https://ifizbox.example");
     calls.push({ method: init.method ?? "GET", path: u.pathname, q: Object.fromEntries(u.searchParams) });
     if (u.pathname === "/api/fetch") return new Response(new Uint8Array([0x50, 0x4b, 3, 4]));
     if (u.pathname === "/sign/upload") {
@@ -40,9 +40,9 @@ function deps(id, over = {}) {
     go: () => {},
     now: () => id,
     identity: async () => { log.order.push("identity"); return id; },
-    worker: async () => ({ ok: true, ipa: new Uint8Array([0x50, 0x4b, 1, 2, 3]), bundleId: "com.you.cydian", name: "iFizBox", version: "0.4" }),
+    worker: async () => ({ ok: true, ipa: new Uint8Array([0x50, 0x4b, 1, 2, 3]), bundleId: "com.you.ifizbox", name: "iFizBox", version: "0.4" }),
     transfer: async () => null,
-    origin: () => "https://cydian.example",
+    origin: () => "https://ifizbox.example",
     ...over,
   };
   return { d, log };
@@ -50,7 +50,7 @@ function deps(id, over = {}) {
 
 test("expectedBundleId: explicit profiles, wildcards with a known app ID, else null", () => {
   assert.equal(expectedBundleId(idFor("com.you.app"), { url: "https://x/a.ipa" }), "com.you.app");
-  assert.equal(expectedBundleId(idFor("com.you.*"), { url: SELF }), "com.you.cydian");
+  assert.equal(expectedBundleId(idFor("com.you.*"), { url: SELF }), "com.you.ifizbox");
   assert.equal(expectedBundleId(idFor("com.you.*"), { url: "https://x/a.ipa", bundleId: "io.dev.delta" }), "com.you.delta");
   assert.equal(expectedBundleId(idFor("*"), { url: "https://x/a.ipa", bundleId: "io.dev.delta" }), "io.dev.delta");
   assert.equal(expectedBundleId(idFor("com.you.*"), { url: "https://x/a.ipa" }), null); // its own ID comes with the download
@@ -59,11 +59,11 @@ test("expectedBundleId: explicit profiles, wildcards with a known app ID, else n
 });
 
 test("earlyLink: a fresh 48-hex token and the itms link to its manifest", () => {
-  const app = { bundleId: "com.you.cydian", name: "iFizBox & Co", version: "0.4" };
+  const app = { bundleId: "com.you.ifizbox", name: "iFizBox & Co", version: "0.4" };
   const a = earlyLink("https://cydian.dev", app), b = earlyLink("https://cydian.dev", app);
   assert.match(a.token, /^[0-9a-f]{48}$/);
   assert.notEqual(a.token, b.token);
-  assert.equal(a.manifest, `https://cydian.dev/sign/up/${a.token}/manifest.plist?bundleid=com.you.cydian&version=0.4&title=iFizBox+%26+Co`);
+  assert.equal(a.manifest, `https://cydian.dev/sign/up/${a.token}/manifest.plist?bundleid=com.you.ifizbox&version=0.4&title=iFizBox+%26+Co`);
   assert.equal(a.itms, "itms-services://?action=download-manifest&url=" + encodeURIComponent(a.manifest));
 });
 
@@ -73,14 +73,14 @@ test("Install with the bundle ID known: iOS's prompt opens first, reserved, then
   let recorded = null;
   assert.equal(await signInBrowser({ url: SELF, name: "iFizBox", onInstalled: (r) => { recorded = r; } }, d), true);
   assert.deepEqual(log.order.slice(0, 2), ["open", "identity"]); // the link opened before anything waited
-  const token = /%2Fsign%2Fup%2F([0-9a-f]{48})%2Fmanifest\.plist%3Fbundleid%3Dcom\.you\.cydian%26/.exec(log.opened[0])?.[1];
+  const token = /%2Fsign%2Fup%2F([0-9a-f]{48})%2Fmanifest\.plist%3Fbundleid%3Dcom\.you\.ifizbox%26/.exec(log.opened[0])?.[1];
   assert.ok(token, log.opened[0]);
   assert.equal(log.opened.length, 1);
   assert.deepEqual(log.alerts, []);
   const ups = srv.calls.filter((c) => c.path === "/sign/upload");
-  assert.deepEqual(ups.map((c) => [c.q.token, c.q.bundleid, "size" in c.q]), [[token, "com.you.cydian", false], [token, "com.you.cydian", true]]);
+  assert.deepEqual(ups.map((c) => [c.q.token, c.q.bundleid, "size" in c.q]), [[token, "com.you.ifizbox", false], [token, "com.you.ifizbox", true]]);
   assert.ok(srv.calls.some((c) => c.path === `/sign/upload/${token}/done`));
-  assert.equal(recorded.bundleId, "com.you.cydian");
+  assert.equal(recorded.bundleId, "com.you.ifizbox");
   assert.equal(log.hud.at(-1), "done Installing");
 });
 

@@ -17,7 +17,7 @@ export async function buildInfo(fetcher = globalThis.fetch) {
 }
 
 // The two lines, filled in as the app's info and build.json answer: [foot, commit], to append at the bottom.
-export function versionLines({ native = globalThis.cydianNative, info = buildInfo, ios = () => currentDevice().ios } = {}) {
+export function versionLines({ native = globalThis.ifizboxNative, info = buildInfo, ios = () => currentDevice().ios } = {}) {
   const foot = el("p", "home-version", footLine({ ios: ios(), web: !native }));
   const commit = el("p", "home-version home-commit");
   native?.call?.("app.info", {}).then((i) => { foot.textContent = footLine(i ?? {}); }, () => {});

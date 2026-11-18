@@ -117,7 +117,7 @@ test("F157: OpenSSH's steps tick green when tapped, remembered per guide", async
   await badges[2].click();
   assert.ok(badges[0]._cls.has("is-done"));
   assert.equal(badges[0].getAttribute("aria-pressed"), "true");
-  assert.deepEqual(JSON.parse(store.m.get("cydian.guideSteps.openssh")), [1, 3]);
+  assert.deepEqual(JSON.parse(store.m.get("ifizbox.guideSteps.openssh")), [1, 3]);
   await badges[2].click(); // untick
   assert.ok(!badges[2]._cls.has("is-done"));
   // drawn again: still ticked; another guide keeps its own

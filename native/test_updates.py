@@ -29,7 +29,7 @@ def read(*p):
 class SwiftUpdates(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.mkdtemp(prefix="cydian-updatestest-")
+        cls.tmp = tempfile.mkdtemp(prefix="ifizbox-updatestest-")
         binary = os.path.join(cls.tmp, "updatestest")
         env = dict(os.environ)
         shim = os.path.join(cls.tmp, "libshim")
@@ -67,12 +67,12 @@ class Wiring(unittest.TestCase):
         self.assertIn("BackgroundCheck.register()", launch)
         self.assertIn("BGTaskScheduler.shared.register(forTaskWithIdentifier: taskID", self.src)
         self.assertIn('"BGTaskSchedulerPermittedIdentifiers"', self.src)  # never registers an id iOS would crash on
-        self.assertIn('taskID = "com.ryha.cydian.updates"', self.src)
+        self.assertIn('taskID = "com.ryha.ifizbox.updates"', self.src)
 
     def test_sideload_plist_permits_it(self):
         with open(os.path.join(HERE, "Info-sideload.plist"), "rb") as f:
             p = plistlib.load(f)
-        self.assertIn("com.ryha.cydian.updates", p["BGTaskSchedulerPermittedIdentifiers"])
+        self.assertIn("com.ryha.ifizbox.updates", p["BGTaskSchedulerPermittedIdentifiers"])
         self.assertIn("fetch", p["UIBackgroundModes"])
         self.assertIn("audio", p["UIBackgroundModes"])  # F14's keep-alive stays
 

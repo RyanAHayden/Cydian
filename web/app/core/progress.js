@@ -34,7 +34,7 @@ export function classify({ fd = "out", line = "" } = {}) {
   }
   const text = consoleText(line).replace(/\s+$/, "");
   if (!text) return null;
-  if (/^(E: |E:$|dpkg: error|dpkg: dependency problems|Errors were encountered|cydian-helper: (?!cancelled))/.test(text)) return { kind: "error", text };
+  if (/^(E: |E:$|dpkg: error|dpkg: dependency problems|Errors were encountered|ifizbox-helper: (?!cancelled))/.test(text)) return { kind: "error", text };
   if (/^(W: |W:$|dpkg: warning)/.test(text)) return { kind: "warning", text };
   return { kind: "raw", text };
 }

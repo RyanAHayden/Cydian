@@ -62,7 +62,7 @@ def edit_ipa():
         put("Payload/", b"", 0o40755)
         put(A, b"", 0o40755)
         put(A + "Info.plist", info(
-            "dev.cydian.fixture", "Fixture", CFBundleDisplayName="Fixture", MinimumOSVersion="15.0",
+            "dev.ifizbox.fixture", "Fixture", CFBundleDisplayName="Fixture", MinimumOSVersion="15.0",
             NSCameraUsageDescription="To scan codes.", NSLocalNetworkUsageDescription="To find your Mac.",
             CFBundleIcons={"CFBundlePrimaryIcon": {"CFBundleIconFiles": ["AppIcon60x60"], "CFBundleIconName": "AppIcon"}}))
         put(A + "Fixture", macho(), 0o100755)
@@ -71,14 +71,14 @@ def edit_ipa():
             '/* names */\n"CFBundleDisplayName" = "Fixture \\"EN\\"";\n// other\n"NSCameraUsageDescription" = "Scan";\n'.encode())
         put(A + "de.lproj/InfoPlist.strings", '"CFBundleName" = "Fixtur";'.encode("utf-16"))
         put(A + "fr.lproj/InfoPlist.strings", b'"Other" = "x";')
-        put(A + "Frameworks/Sub.framework/Info.plist", info("dev.cydian.sub", "Sub", "Sub", CFBundlePackageType="FMWK"))
+        put(A + "Frameworks/Sub.framework/Info.plist", info("dev.ifizbox.sub", "Sub", "Sub", CFBundlePackageType="FMWK"))
         put(A + "Frameworks/Sub.framework/Sub", fat_arm64e(), 0o100755)
         put(A + "PlugIns/Share.appex/Info.plist", info(
-            "dev.cydian.fixture.share", "Share", "Share", CFBundlePackageType="XPC!",
+            "dev.ifizbox.fixture.share", "Share", "Share", CFBundlePackageType="XPC!",
             NSExtension={"NSExtensionPointIdentifier": "com.apple.share-services"}))
         put(A + "PlugIns/Share.appex/Share", macho(), 0o100755)
         put(A + "PlugIns/Widget.appex/Info.plist", info(
-            "dev.cydian.fixture.widget", "Widget", "Widget", CFBundlePackageType="XPC!",
+            "dev.ifizbox.fixture.widget", "Widget", "Widget", CFBundlePackageType="XPC!",
             NSExtension={"NSExtensionPointIdentifier": "com.apple.widgetkit-extension"}))
         put(A + "PlugIns/Widget.appex/Widget", macho(), 0o100755)
     return buf.getvalue()
@@ -104,7 +104,7 @@ def cd_identifier(blob):
 class Sideload(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.mkdtemp(prefix="cydian-sideloadtest-")
+        cls.tmp = tempfile.mkdtemp(prefix="ifizbox-sideloadtest-")
         cls.fx = os.path.join(cls.tmp, "fixtures")
         cls.work = os.path.join(cls.tmp, "work")
         os.makedirs(cls.fx)
@@ -194,20 +194,20 @@ class Sideload(unittest.TestCase):
         app = plistlib.loads(files[A + "Info.plist"])
         self.assertEqual(app["CFBundleIdentifier"], "com.me.renamed")
         self.assertEqual(app["CFBundleDisplayName"], "Renamed")
-        self.assertEqual(app["CFBundleIcons"]["CFBundlePrimaryIcon"], {"CFBundleIconFiles": ["CydianIcon60x60"]})
+        self.assertEqual(app["CFBundleIcons"]["CFBundlePrimaryIcon"], {"CFBundleIconFiles": ["iFizBoxIcon60x60"]})
         self.assertNotIn("CFBundleIconName", app)
         share = plistlib.loads(files[A + "PlugIns/Share.appex/Info.plist"])
         self.assertEqual(share["CFBundleIdentifier"], "com.me.renamed.share")
         self.assertEqual(cd_identifier(slots(files[A + "PlugIns/Share.appex/Share"])[0]), "com.me.renamed.share")
         self.assertEqual(cd_identifier(slots(files[A + "Fixture"])[0]), "com.me.renamed")
-        self.assertEqual(files[A + "CydianIcon60x60@2x.png"], PNG)
-        self.assertEqual(files[A + "CydianIcon60x60@3x.png"], PNG)
+        self.assertEqual(files[A + "iFizBoxIcon60x60@2x.png"], PNG)
+        self.assertEqual(files[A + "iFizBoxIcon60x60@3x.png"], PNG)
         self.assertEqual(plistlib.loads(files[A + "en.lproj/InfoPlist.strings"]),
                          {"CFBundleDisplayName": "Renamed", "NSCameraUsageDescription": "Scan"})
         self.assertEqual(plistlib.loads(files[A + "de.lproj/InfoPlist.strings"]), {"CFBundleName": "Renamed"})
         self.assertEqual(files[A + "fr.lproj/InfoPlist.strings"], b'"Other" = "x";')
         cr = plistlib.loads(files[A + "_CodeSignature/CodeResources"])["files2"]
-        for f in ("CydianIcon60x60@2x.png", "en.lproj/InfoPlist.strings"):
+        for f in ("iFizBoxIcon60x60@2x.png", "en.lproj/InfoPlist.strings"):
             self.assertIn(f, cr)
         # the framework's arm64e slice: subtype 0x80000002 in the fat header and the slice header
         sub = files[A + "Frameworks/Sub.framework/Sub"]
@@ -247,7 +247,7 @@ if __name__ == "__main__":
 
 
 class HandoffSourceTest(unittest.TestCase):
-    """F75: the phone half can't run here, so read the sources: cydian:// links reach the page (scene URL contexts,
+    """F75: the phone half can't run here, so read the sources: ifizbox:// links reach the page (scene URL contexts,
     app.takeURL), the certificate inside iFizBox's own IPA is imported at launch, and nothing of the old local HTTPS
     install mode (its CA, TLS server, trust calls) is left."""
 
@@ -271,14 +271,14 @@ class HandoffSourceTest(unittest.TestCase):
         self.assertIn("Incoming.register(self)", self.files["Bridge.swift"])
         with open(os.path.join(HERE, "Info-sideload.plist"), "rb") as f:
             info = plistlib.load(f)
-        self.assertIn("cydian", [s for t in info["CFBundleURLTypes"] for s in t["CFBundleURLSchemes"]])
+        self.assertIn("ifizbox", [s for t in info["CFBundleURLTypes"] for s in t["CFBundleURLSchemes"]])
 
     def test_bundled_identity_at_launch(self):
         self.assertIn("SignBridge.importBundled()", self.files["App.swift"])
         bridge = self.files["SignBridge.swift"]
         start = bridge.index("static func importBundled()")
         body = bridge[start:bridge.index("\n    }\n", start)]
-        for part in ('"cydian-identity"', "BundledIdentity.shouldImport", "SignStore.identity() != nil",
+        for part in ('"ifizbox-identity"', "BundledIdentity.shouldImport", "SignStore.identity() != nil",
                      "UserDefaults.standard.set(digest", "SignStore.importIdentity", "confirmImport"):
             self.assertIn(part, body)
 

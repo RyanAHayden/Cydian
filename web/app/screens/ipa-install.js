@@ -70,7 +70,7 @@ export async function openIpaInstall({ url, name = "", onInstalled = () => {}, n
 // The page has already ended the run; the answer is ignored (a refusal once the helper runs, a shell without the
 // call). Not for share.js's stand-in (`native`): it sends every call to share.ipaInstall, a staged file with no
 // download to stop. True when ipa.cancel was asked for.
-export function stopIpaInstall(native = undefined, { bridge = globalThis.cydianNative } = {}) {
+export function stopIpaInstall(native = undefined, { bridge = globalThis.ifizboxNative } = {}) {
   if (native !== undefined || typeof bridge?.call !== "function") return false;
   try { Promise.resolve(bridge.call("ipa.cancel", {})).catch(() => {}); } catch { return false; }
   return true;

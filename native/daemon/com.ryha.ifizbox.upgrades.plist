@@ -2,9 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>Label</key><string>com.ryha.cydian.upgrades</string>
+	<key>Label</key><string>com.ryha.ifizbox.upgrades</string>
 	<key>ProgramArguments</key>
-	<array><string>/var/jb/usr/libexec/cydian/cydian-upgrades</string></array>
+	<array><string>/var/jb/usr/libexec/ifizbox/ifizbox-upgrades</string></array>
 	<key>UserName</key><string>root</string>
 	<key>RunAtLoad</key><true/>
 	<key>StartInterval</key><integer>3600</integer>

@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { installRows, appBundleId } from "./altstore.js";
 
 const V = { version: "1.2", downloadURL: "https://example.com/My-Delta.ipa" };
-const CYDIAN = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.7/Cydian.ipa" };
+const IFIZBOX = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.7/iFizBox.ipa" };
 
 function rowsWith(version, opts) {
   const calls = [];
@@ -27,9 +27,9 @@ test("the website's Install on the Website signs with the app's bundle ID", asyn
 });
 
 test("iFizBox's own website Install and the sideload app's Install pass it too", async () => {
-  const own = rowsWith(CYDIAN, { site: true, bundleId: "com.ryha.cydian" });
+  const own = rowsWith(IFIZBOX, { site: true, bundleId: "com.ryha.ifizbox" });
   await own.rows[0].onClick();
-  assert.equal(own.calls[0].bundleId, "com.ryha.cydian");
+  assert.equal(own.calls[0].bundleId, "com.ryha.ifizbox");
   const side = rowsWith(V, { site: false, bundleId: "com.example.delta" });
   await side.rows[0].onClick();
   assert.equal(side.calls[0].bundleId, "com.example.delta");

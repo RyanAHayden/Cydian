@@ -6,7 +6,7 @@
 //                                        it's locked like Home's rows (.home-locked: dimmed, a padlock where the
 //                                        switch was), and a tap asks the same "Install iFizBox First" as Home
 //                                        (askToBrowse: Install iFizBox / Browse Anyway (5) / Cancel).
-// The box redraws itself on cydian:browse-lock (websign-gate.js setFirstVisit), so Browse Anyway from anywhere, or the
+// The box redraws itself on ifizbox:browse-lock (websign-gate.js setFirstVisit), so Browse Anyway from anywhere, or the
 // Lock Home switch, unlocks or locks the row at once.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped } from "../nav/ui.js";
@@ -26,7 +26,7 @@ export const WEBSITE_INSTALLS_FOOTER = `Other apps' pages offer Install in ${NAM
   + `site's limited storage. ${NAME} itself always installs from here.`;
 
 // Home's Install iFizBox App flow, loaded when asked (home.js imports Settings' module graph).
-const installCydian = () => import("./home.js").then((h) => h.installCydian());
+const installiFizBox = () => import("./home.js").then((h) => h.installiFizBox());
 
 function switchRow(frag, label, sw) {
   const cell = frag.querySelector(".cell-inner");
@@ -36,7 +36,7 @@ function switchRow(frag, label, sw) {
 }
 
 // -> a div holding both groups; empty outside the website.
-export function websiteSection({ mode = detectMode(), storage, alert = showAlert, install = installCydian,
+export function websiteSection({ mode = detectMode(), storage, alert = showAlert, install = installiFizBox,
   target = globalThis } = {}) {
   const box = document.createElement("div");
   box.className = "website-settings";
@@ -66,9 +66,9 @@ export function websiteSection({ mode = detectMode(), storage, alert = showAlert
   draw();
   const onLock = () => {
     // in a page that was popped (a parent, out of the document): stop listening; not yet appended: just redraw
-    if (box.isConnected === false && box.parentNode) { target.removeEventListener?.("cydian:browse-lock", onLock); return; }
+    if (box.isConnected === false && box.parentNode) { target.removeEventListener?.("ifizbox:browse-lock", onLock); return; }
     draw();
   };
-  target.addEventListener?.("cydian:browse-lock", onLock);
+  target.addEventListener?.("ifizbox:browse-lock", onLock);
   return box;
 }

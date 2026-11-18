@@ -1,8 +1,8 @@
 #!/bin/sh
 # Unregister the app before its files go, so no dead icon is left on the home screen.
 if [ "$1" = remove ] || [ "$1" = purge ]; then
-  uicache -u /var/jb/Applications/Cydian.app || true
+  uicache -u /var/jb/Applications/iFizBox.app || true
   # N5: stop the daily upgrade check before its files go.
-  launchctl unload /var/jb/Library/LaunchDaemons/com.ryha.cydian.upgrades.plist 2>/dev/null || true
+  launchctl unload /var/jb/Library/LaunchDaemons/com.ryha.ifizbox.upgrades.plist 2>/dev/null || true
 fi
 exit 0

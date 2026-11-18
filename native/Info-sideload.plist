@@ -5,7 +5,7 @@
 <dict>
 	<key>UIBackgroundModes</key><array><string>audio</string><string>fetch</string></array>
 	<!-- I3: the background update check (BackgroundCheck.swift), a BGAppRefreshTask. -->
-	<key>BGTaskSchedulerPermittedIdentifiers</key><array><string>com.ryha.cydian.updates</string></array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key><array><string>com.ryha.ifizbox.updates</string></array>
 	<!-- F77: Documents (My IPAs) shows in Files under On My iPhone > iFizBox; IPAs dropped there are listed. -->
 	<key>UIFileSharingEnabled</key><true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key><true/>
@@ -38,13 +38,13 @@
 	</array>
 	<key>CFBundleURLTypes</key><array>
 		<dict>
-			<key>CFBundleURLName</key><string>com.ryha.cydian</string>
-			<key>CFBundleURLSchemes</key><array><string>cydian</string></array>
+			<key>CFBundleURLName</key><string>com.ryha.ifizbox</string>
+			<key>CFBundleURLSchemes</key><array><string>ifizbox</string></array>
 		</dict>
 		<!-- F83: other sideloaders' links, turned into iFizBox's own (web/app/core/otherlinks.js; App.swift OtherLink holds
 		     the same list). iOS gives a scheme to one app when several claim it. -->
 		<dict>
-			<key>CFBundleURLName</key><string>com.ryha.cydian.other</string>
+			<key>CFBundleURLName</key><string>com.ryha.ifizbox.other</string>
 			<key>CFBundleURLSchemes</key><array><string>altstore</string><string>altstore-classic</string><string>sidestore</string><string>feather</string><string>ksign</string><string>esign</string><string>scarlet</string><string>gbox</string><string>trollapps</string><string>stikstore</string></array>
 		</dict>
 	</array>

@@ -31,7 +31,7 @@ def signed_fake(entitlements):
     return bytes(head) + sb
 
 
-DAEMON_ENTS = {mkdeb.NOTIFY_ENTITLEMENT: ["com.ryha.cydian"], "platform-application": True,
+DAEMON_ENTS = {mkdeb.NOTIFY_ENTITLEMENT: ["com.ryha.ifizbox"], "platform-application": True,
                "com.apple.private.security.no-sandbox": True}
 HELPER_ENTS = {"platform-application": True, "com.apple.private.security.no-container": True}
 
@@ -57,18 +57,18 @@ class Deb(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp)
         self.root = os.path.join(self.tmp, "root")
-        self.app = os.path.join(self.root, "var/jb/Applications/Cydian.app")
+        self.app = os.path.join(self.root, "var/jb/Applications/iFizBox.app")
         self.debian = os.path.join(self.tmp, "debian")
         os.makedirs(os.path.join(self.app, "web/nav"))
         os.makedirs(self.debian)
-        self.write(self.app, "Cydian", fake_macho(), 0o755)
+        self.write(self.app, "iFizBox", fake_macho(), 0o755)
         self.write(self.app, "Info.plist", plist())
         self.write(self.app, "bridge.js", b"x")
-        os.makedirs(os.path.join(self.root, "var/jb/usr/libexec/cydian"))
+        os.makedirs(os.path.join(self.root, "var/jb/usr/libexec/ifizbox"))
         self.write(self.root, mkdeb.HELPER[len("./"):], signed_fake(HELPER_ENTS), 0o755)
         self.write(self.root, mkdeb.DAEMON[len("./"):], signed_fake(DAEMON_ENTS), 0o755)
         os.makedirs(os.path.join(self.root, "var/jb/Library/LaunchDaemons"))
-        shutil.copy(os.path.join(HERE, "daemon/com.ryha.cydian.upgrades.plist"),
+        shutil.copy(os.path.join(HERE, "daemon/com.ryha.ifizbox.upgrades.plist"),
                     os.path.join(self.root, mkdeb.DAEMON_JOB[len("./"):]))
         os.chmod(os.path.join(self.root, mkdeb.DAEMON_JOB[len("./"):]), 0o644)
         for name in ("AppIcon60x60@2x.png", "AppIcon60x60@3x.png"):
@@ -80,7 +80,7 @@ class Deb(unittest.TestCase):
             self.write(self.debian, "control", f.read().replace("@VERSION@", "0.1.0-7").encode())
         for name in ("postinst", "prerm"):
             shutil.copy(os.path.join(HERE, "deb", name), self.debian)
-        self.deb = os.path.join(self.tmp, "Cydian.deb")
+        self.deb = os.path.join(self.tmp, "iFizBox.deb")
 
     @staticmethod
     def write(base, rel, data, mode=0o644):
@@ -148,7 +148,7 @@ class Deb(unittest.TestCase):
         self.assertTrue(any("tests shipped" in p for p in self.problems()))
 
     def test_wrong_binary_flagged(self):
-        self.write(self.app, "Cydian", fake_macho(cpu=0x01000007, minos=(14, 0), signed=False), 0o755)
+        self.write(self.app, "iFizBox", fake_macho(cpu=0x01000007, minos=(14, 0), signed=False), 0o755)
         p = " | ".join(self.problems())
         self.assertIn("not arm64", p)
         self.assertIn("minos 14.0", p)
@@ -173,7 +173,7 @@ class Deb(unittest.TestCase):
         self.write(self.root, mkdeb.HELPER[len("./"):], signed_fake({"platform-application": True}), 0o755)
         self.assertTrue(any("helper has neither" in p for p in self.problems()))
         self.write(self.root, mkdeb.HELPER[len("./"):], signed_fake(HELPER_ENTS), 0o755)
-        self.write(self.root, mkdeb.DAEMON[len("./"):], signed_fake({mkdeb.NOTIFY_ENTITLEMENT: ["com.ryha.cydian"]}),
+        self.write(self.root, mkdeb.DAEMON[len("./"):], signed_fake({mkdeb.NOTIFY_ENTITLEMENT: ["com.ryha.ifizbox"]}),
                    0o755)
         self.assertTrue(any("daemon has neither" in p for p in self.problems()))
 
@@ -205,10 +205,10 @@ class Deb(unittest.TestCase):
         p = " | ".join(self.problems_with_mode(mkdeb.DAEMON_JOB, 0o666))
         self.assertIn("launchd job mode is 666", p)
         self.assertIn("Label is 'x'", p)
-        self.assertIn("does not run /var/jb/usr/libexec/cydian/cydian-upgrades", p)
+        self.assertIn("does not run /var/jb/usr/libexec/ifizbox/ifizbox-upgrades", p)
 
     def test_postinst_must_load_daemon(self):
-        self.write(self.debian, "postinst", b"#!/bin/sh\nuicache -p /var/jb/Applications/Cydian.app\n", 0o755)
+        self.write(self.debian, "postinst", b"#!/bin/sh\nuicache -p /var/jb/Applications/iFizBox.app\n", 0o755)
         self.write(self.debian, "prerm", b"#!/bin/sh\nexit 0\n", 0o755)
         p = " | ".join(self.problems())
         self.assertIn("postinst does not launchctl load", p)
@@ -259,13 +259,13 @@ class Plists(unittest.TestCase):
             e = plistlib.load(f)
         self.assertTrue(e["platform-application"])
         self.assertTrue(e["com.apple.private.security.no-container"])
-        self.assertTrue(e["com.apple.private.persona-mgmt"])  # N3: spawning cydian-helper as root
+        self.assertTrue(e["com.apple.private.persona-mgmt"])  # N3: spawning ifizbox-helper as root
 
     def test_paid_entitlements(self):
         """F57 (Paid.swift): the Keychain group for payment secrets, the UDID key, and Face ID's usage string."""
         with open(os.path.join(HERE, "entitlements.plist"), "rb") as f:
             e = plistlib.load(f)
-        self.assertEqual(e["keychain-access-groups"], ["com.ryha.cydian"])
+        self.assertEqual(e["keychain-access-groups"], ["com.ryha.ifizbox"])
         self.assertEqual(e["com.apple.private.MobileGestalt.AllowedProtectedKeys"], ["UniqueDeviceID"])
         with open(os.path.join(HERE, "Info.plist"), "rb") as f:
             self.assertIn("Face ID", plistlib.load(f)["NSFaceIDUsageDescription"])
@@ -273,7 +273,7 @@ class Plists(unittest.TestCase):
     def test_daemon_entitlements(self):
         with open(os.path.join(HERE, "daemon/entitlements.plist"), "rb") as f:
             e = plistlib.load(f)
-        self.assertEqual(e[mkdeb.NOTIFY_ENTITLEMENT], ["com.ryha.cydian"])
+        self.assertEqual(e[mkdeb.NOTIFY_ENTITLEMENT], ["com.ryha.ifizbox"])
 
     def test_helper_entitlements(self):
         """N6: the helper's signing entitlements keep it out of the sandbox (else palera1n SIGKILLs it)."""

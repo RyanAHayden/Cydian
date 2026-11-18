@@ -1,6 +1,6 @@
 // F67: the jailbreak build's Install IPA flow, the pure part (screens/ipa-install.js draws it, ipa-install.js calls
 // the bridge). The shell's ipa.install {url, stream} (native/Sources/Apt.swift IPAInstall, F59) downloads the IPA and
-// runs `cydian-helper install-ipa` on it: installd takes it as it is when AppSync Unified is there, else the helper ad
+// runs `ifizbox-helper install-ipa` on it: installd takes it as it is when AppSync Unified is there, else the helper ad
 // hoc signs it with ldid first. The sideload build never comes here: it keeps signing.install (signing-client.js).
 //
 //   ipaUrl(text)              -> the http(s) URL typed or pasted ("example.com/a.ipa" gets https://), or null

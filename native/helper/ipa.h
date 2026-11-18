@@ -1,12 +1,12 @@
 /* F59: install-ipa's work (ipa.c), kept apart from main() so the parts that aren't installd build and are tested on
  * Linux (test_helper.py). SPDX-License-Identifier: GPL-3.0-or-later */
-#ifndef CYDIAN_HELPER_IPA_H
-#define CYDIAN_HELPER_IPA_H
+#ifndef IFIZBOX_HELPER_IPA_H
+#define IFIZBOX_HELPER_IPA_H
 
 #include <stddef.h>
 #include <stdio.h>
 
-/* Where install-ipa makes its root-owned work directory (cydian-ipa.XXXXXX, removed at the end). Tests build with
+/* Where install-ipa makes its root-owned work directory (ifizbox-ipa.XXXXXX, removed at the end). Tests build with
  * their own -DHELPER_IPA_WORK. */
 #ifndef HELPER_IPA_WORK
 #define HELPER_IPA_WORK "/var/tmp"

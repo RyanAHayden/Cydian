@@ -13,7 +13,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { compareVersions } from "./apt.js";
 
-export const SELF_ID = "com.ryha.cydian"; // core/installed.js SELF_ID: iFizBox's own row is essential.js's
+export const SELF_ID = "com.ryha.ifizbox"; // core/installed.js SELF_ID: iFizBox's own row is essential.js's
 
 const byName = (a, b) => String(a.name ?? a.id).localeCompare(String(b.name ?? b.id), undefined, { sensitivity: "base" }) ||
   String(a.id).localeCompare(String(b.id));

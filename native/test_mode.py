@@ -9,10 +9,10 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 DRIVER = r"""
 #include <stdio.h>
-int cydian_mode_at(const char *helper);
-int cydian_mode(void);
+int ifizbox_mode_at(const char *helper);
+int ifizbox_mode(void);
 int main(int argc, char **argv) {
-  printf("%d\n", argc > 1 ? cydian_mode_at(argv[1]) : cydian_mode());
+  printf("%d\n", argc > 1 ? ifizbox_mode_at(argv[1]) : ifizbox_mode());
   return 0;
 }
 """
@@ -40,7 +40,7 @@ class Mode(unittest.TestCase):
         return {"0": "sideload", "1": "jailbreak"}[out]
 
     def helper(self, mode=0o755, directory=False):
-        p = os.path.join(tempfile.mkdtemp(dir=self.tmp), "var/jb/usr/libexec/cydian/cydian-helper")
+        p = os.path.join(tempfile.mkdtemp(dir=self.tmp), "var/jb/usr/libexec/ifizbox/ifizbox-helper")
         if directory:
             os.makedirs(p)
         else:
@@ -51,7 +51,7 @@ class Mode(unittest.TestCase):
         return p
 
     def test_no_helper_is_sideload(self):
-        self.assertEqual(self.mode(os.path.join(self.tmp, "nope/cydian-helper")), "sideload")
+        self.assertEqual(self.mode(os.path.join(self.tmp, "nope/ifizbox-helper")), "sideload")
 
     def test_fake_helper_is_jailbreak(self):
         self.assertEqual(self.mode(self.helper()), "jailbreak")
@@ -64,8 +64,8 @@ class Mode(unittest.TestCase):
 
     def test_default_path_is_the_rootless_helper(self):
         with open(os.path.join(HERE, "Sources/mode.c")) as f:
-            self.assertIn('"/var/jb/usr/libexec/cydian/cydian-helper"', f.read())
-        if not os.path.exists("/var/jb/usr/libexec/cydian/cydian-helper"):
+            self.assertIn('"/var/jb/usr/libexec/ifizbox/ifizbox-helper"', f.read())
+        if not os.path.exists("/var/jb/usr/libexec/ifizbox/ifizbox-helper"):
             self.assertEqual(self.mode(), "sideload")
 
 

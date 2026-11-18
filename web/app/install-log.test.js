@@ -28,8 +28,8 @@ function fakeHUD() {
 }
 
 let saved;
-beforeEach(() => { saved = globalThis.cydianNative; });
-afterEach(() => { if (saved === undefined) delete globalThis.cydianNative; else globalThis.cydianNative = saved; });
+beforeEach(() => { saved = globalThis.ifizboxNative; });
+afterEach(() => { if (saved === undefined) delete globalThis.ifizboxNative; else globalThis.ifizboxNative = saved; });
 
 test("followInstall: the install server's lines go to the console, and one after progress doesn't end the follow", async () => {
   let round = 0;

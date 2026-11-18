@@ -1,17 +1,17 @@
-// F75: cydian:// links the shell hands over (native/Sources/App.swift, Incoming): it keeps the latest, sends
-// "cydian:url" on window, and the page takes it with app.takeURL (also once at start, for a link that launched the
+// F75: ifizbox:// links the shell hands over (native/Sources/App.swift, Incoming): it keeps the latest, sends
+// "ifizbox:url" on window, and the page takes it with app.takeURL (also once at start, for a link that launched the
 // app before the page was there).
-//   cydian://import?d=<gzipped JSON>   Open in iFizBox App on the website: the review alert (screens/importlink.js)
-//   cydian://install?url=<ipa>[&name=…]  F89: the Install IPA alert, then Install (signAndInstall). The website's app
+//   ifizbox://import?d=<gzipped JSON>   Open in iFizBox App on the website: the review alert (screens/importlink.js)
+//   ifizbox://install?url=<ipa>[&name=…]  F89: the Install IPA alert, then Install (signAndInstall). The website's app
 //                                      page sent it (Open in iFizBox) until F92/F95 dropped the hand-offs; kept for
 //                                      links already out there and anyone's own pages
-//   cydian://myipas?file=<name>        F77: an .ipa another app sent, already in My IPAs (MyIPAs.swift): its page
-//   cydian://add?url=<url>[&suite=…]   N8: the Add Source intent: Add Source's alert, filled in (core/handoff.js);
+//   ifizbox://myipas?file=<name>        F77: an .ipa another app sent, already in My IPAs (MyIPAs.swift): its page
+//   ifizbox://add?url=<url>[&suite=…]   N8: the Add Source intent: Add Source's alert, filled in (core/handoff.js);
 //                                      N9: also an APT repo or AltStore source shared with iFizBox
-//   cydian://shared?route=…            N9: an .ipa or .deb shared with iFizBox, or why not (share.js)
-//   cydian://package?id=<id>           F96: the website's Install in iFizBox: that app's page (Search's package:<id>)
-//   cydian://account?k=<key>           F97: a iFizBox Account's link or QR code: Sign In With Key, filled in
-//   cydian://<tab>                     B14: home, sources, changes, installed, search, settings: that tab, at its root
+//   ifizbox://shared?route=…            N9: an .ipa or .deb shared with iFizBox, or why not (share.js)
+//   ifizbox://package?id=<id>           F96: the website's Install in iFizBox: that app's page (Search's package:<id>)
+//   ifizbox://account?k=<key>           F97: a iFizBox Account's link or QR code: Sign In With Key, filled in
+//   ifizbox://<tab>                     B14: home, sources, changes, installed, search, settings: that tab, at its root
 //   altstore://source?url=…, feather://install/<ipa>, …   F83: other sideloaders' links (core/otherlinks.js), when
 //                                      Settings > Sideloading > Open Other Apps' Links is on: a source goes to Sources >
 //                                      Manage's Add, filled in; an IPA to Install IPAs, then Install (signAndInstall).
@@ -29,7 +29,7 @@ import { parseOtherLink, otherLinksOn } from "./core/otherlinks.js";
 import { packageIdOf } from "./websign-gate.js";
 import { NAME } from "./brand.js";
 
-export function startIncoming({ native = globalThis.cydianNative } = {}) {
+export function startIncoming({ native = globalThis.ifizboxNative } = {}) {
   if (!native?.call) return;
   let busy = false;
   const take = async () => {
@@ -44,47 +44,47 @@ export function startIncoming({ native = globalThis.cydianNative } = {}) {
       }
     } finally { busy = false; }
   };
-  addEventListener("cydian:url", take);
+  addEventListener("ifizbox:url", take);
   take();
 }
 
-export async function handleIncoming(url, { native = globalThis.cydianNative, alert = showAlert, hud = showHUD,
+export async function handleIncoming(url, { native = globalThis.ifizboxNative, alert = showAlert, hud = showHUD,
   review = null, add = null, shared = null, install = null, signIn = null, on = otherLinksOn, open = goHash, now = Date.now } = {}) {
   const u = String(url ?? "");
-  if (/^cydian:\/\/install\b/i.test(u)) {
+  if (/^ifizbox:\/\/install\b/i.test(u)) {
     const ask = installAsk(u);
     if (ask) await confirmInstall(ask.url, ask.name, `${ask.name || ipaFileName(ask.url)}\n${ask.url}`, { alert, install, open });
     return "install";
   }
-  if (/^cydian:\/\/myipas\b/i.test(u)) {
+  if (/^ifizbox:\/\/myipas\b/i.test(u)) {
     const path = myIpasPath(u);
     const hash = format({ tab: "installed", path }).replace(/^#/, "");
     if (typeof location !== "undefined") location.hash = hash;
     return "myipas";
   }
-  if (/^cydian:\/\/add\b/i.test(u)) {
+  if (/^ifizbox:\/\/add\b/i.test(u)) {
     const prefill = addPrefill(u);
     if (!prefill) return "add";
     const run = add ?? (await import("./screens/manage.js")).addSource;
     await run({ showHUD: hud }, prefill);
     return "add";
   }
-  if (/^cydian:\/\/shared\b/i.test(u)) {
+  if (/^ifizbox:\/\/shared\b/i.test(u)) {
     const run = shared ?? (await import("./share.js")).handleShared;
     await run(u, { native, alert, hud });
     return "shared";
   }
-  if (/^cydian:\/\/package\b/i.test(u)) {
+  if (/^ifizbox:\/\/package\b/i.test(u)) {
     const id = packageIdOf(u);
     if (id) open(format({ tab: "search", path: [`package:${id}`] }));
     return "package";
   }
-  if (/^cydian:\/\/account\b/i.test(u)) {
+  if (/^ifizbox:\/\/account\b/i.test(u)) {
     const run = signIn ?? (await import("./screens/account.js")).signInFromLink;
     await run(u, { open });
     return "account";
   }
-  if (/^cydian:\/\/import\b/i.test(u)) {
+  if (/^ifizbox:\/\/import\b/i.test(u)) {
     const run = review ?? (await import("./screens/importlink.js")).reviewAndImport;
     await run(u, { native });
     return "import";
@@ -99,9 +99,9 @@ export async function handleIncoming(url, { native = globalThis.cydianNative, al
   return null;
 }
 
-// B14: cydian://sources, cydian://changes/, … -> "sources", or null (not a bare tab link).
+// B14: ifizbox://sources, ifizbox://changes/, … -> "sources", or null (not a bare tab link).
 export function tabOf(link) {
-  const m = /^cydian:\/\/([a-z]+)\/?(?:[?#].*)?$/i.exec(String(link ?? ""));
+  const m = /^ifizbox:\/\/([a-z]+)\/?(?:[?#].*)?$/i.exec(String(link ?? ""));
   const t = m?.[1].toLowerCase();
   return t && ALL_TABS.includes(t) ? t : null;
 }
@@ -132,7 +132,7 @@ async function confirmInstall(url, name, message, { alert, install, open }) {
   return true;
 }
 
-// F89: cydian://install?url=<https IPA>[&name=…] -> { url, name }, or null (no http(s) URL in it).
+// F89: ifizbox://install?url=<https IPA>[&name=…] -> { url, name }, or null (no http(s) URL in it).
 export function installAsk(link) {
   let q;
   try { q = new URL(String(link)).searchParams; } catch { return null; }
@@ -171,14 +171,14 @@ const ipaFileName = (url) => {
   try { return decodeURIComponent(new URL(url).pathname.split("/").pop() || "") || new URL(url).host; } catch { return url; }
 };
 
-// N8: cydian://add?url=…[&suite=…&component=…] -> Add Source's prefill ({ url, dist?, components? }), or null.
+// N8: ifizbox://add?url=…[&suite=…&component=…] -> Add Source's prefill ({ url, dist?, components? }), or null.
 export function addPrefill(url) {
   let search = "";
   try { search = new URL(String(url)).search; } catch { return null; }
   return parseAddLink(search);
 }
 
-// F77: the Installed path for cydian://myipas?file=<name>: the IPA's page, or the library when the name is missing.
+// F77: the Installed path for ifizbox://myipas?file=<name>: the IPA's page, or the library when the name is missing.
 export function myIpasPath(url) {
   let file = null;
   try { file = new URL(String(url)).searchParams.get("file"); } catch { /* none */ }

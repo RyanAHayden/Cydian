@@ -12,7 +12,7 @@ let current = null;
 // iFizBox's own icon for where it runs: WEB on the website, LITE in the sideload app, plain in the jailbreak app.
 import { detectMode } from "../core/settings.js";
 import { NAME } from "../brand.js";
-const ownIcon = () => (!globalThis.cydianNative ? "icons/icon-web-glossy-76.png"
+const ownIcon = () => (!globalThis.ifizboxNative ? "icons/icon-web-glossy-76.png"
   : detectMode() === "sideload" ? "icons/icon-lite-glossy-76.png" : "icons/icon-glossy-76.png");
 
 // `onTap` (B23): a tap on the banner hides it and runs onTap (the refresh-failure banner opens Sources).

@@ -12,7 +12,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         let reply: (Any?, String?) -> Void
 
         func emit(_ events: [[String: Any]]) {
-            web?.callAsyncJavaScript("cydianNative.emit(id, events)", arguments: ["id": id, "events": events],
+            web?.callAsyncJavaScript("ifizboxNative.emit(id, events)", arguments: ["id": id, "events": events],
                                      in: nil, in: .page, completionHandler: nil)
         }
     }
@@ -76,10 +76,10 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
     }
 }
 
-// Serves Bundle/web/* as cydian://app/*. A real origin (unlike file://), so ES modules, module workers and
+// Serves Bundle/web/* as ifizbox://app/*. A real origin (unlike file://), so ES modules, module workers and
 // IndexedDB behave as on the site, and nothing ever comes from the network.
 final class AppScheme: NSObject, WKURLSchemeHandler {
-    static let scheme = "cydian"
+    static let scheme = "ifizbox"
     static func url(_ page: String) -> URL { URL(string: "\(scheme)://app/\(page)")! }
     private let root = Bundle.main.resourceURL!.appendingPathComponent("web").standardizedFileURL
 
@@ -117,7 +117,7 @@ enum Web {
     static func make(bridge: Bridge) -> WKWebView {
         let c = WKWebViewConfiguration()
         c.setURLSchemeHandler(AppScheme(), forURLScheme: AppScheme.scheme)
-        c.userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "cydian")
+        c.userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "ifizbox")
         WebKitFeature.set({ $0.contains("60FPS") }, Settings.prefer60, c.preferences)
         let w = WKWebView(frame: .zero, configuration: c)
         w.allowsBackForwardNavigationGestures = false

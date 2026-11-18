@@ -45,9 +45,9 @@ test("the API: list, post, report with the token; anything that isn't the server
   const answer = (status, body, type = "application/json") => new Response(typeof body === "string" ? body : JSON.stringify(body), { status, headers: { "Content-Type": type } });
   let next = () => answer(200, { enabled: true, average: 4, count: 2, histogram: [1, 1, 0, 0, 0], reviews: [{ id: "a", stars: 5 }], more: false, mine: null });
   const fetcher = async (url, init = {}) => { calls.push({ url, init }); return next(); };
-  const api = reviewsApi({ base: "https://cydian.example", fetcher, token: async () => "t".repeat(40) });
+  const api = reviewsApi({ base: "https://ifizbox.example", fetcher, token: async () => "t".repeat(40) });
   const l = await api.list("com.example.a b");
-  assert.equal(calls[0].url, "https://cydian.example/reviews/com.example.a%20b?page=0");
+  assert.equal(calls[0].url, "https://ifizbox.example/reviews/com.example.a%20b?page=0");
   assert.equal(calls[0].init.headers["X-Review-Token"], "t".repeat(40));
   assert.deepEqual([l.enabled, l.count, l.reviews.length], [true, 2, 1]);
   next = () => answer(200, "<!doctype html><title>app</title>", "text/html");
@@ -65,7 +65,7 @@ test("the API: list, post, report with the token; anything that isn't the server
   await assert.rejects(api.post("x", { stars: 5 }), { code: "rate_limited", message: /Too many/ });
   next = () => answer(200, { ok: true, hidden: true });
   assert.equal((await api.report("x", "0123456789abcdef")).hidden, true);
-  assert.equal(calls.at(-1).url, "https://cydian.example/reviews/x/0123456789abcdef/report");
+  assert.equal(calls.at(-1).url, "https://ifizbox.example/reviews/x/0123456789abcdef/report");
   next = () => { throw new TypeError("offline"); };
   await assert.rejects(api.report("x", "0123456789abcdef"), { code: "network" });
   assert.equal(reviewsBase("site"), "");

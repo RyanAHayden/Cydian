@@ -11,7 +11,7 @@
 //   vendor.log                       every request it got, parsed: {method, path, body}
 //
 // A ".deb" here is "!<arch>\n" and then a control stanza (Package, Version, Architecture), which
-// native/fake/cydian-helper's install-paid reads. Purchases need the payment secret the sign-in handed out;
+// native/fake/ifizbox-helper's install-paid reads. Purchases need the payment secret the sign-in handed out;
 // `purchaseNeedsAction` makes purchase answer status 1 with a URL that auth.session "completes".
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { randomUUID } from "node:crypto";

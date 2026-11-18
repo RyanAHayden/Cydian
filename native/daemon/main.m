@@ -1,20 +1,20 @@
-/* cydian-upgrades (N5, N7): iFizBox's background upgrade check and automatic updates, a launchd daemon running as root.
+/* ifizbox-upgrades (N5, N7): iFizBox's background upgrade check and automatic updates, a launchd daemon running as root.
  *
- *   cydian-upgrades [--force] [--no-update] [--dry-run]
+ *   ifizbox-upgrades [--force] [--no-update] [--dry-run]
  *
- * launchd starts it every hour and at load (com.ryha.cydian.upgrades.plist). What a run does is auto.c's
+ * launchd starts it every hour and at load (com.ryha.ifizbox.upgrades.plist). What a run does is auto.c's
  * auto_step, tested on Linux (test_auto.py); this file only gathers the facts and does the work:
- *   - the F13 settings, as the app mirrors them into its preferences (com.ryha.cydian, user mobile: keys
- *     "cydian.checkUpdates" and so on, "cydian.autoMarked" and "cydian.holds" lists), flattened to auto.h's text;
+ *   - the F13 settings, as the app mirrors them into its preferences (com.ryha.ifizbox, user mobile: keys
+ *     "ifizbox.checkUpdates" and so on, "ifizbox.autoMarked" and "ifizbox.holds" lists), flattened to auto.h's text;
  *   - the network (SCNetworkReachability: none, Wi-Fi, cellular), charging (IOKit's power sources: AC Power),
  *     locked (com.apple.springboard.lockstate), when SpringBoard started (sysctl), dpkg's lock;
  *   - apt from <prefix>/usr/bin with a clean environment and time limits: update (10 min), the plan
  *     (-s dist-upgrade, 2 min), the automatic installs' plan and install (install --only-upgrade --no-remove,
  *     30 min, $CYDIA on stdout for the finish protocol), apt-mark showhold; sbreload (or killall backboardd);
- *   - notifications and the badge for com.ryha.cydian: N5's "3 Upgrades" (cydian-upgrades) and N7's
- *     "2 Packages Updated" / "Update Failed" (cydian-autoupdate).
- * State: <prefix>/var/lib/cydian/upgrades.state (last check, id=version pairs shown, failed installs, a pending
- * respring); .debs kept for rollback: <prefix>/var/cache/cydian/rollback/<id>/.
+ *   - notifications and the badge for com.ryha.ifizbox: N5's "3 Upgrades" (ifizbox-upgrades) and N7's
+ *     "2 Packages Updated" / "Update Failed" (ifizbox-autoupdate).
+ * State: <prefix>/var/lib/ifizbox/upgrades.state (last check, id=version pairs shown, failed installs, a pending
+ * respring); .debs kept for rollback: <prefix>/var/cache/ifizbox/rollback/<id>/.
  *
  * The notification and badge go through UNUserNotificationCenter's private -initWithBundleIdentifier:, which
  * usernotificationsd allows for a process entitled with com.apple.private.usernotifications.bundle-identifiers
@@ -46,12 +46,12 @@
 #include <time.h>
 #include <unistd.h>
 
-#ifndef CYDIAN_PREFIX
-#define CYDIAN_PREFIX "/var/jb"
+#ifndef IFIZBOX_PREFIX
+#define IFIZBOX_PREFIX "/var/jb"
 #endif
-#define BUNDLE_ID @"com.ryha.cydian"
-#define NOTE_ID @"cydian-upgrades" /* one notification, replaced by the next */
-#define AUTO_NOTE_ID @"cydian-autoupdate" /* N7's: what installed by itself, or failed to */
+#define BUNDLE_ID @"com.ryha.ifizbox"
+#define NOTE_ID @"ifizbox-upgrades" /* one notification, replaced by the next */
+#define AUTO_NOTE_ID @"ifizbox-autoupdate" /* N7's: what installed by itself, or failed to */
 #define UPDATE_SECONDS 600
 #define SIMULATE_SECONDS 120
 #define INSTALL_SECONDS 1800
@@ -63,7 +63,7 @@ extern char **environ;
 extern CFTypeRef IOPSCopyPowerSourcesInfo(void);
 extern CFStringRef IOPSGetProvidingPowerSourceType(CFTypeRef snapshot);
 
-@interface UNUserNotificationCenter (CydianPrivate)
+@interface UNUserNotificationCenter (iFizBoxPrivate)
 - (instancetype)initWithBundleIdentifier:(NSString *)bundleIdentifier;
 - (void)setBadgeNumber:(NSNumber *)number withCompletionHandler:(void (^)(NSError *))handler; /* before iOS 16 */
 @end
@@ -74,7 +74,7 @@ static void say(const char *fmt, ...) {
     va_start(ap, fmt);
     NSString *s = [[NSString alloc] initWithFormat:@(fmt) arguments:ap];
     va_end(ap);
-    NSLog(@"cydian-upgrades: %@", s); /* the system log, and stderr (launchd's StandardErrorPath) */
+    NSLog(@"ifizbox-upgrades: %@", s); /* the system log, and stderr (launchd's StandardErrorPath) */
 }
 
 /* Run argv (argv[0] a full path) with a clean environment (plus `extra`, "NAME=value", when not NULL), stdin
@@ -83,7 +83,7 @@ static void say(const char *fmt, ...) {
 static int run_env(const char *const argv[], int seconds, NSMutableData *out, char *extra) {
     static char path_env[1024];
     snprintf(path_env, sizeof path_env,
-             "PATH=%1$s/usr/bin:%1$s/bin:%1$s/usr/sbin:%1$s/sbin:/usr/bin:/bin:/usr/sbin:/sbin", CYDIAN_PREFIX);
+             "PATH=%1$s/usr/bin:%1$s/bin:%1$s/usr/sbin:%1$s/sbin:/usr/bin:/bin:/usr/sbin:/sbin", IFIZBOX_PREFIX);
     char *env[] = {path_env, "HOME=/var/root", "USER=root", "LOGNAME=root", "LANG=C",
                    "DEBIAN_FRONTEND=noninteractive", extra, NULL};
     int pipefd[2] = {-1, -1};
@@ -188,7 +188,7 @@ static NSString *flat(id v) {
     return [v isKindOfClass:NSString.class] ? v : nil;
 }
 
-/* A list setting: an array of strings, or the JSON text localStorage keeps (cydian.holds). */
+/* A list setting: an array of strings, or the JSON text localStorage keeps (ifizbox.holds). */
 static NSArray *flatList(id v) {
     if ([v isKindOfClass:NSString.class]) {
         NSData *d = [v dataUsingEncoding:NSUTF8StringEncoding];
@@ -203,16 +203,16 @@ static char *dupString(NSString *s) { return s ? strdup(s.UTF8String) : NULL; }
  * "key=value" lines; missing preferences: NULL, every setting at its default. */
 static char *e_settings(void *ctx) {
     (void)ctx;
-    CFDictionaryRef all = CFPreferencesCopyMultiple(NULL, CFSTR("com.ryha.cydian"), CFSTR("mobile"), kCFPreferencesAnyHost);
+    CFDictionaryRef all = CFPreferencesCopyMultiple(NULL, CFSTR("com.ryha.ifizbox"), CFSTR("mobile"), kCFPreferencesAnyHost);
     NSDictionary *prefs = CFBridgingRelease(all);
-    if (!prefs.count) prefs = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.ryha.cydian.plist"];
+    if (!prefs.count) prefs = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.ryha.ifizbox.plist"];
     if (!prefs.count) return NULL;
     NSMutableString *text = [NSMutableString string];
     for (NSString *key in @[@"checkUpdates", @"cellular", @"autoInstall", @"autoInstallIdle", @"respring", @"keepVersions"]) {
-        NSString *v = flat(prefs[[@"cydian." stringByAppendingString:key]]);
+        NSString *v = flat(prefs[[@"ifizbox." stringByAppendingString:key]]);
         if (v && [v rangeOfString:@"\n"].location == NSNotFound) [text appendFormat:@"%@=%@\n", key, v];
     }
-    for (NSArray *pair in @[@[@"cydian.autoMarked", @"marked"], @[@"cydian.holds", @"hold"]])
+    for (NSArray *pair in @[@[@"ifizbox.autoMarked", @"marked"], @[@"ifizbox.holds", @"hold"]])
         for (id v in flatList(prefs[pair[0]]))
             if ([v isKindOfClass:NSString.class] && [v rangeOfString:@"\n"].location == NSNotFound)
                 [text appendFormat:@"%@=%@\n", pair[1], v];
@@ -222,7 +222,7 @@ static char *e_settings(void *ctx) {
 static char *e_held(void *ctx) {
     (void)ctx;
     NSMutableData *out = [NSMutableData data];
-    const char *argv[] = {CYDIAN_PREFIX "/usr/bin/apt-mark", "showhold", NULL};
+    const char *argv[] = {IFIZBOX_PREFIX "/usr/bin/apt-mark", "showhold", NULL};
     if (run(argv, SIMULATE_SECONDS, out) != 0) return NULL;
     [out appendBytes:"" length:1];
     return strdup(out.bytes);
@@ -286,7 +286,7 @@ static long e_springboard_started(void *ctx) {
 /* 1 while another apt or dpkg holds dpkg's front-end lock (the app's queue running). */
 static int e_busy(void *ctx) {
     (void)ctx;
-    int fd = open(CYDIAN_PREFIX "/var/lib/dpkg/lock-frontend", O_RDWR | O_CLOEXEC);
+    int fd = open(IFIZBOX_PREFIX "/var/lib/dpkg/lock-frontend", O_RDWR | O_CLOEXEC);
     if (fd < 0) return 0;
     struct flock fl = {.l_type = F_WRLCK, .l_whence = SEEK_SET};
     int busy = fcntl(fd, F_GETLK, &fl) == 0 && fl.l_type != F_UNLCK;
@@ -296,7 +296,7 @@ static int e_busy(void *ctx) {
 
 static int e_update(void *ctx) {
     (void)ctx;
-    const char *argv[] = {CYDIAN_PREFIX "/usr/bin/apt-get", "-q", "-o", "Acquire::AllowInsecureRepositories=true", "update", NULL};
+    const char *argv[] = {IFIZBOX_PREFIX "/usr/bin/apt-get", "-q", "-o", "Acquire::AllowInsecureRepositories=true", "update", NULL};
     return run(argv, UPDATE_SECONDS, nil);
 }
 
@@ -304,7 +304,7 @@ static int e_update(void *ctx) {
 static int apt(const char *const *ids, int n, int simulate, char **out) {
     const char *argv[UPD_MAX + 16];
     int k = 0;
-    argv[k++] = CYDIAN_PREFIX "/usr/bin/apt-get";
+    argv[k++] = IFIZBOX_PREFIX "/usr/bin/apt-get";
     argv[k++] = "-q";
     if (simulate) { argv[k++] = "-s"; argv[k++] = "-o"; argv[k++] = "Debug::NoLocking=1"; }
     else {
@@ -334,8 +334,8 @@ static int e_install(void *ctx, const char *const *ids, int n, char **out) { (vo
 
 static void e_respring(void *ctx) {
     (void)ctx;
-    const char *sb[] = {CYDIAN_PREFIX "/usr/bin/sbreload", NULL};
-    const char *kill_bb[] = {CYDIAN_PREFIX "/usr/bin/killall", "-9", "backboardd", NULL};
+    const char *sb[] = {IFIZBOX_PREFIX "/usr/bin/sbreload", NULL};
+    const char *kill_bb[] = {IFIZBOX_PREFIX "/usr/bin/killall", "-9", "backboardd", NULL};
     run(access(sb[0], X_OK) == 0 ? sb : kill_bb, 60, nil);
 }
 
@@ -344,7 +344,7 @@ static void e_notify(void *ctx, int kind, int badge, const char *title, const ch
     if (p->dry) { printf("%s\n%s\n", title ? title : "", body ? body : ""); return; }
     if (!p->center) return;
     /* F65: Upgrade Notifications off (quiet.h): N5's notification becomes a badge-only update. */
-    kind = quiet_kind(kind, access(CYDIAN_PREFIX QUIET_FILE, F_OK) == 0);
+    kind = quiet_kind(kind, access(IFIZBOX_PREFIX QUIET_FILE, F_OK) == 0);
     if (kind == AUTO_NOTE_BADGE) setBadge(p->center, badge);
     else post(p->center, kind == AUTO_NOTE_UPGRADES ? NOTE_ID : AUTO_NOTE_ID, badge, title, body);
 }
@@ -360,12 +360,12 @@ int main(int argc, char *argv[]) {
             if (!strcmp(argv[i], "--force")) force = 1;
             else if (!strcmp(argv[i], "--no-update")) update = 0;
             else if (!strcmp(argv[i], "--dry-run")) dry = 1;
-            else { fprintf(stderr, "usage: cydian-upgrades [--force] [--no-update] [--dry-run]\n"); return 64; }
+            else { fprintf(stderr, "usage: ifizbox-upgrades [--force] [--no-update] [--dry-run]\n"); return 64; }
         }
         umask(022);
-        NSString *dir = @CYDIAN_PREFIX "/var/lib/cydian";
+        NSString *dir = @IFIZBOX_PREFIX "/var/lib/ifizbox";
         mkdir(dir.fileSystemRepresentation, 0755);
-        mkdir(CYDIAN_PREFIX "/var/cache/cydian", 0755);
+        mkdir(IFIZBOX_PREFIX "/var/cache/ifizbox", 0755);
 
         /* One run at a time (RunAtLoad and the interval can meet, or a hand-run --force). */
         int lock = open([dir stringByAppendingPathComponent:@"upgrades.lock"].fileSystemRepresentation,
@@ -377,16 +377,16 @@ int main(int argc, char *argv[]) {
         struct phone phone = {.dry = dry};
         if (!dry) {
             phone.center = [[UNUserNotificationCenter alloc] initWithBundleIdentifier:BUNDLE_ID];
-            if (!phone.center) say("no notification center for " "com.ryha.cydian");
+            if (!phone.center) say("no notification center for " "com.ryha.ifizbox");
         }
         struct auto_env env = {
             .ctx = &phone,
-            .state_path = CYDIAN_PREFIX "/var/lib/cydian/upgrades.state",
-            .status_path = CYDIAN_PREFIX "/var/lib/dpkg/status",
-            .info_dir = CYDIAN_PREFIX "/var/lib/dpkg/info",
-            .cache_dir = CYDIAN_PREFIX "/var/cache/apt/archives",
-            .rollback_dir = CYDIAN_PREFIX "/var/cache/cydian/rollback",
-            .lists_dir = CYDIAN_PREFIX "/var/lib/apt/lists",
+            .state_path = IFIZBOX_PREFIX "/var/lib/ifizbox/upgrades.state",
+            .status_path = IFIZBOX_PREFIX "/var/lib/dpkg/status",
+            .info_dir = IFIZBOX_PREFIX "/var/lib/dpkg/info",
+            .cache_dir = IFIZBOX_PREFIX "/var/cache/apt/archives",
+            .rollback_dir = IFIZBOX_PREFIX "/var/cache/ifizbox/rollback",
+            .lists_dir = IFIZBOX_PREFIX "/var/lib/apt/lists",
             .settings = e_settings, .held = e_held, .now = e_now, .net = e_net, .charging = e_charging,
             .locked = e_locked, .springboard_started = e_springboard_started, .busy = e_busy, .update = e_update,
             .simulate = e_simulate, .install = e_install, .respring = e_respring, .notify = e_notify, .say = e_say,

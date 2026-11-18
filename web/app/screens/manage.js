@@ -440,7 +440,7 @@ async function showQR() {
 // Dismissed or empty: nothing found.
 async function importClipboard(row, route, ctx) {
   row?.classList.remove("is-pressed");
-  let text = globalThis.cydianNative ? await nativePaste() : null; // no await on the website: it could lose the tap
+  let text = globalThis.ifizboxNative ? await nativePaste() : null; // no await on the website: it could lose the tap
   if (text == null) { try { text = await navigator.clipboard.readText(); } catch { text = ""; } }
   if (!/^#\/sources\/manage\/io\/?$/.test(location.hash)) return; // left the page while the bubble was up
   await startReview(text, route, ctx);
@@ -529,7 +529,7 @@ export async function currentJailbreak() {
   if (saved) return { id: saved, detected: false };
   const backend = getBackend();
   // F56: the shell's marker files (app.info `markers`) answer for sure; apt's source files are the fallback.
-  const native = globalThis.cydianNative;
+  const native = globalThis.ifizboxNative;
   const fromMarkers = () => (native?.call
     ? Promise.resolve().then(() => native.call("app.info", {})).then((i) => jailbreakFromMarkers(i?.markers), () => null)
     : Promise.resolve(null));

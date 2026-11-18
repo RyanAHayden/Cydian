@@ -75,7 +75,7 @@ test("F103: WebView is a sandboxed iframe at the width/height aspect; only http(
 }));
 
 test("F103: on the site an http WebView, which the proxy can't serve as HTML, is a link row instead", () => withDom(() => {
-  // No cydianNative: getBackend() is the http backend, whose assetUrl goes through /api/fetch.
+  // No ifizboxNative: getBackend() is the http backend, whose assetUrl goes through /api/fetch.
   const u = webUrl("http://example.com/page");
   assert.equal(u.proxied, true);
   assert.match(u.src, /\/api\/fetch\?/);

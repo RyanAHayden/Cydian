@@ -11,7 +11,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         Notifications.shared.start() // F65: permission for N5's daemon, and notification taps (Notifications.swift)
         // The new iFizBox is open: the "iFizBox Updated, tap to open" notices have done their job.
         // and one still waiting to arrive (it's sent 8 s after the old iFizBox closed) never comes once this one is open
-        let notices = ["cydian.updating", "cydian.updated"]
+        let notices = ["ifizbox.updating", "ifizbox.updated"]
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: notices)
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: notices)
         SignBridge.importBundled() // F75: the certificate the website put inside iFizBox's own IPA (bring, F93)
@@ -41,12 +41,12 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         w.overrideUserInterfaceStyle = .light
         w.makeKeyAndVisible()
         window = w
-        if let u = options.urlContexts.first?.url { Incoming.receive(u) } // F75: launched by a cydian:// link
+        if let u = options.urlContexts.first?.url { Incoming.receive(u) } // F75: launched by a ifizbox:// link
         if let item = options.shortcutItem { Shortcut.perform(item.type) } // launched from the icon's Upgrade All
         Replaced.watch()
     }
 
-    // F75: a cydian:// link while iFizBox runs (Open in iFizBox App and Open in iFizBox on the website).
+    // F75: a ifizbox:// link while iFizBox runs (Open in iFizBox App and Open in iFizBox on the website).
     func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem,
                      completionHandler: @escaping (Bool) -> Void) {
         Shortcut.perform(shortcutItem.type)
@@ -58,17 +58,17 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 }
 
-// F75: cydian://import?d=…, cydian://install?url=… (F89) and the rest of IncomingLink's hosts for the page (web/app/incoming.js). The shell keeps the
-// latest one and tells the page there is one ("cydian:url" on window); the page takes it with app.takeURL, also
+// F75: ifizbox://import?d=…, ifizbox://install?url=… (F89) and the rest of IncomingLink's hosts for the page (web/app/incoming.js). The shell keeps the
+// latest one and tells the page there is one ("ifizbox:url" on window); the page takes it with app.takeURL, also
 // once at start, so a link that launched iFizBox before the page loaded isn't lost. Only IncomingLink's hosts pass.
 //   app.takeURL            -> {url} | null (and forgets it)
-//   app.gunzip {data}      base64 gzip -> {text}: cydian://import's payload where WebKit has no DecompressionStream
+//   app.gunzip {data}      base64 gzip -> {text}: ifizbox://import's payload where WebKit has no DecompressionStream
 enum Incoming {
     private static var pending: String?
 
     static func receive(_ url: URL) {
         if SharedInbox.receive(url) { return } // N9: shared .ipa/.deb files and the share extension's links
-        if MyIPAs.receive(url) { return } // F77: an .ipa file goes into My IPAs, which then sends cydian://myipas
+        if MyIPAs.receive(url) { return } // F77: an .ipa file goes into My IPAs, which then sends ifizbox://myipas
         guard IncomingLink.accepts(url) || OtherLink.accepts(url) else { return } // F83: other sideloaders' links too
         pending = url.absoluteString
         notify(tries: 50)
@@ -82,7 +82,7 @@ enum Incoming {
             if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { notify(tries: tries - 1) } }
             return
         }
-        web.callAsyncJavaScript("window.dispatchEvent(new Event('cydian:url'))", arguments: [:], in: nil, in: .page,
+        web.callAsyncJavaScript("window.dispatchEvent(new Event('ifizbox:url'))", arguments: [:], in: nil, in: .page,
                                 completionHandler: nil)
     }
 
@@ -145,7 +145,7 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
         dropCover()
     }
 
-    // B8 (docs/native.md, "Links out of the app"): iFizBox's own pages (cydian:, about:, blob:, data:) load in the
+    // B8 (docs/native.md, "Links out of the app"): iFizBox's own pages (ifizbox:, about:, blob:, data:) load in the
     // web view, and so does anything inside a subframe. Any other main-frame navigation (location.href to https,
     // itms-services, feather://, altstore://, cydia://, sileo://, a target=_blank link) goes to iOS and is cancelled,
     // so iFizBox's UI stays where it was. Going straight to iOS also means an itms-services install link shows only
@@ -184,8 +184,8 @@ enum Web {
     static func make(bridge: Bridge) -> WKWebView {
         let c = WKWebViewConfiguration()
         c.setURLSchemeHandler(AppScheme(), forURLScheme: AppScheme.scheme)
-        c.userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "cydian")
-        Apt.installScript(c.userContentController) // cydianNative, before any page script (native/bridge.js)
+        c.userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "ifizbox")
+        Apt.installScript(c.userContentController) // ifizboxNative, before any page script (native/bridge.js)
         // WebKit holds requestAnimationFrame near 60 Hz by default on iOS; the JS edge swipe needs 120 (R3).
         WebKitFeature.set({ $0 == "PreferPageRenderingUpdatesNear60FPSEnabled" }, false, c.preferences)
         let w = WKWebView(frame: .zero, configuration: c)
@@ -300,7 +300,7 @@ enum Replaced {
         let c = UNMutableNotificationContent()
         c.title = Brand.name
         c.body = newVersion.map { "Updated to \($0). Tap to open it." } ?? "Updated. Tap to open it."
-        let req = UNNotificationRequest(identifier: "cydian.updated", content: c,
+        let req = UNNotificationRequest(identifier: "ifizbox.updated", content: c,
                                         trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
         UNUserNotificationCenter.current().add(req) { _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { exit(0) } // ponytail: a plain exit; iOS allows it here

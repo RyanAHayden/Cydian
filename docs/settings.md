@@ -55,13 +55,13 @@ of the apps it signs, so it shows no dates and the switch would do nothing there
 | Setting | Was | Why it went | Now |
 |---|---|---|---|
 | `sideloader` (Sideloader) | Hidden since 2026-11-17 (`modes: []`) | Nothing read it after app pages stopped handing apps to other sideloaders | iFizBox always signs and installs itself |
-| `checkUpdates` (Check for Updates: Off / On Launch / Every 6 Hours / Daily) | Never shown (its feature, `update-check`, never shipped) | The app checks for its own updates on every launch and Reload (F183, silent: a row in Changes), and N5's daemon checks daily | The daemon's default (Daily). A full `daemonPrefs()` sends `cydian.checkUpdates: null` so the shell removes any old value |
+| `checkUpdates` (Check for Updates: Off / On Launch / Every 6 Hours / Daily) | Never shown (its feature, `update-check`, never shipped) | The app checks for its own updates on every launch and Reload (F183, silent: a row in Changes), and N5's daemon checks daily | The daemon's default (Daily). A full `daemonPrefs()` sends `ifizbox.checkUpdates: null` so the shell removes any old value |
 | `cellular` (Use Cellular Data) | Never shown (feature `cellular` never shipped) | No row, and nobody could set it | The daemon's default (cellular data on). Sent as null like `checkUpdates` |
 | `notifications` (Off / Summary / One per Package) | Never shown (feature `notifications` never shipped) | Nothing read it. Upgrade Notifications (jailbreak) and Update Alerts (sideload) are the real controls | none |
 | `badge` (App Icon Badge) | Never shown (feature `badge` never shipped) | Nothing read it. The icon always shows the upgrade count (Update Alerts > Icon Badge is iOS's own switch in the sideload build) | none |
 | `allowZoom` (Display > Zoom) | F134, user 2026-11-18: "remove zoom setting" | Zoom was off by default and the user wants it gone | Zoom is always off: `applyZoom` keeps the no-zoom viewport, `html.no-zoom` and the cancelled pinch. Not in `TRAVELS` any more; an account or link that still carries it is skipped (`isShown` is false) |
 
-**Migration:** `createSettings()` runs `dropRetired()`, which removes `cydian.<key>` from storage for each key in
+**Migration:** `createSettings()` runs `dropRetired()`, which removes `ifizbox.<key>` from storage for each key in
 `RETIRED`. It runs on every launch and costs one lookup per key when nothing is left to remove.
 
 ## What moved or was renamed
@@ -94,7 +94,7 @@ of the apps it signs, so it shows no dates and the switch would do nothing there
 | `iosVersion` | website | auto | device.js |
 | `refreshOnLaunch` | all | off on the website, on in the apps | app.js |
 | `holds` | all | none | upgrades, Changes, dpkg holds (jailbreak) |
-| `upgradeNotifications` | jailbreak | on | cydian-helper notifications (N5's daemon) |
+| `upgradeNotifications` | jailbreak | on | ifizbox-helper notifications (N5's daemon) |
 | `autoInstall`, `autoInstallIdle`, `respring`, `keepVersions` | jailbreak | off, on, notify, 1 | N7's daemon (daemonPrefs) |
 | `showExpiry` | sideload | on | Installed's signature pills (installed.js withSignatures), an app page's Signature row (altstore.js signatureRow), Signed Apps' days (signed-apps.js). Off hides the days; Expired still shows |
 | `resignReminder` | sideload | 2 days | signing.remind, Changes |

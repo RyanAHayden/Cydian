@@ -5,9 +5,9 @@
 // The rule runs once, when app.js loads. A return from the background never reloads the page, so it never gets
 // here; a reload (Home's Reload button, or iOS reloading the page) and back/forward keep the route.
 
-// win: window-like ({ matchMedia, navigator, performance, location, cydianApp }).
+// win: window-like ({ matchMedia, navigator, performance, location, ifizboxApp }).
 export function isStandaloneWeb(win) {
-  if (win.cydianApp || win.cydianNative) return false; // the native app's WKWebView has its own launch
+  if (win.ifizboxApp || win.ifizboxNative) return false; // the native app's WKWebView has its own launch
   return Boolean(win.matchMedia?.("(display-mode: standalone)")?.matches || win.navigator?.standalone === true);
 }
 

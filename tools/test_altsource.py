@@ -46,7 +46,7 @@ class SourceTest(unittest.TestCase):
 class UpdateTest(unittest.TestCase):
     def test_update_points_at_release(self):
         with tempfile.TemporaryDirectory() as d:
-            ipa = os.path.join(d, "Cydian.ipa")
+            ipa = os.path.join(d, "iFizBox.ipa")
             with open(ipa, "wb") as f:
                 f.write(b"PK" + b"\0" * 1000)
             out = os.path.join(d, "source.json")
@@ -54,7 +54,7 @@ class UpdateTest(unittest.TestCase):
             with open(out) as f:
                 data = json.load(f)
         v = data["apps"][0]["versions"][0]
-        self.assertEqual(v["downloadURL"], "https://github.com/RyanAHayden/iFizBox/releases/download/v9.8.7/Cydian.ipa")
+        self.assertEqual(v["downloadURL"], "https://github.com/RyanAHayden/iFizBox/releases/download/v9.8.7/iFizBox.ipa")
         self.assertEqual(v["size"], 1002)
         self.assertEqual(altsource.check(data), [])
 

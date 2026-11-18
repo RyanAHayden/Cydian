@@ -173,7 +173,7 @@ test("Delete frees the kept bytes", async () => {
   assert.equal(store.files.size, 0);
   assert.deepEqual(siteEntries(storage), []);
   // a link entry has no bytes to free
-  storage.setItem("cydian.myIpas", JSON.stringify([{ file: "L.ipa", url: "https://x/L.ipa" }]));
+  storage.setItem("ifizbox.myIpas", JSON.stringify([{ file: "L.ipa", url: "https://x/L.ipa" }]));
   await removeSiteEntry({ file: "L.ipa", url: "https://x/L.ipa" }, { storage, store: null });
   assert.deepEqual(siteEntries(storage), []);
 });

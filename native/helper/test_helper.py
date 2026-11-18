@@ -1,4 +1,4 @@
-"""N2: cydian-helper's checks (policy.c), the app-side spawn (spawn.c) and the whole chain app -> helper -> apt,
+"""N2: ifizbox-helper's checks (policy.c), the app-side spawn (spawn.c) and the whole chain app -> helper -> apt,
 built with the host's C compiler. The persona spawn and the iOS build can't run here: see the N2 journal."""
 import os
 import shutil
@@ -117,7 +117,7 @@ class Helper(unittest.TestCase):
                 self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
         self.assertEqual(len(self.plan("install", *(["ab"] * 256))), 2 + 9 + 256)
 
-    # --- F33: addsource / removesource and cydian.sources
+    # --- F33: addsource / removesource and ifizbox.sources
 
     def test_source_strings(self):
         good_uris = ["https://repo.example/", "http://a.b/", "https://repo.example:8443/deb/", "https://h/a/b-c_d~e/",
@@ -141,7 +141,7 @@ class Helper(unittest.TestCase):
         self.assertEqual(self.run_driver("component", *bad_comps), ["bad"] * len(bad_comps))
 
     def test_source_plan(self):
-        f = "/var/jb/etc/apt/sources.list.d/cydian.sources"
+        f = "/var/jb/etc/apt/sources.list.d/ifizbox.sources"
         self.assertEqual(self.plan("addsource", "https://r.test/", "./"), [f, "addsource", "https://r.test/", "./"])
         self.assertEqual(self.plan("addsource", "https://r.test/", "stable", "main", "extra"),
                          [f, "addsource", "https://r.test/", "stable", "main", "extra"])
@@ -169,7 +169,7 @@ class Helper(unittest.TestCase):
 
     def sources_file(self, prefix):
         os.makedirs(os.path.join(prefix, "etc/apt"), exist_ok=True)  # always there on a device; sources.list.d may not be
-        return os.path.join(prefix, "etc/apt/sources.list.d/cydian.sources")
+        return os.path.join(prefix, "etc/apt/sources.list.d/ifizbox.sources")
 
     def test_sources_apply(self):
         p = tempfile.mkdtemp(dir=self.tmp)
@@ -237,7 +237,7 @@ class Helper(unittest.TestCase):
             fh.write("root:x:0:0\n")
         os.symlink(secret, f)
         out = self.run_driver("apply", p, "addsource", "https://r.test/", "./")[0]
-        self.assertTrue(out.startswith("error: can't read cydian.sources"), out)
+        self.assertTrue(out.startswith("error: can't read ifizbox.sources"), out)
         self.assertTrue(os.path.islink(f))
         os.unlink(f)
         os.mkdir(f)
@@ -372,11 +372,11 @@ class Helper(unittest.TestCase):
     # --- caller check
 
     def test_caller(self):
-        app = os.path.join(self.tmp, "Cydian")
+        app = os.path.join(self.tmp, "iFizBox")
         other = os.path.join(self.tmp, "Other")
         for f in (app, other):
             open(f, "w").close()
-        link = os.path.join(self.tmp, "Cydian-link")
+        link = os.path.join(self.tmp, "iFizBox-link")
         if not os.path.lexists(link):
             os.symlink(app, link)
         c = lambda *a: self.run_driver("caller", *a)[0]
@@ -398,9 +398,9 @@ class Helper(unittest.TestCase):
 
     def chain_prefix(self):
         p = self.fake_prefix()
-        os.makedirs(os.path.join(p, "Applications/Cydian.app"))
+        os.makedirs(os.path.join(p, "Applications/iFizBox.app"))
         os.makedirs(os.path.join(p, "usr/bin"))
-        app = os.path.join(p, "Applications/Cydian.app/Cydian")
+        app = os.path.join(p, "Applications/iFizBox.app/iFizBox")
         shutil.copy(self.driver, app)
         for tool in ("apt-get", "apt-mark", "dpkg"):
             path = os.path.join(p, "usr/bin", tool)
@@ -412,8 +412,8 @@ class Helper(unittest.TestCase):
                         'printf "fds: " >&2; ls -m /proc/$$/fd >&2\n'
                         'echo "pmstatus:com.repo.tweak:50.0:Installing" >&3\necho "to stderr" >&2\nexit 7\n')
             os.chmod(path, 0o755)
-        helper = os.path.join(p, "cydian-helper")
-        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"', f"-DCYDIAN_ROOT_UID={os.getuid()}"])
+        helper = os.path.join(p, "ifizbox-helper")
+        build(helper, ["main.c", "policy.c"], [f'-DIFIZBOX_PREFIX="{p}"', f"-DIFIZBOX_ROOT_UID={os.getuid()}"])
         return p, app, helper
 
     def test_chain(self):
@@ -451,7 +451,7 @@ class Helper(unittest.TestCase):
         self.assertIn(f"1: argv: {p}/usr/bin/apt-get -s --reinstall --allow-downgrades --allow-unauthenticated install com.repo.tweak", out)
         self.assertNotIn("CYDIA=", next(l for l in out if l.startswith("1: env: ")))
         out = self.run_driver("spawn", helper, "apply", "-com.repo.tweak", driver=app)
-        self.assertIn("2: cydian-helper: unknown package: com.repo.tweak", out)
+        self.assertIn("2: ifizbox-helper: unknown package: com.repo.tweak", out)
         self.assertEqual(out[-1], "exit: 64")
 
     def test_chain_apply_ask(self):
@@ -469,7 +469,7 @@ class Helper(unittest.TestCase):
         self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y --reinstall --allow-downgrades --allow-unauthenticated "
                       "-o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install com.repo.tweak=1", out)
         self.assertIn("1: stdin: Y", out)
-        self.assertEqual(out.count("2: cydian-helper: ignored an answer that isn't Y or N"), 3, out)
+        self.assertEqual(out.count("2: ifizbox-helper: ignored an answer that isn't Y or N"), 3, out)
         self.assertIn("CYDIA=3 1", next(l for l in out if l.startswith("1: env: ")))
         self.assertEqual(out[-1], "exit: 7")
         fds = self.stand_in_fds(out)
@@ -492,7 +492,7 @@ class Helper(unittest.TestCase):
                            text=True, timeout=30, env={**os.environ, "TEST_ANSWERS": "C"})
         self.assertEqual(r.returncode, 0, r.stderr)
         out = r.stdout.splitlines()
-        self.assertIn("2: cydian-helper: cancelled: stopping apt-get", out)
+        self.assertIn("2: ifizbox-helper: cancelled: stopping apt-get", out)
         self.assertFalse([l for l in out if l.startswith("1: stdin:")], out)
         self.assertEqual(out[-1], "exit: 130")
 
@@ -519,16 +519,16 @@ class Helper(unittest.TestCase):
         for parent, words, msg, code in cases:
             with self.subTest(words=words):
                 out = self.run_driver("spawn", helper, *words, driver=parent)
-                self.assertTrue(any(l.startswith("2: cydian-helper: ") and msg in l for l in out), out)
+                self.assertTrue(any(l.startswith("2: ifizbox-helper: ") and msg in l for l in out), out)
                 self.assertEqual(out[-1], f"exit: {code}")
                 self.assertFalse(any(l.startswith("1: argv") for l in out), out)
 
     def test_chain_sources(self):
-        """F33: addsource/removesource through the chain edit cydian.sources and run no apt at all."""
+        """F33: addsource/removesource through the chain edit ifizbox.sources and run no apt at all."""
         p, app, helper = self.chain_prefix()
         f = self.sources_file(p)
         out = self.run_driver("spawn", helper, "addsource", "https://r.test/", "stable", "main", driver=app)
-        self.assertEqual(out, ["1: Added https://r.test/ stable: cydian.sources updated", "exit: 0"])
+        self.assertEqual(out, ["1: Added https://r.test/ stable: ifizbox.sources updated", "exit: 0"])
         self.assertEqual(open(f).read(), "Types: deb\nURIs: https://r.test/\nSuites: stable\nComponents: main\n")
         out = self.run_driver("spawn", helper, "addsource", "https://r.test/", "stable", "main", driver=app)
         self.assertEqual(out, ["1: Added https://r.test/ stable: nothing to change", "exit: 0"])
@@ -556,10 +556,10 @@ class Helper(unittest.TestCase):
         if os.getuid() == 0:
             self.skipTest("running as root")
         p, app, _ = self.chain_prefix()
-        helper = os.path.join(p, "cydian-helper-uid0")
-        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"'])
+        helper = os.path.join(p, "ifizbox-helper-uid0")
+        build(helper, ["main.c", "policy.c"], [f'-DIFIZBOX_PREFIX="{p}"'])
         out = self.run_driver("spawn", helper, "update", driver=app)
-        self.assertIn("2: cydian-helper: not root: the app must spawn the helper with the root persona", out)
+        self.assertIn("2: ifizbox-helper: not root: the app must spawn the helper with the root persona", out)
         self.assertEqual(out[-1], "exit: 77")
 
     def test_ios_build(self):
@@ -574,7 +574,7 @@ class Helper(unittest.TestCase):
                                capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
 
-IPA_DIR = "/var/mobile/Library/Caches/com.ryha.cydian/ipa"
+IPA_DIR = "/var/mobile/Library/Caches/com.ryha.ifizbox/ipa"
 PLIST = ('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n'
          '\t<key>CFBundleExecutable</key><string>Demo</string>\n'
          '\t<key>CFBundleIdentifier</key>\n\t<string>{}</string>\n</dict>\n</plist>\n')
@@ -661,8 +661,8 @@ class InstallIpa(unittest.TestCase):
         self.assertEqual(e["com.apple.security.exception.mach-lookup.global-name"], ["com.apple.mobile.installd"])
         with open(os.path.join(HERE, "..", "build.sh")) as f:
             build_sh = f.read()
-        self.assertIn('-Shelper/entitlements.plist "$libexec/cydian-helper"', build_sh)
-        self.assertIn('--entitlements-xml-file helper/entitlements.plist "$libexec/cydian-helper"', build_sh)
+        self.assertIn('-Shelper/entitlements.plist "$libexec/ifizbox-helper"', build_sh)
+        self.assertIn('--entitlements-xml-file helper/entitlements.plist "$libexec/ifizbox-helper"', build_sh)
         self.assertIn("helper/ipa.c", build_sh)
 
     # --- the chain
@@ -670,11 +670,11 @@ class InstallIpa(unittest.TestCase):
     def chain(self, ldid=False, appsync=False):
         base = tempfile.mkdtemp(dir=self.tmp)
         p, ipa_dir, work = (os.path.join(base, n) for n in ("prefix", "ipa", "work"))
-        for d in ("Applications/Cydian.app", "usr/bin"):
+        for d in ("Applications/iFizBox.app", "usr/bin"):
             os.makedirs(os.path.join(p, d))
         os.makedirs(ipa_dir)
         os.makedirs(work)
-        app = os.path.join(p, "Applications/Cydian.app/Cydian")
+        app = os.path.join(p, "Applications/iFizBox.app/iFizBox")
         shutil.copy(self.driver, app)
         unzip = os.path.join(p, "usr/bin/unzip")  # unzip -qq -o <zip> -d <dir>
         with open(unzip, "w") as f:
@@ -689,8 +689,8 @@ class InstallIpa(unittest.TestCase):
             d = os.path.join(p, "usr/lib/TweakInject")
             os.makedirs(d)
             open(os.path.join(d, "AppSyncUnified-installd.dylib"), "w").close()
-        helper = os.path.join(base, "cydian-helper")
-        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"', f"-DCYDIAN_ROOT_UID={os.getuid()}",
+        helper = os.path.join(base, "ifizbox-helper")
+        build(helper, ["main.c", "policy.c"], [f'-DIFIZBOX_PREFIX="{p}"', f"-DIFIZBOX_ROOT_UID={os.getuid()}",
                                                 f'-DHELPER_IPA_DIR="{ipa_dir}"', f'-DHELPER_IPA_WORK="{work}"'])
         return p, app, helper, ipa_dir, work
 
@@ -719,7 +719,7 @@ class InstallIpa(unittest.TestCase):
         self.assertIn("1: Installed com.example.demo", out)
         self.assertIn("3: pmstatus:com.example.demo:100:Installed", out)
         # unzip runs in the root-owned work directory's pkg/ (as mobile on the phone; here the test's own user)
-        self.assertTrue(any(l.startswith(f"2: unzip as {os.getuid()} in {work}/cydian-ipa.") and l.endswith("/pkg")
+        self.assertTrue(any(l.startswith(f"2: unzip as {os.getuid()} in {work}/ifizbox-ipa.") and l.endswith("/pkg")
                             for l in out), out)
         self.assert_clean(work)
 
@@ -744,7 +744,7 @@ class InstallIpa(unittest.TestCase):
         out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, bundle_id="com.example.refused"))
         self.assertEqual(out[-1], "exit: 69", out)
         self.assertTrue(any("can't install ad hoc apps without AppSync" in l for l in out), out)
-        self.assertIn("2: cydian-helper: installd: test installd refused it", out)
+        self.assertIn("2: ifizbox-helper: installd: test installd refused it", out)
         self.assert_clean(work)
 
     def test_chain_refuses(self):
@@ -771,7 +771,7 @@ class InstallIpa(unittest.TestCase):
         for parent, path, msg, code in cases:
             with self.subTest(path=os.path.basename(path), msg=msg):
                 out = self.spawn(parent, helper, "install-ipa", path)
-                self.assertTrue(any(l.startswith("2: cydian-helper: ") and msg in l for l in out), out)
+                self.assertTrue(any(l.startswith("2: ifizbox-helper: ") and msg in l for l in out), out)
                 self.assertEqual(out[-1], f"exit: {code}")
                 self.assertFalse(any(l.startswith("1: install ") for l in out), out)
                 self.assert_clean(work)
@@ -779,8 +779,8 @@ class InstallIpa(unittest.TestCase):
 
 @unittest.skipUnless(CC, "no C compiler on this machine")
 class Rollback(unittest.TestCase):
-    """F71: rollbacks <id> / rollback <id> <version> over N7's store (<prefix>/var/cache/cydian/rollback/<id>/), with
-    this test's user standing in for root (CYDIAN_ROOT_UID) and a stand-in dpkg-deb that prints the fake .deb's
+    """F71: rollbacks <id> / rollback <id> <version> over N7's store (<prefix>/var/cache/ifizbox/rollback/<id>/), with
+    this test's user standing in for root (IFIZBOX_ROOT_UID) and a stand-in dpkg-deb that prints the fake .deb's
     text as its control."""
 
     @classmethod
@@ -788,7 +788,7 @@ class Rollback(unittest.TestCase):
         cls.tmp = tempfile.mkdtemp()
         cls.uid = str(os.getuid())
         cls.driver = os.path.join(cls.tmp, "test_driver")
-        build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"], [f"-DCYDIAN_ROOT_UID={os.getuid()}"])
+        build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"], [f"-DIFIZBOX_ROOT_UID={os.getuid()}"])
 
     @classmethod
     def tearDownClass(cls):
@@ -813,9 +813,9 @@ class Rollback(unittest.TestCase):
         return p
 
     def store(self, p, pkg="com.example.tweak", files=None):
-        d = os.path.join(p, "var/cache/cydian/rollback", pkg)
+        d = os.path.join(p, "var/cache/ifizbox/rollback", pkg)
         os.makedirs(d, exist_ok=True)
-        for q in (os.path.join(p, "var/cache/cydian/rollback"), d):
+        for q in (os.path.join(p, "var/cache/ifizbox/rollback"), d):
             os.chmod(q, 0o755)
         files = files if files is not None else {"0.9": "0.9", "1:1.0~b1": "1%3a1.0~b1"}
         for ver, spelled in files.items():
@@ -850,7 +850,7 @@ class Rollback(unittest.TestCase):
     def test_file(self):
         p = self.prefix()
         d = self.store(p)
-        root = os.path.join(p, "var/cache/cydian/rollback")
+        root = os.path.join(p, "var/cache/ifizbox/rollback")
         f = lambda ver, pkg="com.example.tweak", uid=self.uid: self.run_driver("rbfile", root, pkg, ver, uid)[0]
         self.assertEqual(f("0.9"), f"{d}/com.example.tweak_0.9_iphoneos-arm64.deb")
         self.assertEqual(f("1:1.0~b1"), f"{d}/com.example.tweak_1%3a1.0~b1_iphoneos-arm64.deb")
@@ -862,7 +862,7 @@ class Rollback(unittest.TestCase):
 
     def test_file_refuses_unsafe(self):
         p = self.prefix()
-        root = os.path.join(p, "var/cache/cydian/rollback")
+        root = os.path.join(p, "var/cache/ifizbox/rollback")
         d = self.store(p, files={})
         name = lambda v: os.path.join(d, f"com.example.tweak_{v}_iphoneos-arm64.deb")
         other = os.path.join(self.tmp, "elsewhere.deb")
@@ -892,14 +892,14 @@ class Rollback(unittest.TestCase):
         os.chmod(root, 0o755)
         q = self.prefix()
         self.store(q, files={"5": "5"})
-        os.symlink(d, os.path.join(q, "var/cache/cydian/rollback/com.example.link"))
+        os.symlink(d, os.path.join(q, "var/cache/ifizbox/rollback/com.example.link"))
         self.assertIn("isn't a root-owned directory",
-                      self.run_driver("rbfile", os.path.join(q, "var/cache/cydian/rollback"), "com.example.link", "5", self.uid)[0])
+                      self.run_driver("rbfile", os.path.join(q, "var/cache/ifizbox/rollback"), "com.example.link", "5", self.uid)[0])
 
     def test_list(self):
         p = self.prefix()
         d = self.store(p)
-        root = os.path.join(p, "var/cache/cydian/rollback")
+        root = os.path.join(p, "var/cache/ifizbox/rollback")
         open(os.path.join(d, "com.example.tweak_1.0_iphoneos-arm64.deb.tmp"), "w").close()
         open(os.path.join(d, "README"), "w").close()
         out = self.run_driver("rblist", root, "com.example.tweak", self.uid)
@@ -937,7 +937,7 @@ class Rollback(unittest.TestCase):
                           "install", deb])
         self.assertEqual(plan("rollback", "com.example.tweak", "1:1.0~b1", fd="-1")[1:], ["apt-get", *fixed, "install", deb])
         self.assertEqual(plan("rollbacks", "com.example.tweak"),
-                         [f"{p}/var/cache/cydian/rollback", "rollbacks", "com.example.tweak"])
+                         [f"{p}/var/cache/ifizbox/rollback", "rollbacks", "com.example.tweak"])
         cases = {
             ("rollback",): "a package name and a version",
             ("rollback", "com.example.tweak"): "a package name and a version",
@@ -959,16 +959,16 @@ class Rollback(unittest.TestCase):
 
     def chain(self):
         p = self.prefix()
-        os.makedirs(os.path.join(p, "Applications/Cydian.app"))
-        app = os.path.join(p, "Applications/Cydian.app/Cydian")
+        os.makedirs(os.path.join(p, "Applications/iFizBox.app"))
+        app = os.path.join(p, "Applications/iFizBox.app/iFizBox")
         shutil.copy(self.driver, app)
         apt = os.path.join(p, "usr/bin/apt-get")
         with open(apt, "w") as f:
             f.write('#!/bin/sh\necho "argv: $0 $*"\necho "env: $(env | sort | tr \'\\n\' \' \')"\n'
                     'echo "pmstatus:com.example.tweak:50:Installing" >&3\nexit 0\n')
         os.chmod(apt, 0o755)
-        helper = os.path.join(p, "cydian-helper")
-        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"', f"-DCYDIAN_ROOT_UID={os.getuid()}"])
+        helper = os.path.join(p, "ifizbox-helper")
+        build(helper, ["main.c", "policy.c"], [f'-DIFIZBOX_PREFIX="{p}"', f"-DIFIZBOX_ROOT_UID={os.getuid()}"])
         return p, app, helper
 
     def test_chain(self):
@@ -1003,11 +1003,11 @@ class Rollback(unittest.TestCase):
         for parent, words, msg, code in cases:
             with self.subTest(words=words):
                 out = self.run_driver("spawn", helper, *words, driver=parent)
-                self.assertTrue(any(l.startswith("2: cydian-helper: ") and msg in l for l in out), out)
+                self.assertTrue(any(l.startswith("2: ifizbox-helper: ") and msg in l for l in out), out)
                 self.assertEqual(out[-1], f"exit: {code}")
                 self.assertFalse(any(l.startswith("1: ") for l in out), out)
 
-PAID_DIR = "/var/mobile/Library/Caches/com.ryha.cydian/paid"
+PAID_DIR = "/var/mobile/Library/Caches/com.ryha.ifizbox/paid"
 
 
 @unittest.skipUnless(CC, "no C compiler on this machine")
@@ -1069,11 +1069,11 @@ class InstallPaid(unittest.TestCase):
     def chain(self, apt_exit=0):
         base = tempfile.mkdtemp(dir=self.tmp)
         p, paid, work = (os.path.join(base, n) for n in ("prefix", "paid", "work"))
-        for d in ("Applications/Cydian.app", "usr/bin"):
+        for d in ("Applications/iFizBox.app", "usr/bin"):
             os.makedirs(os.path.join(p, d))
         os.makedirs(paid)
         os.makedirs(work)
-        app = os.path.join(p, "Applications/Cydian.app/Cydian")
+        app = os.path.join(p, "Applications/iFizBox.app/iFizBox")
         shutil.copy(self.driver, app)
         dpkg_deb = os.path.join(p, "usr/bin/dpkg-deb")  # dpkg-deb -f <deb> Package Version
         with open(dpkg_deb, "w") as f:
@@ -1086,8 +1086,8 @@ class InstallPaid(unittest.TestCase):
                     f'echo "pmstatus:com.example.paid:50:Installing" >&3\nexit {apt_exit}\n')
         os.chmod(dpkg_deb, 0o755)
         os.chmod(apt, 0o755)
-        helper = os.path.join(base, "cydian-helper")
-        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"', f"-DCYDIAN_ROOT_UID={os.getuid()}",
+        helper = os.path.join(base, "ifizbox-helper")
+        build(helper, ["main.c", "policy.c"], [f'-DIFIZBOX_PREFIX="{p}"', f"-DIFIZBOX_ROOT_UID={os.getuid()}",
                                                 f'-DHELPER_PAID_DIR="{paid}"', f'-DHELPER_PAID_WORK="{work}"'])
         return p, app, helper, paid, work
 
@@ -1106,7 +1106,7 @@ class InstallPaid(unittest.TestCase):
         self.assertEqual(out[-1], "exit: 0", out)
         argv = next(l for l in out if l.startswith("1: argv: "))
         self.assertTrue(argv.startswith("1: argv: -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "
-                                        f"-o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install {work}/cydian-paid."), argv)
+                                        f"-o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install {work}/ifizbox-paid."), argv)
         self.assertTrue(argv.endswith("/paid.deb"), argv)  # the root-owned copy, not the app's file
         self.assertIn("1: copy: Package: com.example.paid", out)
         self.assertIn("CYDIA=3 1", next(l for l in out if l.startswith("1: env: ")))
@@ -1116,7 +1116,7 @@ class InstallPaid(unittest.TestCase):
         p, app, helper, paid, work = out
         out = self.spawn(app, helper, "install-paid", self.deb(paid), "com.example.paid", "1:1.0")
         self.assertEqual(out[-1], "exit: 100", out)  # apt's own status
-        self.assertFalse(any(l.startswith("2: cydian-helper: ") for l in out), out)
+        self.assertFalse(any(l.startswith("2: ifizbox-helper: ") for l in out), out)
         self.assertEqual(os.listdir(work), [])
 
     def test_chain_refuses(self):
@@ -1146,14 +1146,14 @@ class InstallPaid(unittest.TestCase):
         for parent, words, msg, code in cases:
             with self.subTest(words=words[0], msg=msg):
                 out = self.spawn(parent, helper, "install-paid", *words)
-                self.assertTrue(any(l.startswith("2: cydian-helper: ") and msg in l for l in out), out)
+                self.assertTrue(any(l.startswith("2: ifizbox-helper: ") and msg in l for l in out), out)
                 self.assertEqual(out[-1], f"exit: {code}")
                 self.assertFalse(any(l.startswith("1: ") for l in out), out)
                 self.assertEqual(os.listdir(work), [])
 
 
 
-DEB_DIR = "/var/mobile/Library/Caches/com.ryha.cydian/deb"
+DEB_DIR = "/var/mobile/Library/Caches/com.ryha.ifizbox/deb"
 
 
 @unittest.skipUnless(CC, "no C compiler on this machine")
@@ -1203,11 +1203,11 @@ class LocalDeb(unittest.TestCase):
     def chain(self, apt_exit=0):
         base = tempfile.mkdtemp(dir=self.tmp)
         p, debs, work = (os.path.join(base, n) for n in ("prefix", "deb", "work"))
-        for d in ("Applications/Cydian.app", "usr/bin"):
+        for d in ("Applications/iFizBox.app", "usr/bin"):
             os.makedirs(os.path.join(p, d))
         os.makedirs(debs)
         os.makedirs(work)
-        app = os.path.join(p, "Applications/Cydian.app/Cydian")
+        app = os.path.join(p, "Applications/iFizBox.app/iFizBox")
         shutil.copy(self.driver, app)
         apt = os.path.join(p, "usr/bin/apt-get")
         with open(apt, "w") as f:
@@ -1215,8 +1215,8 @@ class LocalDeb(unittest.TestCase):
                     'echo "env: $(env | sort | tr \'\\n\' \' \')"\n'
                     f'echo "pmstatus:com.example.shared:50:Installing" >&3\nexit {apt_exit}\n')
         os.chmod(apt, 0o755)
-        helper = os.path.join(base, "cydian-helper")
-        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"', f"-DCYDIAN_ROOT_UID={os.getuid()}",
+        helper = os.path.join(base, "ifizbox-helper")
+        build(helper, ["main.c", "policy.c"], [f'-DIFIZBOX_PREFIX="{p}"', f"-DIFIZBOX_ROOT_UID={os.getuid()}",
                                                 f'-DHELPER_DEB_DIR="{debs}"', f'-DHELPER_PAID_WORK="{work}"'])
         return p, app, helper, debs, work
 
@@ -1233,13 +1233,13 @@ class LocalDeb(unittest.TestCase):
                 out = self.run_driver("spawn", helper, verb, self.deb(debs), driver=app)
                 self.assertEqual(out[-1], f"exit: {apt_exit}", out)
                 argv = next(l for l in out if l.startswith("1: argv: "))
-                self.assertIn(f" install {work}/cydian-deb.", argv)
+                self.assertIn(f" install {work}/ifizbox-deb.", argv)
                 self.assertTrue(argv.endswith("/deb.deb"), argv)  # the root-owned copy, not the app's file
                 self.assertEqual(argv.startswith("1: argv: -s "), verb == "simulate-deb", argv)
                 self.assertIn("1: copy: a shared deb", out)
                 env = next(l for l in out if l.startswith("1: env: "))
                 self.assertEqual("CYDIA=3 1" in env, verb == "install-deb", env)
-                self.assertFalse(any(l.startswith("2: cydian-helper: ") for l in out), out)
+                self.assertFalse(any(l.startswith("2: ifizbox-helper: ") for l in out), out)
                 self.assertEqual(os.listdir(work), [])
 
     def test_chain_refuses(self):
@@ -1258,7 +1258,7 @@ class LocalDeb(unittest.TestCase):
         for parent, path, msg, code in cases:
             with self.subTest(path=path, msg=msg):
                 out = self.run_driver("spawn", helper, "install-deb", path, driver=parent)
-                self.assertTrue(any(l.startswith("2: cydian-helper: ") and msg in l for l in out), out)
+                self.assertTrue(any(l.startswith("2: ifizbox-helper: ") and msg in l for l in out), out)
                 self.assertEqual(out[-1], f"exit: {code}")
                 self.assertFalse(any(l.startswith("1: ") for l in out), out)
                 self.assertEqual(os.listdir(work), [])

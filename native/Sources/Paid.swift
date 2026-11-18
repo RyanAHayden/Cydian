@@ -16,7 +16,7 @@
 //   paid.install {url, package, version[, stream]} -> {code, stdout, stderr}  jailbreak build only: downloads the
 //                                                 one-time https URL from authorize_download straight away into
 //                                                 Paid.dir (= HELPER_PAID_DIR) as <UUID>.deb and runs
-//                                                 `cydian-helper install-paid <path> <package> <version>` (copies it,
+//                                                 `ifizbox-helper install-paid <path> <package> <version>` (copies it,
 //                                                 checks its control is that package and version, apt-get install),
 //                                                 then removes the download
 // Errors are "<code>: <message>" as in Apt.swift: bad_url, network, timeout, too_large, not_found, keychain,
@@ -29,8 +29,8 @@ import Security
 import UIKit
 
 enum Paid {
-    static let dir = "/var/mobile/Library/Caches/com.ryha.cydian/paid" // = native/helper/policy.h HELPER_PAID_DIR
-    static let service = "com.ryha.cydian.payment"
+    static let dir = "/var/mobile/Library/Caches/com.ryha.ifizbox/paid" // = native/helper/policy.h HELPER_PAID_DIR
+    static let service = "com.ryha.ifizbox.payment"
 
     static func register(_ b: Bridge) {
         b.on("net.request") { c in request(c) }
@@ -168,7 +168,7 @@ enum Paid {
 }
 
 // The payment secrets: generic passwords under Paid.service, one per key (core/payment.js's
-// "cydian.payment:<vendor>"). Reading one asks for the passcode or Face ID.
+// "ifizbox.payment:<vendor>"). Reading one asks for the passcode or Face ID.
 enum Keychain {
     static func query(_ key: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: Paid.service,

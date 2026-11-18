@@ -407,7 +407,7 @@ export const neverLoaded = (source) => Boolean(source) && source.updated == null
 // The AltStore source list: its own IndexedDB database, so the APT list, apt's sources.list in the app (F33) and
 // its helper never see these. `defaults` (URLs, core/sources.js DEFAULT_ALT_SOURCES on the site) go in once, the
 // first time a store with a "meta" store opens (version 2), so a default the user deletes stays deleted.
-function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "cydian-altsources", defaults = [] } = {}) {
+function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-altsources", defaults = [] } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
   return new Promise((resolve, reject) => {
     const req = idb.open(name, 2);

@@ -93,7 +93,7 @@ export function initScroller(screens) {
     const was = edges.get(t);
     edges.set(t, at);
     const flung = fingers === 0 || glide !== 0 || grab !== null; // momentum, or the indicator held (its scrub ticks too)
-    if (at && was === "" && flung && globalThis.cydianApp) haptic();
+    if (at && was === "" && flung && globalThis.ifizboxApp) haptic();
   }
 
   // Momentum after letting go, like a native fling: the scrub's last ~80 ms give a velocity in scroll px/ms that
@@ -164,7 +164,7 @@ export function initScroller(screens) {
     held.style.overflowY = "hidden";
     sb.classList.add("grab");
     clearTimeout(hideTimer);
-    if (globalThis.cydianApp) haptic(); // the app's bridge can tick any time; Safari only at the touch's end
+    if (globalThis.ifizboxApp) haptic(); // the app's bridge can tick any time; Safari only at the touch's end
   };
   document.addEventListener("touchstart", (e) => {
     if (e.touches.length !== 1 || grab !== null) return;
@@ -198,7 +198,7 @@ export function initScroller(screens) {
     sb.classList.remove("grab");
     if (held) { held.style.overflowY = ""; held = null; }
     // Safari plays its switch haptic only inside a finished touch (touchend counts, a timer doesn't).
-    if (e?.type === "touchend" && !globalThis.cydianApp) haptic();
+    if (e?.type === "touchend" && !globalThis.ifizboxApp) haptic();
     const [a, z] = [samples[0], samples.at(-1)];
     if (e?.type === "touchend" && a && z && z[0] - a[0] > 10) {
       // ponytail: capped at 6 px/ms; a quick flick on the bar moves the content ~50x as far and flew off the end

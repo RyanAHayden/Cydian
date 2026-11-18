@@ -1,9 +1,9 @@
 // F75: Send Settings (Open in iFizBox App) on the website: its sources, settings and Ignored Upgrades into the
-// sideload app, as one cydian://import link. Pure JS (CompressionStream is a global in Safari and in node), so node
+// sideload app, as one ifizbox://import link. Pure JS (CompressionStream is a global in Safari and in node), so node
 // tests cover both ends. F93: the website keeps a certificate again (Settings > Signing, signing in the browser), so
 // it travels too, as before F89; the Signing Server doesn't (the app keeps its own).
 //
-//   await encodeLink({ sources, settings, holds, identity })   cydian://import?d=<base64url of gzipped JSON>
+//   await encodeLink({ sources, settings, holds, identity })   ifizbox://import?d=<base64url of gzipped JSON>
 //   await decodeLink(url, { gunzip })                  the payload, or null for anything else
 //   reviewLink(payload, { have, get, shown, holds })   what's new: { sources, settings, holds, empty }
 //
@@ -46,12 +46,12 @@ export async function encodeLink({ sources = [], settings = {}, holds = [], iden
   const payload = { v: 1, sources: [...new Set(sources.filter((s) => typeof s === "string" && s))], settings,
     holds: [...new Set(holds.filter((p) => typeof p === "string" && p))], ...(identityOf(identity) ? { identity: identityOf(identity) } : {}) };
   const gz = await pipe(new TextEncoder().encode(JSON.stringify(payload)), new CompressionStream("gzip"));
-  return "cydian://import?d=" + toB64url(gz);
+  return "ifizbox://import?d=" + toB64url(gz);
 }
 
 // `gunzip(bytes)` -> text, for a web view without DecompressionStream (the shell's app.gunzip).
 export async function decodeLink(url, { gunzip = null } = {}) {
-  const m = /^cydian:\/\/import\/?\?(?:.*&)?d=([A-Za-z0-9_-]+)(?:&|$)/i.exec(String(url ?? ""));
+  const m = /^ifizbox:\/\/import\/?\?(?:.*&)?d=([A-Za-z0-9_-]+)(?:&|$)/i.exec(String(url ?? ""));
   if (!m) return null;
   try {
     const gz = fromB64url(m[1]);

@@ -9,7 +9,7 @@ import WebKit
 // drops the tap without asking its delegate (checked on the iPhone 7, iOS 15.8). So the tap goes to a probe of our
 // own instead: a 1 pt tall, invisible UIScrollView across the top of the web view, always 1 pt "scrolled down", the
 // one scroll view with scrollsToTop. Its delegate refuses the scroll (it stays put, ready for the next tap) and asks
-// the page to scroll whatever is on top (web/app/nav/statusbar.js, cydianScrollToTop: a sheet's list, Search's
+// the page to scroll whatever is on top (web/app/nav/statusbar.js, ifizboxScrollToTop: a sheet's list, Search's
 // results, else the top page's body). UIKit only picks scroll views that take touches, so the probe has user
 // interaction on; it lies under the status bar, where no touch reaches the page anyway.
 final class StatusBarTap: NSObject, UIScrollViewDelegate {
@@ -38,7 +38,7 @@ final class StatusBarTap: NSObject, UIScrollViewDelegate {
 
     func scrollViewShouldScrollToTop(_ scrollView: UIScrollView) -> Bool {
         guard let web, scrollView === probe else { return true }
-        web.evaluateJavaScript("globalThis.cydianScrollToTop?.()", completionHandler: nil)
+        web.evaluateJavaScript("globalThis.ifizboxScrollToTop?.()", completionHandler: nil)
         return false
     }
 }

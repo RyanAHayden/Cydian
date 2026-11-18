@@ -23,13 +23,13 @@ test("Home: nothing inside the app, either build, whatever the device", () => {
   }
 });
 
-test("the .deb: the release's asset for the arch, else rootless Cydian.deb, else none", () => {
+test("the .deb: the release's asset for the arch, else rootless iFizBox.deb, else none", () => {
   const release = parseRelease({ tag_name: "v0.2.0", assets: [
-    { name: "Cydian.ipa", browser_download_url: "https://x/Cydian.ipa" },
-    { name: "Cydian.deb", browser_download_url: "https://x/Cydian.deb" },
-    { name: "com.ryha.cydian_0.2.0_iphoneos-arm64e.deb", browser_download_url: "https://x/roothide.deb" },
+    { name: "iFizBox.ipa", browser_download_url: "https://x/iFizBox.ipa" },
+    { name: "iFizBox.deb", browser_download_url: "https://x/iFizBox.deb" },
+    { name: "com.ryha.ifizbox_0.2.0_iphoneos-arm64e.deb", browser_download_url: "https://x/roothide.deb" },
   ] });
-  assert.equal(debUrl("iphoneos-arm64", { release, debFor }), "https://x/Cydian.deb");
+  assert.equal(debUrl("iphoneos-arm64", { release, debFor }), "https://x/iFizBox.deb");
   assert.equal(debUrl("iphoneos-arm64e", { release, debFor }), "https://x/roothide.deb");
   assert.equal(debUrl("iphoneos-arm", { release, debFor }), null);
   assert.equal(debUrl("iphoneos-arm64"), APP_DEB_URL); // GitHub didn't answer
@@ -38,7 +38,7 @@ test("the .deb: the release's asset for the arch, else rootless Cydian.deb, else
   assert.match(debAlert("iphoneos-arm", null).message, /rootful/);
 });
 
-test("the IPA and the source: the release's latest Cydian.ipa, iFizBox's source first among the defaults", () => {
-  assert.match(APP_IPA_URL, /\/releases\/latest\/download\/Cydian\.ipa$/);
+test("the IPA and the source: the release's latest iFizBox.ipa, iFizBox's source first among the defaults", () => {
+  assert.match(APP_IPA_URL, /\/releases\/latest\/download\/iFizBox\.ipa$/);
   assert.equal(DEFAULT_ALT_SOURCES[0], APP_SOURCE_URL);
 });

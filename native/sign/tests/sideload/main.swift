@@ -108,11 +108,11 @@ test("arm64e fix-up") {
 
 test("inspect an IPA") {
     let d = try Inspect.ipa(fixtures.appendingPathComponent("edit.ipa"))
-    check(d.name == "Fixture" && d.bundleID == "dev.cydian.fixture" && d.version == "1.0" && d.minimumOS == "15.0", "basics")
+    check(d.name == "Fixture" && d.bundleID == "dev.ifizbox.fixture" && d.version == "1.0" && d.minimumOS == "15.0", "basics")
     check(d.permissions.map(\.label) == ["Camera", "Local Network"], "permissions \(d.permissions.map(\.label))")
     check(d.permissions.first?.text == "To scan codes.", "the app's reason")
     check(d.extensions.map(\.path) == ["PlugIns/Share.appex", "PlugIns/Widget.appex"], "extensions \(d.extensions.map(\.path))")
-    check(d.extensions.first?.point == "com.apple.share-services" && d.extensions.first?.bundleID == "dev.cydian.fixture.share", "share")
+    check(d.extensions.first?.point == "com.apple.share-services" && d.extensions.first?.bundleID == "dev.ifizbox.fixture.share", "share")
     check(d.iconPath == "Payload/Fixture.app/AppIcon60x60@2x.png", "icon \(String(describing: d.iconPath))")
     check(d.entitlements.isEmpty, "unsigned: no entitlements")
     check(JSONSerialization.isValidJSONObject(d.json), "json")
@@ -126,7 +126,7 @@ test("sign with the user's edits") {
                                        "removeExtensions": ["PlugIns/Widget.appex"]])
     let out = work.appendingPathComponent("edited.ipa")
     let app = try s.sign(fixtures.appendingPathComponent("edit.ipa"), to: out)
-    check(app.bundleID == "com.me.renamed" && app.originalBundleID == "dev.cydian.fixture", "ids \(app.bundleID)")
+    check(app.bundleID == "com.me.renamed" && app.originalBundleID == "dev.ifizbox.fixture", "ids \(app.bundleID)")
     check(app.name == "Renamed", "name \(app.name)")
     check(app.removed == ["PlugIns/Widget.appex"], "removed \(app.removed)")
     check(app.fixedArm64e == ["Frameworks/Sub.framework/Sub"], "fixed \(app.fixedArm64e)")
@@ -134,7 +134,7 @@ test("sign with the user's edits") {
     let d = try Inspect.ipa(out)
     check(d.entitlements["application-identifier"] as? String == "TESTTEAM42.com.me.renamed", "entitlements \(d.entitlements)")
     check(d.extensions.map(\.bundleID) == ["com.me.renamed.share"], "extension moved")
-    check(d.iconPath == "Payload/Fixture.app/CydianIcon60x60@3x.png", "icon \(String(describing: d.iconPath))")
+    check(d.iconPath == "Payload/Fixture.app/iFizBoxIcon60x60@3x.png", "icon \(String(describing: d.iconPath))")
     check(d.missing(from: profile).isEmpty, "the profile covers what it signed")
     let wants = AppDetails(name: "", bundleID: "", version: "", minimumOS: "", executable: "",
                            entitlements: ["com.apple.developer.healthkit": true, "get-task-allow": true,
@@ -153,7 +153,7 @@ test("sign with the user's edits") {
     let plain = IPASigner(profile: profile, identity: identity)
     plain.options.fixArm64e = false
     let p = try plain.sign(fixtures.appendingPathComponent("edit.ipa"), to: work.appendingPathComponent("plain.ipa"))
-    check(p.bundleID == "dev.cydian.fixture" && p.name == "Fixture" && p.fixedArm64e.isEmpty && p.removed.isEmpty, "plain")
+    check(p.bundleID == "dev.ifizbox.fixture" && p.name == "Fixture" && p.fixedArm64e.isEmpty && p.removed.isEmpty, "plain")
 }
 
 test("F196: Cancel stops the signing job") {
@@ -239,8 +239,8 @@ test("signed records") {
     check(SignedRecords.only(list, bundleID: "nope").isEmpty && SignedRecords.only(list, bundleID: "").isEmpty, "none")
 }
 
-// F75: iFizBox's own IPA with the user's certificate inside (BundledIdentity), the cydian:// links the shell takes,
-// and gunzip for cydian://import on an iOS without DecompressionStream.
+// F75: iFizBox's own IPA with the user's certificate inside (BundledIdentity), the ifizbox:// links the shell takes,
+// and gunzip for ifizbox://import on an iOS without DecompressionStream.
 test("bundled identity: first launch imports, once") {
     let plist = try PropertyListSerialization.data(fromPropertyList: ["p12": Data([0x30, 1, 2]), "password": "pw",
                                                                       "profile": Data([0x30, 9])], format: .xml, options: 0)
@@ -257,18 +257,18 @@ test("bundled identity: first launch imports, once") {
     check(BundledIdentity.shouldImport(digest: "other", seen: d, hasIdentity: false), "an update's new file, empty Keychain: import")
 }
 
-test("incoming cydian:// links") {
-    check(IncomingLink.accepts(URL(string: "cydian://import?d=H4sI")!), "import")
-    check(IncomingLink.accepts(URL(string: "cydian://install?url=https%3A%2F%2Fe.example%2Fa.ipa")!), "install (F89)")
-    check(!IncomingLink.accepts(URL(string: "cydian://signing-import#abc")!), "signing-import is gone (F89)")
-    check(!IncomingLink.accepts(URL(string: "cydian://other")!), "other host")
-    check(IncomingLink.accepts(URL(string: "cydian://myipas?file=A.ipa")!), "myipas (F77)")
-    check(IncomingLink.accepts(URL(string: "cydian://package?id=com.example.app")!), "package (F96)")
-    check(IncomingLink.accepts(URL(string: "cydian://account?k=0123456789ABCDEFGHJKMNPQRS")!), "account (F97)")
-    check(IncomingLink.accepts(URL(string: "cydian://sources")!), "a tab (B14)")
-    check(IncomingLink.accepts(URL(string: "cydian://Changes")!), "a tab, any case (B14)")
+test("incoming ifizbox:// links") {
+    check(IncomingLink.accepts(URL(string: "ifizbox://import?d=H4sI")!), "import")
+    check(IncomingLink.accepts(URL(string: "ifizbox://install?url=https%3A%2F%2Fe.example%2Fa.ipa")!), "install (F89)")
+    check(!IncomingLink.accepts(URL(string: "ifizbox://signing-import#abc")!), "signing-import is gone (F89)")
+    check(!IncomingLink.accepts(URL(string: "ifizbox://other")!), "other host")
+    check(IncomingLink.accepts(URL(string: "ifizbox://myipas?file=A.ipa")!), "myipas (F77)")
+    check(IncomingLink.accepts(URL(string: "ifizbox://package?id=com.example.app")!), "package (F96)")
+    check(IncomingLink.accepts(URL(string: "ifizbox://account?k=0123456789ABCDEFGHJKMNPQRS")!), "account (F97)")
+    check(IncomingLink.accepts(URL(string: "ifizbox://sources")!), "a tab (B14)")
+    check(IncomingLink.accepts(URL(string: "ifizbox://Changes")!), "a tab, any case (B14)")
     check(!IncomingLink.accepts(URL(string: "https://import/x")!), "other scheme")
-    check(!IncomingLink.accepts(URL(string: "cydian://import?d=" + String(repeating: "A", count: 600_000))!), "too long")
+    check(!IncomingLink.accepts(URL(string: "ifizbox://import?d=" + String(repeating: "A", count: 600_000))!), "too long")
 }
 
 test("gunzip") {

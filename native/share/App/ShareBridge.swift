@@ -1,19 +1,19 @@
 // N9: the shell's side of the share sheet and Open in iFizBox. What to do with each item is ../Share.swift (tested on
 // Linux); this file is the phone's half: files iOS hands over (the document types in Info.plist and
-// Info-sideload.plist: .ipa, .deb), cydian://share?url=… from the share extension (../Extension/), and the bridge
+// Info-sideload.plist: .ipa, .deb), ifizbox://share?url=… from the share extension (../Extension/), and the bridge
 // calls web/app/share.js runs.
 //
 //   SharedInbox.receive(url)    App.swift's Incoming calls it first. A file: classified by its bytes, staged where the
-//                               helper takes it (or put in My IPAs, sideload), then cydian://shared?route=… for the page.
-//                               cydian://share?url=…|text=…: the link classified, then cydian://add?url=… (sources) or
-//                               cydian://shared?route=… with the link. False for anything else.
-//   share.ipaInstall {file, stream}  jailbreak: cydian-helper install-ipa <staged>; -> {code: 0, stdout, stderr, bundleId,
+//                               helper takes it (or put in My IPAs, sideload), then ifizbox://shared?route=… for the page.
+//                               ifizbox://share?url=…|text=…: the link classified, then ifizbox://add?url=… (sources) or
+//                               ifizbox://shared?route=… with the link. False for anything else.
+//   share.ipaInstall {file, stream}  jailbreak: ifizbox-helper install-ipa <staged>; -> {code: 0, stdout, stderr, bundleId,
 //                               name, version} (the version for I3), errors as ipa.install's (bad_ipa, no_adhoc, ...)
 //   share.debFetch {url, sha256?, md5?}  jailbreak: a .deb link downloaded into the helper's directory -> {file, name,
 //                               checked: "SHA256" | "MD5" | null}; F133: with a hash (the Packages stanza's) a file
 //                               that doesn't match is removed and the call fails "bad_hash: …" (../Share.swift DebChecksum)
-//   share.debSimulate {file}    jailbreak: cydian-helper simulate-deb -> {ok, code, output, stdout, package, version}
-//   share.debInstall {file, stream}  jailbreak: cydian-helper install-deb, streamed as helper.run -> {code, stdout,
+//   share.debSimulate {file}    jailbreak: ifizbox-helper simulate-deb -> {ok, code, output, stdout, package, version}
+//   share.debInstall {file, stream}  jailbreak: ifizbox-helper install-deb, streamed as helper.run -> {code, stdout,
 //                               stderr}; the staged file is removed afterwards
 //   share.discard {file, kind}  a staged file nobody installed (Cancel)
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -52,11 +52,11 @@ struct PhoneSigner: ShareSigner {
 }
 
 enum SharedInbox {
-    static let queue = DispatchQueue(label: "com.ryha.cydian.share", qos: .userInitiated)
+    static let queue = DispatchQueue(label: "com.ryha.ifizbox.share", qos: .userInitiated)
     static let dirs = ShareDirs()
 
     static func receive(_ url: URL) -> Bool {
-        if url.scheme?.lowercased() == "cydian", url.host?.lowercased() == "share" { link(url); return true }
+        if url.scheme?.lowercased() == "ifizbox", url.host?.lowercased() == "share" { link(url); return true }
         guard url.isFileURL else { return false }
         let host = PhoneShareHost()
         let ext = url.pathExtension.lowercased()
@@ -94,7 +94,7 @@ enum SharedInbox {
         hand(ShareRouter.link(route, file: staged))
     }
 
-    // cydian://share?url=<link> or ?text=<text>, from the share extension.
+    // ifizbox://share?url=<link> or ?text=<text>, from the share extension.
     static func link(_ url: URL) {
         let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let item: SharedItem

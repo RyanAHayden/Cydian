@@ -1,4 +1,4 @@
-"""N5: cydian-upgrades' rules (upgrades.c) built with the host's C compiler and run through test_driver.c: the
+"""N5: ifizbox-upgrades' rules (upgrades.c) built with the host's C compiler and run through test_driver.c: the
 upgrade count from apt's plan, names from dpkg's status, the notification's words, when to
 notify and when a check is due; and the launchd job, entitlements and package scripts that ship it.
 The daemon itself (main.m: apt, UserNotifications, launchd) only runs on a jailbroken phone: see the N5 journal."""
@@ -184,9 +184,9 @@ class Packaging(unittest.TestCase):
             return f.read()
 
     def test_launchd_job(self):
-        job = plistlib.loads(self.read("daemon", "com.ryha.cydian.upgrades.plist"))
-        self.assertEqual(job["Label"], "com.ryha.cydian.upgrades")
-        self.assertEqual(job["ProgramArguments"], ["/var/jb/usr/libexec/cydian/cydian-upgrades"])
+        job = plistlib.loads(self.read("daemon", "com.ryha.ifizbox.upgrades.plist"))
+        self.assertEqual(job["Label"], "com.ryha.ifizbox.upgrades")
+        self.assertEqual(job["ProgramArguments"], ["/var/jb/usr/libexec/ifizbox/ifizbox-upgrades"])
         self.assertEqual(job.get("UserName"), "root")
         self.assertTrue(job["RunAtLoad"])
         # Started often enough that the 23-hour rule gives a check at least once every 24 hours.
@@ -196,19 +196,19 @@ class Packaging(unittest.TestCase):
 
     def test_entitlements(self):
         ents = plistlib.loads(self.read("daemon", "entitlements.plist"))
-        self.assertEqual(ents["com.apple.private.usernotifications.bundle-identifiers"], ["com.ryha.cydian"])
+        self.assertEqual(ents["com.apple.private.usernotifications.bundle-identifiers"], ["com.ryha.ifizbox"])
         self.assertNotIn("com.apple.private.persona-mgmt", ents)  # root comes from launchd, not a persona spawn
 
     def test_stage_paths_and_build(self):
         stage = self.read("daemon", "stage.sh").decode()
-        self.assertIn("$root/var/jb/usr/libexec/cydian/cydian-upgrades", stage.replace("exe=", ""))
-        self.assertIn("com.ryha.cydian.upgrades.plist", stage)
+        self.assertIn("$root/var/jb/usr/libexec/ifizbox/ifizbox-upgrades", stage.replace("exe=", ""))
+        self.assertIn("com.ryha.ifizbox.upgrades.plist", stage)
         build = self.read("build.sh").decode()
         deb_part = build[build.index('if [ "$what" != ipa ]'):build.index('if [ "$what" != deb ]')]
         self.assertIn('daemon/stage.sh "$root"', deb_part)  # the .deb only: the sideload IPA has no daemon
 
     def test_scripts(self):
-        job = "/var/jb/Library/LaunchDaemons/com.ryha.cydian.upgrades.plist"
+        job = "/var/jb/Library/LaunchDaemons/com.ryha.ifizbox.upgrades.plist"
         self.assertIn(b"launchctl load " + job.encode(), self.read("deb", "postinst"))
         prerm = self.read("deb", "prerm").decode()
         self.assertIn("launchctl unload " + job, prerm)

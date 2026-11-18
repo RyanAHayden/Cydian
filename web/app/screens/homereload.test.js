@@ -74,26 +74,26 @@ test("F82: Home's Reload no longer reloads the whole page", async () => {
 });
 
 test("F82: Reload waits for a refresh already running, and never for ever", async () => {
-  const saved = globalThis.cydianRefreshing;
+  const saved = globalThis.ifizboxRefreshing;
   const events = new EventTarget(); // the window's events, as sources.js announce() sends them
   const had = { add: globalThis.addEventListener, remove: globalThis.removeEventListener };
   globalThis.addEventListener = events.addEventListener.bind(events);
   globalThis.removeEventListener = events.removeEventListener.bind(events);
   try {
-    globalThis.cydianRefreshing = 0;
+    globalThis.ifizboxRefreshing = 0;
     await untilRefreshed(); // nothing running: at once
-    globalThis.cydianRefreshing = 2;
+    globalThis.ifizboxRefreshing = 2;
     let ended = false;
     const p = untilRefreshed(5000).then(() => { ended = true; });
     await new Promise((r) => setTimeout(r, 10));
     assert.equal(ended, false, "still refreshing");
-    globalThis.cydianRefreshing = 0;
-    events.dispatchEvent(new Event("cydian:refreshing"));
+    globalThis.ifizboxRefreshing = 0;
+    events.dispatchEvent(new Event("ifizbox:refreshing"));
     await p;
-    globalThis.cydianRefreshing = 1;
+    globalThis.ifizboxRefreshing = 1;
     await untilRefreshed(20); // a refresh that never says it ended: the cap lets the button come back
   } finally {
-    globalThis.cydianRefreshing = saved;
+    globalThis.ifizboxRefreshing = saved;
     globalThis.addEventListener = had.add;
     globalThis.removeEventListener = had.remove;
   }

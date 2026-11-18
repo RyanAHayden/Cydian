@@ -1,6 +1,6 @@
 // F70: the package page's Update Automatically switch (screens/browse.js installedGroup), the per-package mark
 // N7's daemon installs for when Install Updates Automatically is Only Packages I Mark (core/settings.js autoMarked,
-// handed to the daemon as cydian.autoMarked). Pure JS.
+// handed to the daemon as ifizbox.autoMarked). Pure JS.
 export const AUTO_MARK_LABEL = "Update Automatically";
 export const AUTO_MARK_FOOTER = "Update Automatically installs its updates by itself (Settings, Install Updates Automatically).";
 

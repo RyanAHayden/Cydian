@@ -22,7 +22,7 @@ final class InstallServer {
         }
     }
 
-    private let queue = DispatchQueue(label: "cydian.install-server")
+    private let queue = DispatchQueue(label: "ifizbox.install-server")
     private var listener: NWListener?
     private var routes = [String: Route]()
     private(set) var port: UInt16 = 0
@@ -125,7 +125,7 @@ final class InstallServer {
         DispatchQueue.main.async {
             // iOS's install sheet can send iFizBox to the background mid-download; ask for the time to finish.
             if self.task == .invalid {
-                self.task = UIApplication.shared.beginBackgroundTask(withName: "cydian.install") { self.endBackground() }
+                self.task = UIApplication.shared.beginBackgroundTask(withName: "ifizbox.install") { self.endBackground() }
             }
         }
     }

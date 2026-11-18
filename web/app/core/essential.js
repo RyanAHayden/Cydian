@@ -14,20 +14,20 @@
 // iFizBox's own upgrade (F183): never an alert. Every launch and Home's Reload read the source (and GitHub's release,
 // core/selfupdate.js); a newer iFizBox is a row on top of Changes (selfUpgradeRow, withSelfUpgrade) and counts in its
 // badge, installed from there. The source may still name a minimum version (AltStore "minimumVersion", APT
-// X-Cydian-Minimum-Version, minimumOf); nothing blocks on it any more.
-// For IPAs only iFizBox itself (com.ryha.cydian from its own source) is ever essential.
+// X-iFizBox-Minimum-Version, minimumOf); nothing blocks on it any more.
+// For IPAs only iFizBox itself (com.ryha.ifizbox from its own source) is ever essential.
 import { compareVersions, isNewer, parseVersion } from "./selfupdate.js";
 import { altKey, seedRecord } from "./altstore.js";
 import { NAME, GITHUB_REPO } from "../brand.js";
 
-export const SELF_ID = "com.ryha.cydian";
+export const SELF_ID = "com.ryha.ifizbox";
 const SELF_NAME = NAME;
 export const SELF_APT_URI = "https://cydian.dev/repo/";
 export const SELF_ALT_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/web/app/source.json`;
 export const SELF_SITE = "https://cydian.dev/";
-export const MIN_FIELD = "x-cydian-minimum-version"; // the Release field, lower-cased as core/apt.js keeps them
+export const MIN_FIELD = "x-ifizbox-minimum-version"; // the Release field, lower-cased as core/apt.js keeps them
 const LOCKED_TEXT = `${NAME}'s own source is built in and can't be removed.`;
-export const STORE_KEY = "cydian.essential";
+export const STORE_KEY = "ifizbox.essential";
 
 // core/sources.js sourceKey, repeated here so this file doesn't import sources.js (which imports altstore.js).
 const aptKey = (uri, dist = "./") => `deb:${uri}:${dist}`;
@@ -117,7 +117,7 @@ const cleanVersion = (v) => {
   return p && /^\s*v?\d/.test(String(v)) ? p.join(".") : null;
 };
 
-// The minimum a source names: AltStore's app "minimumVersion" (or the source's), APT's X-Cydian-Minimum-Version
+// The minimum a source names: AltStore's app "minimumVersion" (or the source's), APT's X-iFizBox-Minimum-Version
 // (a Release's fields, or the record core/sources.js saved as `minimumVersion`). Null when none or unreadable.
 export function minimumOf(x) {
   if (!x || typeof x !== "object") return null;
@@ -212,7 +212,7 @@ export async function installSelf(row, deps) {
   const { alert, open } = deps;
   const v = row?.version ? `${NAME} ${row.version}` : NAME;
   if (!row?.ipa) {
-    await alert({ title: "Can't Install", message: `${v} has no Cydian.ipa in ${NAME}'s source.`, buttons: ["OK"] });
+    await alert({ title: "Can't Install", message: `${v} has no ${NAME}.ipa in ${NAME}'s source.`, buttons: ["OK"] });
     return "no-asset";
   }
   const { index } = await alert({ title: `Install ${v}`,

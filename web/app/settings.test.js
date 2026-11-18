@@ -110,9 +110,9 @@ test("the prefs mirror sends every daemon key at launch, then each change on its
   assert.equal(native.calls.length, 1);
   const [method, { values }] = native.calls[0];
   assert.equal(method, "prefs.set");
-  assert.equal(values["cydian.autoInstall"], "marked");
-  assert.equal(values["cydian.checkUpdates"], null);
-  assert.deepEqual(values["cydian.autoMarked"], []);
+  assert.equal(values["ifizbox.autoInstall"], "marked");
+  assert.equal(values["ifizbox.checkUpdates"], null);
+  assert.deepEqual(values["ifizbox.autoMarked"], []);
   native.calls.length = 0;
   settings.set("keepVersions", 0);
   settings.set("autoInstallIdle", false);
@@ -121,10 +121,10 @@ test("the prefs mirror sends every daemon key at launch, then each change on its
   settings.set("appearance", "dark"); // not the daemon's
   await tick();
   assert.deepEqual(native.calls, [
-    ["prefs.set", { values: { "cydian.keepVersions": 0 } }],
-    ["prefs.set", { values: { "cydian.autoInstallIdle": false } }],
-    ["prefs.set", { values: { "cydian.autoMarked": ["com.foo"] } }],
-    ["prefs.set", { values: { "cydian.holds": ["com.bar"] } }],
+    ["prefs.set", { values: { "ifizbox.keepVersions": 0 } }],
+    ["prefs.set", { values: { "ifizbox.autoInstallIdle": false } }],
+    ["prefs.set", { values: { "ifizbox.autoMarked": ["com.foo"] } }],
+    ["prefs.set", { values: { "ifizbox.holds": ["com.bar"] } }],
   ]);
 });
 

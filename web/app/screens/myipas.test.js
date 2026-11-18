@@ -5,11 +5,11 @@ import { pageOf, nav } from "./myipas.js";
 import { myIpasPath, handleIncoming } from "../incoming.js";
 
 const r = (...path) => ({ tab: "installed", path });
-const saved = globalThis.cydianNative;
-afterEach(() => { if (saved === undefined) delete globalThis.cydianNative; else globalThis.cydianNative = saved; });
+const saved = globalThis.ifizboxNative;
+afterEach(() => { if (saved === undefined) delete globalThis.ifizboxNative; else globalThis.ifizboxNative = saved; });
 
 test("My IPAs' pages", () => {
-  globalThis.cydianNative = { mode: "sideload", call: async () => null };
+  globalThis.ifizboxNative = { mode: "sideload", call: async () => null };
   assert.equal(pageOf(r()), null);
   assert.equal(pageOf(r("package:x")), null);
   assert.deepEqual(pageOf(r("myipas")), { page: "list" });
@@ -23,23 +23,23 @@ test("My IPAs' pages", () => {
 });
 
 test("the website has no Sign Options page (the Signing Server signs as the IPA is)", () => {
-  delete globalThis.cydianNative;
+  delete globalThis.ifizboxNative;
   assert.deepEqual(pageOf(r("myipas", "ipa:A.ipa", "options")), { page: "missing" });
   assert.deepEqual(pageOf(r("myipas", "ipa:A.ipa")), { page: "ipa", file: "A.ipa" });
 });
 
 test("an .ipa another app sent opens its page in My IPAs", async () => {
-  assert.deepEqual(myIpasPath("cydian://myipas?file=My%20App.ipa"), ["myipas", "ipa:My App.ipa"]);
-  assert.deepEqual(myIpasPath("cydian://myipas?file=..%2Fx.ipa"), ["myipas"]);
-  assert.deepEqual(myIpasPath("cydian://myipas?file=notes.txt"), ["myipas"]);
-  assert.deepEqual(myIpasPath("cydian://myipas"), ["myipas"]);
-  assert.equal(await handleIncoming("cydian://myipas?file=A.ipa"), "myipas");
+  assert.deepEqual(myIpasPath("ifizbox://myipas?file=My%20App.ipa"), ["myipas", "ipa:My App.ipa"]);
+  assert.deepEqual(myIpasPath("ifizbox://myipas?file=..%2Fx.ipa"), ["myipas"]);
+  assert.deepEqual(myIpasPath("ifizbox://myipas?file=notes.txt"), ["myipas"]);
+  assert.deepEqual(myIpasPath("ifizbox://myipas"), ["myipas"]);
+  assert.equal(await handleIncoming("ifizbox://myipas?file=A.ipa"), "myipas");
 });
 
 // F79: My IPAs became Install IPAs: Browse (AltStore apps) first, then the user's own IPAs.
 test("Install IPAs: the page's title, Add, and Browse's pages below it", async () => {
   const { PAGE_TITLE } = await import("./myipas.js");
-  globalThis.cydianNative = { mode: "sideload", call: async () => null };
+  globalThis.ifizboxNative = { mode: "sideload", call: async () => null };
   assert.equal(PAGE_TITLE, "Install IPAs");
   assert.equal(nav(r("myipas")).title, "Install IPAs");
   assert.equal(nav(r("myipas")).right.label, "Add");
@@ -55,7 +55,7 @@ test("Install IPAs: the page's title, Add, and Browse's pages below it", async (
   // an IPA's own pages are unchanged
   assert.deepEqual(pageOf(r("myipas", "ipa:A.ipa")), { page: "ipa", file: "A.ipa" });
   // the website has the same Browse
-  delete globalThis.cydianNative;
+  delete globalThis.ifizboxNative;
   assert.equal(nav(r("myipas")).title, "Install IPAs");
   assert.deepEqual(pageOf(r("myipas", "search")), { page: "search" });
 });

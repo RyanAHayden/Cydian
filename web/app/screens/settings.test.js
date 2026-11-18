@@ -13,7 +13,7 @@ test("applyTheme posts app.theme to the bridge once per change", () => {
   const sent = [];
   const win = {
     matchMedia: () => ({ matches: true }),
-    webkit: { messageHandlers: { cydian: { postMessage: (m) => { sent.push(m); return Promise.resolve(null); } } } },
+    webkit: { messageHandlers: { ifizbox: { postMessage: (m) => { sent.push(m); return Promise.resolve(null); } } } },
   };
   const doc = { documentElement: { dataset: {} }, querySelectorAll: () => [] };
   settings.set("appearance", "dark");

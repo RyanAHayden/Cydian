@@ -284,8 +284,8 @@ export const PASSWORD_TRANSCRIPT = [
   { out: "Changing password for root." }, { out: "New Password:" }, { out: "Retype New Password:" }, { cmd: "exit" },
 ];
 
-// Ticked steps, per guide: localStorage["cydian.guideSteps.<id>"] = JSON list of step numbers (from 1).
-const STEP_KEY = (id) => `cydian.guideSteps.${id}`;
+// Ticked steps, per guide: localStorage["ifizbox.guideSteps.<id>"] = JSON list of step numbers (from 1).
+const STEP_KEY = (id) => `ifizbox.guideSteps.${id}`;
 export function doneSteps(id, store = globalThis.localStorage) {
   try {
     const v = JSON.parse(store?.getItem(STEP_KEY(id)) || "[]");

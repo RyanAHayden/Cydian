@@ -97,13 +97,13 @@ test("F146: the app's Add reads with auto, a URL fills the field, none leaves ht
 
 test("Sources' Add has no Type switch anywhere; the website's opens the alert and reads no clipboard", async () => {
   const add = (n) => n.right.find((b) => b.label === "Add");
-  const saved = globalThis.cydianNative;
+  const saved = globalThis.ifizboxNative;
   try {
-    delete globalThis.cydianNative;
+    delete globalThis.ifizboxNative;
     assert.equal(add(nav({ path: [] }, {})).onPress, undefined, "website: no Type switch");
-    globalThis.cydianNative = { call: async () => "" };
+    globalThis.ifizboxNative = { call: async () => "" };
     assert.equal(add(nav({ path: [] }, {})).onPress, undefined, "app: no Type switch");
-  } finally { if (saved === undefined) delete globalThis.cydianNative; else globalThis.cydianNative = saved; }
+  } finally { if (saved === undefined) delete globalThis.ifizboxNative; else globalThis.ifizboxNative = saved; }
   const nav0 = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   let reads = 0;
   Object.defineProperty(globalThis, "navigator", { configurable: true, value: { clipboard: { readText: async () => { reads++; return ""; } } } });

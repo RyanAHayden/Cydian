@@ -1,4 +1,4 @@
-/* cydian-helper's checks: see policy.h. SPDX-License-Identifier: GPL-3.0-or-later */
+/* ifizbox-helper's checks: see policy.h. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "policy.h"
 
 #include <dirent.h>
@@ -247,8 +247,8 @@ int helper_notify_apply(const struct helper_plan *p, const char **err) {
     char *slash = strrchr(dir, '/');
     if (!slash) { *err = "bad upgrades.off path"; return -1; }
     *slash = 0;
-    if (mkdir(dir, 0755) && errno != EEXIST) { *err = "can't create the cydian folder"; return -1; }
-    if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) { *err = "the cydian folder isn't a folder"; return -1; }
+    if (mkdir(dir, 0755) && errno != EEXIST) { *err = "can't create the ifizbox folder"; return -1; }
+    if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) { *err = "the ifizbox folder isn't a folder"; return -1; }
     int fd = open(p->path, O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK, 0644);
     if (fd < 0) { *err = "can't create upgrades.off"; return -1; }
     int bad = fstat(fd, &st) || !S_ISREG(st.st_mode);
@@ -386,8 +386,8 @@ static int uicache_plan(int argc, const char *prefix, struct helper_plan *p, con
 
 /* --- F71: Roll Back to a .deb N7's daemon kept */
 
-#ifndef CYDIAN_ROOT_UID
-#define CYDIAN_ROOT_UID 0
+#ifndef IFIZBOX_ROOT_UID
+#define IFIZBOX_ROOT_UID 0
 #endif
 
 int helper_deb_name_version(const char *file, const char *id, char *ver, size_t size) {
@@ -571,7 +571,7 @@ static int rollback_plan(int argc, char *const argv[], const char *prefix, int s
         return 0;
     }
     snprintf(p->item_buf[0], sizeof p->item_buf[0], "%s", argv[2]);
-    if (helper_rollback_file(dir, argv[1], argv[2], CYDIAN_ROOT_UID, p->deb, sizeof p->deb, err)) return -1;
+    if (helper_rollback_file(dir, argv[1], argv[2], IFIZBOX_ROOT_UID, p->deb, sizeof p->deb, err)) return -1;
     if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/apt-get", prefix) >= sizeof p->path) {
         *err = "prefix too long"; return -1;
     }
@@ -775,9 +775,9 @@ int helper_caller_ok(uid_t uid, uid_t euid, uid_t root_uid, const char *parent_e
     return 0;
 }
 
-/* --- F33: cydian.sources */
+/* --- F33: ifizbox.sources */
 
-#define SOURCES_MAX (1 << 20) /* a bigger cydian.sources isn't ours: refuse rather than rewrite it */
+#define SOURCES_MAX (1 << 20) /* a bigger ifizbox.sources isn't ours: refuse rather than rewrite it */
 
 struct buf { char *s; size_t n, cap; };
 
@@ -844,13 +844,13 @@ static int read_all(const char *path, struct buf *b, const char **err) {
     int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     if (fd < 0) {
         if (errno == ENOENT) return 0;
-        *err = "can't read cydian.sources";
+        *err = "can't read ifizbox.sources";
         return -1;
     }
     struct stat st;
     if (fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size > SOURCES_MAX) {
         close(fd);
-        *err = "cydian.sources isn't a regular file of at most 1 MiB";
+        *err = "ifizbox.sources isn't a regular file of at most 1 MiB";
         return -1;
     }
     char chunk[8192];
@@ -859,7 +859,7 @@ static int read_all(const char *path, struct buf *b, const char **err) {
         if (r < 0 && errno == EINTR) continue;
         if (r < 0 || b->n + (size_t)r > SOURCES_MAX || put(b, chunk, (size_t)r)) {
             close(fd);
-            *err = "can't read cydian.sources";
+            *err = "can't read ifizbox.sources";
             return -1;
         }
     }
@@ -886,10 +886,10 @@ static int replace_file(const char *path, const char *text, size_t n, const char
     if (!slash) { *err = "bad sources path"; return -1; }
     *slash = 0;
     if (!n) {
-        if (unlink(path) && errno != ENOENT) { *err = "can't remove cydian.sources"; return -1; }
+        if (unlink(path) && errno != ENOENT) { *err = "can't remove ifizbox.sources"; return -1; }
         return 0;
     }
-    if ((size_t)snprintf(tmp, sizeof tmp, "%s/.cydian.sources.XXXXXX", dir) >= sizeof tmp) {
+    if ((size_t)snprintf(tmp, sizeof tmp, "%s/.ifizbox.sources.XXXXXX", dir) >= sizeof tmp) {
         *err = "prefix too long"; return -1;
     }
     /* The name starts with "." and has no .sources/.list suffix, so apt ignores it if we die before the rename. */
@@ -898,12 +898,12 @@ static int replace_file(const char *path, const char *text, size_t n, const char
     if (fchmod(fd, 0644) || write_all(fd, text, n) || fsync(fd)) {
         close(fd);
         unlink(tmp);
-        *err = "can't write cydian.sources";
+        *err = "can't write ifizbox.sources";
         return -1;
     }
     if (close(fd) || rename(tmp, path)) {
         unlink(tmp);
-        *err = "can't replace cydian.sources";
+        *err = "can't replace ifizbox.sources";
         return -1;
     }
     return 0;

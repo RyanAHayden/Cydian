@@ -1,6 +1,6 @@
 {
   "name": "iFizBox",
-  "identifier": "com.ryha.cydian",
+  "identifier": "com.ryha.ifizbox",
   "subtitle": "A package manager with the iOS 6 look",
   "description": "iFizBox's own source: the iFizBox app for iPhones without a jailbreak.",
   "iconURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/main/web/app/icons/icon-180.png",
@@ -9,7 +9,7 @@
   "apps": [
     {
       "name": "iFizBox",
-      "bundleIdentifier": "com.ryha.cydian",
+      "bundleIdentifier": "com.ryha.ifizbox",
       "developerName": "Ryan Hayden",
       "subtitle": "Packages and apps with the iOS 6 look",
       "localizedDescription": "iFizBox lists apps from AltStore-style sources and, on a jailbroken iPhone, tweaks and themes from APT repos, with the iOS 6 look. The app signs apps on your iPhone with your own certificate (no server) and scrolls at 120Hz. Free and open source (GPL-3.0-or-later).",
@@ -36,7 +36,7 @@
         {
           "version": "0.9.0",
           "date": "2026-11-18T16:24:14Z",
-          "localizedDescription": "Cydian is now iFizBox: new name, new globe icon, new home at ifizbox.com.\nThe name changed because \"Cydia\" is SaurikIT's trademark; iFizBox is not affiliated with Cydia or SaurikIT.\nNew name and icon everywhere in the app and on the website\nThe website moved to https://ifizbox.com\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.0",
+          "localizedDescription": "iFizBox is now iFizBox: new name, new globe icon, new home at ifizbox.com.\nThe name changed because \"Cydia\" is SaurikIT's trademark; iFizBox is not affiliated with Cydia or SaurikIT.\nNew name and icon everywhere in the app and on the website\nThe website moved to https://ifizbox.com\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.0",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.0/Cydian.ipa",
           "size": 5063491,
           "minOSVersion": "15.0"
@@ -60,7 +60,7 @@
         {
           "version": "0.3.8",
           "date": "2026-11-18T09:26:31Z",
-          "localizedDescription": "The website signs apps for real now (the browser signer kept the old signature: integrity could not be verified), shows Ready to Install so iOS asks only once (no Open in iTunes), and leaves app extensions out.\nThe website pushes Cydian first: Home below Install Cydian App and the other tabs stay locked (Install Cydian, Browse Anyway (5), Cancel; Settings > Signing locks it again); Install Full Cydian for jailbroken phones (Sileo, Zebra, .deb); tweak pages offer Install in Cydian.\nAdd Source paste works again in the app; Back and the swipe go to the page you came from; the scroll bar takes a hold to grab.\nCydian Account syncs settings, sources, ignored upgrades and the wish list.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.8",
+          "localizedDescription": "The website signs apps for real now (the browser signer kept the old signature: integrity could not be verified), shows Ready to Install so iOS asks only once (no Open in iTunes), and leaves app extensions out.\nThe website pushes iFizBox first: Home below Install iFizBox App and the other tabs stay locked (Install iFizBox, Browse Anyway (5), Cancel; Settings > Signing locks it again); Install Full iFizBox for jailbroken phones (Sileo, Zebra, .deb); tweak pages offer Install in iFizBox.\nAdd Source paste works again in the app; Back and the swipe go to the page you came from; the scroll bar takes a hold to grab.\niFizBox Account syncs settings, sources, ignored upgrades and the wish list.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.8",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.8/Cydian.ipa",
           "size": 4377521,
           "minOSVersion": "15.0"
@@ -68,7 +68,7 @@
         {
           "version": "0.3.7",
           "date": "2026-11-18T07:32:34Z",
-          "localizedDescription": "The website signs and installs apps again, entirely in Safari (zsign as WebAssembly): Settings > Signing, Home's Signing tile and Install Cydian App are back. Website Install offers Install and Download IPA.\nInstalled shows each signed app's days left (green, amber, red); Changes lists Needs Re-sign; re-signs go through Confirm.\nModify offers Mark as Not Installed.\nSettings > Update Alerts uses Cydian's switches: Check in the Background, badge, notifications, Background App Refresh.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.7",
+          "localizedDescription": "The website signs and installs apps again, entirely in Safari (zsign as WebAssembly): Settings > Signing, Home's Signing tile and Install iFizBox App are back. Website Install offers Install and Download IPA.\nInstalled shows each signed app's days left (green, amber, red); Changes lists Needs Re-sign; re-signs go through Confirm.\nModify offers Mark as Not Installed.\nSettings > Update Alerts uses iFizBox's switches: Check in the Background, badge, notifications, Background App Refresh.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.7",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.7/Cydian.ipa",
           "size": 3390046,
           "minOSVersion": "15.0"
@@ -76,7 +76,7 @@
         {
           "version": "0.3.6",
           "date": "2026-11-18T06:46:38Z",
-          "localizedDescription": "Icon badge fixed (badge permission is asked for); the background check keeps the badge current and Settings > Update Alerts shows what iOS allows, when it last checked, and a switch to turn background checks off.\nLong-press the Cydian icon: Upgrade All (N) queues every upgrade and opens Confirm.\nA new Cydian (not required) shows a banner with Upgrade instead of an alert; installed apps show Modify (Upgrade or Reinstall, Downgrade).\nUpdating Cydian: a banner says it will close, and it closes itself so iOS finishes.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.6",
+          "localizedDescription": "Icon badge fixed (badge permission is asked for); the background check keeps the badge current and Settings > Update Alerts shows what iOS allows, when it last checked, and a switch to turn background checks off.\nLong-press the iFizBox icon: Upgrade All (N) queues every upgrade and opens Confirm.\nA new iFizBox (not required) shows a banner with Upgrade instead of an alert; installed apps show Modify (Upgrade or Reinstall, Downgrade).\nUpdating iFizBox: a banner says it will close, and it closes itself so iOS finishes.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.6",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.6/Cydian.ipa",
           "size": 3364671,
           "minOSVersion": "15.0"
@@ -84,7 +84,7 @@
         {
           "version": "0.3.5",
           "date": "2026-11-18T06:03:43Z",
-          "localizedDescription": "Updates are checked every time you come back to Cydian, from a fresh copy of the source.\nAfter you tap Install on an update of Cydian, it closes so iOS can finish, with a notification to open the new version.\nThe website no longer needs a server of its own: Install hands apps to Cydian or another sideloader.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.5",
+          "localizedDescription": "Updates are checked every time you come back to iFizBox, from a fresh copy of the source.\nAfter you tap Install on an update of iFizBox, it closes so iOS can finish, with a notification to open the new version.\nThe website no longer needs a server of its own: Install hands apps to iFizBox or another sideloader.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.5",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.5/Cydian.ipa",
           "size": 3376754,
           "minOSVersion": "15.0"
@@ -100,7 +100,7 @@
         {
           "version": "0.3.3",
           "date": "2026-11-18T05:23:13Z",
-          "localizedDescription": "Essential: Cydian now uses its new install server, sign.cydian.dev (a Cloudflare Worker anyone can host for free: worker/README.md). Signing still happens on your iPhone.\nAfter Cydian updates itself it closes, with a notification to open the new version.\nReload works like Cydia's (spinner in the button, no flash).\nMore from the runner (I4, F87).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.3",
+          "localizedDescription": "Essential: iFizBox now uses its new install server, sign.cydian.dev (a Cloudflare Worker anyone can host for free: worker/README.md). Signing still happens on your iPhone.\nAfter iFizBox updates itself it closes, with a notification to open the new version.\nReload works like Cydia's (spinner in the button, no flash).\nMore from the runner (I4, F87).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.3",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.3/Cydian.ipa",
           "size": 2885049,
           "minOSVersion": "15.0"
@@ -108,7 +108,7 @@
         {
           "version": "0.3.2",
           "date": "2026-11-18T05:10:21Z",
-          "localizedDescription": "Install, Upgrade and Version History go through Cydia's Confirm and queue; Custom Install for any app (bundle ID, name, icon, extensions); the Essential Upgrade alert queues too.\nConfirm looks like Cydia's on the 4S: Continue Queuing, Statistics, Modifications.\nCydian opens AltStore, SideStore and Feather links (Settings to turn it off).\nSearch: the bar stays put, with iOS 6's clear button.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.2",
+          "localizedDescription": "Install, Upgrade and Version History go through Cydia's Confirm and queue; Custom Install for any app (bundle ID, name, icon, extensions); the Essential Upgrade alert queues too.\nConfirm looks like Cydia's on the 4S: Continue Queuing, Statistics, Modifications.\niFizBox opens AltStore, SideStore and Feather links (Settings to turn it off).\nSearch: the bar stays put, with iOS 6's clear button.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.2",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.2/Cydian.ipa",
           "size": 2880910,
           "minOSVersion": "15.0"
@@ -124,7 +124,7 @@
         {
           "version": "0.3.0",
           "date": "2026-11-18T04:31:18Z",
-          "localizedDescription": "Install IPAs: browse apps from your sources by category, search them, and keep your own IPAs; linked from Home.\nLinks into another tab slide in.\nSources Add: while iOS shows Paste, the button reads Type (blue): tap it to type a source in.\nCydian checks for essential updates again when you come back to it.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.0",
+          "localizedDescription": "Install IPAs: browse apps from your sources by category, search them, and keep your own IPAs; linked from Home.\nLinks into another tab slide in.\nSources Add: while iOS shows Paste, the button reads Type (blue): tap it to type a source in.\niFizBox checks for essential updates again when you come back to it.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.3.0",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.0/Cydian.ipa",
           "size": 2705463,
           "minOSVersion": "15.0"
@@ -140,7 +140,7 @@
         {
           "version": "0.2.8",
           "date": "2026-11-18T03:46:11Z",
-          "localizedDescription": "Importing from the website shows one popup (ends on Done); anything that could not be added shows in a passing banner.\nA website install brings its settings only on the first launch.\nThe Home Cydian App card; My IPAs (0.2.7).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.8",
+          "localizedDescription": "Importing from the website shows one popup (ends on Done); anything that could not be added shows in a passing banner.\nA website install brings its settings only on the first launch.\nThe Home iFizBox App card; My IPAs (0.2.7).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.8",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.8/Cydian.ipa",
           "size": 2671166,
           "minOSVersion": "15.0"
@@ -148,7 +148,7 @@
         {
           "version": "0.2.7",
           "date": "2026-11-18T03:43:20Z",
-          "localizedDescription": "My IPAs under Installed: add your own IPAs from Files or a URL, sign them on the phone (offline), install, save or share them.\nHome: the Cydian App card (Install Cydian App, Send Settings to App); Featured slides in; the tile says Refreshing Sources while sources load.\nOpen in Cydian brings your certificate too and imports straight away.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.7",
+          "localizedDescription": "My IPAs under Installed: add your own IPAs from Files or a URL, sign them on the phone (offline), install, save or share them.\nHome: the iFizBox App card (Install iFizBox App, Send Settings to App); Featured slides in; the tile says Refreshing Sources while sources load.\nOpen in iFizBox brings your certificate too and imports straight away.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.7",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.7/Cydian.ipa",
           "size": 2670802,
           "minOSVersion": "15.0"
@@ -156,7 +156,7 @@
         {
           "version": "0.2.6",
           "date": "2026-11-18T03:36:05Z",
-          "localizedDescription": "Open in Cydian App brings your certificate, sources and settings, and imports them straight away.\nInstalling Cydian from the website brings all of it along: ready on first launch, nothing to set up.\nHome: by Ryan Hayden (Fizlo).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.6",
+          "localizedDescription": "Open in iFizBox App brings your certificate, sources and settings, and imports them straight away.\nInstalling iFizBox from the website brings all of it along: ready on first launch, nothing to set up.\nHome: by Ryan Hayden (Fizlo).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.6",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.6/Cydian.ipa",
           "size": 2602470,
           "minOSVersion": "15.0"
@@ -164,7 +164,7 @@
         {
           "version": "0.2.5",
           "date": "2026-11-18T03:27:34Z",
-          "localizedDescription": "The app opens on a plain fill that fits every iPhone, then its loading screen (no more cut-off launch screen).\nImport your certificate from Safari, or get it built into the app from the website; Open in Cydian App moves your sources and settings (F75).\nBadges: Changes and the app icon show the upgrade count at launch; sources refresh in the background with the red spinning badge.\nUpgrade/Reinstall on app pages, Discord next to GitHub, the banner moves the bars down, outside links open in Safari.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.5",
+          "localizedDescription": "The app opens on a plain fill that fits every iPhone, then its loading screen (no more cut-off launch screen).\nImport your certificate from Safari, or get it built into the app from the website; Open in iFizBox App moves your sources and settings (F75).\nBadges: Changes and the app icon show the upgrade count at launch; sources refresh in the background with the red spinning badge.\nUpgrade/Reinstall on app pages, Discord next to GitHub, the banner moves the bars down, outside links open in Safari.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.5",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.5/Cydian.ipa",
           "size": 2602473,
           "minOSVersion": "15.0"
@@ -172,7 +172,7 @@
         {
           "version": "0.2.4",
           "date": "2026-11-18T03:06:46Z",
-          "localizedDescription": "Share sheet: Open in \u2026 apps on app pages too.\nThe A\u2013Z index no longer fights a list that is still gliding.\nCydian updates itself in one step (signed on the phone, held on the signing server, then iOS's Install prompt).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.4",
+          "localizedDescription": "Share sheet: Open in \u2026 apps on app pages too.\nThe A\u2013Z index no longer fights a list that is still gliding.\niFizBox updates itself in one step (signed on the phone, held on the signing server, then iOS's Install prompt).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.4",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.4/Cydian.ipa",
           "size": 2621516,
           "minOSVersion": "15.0"

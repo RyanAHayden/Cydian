@@ -1,5 +1,5 @@
 // App backend (N3): the same calls as backend-http.js, answered by the Swift shell instead of the site's proxy.
-// The shell injects `globalThis.cydianNative` before any module runs (native/bridge.js); this file only needs its
+// The shell injects `globalThis.ifizboxNative` before any module runs (native/bridge.js); this file only needs its
 // `call(method, params, onEvent)`, which resolves with the Swift handler's reply (native/Sources/Apt.swift):
 //
 //   apt.sources                 -> [{ path, text }]  sources.list, sources.list.d/*.list and *.sources
@@ -7,26 +7,26 @@
 //   apt.dpkgStatus              -> text | null       dpkg's status file
 //   net.fetch { url }           -> { status, headers, body }   body base64; the shell fetches (no CORS, no proxy)
 //   net.packages { dir }        -> { text, source }  Packages.xz, .gz or plain in dir, decompressed by the shell
-//   helper.run { words, stream } -> { code, stdout, stderr }  cydian-helper <words> as root; stream events
+//   helper.run { words, stream } -> { code, stdout, stderr }  ifizbox-helper <words> as root; stream events
 //                                  { fd: "out" | "err" | "status", line } while it runs
 //
 // The install queue (N4, jailbreak build only: the sideload build has no helper): queue(job) marks a package in the
 // app's one queue (queue.js), which opens the Confirm sheet (screens/queue.js); simulate(jobs) is `apt-get -s` over
 // it, apply(jobs, onEvent) runs it with the console streaming, respring() restarts SpringBoard. All through
-// cydian-helper's simulate | apply | respring verbs (native/helper/README.md).
+// ifizbox-helper's simulate | apply | respring verbs (native/helper/README.md).
 // F64: cancelApply() stops a running apply before dpkg starts (helper.cancel).
 // F131: a job with `debUrl` (its Filename is a full URL, which apt joins to the repo's URL and 404s on) is downloaded
-// by the shell (share.debFetch) and run through cydian-helper simulate-deb / install-deb (share.debSimulate,
+// by the shell (share.debFetch) and run through ifizbox-helper simulate-deb / install-deb (share.debSimulate,
 // share.debInstall: native/share/App/ShareBridge.swift), before apt's apply over the rest (linkedDebs below).
 // F133: the job's debSha256 / debMd5 (its Packages stanza's, screens/queue.js) go to share.debFetch, which checks the
 // download (apt would have); a mismatch is a Cannot Comply sentence, and nothing is installed.
 //
 // Roll Back (F71, jailbreak build): rollbacks(id) lists the .debs N7's daemon kept when automatic updates replaced
-// a version (cydian-helper rollbacks), [{ version, file }] newest first; rollback(id, version, onEvent) installs one
-// (cydian-helper rollback: apt-get install of the stored file, downgrades allowed), streaming like apply.
+// a version (ifizbox-helper rollbacks), [{ version, file }] newest first; rollback(id, version, onEvent) installs one
+// (ifizbox-helper rollback: apt-get install of the stored file, downgrades allowed), streaming like apply.
 //
 // I4 (jailbreak build): appVersions() is every installed app's real version, read by the helper from installd's
-// containers (cydian-helper app-versions: Info.plist, App Store apps' iTunesMetadata), [{ id, version, build, store }],
+// containers (ifizbox-helper app-versions: Info.plist, App Store apps' iTunesMetadata), [{ id, version, build, store }],
 // or null when it can't be read (no helper, an older one). installedApps(records) is the apps iFizBox remembers
 // (core/installed.js) with that version in place of the remembered one, and a note where the two disagree
 // (withRealVersions). The sideload build has neither: no helper, so the remembered version stays.
@@ -37,10 +37,10 @@
 // Sources: the list is apt's (core/aptsources.js), so what the app shows is what apt installs from. Refresh runs
 // `apt-get update` through the helper first, then reads each source's Release and Packages from apt's lists
 // directory, falling back to the network for anything apt has no list for. A source added in iFizBox is checked
-// like on the site, then written into apt's own sources through the helper (F33: `cydian-helper addsource`, which
-// edits only sources.list.d/cydian.sources), so apt-get update and installs use it too. Only where the helper
+// like on the site, then written into apt's own sources through the helper (F33: `ifizbox-helper addsource`, which
+// edits only sources.list.d/ifizbox.sources), so apt-get update and installs use it too. Only where the helper
 // can't be run (not installed) is it kept on the device alone (IndexedDB, `added: true`); refreshSources moves such
-// records into cydian.sources once it can. Removing works for cydian.sources' sources; apt's other files are left
+// records into ifizbox.sources once it can. Removing works for ifizbox.sources' sources; apt's other files are left
 // to the user. Counts, origin and refresh times of every source are kept in IndexedDB.
 import { freshUrl } from "./core/sources.js";
 import { BackendError } from "./backend-http.js";
@@ -56,8 +56,8 @@ import { NAME } from "./brand.js";
 import { reviewsApi, reviewsBase } from "./core/reviews.js";
 import { updateFailures, failureFor } from "./core/aptupdate.js";
 
-// The one apt source file iFizBox writes (cydian-helper addsource/removesource, F33).
-const CYDIAN_SOURCES = /(^|\/)sources\.list\.d\/cydian\.sources$/;
+// The one apt source file iFizBox writes (ifizbox-helper addsource/removesource, F33).
+const IFIZBOX_SOURCES = /(^|\/)sources\.list\.d\/ifizbox\.sources$/;
 
 const CODES = new Set(["bad_url", "refused", "too_large", "timeout", "upstream", "not_found", "network", "helper"]);
 
@@ -79,10 +79,10 @@ function fromBase64(b64) {
 // The last non-empty line of apt's stderr: "E: Could not get lock /var/lib/apt/lists/lock" and the like.
 const lastLine = (s) => String(s ?? "").trim().split("\n").filter(Boolean).pop() ?? "";
 
-// `native`: the bridge (globalThis.cydianNative). `sourceOptions`: { indexedDB, arch: () => string, count, name }
+// `native`: the bridge (globalThis.ifizboxNative). `sourceOptions`: { indexedDB, arch: () => string, count, name }
 // as for core/sources.js sourceCalls; `name` is the IndexedDB database the source records live in.
-export function createNativeBackend({ native = globalThis.cydianNative, sourceOptions = {} } = {}) {
-  if (!native?.call) throw new Error("no native bridge (cydianNative.call)");
+export function createNativeBackend({ native = globalThis.ifizboxNative, sourceOptions = {} } = {}) {
+  if (!native?.call) throw new Error("no native bridge (ifizboxNative.call)");
   const call = (method, params, onEvent) => native.call(method, params, onEvent).catch((e) => { throw backendError(e); });
 
   // A file in apt's lists directory for an index URL, or null when apt has none (not refreshed, or not a source).
@@ -105,7 +105,7 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
   const backend = {
     kind: "native",
     fetch: fetchUrl,
-    // Images load straight from the repo: the page's origin is cydian://app, which <img> may load http(s) from.
+    // Images load straight from the repo: the page's origin is ifizbox://app, which <img> may load http(s) from.
     assetUrl: (url) => url,
     async text(url) {
       if (/\/(In)?Release$/.test(url)) {
@@ -124,7 +124,7 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
       const r = await call("net.packages", { dir: repoDir });
       return { text: r.text, source: r.source || repoDir, cached: false };
     },
-    // cydian-helper <words>; onEvent({ fd, line }) sees its output as it comes. Resolves { code, stdout, stderr }.
+    // ifizbox-helper <words>; onEvent({ fd, line }) sees its output as it comes. Resolves { code, stdout, stderr }.
     helper: (words, onEvent) => call("helper.run", { words, stream: Boolean(onEvent) }, onEvent),
     dpkgStatus: async () => (await call("apt.dpkgStatus")) ?? null,
     // F19: apt's source files ([{ path, text }]): which jailbreak wrote them tells Recommended what to offer.
@@ -166,7 +166,7 @@ function queueCalls(backend, q, call) {
   const run = async (words, onEvent) => {
     const r = await backend.helper(words, onEvent);
     if (r.code === 64 || r.code === 77 || r.code === 126) {
-      throw new BackendError("helper", `cydian-helper ${words[0]} failed (${r.code}): ${lastLine(r.stderr) || "no output"}`);
+      throw new BackendError("helper", `ifizbox-helper ${words[0]} failed (${r.code}): ${lastLine(r.stderr) || "no output"}`);
     }
     return r;
   };
@@ -272,7 +272,7 @@ function queueCalls(backend, q, call) {
 const isLinked = (j) => j?.op === "install" && typeof j.debUrl === "string" && /^https?:\/\//i.test(j.debUrl);
 
 // F131: the links' downloads. share.debFetch puts each in the helper's .deb folder (native/share/App/ShareBridge.swift)
-// once per job and link; simulate asks share.debSimulate (cydian-helper simulate-deb: apt-get -s install ./file.deb)
+// once per job and link; simulate asks share.debSimulate (ifizbox-helper simulate-deb: apt-get -s install ./file.deb)
 // and install runs share.debInstall (install-deb, which removes the file). A file that went (a day's sweep) is fetched
 // again. Clearing a job, or the queue, discards what it had downloaded.
 function linkedDebs(q, call) {
@@ -349,7 +349,7 @@ function linkedDebs(q, call) {
   };
 }
 
-// cydian-helper rollbacks' "<version> <file>" lines -> [{ version, file }], newest version first, each version once.
+// ifizbox-helper rollbacks' "<version> <file>" lines -> [{ version, file }], newest version first, each version once.
 export function parseRollbacks(text) {
   const seen = new Set();
   const out = [];
@@ -362,7 +362,7 @@ export function parseRollbacks(text) {
   return out.sort((a, b) => compareVersions(b.version, a.version));
 }
 
-// I4: cydian-helper app-versions' "<id>\t<short>\t<build>\t<store>" lines -> [{ id, version, build, store }], each
+// I4: ifizbox-helper app-versions' "<id>\t<short>\t<build>\t<store>" lines -> [{ id, version, build, store }], each
 // id once (the first). `version` is what the app shows: CFBundleShortVersionString, else the store's, else the build
 // number; an app with none of them is left out. Empty fields are null.
 export function parseAppVersions(text) {
@@ -423,12 +423,12 @@ function coreFoundationOf(call) {
 function nativeSourceCalls(backend, call, opts) {
   let opened = null;
   // The defaults core/sources.js seeds into a new store stay metadata only: just `added` records are listed.
-  const store = () => (opened ??= openSourceStore({ indexedDB: opts.indexedDB, name: opts.name ?? "cydian-native-sources" }));
+  const store = () => (opened ??= openSourceStore({ indexedDB: opts.indexedDB, name: opts.name ?? "ifizbox-native-sources" }));
   const arch = () => (typeof opts.arch === "function" ? opts.arch() : opts.arch) || DEFAULT_ARCH;
   const count = opts.count;
   const aptSources = async () => parseAptSources((await call("apt.sources")) ?? []);
 
-  // F33: cydian-helper addsource|removesource. Resolves true when it ran and succeeded, false when the helper
+  // F33: ifizbox-helper addsource|removesource. Resolves true when it ran and succeeded, false when the helper
   // couldn't be run at all (no helper: the sideload build); a refusal or failed write is an error with its message.
   async function writeSource(verb, s) {
     const dist = s.dist || "./";
@@ -440,11 +440,11 @@ function nativeSourceCalls(backend, call, opts) {
       if (e?.code === "helper") return false;
       throw e;
     }
-    if (r.code !== 0) throw new BackendError("helper", `cydian-helper ${verb} failed (${r.code}): ${lastLine(r.stderr) || "no output"}`);
+    if (r.code !== 0) throw new BackendError("helper", `ifizbox-helper ${verb} failed (${r.code}): ${lastLine(r.stderr) || "no output"}`);
     return true;
   }
 
-  // Records kept on the device only (`added: true`, from before F33 or without a helper) go into cydian.sources,
+  // Records kept on the device only (`added: true`, from before F33 or without a helper) go into ifizbox.sources,
   // one at a time; one that can't be written stays as it is and is tried again on the next refresh.
   async function migrateAdded() {
     const db = await store();
@@ -477,7 +477,7 @@ function nativeSourceCalls(backend, call, opts) {
   return {
     sources: list,
     // `input`: a URL, or a dist repo { uri, dist, components } (F48, Import's `deb` lines): verifySource checks its
-    // Release under dists/<dist>/, and writeSource puts the suite and components on the cydian.sources line.
+    // Release under dists/<dist>/, and writeSource puts the suite and components on the ifizbox.sources line.
     async addSource(input) {
       const s = await verifySource(backend, input, { arch: arch(), count });
       const db = await store();
@@ -489,8 +489,8 @@ function nativeSourceCalls(backend, call, opts) {
     },
     async removeSource(key) {
       const apt = (await aptSources()).find((s) => s.key === key);
-      if (apt && CYDIAN_SOURCES.test(apt.file)) {
-        if (!(await writeSource("removesource", apt))) throw new BackendError("helper", `cydian-helper is not installed, so ${NAME} can't change apt's sources.`);
+      if (apt && IFIZBOX_SOURCES.test(apt.file)) {
+        if (!(await writeSource("removesource", apt))) throw new BackendError("helper", `ifizbox-helper is not installed, so ${NAME} can't change apt's sources.`);
       } else if (apt) {
         throw new Error(`This source is listed in ${apt.file}, which ${NAME} doesn't change. Remove it there (Filza or a terminal), then Refresh.`);
       }
@@ -498,7 +498,7 @@ function nativeSourceCalls(backend, call, opts) {
     },
     // F144: drops a record from the device store only (core/altstore.js withAltSources dropApt, the sideload build).
     forget: async (key) => (await store()).remove(key),
-    // Device-only sources into cydian.sources, apt-get update, then every source's count and Release from apt's
+    // Device-only sources into ifizbox.sources, apt-get update, then every source's count and Release from apt's
     // lists (all at once), saved as each lands. `filter` (F41, C5): only the sources it keeps are read back and
     // saved (F99's Add Source & Install refreshes one); apt-get update itself still updates all of apt's sources.
     // F150: `signal` (the reload bar's Cancel): once aborted, apt-get update (already running) is left to end

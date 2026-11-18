@@ -57,7 +57,7 @@ export async function rememberedApps({ mode = detectMode(), backend = null, stor
   try { return (await b.installedApps(records)) ?? records; } catch { return records; }
 }
 
-export async function withAppUpgrades(upgrades, holds = [], { mode = detectMode(), native = globalThis.cydianNative, store = apps,
+export async function withAppUpgrades(upgrades, holds = [], { mode = detectMode(), native = globalThis.ifizboxNative, store = apps,
   backend = null, lookup } = {}) {
   if (mode === "jailbreak") {
     let records;

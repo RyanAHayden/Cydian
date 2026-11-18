@@ -1,5 +1,5 @@
 // F75: Open in iFizBox App (Home's Send Settings), like Feather's feather:// links. On the website (Settings, and
-// Home's Install iFizBox App area) a row that opens cydian://import?d=<base64url of gzipped JSON> with the visitor's
+// Home's Install iFizBox App area) a row that opens ifizbox://import?d=<base64url of gzipped JSON> with the visitor's
 // sources, the settings that travel (core/settings.js TRAVELS), Ignored Upgrades and, F93, the certificate saved in
 // the website's Settings > Signing (as before F89; no Signing Server). In the app, incoming.js hands the link to
 // reviewAndImport, which adds only what's new and puts the certificate into the Keychain (signing.import).
@@ -77,7 +77,7 @@ export function reviewText(r) {
   return lines.join("\n");
 }
 
-export async function reviewAndImport(url, { native = globalThis.cydianNative, backend = getBackend(), store = settings,
+export async function reviewAndImport(url, { native = globalThis.ifizboxNative, backend = getBackend(), store = settings,
   alert = showAlert, hud = showHUD, banner = showBanner } = {}) {
   const gunzip = native?.call
     ? async (bytes) => (await native.call("app.gunzip", { data: toBase64(bytes) })).text

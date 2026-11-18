@@ -6,7 +6,7 @@ Throwaway code that answered R3 (`docs/native.md`, "R3 answers"). One iOS app ho
   swipe.
 - **Spike B** (`SpikeB` in `Sources/Spikes.swift`): UITabBarController + UINavigationController, each screen
   borrowing a WKWebView from a pool (`web/b.html`).
-- **Probe** (`web/probe.html`): what the `cydian://app` scheme and the bridge can do.
+- **Probe** (`web/probe.html`): what the `ifizbox://app` scheme and the bridge can do.
 
 Both spikes share a 30k-row virtual list (`web/list.js`), the bridge (`web/bridge.js`, `Sources/Bridge.swift`) and a
 frame meter. The meter records the page's rAF intervals (`web/meter.js`) and the app's CADisplayLink
@@ -14,7 +14,7 @@ frame meter. The meter records the page's rAF intervals (`web/meter.js`) and the
 
 ## Build (Linux)
 
-    SWIFT_TOOLCHAIN=~/swift-6.4.2 IOS_SDK=/path/to/iPhoneOS.sdk native/spike/build.sh    # → native/spike/build/CydianSpike.ipa
+    SWIFT_TOOLCHAIN=~/swift-6.4.2 IOS_SDK=/path/to/iPhoneOS.sdk native/spike/build.sh    # → native/spike/build/iFizBoxSpike.ipa
 
 What it needs and why each flag is there: the comments in `build.sh` and docs/native.md, "Building on Linux".
 The IPA is unsigned and runs on a stock phone (no jailbreak needed): sideload it with any signer, e.g. Feather,

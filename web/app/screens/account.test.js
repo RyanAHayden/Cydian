@@ -1,5 +1,5 @@
 // F97: Settings > Account's wiring (screens/account.js): what this device sends and how the account's changes land,
-// with fake backends; the key store's fallback for an older shell; cydian://account links.
+// with fake backends; the key store's fallback for an older shell; ifizbox://account links.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { collectHere, applyHere, keyStore, sourceLine, lastSyncedText } from "./account.js";
@@ -21,7 +21,7 @@ function fakes() {
     isShown: (k) => k !== "iosVersion", get: (k) => vals[k], set: (k, v) => { vals[k] = v; },
     holds: { list: () => [...holds], set: async (p, on) => { holds = on ? [...holds, p] : holds.filter((x) => x !== p); } },
   };
-  const db = memoryAppStore([{ id: "com.ex.app", name: "App", version: "1.0", date: 5 }, { id: "com.ryha.cydian", self: true, version: "9" }]);
+  const db = memoryAppStore([{ id: "com.ex.app", name: "App", version: "1.0", date: 5 }, { id: "com.ryha.ifizbox", self: true, version: "9" }]);
   const wishes = createWishlist({ storage: null });
   wishes.set("tweak.wish", true);
   return { srcs, backend, store, vals, holds: () => holds, db, appStore: async () => db, wishes };
@@ -96,8 +96,8 @@ test("helpers: one line per source, Last Synced", () => {
   assert.equal(lastSyncedText(1000, 1000 + 5 * 60000), "5 min ago");
 });
 
-test("cydian://account?k= goes to Sign In With Key", async () => {
+test("ifizbox://account?k= goes to Sign In With Key", async () => {
   const got = [];
-  assert.equal(await handleIncoming("cydian://account?k=0123456789ABCDEFGHJKMNPQRS", { signIn: async (u) => got.push(u) }), "account");
-  assert.deepEqual(got, ["cydian://account?k=0123456789ABCDEFGHJKMNPQRS"]);
+  assert.equal(await handleIncoming("ifizbox://account?k=0123456789ABCDEFGHJKMNPQRS", { signIn: async (u) => got.push(u) }), "account");
+  assert.deepEqual(got, ["ifizbox://account?k=0123456789ABCDEFGHJKMNPQRS"]);
 });

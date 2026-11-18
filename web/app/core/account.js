@@ -6,8 +6,8 @@
 // tests cover all of it, the network and the device's stores come in as functions.
 //
 //   newKey()                 16 random bytes                 keyCode(bytes) -> "ABCD-EFGH-…" (Crockford base32)
-//   parseKey(text)           a code, or a cydian://account?k= link -> bytes, or null
-//   keyLink(bytes)           cydian://account?k=<code>
+//   parseKey(text)           a code, or a ifizbox://account?k= link -> bytes, or null
+//   keyLink(bytes)           ifizbox://account?k=<code>
 //   await deriveAccount(bytes)        -> { id (64 hex), key (AES-GCM CryptoKey) }
 //   await seal(key, payload) / await unseal(key, bytes)   payload <-> 12-byte IV + ciphertext
 //   accountApi({ base, id, fetcher })  get() -> {version, data} | null; put(data, version | null) -> version
@@ -33,7 +33,7 @@ import { NAME } from "../brand.js";
 
 const ACCOUNT_VERSION = 1;
 export const ACCOUNT_BASE = "https://cydian.dev"; // the app's server; the website uses its own origin
-const SALT = new TextEncoder().encode("cydian-account-v1");
+const SALT = new TextEncoder().encode("ifizbox-account-v1");
 const subtle = () => {
   const s = globalThis.crypto?.subtle;
   if (!s) throw new AccountError("no_crypto", "This browser can't encrypt (Web Crypto is missing).");
@@ -75,7 +75,7 @@ export function parseKey(text) {
   return (acc & ((1 << bits) - 1)) === 0 ? out : null; // the 2 bits past 128 are zero in a real code
 }
 
-export const keyLink = (bytes) => "cydian://account?k=" + keyCode(bytes, { groups: false });
+export const keyLink = (bytes) => "ifizbox://account?k=" + keyCode(bytes, { groups: false });
 
 const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 

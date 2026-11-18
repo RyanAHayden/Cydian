@@ -124,7 +124,7 @@ function fakeServer() {
   let puts = 0, beforePut = null;
   const fetcher = async (url, init = {}) => {
     if (init.method === "PUT") { puts++; if (beforePut) { const f = beforePut; beforePut = null; await f(); } }
-    return serve(new Request("https://cydian.example" + url, { ...init, cache: undefined }), env, { limit });
+    return serve(new Request("https://ifizbox.example" + url, { ...init, cache: undefined }), env, { limit });
   };
   return { kv, fetcher, get puts() { return puts; }, onNextPut(f) { beforePut = f; } };
 }

@@ -18,12 +18,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import launch_check  # noqa: E402
 
 PREFIX = "./var/jb/"
-APP = PREFIX + "Applications/Cydian.app/"
-HELPER = PREFIX + "usr/libexec/cydian/cydian-helper"
+APP = PREFIX + "Applications/iFizBox.app/"
+HELPER = PREFIX + "usr/libexec/ifizbox/ifizbox-helper"
 # N5: the background upgrade check, a launchd daemon that posts "n upgrades" as the app (jailbreak only).
-DAEMON = PREFIX + "usr/libexec/cydian/cydian-upgrades"
-DAEMON_JOB = PREFIX + "Library/LaunchDaemons/com.ryha.cydian.upgrades.plist"
-DAEMON_LABEL = "com.ryha.cydian.upgrades"
+DAEMON = PREFIX + "usr/libexec/ifizbox/ifizbox-upgrades"
+DAEMON_JOB = PREFIX + "Library/LaunchDaemons/com.ryha.ifizbox.upgrades.plist"
+DAEMON_LABEL = "com.ryha.ifizbox.upgrades"
 NOTIFY_ENTITLEMENT = "com.apple.private.usernotifications.bundle-identifiers"
 SCRIPTS = ("postinst", "prerm", "postrm", "preinst")
 
@@ -179,9 +179,9 @@ def check(path):
     if "@" in ctl["control"][1].decode():
         problems.append("control has an unfilled @PLACEHOLDER@")
     post = ctl.get("postinst")
-    if not post or not post[0].mode & 0o111 or b"uicache -p /var/jb/Applications/Cydian.app" not in post[1]:
+    if not post or not post[0].mode & 0o111 or b"uicache -p /var/jb/Applications/iFizBox.app" not in post[1]:
         problems.append("postinst missing, not executable, or not running uicache -p on the app")
-    if not post or b'chown mobile:mobile "$wk/com.ryha.cydian"' not in post[1]:
+    if not post or b'chown mobile:mobile "$wk/com.ryha.ifizbox"' not in post[1]:
         problems.append("postinst does not make WebKit's storage folder (without it nothing in the web view persists)")
 
     job = "/" + DAEMON_JOB[len("./"):]
@@ -205,10 +205,10 @@ def check(path):
 
     plist = files.get(APP + "Info.plist")
     if not plist:
-        return problems + ["no Cydian.app/Info.plist"], ""
+        return problems + ["no iFizBox.app/Info.plist"], ""
     info = plistlib.loads(plist[1])
     exe = APP + info.get("CFBundleExecutable", "?")
-    want = {"CFBundleExecutable": "Cydian", "MinimumOSVersion": "15.0", "CADisableMinimumFrameDurationOnPhone": True,
+    want = {"CFBundleExecutable": "iFizBox", "MinimumOSVersion": "15.0", "CADisableMinimumFrameDurationOnPhone": True,
             "CFBundleShortVersionString": fields.get("Version", "").split("-")[0],
             "CFBundleVersion": fields.get("Version", "-").split("-")[-1]}
     for k, v in want.items():
@@ -262,7 +262,7 @@ def check(path):
             problems.append("helper: %s" % e)
     problems += _check_daemon(files)
     if APP + "bridge.js" not in files:
-        problems.append("no Cydian.app/bridge.js (the script that sets up cydianNative)")
+        problems.append("no iFizBox.app/bridge.js (the script that sets up ifizboxNative)")
 
     web = {n[len(APP + "web/"):] for n in files if n.startswith(APP + "web/")}
     for need in ("index.html", "app.js", "style.css", "router.js"):
@@ -303,8 +303,8 @@ def _check_daemon(files):
                 problems.append("daemon is not a signed arm64 iOS executable")
             else:
                 ids = (macho_entitlements(data) or {}).get(NOTIFY_ENTITLEMENT)
-                if not isinstance(ids, list) or "com.ryha.cydian" not in ids:
-                    problems.append("daemon has no %s entitlement for com.ryha.cydian (it can't post notifications)"
+                if not isinstance(ids, list) or "com.ryha.ifizbox" not in ids:
+                    problems.append("daemon has no %s entitlement for com.ryha.ifizbox (it can't post notifications)"
                                     % NOTIFY_ENTITLEMENT)
                 if not _unsandboxed(data):
                     problems.append("daemon has neither %s (a rootless jailbreak kills it at launch)"

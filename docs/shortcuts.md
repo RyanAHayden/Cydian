@@ -31,5 +31,5 @@ returns the packages it installed.
 ## Widget
 
 Home Screen (small) and Lock Screen (circular, inline): the update count, from iFizBox's last check. Jailbreak: also
-the daily background check (N5's daemon), whichever is newer. It needs the App Group `group.com.ryha.cydian`; a
+the daily background check (N5's daemon), whichever is newer. It needs the App Group `group.com.ryha.ifizbox`; a
 sideload signer whose profile has none leaves it at "Open iFizBox".

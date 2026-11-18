@@ -2,8 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleExecutable</key><string>Cydian</string>
-	<key>CFBundleIdentifier</key><string>com.ryha.cydian</string>
+	<key>CFBundleExecutable</key><string>iFizBox</string>
+	<key>CFBundleIdentifier</key><string>com.ryha.ifizbox</string>
 	<key>CFBundleName</key><string>$(BRAND_NAME)</string>
 	<key>CFBundleDisplayName</key><string>$(BRAND_NAME)</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
@@ -43,7 +43,7 @@
 	<key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
 	<key>CADisableMinimumFrameDurationOnPhone</key><true/>
 	<!-- N9: Open in iFizBox for .ipa and .deb (Files, Mail, AirDrop, Safari's downloads; share/App/ShareBridge.swift),
-	     and the cydian:// scheme the share extension opens (cydian://share?url=…). Info-sideload.plist repeats these
+	     and the ifizbox:// scheme the share extension opens (ifizbox://share?url=…). Info-sideload.plist repeats these
 	     with F77's types, since mkipa.py's overlay replaces a key whole. iOS copies a file into Documents/Inbox. -->
 	<key>LSSupportsOpeningDocumentsInPlace</key><false/>
 	<key>CFBundleDocumentTypes</key><array>
@@ -62,8 +62,8 @@
 	</array>
 	<key>CFBundleURLTypes</key><array>
 		<dict>
-			<key>CFBundleURLName</key><string>com.ryha.cydian</string>
-			<key>CFBundleURLSchemes</key><array><string>cydian</string></array>
+			<key>CFBundleURLName</key><string>com.ryha.ifizbox</string>
+			<key>CFBundleURLSchemes</key><array><string>ifizbox</string></array>
 		</dict>
 	</array>
 	<!-- iOS has no system type for .deb: declare it, as Sileo and Zebra do. -->

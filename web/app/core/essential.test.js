@@ -121,19 +121,19 @@ test("builtinFirst puts the built-in back on top after a reorder; exportable lea
 
 // ---- versions and the minimum --------------------------------------------------------------------------------
 
-test("minimumOf: AltStore minimumVersion, a Release's X-Cydian-Minimum-Version, a saved record", () => {
+test("minimumOf: AltStore minimumVersion, a Release's X-iFizBox-Minimum-Version, a saved record", () => {
   assert.equal(minimumOf({ minimumVersion: "0.1.3" }), "0.1.3");
-  assert.equal(minimumOf({ fields: { "x-cydian-minimum-version": "v1.2" } }), "1.2.0");
+  assert.equal(minimumOf({ fields: { "x-ifizbox-minimum-version": "v1.2" } }), "1.2.0");
   assert.equal(minimumOf({ minimumVersion: "soon" }), null);
   assert.equal(minimumOf({}), null);
   assert.equal(minimumOf(null), null);
 });
 
 test("refreshSource keeps the Release's minimum on the record (iFizBox's own repo)", async () => {
-  const release = "Origin: iFizBox\nLabel: iFizBox\nArchitectures: iphoneos-arm64\nX-Cydian-Minimum-Version: 0.1.3\n";
+  const release = "Origin: iFizBox\nLabel: iFizBox\nArchitectures: iphoneos-arm64\nX-iFizBox-Minimum-Version: 0.1.3\n";
   const backend = {
     text: async (url) => { if (url.endsWith("Release")) return release; throw Object.assign(new Error("404"), { code: "not_found" }); },
-    packages: async () => ({ text: "Package: com.ryha.cydian\nVersion: 0.1.4\nArchitecture: iphoneos-arm64\n" }),
+    packages: async () => ({ text: "Package: com.ryha.ifizbox\nVersion: 0.1.4\nArchitecture: iphoneos-arm64\n" }),
   };
   const out = await refreshSource(backend, { uri: SELF_APT_URI, dist: "./", components: [] });
   assert.equal(out.minimumVersion, "0.1.3");
@@ -145,16 +145,16 @@ const SOURCE = {
   apps: [
     { bundleIdentifier: "com.example.other", versions: [{ version: "9.0", downloadURL: "https://x.example/o.ipa" }] },
     { bundleIdentifier: SELF_ID, minimumVersion: "0.1.2", versions: [
-      { version: "0.1.1", date: "2026-11-01", downloadURL: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.1/Cydian.ipa" },
-      { version: "0.1.3", date: "2026-11-17", localizedDescription: "Essential Upgrade\nRelease notes: https://x", downloadURL: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.3/Cydian.ipa", size: 10 },
+      { version: "0.1.1", date: "2026-11-01", downloadURL: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.1/iFizBox.ipa" },
+      { version: "0.1.3", date: "2026-11-17", localizedDescription: "Essential Upgrade\nRelease notes: https://x", downloadURL: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.3/iFizBox.ipa", size: 10 },
     ] },
   ],
 };
 
-test("selfFromAltSource: the newest iFizBox (by version), its IPA, notes and minimum; only com.ryha.cydian", () => {
+test("selfFromAltSource: the newest iFizBox (by version), its IPA, notes and minimum; only com.ryha.ifizbox", () => {
   const info = selfFromAltSource(JSON.stringify(SOURCE));
   assert.equal(info.version, "0.1.3");
-  assert.match(info.ipa, /v0\.1\.3\/Cydian\.ipa$/);
+  assert.match(info.ipa, /v0\.1\.3\/iFizBox\.ipa$/);
   assert.deepEqual(info.notes, ["Essential Upgrade"]);
   assert.equal(info.minimum, "0.1.2");
   assert.equal(selfFromAltSource({ apps: [SOURCE.apps[0]] }), null); // no other app is ever iFizBox
@@ -196,7 +196,7 @@ function selfDeps({ answers = [] } = {}) {
     },
   };
 }
-const ROW = { version: "0.1.3", ipa: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.3/Cydian.ipa" };
+const ROW = { version: "0.1.3", ipa: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.3/iFizBox.ipa" };
 
 test("installSelf (no bridge to sign with): it offers cydian.dev in Safari, which hands iFizBox to a sideloader (F89)", async () => {
   const s = selfDeps({ answers: [1] });
@@ -219,7 +219,7 @@ test("the committed web/app/source.json reads as iFizBox's own source", async ()
   const text = await readFile(new URL("../source.json", import.meta.url), "utf8");
   const info = selfFromAltSource(text);
   assert.ok(info?.version, "a version");
-  assert.match(info.ipa, /^https:\/\/github\.com\/RyanAHayden\/iFizBox\/releases\/download\/v[\d.]+\/(?:Cydian|iFizBox)\.ipa$/);
+  assert.match(info.ipa, /^https:\/\/github\.com\/RyanAHayden\/iFizBox\/releases\/download\/v[\d.]+\/[\w.-]+\.ipa$/); // F171: releases before it carry the old asset name
 });
 
 test("F183: no Essential Upgrade alert is left to show", async () => {
@@ -234,7 +234,7 @@ test("F183: a reload with a newer release calls no alert and adds the iFizBox ro
   const storage = memStorage();
   const alert = () => assert.fail("an update popup");
   const gh = parseRelease({ tag_name: "v0.5.0", body: "- Silent updates", assets: [
-    { name: "Cydian.ipa", browser_download_url: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.5.0/Cydian.ipa" }] });
+    { name: "iFizBox.ipa", browser_download_url: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.5.0/iFizBox.ipa" }] });
   let changed = 0;
   const r = await lookForSelfUpdate({
     mode: "sideload",
@@ -276,7 +276,7 @@ test("F183: app.js's launch, Reload and return check runs lookForUpdates and not
   const { readFile } = await import("node:fs/promises");
   const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
   const ui = await readFile(new URL("../essential-ui.js", import.meta.url), "utf8");
-  assert.match(app, /addEventListener\("cydian:reloaded", lookForSelf\)/);
+  assert.match(app, /addEventListener\("ifizbox:reloaded", lookForSelf\)/);
   for (const gone of ["startEssential", "checkUpdates", "showBanner", "Updated to"]) assert.equal(app.includes(gone), false, gone);
   for (const gone of ["showBanner", "runEssential", "lock("]) assert.equal(ui.includes(gone), false, gone);
 });

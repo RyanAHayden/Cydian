@@ -15,7 +15,7 @@ import { showAlert } from "./nav/alert.js";
 import { installOnDevice } from "./signing-client.js";
 import { NAME } from "./brand.js";
 
-const native = () => globalThis.cydianNative;
+const native = () => globalThis.ifizboxNative;
 const storage = () => { try { return globalThis.localStorage; } catch { return null; } };
 
 export const appVersion = () => native()?.call
@@ -40,7 +40,7 @@ export async function readSelfInfo() {
     saveInfo(storage(), info);
     // Changes counts iFizBox's own upgrade from this (upgradesWithSelf): it may have counted before it was read at
     // launch (user 2026-11-18: the 0.3.8 banner came, Changes had no row and no badge).
-    globalThis.dispatchEvent?.(new Event("cydian:self-info"));
+    globalThis.dispatchEvent?.(new Event("ifizbox:self-info"));
   }
   return info;
 }
@@ -58,7 +58,7 @@ export async function upgradesWithSelf(upgrades) {
 export async function installSelfNow(row) {
   // The sideload app signs its own update on the phone and hosts it on the Signing Server (signing.install host:
   // true): straight to iOS's Install prompt, the key never leaves the phone. Without the bridge: installSelf.
-  if (detectMode() === "sideload" && row?.ipa && globalThis.cydianNative?.call) {
+  if (detectMode() === "sideload" && row?.ipa && globalThis.ifizboxNative?.call) {
     const ok = await installOnDevice({ url: row.ipa, name: NAME, host: true });
     return ok ? "installing" : "failed";
   }
@@ -68,7 +68,7 @@ export async function installSelfNow(row) {
 // ---- launch, Home's Reload, a return ----------------------------------------------------------------------------
 
 // Silent whatever it finds (F183): reads iFizBox's source (sideload) and GitHub's release, then Changes counts
-// again (cydian:self-info). One at a time. Resolves core/essential.js lookForSelfUpdate's answer.
+// again (ifizbox:self-info). One at a time. Resolves core/essential.js lookForSelfUpdate's answer.
 let running = null;
 export function lookForUpdates() {
   const mode = detectMode();
@@ -76,6 +76,6 @@ export function lookForUpdates() {
     mode,
     readSource: () => readSelfInfo(),
     checkRelease: () => checkForUpdates({ mode, storage: storage(), current: appVersion, release: () => fetchRelease({ native: native() }) }),
-    changed: () => globalThis.dispatchEvent?.(new Event("cydian:self-info")),
+    changed: () => globalThis.dispatchEvent?.(new Event("ifizbox:self-info")),
   }).finally(() => { running = null; }));
 }

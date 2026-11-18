@@ -14,7 +14,7 @@ import { isAltKey, neverLoaded } from "./altstore.js";
 import { releaseTime, fingerprint, healthFields, withTimeout, pool, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 
 // F72: iFizBox's own repo names the oldest iFizBox that may run without upgrading first (core/essential.js).
-const MIN_FIELD = "x-cydian-minimum-version";
+const MIN_FIELD = "x-ifizbox-minimum-version";
 
 // A source: { key, uri, dist, components, name?, origin?, depiction?, count?, updated?, error? }. `name` is ours
 // (the defaults), `origin` comes from the repo's Release; the row shows the first there is, else the host.
@@ -344,7 +344,7 @@ export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, coun
     if (release?.origin) out.origin = release.origin;
     if (release) {
       out.depiction = release.fields.depiction || null;
-      out.minimumVersion = release.fields[MIN_FIELD] || null; // F72: X-Cydian-Minimum-Version (iFizBox's own repo)
+      out.minimumVersion = release.fields[MIN_FIELD] || null; // F72: X-iFizBox-Minimum-Version (iFizBox's own repo)
       out.releaseDate = releaseTime(release);
       out.releaseHash = fingerprint(release.raw);
     }
@@ -385,7 +385,7 @@ async function refreshTimed(backend, source, { timeout = REFRESH_TIMEOUT, ...res
 
 // IndexedDB: store "sources" (keyPath "key") and "meta". The defaults go in once, on the first open, so a source
 // the user deletes stays deleted. The IDBFactory is passed in so node tests can hand it a fake.
-export function openSourceStore({ indexedDB: idb = globalThis.indexedDB, name = "cydian-sources" } = {}) {
+export function openSourceStore({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-sources" } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
   return new Promise((resolve, reject) => {
     const req = idb.open(name, 1);

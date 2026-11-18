@@ -150,14 +150,14 @@ test("the app's native call clicks the row under the point, once", () => {
   const row = el(["button", ".cell-inner"]);
   h.under(row);
   h.at(5000);
-  assert.equal(globalThis.cydianMomentumTap(40, 300), true);
+  assert.equal(globalThis.ifizboxMomentumTap(40, 300), true);
   assert.equal(row.clicks.length, 1);
   assert.equal(row.clicks[0].clientY, 300);
   // A native click that did come just before: ours is skipped.
   h.at(9000); h.native(row);
-  h.at(9050); assert.equal(globalThis.cydianMomentumTap(40, 300), false);
+  h.at(9050); assert.equal(globalThis.ifizboxMomentumTap(40, 300), false);
   assert.equal(row.clicks.length, 1);
   // Nothing tappable there (a text field, a header): no click.
   h.under(el(["input"], row));
-  h.at(12000); assert.equal(globalThis.cydianMomentumTap(40, 300), false);
+  h.at(12000); assert.equal(globalThis.ifizboxMomentumTap(40, 300), false);
 });

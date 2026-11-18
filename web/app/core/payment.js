@@ -22,12 +22,12 @@
 //
 // Sign-in: the vendor finishes at sileo://authentication_success?token=…&payment_secret=…, a scheme its server
 // writes, not one iFizBox picks. The shell's auth session catches that URL (ASWebAuthenticationSession's
-// callbackURLScheme "sileo" needs no registered scheme) and hands it back; a cydian:// link with the same path
-// (cydian://authentication_success?… or cydian://payment/authentication_success?…) is read the same way, for a
+// callbackURLScheme "sileo" needs no registered scheme) and hands it back; a ifizbox:// link with the same path
+// (ifizbox://authentication_success?… or ifizbox://payment/authentication_success?…) is read the same way, for a
 // vendor that lets the client name its own callback.
 
 const COMMERCIAL_TAG = "cydia::commercial";
-const CALLBACK_SCHEMES = ["sileo:", "cydian:"];
+const CALLBACK_SCHEMES = ["sileo:", "ifizbox:"];
 const PKG = /^[a-z0-9][a-z0-9+.-]*$/i;
 
 export function isCommercial(st) {
@@ -101,7 +101,7 @@ export function authenticateUrl(base, { udid = "", model = "" } = {}) {
   return `${b}authenticate?${new URLSearchParams({ udid, model })}`;
 }
 
-// sileo://authentication_success?token=…&payment_secret=… (host form) and cydian://payment/authentication_success
+// sileo://authentication_success?token=…&payment_secret=… (host form) and ifizbox://payment/authentication_success
 // (path form) both parse; so does sileo://payment_completed.
 export function parseCallback(url) {
   let u;
@@ -235,7 +235,7 @@ export function createPaymentClient({ base, request, device = () => ({}), creden
 // ({ get(key), set(key, value), remove(key) }, the shell's Keychain behind the passcode or Face ID as the spec asks)
 // when there is one, else beside the token. Screens say which one they got (`secureStorage`).
 export function createCredentialStore({ storage = globalThis.localStorage, secure = null } = {}) {
-  const k = (vendor) => "cydian.payment:" + vendor;
+  const k = (vendor) => "ifizbox.payment:" + vendor;
   return {
     secureStorage: Boolean(secure),
     async load(vendor) {

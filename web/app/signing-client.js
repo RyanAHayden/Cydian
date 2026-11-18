@@ -253,7 +253,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   onInstalled(result);
   // Cydian itself (host): iOS's Install prompt is up, and Cydian closes once it's answered so the install finishes
   // (native CloseForUpdate): say so first (user 2026-11-18).
-  if (host) showBanner({ title: "Cydian", message: "Press Install. Cydian closes to finish updating; tap its notification to open the new one." });
+  if (host) showBanner({ title: "Cydian", message: "Press Install. Cydian closes to finish updating; open it again once the new icon appears." });
   if (after) { after(result, h); return true; }
   // iOS asks "Install …?" over the app: the HUD ends on a checkmark (signed and handed to iOS) and fades.
   later(() => (h.done ? h.done("Done") : h.hide()), 1200);

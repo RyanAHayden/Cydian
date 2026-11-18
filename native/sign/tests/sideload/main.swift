@@ -282,4 +282,39 @@ test("gunzip") {
     check((try? gunzip(Data("not gzip at all, long enough".utf8))) == nil, "not gzip")
 }
 
+test("manifest check before iOS gets the link (B30)") {
+    let good = try InstallManifest.manifest(ipaURL: "http://127.0.0.1:8080/t/app.ipa", bundleID: "com.me.app", version: "1", title: "App")
+    check(ManifestCheck.problem(status: 200, body: good, error: nil) == nil, "a manifest passes")
+    // What sign.ifizbox.com/sign/manifest answered the iPhone 7 (worker/src/index.js manifest()), 2026-11-18.
+    let worker = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0"><dict><key>items</key><array><dict>
+        <key>assets</key><array><dict><key>kind</key><string>software-package</string><key>url</key><string>http://127.0.0.1:8080/abc/app.ipa</string></dict></array>
+        <key>metadata</key><dict><key>bundle-identifier</key><string>com.ryha.test</string><key>bundle-version</key><string>1</string><key>kind</key><string>software</string><key>title</key><string>T</string></dict>
+        </dict></array></dict></plist>
+        """
+    check(ManifestCheck.problem(status: 200, body: Data(worker.utf8), error: nil) == nil, "the Worker's manifest passes")
+    check(ManifestCheck.problem(status: 404, body: Data("Not found".utf8), error: nil) == "it answered HTTP 404", "404")
+    let workerError = Data(#"{"code":"bad_url","error":"Only an IPA on this iPhone (127.0.0.1) can be installed this way."}"#.utf8)
+    check(ManifestCheck.problem(status: 400, body: workerError, error: nil)
+          == "it answered HTTP 400 (Only an IPA on this iPhone (127.0.0.1) can be installed this way.)", "the Worker's words")
+    check(ManifestCheck.problem(status: 200, body: Data("<html>captive portal</html>".utf8), error: nil)
+          == "its answer isn't an install manifest", "200 with HTML")
+    let empty = try PropertyListSerialization.data(fromPropertyList: ["items": [Any]()], format: .xml, options: 0)
+    check(ManifestCheck.problem(status: 200, body: empty, error: nil) != nil, "a plist with no items")
+    check(ManifestCheck.problem(status: nil, body: nil, error: nil) == "no answer", "nothing at all")
+    let offline = NSError(domain: NSURLErrorDomain, code: -1003,
+                          userInfo: [NSLocalizedDescriptionKey: "A server with the specified hostname could not be found."])
+    let why = ManifestCheck.problem(status: nil, body: nil, error: offline)
+    check(why == "A server with the specified hostname could not be found", "transport error, no full stop: \(why ?? "nil")")
+    check(ManifestCheck.errorText(host: "sign.ifizbox.com", reason: why!, reached: false)
+          == "no_manifest: Couldn't reach sign.ifizbox.com: A server with the specified hostname could not be found. iOS can't show Install without it.",
+          "unreachable text")
+    check(ManifestCheck.errorText(host: "old.example", reason: "it answered HTTP 404", reached: true)
+          == "no_manifest: old.example didn't give the install manifest: it answered HTTP 404. iOS can't show Install without it.",
+          "wrong answer text")
+    check(ManifestCheck.host(of: URL(string: "https://sign.ifizbox.com/sign/manifest?x=1")!) == "sign.ifizbox.com", "host")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

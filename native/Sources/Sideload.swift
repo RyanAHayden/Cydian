@@ -327,52 +327,99 @@ enum Sideload {
                 let link = InstallManifest.itmsURL(manifest: q.url!.absoluteString)
                 log?("Serving the IPA at http://127.0.0.1:\(server.port)\(ipaPath)")
                 log?("Manifest: \(q.url!.absoluteString)")
-                let once = Once()
-                KeepAlive.shared.begin()
-                // B29: the bundle ID iOS is told to install (the manifest's, the signed Info.plist's) and what the
-                // server sends, in the install log; the server's lines reach the page through signing.progress.
-                InstallLog.reset(app.bundleID)
-                log?("Bundle ID: \(app.bundleID)" + (app.bundleID == app.originalBundleID ? "" : " (the app's own: \(app.originalBundleID))")
-                     + ", version \(app.version); serving \(Sideload.size(output))")
-                let bid = app.bundleID
-                let serverLog = { (s: String) in InstallLog.say(bid, s) }
-                let end = { (ok: Bool) in
-                    guard once.first() else { return }
-                    job?.end()
-                    if !ok { serverLog("iOS didn't fetch the whole IPA within 15 minutes; it is no longer served"); server.remove(ipaPath) }
-                    // B29: served: the route stays for the grace too. iOS's installer may ask again for parts, and
-                    // a route removed the moment one request reached the last byte answered those with 404.
-                    SignBridge.queue.asyncAfter(deadline: .now() + servedGrace) {
-                        if ok { server.remove(ipaPath) }
+                // B30: iOS shows nothing at all when it can't load the manifest, so fetch it first, here.
+                checkManifest(q.url!, job: job) { failure in
+                    if job?.cancelled == true {
                         try? FileManager.default.removeItem(at: output)
-                        KeepAlive.shared.end()
+                        opened(.failure(SignJob.cancelledError)); served?(false)
+                        return
                     }
-                    served?(ok)
-                }
-                server.serve(ipaPath, .init(type: "application/octet-stream", body: .file(output), log: serverLog,
-                                            onServed: { serverLog("iOS has the whole IPA"); end(true) }))
-                // F196: Cancel: no more serving, no minute's grace, the listener ends when nothing else is served.
-                job?.onCancel {
-                    guard once.first() else { return }
-                    log?("Cancelled: the IPA is no longer served")
-                    server.cancel(ipaPath)
-                    SignBridge.queue.async {
+                    if let text = failure {
+                        log?(String(text.dropFirst("no_manifest: ".count)))
                         try? FileManager.default.removeItem(at: output)
-                        KeepAlive.shared.end()
+                        opened(.failure(Failed(text: text))); served?(false)
+                        return
                     }
-                    served?(false)
-                }
-                SignBridge.queue.asyncAfter(deadline: .now() + 15 * 60) { end(false) }
-                SignBridge.queue.async {
-                    saveRecords(SignedRecords.adding(record, to: records()))
-                    reschedule()
-                }
-                DispatchQueue.main.async {
-                    log?("Handing iOS the install link; it asks \"Install \(app.name)?\"")
-                    UIApplication.shared.open(URL(string: link)!)
-                    opened(.success((app, record)))
+                    log?(ManifestCheck.okLine(host: ManifestCheck.host(of: q.url!)))
+                    serveChecked(output, server: server, ipaPath: ipaPath, link: link, app: app, record: record, log: log,
+                                 job: job, opened: opened, served: served)
                 }
             }
+        }
+    }
+
+    // B30: GET the exact manifest URL iOS will be handed (ManifestCheck.timeout); calls back on SignBridge.queue
+    // with nil when it is a manifest iOS can read, else the page's error ("no_manifest: ..."). Cancel (`job`) ends
+    // the request at once; the caller sees job.cancelled.
+    static func checkManifest(_ url: URL, job: SignJob? = nil, done: @escaping (String?) -> Void) {
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: ManifestCheck.timeout)
+        req.httpMethod = "GET"
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.timeoutIntervalForRequest = ManifestCheck.timeout
+        cfg.timeoutIntervalForResource = ManifestCheck.timeout
+        cfg.waitsForConnectivity = false
+        let session = URLSession(configuration: cfg)
+        let task = session.dataTask(with: req) { data, resp, error in
+            session.finishTasksAndInvalidate()
+            let status = (resp as? HTTPURLResponse)?.statusCode
+            let text = ManifestCheck.problem(status: status, body: data, error: error).map {
+                ManifestCheck.errorText(host: ManifestCheck.host(of: url), reason: $0, reached: error == nil && status != nil)
+            }
+            SignBridge.queue.async { done(text) }
+        }
+        job?.onCancel { task.cancel() }
+        task.resume()
+    }
+
+    // The rest of serveAndOpen once the manifest checked out (B30): serve the IPA, record it, hand iOS the link.
+    private static func serveChecked(_ output: URL, server: InstallServer, ipaPath: String, link: String, app: SignedApp,
+                                     record: SignedRecord, log: ((String) -> Void)?, job: SignJob?,
+                                     opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
+                                     served: ((Bool) -> Void)?) {
+        let once = Once()
+        KeepAlive.shared.begin()
+        // B29: the bundle ID iOS is told to install (the manifest's, the signed Info.plist's) and what the
+        // server sends, in the install log; the server's lines reach the page through signing.progress.
+        InstallLog.reset(app.bundleID)
+        log?("Bundle ID: \(app.bundleID)" + (app.bundleID == app.originalBundleID ? "" : " (the app's own: \(app.originalBundleID))")
+             + ", version \(app.version); serving \(Sideload.size(output))")
+        let bid = app.bundleID
+        let serverLog = { (s: String) in InstallLog.say(bid, s) }
+        let end = { (ok: Bool) in
+            guard once.first() else { return }
+            job?.end()
+            if !ok { serverLog("iOS didn't fetch the whole IPA within 15 minutes; it is no longer served"); server.remove(ipaPath) }
+            // B29: served: the route stays for the grace too. iOS's installer may ask again for parts, and
+            // a route removed the moment one request reached the last byte answered those with 404.
+            SignBridge.queue.asyncAfter(deadline: .now() + servedGrace) {
+                if ok { server.remove(ipaPath) }
+                try? FileManager.default.removeItem(at: output)
+                KeepAlive.shared.end()
+            }
+            served?(ok)
+        }
+        server.serve(ipaPath, .init(type: "application/octet-stream", body: .file(output), log: serverLog,
+                                    onServed: { serverLog("iOS has the whole IPA"); end(true) }))
+        // F196: Cancel: no more serving, no minute's grace, the listener ends when nothing else is served.
+        job?.onCancel {
+            guard once.first() else { return }
+            log?("Cancelled: the IPA is no longer served")
+            server.cancel(ipaPath)
+            SignBridge.queue.async {
+                try? FileManager.default.removeItem(at: output)
+                KeepAlive.shared.end()
+            }
+            served?(false)
+        }
+        SignBridge.queue.asyncAfter(deadline: .now() + 15 * 60) { end(false) }
+        SignBridge.queue.async {
+            saveRecords(SignedRecords.adding(record, to: records()))
+            reschedule()
+        }
+        DispatchQueue.main.async {
+            log?("Handing iOS the install link; it asks \"Install \(app.name)?\"")
+            UIApplication.shared.open(URL(string: link)!)
+            opened(.success((app, record)))
         }
     }
 

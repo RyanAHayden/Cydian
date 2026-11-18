@@ -107,6 +107,11 @@ import { PART, uploadCap } from "./src/index.js";
     fetcher: async (u, o) => { seen.push(o.cf.cacheTtlByStatus); return new Response("x", { status: answers.shift(), headers: {} }); } });
   assert.equal(r.status, 200);
   assert.deepEqual(seen, Array(3).fill({ "200-299": 86400, "300-599": 0 })); // retried twice; only a 2xx is cached at the edge
+  const asked = [];
+  const again = await upstream("https://github.com/o/r/releases/download/v1/a.ipa", { wait: async () => {},
+    fetcher: async (u, o) => { asked.push(o.cache ?? "edge"); return new Response("x", { status: asked.length === 1 ? 404 : 200 }); } });
+  assert.equal(again.status, 200);
+  assert.deepEqual(asked, ["edge", "no-store"]); // a release file's 404 is asked once more past the edge cache
   console.log("worker upstream: ok");
 }
 {

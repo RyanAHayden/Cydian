@@ -2,14 +2,11 @@
 // eats taps until it goes. showHUD() returns hide(), and hide.done(label) ends it on a checkmark. Fades and spins by
 // opacity/transform only.
 
-const SPOKES = Array.from({ length: 12 }, (_, i) =>
-  `<line x1="18" y1="3" x2="18" y2="10" transform="rotate(${i * 30} 18 18)" opacity="${(1 - i / 14).toFixed(2)}"/>`).join("");
-
 export function showHUD(text = "Reloading Data") {
   const scrim = document.createElement("div");
   scrim.className = "hud-scrim";
   scrim.innerHTML = '<div class="hud" role="status" aria-live="polite">' +
-    `<svg class="hud-spinner" viewBox="0 0 36 36" aria-hidden="true"><g stroke="#fff" stroke-width="3.2" stroke-linecap="round">${SPOKES}</g></svg>` +
+    '<span class="hud-spinner" aria-hidden="true"></span>' + // F166: UIKit's WhiteLarge spinner (ios6.css --spinner-large)
     '<span class="hud-label"></span></div>';
   scrim.querySelector(".hud-label").textContent = text;
   document.body.append(scrim);

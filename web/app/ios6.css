@@ -280,9 +280,33 @@ html[data-theme="dark"] .switch.is-held .sw-knob { background: linear-gradient(#
   background: rgba(0,0,0,.75); color: #fff; text-align: center; text-shadow: 0 -1px 0 rgba(0,0,0,.5);
   font-size: 24px; font-weight: bold; line-height: 28px;
 }
-.hud-spinner { width: 36px; height: 36px; animation: hud-spin .96s steps(12) infinite; }
+.hud-spinner { width: 37px; height: 37px; background: var(--spinner-large) center / 37px no-repeat; animation: hud-spin .96s linear infinite; }
 .hud-check { width: 36px; height: 36px; }
-@keyframes hud-spin { to { transform: rotate(360deg); } }
+/* F166: the spinners turn a spoke at a time by holding each 30-degree turn for 1/12 of the cycle, with linear timing.
+   Not steps(12): WebKit on iOS 15 (Safari and the app's WKWebView alike) hands the transform animation to Core
+   Animation and a steps() timing function there leaves it standing still (journal/2026-11-18-f166-spinners). */
+@keyframes hud-spin {
+  0%, 8.332% { transform: rotate(0deg); }
+  8.333%, 16.666% { transform: rotate(30deg); }
+  16.667%, 24.999% { transform: rotate(60deg); }
+  25.000%, 33.332% { transform: rotate(90deg); }
+  33.333%, 41.666% { transform: rotate(120deg); }
+  41.667%, 49.999% { transform: rotate(150deg); }
+  50.000%, 58.332% { transform: rotate(180deg); }
+  58.333%, 66.666% { transform: rotate(210deg); }
+  66.667%, 74.999% { transform: rotate(240deg); }
+  75.000%, 83.332% { transform: rotate(270deg); }
+  83.333%, 91.666% { transform: rotate(300deg); }
+  91.667%, 100% { transform: rotate(330deg); }
+}
+/* iOS 6's UIActivityIndicatorView styles (nav/spinner.js draws them; spinner.test.js keeps the two the same). */
+:root {
+  --spinner-white: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%23fff' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='10' y1='1' x2='10' y2='4' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(30 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(60 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(90 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(120 10 10)' opacity='0.369'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(150 10 10)' opacity='0.463'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(180 10 10)' opacity='0.561'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(210 10 10)' opacity='0.659'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(240 10 10)' opacity='0.753'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(270 10 10)' opacity='0.851'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(300 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(330 10 10)' opacity='0.271'/%3E%3C/g%3E%3C/svg%3E");
+  --spinner-gray: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='10' y1='1' x2='10' y2='4' opacity='0.122'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(30 10 10)' opacity='0.122'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(60 10 10)' opacity='0.122'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(90 10 10)' opacity='0.122'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(120 10 10)' opacity='0.165'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(150 10 10)' opacity='0.208'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(180 10 10)' opacity='0.251'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(210 10 10)' opacity='0.294'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(240 10 10)' opacity='0.337'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(270 10 10)' opacity='0.384'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(300 10 10)' opacity='0.122'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(330 10 10)' opacity='0.122'/%3E%3C/g%3E%3C/svg%3E");
+  --spinner-large: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 37 37'%3E%3Cg stroke='%23fff' stroke-width='3' stroke-linecap='round'%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' opacity='0.271'/%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' transform='rotate(30 18.5 18.5)' opacity='0.271'/%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' transform='rotate(60 18.5 18.5)' opacity='0.271'/%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' transform='rotate(90 18.5 18.5)' opacity='0.271'/%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' transform='rotate(120 18.5 18.5)' opacity='0.369'/%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' transform='rotate(150 18.5 18.5)' opacity='0.463'/%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' transform='rotate(180 18.5 18.5)' opacity='0.561'/%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' transform='rotate(210 18.5 18.5)' opacity='0.659'/%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' transform='rotate(240 18.5 18.5)' opacity='0.753'/%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' transform='rotate(270 18.5 18.5)' opacity='0.851'/%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' transform='rotate(300 18.5 18.5)' opacity='0.271'/%3E%3Cline x1='18.5' y1='2.5' x2='18.5' y2='8.5' transform='rotate(330 18.5 18.5)' opacity='0.271'/%3E%3C/g%3E%3C/svg%3E");
+}
+/* No dark iOS 6: on the dark theme the grey (black at 38%) spinner would vanish, so lists take the white one. */
+:root[data-theme="dark"] { --spinner-gray: var(--spinner-white); }
 
 .empty { color: var(--head); text-shadow: var(--emboss); font-size: 17px; }
 
@@ -469,13 +493,13 @@ input.sign-field::placeholder { color: var(--field-hint); opacity: 1; }
 /* Cydia's Sources badge while sources refresh: the red badge holding a white spinner (4S screenshots). */
 .badge.spinning { position: absolute; width: 20px; padding: 0; }
 .badge.spinning::after { /* the white spokes turn a step at a time, as Cydia's do */
-  content: ""; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%23fff' stroke-width='1.9' stroke-linecap='round'%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(0 10 10)' opacity='1.00'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(30 10 10)' opacity='0.93'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(60 10 10)' opacity='0.86'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(90 10 10)' opacity='0.79'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(120 10 10)' opacity='0.71'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(150 10 10)' opacity='0.64'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(180 10 10)' opacity='0.57'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(210 10 10)' opacity='0.50'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(240 10 10)' opacity='0.43'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(270 10 10)' opacity='0.36'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(300 10 10)' opacity='0.29'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(330 10 10)' opacity='0.21'/%3E%3C/g%3E%3C/svg%3E") center / 14px no-repeat;
-  animation: hud-spin .96s steps(12) infinite;
+  content: ""; position: absolute; inset: 0; background: var(--spinner-white) center / 16px no-repeat; /* the 20 pt white spinner inside the 2 px ring */
+  animation: hud-spin .96s linear infinite;
 }
 /* A source row while it loads: a small grey spinner in place of its count and chevron (Cydia). */
 .source-row.is-loading .cell-count { display: none; }
 .source-row.is-loading .cell-inner::after { /* the chevron's place holds a small grey spinner while the source loads */
-  width: 18px; height: 18px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%23808080' stroke-width='1.9' stroke-linecap='round'%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(0 10 10)' opacity='1.00'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(30 10 10)' opacity='0.93'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(60 10 10)' opacity='0.86'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(90 10 10)' opacity='0.79'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(120 10 10)' opacity='0.71'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(150 10 10)' opacity='0.64'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(180 10 10)' opacity='0.57'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(210 10 10)' opacity='0.50'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(240 10 10)' opacity='0.43'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(270 10 10)' opacity='0.36'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(300 10 10)' opacity='0.29'/%3E%3Cline x1='10' y1='3.2' x2='10' y2='6.4' transform='rotate(330 10 10)' opacity='0.21'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat; animation: hud-spin .96s steps(12) infinite;
+  width: 20px; height: 20px; background: var(--spinner-gray) center / 20px no-repeat; animation: hud-spin .96s linear infinite;
 }
 
 /* While a banner shows (nav/banner.js), the nav bar and the screens move down by its height, so it covers nothing. */
@@ -523,7 +547,7 @@ html[data-theme="dark"] .ph-box, html[data-theme="dark"] .ph-bar { background: #
     linear-gradient(rgba(76,76,76,.8), rgba(0,0,0,.8) 52%);
   will-change: transform;
 }
-.reload-spinner { flex: none; width: 20px; height: 20px; animation: hud-spin .96s steps(12) infinite; }
+.reload-spinner { flex: none; width: 20px; height: 20px; background: var(--spinner-white) center / 20px no-repeat; animation: hud-spin .96s linear infinite; }
 .reload-text {
   flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   font-size: 14px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.8);

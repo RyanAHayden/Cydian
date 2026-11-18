@@ -23,6 +23,8 @@
 //                                           started, the body once it's done. The same POST with token and size starts it
 //   GET/PUT/DELETE /api/account/<id>       F97: Cydian Account's encrypted blob (src/account.js)
 //   GET  /api/fetch?url=&kind=ipa           F93: an IPA for the website's signer, streamed, up to MAX_UPLOAD_MB
+//   GET  /api/applookup?bundleId=&country=  F161: Apple's iTunes Search API lookup of one app by bundle ID (the
+//                                           app page's App Store details), its first result only; cached a day
 //   GET  /repo/<file>                       B17: Cydian's own flat APT repo (Release, Packages, Packages.gz, *.deb),
 //                                           the latest release's asset fetched here, redirects followed here
 //
@@ -353,6 +355,36 @@ async function metaOf(env, t, part = null) {
   return r.metadata ?? null;
 }
 
+// ---- /api/applookup: one app's App Store details (F161) -------------------------------------------------------
+// The website asks here, not Apple, so the answer is cached at the edge for a day (Cloudflare's cache; node.mjs hands
+// an in-memory one as env.LOOKUP_CACHE) and every visitor's look at an app costs Apple one request a day.
+// Only a bundle ID and a two-letter country go to Apple; the answer is { resultCount, results: [first app] }.
+export const LOOKUP_TTL_S = 86400;
+export async function appLookup(u, env = {}, { fetcher = fetch, cache = env.LOOKUP_CACHE ?? globalThis.caches?.default ?? null } = {}) {
+  const bundleId = u.searchParams.get("bundleId") ?? "";
+  const country = (u.searchParams.get("country") || "us").toLowerCase();
+  if (!/^[A-Za-z0-9.-]{1,155}$/.test(bundleId) || !/^[a-z]{2}$/.test(country)) return fail("bad_request", "Send bundleId and a two-letter country.");
+  const apple = `https://itunes.apple.com/lookup?${new URLSearchParams({ bundleId, country })}`;
+  const key = new Request(`https://applookup.cydian.internal/${country}/${encodeURIComponent(bundleId)}`);
+  const hit = cache ? await cache.match(key).catch(() => null) : null;
+  if (hit) return hit;
+  let r;
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 10000);
+    try { r = await fetcher(apple, { headers: { Accept: "application/json" }, cf: { cacheEverything: true, cacheTtl: LOOKUP_TTL_S }, signal: ctl.signal }); }
+    finally { clearTimeout(timer); }
+  } catch { return fail("upstream", "The App Store didn't answer.", 502); }
+  if (!r.ok) return fail("upstream", `The App Store answered HTTP ${r.status}.`, 502);
+  let body;
+  try { body = JSON.parse(await r.text()); } catch { return fail("upstream", "The App Store's answer wasn't JSON.", 502); }
+  const first = Array.isArray(body?.results) ? body.results.find((x) => x && typeof x === "object") : null;
+  const res = new Response(JSON.stringify({ resultCount: first ? 1 : 0, results: first ? [first] : [] }), { headers: {
+    "Content-Type": "application/json", "Cache-Control": `public, max-age=${LOOKUP_TTL_S}`, "X-Content-Type-Options": "nosniff", ...CORS } });
+  if (cache) await cache.put(key, res.clone()).catch(() => {});
+  return res;
+}
+
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 export default {
@@ -363,6 +395,7 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null);
+    if (u.pathname === "/api/applookup" && req.method === "GET") return appLookup(u, env);
     if (u.pathname === "/repo" || u.pathname.startsWith("/repo/")) return repo(req, u, env);
     if (u.pathname === "/healthz") return new Response("ok\n", { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
     if (u.pathname === "/sign/status") return json({ ok: true, ttl, worker: true, zsign: false, upload: uploadCap(env) });

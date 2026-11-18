@@ -9,7 +9,7 @@ import { grouped, placeholder, el } from "../nav/ui.js";
 import { format } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
 import { getBackend } from "../backend.js";
-import { mediaUrl } from "./depiction.js";
+import { mediaUrl, stars } from "./depiction.js";
 import { installOptions } from "../core/altstore.js";
 import { appLinks, appGithub, altShots, loadPreviews, dedupeShots } from "../core/previews.js";
 import { settings } from "./settings.js";
@@ -31,6 +31,7 @@ import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, dest
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { compareVersions } from "../core/apt.js";
 import { queueApp } from "./queue.js";
+import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText } from "../core/applookup.js";
 
 function img(url, cls) {
   const src = mediaUrl(url);
@@ -398,17 +399,38 @@ export function renderApp(body, route, pkg, source) {
   const ht = el("div", "pkg-head-text");
   ht.append(el("span", "pkg-head-name", app.name));
   if (app.developerName) ht.append(el("span", "pkg-head-version", app.developerName));
+  const storeDev = el("span", "pkg-head-version"); // F161: the App Store's developer, when the source names none
+  storeDev.hidden = true;
+  ht.append(storeDev);
   ht.append(el("span", "pkg-head-version", `Version ${v.version}${v.buildVersion ? ` (${v.buildVersion})` : ""}`));
   const fit = compat(st, currentDevice());
   const fitCode = fit.status === "no" ? fit.reason : fit.status;
   const badge = el("span", "pkg-compat", fit.label);
   badge.dataset.compat = fitCode;
   ht.append(badge);
+  const ratingLine = el("span", "pkg-head-version app-rating"); // F161: App Store stars (F103's)
+  ratingLine.hidden = true;
+  ht.append(ratingLine);
   head.append(icon, ht);
   const size = formatSize(v.size);
   if (size) head.append(el("span", "pkg-head-size", size));
   page.append(card([head], "pkg-head-table"));
   body.replaceChildren(page);
+
+  // F161: the App Store's details by bundle ID (core/applookup.js), only now that the page is open; none when the
+  // source already gives screenshots, developer and the app's own page.
+  const ownLinks = ownPageLinks(app, appLinks(app));
+  const need = lookupNeed(app, ownLinks);
+  const looked = need === "none" ? Promise.resolve(null) : storeLookup(appBundleId(app, pkg.row?.id));
+  const merged = looked.then((store) => mergeDetails(app, store, need));
+  merged.then((m) => {
+    if (m.developer) { storeDev.textContent = m.developer; storeDev.hidden = false; }
+    if (m.rating != null) {
+      ratingLine.replaceChildren(stars(m.rating), ` ${m.ratingCount ? `${m.ratingCount.toLocaleString()} Ratings` : ""}`);
+      ratingLine.title = "App Store rating";
+      ratingLine.hidden = false;
+    }
+  });
 
   // What the app may do, listed before the install buttons (AltStore shows these before it installs).
   const perm = app.permissions;
@@ -478,29 +500,89 @@ export function renderApp(body, route, pkg, source) {
   }
 
   // F122: the source's screenshots, or (when it lists none) its GitHub repo's README and release pictures.
-  body.append(previewSlot(`app:${pkg.key}:${pkg.row?.id ?? app.bundleIdentifier}`, { shots: altShots(app), gh: appGithub(app) }));
+  // F161: when the source lists none, the App Store's screenshots come before the GitHub ones.
+  const previewKey = `app:${pkg.key}:${pkg.row?.id ?? app.bundleIdentifier}`;
+  const shots = altShots(app);
+  if (shots.length || need !== "full") body.append(previewSlot(previewKey, { shots, gh: appGithub(app) }));
+  else {
+    const slot = el("div", "preview-slot");
+    body.append(slot);
+    merged.then((m) => slot.replaceWith(previewSlot(previewKey, { shots: m.screenshots.map((url) => ({ url, from: "appstore" })), gh: appGithub(app) })));
+  }
 
   if (app.localizedDescription) body.append(card([el("div", "pkg-description", app.localizedDescription)]));
+  // F161: the App Store's description, under the source's own text.
+  const storeText = el("div");
+  body.append(storeText);
+  merged.then((m) => {
+    if (!m.description) return;
+    // Apple's text runs long: the first lines, and a More row that opens the rest in place (iOS 6 App Store's More).
+    const short = shortText(m.description);
+    const text = el("div", "pkg-description", short ?? m.description);
+    const g = card([text]);
+    g.prepend(el("h2", "group-header", "From the App Store"));
+    if (short) {
+      const more = grouped([{ rows: [{ label: "More", onClick: () => { text.textContent = m.description; more.remove(); } }] }]).querySelector("li");
+      g.querySelector(".table").append(more);
+    }
+    storeText.replaceChildren(g);
+  });
 
-  const details = [{ label: "Version", detail: v.version }];
-  if (size) details.push({ label: "Size", detail: size });
-  if (v.date) details.push({ label: "Updated", detail: formatDate(v.date) });
-  if (app.developerName) details.push({ label: "Developer", detail: app.developerName });
-  details.push({ label: "Category", detail: pkg.row.section });
-  if (osRange(v)) details.push({ label: "Compatibility", detail: osRange(v) });
-  details.push({ label: "Bundle ID", detail: app.bundleIdentifier });
-  body.append(grouped([{ header: "Details", rows: details }]));
+  // F161: Details are drawn again once the App Store's facts are in (developer, category, its version and iOS).
+  const detailsBox = el("div");
+  const drawDetails = (m = {}) => {
+    const details = [{ label: "Version", detail: v.version }];
+    if (size) details.push({ label: "Size", detail: size });
+    if (v.date) details.push({ label: "Updated", detail: formatDate(v.date) });
+    if (app.developerName || m.developer) details.push({ label: "Developer", detail: app.developerName || m.developer });
+    details.push({ label: "Category", detail: m.category || pkg.row.section });
+    if (osRange(v)) details.push({ label: "Compatibility", detail: osRange(v) });
+    if (m.version) details.push({ label: "App Store Version", detail: m.version });
+    if (m.minimumOs) details.push({ label: "App Store Requires", detail: `iOS ${m.minimumOs} or later` });
+    details.push({ label: "Bundle ID", detail: app.bundleIdentifier });
+    detailsBox.replaceChildren(grouped([{ header: "Details", rows: details }]));
+  };
+  drawDetails();
+  body.append(detailsBox);
+  merged.then(drawDetails);
   body.append(grouped([{ header: "Works on My Phone", rows: [{ label: compatBadge(fitCode) }], footer: fit.detail }]));
 
   // Version History (F29): its own page (browse.js renderVersions), every versions[] entry, older ones installable.
   body.append(grouped([{ rows: [{ label: "Version History", href: deeper(route, `versions:${pkg.row.id}`) }] }]));
 
-  // Links (F122): the source it came from (its page in Sources), then the developer's site and GitHub repo.
+  // Links (F161, after F122): this app's own page (its GitHub or website, else the App Store), then the source's page
+  // in Cydian, then the source's website when it is another page. Never two rows to one page (core/applookup.js).
   const sourceName = app.sourceName || (source ? displayName(source) : "") || app.sourceUrl;
-  body.append(linksGroup({ label: sourceName, subtitle: app.sourceUrl,
-    href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) }, appLinks(app)));
+  const sourceRow = { label: sourceName, subtitle: app.sourceUrl,
+    href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) };
+  const linksBox = el("div");
+  const drawLinks = (store, sourceWebsite) => linksBox.replaceChildren(appLinksGroup(pageLinks({ ownLinks, store, source: sourceRow,
+    sourceWebsite, appUrls: [app.sourceUrl] }), sourceRow));
+  drawLinks(null, null);
+  body.append(linksBox);
+  Promise.all([looked, catalog.altSource(pkg.key).then((m) => m?.website ?? null, () => null)])
+    .then(([store, site]) => drawLinks(store, site), () => {});
   setSourceShare(body, source ?? { key: pkg.key }, { app: true }); // F76: Copy Link and Add on Another Device only
   body.append(grouped([{ footer: `${app.bundleIdentifier}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
+}
+
+// F161: an app's App Store details on this device: the website asks the Worker (/api/applookup, cached at the edge),
+// the app asks Apple itself; cached a week per bundle ID (core/applookup.js lookupApp). Null when it fails.
+export function storeLookup(bundleId, { backend = getBackend(), fetchFn = globalThis.fetch,
+  locale = globalThis.navigator?.language, store = globalThis.localStorage ?? null } = {}) {
+  const get = backend.kind === "http"
+    ? (id, c) => fetchFn(workerLookupUrl(id, c)).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
+    : (id, c) => backend.text(lookupUrl(id, c));
+  return lookupApp(bundleId, { country: regionOf(locale), get, store }).catch(() => null);
+}
+
+// F161: core/applookup.js pageLinks' rows as the Links group: a link row opens out, the source row opens its page.
+function appLinksGroup(links, sourceRow) {
+  const rows = links.map((l) => (l.kind === "source" ? { ...sourceRow, chevron: true }
+    : { label: l.label, subtitle: l.detail || l.url, onClick: () => openOut(l.url), chevron: true }));
+  const g = grouped([{ header: "Links", rows }]);
+  g.firstElementChild?.classList.add("links-group");
+  return g;
 }
 
 // ---- Links and the screenshots gallery (F122), shared with browse.js's package pages ---------------------------

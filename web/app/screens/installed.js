@@ -30,6 +30,11 @@
 // the list as it is typed and Search's scope segments filter by kind (All, Tweaks, Themes, Apps). Without a jailbreak
 // the apps list gets User (A–Z) | Recent (newest first, by day) and the search bar, no kinds (it is all apps).
 //
+// F130: User mode from apt's own marks: in the jailbreak app apt.autoInstalled (Apt.swift, /var/lib/apt/
+// extended_states) names the packages apt installed only for another's dependency, and core/installed.js markedRows
+// hides those instead of F127's guess (anything another installed package needs), which hid tweaks the user chose
+// that others also need. Where the marks can't be read (the site's uploaded status file) the guess stays.
+//
 // F125: the Wish List lives here (it was a row on Home): a Wish List row with its count (a grey count badge) on the
 // root, under the installed lists (beside Apps above dpkg's packages in the jailbreak app, so it isn't hundreds of rows
 // down; a Packages section under the apps elsewhere), opens #installed/wishlist: the wished packages as a package
@@ -42,7 +47,7 @@ import { catalog, ALL } from "../catalog.js";
 import { showAlert } from "../nav/alert.js";
 import { detectMode } from "../core/settings.js";
 import { apps, appRows, appUpgrades, removeInstall, onAppsChange, MODES, MODE_LABEL, TYPES, modeRows, typeRows, queryRows,
-  dayHeaders, dayLabel } from "../core/installed.js";
+  dayHeaders, dayLabel, markedRows } from "../core/installed.js";
 import { mediaUrl } from "./depiction.js";
 import { rememberedApps } from "../app-updates.js";
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
@@ -56,7 +61,7 @@ export const DPKG = "dpkg"; // the site's path segment for the status file's pac
 export const APPS = "apps"; // F87: the jailbreak app's path segment for the remembered apps
 export const WISH = "wishlist"; // F125: the Wish List page's path segment
 
-const state = { body: null, route: null, list: null, seq: 0, dates: null, mode: "user", type: "All", query: "", tail: [] };
+const state = { body: null, route: null, list: null, seq: 0, dates: null, auto: null, mode: "user", type: "All", query: "", tail: [] };
 
 // ---- F127: modes, kinds and search -----------------------------------------------------------------------------
 
@@ -71,8 +76,9 @@ export const dpkgModes = (hasDates) => MODES.filter((m) => m !== "recent" || has
 export const APP_MODES = ["user", "recent"];
 
 // What the dpkg list shows: the mode's rows of the kind, narrowed by the search; Recent with its day headers.
-export function dpkgItems(rows, { mode = "user", type = "All", query = "", dates = null, locale } = {}) {
-  const shown = queryRows(typeRows(modeRows(rows, mode, dates), type), query);
+// F130: `auto` is apt's Auto-Installed set (autoInstalled), or null to keep the dependency guess.
+export function dpkgItems(rows, { mode = "user", type = "All", query = "", dates = null, auto = null, locale } = {}) {
+  const shown = queryRows(typeRows(modeRows(markedRows(rows, auto), mode, dates), type), query);
   return mode === "recent" ? dayHeaders(shown, dates, locale) : shown;
 }
 
@@ -103,6 +109,16 @@ export async function installDates(native = globalThis.cydianNative) {
   try {
     const d = await native.call("apt.installDates", {});
     return d && typeof d === "object" && Object.keys(d).length ? d : null;
+  } catch { return null; }
+}
+
+// F130: a Set of the packages apt marked Auto-Installed (apt.autoInstalled, the jailbreak app), or null where the
+// marks can't be read: no dpkg (the site, the sideload build), an older shell, or no extended_states file.
+export async function autoInstalled(native = globalThis.cydianNative) {
+  if (!canReadDates(native)) return null;
+  try {
+    const list = await native.call("apt.autoInstalled", {});
+    return Array.isArray(list) ? new Set(list.filter((p) => typeof p === "string")) : null;
   } catch { return null; }
 }
 
@@ -255,15 +271,17 @@ async function load() {
   let rows;
   let appCount = 0;
   let dates = null;
+  let auto = null;
   try {
     // F87: the Apps row has to be there before the list measures where it starts (vlist.js caches the offset).
-    [rows, appCount, dates] = await Promise.all([catalog.installed(), recordsApps() ? 0 : jailbreakAppCount(), installDates()]);
+    [rows, appCount, dates, auto] = await Promise.all([catalog.installed(), recordsApps() ? 0 : jailbreakAppCount(), installDates(),
+      autoInstalled()]);
   } catch (e) {
     if (seq === state.seq) state.body.replaceChildren(note(e.message));
     return;
   }
   if (seq !== state.seq) return;
-  Object.assign(state, { rows, appCount, dates });
+  Object.assign(state, { rows, appCount, dates, auto });
   draw();
 }
 
@@ -309,8 +327,8 @@ function drawList() {
   browse.dropList(body, state.list);
   state.list = null;
   for (const n of state.tail) n.remove();
-  const { mode, dates } = state;
-  const items = dpkgItems(rows, { mode, type: state.type, query: state.query, dates });
+  const { mode, dates, auto } = state;
+  const items = dpkgItems(rows, { mode, type: state.type, query: state.query, dates, auto });
   if (!items.length) {
     state.tail = [note(state.query.trim() ? "No matches." : mode === "recent" ? "No install dates." : "No packages.")];
     body.append(...state.tail);

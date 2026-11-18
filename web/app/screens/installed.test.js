@@ -246,3 +246,39 @@ test("F127: the apps list: User A–Z, Recent newest first by day, both searchab
   assert.deepEqual(shape(appSections(recs, { mode: "recent", query: "ta", locale: "en-US" })), [["November 17, 2026", ["b", "d"]]]);
   assert.deepEqual(appSections(recs, { query: "nothing" }), []);
 });
+
+test("F130: apt.autoInstalled gives a Set of apt's Auto-Installed marks, else null; dpkgItems uses them", async () => {
+  const { autoInstalled, dpkgItems } = await import("./installed.js");
+  const native = { dpkgStatus: () => "", call: async (m) => (m === "apt.autoInstalled" ? ["libfoo"] : null) };
+  assert.deepEqual(await autoInstalled(native), new Set(["libfoo"]));
+  assert.deepEqual(await autoInstalled({ ...native, call: async () => [] }), new Set()); // read, nothing marked
+  assert.equal(await autoInstalled({ ...native, call: async () => null }), null); // no extended_states
+  assert.equal(await autoInstalled({ ...native, call: async () => { throw new Error("unknown method"); } }), null);
+  assert.equal(await autoInstalled({ call: native.call }), null); // the sideload build
+  assert.equal(await autoInstalled(undefined), null);
+  const rows = [{ id: "activator", name: "Activator", tier: 2 }, { id: "libfoo", name: "libfoo", tier: 2 }];
+  assert.deepEqual(dpkgItems(rows, { auto: new Set(["libfoo"]) }).map((r) => r.id), ["activator"]);
+  assert.deepEqual(dpkgItems(rows, {}).map((r) => r.id), []); // the guess
+});
+
+test("F130: the fake shell's apt.autoInstalled reads extended_states as Apt.swift does", async () => {
+  const { createFakeNative, makeFixture } = await import("../../../native/fake/fake-native.mjs");
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const fx = makeFixture();
+  try {
+    const native = createFakeNative({ prefix: fx.prefix, remote: fx.remote });
+    const before = await autoInstalledOf(native);
+    const dir = join(fx.prefix, "var/lib/apt");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "extended_states"), "Package: libfoo\nArchitecture: iphoneos-arm64\nAuto-Installed: 1\n\n" +
+      "Package: tweak\nArchitecture: iphoneos-arm64\nAuto-Installed: 0\n\nPackage: abar\r\nAuto-Installed: 1\r\n");
+    assert.equal(before, null);
+    assert.deepEqual(await autoInstalledOf(native), new Set(["abar", "libfoo"]));
+  } finally { fx.cleanup(); }
+});
+
+async function autoInstalledOf(native) {
+  const { autoInstalled } = await import("./installed.js");
+  return autoInstalled(native);
+}

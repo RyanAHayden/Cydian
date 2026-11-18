@@ -131,7 +131,7 @@ test("the sideload app lists itself at its own version, ahead of any recorded co
 });
 
 // ---- F127: Installed's modes ----------------------------------------------------------------------------------
-import { dependedOn, packageTier, roleRank, modeRows, typeRows, queryRows } from "./installed.js";
+import { dependedOn, packageTier, roleRank, modeRows, typeRows, queryRows, markedRows } from "./installed.js";
 
 test("F127: dependencies count by name, alternative and Provides; never a package's own name", () => {
   const st = [
@@ -149,7 +149,8 @@ test("F127: Cydia's role tiers: none/enduser User, hacker/developer Expert, othe
   assert.equal(roleRank({ tag: "role::leaper" }), 4);
   assert.equal(roleRank({ tag: "role::cydia" }), 7);
   assert.equal(packageTier({ package: "a" }), 1);
-  assert.equal(packageTier({ package: "a", tag: "role::enduser" }, new Set(["a"])), 3); // a dependency
+  assert.equal(packageTier({ package: "a", tag: "role::enduser" }, new Set(["a"])), 2); // a dependency (F130)
+  assert.equal(packageTier({ package: "a", essential: "yes" }, new Set(["a"])), 3); // Essential beats dependency
   assert.equal(packageTier({ package: "a", essential: "yes" }), 3);
   assert.equal(packageTier({ package: "a", tag: "cydia::essential" }), 3);
   assert.equal(packageTier({ package: "a", priority: "required" }), 3);
@@ -169,4 +170,18 @@ test("F127: modeRows, typeRows and queryRows", () => {
   assert.equal(typeRows(rows, "Nonsense"), rows);
   assert.deepEqual(queryRows(rows, "b").map((r) => r.id), ["b"]);
   assert.equal(queryRows(rows, "   "), rows);
+});
+
+test("F130: apt's Auto-Installed marks replace the dependency guess; Essential and roles stay; no marks, the guess", () => {
+  const rows = [{ id: "activator", name: "Activator", tier: 2 }, { id: "libfoo", name: "libfoo", tier: 2 },
+    { id: "tweak", name: "Tweak", tier: 1 }, { id: "auto", name: "Auto", tier: 1 }, { id: "base", name: "Base", tier: 3 },
+    { id: "old", name: "Old" }]; // old: no tier (an older worker), User
+  const auto = new Set(["libfoo", "auto", "base"]);
+  const marked = markedRows(rows, auto);
+  assert.deepEqual(modeRows(marked, "user").map((r) => r.id), ["activator", "tweak", "old"]);
+  assert.deepEqual(modeRows(marked, "expert").map((r) => r.id), rows.map((r) => r.id));
+  assert.equal(rows[0].tier, 2, "the rows themselves are left as they were");
+  assert.equal(markedRows(rows, null), rows);
+  assert.deepEqual(modeRows(markedRows(rows, null), "user").map((r) => r.id), ["tweak", "auto", "old"]);
+  assert.deepEqual(modeRows(markedRows(rows, new Set()), "user").map((r) => r.id), ["activator", "libfoo", "tweak", "auto", "old"]);
 });

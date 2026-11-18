@@ -85,6 +85,24 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       }
       return out;
     },
+    // F130: Apt.swift autoInstalled: the names var/lib/apt/extended_states marks Auto-Installed: 1, sorted; null
+    // without the file.
+    "apt.autoInstalled"() {
+      const text = read(join(prefix, "var/lib/apt/extended_states"));
+      if (text == null) return null;
+      const out = new Set();
+      for (const stanza of text.replace(/\r\n/g, "\n").split("\n\n")) {
+        let pkg = "", auto = false;
+        for (const line of stanza.split("\n")) {
+          const i = line.indexOf(":");
+          if (i < 0) continue;
+          const key = line.slice(0, i).trim().toLowerCase(), value = line.slice(i + 1).trim();
+          if (key === "package") pkg = value; else if (key === "auto-installed") auto = value === "1";
+        }
+        if (auto && pkg) out.add(pkg);
+      }
+      return [...out].sort();
+    },
     "net.fetch"({ url }) {
       if (!/^https?:\/\//i.test(url ?? "")) return fail("bad_url: not an http(s) URL");
       const r = netGet(url);

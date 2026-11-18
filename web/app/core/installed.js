@@ -216,11 +216,18 @@ export function installedIds(dpkgRows, appRecords) {
 // sections (long date style), leaving out packages with no date. Few packages carry role tags now, so User also
 // leaves out what the user didn't choose (the brief, user 2026-11-18): Essential packages (`Essential: yes`, the
 // `cydia::essential` tag, `Priority: required`) and dependencies (anything another installed package Depends or
-// Pre-Depends on, by name or through Provides). A row's `tier` holds that rank: 1 User, 3 Expert, 6 Recent only, 7
-// never listed.
+// Pre-Depends on, by name or through Provides). A row's `tier` holds that rank: 1 User, 2 Expert as a dependency
+// only (F130), 3 Expert, 6 Recent only, 7 never listed.
+//
+// F130: the dependency rule is a guess, and it hides tweaks the user chose that others also need (Activator,
+// AppList, AppSync). Where apt's own marks can be read (the jailbreak app: apt.autoInstalled, the packages
+// /var/lib/apt/extended_states marks `Auto-Installed: 1`), markedRows puts them in its place: tier 2 rows apt
+// didn't mark go back to User, User rows apt marked go to Expert. Without marks (the site's uploaded status file,
+// an older shell) the guess stays.
 //
 //   dependedOn(stanzas)                     -> Set of the installed ids another installed package needs
-//   packageTier(stanza, deps)               -> 1 | 3 | 6 | 7
+//   packageTier(stanza, deps)               -> 1 | 2 | 3 | 6 | 7
+//   markedRows(rows, auto)                  -> rows re-tiered by apt's Auto-Installed marks (auto: Set, or null)
 //   modeRows(rows, mode, dates)             -> the rows a mode lists, in its order (dates: { id: seconds })
 //   typeRows(rows, type)                    -> rows of one TYPES kind (Search's scope bar: core/catalog.js sectionGroup)
 //   queryRows(rows, query)                  -> rows whose name, id, description or author hold every word of query
@@ -268,7 +275,18 @@ export function packageTier(st, deps = new Set()) {
   if (role >= 2) return 3;
   const essential = /^yes$/i.test(st.essential ?? "") || tagsOf(st).includes("cydia::essential") ||
     /^required$/i.test(String(st.priority ?? "").trim());
-  return essential || deps.has(st.package) ? 3 : 1;
+  if (essential) return 3;
+  return deps.has(st.package) ? 2 : 1;
+}
+
+export function markedRows(rows, auto) {
+  if (!(auto instanceof Set)) return rows;
+  return rows.map((r) => {
+    const t = tierOf(r);
+    if (t === 2 && !auto.has(r.id)) return { ...r, tier: 1 };
+    if (t === 1 && auto.has(r.id)) return { ...r, tier: 2 };
+    return r;
+  });
 }
 
 // Rows without a tier (an older worker's) count as User, so nothing disappears.
@@ -280,7 +298,7 @@ export function modeRows(rows, mode, dates = null) {
     return rows.filter((r) => tierOf(r) < 7 && dateOf(dates, r) > 0)
       .sort((a, b) => dateOf(dates, b) - dateOf(dates, a) || compareNames(a, b));
   }
-  const max = mode === "expert" ? 3 : 1;
+  const max = mode === "expert" ? 3 : 1; // tier 2 (F130) is Expert
   return rows.filter((r) => tierOf(r) <= max);
 }
 

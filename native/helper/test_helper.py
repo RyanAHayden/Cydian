@@ -406,6 +406,13 @@ class Helper(unittest.TestCase):
 
     # --- the chain on Linux: a stand-in Cydian spawns the helper, which runs a stand-in apt-get
 
+    @staticmethod
+    def stand_in_fds(out):
+        """The fds the stand-in apt-get had open, from its 'fds: 0, 1, 2, 255, 3' line."""
+        fds = next(l for l in out if l.startswith("2: fds: "))[len("2: fds: "):].replace(",", " ").split()
+        assert {"0", "1", "2"} <= set(fds), fds  # the line was read whole, not cut
+        return fds
+
     def chain_prefix(self):
         p = self.fake_prefix()
         os.makedirs(os.path.join(p, "Applications/Cydian.app"))
@@ -417,7 +424,9 @@ class Helper(unittest.TestCase):
             with open(path, "w") as f:
                 f.write('#!/bin/sh\necho "argv: $0 $*"\necho "cwd: $(pwd)"\necho "env: $(env | sort | tr \'\\n\' \' \')"\n'
                         'read line && echo "stdin: $line" || echo "stdin: eof"\n'
-                        'ls /proc/$$/fd | sort -n | tr \'\\n\' \' \' | sed "s/^/fds: /" >&2; echo >&2\n'
+                        # T7: a plain command, no pipe or $(...): for those the shell itself holds pipe fds
+                        # while ls reads its fd list, and a loaded machine shows them as leaked 4 5 6
+                        'printf "fds: " >&2; ls -m /proc/$$/fd >&2\n'
                         'echo "pmstatus:com.repo.tweak:50.0:Installing" >&3\necho "to stderr" >&2\nexit 7\n')
             os.chmod(path, 0o755)
         helper = os.path.join(p, "cydian-helper")
@@ -439,7 +448,7 @@ class Helper(unittest.TestCase):
         self.assertLessEqual(names, {"PATH", "HOME", "USER", "LOGNAME", "LANG", "DEBIAN_FRONTEND", "PWD", "SHLVL",
                                      "_", "OLDPWD"})
         self.assertIn("DEBIAN_FRONTEND=noninteractive", env)
-        fds = next(l for l in out if l.startswith("2: fds: ")).split()[2:]
+        fds = self.stand_in_fds(out)
         self.assertEqual([f for f in fds if int(f) > 3 and f != "255"], [], fds)  # only 0-3 reach apt (sh may hold one)
 
         out = self.run_driver("spawn", helper, "configure", driver=app)
@@ -480,7 +489,7 @@ class Helper(unittest.TestCase):
         self.assertEqual(out.count("2: cydian-helper: ignored an answer that isn't Y or N"), 3, out)
         self.assertIn("CYDIA=3 1", next(l for l in out if l.startswith("1: env: ")))
         self.assertEqual(out[-1], "exit: 7")
-        fds = next(l for l in out if l.startswith("2: fds: ")).split()[2:]
+        fds = self.stand_in_fds(out)
         self.assertEqual([f for f in fds if int(f) > 3 and f != "255"], [], fds)  # the answer fd stays the helper's
 
         out = ask("keep", "N", "apply-ask", "com.repo.tweak")  # the app's end stays open: apt's exit ends it

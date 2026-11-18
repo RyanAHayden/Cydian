@@ -28,7 +28,7 @@ import { getBackend } from "../backend.js";
 import { catalog } from "../catalog.js";
 import { installQueue, runLogs } from "../queue.js";
 import { MODES, MODE_LABEL, changeCount, parseStatusLine, consoleText, finishOf, FINISH_LABEL, runTitle, createRepeatFilter, CONFFILE_TITLE,
-  CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine } from "../core/queue.js";
+  CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 
@@ -158,13 +158,17 @@ export function openConfirm() {
     const gen = ++generation;
     ready = null;
     ok.hidden = true;
-    const jobs = installQueue.list();
-    if (!jobs.length) { close("cancel"); return; }
+    if (!installQueue.size) { close("cancel"); return; }
     m.setTitle("Confirm");
     m.scroll.replaceChildren(loading("Checking with apt"));
+    const jobs = await withDebUrls(installQueue.list());
+    if (gen !== generation) return;
     let r, err = null;
     try { r = await getBackend().simulate(jobs); } catch (e) { err = e; }
     if (gen !== generation) return; // the queue changed while apt was asked; a newer answer is coming
+    // F131: apt would pull in a package it can't download (its Filename is a full URL): queue it, so the shell
+    // fetches it; the add redraws this sheet.
+    if (r?.ok && (await queueLinkedDeps(r.plan, jobs)) && gen !== generation) return;
     const names = await namesFor([...jobs.map((j) => j.id), ...(r ? planIds(r.plan) : [])]);
     if (gen !== generation) return;
     m.scroll.replaceChildren();
@@ -192,6 +196,37 @@ export function openConfirm() {
   confirm = { refresh, close };
   updateChrome();
   refresh();
+}
+
+// F131: each install job whose version's Filename is a full URL gets that link as `debUrl` (core/queue.js debUrlOf);
+// the native backend downloads those itself, since apt would join the link to the repo's URL and 404.
+async function withDebUrls(jobs) {
+  return Promise.all(jobs.map(async (j) => {
+    if (j.op !== "install") return j;
+    try {
+      const url = debUrlOf(await catalog.history(j.id), j.version);
+      return url ? { ...j, debUrl: url } : j;
+    } catch {
+      return j;
+    }
+  }));
+}
+
+// F131: packages apt-get -s would install or upgrade that aren't queued but whose Filename is a full URL go into the
+// queue for that version. True when one was added.
+async function queueLinkedDeps(plan, jobs) {
+  const queued = new Set(jobs.map((j) => j.id));
+  let added = false;
+  for (const e of [...plan.installs, ...plan.upgrades, ...plan.downgrades]) {
+    if (queued.has(e.id)) continue;
+    let url = null;
+    try { url = debUrlOf(await catalog.history(e.id), e.to); } catch { url = null; }
+    if (!url) continue;
+    installQueue.add({ op: "install", id: e.id, version: e.to, installed: e.from });
+    queued.add(e.id);
+    added = true;
+  }
+  return added;
 }
 
 function loading(text) {
@@ -246,6 +281,7 @@ async function drawIssues(box, r, names, close) {
     try { problems = (await catalog.aptProblems(r.output)) ?? []; } catch { problems = []; }
   }
   const sentences = [
+    ...(r.issues ?? []).map((sentence) => ({ sentence })), // F131: a link that couldn't be downloaded
     ...r.plan.essential.map((id) => ({ sentence: `Removing ${names[id] || id} would take away part of the jailbreak itself (an essential package), so Cydian won't do it.` })),
     ...problems,
   ];

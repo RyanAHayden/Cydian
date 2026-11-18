@@ -21,3 +21,16 @@ test("the rubber-band spacer is a zero-width float 1px taller than the page", ()
   assert.match(r.decl, /margin-right\s*:\s*-1px/);
   assert.match(r.decl, /height\s*:\s*calc\(100% \+ 1px\)/);
 });
+
+// B25: the banner covered the top of sheets (the install progress page's nav bar). The has-banner rule must move
+// every .sheet down by --banner-h (by `translate`, which composes with the sheets' slide animations) and end it that
+// much higher, and the banner must stay above the sheets.
+test("while a banner shows, sheets move below it and end higher", () => {
+  const r = rules.find((x) => /(^|,)\s*html\.has-banner \.sheet\s*(,|$)/.test(x.sel));
+  assert.ok(r, "no html.has-banner .sheet rule");
+  assert.match(r.decl, /translate\s*:\s*0 var\(--banner-h/);
+  assert.match(r.decl, /bottom\s*:\s*var\(--banner-h/);
+  const pk = readFileSync(new URL("./packages.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const z = (src, sel) => Number(new RegExp(`(^|\\n)${sel.replace(".", "\\.")}\\s*\\{[^}]*z-index:\\s*(\\d+)`).exec(src)?.[2]);
+  assert.ok(z(css, ".banner") > z(pk, ".sheet"), "the banner must sit above sheets");
+});

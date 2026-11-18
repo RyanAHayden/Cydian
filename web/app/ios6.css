@@ -510,6 +510,13 @@ input.sign-field::placeholder { color: var(--field-hint); opacity: 1; }
 html.has-banner #navbar, html.has-banner #screens { transform: translateY(var(--banner-h, 44px)); }
 /* The screens also end that much higher, so moving down doesn't push the bottom of a page under the tab bar. */
 html.has-banner #screens { bottom: var(--banner-h, 44px); }
+/* B25: every full-screen sheet (nav/sheet.js, queue.js modal(), the progress page, reviews) sits outside #navbar and
+   #screens, so it moves down and ends higher the same way: its nav bar clears the banner (z-index 50 over the sheets'
+   25) and its bottom button stays on screen. `translate`, not `transform`: the sheets slide in and out by animating
+   `transform` (Web Animations), which would override a transform here and snap at its end; `translate` composes with
+   it, is still composited (120 Hz rule), and a sheet opened while the banner shows starts below it. */
+.sheet { transition: translate .3s cubic-bezier(.25,.1,.25,1); }
+html.has-banner .sheet { translate: 0 var(--banner-h, 44px); bottom: var(--banner-h, 44px); }
 
 /* A bar button iOS left stuck in :active (Sources' Add after the Paste bubble): drawn as normal until touched again. */
 

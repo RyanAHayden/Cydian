@@ -174,6 +174,8 @@ export function createVList(scroller, { items = [], rowHeight = 58, headerHeight
     el,
     setItems,
     refresh: () => { for (const [i, n] of live) if (items[i].header == null) bindRow(n, items[i], i); },
+    // Each header's text and where it starts in the scroller's content (the section index jumps there).
+    headerTops: () => { const off = el.offsetTop; return headers.map((i) => ({ text: items[i].header, top: off + tops[i] })); },
     destroy() {
       scroller.removeEventListener("scroll", onScroll);
       ro?.disconnect();

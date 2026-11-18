@@ -72,6 +72,7 @@ export function initScroller(screens) {
     const t = e.target;
     if (!(t instanceof Element) || !(t.classList.contains("page-body") || t.hasAttribute("data-scroller"))) return;
     if (body !== t) { body = t; sizes = null; bars = null; watch(t); }
+    if (t.hasAttribute("data-section-index")) { sb.classList.remove("on"); return; } // its A–Z index instead
     draw();
   }, { capture: true, passive: true });
 

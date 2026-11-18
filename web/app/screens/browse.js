@@ -12,6 +12,7 @@
 // Lists come from the catalog in the parse worker (catalog.js); long ones are virtualised (nav/vlist.js).
 import { grouped } from "../nav/ui.js";
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
+import { createSectionIndex } from "../nav/sectionindex.js";
 import { showSheet } from "../nav/sheet.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
@@ -340,6 +341,8 @@ export function packageList(body, route, rows, { letters = true, decorate = null
     idle: loadIcon,
   });
   list.el.classList.add("pkg-vlist"); // placeholder rows show through wherever real rows aren't drawn yet
+  // Sorted by name with A–Z headers: Cydia's index down the right edge, instead of the scroll indicator.
+  if (letters && body.parentElement) createSectionIndex(body, list);
   return list;
 }
 

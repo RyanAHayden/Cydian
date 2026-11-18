@@ -34,11 +34,15 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let ws = scene as? UIWindowScene else { return }
         let w = UIWindow(windowScene: ws)
         // N10: the pinstripes, not black, behind everything: nothing dark shows between the launch screen and the page.
-        w.backgroundColor = Launch.pinstripes
+        // F198: unless the page last said dark: then its palette's ground (black for OLED Black), so a dark launch
+        // shows no light or grey before the page paints.
+        let ground = Theme.launchGround(systemDark: ws.traitCollection.userInterfaceStyle == .dark)
+        w.backgroundColor = ground.pattern
         w.rootViewController = WebController()
-        // Light until the page says otherwise (Settings > Appearance, Light by default): Automatic then lets the window
-        // follow iOS, dark included (Theme.apply). Info.plist has no UIUserInterfaceStyle, which would pin it to light.
-        w.overrideUserInterfaceStyle = .light
+        // The style the page last asked for (Settings > Appearance, Light by default and until the page has said):
+        // Automatic lets the window follow iOS, dark included (Theme.apply). Info.plist has no UIUserInterfaceStyle,
+        // which would pin it to light.
+        w.overrideUserInterfaceStyle = Theme.style(Theme.saved.style)
         w.makeKeyAndVisible()
         window = w
         if let u = options.urlContexts.first?.url { Incoming.receive(u) } // F75: launched by a ifizbox:// link
@@ -194,9 +198,8 @@ enum Web {
         w.allowsLinkPreview = false
         // N10: transparent until the page paints, over the window's pinstripes; the same behind the page's edges.
         w.isOpaque = false
-        w.backgroundColor = Launch.pinstripes
-        w.scrollView.backgroundColor = Launch.pinstripes
-        if #available(iOS 15.0, *) { w.underPageBackgroundColor = Launch.pinLight }
+        let systemDark = UIScreen.main.traitCollection.userInterfaceStyle == .dark
+        Launch.paint(w, Theme.launchGround(systemDark: systemDark)) // F198: the dark palette's ground after a dark run
         // The page lays itself out with env(safe-area-inset-*) (viewport-fit=cover) and scrolls inside its own boxes.
         w.scrollView.contentInsetAdjustmentBehavior = .never
         w.scrollView.bounces = false
@@ -255,6 +258,35 @@ enum Launch {
         }
         return UIColor(patternImage: tile)
     }()
+
+    // F198: what each palette paints behind the page (web/app/ios6.css): the pattern for the window and web view,
+    // and a plain colour for underPageBackgroundColor (the overscroll). OLED Black is black, no pinstripe;
+    // Gunmetal is its dark pinstripes (--pin-dark #2b2e33, --pin-light #303338).
+    struct Ground { let pattern: UIColor; let plain: UIColor }
+    static let light = Ground(pattern: pinstripes, plain: pinLight)
+    static let oled = Ground(pattern: .black, plain: .black)
+    static let gunmetal: Ground = {
+        let dark = UIColor(red: 0x2b / 255.0, green: 0x2e / 255.0, blue: 0x33 / 255.0, alpha: 1)
+        let light = UIColor(red: 0x30 / 255.0, green: 0x33 / 255.0, blue: 0x38 / 255.0, alpha: 1)
+        let tile = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 1)).image { ctx in
+            light.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 8, height: 1))
+            dark.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 2.5, height: 1))
+        }
+        return Ground(pattern: UIColor(patternImage: tile), plain: light)
+    }()
+    static func ground(dark: Bool, palette: String) -> Ground {
+        guard dark else { return light }
+        return palette == "gunmetal" ? gunmetal : oled
+    }
+
+    // The web view's backgrounds: behind a page that hasn't painted yet, and behind its edges.
+    static func paint(_ w: WKWebView, _ g: Ground) {
+        w.backgroundColor = g.pattern
+        w.scrollView.backgroundColor = g.pattern
+        if #available(iOS 15.0, *) { w.underPageBackgroundColor = g.plain }
+    }
 
     // The website's launch image for this screen (web/icons/launch/launch-<W>x<H>.png, in device pixels, made by
     // tools/launch_images.py): nav bar titled iFizBox, the pinstripes with Loading, the tab bar with Home selected.

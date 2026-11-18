@@ -1,0 +1,23 @@
+[
+  {"wait": 4000},
+  {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.appearance','dark'); 'ok'"},
+  {"nav": "", "ms": 20000},
+  {"eval": "[document.documentElement.dataset.theme, document.documentElement.dataset.palette, document.querySelector('meta[name=theme-color]').content, getComputedStyle(document.documentElement).backgroundColor, getComputedStyle(document.querySelector('.navbar')).backgroundImage.slice(0,300)].join(' | ')"},
+  {"shot": "oled-home"},
+  {"nav": "#/changes", "ms": 12000},
+  {"shot": "oled-changes"},
+  {"nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance", "ms": 12000},
+  {"shot": "oled-package"},
+  {"eval": "[...document.querySelectorAll('.navbar .bar-button')].map(b=>b.className+':'+b.textContent).join(' / ')"},
+  {"eval": "(()=>{const b=[...document.querySelectorAll('.navbar .bar-button')].filter(b=>b.offsetParent).at(-1); if(!b) return 'none'; b.click(); return b.textContent})()"},
+  {"wait": 2500},
+  {"shot": "oled-tap-install"},
+  {"eval": "(()=>{const b=[...document.querySelectorAll('.action-button')].find(b=>/Install|Sign/.test(b.textContent)); if(!b) return 'none: '+[...document.querySelectorAll('.action-button')].map(b=>b.textContent).join(','); b.click(); return b.textContent})()"},
+  {"wait": 3000},
+  {"shot": "oled-queue"},
+  {"eval": "localStorage.setItem('ifizbox.darkTheme','gunmetal'); 'ok'"},
+  {"nav": "", "ms": 15000},
+  {"shot": "gunmetal-home"},
+  {"nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance", "ms": 12000},
+  {"shot": "gunmetal-package"}
+]

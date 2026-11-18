@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { themeMessage, applyTheme, settings } from "./settings.js";
 
 test("the shell gets the fixed theme, or auto while Appearance is Automatic (F23)", () => {
-  assert.deepEqual(themeMessage("dark", "dark").params, { style: "dark", theme: "dark" });
-  assert.deepEqual(themeMessage("light", "light").params, { style: "light", theme: "light" });
-  assert.deepEqual(themeMessage("auto", "dark").params, { style: "auto", theme: "dark" });
+  assert.deepEqual(themeMessage("dark", "dark").params, { style: "dark", theme: "dark", darkPalette: "oled" });
+  assert.deepEqual(themeMessage("light", "light", "gunmetal").params, { style: "light", theme: "light", darkPalette: "gunmetal" });
+  assert.deepEqual(themeMessage("auto", "dark").params, { style: "auto", theme: "dark", darkPalette: "oled" });
   assert.equal(themeMessage("auto", "light").method, "app.theme");
 });
 
@@ -20,10 +20,11 @@ test("applyTheme posts app.theme to the bridge once per change", () => {
   applyTheme(doc, win);
   applyTheme(doc, win);
   assert.equal(doc.documentElement.dataset.theme, "dark");
-  assert.deepEqual(sent.map((m) => m.params), [{ style: "dark", theme: "dark" }]);
+  assert.equal(doc.documentElement.dataset.palette, "oled"); // F198: OLED Black unless Gunmetal is chosen
+  assert.deepEqual(sent.map((m) => m.params), [{ style: "dark", theme: "dark", darkPalette: "oled" }]);
   settings.set("appearance", "auto");
   applyTheme(doc, win);
-  assert.deepEqual(sent.at(-1).params, { style: "auto", theme: "dark" });
+  assert.deepEqual(sent.at(-1).params, { style: "auto", theme: "dark", darkPalette: "oled" });
   // the site: no handler, no throw
   applyTheme(doc, { matchMedia: () => ({ matches: false }) });
 });

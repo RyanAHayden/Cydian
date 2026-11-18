@@ -27,6 +27,8 @@ import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js"
 import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
 import { renderAltSource, renderApp, installRows, formatDate, osRange, appPageAction, appPageCustom } from "./altstore.js";
+import { linksGroup, previewSlot } from "./altstore.js";
+import { packageLinks, packageGithub, aptShots, sileoShots } from "../core/previews.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { signAndInstall, localSigning } from "../signing-client.js";
 import { installOptions } from "../core/altstore.js";
@@ -562,8 +564,7 @@ async function renderPackage(body, route, key, id, ctx) {
   const depictionSlot = el("div", "depiction-slot");
   const more = [];
   if (html) more.push({ label: "Depiction", onClick: () => openHtmlDepiction(html, name) });
-  const homepage = httpUrl(st.homepage);
-  if (homepage) more.push({ label: "More Information", subtitle: homepage, onClick: () => window.open(homepage, "_blank", "noopener") });
+  // F122: Homepage: (More Information before) is the Links group's Developer Website now.
   const descText = desc.long || desc.short;
 
   // Details.
@@ -615,7 +616,27 @@ async function renderPackage(body, route, key, id, ctx) {
     g.append(t);
     body.append(g);
   }
+  // F122: the gallery (Screenshots:/Header:, a Sileo depiction's screenshots, else the HTML depiction's pictures or
+  // the GitHub repo's) and the Links group (the source, Homepage:, GitHub, a Sileo depiction's buttons).
+  const previews = el("div", "package-previews");
+  body.append(previews);
   if (more.length) body.append(grouped([{ rows: more.map((r) => ({ ...r, chevron: true })) }]));
+  const sourceLink = pkg.installedOnly ? null : { label: sourceName || "Unknown Source", subtitle: source?.uri,
+    href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) };
+  const links = el("div", "package-links");
+  const drawLinks = (json) => {
+    const list = packageLinks(st, json);
+    links.replaceChildren(...(sourceLink || list.length ? [linksGroup(sourceLink, list)] : []));
+  };
+  drawLinks(null);
+  body.append(links);
+  const previewKey = `pkg:${pkg.key ?? "installed"}:${st.package || id}`;
+  const drawPreviews = (json) => previews.replaceChildren(previewSlot(previewKey, {
+    shots: [...aptShots(st), ...(json ? sileoShots(json) : [])],
+    html: sileo ? null : html,
+    gh: packageGithub(st, json),
+  }));
+  if (!sileo) drawPreviews(null);
   body.append(grouped([{ header: "Details", rows: details }]));
   // F29: Version History, every version the sources offer (Downgrade's list); and Modify once it's installed.
   const history = await catalog.history(id, key).catch(() => null);
@@ -647,7 +668,15 @@ async function renderPackage(body, route, key, id, ctx) {
   }
   body.append(grouped([{ footer: `${st.package}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
 
-  if (sileo) loadSileo(depictionSlot, sileo, { fallback: descText });
+  if (sileo) {
+    loadSileo(depictionSlot, sileo, { fallback: descText }).then((json) => {
+      if (!previews.isConnected) return;
+      // The gallery shows the depiction's screenshots (F122), so its own strip goes.
+      if (json && sileoShots(json).length) for (const strip of depictionSlot.querySelectorAll(".dep-shots")) strip.remove();
+      drawLinks(json);
+      drawPreviews(json);
+    });
+  }
 }
 
 // ---- Install / Modify and Version History (F29) ------------------------------------------------------------
@@ -1005,6 +1034,7 @@ async function loadSileo(slot, url, { fallback }) {
     t.append(dep);
     g.append(t);
     slot.replaceChildren(g);
+    return json; // F122: its screenshots and links go to the gallery and the Links group
   } catch {
     // A dead or broken JSON depiction: show the description instead, as if there were none.
     slot.replaceChildren();
@@ -1015,6 +1045,7 @@ async function loadSileo(slot, url, { fallback }) {
       g.append(t);
       slot.append(g);
     }
+    return null;
   }
 }
 

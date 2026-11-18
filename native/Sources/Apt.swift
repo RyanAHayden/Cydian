@@ -51,6 +51,8 @@ enum Apt {
         b.on("apt.dpkgStatus") { c in work(c) { () throws -> Any? in readText(Jailbreak.path("/var/lib/dpkg/status")) } }
         // F104: when each package was installed or last upgraded, as Installed's Recent sort needs it.
         b.on("apt.installDates") { c in work(c) { () throws -> Any? in installDates() } }
+        // F130: the packages apt marked as installed only to satisfy another's dependency, for Installed's User mode.
+        b.on("apt.autoInstalled") { c in work(c) { () throws -> Any? in autoInstalled() } }
         b.on("net.fetch") { c in
             guard let url = httpURL(c.params["url"]) else { return reply(c, nil, "bad_url: not an http(s) URL") }
             get(url) { res in
@@ -121,6 +123,24 @@ enum Apt {
             out[pkg] = max(out[pkg] ?? 0, date.timeIntervalSince1970.rounded())
         }
         return out
+    }
+
+    // F130: the names /var/lib/apt/extended_states marks `Auto-Installed: 1` (apt-mark auto), sorted; nil when the
+    // file can't be read (apt never marked anything), so the page keeps its dependency guess.
+    static func autoInstalled() -> [String]? {
+        guard let text = readText(Jailbreak.path("/var/lib/apt/extended_states")) else { return nil }
+        var out = Set<String>()
+        for stanza in text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n\n") {
+            var pkg = "", auto = false
+            for line in stanza.split(separator: "\n") {
+                guard let colon = line.firstIndex(of: ":") else { continue }
+                let key = line[..<colon].trimmingCharacters(in: .whitespaces).lowercased()
+                let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+                if key == "package" { pkg = value } else if key == "auto-installed" { auto = value == "1" }
+            }
+            if auto && !pkg.isEmpty { out.insert(pkg) }
+        }
+        return out.sorted()
     }
 
     static func readText(_ path: String) -> String? {

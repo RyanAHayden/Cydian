@@ -1,5 +1,5 @@
 """I6: the on-device signer (native/sign/), built for Linux with the Swift toolchain and run against throwaway signing
-material from web/signer/testkit.py. The Swift tests (native/sign/tests/main.swift) sign a fixture IPA and check
+material from native/testkit.py. The Swift tests (native/sign/tests/main.swift) sign a fixture IPA and check
 the signatures with openssl; this file makes the fixtures, runs them, and then checks the signed IPA once more with
 its own Python reading (DER entitlements, CodeResources against the files). Without a Swift toolchain
 (SWIFT_TOOLCHAIN, or swiftc on PATH) the tests skip and say so."""
@@ -17,7 +17,7 @@ import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-sys.path.insert(0, os.path.join(ROOT, "web"))
+sys.path.insert(0, HERE)
 
 
 def toolchain():
@@ -30,11 +30,13 @@ def toolchain():
 
 SWIFTC = toolchain()
 OPENSSL = shutil.which("openssl")
+MISSING = ""
 try:
-    from signer import testkit as T  # noqa: E402  (needs `cryptography`, from web/requirements.txt)
+    import testkit as T  # noqa: E402  (native/testkit.py; needs `cryptography`)
     from cryptography.hazmat.primitives import serialization
-except ImportError:  # pragma: no cover
+except ImportError as e:  # pragma: no cover
     T = None
+    MISSING = f"{e} (pip install cryptography for {sys.executable})"
 
 A = "Payload/Fixture.app/"
 
@@ -171,7 +173,7 @@ def slots(binary):
     return out
 
 
-@unittest.skipUnless(T, "cryptography not installed: the signer's fixtures can't be made")
+@unittest.skipUnless(T, f"the signer's fixtures can't be made: {MISSING}")
 @unittest.skipUnless(SWIFTC, "no Swift toolchain (SWIFT_TOOLCHAIN or swiftc on PATH): native/sign/ not tested")
 @unittest.skipUnless(OPENSSL, "openssl not on PATH: signatures can't be checked")
 class OnDeviceSigner(unittest.TestCase):

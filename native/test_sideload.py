@@ -2,7 +2,7 @@
 native/sign/ by the Swift toolchain, as native/test_sign.py builds it) checks the profile kinds, the user's edits
 (name, bundle ID across extensions, icon, extensions left out), the arm64e fix-up, the IPA inspector (entitlements,
 permissions, extensions, icon), the OCSP request and answers, the re-sign reminder and the record of signed apps.
-This file makes the fixtures (web/signer/testkit.py's throwaway CA, cryptography's OCSP builder), runs it, and reads
+This file makes the fixtures (native/testkit.py's throwaway CA, cryptography's OCSP builder), runs it, and reads
 what Swift wrote: the signed IPA, and the OCSP request. Without a Swift toolchain it skips and says so."""
 import datetime as dt
 import io
@@ -18,16 +18,16 @@ import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.join(os.path.dirname(HERE), "web"))
 
-from test_sign import SWIFTC, OPENSSL, T, macho, info, slots  # noqa: E402
+from test_sign import MISSING, SWIFTC, OPENSSL, T, macho, info, slots  # noqa: E402
 
 try:
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.x509 import ocsp
-except ImportError:  # pragma: no cover
+except ImportError as e:  # pragma: no cover
     x509 = None
+    MISSING = f"{e} (pip install cryptography for {sys.executable})"
 
 A = "Payload/Fixture.app/"
 PNG = b"\x89PNG\r\n\x1a\n" + b"\0\0\0\rIHDR" + b"\0" * 17 + b"fake icon"
@@ -98,7 +98,7 @@ def cd_identifier(blob):
     return blob[off:blob.index(b"\0", off)].decode()
 
 
-@unittest.skipUnless(T and x509, "cryptography not installed: the fixtures can't be made")
+@unittest.skipUnless(T and x509, f"the fixtures can't be made: {MISSING}")
 @unittest.skipUnless(SWIFTC, "no Swift toolchain (SWIFT_TOOLCHAIN or swiftc on PATH): native/sign/ F14 parts not tested")
 @unittest.skipUnless(OPENSSL, "openssl not on PATH")
 class Sideload(unittest.TestCase):

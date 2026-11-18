@@ -11,7 +11,7 @@
 //      bridge as they come, the status fd's steps in bold white, dpkg's own output in monospace, errors in red, a
 //      progress bar, then the finish button (core/progress.js chooseFinish): Restart SpringBoard when a changed
 //      package is a tweak, Reload Data (uicache) for an app, or what a script asked ($CYDIA's finish: words, up to
-//      Reboot Device), else Return to iFizBox. The run's output is
+//      Reboot Device), else Close iFizBox. The run's output is
 //      kept (queue.js runLogs) for Settings > Console Logs (logsPage below). A conffile changed by both the user and
 //      the package opens Cydia's Configuration Upgrade alert (F63): Keep My Old Copy or Accept The New Copy, sent
 //      back to dpkg through backend.answerConffile while the run waits. While apt is still downloading (no dpkg

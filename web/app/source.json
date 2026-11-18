@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.1.7",
+          "date": "2026-11-18T02:08:32Z",
+          "localizedDescription": "Signing and installing end on a Done checkmark that fades, so it is clear the app was handed to iOS.\nThe Signing walkthrough moves to the next step by itself when you come back from Settings.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.7",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.7/Cydian.ipa",
+          "size": 2496201,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.6",
           "date": "2026-11-18T02:05:47Z",
           "localizedDescription": "The app opens on Home loading (title, the Loading spinner, the tab bar), like Cydia, instead of a black screen.\nInstalls in the app: the manifest request gets past the server proxy (0.1.5), and Cydian's built-in source names the newest version.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.6",

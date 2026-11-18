@@ -309,7 +309,8 @@ document.getElementById("boot")?.remove(); // the first page is drawn: the loadi
 if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.
-if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch")) getBackend().refreshSources(undefined, { filter: sourceFilter(settingsScreen.settings.deviceType()) }).catch(() => {});
+// Refresh on Launch: in the background, with the Sources tab's spinning red badge (screens/sources.js).
+if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch")) SCREENS.sources.refreshInBackground?.(ctx);
 
 // F72: in the app, once the launch has settled, the Essential Upgrade alert when Cydian (or, jailbroken, apt, dpkg or
 // another Essential: yes package) has an upgrade on Cydian's built-in source. It replaces F61's own popup: only when

@@ -22,11 +22,16 @@ export function showBanner({ title = "Cydian", message = "", icon = "icons/icon-
   b.append(img, text);
   document.body.append(b);
   b.animate([{ transform: "translateY(-100%)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
+  // The nav bar and the page slide down by the banner's height while it shows, so it covers no buttons.
+  const root = document.documentElement;
+  root.style.setProperty("--banner-h", `${Math.round(b.getBoundingClientRect().height - (parseFloat(getComputedStyle(b).paddingTop) - 6))}px`);
+  root.classList.add("has-banner");
   let gone = false;
   const hide = () => {
     if (gone) return;
     gone = true;
     if (current === hide) current = null;
+    document.documentElement.classList.remove("has-banner");
     const a = b.animate([{ transform: "none" }, { transform: "translateY(-100%)" }], { duration: 250, easing: "ease-in", fill: "forwards" });
     a.finished.then(() => b.remove(), () => b.remove());
   };

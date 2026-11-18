@@ -144,6 +144,26 @@ function clearLoading(ctx) {
   for (const li of document.querySelectorAll(".source-row.is-loading")) li.classList.remove("is-loading");
 }
 
+// At launch (app.js, Settings > Refresh on Launch): every source the device type shows, behind whatever page is
+// open, with the Sources tab's red spinning badge and the rows spinning if Sources is on screen. No HUD.
+export async function refreshInBackground(ctx) {
+  if (state.busy) return;
+  state.busy = true;
+  try {
+    state.sources = await getBackend().sources();
+    const filter = sourceFilter(settings.deviceType());
+    const onEach = markLoading(ctx, state.sources.filter(filter ?? (() => true)).map((x) => x.key));
+    await getBackend().refreshSources(onEach, { filter });
+    state.sources = await getBackend().sources();
+    if (state.box?.isConnected) draw();
+  } catch {
+    // a failed refresh shows per source (its row) once it has failed
+  } finally {
+    clearLoading(ctx);
+    state.busy = false;
+  }
+}
+
 // The HUD stays exactly as long as the loading, then a second more before its usual fade.
 const linger = (hide) => setTimeout(hide, 1000);
 

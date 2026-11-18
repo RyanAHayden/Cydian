@@ -6,9 +6,9 @@
 #   1. checks: on main, no uncommitted changes, up to date with origin, X.Y.Z newer than the last v* tag
 #   2. writes native/VERSION, commits "Version X.Y.Z" and pushes it
 #   3. builds that commit in a clean temporary worktree and publishes it with tools/release.sh: tag vX.Y.Z,
-#      Cydian.ipa, the .debs and iFizBox's own APT repo, as the repo owner's GitHub account
+#      iFizBox.ipa, the .debs and iFizBox's own APT repo, as the repo owner's GitHub account
 #   4. commits the updated AltStore source (web/app/source.json, the built-in source) and pushes it
-#   5. checks that releases/latest/download/Cydian.ipa is X.Y.Z
+#   5. checks that releases/latest/download/iFizBox.ipa is X.Y.Z
 #
 # Needs SWIFT_TOOLCHAIN and IOS_SDK in the environment (the native build: native/README.md) and gh logged in to the
 # repo owner's account. --dry-run builds and prints what would be published, and changes nothing.
@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
     *) die "unknown option $1" ;;
   esac
 done
-repo="${CYDIAN_RELEASE_REPO:-RyanAHayden/iFizBox}"
+repo="${IFIZBOX_RELEASE_REPO:-RyanAHayden/iFizBox}"
 owner="${repo%%/*}"
 
 # 1. checks
@@ -74,9 +74,9 @@ if ! git diff --quiet web/app/source.json; then
 fi
 
 # 5. what the app and the site will download now
-got=$(curl -fsSL "https://github.com/$repo/releases/latest/download/Cydian.ipa" | python3 -c '
+got=$(curl -fsSL "https://github.com/$repo/releases/latest/download/iFizBox.ipa" | python3 -c '
 import io, plistlib, sys, zipfile
 z = zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read()))
 print(plistlib.loads(z.read(next(n for n in z.namelist() if n.endswith(".app/Info.plist"))))["CFBundleShortVersionString"])')
-[ "$got" = "$version" ] || die "latest/download/Cydian.ipa is $got, not $version"
+[ "$got" = "$version" ] || die "latest/download/iFizBox.ipa is $got, not $version"
 echo "publish: $BRAND_NAME $version is out: https://github.com/$repo/releases/tag/v$version"

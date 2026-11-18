@@ -1,4 +1,4 @@
-/* F59: cydian-helper install-ipa <path>: install an IPA the app downloaded, as AppSync's appinst does
+/* F59: ifizbox-helper install-ipa <path>: install an IPA the app downloaded, as AppSync's appinst does
  * (docs/sideload.md, "How jailbreak installers do it"): [[LSApplicationWorkspace defaultWorkspace]
  * installApplication:withOptions:error:] with appinst's entitlements on the helper (helper/entitlements.plist).
  *
@@ -64,7 +64,7 @@ static int run_as(uid_t uid, gid_t gid, const char *cwd, char *const env[], cons
         if (getuid() == 0 && uid != 0) _exit(126); /* never extract or sign as root */
         if (chdir(cwd)) _exit(126);
         execve(argv[0], (char *const *)argv, env);
-        fprintf(stderr, "cydian-helper: %s: %s\n", argv[0], strerror(errno));
+        fprintf(stderr, "ifizbox-helper: %s: %s\n", argv[0], strerror(errno));
         _exit(126);
     }
     int st;
@@ -291,7 +291,7 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
     if (helper_ipa_appsync(prefix)) {
         progress(id, 50, "Installing (AppSync Unified)");
         if (install(copy, id, 0, why, sizeof why)) {
-            fprintf(stderr, "cydian-helper: installd: %s\n", why);
+            fprintf(stderr, "ifizbox-helper: installd: %s\n", why);
             *err = "installd refused the app";
             return 1;
         }
@@ -309,7 +309,7 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
         if (rc) { *err = "ldid couldn't sign the app ad hoc"; return HELPER_EX_ADHOC; }
         progress(id, 60, "Installing (ad hoc signed)");
         if (install(app, id, 1, why, sizeof why)) {
-            fprintf(stderr, "cydian-helper: installd: %s\n", why);
+            fprintf(stderr, "ifizbox-helper: installd: %s\n", why);
             *err = "installd refused the ad hoc signed app: this jailbreak can't install ad hoc apps without AppSync "
                    "Unified. Install AppSync Unified, or sign the IPA for this iPhone first";
             return HELPER_EX_ADHOC;
@@ -323,7 +323,7 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
 int helper_install_ipa(const char *prefix, const char *ipa, int fd3, char *const env[], const char **err) {
     status_fd = fd3;
     char work[PATH_MAX];
-    if ((size_t)snprintf(work, sizeof work, "%s/cydian-ipa.XXXXXX", HELPER_IPA_WORK) >= sizeof work)
+    if ((size_t)snprintf(work, sizeof work, "%s/ifizbox-ipa.XXXXXX", HELPER_IPA_WORK) >= sizeof work)
         return fail(err, "work path too long");
     if (!mkdtemp(work)) return fail(err, "can't make a work directory");
     chmod(work, 0755); /* installd reads the copy; nobody else may write here */

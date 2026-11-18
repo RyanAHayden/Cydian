@@ -1,6 +1,6 @@
 // N9: a .deb shared with iFizBox (jailbreak build): the Confirm sheet for that one file, then the console. The shell
-// staged the file where cydian-helper takes it (native/share/App/ShareBridge.swift); share.debSimulate is
-// `apt-get -s install ./file.deb` (cydian-helper simulate-deb), so the sheet lists every package apt would change,
+// staged the file where ifizbox-helper takes it (native/share/App/ShareBridge.swift); share.debSimulate is
+// `apt-get -s install ./file.deb` (ifizbox-helper simulate-deb), so the sheet lists every package apt would change,
 // its dependencies resolved from the sources, like the install queue's (screens/queue.js); Confirm runs
 // share.debInstall (install-deb) in the same console (runPaidInstall's: outside the queue, kept in Console Logs).
 // Cancel removes the staged file. When apt says no, F18's sentences come first, then apt's own words.
@@ -15,7 +15,7 @@ import { NAME } from "../brand.js";
 const call = (native, method, params, onEvent) => native.call(`share.${method}`, params, onEvent);
 
 // { file: the staged name, name: what the user knows it as }. Resolves once the sheet (and any console) is done.
-export async function openDebConfirm({ file, name = "" }, { native = globalThis.cydianNative } = {}) {
+export async function openDebConfirm({ file, name = "" }, { native = globalThis.ifizboxNative } = {}) {
   const cancel = barButton("Cancel");
   const ok = barButton("Confirm", "done");
   ok.hidden = true;

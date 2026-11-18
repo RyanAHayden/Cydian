@@ -22,7 +22,7 @@ function box(cls, { top = 0, shown = true, attrs = {}, kids = [] } = {}) {
 const docWith = (...dialogs) => box("doc", { kids: dialogs });
 const win = { matchMedia: () => ({ matches: false }) };
 
-test("cydianScrollToTop glides the top page's body to the top", () => {
+test("ifizboxScrollToTop glides the top page's body to the top", () => {
   const body = box("page-body", { top: 787 });
   const scroll = makeScrollToTop(docWith(), () => body, win);
   assert.equal(scroll(), true);
@@ -69,15 +69,15 @@ test("the last open dialog wins; a hidden one is skipped", () => {
   assert.equal(statusBarTarget(docWith(first, second, gone), null), b);
 });
 
-test("app.js hands the native shell cydianScrollToTop for the top page", () => {
+test("app.js hands the native shell ifizboxScrollToTop for the top page", () => {
   const src = readFileSync(new URL("../app.js", import.meta.url), "utf8");
-  assert.match(src, /globalThis\.cydianScrollToTop = makeScrollToTop\(document, \(\) => stacks\.top\(\)\?\.page\.body\)/);
+  assert.match(src, /globalThis\.ifizboxScrollToTop = makeScrollToTop\(document, \(\) => stacks\.top\(\)\?\.page\.body\)/);
 });
 
-test("the native shell sends the status bar tap to cydianScrollToTop", () => {
+test("the native shell sends the status bar tap to ifizboxScrollToTop", () => {
   const swift = readFileSync(new URL("../../../native/Sources/StatusBarTap.swift", import.meta.url), "utf8");
   assert.match(swift, /scrollViewShouldScrollToTop/);
-  assert.match(swift, /cydianScrollToTop/);
+  assert.match(swift, /ifizboxScrollToTop/);
   const app = readFileSync(new URL("../../../native/Sources/App.swift", import.meta.url), "utf8");
   assert.match(app, /StatusBarTap\.attach\(to: w\)/);
 });

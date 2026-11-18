@@ -4,8 +4,9 @@
 // name here and in brand.env, then run `python3 native/brand.py sync` for the files that can't import it
 // (native/sign/Brand.swift, index.html, manifest.json, source.json).
 //
-// F170 wires NAME everywhere a person reads it. The IDs, package name and storage keys move in F171, the domain
-// and GitHub repo in F172: until then code that needs those still spells the old ones.
+// F170 wired NAME everywhere a person reads it; F171 moved the IDs, package name, storage keys and paths to the
+// lowercase name (com.ryha.ifizbox, ifizbox.*, IFIZBOX_*; native/test_brand.py: every com.ryha ID is BUNDLE_ID or a
+// suffix of it, and no file says the old name). The domain and GitHub repo move in F172.
 
 export const NAME = "iFizBox";
 export const DOMAIN = "ifizbox.com";

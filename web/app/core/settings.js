@@ -4,7 +4,7 @@
 //
 //   const s = createSettings({ mode: detectMode() });
 //   s.get("appearance");            // "auto" | "light" | "dark" (light unless chosen: iOS 6 was light)
-//   s.set("appearance", "dark");    // stored at localStorage["cydian.appearance"], listeners told
+//   s.set("appearance", "dark");    // stored at localStorage["ifizbox.appearance"], listeners told
 //   s.onChange((key, value) => …);  // returns an unsubscribe function
 //   s.sections();                   // [{ id, page, title, footer, settings: [def…] }], only the rows this mode shows
 //   s.pages();                      // [{ id, title, sections }]: Settings' root rows (General, Display, Updates…)
@@ -14,9 +14,9 @@
 //   s.hiddenAuthors.set("Jane Doe", true);  // Hide by Author (F104): listeners hear ("hiddenAuthors", list)
 //   s.autoMarked.set("com.example.tweak", true); // Update Automatically, for Only Packages I Mark (F70)
 //   s.recentSearches.add("snowboard");      // Search's Recent table (F100): last 5, newest first
-//   s.daemonPrefs();                         // { "cydian.autoInstall": "marked", … } for N7's daemon (F70)
+//   s.daemonPrefs();                         // { "ifizbox.autoInstall": "marked", … } for N7's daemon (F70)
 //
-// Every value is stored as a string under `cydian.<key>`, so backend.js getArch() keeps reading `cydian.arch`.
+// Every value is stored as a string under `ifizbox.<key>`, so backend.js getArch() keeps reading `ifizbox.arch`.
 // A stored value that is not one of the setting's options reads as the default (a hand-edited or older value
 // never breaks the app).
 //
@@ -100,7 +100,7 @@ export const SETTINGS = [
     footer: "Jailbroken also lists tweaks and themes from APT sources, built for its architecture.",
   },
   {
-    // The architecture APT packages are listed for, kept for backend.js getArch() (`cydian.arch`). No row of its
+    // The architecture APT packages are listed for, kept for backend.js getArch() (`ifizbox.arch`). No row of its
     // own since F37: Device sets it on the site, the bridge in the jailbreak app.
     key: "arch", section: "sources", kind: "list", feature: "sources", modes: [], default: DEFAULT_ARCH,
     label: "Architecture",
@@ -142,8 +142,8 @@ export const SETTINGS = [
       : `Kept on this device, and synced by a ${NAME} Account.`,
   },
   {
-    // F65: N5's background check (native/daemon/) posts "3 Upgrades". Off: `cydian-helper notifications off` writes
-    // /var/jb/var/lib/cydian/upgrades.off and the daemon only updates the icon's count (daemon/quiet.h).
+    // F65: N5's background check (native/daemon/) posts "3 Upgrades". Off: `ifizbox-helper notifications off` writes
+    // /var/jb/var/lib/ifizbox/upgrades.off and the daemon only updates the icon's count (daemon/quiet.h).
     key: "upgradeNotifications", section: "notifications", kind: "toggle", feature: "upgrade-notifications",
     modes: ["jailbreak"], default: true, label: "Upgrade Notifications", options: onOff,
     footer: `Off, ${NAME}'s icon still shows how many upgrades there are.`,
@@ -186,7 +186,7 @@ export const SETTINGS = [
   },
 ];
 
-const PREFIX = "cydian.";
+const PREFIX = "ifizbox.";
 const HOLDS_KEY = PREFIX + "holds";
 const HIDDEN_SECTIONS_KEY = PREFIX + "hiddenSections";
 const AUTO_MARKED_KEY = PREFIX + "autoMarked";
@@ -204,7 +204,7 @@ export function addRecent(list, query, max = RECENT_MAX) {
 }
 
 // F70: what N7's daemon (native/daemon/README.md "Automatic updates (N7)") reads from the app's preferences
-// (com.ryha.cydian), by the same `cydian.<key>` names: these settings, and the lists in DAEMON_LISTS.
+// (com.ryha.ifizbox), by the same `ifizbox.<key>` names: these settings, and the lists in DAEMON_LISTS.
 // F75: the settings that move with the user from the website to the app (Open in iFizBox App, core/transfer.js):
 // appearance, device, the compat options; Ignored Upgrades (holds) and the Signing Server travel beside them. The
 // app takes only those it shows itself (settings.isShown).
@@ -220,7 +220,7 @@ for (const a of ARCHES) if (!byKey.get("device").options.some((o) => o.value ===
 // F37: the device types. "none" is an iPhone without a jailbreak; the others are the APT architecture it installs.
 export const NOT_JAILBROKEN = "none";
 
-// The jailbreak app's type from its bridge: `cydianNative.arch` (one of ARCHES) or `cydianNative.jailbreak`
+// The jailbreak app's type from its bridge: `ifizboxNative.arch` (one of ARCHES) or `ifizboxNative.jailbreak`
 // ("rootless" | "rootful" | "roothide", also what Bridge.swift app.info reports, F38), whichever the shell
 // detected; null when it says neither (or "none").
 export function bridgeArch(native) {
@@ -228,10 +228,10 @@ export function bridgeArch(native) {
   return JAILBREAK_ARCH[native?.jailbreak] ?? null;
 }
 
-// The mode: the app's bridge says which build is running (I2 sets `cydianNative.mode`); a bridge without one is
+// The mode: the app's bridge says which build is running (I2 sets `ifizboxNative.mode`); a bridge without one is
 // the N1 jailbreak shell; no bridge is the site.
 export function detectMode(g = globalThis) {
-  const n = g.cydianNative;
+  const n = g.ifizboxNative;
   if (!n) return "site";
   return MODES.includes(n.mode) && n.mode !== "site" ? n.mode : "jailbreak";
 }
@@ -271,8 +271,8 @@ export function dropRetired(storage = globalThis.localStorage) {
   return gone;
 }
 
-// `helper` (jailbreak mode only): runs cydian-helper with the given words and resolves to { code, stdout }, e.g.
-// helper(["hold", "com.foo"]). The app's bridge provides it as `cydianNative.helper` (N3); without one the holds
+// `helper` (jailbreak mode only): runs ifizbox-helper with the given words and resolves to { code, stdout }, e.g.
+// helper(["hold", "com.foo"]). The app's bridge provides it as `ifizboxNative.helper` (N3); without one the holds
 // stay a list on the device, as in the other modes.
 // `native` (jailbreak mode): the bridge, for the detected jailbreak type (bridgeArch).
 export function createSettings({ storage = globalThis.localStorage, mode = "site", features = FEATURES, helper, native = null } = {}) {
@@ -340,12 +340,12 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
   const dpkg = mode === "jailbreak" && typeof helper === "function" ? helper : null;
   async function run(words) {
     const r = await dpkg(words);
-    if (!r || r.code !== 0) throw new Error(`cydian-helper ${words[0]} failed (exit ${r?.code})`);
+    if (!r || r.code !== 0) throw new Error(`ifizbox-helper ${words[0]} failed (exit ${r?.code})`);
     return r;
   }
 
   // Ignore upgrades, per package, on the device. In jailbreak mode with a helper the real hold is dpkg's
-  // (apt-mark hold/unhold through cydian-helper, F22); this list is then the cache the row shows, set at once and
+  // (apt-mark hold/unhold through ifizbox-helper, F22); this list is then the cache the row shows, set at once and
   // put right by `sync()` (apt-mark showhold) when the helper fails or something else changed the holds.
   const holds = {
     list: () => readHolds().sort(),
@@ -380,7 +380,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     },
   };
 
-  // F65: Upgrade Notifications reaches N5's daemon as a file only root can write: `cydian-helper notifications
+  // F65: Upgrade Notifications reaches N5's daemon as a file only root can write: `ifizbox-helper notifications
   // on|off`. set() runs it on every change; sync() also runs it at launch (web/app/settings.js) when the switch is
   // off, so a phone whose file went missing (a reinstall of the .deb) is quiet again. Resolves to true once the
   // helper has done it (at once, without a helper); when it fails, the switch goes back to `undo` (listeners told)
@@ -498,7 +498,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     clear: () => writeRecent([]),
   };
 
-  // F70: the daemon's preferences, { "cydian.<key>": value }: string, bool or number as get() gives them, the lists
+  // F70: the daemon's preferences, { "ifizbox.<key>": value }: string, bool or number as get() gives them, the lists
   // as arrays of package ids. A setting nobody has picked is null (the shell removes the key), so the daemon keeps
   // its own default.
   // `keys`: only these (a setting's key or a list's name), for one change.

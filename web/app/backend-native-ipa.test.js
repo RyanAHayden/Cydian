@@ -1,5 +1,5 @@
 // F59: the jailbreak build's ipa.install bridge call (native/Sources/Apt.swift IPAInstall) against the fake bridge and
-// fake helper (native/fake/): download into the helper's one IPA directory, cydian-helper install-ipa, the download
+// fake helper (native/fake/): download into the helper's one IPA directory, ifizbox-helper install-ipa, the download
 // removed afterwards, and the error codes the helper's exits turn into (no_adhoc when the jailbreak can't install ad
 // hoc apps). The real helper's side is native/helper/test_helper.py's InstallIpa.
 import { test } from "node:test";
@@ -117,6 +117,6 @@ test("the fake helper keeps the real one's path allowlist for install-ipa", asyn
   ]) {
     const r = await native.helper(words);
     assert.equal(r.code, 64, words.join(" "));
-    assert.match(r.stderr, new RegExp(`cydian-helper: ${msg}`));
+    assert.match(r.stderr, new RegExp(`ifizbox-helper: ${msg}`));
   }
 });

@@ -7,7 +7,7 @@
 +#ifdef __EMSCRIPTEN__
 +		// Emscripten writes a MAP_SHARED mapping back to the file at munmap through the mapping's fd, so it must
 +		// stay open until then: closed here, munmap wrote the signed Mach-O to whatever file reused the fd (or
-+		// nowhere) and the app kept its old signature (Cydian, website signing, 2026-11-18).
++		// nowhere) and the app kept its old signature (iFizBox, website signing, 2026-11-18).
 +		if (NULL != base) {
 +			s_mapFiles[base] = (void*)(intptr_t)fd;
 +		} else {

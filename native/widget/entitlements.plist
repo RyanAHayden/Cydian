@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- N8: the jailbreak build's widget extension. The App Group the app writes the count into; and, as the app's own
-     entitlements, what lets Controls.swift spawn cydian-helper as root and the widget read N5's state under /var/jb. -->
+     entitlements, what lets Controls.swift spawn ifizbox-helper as root and the widget read N5's state under /var/jb. -->
 <plist version="1.0">
 <dict>
-	<key>application-identifier</key><string>com.ryha.cydian.widget</string>
-	<key>com.apple.security.application-groups</key><array><string>group.com.ryha.cydian</string></array>
+	<key>application-identifier</key><string>com.ryha.ifizbox.widget</string>
+	<key>com.apple.security.application-groups</key><array><string>group.com.ryha.ifizbox</string></array>
 	<key>platform-application</key><true/>
 	<key>com.apple.private.security.no-sandbox</key><true/>
 	<key>com.apple.private.persona-mgmt</key><true/>

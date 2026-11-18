@@ -7,7 +7,7 @@
 //                             Certificate switch, Show Account Key, Delete Account
 //   startAccountSync()        once at start: read on launch; save when the app goes to the background or the page is
 //                             hidden, only if something changed (the free tier's 1,000 writes a day)
-//   signInFromLink(url)       cydian://account?k=… (incoming.js): Sign In With Key, filled in
+//   signInFromLink(url)       ifizbox://account?k=… (incoming.js): Sign In With Key, filled in
 //   accountSync()             the controller, wired to this build's stores
 //
 // Where things live: the key in the Keychain in the app (account.key.* in native/Sources/Account.swift; IndexedDB in
@@ -31,11 +31,11 @@ import { loadIdentity, saveIdentity } from "../signing-client.js";
 import { settings, createSwitch } from "./settings.js";
 import { NAME } from "../brand.js";
 
-const STATE_KEY = "cydian.account";
+const STATE_KEY = "ifizbox.account";
 
 // ---- where the key lives ----------------------------------------------------------------------------------------
 
-function idbKeys(name = "cydian-account") {
+function idbKeys(name = "ifizbox-account") {
   const run = (mode, f) => new Promise((resolve, reject) => {
     const req = indexedDB.open(name, 1);
     req.onupgradeneeded = () => req.result.createObjectStore("kv");
@@ -56,7 +56,7 @@ function idbKeys(name = "cydian-account") {
 }
 
 // The app's Keychain (no Face ID: the key is read at every launch), or IndexedDB in a shell without account.key.*.
-export function keyStore(native = globalThis.cydianNative) {
+export function keyStore(native = globalThis.ifizboxNative) {
   const idb = idbKeys();
   if (!native?.call) return idb;
   let old = false;
@@ -85,7 +85,7 @@ export const sourceLine = (line) => (/^https?:\/\/[^/\s]+$/i.test(line) ? line +
 
 const certBuild = (mode = detectMode()) => mode === "site" || mode === "sideload";
 
-export async function collectHere({ syncCert = true, backend = getBackend(), store = settings, native = globalThis.cydianNative,
+export async function collectHere({ syncCert = true, backend = getBackend(), store = settings, native = globalThis.ifizboxNative,
   mode = detectMode(), appStore = apps, load = loadIdentity, wishes = createWishlist() } = {}) {
   const sources = (await backend.sources().catch(() => [])).filter((s) => s?.uri).map((s) => sourceLine(exportLine(s)));
   const values = {};
@@ -110,7 +110,7 @@ export async function collectHere({ syncCert = true, backend = getBackend(), sto
 }
 const b64toUrl = (b64) => String(b64).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-export async function applyHere(c, { backend = getBackend(), store = settings, native = globalThis.cydianNative, mode = detectMode(),
+export async function applyHere(c, { backend = getBackend(), store = settings, native = globalThis.ifizboxNative, mode = detectMode(),
   appStore = apps, wishes = createWishlist() } = {}) {
   if (c.removeSources.length) {
     const have = await backend.sources().catch(() => []);
@@ -265,7 +265,7 @@ async function createFlow(el) {
 }
 
 async function signInFlow(el, prefill = "") {
-  const { index, value } = await showAlert({ title: "Sign In With Key", message: "Your account key, or the cydian://account link you saved.",
+  const { index, value } = await showAlert({ title: "Sign In With Key", message: "Your account key, or the ifizbox://account link you saved.",
     input: { placeholder: "XXXX-XXXX-XXXX-…", value: prefill, paste: true }, buttons: ["Cancel", "Sign In"], cancel: 0 });
   if (index !== 1) return;
   const hide = showHUD("Signing In");
@@ -301,7 +301,7 @@ async function deleteFlow(el) {
   await drawAccount(el);
 }
 
-// cydian://account?k=… : the Account page, and Sign In With Key filled in.
+// ifizbox://account?k=… : the Account page, and Sign In With Key filled in.
 export async function signInFromLink(url, { open = (hash) => { location.hash = hash.replace(/^#/, ""); } } = {}) {
   const bytes = parseKey(url);
   open(format(settingsRoute(["account"])));

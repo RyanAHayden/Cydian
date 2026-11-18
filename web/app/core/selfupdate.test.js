@@ -17,10 +17,10 @@ const GH = {
   html_url: "https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.0",
   body: "## What's new\n\n- **Updates itself**: a row in Changes when a release is out\n- Settings shows the version\n\n![shot](x.png)\n* Fixes [#3](https://x)\n1. Line four\n- Line five",
   assets: [
-    { name: "Cydian.ipa", browser_download_url: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.0/Cydian.ipa" },
-    { name: "Cydian.deb", browser_download_url: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.0/Cydian.deb" },
-    { name: "com.ryha.cydian_0.2.0_iphoneos-arm64e.deb", browser_download_url: "https://example.com/e.deb" },
-    { name: "com.ryha.cydian_0.2.0_iphoneos-arm.deb", browser_download_url: "https://example.com/arm.deb" },
+    { name: "iFizBox.ipa", browser_download_url: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.0/iFizBox.ipa" },
+    { name: "iFizBox.deb", browser_download_url: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.0/iFizBox.deb" },
+    { name: "com.ryha.ifizbox_0.2.0_iphoneos-arm64e.deb", browser_download_url: "https://example.com/e.deb" },
+    { name: "com.ryha.ifizbox_0.2.0_iphoneos-arm.deb", browser_download_url: "https://example.com/arm.deb" },
   ],
 };
 const release = parseRelease(GH);
@@ -70,14 +70,14 @@ test("parseRelease", () => {
   assert.deepEqual(bare.notes, []);
 });
 
-test("debFor: the device's arch, else Cydian.deb for rootless only", () => {
+test("debFor: the device's arch, else iFizBox.deb for rootless only", () => {
   assert.equal(debFor(release, "iphoneos-arm64e"), "https://example.com/e.deb");
   assert.equal(debFor(release, "iphoneos-arm"), "https://example.com/arm.deb");
   assert.equal(debFor(release, "iphoneos-arm64"), GH.assets[1].browser_download_url);
   assert.equal(debFor(release, null), GH.assets[1].browser_download_url);
   const onlyPlain = parseRelease({ tag_name: "v1.0.0", assets: [GH.assets[1]] });
   assert.equal(debFor(onlyPlain, "iphoneos-arm"), null); // the plain one is rootless: not for rootful
-  const arm64 = parseRelease({ tag_name: "v1.0.0", assets: [{ name: "cydian_1.0.0_iphoneos-arm64.deb", browser_download_url: "https://example.com/64.deb" }, GH.assets[1]] });
+  const arm64 = parseRelease({ tag_name: "v1.0.0", assets: [{ name: "ifizbox_1.0.0_iphoneos-arm64.deb", browser_download_url: "https://example.com/64.deb" }, GH.assets[1]] });
   assert.equal(debFor(arm64, "iphoneos-arm64"), "https://example.com/64.deb");
   assert.equal(debFor(arm64, "iphoneos-arm"), null); // "-arm64.deb" is not "-arm.deb"
 });

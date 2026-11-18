@@ -4,15 +4,15 @@
 // too, and rightly, since a sandboxed app can't spawn the helper. SPDX-License-Identifier: GPL-3.0-or-later
 #include <sys/stat.h>
 
-#define CYDIAN_HELPER "/var/jb/usr/libexec/cydian/cydian-helper"
+#define IFIZBOX_HELPER "/var/jb/usr/libexec/ifizbox/ifizbox-helper"
 
-enum { CYDIAN_MODE_SIDELOAD = 0, CYDIAN_MODE_JAILBREAK = 1 };
+enum { IFIZBOX_MODE_SIDELOAD = 0, IFIZBOX_MODE_JAILBREAK = 1 };
 
 // Jailbreak if helper is a regular file someone may execute; anything else (missing, denied, a directory) is sideload.
-int cydian_mode_at(const char *helper) {
+int ifizbox_mode_at(const char *helper) {
   struct stat st;
-  if (!helper || stat(helper, &st) != 0) return CYDIAN_MODE_SIDELOAD;
-  return S_ISREG(st.st_mode) && (st.st_mode & 0111) ? CYDIAN_MODE_JAILBREAK : CYDIAN_MODE_SIDELOAD;
+  if (!helper || stat(helper, &st) != 0) return IFIZBOX_MODE_SIDELOAD;
+  return S_ISREG(st.st_mode) && (st.st_mode & 0111) ? IFIZBOX_MODE_JAILBREAK : IFIZBOX_MODE_SIDELOAD;
 }
 
-int cydian_mode(void) { return cydian_mode_at(CYDIAN_HELPER); }
+int ifizbox_mode(void) { return ifizbox_mode_at(IFIZBOX_HELPER); }

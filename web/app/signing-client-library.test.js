@@ -31,8 +31,8 @@ function fakeUI() {
 }
 
 let saved;
-beforeEach(() => { saved = globalThis.cydianNative; });
-afterEach(() => { if (saved === undefined) delete globalThis.cydianNative; else globalThis.cydianNative = saved; });
+beforeEach(() => { saved = globalThis.ifizboxNative; });
+afterEach(() => { if (saved === undefined) delete globalThis.ifizboxNative; else globalThis.ifizboxNative = saved; });
 
 test("offline: signed and kept, and the alert says installing needs the Signing Server", async () => {
   const native = fakeNative({ "library.sign": (p, on) => { on({ phase: "signing", progress: 0.5 }); return { file: p.file, signed: { at: "x" } }; } });

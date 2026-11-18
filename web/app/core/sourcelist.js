@@ -19,7 +19,7 @@ import { sectionName, isVisible, compareNames } from "./catalog.js";
 import { altKey, isAltKey, normalizeAltUrl, looksLikeAltUrl, seedRecord } from "./altstore.js";
 import { NAME } from "../brand.js";
 
-export const EXPORT_FILENAME = "cydian-sources.txt";
+export const EXPORT_FILENAME = "ifizbox-sources.txt";
 
 const isFlat = (dist) => !dist || String(dist).endsWith("/");
 
@@ -190,7 +190,7 @@ export function orderSources(list, order) {
   return [...known, ...all.filter((s) => !at.has(s.key))];
 }
 
-export const ORDER_KEY = "cydian.sourceOrder";
+export const ORDER_KEY = "ifizbox.sourceOrder";
 
 export function loadOrder(storage = globalThis.localStorage) {
   try {

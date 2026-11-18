@@ -13,7 +13,7 @@ import { memoryAppStore } from "./core/installed.js";
 import { SELF_ALT_URL } from "./core/essential.js";
 
 const SRC = "https://a.example/apps.json";
-const self = { id: "com.ryha.cydian", name: "iFizBox", version: "0.2.6", self: true, source: null, date: 0 };
+const self = { id: "com.ryha.ifizbox", name: "iFizBox", version: "0.2.6", self: true, source: null, date: 0 };
 
 test("jailbreak mode leaves dpkg's upgrades as they are", async () => {
   const up = { available: [{ id: "x", version: "2" }], ignored: [] };
@@ -29,7 +29,7 @@ test("sideload: no sources loaded yet, nothing new to show, and the shell is tol
   assert.deepEqual(up, { available: [], ignored: [] });
   await new Promise((r) => setTimeout(r, 0));
   assert.deepEqual(calls, [["updates.watch", { apps: [
-    { id: "com.ryha.cydian", name: "iFizBox", version: "0.2.6", source: SELF_ALT_URL },
+    { id: "com.ryha.ifizbox", name: "iFizBox", version: "0.2.6", source: SELF_ALT_URL },
     { id: "delta", name: "Delta", version: "1.5", source: SRC }], known: [] }]]);
   // The same list again isn't sent twice.
   await withAppUpgrades({ available: [], ignored: [] }, [], { mode: "sideload", native, store });
@@ -38,12 +38,12 @@ test("sideload: no sources loaded yet, nothing new to show, and the shell is tol
 });
 
 test("the shell's known list is every upgrade already counted on screen", () => {
-  const w = shellWatch([{ id: "delta", name: "Delta", version: "1.5", source: SRC }], [{ id: "delta", version: "1.6" }, { id: "com.ryha.cydian", version: "0.3" }]);
-  assert.deepEqual(w.known, ["com.ryha.cydian 0.3", "delta 1.6"]);
+  const w = shellWatch([{ id: "delta", name: "Delta", version: "1.5", source: SRC }], [{ id: "delta", version: "1.6" }, { id: "com.ryha.ifizbox", version: "0.3" }]);
+  assert.deepEqual(w.known, ["com.ryha.ifizbox 0.3", "delta 1.6"]);
   assert.deepEqual(w.apps.map((a) => a.id), ["delta"]);
 });
 
-// ---- F87: the jailbreak app, with I4's real versions (the fake helper's app-versions over CYDIAN_APPS_DIR) ----
+// ---- F87: the jailbreak app, with I4's real versions (the fake helper's app-versions over IFIZBOX_APPS_DIR) ----
 
 const plist = (values) => `<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n${
   Object.entries(values).map(([k, v]) => `\t<key>${k}</key>\n\t<string>${v}</string>\n`).join("")}</dict>\n</plist>\n`;
@@ -53,7 +53,7 @@ function jailbreakBackend(t, { apps = true } = {}) {
   t.after(fx.cleanup);
   const env = {};
   if (apps) {
-    const dir = mkdtempSync(join(tmpdir(), "cydian-apps-"));
+    const dir = mkdtempSync(join(tmpdir(), "ifizbox-apps-"));
     t.after(() => rmSync(dir, { recursive: true, force: true }));
     for (const [uuid, name, info] of [
       ["0A1B", "Delta.app", { CFBundleIdentifier: "com.rileytestut.Delta", CFBundleShortVersionString: "1.6", CFBundleVersion: "45" }],
@@ -62,7 +62,7 @@ function jailbreakBackend(t, { apps = true } = {}) {
       mkdirSync(join(dir, uuid, name), { recursive: true });
       writeFileSync(join(dir, uuid, name, "Info.plist"), plist(info));
     }
-    env.CYDIAN_APPS_DIR = dir;
+    env.IFIZBOX_APPS_DIR = dir;
   }
   const native = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: null, env });
   return createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB(), mode: "jailbreak", queue: createQueue() } });
@@ -109,7 +109,7 @@ test("jailbreak: rememberedApps carries I4's notes; the site and the sideload ap
   const store = async () => memoryAppStore(jbRecords);
   const notes = Object.fromEntries((await rememberedApps({ mode: "jailbreak", backend, store })).map((r) => [r.id, r.note ?? null]));
   assert.deepEqual(notes, {
-    "com.ryha.cydian": null,
+    "com.ryha.ifizbox": null,
     "com.rileytestut.Delta": "Installed: 1.6 (iFizBox remembered 1.5)",
     "com.utmapp.UTM": null,
     "com.example.gone": "Not installed (iFizBox remembered 2.0)",

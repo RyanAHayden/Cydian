@@ -34,8 +34,8 @@ class Notifications(unittest.TestCase):
         self.assertIn('c.userInfo = @{@"url": @"#/changes"}', read("daemon", "main.m"))
         self.assertIn('location.hash = route', self.src)
         self.assertIn('arguments: ["route": route]', self.src)  # passed as data, never pasted into the script
-        self.assertIn('upgradesID = "cydian-upgrades"', self.src)
-        self.assertIn('#define NOTE_ID @"cydian-upgrades"', read("daemon", "main.m"))
+        self.assertIn('upgradesID = "ifizbox-upgrades"', self.src)
+        self.assertIn('#define NOTE_ID @"ifizbox-upgrades"', read("daemon", "main.m"))
         allowed = re.search(r'CharacterSet\(charactersIn: "([^"]+)"\)', self.src).group(1)
         self.assertNotIn("'", allowed)
         self.assertNotIn('\\', allowed)

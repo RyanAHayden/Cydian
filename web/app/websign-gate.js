@@ -1,10 +1,10 @@
-// F96: the website pushes iFizBox first (user 2026-11-18: "we push users toward installing cydian FIRST when the
+// F96: the website pushes iFizBox first (user 2026-11-18: "we push users toward installing ifizbox FIRST when the
 // webpage is launched. all others should be disabled until they accept a delayed warning that the experience on web
 // will not be good"). Website only: the app never asks.
 //
 //   First visit (until iFizBox is installed from the website, or Not Now): "Install iFizBox First" at launch
 //   (promptFirstVisit, from screens/home.js init), Install iFizBox running Home's Install iFizBox App flow.
-//   Other apps' pages: installRows (screens/altstore.js) gives "Install in iFizBox" (cydian://package?id=…, which the
+//   Other apps' pages: installRows (screens/altstore.js) gives "Install in iFizBox" (ifizbox://package?id=…, which the
 //   app's incoming.js opens at that app's page), Download IPA, then "Install on the Website", greyed out until the
 //   user accepts the warning once (acceptWebsiteInstalls: its I Understand counts down 5 seconds first). iFizBox's own
 //   IPA always installs from the website. Settings > General > Website's switch turns website installs back off.
@@ -14,8 +14,8 @@
 import { showAlert } from "./nav/alert.js";
 import { NAME } from "./brand.js";
 
-export const ACCEPT_KEY = "cydian.websiteInstalls"; // "on" once the warning was accepted
-export const FIRST_KEY = "cydian.firstVisit"; // "later" (Not Now) | "installed" (iFizBox installed from here)
+export const ACCEPT_KEY = "ifizbox.websiteInstalls"; // "on" once the warning was accepted
+export const FIRST_KEY = "ifizbox.firstVisit"; // "later" (Not Now) | "installed" (iFizBox installed from here)
 
 const store = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 const read = (storage, key) => { try { return storage?.getItem(key) ?? null; } catch { return null; } };
@@ -50,9 +50,9 @@ export async function acceptWebsiteInstalls({ alert = showAlert, storage = store
 
 // ---- Install in iFizBox -----------------------------------------------------------------------------------------
 
-export const packageLink = (id) => `cydian://package?id=${encodeURIComponent(String(id))}`;
+export const packageLink = (id) => `ifizbox://package?id=${encodeURIComponent(String(id))}`;
 
-// cydian://package?id=<id> -> the id, or null.
+// ifizbox://package?id=<id> -> the id, or null.
 export function packageIdOf(link) {
   let id = null;
   try { id = new URL(String(link)).searchParams.get("id"); } catch { return null; }
@@ -70,7 +70,7 @@ export function idFromHash(hash = globalThis.location?.hash ?? "") {
   return null;
 }
 
-const IN_CYDIAN_SUBTITLE = "Signed and installed on the iPhone: fast, no limits";
+const IN_IFIZBOX_SUBTITLE = "Signed and installed on the iPhone: fast, no limits";
 export const WEBSITE_ON_SUBTITLE = "Signed in the browser with your certificate";
 export const WEBSITE_OFF_SUBTITLE = "Slow, and can fail on big apps: tap to read why";
 export const SITE_GATE_FOOTER = `Install in ${NAME} opens this app in the ${NAME} app, which signs and installs it on the `
@@ -80,7 +80,7 @@ export const SITE_GATE_FOOTER = `Install in ${NAME} opens this app in the ${NAME
 // installRows makes), Install on the Website (greyed out until accepted; once accepted it runs `install`).
 export function siteGateRows({ id, install, download = null, open = (u) => { location.href = u; }, alert = showAlert, storage = store() }) {
   const on = websiteInstallsOn(storage);
-  const rows = [{ label: `Install in ${NAME}`, subtitle: IN_CYDIAN_SUBTITLE, onClick: () => open(packageLink(id ?? idFromHash() ?? "")) }];
+  const rows = [{ label: `Install in ${NAME}`, subtitle: IN_IFIZBOX_SUBTITLE, onClick: () => open(packageLink(id ?? idFromHash() ?? "")) }];
   if (download) rows.push(download);
   rows.push({ label: "Install on the Website", subtitle: on ? WEBSITE_ON_SUBTITLE : WEBSITE_OFF_SUBTITLE, cls: on ? null : "websign-off",
     onClick: async (e) => {
@@ -106,9 +106,9 @@ export function firstVisitState(storage = store()) {
 export function setFirstVisit(state, storage = store()) {
   write(storage, FIRST_KEY, state === "ask" ? null : state);
   // the tab bar and Home follow (app.js, screens/home.js)
-  globalThis.dispatchEvent?.(new Event("cydian:browse-lock"));
+  globalThis.dispatchEvent?.(new Event("ifizbox:browse-lock"));
 }
-export const markCydianInstalled = (storage = store()) => setFirstVisit("installed", storage);
+export const markiFizBoxInstalled = (storage = store()) => setFirstVisit("installed", storage);
 
 export const shouldAskFirst = ({ mode = "site", storage = store() } = {}) => mode === "site" && firstVisitState(storage) === "ask";
 
@@ -158,14 +158,14 @@ export async function askToBrowse({ install, alert = showAlert, storage = store(
 
 // ---- ?install (F184) -------------------------------------------------------------------------------------------
 
-// fizl0.github.io/apps' Add to iFizBox button tries cydian://add and, when the app isn't there, opens the site at
+// fizl0.github.io/apps' Add to iFizBox button tries ifizbox://add and, when the app isn't there, opens the site at
 // /?install (user 2026-11-18). Website only: on launch, Home, the param gone from the URL, then the Install iFizBox
 // First popup a locked row shows, whatever firstVisitState is (they came because the app isn't installed).
 
 // Before the router starts: true when the URL carries ?install in site mode; then it's replaced (history, no reload)
 // by the same URL without the param, on Home. The app and native shells never take it.
 export function takeInstallParam(win = globalThis, { mode = "site" } = {}) {
-  if (mode !== "site" || win.cydianApp || win.cydianNative) return false;
+  if (mode !== "site" || win.ifizboxApp || win.ifizboxNative) return false;
   const { pathname = "/", search = "" } = win.location ?? {};
   const params = new URLSearchParams(search);
   if (!params.has("install")) return false;

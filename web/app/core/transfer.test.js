@@ -16,7 +16,7 @@ const SOURCES = ["https://repo.chariz.com/", "deb https://apt.procurs.us/ 1900 m
 
 test("Open in iFizBox App: encode/decode round trip, gzip keeps hundreds of sources inside a URL", async () => {
   const url = await encodeLink({ sources: [...SOURCES, SOURCES[0]], settings: { appearance: "dark" }, holds: ["a"], server: "sign.example.org" });
-  assert.match(url, /^cydian:\/\/import\?d=[A-Za-z0-9_-]+$/);
+  assert.match(url, /^ifizbox:\/\/import\?d=[A-Za-z0-9_-]+$/);
   const p = await decodeLink(url);
   assert.deepEqual(p, { v: 1, sources: SOURCES, settings: { appearance: "dark" }, holds: ["a"] }); // F89: no server
   const withCert = await decodeLink(await encodeLink({ identity: { p12: "MAE", profile: "Ag", password: "pw", p12Name: "c.p12", profileName: "p" } }));
@@ -42,7 +42,7 @@ test("Open in iFizBox App: the shell's gunzip where WebKit has no DecompressionS
 });
 
 test("Open in iFizBox App: anything else decodes to null, and the certificate never rides along", async () => {
-  for (const bad of ["cydian://import", "cydian://import?d=!!", "cydian://other?d=H4sI", "https://x/?d=H4sI", "cydian://import?d=AAAA"]) {
+  for (const bad of ["ifizbox://import", "ifizbox://import?d=!!", "ifizbox://other?d=H4sI", "https://x/?d=H4sI", "ifizbox://import?d=AAAA"]) {
     assert.equal(await decodeLink(bad), null, bad);
   }
   const url = await encodeLink({ sources: SOURCES, p12: "secret", settings: {} });

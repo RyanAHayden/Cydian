@@ -386,7 +386,7 @@ export function dedupeShots(list) {
 
 // ---- Loading (fetched text, cached per app) --------------------------------------------------------------------
 
-const PREVIEW_CACHE_PREFIX = "cydian.previews.";
+const PREVIEW_CACHE_PREFIX = "ifizbox.previews.";
 export const PREVIEW_TTL = 24 * 3600 * 1000;
 const memory = new Map();
 

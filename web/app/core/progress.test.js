@@ -34,8 +34,8 @@ test("classify: dpkg's and apt's own output is raw (monospace); E:, dpkg errors 
   assert.equal(classify({ fd: "err", line: "E: Unable to locate package nope" }).kind, "error");
   assert.equal(classify({ fd: "err", line: "dpkg: error processing package x (--configure):" }).kind, "error");
   assert.equal(classify({ fd: "err", line: "Errors were encountered while processing:" }).kind, "error");
-  assert.equal(classify({ fd: "err", line: "cydian-helper: not a regular file" }).kind, "error");
-  assert.equal(classify({ fd: "err", line: "cydian-helper: cancelled: stopping apt-get" }).kind, "raw");
+  assert.equal(classify({ fd: "err", line: "ifizbox-helper: not a regular file" }).kind, "error");
+  assert.equal(classify({ fd: "err", line: "ifizbox-helper: cancelled: stopping apt-get" }).kind, "raw");
   assert.equal(classify({ fd: "err", line: "W: Some index files failed to download." }).kind, "warning");
   assert.equal(classify({ fd: "out", line: "dpkg: warning: downgrading x from 2 to 1" }).kind, "warning");
 });

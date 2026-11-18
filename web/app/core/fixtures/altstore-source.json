@@ -1,7 +1,7 @@
 {
   "name": "Example Apps",
   "identifier": "dev.example.apps",
-  "subtitle": "Apps for testing Cydian",
+  "subtitle": "Apps for testing iFizBox",
   "description": "A fixture source in AltStore's 2.0 format, with one 1.x-style app.",
   "iconURL": "https://example.dev/icon.png",
   "headerURL": "https://example.dev/header.png",

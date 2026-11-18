@@ -1,6 +1,6 @@
 // F167: a tap on the status bar scrolls to the top, as in native iOS apps. iOS sends the tap to the WKWebView's own
 // scroll view, which never scrolls (every page scrolls inside its .page-body), so the native shell refuses it
-// (scrollViewShouldScrollToTop -> false) and calls globalThis.cydianScrollToTop() instead. Safari never sends it.
+// (scrollViewShouldScrollToTop -> false) and calls globalThis.ifizboxScrollToTop() instead. Safari never sends it.
 //
 // What scrolls is the list on top: an open sheet's (the last [role=dialog] on the page), else the top page's. Inside
 // that layer, the scroller that is scrolled down (Search's results under its field, a sheet's list), the innermost
@@ -21,7 +21,7 @@ export function statusBarTarget(doc, pageBody) {
   return all.filter((el) => el.scrollTop > 0 && shown(el)).at(-1) || null;
 }
 
-// globalThis.cydianScrollToTop: true when something scrolled.
+// globalThis.ifizboxScrollToTop: true when something scrolled.
 export function makeScrollToTop(doc, topBody, win = globalThis) {
   return () => scrollToTop(statusBarTarget(doc, topBody()), win);
 }

@@ -228,7 +228,7 @@ test("QR: sizes grow with the text, and a list too long for version 40 throws", 
 let zbar = true;
 try { execFileSync("zbarimg", ["--version"], { stdio: "ignore" }); } catch { zbar = false; }
 test("QR: zbarimg decodes the export of the default list", { skip: !zbar && "zbarimg not installed" }, () => {
-  const dir = mkdtempSync(join(tmpdir(), "cydian-qr-"));
+  const dir = mkdtempSync(join(tmpdir(), "ifizbox-qr-"));
   try {
     for (const [text, ecc] of [[exportText(ALL), "M"], ["héllo · https://example.com/", "L"], ["https://repo.chariz.com/", "M"]]) {
       const m = qrMatrix(text, { ecc });

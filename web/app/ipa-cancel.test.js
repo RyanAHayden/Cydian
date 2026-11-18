@@ -8,7 +8,7 @@ import { stopIpaInstall } from "./screens/ipa-install.js";
 
 test("stopIpaInstall asks the app's bridge for ipa.cancel and ignores its answer", async () => {
   const calls = [];
-  const bridge = { call: (m, p) => { calls.push([m, p]); return Promise.reject(new Error("helper: cydian-helper is already installing")); } };
+  const bridge = { call: (m, p) => { calls.push([m, p]); return Promise.reject(new Error("helper: ifizbox-helper is already installing")); } };
   assert.equal(stopIpaInstall(undefined, { bridge }), true);
   assert.deepEqual(calls, [["ipa.cancel", {}]]);
   await new Promise((r) => setTimeout(r, 0)); // the rejection is caught, not unhandled

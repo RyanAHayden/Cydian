@@ -27,7 +27,7 @@ const httpsUrl = (u) => (/^https?:\/\//i.test(str(u)) ? str(u).replace(/^http:/i
 const BUNDLE = /^[A-Za-z0-9.-]{1,155}$/;
 
 export const LOOKUP_TTL = 7 * 24 * 3600 * 1000;
-const PREFIX = "cydian.applookup.";
+const PREFIX = "ifizbox.applookup.";
 
 const country = (c) => (/^[a-z]{2}$/.test(str(c).toLowerCase()) ? str(c).toLowerCase() : "us");
 

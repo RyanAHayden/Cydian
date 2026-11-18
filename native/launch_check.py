@@ -12,7 +12,7 @@ WANT = {"UIImageName": "LaunchLoading"}
 
 
 def problems(info, files, app):
-    """Problems with info's UILaunchScreen; files maps bundle paths to bytes, app is the Cydian.app/ prefix."""
+    """Problems with info's UILaunchScreen; files maps bundle paths to bytes, app is the iFizBox.app/ prefix."""
     out = []
     ls = info.get("UILaunchScreen")
     if not isinstance(ls, dict):

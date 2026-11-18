@@ -15,7 +15,7 @@
 // (the earlier signed copy, if any, stays), and an install's serving to iOS.
 //
 // Other apps' .ipa (Open in iFizBox, AirDrop, Files: the document type in Info-sideload.plist) land in the library
-// too: MyIPAs.receive copies the file in and hands the page cydian://myipas?file=<name> (web/app/incoming.js).
+// too: MyIPAs.receive copies the file in and hands the page ifizbox://myipas?file=<name> (web/app/incoming.js).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 import UIKit
@@ -163,7 +163,7 @@ enum MyIPAs {
                 let inbox = dir == docs + "/Inbox"
                 file = try? library.add(url, name: url.lastPathComponent, move: inbox)
             }
-            guard let f = file, var q = URLComponents(string: "cydian://myipas") else { return }
+            guard let f = file, var q = URLComponents(string: "ifizbox://myipas") else { return }
             q.queryItems = [URLQueryItem(name: "file", value: f)]
             if let link = q.url { DispatchQueue.main.async { Incoming.receive(link) } }
         }

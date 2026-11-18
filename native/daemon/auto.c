@@ -1,4 +1,4 @@
-/* cydian-upgrades' automatic updates (N7): see auto.h. SPDX-License-Identifier: GPL-3.0-or-later */
+/* ifizbox-upgrades' automatic updates (N7): see auto.h. SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef __APPLE__
 #define _POSIX_C_SOURCE 200809L /* utimensat, O_NOFOLLOW on Linux's -std=c11; Darwin hides other things with it */
 #endif

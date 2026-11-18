@@ -1,4 +1,4 @@
-Package: com.ryha.cydian
+Package: com.ryha.ifizbox
 Name: $(BRAND_NAME)
 Version: @VERSION@
 Architecture: iphoneos-arm64

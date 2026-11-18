@@ -15,7 +15,7 @@ import WebKit
 
 final class Notifications: NSObject, UNUserNotificationCenterDelegate {
     static let shared = Notifications()
-    static let upgradesID = "cydian-upgrades" // native/daemon/main.m NOTE_ID
+    static let upgradesID = "ifizbox-upgrades" // native/daemon/main.m NOTE_ID
 
     // From application(_:didFinishLaunchingWithOptions:), before it returns, so a tap that launched the app arrives.
     func start() {
@@ -135,9 +135,9 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
 }
 
 // The Home Screen icon's quick action (app.shortcuts sets it): the page queues every upgrade and opens Confirm
-// (app.js cydianShortcut). A tap that launched iFizBox waits for the page as a notification tap does.
+// (app.js ifizboxShortcut). A tap that launched iFizBox waits for the page as a notification tap does.
 enum Shortcut {
-    static let upgrade = "com.ryha.cydian.upgrade"
+    static let upgrade = "com.ryha.ifizbox.upgrade"
     static func perform(_ type: String, tries: Int = 50) {
         let web = UIApplication.shared.connectedScenes
             .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
@@ -146,7 +146,7 @@ enum Shortcut {
             return
         }
         // the page's own scripts may still be starting: it calls this once it can (app.js)
-        web.callAsyncJavaScript("globalThis.cydianShortcut ? globalThis.cydianShortcut(t) : (globalThis.cydianPendingShortcut = t)",
+        web.callAsyncJavaScript("globalThis.ifizboxShortcut ? globalThis.ifizboxShortcut(t) : (globalThis.ifizboxPendingShortcut = t)",
                                 arguments: ["t": type == upgrade ? "upgrade" : type], in: nil, in: .page, completionHandler: nil)
     }
 }

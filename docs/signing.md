@@ -15,7 +15,7 @@ WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for i
 - **zsign as WebAssembly**: `web/app/vendor/zsign/` (`zsign.js` + `zsign.wasm`, ~2.2 MB), built by
   `tools/build-zsign-wasm.sh` from zsign at the commit the old signer's Dockerfile pinned and OpenSSL 3.5 (static,
   legacy provider built in for RC2 `.p12`s), both checked by SHA-256; `SOURCE` and the licences (zsign MIT, OpenSSL
-  Apache-2.0, zlib) sit beside it. `tools/zsign-wasm/cydian.cpp` adds two calls into zsign's own code: unzip, and
+  Apache-2.0, zlib) sit beside it. `tools/zsign-wasm/ifizbox.cpp` adds two calls into zsign's own code: unzip, and
   read a plist (binary or XML) as JSON. The build is reproducible: `tools/check.sh` rebuilds it where emcc is (emsdk
   on PATH or in `~/emsdk`) and fails when the committed copy differs from what the same emcc builds.
 - **Settings > Signing** (as before F89): the `.p12`, its password and the `.mobileprovision` in this browser's
@@ -46,13 +46,13 @@ WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for i
   Install tap still got its app. Each retry is a new request, so the Worker's 2-minute wait per request never runs out.
   Download IPA is its own row. F92 removed the hand-offs that followed Install (Open in iFizBox, Get in AltStore /
   SideStore / Feather); the nav bar's Share (F76) still offers the source to those sideloaders. The app still opens a
-  `cydian://install?url=<ipa>&name=…` link (`incoming.js`: Install IPAs, "Install IPA", then `signAndInstall`) for
+  `ifizbox://install?url=<ipa>&name=…` link (`incoming.js`: Install IPAs, "Install IPA", then `signAndInstall`) for
   links already out there. A source's own signed link (`itms-services`) still installs straight away. Nothing queues
   on the website (the F80 queue is the sideload app's).
 - **My IPAs' links** (F95): Install is still the alert saying the certificate is needed, with **Download IPA** beside
   OK (`altstore.js siteCertificateAlert`).
 - **Home's Install iFizBox App** (Not Jailbroken; `home.js installApp`): with a certificate, iFizBox's IPA signed and
-  installed as above, carrying the certificate (`cydian-identity.plist`, the shell's `BundledIdentity` imports it on
+  installed as above, carrying the certificate (`ifizbox-identity.plist`, the shell's `BundledIdentity` imports it on
   first launch) unless Bring My Certificate is off, and always the website's sources and settings
   (`web/transfer.link`, which `app.js` imports once on first launch). Both files go in before zsign seals the
   bundle. Without a certificate it opens Settings > Signing. Jailbroken visitors get the release's `.deb`.
@@ -103,7 +103,7 @@ server step.
    to `signing.import`: the `.p12` is opened with `SecPKCS12Import` and its identity (certificate and private key)
    is added to the iOS Keychain, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` (never synced to iCloud, never in
    a backup that restores to another phone). F73: the `.p12` file as picked and its password are kept too, as one
-   Keychain generic-password item (service `com.ryha.cydian.signing.p12`, also `...ThisDeviceOnly`), for iFizBox's own
+   Keychain generic-password item (service `com.ryha.ifizbox.signing.p12`, also `...ThisDeviceOnly`), for iFizBox's own
    update (below); nothing else reads it. The checks are I5's: a wrong password, an expired certificate or profile, a certificate the profile
    doesn't list.
 2. **A Signing Server**: sign.cydian.dev unless the user enters their own (a saved cydian.dev, the website's old
@@ -143,29 +143,29 @@ one missing opens this page at that step, with no alert. Then `signing.install {
 (`installOnDevice`); the HUD follows its phase events (`phaseLabel`: "Downloading 42%", "Reading", "Signing",
 "Installing") and an error alerts by its code (`deviceError`): `no_server` and `no_identity` then open Settings >
 Signing. Tests: `web/app/signing-client-device.test.js`, `web/app/screens/signing.test.js` and
-`web/app/core/signing-device.test.js`, against a fake `cydianNative`.
+`web/app/core/signing-device.test.js`, against a fake `ifizboxNative`.
 
 ### From the website to the app (F75, F89, F93)
 
-- **Open in iFizBox App** (Home's Send Settings, and Settings; Not Jailbroken only): `cydian://import?d=<base64url of
+- **Open in iFizBox App** (Home's Send Settings, and Settings; Not Jailbroken only): `ifizbox://import?d=<base64url of
   gzipped JSON>`, the source list as export lines, the settings in `core/settings.js TRAVELS`, Ignored Upgrades and
   (F93, as before F89) the website's certificate, after a banner saying to press Open. The app adds what's new
   straight away and puts the certificate into the Keychain (`signing.import`). Gzip keeps 400 sources around 5 kB.
   No Signing Server travels.
-- `cydian://install?url=…&name=…`: the app's Install IPA alert. The website's app page sent it (Open in iFizBox)
+- `ifizbox://install?url=…&name=…`: the app's Install IPA alert. The website's app page sent it (Open in iFizBox)
   until F92/F95 removed the hand-offs; the app still opens one ("The website signs in the browser", above).
-- **Install iFizBox App** on the website: iFizBox's IPA, signed in the browser, carries `cydian-identity.plist`
+- **Install iFizBox App** on the website: iFizBox's IPA, signed in the browser, carries `ifizbox-identity.plist`
   (Bring My Certificate) and `web/transfer.link` (sources and settings), imported on first launch.
 - **iFizBox first** (F96, `web/app/websign-gate.js`): the website asks "Install iFizBox First" at launch until iFizBox
   is installed from it or the user taps Not Now. Other apps' pages offer **Install in iFizBox**
-  (`cydian://package?id=<id>`: the app opens that app's page, Search's `package:<id>`), Download IPA, then **Install
+  (`ifizbox://package?id=<id>`: the app opens that app's page, Search's `package:<id>`), Download IPA, then **Install
   on the Website**, greyed out until the user accepts a warning once (its I Understand counts down 5 seconds); the
   acceptance is kept in localStorage and Settings > Signing > Other Apps turns it back off. iFizBox's own IPA always
   installs from the website.
 
-Gone with the website's old signer (F89) and not back: Import from Safari (`cydian://signing-import`).
+Gone with the website's old signer (F89) and not back: Import from Safari (`ifizbox://signing-import`).
 
-The shell keeps the latest `cydian://` link (`IncomingLink`, at most 512 kB) and tells the page (`cydian:url`), which
+The shell keeps the latest `ifizbox://` link (`IncomingLink`, at most 512 kB) and tells the page (`ifizbox:url`), which
 takes it with `app.takeURL` (also at start, for a link that launched the app). `app.gunzip` unpacks the import link
 where WebKit has no `DecompressionStream` (before iOS 16.4).
 
@@ -229,7 +229,7 @@ F14 added the arm64e fix-up and the user's edits (below). Not done: dylib inject
   the name goes into `CFBundleDisplayName`, `CFBundleName` and every `<lang>.lproj/InfoPlist.strings` that names
   either (rewritten as a binary plist); the bundle ID is asked of the profile (I5's rules, so an explicit profile
   still signs as its own ID) and extensions follow it (`old.share` -> `new.share`); the icon (a PNG the page sizes,
-  180x180 best) is written as `CydianIcon60x60@2x.png` and `@3x.png` and named in `CFBundleIcons` (and `~ipad`), with
+  180x180 best) is written as `iFizBoxIcon60x60@2x.png` and `@3x.png` and named in `CFBundleIcons` (and `~ipad`), with
   `CFBundleIconName` dropped so iOS doesn't take the asset catalog's; `removeExtensions` leaves those bundles out
   (an unknown path is refused). Bad input answers `bad_options`.
 - **arm64e fix-up**, on by default: Feather's `_locateMachosAndFixupArm64eSlice` (via LiveContainer's
@@ -304,7 +304,7 @@ Installed > My IPAs is the user's own IPAs. In the sideload app they are plain f
 Files shows under On My iPhone > iFizBox (`UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace`), so an IPA
 dropped there from Files is listed too. Add offers Browse (the iOS Files picker, several at once) and From URL (the
 Add alert with Paste); an .ipa another app opens in iFizBox (AirDrop, Files, Mail: the document type in
-`Info-sideload.plist`) is copied in and its page opens (`cydian://myipas?file=<name>`, `web/app/incoming.js`).
+`Info-sideload.plist`) is copied in and its page opens (`ifizbox://myipas?file=<name>`, `web/app/incoming.js`).
 
 - `native/sign/Library.swift` (`IPALibrary`, Foundation only, tested on Linux in `native/sign/tests/main.swift`):
   the list, the details cache (by size and date) with the icon, each IPA's Sign Options, and the signed copy in
@@ -327,7 +327,7 @@ Add alert with Paste); an .ipa another app opens in iFizBox (AirDrop, Files, Mai
 native build uses; it skips and says so without one) and runs it against `native/testkit.py`'s throwaway CA,
 certificate and profiles, with openssl holding the key. It signs a fixture IPA with a framework, a loose dylib, an
 extension, localisations, a symlink and an old signature's leftovers, then re-signs the result, signs with an
-explicit profile, signs an unsigned and a fat binary, and, where the build made one, `native/build/Cydian.ipa`
+explicit profile, signs an unsigned and a fat binary, and, where the build made one, `native/build/iFizBox.ipa`
 itself. Each signature is read back: identifier, team, every page hash, the Info.plist, requirements,
 CodeResources and entitlement slots, and the CMS checked by `openssl cms -verify`, also against the test CA. Python
 then reads the signed IPA again on its own (the DER entitlements decode to the XML ones; CodeResources lists exactly
@@ -336,9 +336,9 @@ profile rules, refusals (not an IPA, a path out of the folder, an encrypted bina
 the HTTP parsing and ranges. F75: `test_sideload.py`'s Swift also covers `BundledIdentity` (parse, the first-launch
 rule), `IncomingLink` and `gunzip`; its `HandoffSourceTest` reads the sources for the URL hand-off, the launch import
 and that nothing of the local CA is left. Node: `core/transfer.test.js` (the import link's encode/decode and
-review), `incoming.test.js` (the hand-off, `cydian://install` and the import's merge), `screens/siteinstall.test.js`
+review), `incoming.test.js` (the hand-off, `ifizbox://install` and the import's merge), `screens/siteinstall.test.js`
 (the website's Install rows and certificate alert, Home's Install iFizBox App, My IPAs' Install). `rcodesign verify`
-also passed on the signed fixture and the signed Cydian.ipa (by hand, not in the gate).
+also passed on the signed fixture and the signed iFizBox.ipa (by hand, not in the gate).
 
 The phone half (Keychain, `NWListener`, opening the links, the scene's URL contexts) compiles in the native build but runs only on an iPhone.
 F73: `test_sign.py` also checks that `signing.export` is registered and answers `p12`, `profile` and `password`

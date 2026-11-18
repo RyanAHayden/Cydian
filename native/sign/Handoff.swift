@@ -1,21 +1,21 @@
 // F75: what reaches the sideload build from the website, the pure half (the Linux tests build it; App.swift and
 // SignBridge.swift do the UIKit and Keychain half). docs/signing.md, "From the website to the app (F75)".
 //
-//   BundledIdentity    Payload/Cydian.app/cydian-identity.plist: the user's .p12, password and profile, which the
+//   BundledIdentity    Payload/iFizBox.app/ifizbox-identity.plist: the user's .p12, password and profile, which the
 //                      website adds to iFizBox's own IPA as it signs it (F93, Install iFizBox App's bring). Imported
 //                      into the Keychain on the first launch that finds it, unless the Keychain already holds one;
 //                      the bundle is read-only, so its digest is remembered and the same file is never looked at again.
-//   IncomingLink       which cydian:// links the shell hands to the page: cydian://import?d=… (sources and settings),
-//                      cydian://install?url=… (F89: the website's Open in iFizBox on an app page), cydian://myipas (F77),
-//                      cydian://add?url=… (N8's Add Source intent), cydian://shared?route=… (N9), cydian://package?id=… (F96:
-//                      the website's Install in iFizBox), cydian://account?k=… (F97); nothing else, nothing huge.
+//   IncomingLink       which ifizbox:// links the shell hands to the page: ifizbox://import?d=… (sources and settings),
+//                      ifizbox://install?url=… (F89: the website's Open in iFizBox on an app page), ifizbox://myipas (F77),
+//                      ifizbox://add?url=… (N8's Add Source intent), ifizbox://shared?route=… (N9), ifizbox://package?id=… (F96:
+//                      the website's Install in iFizBox), ifizbox://account?k=… (F97); nothing else, nothing huge.
 //   gunzip(_:)         a gzip member's contents, for the page on an iOS without DecompressionStream (app.gunzip)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
 enum BundledIdentity {
-    static let fileName = "cydian-identity.plist"
-    static let seenKey = "cydian.bundledIdentity" // UserDefaults: the digest of the file last looked at
+    static let fileName = "ifizbox-identity.plist"
+    static let seenKey = "ifizbox.bundledIdentity" // UserDefaults: the digest of the file last looked at
 
     struct Contents { let p12: Data; let password: String; let profile: Data }
 
@@ -36,18 +36,18 @@ enum BundledIdentity {
 }
 
 enum IncomingLink {
-    // myipas: F77, an .ipa opened in iFizBox; add: N8, the Add Source intent (cydian://add?url=…)
+    // myipas: F77, an .ipa opened in iFizBox; add: N8, the Add Source intent (ifizbox://add?url=…)
     // shared: N9, a shared item's route (native/share/, web/app/share.js); install: F89, the website's Open in iFizBox
     // (Import from Safari's signing-import went with the website's signer); package: F96, the website's Install in
-    // iFizBox (cydian://package?id=…, an app's page)
-    // account: F97, a iFizBox Account's link (cydian://account?k=…)
-    // B14: a tab's own link (cydian://sources, cydian://changes, …) opens that tab: web/app/router.js ALL_TABS
+    // iFizBox (ifizbox://package?id=…, an app's page)
+    // account: F97, a iFizBox Account's link (ifizbox://account?k=…)
+    // B14: a tab's own link (ifizbox://sources, ifizbox://changes, …) opens that tab: web/app/router.js ALL_TABS
     static let tabs: Set<String> = ["home", "sources", "changes", "installed", "search", "settings"]
     static let hosts: Set<String> = Set(["import", "install", "myipas", "add", "shared", "package", "account"]).union(tabs)
     static let maxLength = 512 * 1024
 
     static func accepts(_ url: URL) -> Bool {
-        guard url.scheme?.lowercased() == "cydian", let host = url.host?.lowercased(), hosts.contains(host) else { return false }
+        guard url.scheme?.lowercased() == "ifizbox", let host = url.host?.lowercased(), hosts.contains(host) else { return false }
         return url.absoluteString.utf8.count <= maxLength
     }
 }

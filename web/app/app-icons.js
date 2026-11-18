@@ -21,7 +21,7 @@ export const APP_ICONS = {
   Zebra: gh("zbrateam"),
 };
 
-const KEY = "cydian.appicon.";
+const KEY = "ifizbox.appicon.";
 const MAX_AGE = 30 * 24 * 3600 * 1000;
 const SIZE = 114;
 

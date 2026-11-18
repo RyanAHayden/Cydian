@@ -518,7 +518,7 @@ enum Sideload {
 
     // ---- the certificate's revocation status (cached; I6's status() shows the last answer)
 
-    static let ocspKey = "cydian.signing.ocsp"
+    static let ocspKey = "ifizbox.signing.ocsp"
 
     static func checkCertificate(_ c: Bridge.Call) {
         guard let (sid, _) = ready(c) else { return }
@@ -563,8 +563,8 @@ enum Sideload {
 
     // ---- the re-sign reminder: one local notification, moved whenever the apps or the setting change
 
-    static let remindKey = "cydian.signing.remindDays"
-    static let reminderID = "cydian.resign"
+    static let remindKey = "ifizbox.signing.remindDays"
+    static let reminderID = "ifizbox.resign"
 
     @discardableResult
     static func reschedule(ask: Bool = false) -> Date? {
@@ -706,7 +706,7 @@ enum CloseForUpdate {
             // It arrives 8 s later, by when iOS has usually finished (user 2026-11-18: "tap when it's done" read wrong).
             c.title = "\(Brand.name) Updated"
             c.body = "Tap to open the new version."
-            let req = UNNotificationRequest(identifier: "cydian.updating", content: c,
+            let req = UNNotificationRequest(identifier: "ifizbox.updating", content: c,
                                             trigger: UNTimeIntervalNotificationTrigger(timeInterval: 8, repeats: false))
             UNUserNotificationCenter.current().add(req) { _ in
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { exit(0) }

@@ -12,8 +12,8 @@ import { NAME, GITHUB_REPO } from "../brand.js";
 
 export const REPO_URL = `https://github.com/${GITHUB_REPO}`;
 // The release assets native/build.sh makes (tools/release.sh uploads them): latest/download always names the newest.
-export const APP_IPA_URL = `${REPO_URL}/releases/latest/download/Cydian.ipa`;
-export const APP_DEB_URL = `${REPO_URL}/releases/latest/download/Cydian.deb`; // rootless, iphoneos-arm64
+export const APP_IPA_URL = `${REPO_URL}/releases/latest/download/${NAME}.ipa`;
+export const APP_DEB_URL = `${REPO_URL}/releases/latest/download/${NAME}.deb`; // rootless, iphoneos-arm64
 // iFizBox's own AltStore source, kept current with native/VERSION by test_release.py.
 export const APP_SOURCE_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/web/app/source.json`;
 export const APP_NAME = NAME;
@@ -31,7 +31,7 @@ export function homeOffer({ mode = "site", deviceType = NOT_JAILBROKEN } = {}) {
 }
 
 // The .deb for an architecture: from the latest release (core/selfupdate.js parseRelease + debFor) when GitHub
-// answered, else the plain Cydian.deb, which is the rootless build. Null when no build fits the arch.
+// answered, else the plain iFizBox.deb, which is the rootless build. Null when no build fits the arch.
 export function debUrl(arch, { release = null, debFor = null } = {}) {
   if (release && debFor) {
     const u = debFor(release, arch);

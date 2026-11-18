@@ -1,10 +1,10 @@
-/* cydian-upgrades' automatic updates (N7), following the F13 settings: when to check, what installs and when,
+/* ifizbox-upgrades' automatic updates (N7), following the F13 settings: when to check, what installs and when,
  * what a respring needs, and which cached .debs are kept for rollback. Plain C beside upgrades.c, so the decisions
  * build and are tested on Linux (test_auto.py through auto_driver.c, with a fake clock and fake phone state); main.m
  * only gathers the facts (settings, time, network, charging, lock, apt's output) and acts on the answers.
  * SPDX-License-Identifier: GPL-3.0-or-later */
-#ifndef CYDIAN_AUTO_H
-#define CYDIAN_AUTO_H
+#ifndef IFIZBOX_AUTO_H
+#define IFIZBOX_AUTO_H
 
 #include <stddef.h>
 
@@ -32,7 +32,7 @@ struct auto_settings {
     int keep;     /* Keep Previous Versions: 0-2, 1 */
 };
 
-/* Settings text: one "key=value" per line, the F13 keys without "cydian." (checkUpdates=off|launch|6h|daily,
+/* Settings text: one "key=value" per line, the F13 keys without "ifizbox." (checkUpdates=off|launch|6h|daily,
  * cellular=true|false, autoInstall=off|marked|all, autoInstallIdle=true|false, respring=notify|locked,
  * keepVersions=0|1|2), plus any number of "marked=<id>" (Only Packages I Mark) and "hold=<id>" (Ignored Upgrades)
  * lines. A missing key, or a value that isn't one of its options, reads as the default (settings.js does the same).
@@ -149,11 +149,11 @@ int auto_plan_installs(const char *plan, char (*ids)[UPD_FIELD], char (*vers)[UP
 enum { AUTO_NOTE_UPGRADES, AUTO_NOTE_UPDATED, AUTO_NOTE_FAILED, AUTO_NOTE_BADGE };
 struct auto_env {
     void *ctx;
-    const char *state_path;   /* <prefix>/var/lib/cydian/upgrades.state */
+    const char *state_path;   /* <prefix>/var/lib/ifizbox/upgrades.state */
     const char *status_path;  /* <prefix>/var/lib/dpkg/status */
     const char *info_dir;     /* <prefix>/var/lib/dpkg/info (the <id>.list files) */
     const char *cache_dir;    /* <prefix>/var/cache/apt/archives */
-    const char *rollback_dir; /* <prefix>/var/cache/cydian/rollback */
+    const char *rollback_dir; /* <prefix>/var/cache/ifizbox/rollback */
     const char *lists_dir;    /* <prefix>/var/lib/apt/lists (B16: full-URL Filenames), NULL: not looked at */
     char *(*settings)(void *ctx);           /* the settings text (auto_settings_parse) */
     char *(*held)(void *ctx);               /* `apt-mark showhold` */

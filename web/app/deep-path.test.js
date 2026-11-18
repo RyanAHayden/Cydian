@@ -39,7 +39,7 @@ test("a deep /add link keeps its source", () => {
 
 test("root and one-level paths stay, as does the app's scheme", () => {
   for (const u of ["https://cydian.dev/", "https://cydian.dev/#/sources", "https://cydian.dev/index.html",
-    "https://cydian.dev/add?url=x", "https://cydian.dev/settings", "cydian://app/index.html#/home"]) {
+    "https://cydian.dev/add?url=x", "https://cydian.dev/settings", "ifizbox://app/index.html#/home"]) {
     assert.equal(run(u), null, u);
   }
 });

@@ -53,7 +53,7 @@ final class MenuController: UIViewController {
             stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
         ])
         let title = UILabel()
-        title.text = "Cydian navigation spike (R3)"
+        title.text = "iFizBox navigation spike (R3)"
         title.font = .boldSystemFont(ofSize: 22)
         stack.addArrangedSubview(title)
         stack.addArrangedSubview(toggle("Prefer 60 fps page rendering (WebKit default)", Settings.prefer60) { Settings.prefer60 = $0 })

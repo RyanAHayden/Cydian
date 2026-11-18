@@ -1,5 +1,5 @@
-"""F65: cydian-helper notifications on|off, Settings' Upgrade Notifications for N5's daemon. The plan (policy.c) and
-the whole chain app -> helper -> <prefix>/var/lib/cydian/upgrades.off, built with the host's C compiler."""
+"""F65: ifizbox-helper notifications on|off, Settings' Upgrade Notifications for N5's daemon. The plan (policy.c) and
+the whole chain app -> helper -> <prefix>/var/lib/ifizbox/upgrades.off, built with the host's C compiler."""
 import os
 import shutil
 import subprocess
@@ -29,7 +29,7 @@ class Notifications(unittest.TestCase):
         return r.stdout.splitlines()
 
     def test_plan(self):
-        off = "/var/jb/var/lib/cydian/upgrades.off"
+        off = "/var/jb/var/lib/ifizbox/upgrades.off"
         self.assertEqual(self.run_driver("plan", "/var/jb", "3", "notifications", "off"), [off, "notifications", "off"])
         self.assertEqual(self.run_driver("plan", "/var/jb", "-1", "notifications", "on"), [off, "notifications", "on"])
         for words in (["notifications"], ["notifications", "yes"], ["notifications", "on", "off"],
@@ -40,20 +40,20 @@ class Notifications(unittest.TestCase):
 
     def chain(self):
         p = tempfile.mkdtemp(dir=self.tmp)
-        os.makedirs(os.path.join(p, "Applications/Cydian.app"))
+        os.makedirs(os.path.join(p, "Applications/iFizBox.app"))
         os.makedirs(os.path.join(p, "var/lib"))
-        app = os.path.join(p, "Applications/Cydian.app/Cydian")
+        app = os.path.join(p, "Applications/iFizBox.app/iFizBox")
         shutil.copy(self.driver, app)
-        helper = os.path.join(p, "cydian-helper")
-        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"', f"-DCYDIAN_ROOT_UID={os.getuid()}"])
+        helper = os.path.join(p, "ifizbox-helper")
+        build(helper, ["main.c", "policy.c"], [f'-DIFIZBOX_PREFIX="{p}"', f"-DIFIZBOX_ROOT_UID={os.getuid()}"])
         return p, app, helper
 
     def test_chain(self):
         p, app, helper = self.chain()
-        f = os.path.join(p, "var/lib/cydian/upgrades.off")
+        f = os.path.join(p, "var/lib/ifizbox/upgrades.off")
         out = self.run_driver("spawn", helper, "notifications", "off", driver=app)
         self.assertEqual(out, ["1: Upgrade notifications off", "exit: 0"])
-        self.assertTrue(os.path.isfile(f))  # the cydian folder made too
+        self.assertTrue(os.path.isfile(f))  # the ifizbox folder made too
         self.assertEqual(os.stat(f).st_mode & 0o777, 0o644)
         self.assertEqual(os.stat(os.path.dirname(f)).st_mode & 0o777, 0o755)
         self.assertEqual(self.run_driver("spawn", helper, "notifications", "off", driver=app)[-1], "exit: 0")  # twice
@@ -70,7 +70,7 @@ class Notifications(unittest.TestCase):
     def test_chain_refuses_links(self):
         """Root never writes through, or deletes, something that isn't a plain file at the path."""
         p, app, helper = self.chain()
-        d = os.path.join(p, "var/lib/cydian")
+        d = os.path.join(p, "var/lib/ifizbox")
         os.makedirs(d)
         target = os.path.join(p, "elsewhere")
         open(target, "w").close()

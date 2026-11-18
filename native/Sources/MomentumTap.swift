@@ -6,7 +6,7 @@ import WebKit
 // no click (checked on the iPhone 7 with an on-screen event trace). So the app watches for it here: a tap
 // recognizer on the web view that only takes touches landing on a scroll view that is decelerating, and when one
 // ends as a tap (short, under 10 pt of movement: UITapGestureRecognizer's own rule, plus MAX_TAP), it asks the page
-// to click what is under the finger (web/app/nav/momentum-tap.js, cydianMomentumTap). A drag fails the
+// to click what is under the finger (web/app/nav/momentum-tap.js, ifizboxMomentumTap). A drag fails the
 // recognizer, so it only scrolls. Every other touch never reaches this recognizer, so ordinary taps are untouched.
 final class MomentumTap: NSObject, UIGestureRecognizerDelegate {
     static let maxTap: TimeInterval = 0.3 // as momentum-tap.js TAP_MS: longer is a hold, not a tap
@@ -49,7 +49,7 @@ final class MomentumTap: NSObject, UIGestureRecognizerDelegate {
         else { return }
         // The page is laid out 1:1 in points from the web view's top left (no zoom, the outer scroll view never moves).
         let p = g.location(in: web)
-        web.callAsyncJavaScript("globalThis.cydianMomentumTap?.(x, y)", arguments: ["x": Double(p.x), "y": Double(p.y)],
+        web.callAsyncJavaScript("globalThis.ifizboxMomentumTap?.(x, y)", arguments: ["x": Double(p.x), "y": Double(p.y)],
                                 in: nil, in: .page, completionHandler: nil)
     }
 }

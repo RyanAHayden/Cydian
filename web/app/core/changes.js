@@ -168,7 +168,7 @@ export async function recordRefresh(store, current, now = Date.now()) {
   return add.length;
 }
 
-export function openSeenStore({ indexedDB: idb = globalThis.indexedDB, name = "cydian-changes" } = {}) {
+export function openSeenStore({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-changes" } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
   return new Promise((resolve, reject) => {
     const req = idb.open(name, 1);

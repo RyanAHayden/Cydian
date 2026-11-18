@@ -40,7 +40,7 @@ node --test web/app
 node worker/test.mjs
 
 # Native builds (native/, N1 and I2): only where their toolchain is set up (SWIFT_TOOLCHAIN or swiftc on PATH,
-# IOS_SDK, ld64.lld). build.sh builds native/build/Cydian.deb and Cydian.ipa and checks them (mkdeb.py/mkipa.py).
+# IOS_SDK, ld64.lld). build.sh builds native/build/iFizBox.deb and iFizBox.ipa and checks them (mkdeb.py/mkipa.py).
 if native/build.sh --probe 2>/dev/null; then
   make -s -C native package
 else

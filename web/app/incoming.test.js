@@ -1,6 +1,6 @@
-// F75: the native URL hand-off (incoming.js): app.takeURL at start and on "cydian:url", each link to its handler;
+// F75: the native URL hand-off (incoming.js): app.takeURL at start and on "ifizbox:url", each link to its handler;
 // Open in iFizBox App's review (screens/importlink.js reviewAndImport) adds only what's new; F89: the website's
-// Open in iFizBox (cydian://install) asks, then installs.
+// Open in iFizBox (ifizbox://install) asks, then installs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { handleIncoming, startIncoming } from "./incoming.js";
@@ -21,7 +21,7 @@ function ui() {
 test("not ours: nothing happens", async () => {
   const u = ui();
   assert.equal(await handleIncoming("https://cydian.dev/", u.deps), null);
-  assert.equal(await handleIncoming("cydian://elsewhere", u.deps), null);
+  assert.equal(await handleIncoming("ifizbox://elsewhere", u.deps), null);
   assert.deepEqual([u.alerts.length, u.huds.length, u.went], [0, 0, 0]);
 });
 
@@ -29,7 +29,7 @@ test("F89 install: the website's Open in iFizBox asks, then installs the IPA wit
   const u = ui();
   const ran = [];
   const opened = [];
-  const link = "cydian://install?url=" + encodeURIComponent("https://e.example/My App.ipa") + "&name=My%20App";
+  const link = "ifizbox://install?url=" + encodeURIComponent("https://e.example/My App.ipa") + "&name=My%20App";
   assert.equal(await handleIncoming(link, { ...u.deps, install: async (o) => ran.push(o), open: (h) => opened.push(h) }), "install");
   assert.deepEqual(opened, ["#/installed/myipas"]);
   assert.equal(u.alerts[0].title, "Install IPA");
@@ -42,16 +42,16 @@ test("F89 install: the website's Open in iFizBox asks, then installs the IPA wit
 
 test("F89 install: a link without an http(s) IPA does nothing", async () => {
   const u = ui();
-  for (const bad of ["cydian://install", "cydian://install?url=javascript:alert(1)", "cydian://install?url=file:///x.ipa"]) {
+  for (const bad of ["ifizbox://install", "ifizbox://install?url=javascript:alert(1)", "ifizbox://install?url=file:///x.ipa"]) {
     assert.equal(installAsk(bad), null, bad);
     assert.equal(await handleIncoming(bad, { ...u.deps, install: async () => assert.fail("installed"), open: () => {} }), "install");
   }
   assert.equal(u.alerts.length, 0);
-  assert.deepEqual(installAsk("cydian://install?url=https%3A%2F%2Fa.example%2Fb.ipa"), { url: "https://a.example/b.ipa", name: "" });
+  assert.deepEqual(installAsk("ifizbox://install?url=https%3A%2F%2Fa.example%2Fb.ipa"), { url: "https://a.example/b.ipa", name: "" });
 });
 
-test("startIncoming takes the pending link at start and again on cydian:url", async () => {
-  const queue = ["cydian://nothing-of-ours", null];
+test("startIncoming takes the pending link at start and again on ifizbox:url", async () => {
+  const queue = ["ifizbox://nothing-of-ours", null];
   const calls = [];
   const native = { async call(m) { calls.push(m); return queue.length ? (queue[0] ? { url: queue.shift() } : (queue.shift(), null)) : null; } };
   const listeners = {};
@@ -61,8 +61,8 @@ test("startIncoming takes the pending link at start and again on cydian:url", as
     startIncoming({ native });
     await new Promise((r) => setTimeout(r, 10));
     assert.deepEqual(calls, ["app.takeURL", "app.takeURL"]); // one link, then none left
-    assert.equal(typeof listeners["cydian:url"], "function");
-    await listeners["cydian:url"]();
+    assert.equal(typeof listeners["ifizbox:url"], "function");
+    await listeners["ifizbox:url"]();
     assert.equal(calls.length, 3);
   } finally { globalThis.addEventListener = saved; }
   startIncoming({ native: null }); // the website: nothing to listen to
@@ -119,7 +119,7 @@ test("review in the app: nothing new says so; a broken link says so", async () =
   const u = ui();
   const same = await encodeLink({ settings: { appearance: "light" } });
   assert.equal(await reviewAndImport(same, { native: null, backend, store, ...u.deps }), "nothing");
-  assert.equal(await reviewAndImport("cydian://import?d=AAAA", { native: null, backend, store, ...u.deps }), "bad");
+  assert.equal(await reviewAndImport("ifizbox://import?d=AAAA", { native: null, backend, store, ...u.deps }), "bad");
 });
 
 test("review text: five names at most", () => {
@@ -149,7 +149,7 @@ test("Send Settings' import without a certificate never touches the Keychain", a
   const url = await encodeLink({ sources: ["https://n.example/"] });
   assert.equal(await reviewAndImport(url, { native, backend, store, ...u.deps }), "imported");
   assert.equal(calls.includes("signing.import"), false);
-  assert.equal(await handleIncoming("cydian://import?d=AAAA", { ...u.deps, review: async () => "bad" }), "import");
+  assert.equal(await handleIncoming("ifizbox://import?d=AAAA", { ...u.deps, review: async () => "bad" }), "import");
 });
 
 test("B14 a tab's link opens that tab, cold or warm", async () => {
@@ -157,11 +157,11 @@ test("B14 a tab's link opens that tab, cold or warm", async () => {
   const opened = [];
   const u = ui();
   for (const t of ["sources", "Changes", "home", "installed", "search", "settings"]) {
-    assert.equal(await handleIncoming(`cydian://${t}`, { ...u.deps, open: (h) => opened.push(h) }), "tab");
+    assert.equal(await handleIncoming(`ifizbox://${t}`, { ...u.deps, open: (h) => opened.push(h) }), "tab");
   }
   assert.deepEqual(opened, ["#/sources", "#/changes", "#/home", "#/installed", "#/search", "#/settings"]);
-  assert.equal(tabOf("cydian://sources/"), "sources");
-  assert.equal(tabOf("cydian://sources/x"), null);
-  assert.equal(tabOf("cydian://elsewhere"), null);
+  assert.equal(tabOf("ifizbox://sources/"), "sources");
+  assert.equal(tabOf("ifizbox://sources/x"), null);
+  assert.equal(tabOf("ifizbox://elsewhere"), null);
   assert.equal(tabOf("https://sources"), null);
 });

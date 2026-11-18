@@ -148,7 +148,7 @@ test("lookupApp: cached per bundle ID a week, not-found too; a failed fetch isn'
   assert.equal(asked, 3, "not found is remembered too");
 
   await assert.rejects(lookupApp("com.down", { get: async () => { throw new Error("offline"); }, store, now: 0 }));
-  assert.equal(store.getItem("cydian.applookup.us.com.down"), null);
+  assert.equal(store.getItem("ifizbox.applookup.us.com.down"), null);
   assert.equal(await lookupApp("a/b", { get, store }), null);
 });
 

@@ -1,4 +1,4 @@
-"""N7: automatic updates in cydian-upgrades (auto.c), built with the host's C compiler and run through auto_driver.c:
+"""N7: automatic updates in ifizbox-upgrades (auto.c), built with the host's C compiler and run through auto_driver.c:
 the F13 settings as the daemon reads them, when a check runs, what installs and when, what a respring needs, which
 .debs are kept for rollback, and whole hourly runs (auto_step) against a fake phone, clock and apt in a folder.
 main.m's side (the real apt, IOKit power, the lock state, reachability, sbreload) only runs on a jailbroken phone:

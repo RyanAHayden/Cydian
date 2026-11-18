@@ -27,7 +27,7 @@ import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
 import { renderAltSource, renderApp, installRows, formatDate, osRange } from "./altstore.js";
 import { showActionSheet } from "../nav/actionsheet.js";
-import { signingReady, signingAvailable, signAndInstall } from "../signing-client.js";
+import { signingReady, signingAvailable, signAndInstall, localSigning } from "../signing-client.js";
 import { installOptions } from "../core/altstore.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
@@ -615,7 +615,7 @@ async function packageActions(route, button) {
     const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v));
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });
     if (many) actions.push({ label: "Version History", run: () => go(versionsHref(route, id)) });
-    if (!options.itms && signingAvailable()) actions.push({ label: "Sign with My Certificate", run: () => go(format({ tab: "settings", path: ["signing"] })) });
+    if (!options.itms && (signingAvailable() || localSigning())) actions.push({ label: "Sign with My Certificate", run: () => go(format({ tab: "settings", path: ["signing"] })) });
     return sheet(options.itms ? "" : "This app needs signing: a sideloader signs it on the iPhone with your Apple ID, or add your own certificate in Settings > Signing.", actions);
   }
   const installed = installedOf(history);

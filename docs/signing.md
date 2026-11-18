@@ -212,6 +212,22 @@ Cydian, see journal/2026-11-17-i6-on-device-signing **Not verified**), B with th
 Remove Certificate (`signing.remove`) deletes the identity from the Keychain and the profile file.
 `signing.resetTrust` throws away the CA and its keys; the old profile stays in Settings until the user deletes it.
 
+### The page's side (F58)
+
+In the sideload build Settings > Signing has the site's Certificate rows (`.p12`, `.mobileprovision`, Password, each
+with Browse; one pick can fill all three), but the picks wait in memory only (`signing-client.js`: no IndexedDB)
+until all three are there and the password isn't known to be wrong, then go to `signing.import`; after that only the
+file names stay, until the app quits. The rest of the page comes from `signing.status`: the identity and its profile
+(`core/signing.js deviceSummary`, the signer's `problem` as its footer), the **Local Install** group
+(`localInstallSection`: Status, and until `trust.trusted` a Set Up row calling `signing.trust`, the two iOS Settings
+steps and Check Again; the page also redraws when the app comes back to the front) and Remove Certificate
+(`signing.remove`). There is no Signing Server row. Install on an AltStore app's page and Version History's rows call
+`signing.install {url}` once the Keychain holds an identity (`installOnDevice`); the HUD follows its phase events
+(`phaseLabel`: "Downloading 42%", "Reading", "Signing", "Installing") and an error alerts by its code
+(`deviceError`): `untrusted` and `no_identity` then open Settings > Signing. Without an identity the Install sheet
+offers the source's own options plus "Sign with My Certificate". Tests: `web/app/signing-client-device.test.js` and
+`web/app/core/signing-device.test.js`, against a fake `cydianNative`.
+
 ### Installing an app
 
 `signing.install {url}`, with progress events (`downloading`, `reading`, `signing`, `installing`):

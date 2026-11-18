@@ -14,7 +14,8 @@
 //
 // The certificate, key and password leave the phone only inside the POST to the signing server, over HTTPS, for
 // that one request. Nothing goes to localStorage but the server's address.
-import { DEFAULT_SERVER, normalizeServer, signBody, errorText } from "./core/signing.js";
+import { DEFAULT_SERVER, normalizeServer, signBody, errorText, toBase64, phaseLabel, deviceError } from "./core/signing.js";
+import { format } from "./router.js";
 import { detectMode } from "./core/settings.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
@@ -47,24 +48,35 @@ async function tx(mode, fn) {
   } finally { db.close(); }
 }
 
+// F58: the sideload build keeps the picks in memory only, until signing.import puts them into the Keychain; then
+// only their names stay (the .p12 itself never goes to the web view's storage).
+let staged = null;
+const inMemory = () => detectMode() === "sideload";
+
 export async function loadIdentity() {
+  if (inMemory()) return staged ? { ...staged } : null;
   try { return (await tx("readonly", (s) => s.get(KEY))) ?? null; } catch { return null; }
 }
 
 export async function saveIdentity(patch) {
   const cur = (await loadIdentity()) ?? {};
   const next = { ...cur, ...patch, savedAt: Date.now() };
+  if (inMemory()) { staged = next; return { ...next }; }
   await tx("readwrite", (s) => s.put(next, KEY));
   return next;
 }
 
 export async function clearIdentity() {
+  if (inMemory()) { staged = null; return; }
   await tx("readwrite", (s) => s.delete(KEY));
 }
 
 export const signingAvailable = () => detectMode() === "site";
 
 export async function signingReady() {
+  if (localSigning()) {
+    try { return Boolean((await deviceStatus())?.identity); } catch { return false; }
+  }
   if (!signingAvailable()) return false;
   const id = await loadIdentity();
   return Boolean(id?.p12 && id?.profile);
@@ -92,6 +104,7 @@ export async function serverStatus(server = getServer()) {
 // Signs `url` (an IPA) on the server and opens the install link it answers with. Resolves true once the link is
 // opened; false after an error, which it shows in an alert.
 export async function signAndInstall({ url, name = "", onInstalled = () => {} }) {
+  if (localSigning()) return installOnDevice({ url, name, onInstalled });
   const id = await loadIdentity();
   if (!id?.p12 || !id?.profile) {
     await showAlert({ title: "No Certificate", message: "Add your certificate and provisioning profile in Settings > Signing.", buttons: ["OK"] });
@@ -160,4 +173,71 @@ export async function pollJob(server, first, { wait = sleep } = {}) {
     // downloading or signing: the "Signing" HUD stays up
   }
   return { status: 504, body: { error: "Signing took too long: try again later." } };
+}
+
+// ---- on the phone (F58): the sideload build signs and installs itself, through I6's signing.* bridge calls ------
+//
+//   localSigning()                     true in the sideload build (signingAvailable() stays the site's server signer)
+//   await deviceStatus()               signing.status: { identity | null, trust: { ca, trusted, name } }
+//   await importToDevice({ p12, password, profile })   signing.import (files base64) -> status
+//   await removeFromDevice()           signing.remove -> status
+//   await setUpTrust()                 signing.trust: makes the local CA, opens its profile in Safari -> { url }
+//   await installOnDevice({ url, name, onInstalled })  signing.install with a HUD following its phases
+//
+// Each takes `native` (the bridge, globalThis.cydianNative by default) so tests can pass a fake.
+
+export const localSigning = () => detectMode() === "sideload";
+const bridge = (native) => {
+  const n = native ?? globalThis.cydianNative;
+  if (!n?.call) throw Object.assign(new Error("This build has no signer."), { code: "internal" });
+  return n;
+};
+
+export async function deviceStatus(native) {
+  return bridge(native).call("signing.status", {});
+}
+
+export async function importToDevice({ p12, password, profile }, native) {
+  return bridge(native).call("signing.import", { p12: toBase64(p12), profile: toBase64(profile), password: password ?? "" });
+}
+
+export async function removeFromDevice(native) {
+  return bridge(native).call("signing.remove", {});
+}
+
+export async function setUpTrust(native) {
+  return bridge(native).call("signing.trust", {});
+}
+
+// The HUD whose label follows the install's phases: { set(text), hide() }.
+function liveHUD(text) {
+  const hide = showHUD(text);
+  const label = [...document.querySelectorAll(".hud-label")].at(-1);
+  return { set: (t) => { if (label) label.textContent = t; }, hide };
+}
+
+const openRoute = (path) => { location.hash = format({ tab: "settings", path }).replace(/^#/, ""); };
+
+// Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an
+// error, which an alert explains (untrusted and no_identity then open Settings > Signing).
+export async function installOnDevice({ url, name = "", onInstalled = () => {} },
+  { native, hud = liveHUD, alert = showAlert, go = openRoute, later = setTimeout } = {}) {
+  const h = hud("Downloading");
+  let result;
+  try {
+    result = await bridge(native).call("signing.install", { url }, (ev) => {
+      const t = phaseLabel(ev);
+      if (t) h.set(t);
+    });
+  } catch (e) {
+    h.hide();
+    const why = deviceError(e, name);
+    await alert({ title: why.title, message: why.message, buttons: ["OK"] });
+    if (why.open === "signing") go(["signing"]);
+    return false;
+  }
+  h.set("Installing");
+  onInstalled(result);
+  later(h.hide, 2500); // iOS asks "Install …?" over the app; the HUD only bridges the wait for it
+  return true;
 }

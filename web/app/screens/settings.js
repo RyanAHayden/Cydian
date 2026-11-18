@@ -12,10 +12,11 @@ import { createSettings, detectMode, themeFor, SETTINGS } from "../core/settings
 import { drawSection as drawPushSection } from "../push-client.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
-import { parseProfile, checkP12Password, summary, profileKind, DEFAULT_SERVER } from "../core/signing.js";
+import { parseProfile, checkP12Password, summary, profileKind, DEFAULT_SERVER, deviceSummary, localInstallSection, deviceError } from "../core/signing.js";
 import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
-import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus } from "../signing-client.js";
+import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus,
+  localSigning, deviceStatus, importToDevice, removeFromDevice, setUpTrust } from "../signing-client.js";
 
 export const title = "Settings";
 
@@ -267,6 +268,7 @@ export function init() {
 // The root page's row: the certificate's name once one is set.
 function signingSection() {
   const box = document.createElement("div");
+  if (localSigning()) return deviceSigningSection(box);
   if (!signingAvailable()) return box;
   const fill = (detail) => box.replaceChildren(grouped([{ header: "Signing",
     rows: [{ label: "Certificate", detail, href: format({ tab: "settings", path: ["signing"] }) }],
@@ -313,6 +315,7 @@ async function chooseFiles(el, files, slot) {
     if (pw != null) await saveIdentity({ password: pw, passwordOk: true });
   }
   if (id?.p12) await recheckPassword(el, false);
+  if (localSigning()) await importIfComplete(el, false);
   redrawAll();
 }
 
@@ -385,6 +388,7 @@ async function removeCertificate(el) {
 }
 
 async function drawSigning(el) {
+  if (localSigning()) return drawDeviceSigning(el);
   const id = await loadIdentity();
   if (!signingAvailable()) {
     el.replaceChildren(grouped([{ footer: "Signing with your own certificate is on the website. This app signs on the iPhone itself." }]));
@@ -419,7 +423,8 @@ async function drawSigning(el) {
 // middle and a Browse button on the right (a <label> over a hidden file input, so iOS opens its picker straight from
 // the tap). Any Browse takes several files at once, or the .zip they came in: each goes where it belongs and the
 // password is found if a text file holds it (core/certfiles.js), so one pick can fill all three.
-function certificateBlock(el, id) {
+function certificateBlock(el, id, status = null) {
+  const kept = status?.identity ?? null; // F58: what the sideload build's Keychain holds
   const box = document.createElement("div");
   box.className = "group sign-files"; // a .group, like every grouped section: its 10px side margins
   const head = Object.assign(document.createElement("h3"), { className: "group-header", textContent: "Certificate" });
@@ -431,26 +436,40 @@ function certificateBlock(el, id) {
     return signRow(name, shown, browseButton(accept, true, (files) => chooseFiles(el, files, slot)));
   };
 
-  const input = Object.assign(document.createElement("input"), { type: "password", className: "sign-value", placeholder: "None", value: id?.password ?? "" });
+  const input = Object.assign(document.createElement("input"), { type: "password", className: "sign-value",
+    placeholder: kept && !id?.p12 ? "Not Kept" : "None", value: id?.password ?? "" });
   input.autocomplete = "off";
   input.setAttribute("autocapitalize", "off");
   input.setAttribute("autocorrect", "off");
   let timer = 0;
-  const save = async () => { clearTimeout(timer); await saveIdentity({ password: input.value }); await recheckPassword(el, false); };
+  // F58: in the sideload build a password that opens the .p12 (or, where it can't be checked here, a finished
+  // entry) sends all three to the Keychain.
+  const save = async (done = false) => {
+    clearTimeout(timer);
+    await saveIdentity({ password: input.value });
+    await recheckPassword(el, false);
+    if (localSigning()) {
+      const now = await loadIdentity();
+      if (now?.passwordOk === true || (done && now?.passwordOk !== false)) await importIfComplete(el, true);
+    }
+  };
   input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(save, 500); });
-  input.addEventListener("change", save);
+  input.addEventListener("change", () => save(true));
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
   // Browse here reads the password from a .txt (its first line).
   const pwBrowse = browseButton(".txt,text/plain", false, async ([f]) => {
     if (!f || f.bytes.length > 4096) return;
     input.value = new TextDecoder().decode(f.bytes).split(/\r?\n/)[0];
-    await save();
+    await save(true);
   });
 
-  ul.append(fileRow(".p12", id?.p12Name, "p12"), fileRow(".mobileprovision", id?.profileName, "profile"), signRow("Password", input, pwBrowse));
+  ul.append(fileRow(".p12", id?.p12Name ?? (kept ? "In Keychain" : null), "p12"),
+    fileRow(".mobileprovision", id?.profileName ?? kept?.profile?.name, "profile"), signRow("Password", input, pwBrowse));
   const state = id?.p12 && id?.password != null ? (id.passwordOk === false ? " The password doesn't open this certificate." : id.passwordOk ? " The password opens it." : "") : "";
+  const kind = status ? "Once all three are here, they go into this iPhone's Keychain, where only Cydian can use them; the password isn't kept. To change one, choose the .p12 and the profile again."
+    : "They're kept on this iPhone only, in this browser's storage.";
   const foot = Object.assign(document.createElement("p"), { className: "group-footer",
-    textContent: "Your .p12 (the certificate and its key), its .mobileprovision and the password. Browse can take all of them at once, or their .zip. They're kept on this iPhone only, in this browser's storage." + state });
+    textContent: "Your .p12 (the certificate and its key), its .mobileprovision and the password. Browse can take all of them at once, or their .zip. " + kind + state });
   box.append(head, ul, foot);
   return box;
 }
@@ -477,4 +496,105 @@ function browseButton(accept, multiple, onFiles) {
     if (files.length) onFiles(files);
   });
   return [input, label];
+}
+
+// ---- Signing on the phone (F58) ------------------------------------------------------------------------------
+// The sideload build: the same Certificate rows, but the picks wait in memory (signing-client.js) until the .p12, the
+// profile and a password are there, then go to the Keychain through signing.import (I6, docs/signing.md "On the
+// phone"). What the page shows comes from signing.status: the identity, its profile and their problem, and Local
+// Install, the one-time trust of Cydian's local certificate that installing needs. No Signing Server: nothing is
+// sent anywhere.
+
+function deviceSigningSection(box) {
+  const fill = (detail) => box.replaceChildren(grouped([{ header: "Signing",
+    rows: [{ label: "Certificate", detail, href: format({ tab: "settings", path: ["signing"] }) }],
+    footer: "Your own certificate: Install signs AltStore apps with it on this iPhone." }]));
+  fill("");
+  Promise.all([deviceStatus().catch(() => null), loadIdentity()]).then(([st, id]) => {
+    fill(st?.identity ? (st.identity.name || "In Keychain") : id?.p12 || id?.profile ? "Incomplete" : "None");
+  });
+  return box;
+}
+
+// The staged .p12, profile and password into the Keychain, once all are there and the password isn't known to be
+// wrong. True when imported. `typing`: the password field has focus, so a wrong password only updates its footer.
+async function importIfComplete(el, typing) {
+  const id = await loadIdentity();
+  if (!id?.p12 || !id?.profile || id.password == null || id.passwordOk === false) return false;
+  const hide = showHUD("Importing");
+  try {
+    await importToDevice(id);
+  } catch (e) {
+    hide();
+    if (e?.code === "wrong_password") {
+      await saveIdentity({ passwordOk: false });
+      if (typing) {
+        const foot = el.querySelector(".sign-files .group-footer");
+        if (foot && !/doesn't open/.test(foot.textContent)) foot.textContent += " The password doesn't open this certificate.";
+      } else redrawAll();
+      return false;
+    }
+    await alertOK("Couldn't Import", deviceError(e).message);
+    return false;
+  }
+  hide();
+  // In the Keychain now: only the names stay in memory, for the rows.
+  await clearIdentity();
+  await saveIdentity({ p12Name: id.p12Name, profileName: id.profileName });
+  redrawAll();
+  return true;
+}
+
+async function setUpLocalInstall() {
+  const hide = showHUD("Setting Up");
+  try {
+    await setUpTrust(); // Safari opens the profile; iOS says "Profile Downloaded"
+    hide();
+  } catch (e) {
+    hide();
+    await alertOK("Couldn't Set Up", deviceError(e).message);
+  }
+}
+
+async function removeDeviceCertificate() {
+  const { index } = await showAlert({ title: "Remove Certificate?", message: "The certificate, its key and the profile are deleted from this iPhone's Keychain.",
+    buttons: ["Cancel", "Remove"], cancel: 0 });
+  if (index !== 1) return;
+  try { await removeFromDevice(); } catch (e) { await alertOK("Couldn't Remove", deviceError(e).message); }
+  await clearIdentity();
+  redrawAll();
+}
+
+// Back from iOS Settings (the profile installed, full trust on): redraw so Local Install says Ready.
+let watchingReturn = false;
+function watchReturn() {
+  if (watchingReturn || typeof document === "undefined") return;
+  watchingReturn = true;
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") redrawAll(); });
+}
+
+async function drawDeviceSigning(el) {
+  watchReturn();
+  const id = await loadIdentity();
+  let status = null, failure = null;
+  try { status = await deviceStatus(); } catch (e) { failure = e; }
+  const top = el.scrollTop;
+  const sections = [];
+  const kept = status?.identity ?? null;
+  if (kept) {
+    const info = deviceSummary(kept);
+    sections.push({ header: "In This iPhone's Keychain",
+      rows: info.rows.map((r) => (r.detail.length > 16 ? { label: r.label, subtitle: r.detail } : r)),
+      footer: info.problems.length ? info.problems.join(" ") : null });
+  }
+  if (status) {
+    const local = localInstallSection(status.trust);
+    const act = { trust: () => setUpLocalInstall(), refresh: () => redrawAll() };
+    sections.push({ ...local, rows: local.rows.map(({ action, ...r }) => (action ? { ...r, onClick: act[action] } : r)) });
+  } else {
+    sections.push({ header: "Local Install", footer: `The signer didn't answer: ${deviceError(failure).message}` });
+  }
+  if (kept || id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeDeviceCertificate() }] });
+  el.replaceChildren(certificateBlock(el, id, status ?? { identity: null }), grouped(sections));
+  el.scrollTop = top;
 }

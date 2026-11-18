@@ -376,3 +376,87 @@ export function errorText(status, body) {
   if (status === 404 || status === 405) return "This signing server doesn't sign apps (no /sign).";
   return `The signing server answered HTTP ${status}.`;
 }
+
+// ---- on the phone (F58: the sideload build's Settings > Signing and Install, through I6's signing.* calls) -------
+
+const isoDate = (s) => { const d = s ? new Date(s) : null; return d && !Number.isNaN(d.getTime()) ? d : null; };
+
+// signing.status's identity as the Signing page's rows and problems, in the shape summary() answers:
+// { rows: [{label, detail}], problems: [text] }. `identity` is { name, team, expires, profile: { name, team, appId,
+// devices, wildcard, expires, problem } } or null (nothing in the Keychain: no rows).
+export function deviceSummary(identity, { now = new Date(), locale, timeZone } = {}) {
+  const rows = [];
+  const problems = [];
+  if (!identity) return { rows, problems };
+  const certExpires = isoDate(identity.expires);
+  const p = identity.profile ?? null;
+  const profExpires = isoDate(p?.expires);
+  rows.push({ label: "Certificate", detail: identity.name || "Unknown" });
+  rows.push({ label: "Team", detail: identity.team || p?.team || "Unknown" });
+  if (certExpires) rows.push({ label: "Certificate Expires", detail: fmtDate(certExpires, locale, timeZone) });
+  if (p) {
+    if (p.name) rows.push({ label: "Profile", detail: p.name });
+    rows.push({ label: "Profile Expires", detail: fmtDate(profExpires, locale, timeZone) });
+    // Bridge.swift sends the device count, or -1 / a string for a profile that lists none (enterprise: all).
+    const all = p.devices === "all" || p.devices === -1 || p.devices == null;
+    rows.push({ label: "Devices", detail: all ? "All" : String(p.devices) });
+    rows.push({ label: "App ID", detail: p.appId || "Unknown" });
+  } else {
+    problems.push("No provisioning profile: choose its .mobileprovision.");
+  }
+  if (p?.problem) problems.push(p.problem);
+  else {
+    if (certExpires && certExpires < now) problems.push(`The certificate expired on ${fmtDate(certExpires, locale, timeZone)}.`);
+    if (profExpires && profExpires < now) problems.push(`The provisioning profile expired on ${fmtDate(profExpires, locale, timeZone)}.`);
+  }
+  return { rows, problems };
+}
+
+// The Signing page's Local Install group from signing.status's trust ({ ca, trusted, name }). Until iOS trusts
+// Cydian's local certificate: a Set Up row (action "trust": signing.trust opens the profile in Safari) and the two
+// steps in iOS Settings, then Check Again (action "refresh"). Rows carry `action` names, settings.js binds them.
+export function localInstallSection(trust) {
+  const t = trust ?? {};
+  if (t.trusted) {
+    return { header: "Local Install", rows: [{ label: "Status", detail: "Ready" }],
+      footer: `iOS trusts ${t.name ? `“${t.name}”` : "Cydian's local certificate"}: Install signs apps on this iPhone and installs them from it. Nothing leaves the phone.` };
+  }
+  return {
+    header: "Local Install",
+    rows: [
+      { label: "Status", detail: t.ca ? "Not Trusted Yet" : "Not Set Up" },
+      { label: "Set Up", subtitle: "Downloads Cydian's certificate profile in Safari", action: "trust", chevron: true },
+      { label: "Install the Profile", subtitle: "Settings > General > VPN & Device Management" },
+      { label: "Turn On Full Trust", subtitle: "Settings > General > About > Certificate Trust Settings" },
+      { label: "Check Again", action: "refresh" },
+    ],
+    footer: "Once, before the first install: iOS installs apps only from an HTTPS address it trusts, so Cydian makes its own "
+      + "certificate, good for this iPhone's own address (localhost) only, and you trust it in Settings. Then come back here.",
+  };
+}
+
+// The HUD's text for a signing.install progress event { phase, progress }.
+const PHASES = { downloading: "Downloading", reading: "Reading", signing: "Signing", installing: "Installing" };
+export function phaseLabel(ev) {
+  const name = PHASES[ev?.phase];
+  if (!name) return null;
+  const pct = Math.round(Number(ev.progress) * 100);
+  return ev.phase !== "installing" && pct > 0 && pct < 100 ? `${name} ${pct}%` : name;
+}
+
+// What a failed signing call leads to, by its error code (native/Sources/SignBridge.swift): an alert's
+// { title, message } and where it sends the user next ("signing": Settings > Signing, whose Local Install group has
+// the trust steps; null: nowhere).
+export function deviceError(err, name = "") {
+  const code = err?.code ?? "";
+  const raw = String(err?.message ?? err ?? "").trim();
+  const message = raw ? raw[0].toUpperCase() + raw.slice(1) : "Something went wrong.";
+  if (code === "untrusted") {
+    return { title: "Set Up Local Install", open: "signing",
+      message: "Before the first install, iOS has to trust Cydian's local certificate. Settings > Signing > Local Install shows the steps." };
+  }
+  if (code === "no_identity") {
+    return { title: "No Certificate", open: "signing", message: "Add your certificate and provisioning profile in Settings > Signing." };
+  }
+  return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null, message };
+}

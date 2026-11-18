@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import {
   builtinSources, withBuiltins, withBuiltinRecords, builtinFirst, exportable, isBuiltin, BuiltinError,
   minimumOf, belowMinimum, selfFromAltSource, essentialIds, essentialUpgrades, selfUpgradeRow, withSelfUpgrade,
-  essentialAlert, runEssential, installSelf, loadInfo, saveInfo,
+  essentialAlert, runEssential, queueEssential, installSelf, loadInfo, saveInfo,
   SELF_ID, SELF_APT_URI, SELF_ALT_URL, SELF_SITE, SERVER_OK_KEY, TITLE, MESSAGE, COMPLETE, ESSENTIAL_ONLY, IGNORE,
 } from "./essential.js";
 import { altKey } from "./altstore.js";
@@ -277,6 +277,58 @@ test("runEssential: below the minimum the UI is locked, the alert has no Ignore,
   // At the minimum: Ignore is back.
   const ok = runDeps({ ...INFO, current: "0.1.2", minimum: "0.1.2" }, [2]);
   assert.equal(await runEssential(ok.deps), "ignored");
+});
+
+// ---- F86: both buttons queue and open Confirm ---------------------------------------------------------------
+
+// The alert's buttons as essential-ui.js binds them: queueEssential over a fake queue whose first add opens a fake
+// Confirm sheet; `endings` are how each Confirm goes away ("confirm" | "cancel" | "closed").
+function queueDeps(info, answers, endings) {
+  const r = runDeps(info, answers);
+  const queued = [], opened = [];
+  const ends = [...endings];
+  const button = (name) => (rows) => queueEssential(rows, {
+    queue: async (list) => { queued.push([name, list.map((x) => x.id)]); opened.push(name); r.log.push(["confirm", name]); return list.length; },
+    confirmed: async () => { const how = ends.shift() ?? "confirm"; r.log.push([how]); return how; },
+    fallback: async () => { r.log.push(["fallback"]); return "failed"; },
+  });
+  r.deps.complete = button("complete");
+  r.deps.essentialOnly = button("essential");
+  return { ...r, queued, opened };
+}
+
+test("F86: Complete Upgrade queues every upgrade and opens Confirm", async () => {
+  const r = queueDeps(INFO, [0], ["confirm"]);
+  assert.equal(await runEssential(r.deps), "complete");
+  assert.deepEqual(r.queued, [["complete", [SELF_ID, "tweak"]]]);
+  assert.deepEqual(r.log, [["alert", [COMPLETE, ESSENTIAL_ONLY, IGNORE]], ["confirm", "complete"], ["confirm"]]);
+});
+
+test("F86: Essential Only queues just the essential ones and opens Confirm", async () => {
+  const r = queueDeps(INFO, [1], ["confirm"]);
+  assert.equal(await runEssential(r.deps), "essential");
+  assert.deepEqual(r.queued, [["essential", [SELF_ID]]]);
+  assert.deepEqual(r.opened, ["essential"]);
+});
+
+test("F86: Confirm's Cancel: forced, the alert comes back; not forced, it's over", async () => {
+  const forced = queueDeps({ ...INFO, minimum: "0.1.2" }, [0, 1], ["cancel", "confirm"]);
+  assert.equal(await runEssential(forced.deps), "essential");
+  assert.deepEqual(forced.log, [["lock"], ["alert", [COMPLETE, ESSENTIAL_ONLY]], ["confirm", "complete"], ["cancel"],
+    ["alert", [COMPLETE, ESSENTIAL_ONLY]], ["confirm", "essential"], ["confirm"]]);
+  const free = queueDeps(INFO, [1], ["cancel"]);
+  assert.equal(await runEssential(free.deps), "cancelled");
+  assert.equal(free.log.filter((e) => e[0] === "alert").length, 1);
+});
+
+test("F86: Continue Queuing keeps the queue and doesn't ask again; nothing queuable falls back", async () => {
+  const r = queueDeps({ ...INFO, minimum: "0.1.2" }, [1], ["closed"]);
+  assert.equal(await runEssential(r.deps), "essential");
+  assert.equal(r.log.filter((e) => e[0] === "alert").length, 1);
+  const none = await queueEssential([{ id: SELF_ID }], { queue: async () => 0, confirmed: async () => assert.fail("no Confirm"),
+    fallback: async () => "no-asset" });
+  assert.equal(none, "no-asset");
+  assert.equal(await queueEssential([], { queue: async () => { throw new Error("x"); }, confirmed: async () => "confirm" }), "failed");
 });
 
 // ---- Cydian's own IPA in the sideload app ---------------------------------------------------------------------

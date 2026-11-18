@@ -214,7 +214,8 @@ test("F181: Install / Modify stays the nav bar's right button; the header has no
   // Neither page builds an install button into its header: renderPackage and renderApp hand the header no button.
   for (const file of ["./browse.js", "./altstore.js", "./storepage.js"]) {
     const src = readFileSync(new URL(file, import.meta.url), "utf8");
-    for (const call of src.match(/storeHeader\(\{[^)]*\}\)/gs) ?? []) assert.doesNotMatch(call, /Install|bar-button|button/i, file);
+    // F194: an app page's Share (headerShareButton) sits there; nothing that installs.
+    for (const call of src.match(/storeHeader\(\{[^)]*\}\)/gs) ?? []) assert.doesNotMatch(call.replace(/headerShareButton/g, ""), /Install|bar-button|button/i, file);
   }
   const browse = readFileSync(new URL("./browse.js", import.meta.url), "utf8");
   const page = browse.slice(browse.indexOf("async function renderPackage("), browse.indexOf("// ---- Install / Modify and Version History"));
@@ -237,4 +238,13 @@ test("F181: the CSS is there: the segmented control in ios6.css, the page in pac
   // 120 Hz: no transition or animation of anything but transform/opacity in the new rules.
   const part = pkgs.slice(pkgs.indexOf("F181: the package page"));
   assert.doesNotMatch(part, /transition\s*:\s*(?!transform|opacity)[a-z]/);
+});
+
+test("F194: storeHeader's action goes on the header's right edge, after the text", () => {
+  const share = document.createElement("button");
+  share.className = "bar-button bar-icon share-button store-head-share";
+  const h = sp.storeHeader({ name: "Velvet", line: "Version 1 · Free", action: share });
+  assert.equal(h.head.children.at(-1), share);
+  assert.equal(h.head.children.length, 3, "icon, text, action");
+  assert.equal(sp.storeHeader({ name: "Velvet" }).head.children.length, 2, "no action, nothing added");
 });

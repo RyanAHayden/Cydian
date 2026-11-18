@@ -22,7 +22,7 @@ import { signAndInstall, localSigning, isSelfIpa } from "../signing-client.js";
 import { siteGateRows, markCydianInstalled, websiteInstallsOn, SITE_GATE_FOOTER } from "../websign-gate.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
-import { setSourceShare } from "./handoff.js";
+import { setSourceShare, headerShareButton } from "./handoff.js";
 import { openIpaInstall } from "./ipa-install.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
@@ -409,7 +409,9 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   const keptInfo = needsCheck(v) ? savedInfo(ipaStore, v.downloadURL) : null;
   const fit = compat(keptInfo ? withIpaInfo(st, keptInfo) : st, currentDevice());
   const size = formatSize(v.size);
+  // F194: Share sits on the header, where the App Store's install button was (the nav bar keeps Install / Modify).
   const header = storeHeader({ art: icon, name: app.name, author: app.developerName || null,
+    action: headerShareButton(source ?? { key: pkg.key }, { app: true }),
     line: headerLine({ version: `${v.version}${v.buildVersion ? ` (${v.buildVersion})` : ""}`, size, price: "Free" }) });
   page.append(header.head);
 
@@ -610,7 +612,6 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   details.append(linksBox);
   Promise.all([looked, catalog.altSource(pkg.key).then((m) => m?.website ?? null, () => null)])
     .then(([store, site]) => drawLinks(store, site), () => {});
-  setSourceShare(body, source ?? { key: pkg.key }, { app: true }); // F76: Copy Link and Add on Another Device only
   details.append(grouped([{ footer: `${app.bundleIdentifier}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
   return { details, tabs };
 }

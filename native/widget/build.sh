@@ -17,7 +17,7 @@ variant=$1 app=$2
 : "${SWIFTC:?}" "${SDK:?}" "${RD:?}" "${LLD:?}" "${OUT:?}" "${VERSION:?}" "${BUILD:?}" "${BRAND_NAME:?}"
 min=17.0 target=arm64-apple-ios17.0
 obj=$OUT/widget-$variant
-appex=$app/PlugIns/iFizBoxWidget.appex
+appex=$app/PlugIns/${BRAND_NAME}Widget.appex
 mkdir -p "$obj" "$appex"
 
 sources=("$here/Widget.swift" "$native/intents/Core.swift" "$native/sign/Updates.swift" "$native/sign/Brand.swift")
@@ -26,7 +26,7 @@ cobjs=("$obj/availability.o")
 if [ "$variant" = jailbreak ]; then
   sources+=("$here/Controls.swift" "$native/intents/App/Host.swift")
   flags+=(-D IFIZBOX_JAILBREAK -import-objc-header "$here/Widget-Bridging-Header.h"
-          -emit-const-values-path "$obj/iFizBoxWidget.swiftconstvalues"
+          -emit-const-values-path "$obj/${BRAND_NAME}Widget.swiftconstvalues"
           -Xfrontend -const-gather-protocols-file -Xfrontend "$native/intents/protocols.json")
   clang -target "$target" -isysroot "$SDK" -O2 -c "$native/Sources/mode.c" -o "$obj/mode.o"
   clang -target "$target" -isysroot "$SDK" -std=c11 -Wall -Wextra -Werror -O2 -c "$native/helper/spawn.c" -o "$obj/spawn.o"
@@ -37,25 +37,25 @@ fi
 "$SWIFTC" -parse-as-library -O -wmo -swift-version 5 -runtime-compatibility-version none -application-extension \
   -target "$target" -sdk "$SDK" -resource-dir "$RD" -I "$RD/shims" -module-cache-path "$OUT/modules" \
   -Xcc -Wno-nullability-completeness -Xcc -Wno-nullability-inferred-on-nested-type \
-  "${flags[@]}" -module-name iFizBoxWidget -c "${sources[@]}" -o "$obj/iFizBoxWidget.o"
+  "${flags[@]}" -module-name ${BRAND_NAME}Widget -c "${sources[@]}" -o "$obj/${BRAND_NAME}Widget.o"
 clang -target "$target" -isysroot "$SDK" -O2 -c "$native/Sources/availability.c" -o "$obj/availability.o"
-clang -target "$target" -isysroot "$SDK" -fuse-ld=lld --ld-path="$LLD" -fapplication-extension "$obj/iFizBoxWidget.o" \
+clang -target "$target" -isysroot "$SDK" -fuse-ld=lld --ld-path="$LLD" -fapplication-extension "$obj/${BRAND_NAME}Widget.o" \
   "${cobjs[@]}" -L "$SDK/usr/lib/swift" -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
-  -o "$appex/iFizBoxWidget"
+  -o "$appex/${BRAND_NAME}Widget"
 
 sed -e "s/@VERSION@/$VERSION/" -e "s/@BUILD@/$BUILD/" -e "s/@MIN@/$min/" -e "s/\$(BRAND_NAME)/$BRAND_NAME/g" "$here/Info.plist" > "$appex/Info.plist"
 rm -rf "$appex/Metadata.appintents"
 if [ "$variant" = jailbreak ]; then
-  python3 "$native/intents/metadata.py" build "$obj/iFizBoxWidget.swiftconstvalues" "$appex/Metadata.appintents" >/dev/null
+  python3 "$native/intents/metadata.py" build "$obj/${BRAND_NAME}Widget.swiftconstvalues" "$appex/Metadata.appintents" >/dev/null
 fi
 
 ents=$here/entitlements.plist
 [ "$variant" = jailbreak ] || ents=$here/entitlements-sideload.plist
 if [ -n "${LDID:-}" ]; then
-  "$LDID" -S"$ents" "$appex/iFizBoxWidget"
+  "$LDID" -S"$ents" "$appex/${BRAND_NAME}Widget"
 elif [ -n "${RCODESIGN:-}" ]; then
-  "$RCODESIGN" sign --entitlements-xml-file "$ents" "$appex/iFizBoxWidget" >/dev/null 2>"$obj/rcodesign.log" ||
+  "$RCODESIGN" sign --entitlements-xml-file "$ents" "$appex/${BRAND_NAME}Widget" >/dev/null 2>"$obj/rcodesign.log" ||
     { cat "$obj/rcodesign.log" >&2; exit 1; }
 else
-  echo "widget: WARNING no ldid or rcodesign; iFizBoxWidget.appex is ad hoc signed without entitlements" >&2
+  echo "widget: WARNING no ldid or rcodesign; ${BRAND_NAME}Widget.appex is ad hoc signed without entitlements" >&2
 fi

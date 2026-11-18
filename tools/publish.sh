@@ -14,7 +14,7 @@
 # repo owner's account. --dry-run builds and prints what would be published, and changes nothing.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
-. native/brand.env # F170: BRAND_NAME
+. native/brand.env # F170: BRAND_NAME; F180: the asset name ($BRAND_NAME.ipa) and the repo
 die() { echo "publish: $*" >&2; exit 1; }
 
 version="${1:-}"; shift || true
@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
     *) die "unknown option $1" ;;
   esac
 done
-repo="${IFIZBOX_RELEASE_REPO:-RyanAHayden/iFizBox}"
+repo="${IFIZBOX_RELEASE_REPO:-$BRAND_GITHUB_REPO}"
 owner="${repo%%/*}"
 
 # 1. checks
@@ -74,9 +74,9 @@ if ! git diff --quiet web/app/source.json; then
 fi
 
 # 5. what the app and the site will download now
-got=$(curl -fsSL "https://github.com/$repo/releases/latest/download/iFizBox.ipa" | python3 -c '
+got=$(curl -fsSL "https://github.com/$repo/releases/latest/download/$BRAND_NAME.ipa" | python3 -c '
 import io, plistlib, sys, zipfile
 z = zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read()))
 print(plistlib.loads(z.read(next(n for n in z.namelist() if n.endswith(".app/Info.plist"))))["CFBundleShortVersionString"])')
-[ "$got" = "$version" ] || die "latest/download/iFizBox.ipa is $got, not $version"
+[ "$got" = "$version" ] || die "latest/download/$BRAND_NAME.ipa is $got, not $version"
 echo "publish: $BRAND_NAME $version is out: https://github.com/$repo/releases/tag/v$version"

@@ -58,6 +58,14 @@ class UpdateTest(unittest.TestCase):
         self.assertEqual(v["size"], 1002)
         self.assertEqual(altsource.check(data), [])
 
+    def test_update_drops_old_asset_names(self):
+        """F180: versions[] keeps only releases whose IPA is <NAME>.ipa; the ones under the old name go."""
+        old = {"version": "0.9.3", "downloadURL": altsource.REPO + "/releases/download/v0.9.3/" + "Cy" + "dian.ipa"}
+        own = {"version": "0.9.4", "downloadURL": altsource.ipa_url("0.9.4")}
+        data = altsource.build("0.9.5", 10, "2026-11-18T00:00:00Z", previous=[own, old])
+        self.assertEqual([v["version"] for v in data["apps"][0]["versions"]], ["0.9.5", "0.9.4"])
+        self.assertTrue(all(v["downloadURL"].endswith("/" + altsource.NAME + ".ipa") for v in data["apps"][0]["versions"]))
+
     def test_check_refuses(self):
         data = altsource.build("1.0.0", 10, "2026-11-17T00:00:00Z")
         data["apps"][0]["versions"][0]["downloadURL"] = altsource.ipa_url("0.9.0")

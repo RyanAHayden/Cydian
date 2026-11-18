@@ -74,22 +74,22 @@ ln -sfn "$tc/usr/lib/swift/clang" "$rd/clang"
   -target "$target" -sdk "$sdk" -resource-dir "$rd" -I "$rd/shims" -module-cache-path "$out/modules" \
   -Xcc -Wno-nullability-completeness -Xcc -Wno-nullability-inferred-on-nested-type \
   -import-objc-header Sources/iFizBox-Bridging-Header.h \
-  -emit-const-values-path "$out/iFizBox.swiftconstvalues" \
+  -emit-const-values-path "$out/$BRAND_NAME.swiftconstvalues" \
   -Xfrontend -const-gather-protocols-file -Xfrontend intents/protocols.json \
-  -module-name iFizBox -c Sources/*.swift sign/*.swift intents/*.swift intents/App/*.swift share/*.swift share/App/*.swift \
-  -o "$out/iFizBox.o"
+  -module-name "$BRAND_NAME" -c Sources/*.swift sign/*.swift intents/*.swift intents/App/*.swift share/*.swift share/App/*.swift \
+  -o "$out/$BRAND_NAME.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/availability.c -o "$out/availability.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/mode.c -o "$out/mode.o"
 # The app's half of the root helper (ifizbox_helper_spawn), and the helper itself (N2's native/helper/).
 hflags=(-target "$target" -isysroot "$sdk" -std=c11 -Wall -Wextra -Werror -O2)
 clang "${hflags[@]}" -c helper/spawn.c -o "$out/spawn.o"
-clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/iFizBox.o" "$out/availability.o" \
+clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/$BRAND_NAME.o" "$out/availability.o" \
   "$out/mode.o" "$out/spawn.o" -L "$sdk/usr/lib/swift" -lz -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
-  -Wl,-weak_framework,AppIntents -o "$out/iFizBox"
+  -Wl,-weak_framework,AppIntents -o "$out/$BRAND_NAME"
 # N8: AppIntents is iOS 16+ and weak (above), so iFizBox still launches on iOS 15. Nothing else may need it strongly.
 if command -v llvm-objdump >/dev/null || [ -x "$tc/usr/bin/llvm-objdump" ]; then
   od=$(command -v llvm-objdump || echo "$tc/usr/bin/llvm-objdump")
-  strong=$("$od" --macho --dylibs-used "$out/iFizBox" | grep -E '/(AppIntents|_AppIntents_[A-Za-z]+)\.framework/' | grep -v 'weak)' || true)
+  strong=$("$od" --macho --dylibs-used "$out/$BRAND_NAME" | grep -E '/(AppIntents|_AppIntents_[A-Za-z]+)\.framework/' | grep -v 'weak)' || true)
   [ -z "$strong" ] || { echo "native build: AppIntents linked strongly ($BRAND_NAME would not launch on iOS 15): $strong" >&2; exit 1; }
 fi
 
@@ -104,14 +104,14 @@ SIDELOAD_INTENTS=CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent # N
 bundle() {
   local app=$1 ents=$2 overlay=$3
   mkdir -p "$app/web"
-  cp "$out/iFizBox" "$app/iFizBox"
+  cp "$out/$BRAND_NAME" "$app/$BRAND_NAME"
   if [ -n "$ldid" ]; then
-    "$ldid" -S"$ents" "$app/iFizBox"
+    "$ldid" -S"$ents" "$app/$BRAND_NAME"
   elif [ -n "$rcodesign" ]; then
-    "$rcodesign" sign --entitlements-xml-file "$ents" "$app/iFizBox" >/dev/null 2>"$out/rcodesign.log" ||
+    "$rcodesign" sign --entitlements-xml-file "$ents" "$app/$BRAND_NAME" >/dev/null 2>"$out/rcodesign.log" ||
       { cat "$out/rcodesign.log" >&2; exit 1; }
   else
-    echo "native build: WARNING no ldid or rcodesign; $app/iFizBox is ad hoc signed without entitlements" >&2
+    echo "native build: WARNING no ldid or rcodesign; $app/$BRAND_NAME is ad hoc signed without entitlements" >&2
   fi
   # web/app/ goes in as it is, minus the tests and the website's zsign WebAssembly (F93: the app signs natively).
   (cd ../web/app && find . -type f ! -name '*.test.js' ! -name '.*' ! -path './vendor/zsign/*' -print0) |
@@ -131,7 +131,7 @@ bundle() {
   local variant=jailbreak only=()
   [ -z "$overlay" ] || { variant=sideload; only=(--only "$SIDELOAD_INTENTS"); }
   rm -rf "$app/Metadata.appintents"
-  python3 intents/metadata.py build "$out/iFizBox.swiftconstvalues" "$app/Metadata.appintents" "${only[@]}" >/dev/null
+  python3 intents/metadata.py build "$out/$BRAND_NAME.swiftconstvalues" "$app/Metadata.appintents" "${only[@]}" >/dev/null
   SWIFTC=$swiftc SDK=$sdk RD=$rd LLD=$lld OUT=$out VERSION=$version BUILD=$build LDID=$ldid RCODESIGN=$rcodesign \
     widget/build.sh "$variant" "$app"
   # N9: the share extension (share/build.sh): a shared link -> ifizbox://share?url=…
@@ -145,7 +145,7 @@ if [ "$what" != ipa ]; then
   root=$out/root
   rm -rf "$root" "$out/debian"
   mkdir -p "$out/debian"
-  bundle "$root/var/jb/Applications/iFizBox.app" entitlements.plist ""
+  bundle "$root/var/jb/Applications/$BRAND_NAME.app" entitlements.plist ""
   # ifizbox-helper: plain 0755, no setuid (the app spawns it as root through the persona attributes); ad hoc signed.
   # Only the .deb has it: the IPA's app finds no helper and runs in sideload mode (Sources/mode.c).
   libexec=$root/var/jb/usr/libexec/ifizbox
@@ -163,17 +163,17 @@ if [ "$what" != ipa ]; then
   # N5: the background upgrade check (daemon/README.md), a launchd daemon; jailbreak only.
   daemon/stage.sh "$root" "$sdk" "$lld" "$ldid" "$rcodesign"
   sed -e "s/@VERSION@/$version-$build/" "${brand_sed[@]}" deb/control > "$out/debian/control"
-  cp deb/postinst deb/prerm "$out/debian/"
-  python3 mkdeb.py build "$root" "$out/debian" "$out/iFizBox.deb"
-  python3 mkdeb.py check "$out/iFizBox.deb"
-  echo "$out/iFizBox.deb ($(du -h "$out/iFizBox.deb" | cut -f1))"
+  for s in postinst prerm; do sed "${brand_sed[@]}" deb/$s > "$out/debian/$s"; chmod 0755 "$out/debian/$s"; done
+  python3 mkdeb.py build "$root" "$out/debian" "$out/$BRAND_NAME.deb"
+  python3 mkdeb.py check "$out/$BRAND_NAME.deb"
+  echo "$out/$BRAND_NAME.deb ($(du -h "$out/$BRAND_NAME.deb" | cut -f1))"
 fi
 
 if [ "$what" != deb ]; then
   ipa=$out/ipa
   rm -rf "$ipa"
-  bundle "$ipa/iFizBox.app" entitlements-sideload.plist Info-sideload.plist
-  python3 mkipa.py build "$ipa/iFizBox.app" "$out/iFizBox.ipa"
-  python3 mkipa.py check "$out/iFizBox.ipa"
-  echo "$out/iFizBox.ipa ($(du -h "$out/iFizBox.ipa" | cut -f1))"
+  bundle "$ipa/$BRAND_NAME.app" entitlements-sideload.plist Info-sideload.plist
+  python3 mkipa.py build "$ipa/$BRAND_NAME.app" "$out/$BRAND_NAME.ipa"
+  python3 mkipa.py check "$out/$BRAND_NAME.ipa"
+  echo "$out/$BRAND_NAME.ipa ($(du -h "$out/$BRAND_NAME.ipa" | cut -f1))"
 fi

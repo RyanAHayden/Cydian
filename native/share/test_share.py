@@ -23,6 +23,7 @@ REPO = os.path.dirname(NATIVE)
 sys.path.insert(0, NATIVE)
 
 from test_sign import toolchain  # noqa: E402
+import brand  # noqa: E402
 
 SWIFTC = toolchain()
 INFO_PLIST = b"""<?xml version="1.0" encoding="UTF-8"?>
@@ -140,7 +141,7 @@ class Declared(unittest.TestCase):
         rule = ext["NSExtensionAttributes"]["NSExtensionActivationRule"]
         self.assertEqual(rule.get("NSExtensionActivationSupportsWebURLWithMaxCount"), 1)
         self.assertEqual(rule.get("NSExtensionActivationSupportsText"), True)
-        self.assertEqual(ext["NSExtensionPrincipalClass"], "iFizBoxShare.ShareViewController")
+        self.assertEqual(ext["NSExtensionPrincipalClass"], "$(BRAND_NAME)Share.ShareViewController")  # build.sh fills it in
 
 
 BUILD = os.path.join(NATIVE, "build")

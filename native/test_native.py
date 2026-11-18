@@ -11,6 +11,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import mkdeb  # noqa: E402
+import brand  # noqa: E402
 
 
 def fake_macho(cpu=0x0100000C, minos=(15, 0), signed=True):
@@ -39,7 +40,7 @@ HELPER_ENTS = {"platform-application": True, "com.apple.private.security.no-cont
 def plist(version="0.1.0", build="7"):
     with open(os.path.join(HERE, "Info.plist")) as f:
         text = f.read().replace("@VERSION@", version).replace("@BUILD@", build).replace("@MIN@", "15.0")
-    return text.encode()
+    return text.replace("$(BRAND_NAME)", brand.NAME).encode()
 
 
 def copy_launch(app):
@@ -78,8 +79,9 @@ class Deb(unittest.TestCase):
             self.write(self.app, "web/" + name, b"x")
         with open(os.path.join(HERE, "deb/control")) as f:
             self.write(self.debian, "control", f.read().replace("@VERSION@", "0.1.0-7").encode())
-        for name in ("postinst", "prerm"):
-            shutil.copy(os.path.join(HERE, "deb", name), self.debian)
+        for name in ("postinst", "prerm"):  # build.sh puts BRAND_NAME in them (F180)
+            with open(os.path.join(HERE, "deb", name)) as f:
+                self.write(self.debian, name, f.read().replace("$(BRAND_NAME)", brand.NAME).encode(), 0o755)
         self.deb = os.path.join(self.tmp, "iFizBox.deb")
 
     @staticmethod

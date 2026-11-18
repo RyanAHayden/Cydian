@@ -217,9 +217,10 @@ export async function signedRecordOf(id, { mode = detectMode(), native = globalT
 }
 
 // F91: the Installed section's "Signature" row: the days left as the Installed tab's pill. Null without a date.
-export function signatureRow(record, { now = new Date(), window = resignWindow((k) => settings.get(k)) } = {}) {
+// F134: null too while Show Expiry Dates is off (`show`), unless the signature expired.
+export function signatureRow(record, { now = new Date(), window = resignWindow((k) => settings.get(k)), show = settings.get("showExpiry") } = {}) {
   const sig = record ? signatureState(record.expires, { now, window }) : null;
-  return sig ? { label: "Signature", detail: sig.long, cls: `sig-row-${sig.state}` } : null;
+  return sig && (show || sig.state === "expired") ? { label: "Signature", detail: sig.long, cls: `sig-row-${sig.state}` } : null;
 }
 
 function trackingSection(app, pkg, source) {

@@ -16,7 +16,6 @@ test("defaults with nothing stored", () => {
   const s = createSettings({ storage: memStorage(), mode: "site" });
   assert.equal(s.get("appearance"), "light"); // Light unless chosen, dark iPhones too
   assert.equal(s.get("arch"), DEFAULT_ARCH);
-  assert.equal(s.get("allowZoom"), false);
   assert.equal(s.get("device"), "none");
   assert.equal(s.get("worksOnMyPhone"), true);
   assert.equal(s.get("compatMarks"), true);
@@ -32,10 +31,10 @@ test("defaults with nothing stored", () => {
 
 // F128: the settings audit. What's left, and the ones that went (docs/settings.md).
 test("F128: exactly these settings remain, and the retired ones are gone", () => {
-  assert.deepEqual(SETTINGS.map((d) => d.key), ["appearance", "allowZoom", "device", "arch", "worksOnMyPhone", "compatMarks",
+  assert.deepEqual(SETTINGS.map((d) => d.key), ["appearance", "device", "arch", "worksOnMyPhone", "compatMarks",
     "iosVersion", "refreshOnLaunch", "holds", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
-    "keepVersions", "resignReminder"]);
-  assert.deepEqual(RETIRED, ["sideloader", "checkUpdates", "cellular", "notifications", "badge"]);
+    "keepVersions", "showExpiry", "resignReminder"]);
+  assert.deepEqual(RETIRED, ["sideloader", "checkUpdates", "cellular", "notifications", "badge", "allowZoom"]);
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
   for (const k of RETIRED) {
     assert.throws(() => s.get(k), new RegExp(k));
@@ -49,15 +48,15 @@ test("F128: exactly these settings remain, and the retired ones are gone", () =>
 
 test("F128: the migration drops the retired settings' stored values and keeps everything else", () => {
   const old = { "cydian.sideloader": "altstore", "cydian.checkUpdates": "6h", "cydian.cellular": "false",
-    "cydian.notifications": "each", "cydian.badge": "false", "cydian.appearance": "dark", "cydian.allowZoom": "true",
+    "cydian.notifications": "each", "cydian.badge": "false", "cydian.appearance": "dark", "cydian.allowZoom": "true", "cydian.showExpiry": "false",
     "cydian.holds": '["com.a"]', "cydian.keepVersions": "2", "other.key": "x" };
   const storage = memStorage(old);
   const s = createSettings({ storage, mode: "jailbreak" });
   for (const k of RETIRED) assert.equal(storage.map.has("cydian." + k), false, k);
   assert.deepEqual([...storage.map.keys()].sort(),
-    ["cydian.allowZoom", "cydian.appearance", "cydian.holds", "cydian.keepVersions", "other.key"]);
+    ["cydian.appearance", "cydian.holds", "cydian.keepVersions", "cydian.showExpiry", "other.key"]);
   assert.equal(s.get("appearance"), "dark");
-  assert.equal(s.get("allowZoom"), true);
+  assert.equal(s.get("showExpiry"), false);
   assert.equal(s.get("keepVersions"), 2);
   assert.deepEqual(s.holds.list(), ["com.a"]);
   // run again: nothing left to drop; storage without removeItem or that throws doesn't break it
@@ -72,7 +71,7 @@ test("F128: the migration drops the retired settings' stored values and keeps ev
 test("F128: pages like iOS 6's Settings: General, Display, Updates (Signing in the sideload build), by mode", () => {
   const layout = (mode) => createSettings({ storage: memStorage(), mode }).pages()
     .map((p) => [p.id, p.title, p.sections.map((x) => x.settings.map((d) => d.key))]);
-  const display = ["display", "Display", [["appearance"], ["compatMarks"], ["allowZoom"]]];
+  const display = ["display", "Display", [["appearance"], ["compatMarks"]]];
   assert.deepEqual(layout("site"), [
     ["general", "General", [["device", "iosVersion"], ["worksOnMyPhone"], ["refreshOnLaunch"]]],
     display,
@@ -87,7 +86,7 @@ test("F128: pages like iOS 6's Settings: General, Display, Updates (Signing in t
     ["general", "General", [["worksOnMyPhone"], ["refreshOnLaunch"]]],
     display,
     ["updates", "Updates", [["holds"]]],
-    ["signing", "Signing", [["resignReminder"]]],
+    ["signing", "Signing", [["showExpiry", "resignReminder"]]],
   ]);
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
   assert.equal(s.pageOf("display").title, "Display");
@@ -241,28 +240,28 @@ test("holds: the helper is only used in jailbreak mode", async () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["appearance", "allowZoom", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "holds"]);
+    ["appearance", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "holds"]);
   assert.deepEqual(show("jailbreak"),
-    ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds",
+    ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds",
       "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
-    ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds", "resignReminder"]);
+    ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds", "showExpiry", "resignReminder"]);
 });
 
 test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone, Ignored Upgrades and Automatic Installs", () => {
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds", "upgradeNotifications",
+  assert.deepEqual(keysOf(s), ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds", "upgradeNotifications",
     "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.equal(s.isShown("autoInstall"), true);
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", features: new Set(["appearance"]) }).isShown("autoInstall"), false);
   assert.ok(FEATURES.has("appearance"));
   assert.deepEqual(createSettings({ storage: memStorage(), mode: "site", features: new Set(["appearance"]) })
-    .sections().map((x) => x.id), ["appearance", "zoom"]);
+    .sections().map((x) => x.id), ["appearance"]);
 });
 
 test("sections come in page order, empty ones dropped", () => {
   const s = createSettings({ storage: memStorage(), mode: "sideload", features: everything });
-  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "sources", "appearance", "display", "zoom", "updates", "signing"]);
+  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "sources", "appearance", "display", "updates", "signing"]);
   assert.equal(s.sections().find((x) => x.id === "appearance").settings[0].key, "appearance");
 });
 
@@ -449,4 +448,30 @@ test("F70: daemonPrefs: the daemon's keys with their typed values, unpicked ones
   });
   assert.deepEqual(s.daemonPrefs(["keepVersions"]), { "cydian.keepVersions": 2 });
   assert.deepEqual(s.daemonPrefs(["holds", "appearance"]), { "cydian.holds": ["com.h", "com.z"] }); // not the daemon's: left out
+});
+
+// F134: Display > Zoom went (zoom stays off), and Settings > Signing has Show Expiry Dates, a switch, on by default.
+test("F134: allowZoom is retired: its stored value is dropped and nothing shows or travels it", async () => {
+  assert.ok(RETIRED.includes("allowZoom"));
+  const storage = memStorage({ "cydian.allowZoom": "true", "cydian.appearance": "dark" });
+  const s = createSettings({ storage, mode: "site" });
+  assert.equal(storage.map.has("cydian.allowZoom"), false);
+  assert.equal(storage.map.get("cydian.appearance"), "dark");
+  assert.equal(s.isShown("allowZoom"), false);
+  assert.throws(() => s.get("allowZoom"), /allowZoom/);
+  const { TRAVELS } = await import("./settings.js");
+  assert.equal(TRAVELS.includes("allowZoom"), false);
+  assert.equal(SECTIONS.some((x) => x.id === "zoom"), false);
+});
+
+test("F134: Show Expiry Dates is a switch on Settings > Signing, on by default, in the sideload build", () => {
+  const d = SETTINGS.find((x) => x.key === "showExpiry");
+  assert.equal(d.kind, "toggle"); // createSwitch, never On/Off text
+  assert.equal(d.label, "Show Expiry Dates");
+  const s = createSettings({ storage: memStorage(), mode: "sideload" });
+  assert.equal(s.get("showExpiry"), true);
+  assert.deepEqual(s.sections().find((x) => x.page === "signing").settings.map((x) => x.key), ["showExpiry", "resignReminder"]);
+  s.set("showExpiry", false);
+  assert.equal(s.get("showExpiry"), false);
+  for (const mode of ["site", "jailbreak"]) assert.equal(createSettings({ storage: memStorage(), mode }).isShown("showExpiry"), false, mode);
 });

@@ -1,0 +1,12 @@
+/* F134: Settings' own rules (screens/settings.js links this file when it first draws a page). Settings > Signing is an
+   iOS 6 settings page (.signing-page): the Certificate group with its Import or Replace row, the Files group while a
+   file or the password is missing, the profile, the options, then How Signing Works. Colours from ios6.css. */
+.signing-page { padding-bottom: 20px; }
+/* The Files group is a plain .group here: its rows sit at the group's own margins, not inset again as in the
+   walkthrough's card (signing.css .sign-files > .table). */
+.signing-page .sign-files > .table { margin-left: 0; margin-right: 0; }
+/* The Import row carries the hidden file input it clicks. */
+.signing-page .sign-import { position: relative; }
+/* A problem with the certificate or profile, in the Certificate group's footer (signsheet.css's red, which only
+   loads with Signed Apps). */
+.signing-page .group-footer.sign-warning { color: #b5322c; text-shadow: none; }

@@ -69,8 +69,21 @@ const fetchErr = (code, error, status = 502) => new Response(JSON.stringify({ er
 export function httpUrl(raw) {
   try { const u = new URL(raw); return /^https?:$/.test(u.protocol) && !u.username && !u.password ? u : null; } catch { return null; }
 }
-async function upstream(url) {
-  return fetch(url, { headers: CYDIA, redirect: "follow", cf: { cacheTtl: 0 }, signal: AbortSignal.timeout(30000) });
+// GitHub release files never change once published: Cloudflare keeps them a day, so an install fetches GitHub once,
+// not every time. Everything else (sources, Packages) is fetched fresh.
+export const releaseFile = (url) => /^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/download\/[^/]+\/[^/]+$/.test(String(url));
+// GitHub limits requests per address, and Workers share theirs with other sites: a 429 (or a 5xx) is tried again
+// after a short wait, up to 3 times (user 2026-11-18: "upstream answered HTTP 429" installing Cydian).
+export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  const cf = releaseFile(url) ? { cacheEverything: true, cacheTtl: 86400 } : { cacheTtl: 0 };
+  let r;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    r = await fetcher(url, { headers: CYDIA, redirect: "follow", cf, signal: AbortSignal.timeout(30000) });
+    if (r.status !== 429 && r.status < 500) return r;
+    const after = Number(r.headers.get("retry-after"));
+    await wait(Number.isFinite(after) && after > 0 && after <= 5 ? after * 1000 : 600 * (attempt + 1));
+  }
+  return r;
 }
 async function apiFetch(u, maxBytes = MAX_UPLOAD) {
   const target = httpUrl(u.searchParams.get("url") ?? "");

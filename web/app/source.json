@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.2.8",
+          "date": "2026-11-18T03:46:11Z",
+          "localizedDescription": "Importing from the website shows one popup (ends on Done); anything that could not be added shows in a passing banner.\nA website install brings its settings only on the first launch.\nThe Home Cydian App card; My IPAs (0.2.7).\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.8",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.8/Cydian.ipa",
+          "size": 2671166,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.2.7",
           "date": "2026-11-18T03:43:20Z",
           "localizedDescription": "My IPAs under Installed: add your own IPAs from Files or a URL, sign them on the phone (offline), install, save or share them.\nHome: the Cydian App card (Install Cydian App, Send Settings to App); Featured slides in; the tile says Refreshing Sources while sources load.\nOpen in Cydian brings your certificate too and imports straight away.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.7",

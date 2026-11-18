@@ -144,8 +144,9 @@ test("popping several levels at once, and replacing a sibling", () => {
   assert.equal(r.kind, "pop");
   assert.deepEqual(r.removed.map((e) => e.path.join("/")), ["a/b/c", "a/b", "a"]); // top first
   assert.equal(r.to, root);
-  h.router.go({ tab: "sources", path: ["x", "y"] }); // two levels: not a single push
-  assert.equal(h.last().kind, "replace");
+  h.router.go({ tab: "sources", path: ["x", "y"] }); // two levels at once slide in as one push (Home's Featured)
+  assert.equal(h.last().kind, "push");
+  assert.equal(h.last().to.pushed, false); // one history entry for two pages: Back goes to x, not history.back()
   h.router.go({ tab: "sources", path: ["x", "z"] });
   r = h.last();
   assert.equal(r.kind, "replace");

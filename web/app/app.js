@@ -318,6 +318,18 @@ if (standalone) {
   }, true);
 }
 router.start();
+// First launch of a Cydian installed from the website: its signed copy carries the website's sources, settings and
+// certificate as web/transfer.link (the Signing Server's bring + transfer); import them once, no question.
+if (globalThis.cydianNative) {
+  let done = null;
+  try { done = localStorage.getItem("cydian.transferDone"); } catch { /* private */ }
+  if (!done) fetch("transfer.link", { cache: "no-store" }).then((r) => (r.ok ? r.text() : null)).then(async (link) => {
+    if (!link || !link.startsWith("cydian://import?")) return;
+    try { localStorage.setItem("cydian.transferDone", "1"); } catch { /* asks again next launch */ }
+    const { handleIncoming } = await import("./incoming.js");
+    await handleIncoming(link.trim());
+  }).catch(() => {});
+}
 upgradeNotices.start();
 createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon
 document.getElementById("boot")?.remove(); // the first page is drawn: the loading screen goes

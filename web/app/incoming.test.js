@@ -100,25 +100,18 @@ test("review in the app: Import adds only the new, keeps the user's own, no dupl
   const backend = fakeBackend([{ key: "deb:https://a.example/:./" }]);
   const store = fakeStore({ appearance: "light", worksOnMyPhone: true }, ["two"]); // no Device in the app
   const u = ui();
-  assert.equal(await reviewAndImport(url, { native: null, backend, store, ...u.deps }), "imported");
-  assert.equal(u.alerts[0].title, "Import from the Website?");
-  assert.deepEqual(u.alerts[0].buttons, ["Cancel", "Import"]);
-  assert.match(u.alerts[0].message, /^2 new sources: b\.example, fail\.example\.\nAppearance: Dark\.\nIgnored Upgrades: 1 more\.$/);
+  assert.equal(await reviewAndImport(url, { native: null, backend, store, ...u.deps }), "imported"); // no question first
   assert.equal(backend.added.length, 1); // b; a was listed; fail failed and is reported
-  assert.equal(u.alerts[1].title, "Some Sources Failed");
+  assert.equal(u.alerts[0].title, "Some Things Didn't Import");
   assert.equal(store.v.appearance, "dark");
   assert.equal("device" in store.v, false);
   assert.deepEqual(store.h, ["two", "one"]);
 });
 
-test("review in the app: Cancel changes nothing; nothing new says so; a broken link says so", async () => {
-  const url = await encodeLink({ sources: ["https://b.example/"], settings: { appearance: "dark" } });
+test("review in the app: nothing new says so; a broken link says so", async () => {
   const backend = fakeBackend();
   const store = fakeStore({ appearance: "light" });
   const u = ui();
-  u.answer = 0;
-  assert.equal(await reviewAndImport(url, { native: null, backend, store, ...u.deps }), "cancelled");
-  assert.deepEqual([backend.added.length, store.v.appearance], [0, "light"]);
   const same = await encodeLink({ settings: { appearance: "light" } });
   assert.equal(await reviewAndImport(same, { native: null, backend, store, ...u.deps }), "nothing");
   assert.equal(await reviewAndImport("cydian://import?d=AAAA", { native: null, backend, store, ...u.deps }), "bad");

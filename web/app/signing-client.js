@@ -147,9 +147,18 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {}, b
   const server = getServer();
   let hide = showHUD("Signing");
   let status, body = null;
+  // Installing Cydian itself from the website brings everything along (user 2026-11-17): the certificate (bring) and
+  // the website's sources and settings (transfer), which the app imports on its first launch.
+  let transfer = null;
+  if (bring) {
+    try {
+      const [{ websitePayload }, { encodeLink }] = await Promise.all([import("./screens/importlink.js"), import("./core/transfer.js")]);
+      transfer = await encodeLink(await websitePayload());
+    } catch { /* an older browser: the certificate still goes */ }
+  }
   try {
     const json = JSON.stringify({ ...JSON.parse(signBody({ url, p12: id.p12, profile: id.profile, password: id.password })), async: true,
-      ...(bring ? { bring: true } : {}) });
+      ...(bring ? { bring: true } : {}), ...(transfer ? { transfer } : {}) });
     const res = await fetch(`${server}/sign`, {
       method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: json,
     });

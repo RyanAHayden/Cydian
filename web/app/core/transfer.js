@@ -11,7 +11,7 @@
 //   importUrl(sealed)                 cydian://signing-import#<sealed>: only ciphertext travels in a URL, so another
 //                                     app that claims cydian:// gets nothing it can use
 //
-// Open in Cydian App (sources and settings, never the certificate):
+// Open in Cydian App (sources, settings and the certificate):
 //   await encodeLink({ sources, settings, holds, server })   cydian://import?d=<base64url of gzipped JSON>
 //   await decodeLink(url, { gunzip })                        the payload, or null for anything else
 //   reviewLink(payload, { have, get, shown, holds, server }) what's new: { sources, settings, holds, server, empty }
@@ -103,9 +103,11 @@ async function pipe(data, stream) {
   return new Uint8Array(await out.arrayBuffer());
 }
 
-export async function encodeLink({ sources = [], settings = {}, holds = [], server = null } = {}) {
+export async function encodeLink({ sources = [], settings = {}, holds = [], server = null, identity = null } = {}) {
   const payload = { v: 1, sources: [...new Set(sources.filter((s) => typeof s === "string" && s))], settings,
     holds: [...new Set(holds.filter((p) => typeof p === "string" && p))], server: normalizeServer(server) ?? null };
+  // The certificate too (user 2026-11-17): { p12, profile (base64url), password, p12Name, profileName }.
+  if (identity?.p12 && identity?.profile) payload.identity = identity;
   const gz = await pipe(new TextEncoder().encode(JSON.stringify(payload)), new CompressionStream("gzip"));
   return "cydian://import?d=" + toB64url(gz);
 }
@@ -128,6 +130,7 @@ export async function decodeLink(url, { gunzip = null } = {}) {
       settings: p.settings && typeof p.settings === "object" && !Array.isArray(p.settings) ? p.settings : {},
       holds: Array.isArray(p.holds) ? p.holds.filter((s) => typeof s === "string") : [],
       server: normalizeServer(p.server) ?? null,
+      identity: p.identity && typeof p.identity.p12 === "string" && typeof p.identity.profile === "string" ? p.identity : null,
     };
   } catch {
     return null;

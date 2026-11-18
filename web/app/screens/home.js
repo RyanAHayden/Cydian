@@ -107,7 +107,7 @@ export function nav(route, ctx) {
 async function showAbout(ctx) {
   await ctx.showAlert({
     title: "About Cydian",
-    message: "Version 0.1\nFree and open source\n\nRyan Hayden\n\nInspired by Cydia\nby Jay Freeman (saurik)\nNot affiliated with SaurikIT",
+    message: "Version 0.1\nFree and open source\n\nRyan Hayden (Fizlo)\n\nInspired by Cydia\nby Jay Freeman (saurik)\nNot affiliated with SaurikIT",
     buttons: ["Close"],
   });
 }
@@ -203,7 +203,7 @@ function renderRoot(body) {
   const words = el("div", "home-words");
   words.append(el("h2", "home-title", "Welcome to Cydian"));
   const by = el("p", "home-by", "by ");
-  const who = el("a", null, "Ryan Hayden");
+  const who = el("a", null, "Ryan Hayden (Fizlo)"); // as Cydia's "Jay Freeman (saurik)"
   who.href = REPO_URL;
   who.target = "_blank";
   who.rel = "noopener";

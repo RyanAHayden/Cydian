@@ -141,6 +141,20 @@ IDENTITY_FILE = "cydian-identity.plist"
 CYDIAN_BUNDLE_ID = "com.ryha.cydian"
 
 
+TRANSFER_FILE = "web/transfer.link"
+
+
+def add_transfer(path: str, link: str) -> None:
+    """Add Payload/<App>.app/web/transfer.link: the website's cydian://import link (sources, settings, certificate),
+    which the app's page reads and imports on its first launch, so installing Cydian from the website brings
+    everything along. The caller checks the bundle ID."""
+    with zipfile.ZipFile(path, "a", compression=zipfile.ZIP_DEFLATED) as z:
+        info = next((n for n in z.namelist() if _INFO.match(n)), None)
+        if not info:
+            raise SignError("bad_ipa", "That file is not an IPA: it has no Payload/<App>.app/Info.plist.")
+        z.writestr(info[: -len("Info.plist")] + TRANSFER_FILE, link)
+
+
 def add_identity(path: str, p12: bytes, password: str, profile: bytes) -> str:
     """Add Payload/<App>.app/cydian-identity.plist ({p12, password, profile}) to the IPA at `path`, before zsign
     seals the bundle. The caller checks the bundle ID. Returns the entry's name."""

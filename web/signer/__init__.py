@@ -339,6 +339,12 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
             identity = load_p12(p12_bytes, body.get("password") or "")
             # F75: Install Cydian App asks for the certificate inside the app (Cydian's own IPA only, see _run)
             bring = (p12_bytes, body.get("password") or "") if body.get("bring") is True else None
+            transfer = body.get("transfer") if bring else None  # the website's cydian://import link, Cydian's IPA only
+            if transfer is not None and (not isinstance(transfer, str) or not transfer.startswith("cydian://import?")
+                                         or len(transfer) > 512 * 1024):
+                transfer = None
+            if bring and transfer:
+                bring = bring + (transfer,)
             profile_bytes = _b64(body.get("profile"), "profile")
             profile = parse_profile(profile_bytes)
             check(identity, profile)
@@ -451,6 +457,8 @@ def _run(store: Store, fetcher, binary, url, identity, profile, profile_bytes, o
         app = ipa_mod.inspect(src, MAX_UNZIPPED)
         if bring and app.bundle_id == ipa_mod.CYDIAN_BUNDLE_ID:
             ipa_mod.add_identity(src, bring[0], bring[1], profile_bytes)
+            if len(bring) > 2:
+                ipa_mod.add_transfer(src, bring[2])
         bundle_id = target_bundle_id(profile, app.bundle_id)
         on_phase("signing")
         zsign.sign(binary, src, out, identity.unlocked_p12(), profile_bytes, work,

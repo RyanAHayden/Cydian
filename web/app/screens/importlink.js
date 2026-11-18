@@ -16,9 +16,9 @@ import { showBanner } from "../nav/banner.js";
 import { showHUD } from "../nav/hud.js";
 import { detectMode, TRAVELS, SETTINGS } from "../core/settings.js";
 import { exportLine } from "../core/sourcelist.js";
-import { encodeLink, decodeLink, reviewLink } from "../core/transfer.js";
+import { encodeLink, decodeLink, reviewLink, toB64url, fromB64url } from "../core/transfer.js";
 import { toBase64 } from "../core/signing.js";
-import { getServer, setServer } from "../signing-client.js";
+import { getServer, setServer, loadIdentity, saveIdentity } from "../signing-client.js";
 import { getBackend } from "../backend.js";
 import { settings } from "./settings.js";
 
@@ -34,7 +34,14 @@ export async function websitePayload({ backend = getBackend(), store = settings,
   const sources = (await backend.sources().catch(() => [])).filter((s) => s?.uri).map(exportLine);
   const values = {};
   for (const k of TRAVELS) if (store.isShown(k)) values[k] = store.get(k);
-  return { sources, settings: values, holds: store.holds.list(), server };
+  // The certificate goes along when this browser has one (Settings > Signing), so the app needs no setup.
+  let identity = null;
+  try {
+    const id = await loadIdentity();
+    if (id?.p12 && id?.profile) identity = { p12: toB64url(id.p12), profile: toB64url(id.profile), password: id.password ?? "",
+      p12Name: id.p12Name ?? "", profileName: id.profileName ?? "" };
+  } catch { /* no certificate stored here */ }
+  return { sources, settings: values, holds: store.holds.list(), server, identity };
 }
 
 export async function openInApp() {
@@ -47,7 +54,7 @@ export async function openInApp() {
   }
   hide();
   // Safari's own "Open in Cydian?" can't be reworded: the banner says which button to press.
-  showBanner({ title: "Cydian", message: "Press Open to import your sources and settings into Cydian." });
+  showBanner({ title: "Cydian", message: "Press Open to bring your certificate, sources and settings into Cydian." });
   location.href = link;
 }
 
@@ -83,14 +90,22 @@ export async function reviewAndImport(url, { native = globalThis.cydianNative, b
     have, get: (k) => (store.isShown(k) ? store.get(k) : undefined), shown: (k) => store.isShown(k),
     holds: store.holds.list(), server: getServer(),
   });
-  if (r.empty) {
+  // Straight away, no question (user 2026-11-17): the user asked for it by opening the link.
+  const hide = hud("Importing");
+  const failed = [];
+  if (payload.identity && native?.call) {
+    try {
+      const b64 = (t) => toBase64(fromB64url(t));
+      await native.call("signing.import", { p12: b64(payload.identity.p12), profile: b64(payload.identity.profile),
+        password: payload.identity.password ?? "" });
+      await saveIdentity({ p12Name: payload.identity.p12Name, profileName: payload.identity.profileName }).catch(() => {});
+    } catch (err) { failed.push(`Certificate: ${err?.message ?? err}`); }
+  }
+  if (r.empty && !payload.identity) {
+    hide();
     await alert({ title: "Nothing New", message: "Cydian already has the website's sources and settings.", buttons: ["OK"] });
     return "nothing";
   }
-  const { index } = await alert({ title: "Import from the Website?", message: reviewText(r), buttons: ["Cancel", "Import"], cancel: 0 });
-  if (index !== 1) return "cancelled";
-  const hide = hud("Importing");
-  const failed = [];
   // Sources on the Source Warning list (core/warnings.js) stay out, as Manage's import leaves them unticked.
   for (const e of r.sources.filter((x) => !x.warning)) {
     try { await backend.addSource(e.input); } catch (err) { failed.push(`${e.uri}: ${err?.message ?? err}`); }
@@ -100,7 +115,7 @@ export async function reviewAndImport(url, { native = globalThis.cydianNative, b
   if (r.server) setServer(r.server.to);
   if (failed.length) {
     hide();
-    await alert({ title: "Some Sources Failed", message: failed.join("\n\n"), buttons: ["OK"] });
+    await alert({ title: "Some Things Didn't Import", message: failed.join("\n\n"), buttons: ["OK"] });
   } else if (hide.done) hide.done("Imported");
   else hide();
   return "imported";

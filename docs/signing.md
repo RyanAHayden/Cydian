@@ -379,13 +379,15 @@ it).
 ### The page's side (F68)
 
 - **Install** on an AltStore app in the sideload build (`signing-client.js` `signAndInstall`, so the package page,
-  Sign with My Certificate and Version History alike) goes through `signing-sheet.js`: `signing.inspect` under a
-  Downloading HUD, then a sheet (iOS 6 grouped table, Cancel in its bar): the app's head, **Install As** (Name, Bundle
+  Sign with My Certificate and Version History alike) signs and installs straight away (F81, one tap). **Custom
+  Install**, the row under it on an app page (`signing-sheet.js` `customInstall`), goes through `signing-sheet.js`:
+  `signing.inspect` under a Downloading HUD, then a sheet (iOS 6 grouped table, **Install** at the top right of its
+  bar, a red **Cancel** at the bottom): the app's head, **Install As** (Name, Bundle
   ID, Icon: Choose draws the picked image centred and cropped into a 180x180 canvas and sends that PNG), App
   (version, size, minimum iOS, profile kind), Permissions, Entitlements (each one the profile lacks marked Missing),
   **Your Profile Can't Give It** (red), and Extensions with a switch each (off leaves it out). The IPA's own icon is
   shown when it's a plain PNG; Apple's CgBI PNG (most) can't be drawn, so a letter placeholder stands in.
-  **Sign & Install** sends `signing.install {token, ...}` with only what changed (`core/signing.js installParams`: a
+  **Install** sends `signing.install {token, ...}` with only what changed (`core/signing.js installParams`: a
   name or ID left as it was isn't sent; a bad ID is refused before signing), then `signing.progress {bundleId}`
   keeps the HUD on "Installing N%" until iOS says it's installed. A shell without `signing.inspect` installs as
   before (straight `signing.install {url}`).

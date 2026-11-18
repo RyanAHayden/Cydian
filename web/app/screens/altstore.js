@@ -86,8 +86,11 @@ function card(children, cls = "") {
 // `opener` opens a URL outside the app (window.open on the site). `onInstall` runs first on any of them (F30: the
 // Installed tab's record). F80: `queue`, when given, is what "Signed with your certificate" does instead (the app page
 // queues the app and opens Confirm: appPageAction); it resolves false to sign and install straight away as before.
+// F81: where the phone signs (the sideload app), any version with an IPA also gets "Custom Install": the look-first
+// sheet (signing-sheet.js customInstall) to change the bundle ID, name or icon, or leave extensions out. `custom`
+// overrides whether it shows, `customize` what it runs (tests).
 export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {},
-  queue = null, name = "") {
+  queue = null, name = "", { custom = localSigning() && !ipaInstallAvailable(), customize = null } = {}) {
   const o = installOptions(version, sourceUrl);
   const rows = [];
   if (o.download && ipaInstallAvailable()) {
@@ -98,6 +101,11 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
     const direct = () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() });
     rows.push({ label: "Install", subtitle: "Signed with your certificate",
       onClick: queue ? async () => { if (!(await queue())) direct(); } : direct });
+  }
+  if (o.download && custom) {
+    const run = customize ?? (async (opts) => (await import("../signing-sheet.js")).customInstall(opts));
+    rows.push({ label: "Custom Install", subtitle: "Bundle ID, name, icon, extensions",
+      onClick: () => run({ url: o.download, name, onInstalled: () => onInstall() }) });
   }
   if (o.download) rows.push({ label: "Download IPA", subtitle: decodeURIComponent(o.download.split("/").pop() || ""), onClick: () => opener(o.download) });
   return { rows, options: o };
@@ -312,6 +320,7 @@ export function renderApp(body, route, pkg, source) {
   body.append(grouped([{ header: "Install", rows,
     footer: options.download && ipaInstallAvailable() ? IPA_FOOTER
       : options.itms ? "Installs over the air with the source's signed link."
+      : localSigning() ? "Install signs it with your own certificate (Settings > Signing) and installs it. Custom Install first lets you change its bundle ID, name, icon or extensions. Download IPA keeps the file."
       : "Install signs it with your own certificate (Settings > Signing) and installs it. Download IPA keeps the file." }]));
 
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on

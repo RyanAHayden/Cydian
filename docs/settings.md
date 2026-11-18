@@ -13,10 +13,10 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 | Root row | Builds | Page |
 |---|---|---|
 | Cydian Account | all | sign in, create an account (screens/account.js) |
-| General | all | Device and iOS Version (website only); Works on My Phone; Refresh Sources on Launch; Sideloading > Open Other Apps' Links (sideload only) |
+| General | all | Device and iOS Version (website only); Works on My Phone; Refresh Sources on Launch; Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home Until Cydian Is Installed and Other Apps > Install on the Website (website only, F145) |
 | Display | all | Appearance (Automatic / Light / Dark as checkmarks); Compatibility Marks; Zoom |
 | Updates | all | Ignored Upgrades; Upgrade Notifications (jailbreak only); Automatic Installs (jailbreak only: Install Updates Automatically, When Charging and Locked, After a Respring Update, Keep Previous Versions); Update Alerts (sideload only) |
-| Signing | website, sideload | the certificate walkthrough; Re-sign Reminder (sideload only); Other Apps (website only) |
+| Signing | website, sideload | the certificate walkthrough; Re-sign Reminder (sideload only) |
 | Open in Cydian App | website, not jailbroken | an action, not a setting (screens/importlink.js) |
 | Install from URL | where Install IPA works | an action (screens/ipa-install.js) |
 | Console Logs | jailbreak, or wherever there are logs | screens/queue.js |
@@ -55,6 +55,7 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 | Ignored Upgrades, Upgrade Notifications, Automatic Installs | Root | Updates |
 | Only When Charging and Locked | Root | Updates, renamed **When Charging and Locked** (the old label was cut off), now with a footer |
 | Update Alerts (sideload) | Root | Updates |
+| Lock Home Until Cydian Is Installed, Install on the Website (website) | Settings > Signing | General > Website (F145); Install on the Website is padlocked while Home is locked |
 | Re-sign Reminder (sideload) | Root, Signing group | Settings > Signing, under the walkthrough's steps |
 | Certificate row (website, sideload) | Root, Signing group with a footer | Root row **Signing**, with the certificate's name as its detail |
 | About (app builds) | Root group with the version | Root row **About**, which opens the version, Check for Updates and Skip This Version |

@@ -8,6 +8,7 @@ import UserNotifications
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        application.applicationSupportsShakeToEdit = false // no "Undo Typing" alert on an accidental shake
         Notifications.shared.start() // F65: permission for N5's daemon, and notification taps (Notifications.swift)
         // The new iFizBox is open: the "iFizBox Updated, tap to open" notices have done their job.
         // and one still waiting to arrive (it's sent 8 s after the old iFizBox closed) never comes once this one is open

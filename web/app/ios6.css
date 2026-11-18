@@ -361,6 +361,12 @@ html[data-theme="dark"] { background: #5f656f; }
 .menu.below .menu-arrow { top: auto; bottom: 100%; margin: 0 0 -1px -10px; border: 10px solid transparent; border-top: 0; border-bottom-color: #3c3c3c; }
 .cell.is-held > .cell-inner, .cell.is-held > .cell-inner * { background-color: transparent; color: #fff; }
 .cell.is-held > .cell-inner { background: var(--select); }
+/* F192: a held package row (browse.js) keeps the blue selection under its callout; its icon keeps its own colours. */
+.pkg-row.is-held > .cell-inner { background: var(--select); }
+.pkg-row.is-held > .cell-inner .pkg-text, .pkg-row.is-held > .cell-inner .pkg-text * { color: #fff; } /* over queue.css's Queued for */
+.pkg-row.is-held > .cell-inner::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+}
 
 /* Settings > Signing (screens/settings.js certificateBlock). Choose buttons: a <label> over a hidden file input, drawn
    as iOS 6's white round button (iTunesStoreUI GradientButtonBackground), going blue while held. */

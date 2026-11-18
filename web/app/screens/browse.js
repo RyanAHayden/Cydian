@@ -55,6 +55,11 @@ import { sizeText as formatSize } from "../core/appqueue.js";
 import { dailyPick, browseKind, collectionsFor, dayKey } from "../core/catalog.js";
 import { readSpins, currentStreak, rouletteRow } from "./roulette.js";
 import { NAME } from "../brand.js";
+import { showMenu, longPress, copyText } from "../nav/menu.js";
+import { showShareSheet } from "../nav/sharesheet.js";
+import { showHUD } from "../nav/hud.js";
+import { packageLinks as managerLinks, siteOrigin, formatOf } from "../core/handoff.js";
+import { APP_TILES } from "./handoff.js";
 
 const ROW_HEIGHT = 58;
 
@@ -376,9 +381,79 @@ export function packageList(body, route, rows, { letters = true, decorate = null
     idle: loadIcon,
   });
   list.el.classList.add("pkg-vlist"); // placeholder rows show through wherever real rows aren't drawn yet
+  attachRowMenu(list.el, route); // F192: hold a row for Install / Share / Source
   // Sorted by name with A–Z headers: Cydia's index down the right edge, instead of the scroll indicator.
   if (letters && body.parentElement) createSectionIndex(body, list);
   return list;
+}
+
+// F192: hold a package row for iOS 6's black callout (nav/menu.js), as a source row's Copy URL. Pure: what it lists.
+// [{ kind: "queue", label: "Install" | "Upgrade" | "Remove", job } | { kind: "cancel", label: "Cancel" } |
+//  { kind: "share", label: "Share" } | { kind: "source", label: "Source", key }].
+// queue: the backend has an install queue (the jailbreak app); installed: the installed version or null; newest: the
+// newest version a source can download (null when none can); queued: it is already in the queue; listKey: the source
+// the list belongs to (Sources > a source), so Source isn't offered there. AltStore apps (kind "ipa") install from
+// their page, and a paid package its vendor sells goes through the page's Purchase step (B11), so neither gets a
+// queue item until installed.
+export function rowMenuItems(item, { queue = false, installed = null, newest = null, queued = false, listKey = null } = {}) {
+  const items = [];
+  const id = item?.id;
+  if (!id) return items;
+  if (queue && item.kind !== "ipa") {
+    if (queued) items.push({ kind: "cancel", label: "Cancel" });
+    else if (installed) {
+      items.push(newest && compareVersions(newest, installed) > 0
+        ? { kind: "queue", label: "Upgrade", job: { op: "install", id, version: newest } }
+        : { kind: "queue", label: "Remove", job: { op: "remove", id } });
+    } else if (newest && !item.paid) items.push({ kind: "queue", label: "Install", job: { op: "install", id, version: newest } });
+  }
+  items.push({ kind: "share", label: "Share" });
+  if (item.key && item.key !== ALL && item.key !== listKey) items.push({ kind: "source", label: "Source", key: item.key });
+  return items;
+}
+
+// F192: what Share on a package row lists (pure, as handoff.js shareItems): Copy Link, the package's page on the
+// site (Search's package:<id>, which every visitor can open), then, for an APT package on the website with the phone
+// set to Jailbroken, the package managers that open it (core/handoff.js packageLinks, imported as managerLinks). The app is the package manager
+// itself, so it lists no others.
+export function packageShareItems(item, source, { origin = siteOrigin(globalThis.location), mode = detectMode(),
+  jailbroken = settings.jailbroken() } = {}) {
+  if (!item?.id) return [];
+  const items = [{ kind: "copy", label: "Copy Link", text: origin + "/" + format({ tab: "search", path: [token("package", item.id)] }) }];
+  if (mode === "site" && jailbroken && source && formatOf(source) === "apt" && item.kind !== "ipa") {
+    for (const l of managerLinks(item.id, source)) items.push({ kind: "open", label: l.app, url: l.url, ...(APP_TILES[l.app] ?? { letter: l.app[0] }) });
+  }
+  return items;
+}
+
+function attachRowMenu(listEl, route) {
+  const listKey = route.tab === "sources" ? route.path[0] ?? null : null;
+  longPress(listEl, ".pkg-row", async (row, e) => {
+    const item = row._item;
+    // Not while editing or showing a Delete (Wish List), nor on rows with no page (an unadded repo's preview).
+    if (!item?.id || !row._.a.getAttribute("href") || row.classList.contains("armed") || row.closest(".editing")) return;
+    const x = e.clientX;
+    const queue = queueOf();
+    const history = queue && item.kind !== "ipa" ? await catalog.history(item.id, ALL).catch(() => null) : null;
+    if (!row.isConnected || row._item !== item) return; // scrolled away and rebound while history came
+    const installed = installedOf(history);
+    const newest = history ? history.versions.find((v) => v.keys.length)?.version ?? null : item.version || null;
+    const items = rowMenuItems(item, { queue: !!queue, installed, newest, queued: !!installQueue.get(item.id), listKey });
+    showMenu(row, items.map((it) => ({ label: it.label, onClick: () => runRowMenuItem(it, item, { installed, name: item.name }) })), { x });
+  });
+}
+
+async function runRowMenuItem(it, item, { installed, name }) {
+  if (it.kind === "cancel") return installQueue.clear(item.id);
+  if (it.kind === "queue") return queueOf({ installed, name })?.(it.job);
+  if (it.kind === "source") return go(format({ tab: "sources", path: [it.key] }));
+  if (it.kind === "share") {
+    const source = item.key ? (await getBackend().sources().catch(() => [])).find((s) => s.key === item.key) : null;
+    const items = packageShareItems(item, source).map((s) => s.kind === "copy"
+      ? { label: s.label, glyph: "copy", onSelect: () => copyText(s.text).then(() => showHUD("Copying").done("Copied")) }
+      : { label: s.label, letter: s.letter, color: s.color, onSelect: () => { location.href = s.url; } });
+    return showShareSheet({ items });
+  }
 }
 
 // Exported for Home's Browse (F46).

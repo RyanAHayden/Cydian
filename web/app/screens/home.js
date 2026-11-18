@@ -453,17 +453,14 @@ function renderRoot(body) {
     a.href = h.href;
     hintBox.replaceChildren(a);
   };
-  // Themes beside Featured when jailbroken; while Not Jailbroken (F41) a Signing tile takes its place, the way to
-  // the user's own certificate (Settings > Signing), in the sideload app and on the website (F93).
-  const halves = tileRow("halves",
-    tile({ label: "Featured", href: format({ tab: "home", path: ["browse", "popular"] }), glyph: "featured" }), // Popular, not every package
-    tile({ label: "Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }), glyph: "themes" }),
-    tile({ label: "Signing", href: format(settingsRoute(["signing"])), glyph: "signing" }));
+  // F41/F93: while Not Jailbroken, a Signing tile under Browse, the way to the user's own certificate (Settings >
+  // Signing), in the sideload app and on the website. No Featured or Themes tiles (user 2026-11-18): Browse holds
+  // both (Top 25, and the Themes collection).
+  const halves = tileRow("halves", tile({ label: "Signing", href: format(settingsRoute(["signing"])), glyph: "signing" }));
   let setUp = true; // hidden until signingSetUp answers: no tile flashing in and out once it is set up
   const drawThemes = () => {
     const themes = showsThemes(settings.deviceType());
-    halves.children[1].hidden = !themes;
-    halves.children[2].hidden = themes || !showsSigningTile(settings.mode, setUp);
+    halves.hidden = lockedNow || themes || !showsSigningTile(settings.mode, setUp);
     for (const row of lockedTop) row.hidden = !showsSigningTile(settings.mode, setUp);
   };
   // Asked again each time Home's root comes back (Settings > Signing is on Home's stack: Back from it lands here).
@@ -521,7 +518,7 @@ function renderRoot(body) {
   };
   drawApp();
 
-  // F46: Browse, under Featured and Themes. F124: a row of its own, full width and taller, with what it holds
+  // F46: Browse, at the top (user 2026-11-18: in Featured's place). F124: a row of its own, full width and taller, with what it holds
   // (user 2026-11-18: "browse should be bigger"); F79's Install IPAs, which sat beside it, gets its own row below.
   const ipas = ipasTile(settings.mode);
   const browseRow = tileRow("stack browse", tile({ label: "Browse", subtitle: BROWSE_SUBTITLE,
@@ -531,10 +528,8 @@ function renderRoot(body) {
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));
   state.tile = stateRow.querySelector("a");
   paintTile(stateTile());
-  // Locked Home (the website before Cydian is installed): Signing full width where Featured | Signing was, and
-  // Featured down among the locked rows (user 2026-11-18). Ignore puts the usual row back.
-  const lockedFeatured = lockedNow ? [tileRow("halves", tile({ label: "Featured", href: format({ tab: "home", path: ["browse", "popular"] }), glyph: "featured" }))] : [];
-  if (lockedNow) halves.hidden = true;
+  // Locked Home (the website before Cydian is installed): Signing full width at the top, Browse down among the
+  // locked rows (user 2026-11-18); unlocked, Browse is the first row under GitHub | Discord.
 
   home.append(
     head,
@@ -543,12 +538,12 @@ function renderRoot(body) {
       tile({ label: "GitHub", href: REPO_URL, glyph: "github", external: true }),
       // Cydia's pair was Facebook | Twitter: here GitHub | Discord (the community)
       tile({ label: "Discord", href: DISCORD_URL, glyph: "discord", external: true })),
+    ...(lockedNow ? [] : [browseRow]),
     halves,
     ...lockedTop,
     appRow,
     ...(debRow ? [debRow] : []),
-    ...lockedFeatured,
-    browseRow,
+    ...(lockedNow ? [browseRow] : []),
     ...(ipasRow ? [ipasRow] : []),
     stateRow,
   );
@@ -562,7 +557,7 @@ function renderRoot(body) {
   // The website before Cydian is installed: everything below the Cydian App card is locked; a tap asks first. Not
   // Settings (F123: unlocked like Home, as its tab was), nor help, guides and credits (F156, lockHomeLinks).
   if (browsingLocked({ mode: settings.mode })) {
-    const locked = [...lockedFeatured, browseRow, ...(ipasRow ? [ipasRow] : []), stateRow];
+    const locked = [browseRow, ...(ipasRow ? [ipasRow] : []), stateRow];
     for (const box of locked) box.classList.add("home-locked");
     lockHomeLinks(groups, links);
     askOnLocked(home, () => askToBrowse({ install: installCydian })); // Browse Anyway redraws Home (followBrowseLock below)

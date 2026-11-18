@@ -75,8 +75,8 @@ test("browseKind: tweaks and themes when jailbroken, apps otherwise", () => {
   assert.equal(browseKind({ section: "Tweaks" }, false), false);
 });
 
-test("Collections: Lock Screen, Home Screen, Keyboard, Make It Yours for the jailbroken build; app ones otherwise", () => {
-  assert.deepEqual(collectionsFor(true).map((c) => c.title), ["Lock Screen", "Home Screen", "Keyboard", "Make It Yours"]);
+test("Collections: Themes, Lock Screen, Home Screen, Keyboard, Make It Yours for the jailbroken build; app ones otherwise", () => {
+  assert.deepEqual(collectionsFor(true).map((c) => c.title), ["Themes", "Lock Screen", "Home Screen", "Keyboard", "Make It Yours"]);
   assert.ok(collectionsFor(false).length >= 3 && collectionsFor(false).every((c) => !c.jailbreak));
   for (const c of COLLECTIONS) assert.match(c.icon, /^[A-Z]/, `${c.id}: a file in icons/sections`);
   assert.equal(collection("nope"), null);
@@ -84,7 +84,8 @@ test("Collections: Lock Screen, Home Screen, Keyboard, Make It Yours for the jai
   assert.deepEqual(ids(c.collection("lock-screen")), ["com.x.clock", "com.x.notify"]);
   assert.deepEqual(ids(c.collection("home-screen")), ["com.x.dock"]);
   assert.deepEqual(ids(c.collection("keyboard")), ["com.x.keys", "com.x.swipe"]);
-  assert.deepEqual(ids(c.collection("make-it-yours")), ["com.x.theme", "com.x.walls"]);
+  assert.deepEqual(ids(c.collection("themes")), ["com.x.theme"], "Home's Themes tile, now a collection");
+  assert.deepEqual(ids(c.collection("make-it-yours")), ["com.x.walls"], "themes have their own");
   assert.deepEqual(ids(c.collection("play")), ["com.example.cards", "com.example.delta"]);
   assert.deepEqual(c.collection("nope"), []);
   assert.deepEqual(ids(runCatalog(c, "collection", ["keyboard"])), ["com.x.keys", "com.x.swipe"], "through the worker's entry point");

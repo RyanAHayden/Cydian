@@ -330,14 +330,17 @@ const says = (row, re) => re.test(`${row?.name ?? ""}\n${row?.short ?? ""}`);
 // short description. `icon`: a file in icons/sections. `jailbreak`: the jailbroken build's four; the others are
 // the apps builds' (sideload, the website while Not Jailbroken).
 export const COLLECTIONS = [
+  // Themes (user 2026-11-18: Home's Themes tile moved here): the Themes sections Home's tile opened.
+  { id: "themes", title: "Themes", subtitle: "Icons, looks and SpringBoard themes", icon: "Themes", jailbreak: true,
+    test: (r) => lowSimple(r) === "themes" },
   { id: "lock-screen", title: "Lock Screen", subtitle: "Clocks, music and notifications", icon: "Widgets", jailbreak: true,
     test: (r) => lowSimple(r) === "widgets" || says(r, /\block ?screen|lockscreen|cover ?sheet|notification/i) },
   { id: "home-screen", title: "Home Screen", subtitle: "Layouts, docks and icon effects", icon: "Tweaks", jailbreak: true,
     test: (r) => browseCategory(r) === "Tweaks" && says(r, /home ?screen|springboard|\bdock\b|\bicons?\b|folder|page/i) },
   { id: "keyboard", title: "Keyboard", subtitle: "Swipes, sounds and layouts", icon: "Keyboards", jailbreak: true,
     test: (r) => lowSimple(r) === "keyboards" || says(r, /keyboard/i) },
-  { id: "make-it-yours", title: "Make It Yours", subtitle: "Themes, fonts and wallpapers", icon: "Wallpaper", jailbreak: true,
-    test: (r) => ["themes", "wallpaper", "fonts", "ringtones"].includes(lowSimple(r)) || browseCategory(r) === "Themes" },
+  { id: "make-it-yours", title: "Make It Yours", subtitle: "Fonts, wallpapers and sounds", icon: "Wallpaper", jailbreak: true,
+    test: (r) => ["wallpaper", "fonts", "ringtones"].includes(lowSimple(r)) },
   { id: "play", title: "Play", subtitle: "Games and emulators", icon: "Games",
     test: (r) => ["Games", "Emulators"].includes(browseCategory(r)) },
   { id: "create", title: "Create", subtitle: "Photo, video and music", icon: "Multimedia",

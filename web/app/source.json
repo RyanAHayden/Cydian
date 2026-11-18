@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.3.3",
+          "date": "2026-11-18T05:23:13Z",
+          "localizedDescription": "Essential: Cydian now uses its new install server, sign.cydian.dev (a Cloudflare Worker anyone can host for free: worker/README.md). Signing still happens on your iPhone.\nAfter Cydian updates itself it closes, with a notification to open the new version.\nReload works like Cydia's (spinner in the button, no flash).\nMore from the runner (I4, F87).\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.3",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.3/Cydian.ipa",
+          "size": 2885049,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.3.2",
           "date": "2026-11-18T05:10:21Z",
           "localizedDescription": "Install, Upgrade and Version History go through Cydia's Confirm and queue; Custom Install for any app (bundle ID, name, icon, extensions); the Essential Upgrade alert queues too.\nConfirm looks like Cydia's on the 4S: Continue Queuing, Statistics, Modifications.\nCydian opens AltStore, SideStore and Feather links (Settings to turn it off).\nSearch: the bar stays put, with iOS 6's clear button.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.2",
@@ -169,7 +177,8 @@
           "size": 2331028,
           "minOSVersion": "15.0"
         }
-      ]
+      ],
+      "minimumVersion": "0.3.3"
     }
   ],
   "news": []

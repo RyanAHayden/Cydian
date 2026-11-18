@@ -563,7 +563,9 @@ html[data-theme="dark"] .desc-link { color: var(--dk-link); }
    Reviews tab's ratings card and review cells, the screenshot strip's page dots and its tap-to-zoom layer. Nothing
    here animates but transform and opacity (120 Hz). ---- */
 .store-head {
-  display: flex; gap: 12px; padding: 14px 10px 30px; color: var(--text); text-shadow: 0 1px 0 #fff;
+  /* B41: 21px each side, the grouped rows' content line (10px group margin + 1px border + 10px cell padding), so
+     the icon and an app page's Share sit in from the edges as the rows below do. */
+  display: flex; gap: 12px; padding: 14px 21px 30px; color: var(--text); text-shadow: 0 1px 0 #fff;
   background: linear-gradient(#fdfdfd, #e6e8eb); border-bottom: 1px solid #b0b4ba;
 }
 html[data-theme="dark"] .store-head { text-shadow: var(--emboss); background: var(--dk-store-head); border-bottom-color: var(--table-edge); }
@@ -687,8 +689,11 @@ html[data-theme="dark"] .store-bar-fill { background: var(--dk-bar-fill); }
 }
 html[data-theme="dark"] .store-review-response { background: var(--dk-inset-box); border-color: var(--table-edge); }
 
-/* The Related tab's rows: the package's icon in the cell's icon box. */
-.store-related-icon { overflow: hidden; }
+/* The Related tab's rows: the package's icon in the cell's icon box. B41: the picture fills the box over the letter
+   tile and stays hidden until it loads (ui.js removes it when it fails), so the letter shows otherwise. */
+.store-related-icon { position: relative; overflow: hidden; }
+.store-related-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; opacity: 0; }
+.store-related-icon img.loaded { opacity: 1; }
 
 /* F193: swipe a package row left to queue it (nav/rowswipe.js). The row's content slides over the pinstripes, sunk
    in, with UITableView's editing control on the right (the kit's "Add Icon (green)" and "remove Icon",

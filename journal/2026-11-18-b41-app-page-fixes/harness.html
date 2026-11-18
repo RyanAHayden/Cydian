@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width">
+<link rel=stylesheet href="app/style.css"><link rel=stylesheet href="app/ios6.css"><link rel=stylesheet href="app/packages.css"><link rel=stylesheet href="app/altstore.css">
+<style>html,body{margin:0;height:auto!important;overflow:visible!important} .page{visibility:visible!important;position:static!important;transform:none!important} .page-body{position:static!important;overflow:visible!important;height:auto!important}</style></head>
+<body><div class="page"><div class="page-body grouped" id=b></div></div>
+<script type=module>
+// B41: an app page's header (with Share) and its Related tab's rows: a loading picture (a data: URL drawn here),
+// a URL that fails to load, and a row with no icon. Serve web/ so that app/ resolves; the real modules and CSS.
+const q=new URLSearchParams(location.search);
+if(q.has('dark')) document.documentElement.dataset.theme='dark';
+const sp=await import('./app/screens/storepage.js');
+const {headerShareButton}=await import('./app/screens/handoff.js');
+const {el,grouped}=await import('./app/nav/ui.js');
+const {relatedRow}=await import('./app/screens/browse.js');
+const icon=el('span','pkg-icon large alt-app-icon'); icon.append(el('span','pkg-letter','D'));
+const share=headerShareButton({key:'alt:https://alt.example/apps.json',kind:'altstore',uri:'https://alt.example/apps.json'},{app:true,origin:'https://example.org',mode:'sideload'});
+const h=sp.storeHeader({art:icon,name:'Delta',author:'Riley Testut',action:share,line:sp.headerLine({version:'1.6.3 (77)',size:'38.2 MB',price:'Free'})});
+h.setRating({average:4.5,count:1210,noun:'Ratings'});
+const c=document.createElement('canvas'); c.width=c.height=120; const g=c.getContext('2d');
+const gr=g.createLinearGradient(0,0,0,120); gr.addColorStop(0,'#ff9a3c'); gr.addColorStop(1,'#d9480f'); g.fillStyle=gr; g.fillRect(0,0,120,120);
+g.fillStyle='#fff'; g.beginPath(); g.arc(60,60,34,0,7); g.fill();
+const route={tab:'search',path:['package:com.delta']};
+const rows=[{id:'com.a',name:'Amber',short:'A picture that loads',icon:c.toDataURL()},
+  {id:'com.b',name:'bolt',short:'A picture that fails',icon:'https://invalid.invalid/b.png'},
+  {id:'com.c',name:'Cobalt',short:'No icon at all'}].map((r)=>relatedRow(r,route));
+const tabs=sp.storeTabs({});
+document.getElementById('b').append(h.head, tabs.control, grouped([{header:'More in Games',rows}]));
+</script></body></html>

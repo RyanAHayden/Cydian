@@ -934,6 +934,18 @@ async function renderPackage(body, route, key, id, ctx) {
 // F181: the Related tab: other packages in the same section from the same source (All Sources: from every source),
 // as a plain list of up to RELATED rows; none when the package has no section.
 const RELATED = 50;
+
+// B41: one Related row. The icon is the letter tile, with the package's own picture over it when its URL is one we
+// can load (iconSrc: https/data, http through the proxy, not one that already failed in a list). ui.js drops the
+// <img> when it fails, and packages.css .store-related-icon keeps it out of sight until it loads, so the letter
+// shows while loading, without an icon, and after a failure.
+export function relatedRow(r, route) {
+  return {
+    label: r.name, subtitle: r.short || null, href: deeper(route, token("package", r.id)), cls: "store-related-row",
+    icon: { text: (String(r.name || r.id || "").trim().charAt(0) || "?").toUpperCase(), src: iconSrc(r), cls: "store-related-icon" },
+  };
+}
+
 async function relatedPane(pane, route, pkg, id) {
   const section = pkg.row?.section;
   if (!section || section === NO_SECTION || pkg.installedOnly) {
@@ -945,10 +957,7 @@ async function relatedPane(pane, route, pkg, id) {
   try { rows = await catalog.list(pkg.key ?? ALL, section); } catch (e) { pane.replaceChildren(el("p", "empty", e.message)); return; }
   rows = rows.filter((r) => r.id !== id);
   if (!rows.length) { pane.replaceChildren(el("p", "empty", `Nothing else in ${section}.`)); return; }
-  pane.replaceChildren(grouped([{ header: `More in ${section}`, rows: rows.slice(0, RELATED).map((r) => ({
-    label: r.name, subtitle: r.short || null, href: deeper(route, token("package", r.id)), cls: "store-related-row",
-    icon: { text: (r.name || "?").charAt(0).toUpperCase(), src: r.icon ? mediaUrl(r.icon) : null, cls: "store-related-icon" },
-  })), footer: rows.length > RELATED ? `${RELATED} of ${rows.length}: all of them are in ${section}.` : null }]));
+  pane.replaceChildren(grouped([{ header: `More in ${section}`, rows: rows.slice(0, RELATED).map((r) => relatedRow(r, route)), footer: rows.length > RELATED ? `${RELATED} of ${rows.length}: all of them are in ${section}.` : null }]));
   if (rows.length > RELATED) pane.append(grouped([{ rows: [{ label: `All of ${section}`, href: deeper(route, token("section", section)) }] }]));
 }
 

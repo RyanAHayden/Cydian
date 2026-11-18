@@ -53,6 +53,12 @@ Shortcuts recipes live in `docs/shortcuts.md`.
   Only one agent may drive its screen at a time. Taps, swipes, opening URLs and screenshots go through
   `tools/ui-4s.sh` under its lock: `lock <ID>` first, `unlock <ID>` when done (also after a failure). If it's
   locked, do other work and try later. Reading or pulling files over ssh needs no lock and can run alongside.
+- The iPhone 7 (iOS 15.8.8, palera1n rootless) is the test phone for the jailbreak app (.deb): `ssh 7` (user
+  `mobile`; `sudo` needs a password, so ask the user). Same rules as the 4S: touch it only when your task says so,
+  drive its screen only through `tools/ui-7.sh` under its own lock (tap/swipe in screenshot pixels, 750x1334;
+  `open URL`, `home`, `shot NAME` -> `ref/7/screens/`). `phonectl` on the phone does the touches and screenshots
+  (source and installer: `tools/phonectl/`). The jailbreak is gone after a reboot: if `ssh 7` fails or
+  `/var/jb` is missing, stop and ask the user to re-jailbreak it.
 - License: GPL-3.0-or-later. Code taken from GPLv3 projects (Cydia) is fine; never copy code under a license GPLv3 can't include.
 - Write findings worth keeping to `journal/<ID>/notes.md`.
 

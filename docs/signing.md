@@ -391,6 +391,13 @@ it).
   name or ID left as it was isn't sent; a bad ID is refused before signing), then `signing.progress {bundleId}`
   keeps the HUD on "Installing N%" until iOS says it's installed. A shell without `signing.inspect` installs as
   before (straight `signing.install {url}`).
+- **Through the queue (F84)**: on an app page, Install (the nav button and the Install row) queues the app with no
+  sheet and opens Confirm (`screens/queue.js`); Custom Install's sheet Install queues it with its options
+  (`altstore.js appPageCustom`, `signing-sheet.js inspectToQueue`) kept on the job (`core/appqueue.js` `options`:
+  the look's token and time, the edits). Confirm signs each in turn with its own options (`queue.js installCustom`):
+  the token while it's under 14 minutes old (the phone keeps the looked-at IPA 15), else `{url, ...edits}`, which
+  downloads it again; a token goes with one try only. The Queue row says what's custom ("Custom: as \"Name\", ID").
+  Version History's rows still sign straight away.
 - **Settings > Signing** (sideload, under the walkthrough; `screens/signed-apps.js`): Certificate Status with Check
   Certificate (`signing.checkCertificate`; the row shows Good / Revoked / Unknown / Not Checked from
   `identity.revocation`) and a red footer when the certificate is revoked or `identity.signatureExpires` is under 7

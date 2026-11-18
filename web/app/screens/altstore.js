@@ -88,7 +88,7 @@ function card(children, cls = "") {
 // queues the app and opens Confirm: appPageAction); it resolves false to sign and install straight away as before.
 // F81: where the phone signs (the sideload app), any version with an IPA also gets "Custom Install": the look-first
 // sheet (signing-sheet.js customInstall) to change the bundle ID, name or icon, or leave extensions out. `custom`
-// overrides whether it shows, `customize` what it runs (tests).
+// overrides whether it shows, `customize` what it runs (tests; F84: the app page's appPageCustom, which queues).
 export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {},
   queue = null, name = "", { custom = localSigning() && !ipaInstallAvailable(), customize = null } = {}) {
   const o = installOptions(version, sourceUrl);
@@ -257,6 +257,23 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   return true;
 }
 
+// F84: the app page's Custom Install, where the phone signs: the options sheet (signing-sheet.js customInstall), whose
+// Install queues the app with those options (kept on the job) and opens Confirm, as Install does. Elsewhere (no job:
+// a source-signed link; not the sideload app) it signs straight away as F81's did. `opts` is installRows' { url,
+// name, onInstalled }. -> what customInstall resolved.
+export async function appPageCustom(pkg, source, opts, { queue = appQueue, add = queueApp, mode = detectMode(), store = apps,
+  custom = async (o) => (await import("../signing-sheet.js")).customInstall(o) } = {}) {
+  const app = pkg?.stanza?.ipa;
+  let job = null;
+  if (app && mode === "sideload") {
+    let rec = null;
+    try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
+    job = appJob(pkg, { installed: rec ? rec.version || null : null, source: source ? displayName(source) : null });
+  }
+  if (!job) return custom(opts);
+  return custom({ url: job.url, name: opts?.name || job.name || "", queue: (options) => add({ ...job, options }, { queue }) });
+}
+
 export function renderApp(body, route, pkg, source) {
   const st = pkg.stanza;
   const app = st.ipa;
@@ -316,11 +333,12 @@ export function renderApp(body, route, pkg, source) {
     apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: v.version, key: pkg.key,
       source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
   };
-  const { rows, options } = installRows(v, app.sourceUrl, undefined, record, record ? () => appPageAction(pkg, source) : null, app.name);
+  const { rows, options } = installRows(v, app.sourceUrl, undefined, record, record ? () => appPageAction(pkg, source) : null, app.name,
+    record ? { customize: (o) => appPageCustom(pkg, source, o) } : undefined);
   body.append(grouped([{ header: "Install", rows,
     footer: options.download && ipaInstallAvailable() ? IPA_FOOTER
       : options.itms ? "Installs over the air with the source's signed link."
-      : localSigning() ? "Install signs it with your own certificate (Settings > Signing) and installs it. Custom Install first lets you change its bundle ID, name, icon or extensions. Download IPA keeps the file."
+      : localSigning() ? "Install queues it and opens Confirm, which signs it with your own certificate (Settings > Signing) and installs it. Custom Install first lets you change its bundle ID, name, icon or extensions. Download IPA keeps the file."
       : "Install signs it with your own certificate (Settings > Signing) and installs it. Download IPA keeps the file." }]));
 
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on

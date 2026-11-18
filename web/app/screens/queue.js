@@ -30,7 +30,7 @@ import { installQueue, runLogs } from "../queue.js";
 import { MODES, MODE_LABEL, changeCount, parseStatusLine, consoleText, finishOf, FINISH_LABEL, runTitle, CONFFILE_TITLE,
   CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
-import { appPlan, runOrder, sizeText, SELF_ID } from "../core/appqueue.js";
+import { appPlan, runOrder, sizeText, SELF_ID, customParams } from "../core/appqueue.js";
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 
@@ -338,7 +338,7 @@ export function openAppConfirm(queue = appQueue) {
 function appQueueGroup(jobs, queue) {
   return grouped([{ header: "Queue", rows: jobs.map((j) => ({
     label: j.name || j.id,
-    subtitle: sizeText(j.size),
+    subtitle: [sizeText(j.size), customLabel(j)].filter(Boolean).join(" · ") || null,
     detail: MODE_LABEL[j.mode] + (j.version ? ` ${j.version}` : ""),
     onClick: async () => {
       const i = await showActionSheet({ title: j.name || j.id, buttons: ["Clear"], destructive: 0 });
@@ -353,8 +353,30 @@ function appQueueGroup(jobs, queue) {
 // hosts it on the Signing Server), on the Signing Server on the website (signAndInstall). True once iOS was asked.
 async function installApp(job) {
   const sc = await import("../signing-client.js");
+  if (job.options && sc.localSigning()) return installCustom(job, { sc });
   if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" });
   return sc.signAndInstall({ url: job.url, name: job.name || "" });
+}
+
+// F84: Custom Install's words on its Queue row: what it signs as, where that differs.
+export function customLabel(job) {
+  const o = job?.options;
+  if (!o) return null;
+  const e = o.edits ?? {};
+  const bits = [e.name && `as "${e.name}"`, e.bundleId, e.icon && "new icon",
+    e.removeExtensions?.length && `${e.removeExtensions.length} extension${e.removeExtensions.length === 1 ? "" : "s"} left out`].filter(Boolean);
+  return bits.length ? `Custom: ${bits.join(", ")}` : "Custom Install";
+}
+
+// F84: a Custom Install job: signing.install with its own options (core/appqueue.js customParams: the look's token
+// while fresh, else the url, and the edits), then iOS's progress on the HUD as the sheet did (signing-sheet.js
+// followInstall). The token is spent by the try, so a failed run that keeps the job queued downloads it again next time.
+export async function installCustom(job, { sc, follow = null, now = Date.now(), native = globalThis.cydianNative } = {}) {
+  const params = customParams(job, now);
+  if (params.token) job.options.token = null;
+  const after = follow ?? (async (result, h) => (await import("../signing-sheet.js")).followInstall(native, result?.bundleId || job.options.signsAs || "", h));
+  return sc.installOnDevice({ url: job.url, name: job.options.name || job.name || "", params,
+    after, ...(sc.isSelfIpa(job.url) ? { host: true } : {}) });
 }
 
 // F30/I3: the version Install put on the phone, so Installed and Changes follow it (Cydian records itself).

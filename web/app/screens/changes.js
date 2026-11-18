@@ -82,9 +82,10 @@ export function canUpgrade(mode = detectMode(), backend = () => getBackend()) {
 
 export const upgradeLabel = (n) => `Upgrade (${n})`;
 
-// One install job per available upgrade, as browse.js's Upgrade action queues it.
+// One install job per available upgrade, as browse.js's Upgrade action queues it. F87: not the jailbreak app's
+// remembered apps (`remembered`, app-updates.js): apt has no package by an app's bundle id; their row opens the app page.
 export const upgradeJobs = (available = []) =>
-  available.filter((r) => r?.id && r.version).map((r) => ({ op: "install", id: r.id, version: r.version, installed: r.installed ?? null, name: r.name ?? null }));
+  available.filter((r) => r?.id && r.version && !r.remembered).map((r) => ({ op: "install", id: r.id, version: r.version, installed: r.installed ?? null, name: r.name ?? null }));
 
 // Queues them all; the first add opens Confirm (screens/queue.js initQueue), the rest refresh it. -> jobs queued.
 export function upgradeAll(queue, available) {
@@ -274,7 +275,7 @@ function draw() {
   const { groups, upgrades, installed } = state.data;
   state.ph?.remove();
   state.ph = null;
-  drawUpgradeButton(upgrades.available.length);
+  drawUpgradeButton(canUpgrade() ? upgradeJobs(upgrades.available).length : upgrades.available.length); // F87: what Upgrade queues
   const scope = scopeOf(state.scope, installed);
   drawScope(scope);
   const items = itemsOf(groups, undefined, upgrades, { query: state.query, scope, installed });

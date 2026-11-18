@@ -9,6 +9,10 @@
 // dpkg list above stays for jailbroken phones, one row down at #installed/dpkg. Jailbreak mode is F7 unchanged.
 //
 // F77: a My IPAs row under the apps opens the user's own IPAs (screens/myipas.js, #installed/myipas/...).
+//
+// F87: in the jailbreak app, apps Cydian remembers (core/installed.js) are on an Apps page one row down
+// (#installed/apps, the row above dpkg's packages, there only when it has any), listed at the version on the phone
+// (app-updates.js rememberedApps, I4) with the note where it differs from what Cydian remembered.
 import * as browse from "./browse.js";
 import * as myipas from "./myipas.js";
 import { grouped, plain, placeholder } from "../nav/ui.js";
@@ -18,10 +22,12 @@ import { showAlert } from "../nav/alert.js";
 import { detectMode } from "../core/settings.js";
 import { apps, appRows, appUpgrades, removeInstall, onAppsChange } from "../core/installed.js";
 import { mediaUrl } from "./depiction.js";
+import { rememberedApps } from "../app-updates.js";
 
 export const title = "Installed";
 
 export const DPKG = "dpkg"; // the site's path segment for the status file's packages
+export const APPS = "apps"; // F87: the jailbreak app's path segment for the remembered apps
 
 const state = { body: null, route: null, list: null, seq: 0 };
 const appView = { body: null, route: null, seq: 0, editing: false, right: null };
@@ -31,7 +37,7 @@ export const recordsApps = (mode = detectMode()) => mode !== "jailbreak";
 
 // Which page a route is: "apps" (F30's list), "dpkg" (the status file's packages), "myipas" (F77) or a browse.js page.
 export function pageKind(route, mode = detectMode()) {
-  if (!recordsApps(mode)) return route.path.length ? "browse" : "dpkg";
+  if (!recordsApps(mode)) return !route.path.length ? "dpkg" : route.path.length === 1 && route.path[0] === APPS ? "apps" : "browse";
   if (!route.path.length) return "apps";
   if (route.path[0] === myipas.MYIPAS) return "myipas";
   return route.path.length === 1 && route.path[0] === DPKG && mode === "site" ? "dpkg" : "browse";
@@ -50,7 +56,7 @@ export function nav(route) {
   if (kind === "browse") return browse.nav(route);
   if (kind === "myipas") return myipas.nav(route);
   if (kind === "apps") {
-    return { title: "Installed", style: "plain",
+    return { title: recordsApps() ? "Installed" : "Apps", style: "plain", // F87: "Apps" one row down in the jailbreak app
       right: { label: appView.editing ? "Done" : "Edit", onClick: (e) => setEditing(!appView.editing, e.currentTarget) } };
   }
   const info = { title: recordsApps() ? "dpkg Status" : "Installed", style: "plain" };
@@ -97,8 +103,10 @@ export function emptyText(source) {
 async function load() {
   const seq = ++state.seq;
   let rows;
+  let appCount = 0;
   try {
-    rows = await catalog.installed();
+    // F87: the Apps row has to be there before the list measures where it starts (vlist.js caches the offset).
+    [rows, appCount] = await Promise.all([catalog.installed(), recordsApps() ? 0 : jailbreakAppCount()]);
   } catch (e) {
     if (seq === state.seq) state.body.replaceChildren(note(e.message));
     return;
@@ -122,8 +130,19 @@ async function load() {
     return;
   }
   body.replaceChildren();
+  if (appCount) body.append(appsRow(state.route, appCount));
   state.list = browse.packageList(body, state.route, rows);
   body.append(state.list.el);
+}
+
+// F87: how many apps (not Cydian itself) the jailbreak app remembers; 0 when the store can't be read.
+async function jailbreakAppCount() {
+  try { return (await (await apps()).all()).filter((r) => r?.id && !r.self).length; } catch { return 0; }
+}
+
+function appsRow(route, n) {
+  return grouped([{ rows: [{ label: "Apps", subtitle: n === 1 ? "1 app installed from an app page" : `${n} apps installed from an app page`,
+    href: format({ tab: route.tab, path: [...route.path, APPS] }) }] }]);
 }
 
 // A file picker for the status file; the read stays in the browser.
@@ -155,14 +174,20 @@ async function candidates(rows) {
 
 export function appSubtitle(r, locale) {
   const date = r.date ? new Date(r.date).toLocaleDateString(locale, { dateStyle: "medium" }) : null;
-  return [r.upgrade ? `Upgrade to ${r.upgrade}` : null, r.sourceName || r.source, date].filter(Boolean).join(" · ");
+  // F87: I4's note, where the phone's version isn't the one Cydian remembered, comes first.
+  return [r.note || null, r.upgrade ? `Upgrade to ${r.upgrade}` : null, r.sourceName || r.source, date].filter(Boolean).join(" · ");
+}
+
+// F87: the remembered apps for the list; an app the phone doesn't have (I4's `actual` null) offers no upgrade.
+export function appListRows(records, candidateOf) {
+  return appUpgrades(appRows(records), candidateOf).map((r) => (r.actual === null ? { ...r, upgrade: null } : r));
 }
 
 async function loadApps() {
   const seq = ++appView.seq;
   let rows;
   try {
-    rows = appRows(await (await apps()).all());
+    rows = await rememberedApps(); // F87: the phone's versions and I4's notes in the jailbreak app
   } catch (e) {
     if (seq === appView.seq) appView.body.replaceChildren(note(e.message));
     return;
@@ -170,13 +195,14 @@ async function loadApps() {
   const site = detectMode() === "site";
   const hasStatus = site ? await catalog.hasStatus() : false;
   if (seq !== appView.seq) return;
-  drawApps(appUpgrades(rows, () => null), new Map(), site, hasStatus);
+  if (!recordsApps()) rows = rows.filter((r) => !r?.self); // Cydian's own row is dpkg's there
+  drawApps(appListRows(rows, () => null), new Map(), site, hasStatus);
   // The upgrade badges wait on the sources; the list doesn't.
   if (!rows.length) return;
   let cands;
   try { cands = await candidates(rows); } catch { return; }
   if (seq !== appView.seq) return;
-  drawApps(appUpgrades(rows, (id) => cands.get(id) ?? null), cands, site, hasStatus);
+  drawApps(appListRows(rows, (id) => cands.get(id) ?? null), cands, site, hasStatus);
 }
 
 function drawApps(rows, cands, site, hasStatus) {
@@ -184,7 +210,7 @@ function drawApps(rows, cands, site, hasStatus) {
   const route = appView.route;
   const sections = [{
     rows: rows.map((r) => ({
-      label: r.name, subtitle: appSubtitle(r), detail: r.upgrade ? undefined : r.version,
+      label: r.name, subtitle: appSubtitle(r), detail: r.upgrade || r.actual === null ? undefined : r.version,
       badge: r.upgrade ? "Upgrade" : undefined, icon: { text: r.name.charAt(0).toUpperCase() },
       // The app page, while a source still has the app.
       href: cands.has(r.id) ? format({ tab: route.tab, path: [...route.path, `package:${r.id}`] }) : null,
@@ -201,9 +227,10 @@ function drawApps(rows, cands, site, hasStatus) {
   rows.forEach((r, i) => decorateApp(cells[i], r));
   attachRowGestures(ul);
   body.classList.replace("grouped", "plain");
-  body.replaceChildren(myIpasTile(route, site), ul);
+  // F87: no Install IPAs tile on the jailbreak app's Apps page (My IPAs is a sideload page).
+  body.replaceChildren(...(recordsApps() ? [myIpasTile(route, site)] : []), ul);
   if (!rows.length) {
-    body.firstChild.after(note("No apps yet. Apps you install from an app's page are listed here, on this device.")); // under My IPAs
+    ul.before(note("No apps yet. Apps you install from an app's page are listed here, on this device.")); // under My IPAs
   }
 }
 

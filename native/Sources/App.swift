@@ -10,7 +10,10 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         Notifications.shared.start() // F65: permission for N5's daemon, and notification taps (Notifications.swift)
         // The new Cydian is open: the "Cydian Updated, tap to open" notices have done their job.
-        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["cydian.updating", "cydian.updated"])
+        // and one still waiting to arrive (it's sent 8 s after the old Cydian closed) never comes once this one is open
+        let notices = ["cydian.updating", "cydian.updated"]
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: notices)
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: notices)
         SignBridge.importBundled() // F75: the certificate the Signing Server put inside Cydian's own IPA
         BackgroundCheck.register() // I3: before launch ends, as BGTaskScheduler requires (sideload build)
         return true

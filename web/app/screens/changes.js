@@ -23,6 +23,7 @@ import { settings } from "./settings.js";
 import { sourceFilter } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
 import { upgradesWithSelf } from "../essential-ui.js";
+import { withAppUpgrades } from "../app-updates.js";
 
 export const title = "Changes";
 
@@ -36,7 +37,7 @@ export const scopeOf = (picked, installed) => picked ?? defaultScope(installed.s
 export function init(ctx) {
   state.ctx = ctx;
   catalog.onChange(() => { if (state.body) load(); else badge(); });
-  onAppsChange(() => { if (state.body) load(); });
+  onAppsChange(() => { if (state.body) load(); else badge(); }); // I3: a recorded install can end an upgrade
   settings.onChange((key) => { if (key === "holds") { if (state.body) load(); else badge(); } });
   // At launch, only with a status file: without one there are no upgrades, and no reason to load every source.
   // Without one (the site, the sideload app) the remembered apps count, and Cydian itself in the app: badge at
@@ -52,7 +53,7 @@ export function init(ctx) {
 // The tab badge: how many upgrades are available (ignored ones don't count).
 async function badge(upgrades) {
   try {
-    upgrades ??= await upgradesWithSelf(await catalog.upgrades(settings.holds.list())); // F72: Cydian's own (sideload)
+    upgrades ??= await withAppUpgrades(await upgradesWithSelf(await catalog.upgrades(settings.holds.list())), settings.holds.list()); // F72, I3
     state.ctx?.setBadge("changes", upgrades.available.length);
   } catch {
     // no catalog yet: no badge
@@ -225,6 +226,7 @@ async function load() {
     await catalog.ensure();
     [groups, upgrades, installed] = await Promise.all([catalog.changes(), catalog.upgrades(settings.holds.list()), installedNow()]);
     upgrades = await upgradesWithSelf(upgrades); // F72: the sideload build lists Cydian's own upgrade here
+    upgrades = await withAppUpgrades(upgrades, settings.holds.list()); // I3: the apps Install remembered (app-updates.js)
   } catch (e) {
     if (seq === state.seq && state.note) { state.note.textContent = e.message; state.note.hidden = false; }
     return;

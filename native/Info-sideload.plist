@@ -3,7 +3,9 @@
 <!-- Keys the sideload IPA adds to Info.plist (docs/sideload.md, "What I2 needs"). mkipa.py merges them in. -->
 <plist version="1.0">
 <dict>
-	<key>UIBackgroundModes</key><array><string>audio</string></array>
+	<key>UIBackgroundModes</key><array><string>audio</string><string>fetch</string></array>
+	<!-- I3: the background update check (BackgroundCheck.swift), a BGAppRefreshTask. -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key><array><string>com.ryha.cydian.updates</string></array>
 	<!-- F77: Documents (My IPAs) shows in Files under On My iPhone > Cydian; IPAs dropped there are listed. -->
 	<key>UIFileSharingEnabled</key><true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key><true/>

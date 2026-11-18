@@ -9,6 +9,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         Notifications.shared.start() // F65: permission for N5's daemon, and notification taps (Notifications.swift)
         SignBridge.importBundled() // F75: the certificate the Signing Server put inside Cydian's own IPA
+        BackgroundCheck.register() // I3: before launch ends, as BGTaskScheduler requires (sideload build)
         return true
     }
 

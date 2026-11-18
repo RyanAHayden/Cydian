@@ -49,6 +49,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         Notifications.register(self) // F65: app.badge, the icon badge (Notifications.swift)
         Prefs.register(self) // F70: prefs.set, N7's settings for the daemon (below)
         Incoming.register(self) // F75: cydian:// links for the page, app.takeURL and app.gunzip (App.swift)
+        BackgroundCheck.register(self) // I3: updates.watch, the sideload build's background update check
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }

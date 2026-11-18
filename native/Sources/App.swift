@@ -210,11 +210,20 @@ enum LinkOut {
         return !never.contains(s)
     }
 
-    // UIApplication.open: Safari or the app that claims an https link, the app for its scheme, iOS's install
-    // prompt for itms-services. An unclaimed scheme just reports false.
+    // UIApplication.open: the app that claims an https link (a universal link: X, Discord, GitHub...), asked for
+    // first so the link never stops in Safari when its app is there; then Safari. The app for its scheme, iOS's
+    // install prompt for itms-services. An unclaimed scheme just reports false.
     static func open(_ url: URL, done: ((Bool) -> Void)? = nil) {
         guard canOpen(url) else { done?(false); return }
-        DispatchQueue.main.async { UIApplication.shared.open(url, options: [:]) { done?($0) } }
+        DispatchQueue.main.async {
+            guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
+                UIApplication.shared.open(url, options: [:]) { done?($0) }
+                return
+            }
+            UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { inApp in
+                if inApp { done?(true) } else { UIApplication.shared.open(url, options: [:]) { done?($0) } }
+            }
+        }
     }
 }
 

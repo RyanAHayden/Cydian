@@ -54,7 +54,7 @@ Shortcuts recipes live in `docs/shortcuts.md`.
   `tools/ui-4s.sh` under its lock: `lock <ID>` first, `unlock <ID>` when done (also after a failure). If it's
   locked, do other work and try later. Reading or pulling files over ssh needs no lock and can run alongside.
 - The iPhone 7 (iOS 15.8.8, palera1n rootless) is the test phone for the jailbreak app (.deb): `ssh 7` (user
-  `mobile`; `sudo` needs a password, so ask the user). Read `docs/iphone7.md` before using it. Touch it only when
+  `mobile`; `sudo -n` works, passwordless since 2026-11-18; if it fails, ask the user). Read `docs/iphone7.md` before using it. Touch it only when
   your task says so; drive its screen only through `tools/ui-7.sh` under its own lock. If `ssh 7` fails or
   `/var/jb` is missing, it rebooted: stop and ask the user to re-jailbreak it.
 - License: GPL-3.0-or-later. Code taken from GPLv3 projects (Cydia) is fine; never copy code under a license GPLv3 can't include.

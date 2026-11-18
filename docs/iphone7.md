@@ -64,9 +64,8 @@ phonectl size | sender | tap X Y | swipe X1 Y1 X2 Y2 [secs] | home | lock | shot
   (IOSurfaceRootUserClient) `IOSurfaceCreate` returns NULL, and without `com.apple.QuartzCore.global-capture` the
   screenshot is black.
 - `shot -` writes the PNG to stdout; ui-7.sh uses that so a setuid run leaves no root-owned file on the phone.
-- Rebuild and reinstall: `PHONE_SUDO_PASS=x tools/phonectl/build.sh` (needs `IOS_SDK` and ld64.lld like
-  `native/build.sh`; signs on the phone with its `ldid`). The script still insists on `PHONE_SUDO_PASS`, but sudo
-  is passwordless now and ignores it, so any value does. It survives reboots (it's in `/var/jb`).
+- Rebuild and reinstall: `tools/phonectl/build.sh` (needs `IOS_SDK` and ld64.lld like `native/build.sh`; signs
+  on the phone with its `ldid`). It installs with `sudo -n`; `PHONE_SUDO_PASS` is only a fallback if that fails. It survives reboots (it's in `/var/jb`).
 
 ## Installing Cydian on it
 

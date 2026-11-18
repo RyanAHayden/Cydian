@@ -518,6 +518,7 @@ const THANKS = [
   ["Procursus", "GitHub", "https://github.com/ProcursusTeam", "ProcursusTeam", "For the bootstrap today's jailbreaks run on."],
   ["Dopamine", "@opa334dev", "https://x.com/opa334dev", "opa334", "opa334 and team, for the iOS 15 and 16 jailbreak."],
   ["palera1n", "@palera1n", "https://x.com/palera1n", "palera1n", "For the checkm8 jailbreak."],
+  ["Calif", "GitHub", "https://github.com/califio", "califio", "For the iOS 27.0.1 exploit."],
 ];
 
 // Credits / Thank You (Cydia's credits.html: who it thanks), with what Cydian is and its version.

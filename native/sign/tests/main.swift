@@ -301,6 +301,34 @@ test("refusals") {
     }
 }
 
+test("B21: a nested bundle or framework without its executable is sealed as resources, not an error") {
+    let profile = try Profile(try fixture("profile.mobileprovision"))
+    let signer = IPASigner(profile: profile, identity: identity)
+    var logged = [String]()
+    signer.log = { logged.append($0) }
+    let out = work.appendingPathComponent("missing-exe-signed.ipa")
+    let app = try signer.sign(fixtures.appendingPathComponent("missing-exe.ipa"), to: out)
+    check(app.skipped == ["Frameworks/Kit.framework", "YTUHD.bundle"], "skipped \(app.skipped)")
+    check(logged.contains("Skipped YTUHD.bundle: its executable YTUHD is missing, sealed as resources"), "log \(logged)")
+    let f = try entries(out)
+    let a = "Payload/Tiny.app/"
+    check(f[a + "YTUHD.bundle/_CodeSignature/CodeResources"] == nil && f[a + "YTUHD.bundle/YTUHD"] == nil, "nothing made in the bundle")
+    check(f[a + "Frameworks/Kit.framework/_CodeSignature/CodeResources"] == nil, "no seal of its own in the framework")
+    try verifySigned(f[a + "Tiny"]!, name: "Tiny-missing-exe", expectIdent: "com.ryha.cydian", team: team,
+                     info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
+    let cr = try PropertyListSerialization.propertyList(from: f[a + "_CodeSignature/CodeResources"]!, format: nil) as! [String: Any]
+    let files2 = cr["files2"] as! [String: Any]
+    for rel in ["YTUHD.bundle/Info.plist", "Frameworks/Kit.framework/Info.plist", "Frameworks/Kit.framework/kit.txt"] {
+        check((files2[rel] as? [String: Any])?["hash2"] as? Data == sha256(f[a + rel]!), "\(rel) sealed by the app")
+    }
+    check((files2["YTUHD.bundle/en.lproj/Localizable.strings"] as? [String: Any])?["optional"].flatMap(plistBool) == true, "lproj in the bundle")
+    // The app's own executable missing is still an error.
+    do {
+        _ = try signer.sign(fixtures.appendingPathComponent("noexe.ipa"), to: work.appendingPathComponent("x.ipa"))
+        check(false, "an app without its executable signed")
+    } catch let e as SignError { check(e.code == "bad_ipa" && "\(e)".contains("X is missing"), "\(e)") }
+}
+
 test("HTTP requests and ranges") {
     check(try HTTPRequest.parse(Data("GET /a HTTP/1.1\r\nHost: x".utf8)) == nil, "incomplete header waits")
     let r = try HTTPRequest.parse(Data("GET /t/app.ipa?x=1 HTTP/1.1\r\nHost: 127.0.0.1\r\nRange: bytes=10-19\r\n\r\n".utf8))!

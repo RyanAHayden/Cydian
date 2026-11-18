@@ -206,6 +206,10 @@ class OnDeviceSigner(unittest.TestCase):
         w("fat.macho", fat())
         w("notanipa.ipa", small_zip({"hello.txt": "hi"}))
         w("escape.ipa", small_zip({"Payload/X.app/Info.plist": info("a.b", "X"), "Payload/../evil": "x"}))
+        # B21: nested bundles naming a missing executable (YouMod's YTUHD.bundle) are sealed, not signed; the app's
+        # own missing executable is still refused.
+        shutil.copy(os.path.join(ROOT, "web", "fixtures", "missing-exe.ipa"), os.path.join(cls.fx, "missing-exe.ipa"))
+        w("noexe.ipa", small_zip({"Payload/X.app/Info.plist": info("a.b", "X"), "Payload/X.app/hello.txt": "hi"}))
         enc = io.BytesIO(rich_ipa(macho(encrypted=True)))
         w("encrypted.ipa", enc.getvalue())
         cls.binary = os.path.join(cls.tmp, "signtest")

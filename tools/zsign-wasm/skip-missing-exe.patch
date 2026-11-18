@@ -1,0 +1,17 @@
+--- a/src/bundle.cpp
++++ b/src/bundle.cpp
+@@ -116,6 +116,14 @@
+ 	for (const string& bundlePath : allBundles) {
+ 		jvalue jvNode;
+ 		if (GetSignFolderInfo(bundlePath, jvNode)) {
++			// A nested bundle whose Info.plist names an executable that isn't there (a tweak's .framework in a modded
++			// IPA) has nothing to sign: its files are sealed as resources of the bundle around it, as Feather does
++			// (cydian B21; was "Can't parse BundleExecute file!").
++			if (!ZFile::IsFileExistsV("%s/%s", bundlePath.c_str(), jvNode["bundle_executable"].as_cstr())) {
++				ZLog::WarnV(">>> Skipped %s: its executable %s is missing, sealed as resources\n",
++					jvNode["path"].as_cstr(), jvNode["bundle_executable"].as_cstr());
++				continue;
++			}
+ 			jvInfo["folders"].push_back(jvNode);
+ 		}
+ 	}

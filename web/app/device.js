@@ -16,7 +16,7 @@ import { bridgeArch } from "./core/settings.js";
 import { iosFromUserAgent, jailbreakOfArch, badge, normalizeDevice } from "./core/compat.js";
 
 // The settings that change who the rows are judged for (F37 adds Device, which also sets "arch").
-export const DEVICE_KEYS = ["worksOnMyPhone", "iosVersion", "arch", "device"];
+const DEVICE_KEYS = ["worksOnMyPhone", "iosVersion", "arch", "device"];
 
 let nativeIos = null; // the app's own answer, once app.info came back
 

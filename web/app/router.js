@@ -5,7 +5,7 @@
 export const ALL_TABS = ["home", "sources", "changes", "installed", "search", "settings"];
 // The tabs this build shows: every build (site, jailbreak, sideload) shows every tab (user 2026-11-17).
 export const TABS = ALL_TABS;
-export const DEFAULT_TAB = "home";
+const DEFAULT_TAB = "home";
 // F123: Settings is no tab of its own any more, as in Cydia: the tab bar shows the other five, and Settings' pages
 // open on Home's stack (Home's Settings row), as #/home/settings/<…>. Its screen stays in TABS: it draws those pages.
 export const BAR_TABS = TABS.filter((t) => t !== "settings");

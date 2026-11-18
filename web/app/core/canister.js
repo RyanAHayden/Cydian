@@ -26,7 +26,7 @@
 // or a CJK Extension B character is one character but two UTF-16 units).
 
 export const CANISTER = "https://api.canister.me/v2/jailbreak";
-export const SEARCH_LIMIT = 50;
+const SEARCH_LIMIT = 50;
 const TTL = 10 * 60 * 1000;
 const PKG = /^[a-z0-9][a-z0-9+.-]*$/i;
 

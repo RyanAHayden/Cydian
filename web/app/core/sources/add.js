@@ -33,7 +33,7 @@ async function bodyOf(backend, url) {
 
 // The record an IPA-format source is kept as: core/altstore.js altRecord's fields plus `format`, so the AltStore
 // list (withAltSources) keeps every IPA format.
-export function ipaRecord(url, format, parsed, reason = null) {
+function ipaRecord(url, format, parsed, reason = null) {
   const rec = {
     key: altKey(url), kind: "altstore", format, uri: url, name: parsed?.name || null, iconURL: parsed?.iconURL ?? null,
     tintColor: parsed?.tintColor ?? null, count: parsed ? parsed.apps.length : null, updated: Date.now(), error: null,

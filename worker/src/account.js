@@ -17,7 +17,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 export const MAX_ACCOUNT = 256 * 1024;
-export const ACCOUNT_RATE = 60, ACCOUNT_WRITES = 12;
+const ACCOUNT_RATE = 60, ACCOUNT_WRITES = 12;
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, If-Match, If-None-Match", "Access-Control-Expose-Headers": "ETag" };
 const PATH = /^\/api\/account\/([0-9a-f]{64})$/;

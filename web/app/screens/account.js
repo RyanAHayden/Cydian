@@ -140,7 +140,7 @@ export async function applyHere(c, { backend = getBackend(), store = settings, n
 }
 
 let shared = null;
-export function accountSync() {
+function accountSync() {
   shared ??= createAccountSync({
     keys: keyStore(), state: stateStore(), collect: (o) => collectHere(o), apply: (c) => applyHere(c),
     base: detectMode() === "site" ? "" : ACCOUNT_BASE,
@@ -188,10 +188,10 @@ export function accountSection() {
   return box;
 }
 
-export const ACCOUNT_FOOTER = "Keeps your sources, settings, Ignored Upgrades, installed apps and certificate on cydian.dev, "
+const ACCOUNT_FOOTER = "Keeps your sources, settings, Ignored Upgrades, installed apps and certificate on cydian.dev, "
   + "so a new iPhone, a reinstall or the website gets them back. No email, no password: your account key is the account.";
-export const KEY_WARNING = "Save this key somewhere safe. It is the only way into your account: if you lose it, nobody can get your data back, cydian.dev included.";
-export const CERT_FOOTER = "Your certificate is encrypted with your account key before it leaves this device: cydian.dev can't read it. Off takes it out of your account.";
+const KEY_WARNING = "Save this key somewhere safe. It is the only way into your account: if you lose it, nobody can get your data back, cydian.dev included.";
+const CERT_FOOTER = "Your certificate is encrypted with your account key before it leaves this device: cydian.dev can't read it. Off takes it out of your account.";
 
 let reveal = false; // Show Account Key: the key's group stays open until the page is left
 
@@ -228,7 +228,7 @@ export async function drawAccount(el) {
 }
 
 // The key as a code, a link and a QR code another device's Camera opens in Cydian.
-export function keyBlock(code) {
+function keyBlock(code) {
   const box = document.createElement("div");
   const link = keyLink(parseKey(code));
   box.append(grouped([{ header: "Account Key", rows: [{ label: code, cls: "account-code" },
@@ -263,7 +263,7 @@ async function createFlow(el) {
   } catch (e) { hide(); await alertOK("Can't Create Account", problem(e)); }
 }
 
-export async function signInFlow(el, prefill = "") {
+async function signInFlow(el, prefill = "") {
   const { index, value } = await showAlert({ title: "Sign In With Key", message: "Your account key, or the cydian://account link you saved.",
     input: { placeholder: "XXXX-XXXX-XXXX-…", value: prefill, paste: true }, buttons: ["Cancel", "Sign In"], cancel: 0 });
   if (index !== 1) return;

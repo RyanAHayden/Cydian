@@ -366,7 +366,7 @@ function inline(parent, text, opts) {
 const ALLOWED = new Set(["P", "BR", "B", "STRONG", "I", "EM", "U", "S", "SMALL", "A", "UL", "OL", "LI", "H1", "H2", "H3",
   "H4", "H5", "H6", "SPAN", "DIV", "CODE", "PRE", "BLOCKQUOTE", "IMG", "HR", "SUP", "SUB"]);
 
-export function sanitizeHtml(html, opts = {}) {
+function sanitizeHtml(html, opts = {}) {
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
   const frag = document.createDocumentFragment();
   const copy = (from, to) => {

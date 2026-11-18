@@ -62,7 +62,7 @@ export function formatSize(bytes) {
 }
 
 // "com.apple.developer.kernel.increased-memory-limit" -> "Increased Memory Limit" (the full name goes below).
-export const entitlementLabel = (name) => (String(name).split(".").pop() || String(name)).replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const entitlementLabel = (name) => (String(name).split(".").pop() || String(name)).replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 export const formatDate = (t, locale) => (t ? new Date(t).toLocaleDateString(locale, { dateStyle: "medium" }) : null);
 
@@ -384,7 +384,7 @@ export const SITE_INSTALL_FOOTER = "Install signs the app here in the browser wi
 // F95: My IPAs' website Install (screens/myipas.js siteInstallSheet) still says the certificate is needed, with
 // Download IPA beside OK.
 export const SITE_CERT_TITLE = "Certificate Needed";
-export const SITE_CERT_MESSAGE = "Installing from the website signs the app with your own certificate in the browser. "
+const SITE_CERT_MESSAGE = "Installing from the website signs the app with your own certificate in the browser. "
   + "That isn't here yet: Download IPA keeps the file for now.";
 
 // The certificate alert, with Download IPA beside OK. -> whether it downloaded.
@@ -519,7 +519,7 @@ export function renderApp(body, route, pkg, source) {
 // ---- Links and the screenshots gallery (F122), shared with browse.js's package pages ---------------------------
 
 // A link out opens in its own app or Safari (app.js's window.open in the Home Screen app, LinkOut in the shell).
-export const openOut = (url) => window.open(url, "_blank", "noopener");
+const openOut = (url) => window.open(url, "_blank", "noopener");
 
 // The Links group: `source` (a row opening the source's page, or null) and core/previews.js's links, in that order.
 export function linksGroup(source, links) {
@@ -566,7 +566,7 @@ function gone(i) {
   if (group && !group.querySelector(".alt-shot")) group.remove();
 }
 
-export function galleryGroup(shots) {
+function galleryGroup(shots) {
   const strip = el("div", "alt-shots");
   for (const s of shots) {
     const pic = galleryImage(s);

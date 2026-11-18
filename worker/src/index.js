@@ -93,7 +93,7 @@ export function githubRelease(url) {
 // GitHub limits anonymous downloads per address, and Cloudflare's addresses are shared: when github.com still says
 // 429, the same file comes through GitHub's API with GITHUB_TOKEN (a token with no permissions: public repos only),
 // limited per token instead. The asset's real address (GitHub's blob store) is fetched without the token.
-export async function viaGitHubApi(url, token, { fetcher = fetch } = {}) {
+async function viaGitHubApi(url, token, { fetcher = fetch } = {}) {
   const g = githubRelease(url);
   if (!g || !token) return null;
   const api = { Authorization: `Bearer ${token}`, "User-Agent": "cydian.dev", Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
@@ -133,7 +133,7 @@ export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promis
 // the Worker follows the redirect and answers with the file itself, so https://cydian.dev/repo/ has no redirect.
 // Only the repo's own names are fetched (anything else, InRelease, Packages.xz, icons: 404 without asking GitHub).
 // CYDIAN_REPO (owner/name) picks another GitHub repo's releases (default RyanAHayden/Cydian).
-export const SELF_REPO = "RyanAHayden/Cydian";
+const SELF_REPO = "RyanAHayden/Cydian";
 const REPO_TYPES = { "Release": "text/plain; charset=utf-8", "Packages": "text/plain; charset=utf-8", "Packages.gz": "application/gzip" };
 export function repoFile(pathname) {
   const m = /^\/repo\/([^/]+)$/.exec(pathname);

@@ -237,7 +237,7 @@ const loadNew = async () => {
   globalThis.dispatchEvent?.(new Event("cydian:reloaded"));
 };
 // build.json (tools/buildinfo.sh), never from the browser's cache; null where there is none (a local checkout).
-export async function buildInfo(fetcher = globalThis.fetch) {
+async function buildInfo(fetcher = globalThis.fetch) {
   try { const r = await fetcher("build.json", { cache: "no-store" }); return r.ok ? await r.json() : null; } catch { return null; }
 }
 
@@ -790,7 +790,7 @@ export function render(el, route, ctx) {
 export const CYDIAN_APT_REPO = "https://cydian.dev/repo/";
 export const JAILBROKEN_SHEET = { title: "Install Cydian with your jailbreak's package manager: it keeps Cydian updated.",
   buttons: ["Add to Sileo", "Add to Zebra", "Copy Repo URL", "Download .deb"] };
-export const CYDIAN_PACKAGE = "com.ryha.cydian";
+const CYDIAN_PACKAGE = "com.ryha.cydian";
 export const repoLinks = (repo = CYDIAN_APT_REPO, id = CYDIAN_PACKAGE) => ({
   sileo: `sileo://source/${repo}`, zebra: `zbra://sources/add/${repo}`,
   // their pages for a package, once the repo is there

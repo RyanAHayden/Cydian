@@ -30,7 +30,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { toB64url, fromB64url } from "./transfer.js";
 
-export const ACCOUNT_VERSION = 1;
+const ACCOUNT_VERSION = 1;
 export const ACCOUNT_BASE = "https://cydian.dev"; // the app's server; the website uses its own origin
 const SALT = new TextEncoder().encode("cydian-account-v1");
 const subtle = () => {
@@ -39,7 +39,7 @@ const subtle = () => {
   return s;
 };
 
-export class AccountError extends Error {
+class AccountError extends Error {
   constructor(code, message, extra = {}) { super(message); this.code = code; Object.assign(this, extra); }
 }
 

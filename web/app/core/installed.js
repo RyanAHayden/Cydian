@@ -95,7 +95,7 @@ export function findUpgrades(installed, candidateOf, holds = [], { dpkgHolds = t
 //   openAppStore({ indexedDB, name })   -> Promise of { all, put, remove }; memoryAppStore() is the same in memory
 //   apps()                              -> the device's store, opened once; onAppsChange(f) after record/remove
 
-export const APP_DB = "cydian-installed";
+const APP_DB = "cydian-installed";
 const APP_STORE = "apps";
 
 const text = (v) => (v == null ? "" : String(v).trim());

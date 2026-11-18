@@ -13,9 +13,9 @@
 // its titles are in the image). Every field from the repo is checked: images http(s) only, package names as dpkg
 // allows them, titles plain text (screens set them with textContent).
 
-export const FEATURED_FILE = "sileo-featured.json";
+const FEATURED_FILE = "sileo-featured.json";
 export const DEFAULT_ITEM_SIZE = { width: 263, height: 148 };
-export const DEFAULT_RADIUS = 10;
+const DEFAULT_RADIUS = 10;
 export const MAX_BANNERS = 20;
 const TTL = 6 * 60 * 60 * 1000; // banners change rarely; Home asks every source, so keep them a few hours
 const PKG = /^[a-z0-9][a-z0-9+.-]*$/i;

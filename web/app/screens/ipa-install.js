@@ -105,7 +105,7 @@ export async function rememberIpa(r, name, { store = apps } = {}) {
 }
 
 // Settings > Install IPA's row: a URL typed or pasted. Asks again (with what was typed) when it isn't an http(s) link.
-export async function askIpaUrl(value = "") {
+async function askIpaUrl(value = "") {
   for (;;) {
     const { index, value: typed } = await showAlert({
       title: "Install IPA",

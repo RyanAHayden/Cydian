@@ -6,7 +6,7 @@
 // here; a reload (Home's Reload button, or iOS reloading the page) and back/forward keep the route. A notification
 // tap that opens the app (sw.js) marks its URL with ?launch=push and keeps the page it names.
 
-export const PUSH_MARK = "launch";
+const PUSH_MARK = "launch";
 
 // win: window-like ({ matchMedia, navigator, performance, location, cydianApp }).
 export function isStandaloneWeb(win) {

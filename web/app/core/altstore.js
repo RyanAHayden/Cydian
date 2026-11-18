@@ -27,7 +27,7 @@
 import { pool, withTimeout, healthFields, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 import { parseIpaSource } from "./sources/ipa.js";
 
-export const ALT_PREFIX = "alt:";
+const ALT_PREFIX = "alt:";
 export const isAltKey = (key) => String(key ?? "").startsWith(ALT_PREFIX);
 export const altKey = (url) => ALT_PREFIX + url;
 
@@ -74,7 +74,7 @@ export function runsOn(version, ios) {
   return true;
 }
 
-export const runnableVersions = (app, ios) => app.versions.filter((v) => runsOn(v, ios));
+const runnableVersions = (app, ios) => app.versions.filter((v) => runsOn(v, ios));
 
 function parseVersion(v, legacy = false) {
   if (!v || typeof v !== "object") return null;
@@ -123,7 +123,7 @@ const PRIVACY_NAMES = {
   NSHealthUpdateUsageDescription: "Health (Write)", NSHomeKitUsageDescription: "Home",
   NSUserTrackingUsageDescription: "Tracking", NSSiriUsageDescription: "Siri",
 };
-export const privacyName = (key) => PRIVACY_NAMES[key] ?? str(key).replace(/^NS/, "").replace(/UsageDescription$/, "").replace(/([a-z])([A-Z])/g, "$1 $2");
+const privacyName = (key) => PRIVACY_NAMES[key] ?? str(key).replace(/^NS/, "").replace(/UsageDescription$/, "").replace(/([a-z])([A-Z])/g, "$1 $2");
 
 // appPermissions (2.0): { entitlements: ["com.apple..."] | [{ name }], privacy: { NSKey: text } | [{ name, usageDescription }] }.
 // 1.x: permissions: [{ type: "photos", usageDescription }].
@@ -228,7 +228,7 @@ function sortByDate(versions) {
 }
 
 // Does this parsed JSON look like an AltStore source? An object with an apps array (empty counts: a new source).
-export const looksLikeAltSource = (json) => Boolean(json && typeof json === "object" && !Array.isArray(json) && Array.isArray(json.apps));
+const looksLikeAltSource = (json) => Boolean(json && typeof json === "object" && !Array.isArray(json) && Array.isArray(json.apps));
 
 export function parseAltSource(input) {
   let json = input;
@@ -299,7 +299,7 @@ export function appStanza(app, source, ios = null) {
 // AltStore and SideStore take <scheme>://source?url=<encoded url>; Feather takes feather://source/<url>, the URL
 // unencoded after the path (FeatherApp.swift, `validatedScheme(after: "/source/")`), as for /install/ (B6).
 const sourceQuery = (scheme) => (u) => `${scheme}://source?url=${encodeURIComponent(u)}`;
-export const SIDELOADERS = [
+const SIDELOADERS = [
   { name: "AltStore", scheme: "altstore", source: sourceQuery("altstore") },
   { name: "SideStore", scheme: "sidestore", source: sourceQuery("sidestore") },
   { name: "Feather", scheme: "feather", source: (u) => `feather://source/${u}` },
@@ -404,7 +404,7 @@ export const neverLoaded = (source) => Boolean(source) && source.updated == null
 // The AltStore source list: its own IndexedDB database, so the APT list, apt's sources.list in the app (F33) and
 // its helper never see these. `defaults` (URLs, core/sources.js DEFAULT_ALT_SOURCES on the site) go in once, the
 // first time a store with a "meta" store opens (version 2), so a default the user deletes stays deleted.
-export function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "cydian-altsources", defaults = [] } = {}) {
+function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "cydian-altsources", defaults = [] } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
   return new Promise((resolve, reject) => {
     const req = idb.open(name, 2);

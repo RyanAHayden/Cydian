@@ -46,7 +46,7 @@ export function newRecords(known, current, now) {
 }
 
 // id -> { first, byVersion: Map(version -> earliest first) }.
-export function packageTimes(records) {
+function packageTimes(records) {
   const times = new Map();
   for (const r of records) {
     let t = times.get(r.id);

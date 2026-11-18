@@ -69,7 +69,7 @@ export function idFromHash(hash = globalThis.location?.hash ?? "") {
   return null;
 }
 
-export const IN_CYDIAN_SUBTITLE = "Signed and installed on the iPhone: fast, no limits";
+const IN_CYDIAN_SUBTITLE = "Signed and installed on the iPhone: fast, no limits";
 export const WEBSITE_ON_SUBTITLE = "Signed in the browser with your certificate";
 export const WEBSITE_OFF_SUBTITLE = "Slow, and can fail on big apps: tap to read why";
 export const SITE_GATE_FOOTER = "Install in Cydian opens this app in the Cydian app, which signs and installs it on the "
@@ -137,7 +137,7 @@ export async function promptFirstVisit({ mode, install, alert = showAlert, stora
 // Only Browse Anyway unlocks it ("later"): installing Cydian from here doesn't (user 2026-11-18: someone who installs
 // through the website likely never comes back, so the website keeps pointing at the app).
 export const browsingLocked = ({ mode = "site", storage = store() } = {}) => mode === "site" && firstVisitState(storage) !== "later";
-export const BROWSE_GATE = {
+const BROWSE_GATE = {
   title: "Install Cydian First",
   message: "Apps installed in the Cydian app are signed and installed on the iPhone itself: much faster than this "
     + "website, with no upload and no limits.\n\nYou can browse the website anyway, but installing here is slow and can fail on big apps.",

@@ -29,7 +29,7 @@ export const appVersion = () => native()?.call
   : Promise.resolve("");
 
 // A link outside the web view: the shell's app.openURL (F72), else a plain navigation.
-export async function openOutside(url) {
+async function openOutside(url) {
   try {
     const r = await native()?.call?.("app.openURL", { url });
     if (r?.opened) return;

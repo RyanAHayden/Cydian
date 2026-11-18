@@ -33,7 +33,7 @@ let staged = null;
 // F121: the website's identity as last read from or written to IndexedDB, for Install's tap to use without waiting
 // (identityNow); warmed when this module loads on the website.
 let known = null;
-export const identityNow = () => known;
+const identityNow = () => known;
 const DB = "cydian-signing", STORE = "identity", KEY = "current", BRING_KEY = "cydian.bringCertificate";
 
 function openDb() {
@@ -372,7 +372,7 @@ async function answerError(res) {
 // A request that failed for want of a connection (Safari: "Load failed") is tried again, up to `tries` times with a
 // pause, as phones drop a request now and then mid-upload (user 2026-11-18: an upload stopped after its second part).
 // An answer from the server, even an error, is final.
-export async function retrying(send, { tries = 3, wait = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+async function retrying(send, { tries = 3, wait = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
   for (let i = 1; ; i++) {
     try { return await send(); } catch (e) {
       if (i >= tries) throw e;

@@ -137,7 +137,7 @@ export function modal({ title, left = null, right = null, cls = "" }) {
 
 // ---- Confirm ---------------------------------------------------------------------------------------------------
 
-export function openConfirm() {
+function openConfirm() {
   if (confirm || running) { confirm?.refresh(); return; }
   if (!installQueue.size) return;
   const cancel = barButton("Cancel");

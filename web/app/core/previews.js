@@ -76,7 +76,7 @@ export function githubOf(urls, { not = null } = {}) {
   return null;
 }
 
-export const githubUrl = (gh) => `https://github.com/${gh.owner}/${gh.repo}`;
+const githubUrl = (gh) => `https://github.com/${gh.owner}/${gh.repo}`;
 
 // ---- Links -----------------------------------------------------------------------------------------------------
 
@@ -305,7 +305,7 @@ export function htmlShots(html, baseUrl) {
 }
 
 // github.com/<o>/<r>/blob/<ref>/<path> and …/raw/… -> raw.githubusercontent.com/<o>/<r>/<ref>/<path>.
-export function rawGithub(url) {
+function rawGithub(url) {
   const m = /^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+)\/(?:blob|raw)\/(.+)$/i.exec(url);
   return m ? `https://raw.githubusercontent.com/${m[1]}/${m[2]}/${m[3].replace(/\?raw=true$/, "")}` : url;
 }
@@ -355,7 +355,7 @@ export function releaseShots(release, gh = {}) {
 }
 
 // One per picture: http and https, host case, a trailing slash, github blob/raw links and ?raw=true are the same.
-export function shotKey(url) {
+function shotKey(url) {
   let s = rawGithub(str(url)).replace(/^http:/i, "https:").replace(/[?&]raw=true$/, "");
   try {
     const u = new URL(s);
@@ -385,7 +385,7 @@ export function dedupeShots(list) {
 
 // ---- Loading (fetched text, cached per app) --------------------------------------------------------------------
 
-export const PREVIEW_CACHE_PREFIX = "cydian.previews.";
+const PREVIEW_CACHE_PREFIX = "cydian.previews.";
 export const PREVIEW_TTL = 24 * 3600 * 1000;
 const memory = new Map();
 

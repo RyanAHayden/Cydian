@@ -339,7 +339,7 @@ export async function addSource(ctx, prefill = null) {
 
 // F19: Cydia's Source Warning, from our own list (core/warnings.js), before anything is fetched. Resolves true to
 // go on: the source isn't listed, or the user tapped Add Anyway.
-export async function confirmWarning(input) {
+async function confirmWarning(input) {
   const w = sourceWarning(input);
   if (!w) return true;
   return (await showAlert(warningAlert(w))).index === 1;

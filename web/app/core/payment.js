@@ -26,8 +26,8 @@
 // (cydian://authentication_success?… or cydian://payment/authentication_success?…) is read the same way, for a
 // vendor that lets the client name its own callback.
 
-export const COMMERCIAL_TAG = "cydia::commercial";
-export const CALLBACK_SCHEMES = ["sileo:", "cydian:"];
+const COMMERCIAL_TAG = "cydia::commercial";
+const CALLBACK_SCHEMES = ["sileo:", "cydian:"];
 const PKG = /^[a-z0-9][a-z0-9+.-]*$/i;
 
 export function isCommercial(st) {
@@ -134,7 +134,7 @@ export function parseReply(status, json) {
 }
 
 // Typed answers.
-export function parseInfo(j) {
+function parseInfo(j) {
   const banner = j?.authentication_banner;
   return {
     name: typeof j?.name === "string" ? j.name : "",
@@ -151,7 +151,7 @@ export function isFreePrice(price) {
   return typeof price === "string" && price.trim().toLowerCase() === "free";
 }
 
-export function parsePackageInfo(j) {
+function parsePackageInfo(j) {
   return { price: typeof j?.price === "string" ? j.price : null, purchased: j?.purchased === true,
     available: j?.available !== false };
 }

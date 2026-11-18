@@ -20,7 +20,7 @@
 export const RELEASES_URL = "https://api.github.com/repos/RyanAHayden/Cydian/releases/latest";
 export const DAY = 24 * 60 * 60 * 1000;
 export const STORE_KEY = "cydian.selfupdate";
-export const NOTE_LINES = 4;
+const NOTE_LINES = 4;
 
 // "v1.2.3", "1.2", "1.2.3-beta" -> [1, 2, 3] (missing parts are 0; anything after the numbers is ignored).
 // Null when it doesn't start with a number.

@@ -81,7 +81,7 @@ export function recommendedFor(recs, jailbreak) {
 }
 
 // The user's pick on Recommended (localStorage), else what was detected.
-export const JAILBREAK_KEY = "cydian.jailbreakName";
+const JAILBREAK_KEY = "cydian.jailbreakName";
 export function savedJailbreak(storage = globalThis.localStorage) {
   try {
     const v = storage?.getItem(JAILBREAK_KEY);
@@ -93,7 +93,7 @@ export function saveJailbreak(id, storage = globalThis.localStorage) {
 }
 
 // F19 first run: the Sources tab shows a "Recommended for <jailbreak>" row until Recommended has been opened once.
-export const FIRST_RUN_KEY = "cydian.recommendedSeen";
+const FIRST_RUN_KEY = "cydian.recommendedSeen";
 export function recommendedSeen(storage = globalThis.localStorage) {
   try { return storage?.getItem(FIRST_RUN_KEY) === "1"; } catch { return true; }
 }

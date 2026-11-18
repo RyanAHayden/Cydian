@@ -23,14 +23,14 @@ import { compareVersions, isNewer, parseVersion } from "./selfupdate.js";
 import { altKey, seedRecord } from "./altstore.js";
 
 export const SELF_ID = "com.ryha.cydian";
-export const SELF_NAME = "Cydian";
+const SELF_NAME = "Cydian";
 export const SELF_APT_URI = "https://cydian.dev/repo/";
 export const SELF_ALT_URL = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json";
 export const SELF_SITE = "https://cydian.dev/";
 // The .debs that are essential whatever their control says (Cydian's helper is in Cydian's own package).
-export const ESSENTIAL_IDS = [SELF_ID, "apt", "dpkg"];
+const ESSENTIAL_IDS = [SELF_ID, "apt", "dpkg"];
 export const MIN_FIELD = "x-cydian-minimum-version"; // the Release field, lower-cased as core/apt.js keeps them
-export const LOCKED_TEXT = "Cydian's own source is built in and can't be removed.";
+const LOCKED_TEXT = "Cydian's own source is built in and can't be removed.";
 export const STORE_KEY = "cydian.essential";
 
 // core/sources.js sourceKey, repeated here so this file doesn't import sources.js (which imports altstore.js).

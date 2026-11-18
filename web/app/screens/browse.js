@@ -48,7 +48,7 @@ import { autoMarkShown, AUTO_MARK_LABEL, AUTO_MARK_FOOTER } from "../core/automa
 import { createWishlist, wishLabel, wishRows, WISH_EMPTY } from "../core/wishlist.js";
 import { filterRows } from "../core/changes.js";
 
-export const ROW_HEIGHT = 58;
+const ROW_HEIGHT = 58;
 
 // Section Visibility (F24): the hidden sections live on the device (core/settings.js hiddenSections) and reach
 // the worker's catalog before its next answer, so every list, Search and Changes leave them out.
@@ -71,7 +71,7 @@ settings.onChange((key) => { if (key === "compatMarks") applyMarks(); });
 const MARK_LABEL = { works: "Works on this iPhone", no: "Doesn't work on this iPhone", unknown: "Compatibility unknown" };
 
 // The mark for a row's compat code: data-mark works | no | unknown (packages.css draws it); none when unjudged.
-export function setMark(span, code) {
+function setMark(span, code) {
   const m = markOf(code);
   if (m) { span.dataset.mark = m; span.setAttribute("aria-label", MARK_LABEL[m]); span.setAttribute("role", "img"); }
   else { delete span.dataset.mark; span.removeAttribute("aria-label"); span.removeAttribute("role"); }
@@ -378,7 +378,7 @@ export function packageList(body, route, rows, { letters = true, decorate = null
 }
 
 // Exported for Home's Browse (F46).
-export async function renderList(body, route, fetchRows, letters) {
+async function renderList(body, route, fetchRows, letters) {
   body.append(placeholder("list"));
   let rows;
   try {
@@ -1036,7 +1036,7 @@ function setRightLabel(body, label) {
 // F87: in the jailbreak app, an app Cydian remembers (core/installed.js) at the version on the phone, with I4's note
 // where that isn't the one it remembered ("Installed: 1.6 (Cydian remembered 1.5)", "Not installed (...)").
 // Null when Cydian doesn't remember the app.
-export async function installedAppGroup(id, { records = () => rememberedApps({ mode: "jailbreak" }) } = {}) {
+async function installedAppGroup(id, { records = () => rememberedApps({ mode: "jailbreak" }) } = {}) {
   let rec;
   try { rec = (await records()).find((r) => r?.id === id && !r.self); } catch { return null; }
   return rec ? grouped([installedAppSection(rec)]) : null;
@@ -1179,7 +1179,7 @@ function openSileoSheet(url, title) {
 // HTML depictions open in a sheet, in a sandboxed iframe with no bridge to us (docs/cydia.md). An http
 // depiction on the https site would be blocked as mixed content, so it comes through the proxy instead, as
 // srcdoc with scripts off; everything else loads directly from its own origin.
-export function openHtmlDepiction(url, title) {
+function openHtmlDepiction(url, title) {
   const frame = document.createElement("iframe");
   frame.className = "depiction-frame";
   frame.title = title;

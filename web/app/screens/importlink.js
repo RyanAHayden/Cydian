@@ -47,7 +47,7 @@ export async function websitePayload({ backend = getBackend(), store = settings,
   return { sources, settings: values, holds: store.holds.list(), ...(id ? { identity: id } : {}) };
 }
 
-export async function openInApp() {
+async function openInApp() {
   const hide = showHUD("Preparing");
   let link;
   try { link = await encodeLink(await websitePayload()); } catch {

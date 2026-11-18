@@ -40,7 +40,7 @@ export const title = "Settings";
 export const settings = createSettings({ mode: detectMode(), helper: globalThis.cydianNative?.helper, native: globalThis.cydianNative });
 
 // Light: the top of the blue status bar under the nav bar; dark: "Status Bar (Black)".
-export const THEME_COLORS = { light: "#4f698b", dark: "#5f656f" }; // dark: the gunmetal bar's top
+const THEME_COLORS = { light: "#4f698b", dark: "#5f656f" }; // dark: the gunmetal bar's top
 
 const defOf = (key) => SETTINGS.find((d) => d.key === key);
 const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? String(v);
@@ -282,7 +282,7 @@ function tellShell(appearance, theme, win) {
 
 // Zoom is off unless Settings > Allow Zoom is on. iOS Safari ignores user-scalable=no, so besides the viewport and
 // touch-action (html.no-zoom in ios6.css) the pinch gesture itself is cancelled while zoom is off.
-export function applyZoom(doc = document) {
+function applyZoom(doc = document) {
   const allow = settings.get("allowZoom") === true || settings.get("allowZoom") === "true";
   doc.documentElement.classList.toggle("no-zoom", !allow);
   const vp = doc.querySelector('meta[name="viewport"]');
@@ -362,9 +362,9 @@ async function chooseFiles(el, files, slot) {
 
 // F83: Sideloading > Open Other Apps' Links (sideload build only, which claims the schemes; on by default). The
 // footer says the limit: iOS fixed the schemes at install, so off can't hand a link back to the app it was for.
-export const OTHER_LINKS_FOOTER = "AltStore, SideStore, Feather and other sideloaders' links open in Cydian. "
+const OTHER_LINKS_FOOTER = "AltStore, SideStore, Feather and other sideloaders' links open in Cydian. "
   + "iOS picks the app for each kind of link, so Off can't always hand them back.";
-export function sideloadingSection(mode = detectMode()) {
+function sideloadingSection(mode = detectMode()) {
   const box = document.createElement("div");
   if (mode !== "sideload") return box;
   const frag = grouped([{ header: "Sideloading", rows: [{ label: "Open Other Apps' Links" }], footer: OTHER_LINKS_FOOTER }]);
@@ -820,10 +820,10 @@ function siteAppSection(id) {
 
 // F96: Install on the Website for apps other than Cydian, on once the user accepted the warning on an app page
 // (websign-gate.js). Off here puts the warning back; on here shows it first, and Cancel leaves the switch off.
-export const WEBSITE_INSTALLS_FOOTER = "Other apps' pages offer Install in Cydian first. Installing on the website is "
+const WEBSITE_INSTALLS_FOOTER = "Other apps' pages offer Install in Cydian first. Installing on the website is "
   + "slower (download, sign in Safari, upload, then iOS downloads it again), can fail on big apps and uses this "
   + "site's limited storage. Cydian itself always installs from here.";
-export function websiteInstallsSection({ on = websiteInstallsOn, set = setWebsiteInstalls, accept = acceptWebsiteInstalls } = {}) {
+function websiteInstallsSection({ on = websiteInstallsOn, set = setWebsiteInstalls, accept = acceptWebsiteInstalls } = {}) {
   const frag = grouped([{ header: "Other Apps", rows: [{ label: "Install on the Website" }], footer: WEBSITE_INSTALLS_FOOTER }]);
   const cell = frag.querySelector(".cell-inner");
   const sw = createSwitch({ label: "Install on the Website", checked: on(), onToggle: async (want) => {

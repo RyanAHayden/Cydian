@@ -31,7 +31,7 @@ const ELLEKIT = { name: "ElleKit", url: "https://ellekit.space/" };
 const PALERA1N = { name: "palera1n", url: "https://repo.palera.in/" };
 const CHARIZ = { name: "Chariz", url: "https://repo.chariz.com/" };
 const HAVOC = { name: "Havoc", url: "https://havoc.app/" };
-export const KNOWN_HOMES = {
+const KNOWN_HOMES = {
   "ellekit": ELLEKIT, "mobilesubstrate": ELLEKIT, "org.coolstar.libhooker": ELLEKIT,
   "preferenceloader": PALERA1N,
   "ws.hbang.common": CHARIZ, "ws.hbang.alderis": CHARIZ, "org.thebigboss.libcolorpicker": CHARIZ,

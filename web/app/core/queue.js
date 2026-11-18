@@ -176,7 +176,7 @@ export function createRepeatFilter() {
 }
 
 // Cydia's finish levels, lowest first; the button shows the highest reached.
-export const FINISH = ["return", "reopen", "restart", "reload", "reboot"];
+const FINISH = ["return", "reopen", "restart", "reload", "reboot"];
 export const FINISH_LABEL = {
   return: "Return to Cydian", reopen: "Close Cydian", restart: "Restart SpringBoard", reload: "Reload SpringBoard", reboot: "Reboot Device",
 };
@@ -263,7 +263,7 @@ export function runTitle(jobs) {
 // it (share.debFetch) and hands the file to cydian-helper simulate-deb / install-deb, beside apt's run for the rest.
 
 // A Filename apt can't fetch: an absolute URL rather than a path under the repo.
-export const isAbsoluteFilename = (filename) => /^[a-z][a-z0-9+.-]*:\/\//i.test(String(filename ?? ""));
+const isAbsoluteFilename = (filename) => /^[a-z][a-z0-9+.-]*:\/\//i.test(String(filename ?? ""));
 
 // catalog.history(id) ({ kind, versions: [{ version, keys, filename, debUrl, candidate }] }) and the job's version
 // (null: the newest a source offers, the page's candidate) -> the http(s) link to download, or null when apt can

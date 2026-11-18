@@ -42,7 +42,7 @@ function footerFor(source, pkg, shown) {
   return flat ? "Adds this source to that app." : "Only Irisin takes a source with a suite; the others add flat repos only.";
 }
 
-export function showAddQR(link) {
+function showAddQR(link) {
   let svg;
   try {
     svg = qrSvg(link, { ecc: "M" });
@@ -113,7 +113,7 @@ export function shareItems(source, { app = false, jailbroken = settings.jailbrok
   return items;
 }
 
-export function showShareFor(source, opts) {
+function showShareFor(source, opts) {
   const items = shareItems(source, opts).map((it) => {
     if (it.kind === "copy") return { label: it.label, glyph: "copy", onSelect: () => copyText(it.text) };
     if (it.kind === "qr") return { label: it.label, glyph: "qr", onSelect: () => showAddQR(it.link) };

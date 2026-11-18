@@ -155,7 +155,7 @@ const ESIGN_SOURCE_KEYS = ["sourceicon", "payURL", "unlockURL", "message"];
 const ESIGN_APP_KEYS = ["isLanZouCloud", "lock", "type"];
 
 // Scarlet: META (Scylla: Info) with repoName, and app groups: arrays of objects with a name and a download.
-export function scarletGroups(json) {
+function scarletGroups(json) {
   return Object.entries(json).filter(([k, v]) => k !== "META" && k !== "Info" && Array.isArray(v)
     && v.some((a) => isObj(a) && (a.down || a.ipa || a.downloadURL)));
 }

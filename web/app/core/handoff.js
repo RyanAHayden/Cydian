@@ -39,7 +39,7 @@ const altUrl = (source) => source?.uri || String(source?.key ?? "").replace(/^al
 //           absolute string, so the URL goes in raw.
 //   Zebra   ZBAppDelegate.m / ZBSourceListTableViewController handleURL: zbra://sources/add/<url>, raw.
 //   Irisin  IrisinLink.swift: irisin://repository/add?url=…&suite=…&component=… (query items, encoded).
-export const APT_MANAGERS = [
+const APT_MANAGERS = [
   { app: "Cydia", source: (s) => (isFlat(s.dist) ? cydiaShare(s.uri) : null) },
   { app: "Sileo", source: (s) => (isFlat(s.dist) ? `sileo://source/${s.uri}` : null) },
   { app: "Zebra", source: (s) => (isFlat(s.dist) ? `zbra://sources/add/${s.uri}` : null) },
@@ -69,7 +69,7 @@ function irisinAdd({ uri, dist, components }) {
 //   StikStore          stikstore://add-source?url=<encoded>, as AltDirect sends it (no public source found)
 //   TrollApps          SourcesView.swift onOpenURL: hasPrefix("trollapps://add?url=") then queryItems["url"]
 const query = (prefix) => (u) => `${prefix}${enc(u)}`;
-export const ALT_MANAGERS = [
+const ALT_MANAGERS = [
   { app: "AltStore Classic", source: query("altstore-classic://source?url=") },
   { app: "AltStore", source: query("altstore://source?url=") },
   { app: "SideStore", source: query("sidestore://source?url=") },
@@ -88,7 +88,7 @@ export const ALT_MANAGERS = [
 // Scarlet's and GBox's JSON is their own, so only that app. A record with `unsupported` (an encrypted GBox source)
 // gets only its own app, whatever the format.
 const queryValue = (u) => String(u).replace(/[&# ]/g, (c) => enc(c));
-export const OWN_APP = {
+const OWN_APP = {
   scarlet: { app: "Scarlet", source: (u) => `scarlet://repo=${u}` },
   esign: { app: "ESign", source: (u) => `esign://addsource?url=${queryValue(u)}` },
   gbox: { app: "GBox", source: (u) => `gbox://AddSource/${u}` },

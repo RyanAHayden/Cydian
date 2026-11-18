@@ -10,7 +10,7 @@
 //   sharedRecord(result, name) -> I3's record ({ id, name, version, source: null, sourceName: "Shared" }) | null
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-export const ROUTES = ["helper-ipa", "sign-ipa", "deb", "refuse"];
+const ROUTES = ["helper-ipa", "sign-ipa", "deb", "refuse"];
 
 const FILE = /^[A-Za-z0-9][^/\\\0]{0,250}\.(ipa|deb)$/i;
 

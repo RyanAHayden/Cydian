@@ -48,7 +48,7 @@ let featured = null;
 const featuredStore = () => (featured ??= createFeaturedStore({ getText: (u) => getBackend().text(u) }));
 
 // A horizontal row of banners, scroll-snapped one per page like Sileo's. Sizes and corner radius from the repo.
-export function bannerRow(banners, { itemSize = { width: 263, height: 148 }, radius = 10 } = {}) {
+function bannerRow(banners, { itemSize = { width: 263, height: 148 }, radius = 10 } = {}) {
   const row = el("div", "featured-row");
   row.style.setProperty("--banner-ratio", `${itemSize.width} / ${itemSize.height}`);
   row.style.setProperty("--banner-radius", `${radius}px`);

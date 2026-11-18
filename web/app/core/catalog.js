@@ -58,7 +58,7 @@ export const ALL = "*";
 export const NO_SECTION = "(No Section)";
 
 // Cydia.app/Sections.plist: typo and alias fixes applied to `Section:` before it is shown (Cydia, GPLv3).
-export const SECTION_FIXES = {
+const SECTION_FIXES = {
   "Hunspell Dictionaries": "Dictionaries", "Utility": "Utilities", "Utilites": "Utilities", "Developer": "Development",
   "Site-Specific": "Site-Specific Apps", "Themes (Springboard)": "Themes (SpringBoard)",
   "Themes (SummerBoard)": "Themes (SpringBoard)", "Themes (Systen)": "Themes (System)",
@@ -174,7 +174,7 @@ function sectionTest(section) {
 export const BROWSE_CATEGORIES = ["Games", "Emulators", "Entertainment", "Photo & Video", "Social", "Lifestyle",
   "Utilities", "Developer", "Themes", "Tweaks", "Other"];
 // Categories only a jailbroken phone can install: hidden while Not Jailbroken (F37).
-export const JAILBREAK_CATEGORIES = new Set(["Themes", "Tweaks"]);
+const JAILBREAK_CATEGORIES = new Set(["Themes", "Tweaks"]);
 const BROWSE_OF = {
   games: "Games", game: "Games", emulators: "Emulators", emulator: "Emulators",
   entertainment: "Entertainment", multimedia: "Entertainment", books: "Entertainment", music: "Entertainment",
@@ -238,7 +238,7 @@ export const browseListsFor = (jailbroken = true) => BROWSE_LISTS.filter((l) => 
 
 // New and Recently Updated: how many days back they reach, and how many rows each keeps.
 export const FRESH_DAYS = 30;
-export const FRESH_LIMIT = 100;
+const FRESH_LIMIT = 100;
 
 // The Changes tab's records (core/changes.js: { id, version, first, date? }) and the catalog's rows (All Sources,
 // one per id, the candidate version) -> { new: [row], updated: [row] }, each row with `seen` (epoch ms) and

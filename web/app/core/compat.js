@@ -28,7 +28,7 @@ export const IOS_VERSIONS = Object.entries(MINORS).flatMap(([major, last]) =>
 export const JAILBREAKS = ["rootless", "rootful", "roothide", "none"];
 
 // Architecture -> the jailbreak type it installs on.
-export const ARCH_JAILBREAK = { "iphoneos-arm64": "rootless", "iphoneos-arm": "rootful", "iphoneos-arm64e": "roothide" };
+const ARCH_JAILBREAK = { "iphoneos-arm64": "rootless", "iphoneos-arm": "rootful", "iphoneos-arm64e": "roothide" };
 export const JAILBREAK_ARCH = { rootless: "iphoneos-arm64", rootful: "iphoneos-arm", roothide: "iphoneos-arm64e" };
 export const jailbreakOfArch = (arch) => ARCH_JAILBREAK[arch] ?? "rootless";
 
@@ -104,7 +104,7 @@ function cut(ios, r) {
 }
 
 // "iOS 14.0 – 16.x" style text for the page: the bounds the package states.
-export function rangeText(req) {
+function rangeText(req) {
   let lo = null, hi = null;
   for (const g of req.groups) {
     if (g.length !== 1 || !g[0].op) continue;

@@ -3,7 +3,7 @@
 // .name-lock (after the name, in the Sources tab) place it.
 const NS = "http://www.w3.org/2000/svg";
 
-export function lockIcon(size = 13) {
+function lockIcon(size = 13) {
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("viewBox", "0 0 12 16");
   svg.setAttribute("width", String(Math.round(size * 12 / 16)));

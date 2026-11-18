@@ -27,7 +27,7 @@
 // which TrollStore borrows), altstore-pal (AltStore PAL's marketplace flows).
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-export const OTHER_APPS = {
+const OTHER_APPS = {
   altstore: "AltStore", "altstore-classic": "AltStore Classic", sidestore: "SideStore", feather: "Feather",
   ksign: "Ksign", esign: "ESign", scarlet: "Scarlet", gbox: "GBox", trollapps: "TrollApps", stikstore: "StikStore",
 };

@@ -174,7 +174,7 @@ export async function followInstall(native, bundleId, h, { later = setTimeout } 
 
 // The sheet itself. `onSign(edits)` with { name, bundleId, icon (base64 PNG | null), removeExtensions: [path] }.
 // Returns the sheet's close().
-export function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } = {}) {
+function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } = {}) {
   style();
   const app = info?.app ?? {};
   const edits = { name: app.name || fallbackName, bundleId: info?.signsAs || app.bundleId || "", icon: null, removeExtensions: [] };

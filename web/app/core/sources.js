@@ -65,7 +65,7 @@ export function sourceKey({ uri, dist }) {
 }
 
 // Cydia's alert texts (docs/cydia.md "UI strings"). `kind`: invalid_url, not_repository, verification.
-export const ALERTS = {
+const ALERTS = {
   invalid_url: ["Invalid URL", "That is not a valid source URL. Please check it and try again."],
   not_repository: ["Did not Find Repository", "The indicated repository could not be found. This could be because "
     + "you are trying to add a legacy Installer repository (these are not supported). Also, this interface is only "
@@ -372,7 +372,7 @@ export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, coun
 
 // F19: refreshSource with a time limit. The fetches it started go on unawaited; the source gets the timeout as its
 // error, so the row says Not Responding and the rest of Refresh goes on.
-export async function refreshTimed(backend, source, { timeout = REFRESH_TIMEOUT, ...rest } = {}) {
+async function refreshTimed(backend, source, { timeout = REFRESH_TIMEOUT, ...rest } = {}) {
   try {
     return await withTimeout(refreshSource(backend, source, rest), timeout);
   } catch (e) {

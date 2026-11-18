@@ -32,7 +32,7 @@ export const SECTION_ICONS = [
 
 export const PURPOSES = ["commercial", "console", "daemon", "extension", "library", "uikit", "x"];
 
-export const ICON_DIR = "icons/sections/";
+const ICON_DIR = "icons/sections/";
 export const UNKNOWN_ICON = `${ICON_DIR}unknown.png`;
 
 // Lower-cased names a repo uses for one of the sections above (Sections.plist's own, lower-cased, and common ones).

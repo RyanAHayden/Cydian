@@ -1,7 +1,0 @@
-<!doctype html><meta name=viewport content="width=device-width"><link rel=stylesheet href=ios6.css><link rel=stylesheet href=packages.css>
-<body style="margin:0;height:100vh;background:#ccc"><div id=screens style="position:fixed;inset:0"></div><script type=module>
-import { showActionSheet } from "./nav/actionsheet.js";
-import { initScroller } from "./nav/scroller.js";
-initScroller(document.getElementById("screens"));
-showActionSheet({ title: "Which version is installed?", buttons: Array.from({length: 20}, (_, i) => "0." + i) });
-</script>

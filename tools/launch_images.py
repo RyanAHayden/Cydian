@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Launch images for the home-screen web app (apple-touch-startup-image), one per current iPhone screen.
 
-Like Cydia's own Default.png: the app's frame with nothing in it. The blue nav bar (under the status bar too), the
-pinstripe background and the black tab bar, no title, no icons. Drawn by headless Chromium from the app's real
-style.css and ios6.css, with each phone's safe-area insets put in where env() would give them.
+Home as it first appears while it loads: the nav bar titled Cydian (under the status bar too), the pinstripe
+background with the app's own Loading spinner in the middle, and the tab bar with Home selected, so the launch screen
+turns into the page without a jump. Drawn by headless Chromium from the app's real stylesheets (the ones index.html
+links), with each phone's safe-area insets put in where env() would give them.
 
     tools/launch_images.py OUT_DIR      (writes launch-<W>x<H>.png in device pixels; index.html links them)
 """
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -24,14 +26,23 @@ SCREENS = [
 ]
 
 
+TABS = ["Home", "Sources", "Changes", "Installed", "Search", "Settings"]
+
+
 def page(top: int, bottom: int) -> str:
-    css = (APP / "style.css").read_text() + (APP / "ios6.css").read_text()
+    links = re.findall(r'<link rel="stylesheet" href="([^"]+)"', (APP / "index.html").read_text())
+    css = "".join((APP / href).read_text() for href in links)
     css = css.replace("env(safe-area-inset-top)", f"{top}px").replace("env(safe-area-inset-bottom)", f"{bottom}px")
     css = css.replace("env(safe-area-inset-left)", "0px").replace("env(safe-area-inset-right)", "0px")
+    tabs = "".join(f'<a class="tab{" active" if t == "Home" else ""}" data-tab="{t.lower()}"><span class="tab-icon"></span>'
+                   f'<span class="tab-label">{t}</span></a>' for t in TABS)
     return (f"<!doctype html><html data-theme='light'><head><meta charset=utf-8><style>{css}"
-            "html,body{margin:0;overflow:hidden} .page-body{visibility:visible}</style></head><body>"
-            "<header class='navbar'></header><div class='page-body grouped'></div><nav class='tabbar'></nav>"
-            "</body></html>")
+            "html,body{margin:0;overflow:hidden} .page-body{visibility:visible;display:flex;align-items:center;"
+            "justify-content:center} .page-body::before{display:none} .loading-spinner{animation:none}</style></head><body>"
+            "<header class='navbar'><div class='nav-stack is-active'><div class='nav-item is-top'><div></div>"
+            "<h1 class='nav-title'>Cydian</h1><div></div></div></div></header>"
+            "<div class='page-body grouped'><div class='loading'><span class='loading-spinner'></span><span>Loading</span></div></div>"
+            f"<nav class='tabbar'>{tabs}</nav></body></html>")
 
 
 def main(out: str) -> None:

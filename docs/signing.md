@@ -37,7 +37,7 @@ WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for i
   `/sign/up/<token>/manifest.plist?bundleid=&version=&title=` (the Worker answers it from the query), reserves the
   token (`POST /sign/upload?token=`, no size), then signs and uploads into it (`&token=&size=`). The Worker holds
   iOS's `app.ipa` up to 2 minutes: headers once the upload has started, the body once it's done. A different bundle
-  ID out of zsign, a failed reservation, or more than 110 s fall back to the Ready to Install alert.
+  ID out of zsign, a failed reservation, or more than 8 minutes (F132: iOS retries a held `app.ipa` for 5+ minutes, R14) fall back to the Ready to Install alert.
   R14 measured it on the iPhone 7 (iOS 15.8.8, `wrangler tail`): the prompt opens straight from the tap (manifest
   fetched 0.6 s after it, no "Open in iTunes?"), and Safari keeps downloading, signing and uploading behind iOS's
   alert. iOS's installer (`com.apple.appstored`) never gives up on a held `app.ipa`; it retries. It sends a HEAD and

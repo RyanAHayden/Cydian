@@ -65,14 +65,14 @@ ln -sfn "$tc/usr/lib/swift/clang" "$rd/clang"
   -target "$target" -sdk "$sdk" -resource-dir "$rd" -I "$rd/shims" -module-cache-path "$out/modules" \
   -Xcc -Wno-nullability-completeness -Xcc -Wno-nullability-inferred-on-nested-type \
   -import-objc-header Sources/Cydian-Bridging-Header.h \
-  -module-name Cydian -c Sources/*.swift -o "$out/Cydian.o"
+  -module-name Cydian -c Sources/*.swift sign/*.swift -o "$out/Cydian.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/availability.c -o "$out/availability.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/mode.c -o "$out/mode.o"
 # The app's half of the root helper (cydian_helper_spawn), and the helper itself (N2's native/helper/).
 hflags=(-target "$target" -isysroot "$sdk" -std=c11 -Wall -Wextra -Werror -O2)
 clang "${hflags[@]}" -c helper/spawn.c -o "$out/spawn.o"
 clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/Cydian.o" "$out/availability.o" \
-  "$out/mode.o" "$out/spawn.o" -L "$sdk/usr/lib/swift" -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
+  "$out/mode.o" "$out/spawn.o" -L "$sdk/usr/lib/swift" -lz -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
   -o "$out/Cydian"
 
 rcodesign=${RCODESIGN:-$(command -v rcodesign || true)}
@@ -98,6 +98,8 @@ bundle() {
     while IFS= read -r -d '' f; do mkdir -p "$app/web/$(dirname "$f")" && cp "../web/app/$f" "$app/web/$f"; done
   cp icon/AppIcon60x60@2x.png icon/AppIcon60x60@3x.png "$app/"
   cp bridge.js "$app/bridge.js"
+  # Apple's WWDR intermediates and roots, public certificates the on-device signer puts in each CMS (I6).
+  mkdir -p "$app/certs" && cp sign/certs/*.cer "$app/certs/"
   sed -e "s/@VERSION@/$version/" -e "s/@BUILD@/$build/" -e "s/@MIN@/$min/" Info.plist > "$app/Info.plist"
   [ -z "$overlay" ] || python3 mkipa.py plist "$app/Info.plist" "$overlay" "$app/Info.plist"
   printf 'APPL????' > "$app/PkgInfo"

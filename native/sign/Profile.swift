@@ -1,0 +1,75 @@
+// A provisioning profile (.mobileprovision) for the on-device signer (I6): the plist inside its CMS envelope, and the
+// same rules web/signer/identity.py (I5) applies, so the phone and the signing server sign an app the same way.
+// SPDX-License-Identifier: GPL-3.0-or-later
+import Foundation
+
+struct Profile {
+    let data: Data
+    let name: String
+    let uuid: String
+    let team: String
+    let appID: String                 // application-identifier without the team: "*", "com.you.*" or explicit
+    let entitlements: [String: Any]
+    let expires: Date?
+    let created: Date?
+    let devices: Int                  // -1: all (enterprise)
+    let certificates: [Data]          // DeveloperCertificates, DER
+
+    init(_ data: Data) throws {
+        self.data = data
+        guard let start = data.range(of: Data("<?xml".utf8)), let end = data.range(of: Data("</plist>".utf8), in: start.lowerBound..<data.endIndex),
+              let plist = try? PropertyListSerialization.propertyList(from: data.subdata(in: start.lowerBound..<end.upperBound), format: nil) as? [String: Any]
+        else { throw SignError("bad_profile", "That file isn't a provisioning profile.") }
+        name = plist["Name"] as? String ?? ""
+        uuid = plist["UUID"] as? String ?? ""
+        let ents = plist["Entitlements"] as? [String: Any] ?? [:]
+        entitlements = ents
+        team = (plist["TeamIdentifier"] as? [String])?.first ?? ents["com.apple.developer.team-identifier"] as? String ?? ""
+        let full = ents["application-identifier"] as? String ?? ""
+        appID = full.hasPrefix(team + ".") ? String(full.dropFirst(team.count + 1)) : full
+        expires = plist["ExpirationDate"] as? Date
+        created = plist["CreationDate"] as? Date
+        if plist["ProvisionsAllDevices"].flatMap(plistBool) == true { devices = -1 }
+        else { devices = (plist["ProvisionedDevices"] as? [Any])?.count ?? 0 }
+        certificates = plist["DeveloperCertificates"] as? [Data] ?? []
+    }
+
+    var isWildcard: Bool { appID == "*" || appID.hasSuffix(".*") }
+
+    // The bundle ID an app is signed as: a wildcard TEAM.* keeps the app's own; TEAM.com.you.* keeps it if it
+    // fits, else puts the last part of the app's ID under the prefix; an explicit app ID signs the app as that ID.
+    func bundleID(for appBundleID: String) throws -> String {
+        if appID == "*" { return appBundleID }
+        if appID.hasSuffix(".*") {
+            let prefix = String(appID.dropLast())
+            if appBundleID.hasPrefix(prefix) { return appBundleID }
+            return prefix + (appBundleID.split(separator: ".").last.map(String.init) ?? appBundleID)
+        }
+        guard !appID.isEmpty else { throw SignError("bad_profile", "The provisioning profile has no app ID.") }
+        return appID
+    }
+
+    // The profile's entitlements narrowed to one bundle, the way Xcode signs (I5's app_entitlements).
+    func entitlements(for bundleID: String) -> [String: Any] {
+        var e = entitlements
+        let t = e["com.apple.developer.team-identifier"] as? String ?? team
+        if !t.isEmpty {
+            e["application-identifier"] = "\(t).\(bundleID)"
+            if e["keychain-access-groups"] != nil { e["keychain-access-groups"] = ["\(t).\(bundleID)"] }
+        }
+        e["get-task-allow"] = false
+        return e
+    }
+
+    // Why this certificate can't sign with this profile, or nil when it can.
+    func problem(with cert: Data, now: Date = Date()) -> SignError? {
+        if let x = expires, x < now { return SignError("profile_expired", "The provisioning profile \"\(name)\" expired.") }
+        guard let c = try? Certificate(der: cert) else { return SignError("bad_p12", "The certificate can't be read.") }
+        if let na = c.notAfter, na < now { return SignError("cert_expired", "The certificate expired.") }
+        if let nb = c.notBefore, nb > now { return SignError("cert_expired", "The certificate isn't valid yet.") }
+        if !certificates.contains(cert) {
+            return SignError("cert_not_in_profile", "The provisioning profile doesn't list this certificate.")
+        }
+        return nil
+    }
+}

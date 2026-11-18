@@ -164,7 +164,8 @@ export function render(body, route, ctx) {
   const list = browse.packageList(results, route, [], { letters: false });
   results.append(list.el);
   // F20: packages from sources the user hasn't added (Canister), under the local results.
-  const others = discoveryGroup(ctx);
+  // B33: its rows not built for this device follow Show Incompatible too (settings.onChange below runs it again).
+  const others = discoveryGroup(ctx, { hideIncompatible: compatFilterOn });
   const recs = recommendedGroup(ctx);
   results.append(recs.el, others.el);
 

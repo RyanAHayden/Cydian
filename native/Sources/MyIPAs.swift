@@ -11,6 +11,10 @@
 //                                   -> signing.install's reply + {file}; the signed copy stays either way
 //   library.export {file}           the share sheet (Save to Files, AirDrop...) for the signed copy -> {shared: bool}
 //   library.delete {file}           the IPA, its signed copy and options -> {ipas}
+//   library.helperInstall {file, stream}   F212, jailbreak only: ifizbox-helper installs the file as it is
+//                                   -> {code: 0, stdout, stderr, bundleId, name, version} (share.ipaInstall's reply)
+// F212: list, add, pick, delete and helperInstall work in the jailbreak app too (its Documents is
+// /var/mobile/Documents); options, sign, install and export stay the sideload build's (they sign).
 // F196: signing.cancel (Sideload.cancel) stops library.sign and library.install too: the signer at its next step
 // (the earlier signed copy, if any, stays), and an install's serving to iOS.
 //
@@ -32,7 +36,7 @@ enum MyIPAs {
     }()
 
     static func register(_ b: Bridge) {
-        b.on("library.list") { c in SignBridge.run(c) { list() } }
+        b.on("library.list") { c in anyMode(c) { list() } } // F212: list, add, pick, delete in the jailbreak app too
         b.on("library.add") { c in add(c) }
         b.on("library.pick") { c in pick(c) }
         b.on("library.options") { c in
@@ -56,12 +60,41 @@ enum MyIPAs {
             }
         }
         b.on("library.install") { c in install(c) }
+        b.on("library.helperInstall") { c in helperInstall(c) } // F212
         b.on("library.export") { c in export(c) }
         b.on("library.delete") { c in
-            SignBridge.run(c) {
+            anyMode(c) {
                 try library.delete(c.params["file"] as? String ?? "")
                 return list()
             }
+        }
+    }
+
+    // F212: SignBridge.run without its jailbreak refusal, for the calls the jailbreak app's My IPAs makes too.
+    static func anyMode(_ c: Bridge.Call, _ f: @escaping () throws -> Any?) {
+        SignBridge.queue.async {
+            do { Apt.reply(c, try f(), nil) } catch { Apt.reply(c, nil, SignBridge.text(error)) }
+        }
+    }
+
+    // F212: the jailbreak app's Install for a library file: a copy staged where ifizbox-helper takes IPAs, then
+    // share.ipaInstall's run (ShareRun.installIPA); the library keeps its file. Replies and errors as share.ipaInstall's.
+    static func helperInstall(_ c: Bridge.Call) {
+        guard AppMode.current == .jailbreak else {
+            return Apt.reply(c, nil, "sideload: the sideload build installs My IPAs with library.install")
+        }
+        let emit = ShareBridge.emitter(c)
+        SharedInbox.queue.async {
+            var staged: String?
+            defer { if let p = staged { try? FileManager.default.removeItem(atPath: p) } }
+            do {
+                let src = try library.url(c.params["file"] as? String ?? "")
+                staged = try ShareInbox.stage(src, kind: .ipa, dirs: SharedInbox.dirs)
+                let app = try ShareRun.installIPA(staged!, PhoneShareHost(), emit: emit)
+                Apt.reply(c, ["code": 0, "stdout": "", "stderr": "", "bundleId": app.bundleID, "name": app.name,
+                              "version": app.version], nil)
+            } catch let e as SignError { Apt.reply(c, nil, SignBridge.text(e)) }
+            catch { Apt.reply(c, nil, ShareBridge.text(error)) }
         }
     }
 
@@ -97,7 +130,6 @@ enum MyIPAs {
     // ---- adding
 
     static func add(_ c: Bridge.Call) {
-        guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: not in the jailbreak app") }
         guard let url = Apt.httpURL(c.params["url"]) else { return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
         let tmp = SignBridge.work.appendingPathComponent("\(SignBridge.token())-add.ipa")
         let emit = emitter(c)
@@ -123,7 +155,6 @@ enum MyIPAs {
     }
 
     static func pick(_ c: Bridge.Call) {
-        guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: not in the jailbreak app") }
         DispatchQueue.main.async {
             guard let top = topController() else { return c.reply(nil, "internal: no window to show the picker in") }
             let types = [UTType("com.apple.itunes.ipa"), UTType(filenameExtension: "ipa")].compactMap { $0 }

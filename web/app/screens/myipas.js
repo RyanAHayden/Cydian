@@ -14,7 +14,9 @@
 //   #/installed/myipas/ipa:<file>/options   Sign Options: name, bundle ID, icon, extensions, arm64e fix-up
 //
 // In the sideload app the files live in iFizBox's Documents (Files > On My iPhone > iFizBox) and the shell signs them
-// (signing-client.js libraryCall, native/Sources/MyIPAs.swift). On the website there is no signer on the phone:
+// (signing-client.js libraryCall, native/Sources/MyIPAs.swift). F212: the jailbreak app uses the same library (its
+// Documents is /var/mobile/Documents) but doesn't sign: an IPA's page is its details and Delete, and Install runs
+// Install IPA's console over library.helperInstall (ifizbox-helper installs the file as it is). On the website there is no signer on the phone:
 // Add is Choose File (F197: the IPA is kept in this browser's IndexedDB and Install signs it here, signInBrowser with
 // its bytes) or From URL; links are kept on this device, and a link's Install is an app page's (F95, user 2026-11-18: no
 // Open in iFizBox / Get in AltStore / SideStore / Feather): it signs in the browser (F93), and until that lands it says
@@ -36,7 +38,7 @@ import { deviceError, phaseLabel, isCgBI, fromBase64 } from "../core/signing.js"
 import { apps, recordInstall } from "../core/installed.js";
 import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optionsParams, siteEntries, addSiteUrl,
   STATE_LABELS, addSiteFile, removeSiteEntry, openIpaStore, memoryIpaStore, libraryFooter, listState, listStep, tapOpens,
-  allSelected, deleteLabel, deleteButtonText, deleteSheetTitle, deleteEntries, holdActions, HOLD } from "../core/myipas.js";
+  allSelected, deleteLabel, deleteButtonText, deleteSheetTitle, deleteEntries, holdActions, HOLD, libraryMode } from "../core/myipas.js";
 import { barButton } from "../nav/ui.js";
 import { longPress } from "../nav/menu.js";
 import { readIpaFile } from "../core/ipainfo.js";
@@ -74,7 +76,12 @@ export function pageOf(route) {
   return { page: "missing" };
 }
 
-const site = () => !localSigning();
+// F212: the jailbreak app keeps its IPAs in the shell's library too (/var/mobile/Documents, library.*), installed by
+// ifizbox-helper as they are (library.helperInstall); localSigning stays the sideload build's alone (Sign Options,
+// Sign Now, Save Signed IPA).
+export const listMode = () => libraryMode(detectMode());
+const site = () => listMode() === "site";
+const jailbreak = () => listMode() === "jailbreak";
 
 export function nav(route) {
   const p = pageOf(route);
@@ -184,15 +191,19 @@ async function load() {
 
 function draw(list) {
   const isSite = site();
-  const files = libraryRows(list, { site: isSite }).map((r) => r.file);
+  const jb = jailbreak();
+  const files = libraryRows(list, { site: isSite, jailbreak: jb }).map((r) => r.file);
   lib.state = files.length ? listStep(lib.state, { type: "list", files }) : listState();
-  lib.ctl = libraryGroup(list, { site: isSite, state: lib.state,
+  lib.ctl = libraryGroup(list, { site: isSite, jailbreak: jb, state: lib.state,
     on: { change: onListChange, delete: (es) => deleteMany(es), hold: (e) => holdSheet(e) } });
   view.body.replaceChildren(lib.ctl.el);
   onListChange(lib.state);
 }
 
-export function libraryEmptyText(site) {
+// F212: the jailbreak app's: no sideloaders (they aren't offered there), and its Documents is /var/mobile/Documents,
+// which the Files app doesn't show.
+export function libraryEmptyText(site, { jailbreak = false } = {}) {
+  if (!site && jailbreak) return "No IPAs yet. Tap Add to choose one in Files or download one, or put IPAs in /var/mobile/Documents.";
   return site
     ? `No IPAs yet. Tap Add to choose an IPA in Files (kept in this browser, signed here when you install it) or to keep a link to one: Install opens it in ${NAME}, AltStore, SideStore or Feather.`
     : `No IPAs yet. Tap Add to choose one in Files or download one, or put IPAs in Files under On My iPhone > ${NAME}.`;
@@ -207,12 +218,12 @@ export function libraryEmptyText(site) {
 
 // The My IPAs group for `list`. -> { el (a fragment), ul, rows, state, step(action), cellOf(file) }.
 // on.change(state) after each step, on.delete([entry]) for a row's Delete, on.hold(entry) for a held row.
-export function libraryGroup(list, { site: isSite = site(), state = listState(), on = {} } = {}) {
-  const rows = libraryRows(list, { site: isSite });
+export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jailbreak(), state = listState(), on = {} } = {}) {
+  const rows = libraryRows(list, { site: isSite, jailbreak: jb });
   const el0 = grouped([{ header: "My IPAs", rows: rows.map((r) => ({
     label: r.title, subtitle: r.subtitle, icon: { text: r.title.charAt(0).toUpperCase() },
     href: format({ tab: "installed", path: ipaPath(r.file) }),
-  })), footer: rows.length ? libraryFooter(list) : libraryEmptyText(isSite) }]);
+  })), footer: rows.length ? libraryFooter(list) : libraryEmptyText(isSite, { jailbreak: jb }) }]);
   const ul = el0.querySelector(".table");
   const cells = ul ? [...ul.querySelectorAll(":scope > .cell")] : [];
   const byFile = new Map();
@@ -374,11 +385,12 @@ if (typeof window !== "undefined") {
 
 // Deletes `es` (rows of the list) after the sheet ('Delete n IPAs' red / Cancel): their records and stored files
 // (core/myipas.js deleteEntries), then the list again, its footer's total with it.
-export async function deleteMany(es, { sheet = showActionSheet, alert = showAlert, isSite = site(), store = siteStore, call = libraryCall,
-  storage = globalThis.localStorage } = {}) {
+export async function deleteMany(es, { sheet = showActionSheet, alert = showAlert, isSite = site(), isJailbreak = jailbreak(), store = siteStore,
+  call = libraryCall, storage = globalThis.localStorage } = {}) {
   if (!es?.length) return null;
   const n = es.length;
-  const i = await sheet({ title: deleteSheetTitle(n, { site: isSite, stored: es.some((e) => e.stored) }), buttons: [deleteButtonText(n)], destructive: 0 });
+  const i = await sheet({ title: deleteSheetTitle(n, { site: isSite, jailbreak: isJailbreak, stored: es.some((e) => e.stored) }),
+    buttons: [deleteButtonText(n)], destructive: 0 });
   if (i !== 0) return null;
   for (const e of es) lib.ctl?.cellOf(e.file)?.classList.add("removing");
   const r = await deleteEntries(es, { site: isSite, store, call, storage });
@@ -396,7 +408,7 @@ export async function deleteMany(es, { sheet = showActionSheet, alert = showAler
 
 // A held row's sheet: Install, Sign Now, Save Signed IPA, Delete (the website: Install, Delete).
 async function holdSheet(entry) {
-  const buttons = holdActions(entry, { site: site() });
+  const buttons = holdActions(entry, { site: site(), jailbreak: jailbreak() });
   if (!buttons.length) return;
   const i = await showActionSheet({ title: entry.title || entry.name || entry.file, buttons, destructive: buttons.indexOf(HOLD.DELETE) });
   const b = buttons[i];
@@ -426,12 +438,12 @@ export function browseGroups(apps) {
   }
   if (!apps.length) {
     return [{ header: "Browse", rows: top,
-      footer: site() ? "Add an AltStore source in Sources to browse its apps here." : "Add an AltStore source in Sources to browse its apps here. Every app installs signed with your certificate." }];
+      footer: !localSigning() ? "Add an AltStore source in Sources to browse its apps here." : "Add an AltStore source in Sources to browse its apps here. Every app installs signed with your certificate." }];
   }
   return [
     { header: "Browse", rows: [...top, { label: "All Apps", detail: String(apps.length), href: browseHref("apps") }] },
     { rows: mergeCategories(apps, { jailbroken: false }).map((c) => ({ label: c.name, detail: String(c.count), href: browseHref(`category:${c.name}`) })),
-      footer: site() ? "Apps from your AltStore sources." : "Apps from your AltStore sources, signed with your certificate when you install one." },
+      footer: !localSigning() ? "Apps from your AltStore sources.": "Apps from your AltStore sources, signed with your certificate when you install one." },
   ];
 }
 
@@ -741,6 +753,11 @@ async function renderIpa(body, route, file) {
     markDelete(body);
     return;
   }
+  if (jailbreak()) {
+    body.append(grouped(jailbreakIpaGroups(entry, () => confirmDelete(entry))));
+    markDelete(body);
+    return;
+  }
   const st = stateOf(entry);
   const status = [{ label: "Status", detail: st.label, chevron: false }];
   if (entry.signed) {
@@ -770,6 +787,24 @@ async function renderIpa(body, route, file) {
   groups.push({ rows: [{ label: "Delete", onClick: () => confirmDelete(entry) }] });
   body.append(grouped(groups));
   markDelete(body);
+}
+
+// F212: an IPA's page in the jailbreak app: its details and Delete; Install (nav bar) hands the file to ifizbox-helper
+// as it is (no Sign Options, Sign Now or Save Signed IPA: that app doesn't sign).
+export function jailbreakIpaGroups(entry, onDelete) {
+  const details = [
+    { label: "Version", detail: entry.version || "—", chevron: false },
+    { label: "Bundle ID", detail: entry.bundleId || "—", chevron: false },
+    { label: "Size", detail: formatBytes(entry.size) || "—", chevron: false },
+  ];
+  if (entry.minimumOS) details.push({ label: "Requires", detail: `iOS ${entry.minimumOS}`, chevron: false });
+  if (entry.extensions?.length) details.push({ label: "Extensions", detail: String(entry.extensions.length), chevron: false });
+  details.push({ label: "File", detail: entry.file, chevron: false });
+  return [
+    { header: "Details", rows: details,
+      footer: entry.error ? `This file can't be read: ${entry.error}` : `In /var/mobile/Documents. Install hands it to ${NAME}'s helper, which installs it as it is.` },
+    { rows: [{ label: "Delete", onClick: onDelete }] },
+  ];
 }
 
 function markDelete(body) {
@@ -818,7 +853,7 @@ async function saveSigned(entry, body, route) {
 }
 
 async function confirmDelete(entry) {
-  const i = await showActionSheet({ title: site() ? (entry.stored ? "The IPA is deleted from this browser." : "") : "The IPA and its signed copy are deleted from this iPhone.",
+  const i = await showActionSheet({ title: deleteSheetTitle(1, { site: site(), jailbreak: jailbreak(), stored: Boolean(entry.stored) }),
     buttons: ["Delete IPA"], destructive: 0 });
   if (i !== 0) return;
   try {
@@ -850,6 +885,13 @@ async function install(file) {
     await siteInstallSheet(entry);
     return;
   }
+  if (jailbreak()) {
+    const name = entry?.name || file.replace(/\.ipa$/i, "");
+    await jailbreakInstall(file, name, { onInstalled: (r) => {
+      if (r?.bundleId) record(r.bundleId, r.name || name, r.version || entry?.version || "", entry?.icon);
+    } });
+    return;
+  }
   const name = entry?.options?.name || entry?.name || file.replace(/\.ipa$/i, "");
   await installFromLibrary({ file, name, signed: Boolean(entry?.signed), onInstalled: (r) => {
     if (r?.bundleId) record(r.bundleId, r.name || name, r.version || entry?.version || "", entry?.options?.icon || entry?.icon);
@@ -858,6 +900,18 @@ async function install(file) {
   const route = { tab: "installed", path: ipaPath(file) };
   const body = shownBody(route);
   if (body) rerender(body, route);
+}
+
+// F212: the jailbreak app's Install for a library file: Install IPA's console (screens/ipa-install.js, as a URL's or a
+// shared file's), whose ipa.install call goes to library.helperInstall {file} instead (MyIPAs.swift: the file staged
+// where ifizbox-helper takes IPAs, then install-ipa), as share.js does for share.ipaInstall.
+export function helperBridge(file, native = globalThis.ifizboxNative) {
+  return { call: (method, params, onEvent) => native.call("library.helperInstall", { file, stream: params?.stream }, onEvent) };
+}
+
+export async function jailbreakInstall(file, name, { onInstalled = () => {}, native = globalThis.ifizboxNative, open } = {}) {
+  const run = open ?? (await import("./ipa-install.js")).openIpaInstall;
+  return run({ url: file, name, native: helperBridge(file, native), onInstalled });
 }
 
 // The IPA's page body when it is on screen (its own tab, or mounted on Home's stack), else null. Only the active

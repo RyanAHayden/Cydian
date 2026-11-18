@@ -90,7 +90,7 @@ test("Install: the HUD follows the phases, then Installing, and records the app"
   const ui = fakeUI();
   let recorded = null;
   assert.equal(await installOnDevice({ url: "https://e.example/x.ipa", name: "X", onInstalled: (r) => { recorded = r; } }, { native: n, ...ui.deps }), true);
-  assert.deepEqual(n.calls[0], { method: "signing.install", params: { url: "https://e.example/x.ipa" } });
+  assert.deepEqual(n.calls[0], { method: "signing.install", params: { url: "https://e.example/x.ipa", manifestServer: "https://cydian.dev" } }); // the manifest from the signing server
   assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Reading", "Signing 25%", "Installing", "Installing"]);
   assert.equal(recorded, done);
   assert.equal(ui.alerts.length, 0);

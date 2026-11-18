@@ -95,9 +95,17 @@ enum Sideload {
 
     // ---- install
 
+    // The signing server whose GET /sign/manifest hands iOS the manifest for an IPA Cydian serves over plain HTTP
+    // at 127.0.0.1 (Feather's "Semi Local", on our own server): no certificate to trust on the phone, the key never
+    // leaves it, the server sees only the app's ID, version and name. Nil: everything local over HTTPS with the
+    // phone's own trusted CA. Set by each signing.install call's `manifestServer`.
+    static var manifestServer: String?
+
     static func install(_ c: Bridge.Call) {
         guard let (id, profile) = ready(c) else { return }
-        guard LocalTrust.trusted() else {
+        let ms = (c.params["manifestServer"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        manifestServer = (ms?.hasPrefix("https://") ?? false) ? ms : nil
+        guard manifestServer != nil || LocalTrust.trusted() else {
             return Apt.reply(c, nil, "untrusted: set up Local Install in Settings > Signing first (install and trust Cydian's certificate)")
         }
         let options: SignOptions
@@ -172,7 +180,8 @@ enum Sideload {
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored)
         emit("installing", 0)
         let manifestPath = "/\(tok)/manifest.plist", ipaPath = "/\(tok)/app.ipa"
-        let server = InstallServer.secure
+        let remote = manifestServer
+        let server = remote != nil ? InstallServer.plain : InstallServer.secure
         server.start { res in
             switch res {
             case .failure(let e):
@@ -196,7 +205,15 @@ enum Sideload {
                     server.serve(manifestPath, .init(type: "text/xml", body: .data(manifest), onServed: nil))
                     server.serve(ipaPath, .init(type: "application/octet-stream", body: .file(output)) { end(true) })
                     SignBridge.queue.asyncAfter(deadline: .now() + 15 * 60) { end(false) }
-                    let link = LocalCA.itmsURL(manifest: server.base + manifestPath)
+                    let link: String
+                    if let remote = remote {
+                        var q = URLComponents(string: remote + "/sign/manifest")!
+                        q.queryItems = [URLQueryItem(name: "bundleid", value: app.bundleID), URLQueryItem(name: "version", value: app.version),
+                                        URLQueryItem(name: "title", value: app.name), URLQueryItem(name: "url", value: server.base + ipaPath)]
+                        link = LocalCA.itmsURL(manifest: q.url!.absoluteString)
+                    } else {
+                        link = LocalCA.itmsURL(manifest: server.base + manifestPath)
+                    }
                     SignBridge.queue.async {
                         saveRecords(SignedRecords.adding(record, to: records()))
                         reschedule()

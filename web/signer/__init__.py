@@ -7,6 +7,7 @@ itms-services:// link the phone installs from. docs/signing.md is the long versi
   GET  /sign/job/<job>            {status: downloading | signing | done (+ the fields above) | error (+ error, code,
                                   httpStatus)}: the phone polls it, so no one request outlasts a proxy's timeout
   GET  /sign/<token>/manifest.plist   the install manifest iOS reads (until the token expires)
+  GET  /sign/manifest?bundleid=&version=&title=&url=http://127.0.0.1:<port>/...   a manifest for an IPA the phone serves
   GET  /sign/<token>/app.ipa          the signed IPA (HEAD and Range too), until the token expires
   GET  /sign/status                   {ok, zsign, maxBytes, ttl, jobs}: Settings > Signing asks if this server signs
 
@@ -25,13 +26,14 @@ import binascii
 import hashlib
 import os
 import plistlib
+import re
 import secrets
 import shutil
 import tempfile
 import threading
 import time
 from dataclasses import dataclass
-from urllib.parse import quote
+from urllib.parse import urlsplit, quote
 
 from flask import Blueprint, Response, jsonify, request, send_file
 
@@ -248,6 +250,31 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
     def status():
         return answer({"ok": True, "zsign": bool(zsign_path()), "maxBytes": MAX_BYTES, "ttl": int(db().ttl),
                        "jobs": True})
+
+    @bp.get("/sign/manifest")
+    def loopback_manifest():
+        """Feather's "Semi Local", done with our own server: the itms-services manifest for an IPA the phone serves
+        itself over plain HTTP at 127.0.0.1 (the sideload app's install server). iOS insists on HTTPS only for the
+        manifest, so no certificate has to be trusted on the phone. Only loopback IPA URLs are accepted (this is
+        no open redirect), and nothing is stored or logged."""
+        q = request.args
+        url = q.get("url", "")
+        try:
+            u = urlsplit(url)
+            port = u.port
+        except ValueError:
+            u, port = None, None
+        if not u or u.scheme != "http" or u.hostname not in ("127.0.0.1", "localhost") or not port or u.username or u.password:
+            return answer({"error": "Only an IPA on this iPhone (http://127.0.0.1:<port>/...) can be installed this way.",
+                           "code": "bad_url"}, 400)
+        bundle_id, version, title = q.get("bundleid", ""), q.get("version", "") or "1.0", q.get("title", "")
+        if not re.fullmatch(r"[A-Za-z0-9.\-]{1,155}", bundle_id) or len(version) > 64 or len(title) > 200:
+            return answer({"error": "Bad bundle ID, version or title.", "code": "bad_request"}, 400)
+        doc = {"items": [{"assets": [{"kind": "software-package", "url": url}],
+                          "metadata": {"bundle-identifier": bundle_id, "bundle-version": version, "kind": "software",
+                                       "title": title or bundle_id}}]}
+        return Response(plistlib.dumps(doc), 200, {"Content-Type": "application/xml", "Cache-Control": "no-store",
+                                                    "X-Content-Type-Options": "nosniff"})
 
     @bp.post("/sign")
     def sign():

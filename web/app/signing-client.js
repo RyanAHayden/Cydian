@@ -225,7 +225,9 @@ export async function installOnDevice({ url, name = "", onInstalled = () => {} }
   const h = hud("Downloading");
   let result;
   try {
-    result = await bridge(native).call("signing.install", { url }, (ev) => {
+    // manifestServer: the signing server hands iOS the manifest while Cydian serves the IPA over plain HTTP at
+    // 127.0.0.1 (no certificate to trust on the phone; the server sees only the app's ID, version and name).
+    result = await bridge(native).call("signing.install", { url, manifestServer: getServer() }, (ev) => {
       const t = phaseLabel(ev);
       if (t) h.set(t);
     });

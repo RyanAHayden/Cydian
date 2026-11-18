@@ -269,6 +269,19 @@ class GuardTest(Base):
         codes = [self.post(password="wrong").status_code for _ in range(3)]
         self.assertEqual(codes, [400, 400, 429])
 
+    def test_loopback_manifest(self):
+        # Semi Local: a manifest for an IPA the phone serves itself over HTTP at 127.0.0.1; nothing else accepted.
+        ok = self.c.get("/sign/manifest", query_string={"bundleid": "com.ryha.openmx", "version": "0.16.0", "title": "openMX",
+                                                        "url": "http://127.0.0.1:52344/abc/app.ipa"})
+        self.assertEqual(ok.status_code, 200)
+        item = plistlib.loads(ok.data)["items"][0]
+        self.assertEqual(item["assets"][0]["url"], "http://127.0.0.1:52344/abc/app.ipa")
+        self.assertEqual((item["metadata"]["bundle-identifier"], item["metadata"]["title"]), ("com.ryha.openmx", "openMX"))
+        for url in ("https://evil.example/x.ipa", "http://10.0.0.5:80/x.ipa", "http://127.0.0.1/x.ipa", "http://u:p@127.0.0.1:1/x", "ftp://127.0.0.1:2/x"):
+            r = self.c.get("/sign/manifest", query_string={"bundleid": "a.b", "url": url})
+            self.assertEqual(r.status_code, 400, url)
+        self.assertEqual(self.c.get("/sign/manifest", query_string={"bundleid": "bad id!", "url": "http://127.0.0.1:1/x"}).status_code, 400)
+
     def test_unknown_token(self):
         self.assertEqual(self.c.get("/sign/nope/manifest.plist").status_code, 404)
         self.assertEqual(self.c.get("/sign/nope/app.ipa").status_code, 404)

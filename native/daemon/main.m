@@ -296,7 +296,7 @@ static int e_busy(void *ctx) {
 
 static int e_update(void *ctx) {
     (void)ctx;
-    const char *argv[] = {CYDIAN_PREFIX "/usr/bin/apt-get", "-q", "update", NULL};
+    const char *argv[] = {CYDIAN_PREFIX "/usr/bin/apt-get", "-q", "-o", "Acquire::AllowInsecureRepositories=true", "update", NULL};
     return run(argv, UPDATE_SECONDS, nil);
 }
 
@@ -311,6 +311,7 @@ static int apt(const char *const *ids, int n, int simulate, char **out) {
         argv[k++] = "-y";
         argv[k++] = "-o"; argv[k++] = "Dpkg::Options::=--force-confdef";
         argv[k++] = "-o"; argv[k++] = "Dpkg::Options::=--force-confold";
+        argv[k++] = "--allow-unauthenticated"; /* N6: upgrades from unsigned repos, as the helper's install */
     }
     if (n == 0) argv[k++] = "dist-upgrade";
     else {

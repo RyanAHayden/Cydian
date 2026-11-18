@@ -281,6 +281,11 @@ class Plists(unittest.TestCase):
             e = plistlib.load(f)
         self.assertTrue(any(e.get(k) is True for k in mkdeb.UNSANDBOXED))
 
+    def test_local_notifications_key(self):
+        """N6: without SBAppUsesLocalNotifications iOS keeps no notification permission for a /Applications app."""
+        with open(os.path.join(HERE, "Info.plist"), "rb") as f:
+            self.assertIs(plistlib.load(f).get("SBAppUsesLocalNotifications"), True)
+
     def test_version_file(self):
         with open(os.path.join(HERE, "VERSION")) as f:
             self.assertRegex(f.read().strip(), r"^\d+\.\d+\.\d+$")

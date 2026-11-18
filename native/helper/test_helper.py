@@ -55,13 +55,15 @@ class Helper(unittest.TestCase):
         return self.run_driver("plan", "/var/jb", fd, *words)
 
     def test_update(self):
+        """N6: unsigned repos are read (apt-get update exits 100 on one otherwise, and most jailbreak repos are)."""
+        insecure = ["-o", "Acquire::AllowInsecureRepositories=true"]
         self.assertEqual(self.plan("update"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", "-o", "APT::Status-Fd=3", "update"])
-        self.assertEqual(self.plan("update", fd="-1"), ["/var/jb/usr/bin/apt-get", "apt-get", "update"])
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *insecure, "-o", "APT::Status-Fd=3", "update"])
+        self.assertEqual(self.plan("update", fd="-1"), ["/var/jb/usr/bin/apt-get", "apt-get", *insecure, "update"])
 
     def test_install_remove_upgrade(self):
         fixed = ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold",
-                 "-o", "APT::Status-Fd=3"]
+                 "--allow-unauthenticated", "-o", "APT::Status-Fd=3"]
         self.assertEqual(self.plan("install", "com.a.b", "libstdc++"),
                          ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "install", "com.a.b", "libstdc++"])
         self.assertEqual(self.plan("remove", "com.a.b"),
@@ -113,7 +115,7 @@ class Helper(unittest.TestCase):
                 out = self.plan(*words)
                 self.assertEqual(len(out), 1, out)
                 self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
-        self.assertEqual(len(self.plan("install", *(["ab"] * 256))), 2 + 8 + 256)
+        self.assertEqual(len(self.plan("install", *(["ab"] * 256))), 2 + 9 + 256)
 
     # --- F33: addsource / removesource and cydian.sources
 
@@ -281,23 +283,25 @@ class Helper(unittest.TestCase):
 
     def test_queue_plan(self):
         apply_fixed = ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold",
-                       "--reinstall", "--allow-downgrades", "-o", "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3"]
+                       "--reinstall", "--allow-downgrades", "--allow-unauthenticated", "-o", "APT::Keep-Fds::=3", "-o",
+                       "APT::Status-Fd=3"]
         self.assertEqual(self.plan("apply", "com.a.b", "com.c=1:1.0~b1+x-2", "-com.d"),
                          ["/var/jb/usr/bin/apt-get", "apt-get", *apply_fixed, "install", "com.a.b", "com.c=1:1.0~b1+x-2",
                           "com.d-"])
         self.assertEqual(self.plan("apply", "com.a.b", fd="-1")[2:], ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o",
-                         "Dpkg::Options::=--force-confold", "--reinstall", "--allow-downgrades", "install", "com.a.b"])
+                         "Dpkg::Options::=--force-confold", "--reinstall", "--allow-downgrades", "--allow-unauthenticated", "install",
+                         "com.a.b"])
         # simulate: apt-get -s, no status fd even when one is open (nothing to report)
         self.assertEqual(self.plan("simulate", "com.a.b=2", "-com.d"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", "-s", "--reinstall", "--allow-downgrades", "install",
-                          "com.a.b=2", "com.d-"])
-        self.assertEqual(len(self.plan("apply", *[f"p{i:03d}" for i in range(256)])), 2 + 12 + 256)
+                         ["/var/jb/usr/bin/apt-get", "apt-get", "-s", "--reinstall", "--allow-downgrades",
+                          "--allow-unauthenticated", "install", "com.a.b=2", "com.d-"])
+        self.assertEqual(len(self.plan("apply", *[f"p{i:03d}" for i in range(256)])), 2 + 13 + 256)
 
     def test_apply_ask_plan(self):
         """F63: apply-ask is apply without the conffile options, and needs the status fd to ask on."""
         self.assertEqual(self.plan("apply-ask", "com.a.b", "-com.d"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", "-y", "--reinstall", "--allow-downgrades", "-o",
-                          "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3", "install", "com.a.b", "com.d-"])
+                         ["/var/jb/usr/bin/apt-get", "apt-get", "-y", "--reinstall", "--allow-downgrades",
+                          "--allow-unauthenticated", "-o", "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3", "install", "com.a.b", "com.d-"])
         self.assertEqual(self.plan("apply-ask", "com.a.b", fd="-1"), ["error: apply-ask needs the status fd (3) to ask on"])
         self.assertEqual(self.plan("apply-ask", "ab-"), ["error: bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"])
         self.assertEqual(self.plan("apply-ask"), ["error: no packages"])
@@ -444,7 +448,7 @@ class Helper(unittest.TestCase):
         p, app, helper = self.chain_prefix()
         out = self.run_driver("spawn", helper, "install", "com.repo.tweak", driver=app)
         self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y -o Dpkg::Options::=--force-confdef -o "
-                      "Dpkg::Options::=--force-confold -o APT::Status-Fd=3 install com.repo.tweak", out)
+                      "Dpkg::Options::=--force-confold --allow-unauthenticated -o APT::Status-Fd=3 install com.repo.tweak", out)
         self.assertIn("1: cwd: /", out)
         self.assertIn("1: stdin: eof", out)
         self.assertIn("3: pmstatus:com.repo.tweak:50.0:Installing", out)
@@ -466,13 +470,13 @@ class Helper(unittest.TestCase):
         p, app, helper = self.chain_prefix()
         out = self.run_driver("spawn", helper, "apply", "com.repo.tweak=1", "-installed.one", driver=app)
         self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y -o Dpkg::Options::=--force-confdef -o "
-                      "Dpkg::Options::=--force-confold --reinstall --allow-downgrades -o APT::Keep-Fds::=3 "
-                      "-o APT::Status-Fd=3 install com.repo.tweak=1 installed.one-", out)
+                      "Dpkg::Options::=--force-confold --reinstall --allow-downgrades --allow-unauthenticated "
+                      "-o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install com.repo.tweak=1 installed.one-", out)
         env = next(l for l in out if l.startswith("1: env: ")).split(" ", 2)[2]
         self.assertIn("CYDIA=3 1", env)
         self.assertIn("3: pmstatus:com.repo.tweak:50.0:Installing", out)
         out = self.run_driver("spawn", helper, "simulate", "com.repo.tweak", driver=app)
-        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -s --reinstall --allow-downgrades install com.repo.tweak", out)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -s --reinstall --allow-downgrades --allow-unauthenticated install com.repo.tweak", out)
         self.assertNotIn("CYDIA=", next(l for l in out if l.startswith("1: env: ")))
         out = self.run_driver("spawn", helper, "apply", "-com.repo.tweak", driver=app)
         self.assertIn("2: cydian-helper: unknown package: com.repo.tweak", out)
@@ -490,8 +494,8 @@ class Helper(unittest.TestCase):
             return r.stdout.splitlines()
 
         out = ask("close", "Z,D,maybe,Y", "apply-ask", "com.repo.tweak=1")
-        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y --reinstall --allow-downgrades -o APT::Keep-Fds::=3 "
-                      "-o APT::Status-Fd=3 install com.repo.tweak=1", out)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y --reinstall --allow-downgrades --allow-unauthenticated "
+                      "-o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install com.repo.tweak=1", out)
         self.assertIn("1: stdin: Y", out)
         self.assertEqual(out.count("2: cydian-helper: ignored an answer that isn't Y or N"), 3, out)
         self.assertIn("CYDIA=3 1", next(l for l in out if l.startswith("1: env: ")))

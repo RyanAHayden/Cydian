@@ -20,6 +20,12 @@
 // a version (cydian-helper rollbacks), [{ version, file }] newest first; rollback(id, version, onEvent) installs one
 // (cydian-helper rollback: apt-get install of the stored file, downgrades allowed), streaming like apply.
 //
+// I4 (jailbreak build): appVersions() is every installed app's real version, read by the helper from installd's
+// containers (cydian-helper app-versions: Info.plist, App Store apps' iTunesMetadata), [{ id, version, build, store }],
+// or null when it can't be read (no helper, an older one). installedApps(records) is the apps Cydian remembers
+// (core/installed.js) with that version in place of the remembered one, and a note where the two disagree
+// (withRealVersions). The sideload build has neither: no helper, so the remembered version stays.
+//
 // Errors from the shell come as "<code>: <message>" (bridge.js turns them into errors with a `code`); here they
 // become BackendError with the same codes the proxy uses (network, timeout, too_large, upstream, not_found, ...).
 //
@@ -176,6 +182,20 @@ function queueCalls(backend, q, call) {
     },
     // -> { code, stdout, stderr } like apply; a refusal (64: not stored, control doesn't match) is an error.
     rollback: (id, version, onEvent) => run(["rollback", id, version], onEvent),
+    // I4: null (not []) when the helper can't list, so callers keep the remembered versions instead of "not installed".
+    async appVersions() {
+      let r;
+      try {
+        r = await backend.helper(["app-versions"]);
+      } catch {
+        return null;
+      }
+      return r.code === 0 ? parseAppVersions(r.stdout) : null;
+    },
+    // I4: core/installed.js records with the real versions (withRealVersions); as they were when those can't be read.
+    async installedApps(records) {
+      return withRealVersions(records, await backend.appVersions());
+    },
     async respring() {
       const r = await run(["respring"]);
       if (r.code !== 0) throw new BackendError("helper", `Couldn't restart SpringBoard (${r.code}): ${lastLine(r.stderr) || "no output"}`);
@@ -194,6 +214,49 @@ export function parseRollbacks(text) {
     out.push({ version: m[1], file: m[2] });
   }
   return out.sort((a, b) => compareVersions(b.version, a.version));
+}
+
+// I4: cydian-helper app-versions' "<id>\t<short>\t<build>\t<store>" lines -> [{ id, version, build, store }], each
+// id once (the first). `version` is what the app shows: CFBundleShortVersionString, else the store's, else the build
+// number; an app with none of them is left out. Empty fields are null.
+export function parseAppVersions(text) {
+  const seen = new Set();
+  const out = [];
+  for (const line of String(text ?? "").split("\n")) {
+    const [id, short, build, store] = line.replace(/\r$/, "").split("\t").map((v) => (v ?? "").trim() || null);
+    if (!id || !/^[A-Za-z0-9][A-Za-z0-9.-]*$/.test(id) || seen.has(id)) continue;
+    const version = short ?? store ?? build;
+    if (!version) continue;
+    seen.add(id);
+    out.push({ id, version, build: build ?? null, store: store ?? null });
+  }
+  return out;
+}
+
+// I4: the remembered apps (core/installed.js records: { id, name, version, ... }) against what is really installed
+// (parseAppVersions' list, or null when it couldn't be read: the records come back as they are). Each record gets
+//   remembered  the version Cydian recorded at Install
+//   actual      the installed app's version, or null when no installed app has that id (removed outside Cydian)
+//   disagrees   true when both are known and the remembered one is none of the app's spellings (short version,
+//               build number, store version), compared as written
+//   note        what to say then: "Installed: 1.6 (Cydian remembered 1.5)", or "Not installed (Cydian remembered 1.5)"
+// and `version` becomes the actual one where there is one, so upgrades are worked out from what's on the phone.
+// Cydian's own record (`self`) is dpkg's in jailbreak mode and is left as it is.
+export function withRealVersions(records, actual) {
+  if (!Array.isArray(actual)) return records ?? [];
+  const byId = new Map(actual.map((a) => [a.id, a]));
+  return (records ?? []).map((rec) => {
+    if (!rec?.id || rec.self) return rec;
+    const remembered = rec.version ?? null;
+    const app = byId.get(rec.id) ?? null;
+    if (!app) {
+      return { ...rec, remembered, actual: null, disagrees: false, note: remembered ? `Not installed (Cydian remembered ${remembered})` : "Not installed" };
+    }
+    const spellings = [app.version, app.build, app.store].filter(Boolean).map(String);
+    const disagrees = Boolean(remembered) && !spellings.includes(String(remembered).trim());
+    return { ...rec, version: app.version, remembered, actual: app.version, disagrees,
+      note: disagrees ? `Installed: ${app.version} (Cydian remembered ${remembered})` : null };
+  });
 }
 
 // The app.info `cf` number, asked once when first needed: get() is it (or null: an older shell, or no answer) once

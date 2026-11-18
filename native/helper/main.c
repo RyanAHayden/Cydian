@@ -17,6 +17,8 @@
  *                                                           vendor; copied, its control checked, apt-get install; paid.c)
  *   cydian-helper rollbacks <pkg> | rollback <pkg> <version>  (F71: the .debs N7's daemon kept, and apt-get install
  *                                                              of one, after dpkg-deb shows its control matches)
+ *   cydian-helper app-versions   (I4: every installed app's id and real versions, from installd's containers;
+ *                                 runs nothing; ipa.c)
  *   cydian-helper notifications on|off   (F65: Settings' Upgrade Notifications; off creates
  *                                         <prefix>/var/lib/cydian/upgrades.off, which N5's daemon reads; runs nothing)
  *
@@ -196,6 +198,14 @@ int main(int argc, char *argv[]) {
         }
         printf("Upgrade notifications %s\n", plan.argv[1]);
         return 0;
+    }
+
+    if (plan.verb == HV_APP_VERSIONS) {
+        if (helper_app_versions(plan.path, stdout, &err) < 0) {
+            fprintf(stderr, "cydian-helper: %s: %s\n", err, strerror(errno));
+            return HELPER_EX_IOERR;
+        }
+        return fflush(stdout) ? HELPER_EX_IOERR : 0;
     }
 
     if (plan.verb == HV_ROLLBACKS) {

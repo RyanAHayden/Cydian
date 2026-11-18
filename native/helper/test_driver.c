@@ -9,6 +9,7 @@
  *   test_driver paidpath <dir> <path>...       F57: print "ok" or "bad" per path (helper_paid_path_ok)
  *   test_driver plistid <file>                 F59: the Info.plist's CFBundleIdentifier, or "bad"
  *   test_driver appsync <prefix>               F59: "yes" or "no"
+ *   test_driver appversions <dir>              I4: helper_app_versions' lines (tabs as " | "), then "count: <n>"
  *   test_driver debname <id> <file>...         F71: the version in each stored .deb name, or "bad"
  *   test_driver rbfile <dir> <id> <version> <root_uid>   F71: the stored .deb's path, or "error: ..."
  *   test_driver rblist <dir> <id> <root_uid>   F71: helper_rollback_list's lines, then "count: <n>" (or "error: ...")
@@ -122,6 +123,20 @@ int main(int argc, char **argv) {
         size_t n = f ? fread(buf, 1, sizeof buf, f) : 0;
         if (f) fclose(f);
         printf("%s\n", helper_ipa_plist_id(buf, n, id, sizeof id) ? "bad" : id);
+    } else if (!strcmp(cmd, "appversions") && argc == 3) {
+        char *text = NULL;
+        size_t size = 0;
+        FILE *mem = open_memstream(&text, &size);
+        const char *err = NULL;
+        int n = mem ? helper_app_versions(argv[2], mem, &err) : -1;
+        if (mem) fclose(mem);
+        for (char *p = text; p && *p; p++) {
+            if (*p == '\t') fputs(" | ", stdout);
+            else putchar(*p);
+        }
+        free(text);
+        if (n < 0) printf("error: %s\n", err ? err : "no memory");
+        else printf("count: %d\n", n);
     } else if (!strcmp(cmd, "appsync") && argc == 3) {
         printf("%s\n", helper_ipa_appsync(argv[2]) ? "yes" : "no");
     } else if (!strcmp(cmd, "debname") && argc >= 3) {

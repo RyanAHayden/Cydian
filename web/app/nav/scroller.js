@@ -62,11 +62,17 @@ export function initScroller(screens) {
     sb.style.transform = `translateY(${m.top + (m.track - th) * y}px)`;
     return true;
   };
-  const draw = () => {
-    if (!place()) return;
-    sb.classList.add("on");
+  // B31: every path that keeps it showing (a scroll, a finger deciding on it, a grab) ends here, so it always fades
+  // once nobody touches it, as iOS 6's does. It stuck on for good when a touch on it ended without a scroll or grab
+  // (a tap by the right edge, or one that stopped a fling there), and when its list left the page.
+  const fadeSoon = () => {
     clearTimeout(hideTimer);
-    if (grab === null) hideTimer = setTimeout(() => sb.classList.remove("on"), 600);
+    if (grab === null && !pending) hideTimer = setTimeout(() => sb.classList.remove("on"), 600);
+  };
+  const draw = () => {
+    if (!place()) { clearTimeout(hideTimer); sb.classList.remove("on"); return; }
+    sb.classList.add("on");
+    fadeSoon();
   };
 
   document.addEventListener("scroll", (e) => {
@@ -180,7 +186,7 @@ export function initScroller(screens) {
     const t = [...e.touches].find((x) => pending ? x.identifier === pending.id : true);
     if (!t) return;
     if (pending) {
-      if (Math.hypot(t.clientX - pending.x, t.clientY - pending.y) > SLOP) { clearTimeout(pending.timer); pending = null; }
+      if (Math.hypot(t.clientX - pending.x, t.clientY - pending.y) > SLOP) { clearTimeout(pending.timer); pending = null; fadeSoon(); }
       return;
     }
     if (grab === null || !body) return;
@@ -194,7 +200,7 @@ export function initScroller(screens) {
   }, { capture: true, passive: false });
   const end = (e) => {
     if (pending) { clearTimeout(pending.timer); pending = null; }
-    if (grab === null) return;
+    if (grab === null) { if (sb.classList.contains("on")) fadeSoon(); return; }
     grab = null;
     sb.classList.remove("grab");
     if (held) { held.style.overflowY = ""; held = null; }

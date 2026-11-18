@@ -8,7 +8,11 @@
 // for the session.
 // Upgrades (F7): installed packages with a newer version on a source come first, under "Available Upgrades", then
 // held ones (dpkg holds and Settings' Ignored Upgrades) under "Ignored Upgrades"; the tab badge counts the
-// available ones, as Cydia's does. Not here yet: Cydia's "Upgrade (N)" button, which needs the install queue.
+// available ones, as Cydia's does.
+// F62: Cydia's "Upgrade (N)" nav button (jailbreak build only: the site and the sideload build have no install
+// queue). It queues every Available Upgrade, never the ignored ones, through N4's queue (one install job each, with
+// the installed version so the queue reads it as an upgrade), which opens the Confirm sheet: Cydia's dist-upgrade.
+// Hidden while there are none, as Cydia's is.
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
 import { getBackend } from "../backend.js";
@@ -17,6 +21,7 @@ import { dayTitle, filterGroups, filterRows, defaultScope } from "../core/change
 import { apps, installedIds, onAppsChange } from "../core/installed.js";
 import { settings } from "./settings.js";
 import { sourceFilter } from "../core/sources.js";
+import { detectMode } from "../core/settings.js";
 
 export const title = "Changes";
 
@@ -50,7 +55,46 @@ async function badge(upgrades) {
 
 export function nav(route, ctx) {
   if (route.path.length) return browse.nav(route);
-  return { title: "Changes", style: "plain", left: { label: "Refresh", onClick: () => refresh(ctx) } };
+  const info = { title: "Changes", style: "plain", left: { label: "Refresh", onClick: () => refresh(ctx) } };
+  if (canUpgrade()) info.right = { label: upgradeLabel(0), onClick: () => upgradeAll(queueFn(), state.data?.upgrades.available) };
+  return info;
+}
+
+// ---- Upgrade (N) (F62) ----------------------------------------------------------------------------------------
+
+// Only the jailbreak build has an install queue (backend-native.js queueCalls); the site and sideload never ask.
+export function canUpgrade(mode = detectMode(), backend = () => getBackend()) {
+  return mode === "jailbreak" && typeof backend()?.queue === "function";
+}
+
+export const upgradeLabel = (n) => `Upgrade (${n})`;
+
+// One install job per available upgrade, as browse.js's Upgrade action queues it.
+export const upgradeJobs = (available = []) =>
+  available.filter((r) => r?.id && r.version).map((r) => ({ op: "install", id: r.id, version: r.version, installed: r.installed ?? null, name: r.name ?? null }));
+
+// Queues them all; the first add opens Confirm (screens/queue.js initQueue), the rest refresh it. -> jobs queued.
+export function upgradeAll(queue, available) {
+  const jobs = upgradeJobs(available);
+  if (!queue) return [];
+  for (const job of jobs) queue(job);
+  return jobs;
+}
+
+const queueFn = () => { const b = getBackend(); return typeof b.queue === "function" ? (job) => b.queue(job) : null; };
+
+// The root page's nav bar button, found as browse.js setRightLabel finds its own: label and shown with the count.
+function drawUpgradeButton(n) {
+  const page = state.body?.closest(".page");
+  const stack = page?.parentElement;
+  if (!stack) return;
+  const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
+  const item = document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i];
+  const b = item?.querySelector(".nav-right .bar-button");
+  if (!b) return;
+  const label = upgradeLabel(n);
+  if (b.textContent !== label) b.textContent = label;
+  b.hidden = n === 0;
 }
 
 export function render(body, route, ctx) {
@@ -63,6 +107,7 @@ export function render(body, route, ctx) {
   state.list?.destroy();
   state.list = null;
   state.data = null;
+  drawUpgradeButton(0);
   body.append(...filterBar());
   state.note = note("Loading Changes");
   body.append(state.note);
@@ -188,6 +233,7 @@ function draw() {
   const body = state.body;
   if (!body || !state.data) return;
   const { groups, upgrades, installed } = state.data;
+  drawUpgradeButton(upgrades.available.length);
   const scope = scopeOf(state.scope, installed);
   drawScope(scope);
   const items = itemsOf(groups, undefined, upgrades, { query: state.query, scope, installed });

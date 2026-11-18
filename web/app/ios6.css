@@ -464,7 +464,6 @@ input.sign-field::placeholder { color: var(--field-hint); opacity: 1; }
   position: relative; font-size: 32px; font-weight: bold; line-height: 1; color: #fff;
   text-shadow: 0 -1px 0 rgba(0,0,0,.35);
 }
-.share-item:active .share-icon { filter: brightness(.55); }
 .share-label {
   width: 96px; margin-top: 4px; font-size: 12px; font-weight: bold; line-height: 14.5px; letter-spacing: .12px;
   color: #fafafa; text-shadow: 0 1px 0 rgba(0,0,0,.75); text-align: center;

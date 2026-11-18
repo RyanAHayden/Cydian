@@ -30,6 +30,7 @@ import { getBackend } from "../backend.js";
 import { loadIdentity, saveIdentity } from "../signing-client.js";
 import { settings, createSwitch } from "./settings.js";
 import { NAME, DOMAIN } from "../brand.js";
+import { rowIcon } from "../icons/rowicons.js";
 
 const STATE_KEY = "ifizbox.account";
 
@@ -183,7 +184,7 @@ export function lastSyncedText(t, now = Date.now()) {
 export function accountSection() {
   const box = document.createElement("div");
   const fill = (detail) => box.replaceChildren(grouped([{ rows: [{ label: `${NAME} Account`, detail,
-    href: format(settingsRoute(["account"])) }] }]));
+    href: format(settingsRoute(["account"])), icon: rowIcon("account") }] }]));
   fill("");
   accountSync().status().then((s) => fill(s.signedIn ? "On" : "Off")).catch(() => fill("Off"));
   return box;
@@ -203,21 +204,24 @@ export async function drawAccount(el) {
   if (!s.signedIn) {
     reveal = false;
     el.replaceChildren(grouped([
-      { rows: [{ label: "Create Account", onClick: () => createFlow(el) }, { label: "Sign In With Key", onClick: () => signInFlow(el) }],
+      { rows: [{ label: "Create Account", onClick: () => createFlow(el), icon: rowIcon("createAccount") },
+        { label: "Sign In With Key", onClick: () => signInFlow(el), icon: rowIcon("signInKey") }],
         footer: ACCOUNT_FOOTER },
     ]));
     return;
   }
-  const parts = [grouped([{ rows: [{ label: "Sync Now", onClick: () => syncNow(el) }, { label: "Last Synced", detail: lastSyncedText(s.lastSynced) }],
+  const parts = [grouped([{ rows: [{ label: "Sync Now", onClick: () => syncNow(el), icon: rowIcon("syncNow") },
+    { label: "Last Synced", detail: lastSyncedText(s.lastSynced), icon: rowIcon("lastSynced") }],
     footer: `${NAME} saves to your account when you leave it, and reads it when it opens.` }])];
   if (certBuild()) {
-    const g = grouped([{ rows: [{ label: "Sync Certificate" }], footer: CERT_FOOTER }]);
+    const g = grouped([{ rows: [{ label: "Sync Certificate", icon: rowIcon("syncCert") }], footer: CERT_FOOTER }]);
     const cell = g.querySelector(".cell-inner");
     cell.append(createSwitch({ label: "Sync Certificate", checked: s.syncCert, onToggle: (on) => { a.setSyncCert(on); } }));
     cell.classList.add("has-switch");
     parts.push(g);
   }
-  parts.push(grouped([{ rows: [{ label: reveal ? "Hide Account Key" : "Show Account Key", onClick: () => { reveal = !reveal; drawAccount(el); } }] }]));
+  parts.push(grouped([{ rows: [{ label: reveal ? "Hide Account Key" : "Show Account Key", icon: rowIcon(reveal ? "hidden" : "showKey"),
+    onClick: () => { reveal = !reveal; drawAccount(el); } }] }]));
   if (reveal && s.code) parts.push(keyBlock(s.code));
   const del = document.createElement("div");
   del.className = "account-delete-wrap";

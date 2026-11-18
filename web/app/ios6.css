@@ -324,6 +324,10 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
   font-size: 15px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.3);
   background: #8c99b3; box-shadow: 0 1px 2px rgba(0,0,0,.35);
 }
+/* F205: iOS 6 Settings' row tiles (icons/rowicons.js draws tile, gloss and edge as one SVG). Measured on the 4S: the
+   tile 7pt in from the cell's edge and the label 11pt after it, so 3pt off .cell-inner's 10px padding and onto its gap. */
+.cell-icon.row-icon { background: none; box-shadow: none; border-radius: 0; margin: 0 3px 0 -3px; }
+.cell-icon.row-icon img { display: block; width: 29px; height: 29px; }
 /* "arrows copy": 8.75 x 13.2 chevron, #7f7f7f, its right edge 10.5px in from the cell's */
 .cell-inner.chevron::after {
   content: ""; flex: none; width: 9px; height: 13px; margin-right: .5px;

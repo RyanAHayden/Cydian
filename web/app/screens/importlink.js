@@ -23,11 +23,12 @@ import { getBackend } from "../backend.js";
 import { loadIdentity, saveIdentity } from "../signing-client.js";
 import { settings } from "./settings.js";
 import { NAME } from "../brand.js";
+import { rowIcon } from "../icons/rowicons.js";
 
 export function openInAppSection() {
   const box = document.createElement("div");
   if (detectMode() !== "site" || settings.deviceType() !== "none") return box; // the sideload app takes the link
-  box.append(grouped([{ header: `${NAME} App`, rows: [{ label: `Open in ${NAME} App`, onClick: () => openInApp() }],
+  box.append(grouped([{ header: `${NAME} App`, rows: [{ label: `Open in ${NAME} App`, onClick: () => openInApp(), icon: rowIcon("openInApp") }],
     footer: `Brings your certificate, sources and settings into the ${NAME} app on this iPhone.` }]));
   return box;
 }

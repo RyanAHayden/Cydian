@@ -369,7 +369,8 @@ if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.setting
 // F72: in the app, once the launch has settled, the Essential Upgrade alert when Cydian (or, jailbroken, apt, dpkg or
 // another Essential: yes package) has an upgrade on Cydian's built-in source. It replaces F61's own popup: only when
 // that source couldn't be read does F61 look on GitHub (at most once a day).
-// F75: cydian:// links from the website (Open in Cydian App, F89's Open in Cydian on an app page).
+// F75: cydian:// links from the website (Send Settings, Home's Open in Cydian App) and elsewhere (incoming.js).
+// cydian://install (F89) is no longer sent by the website since F92/F95: only for links already out there.
 if (globalThis.cydianNative) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
 
 // The Home Screen icon's long-press Upgrade All (native Shortcut.perform): Changes, every upgrade queued, Confirm.

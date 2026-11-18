@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.9.1",
+          "date": "2026-11-18T17:25:13Z",
+          "localizedDescription": "Signing no longer fails on apps with an executable-less bundle (\"bundle missing\" errors, e.g. YTUHD.bundle).\nPackage pages redone as the iOS 6 App Store's: big icon, stars, screenshots, Details / Reviews / Related.\nInstall Now right after setting up Signing, and the Signing Server row works again.\nReload shows Cydia's four steps; coming back after a few minutes refreshes sources.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.1",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.1/Cydian.ipa",
+          "size": 5093277,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.9.0",
           "date": "2026-11-18T16:24:14Z",
           "localizedDescription": "Cydian is now iFizBox: new name, new globe icon, new home at ifizbox.com.\nThe name changed because \"Cydia\" is SaurikIT's trademark; iFizBox is not affiliated with Cydia or SaurikIT.\nNew name and icon everywhere in the app and on the website\nThe website moved to https://ifizbox.com\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.0",
@@ -167,14 +175,6 @@
           "localizedDescription": "Cydian updates itself in one step: it signs the update on the phone, the signing server holds it for a few minutes, and iOS asks Install right away.\nInstall at the top right installs straight away (Download IPA is on the page).\nThe test apps (Test Alpha, Test Beta...) are no longer mistaken for Cydian.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.3",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.3/Cydian.ipa",
           "size": 2621218,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.2.2",
-          "date": "2026-11-18T02:57:28Z",
-          "localizedDescription": "The Installed tab is back in the app: your apps, and Cydian itself at its real version.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.2.2",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.2.2/Cydian.ipa",
-          "size": 2613286,
           "minOSVersion": "15.0"
         }
       ]

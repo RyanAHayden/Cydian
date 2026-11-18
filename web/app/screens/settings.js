@@ -20,6 +20,7 @@ import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, server
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { drawWalkthrough, walkOpen } from "./signing.js";
 import { openInAppSection } from "./importlink.js";
+import { accountSection, drawAccount, startAccountSync } from "./account.js";
 import { signingExtras } from "./signed-apps.js";
 import { syncReminder } from "../core/signing.js";
 import { websiteInstallsOn, setWebsiteInstalls, acceptWebsiteInstalls } from "../websign-gate.js";
@@ -44,6 +45,7 @@ export function nav(route) {
   const key = route.path[0];
   if (key === "holds") return { title: "Ignored Upgrades" };
   if (key === "signing") return { title: "Signing" };
+  if (key === "account") return { title: "Cydian Account" }; // F97
   if (key === LOGS) return { title: logsTitle(route.path[1]) }; // N4: Console Logs
   if (key && defOf(key)) return { title: defOf(key).label };
   return { title: "Settings" };
@@ -75,9 +77,10 @@ function draw({ el, route }) {
   const top = el.scrollTop;
   if (key === "holds") el.replaceChildren(holdsPage());
   else if (key === "signing") drawSigning(el);
+  else if (key === "account") drawAccount(el); // F97
   else if (key === LOGS) el.replaceChildren(logsPage(route.path[1], () => draw({ el, route })));
   else if (key) el.replaceChildren(listPage(key));
-  else el.replaceChildren(rootPage(), signingSection(), sideloadingSection(), openInAppSection(), ipaSection(), notifySection(), logsSection(detectMode()), aboutSection());
+  else el.replaceChildren(rootPage(), accountSection(), signingSection(), sideloadingSection(), openInAppSection(), ipaSection(), notifySection(), logsSection(detectMode()), aboutSection());
   el.scrollTop = top;
 }
 
@@ -272,6 +275,7 @@ export function init() {
     if (key === "allowZoom") applyZoom();
     if (key === "resignReminder") remindNow();
   });
+  startAccountSync(); // F97: read the account on launch, save it when Cydian goes to the background
   remindNow(); // F68: on launch too, so the notification follows the setting (and any change the shell missed)
 }
 

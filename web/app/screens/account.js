@@ -1,0 +1,309 @@
+// F97: Settings > Account (iOS 6 grouped tables). Cydian Account keeps this device's sources, the settings that
+// travel, Ignored Upgrades, installed-app records and the signing certificate on cydian.dev, encrypted with an account
+// key only the user's devices have (core/account.js has the rules; worker/src/account.js the storage).
+//
+//   accountSection()          the root Settings page's row: Cydian Account, Signed In / Off; pushes #/settings/account
+//   drawAccount(el)           the page: Create Account / Sign In With Key; signed in: Sync Now, Last Synced, the Sync
+//                             Certificate switch, Show Account Key, Delete Account
+//   startAccountSync()        once at start: read on launch; save when the app goes to the background or the page is
+//                             hidden, only if something changed (the free tier's 1,000 writes a day)
+//   signInFromLink(url)       cydian://account?k=… (incoming.js): Sign In With Key, filled in
+//   accountSync()             the controller, wired to this build's stores
+//
+// Where things live: the key in the Keychain in the app (account.key.* in native/Sources/Account.swift; IndexedDB in
+// an older shell), in IndexedDB on the website; the sync state (version, what was last synced, without the
+// certificate) in localStorage.
+// SPDX-License-Identifier: GPL-3.0-or-later
+import { grouped } from "../nav/ui.js";
+import { format } from "../router.js";
+import { showAlert } from "../nav/alert.js";
+import { showHUD } from "../nav/hud.js";
+import { copyText } from "../nav/menu.js";
+import { qrSvg } from "../core/qr.js";
+import { createAccountSync, keyLink, parseKey, identityOf, identityFiles, ACCOUNT_BASE } from "../core/account.js";
+import { detectMode, TRAVELS } from "../core/settings.js";
+import { exportLine } from "../core/sourcelist.js";
+import { toBase64 } from "../core/signing.js";
+import { apps, recordInstall, removeInstall } from "../core/installed.js";
+import { getBackend } from "../backend.js";
+import { loadIdentity, saveIdentity } from "../signing-client.js";
+import { settings, createSwitch } from "./settings.js";
+
+const STATE_KEY = "cydian.account";
+
+// ---- where the key lives ----------------------------------------------------------------------------------------
+
+function idbKeys(name = "cydian-account") {
+  const run = (mode, f) => new Promise((resolve, reject) => {
+    const req = indexedDB.open(name, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("kv");
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      const tx = db.transaction("kv", mode);
+      const r = f(tx.objectStore("kv"));
+      tx.oncomplete = () => { db.close(); resolve(r?.result); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  });
+  return {
+    get: async () => (await run("readonly", (s) => s.get("key"))) ?? null,
+    set: (code) => run("readwrite", (s) => s.put(code, "key")),
+    remove: () => run("readwrite", (s) => s.delete("key")),
+  };
+}
+
+// The app's Keychain (no Face ID: the key is read at every launch), or IndexedDB in a shell without account.key.*.
+export function keyStore(native = globalThis.cydianNative) {
+  const idb = idbKeys();
+  if (!native?.call) return idb;
+  let old = false;
+  const via = (method, params, fallback) => (old ? fallback() : native.call(method, params).catch((e) => {
+    if (!/unknown|no handler|not found/i.test(String(e?.message ?? e))) throw e;
+    old = true;
+    return fallback();
+  }));
+  return {
+    get: () => via("account.key.get", {}, idb.get).then((v) => (typeof v === "string" ? v : v?.key ?? null)),
+    set: (code) => via("account.key.set", { key: code }, () => idb.set(code)),
+    remove: () => via("account.key.remove", {}, idb.remove),
+  };
+}
+
+const stateStore = (storage = globalThis.localStorage) => ({
+  get: () => { try { return JSON.parse(storage.getItem(STATE_KEY) ?? "null"); } catch { return null; } },
+  set: (v) => { try { if (v) storage.setItem(STATE_KEY, JSON.stringify(v)); else storage.removeItem(STATE_KEY); } catch { /* full */ } },
+});
+
+// ---- this device's things ---------------------------------------------------------------------------------------
+
+// A source line as every device writes it: a bare host gets its "/", so "https://a" and "https://a/" are one source.
+// Anything with a path stays as it is (an AltStore source's …/apps.json is a file, not a directory).
+export const sourceLine = (line) => (/^https?:\/\/[^/\s]+$/i.test(line) ? line + "/" : line);
+
+const certBuild = (mode = detectMode()) => mode === "site" || mode === "sideload";
+
+export async function collectHere({ syncCert = true, backend = getBackend(), store = settings, native = globalThis.cydianNative,
+  mode = detectMode(), appStore = apps, load = loadIdentity } = {}) {
+  const sources = (await backend.sources().catch(() => [])).filter((s) => s?.uri).map((s) => sourceLine(exportLine(s)));
+  const values = {};
+  for (const k of TRAVELS) if (store.isShown(k)) values[k] = store.get(k);
+  const recs = await (await appStore()).all().catch(() => []);
+  const out = { sources: [...new Set(sources)], settings: values, holds: store.holds.list(),
+    apps: recs.filter((r) => r?.id && !r.self).map(({ id, name, version, key, source, sourceName, icon, date }) =>
+      ({ id, name, version, key: key ?? null, source: source ?? null, sourceName: sourceName ?? null, icon: icon ?? null, date: date ?? 0 })) };
+  if (!certBuild(mode)) return out; // the jailbreak app signs nothing: it leaves the account's certificate as it is
+  if (!syncCert) return { ...out, identity: null };
+  let id = null;
+  try {
+    if (mode === "site") id = identityOf(await load());
+    else {
+      const e = await native.call("signing.export", {});
+      const names = (await load().catch(() => null)) ?? {};
+      if (e?.p12 && e?.profile) id = { p12: b64toUrl(e.p12), profile: b64toUrl(e.profile), password: e.password ?? "",
+        p12Name: names.p12Name ?? "", profileName: names.profileName ?? "" };
+    }
+  } catch { id = null; }
+  return { ...out, identity: id };
+}
+const b64toUrl = (b64) => String(b64).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+export async function applyHere(c, { backend = getBackend(), store = settings, native = globalThis.cydianNative, mode = detectMode(),
+  appStore = apps } = {}) {
+  if (c.removeSources.length) {
+    const have = await backend.sources().catch(() => []);
+    for (const line of c.removeSources) {
+      const s = have.find((x) => x?.uri && sourceLine(exportLine(x)) === line);
+      if (s) await backend.removeSource(s.key).catch(() => {}); // a source in a file Cydian doesn't change stays
+    }
+  }
+  for (const line of c.addSources) await backend.addSource(line).catch(() => {}); // offline, or gone: next sync tries again
+  for (const [k, v] of Object.entries(c.settings)) { try { if (store.isShown(k)) store.set(k, v); } catch { /* not in this build */ } }
+  for (const p of c.addHolds) await Promise.resolve(store.holds.set(p, true)).catch(() => {});
+  for (const p of c.removeHolds) await Promise.resolve(store.holds.set(p, false)).catch(() => {});
+  if (c.identity) {
+    try {
+      if (mode === "site") await saveIdentity({ ...identityFiles(c.identity), passwordOk: null });
+      else if (mode === "sideload") {
+        const f = identityFiles(c.identity);
+        await native.call("signing.import", { p12: toBase64(f.p12), profile: toBase64(f.profile), password: f.password ?? "" });
+        await saveIdentity({ p12Name: f.p12Name, profileName: f.profileName }).catch(() => {});
+      }
+    } catch { /* a certificate this device can't take: the next sync tries again */ }
+  }
+  const db = await appStore();
+  for (const r of c.putApps) await recordInstall(db, r, r.date ?? Date.now()).catch(() => {});
+  for (const id of c.removeApps) await removeInstall(db, id).catch(() => {});
+}
+
+let shared = null;
+export function accountSync() {
+  shared ??= createAccountSync({
+    keys: keyStore(), state: stateStore(), collect: (o) => collectHere(o), apply: (c) => applyHere(c),
+    base: detectMode() === "site" ? "" : ACCOUNT_BASE,
+  });
+  return shared;
+}
+
+// ---- lifecycle --------------------------------------------------------------------------------------------------
+
+let started = false;
+export function startAccountSync({ acct = accountSync, doc = globalThis.document, win = globalThis.window } = {}) {
+  if (started || !doc) return;
+  started = true;
+  const quiet = (p) => p.catch((e) => { if (e?.code === "gone") forgetGone(acct()); });
+  acct().status().then((s) => { if (s.signedIn) quiet(acct().sync({ write: false })).then(redraw); }).catch(() => {});
+  const save = () => { quiet(acct().save()); };
+  doc.addEventListener("visibilitychange", () => { if (doc.visibilityState === "hidden") save(); });
+  win?.addEventListener?.("pagehide", save);
+}
+
+async function forgetGone(a) {
+  await a.forget().catch(() => {});
+  redraw();
+}
+
+// ---- the page ---------------------------------------------------------------------------------------------------
+
+const pages = new Set();
+function redraw() {
+  for (const el of pages) { if (el.isConnected) drawAccount(el); else pages.delete(el); }
+}
+
+export function lastSyncedText(t, now = Date.now()) {
+  if (!t) return "Never";
+  const m = Math.round((now - t) / 60000);
+  return m < 1 ? "Just now" : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+}
+
+export function accountSection() {
+  const box = document.createElement("div");
+  const fill = (detail) => box.replaceChildren(grouped([{ rows: [{ label: "Cydian Account", detail,
+    href: format({ tab: "settings", path: ["account"] }) }] }]));
+  fill("");
+  accountSync().status().then((s) => fill(s.signedIn ? "On" : "Off")).catch(() => fill("Off"));
+  return box;
+}
+
+export const ACCOUNT_FOOTER = "Keeps your sources, settings, Ignored Upgrades, installed apps and certificate on cydian.dev, "
+  + "so a new iPhone, a reinstall or the website gets them back. No email, no password: your account key is the account.";
+export const KEY_WARNING = "Save this key somewhere safe. It is the only way into your account: if you lose it, nobody can get your data back, cydian.dev included.";
+export const CERT_FOOTER = "Your certificate is encrypted with your account key before it leaves this device: cydian.dev can't read it. Off takes it out of your account.";
+
+let reveal = false; // Show Account Key: the key's group stays open until the page is left
+
+export async function drawAccount(el) {
+  pages.add(el);
+  const a = accountSync();
+  const s = await a.status().catch(() => ({ signedIn: false }));
+  if (!s.signedIn) {
+    reveal = false;
+    el.replaceChildren(grouped([
+      { rows: [{ label: "Create Account", onClick: () => createFlow(el) }, { label: "Sign In With Key", onClick: () => signInFlow(el) }],
+        footer: ACCOUNT_FOOTER },
+    ]));
+    return;
+  }
+  const parts = [grouped([{ rows: [{ label: "Sync Now", onClick: () => syncNow(el) }, { label: "Last Synced", detail: lastSyncedText(s.lastSynced) }],
+    footer: "Cydian saves to your account when you leave it, and reads it when it opens." }])];
+  if (certBuild()) {
+    const g = grouped([{ rows: [{ label: "Sync Certificate" }], footer: CERT_FOOTER }]);
+    const cell = g.querySelector(".cell-inner");
+    cell.append(createSwitch({ label: "Sync Certificate", checked: s.syncCert, onToggle: (on) => { a.setSyncCert(on); } }));
+    cell.classList.add("has-switch");
+    parts.push(g);
+  }
+  parts.push(grouped([{ rows: [{ label: reveal ? "Hide Account Key" : "Show Account Key", onClick: () => { reveal = !reveal; drawAccount(el); } }] }]));
+  if (reveal && s.code) parts.push(keyBlock(s.code));
+  const del = document.createElement("div");
+  del.className = "account-delete-wrap";
+  const btn = Object.assign(document.createElement("button"), { type: "button", className: "action-button destructive account-delete", textContent: "Delete Account" });
+  btn.addEventListener("click", () => deleteFlow(el));
+  del.append(btn);
+  parts.push(del);
+  el.replaceChildren(...parts);
+}
+
+// The key as a code, a link and a QR code another device's Camera opens in Cydian.
+export function keyBlock(code) {
+  const box = document.createElement("div");
+  const link = keyLink(parseKey(code));
+  box.append(grouped([{ header: "Account Key", rows: [{ label: code, cls: "account-code" },
+    { label: "Copy Key", onClick: () => copyText(code) }, { label: "Copy Link", onClick: () => copyText(link) }], footer: KEY_WARNING }]));
+  try {
+    const qr = document.createElement("div");
+    qr.className = "manage-qr account-qr"; // manage.css draws the code
+    const img = new Image();
+    img.alt = "QR code of your account link";
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(qrSvg(link, { ecc: "M" }));
+    const note = Object.assign(document.createElement("p"), { className: "group-footer",
+      textContent: "Scan it with another iPhone's Camera to sign in there in Cydian." });
+    qr.append(img, note);
+    box.append(qr);
+  } catch { /* a 26-letter link always fits */ }
+  return box;
+}
+
+const alertOK = (title, message) => showAlert({ title, message, buttons: ["OK"] });
+const problem = (e) => e?.message ?? String(e);
+
+async function createFlow(el) {
+  const { index } = await showAlert({ title: "Create Account", message: `Cydian makes an account key on this device. ${KEY_WARNING}`,
+    buttons: ["Cancel", "Create"], cancel: 0 });
+  if (index !== 1) return;
+  const hide = showHUD("Creating");
+  try {
+    await accountSync().create();
+    hide.done ? hide.done("Created") : hide();
+    reveal = true; // shown once, now
+    await drawAccount(el);
+  } catch (e) { hide(); await alertOK("Can't Create Account", problem(e)); }
+}
+
+export async function signInFlow(el, prefill = "") {
+  const { index, value } = await showAlert({ title: "Sign In With Key", message: "Your account key, or the cydian://account link you saved.",
+    input: { placeholder: "XXXX-XXXX-XXXX-…", value: prefill, paste: true }, buttons: ["Cancel", "Sign In"], cancel: 0 });
+  if (index !== 1) return;
+  const hide = showHUD("Signing In");
+  try {
+    await accountSync().signIn(value);
+    hide.done ? hide.done("Signed In") : hide();
+  } catch (e) { hide(); await alertOK("Can't Sign In", problem(e)); }
+  if (el) await drawAccount(el);
+}
+
+async function syncNow(el) {
+  const hide = showHUD("Syncing");
+  try {
+    await accountSync().sync({ write: true });
+    hide.done ? hide.done("Synced") : hide();
+  } catch (e) {
+    hide();
+    if (e?.code === "gone") { await accountSync().forget(); await alertOK("Account Deleted", "This account was deleted on another device."); }
+    else await alertOK("Can't Sync", problem(e));
+  }
+  await drawAccount(el);
+}
+
+async function deleteFlow(el) {
+  const { index } = await showAlert({ title: "Delete Account?", message: "Your saved sources, settings, apps and certificate are deleted from cydian.dev, and every device is signed out. What's on this device stays.",
+    buttons: ["Cancel", "Delete"], cancel: 0 });
+  if (index !== 1) return;
+  const hide = showHUD("Deleting");
+  try {
+    await accountSync().remove();
+    hide.done ? hide.done("Deleted") : hide();
+  } catch (e) { hide(); await alertOK("Can't Delete Account", problem(e)); }
+  await drawAccount(el);
+}
+
+// cydian://account?k=… : the Account page, and Sign In With Key filled in.
+export async function signInFromLink(url, { open = (hash) => { location.hash = hash.replace(/^#/, ""); } } = {}) {
+  const bytes = parseKey(url);
+  open(format({ tab: "settings", path: ["account"] }));
+  if (!bytes) { await alertOK("Can't Sign In", "That account link is damaged."); return; }
+  const s = await accountSync().status().catch(() => ({}));
+  const code = url.replace(/^.*[?&]k=([^&#]+).*$/, "$1");
+  if (s.code && parseKey(s.code)?.join() === bytes.join()) return; // already this account
+  await signInFlow([...pages].find((p) => p.isConnected) ?? null, decodeURIComponent(code));
+}

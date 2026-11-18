@@ -238,6 +238,7 @@ test("incoming cydian:// links") {
     check(!IncomingLink.accepts(URL(string: "cydian://other")!), "other host")
     check(IncomingLink.accepts(URL(string: "cydian://myipas?file=A.ipa")!), "myipas (F77)")
     check(IncomingLink.accepts(URL(string: "cydian://package?id=com.example.app")!), "package (F96)")
+    check(IncomingLink.accepts(URL(string: "cydian://account?k=0123456789ABCDEFGHJKMNPQRS")!), "account (F97)")
     check(!IncomingLink.accepts(URL(string: "https://import/x")!), "other scheme")
     check(!IncomingLink.accepts(URL(string: "cydian://import?d=" + String(repeating: "A", count: 600_000))!), "too long")
 }

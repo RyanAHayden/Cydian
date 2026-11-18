@@ -60,6 +60,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         Incoming.register(self) // F75: cydian:// links for the page, app.takeURL and app.gunzip (App.swift)
         BackgroundCheck.register(self) // I3: updates.watch, the sideload build's background update check
         ShareBridge.register(self) // N9: share.*, what the share sheet and Open in Cydian handed over (share/App/)
+        AccountKey.register(self) // F97: account.key.*, the Cydian Account key in the Keychain (Account.swift)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }

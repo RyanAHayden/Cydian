@@ -18,10 +18,11 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", "
 // KV in memory, with expiry: held updates are minutes-long, so a restart losing them is fine.
 const kv = new Map();
 const HOSTED = {
-  async put(k, v, o = {}) { kv.set(k, { v, m: o.metadata ?? null, until: Date.now() + (o.expirationTtl ?? 600) * 1000 }); },
+  async put(k, v, o = {}) { kv.set(k, { v, m: o.metadata ?? null, until: o.expirationTtl ? Date.now() + o.expirationTtl * 1000 : Infinity }); }, // F97: accounts have no TTL
   live(k) { const e = kv.get(k); if (e && e.until < Date.now()) { kv.delete(k); return null; } return e ?? null; },
   async get(k) { return this.live(k)?.v ?? null; },
-  async getWithMetadata(k) { const e = this.live(k); return { value: null, metadata: e?.m ?? null }; },
+  async getWithMetadata(k, o = {}) { const e = this.live(k); return { value: o.type === "arrayBuffer" ? e?.v ?? null : null, metadata: e?.m ?? null }; },
+  async delete(k) { kv.delete(k); }, // F97: Delete Account
 };
 setInterval(() => { for (const k of kv.keys()) HOSTED.live(k); }, 60_000).unref();
 

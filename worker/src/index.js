@@ -16,11 +16,14 @@
 //                                           holds 25 MB a value, a Worker request ~100 MB), POST /sign/upload/<token>/done
 //                                           -> {itms, ...}; GET /sign/up/<token>/manifest.plist and app.ipa (HEAD,
 //                                           Range) for TTL seconds, like /sign/host
+//   GET/PUT/DELETE /api/account/<id>       F97: Cydian Account's encrypted blob (src/account.js)
 //   GET  /api/fetch?url=&kind=ipa           F93: an IPA for the website's signer, streamed, up to MAX_UPLOAD_MB
 //
 // Settings (wrangler.toml [vars]): HOST_IDS, the bundle IDs /sign/host takes ("*.cydian" = any ending in .cydian);
 // TTL (seconds, 600); MAX_UPLOAD_MB (512), the largest IPA /sign/upload and kind=ipa take ("0": no uploads). KV
 // namespace binding: HOSTED.
+
+import { account, isAccountPath } from "./account.js";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
@@ -258,6 +261,7 @@ export default {
   async fetch(req, env) {
     const u = new URL(req.url);
     const ttl = Math.max(60, Number(env.TTL) || 600);
+    if (isAccountPath(u.pathname)) return account(req, env); // F97: Cydian Account (src/account.js)
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null);

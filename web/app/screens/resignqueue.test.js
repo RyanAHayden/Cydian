@@ -173,3 +173,20 @@ test("Confirm: a Re-sign group in Modifications", async () => {
     globalThis.document = saved;
   }
 });
+
+// F134: Settings > Signing > Show Expiry Dates off hides the days left (pills, the Signature row) but not Expired,
+// and leaves Changes' Needs Re-sign (the reminder's list) as it was.
+test("Show Expiry Dates off: no pill or Signature row with days left; Expired still shows", () => {
+  const rows = [{ id: "a", name: "Alpha", version: "1.0" }, { id: "c", name: "Charlie", version: "3.0" }];
+  const signed = { apps: [installed.apps[0], installed.apps[2], installed.apps[1]] };
+  const off = withSignatures(rows, signed, { now, window: 2, show: false });
+  assert.deepEqual(off.rows.map((x) => [x.id, x.sig?.text ?? null]), [["a", null], ["c", "Expired"]]);
+  assert.deepEqual(off.extra.map((x) => [x.id, x.sig ?? null, x.signedOnly]), [["b", null, true]]); // still listed, without the pill
+  const on = withSignatures(rows, signed, { now, window: 2, show: true });
+  assert.deepEqual(on.rows.map((x) => x.sig?.text ?? null), ["5 days", "Expired"]);
+  assert.equal(signatureRow({ expires: inDays(5) }, { now, window: 2, show: false }), null);
+  assert.equal(signatureRow({ expires: inDays(-1) }, { now, window: 2, show: false }).detail, "Expired");
+  assert.equal(signatureRow({ expires: inDays(5) }, { now, window: 2, show: true }).detail, "5 days left");
+  // the re-sign list is the reminder's: it doesn't read the switch
+  assert.deepEqual(needsResign(installed, { now, window: 2 }).map((r) => r.id).sort(), ["b", "c", "u"]);
+});

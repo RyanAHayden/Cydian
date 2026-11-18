@@ -61,3 +61,42 @@ test("F128: page titles for the iOS 6-style routes and the old ones", async () =
   assert.equal(t("holds"), "Ignored Upgrades");
   assert.equal(t("account"), "Cydian Account");
 });
+
+// F134: Settings > Signing like an iOS 6 settings page: the certificate first, then its profile, the options, and How
+// Signing Works as a link at the bottom.
+test("F134: the Signing page's groups, in order, for each build and state", async () => {
+  const { signingLayout, splitSummary, HELP } = await import("./settings.js");
+  const { SIGNING_GROUPS } = await import("../core/settings.js");
+  assert.deepEqual(SIGNING_GROUPS.slice(0, 4), ["certificate", "files", "profile", "options"]);
+  assert.equal(SIGNING_GROUPS.at(-1), "help");
+  // the sideload app, set up
+  assert.deepEqual(signingLayout({ mode: "sideload", certificate: true, profile: true, options: true }),
+    ["certificate", "profile", "options", "server", "status", "remove", "help"]);
+  // nothing yet: the certificate's Import row, the options, the server, then the walkthrough's link
+  assert.deepEqual(signingLayout({ mode: "sideload", options: true }), ["certificate", "options", "server", "status", "help"]);
+  // a file picked, one still missing: the Files group under the certificate
+  assert.deepEqual(signingLayout({ mode: "sideload", staged: true, options: true }), ["certificate", "files", "options", "server", "status", "remove", "help"]);
+  // the website: no options, server or Signed Apps; Install Cydian App once the certificate works
+  assert.deepEqual(signingLayout({ mode: "site", certificate: true, profile: true, ready: true }), ["certificate", "profile", "app", "other", "remove", "help"]);
+  assert.deepEqual(signingLayout({ mode: "site" }), ["certificate", "other", "help"]);
+  // each layout is in SIGNING_GROUPS order with no group twice
+  for (const l of [signingLayout({ mode: "sideload", certificate: true, staged: true, profile: true, options: true }), signingLayout({ mode: "site", staged: true })]) {
+    assert.deepEqual(l, SIGNING_GROUPS.filter((g) => l.includes(g)));
+    assert.equal(new Set(l).size, l.length);
+  }
+  // the summary's rows split into the two groups, no row in both
+  const rows = [{ label: "Certificate", detail: "iPhone Distribution: Jane Doe" }, { label: "Team", detail: "Jane" },
+    { label: "Certificate Expires", detail: "1/1/27" }, { label: "Profile", detail: "Wild" }, { label: "Profile Expires", detail: "2/2/27" },
+    { label: "Devices", detail: "3" }, { label: "App ID", detail: "ABC.*" }];
+  const split = splitSummary(rows);
+  assert.deepEqual(split.certificate.map((r) => [r.label, r.detail ?? r.subtitle]), [["Name", "iPhone Distribution: Jane Doe"], ["Team", "Jane"], ["Expires", "1/1/27"]]);
+  assert.equal(split.certificate[0].subtitle, "iPhone Distribution: Jane Doe"); // long: under the label
+  assert.deepEqual(split.profile.map((r) => r.label), ["Name", "Expires", "Devices", "App ID"]);
+  assert.equal(HELP, "help");
+});
+
+test("F134: the walkthrough is How Signing Works, a page below Signing", async () => {
+  const { nav } = await import("./settings.js");
+  assert.equal(nav({ path: ["signing", "help"] }).title, "How Signing Works");
+  assert.equal(nav({ path: ["signing", "showExpiry"] }).title, "Show Expiry Dates");
+});

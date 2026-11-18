@@ -57,16 +57,22 @@ export const SECTIONS = [
   { id: "sources", page: "general" },
   { id: "appearance", page: "display", title: "Appearance" },
   { id: "display", page: "display" },
-  { id: "zoom", page: "display" },
   { id: "updates", page: "updates" },
   { id: "notifications", page: "updates" },
   { id: "automatic", page: "updates", title: "Automatic Installs" },
   { id: "signing", page: "signing" },
 ];
 
+// F134: Settings > Signing's groups, top to bottom, like an iOS 6 settings page: the certificate (its name, team and
+// expiry, with Import or Replace), the provisioning profile, the options (SECTIONS' "signing": Show Expiry Dates,
+// Re-sign Reminder), then the rest, and How Signing Works (the walkthrough) as a link at the bottom.
+// screens/settings.js signingLayout() picks the ones a build shows, in this order.
+export const SIGNING_GROUPS = ["certificate", "files", "profile", "options", "server", "status", "app", "other", "remove", "help"];
+
 // F128: settings that went (docs/settings.md says why). Nothing reads them; createSettings() drops their stored
 // values, and a full daemonPrefs() sends the daemon's two as null so the shell removes them there too.
-export const RETIRED = ["sideloader", "checkUpdates", "cellular", "notifications", "badge"];
+// F134: allowZoom (Display > Zoom) went too: zoom is always off (screens/settings.js applyZoom).
+export const RETIRED = ["sideloader", "checkUpdates", "cellular", "notifications", "badge", "allowZoom"];
 export const RETIRED_DAEMON_KEYS = ["checkUpdates", "cellular"];
 
 // kind: "choice" (one row per option, the chosen one checked), "toggle" (a switch), "list" (pushes a page that
@@ -77,10 +83,6 @@ export const SETTINGS = [
     label: "Appearance",
     options: [{ value: "auto", label: "Automatic" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }],
     footer: "Automatic follows the iPhone's own Light or Dark setting.",
-  },
-  {
-    key: "allowZoom", section: "zoom", kind: "toggle", feature: "appearance", modes: ALL, default: false,
-    label: "Zoom", options: onOff, footer: "Zoom lets you pinch to zoom in.",
   },
   {
     // F37: what kind of iPhone this is. The site only: the jailbreak app takes it from the bridge (deviceType) and
@@ -165,6 +167,14 @@ export const SETTINGS = [
     footer: "Cached .debs to roll back to.",
   },
   {
+    // F134: the days left on signed apps (Installed's pills, an app page's Signature row, Signed Apps' days). Off
+    // hides the dates only: Expired still shows, and the Re-sign Reminder and Changes' re-sign rows carry on. The
+    // sideload build only: the website signs apps too but keeps no record of them, so it draws no dates to hide.
+    key: "showExpiry", section: "signing", kind: "toggle", feature: "resign", modes: ["sideload"], default: true,
+    label: "Show Expiry Dates", options: onOff,
+    footer: "Shows how many days each signed app has left.",
+  },
+  {
     key: "resignReminder", section: "signing", kind: "list", feature: "resign", modes: ["sideload"], default: 2,
     label: "Re-sign Reminder",
     options: [
@@ -197,7 +207,7 @@ export function addRecent(list, query, max = RECENT_MAX) {
 // F75: the settings that move with the user from the website to the app (Open in Cydian App, core/transfer.js):
 // appearance, device, the compat options; Ignored Upgrades (holds) and the Signing Server travel beside them. The
 // app takes only those it shows itself (settings.isShown).
-export const TRAVELS = ["appearance", "allowZoom", "device", "worksOnMyPhone", "compatMarks", "iosVersion"];
+export const TRAVELS = ["appearance", "device", "worksOnMyPhone", "compatMarks", "iosVersion"];
 export const DAEMON_KEYS = ["autoInstall", "autoInstallIdle", "respring", "keepVersions"];
 export const DAEMON_LISTS = ["holds", "autoMarked"];
 const byKey = new Map(SETTINGS.map((d) => [d.key, d]));

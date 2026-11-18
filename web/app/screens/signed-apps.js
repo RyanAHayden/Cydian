@@ -27,14 +27,15 @@ const alertOK = (alert, title, message) => alert({ title, message, buttons: ["OK
 const day = (iso) => { const d = new Date(iso ?? ""); return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString(); };
 
 // `identity`: signing.status's identity (null without one). `redraw()` draws the page again (status asked anew).
-export function signingExtras({ identity = null, redraw = () => {}, native = globalThis.cydianNative, alert = showAlert, hud = liveHUD } = {}) {
+// F134: `dates` false (Settings > Signing > Show Expiry Dates off) leaves Signed Apps' days left out; Expired stays.
+export function signingExtras({ identity = null, redraw = () => {}, native = globalThis.cydianNative, alert = showAlert, hud = liveHUD, dates = true } = {}) {
   style();
   const box = document.createElement("div");
   box.className = "signed-apps";
   if (identity) box.append(statusGroup(identity, { redraw, native, alert, hud }));
   const apps = document.createElement("div");
   box.append(apps);
-  fillApps(apps, { identity, redraw, native, alert, hud });
+  fillApps(apps, { identity, redraw, native, alert, hud, dates });
   return box;
 }
 
@@ -72,7 +73,7 @@ async function check({ redraw, native, alert, hud }) {
   redraw();
 }
 
-async function fillApps(box, { identity, redraw, native, alert, hud }) {
+async function fillApps(box, { identity, redraw, native, alert, hud, dates = true }) {
   let installed;
   try {
     installed = await native.call("signing.installed", {});
@@ -80,11 +81,12 @@ async function fillApps(box, { identity, redraw, native, alert, hud }) {
     return; // an older shell without the call: no list
   }
   const rows = signedAppRows(installed);
-  const next = installed?.next?.expires ? day(installed.next.expires) : null;
+  const next = dates && installed?.next?.expires ? day(installed.next.expires) : null;
   const sections = [{ header: "Signed Apps",
-    rows: rows.length ? rows.map((r) => ({ label: r.label, subtitle: r.subtitle, detail: r.detail })) : [{ label: "None Yet" }],
+    rows: rows.length ? rows.map((r) => ({ label: r.label, subtitle: r.subtitle, detail: dates || r.detail === "Expired" ? r.detail : undefined })) : [{ label: "None Yet" }],
     footer: rows.length
-      ? `Apps you installed with your certificate, soonest to expire first${next ? ` (next: ${next})` : ""}. Re-sign All queues them all: Confirm downloads each again, signs it with the current certificate and its edits, and installs it. Swipe left on one to forget it.`
+      // F134: one line (Settings > Signing's footers); Confirm says what Re-sign All does
+      ? `Soonest to expire first${next ? ` (next: ${next})` : ""}. Swipe left on one to forget it.`
       : "Apps you install with your certificate show here, with when their signatures end." }];
   if (rows.length && identity) sections.push({ rows: [{ label: "Re-sign All", onClick: () => queueResignAll(rows) }] });
   box.replaceChildren(grouped(sections));

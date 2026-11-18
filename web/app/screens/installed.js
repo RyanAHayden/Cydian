@@ -197,6 +197,8 @@ export function init() {
     if (state.body && state.rows !== undefined) draw();
     if (appView.body) loadApps();
   });
+  // F134: Settings > Signing > Show Expiry Dates puts the pills back or takes them away.
+  settings.onChange((key) => { if (key === "showExpiry") redrawApps(); });
 }
 
 export function nav(route) {
@@ -396,14 +398,16 @@ export function appListRows(records, candidateOf) {
 
 // F91: each row's signature ({ state, text, long } or none) from signing.installed, by bundle ID (installed or
 // original), and the signed apps no row stands for, as rows of their own (`signedOnly`). -> { rows, extra }
-export function withSignatures(rows, installed, { now = new Date(), window } = {}) {
+// F134: `show` false (Show Expiry Dates off) leaves the days out; Expired still shows, since that app won't open.
+export function withSignatures(rows, installed, { now = new Date(), window, show = true } = {}) {
+  const shown = (sig) => (sig && (show || sig.state === "expired") ? sig : null);
   const index = signedIndex(installed);
   const used = new Set();
   const out = rows.map((r) => {
     const a = index.get(r.id);
     if (!a) return r;
     used.add(a.bundleId);
-    const sig = signatureState(a.expires, { now, window });
+    const sig = shown(signatureState(a.expires, { now, window }));
     return sig ? { ...r, sig } : r;
   });
   const extra = [];
@@ -411,7 +415,7 @@ export function withSignatures(rows, installed, { now = new Date(), window } = {
     if (!a?.bundleId || used.has(a.bundleId)) continue;
     used.add(a.bundleId);
     extra.push({ id: a.bundleId, name: a.name || a.bundleId, version: a.version || "", signedOnly: true,
-      sig: signatureState(a.expires, { now, window }) ?? undefined });
+      sig: shown(signatureState(a.expires, { now, window })) ?? undefined });
   }
   return { rows: out, extra };
 }
@@ -479,7 +483,7 @@ function drawAppList() {
   const { listRows, cands, site, hasStatus } = appView.last;
   for (const n of appView.tail ?? []) n.remove();
   // F91: the signature pill in place of the version (the version stays in the subtitle).
-  const signed = appView.signed ? withSignatures(listRows, appView.signed, { window: resignWindow((k) => settings.get(k)) }) : { rows: listRows, extra: [] };
+  const signed = appView.signed ? withSignatures(listRows, appView.signed, { window: resignWindow((k) => settings.get(k)), show: settings.get("showExpiry") }) : { rows: listRows, extra: [] };
   // F127: User (A–Z) or Recent (by day) on the root, narrowed by the search; the jailbreak app's Apps page as before.
   const appSecs = recordsApps() ? appSections(signed.rows, { mode: appView.mode, query: appView.query }) : [{ rows: signed.rows }];
   const extra = recordsApps() ? queryRows(signed.extra, appView.query) : signed.extra;

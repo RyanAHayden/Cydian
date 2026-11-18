@@ -16,7 +16,7 @@ import { grouped } from "../nav/ui.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
-import { sourceKey } from "../core/sources.js";
+import { sourceKey, sourcesFor } from "../core/sources.js";
 import { settings } from "./settings.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
@@ -44,12 +44,14 @@ export const CURATED_SOURCES = [
 // The green tile: what Home suggests next, from the source list and the upgrade count.
 //   sources: the backend's list, or null while it loads; upgrades: a count, or null where nothing knows it yet
 //   (the site has no installed list). Returns { kind, label, href }.
-export function stateTile({ sources = null, upgrades = null } = {}) {
+export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = {}) {
   if (sources == null) return { kind: "loading", label: "Loading Sources", href: format({ tab: "sources" }) };
   if (!sources.length) return { kind: "add", label: "Add a Source", href: format({ tab: "home", path: ["sources"] }) };
   if (upgrades > 0) {
     return { kind: "upgrades", label: `${upgrades} ${upgrades === 1 ? "Upgrade" : "Upgrades"} Available`, href: format({ tab: "changes" }) };
   }
+  // While a refresh runs, its errors aren't known yet: no "failed" until a source has actually failed this time.
+  if (refreshing > 0) return { kind: "loading", label: "Refreshing Sources", href: format({ tab: "sources" }) };
   const failed = sources.filter((s) => s.error).length;
   if (failed) {
     return { kind: "failed", label: `${failed} ${failed === 1 ? "Source" : "Sources"} Failed to Load`, href: format({ tab: "sources" }) };
@@ -117,6 +119,8 @@ async function showAbout(ctx) {
 const state = { tile: null, seq: 0 };
 
 export function init() {
+  // Sources tells when a refresh starts and each time one ends (screens/sources.js markLoading): repaint the tile.
+  globalThis.addEventListener?.("cydian:refreshing", () => refreshState());
   // The root page stays in the stack while other tabs add or remove sources: look again whenever Home shows.
   globalThis.addEventListener?.("hashchange", () => {
     if (/^#\/home\/?$/.test(globalThis.location.hash)) refreshState();
@@ -136,7 +140,9 @@ async function refreshState() {
   } catch {
     // a broken source store reads as no sources: the tile then offers to add one
   }
-  if (seq === state.seq) paintTile(stateTile({ sources, upgrades }));
+  // only the sources this device type shows (Not Jailbroken hides APT ones, and their errors with them)
+  const shown = sourcesFor(sources, settings.deviceType()).shown;
+  if (seq === state.seq) paintTile(stateTile({ sources: shown, upgrades, refreshing: globalThis.cydianRefreshing ?? 0 }));
 }
 
 function paintTile(t) {
@@ -250,7 +256,11 @@ function renderRoot(body) {
   // Install Cydian App, full width under Featured | Signing, on the website only (I7, core/appoffer.js homeOffer):
   // Not Jailbroken, the sideload build (I2) signed with the user's own certificate through the signing server, or
   // Settings > Signing first when there's none; jailbroken, the release's .deb for the device's arch.
-  const appRow = tileRow("green", tile({ label: APP_LABEL, href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }));
+  // One green split button (user 2026-11-17): Install Cydian App | Send Settings (Open in Cydian App: the certificate,
+  // sources and settings into the app).
+  const sendTile = tile({ label: "Send Settings", href: format({ tab: "home" }), glyph: "send" });
+  const appRow = tileRow("pair", tile({ label: APP_LABEL, href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }), sendTile);
+  appRow.classList.add("green");
   const appLink = appRow.querySelector("a");
   let offer = null;
   appLink.addEventListener("click", (e) => {
@@ -261,8 +271,8 @@ function renderRoot(body) {
     if (offer.action === "install") signAndInstall({ url: APP_IPA_URL, name: APP_NAME, bring: getBring() }); // F75
     else installDeb(offer.arch);
   }, true);
-  // F75: Open in Cydian App beside it (the website, not jailbroken): the visitor's sources and settings into the app.
-  const openRow = tileRow("halves", tile({ label: "Open in Cydian App", href: format({ tab: "home" }), glyph: "install" }));
+  // F75: Send Settings (Open in Cydian App), the split button's right half (the website, not jailbroken).
+  const openRow = sendTile;
   openRow.querySelector("a").addEventListener("click", (e) => {
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -303,7 +313,6 @@ function renderRoot(body) {
       tile({ label: "Discord", href: DISCORD_URL, glyph: "discord", external: true })),
     halves,
     appRow,
-    openRow,
     browseRow,
     stateRow,
   );

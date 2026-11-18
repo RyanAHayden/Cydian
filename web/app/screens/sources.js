@@ -128,8 +128,14 @@ async function firstLoad(ctx) {
 
 // Loading marks: the rows of `keys` spin and the Sources tab's badge spins until each answers (onEach), as
 // Cydia does. Returns onEach for refreshSources.
+// globalThis.cydianRefreshing: how many sources are refreshing now, for Home's tile (with the cydian:refreshing event).
+function announce() {
+  globalThis.cydianRefreshing = state.loading.size;
+  globalThis.dispatchEvent?.(new Event("cydian:refreshing"));
+}
 function markLoading(ctx, keys) {
   for (const k of keys) state.loading.add(k);
+  announce();
   ctx?.setBadge?.("sources", state.loading.size ? "spinner" : null);
   for (const li of document.querySelectorAll(".source-row")) li.classList.toggle("is-loading", state.loading.has(li.dataset.key));
   return (done) => {
@@ -138,11 +144,12 @@ function markLoading(ctx, keys) {
     if (i >= 0) state.sources[i] = done;
     const li = document.querySelector(`.source-row[data-key="${CSS.escape(String(done?.key))}"]`);
     if (li) li.classList.remove("is-loading");
-    if (!state.loading.size) ctx?.setBadge?.("sources", null);
+    if (!state.loading.size) { ctx?.setBadge?.("sources", null); announce(); }
   };
 }
 function clearLoading(ctx) {
   state.loading.clear();
+  announce();
   ctx?.setBadge?.("sources", null);
   for (const li of document.querySelectorAll(".source-row.is-loading")) li.classList.remove("is-loading");
 }

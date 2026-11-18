@@ -30,7 +30,8 @@ import { isAddPath, parseAddLink } from "./core/handoff.js";
 import { addSource } from "./screens/manage.js";
 import { initQueue } from "./screens/queue.js";
 import { initIpaLinks } from "./screens/ipa-install.js";
-import { startEssential } from "./essential-ui.js";
+import { startEssential, appVersion } from "./essential-ui.js";
+import { showBanner } from "./nav/banner.js";
 import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
 
@@ -355,6 +356,13 @@ if (globalThis.cydianNative) import("./incoming.js").then((m) => m.startIncoming
 
 if (globalThis.cydianNative) {
   setTimeout(() => startEssential().then((r) => (r === "unknown" ? settingsScreen.checkUpdates() : r)).catch(() => {}), 2000);
+  // The first launch after Cydian updated itself (iOS closed the old one as it installed this one): say so.
+  appVersion().then((v) => {
+    if (!v) return;
+    let last = null;
+    try { last = localStorage.getItem("cydian.lastVersion"); localStorage.setItem("cydian.lastVersion", v); } catch { return; }
+    if (last && last !== v) showBanner({ title: "Cydian", message: `Updated to ${v}.`, duration: 4000 });
+  }).catch(() => {});
   // Back in the foreground after a while: look again (an essential update can come out while Cydian sits in the
   // background, and iOS rarely cold-launches it). ponytail: at most every 10 minutes.
   let lastEssential = Date.now();

@@ -1,6 +1,7 @@
 // iFizBox's own update, bound to the real backend, bridge and storage (F72, F183). The logic is core/essential.js
 // and core/selfupdate.js; app.js calls lookForUpdates() on every launch, Home's Reload and return, in the app only.
-// Nothing pops up (user 2026-11-18): a newer iFizBox is only a row on top of Changes, with its badge.
+// No alert (user 2026-11-18): a newer iFizBox is a row on top of Changes, with its badge, and the iOS 6 banner
+// "iFizBox X is out." once per version per session (user 2026-11-18: 0.9.2 showed no banner for 0.9.3).
 //
 //   sideload    iFizBox's own AltStore source and GitHub's latest release, both read every time; Changes' row takes
 //               whichever is newer (upgradesWithSelf). Installing it (Changes' Upgrade, the app queue) signs it on
@@ -14,6 +15,7 @@ import { detectMode } from "./core/settings.js";
 import { showAlert } from "./nav/alert.js";
 import { installOnDevice } from "./signing-client.js";
 import { NAME } from "./brand.js";
+import { showBanner } from "./nav/banner.js";
 
 const native = () => globalThis.cydianNative;
 const storage = () => { try { return globalThis.localStorage; } catch { return null; } };
@@ -77,5 +79,17 @@ export function lookForUpdates() {
     readSource: () => readSelfInfo(),
     checkRelease: () => checkForUpdates({ mode, storage: storage(), current: appVersion, release: () => fetchRelease({ native: native() }) }),
     changed: () => globalThis.dispatchEvent?.(new Event("cydian:self-info")),
-  }).finally(() => { running = null; }));
+  }).then(async (r) => { await bannerOnce(mode).catch(() => {}); return r; }).finally(() => { running = null; }));
+}
+
+// The newer iFizBox the last check found, as Changes' row has it: sideload the source or GitHub's release, jailbreak
+// GitHub's (apt's row comes from the same release). Upgrade opens Changes. Once per version per session.
+let bannered = null;
+async function bannerOnce(mode) {
+  const current = await appVersion();
+  const release = newerRelease(storage(), current);
+  const v = mode === "sideload" ? selfUpgradeRow(selfInfoWith(loadInfo(storage()), release), current)?.version : release?.version;
+  if (!v || bannered === v) return;
+  bannered = v;
+  showBanner({ title: NAME, message: `${NAME} ${v} is out.`, action: { label: "Upgrade", onClick: () => { location.hash = "#/changes"; } } });
 }

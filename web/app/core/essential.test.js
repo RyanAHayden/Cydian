@@ -272,11 +272,12 @@ test("F183: lookForSelfUpdate is silent on failures, reads no source in the jail
   assert.deepEqual(log, [["sideload", "source"], ["sideload", "github"], ["sideload", "changed"], ["jailbreak", "github"], ["jailbreak", "changed"]]);
 });
 
-test("F183: app.js's launch, Reload and return check runs lookForUpdates and nothing that pops up", async () => {
+test("F183: app.js's launch, Reload and return check runs lookForUpdates; no alert, only the is-out banner", async () => {
   const { readFile } = await import("node:fs/promises");
   const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
   const ui = await readFile(new URL("../essential-ui.js", import.meta.url), "utf8");
   assert.match(app, /addEventListener\("cydian:reloaded", lookForSelf\)/);
   for (const gone of ["startEssential", "checkUpdates", "showBanner", "Updated to"]) assert.equal(app.includes(gone), false, gone);
-  for (const gone of ["showBanner", "runEssential", "lock("]) assert.equal(ui.includes(gone), false, gone);
+  for (const gone of ["showAlert({", "runEssential", "lock("]) assert.equal(ui.includes(gone), false, gone);
+  assert.match(ui, /is out\.`/); // user 2026-11-18: the banner is wanted, once per version
 });

@@ -1,6 +1,12 @@
 #!/bin/sh
 # Register the app with SpringBoard (rootless: the jailbreak maps /var/jb).
 uicache -p /var/jb/Applications/Cydian.app || true
+# The app has no container, so WebKit keeps its localStorage and IndexedDB (Settings, the source cache, Changes) in
+# /var/mobile/Library/WebKit/com.ryha.cydian/. iOS ships that parent as root:mobile 0700, so WebKit (running as
+# mobile) can't create it and keeps everything in memory: every launch starts empty and Changes never shows a
+# change. Let group mobile through the parent and make the app's folder for it.
+wk=/var/mobile/Library/WebKit
+mkdir -p "$wk/com.ryha.cydian" && chmod g+x "$wk" && chown mobile:mobile "$wk/com.ryha.cydian" || true
 # N5: start the daily upgrade check (unload first so an upgrade picks up a changed job).
 launchctl unload /var/jb/Library/LaunchDaemons/com.ryha.cydian.upgrades.plist 2>/dev/null || true
 launchctl load /var/jb/Library/LaunchDaemons/com.ryha.cydian.upgrades.plist || true

@@ -181,6 +181,8 @@ def check(path):
     post = ctl.get("postinst")
     if not post or not post[0].mode & 0o111 or b"uicache -p /var/jb/Applications/Cydian.app" not in post[1]:
         problems.append("postinst missing, not executable, or not running uicache -p on the app")
+    if not post or b'chown mobile:mobile "$wk/com.ryha.cydian"' not in post[1]:
+        problems.append("postinst does not make WebKit's storage folder (without it nothing in the web view persists)")
 
     job = "/" + DAEMON_JOB[len("./"):]
     if not post or b"launchctl load " + job.encode() not in post[1]:

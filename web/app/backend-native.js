@@ -18,6 +18,8 @@
 // F131: a job with `debUrl` (its Filename is a full URL, which apt joins to the repo's URL and 404s on) is downloaded
 // by the shell (share.debFetch) and run through cydian-helper simulate-deb / install-deb (share.debSimulate,
 // share.debInstall: native/share/App/ShareBridge.swift), before apt's apply over the rest (linkedDebs below).
+// F133: the job's debSha256 / debMd5 (its Packages stanza's, screens/queue.js) go to share.debFetch, which checks the
+// download (apt would have); a mismatch is a Cannot Comply sentence, and nothing is installed.
 //
 // Roll Back (F71, jailbreak build): rollbacks(id) lists the .debs N7's daemon kept when automatic updates replaced
 // a version (cydian-helper rollbacks), [{ version, file }] newest first; rollback(id, version, onEvent) installs one
@@ -262,15 +264,19 @@ function linkedDebs(q, call) {
     else if (e.type === "clearAll") for (const id of [...staged.keys()]) discard(id);
     else if (e.type === "add" && staged.has(e.job.id)) discard(e.job.id); // queued for something else now
   });
+  // F133: the stanza's hashes ride along; a file fetched for another hash is fetched again.
+  const hashes = (j) => ({ ...(j.debSha256 ? { sha256: j.debSha256 } : {}), ...(j.debMd5 ? { md5: j.debMd5 } : {}) });
+  const fetchKey = (j) => [j.debUrl, j.debSha256 ?? "", j.debMd5 ?? ""].join(" ");
   const fetchFor = async (j, again = false) => {
     const s = staged.get(j.id);
-    if (s && s.url === j.debUrl && !again) return s.file;
+    if (s && s.url === fetchKey(j) && !again) return s.file;
     if (s) discard(j.id);
-    const r = await call("share.debFetch", { url: j.debUrl });
+    const r = await call("share.debFetch", { url: j.debUrl, ...hashes(j) });
     if (!r?.file) throw new BackendError("network", `${j.debUrl} gave nothing to install`);
-    staged.set(j.id, { url: j.debUrl, file: r.file });
+    staged.set(j.id, { url: fetchKey(j), file: r.file });
     return r.file;
   };
+  const badHash = (e) => /^bad_hash:/.test(String(e?.message ?? e));
   const gone = (e) => /^gone:/.test(String(e?.message ?? e));
   const clean = (e) => String(e?.message ?? e).replace(/^[a-z_]+: /, "");
   const label = (j) => j.name || j.id;
@@ -289,8 +295,10 @@ function linkedDebs(q, call) {
         }
       } catch (e) {
         discard(j.id);
-        return { ok: false, code: -1, plan: empty(), output: `E: ${label(j)}: ${clean(e)} (${j.debUrl})`,
-          issue: `Couldn't download ${label(j)} from ${j.debUrl}, where its source says it is: ${clean(e)}` };
+        const issue = badHash(e)
+          ? `${label(j)} from ${j.debUrl} isn't the file its source lists (${clean(e)}), so Cydian won't install it.`
+          : `Couldn't download ${label(j)} from ${j.debUrl}, where its source says it is: ${clean(e)}`;
+        return { ok: false, code: -1, plan: empty(), output: `E: ${label(j)}: ${clean(e)} (${j.debUrl})`, issue };
       }
       if (r.package && r.package !== j.id) {
         discard(j.id);

@@ -291,5 +291,31 @@ test("apt's plan names the shared package") {
     check(ShareRun.ownPackage("Inst a (1 r [x])\n") == nil, "nothing to go on")
 }
 
+test("F133: a downloaded .deb checked against its stanza's SHA256 or MD5sum") {
+    let dir = NSTemporaryDirectory() + "/sharetest-sum-" + UUID().uuidString
+    try fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    defer { try? fm.removeItem(atPath: dir) }
+    let f = URL(fileURLWithPath: dir + "/a.deb")
+    try Data("!<arch>\nPackage: com.example.linked\nVersion: 1.0\n".utf8).write(to: f)
+    let sha = "3b8d4b223885791e961e669b6d23b7311b5c1b3de5ae3f9aa603bd77e7468a9b", md5 = "ca04ec38027c07c41a28c17e97ca13a9"
+    check(DebChecksum.check(f, sha256: nil, md5: nil) == nil, "no hash: nothing to check")
+    check(DebChecksum.check(f, sha256: sha, md5: nil) == nil, "SHA256 matches")
+    check(DebChecksum.check(f, sha256: " " + sha.uppercased() + "\n", md5: nil) == nil, "case and spaces don't matter")
+    check(DebChecksum.check(f, sha256: nil, md5: md5) == nil, "MD5 matches")
+    check(DebChecksum.check(f, sha256: sha, md5: String(repeating: "0", count: 32)) == nil, "SHA256 wins over MD5")
+    let bad = DebChecksum.check(f, sha256: String(repeating: "a", count: 64), md5: md5) ?? ""
+    check(bad.hasPrefix("bad_hash: ") && bad.contains(sha), bad)
+    check((DebChecksum.check(f, sha256: nil, md5: String(repeating: "b", count: 32)) ?? "").contains(md5), "MD5 mismatch")
+    check((DebChecksum.check(f, sha256: "xyz", md5: nil) ?? "").hasPrefix("bad_hash: "), "not a hash: refused")
+    check((DebChecksum.check(URL(fileURLWithPath: dir + "/none.deb"), sha256: sha, md5: nil) ?? "").hasPrefix("bad_hash: "), "missing file")
+    // MD5 against RFC 1321's vectors, and pieces across block edges
+    func md5hex(_ parts: [Data]) -> String { var m = MD5(); for p in parts { m.update(p) }; return DebChecksum.hex(m.final()) }
+    check(md5hex([]) == "d41d8cd98f00b204e9800998ecf8427e", "empty")
+    check(md5hex([Data("abc".utf8)]) == "900150983cd24fb0d6963f7d28e17f72", "abc")
+    check(md5hex([Data("12345678901234567890123456789012345678901234567890123456789012345678901234567890".utf8)]) == "57edf4a22be3c955ac49da2e2107b67a", "80 digits")
+    let big = Data((0..<256000).map { UInt8($0 % 256) })
+    check(md5hex([big.prefix(63), big.dropFirst(63).prefix(65), big.dropFirst(128)]) == "1da708a75e25110b1341d16814feb52d", "pieces")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

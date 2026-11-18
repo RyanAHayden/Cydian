@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createNativeBackend } from "./backend-native.js";
-import { createQueue, debUrlOf } from "./core/queue.js";
+import { createHash } from "node:crypto";
+import { createQueue, debUrlOf, debLinkOf } from "./core/queue.js";
 import { aptVersionList } from "./core/catalog.js";
 import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
 import { fakeIndexedDB } from "../../native/fake/fake-indexeddb.mjs";
@@ -26,11 +27,17 @@ function setup(t, { served = { [URL_DEB]: DEB }, env = {} } = {}) {
   const fake = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: null, env: { CYDIAN_DEB_DIR: debDir, ...env } });
   let n = 0;
   const share = {
-    "share.debFetch"({ url }) {
+    "share.debFetch"({ url, sha256, md5 }) {
       if (!(url in served)) throw new Error(`network: ${url} answered 404`);
+      // F133: as ShareBridge.swift (Share.swift DebChecksum): SHA256 first, else MD5; a mismatch removes the file
+      const [kind, want] = sha256 ? ["sha256", sha256] : md5 ? ["md5", md5] : [];
+      if (kind) {
+        const got = createHash(kind).update(served[url]).digest("hex");
+        if (got !== want.toLowerCase()) throw new Error(`bad_hash: the download's ${kind.toUpperCase()} is ${got}, not the ${want} its source lists`);
+      }
       const file = `f${++n}.deb`;
       writeFileSync(join(debDir, file), served[url]);
-      return { file, name: url.split("/").pop() };
+      return { file, name: url.split("/").pop(), checked: kind ? kind.toUpperCase() : null };
     },
     async "share.debSimulate"({ file }) {
       if (!existsSync(join(debDir, file))) throw new Error("gone: that shared file isn't there any more; share it again");
@@ -145,4 +152,52 @@ test("without linked jobs nothing goes through the shell's downloads", async (t)
   const { backend, calls } = setup(t);
   await backend.simulate([{ op: "install", id: "bash", version: null }]);
   assert.deepEqual(methods(calls), ["helper simulate"]);
+});
+
+// ---- F133: the download checked against its Packages stanza's SHA256 (or MD5sum)
+
+const sha = (t) => createHash("sha256").update(t).digest("hex");
+const md5 = (t) => createHash("md5").update(t).digest("hex");
+
+test("F133 debLinkOf: the link with the version's stanza hashes, from catalog.history", () => {
+  const offers = [
+    { key: "j", stanza: { version: "1.0", filename: URL_DEB, debUrl: URL_DEB, sha256: sha(DEB).toUpperCase(), md5sum: md5(DEB) } },
+    { key: "k", stanza: { version: "0.9", filename: URL_DEB, debUrl: URL_DEB, md5sum: "not hex" } },
+  ];
+  const history = { kind: "apt", versions: aptVersionList(offers, { candidate: "1.0" }) };
+  assert.equal(history.versions[0].sha256, sha(DEB)); // lowercased
+  assert.equal(history.versions[1].sha256, null);
+  assert.equal(history.versions[1].md5sum, null);     // garbage dropped
+  assert.deepEqual(debLinkOf(history, null), { debUrl: URL_DEB, debSha256: sha(DEB), debMd5: md5(DEB) });
+  assert.deepEqual(debLinkOf(history, "0.9"), { debUrl: URL_DEB });
+  const rel = { kind: "apt", versions: aptVersionList([{ key: "j", stanza: { version: "1", filename: "debs/x.deb", debUrl: "https://r/debs/x.deb", sha256: sha(DEB) } }], { candidate: "1" }) };
+  assert.equal(debLinkOf(rel, null), null); // apt fetches (and checks) that one
+});
+
+test("F133: the stanza's SHA256 goes to share.debFetch; a matching download installs", async (t) => {
+  const { backend, calls } = setup(t);
+  const job = { ...linked, debSha256: sha(DEB), debMd5: md5(DEB) };
+  assert.equal((await backend.simulate([job])).ok, true);
+  assert.deepEqual(calls[0].params, { url: URL_DEB, sha256: sha(DEB), md5: md5(DEB) });
+  calls.length = 0;
+  assert.equal((await backend.apply([job])).code, 0);
+  assert.deepEqual(methods(calls), ["share.debInstall"]); // the checked file, not fetched again
+});
+
+test("F133: a download that doesn't match its stanza is refused on Cannot Comply, nothing staged", async (t) => {
+  const { backend, debDir } = setup(t);
+  const r = await backend.simulate([{ ...linked, debSha256: sha("something else") }]);
+  assert.equal(r.ok, false);
+  assert.equal(r.issues.length, 1);
+  assert.match(r.issues[0], /^Linked from https:\/\/github\.com\/.* isn't the file its source lists \(the download's SHA256 is [0-9a-f]{64}, not .*\), so Cydian won't install it\.$/);
+  assert.deepEqual(readdirSync(debDir), []);
+  const m = await backend.simulate([{ ...linked, debMd5: md5("other") }]);
+  assert.match(m.issues[0], /MD5 is/);
+});
+
+test("F133: a job whose hash changed (the source updated) is fetched again", async (t) => {
+  const { backend, calls } = setup(t);
+  assert.equal((await backend.simulate([linked])).ok, true);
+  assert.equal((await backend.simulate([{ ...linked, debSha256: sha(DEB) }])).ok, true);
+  assert.equal(calls.filter((c) => c.method === "share.debFetch").length, 2);
 });

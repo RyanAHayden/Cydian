@@ -358,3 +358,92 @@ enum ShareRun {
         return nil
     }
 }
+
+// ---- F133: checking a downloaded .deb against its Packages stanza
+
+// F131's links (a Filename that is a full URL) are downloaded by the shell, not apt, so apt's hash check never runs
+// on them. share.debFetch takes the stanza's SHA256 (or, when a repo gives none, its MD5sum) and this checks the
+// file: nil when it matches (or no hash was given), else the sentence for the Cannot Comply sheet. SHA256 is
+// sign/Hash.swift's (CommonCrypto on the phone); MD5 is below, plain Swift (CC_MD5 is deprecated on iOS 13+).
+enum DebChecksum {
+    static func check(_ file: URL, sha256 want256: String?, md5 wantMD5: String?) -> String? {
+        let w256 = clean(want256), wMD5 = clean(wantMD5)
+        let (kind, want): (String, String)
+        if let w = w256 { (kind, want) = ("SHA256", w) } else if let w = wMD5 { (kind, want) = ("MD5", w) } else { return nil }
+        guard want.count == (kind == "SHA256" ? 64 : 32), want.allSatisfy(\.isHexDigit) else {
+            return "bad_hash: its source lists a \(kind) that isn't one (\(want.prefix(80)))"
+        }
+        guard let h = try? FileHandle(forReadingFrom: file) else { return "bad_hash: the download couldn't be read" }
+        defer { try? h.close() }
+        var s256 = SHA256(), m = MD5()
+        while true {
+            let d = h.readData(ofLength: 1 << 20)
+            if d.isEmpty { break }
+            if kind == "SHA256" { s256.update(d) } else { m.update(d) }
+        }
+        let got = hex(kind == "SHA256" ? s256.final() : m.final())
+        return got == want ? nil : "bad_hash: the download's \(kind) is \(got), not the \(want) its source lists"
+    }
+
+    static func clean(_ s: String?) -> String? {
+        let t = (s ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return t.isEmpty ? nil : t
+    }
+
+    static func hex(_ d: Data) -> String { d.map { String(format: "%02x", $0) }.joined() }
+}
+
+// RFC 1321 MD5, streamed: update() with pieces, then final(). Only for repos whose stanzas have no SHA256.
+struct MD5 {
+    private var h: [UInt32] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476]
+    private var buf = [UInt8]()
+    private var len: UInt64 = 0
+    private static let s: [UInt32] = [7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+                                      5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+                                      4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+                                      6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21]
+    private static let k: [UInt32] = (0..<64).map { UInt32(truncatingIfNeeded: Int64(abs(sin(Double($0 + 1))) * 4294967296.0)) }
+
+    mutating func update(_ d: Data) {
+        len &+= UInt64(d.count)
+        buf.append(contentsOf: d)
+        var i = 0
+        while buf.count - i >= 64 { block(buf, i); i += 64 }
+        if i > 0 { buf.removeFirst(i) }
+    }
+
+    mutating func final() -> Data {
+        let bits = len &* 8
+        var tail: [UInt8] = [0x80]
+        while (buf.count + tail.count) % 64 != 56 { tail.append(0) }
+        for i in 0..<8 { tail.append(UInt8(truncatingIfNeeded: bits >> (8 * UInt64(i)))) }
+        buf.append(contentsOf: tail)
+        var i = 0
+        while i < buf.count { block(buf, i); i += 64 }
+        buf = []
+        var out = Data()
+        for v in h { for j in 0..<4 { out.append(UInt8(truncatingIfNeeded: v >> (8 * UInt32(j)))) } }
+        return out
+    }
+
+    private mutating func block(_ b: [UInt8], _ o: Int) {
+        var m = [UInt32](repeating: 0, count: 16)
+        for i in 0..<16 {
+            m[i] = UInt32(b[o + 4 * i]) | UInt32(b[o + 4 * i + 1]) << 8 | UInt32(b[o + 4 * i + 2]) << 16 | UInt32(b[o + 4 * i + 3]) << 24
+        }
+        var a = h[0], bb = h[1], c = h[2], d = h[3]
+        for i in 0..<64 {
+            var f: UInt32, g: Int
+            switch i {
+            case 0..<16: f = (bb & c) | (~bb & d); g = i
+            case 16..<32: f = (d & bb) | (~d & c); g = (5 * i + 1) % 16
+            case 32..<48: f = bb ^ c ^ d; g = (3 * i + 5) % 16
+            default: f = c ^ (bb | ~d); g = (7 * i) % 16
+            }
+            f = f &+ a &+ MD5.k[i] &+ m[g]
+            a = d; d = c; c = bb
+            bb = bb &+ ((f << MD5.s[i]) | (f >> (32 - MD5.s[i])))
+        }
+        h[0] &+= a; h[1] &+= bb; h[2] &+= c; h[3] &+= d
+    }
+}

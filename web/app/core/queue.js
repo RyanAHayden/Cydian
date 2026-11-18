@@ -276,6 +276,16 @@ export function debUrlOf(history, version = null) {
   return /^https?:\/\/[^/\s]+/i.test(v.debUrl ?? "") ? v.debUrl : null;
 }
 
+// F133: the job fields for a linked download (debUrlOf's link) with its stanza's hashes, which the shell checks the
+// file against (share.debFetch): { debUrl, debSha256?, debMd5? }, or null when debUrlOf gives no link.
+export function debLinkOf(history, version = null) {
+  const debUrl = debUrlOf(history, version);
+  if (!debUrl) return null;
+  const offered = history.versions.filter((v) => v.keys?.length);
+  const v = version ? offered.find((o) => o.version === version) : offered.find((o) => o.candidate) ?? offered[0];
+  return { debUrl, ...(v?.sha256 ? { debSha256: v.sha256 } : {}), ...(v?.md5sum ? { debMd5: v.md5sum } : {}) };
+}
+
 // Several apt-get -s plans (parseSimulation's) as one: each package once per list (the first plan's entry), the
 // essentials together, the first download size.
 export function mergePlans(plans) {

@@ -5,6 +5,7 @@
 // device and comes through the backend (core/sources.js sourceCalls), so the app runs this file unchanged.
 // Above the sources, Cydia's "All Sources" row; a source (or All Sources) opens its Sections, and everything
 // below that is screens/browse.js.
+import { cleanSourceUrl } from "../core/sources.js";
 import { plain, collapse } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
@@ -32,6 +33,17 @@ const state = {
 
 const byKey = (key) => state.sources?.find((s) => s.key === key);
 
+async function addFromClipboard(ctx, button) {
+  button.textContent = "Paste";
+  button.classList.add("done", "paste-wait");
+  let text = "";
+  try { text = await navigator.clipboard.readText(); } catch { /* refused, or nothing to read */ }
+  button.textContent = "Add";
+  button.classList.remove("done", "paste-wait");
+  const url = cleanSourceUrl(text);
+  manage.addSource(ctx, url ? { url } : null);
+}
+
 export function nav(route, ctx) {
   if (manage.isManage(route)) return manage.nav(route, ctx);
   if (route.path.length) {
@@ -41,8 +53,9 @@ export function nav(route, ctx) {
     title: "Sources", style: "plain",
     left: { label: "Refresh", onClick: () => refresh(ctx) },
     right: [
-      // Add: the Enter APT URL alert at once; its Paste button reads the clipboard only when tapped.
-      { label: "Add", onClick: () => manage.addSource(ctx) },
+      // Add: asks iOS for the clipboard (its Paste bubble); while that waits the button turns blue and reads Paste,
+      // so it's clear the bubble wants a tap. Then the Enter APT URL alert, filled with a copied source URL.
+      { label: "Add", onClick: (e) => addFromClipboard(ctx, e.currentTarget) },
       { label: "Manage", onClick: () => ctx.go({ tab: "sources", path: [manage.SEGMENT] }) },
     ],
   };

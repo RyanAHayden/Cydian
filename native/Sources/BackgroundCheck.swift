@@ -9,9 +9,10 @@
 // iOS decides when the task runs (how often the app is used, battery, Low Power Mode): earliestBeginDate is only
 // "not before". It never runs in the jailbreak build (N5's daemon checks apt there), and only registers where the
 // Info.plist permits its identifier: register(forTaskWithIdentifier:) traps on one that isn't listed.
-// Notification permission is asked once the page follows an app other than iFizBox itself (an Install was recorded),
-// or by app.badge's first count (Notifications.swift); in the background iOS can't ask, so until then the check only
-// updates what it knows and sets nothing.
+// Notification permission is asked once the page follows anything, iFizBox itself included (B34: before, only an app
+// other than iFizBox asked, so a phone with nothing else recorded could never be told about iFizBox's own update in
+// the background), or by app.badge's first count (Notifications.swift); in the background iOS can't ask, so until
+// then the check only updates what it knows and sets nothing.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import BackgroundTasks
 import Foundation
@@ -49,7 +50,9 @@ enum BackgroundCheck {
             queue.async {
                 let known = UpdateCheck.mergeKnown(old: loadKnown(), oldWatch: loadWatch(), page: page, newWatch: apps)
                 save(apps, known: known)
-                if apps.contains(where: { $0.id != "com.ryha.ifizbox" }) { askOnce() }
+                // B34: iFizBox itself counts too, or a phone following only iFizBox never gets asked and its own
+                // update can neither badge the icon nor notify from here.
+                if !apps.isEmpty { askOnce() }
                 Apt.reply(c, ["scheduled": schedule()], nil)
             }
         }

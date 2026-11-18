@@ -7,10 +7,13 @@
   /* a screen's height past each edge (nav/alert.js: no white shows when iOS pans for the keyboard) */
   position: fixed; inset: -100vh 0; z-index: 30; display: grid; place-items: center; padding: calc(100vh + 16px) 16px;
   background: radial-gradient(ellipse at center, rgba(0,0,0,.25), rgba(0,0,0,.6) 70%) center / 100% 100vh no-repeat, rgba(0,0,0,.6);
+  /* B32: one column exactly the screen's width. An auto column grew to the text's unwrapped (max-content) width, so a
+     long URL in a message pushed the box right and off the screen even though the message itself wraps. */
+  grid-template-columns: minmax(0, 1fr);
 }
 .alert {
   /* iOS 6's 284pt, widened to fit longer text and button labels on today's wider screens */
-  position: relative; width: min(340px, 100%); padding: 16px 12px 11px; border-radius: 10px;
+  position: relative; width: min(340px, 100%); max-width: 100%; min-width: 0; padding: 16px 12px 11px; border-radius: 10px;
   transition: translate .3s cubic-bezier(.25,.1,.25,1); /* glides above the keyboard (nav/alert.js) instead of jumping */
   color: #fff; text-align: center; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
   background: rgba(11,27,67,.8); border: 2px solid #b1b7c1; border-bottom-color: #e1e3e3;
@@ -21,8 +24,8 @@
   background: radial-gradient(ellipse 150% 100% at 50% 0, rgba(255,255,255,.5), rgba(255,255,255,.25) 99%, transparent 100%);
   pointer-events: none;
 }
-.alert-title { position: relative; margin: 0 0 6px; font-size: 18px; line-height: 22px; font-weight: bold; }
-.alert-message { position: relative; margin: 0 0 10px; font-size: 16px; line-height: 20px; overflow-wrap: anywhere; white-space: pre-line; } /* \n breaks lines, as in Cydia's About */
+.alert-title { position: relative; margin: 0 0 6px; font-size: 18px; line-height: 22px; font-weight: bold; overflow-wrap: anywhere; word-break: break-word; }
+.alert-message { position: relative; margin: 0 0 10px; font-size: 16px; line-height: 20px; overflow-wrap: anywhere; word-break: break-word; white-space: pre-line; } /* \n breaks lines, as in Cydia's About */
 .alert-field {
   display: block; width: 100%; height: 31px; margin: 6px 0 12px; padding: 0 8px; border-radius: 4px;
   font: inherit; font-size: 16px; color: #000; text-shadow: none; -webkit-user-select: text; user-select: text;

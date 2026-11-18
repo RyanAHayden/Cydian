@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { searchUrl, lookupUrl, mapResults, priceFor, normalRepo, createCanister } from "./canister.js";
+import { searchUrl, askable, lookupUrl, mapResults, priceFor, normalRepo, createCanister } from "./canister.js";
 
 const live = JSON.parse(readFileSync(new URL("./fixtures/f20/canister-search.json", import.meta.url), "utf8"));
 
@@ -10,6 +10,17 @@ test("search and lookup URLs", () => {
   assert.equal(searchUrl(" a b ", { limit: 999, page: 3 }), "https://api.canister.me/v2/jailbreak/package/search?q=a+b&limit=250&page=3");
   assert.equal(searchUrl("a"), null);
   assert.equal(searchUrl(""), null);
+});
+
+test("one character, CJK or not, isn't sent to Canister (F106: it finds nothing for one)", () => {
+  assert.equal(askable("a"), false);
+  assert.equal(askable(" 微 "), false);
+  assert.equal(askable("\u{20000}"), false); // one character, two UTF-16 units
+  assert.equal(askable("😀"), false);
+  assert.equal(searchUrl("微"), null);
+  assert.equal(askable("微信"), true);
+  assert.equal(askable("ab"), true);
+  assert.equal(searchUrl("微信"), "https://api.canister.me/v2/jailbreak/package/search?q=%E5%BE%AE%E4%BF%A1&limit=50");
   assert.equal(lookupUrl("com.purdix.muze4"), "https://api.canister.me/v2/jailbreak/package/com.purdix.muze4");
   assert.equal(lookupUrl("../x"), null);
 });

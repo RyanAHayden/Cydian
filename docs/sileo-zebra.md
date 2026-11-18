@@ -59,12 +59,16 @@ ranked list of follow-ups is at the end.
 ### Cydian today
 `screens/search.js` with `core/catalog.js search()`, run in the worker:
 - Every word must appear somewhere in name, id, description, author or maintainer.
-- Rank tiers: exact name or id, then prefix, then substring in name or id, then author or maintainer. Ties are
-  alphabetical.
+- Rank tiers: exact name or id, then prefix, then the query starting a word in the name or id ("board" in "Snow
+  Board", not "Keyboard"), then substring in name or id, then author or maintainer. Within a tier: name length
+  closest to the query, then how many sources list the package, then by name (F101, proposal 2).
+- One Latin character searches nothing; one CJK character searches locally (`core/catalog.js searchable()`, F101,
+  proposal 4).
 - 120 ms debounce. A scope bar (All, Tweaks, Themes, Apps) plus a Filter panel (section, source, installed,
   free/paid, Show Incompatible).
-- Canister "Other Sources" under the local results (`screens/extras.js discoveryGroup`, 2+ characters, 10-minute
-  cache, `core/canister.js`).
+- Canister "Other Sources" under the local results (`screens/extras.js discoveryGroup`, 2+ characters even for CJK,
+  10-minute cache, `core/canister.js`). Canister accepts one CJK character but answers nothing for it (checked
+  2026-11-18, F106), so it isn't asked.
 - No search history. Each keystroke scans every row.
 
 ### Proposals (iOS 6 style)

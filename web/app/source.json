@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.2.0",
+          "date": "2026-11-18T02:27:55Z",
+          "localizedDescription": "App pages: Install signs with your own certificate and installs; Download IPA keeps the file, on every older version too. No more hand-offs to AltStore, SideStore or Feather.\nInstalls in the app show only iOS's Install prompt.\nMark as Installed for apps installed another way.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.0",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.0/Cydian.ipa",
+          "size": 2541172,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.9",
           "date": "2026-11-18T02:20:15Z",
           "localizedDescription": "Installing in the app shows only iOS's Install prompt, no Open in iTunes before it.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.9",

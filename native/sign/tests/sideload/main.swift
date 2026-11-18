@@ -148,7 +148,7 @@ test("sign with the user's edits") {
     let explicit = IPASigner(profile: try Profile(fixture("profile-explicit.mobileprovision")), identity: identity)
     explicit.options = try SignOptions(json: ["bundleId": "com.me.asked"])
     let e = try explicit.sign(fixtures.appendingPathComponent("edit.ipa"), to: work.appendingPathComponent("explicit.ipa"))
-    check(e.bundleID == "com.me.only" && e.removed == ["PlugIns/Share.appex", "PlugIns/Widget.appex"], "explicit \(e.bundleID) \(e.removed)")
+    check(e.bundleID == "com.me.only" && e.removed.sorted() == ["PlugIns/Share.appex", "PlugIns/Widget.appex"], "explicit \(e.bundleID) \(e.removed)")
     // no options: the plain I6 behaviour, no fix-up when turned off
     let plain = IPASigner(profile: profile, identity: identity)
     plain.options.fixArm64e = false

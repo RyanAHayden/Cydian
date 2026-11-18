@@ -1,0 +1,100 @@
+"""T6: tools/release.sh names the assets the way F61's self-update looks for them (web/app/core/selfupdate.js
+parseRelease/debFor), and refuses a build whose version isn't native/VERSION. Dry runs only: nothing is published
+and nothing touches the network."""
+import json
+import os
+import plistlib
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "native"))
+import mkdeb  # noqa: E402
+import mkipa  # noqa: E402
+
+SCRIPT = os.path.join(ROOT, "tools", "release.sh")
+with open(os.path.join(ROOT, "native", "VERSION")) as f:
+    VERSION = f.read().strip()
+
+
+class Release(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.dist = os.path.join(self.tmp, "dist")
+        os.makedirs(self.dist)
+
+    def fake_build(self, deb_version, ipa_version):
+        """A Cydian.deb and Cydian.ipa just real enough to name: they fail mkdeb/mkipa's checks, which a dry run
+        only reports."""
+        root, debian = os.path.join(self.tmp, "root"), os.path.join(self.tmp, "debian")
+        os.makedirs(os.path.join(root, "var/jb/Applications/Cydian.app"))
+        os.makedirs(debian)
+        with open(os.path.join(root, "var/jb/Applications/Cydian.app/x"), "wb") as f:
+            f.write(b"x")
+        with open(os.path.join(debian, "control"), "w") as f:
+            f.write("Package: com.ryha.cydian\nVersion: %s\nArchitecture: iphoneos-arm64\n"
+                    "Installed-Size: @SIZE@\n" % deb_version)
+        mkdeb.build(root, debian, os.path.join(self.dist, "Cydian.deb"), mtime=0)
+        app = os.path.join(self.tmp, "Cydian.app")
+        os.makedirs(app)
+        with open(os.path.join(app, "Info.plist"), "wb") as f:
+            plistlib.dump({"CFBundleShortVersionString": ipa_version, "CFBundleIdentifier": "com.ryha.cydian"}, f)
+        mkipa.build(app, os.path.join(self.dist, "Cydian.ipa"), mtime=0)
+
+    def dry_run(self):
+        notes = os.path.join(self.tmp, "notes.md")
+        with open(notes, "w") as f:
+            f.write("- A test release\n")
+        env = {k: v for k, v in os.environ.items() if k != "CYDIAN_RELEASE_REPO"}
+        return subprocess.run([SCRIPT, "--dry-run", "--dist", self.dist, "--notes", notes], cwd=ROOT, env=env,
+                              capture_output=True, text=True, timeout=60)
+
+    def assets(self, out):
+        line = next(l for l in out.splitlines() if l.startswith("release: assets: "))
+        return line[len("release: assets: "):].split()
+
+    def test_asset_names(self):
+        self.fake_build("%s-7" % VERSION, VERSION)
+        r = self.dry_run()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.assets(r.stdout),
+                         ["Cydian.ipa", "Cydian.deb", "com.ryha.cydian_%s-7_iphoneos-arm64.deb" % VERSION])
+        self.assertIn("RyanAHayden/Cydian v%s " % VERSION, r.stdout)
+        self.assertIn("nothing published", r.stdout)
+        self.assertNotIn("is not native/VERSION", r.stderr)
+
+    @unittest.skipUnless(shutil.which("node"), "no node")
+    def test_selfupdate_finds_them(self):
+        """The names the script prints, fed to selfupdate.js as a GitHub release, give an IPA and the arm64 .deb."""
+        self.fake_build("%s-7" % VERSION, VERSION)
+        names = self.assets(self.dry_run().stdout)
+        release = {"tag_name": "v" + VERSION, "body": "- x", "html_url": "https://example.invalid/r",
+                   "assets": [{"name": n, "browser_download_url": "https://example.invalid/" + n} for n in names]}
+        js = ("import { parseRelease, debFor } from %s;\n"
+              "const r = parseRelease(%s);\n"
+              "console.log(JSON.stringify({ v: r.version, ipa: r.ipa, arm64: debFor(r, 'iphoneos-arm64'),"
+              " none: debFor(r, 'iphoneos-arm64e') }));"
+              % (json.dumps("file://" + os.path.join(ROOT, "web/app/core/selfupdate.js")), json.dumps(release)))
+        out = subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True, text=True, timeout=60)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        got = json.loads(out.stdout)
+        base = "https://example.invalid/"
+        self.assertEqual(got["v"], VERSION)
+        self.assertEqual(got["ipa"], base + "Cydian.ipa")
+        self.assertEqual(got["arm64"], base + "com.ryha.cydian_%s-7_iphoneos-arm64.deb" % VERSION)
+        self.assertIsNone(got["none"])  # the rootless build is never offered to a roothide (arm64e) phone
+
+    def test_version_mismatch_reported(self):
+        self.fake_build("0.0.1-7", "0.0.1")
+        r = self.dry_run()
+        self.assertEqual(r.returncode, 0, r.stderr)  # a dry run reports; a real run would stop
+        self.assertIn("is not native/VERSION %s" % VERSION, r.stderr)
+        self.assertIn("a real run would stop here", r.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

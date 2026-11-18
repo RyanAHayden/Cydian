@@ -146,7 +146,7 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {} })
   else hide = showHUD("Installing");
   onInstalled(body);
   location.href = body.itms;
-  setTimeout(hide, 2500); // iOS asks "Install …?" over the page; the HUD only bridges the wait for it
+  setTimeout(() => (hide.done ? hide.done("Done") : hide()), 1200); // iOS asks "Install …?": end on a checkmark, then fade
   return true;
 }
 
@@ -243,7 +243,7 @@ export async function setUpTrust(native) {
 function liveHUD(text) {
   const hide = showHUD(text);
   const label = [...document.querySelectorAll(".hud-label")].at(-1);
-  return { set: (t) => { if (label) label.textContent = t; }, hide };
+  return { set: (t) => { if (label) label.textContent = t; }, hide, done: (t) => hide.done(t) };
 }
 
 const openRoute = (path) => { location.hash = format({ tab: "settings", path }).replace(/^#/, ""); };
@@ -270,6 +270,7 @@ export async function installOnDevice({ url, name = "", onInstalled = () => {} }
   }
   h.set("Installing");
   onInstalled(result);
-  later(h.hide, 2500); // iOS asks "Install …?" over the app; the HUD only bridges the wait for it
+  // iOS asks "Install …?" over the app: the HUD ends on a checkmark (signed and handed to iOS) and fades.
+  later(() => (h.done ? h.done("Done") : h.hide()), 1200);
   return true;
 }

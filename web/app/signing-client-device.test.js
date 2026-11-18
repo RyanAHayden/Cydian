@@ -95,7 +95,7 @@ test("Install: the HUD follows the phases, then Installing, and records the app"
   assert.equal(recorded, done);
   assert.equal(ui.alerts.length, 0);
   assert.equal(ui.hidden, 0);
-  assert.equal(ui.later[0][1], 2500);
+  assert.equal(ui.later[0][1], 1200); // then the checkmark, which fades on its own
   ui.later[0][0]();
   assert.equal(ui.hidden, 1);
 });

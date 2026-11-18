@@ -274,6 +274,7 @@ html[data-theme="dark"] .switch.is-held .sw-knob { background: linear-gradient(#
   font-size: 24px; font-weight: bold; line-height: 28px;
 }
 .hud-spinner { width: 36px; height: 36px; animation: hud-spin .96s steps(12) infinite; }
+.hud-check { width: 36px; height: 36px; }
 @keyframes hud-spin { to { transform: rotate(360deg); } }
 
 .empty { color: var(--head); text-shadow: var(--emboss); font-size: 17px; }

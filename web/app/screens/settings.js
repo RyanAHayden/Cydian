@@ -625,10 +625,25 @@ async function removeDeviceCertificate() {
 
 // Back from iOS Settings (the profile installed, full trust on): redraw so Local Install says Ready.
 let watchingReturn = false;
+// The app's web view doesn't always send visibilitychange on the way back from Settings, so focus and pageshow
+// count too, and while the Signing page is open and the certificate isn't trusted yet it looks again every 2 s:
+// the walkthrough moves on by itself the moment iOS trusts it.
 function watchReturn() {
   if (watchingReturn || typeof document === "undefined") return;
   watchingReturn = true;
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") redrawAll(); });
+  const again = () => { if (document.visibilityState !== "hidden") redrawAll(); };
+  document.addEventListener("visibilitychange", again);
+  addEventListener("focus", again);
+  addEventListener("pageshow", again);
+  let last = null;
+  setInterval(async () => {
+    if (document.visibilityState === "hidden" || !document.querySelector(".page.is-top .walkthrough, .page.is-top .sign-files")) return;
+    let st = null;
+    try { st = await deviceStatus(); } catch { return; }
+    const now = JSON.stringify([Boolean(st?.identity), st?.trust?.ca, st?.trust?.trusted]);
+    if (last !== null && now !== last) redrawAll();
+    last = now;
+  }, 2000);
 }
 
 // F69: the page is the walkthrough (screens/signing.js): import, download the profile, install it, trust it, Check.

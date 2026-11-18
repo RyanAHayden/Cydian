@@ -7,6 +7,7 @@ import {
   installOnDevice, loadIdentity, saveIdentity, clearIdentity, firstInstallCheck, getServer, setServer,
 } from "./signing-client.js";
 import { walkOpen } from "./screens/signing.js";
+import { CYDIAN_ID } from "./core/websign.js";
 
 // A fake bridge: `answers[method]` is a value, an Error (rejects) or fn(params, onEvent).
 function fakeNative(answers = {}) {
@@ -24,12 +25,13 @@ function fakeNative(answers = {}) {
 }
 const coded = (code, message) => Object.assign(new Error(message), { code });
 function fakeUI() {
-  const ui = { labels: [], hidden: 0, alerts: [], went: [], later: [] };
+  const ui = { labels: [], hidden: 0, alerts: [], went: [], later: [], followed: [] };
   ui.deps = {
     hud: (t) => { ui.labels.push(t); return { set: (x) => ui.labels.push(x), hide: () => { ui.hidden++; } }; },
     alert: async (a) => { ui.alerts.push(a); return { index: 0 }; },
     go: (path) => ui.went.push(path),
     later: (f, ms) => ui.later.push([f, ms]),
+    follow: (n, id, h, o) => ui.followed.push({ id, name: o.name }),
   };
   return ui;
 }
@@ -145,9 +147,54 @@ test("Install: the HUD follows the phases, then Installing, and records the app"
   assert.equal(recorded, done);
   assert.equal(ui.alerts.length, 0);
   assert.equal(ui.hidden, 0);
+  assert.deepEqual(ui.followed, [{ id: "com.x", name: "X" }]); // F169: then iOS's own install, ending on Open X
+  assert.equal(ui.later.length, 0);
+});
+
+// F169: the plain Install ends like Custom Install (F155's Open <app>) when signing.install answers the app's ID.
+test("Install: follows iOS's install with the signed app's ID and name", async () => {
+  const n = fakeNative({ "signing.install": { bundleId: "com.me.delta", name: "Delta" } });
+  const ui = fakeUI();
+  assert.equal(await installOnDevice({ url: "https://e.example/d.ipa", name: "delta.ipa" }, { native: n, ...ui.deps }), true);
+  assert.deepEqual(ui.followed, [{ id: "com.me.delta", name: "Delta" }]);
+});
+
+test("Install: the follow goes through the real followInstall to Open <app>", async () => {
+  const n = fakeNative({ "signing.install": { bundleId: "com.x", name: "X" }, "signing.progress": { installed: true } });
+  const ui = fakeUI();
+  delete ui.deps.follow;
+  const finished = [];
+  const hud = (t) => ({ set: (x) => ui.labels.push(x), hide: () => { ui.hidden++; }, finish: (f) => finished.push(f) });
+  assert.equal(await installOnDevice({ url: "https://e.example/x.ipa", name: "X" }, { native: n, ...ui.deps, hud }), true);
+  for (let i = 0; i < 20 && !finished.length; i++) await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(n.calls.map((c) => c.method), ["signing.install", "signing.progress"]);
+  assert.equal(finished[0]?.label, "Open X");
+  assert.equal(ui.hidden, 0);
+});
+
+test("Install: no bundleId from the signer ends on Done as before", async () => {
+  const n = fakeNative({ "signing.install": { name: "X" } });
+  const ui = fakeUI();
+  assert.equal(await installOnDevice({ url: "https://e.example/x.ipa", name: "X" }, { native: n, ...ui.deps }), true);
+  assert.deepEqual(ui.followed, []);
   assert.equal(ui.later[0][1], 1200); // then the checkmark, which fades on its own
   ui.later[0][0]();
   assert.equal(ui.hidden, 1);
+});
+
+// (host: true too, but its banner needs a DOM, so it isn't run here.)
+test("Install: Cydian itself (its own IPA, or its ID) isn't followed", async () => {
+  const self = "https://github.com/RyanAHayden/Cydian/releases/latest/download/Cydian.ipa";
+  for (const [opts, answer] of [
+    [{ url: self }, { bundleId: "com.x" }],
+    [{ url: "https://e.example/c.ipa" }, { bundleId: CYDIAN_ID }],
+  ]) {
+    const n = fakeNative({ "signing.install": answer });
+    const ui = fakeUI();
+    assert.equal(await installOnDevice({ name: "Cydian", ...opts }, { native: n, ...ui.deps }), true);
+    assert.deepEqual(ui.followed, [], JSON.stringify(opts));
+    assert.equal(ui.later[0][1], 1200);
+  }
 });
 
 for (const code of ["no_server", "no_identity"]) {

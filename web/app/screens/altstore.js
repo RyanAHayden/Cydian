@@ -296,17 +296,26 @@ export function renderApp(body, route, pkg, source) {
     const FEW = 3;
     const footer = "What this app asks for, as its source lists it.";
     const more = rows.length - FEW;
-    const group = grouped([{ header: "Permissions", footer,
-      rows: more > 1 ? [...rows.slice(0, FEW), { label: `${more} More Permissions`, onClick: () => open() }] : rows }]).firstElementChild;
-    function open() {
-      const ul = group.querySelector("ul");
-      const toggle = ul.lastElementChild;
-      const extra = grouped([{ rows: rows.slice(FEW) }]).querySelector("ul");
-      const added = [...extra.children];
-      toggle.replaceWith(...added);
-      for (const li of added) li.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250 });
+    const toggleRow = (label, onClick, up) => {
+      const li = grouped([{ rows: [{ label, onClick }] }]).querySelector("li");
+      li.classList.add("perm-more");
+      li.classList.toggle("up", up);
+      return li;
+    };
+    const group = grouped([{ header: "Permissions", footer, rows: more > 1 ? rows.slice(0, FEW) : rows }]).firstElementChild;
+    const ul = group.querySelector("ul");
+    let extra = [];
+    // Open: the rest fade in above a Show Fewer row; Show Fewer puts them away again.
+    function open(toggle) {
+      extra = [...grouped([{ rows: rows.slice(FEW) }]).querySelector("ul").children];
+      toggle.replaceWith(...extra, toggleRow("Show Fewer", (e) => close(e.currentTarget.closest("li")), true));
+      for (const li of extra) li.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250 });
     }
-    if (more > 1) group.querySelector("ul").lastElementChild.classList.add("perm-more");
+    function close(toggle) {
+      for (const li of extra) li.remove();
+      toggle.replaceWith(toggleRow(`${more} More Permissions`, (e) => open(e.currentTarget.closest("li")), false));
+    }
+    if (more > 1) ul.append(toggleRow(`${more} More Permissions`, (e) => open(e.currentTarget.closest("li")), false));
     body.append(group);
   }
 

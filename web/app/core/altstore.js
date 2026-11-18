@@ -141,7 +141,19 @@ function parsePermissions(app) {
     const t = str(p?.type);
     if (t) out.privacy.push({ name: t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, " "), key: t, description: str(p.usageDescription) });
   }
-  return out;
+  // Sources often list one permission twice (2.0's NSCameraUsageDescription and 1.x's type "camera", or a key
+  // repeated): one row per name, keeping a description where either has one.
+  const once = (list) => {
+    const seen = new Map();
+    for (const x of list) {
+      const k = x.name.toLowerCase();
+      const had = seen.get(k);
+      if (!had) seen.set(k, x);
+      else if (!had.description && x.description) seen.set(k, { ...had, description: x.description });
+    }
+    return [...seen.values()];
+  };
+  return { entitlements: once(out.entitlements), privacy: once(out.privacy) };
 }
 
 function parseApp(a) {

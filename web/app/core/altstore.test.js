@@ -459,3 +459,13 @@ test("F16a: an APT repo found by detection goes to the wrapped calls; dist repos
   assert.deepEqual(added[1], { uri: dir, dist: "stable", components: ["main"] });
   assert.equal((await s.sources()).length, 0, "nothing went in the AltStore list");
 });
+
+test("permissions listed twice (2.0 and 1.x, or a repeated key) show once, keeping a description", async () => {
+  const { parseAltSource } = await import("./altstore.js");
+  const src = { name: "S", apps: [{ name: "A", bundleIdentifier: "a", versions: [{ version: "1", downloadURL: "https://x/a.ipa" }],
+    appPermissions: { privacy: { NSCameraUsageDescription: "" }, entitlements: ["com.apple.developer.healthkit", "com.apple.developer.healthkit"] },
+    permissions: [{ type: "camera", usageDescription: "Scans codes." }, { type: "photos" }] }] };
+  const p = parseAltSource(src).apps[0].permissions;
+  assert.deepEqual(p.privacy.map((x) => [x.name, x.description]), [["Camera", "Scans codes."], ["Photos", ""]]);
+  assert.equal(p.entitlements.length, 1);
+});

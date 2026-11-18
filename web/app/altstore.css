@@ -37,5 +37,6 @@
   content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 0 3px 8px; vertical-align: middle;
   border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg);
 }
+.perm-more.up .cell-label::after { transform: rotate(-135deg); margin-bottom: -1px; }
 .perm-more .cell-inner:active .cell-label, .perm-more .cell-inner.is-pressed .cell-label { color: #fff; }
 html[data-theme="dark"] .perm-more .cell-label { color: #8fb0e8; }

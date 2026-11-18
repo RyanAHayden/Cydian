@@ -117,6 +117,8 @@ if [ "$what" != ipa ]; then
   clang "${hflags[@]}" -fuse-ld=lld --ld-path="$lld" -Wl,-adhoc_codesign -o "$libexec/cydian-helper" helper/main.c helper/policy.c
   chmod 0755 "$libexec/cydian-helper"
   if [ -n "$ldid" ]; then "$ldid" -S "$libexec/cydian-helper"; fi
+  # N5: the background upgrade check (daemon/README.md), a launchd daemon; jailbreak only.
+  daemon/stage.sh "$root" "$sdk" "$lld" "$ldid" "$rcodesign"
   sed -e "s/@VERSION@/$version-$build/" deb/control > "$out/debian/control"
   cp deb/postinst deb/prerm "$out/debian/"
   python3 mkdeb.py build "$root" "$out/debian" "$out/Cydian.deb"

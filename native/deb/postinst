@@ -1,4 +1,7 @@
 #!/bin/sh
 # Register the app with SpringBoard (rootless: the jailbreak maps /var/jb).
 uicache -p /var/jb/Applications/Cydian.app || true
+# N5: start the daily upgrade check (unload first so an upgrade picks up a changed job).
+launchctl unload /var/jb/Library/LaunchDaemons/com.ryha.cydian.upgrades.plist 2>/dev/null || true
+launchctl load /var/jb/Library/LaunchDaemons/com.ryha.cydian.upgrades.plist || true
 exit 0

@@ -104,9 +104,9 @@ import { PART, uploadCap } from "./src/index.js";
   const answers = [429, 503, 200];
   const seen = [];
   const r = await upstream("https://github.com/o/r/releases/download/v1/a.ipa", { wait: async () => {},
-    fetcher: async (u, o) => { seen.push(o.cf.cacheTtl); return new Response("x", { status: answers.shift(), headers: {} }); } });
+    fetcher: async (u, o) => { seen.push(o.cf.cacheTtlByStatus); return new Response("x", { status: answers.shift(), headers: {} }); } });
   assert.equal(r.status, 200);
-  assert.deepEqual(seen, [86400, 86400, 86400]); // retried twice, cached at the edge
+  assert.deepEqual(seen, Array(3).fill({ "200-299": 86400, "300-599": 0 })); // retried twice; only a 2xx is cached at the edge
   console.log("worker upstream: ok");
 }
 {

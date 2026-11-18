@@ -35,8 +35,15 @@ memory.
 git clone https://github.com/RyanAHayden/iFizBox && cd iFizBox
 node worker/node.mjs                       # http://0.0.0.0:8787 (PORT, HOST, HOST_IDS, TTL as below)
 # or Docker:
-docker build -f worker/Dockerfile -t cydian . && docker run -d --restart unless-stopped -p 8787:8787 cydian
+docker build -f worker/Dockerfile -t cydian . && docker run -d --restart unless-stopped -p 8787:8787 -v cydian-data:/data cydian
 ```
+
+**Reviews** (`/reviews/*`) are kept in a SQLite file through Node's built-in `node:sqlite` (Node 22.5+, nothing to
+install): `reviews.db` in the folder you start it from, or `REVIEWS_DB=/path/to/reviews.db` (`REVIEWS_DB=off` keeps
+none). The Docker image keeps it at `/data/reviews.db`: the `-v cydian-data:/data` volume above keeps it across
+updates. `REVIEWS_ADMIN=<a long secret>` lets you delete a review (`DELETE /reviews/<package>/<id>` with
+`Authorization: Bearer <secret>`); `REVIEWS_SALT` salts the stored token and address hashes, `REVIEW_DAILY` caps
+writes per address a day (40) and `REPORT_HIDE` is the reports that hide a review (3), as on the Worker.
 
 iOS takes the install manifest **only over HTTPS with a trusted certificate**, so put it behind one of:
 

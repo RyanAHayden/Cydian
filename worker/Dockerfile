@@ -4,7 +4,10 @@ FROM node:22-alpine
 WORKDIR /cydian
 COPY worker/ worker/
 COPY web/app/ web/app/
-ENV PORT=8787 HOST=0.0.0.0
+# F187: reviews in /data/reviews.db; keep it with a volume: docker run -v cydian-data:/data …
+RUN mkdir /data && chown node:node /data
+ENV PORT=8787 HOST=0.0.0.0 REVIEWS_DB=/data/reviews.db
+VOLUME /data
 EXPOSE 8787
 USER node
 CMD ["node", "worker/node.mjs"]

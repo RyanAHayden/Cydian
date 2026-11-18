@@ -134,7 +134,9 @@ export async function promptFirstVisit({ mode, install, alert = showAlert, stora
 // Home on the website while Cydian isn't installed (user 2026-11-18): nothing pops up at launch; everything below the
 // Cydian App card is locked (greyed, a lock in place of the chevron). A tap on a locked row asks: Install Cydian, or
 // Ignore, which counts down from 5 before it can be tapped and then unlocks browsing for good in this browser.
-export const browsingLocked = ({ mode = "site", storage = store() } = {}) => mode === "site" && firstVisitState(storage) === "ask";
+// Only Browse Anyway unlocks it ("later"): installing Cydian from here doesn't (user 2026-11-18: someone who installs
+// through the website likely never comes back, so the website keeps pointing at the app).
+export const browsingLocked = ({ mode = "site", storage = store() } = {}) => mode === "site" && firstVisitState(storage) !== "later";
 export const BROWSE_GATE = {
   title: "Install Cydian First",
   message: "Apps installed in the Cydian app are signed and installed on the iPhone itself: much faster than this "

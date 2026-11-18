@@ -214,3 +214,14 @@ test("the warning can be cancelled during the countdown", async () => {
     globalThis.document = saved;
   }
 });
+
+test("the website stays locked after Cydian is installed from it; only Browse Anyway unlocks", async () => {
+  const { browsingLocked } = await import("./websign-gate.js");
+  const s = memory();
+  assert.equal(browsingLocked({ storage: s }), true);
+  markCydianInstalled(s);
+  assert.equal(browsingLocked({ storage: s }), true); // installed: still locked
+  setFirstVisit("later", s);
+  assert.equal(browsingLocked({ storage: s }), false); // Browse Anyway
+  assert.equal(browsingLocked({ mode: "sideload", storage: memory() }), false); // the app is never locked
+});

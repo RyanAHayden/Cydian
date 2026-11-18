@@ -803,9 +803,9 @@ export function websiteInstallsSection({ on = websiteInstallsOn, set = setWebsit
   cell?.classList.add("has-switch");
   // Home's lock (rows below the Cydian App card until Cydian is installed): on again after an Ignore.
   const lockFrag = grouped([{ rows: [{ label: "Lock Home Until Cydian Is Installed" }],
-    footer: "Home's rows below Install Cydian App stay locked, and ask to install Cydian first, until you tap Ignore." }]);
+    footer: "Home's rows below Install Cydian App and the other tabs stay locked, and ask to install Cydian first, until you tap Browse Anyway." }]);
   const lockCell = lockFrag.querySelector(".cell-inner");
-  const lockSw = createSwitch({ label: "Lock Home Until Cydian Is Installed", checked: firstVisitState() === "ask",
+  const lockSw = createSwitch({ label: "Lock Home Until Cydian Is Installed", checked: firstVisitState() !== "later",
     onToggle: (want) => setFirstVisit(want ? "ask" : "later") });
   lockCell?.append(lockSw);
   lockCell?.classList.add("has-switch");

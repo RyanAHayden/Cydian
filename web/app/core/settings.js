@@ -197,6 +197,10 @@ const AUTO_MARKED_KEY = PREFIX + "autoMarked";
 
 // F70: what N7's daemon (native/daemon/README.md "Automatic updates (N7)") reads from the app's preferences
 // (com.ryha.cydian), by the same `cydian.<key>` names: these settings, and the lists in DAEMON_LISTS.
+// F75: the settings that move with the user from the website to the app (Open in Cydian App, core/transfer.js):
+// appearance, device, the compat options; Ignored Upgrades (holds) and the Signing Server travel beside them. The
+// app takes only those it shows itself (settings.isShown).
+export const TRAVELS = ["appearance", "allowZoom", "device", "worksOnMyPhone", "compatMarks", "iosVersion"];
 export const DAEMON_KEYS = ["checkUpdates", "cellular", "autoInstall", "autoInstallIdle", "respring", "keepVersions"];
 export const DAEMON_LISTS = ["holds", "autoMarked"];
 const byKey = new Map(SETTINGS.map((d) => [d.key, d]));

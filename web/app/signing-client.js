@@ -7,7 +7,10 @@
 //                                identity (the sideload build: statusReady(signing.status), as Settings shows it)
 //   getServer() / setServer(s)   Settings > Signing's server, https://cydian.dev unless the user set another
 //   await serverStatus()         what GET <server>/sign/status says
-//   await signAndInstall({ url, name, onInstalled })   HUD "Signing", POST /sign, HUD "Installing", itms-services
+//   await signAndInstall({ url, name, onInstalled, bring })   HUD "Signing", POST /sign, HUD "Installing", itms-services;
+//                                bring: Cydian's own IPA carries the certificate into the app (F75, getBring())
+//   getBring() / setBring(on)    the website's "Bring my certificate into the app" switch, on unless turned off
+//   await exportToApp(key)       F75, the website's export page: cydian://signing-import#<sealed> or null (none here)
 //
 // POST /sign asks for an asynchronous job (F47): the server answers 202 {job} at once and the HUD polls
 // GET /sign/job/<job> every second under the same "Signing" HUD until done or error, so a big IPA outlasts no proxy's timeout. A server from
@@ -16,6 +19,7 @@
 // The certificate, key and password leave the phone only inside the POST to the signing server, over HTTPS, for
 // that one request. Nothing goes to localStorage but the server's address.
 import { DEFAULT_SERVER, normalizeServer, signBody, errorText, toBase64, phaseLabel, deviceError } from "./core/signing.js";
+import { newKey, exportUrl, sealIdentity, openIdentity, importUrl, sealedFrom } from "./core/transfer.js";
 import { format } from "./router.js";
 import { detectMode } from "./core/settings.js";
 import { showHUD } from "./nav/hud.js";
@@ -26,6 +30,7 @@ const DB = "cydian-signing";
 const STORE = "identity";
 const KEY = "current";
 const SERVER_KEY = "cydian.signingServer";
+const BRING_KEY = "cydian.bringCertificate";
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -95,6 +100,18 @@ export function setServer(s) {
   return n ?? DEFAULT_SERVER;
 }
 
+// F75: on unless the user turned the switch off.
+export function getBring() {
+  try { return localStorage.getItem(BRING_KEY) !== "off"; } catch { return true; }
+}
+
+export function setBring(on) {
+  try {
+    if (on) localStorage.removeItem(BRING_KEY);
+    else localStorage.setItem(BRING_KEY, "off");
+  } catch { /* private mode: this session only */ }
+}
+
 export async function serverStatus(server = getServer()) {
   const r = await fetch(`${server}/sign/status`, { cache: "no-store" });
   if (!r.ok) throw new Error(errorText(r.status, null));
@@ -106,7 +123,7 @@ export const isSelfIpa = (url) => /^https:\/\/github\.com\/RyanAHayden\/Cydian\/
 
 // Signs `url` (an IPA) on the server and opens the install link it answers with. Resolves true once the link is
 // opened; false after an error, which it shows in an alert.
-export async function signAndInstall({ url, name = "", onInstalled = () => {} }) {
+export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false }) {
   // F72: Cydian's own IPA never goes through the local install server (iOS closes Cydian, and the server with it,
   // as it starts installing): essential-ui.js signs it on the Signing Server or sends the user to cydian.dev.
   if (localSigning() && isSelfIpa(url)) {
@@ -114,6 +131,8 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {} })
     const version = /\/download\/v(\d+(?:\.\d+)*)\//.exec(url)?.[1] ?? null;
     return ["installing", "site"].includes(await installSelfNow({ ipa: url, version }));
   }
+  // F75: the first Install with something missing opens the Signing walkthrough at that step, not an alert.
+  if (localSigning() && await firstInstallCheck()) return false;
   // F68: look first (signing.inspect), then the sheet with its edits signs and installs (signing-sheet.js).
   if (localSigning()) {
     const { inspectAndInstall } = await import("./signing-sheet.js");
@@ -128,7 +147,8 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {} })
   let hide = showHUD("Signing");
   let status, body = null;
   try {
-    const json = JSON.stringify({ ...JSON.parse(signBody({ url, p12: id.p12, profile: id.profile, password: id.password })), async: true });
+    const json = JSON.stringify({ ...JSON.parse(signBody({ url, p12: id.p12, profile: id.profile, password: id.password })), async: true,
+      ...(bring ? { bring: true } : {}) });
     const res = await fetch(`${server}/sign`, {
       method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: json,
     });
@@ -194,11 +214,13 @@ export async function pollJob(server, first, { wait = sleep } = {}) {
 // ---- on the phone (F58): the sideload build signs and installs itself, through I6's signing.* bridge calls ------
 //
 //   localSigning()                     true in the sideload build (signingAvailable() stays the site's server signer)
-//   await deviceStatus()               signing.status: { identity | null, trust: { ca, trusted, name }, identityProblem? }
+//   await deviceStatus()               signing.status: { identity | null, identityProblem? }
 //   statusReady(status)                F69: true when that status holds an identity (Install and Settings both ask)
 //   await importToDevice({ p12, password, profile })   signing.import (files base64) -> status
 //   await removeFromDevice()           signing.remove -> status
-//   await setUpTrust()                 signing.trust: makes the local CA, opens its profile in Safari -> { url, signed }
+//   await firstInstallCheck()          F75: the walkthrough's missing step ("certificate" | "server"), opened, or null
+//   await importFromSafari()           F75: a new key, then Safari at <server>/#/settings/signing-export.<key>
+//   await finishSafariImport(url)      F75: cydian://signing-import#… opened with that key, into the Keychain -> status
 //   await installOnDevice({ url, name, onInstalled })  signing.install with a HUD following its phases
 //
 // Each takes `native` (the bridge, globalThis.cydianNative by default) so tests can pass a fake.
@@ -242,8 +264,56 @@ export async function removeFromDevice(native) {
   return bridge(native).call("signing.remove", {});
 }
 
-export async function setUpTrust(native) {
-  return bridge(native).call("signing.trust", {});
+// F75: before the first install in the app: the certificate (signing.status, as signingReady) and a Signing Server
+// (getServer, https only: the shell takes no other for the manifest) must be there. When one is missing, the Signing
+// page opens with that step open and this answers its id; null when Install can go on. A bridge that doesn't answer
+// counts as no certificate, as signingReady does.
+export async function firstInstallCheck({ native, server = getServer(), go = openRoute, wait = sleep } = {}) {
+  const { missingStep, openAt } = await import("./screens/signing.js");
+  const step = missingStep(await readyStatus(native, wait), server);
+  if (!step) return null;
+  openAt(step);
+  go(["signing"]);
+  return step;
+}
+
+// ---- Import from Safari (F75): the certificate the user added on the website, brought over encrypted ----------
+// The app keeps a fresh 256-bit key for this one round trip (30 minutes) and opens the website with it in the URL
+// fragment; the website's export page seals the identity under it and opens cydian://signing-import#<ciphertext>.
+
+const SAFARI_KEY = "cydian.safariImport";
+const SAFARI_TTL = 30 * 60 * 1000;
+
+export async function importFromSafari({ server = getServer(), open = (u) => { location.href = u; }, storage = globalThis.localStorage, now = Date.now } = {}) {
+  const key = newKey();
+  storage.setItem(SAFARI_KEY, JSON.stringify({ key, at: now() }));
+  open(exportUrl(server, key));
+  return key;
+}
+
+// Throws with a message the alert shows: no round trip started here, it timed out, or it doesn't open.
+export async function finishSafariImport(url, { native, storage = globalThis.localStorage, now = Date.now } = {}) {
+  const sealed = sealedFrom(url);
+  if (!sealed) throw new Error("That link holds no certificate.");
+  let saved = null;
+  try { saved = JSON.parse(storage.getItem(SAFARI_KEY) ?? "null"); } catch { /* none */ }
+  if (!saved?.key || !(now() - saved.at < SAFARI_TTL)) {
+    storage.removeItem(SAFARI_KEY);
+    throw new Error("Start again with Import from Safari in Settings > Signing.");
+  }
+  let id;
+  try { id = await openIdentity(sealed, saved.key); } catch {
+    throw new Error("The certificate couldn't be read. Start again with Import from Safari in Settings > Signing.");
+  }
+  storage.removeItem(SAFARI_KEY); // one use
+  return importToDevice(id, native);
+}
+
+// The website's half: the identity this origin keeps, sealed under the app's key, as the link back to the app.
+export async function exportToApp(key) {
+  const id = await loadIdentity();
+  if (!id?.p12 || !id?.profile) return null;
+  return importUrl(await sealIdentity(id, key));
 }
 
 // The HUD whose label follows the install's phases: { set(text), hide() }.
@@ -256,7 +326,7 @@ function liveHUD(text) {
 const openRoute = (path) => { location.hash = format({ tab: "settings", path }).replace(/^#/, ""); };
 
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an
-// error, which an alert explains (untrusted and no_identity then open Settings > Signing).
+// error, which an alert explains (no_server and no_identity then open Settings > Signing).
 // F68: `params` replaces { url } with the look-first sheet's { token, name?, bundleId?, icon?, removeExtensions? }
 // (core/signing.js installParams); `after(result, h)` runs with the HUD still up once iOS has the link (the sheet
 // follows iOS's own progress there) and hides it itself.
@@ -266,7 +336,7 @@ export async function installOnDevice({ url, name = "", onInstalled = () => {}, 
   let result;
   try {
     // manifestServer: the signing server hands iOS the manifest while Cydian serves the IPA over plain HTTP at
-    // 127.0.0.1 (no certificate to trust on the phone; the server sees only the app's ID, version and name).
+    // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
     result = await bridge(native).call("signing.install", { ...(params ?? { url }), manifestServer: getServer() }, (ev) => {
       const t = phaseLabel(ev);
       if (t) h.set(t);

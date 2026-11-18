@@ -412,30 +412,6 @@ export function deviceSummary(identity, { now = new Date(), locale, timeZone } =
   return { rows, problems };
 }
 
-// The Signing page's Local Install group from signing.status's trust ({ ca, trusted, name }). Until iOS trusts
-// Cydian's local certificate: a Set Up row (action "trust": signing.trust opens the profile in Safari) and the two
-// steps in iOS Settings, then Check Again (action "refresh"). Rows carry `action` names, settings.js binds them.
-export function localInstallSection(trust) {
-  const t = trust ?? {};
-  if (t.trusted) {
-    return { header: "Local Install", rows: [{ label: "Status", detail: "Ready" }, { label: "Test Install Server", action: "test" }],
-      footer: `iOS trusts ${t.name ? `“${t.name}”` : "Cydian's local certificate"}: Install signs apps on this iPhone and installs them from it. Nothing leaves the phone.` };
-  }
-  return {
-    header: "Local Install",
-    rows: [
-      { label: "Status", detail: t.ca ? "Not Trusted Yet" : "Not Set Up" },
-      { label: "Set Up", subtitle: "Downloads Cydian's certificate profile in Safari", action: "trust", chevron: true },
-      { label: "Install the Profile", subtitle: "Settings > General > VPN & Device Management" },
-      { label: "Turn On Full Trust", subtitle: "Settings > General > About > Certificate Trust Settings" },
-      { label: "Check Again", action: "refresh" },
-      { label: "Test Install Server", action: "test" },
-    ],
-    footer: "Once, before the first install: iOS installs apps only from an HTTPS address it trusts, so Cydian makes its own "
-      + "certificate, good for this iPhone's own address (localhost) only, and you trust it in Settings. Then come back here.",
-  };
-}
-
 // The HUD's text for a signing.install progress event { phase, progress }.
 const PHASES = { downloading: "Downloading", reading: "Reading", signing: "Signing", installing: "Installing" };
 export function phaseLabel(ev) {
@@ -446,15 +422,13 @@ export function phaseLabel(ev) {
 }
 
 // What a failed signing call leads to, by its error code (native/Sources/SignBridge.swift): an alert's
-// { title, message } and where it sends the user next ("signing": Settings > Signing, whose Local Install group has
-// the trust steps; null: nowhere).
+// { title, message } and where it sends the user next ("signing": Settings > Signing's walkthrough; null: nowhere).
 export function deviceError(err, name = "") {
   const code = err?.code ?? "";
   const raw = String(err?.message ?? err ?? "").trim();
   const message = raw ? raw[0].toUpperCase() + raw.slice(1) : "Something went wrong.";
-  if (code === "untrusted") {
-    return { title: "Set Up Local Install", open: "signing",
-      message: "Before the first install, iOS has to trust Cydian's local certificate. Settings > Signing > Local Install shows the steps." };
+  if (code === "no_server") {
+    return { title: "No Signing Server", open: "signing", message: "Installing needs a Signing Server: set one in Settings > Signing." };
   }
   if (code === "no_identity") {
     return { title: "No Certificate", open: "signing", message: "Add your certificate and provisioning profile in Settings > Signing." };

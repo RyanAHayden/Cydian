@@ -92,7 +92,7 @@ enum SignBridge {
     static func importBundled() {
         guard AppMode.current == .sideload else { return }
         queue.async {
-            SignStore.removeLocalTrustLeftovers()
+            SignStore.removeOldInstallCA()
             guard let url = Bundle.main.url(forResource: "cydian-identity", withExtension: "plist"),
                   let data = try? Data(contentsOf: url) else { return }
             let digest = BundledIdentity.digest(data)

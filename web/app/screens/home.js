@@ -21,7 +21,7 @@ import { settings } from "./settings.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
 import { currentDevice } from "../device.js";
-import { signAndInstall, signingReady } from "../signing-client.js";
+import { signAndInstall, signingReady, getBring } from "../signing-client.js";
 import { homeFeatured } from "./extras.js";
 import { homeOffer, debUrl, debAlert, APP_LABEL, APP_NAME, REPO_URL, APP_IPA_URL } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
@@ -256,13 +256,21 @@ function renderRoot(body) {
     if (!offer || offer.action === "signing") return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    if (offer.action === "install") signAndInstall({ url: APP_IPA_URL, name: APP_NAME });
+    if (offer.action === "install") signAndInstall({ url: APP_IPA_URL, name: APP_NAME, bring: getBring() }); // F75
     else installDeb(offer.arch);
+  }, true);
+  // F75: Open in Cydian App beside it (the website, not jailbroken): the visitor's sources and settings into the app.
+  const openRow = tileRow("halves", tile({ label: "Open in Cydian App", href: format({ tab: "home" }), glyph: "install" }));
+  openRow.querySelector("a").addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    import("./importlink.js").then((m) => m.openInApp());
   }, true);
   const drawApp = () => {
     const type = settings.deviceType();
     offer = homeOffer({ mode: settings.mode, deviceType: type, certificate: false });
     appRow.hidden = !offer;
+    openRow.hidden = !(settings.mode === "site" && type === "none");
     if (!offer || offer.action === "deb") return;
     signingReady().then((ok) => {
       offer = homeOffer({ mode: settings.mode, deviceType: settings.deviceType(), certificate: ok });
@@ -292,6 +300,7 @@ function renderRoot(body) {
       tile({ label: "Sources", href: format({ tab: "sources" }), glyph: "sources" })),
     halves,
     appRow,
+    openRow,
     browseRow,
     stateRow,
   );

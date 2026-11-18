@@ -134,7 +134,7 @@ enum SignStore {
 
     // Once per launch at most, cheap when there is nothing: the CA and TLS keys, the TLS certificate and the two
     // DER files of 0.1.x's Local Install, which nothing uses any more. The user removes the old profile in Settings.
-    static func removeLocalTrustLeftovers() {
+    static func removeOldInstallCA() {
         let ca = dir.appendingPathComponent("localca.der"), leaf = dir.appendingPathComponent("localtls.der")
         guard FileManager.default.fileExists(atPath: ca.path) || FileManager.default.fileExists(atPath: leaf.path) else { return }
         deleteKey(tag: "com.ryha.cydian.localca")

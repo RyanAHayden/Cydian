@@ -50,8 +50,9 @@ async function tap(box, target) {
   return stopped;
 }
 
+// F157: the website Not Jailbroken (the default here) shows the lite User Guides: no OpenSSH or Root Password rows.
 const OPEN = ["Settings", "Upgrading & Jailbreaking Help", "Frequently Asked Questions", "Copying Files to/from Device",
-  "OpenSSH Access How-To", "Root Password How-To", "Credits / Thank You"];
+  "Credits / Thank You"];
 const LOCKED = ["Find Extensions for Applications", "More Package Sources"];
 
 test("F156: help, User Guides and Credits stay open on the locked Home; Find Extensions and More Package Sources ask", async () => {

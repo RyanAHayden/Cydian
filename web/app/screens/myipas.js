@@ -35,7 +35,10 @@ import { detectMode } from "../core/settings.js";
 import { deviceError, phaseLabel, isCgBI, fromBase64 } from "../core/signing.js";
 import { apps, recordInstall } from "../core/installed.js";
 import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optionsParams, siteEntries, addSiteUrl,
-  STATE_LABELS, addSiteFile, removeSiteEntry, openIpaStore, memoryIpaStore } from "../core/myipas.js";
+  STATE_LABELS, addSiteFile, removeSiteEntry, openIpaStore, memoryIpaStore, libraryFooter, listState, listStep, tapOpens,
+  allSelected, deleteLabel, deleteButtonText, deleteSheetTitle, deleteEntries, holdActions, HOLD } from "../core/myipas.js";
+import { barButton } from "../nav/ui.js";
+import { longPress } from "../nav/menu.js";
 import { readIpaFile } from "../core/ipainfo.js";
 import { localSigning, libraryCall, installFromLibrary, signAndInstall, openSigning } from "../signing-client.js";
 import { siteCertificateAlert } from "./altstore.js";
@@ -45,6 +48,8 @@ export { MYIPAS };
 
 const view = { body: null, browse: null, route: null, seq: 0, browseSeq: 0 };
 const known = new Map(); // file -> the last entry seen (titles, the page before its list call answers)
+// F208: the My IPAs list's edit/swipe/selection state (core/myipas.js listStep), its controller and bottom toolbar.
+const lib = { state: listState(), ctl: null, bar: null };
 
 export const PAGE_TITLE = "Install IPAs";
 
@@ -74,7 +79,10 @@ const site = () => !localSigning();
 export function nav(route) {
   const p = pageOf(route);
   switch (p?.page) {
-    case "list": return { title: PAGE_TITLE, right: { label: "Add", onClick: () => addMenu() } };
+    case "list": // F208: Edit beside Add (Edit rightmost, as iOS 6 has it); a new list page starts out of edit mode
+      lib.state = listState();
+      return { title: PAGE_TITLE, right: [{ label: "Add", onClick: () => addMenu() },
+        { label: "Edit", onClick: () => setListEditing(!lib.state.editing) }] };
     case "search": return { title: "Search Apps", style: "plain" };
     case "apps": return { title: "All Apps", style: "plain" };
     case "category": return { title: p.value || "Apps", style: "plain" };
@@ -175,24 +183,227 @@ async function load() {
 }
 
 function draw(list) {
-  const body = view.body;
-  const rows = libraryRows(list, { site: site() });
-  const frag = grouped([{ header: "My IPAs", rows: rows.map((r) => ({
-    label: r.title, subtitle: r.subtitle, icon: { text: r.title.charAt(0).toUpperCase() },
-    href: format({ tab: "installed", path: ipaPath(r.file) }),
-  })), footer: rows.length ? "" : libraryEmptyText(site()) }]);
-  const cells = frag.querySelectorAll(".cell");
-  rows.forEach((r, i) => {
-    cells[i].classList.add("myipa-row", `is-${r.state.kind}`);
-    putIcon(cells[i].querySelector(".cell-icon"), r.icon);
-  });
-  body.replaceChildren(frag);
+  const isSite = site();
+  const files = libraryRows(list, { site: isSite }).map((r) => r.file);
+  lib.state = files.length ? listStep(lib.state, { type: "list", files }) : listState();
+  lib.ctl = libraryGroup(list, { site: isSite, state: lib.state,
+    on: { change: onListChange, delete: (es) => deleteMany(es), hold: (e) => holdSheet(e) } });
+  view.body.replaceChildren(lib.ctl.el);
+  onListChange(lib.state);
 }
 
 export function libraryEmptyText(site) {
   return site
     ? `No IPAs yet. Tap Add to choose an IPA in Files (kept in this browser, signed here when you install it) or to keep a link to one: Install opens it in ${NAME}, AltStore, SideStore or Feather.`
     : `No IPAs yet. Tap Add to choose one in Files or download one, or put IPAs in Files under On My iPhone > ${NAME}.`;
+}
+
+// ---- F208: managing the list: swipe to Delete, Edit (red minus, multi-select, toolbar), hold for a sheet ----------
+//
+// The rows wear Installed's and Sources' delete controls (sources.css .source-row: the red minus slides in with
+// .editing, the red Delete opens with .armed), with Installed's swipe (B36 attachRowGestures: a left swipe arms the
+// row, a right one or a tap puts it away). Editing, a tap on a row ticks it (.picked) for the toolbar's Delete (n).
+// The state is core/myipas.js listStep's; this only draws it.
+
+// The My IPAs group for `list`. -> { el (a fragment), ul, rows, state, step(action), cellOf(file) }.
+// on.change(state) after each step, on.delete([entry]) for a row's Delete, on.hold(entry) for a held row.
+export function libraryGroup(list, { site: isSite = site(), state = listState(), on = {} } = {}) {
+  const rows = libraryRows(list, { site: isSite });
+  const el0 = grouped([{ header: "My IPAs", rows: rows.map((r) => ({
+    label: r.title, subtitle: r.subtitle, icon: { text: r.title.charAt(0).toUpperCase() },
+    href: format({ tab: "installed", path: ipaPath(r.file) }),
+  })), footer: rows.length ? libraryFooter(list) : libraryEmptyText(isSite) }]);
+  const ul = el0.querySelector(".table");
+  const cells = ul ? [...ul.querySelectorAll(":scope > .cell")] : [];
+  const byFile = new Map();
+  const ctl = {
+    el: el0, ul, rows, state,
+    cellOf: (file) => byFile.get(file) ?? null,
+    step(a) {
+      const next = listStep(ctl.state, a);
+      if (next === ctl.state) return next;
+      ctl.state = next;
+      paint();
+      on.change?.(next);
+      return next;
+    },
+  };
+  rows.forEach((r, i) => {
+    const li = cells[i];
+    li.classList.add("myipa-row", `is-${r.state.kind}`, "source-row");
+    li.dataset.file = r.file;
+    li._ipa = r;
+    byFile.set(r.file, li);
+    putIcon(li.querySelector(".cell-icon"), r.icon);
+    const toggle = Object.assign(document.createElement("button"), { type: "button", className: "del-toggle" });
+    toggle.setAttribute("aria-label", "Delete " + r.title);
+    toggle.addEventListener("click", () => ctl.step({ type: "minus", file: r.file }));
+    const confirm = Object.assign(document.createElement("button"), { type: "button", className: "del-confirm", textContent: "Delete" });
+    confirm.addEventListener("click", () => on.delete?.([r]));
+    li.append(toggle, confirm);
+  });
+  function paint() {
+    const s = ctl.state;
+    ul?.classList.toggle("editing", s.editing);
+    for (const [file, li] of byFile) {
+      li.classList.toggle("armed", s.armed === file);
+      li.classList.toggle("picked", s.selected.includes(file));
+      li.querySelector(".cell-inner")?.setAttribute("aria-selected", String(s.editing && s.selected.includes(file)));
+    }
+  }
+  paint();
+  if (ul) attachLibraryGestures(ul, ctl, on);
+  return ctl;
+}
+
+// As Installed's attachRowGestures (B36): a left swipe shows Delete, a right swipe or a tap puts it away; editing,
+// a tap ticks the row instead of opening it. A hold (nav/menu.js longPress) opens the row's sheet, but not while
+// editing or while a Delete shows.
+function attachLibraryGestures(ul, ctl, on) {
+  let start = null;
+  let swiped = false;
+  ul.addEventListener("click", (e) => {
+    if (e.target.closest(".del-toggle, .del-confirm")) return;
+    if (swiped) { swiped = false; e.preventDefault(); e.stopPropagation(); return; }
+    const li = e.target.closest(".myipa-row");
+    if (!li || tapOpens(ctl.state)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    ctl.step({ type: "tap", file: li.dataset.file });
+  }, true);
+  ul.addEventListener("pointerdown", (e) => {
+    const li = e.target.closest(".myipa-row");
+    swiped = false;
+    start = li && !ctl.state.editing && !e.target.closest(".del-confirm, .del-toggle") ? { li, x: e.clientX, y: e.clientY } : null;
+  });
+  ul.addEventListener("pointermove", (e) => {
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { start = null; return; } // a scroll
+    if (Math.abs(dx) < 30 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    start.li.querySelector(".cell-inner")?.classList.remove("is-pressed");
+    ctl.step({ type: "swipe", file: start.li.dataset.file, dir: dx < 0 ? "left" : "right" });
+    swiped = true;
+    start = null;
+  });
+  const stop = () => { start = null; };
+  ul.addEventListener("pointerup", stop);
+  ul.addEventListener("pointercancel", stop);
+  longPress(ul, ".myipa-row", (li) => {
+    if (ctl.state.editing || ctl.state.armed || !li._ipa) return;
+    li.querySelector(".cell-inner")?.classList.remove("is-pressed");
+    on.hold?.(li._ipa);
+  });
+}
+
+function setListEditing(on) {
+  lib.ctl?.step({ type: on ? "edit" : "done" });
+}
+
+// The list page's nav-bar buttons ([Add, Edit]), found as setTitle finds the title.
+function listNavButtons() {
+  const page = view.body?.closest?.(".page");
+  const stack = page?.parentElement;
+  if (!stack) return [];
+  const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
+  const item = document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i];
+  return [...(item?.querySelectorAll(".nav-right .bar-button") ?? [])];
+}
+
+function onListChange(s) {
+  lib.state = s;
+  const [add, edit] = listNavButtons();
+  if (edit) {
+    edit.textContent = s.editing ? "Done" : "Edit";
+    edit.classList.toggle("done", s.editing);
+    edit.hidden = !lib.ctl?.rows.length && !s.editing;
+  }
+  if (add) add.hidden = s.editing;
+  syncToolbar();
+}
+
+// Edit mode's bottom toolbar (above the tab bar, where the undo and reload bars dock): Select All on the left,
+// the red Delete (n) on the right.
+function toolbar() {
+  if (lib.bar) return lib.bar;
+  const bar = el("div", "myipa-toolbar");
+  bar.setAttribute("role", "toolbar");
+  const all = barButton("Select All", "myipa-select-all");
+  const del = barButton("Delete", "myipa-delete-many");
+  all.addEventListener("click", () => {
+    const files = lib.ctl?.rows.map((r) => r.file) ?? [];
+    lib.ctl?.step(allSelected(lib.state, files) ? { type: "deselectAll" } : { type: "selectAll", files });
+  });
+  del.addEventListener("click", () => {
+    const picked = new Set(lib.state.selected);
+    const es = (lib.ctl?.rows ?? []).filter((r) => picked.has(r.file));
+    if (es.length) deleteMany(es);
+  });
+  bar.append(all, del);
+  lib.bar = { el: bar, all, del };
+  return lib.bar;
+}
+
+function listShown() {
+  return Boolean(view.body?.isConnected && view.route && format(mounted(parse(location.hash))) === format(view.route));
+}
+
+function syncToolbar() {
+  if (typeof document === "undefined") return;
+  const show = lib.state.editing && listShown();
+  if (!show && !lib.bar) return;
+  const { el: bar, all, del } = toolbar();
+  if (show) {
+    const files = lib.ctl?.rows.map((r) => r.file) ?? [];
+    all.textContent = allSelected(lib.state, files) ? "Deselect All" : "Select All";
+    del.textContent = deleteLabel(lib.state.selected.length);
+    del.disabled = !lib.state.selected.length;
+    if (!bar.isConnected) document.body.append(bar);
+    requestAnimationFrame(() => requestAnimationFrame(() => bar.classList.add("shown")));
+  } else {
+    bar.classList.remove("shown");
+  }
+  document.documentElement.classList.toggle("has-myipa-toolbar", show);
+}
+
+// Leaving the page (another tab, Back) ends edit mode, so the toolbar never shows over another page.
+if (typeof window !== "undefined") {
+  window.addEventListener("hashchange", () => { if (lib.state.editing && !listShown()) setListEditing(false); });
+}
+
+// Deletes `es` (rows of the list) after the sheet ('Delete n IPAs' red / Cancel): their records and stored files
+// (core/myipas.js deleteEntries), then the list again, its footer's total with it.
+export async function deleteMany(es, { sheet = showActionSheet, alert = showAlert, isSite = site(), store = siteStore, call = libraryCall,
+  storage = globalThis.localStorage } = {}) {
+  if (!es?.length) return null;
+  const n = es.length;
+  const i = await sheet({ title: deleteSheetTitle(n, { site: isSite, stored: es.some((e) => e.stored) }), buttons: [deleteButtonText(n)], destructive: 0 });
+  if (i !== 0) return null;
+  for (const e of es) lib.ctl?.cellOf(e.file)?.classList.add("removing");
+  const r = await deleteEntries(es, { site: isSite, store, call, storage });
+  for (const f of r.deleted) known.delete(f);
+  lib.state = listStep(lib.state, { type: "deleted", files: r.deleted });
+  if (r.failed.length) {
+    for (const f of r.failed) lib.ctl?.cellOf(f.file)?.classList.remove("removing");
+    const names = r.failed.map((f) => es.find((e) => e.file === f.file)?.title || f.file);
+    const why = isSite ? r.failed[0].message : deviceError(r.failed[0].error).message;
+    await alert({ title: "Couldn't Delete", message: `${names.join(", ")}: ${why}`, buttons: ["OK"] });
+  }
+  if (r.ipas && view.body?.isConnected) { remember(r.ipas); draw(r.ipas); } else refresh();
+  return r;
+}
+
+// A held row's sheet: Install, Sign Now, Save Signed IPA, Delete (the website: Install, Delete).
+async function holdSheet(entry) {
+  const buttons = holdActions(entry, { site: site() });
+  if (!buttons.length) return;
+  const i = await showActionSheet({ title: entry.title || entry.name || entry.file, buttons, destructive: buttons.indexOf(HOLD.DELETE) });
+  const b = buttons[i];
+  if (b === HOLD.INSTALL) return install(entry.file);
+  if (b === HOLD.SIGN) return signNow(entry, null, null);
+  if (b === HOLD.SAVE) return saveSigned(entry, null, null);
+  if (b === HOLD.DELETE) return deleteMany([entry]);
 }
 
 // ---- F79: Browse, the apps of the user's AltStore sources ------------------------------------------------------
@@ -569,7 +780,7 @@ function markDelete(body) {
 const optionsChanged = (o) => Boolean(o && (o.name || o.bundleId || o.icon || o.removeExtensions?.length || o.fixArm64e === false));
 
 function rerender(body, route) {
-  if (!body.isConnected) return;
+  if (!body?.isConnected) return; // F208: a hold's Sign Now from the list has no page to redraw
   body.replaceChildren();
   render(body, route);
 }

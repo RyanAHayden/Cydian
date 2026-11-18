@@ -24,3 +24,43 @@
 .install-ipas-browse .group:first-child .cell.ph .cell-label { color: inherit; background: none; width: auto; animation: none; }
 html[data-theme="dark"] .cell.ph .cell-detail, html[data-theme="dark"] .install-ipas-browse .group + .group .cell.ph .cell-label { background: var(--dk-placeholder); }
 @keyframes ph-pulse { from { opacity: 1; } to { opacity: .45; } }
+
+/* F208: managing My IPAs. The red minus, Delete and swipe are sources.css's .source-row (the rows carry it). Edit
+   mode ticks rows for the toolbar: a ticked row gets the table's checkmark (ios6.css .cell-check's ✓ in --detail)
+   on the right, where the chevron was, and UITableView's pale blue multi-select fill. */
+.editing .myipa-row .cell-inner { padding-right: 34px; }
+.myipa-row::after {
+  content: "✓"; position: absolute; right: 12px; top: 50%; margin-top: -12px; line-height: 24px;
+  font-size: 20px; font-weight: bold; color: var(--detail); opacity: 0; transition: opacity .2s ease; pointer-events: none;
+}
+.editing .myipa-row.picked::after { opacity: 1; }
+.editing .myipa-row.picked, .editing .myipa-row.picked .cell-inner { background-color: #e1e8f5; } /* the whole row, under the minus too */
+.myipa-row.armed::after { opacity: 0; }
+html[data-theme="dark"] .editing .myipa-row.picked, html[data-theme="dark"] .editing .myipa-row.picked .cell-inner { background-color: rgba(255,255,255,.15); }
+
+/* Edit mode's toolbar: the navigation bar's colours (ios6.css .navbar: #bdcbdc to #597498, the #eff2f7 highlight)
+   as UIToolbar in the same app, 44pt, docked above the tab bar and sliding up from behind it as the undo bar does.
+   Select All a plain bar button, Delete (n) red (nav/alert.js's red, the same gloss split at half). */
+.myipa-toolbar {
+  position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 2; height: 44px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 0 max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
+  background:
+    linear-gradient(#eff2f7, #eff2f7) top / 100% 1px no-repeat,
+    linear-gradient(#bdcbdc, #597498);
+  opacity: 0; transform: translate3d(0,100%,0); pointer-events: none;
+  transition: transform .3s cubic-bezier(.25,.1,.25,1), opacity .3s cubic-bezier(.25,.1,.25,1);
+}
+.myipa-toolbar.shown { opacity: 1; transform: none; pointer-events: auto; }
+html[data-theme="dark"] .myipa-toolbar { background: var(--dk-nav-bar); }
+.myipa-toolbar .bar-button { flex: none; }
+/* Red in both themes, like the alert's red: specific enough (0,5,0) to beat the dark bar button (0,4,1). */
+.myipa-toolbar .bar-button.myipa-delete-many:not(.back):not(.done) {
+  border-color: #5e0909; border-top-color: #3a0606;
+  background: linear-gradient(#e46a6a, #c51f1f 49%, #b30f0f 50%, #bd1a1a); background-origin: border-box;
+}
+.myipa-toolbar .bar-button.myipa-delete-many:not(.back):not(.done):is(:active, .is-pressed) {
+  background: linear-gradient(#bf4c4c, #9c1414 49%, #880909 50%, #941010); background-origin: border-box;
+}
+.bar-button.myipa-delete-many:disabled { opacity: .5; cursor: default; }
+html.has-myipa-toolbar .page-body::after { content: ""; display: block; flex: none; clear: both; height: 44px; }

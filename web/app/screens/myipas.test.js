@@ -16,7 +16,7 @@ test("My IPAs' pages", () => {
   assert.deepEqual(pageOf(r("myipas", "ipa:A b.ipa")), { page: "ipa", file: "A b.ipa" });
   assert.deepEqual(pageOf(r("myipas", "ipa:A.ipa", "options")), { page: "options", file: "A.ipa" });
   assert.deepEqual(pageOf(r("myipas", "junk")), { page: "missing" });
-  assert.equal(nav(r("myipas")).right.label, "Add");
+  assert.deepEqual(nav(r("myipas")).right.map((b) => b.label), ["Add", "Edit"]); // F208: Edit beside Add
   assert.equal(nav(r("myipas", "ipa:A b.ipa")).title, "A b");
   assert.equal(nav(r("myipas", "ipa:A b.ipa")).right.label, "Install");
   assert.equal(nav(r("myipas", "ipa:A.ipa", "options")).title, "Sign Options");
@@ -42,7 +42,7 @@ test("Install IPAs: the page's title, Add, and Browse's pages below it", async (
   globalThis.ifizboxNative = { mode: "sideload", call: async () => null };
   assert.equal(PAGE_TITLE, "Install IPAs");
   assert.equal(nav(r("myipas")).title, "Install IPAs");
-  assert.equal(nav(r("myipas")).right.label, "Add");
+  assert.equal(nav(r("myipas")).right[0].label, "Add");
   assert.deepEqual(pageOf(r("myipas", "search")), { page: "search" });
   assert.deepEqual(pageOf(r("myipas", "apps")), { page: "apps" });
   assert.deepEqual(pageOf(r("myipas", "category:Games")), { page: "category", value: "Games" });

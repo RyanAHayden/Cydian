@@ -23,6 +23,7 @@ import { syncReminder } from "../core/signing.js";
 import { signingRowShows, offerAfterImport, IMPORT_ALERT, APP_IPA_URL, APP_NAME, APP_LABEL } from "../core/appoffer.js";
 import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installPath, isNewer, compareVersions } from "../core/selfupdate.js";
 import { getArch } from "../backend.js";
+import { ipaSection } from "./ipa-install.js";
 
 export const title = "Settings";
 
@@ -72,7 +73,7 @@ function draw({ el, route }) {
   else if (key === "signing") drawSigning(el);
   else if (key === LOGS) el.replaceChildren(logsPage(route.path[1], () => draw({ el, route })));
   else if (key) el.replaceChildren(listPage(key));
-  else el.replaceChildren(rootPage(), signingSection(), pushSection(), logsSection(detectMode()), aboutSection());
+  else el.replaceChildren(rootPage(), signingSection(), ipaSection(), pushSection(), logsSection(detectMode()), aboutSection());
   el.scrollTop = top;
 }
 

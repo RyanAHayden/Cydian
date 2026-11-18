@@ -29,6 +29,7 @@ import { launchURL } from "./launch.js";
 import { isAddPath, parseAddLink } from "./core/handoff.js";
 import { addSource } from "./screens/manage.js";
 import { initQueue } from "./screens/queue.js";
+import { initIpaLinks } from "./screens/ipa-install.js";
 import { startEssential } from "./essential-ui.js";
 
 const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
@@ -288,6 +289,7 @@ initScroller(document.getElementById("screens"));
 for (const tab of TABS) if (SCREENS[tab].init) SCREENS[tab].init(ctx);
 // N4: the install queue (jailbreak build: the backend has one): Confirm opens when a package is queued.
 if (typeof getBackend().queue === "function") initQueue(ctx);
+initIpaLinks(); // F67: a tapped .ipa link offers Install IPA (jailbreak build only)
 // Home Screen launches open on Home (F32, launch.js); a return from the background runs none of this.
 const startAt = launchURL(window);
 if (startAt) history.replaceState(null, "", startAt);

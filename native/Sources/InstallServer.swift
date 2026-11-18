@@ -43,7 +43,10 @@ final class InstallServer {
                 params.requiredInterfaceType = .loopback
                 params.acceptLocalOnly = true
                 params.allowLocalEndpointReuse = true
-                let l = try NWListener(using: params, on: .any)
+                // Bound to 127.0.0.1 itself: the install links say 127.0.0.1, and "any address on loopback" could
+                // listen on ::1 only, so iOS's installer got "Cannot connect to 127.0.0.1" on every install.
+                params.requiredLocalEndpoint = NWEndpoint.hostPort(host: NWEndpoint.Host("127.0.0.1"), port: .any)
+                let l = try NWListener(using: params)
                 var answered = false
                 l.stateUpdateHandler = { st in // the two servers live as long as the app
                     switch st {

@@ -39,7 +39,7 @@ export async function openIpaInstall({ url, name = "", onInstalled = () => {}, n
   // F188: Cancel at the top right from the first line to the end (Done once it has ended): it stops the run and the
   // page closes, back where Install was tapped.
   const ctl = new AbortController();
-  page.stoppable?.(() => ctl.abort());
+  page.stoppable?.(() => { ctl.abort(); stopIpaInstall(native); });
   const view = {
     line(type, text) { page.line(type === "status" ? "step" : type === "info" ? "raw" : type, text); },
     status(text) { page.status(text); },
@@ -64,6 +64,16 @@ export async function openIpaInstall({ url, name = "", onInstalled = () => {}, n
   } : null });
   if (r.error) await showAlert({ title: r.error.title, message: r.error.message, buttons: ["OK"] });
   return r;
+}
+
+// F196: asks the shell to stop ipa.install (its download, or the helper before it starts: Apt.swift ipa.cancel).
+// The page has already ended the run; the answer is ignored (a refusal once the helper runs, a shell without the
+// call). Not for share.js's stand-in (`native`): it sends every call to share.ipaInstall, a staged file with no
+// download to stop. True when ipa.cancel was asked for.
+export function stopIpaInstall(native = undefined, { bridge = globalThis.cydianNative } = {}) {
+  if (native !== undefined || typeof bridge?.call !== "function") return false;
+  try { Promise.resolve(bridge.call("ipa.cancel", {})).catch(() => {}); } catch { return false; }
+  return true;
 }
 
 // F88: an IPA installed from a URL or a link (no source page to say what it is): remembered by the bundle id the

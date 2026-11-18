@@ -23,6 +23,9 @@ final class IPASigner {
     var options = SignOptions()      // the user's edits (F14): name, bundle ID, icon, extensions left out
     // What signing skipped and why (B21), a line each; on the phone the device log, as the shell's other notes.
     var log: (String) -> Void = { NSLog("\(Brand.name): " + $0.replacingOccurrences(of: "%", with: "%%")) }
+    // F196: true once the progress page's Cancel was tapped (SignJob): signing stops at the next file or bundle with
+    // code "cancelled", and nothing is written.
+    var stop: () -> Bool = { false }
 
     init(profile: Profile, identity: SigningIdentity) {
         self.profile = profile
@@ -164,6 +167,7 @@ final class IPASigner {
             if e.name.hasPrefix(appDir) && MachO.isMachO(head) { machos.insert(e.name) }
             doneBytes += e.size
             progress?("reading", Double(doneBytes) / Double(totalBytes))
+            if stop() { throw SignJob.cancelledError }
         }
         log("Read \(kept.count) files (\(ByteCountFormatter.string(fromByteCount: Int64(totalBytes), countStyle: .file))), \(machos.count) Mach-O, \(bundles.count) bundles to sign")
         for (path, d) in changed { files[path] = .data(d, mode: 0o100644) }
@@ -218,9 +222,11 @@ final class IPASigner {
             let rel = dir == appDir ? String(appDir.dropFirst(8).dropLast()) : String(dir.dropFirst(appDir.count).dropLast())
             log("Signed \(rel) (\(id))" + (isApp ? ", with the profile's entitlements" : ""))
             progress?("signing", Double(n + 1) / Double(dirs.count))
+            if stop() { throw SignJob.cancelledError }
         }
 
         for f in fixedArm64e { log("Fixed the old arm64e slice of \(f)") }
+        if stop() { throw SignJob.cancelledError }
         // Write: kept entries in their order (copied raw when untouched), then the new files.
         let out = try ZipWriter(url: output)
         var written = Set<String>()

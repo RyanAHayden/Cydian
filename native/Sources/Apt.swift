@@ -98,6 +98,12 @@ enum Apt {
             let stream = (c.params["stream"] as? Bool) ?? false
             IPAInstall.run(url, emit: stream ? { c.emitOnMain($0) } : nil) { reply(c, $0, $1) }
         }
+        // F196: ipa.cancel, the IPA install page's Cancel (web/app/screens/ipa-install.js): stops ipa.install's download,
+        // or keeps cydian-helper from starting; an error once the helper runs (it can't be stopped halfway) or when
+        // no IPA install runs. ipa.install then answers "cancelled: Cancelled".
+        b.on("ipa.cancel") { c in
+            work(c) { () throws -> Any? in try IPAInstall.cancel(); return true }
+        }
         b.on("haptic.tap") { c in
             DispatchQueue.main.async {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -390,13 +396,32 @@ enum IPAInstall {
         return URLSession(configuration: cfg)
     }()
 
-    static func run(_ url: URL, emit: (([[String: Any]]) -> Void)?, done: @escaping (Any?, String?) -> Void) {
+    // F196: the running ipa.install, for ipa.cancel. Guarded by runLock.
+    final class Run { var task: URLSessionTask?; var cancelled = false; var helper = false }
+    static let runLock = NSLock()
+    static var running: Run?
+
+    static func cancel() throws {
+        runLock.lock(); defer { runLock.unlock() }
+        guard let r = running, !r.cancelled else { throw BridgeError("helper", "no IPA install is running") }
+        guard !r.helper else { throw BridgeError("helper", "cydian-helper is already installing the IPA; it can't be stopped halfway") }
+        r.cancelled = true
+        r.task?.cancel()
+    }
+
+    static func run(_ url: URL, emit: (([[String: Any]]) -> Void)?, done finished: @escaping (Any?, String?) -> Void) {
+        let job = Run()
+        runLock.lock(); running = job; runLock.unlock()
+        let done = { (v: Any?, e: String?) in
+            runLock.lock(); if running === job { running = nil }; let stopped = job.cancelled; runLock.unlock()
+            finished(stopped && e != nil ? nil : v, stopped && e != nil ? "cancelled: Cancelled" : e)
+        }
         let fm = FileManager.default
         do {
             try fm.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         } catch { return done(nil, "install: can't make \(dir): \(error.localizedDescription)") }
         emit?([["fd": "status", "line": "dlstatus:ipa:0:Downloading"]])
-        session.downloadTask(with: url) { tmp, resp, err in
+        let task = session.downloadTask(with: url) { tmp, resp, err in
             if let e = err as? URLError { return done(nil, "\(e.code == .timedOut ? "timeout" : "network"): \(e.localizedDescription)") }
             if let e = err { return done(nil, "network: \(e.localizedDescription)") }
             guard let tmp = tmp, let http = resp as? HTTPURLResponse else { return done(nil, "network: no HTTP answer") }
@@ -406,6 +431,9 @@ enum IPAInstall {
             catch { return done(nil, "install: can't keep the download: \(error.localizedDescription)") }
             DispatchQueue.global(qos: .userInitiated).async {
                 defer { try? FileManager.default.removeItem(atPath: path) }
+                // F196: Cancel after the download: the helper never starts; from here on ipa.cancel refuses.
+                runLock.lock(); let stop = job.cancelled; if !stop { job.helper = true }; runLock.unlock()
+                if stop { return done(nil, "cancelled: Cancelled") }
                 do {
                     let r = try Helper.run(["install-ipa", path], emit: emit)
                     let code = r["code"] as? Int ?? 1
@@ -421,6 +449,9 @@ enum IPAInstall {
                 } catch let e as BridgeError { done(nil, e.text) }
                 catch { done(nil, "helper: \(error.localizedDescription)") }
             }
-        }.resume()
+        }
+        runLock.lock(); job.task = task; let early = job.cancelled; runLock.unlock()
+        if early { task.cancel() }
+        task.resume()
     }
 }

@@ -30,7 +30,8 @@ export async function installIpa(url, onEvent = null, { native = globalThis.cydi
 //   view.progress(percent)  0..100
 // Resolves { ok, bundleId, error: core/ipainstall.js ipaError's answer or null, log: the console's text, cancelled }.
 // F188: `signal` (the page's Cancel) ends the run at once: it resolves { ok: false, cancelled: true } without waiting
-// for ipa.install (the shell has no call to stop it, so it runs out on its own) and nothing more is drawn.
+// for ipa.install and nothing more is drawn (F196: the page also asks the shell's ipa.cancel to stop it,
+// screens/ipa-install.js stopIpaInstall).
 export async function runIpaInstall({ url, name = "" }, view, { native = globalThis.cydianNative, signal = null } = {}) {
   const log = [];
   const line = (type, text) => {

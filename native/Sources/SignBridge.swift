@@ -12,6 +12,9 @@
 //                               downloads, signs and opens the itms-services link -> {bundleId, originalBundleId,
 //                               name, version, removed}; F14 moved it to Sideload.swift, which adds the user's edits
 //                               and the calls listed there
+//   signing.cancel              F196: the progress page's Cancel stops the running signing.install, library.sign or
+//                               library.install (download, signing, serving the IPA to iOS; SignJob) and any
+//                               signing.progress watch -> {cancelled: bool} (false: nothing was running)
 //
 // F75: the old local HTTPS mode (signing.trust, resetTrust, testServer, its CA) is gone: installs always take the
 // manifest from the Signing Server (manifestServer), and without one signing.install answers no_server.
@@ -50,6 +53,7 @@ enum SignBridge {
         b.on("signing.export") { c in run(c) { export() } } // F73
         b.on("signing.remove") { c in run(c) { SignStore.removeIdentity(); return status() } }
         b.on("signing.install") { c in Sideload.install(c) } // F14: with the user's edits, keep-alive and a record
+        b.on("signing.cancel") { c in Sideload.cancel(c) } // F196: the progress page's Cancel
         Sideload.register(b) // F14: inspect, progress, installed, forget, resignAll, checkCertificate, remind
         MyIPAs.register(b) // F77: library.*, My IPAs under Installed (MyIPAs.swift)
     }
@@ -190,24 +194,37 @@ final class Download: NSObject, URLSessionDownloadDelegate {
     private let progress: (Double) -> Void
     private let done: (String?) -> Void
     private var finished = false
+    private var session: URLSession?
 
     private init(_ dest: URL, _ max: Int64, _ progress: @escaping (Double) -> Void, _ done: @escaping (String?) -> Void) {
         self.dest = dest; self.max = max; self.progress = progress; self.done = done
     }
 
-    static func start(_ url: URL, to dest: URL, max: Int64, progress: @escaping (Double) -> Void, done: @escaping (String?) -> Void) {
+    @discardableResult
+    static func start(_ url: URL, to dest: URL, max: Int64, progress: @escaping (Double) -> Void, done: @escaping (String?) -> Void) -> Download {
         let d = Download(dest, max, progress, done)
         let cfg = URLSessionConfiguration.default
         cfg.timeoutIntervalForRequest = 60
         cfg.timeoutIntervalForResource = 60 * 60
         let s = URLSession(configuration: cfg, delegate: d, delegateQueue: nil)
+        d.session = s
         s.downloadTask(with: url).resume()
         s.finishTasksAndInvalidate()
+        return d
     }
 
+    // F196: the progress page's Cancel: the download stops and `done` gets "cancelled: Cancelled" (once).
+    func cancel() {
+        session?.invalidateAndCancel()
+        finish("cancelled: Cancelled")
+    }
+
+    private let lock = NSLock()
     private func finish(_ err: String?) {
-        guard !finished else { return }
+        lock.lock()
+        guard !finished else { lock.unlock(); return }
         finished = true
+        lock.unlock()
         done(err)
     }
 

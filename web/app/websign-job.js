@@ -27,7 +27,7 @@ export function removeTree(FS, path) {
   } else FS.unlink(path);
 }
 
-export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null }, { progress = () => {} } = {}) {
+export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null }, { progress = () => {} } = {}) {
   const bytes = ipa instanceof Uint8Array ? ipa : new Uint8Array(ipa);
   if (!isZip(bytes)) throw fail("bad_ipa", "That file isn't an IPA (a zip archive).");
   let prof;
@@ -50,7 +50,11 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   try { plist = JSON.parse(zs.ccall("ifizbox_plist_json", "string", ["string"], [`${appDir}/Info.plist`]) || "null"); } catch { /* below */ }
   if (!plist) throw fail("bad_ipa", "That IPA's app has no readable Info.plist.");
   const info = appInfo(plist);
-  const bundleId = targetBundleId(prof.appId, info.bundleId);
+  // appBundleId: the app's own ID as the website knows it (iFizBox's, or the source's), over the IPA's: the early
+  // install link was opened for it, and an IPA under an older ID (0.9.3's) left iOS waiting on a link
+  // nothing filled, then a second prompt from Ready to Install (user 2026-11-18).
+  const own = appBundleId || info.bundleId;
+  const bundleId = targetBundleId(prof.appId, own);
   // App extensions (PlugIns, a Watch app) come out: zsign gives every binary the app's own entitlements, which don't
   // match an extension's bundle ID, and iOS then refuses the app ("its integrity could not be verified", user
   // 2026-11-18, iFizBox's Share and Widget). The app's own Sign Options do the same with Remove App Extensions.
@@ -59,7 +63,7 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   FS.writeFile("/w/key.p12", new Uint8Array(p12));
   FS.writeFile("/w/app.mobileprovision", new Uint8Array(profile));
   FS.writeFile("/w/ents.plist", plistXml(appEntitlements(prof, bundleId)));
-  if (bring && info.bundleId === IFIZBOX_ID) {
+  if (bring && own === IFIZBOX_ID) {
     if (bring.identity) FS.writeFile(`${appDir}/${IDENTITY_FILE}`, identityPlist({ p12, password, profile }));
     if (typeof bring.transfer === "string" && bring.transfer.startsWith("ifizbox://import?")) {
       try { FS.mkdir(`${appDir}/web`); } catch { /* there already */ }

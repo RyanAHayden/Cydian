@@ -85,6 +85,14 @@ test("bring: only iFizBox's own IPA gets the certificate and the website's link,
   assert.equal([...seen.files.keys()].some((k) => k.includes("ifizbox-identity") || k.includes("transfer.link")), false, "switch off, bad link");
 });
 
+test("appBundleId wins over the IPA's own ID: an old-ID iFizBox IPA is signed as iFizBox and gets its bring files", async () => {
+  const { create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.example.oldname", CFBundleName: "iFizBox" }, appName: "iFizBox.app" });
+  const r = await runSignJob(create, job({ appBundleId: "com.ryha.ifizbox", bring: { identity: true, transfer: "ifizbox://import?d=abc" } }));
+  assert.equal(r.bundleId, "com.ryha.ifizbox", "the ID the early install link was opened for");
+  assert.equal(seen.args[seen.args.indexOf("-b") + 1], "com.ryha.ifizbox");
+  assert.ok(seen.files.has("/w/app/Payload/iFizBox.app/ifizbox-identity.plist"));
+});
+
 test("zsign's own reason when it can't sign; not an IPA; no app inside; no Info.plist", async () => {
   const { create } = fakeZsign({ fail: ["\x1b[31m>>> Can't find the signature of Frameworks/X.framework!\x1b[0m"] });
   await assert.rejects(runSignJob(create, job()), (e) => e.code === "sign_failed" && /zsign: Can't find the signature of Frameworks\/X\.framework\./.test(e.message));

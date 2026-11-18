@@ -568,7 +568,8 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     h.set("Signing");
     const self = isSelfIpa(url) || bring;
     const carry = self ? { identity: Boolean(bring), transfer: await transfer().catch(() => null) } : null;
-    const signed = await untilCancel(h, worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(id.profile), password: id.password ?? "", bring: carry },
+    const signed = await untilCancel(h, worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(id.profile), password: id.password ?? "", bring: carry,
+        appBundleId: bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null) },
       { onProgress: (t) => h.set(t), ...(signal ? { signal } : {}) }));
     h.set("Uploading");
     const ipaBytes = signed.ipa instanceof Uint8Array ? signed.ipa : new Uint8Array(signed.ipa);

@@ -39,6 +39,11 @@
 // root, under the installed lists (beside Apps above dpkg's packages in the jailbreak app, so it isn't hundreds of rows
 // down; a Packages section under the apps elsewhere), opens #installed/wishlist: the wished packages as a package
 // list, Edit (the red minus, then Delete) or a left swipe removes one, as on the apps list.
+//
+// F147: the Wish List moved off the page into the nav bar (user 2026-11-18: "the wishlist should go in the top left
+// instead of as an entry in installed"): a bordered "Wish List" bar button in the left slot of Installed's root (the
+// apps list without a jailbreak, dpkg's list in the jailbreak app), with the count as Mail's "Inbox (3)" does,
+// opening the same #installed/wishlist page. Edit was already on the right, so nothing had to move.
 import * as browse from "./browse.js";
 import * as myipas from "./myipas.js";
 import { grouped, plain, placeholder } from "../nav/ui.js";
@@ -191,15 +196,21 @@ export function init() {
     if (appView.body) loadApps();
   });
   onAppsChange(() => { if (appView.body) loadApps(); });
-  // F125: the count on the Wish List row, and the Wish List page, follow the list (the package page's sheet, a Delete).
+  // F125/F147: the count on the Wish List button, and the Wish List page, follow the list (the package page's sheet, a Delete).
   browse.wishlist().onChange(() => {
     if (wishView.body) loadWish();
-    if (state.body && state.rows !== undefined) draw();
-    if (appView.body) loadApps();
+    updateWishButton();
   });
 }
 
-export function nav(route) {
+export function nav(route, ctx) {
+  const info = navInfo(route);
+  // F147: the Wish List button, top left of Installed's root (no back button there).
+  if (isRoot(route)) info.left = wishButton(route, wishCount(browse.wishlist().list(), knownInstalled()), { go: ctx?.go, ref: (b) => { wishBar.el = b; b.classList.add("wish-button"); updateWishButton(); } });
+  return info;
+}
+
+function navInfo(route) {
   const kind = pageKind(route);
   if (kind === "browse") return browse.nav(route);
   if (kind === "myipas") return myipas.nav(route);
@@ -301,9 +312,9 @@ function draw() {
     return;
   }
   body.classList.replace("grouped", "plain");
-  // F87's Apps row and F125's Wish List row, on the root (not the site's dpkg page one row down).
-  const top = [appCount ? appsRow(state.route, appCount) : null,
-    state.route.path.length ? null : wishListRow(state.route, wishCount(browse.wishlist().list(), rows.map((r) => r.id)))].filter(Boolean);
+  updateWishButton(); // F147: dpkg's list is in, so the count leaves installed packages out
+  // F87's Apps row (F147: F125's Wish List row is a nav-bar button now).
+  const top = [appCount ? appsRow(state.route, appCount) : null].filter(Boolean);
   if (!rows.length) {
     body.replaceChildren(...(top.length ? [grouped([{ rows: top }])] : []), note("No packages."));
     return;
@@ -350,10 +361,40 @@ function appsRow(route, n) {
     href: format({ tab: route.tab, path: [...route.path, APPS] }) };
 }
 
-// F125: Installed's Wish List row; `n` (wished, not installed) as the grey count badge, none at 0.
-export function wishListRow(route, n) {
-  return { label: "Wish List", subtitle: "Packages to install later", badge: n > 0 ? String(n) : undefined,
-    href: format({ tab: route.tab, path: [WISH] }) };
+// ---- F147: the Wish List bar button ---------------------------------------------------------------------------
+
+const wishBar = { el: null }; // the root's button, while it is drawn
+
+// Installed's root: the page whose left slot is free (every other Installed page has a back button there).
+export const isRoot = (route) => route.path.length === 0;
+
+// The button's label: `n` (wished, not installed) in brackets as Mail's "Inbox (3)", none at 0.
+export const wishButtonLabel = (n) => (n > 0 ? `Wish List (${n})` : "Wish List");
+
+// The Wish List page's route, under Installed's root whatever page asks.
+export const wishRoute = (route) => ({ tab: route.tab, path: [WISH] });
+
+// The nav bar spec for the button (app.js `left`): a tap opens the Wish List page; `ref` gets the drawn button.
+export function wishButton(route, n, { go, ref } = {}) {
+  const to = wishRoute(route);
+  return { label: wishButtonLabel(n), ref,
+    onClick: () => (go ? go(to) : (location.hash = format(to).replace(/^#/, ""))) };
+}
+
+// The installed package ids known so far (the count leaves them out): dpkg's rows, or the apps page's ids.
+function knownInstalled() {
+  return (state.rows ?? appView.installedIds ?? []).map((r) => (typeof r === "string" ? r : r.id));
+}
+
+// The name may end in "…" on a narrow phone (the segmented title takes the middle); the count never does.
+function updateWishButton() {
+  const b = wishBar.el;
+  if (!b || (b.parentNode && !b.isConnected)) return; // not drawn, or drawn and since dropped
+  const n = wishCount(browse.wishlist().list(), knownInstalled());
+  const name = Object.assign(document.createElement("span"), { className: "wish-name", textContent: "Wish List" });
+  const count = n > 0 ? [Object.assign(document.createElement("span"), { className: "wish-count", textContent: `(${n})` })] : [];
+  b.replaceChildren(name, ...count);
+  b.setAttribute("aria-label", wishButtonLabel(n));
 }
 
 // A file picker for the status file; the read stays in the browser.
@@ -499,7 +540,7 @@ function drawAppList() {
       ? { label: "dpkg Status File", subtitle: "Packages installed with apt", href: format({ tab: route.tab, path: [DPKG] }) }
       : { label: "Choose Status File", subtitle: "See the packages a jailbroken iPhone has", onClick: () => chooseStatus() }] });
   }
-  sections.push({ header: "Packages", rows: [wishListRow(route, wishCount(browse.wishlist().list(), appView.installedIds ?? []))] }); // F125
+  updateWishButton(); // F147 (F125's Packages section with the Wish List row is gone)
   const ul = plain(sections);
   ul.classList.toggle("editing", appView.editing);
   const cells = ul.querySelectorAll(":scope > .cell");

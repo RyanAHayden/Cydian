@@ -139,7 +139,7 @@ test("F104: Hide Packages by <author> on the author page, Hidden in Manage", asy
 });
 
 // ---- F125: the Wish List in Installed ----------------------------------------------------------------------------
-import { WISH, wishListRow } from "./installed.js";
+import { WISH } from "./installed.js";
 import { wishCount, createWishlist } from "../core/wishlist.js";
 
 test("F125: #installed/wishlist is the Wish List page in every mode; its package pages are browse.js's", () => {
@@ -151,13 +151,7 @@ test("F125: #installed/wishlist is the Wish List page in every mode; its package
   assert.equal(pageKind(r(), "site"), "apps");
 });
 
-test("F125: Installed's Wish List row opens the page and counts the wished packages not installed", () => {
-  const row = wishListRow(r(), 3);
-  assert.equal(row.label, "Wish List");
-  assert.equal(row.href, "#/installed/wishlist");
-  assert.equal(row.badge, "3");
-  assert.equal(wishListRow(r(), 0).badge, undefined); // no badge for an empty list
-  assert.equal(wishListRow(r(APPS), 1).href, "#/installed/wishlist"); // the page sits under the root whatever page draws it
+test("F125: wishCount leaves out installed packages and repeats", () => {
   assert.equal(wishCount(["a", "b", "c"], ["b"]), 2);
   assert.equal(wishCount(["a", "a"], []), 1);
   assert.equal(wishCount([], ["x"]), 0);
@@ -168,11 +162,62 @@ test("F125: the page's Delete takes a package off the list, and the count follow
   const seen = [];
   w.onChange((list) => seen.push(list.length));
   w.set("a", true); w.set("b", true);
-  assert.equal(wishListRow(r(), wishCount(w.list(), [])).badge, "2");
+  assert.equal(wishButtonLabel(wishCount(w.list(), [])), "Wish List (2)");
   w.set("a", false); // what removeWish does
   assert.deepEqual(w.list(), ["b"]);
-  assert.deepEqual(seen, [1, 2, 1], "each change tells Installed to redraw the row and the page");
-  assert.equal(wishListRow(r(), wishCount(w.list(), [])).badge, "1");
+  assert.deepEqual(seen, [1, 2, 1], "each change tells Installed to redraw the button and the page");
+  assert.equal(wishButtonLabel(wishCount(w.list(), [])), "Wish List (1)");
+});
+
+// ---- F147: the Wish List as a nav-bar button, not a row ---------------------------------------------------------
+import { nav, isRoot, wishButton, wishButtonLabel, wishRoute } from "./installed.js";
+import * as installedModule from "./installed.js";
+import { readFileSync } from "node:fs";
+
+test("F147: the button's label carries the count, none at 0", () => {
+  assert.equal(wishButtonLabel(0), "Wish List");
+  assert.equal(wishButtonLabel(3), "Wish List (3)");
+});
+
+test("F147: the button opens #installed/wishlist, which is still the Wish List page", () => {
+  const seen = [];
+  let drawn = null;
+  const spec = wishButton(r(), 2, { go: (to) => seen.push(to), ref: (b) => { drawn = b; } });
+  assert.equal(spec.label, "Wish List (2)");
+  spec.onClick();
+  assert.deepEqual(seen, [{ tab: "installed", path: [WISH] }]);
+  spec.ref("button"); // app.js hands the drawn button back so the count can change in place
+  assert.equal(drawn, "button");
+  assert.deepEqual(wishRoute(r(APPS)), { tab: "installed", path: [WISH] }); // under the root whatever page asks
+  for (const mode of ["site", "sideload", "jailbreak"]) assert.equal(pageKind(r(WISH), mode), "wishlist");
+});
+
+test("F147: the button sits top left on Installed's root only; Edit stays on the right", () => {
+  assert.equal(isRoot(r()), true);
+  assert.equal(isRoot(r(WISH)), false);
+  assert.equal(isRoot(r(DPKG)), false); // a back button holds the left slot there
+  // nav() builds the root's User | Expert | Recent control: a do-nothing element is enough here.
+  const el = () => ({ append() {}, setAttribute() {}, addEventListener() {}, classList: { add() {}, toggle() {}, remove() {} }, style: {} });
+  const had = Object.getOwnPropertyDescriptor(globalThis, "document");
+  globalThis.document = { createElement: el };
+  const seen = [];
+  let root;
+  try { root = nav(r(), { go: (to) => seen.push(to) }); } finally {
+    if (had) Object.defineProperty(globalThis, "document", had); else delete globalThis.document;
+  }
+  assert.match(root.left.label, /^Wish List( \(\d+\))?$/);
+  root.left.onClick();
+  assert.deepEqual(seen, [{ tab: "installed", path: [WISH] }]);
+  if (root.right) assert.notEqual(root.right.label, "Wish List"); // Edit (the apps list) or nothing (dpkg), on the right
+  assert.equal(nav(r(WISH), {}).left, undefined); // the Wish List page itself: back button only
+  assert.equal(nav(r(WISH), {}).right.label, "Edit");
+});
+
+test("F147: F125's Wish List row is gone from Installed's page", () => {
+  assert.equal(installedModule.wishListRow, undefined);
+  const src = readFileSync(new URL("./installed.js", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /header: "Packages"/, "no Packages section with the Wish List row under the apps");
+  assert.doesNotMatch(src, /subtitle: "Packages to install later"/, "no Wish List row beside Apps above dpkg's list");
 });
 
 // ---- F127: Installed like Cydia's: User | Expert | Recent, kinds, search -----------------------------------------

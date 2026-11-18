@@ -31,8 +31,9 @@ const ALT_PREFIX = "alt:";
 export const isAltKey = (key) => String(key ?? "").startsWith(ALT_PREFIX);
 export const altKey = (url) => ALT_PREFIX + url;
 
-const str = (v) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
-const httpUrl = (v) => { const s = str(v); return /^https?:\/\/[^\s]+$/i.test(s) ? s : null; };
+// A JSON field as trimmed text (strings and numbers), and an http(s) URL field or null (core/sources/ipa.js too).
+export const str = (v) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
+export const httpUrl = (v) => { const s = str(v); return /^https?:\/\/[^\s]+$/i.test(s) ? s : null; };
 const num = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
 
 // "#8A28F7", "8A28F7", "#abc" -> "#8a28f7"; anything else null (it goes into CSS, so only hex gets through).

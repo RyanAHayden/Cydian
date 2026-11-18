@@ -12,11 +12,9 @@
 //
 // Apps with no bundle id (ESign often, GBox always) get a stable made-up one: `<format>.<name slug>`, so a refresh
 // keeps the same row and Changes sees a version bump, not a new app.
-import { parseAltSource, appStanza } from "../altstore.js";
+import { parseAltSource, appStanza, str, httpUrl } from "../altstore.js";
 
 const isObj = (v) => Boolean(v && typeof v === "object" && !Array.isArray(v));
-const str = (v) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
-const httpUrl = (v) => { const s = str(v); return /^https?:\/\/[^\s]+$/i.test(s) ? s : null; };
 
 export const slug = (s) => str(s).normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase()
   .replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "app";

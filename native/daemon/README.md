@@ -20,7 +20,11 @@ also posts a local notification: "3 Upgrades" / "3 upgrades: A, B and C." (the s
 - Notifications: `-[UNUserNotificationCenter initWithBundleIdentifier:@"com.ryha.cydian"]` (private). It needs the
   `com.apple.private.usernotifications.bundle-identifiers` entitlement (`entitlements.plist`). The badge goes up
   with the notification (`content.badge`) or through `setBadgeCount:` (iOS 16+) / `setBadgeNumber:` (before 16).
-  iOS shows them only once Cydian has notification permission.
+  iOS shows them only once Cydian has notification permission: the jailbreak app asks once, at its first launch
+  (F65, `../Sources/Notifications.swift`). A tap opens the notification's `url` route (`#/changes`) in the app, and
+  the app clears the badge once its Changes tab shows no upgrades (`web/app/settings.js`, bridge `app.badge`).
+- Upgrade Notifications (F65, `quiet.h`): with `/var/jb/var/lib/cydian/upgrades.off` there (Settings' switch, written
+  by `cydian-helper notifications off`), "3 Upgrades" becomes a badge-only update; N7's notes still post.
 - `com.ryha.cydian.upgrades.plist`: the launchd job at `/var/jb/Library/LaunchDaemons/`. It runs as root at load
   and every hour, and the 23-hour rule makes that one check a day, at most 24 hours apart. `deb/postinst` loads it
   and `deb/prerm` unloads it.

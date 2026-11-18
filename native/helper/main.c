@@ -14,6 +14,8 @@
  *                                                           vendor; copied, its control checked, apt-get install; paid.c)
  *   cydian-helper rollbacks <pkg> | rollback <pkg> <version>  (F71: the .debs N7's daemon kept, and apt-get install
  *                                                              of one, after dpkg-deb shows its control matches)
+ *   cydian-helper notifications on|off   (F65: Settings' Upgrade Notifications; off creates
+ *                                         <prefix>/var/lib/cydian/upgrades.off, which N5's daemon reads; runs nothing)
  *
  * No setuid bit: Cydian spawns it as root with the persona spawn attributes (spawn.c), which the kernel allows
  * only because Cydian is signed with com.apple.private.persona-mgmt. Run by anything else it is plain mobile and
@@ -174,6 +176,16 @@ int main(int argc, char *argv[]) {
         }
         printf("%s %s %s: %s\n", plan.verb == HV_ADDSOURCE ? "Added" : "Removed", plan.argv[1], plan.argv[2],
                changed ? "cydian.sources updated" : "nothing to change");
+        return 0;
+    }
+
+    if (plan.verb == HV_NOTIFICATIONS) {
+        errno = 0;
+        if (helper_notify_apply(&plan, &err)) {
+            fprintf(stderr, "cydian-helper: %s%s%s\n", err, errno ? ": " : "", errno ? strerror(errno) : "");
+            return HELPER_EX_IOERR;
+        }
+        printf("Upgrade notifications %s\n", plan.argv[1]);
         return 0;
     }
 

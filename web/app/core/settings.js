@@ -30,7 +30,8 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // automatic-install rows), "rollback" (Keep previous versions), "resign" (Re-sign reminder, F14).
 // "compat": Works on My Phone (F17). "device": Device type and Sideloader (F37).
 // "resign": Re-sign Reminder, which F68 turns on (signing.remind, F14).
-export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device", "resign"]);
+// "upgrade-notifications": Upgrade Notifications, N5's daemon's "n Upgrades" in the jailbreak app (F65).
+export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device", "resign", "upgrade-notifications"]);
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
@@ -147,6 +148,13 @@ export const SETTINGS = [
     label: "Notifications",
     options: [{ value: "off", label: "Off" }, { value: "summary", label: "Summary" }, { value: "each", label: "One per Package" }],
   },
+  {
+    // F65: N5's background check (native/daemon/) posts "3 Upgrades". Off: `cydian-helper notifications off` writes
+    // /var/jb/var/lib/cydian/upgrades.off and the daemon only updates the icon's count (daemon/quiet.h).
+    key: "upgradeNotifications", section: "notifications", kind: "toggle", feature: "upgrade-notifications",
+    modes: ["jailbreak"], default: true, label: "Upgrade Notifications", options: onOff,
+    footer: "A notification when the daily check finds new upgrades. Off, Cydian's icon still shows how many there are.",
+  },
   { key: "badge", section: "notifications", kind: "toggle", feature: "badge", modes: ALL, default: true,
     label: "App Icon Badge", options: onOff },
   {
@@ -261,8 +269,10 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     const d = def(key);
     const hit = d.options.find((o) => o.value === value);
     if (!hit) throw new Error(`${key}: ${JSON.stringify(value)} is not one of its options`);
+    const was = key === "upgradeNotifications" ? get(key) : undefined;
     store.set(PREFIX + key, String(value));
     notify(key, value);
+    if (key === "upgradeNotifications" && was !== value) upgradeNotifications.pending = upgradeNotifications.sync(was);
     // Device (F37) carries the architecture: getArch() and everything listening for "arch" follow it.
     if (key === "device" && ARCHES.includes(value) && get("arch") !== value) set("arch", value);
   }
@@ -331,6 +341,29 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     },
   };
 
+  // F65: Upgrade Notifications reaches N5's daemon as a file only root can write: `cydian-helper notifications
+  // on|off`. set() runs it on every change; sync() also runs it at launch (web/app/settings.js) when the switch is
+  // off, so a phone whose file went missing (a reinstall of the .deb) is quiet again. Resolves to true once the
+  // helper has done it (at once, without a helper); when it fails, the switch goes back to `undo` (listeners told)
+  // and it resolves to false. `pending`: the last change's promise.
+  const upgradeNotifications = {
+    pending: Promise.resolve(true),
+    async sync(undo) {
+      if (!dpkg) return true;
+      const on = get("upgradeNotifications");
+      try {
+        await run(["notifications", on ? "on" : "off"]);
+        return true;
+      } catch {
+        if (typeof undo === "boolean" && get("upgradeNotifications") === on) {
+          store.set(PREFIX + "upgradeNotifications", String(undo));
+          notify("upgradeNotifications", undo);
+        }
+        return false;
+      }
+    },
+  };
+
   // Section Visibility (Cydia's Sections edit mode, F24): section names whose packages drop out of every list,
   // Search and Changes. Kept on this device only, as a sorted JSON list; core/catalog.js setHidden does the filtering.
   function readHidden() {
@@ -364,6 +397,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     set,
     holds,
     hiddenSections,
+    upgradeNotifications,
     deviceType,
     jailbroken: () => deviceType() !== NOT_JAILBROKEN,
     defaultOf: (key) => defaultOf(def(key)),

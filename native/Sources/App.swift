@@ -7,7 +7,8 @@ import WebKit
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        true
+        Notifications.shared.start() // F65: permission for N5's daemon, and notification taps (Notifications.swift)
+        return true
     }
 
     func application(_ application: UIApplication, configurationForConnecting session: UISceneSession,

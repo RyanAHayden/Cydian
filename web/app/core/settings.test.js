@@ -164,15 +164,15 @@ test("rows each mode shows once every feature exists", () => {
   assert.deepEqual(show("site"),
     ["appearance", "allowZoom", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
   assert.deepEqual(show("jailbreak"),
-    ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge",
-      "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
+    ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications",
+      "upgradeNotifications", "badge", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
     ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge", "resignReminder"]);
 });
 
 test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone and Ignored Upgrades", () => {
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds"]);
+  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds", "upgradeNotifications"]);
   assert.equal(s.isShown("autoInstall"), false);
   assert.ok(FEATURES.has("appearance"));
   assert.deepEqual(createSettings({ storage: memStorage(), mode: "site", features: new Set(["appearance"]) })

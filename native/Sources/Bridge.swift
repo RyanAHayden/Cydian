@@ -46,6 +46,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         Apt.register(self) // N3: apt's files, the network, cydian-helper, haptic.tap (Apt.swift)
         Paid.register(self) // F57: vendors' calls, UDID, Keychain, sign-in sheet, paid installs (Paid.swift)
         SignBridge.register(self) // I6: sign and install IPAs on the phone, sideload build (SignBridge.swift)
+        Notifications.register(self) // F65: app.badge, the icon badge (Notifications.swift)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }

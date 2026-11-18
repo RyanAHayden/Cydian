@@ -31,6 +31,7 @@ import { addSource } from "./screens/manage.js";
 import { initQueue } from "./screens/queue.js";
 import { initIpaLinks } from "./screens/ipa-install.js";
 import { startEssential } from "./essential-ui.js";
+import { createUpgradeNotices } from "./settings.js";
 
 const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
 
@@ -47,11 +48,13 @@ for (const tab of TABS) {
   navbarEl.append(navStacks[tab]);
 }
 
+// F65: the icon badge N5's daemon sets goes once the Changes tab shows no upgrades (jailbreak app only).
+const upgradeNotices = createUpgradeNotices({ settings: settingsScreen.settings, current: () => router.current() }); // called only once the screens init, after router exists
 const tabbar = createTabbar(document.getElementById("tabbar"), TABS, (t) => SCREENS[t].title);
 const ctx = {
   go: (route) => router.go(route),
   back: () => goBack(),
-  setBadge: (tab, n) => tabbar.setBadge(tab, n),
+  setBadge: (tab, n) => { tabbar.setBadge(tab, n); upgradeNotices.badge(tab, n); },
   showHUD,
   showAlert,
 };
@@ -299,6 +302,7 @@ if (isAddPath(location.pathname)) {
   history.replaceState(null, "", location.pathname.replace(/add\/?$/, "") + format({ tab: "sources", path: ["manage", "sources"] }));
 }
 router.start();
+upgradeNotices.start();
 document.getElementById("boot")?.remove(); // the first page is drawn: the loading screen goes
 if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 

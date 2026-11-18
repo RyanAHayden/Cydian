@@ -50,7 +50,8 @@ export function nav(route) {
 // root's detail). Pages popped off the stack are out of the DOM and get forgotten here.
 const pages = new Set();
 settings.onChange((key) => {
-  if (defOf(key)?.kind === "toggle") return; // the switch already shows it, and keeps its slide
+  // The switch already shows it, and keeps its slide; unless the value went back (F65: the helper refused it).
+  if (defOf(key)?.kind === "toggle") return syncSwitches(key);
   for (const p of pages) {
     if (p.el.isConnected) draw(p);
     else pages.delete(p);
@@ -120,12 +121,24 @@ function pushSection() {
 }
 
 // A settings row's switch: createSwitch bound to the toggle setting `d`.
+// F65: a toggle whose value changed under its switch (Upgrade Notifications when cydian-helper fails) shows it.
+function syncSwitches(key) {
+  const on = settings.get(key) === true;
+  for (const p of pages) {
+    for (const b of p.el.querySelectorAll?.(".switch[data-key]") ?? []) {
+      if (b.dataset.key === key && (b.getAttribute("aria-checked") === "true") !== on) b.setAttribute("aria-checked", String(on));
+    }
+  }
+}
+
 function makeSwitch(d) {
-  return createSwitch({
+  const b = createSwitch({
     label: d.label,
     checked: settings.get(d.key) === true,
     onToggle: (on) => { if ((settings.get(d.key) === true) !== on) settings.set(d.key, on); },
   });
+  b.dataset.key = d.key;
+  return b;
 }
 
 // The iOS 6 switch (ios6.css .switch), for settings rows (makeSwitch) and anything else (F24's Section

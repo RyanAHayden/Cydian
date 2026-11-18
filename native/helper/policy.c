@@ -184,6 +184,43 @@ static int source_plan(int argc, char *const argv[], const char *prefix, struct 
     return 0;
 }
 
+/* F65: notifications on|off: checked here, done by helper_notify_apply. */
+static int notify_plan(int argc, char *const argv[], const char *prefix, struct helper_plan *p, const char **err) {
+    if (argc != 2 || (strcmp(argv[1], "on") && strcmp(argv[1], "off"))) { *err = "notifications takes on or off"; return -1; }
+    if ((size_t)snprintf(p->path, sizeof p->path, "%s%s", prefix, HELPER_NOTIFY_OFF) >= sizeof p->path) {
+        *err = "prefix too long"; return -1;
+    }
+    p->argv[0] = "notifications";
+    p->argv[1] = strcmp(argv[1], "on") ? "off" : "on";
+    p->argv[2] = NULL;
+    p->argc = 2;
+    return 0;
+}
+
+int helper_notify_apply(const struct helper_plan *p, const char **err) {
+    if (p->verb != HV_NOTIFICATIONS) { *err = "not the notifications verb"; return -1; }
+    struct stat st;
+    if (!strcmp(p->argv[1], "on")) {
+        if (lstat(p->path, &st)) return errno == ENOENT ? 0 : (*err = "can't read upgrades.off", -1);
+        if (!S_ISREG(st.st_mode)) { *err = "upgrades.off isn't a regular file"; return -1; }
+        if (unlink(p->path) && errno != ENOENT) { *err = "can't delete upgrades.off"; return -1; }
+        return 0;
+    }
+    char dir[PATH_MAX];
+    snprintf(dir, sizeof dir, "%s", p->path);
+    char *slash = strrchr(dir, '/');
+    if (!slash) { *err = "bad upgrades.off path"; return -1; }
+    *slash = 0;
+    if (mkdir(dir, 0755) && errno != EEXIST) { *err = "can't create the cydian folder"; return -1; }
+    if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) { *err = "the cydian folder isn't a folder"; return -1; }
+    int fd = open(p->path, O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK, 0644);
+    if (fd < 0) { *err = "can't create upgrades.off"; return -1; }
+    int bad = fstat(fd, &st) || !S_ISREG(st.st_mode);
+    close(fd);
+    if (bad) { *err = "upgrades.off isn't a regular file"; return -1; }
+    return 0;
+}
+
 /* N4: simulate|apply <item>...: one apt-get install over the whole queue. simulate is apt-get -s (prints the
  * Inst/Remv/Conf lines the Confirm sheet lists, or apt's refusal); apply runs it, with Cydia's CYDIA fd kept open
  * for maintainer scripts (APT::Keep-Fds, main.c sets CYDIA="3 1") and downgrades allowed, as Downgrade asks for an
@@ -551,6 +588,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "rollbacks")) { p->verb = HV_ROLLBACKS; return rollback_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "rollback")) { p->verb = HV_ROLLBACK; return rollback_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "install-paid")) { p->verb = HV_INSTALL_PAID; return paid_plan(argc, argv, prefix, status_fd, p, err); }
+    else if (!strcmp(verb, "notifications")) { p->verb = HV_NOTIFICATIONS; return notify_plan(argc, argv, prefix, p, err); }
     else if (!strcmp(verb, "selfupdate")) { p->verb = HV_SELFUPDATE; return selfupdate_plan(argc, argv, prefix, status_fd, p, err); }
     else { *err = "unknown verb (" HELPER_VERBS ")"; return -1; }
 

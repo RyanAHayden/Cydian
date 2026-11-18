@@ -21,7 +21,7 @@ import { NO_SECTION, indexLetter, parseAuthor } from "../core/catalog.js";
 import { packageIcon } from "../core/sectionicons.js";
 import { description, parseRelations, compareVersions } from "../core/apt.js";
 import { displayName, releaseDepiction } from "../core/sources.js";
-import { renderSileo, mediaUrl } from "./depiction.js";
+import { renderSileo, mediaUrl, reviewBody } from "./depiction.js";
 import { settings, createSwitch } from "./settings.js";
 import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js";
 import { compat, markOf, isIncompatible } from "../core/compat.js";
@@ -29,7 +29,8 @@ import { isAltKey } from "../core/altstore.js";
 import { renderAltSource, renderApp, installRows, appBundleId, formatDate, osRange, appPageAction, appPageCustom } from "./altstore.js";
 import { linksGroup, previewSlot } from "./altstore.js";
 import { descriptionGroup } from "./description.js";
-import { packageLinks, packageGithub, aptShots, sileoShots } from "../core/previews.js";
+import { packageLinks, packageGithub, aptShots, sileoShots, sileoRatings, sileoWhatsNew } from "../core/previews.js";
+import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, reviewsPane, whatsNewGroup } from "./storepage.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { signAndInstall, localSigning } from "../signing-client.js";
 import { installOptions } from "../core/altstore.js";
@@ -542,8 +543,9 @@ async function renderPackage(body, route, key, id, ctx) {
     names.set(id, st.name);
     setTitle(body, st.name);
     const altSrc = sources.find((s) => s.key === pkg.key);
-    renderApp(body, route, pkg, altSrc);
-    if (detectMode() === "jailbreak") installedAppGroup(st.ipa.bundleIdentifier).then((g) => { if (g && body.isConnected) body.append(g); });
+    // F181: its Related tab is the same as a package's: the source's other apps in that category.
+    const { details } = renderApp(body, route, pkg, altSrc, { related: (pane) => relatedPane(pane, route, pkg, id) });
+    if (detectMode() === "jailbreak") installedAppGroup(st.ipa.bundleIdentifier).then((g) => { if (g && details.isConnected) details.append(g); });
     rememberPackage(body, route, { id, pkg, source: altSrc, history: await catalog.history(id, key).catch(() => null) });
     return;
   }
@@ -554,10 +556,9 @@ async function renderPackage(body, route, key, id, ctx) {
   const name = st.name || st.package;
   names.set(id, name);
   setTitle(body, name);
-  const groups = [];
 
-  // Header: icon, name, version, size.
-  const head = el("div", "pkg-head");
+  // F181: the iOS 6 App Store's header (screens/storepage.js): the large glossy icon, name, author, stars once a
+  // rating is known, and "Version · size · price". Install / Modify stays the nav bar's right button.
   const art = createArt(true);
   paintArt(art, { ...pkg.row, icon: st.iconUrl ?? pkg.row.icon });
   const src = st.iconUrl && mediaUrl(st.iconUrl);
@@ -566,66 +567,39 @@ async function renderPackage(body, route, key, id, ctx) {
     art.img.onerror = () => { art.img.remove(); if (art.badge.classList.contains("section")) art.badge.hidden = true; };
     art.img.src = src;
   } else art.img.remove();
-  const ht = el("div", "pkg-head-text");
   // Works on my phone (F17): judged here from the stanza, so an installed-only page gets one too.
   const fit = compat(st, currentDevice());
   const fitCode = fit.status === "no" ? fit.reason : fit.status;
-  const nameLine = el("span", "pkg-head-top");
   const headMark = el("span", "compat-mark large");
   setMark(headMark, fitCode);
-  nameLine.append(el("span", "pkg-head-name", name), headMark);
-  ht.append(nameLine);
   const headAuthor = parseAuthor(st.author) || parseAuthor(st.maintainer);
-  if (headAuthor) { // F29: who made it, under the name; opens their packages
-    const a = el("a", "pkg-head-author", headAuthor.name);
-    a.href = deeper(route, token("author", headAuthor.name));
-    ht.append(a);
-  }
-  ht.append(el("span", "pkg-head-version", st.version ?? ""));
-  const fitBadge = el("span", "pkg-compat", fit.label);
-  fitBadge.dataset.compat = fitCode;
-  ht.append(fitBadge);
   const size = formatSize(st.size);
-  head.append(art.art, ht);
-  if (size) head.append(el("span", "pkg-head-size", size));
-  const headGroup = el("div", "group");
-  const headTable = el("div", "table grouped pkg-head-table");
-  headTable.append(head);
-  headGroup.append(headTable);
+  const header = storeHeader({ art: art.art, name, mark: headMark, author: headAuthor?.name ?? null,
+    authorHref: headAuthor ? deeper(route, token("author", headAuthor.name)) : null, // F29: opens their packages
+    line: headerLine({ version: st.version, size, price: pkg.installedOnly ? null : isPaid(st) ? "Paid" : "Free" }) });
 
-  // Author and Maintainer: each opens everything by that person.
-  const people = [];
-  const author = parseAuthor(st.author);
-  const maint = parseAuthor(st.maintainer);
-  if (author) people.push({ label: "Author", detail: author.name, href: deeper(route, token("author", author.name)) });
-  if (maint && maint.name.toLowerCase() !== author?.name.toLowerCase()) {
-    people.push({ label: author ? "Maintainer" : "Contact", detail: maint.name, href: deeper(route, token("author", maint.name)) });
-  }
-  if (people.length) groups.push({ rows: people });
-
-  // Depiction: Sileo JSON drawn natively below; else an HTML depiction in a sheet, and the description. A package
+  // Depiction: Sileo JSON drawn natively in Details; else an HTML depiction in a sheet, and the description. A package
   // with no Depiction: of its own gets the source's Release template (Cydia's fallback; an own non-http one
   // still counts as having one, so it gets neither).
   const sileo = httpUrl(st.sileodepiction);
   const html = st.depiction?.trim() ? httpUrl(st.depiction) : releaseDepiction(source, st.package || id);
-  const depictionSlot = el("div", "depiction-slot");
-  const more = [];
-  if (html) more.push({ label: "Depiction", onClick: () => openHtmlDepiction(html, name) });
-  // F122: Homepage: (More Information before) is the Links group's Developer Website now.
+  // One fetch of the Sileo JSON for the Details body, What's New, the stars and the Reviews tab (F181).
+  const sileoJson = sileo ? getBackend().text(sileo).then((t) => JSON.parse(t)).catch(() => null) : Promise.resolve(null);
+  const ratingOf = (json) => (json ? sileoRatings(json) : null);
+  sileoJson.then((json) => { if (body.isConnected) header.setRating(ratingOf(json)); });
   const descText = desc.long || desc.short;
 
-  // Details.
-  const details = [{ label: "Version", detail: st.version ?? "" }];
-  if (size) details.push({ label: "Size", detail: size });
-  const inst = Number(st["installed-size"]);
-  if (inst > 0) details.push({ label: "Installed Size", detail: formatSize(inst * 1024) });
-  details.push({ label: "Section", detail: pkg.row.section === NO_SECTION ? "—" : pkg.row.section });
-  if (!pkg.installedOnly) {
-    details.push({ label: "Source", detail: sourceName || "Unknown",
-      href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) });
-  }
-  details.push({ label: "Identifier", detail: st.package });
-  if (st.architecture) details.push({ label: "Architecture", detail: st.architecture });
+  const tabs = storeTabs({
+    reviews: async (pane) => {
+      if (sileo) pane.replaceChildren(spinner("Loading Reviews"));
+      const r = ratingOf(await sileoJson);
+      reviewsPane(pane, { rating: r, reviews: r?.reviews ?? [], renderText: (rv) => reviewBody(rv, { open: openSileoSheet }),
+        footer: r ? "Ratings and reviews from the package's depiction, as its source wrote them." : "Its source gives no ratings or reviews for this package." });
+    },
+    related: (pane) => relatedPane(pane, route, pkg, id),
+  });
+  const details = tabs.panes.details;
+  body.replaceChildren(header.head, ...tabs.nodes);
 
   // Depends (and Pre-Depends): each line links to the first alternative we carry.
   const rels = [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)];
@@ -650,20 +624,66 @@ async function renderPackage(body, route, key, id, ctx) {
       href: format({ tab: "sources", path: [o.key, token("package", id)] }) });
   }
 
-  body.replaceChildren(headGroup);
   // F20: price; in the app Sign In, Buy, Install. B11: in the app its state also drives the nav bar button.
   const payBox = pkg.installedOnly ? null : paymentGroup(st, source, ctx, { onState: (s) => paidButton(body, s) });
-  if (payBox) body.append(payBox);
-  const later = [];
-  if (groups.length) later.push(...groups);
-  body.append(grouped(later));
-  body.append(depictionSlot);
-  if (!sileo && descText) body.append(descriptionGroup(descText)); // F165: own group, long ones fold behind More
+  if (payBox) details.append(payBox);
   // F122: the gallery (Screenshots:/Header:, a Sileo depiction's screenshots, else the HTML depiction's pictures or
-  // the GitHub repo's) and the Links group (the source, Homepage:, GitHub, a Sileo depiction's buttons).
+  // the GitHub repo's), sideways with page dots and tap-to-zoom (F181, altstore.js galleryGroup).
   const previews = el("div", "package-previews");
-  body.append(previews);
-  if (more.length) body.append(grouped([{ rows: more.map((r) => ({ ...r, chevron: true })) }]));
+  details.append(previews);
+  const previewKey = `pkg:${pkg.key ?? "installed"}:${st.package || id}`;
+  const drawPreviews = (json) => previews.replaceChildren(previewSlot(previewKey, {
+    shots: [...aptShots(st), ...(json ? sileoShots(json) : [])],
+    html: sileo ? null : html,
+    gh: packageGithub(st, json),
+  }));
+  if (!sileo) drawPreviews(null);
+
+  // F181: the sideways info tiles: Rating (once known), Works On, Size, Section.
+  const tiles = tileRow();
+  tiles.set("works", worksOnTile(fit));
+  tiles.set("size", sizeTile(size));
+  tiles.set("section", sectionTile(pkg.row.section === NO_SECTION ? null : pkg.row.section, { rootless: "Rootless", rootful: "Rootful", roothide: "Roothide" }[fit.need] ?? null));
+  details.append(tiles.row);
+  sileoJson.then((json) => tiles.set("rating", ratingTile(ratingOf(json))));
+
+  // Description, or the Sileo depiction as Details' body (its reviews go to the Reviews tab, its pictures to the
+  // gallery).
+  const depictionSlot = el("div", "depiction-slot");
+  details.append(depictionSlot);
+  if (!sileo && descText) depictionSlot.append(descriptionGroup(descText)); // F165: own group, long ones fold behind More
+
+  // What's New (a Sileo depiction's newest changelog entry) with Version History (F29) under it.
+  const news = el("div", "store-news-slot");
+  details.append(news);
+
+  // Information: who, where from, what it is and needs, and where it runs.
+  const info = [];
+  const author = parseAuthor(st.author);
+  const maint = parseAuthor(st.maintainer);
+  if (author) info.push({ label: "Developer", detail: author.name, href: deeper(route, token("author", author.name)) });
+  if (maint && maint.name.toLowerCase() !== author?.name.toLowerCase()) {
+    info.push({ label: author ? "Maintainer" : "Contact", detail: maint.name, href: deeper(route, token("author", maint.name)) });
+  }
+  if (!pkg.installedOnly) {
+    info.push({ label: "Source", detail: sourceName || "Unknown",
+      href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) });
+  }
+  info.push({ label: "Package", detail: st.package });
+  info.push({ label: "Version", detail: st.version ?? "" });
+  const inst = Number(st["installed-size"]);
+  if (inst > 0) info.push({ label: "Installed Size", detail: formatSize(inst * 1024) });
+  if (st.architecture) info.push({ label: "Architecture", detail: st.architecture });
+  if (rels.length) info.push({ label: "Depends", detail: rels.map((g) => g[0].name).join(", "), cls: "store-info-long" });
+  info.push({ label: "Compatibility", detail: fit.range ?? compatBadge(fitCode) });
+  details.append(grouped([{ header: "Information", rows: info, footer: fit.detail }]));
+
+  // More by the author, the HTML depiction, and Support: the Links group (the source, Homepage:, GitHub, a Sileo
+  // depiction's buttons).
+  const more = [];
+  if (headAuthor) more.push({ label: `More by ${headAuthor.name}`, href: deeper(route, token("author", headAuthor.name)) });
+  if (html) more.push({ label: "Depiction", onClick: () => openHtmlDepiction(html, name), chevron: true });
+  if (more.length) details.append(grouped([{ rows: more }]));
   const sourceLink = pkg.installedOnly ? null : { label: sourceName || "Unknown Source", subtitle: source?.uri,
     href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) };
   const links = el("div", "package-links");
@@ -672,54 +692,74 @@ async function renderPackage(body, route, key, id, ctx) {
     links.replaceChildren(...(sourceLink || list.length ? [linksGroup(sourceLink, list)] : []));
   };
   drawLinks(null);
-  body.append(links);
-  const previewKey = `pkg:${pkg.key ?? "installed"}:${st.package || id}`;
-  const drawPreviews = (json) => previews.replaceChildren(previewSlot(previewKey, {
-    shots: [...aptShots(st), ...(json ? sileoShots(json) : [])],
-    html: sileo ? null : html,
-    gh: packageGithub(st, json),
-  }));
-  if (!sileo) drawPreviews(null);
-  body.append(grouped([{ header: "Details", rows: details }]));
+  details.append(links);
+
   // F29: Version History, every version the sources offer (Downgrade's list); and Modify once it's installed.
   const history = await catalog.history(id, key).catch(() => null);
   rememberPackage(body, route, { id, key, pkg, source, history, payBox });
-  if (history?.versions.length) body.append(versionHistoryRow(route, id, history));
-  body.append(grouped([{ header: "Works on My Phone", rows: [{ label: compatBadge(fitCode) }],
-    footer: fit.detail }]));
+  const drawNews = (json) => {
+    const notes = json ? sileoWhatsNew(json) : null;
+    const row = history?.versions.length ? versionHistoryCell(route, id, history) : null;
+    const g = whatsNewGroup({ version: notes ? notes.title || st.version : null, notes: notes?.text || null, history: row });
+    news.replaceChildren(...(g ? [g] : []));
+  };
+  drawNews(null);
   if (queueOf()) {
     const slot = el("div", "package-queue-slot");
     slot.dataset.id = st.package || id;
     fillQueueSlot(slot);
-    body.append(slot);
+    details.append(slot);
   }
   const installedEl = await installedGroup(st.package || id);
-  if (installedEl) body.append(installedEl);
+  if (installedEl) details.append(installedEl);
   // F71: the copies N7's daemon kept, filled in when the helper answers (screens/rollback.js).
-  if (installedEl && hasRollback()) body.append(rollbackSlot(st.package || id, { installed: installedOf(history), name: pkg.row?.name }));
-  if (depReport?.problems.length) body.append(depProblemsGroup(depReport, route, ctx));
-  if (depRows.length) body.append(grouped([{ header: "Depends", rows: depRows }]));
-  if (conflicts.length) body.append(grouped([{ header: "Conflicts", rows: conflicts }]));
+  if (installedEl && hasRollback()) details.append(rollbackSlot(st.package || id, { installed: installedOf(history), name: pkg.row?.name }));
+  if (depReport?.problems.length) details.append(depProblemsGroup(depReport, route, ctx));
+  if (depRows.length) details.append(grouped([{ header: "Depends", rows: depRows }]));
+  if (conflicts.length) details.append(grouped([{ header: "Conflicts", rows: conflicts }]));
   // An installed package no source carries (F27) has no source to name: its page is the status stanza alone.
-  if (!pkg.installedOnly) body.append(grouped([{ header: pkg.others.length > 1 ? "Sources" : "Source", rows: srcRows }]));
+  if (!pkg.installedOnly) details.append(grouped([{ header: pkg.others.length > 1 ? "Sources" : "Source", rows: srcRows }]));
   // F8: Open In, the package in another package manager (and its source from another device).
-  if (!pkg.installedOnly && source) body.append(openInGroup(source, { pkg: st.package || id }));
+  if (!pkg.installedOnly && source) details.append(openInGroup(source, { pkg: st.package || id }));
   if (st.debUrl && getBackend().kind === "http") {
     // Paid packages (cydia::commercial) only download for a buyer's device: the repo refuses the proxy.
-    if (/(^|,)\s*cydia::commercial\s*(,|$)/.test(st.tag ?? "")) body.append(grouped([{ footer: "A paid package: buy and install it from a package manager on the phone." }]));
-    else body.append(downloadGroup(st));
+    if (/(^|,)\s*cydia::commercial\s*(,|$)/.test(st.tag ?? "")) details.append(grouped([{ footer: "A paid package: buy and install it from a package manager on the phone." }]));
+    else details.append(downloadGroup(st));
   }
-  body.append(grouped([{ footer: `${st.package}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
+  details.append(grouped([{ footer: `${st.package}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
 
   if (sileo) {
-    loadSileo(depictionSlot, sileo, { fallback: descText }).then((json) => {
+    loadSileo(depictionSlot, sileo, { fallback: descText, json: sileoJson }).then((json) => {
       if (!previews.isConnected) return;
-      // The gallery shows the depiction's screenshots (F122), so its own strip goes.
+      // The gallery shows the depiction's screenshots (F122), so its own strip goes; the Reviews tab its reviews.
       if (json && sileoShots(json).length) for (const strip of depictionSlot.querySelectorAll(".dep-shots")) strip.remove();
+      if (json && sileoRatings(json)?.reviews.length) for (const rv of depictionSlot.querySelectorAll(".dep-review")) rv.remove();
       drawLinks(json);
       drawPreviews(json);
+      drawNews(json);
     });
   }
+}
+
+// F181: the Related tab: other packages in the same section from the same source (All Sources: from every source),
+// as a plain list of up to RELATED rows; none when the package has no section.
+const RELATED = 50;
+async function relatedPane(pane, route, pkg, id) {
+  const section = pkg.row?.section;
+  if (!section || section === NO_SECTION || pkg.installedOnly) {
+    pane.replaceChildren(el("p", "empty", "No related packages."));
+    return;
+  }
+  pane.replaceChildren(spinner("Loading Packages"));
+  let rows;
+  try { rows = await catalog.list(pkg.key ?? ALL, section); } catch (e) { pane.replaceChildren(el("p", "empty", e.message)); return; }
+  rows = rows.filter((r) => r.id !== id);
+  if (!rows.length) { pane.replaceChildren(el("p", "empty", `Nothing else in ${section}.`)); return; }
+  pane.replaceChildren(grouped([{ header: `More in ${section}`, rows: rows.slice(0, RELATED).map((r) => ({
+    label: r.name, subtitle: r.short || null, href: deeper(route, token("package", r.id)), cls: "store-related-row",
+    icon: { text: (r.name || "?").charAt(0).toUpperCase(), src: r.icon ? mediaUrl(r.icon) : null, cls: "store-related-icon" },
+  })), footer: rows.length > RELATED ? `${RELATED} of ${rows.length}: all of them are in ${section}.` : null }]));
+  if (rows.length > RELATED) pane.append(grouped([{ rows: [{ label: `All of ${section}`, href: deeper(route, token("section", section)) }] }]));
 }
 
 // ---- Install / Modify and Version History (F29) ------------------------------------------------------------
@@ -896,9 +936,10 @@ async function signIfReady(app, v, record) {
 }
 
 // The package page's row to its Version History: how many versions are on offer.
-function versionHistoryRow(route, id, history) {
+// Version History's row (F29), for the What's New card (F181, screens/storepage.js whatsNewGroup).
+export function versionHistoryCell(route, id, history) {
   const n = history.versions.filter((v) => (history.kind === "ipa" ? true : v.keys.length)).length;
-  return grouped([{ rows: [{ label: "Version History", detail: n === 1 ? "1 version" : `${n} versions`, href: versionsHref(route, id) }] }]);
+  return { label: "Version History", detail: n === 1 ? "1 version" : `${n} versions`, href: versionsHref(route, id) };
 }
 
 // One version's cell: version (and build), its tags, the detail on the right, a line under it, release notes.
@@ -1124,10 +1165,12 @@ function downloadGroup(st) {
   return g;
 }
 
-async function loadSileo(slot, url, { fallback }) {
+// `json`: the page's own fetch of it (F181: shared with the stars, What's New and Reviews), else fetched here.
+async function loadSileo(slot, url, { fallback, json: fetched = null }) {
   slot.append(spinner("Loading Depiction"));
   try {
-    const json = JSON.parse(await getBackend().text(url));
+    const json = fetched ? await fetched : JSON.parse(await getBackend().text(url));
+    if (!json) throw new Error("no depiction");
     const dep = renderSileo(json, { open: (u, title) => openSileoSheet(u, title) });
     const g = el("div", "group");
     const t = el("div", "table grouped dep-card");

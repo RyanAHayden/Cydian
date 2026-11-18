@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width">
+<link rel=stylesheet href="app/style.css"><link rel=stylesheet href="app/ios6.css"><link rel=stylesheet href="app/packages.css"><link rel=stylesheet href="app/altstore.css">
+<style>html,body{margin:0;height:auto!important;overflow:visible!important} .page{visibility:visible!important;position:static!important;transform:none!important} .page-body{position:static!important;overflow:visible!important;height:auto!important}</style></head>
+<body><div class="page"><div class="page-body grouped" id=b></div></div>
+<script type=module>
+const q=new URLSearchParams(location.search);
+if(q.has('dark')) document.documentElement.dataset.theme='dark';
+const sp=await import('./app/screens/storepage.js');
+const {grouped,el}=await import('./app/nav/ui.js');
+const {descriptionGroup}=await import('./app/screens/description.js');
+const body=document.getElementById('b');
+const icon=el('span','pkg-icon large'); const im=el('img','loaded'); im.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9J2cnIHgyPScwJyB5Mj0nMSc+PHN0b3Agb2Zmc2V0PScwJyBzdG9wLWNvbG9yPScjYTg3OWU2Jy8+PHN0b3Agb2Zmc2V0PScxJyBzdG9wLWNvbG9yPScjNWEyZmE4Jy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsbD0ndXJsKCNnKScvPjx0ZXh0IHg9JzIwJyB5PSc4MCcgZm9udC1mYW1pbHk9J0hlbHZldGljYScgZm9udC1zaXplPSc0MCcgZmlsbD0nI2ZmZic+PC90ZXh0Pjwvc3ZnPg=='; icon.append(im);
+const rated=!q.has('norating');
+const h=sp.storeHeader({art:icon,name:'Velvet',author:'Sample Dev',authorHref:'#',line:sp.headerLine({version:'2.1.3',size:'412 kB',price:'Free'})});
+const r={average:4.3,count:212,noun:'Ratings',histogram:q.has('bars')?[131,42,17,9,13]:null,from:'App Store'};
+if(rated) h.setRating(r);
+const tabs=sp.storeTabs({reviews:(p)=>sp.reviewsPane(p,{rating:rated?r:null,reviews:[{title:'Feels like a new phone',author:'mobileuser',rating:5,text:'The Bouncy preset is perfect.'},{title:'Breaks the camera swipe',author:'jbfan',rating:2,version:'2.1.2',date:'Nov 9',text:'Swiping to the camera lags.',response:'Fixed in 2.1.3, thanks!'}],footer:'Ratings and reviews from the package\'s depiction.'}),related:(p)=>p.append(grouped([{header:'More in Tweaks',rows:[{label:'Other',subtitle:'Does a thing',href:'#',icon:{text:'O'}}]}]))});
+body.append(h.head,...tabs.nodes);
+const d=tabs.panes.details;
+const g=el('div','group shots-group'); const strip=el('div','alt-shots');
+for(const s of ['data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSczOTAnIGhlaWdodD0nODQ0Jz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9J2cnIHgyPScwJyB5Mj0nMSc+PHN0b3Agb2Zmc2V0PScwJyBzdG9wLWNvbG9yPScjM2EyNDcwJy8+PHN0b3Agb2Zmc2V0PScxJyBzdG9wLWNvbG9yPScjNmIzZmJmJy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsbD0ndXJsKCNnKScvPjx0ZXh0IHg9JzIwJyB5PSc4MDQnIGZvbnQtZmFtaWx5PSdIZWx2ZXRpY2EnIGZvbnQtc2l6ZT0nNDAnIGZpbGw9JyNmZmYnPk9uZTwvdGV4dD48L3N2Zz4=', 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSczOTAnIGhlaWdodD0nODQ0Jz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9J2cnIHgyPScwJyB5Mj0nMSc+PHN0b3Agb2Zmc2V0PScwJyBzdG9wLWNvbG9yPScjMWYzZjgwJy8+PHN0b3Agb2Zmc2V0PScxJyBzdG9wLWNvbG9yPScjM2Y2ZmM0Jy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsbD0ndXJsKCNnKScvPjx0ZXh0IHg9JzIwJyB5PSc4MDQnIGZvbnQtZmFtaWx5PSdIZWx2ZXRpY2EnIGZvbnQtc2l6ZT0nNDAnIGZpbGw9JyNmZmYnPlR3bzwvdGV4dD48L3N2Zz4=', 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSczOTAnIGhlaWdodD0nODQ0Jz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9J2cnIHgyPScwJyB5Mj0nMSc+PHN0b3Agb2Zmc2V0PScwJyBzdG9wLWNvbG9yPScjMjA0MDIwJy8+PHN0b3Agb2Zmc2V0PScxJyBzdG9wLWNvbG9yPScjM2Y5ZjRmJy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsbD0ndXJsKCNnKScvPjx0ZXh0IHg9JzIwJyB5PSc4MDQnIGZvbnQtZmFtaWx5PSdIZWx2ZXRpY2EnIGZvbnQtc2l6ZT0nNDAnIGZpbGw9JyNmZmYnPlRocmVlPC90ZXh0Pjwvc3ZnPg==']){const i=el('img','alt-shot');i.src=s;strip.append(i);}
+const dots=el('div','shot-dots'); for(let i=0;i<3;i++){const s=el('span','shot-dot'+(i?'':' on'));dots.append(s);}
+g.append(el('h2','group-header','Screenshots'),strip,dots); d.append(g);
+const t=sp.tileRow(); if(rated)t.set('rating',sp.ratingTile(r)); t.set('works',sp.worksOnTile({status:q.has('no')?'no':'works',range:'iOS 15.0 or later'}));
+t.set('size',sp.sizeTile('412 kB')); t.set('section',sp.sectionTile('Tweaks','Rootless')); t.set('updated',sp.updatedTile(Date.now()-6*864e5)); d.append(t.row);
+d.append(descriptionGroup('Smooth, springy animations for every app and the Home screen. Pick a spring per app, slow everything down for a demo, or turn it off for one app.'));
+d.append(sp.whatsNewGroup({version:'2.1.3',date:'Nov 12',notes:'Fixes a stutter when closing apps on iOS 16. New “Bouncy” preset.',history:{label:'Version History',detail:'4 versions',href:'#'}}));
+d.append(grouped([{header:'Information',rows:[{label:'Developer',detail:'Sample Dev',href:'#'},{label:'Source',detail:'repo.example.com',href:'#'},{label:'Package',detail:'com.example.velvet'},{label:'Depends',detail:'ellekit, preferenceloader'},{label:'Compatibility',detail:'iOS 15.0 or later'}],footer:'Made for iOS 15.0 or later; this iPhone runs iOS 16.5.'}]));
+d.append(grouped([{rows:[{label:'More by Sample Dev',href:'#'},{label:'Depiction',onClick:()=>{},chevron:true}]}]));
+if(q.has('tab')) tabs.select(Number(q.get('tab')));
+document.title='ready';
+</script></body></html>

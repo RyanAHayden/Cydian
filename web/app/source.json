@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.4.0",
+          "date": "2026-11-18T13:04:59Z",
+          "localizedDescription": "**Home and Settings**\nSettings now sits at the bottom of Home, like Cydia; the tab bar is Home, Sources, Changes, Installed and Search.\nSettings rebuilt like iOS 6's Settings app: General, Display, Updates, Signing and About. Unused settings removed.\nThe Signing tile hides once signing is set up (it lives in Settings > Signing).\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.4.0",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.4.0/Cydian.ipa",
+          "size": 4726644,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.3.8",
           "date": "2026-11-18T09:26:31Z",
           "localizedDescription": "The website signs apps for real now (the browser signer kept the old signature: integrity could not be verified), shows Ready to Install so iOS asks only once (no Open in iTunes), and leaves app extensions out.\nThe website pushes Cydian first: Home below Install Cydian App and the other tabs stay locked (Install Cydian, Browse Anyway (5), Cancel; Settings > Signing locks it again); Install Full Cydian for jailbroken phones (Sileo, Zebra, .deb); tweak pages offer Install in Cydian.\nAdd Source paste works again in the app; Back and the swipe go to the page you came from; the scroll bar takes a hold to grab.\nCydian Account syncs settings, sources, ignored upgrades and the wish list.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.8",
@@ -167,14 +175,6 @@
           "localizedDescription": "App pages: Install signs with your own certificate and installs; Download IPA keeps the file, on every older version too. No more hand-offs to AltStore, SideStore or Feather.\nInstalls in the app show only iOS's Install prompt.\nMark as Installed for apps installed another way.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.0",
           "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.0/Cydian.ipa",
           "size": 2541172,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.1.9",
-          "date": "2026-11-18T02:20:15Z",
-          "localizedDescription": "Installing in the app shows only iOS's Install prompt, no Open in iTunes before it.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.9",
-          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.9/Cydian.ipa",
-          "size": 2530948,
           "minOSVersion": "15.0"
         }
       ]

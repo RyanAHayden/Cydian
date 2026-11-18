@@ -601,6 +601,33 @@ import { d1 } from "./src/d1-sqlite.js";
   j = await (await call("/reviews/com.example.velvet")).json();
   assert.equal(j.count, 1);
 
+  // F207: the writer's token deletes its own review (by id, or by package alone); another token gets 403
+  const mine = (await (await call("/reviews/com.example.mine", { method: "POST", token: tok("m"), body: { stars: 5, title: "Mine" } })).json()).review;
+  await call("/reviews/com.example.mine", { method: "POST", token: tok("n"), body: { stars: 1, title: "Theirs" } });
+  await call("/reviews/com.example.mine", { method: "POST", token: tok("o"), body: { stars: 3 } });
+  assert.equal((await call(`/reviews/com.example.mine/${mine.id}`, { method: "DELETE", token: tok("n") })).status, 403, "not yours");
+  assert.equal((await call(`/reviews/com.example.mine/${mine.id}`, { method: "DELETE" })).status, 403, "no token, no secret");
+  assert.equal((await call(`/reviews/com.example.other/${mine.id}`, { method: "DELETE", token: tok("m") })).status, 404, "wrong package");
+  r = await call(`/reviews/com.example.mine/${mine.id}`, { method: "DELETE", token: tok("m") });
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { ok: true, id: mine.id });
+  j = await (await call("/reviews/com.example.mine", { token: tok("m") })).json();
+  assert.deepEqual([j.count, j.histogram, j.average, j.mine, j.reviews.map((x) => x.title)], [2, [0, 0, 1, 0, 1], 2, null, ["Theirs"]]);
+  assert.equal((await call(`/reviews/com.example.mine/${mine.id}`, { method: "DELETE", token: tok("m") })).status, 404, "already gone");
+  assert.equal((await call("/reviews/com.example.mine", { method: "DELETE", token: tok("t") })).status, 404, "none of mine here");
+  r = await call("/reviews/com.example.mine", { method: "DELETE", token: tok("o") });
+  assert.equal(r.status, 200, "by package alone");
+  j = await (await call("/reviews/com.example.mine")).json();
+  assert.deepEqual([j.count, j.histogram], [1, [0, 0, 0, 0, 1]]);
+  r = await call("/reviews/com.example.mine", { method: "POST", token: tok("p"), body: { stars: 4 } });
+  const pid = (await r.json()).review.id;
+  assert.equal((await call(`/reviews/com.example.mine/${pid}`, { method: "DELETE", auth: "Bearer owner-secret-123" })).status, 200, "admin still deletes");
+  assert.equal((await call("/reviews/com.example.mine", { method: "DELETE", auth: "Bearer owner-secret-123" })).status, 403, "admin needs an id");
+  // token deletes count against the token's minute
+  const dels = [];
+  for (let i = 0; i < 6; i++) dels.push((await call("/reviews/com.example.mine", { method: "DELETE", token: tok("s") })).status);
+  assert.deepEqual(dels, [404, 404, 404, 404, 429, 429]);
+
   // rate limits: per address a minute, per token a minute, per address a day
   let codes = [];
   for (let i = 0; i < 8; i++) codes.push((await call("/reviews/com.example.rl", { method: "POST", token: tok(String.fromCharCode(103 + i)), ip: "192.0.2.1", body: { stars: 4 } })).status);

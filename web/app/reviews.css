@@ -68,3 +68,10 @@ html[data-theme="dark"] .review-input { color: var(--head); }
 .review-error[hidden] { display: none; }
 html[data-theme="dark"] .review-error { color: var(--dk-bad); }
 .review-note { margin: 10px 19px 20px; font-size: 14px; line-height: 18px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
+/* F207: Delete Review. In the sheet: the action sheet's red button (packages.css .action-button.destructive), full
+   width like Settings > Account's Delete Account. On your own review's row: Report's small text button, in red. */
+.review-delete-wrap { display: flex; padding: 0 10px 30px; }
+.review-delete { flex: 1; }
+.review-delete-own { align-self: flex-end; padding: 2px 0; border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #c8231a; cursor: pointer; }
+.review-delete-own:disabled { opacity: .5; }
+html[data-theme="dark"] .review-delete-own { color: var(--dk-bad); }

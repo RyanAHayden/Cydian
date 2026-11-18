@@ -15,12 +15,14 @@
 //     rating each time it is drawn again after a post (the header and the Rating tile follow).
 //   writeReviewSheet({ initial, version, onSend, footnote }) -> { sheet, close, send, stars, fields }
 //     The iOS 6 modal: Cancel / Send, the five stars, Title, Name, Review. onSend(draft) -> Promise; it closes when
-//     that resolves and shows the error under the form when it throws.
+//     that resolves and shows the error under the form when it throws. F207: with `initial` and `onDelete`, a red
+//     Delete Review at the bottom; `confirmDelete()` (an action sheet) asks first, then onDelete() and it closes.
 //   starPicker(value, onPick)                 -> { node, set(n), value() }  five tappable stars
 //
 // Everything a person wrote goes in through textContent (nav/ui.js el), never innerHTML.
 import { el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
+import { showActionSheet } from "../nav/actionsheet.js";
 import { ratingsCard, reviewCell } from "./storepage.js";
 import { checkDraft, mergeReviews, ourReview, withStars, LIMITS } from "../core/reviews.js";
 
@@ -59,7 +61,8 @@ function field(label, { value = "", placeholder = "", max, multiline = false }) 
   return { row, input };
 }
 
-export function writeReviewSheet({ initial = null, version = "", onSend = async () => {}, footnote = null, onClose = () => {} } = {}) {
+export function writeReviewSheet({ initial = null, version = "", onSend = async () => {}, footnote = null, onClose = () => {},
+  onDelete = null, confirmDelete = confirmDeleteReview } = {}) {
   const sheet = el("div", "sheet review-sheet");
   sheet.setAttribute("role", "dialog");
   sheet.setAttribute("aria-modal", "true");
@@ -94,6 +97,15 @@ export function writeReviewSheet({ initial = null, version = "", onSend = async 
   error.hidden = true;
   const note = el("div", "review-note", footnote ?? `${version ? `Reviewing version ${version}. ` : ""}One review per package per device; you can change it later.`);
   scroll.append(rate, form, error, note);
+  // F207: Delete Review, iOS 6's red destructive button at the bottom, only when there is a review of this device's.
+  let del = null;
+  if (initial && onDelete) {
+    const wrap = el("div", "review-delete-wrap");
+    del = el("button", "action-button destructive review-delete", "Delete Review");
+    del.type = "button";
+    wrap.append(del);
+    scroll.append(wrap);
+  }
   body.append(scroll);
   sheet.append(bar, body);
   document.body.append(sheet);
@@ -129,15 +141,30 @@ export function writeReviewSheet({ initial = null, version = "", onSend = async 
       return false;
     } finally { busy = false; send.disabled = false; }
   }
+  async function doDelete() {
+    if (busy || !del) return false;
+    if (!(await confirmDelete())) return false;
+    busy = true;
+    send.disabled = del.disabled = true;
+    try {
+      await onDelete();
+      close();
+      return true;
+    } catch (e) {
+      showError(e?.message || "Your review couldn't be deleted.");
+      return false;
+    } finally { busy = false; send.disabled = del.disabled = false; }
+  }
   cancel.addEventListener("click", close);
   send.addEventListener("click", doSend);
-  return { sheet, close, send: doSend, stars, fields, error, closed: () => closed };
+  del?.addEventListener("click", doDelete);
+  return { sheet, close, send: doSend, remove: doDelete, deleteButton: del, stars, fields, error, closed: () => closed };
 }
 
 const resolved = (p) => Promise.resolve(p).catch(() => null);
 
 export async function reviewsTab(pane, { id, version = "", depiction = null, appStore = null, api, renderText = null, now = Date.now(),
-  first = null, onRating = null, sheet = writeReviewSheet, confirm = confirmReport, filter = null } = {}) {
+  first = null, onRating = null, sheet = writeReviewSheet, confirm = confirmReport, confirmDelete = confirmDeleteReview, filter = null } = {}) {
   // F206: the card's skeleton (the filled card's shape, "Loading Reviews…" in its last line), not a spinner, so the
   // tab doesn't jump when the reviews arrive.
   pane.replaceChildren(ratingsCard(null, { pending: true }));
@@ -146,7 +173,13 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
   let page = 0;
   let stars = [1, 2, 3, 4, 5].includes(filter) ? filter : null; // F206: the star filter, null for all
 
-  const redraw = async () => { await reviewsTab(pane, { id, version, depiction: dep, appStore: store, api, renderText, now: Date.now(), onRating, sheet, confirm, filter: stars }); };
+  const redraw = async () => { await reviewsTab(pane, { id, version, depiction: dep, appStore: store, api, renderText, now: Date.now(), onRating, sheet, confirm, confirmDelete, filter: stars }); };
+  // F207: delete this device's review; the tab draws again (stars, count, list) and Tap to Rate starts empty.
+  const removeMine = async () => {
+    await api.remove(id, mine?.id ?? null);
+    mine = null;
+    await redraw();
+  };
   // Tap to Rate keeps the words of a review this device wrote: it only changes the stars.
   const post = async (draft) => {
     const r = await api.post(id, draft);
@@ -179,7 +212,7 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
     const actions = el("div", "review-actions");
     const write = el("button", "review-button", mine?.title || mine?.text ? "Edit Your Review" : "Write a Review");
     write.type = "button";
-    write.addEventListener("click", () => sheet({ initial: mine, version, onSend: post }));
+    write.addEventListener("click", () => sheet({ initial: mine, version, onSend: post, onDelete: mine ? removeMine : null, confirmDelete }));
     actions.append(write);
     parts.push(actions);
     if (mine?.hidden) parts.push(el("p", "review-hidden-note", "Your review was hidden after other people reported it. Changing it shows it again."));
@@ -200,6 +233,16 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
         } catch (e) { rep.disabled = false; rep.textContent = e?.code === "rate_limited" ? "Try Later" : "Report"; }
       });
       c.append(rep);
+    } else if (rv.ours && mine && rv.id === mine.id) {
+      // F207: your own review's row offers Delete Review instead of Report.
+      const del = el("button", "review-delete-own", "Delete Review");
+      del.type = "button";
+      del.addEventListener("click", async () => {
+        if (!(await confirmDelete())) return;
+        del.disabled = true;
+        try { await removeMine(); } catch (e) { del.disabled = false; del.textContent = e?.code === "rate_limited" ? "Try Later" : "Not Deleted. Try Again"; }
+      });
+      c.append(del);
     }
     return c;
   };
@@ -274,4 +317,9 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
 async function confirmReport() {
   const { index } = await showAlert({ title: "Report This Review?", message: "Reviews reported by several people are hidden.", buttons: ["Cancel", "Report"], cancel: 0 });
   return index === 1;
+}
+
+// F207: iOS 6's action sheet, red Delete Review over Cancel.
+async function confirmDeleteReview() {
+  return (await showActionSheet({ buttons: ["Delete Review"], destructive: 0 })) === 0;
 }

@@ -269,3 +269,53 @@ test("F206: the card's skeleton while the reviews load has the filled card's sha
   assert.equal(one(filled, "store-ratings-count").textContent, "No Ratings");
   assert.equal(one(filled, "store-ratings-from").textContent, "No reviews to count yet.");
 });
+
+test("F207: Delete Review only with a review of yours: in the sheet and on your row, asked first, then the tab redraws", async () => {
+  // the sheet: no button for a new review; with one, it asks, deletes and closes
+  document.body.replaceChildren();
+  let asked = 0, ok = false, deleted = 0;
+  const none = writeReviewSheet({ initial: null, onDelete: async () => { deleted++; }, confirmDelete: async () => { asked++; return ok; } });
+  assert.equal(byText(none.sheet, "Delete Review"), undefined, "nothing to delete yet");
+  none.close();
+  const s = writeReviewSheet({ initial: { stars: 4, title: "Mine" }, onDelete: async () => { deleted++; }, confirmDelete: async () => { asked++; return ok; } });
+  const red = byText(s.sheet, "Delete Review");
+  assert.ok(red && red._cls.has("action-button") && red._cls.has("destructive"), "iOS 6's red destructive button");
+  await red.click();
+  assert.deepEqual([asked, deleted, s.closed()], [1, 0, false], "Cancel in the action sheet deletes nothing");
+  ok = true;
+  await red.click();
+  assert.deepEqual([asked, deleted, s.closed()], [2, 1, true]);
+  const failing = writeReviewSheet({ initial: { stars: 4 }, onDelete: async () => { throw new Error("Too many changes from here."); }, confirmDelete: async () => true });
+  await failing.remove();
+  assert.deepEqual([failing.closed(), failing.error.textContent], [false, "Too many changes from here."]);
+  failing.close();
+
+  // the tab: your row gets Delete Review (no Report); deleting lists again with no `mine`, so Tap to Rate is empty
+  const mine = rv("me00000000000000", "Mine", { stars: 5 });
+  const pages = [{ enabled: true, average: 4.5, count: 2, histogram: [1, 1, 0, 0, 0], more: false, reviews: [rv("aa00000000000000", "Theirs"), mine], mine: { ...mine, hidden: false } }];
+  const base = fakeApi(pages);
+  const api = { ...base, async remove(id, rid) { base.log.push(["remove", id, rid]); pages[0] = { enabled: true, average: 4, count: 1, histogram: [0, 1, 0, 0, 0], more: false, reviews: [rv("aa00000000000000", "Theirs")], mine: null }; return { ok: true, id: rid }; } };
+  const pane = document.createElement("div");
+  const sheets = [], rated = [];
+  let answer = false;
+  await reviewsTab(pane, { id: "com.example.velvet", api, now, sheet: (o) => sheets.push(o), confirmDelete: async () => answer, onRating: (r) => rated.push(r) });
+  assert.equal(find(pane, "review-delete-own").length, 1, "only on your own row");
+  assert.equal(find(pane, "review-report").length, 1, "Report stays on the other one");
+  assert.equal(one(pane, "review-tap-label").textContent, "Your Rating:");
+  await byText(pane, "Edit Your Review").click();
+  assert.equal(typeof sheets[0].onDelete, "function", "the sheet gets Delete Review");
+  await one(pane, "review-delete-own").click();
+  assert.equal(base.log.some((l) => l[0] === "remove"), false, "Cancel: nothing deleted");
+  answer = true;
+  await one(pane, "review-delete-own").click();
+  await tick();
+  assert.deepEqual(base.log.find((l) => l[0] === "remove"), ["remove", "com.example.velvet", "me00000000000000"]);
+  assert.equal(one(pane, "review-tap-label").textContent, "Tap to Rate:");
+  assert.equal(find(one(pane, "review-tap"), "on").length, 0, "no stars lit");
+  assert.equal(find(pane, "review-delete-own").length, 0);
+  assert.deepEqual(find(pane, "store-review-title").map((t) => t.textContent), ["1. Theirs"]);
+  assert.equal(rated.at(-1).count, 1, "the header's count follows");
+  assert.equal(byText(pane, "Write a Review").textContent, "Write a Review");
+  await byText(pane, "Write a Review").click();
+  assert.equal(sheets.at(-1).onDelete, null, "no review: no Delete Review in the sheet");
+});

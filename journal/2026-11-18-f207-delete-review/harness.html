@@ -1,0 +1,38 @@
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width">
+<!-- F207 render harness: serve the repo root (python3 -m http.server) and open
+     /journal/2026-11-18-f207-delete-review/harness.html?tab | ?sheet | ?ask | ?deleted   [&dark]
+     tab: the Reviews tab with your review; sheet: Edit Your Review's sheet; ask: its Delete Review action sheet;
+     deleted: the tab after Delete Review (the fake server forgets yours). -->
+<link rel=stylesheet href="/web/app/style.css"><link rel=stylesheet href="/web/app/ios6.css"><link rel=stylesheet href="/web/app/sources.css"><link rel=stylesheet href="/web/app/packages.css"><link rel=stylesheet href="/web/app/altstore.css"><link rel=stylesheet href="/web/app/reviews.css">
+<style>html,body{margin:0;height:auto!important;overflow:visible!important} .page{visibility:visible!important;position:static!important;transform:none!important} .page-body{position:static!important;overflow:visible!important;height:auto!important}</style></head>
+<body><div class="page"><div class="page-body grouped" id=b></div></div>
+<script type=module>
+const q = new URLSearchParams(location.search);
+if (q.has("dark")) document.documentElement.dataset.theme = "dark";
+const sp = await import("/web/app/screens/storepage.js");
+const { reviewsTab } = await import("/web/app/screens/reviews.js");
+const body = document.getElementById("b");
+const now = Date.UTC(2026, 10, 18);
+const rv = (id, stars, title, name, text) => ({ id, stars, title, name, text, version: "1.6.3", date: now - 2 * 864e5, updated: now - 2 * 864e5 });
+const mineRv = rv("me00000000000000", 5, "My favourite emulator", "ryan", "Fast and the skins are great.");
+const others = [rv("aa00000000000000", 4, "Great, one bug", "jbfan", "Controller skins reset after an update."), rv("bb00000000000000", 3, "Okay", "bo", "Does the job.")];
+let mine = mineRv;
+const state = () => {
+  const all = mine ? [mine, ...others] : others;
+  const h = [0, 0, 0, 0, 0]; for (const r of all) h[5 - r.stars]++;
+  return { enabled: true, average: Math.round(all.reduce((a, r) => a + r.stars, 0) / all.length * 10) / 10, count: all.length, histogram: h, reviews: all, more: false, mine: mine ? { ...mine, hidden: false } : null };
+};
+const api = { list: async () => state(), post: async () => ({ ok: true }), report: async () => ({ ok: true }), remove: async () => { mine = null; return { ok: true, id: mineRv.id }; } };
+const tabs = sp.storeTabs({ reviews: async (p) => {
+  await reviewsTab(p, { id: "com.example.delta", api, now, confirmDelete: q.has("deleted") ? async () => true : undefined });
+  if (q.has("sheet") || q.has("ask")) {
+    [...p.querySelectorAll("button")].find((b) => b.textContent === "Edit Your Review").click();
+    document.querySelector(".page").style.display = "none"; // the sheet alone, on a phone-sized screen
+    if (q.has("ask")) { await new Promise((r) => setTimeout(r, 500)); document.querySelector(".review-delete").click(); }
+  }
+  if (q.has("deleted")) { document.querySelector(".review-delete-own").click(); }
+  setTimeout(() => { document.getAnimations().forEach((a) => a.finish()); document.title = "ready"; }, 900);
+} });
+body.append(...tabs.nodes);
+tabs.select(1);
+</script></body></html>

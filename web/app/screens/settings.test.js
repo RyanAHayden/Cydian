@@ -121,3 +121,64 @@ test("F149: Password row placeholder and tap-to-focus", async () => {
   onClick({ target: input }); // the field itself focuses on its own
   assert.equal(focused, 1);
 });
+
+// B20: Settings > Signing > Signing Server's row opens an alert with a text field for your own server; Save stores
+// the URL and checks it. Empty Save means the default.
+test("B20: tapping the Signing Server row opens the alert with a field, Save stores the URL and runs the check", async () => {
+  const { serverRow, askServer } = await import("./settings.js");
+  const def = "https://sign.example.dev";
+  let server = def, specs = [], checks = 0, redraws = 0, answer = { index: 1, value: "  https://my.worker.dev  " };
+  const deps = { alert: async (spec) => { specs.push(spec); return answer; }, current: () => server, def: () => def,
+    save: (s) => { server = s; }, check: async () => { checks++; }, redraw: () => { redraws++; } };
+  let asked = null;
+  const row = serverRow({ server, fallback: def, ask: () => { asked = askServer(null, deps); } });
+  assert.equal(typeof row.onClick, "function");
+  assert.equal(row.chevron, true);
+  assert.equal(row.cls, "server-field-default"); // the default's host in the hint grey
+  assert.equal(row.detail, "sign.example.dev");
+  row.onClick();
+  assert.equal(await asked, true);
+  assert.equal(specs.length, 1);
+  assert.equal(specs[0].input.type, "url");
+  assert.equal(specs[0].input.value, ""); // the default shows as an empty field, its URL the placeholder
+  assert.equal(specs[0].input.placeholder, def);
+  assert.deepEqual(specs[0].buttons, ["Cancel", "Save"]);
+  assert.equal(server, "https://my.worker.dev");
+  assert.equal(checks, 1);
+  assert.equal(redraws, 1);
+  // your own server: in the field colour, and the field opens with it
+  const own = serverRow({ server, fallback: def, ask: () => {} });
+  assert.equal(own.cls, "server-field");
+  assert.equal(own.detail, "my.worker.dev");
+  answer = { index: 1, value: "" };
+  await askServer(null, deps);
+  assert.equal(specs[1].input.value, "https://my.worker.dev");
+  assert.equal(server, def); // empty: back to the default
+  // Cancel: nothing saved, no check
+  answer = { index: 0, value: "https://other.dev" };
+  assert.equal(await askServer(null, deps), false);
+  assert.equal(server, def);
+  assert.equal(checks, 2);
+});
+
+// B20: the web view's window focus comes back on an ordinary tap; a full redraw then swapped the rows under the finger
+// and iOS dropped the click. Focus only re-reads signing.status; coming back from hidden still redraws.
+test("B20: window focus doesn't redraw the Signing page unless the certificate changed", async () => {
+  const { returnWatcher } = await import("./settings.js");
+  const on = {};
+  const target = () => ({ addEventListener: (t, fn) => { on[t] = fn; } });
+  const doc = Object.assign(target(), { visibilityState: "visible", querySelector: () => ({}) });
+  const win = target();
+  let redraws = 0, ready = false;
+  const check = returnWatcher({ doc, win, redraw: () => { redraws++; }, status: async () => (ready ? { identity: { profile: {} } } : { identity: null }),
+    interval: () => {} });
+  await check(); // the first look
+  await on.focus();
+  await on.focus();
+  assert.equal(redraws, 0);
+  ready = true; // a certificate landed while away
+  await on.focus();
+  assert.equal(redraws, 1);
+  on.visibilitychange();
+  assert.equal(redraws, 2);
+});

@@ -428,12 +428,26 @@ async function recheckPassword(el, redraw = true) {
   }
 }
 
-async function askServer(el) {
-  const { index, value } = await showAlert({ title: "Signing Server", message: `Hands iOS the install manifests. Empty for ${new URL(defaultServer()).host}.`,
-    input: { type: "url", placeholder: defaultServer(), value: getServer() === defaultServer() ? "" : getServer() }, buttons: ["Cancel", "Save"], cancel: 0 });
-  if (index !== 1) return;
-  setServer(value.trim() || defaultServer());
-  redrawAll();
+// B20: the Signing Server row's alert: a text field with the server's URL (empty for the default), then Save stores
+// it and checks it (Check Server's alerts). Injectable for the tests.
+export async function askServer(el, { alert = showAlert, current = getServer, def = defaultServer, save = setServer,
+  check = checkServer, redraw = redrawAll } = {}) {
+  const server = current(), fallback = def();
+  const { index, value } = await alert({ title: "Signing Server", message: `Hands iOS the install manifests. Empty for ${new URL(fallback).host}.`,
+    input: { type: "url", placeholder: fallback, value: server === fallback ? "" : server }, buttons: ["Cancel", "Save"], cancel: 0 });
+  if (index !== 1) return false;
+  save(String(value ?? "").trim() || fallback);
+  redraw();
+  await check();
+  return true;
+}
+
+// B20: the row that opens it, drawn as a field (F149): "Server" on the left, the host in the field blue-grey on the
+// right, or the default's host in the grey hint colour (what the empty field falls back to).
+export function serverRow({ server, fallback, ask }) {
+  const own = server !== fallback;
+  return { label: "Server", detail: new URL(server).host, subtitle: own ? null : "Default",
+    cls: own ? "server-field" : "server-field-default", chevron: true, onClick: () => ask() };
 }
 
 const RUN_YOUR_OWN = `https://github.com/${GITHUB_REPO}/tree/main/worker#host-your-own-free-about-a-minute`;
@@ -639,23 +653,35 @@ async function removeDeviceCertificate() {
 // every 2 s, so the walkthrough ticks the moment a certificate lands (the launch import of one that came inside the
 // app, an import finished elsewhere). The app's web view doesn't always send visibilitychange, so focus and
 // pageshow count too.
+// B20: but the web view also gets window focus back on an ordinary tap (the first one after a keyboard or a native
+// sheet went away), and a full redraw then swapped the rows under the finger: iOS dropped the click (the Signing
+// Server row "can't be tapped"). Focus now only looks at signing.status and redraws when it changed, as the 2 s check
+// does; visibilitychange (back from hidden) and pageshow still redraw at once.
 let watchingReturn = false;
 function watchReturn() {
   if (watchingReturn || typeof document === "undefined") return;
   watchingReturn = true;
-  const again = () => { if (document.visibilityState !== "hidden") redrawAll(); };
-  document.addEventListener("visibilitychange", again);
-  addEventListener("focus", again);
-  addEventListener("pageshow", again);
+  returnWatcher({ doc: document, win: globalThis, redraw: redrawAll, status: deviceStatus, interval: setInterval });
+}
+
+// watchReturn's listeners, injectable for the tests. Returns the status check (what focus and the timer run).
+export function returnWatcher({ doc, win, redraw, status, interval }) {
   let last = null;
-  setInterval(async () => {
-    if (document.visibilityState === "hidden" || !document.querySelector(".page.is-top .walkthrough, .page.is-top .signing-page")) return;
+  const onPage = () => doc.visibilityState !== "hidden" && doc.querySelector(".page.is-top .walkthrough, .page.is-top .signing-page");
+  const check = async () => {
+    if (!onPage()) return;
     let st = null;
-    try { st = await deviceStatus(); } catch { return; }
+    try { st = await status(); } catch { return; }
     const now = String(statusReady(st));
-    if (last !== null && now !== last) redrawAll();
+    if (last !== null && now !== last) redraw();
     last = now;
-  }, 2000);
+  };
+  const again = () => { if (doc.visibilityState !== "hidden") redraw(); };
+  doc.addEventListener("visibilitychange", again);
+  win.addEventListener("pageshow", again);
+  win.addEventListener("focus", check);
+  interval(check, 2000);
+  return check;
 }
 
 // F134: Settings > Signing as an iOS 6 settings page (signingPage below): the certificate, the files while some are
@@ -672,7 +698,7 @@ async function deviceSigningState(el) {
 const serverGroup = (el) => {
   const server = getServer();
   return grouped([{ header: "Signing Server", rows: [
-    { label: new URL(server).host, subtitle: server === defaultServer() ? "Default" : server, onClick: () => askServer(el), chevron: true },
+    serverRow({ server, fallback: defaultServer(), ask: () => askServer(el) }),
     { label: "Check Server", onClick: () => checkServer() },
     // Nothing depends on cydian.dev: anyone can run their own, free (worker/README.md's Deploy to Cloudflare).
     { label: "Run Your Own", subtitle: "Free on Cloudflare, about a minute", chevron: true,

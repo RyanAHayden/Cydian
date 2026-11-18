@@ -33,7 +33,6 @@ OPENSSL = shutil.which("openssl")
 try:
     from signer import testkit as T  # noqa: E402  (needs `cryptography`, from web/requirements.txt)
     from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import ec
 except ImportError:  # pragma: no cover
     T = None
 
@@ -207,10 +206,6 @@ class OnDeviceSigner(unittest.TestCase):
         w("escape.ipa", small_zip({"Payload/X.app/Info.plist": info("a.b", "X"), "Payload/../evil": "x"}))
         enc = io.BytesIO(rich_ipa(macho(encrypted=True)))
         w("encrypted.ipa", enc.getvalue())
-        for name in ("ec-ca.pem", "ec-leaf.pem"):
-            k = ec.generate_private_key(ec.SECP256R1())
-            w(name, k.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                                    serialization.NoEncryption()))
         cls.binary = os.path.join(cls.tmp, "signtest")
         env = dict(os.environ)
         # The ubuntu toolchain wants libncurses.so.6; Arch has only the wide one (as native/build.sh does).
@@ -263,13 +258,6 @@ class OnDeviceSigner(unittest.TestCase):
             self.assertEqual(entry["hash2"], hashlib.sha256(files[A + rel]).digest(), rel)
             self.assertEqual(entry["hash"], hashlib.sha1(files[A + rel]).digest(), rel)
         self.assertEqual(files[A + "embedded.mobileprovision"], self.profile)
-        # the local CA is limited to localhost and 127.0.0.1, critically
-        text = subprocess.run([OPENSSL, "x509", "-in", os.path.join(self.work, "localca.pem"), "-noout", "-text"],
-                              capture_output=True, text=True).stdout
-        self.assertIn("X509v3 Name Constraints: critical", text)
-        self.assertIn("DNS:localhost", text)
-        self.assertIn("IP:127.0.0.1/255.255.255.255", text)
-
 
 class BridgeSourceTest(unittest.TestCase):
     """F73: the phone half can't run here, so read the sources: signing.export is registered, answers the three

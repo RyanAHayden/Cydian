@@ -55,22 +55,6 @@ struct OpenSSLIdentity: SigningIdentity {
     }
 }
 
-struct OpenSSLECKey: CertKey {
-    let keyPath: String
-    let publicKey: Data
-    init(_ path: String) throws {
-        keyPath = path
-        let (rc, spki, err) = try run(["openssl", "pkey", "-in", path, "-pubout", "-outform", "DER"])
-        guard rc == 0 else { throw SignError("openssl", err) }
-        publicKey = spki.suffix(65)
-    }
-    func sign(_ message: Data) throws -> Data {
-        let (rc, sig, err) = try run(["openssl", "dgst", "-sha256", "-sign", keyPath], input: message)
-        guard rc == 0 else { throw SignError("openssl", err) }
-        return sig
-    }
-}
-
 // ---- reading a signature back (independently of how CodeSign.swift wrote it, as far as the format allows)
 
 struct ReadSignature {
@@ -317,31 +301,6 @@ test("refusals") {
     }
 }
 
-test("local install CA and its TLS certificate") {
-    let caKey = try OpenSSLECKey(fixtures.path + "/ec-ca.pem")
-    let leafKey = try OpenSSLECKey(fixtures.path + "/ec-leaf.pem")
-    let ca = try LocalCA.makeCA(key: caKey, label: "Test iPhone")
-    let leaf = try LocalCA.makeLeaf(key: leafKey.publicKey, ca: ca, caKey: caKey)
-    try ca.write(to: work.appendingPathComponent("localca.der"))
-    try leaf.write(to: work.appendingPathComponent("localleaf.der"))
-    for (der, pem) in [("localca.der", "localca.pem"), ("localleaf.der", "localleaf.pem")] {
-        let (rc, _, err) = try run(["openssl", "x509", "-inform", "DER", "-in", work.path + "/" + der, "-out", work.path + "/" + pem])
-        check(rc == 0, "\(der) parses: \(err)")
-    }
-    let (rc, out, err) = try run(["openssl", "verify", "-x509_strict", "-purpose", "sslserver", "-CAfile", work.path + "/localca.pem", work.path + "/localleaf.pem"])
-    check(rc == 0, "leaf verifies against the CA: \(String(decoding: out, as: UTF8.self)) \(err)")
-    let (rc2, out2, _) = try run(["openssl", "x509", "-in", work.path + "/localleaf.pem", "-noout", "-checkip", "127.0.0.1", "-checkhost", "localhost"])
-    let text = String(decoding: out2, as: UTF8.self)
-    check(rc2 == 0 && !text.contains("NOT"), "leaf names: \(text)")
-    let c = try Certificate(der: leaf)
-    let days = c.notAfter!.timeIntervalSince(c.notBefore!) / 86400
-    check(days <= 825, "leaf lifetime \(days) days within Apple's 825")
-    let mc = try LocalCA.mobileconfig(ca: ca, label: "Test iPhone")
-    let pl = try PropertyListSerialization.propertyList(from: mc, format: nil) as? [String: Any]
-    let inner = (pl?["PayloadContent"] as? [[String: Any]])?.first
-    check(inner?["PayloadType"] as? String == "com.apple.security.root" && inner?["PayloadContent"] as? Data == ca, "mobileconfig")
-}
-
 test("HTTP requests and ranges") {
     check(try HTTPRequest.parse(Data("GET /a HTTP/1.1\r\nHost: x".utf8)) == nil, "incomplete header waits")
     let r = try HTTPRequest.parse(Data("GET /t/app.ipa?x=1 HTTP/1.1\r\nHost: 127.0.0.1\r\nRange: bytes=10-19\r\n\r\n".utf8))!
@@ -359,35 +318,13 @@ test("HTTP requests and ranges") {
 }
 
 test("manifest and itms link") {
-    let m = try LocalCA.manifest(ipaURL: "https://127.0.0.1:4242/t/app.ipa", bundleID: "dev.cydian.fixture", version: "1.0", title: "Fixture")
+    let m = try InstallManifest.manifest(ipaURL: "http://127.0.0.1:4242/t/app.ipa", bundleID: "dev.cydian.fixture", version: "1.0", title: "Fixture")
     let pl = try PropertyListSerialization.propertyList(from: m, format: nil) as? [String: Any]
     let item = (pl?["items"] as? [[String: Any]])?.first
-    check(((item?["assets"] as? [[String: Any]])?.first?["url"] as? String) == "https://127.0.0.1:4242/t/app.ipa", "asset url")
+    check(((item?["assets"] as? [[String: Any]])?.first?["url"] as? String) == "http://127.0.0.1:4242/t/app.ipa", "asset url")
     check((item?["metadata"] as? [String: Any])?["bundle-identifier"] as? String == "dev.cydian.fixture", "bundle id")
-    check(LocalCA.itmsURL(manifest: "https://127.0.0.1:4242/t/manifest.plist")
-          == "itms-services://?action=download-manifest&url=https%3A%2F%2F127.0.0.1%3A4242%2Ft%2Fmanifest.plist", "itms link")
-}
-
-// F69: the install profile signed with the user's certificate: openssl verifies the CMS against the certificate's
-// CA (the phone has Apple's WWDR and root there) and gets the plist back byte for byte; no identity, no signature.
-test("install profile signed with the user's certificate") {
-    let caKey = try OpenSSLECKey(fixtures.path + "/ec-ca.pem")
-    let plist = try LocalCA.mobileconfig(ca: try LocalCA.makeCA(key: caKey, label: "Test iPhone"), label: "Test iPhone")
-    let (signed, isSigned) = ProfileSign.profile(plist, id: identity)
-    check(isSigned && signed != plist, "signed")
-    let d = work.appendingPathComponent("profile-sign", isDirectory: true)
-    try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
-    try signed.write(to: d.appendingPathComponent("signed.mobileconfig"))
-    let (rc, out, err) = try run(["openssl", "cms", "-verify", "-binary", "-inform", "DER", "-in", d.path + "/signed.mobileconfig",
-                                  "-CAfile", fixtures.path + "/ca.pem", "-purpose", "any"])
-    check(rc == 0, "openssl cms -verify against the CA: \(err)")
-    check(out == plist, "the verified content is the profile (\(out.count) of \(plist.count) bytes)")
-    let (rc2, certs, _) = try run(["openssl", "cms", "-verify", "-noverify", "-binary", "-inform", "DER", "-in", d.path + "/signed.mobileconfig",
-                                   "-certsout", "/dev/stdout", "-out", "/dev/null"])
-    let pem = String(decoding: certs, as: UTF8.self)
-    check(rc2 == 0 && pem.components(separatedBy: "BEGIN CERTIFICATE").count == 3, "leaf and its CA in the CMS")
-    let (plain, unsigned) = ProfileSign.profile(plist, id: nil)
-    check(!unsigned && plain == plist, "unsigned without a certificate")
+    check(InstallManifest.itmsURL(manifest: "https://cydian.dev/sign/manifest?bundleid=a.b&port=4242")
+          == "itms-services://?action=download-manifest&url=https%3A%2F%2Fcydian.dev%2Fsign%2Fmanifest%3Fbundleid%3Da.b%26port%3D4242", "itms link")
 }
 
 print(failures == 0 ? "all passed" : "\(failures) failure(s)")

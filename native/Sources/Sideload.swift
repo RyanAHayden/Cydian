@@ -97,17 +97,22 @@ enum Sideload {
 
     // The signing server whose GET /sign/manifest hands iOS the manifest for an IPA Cydian serves over plain HTTP
     // at 127.0.0.1 (Feather's "Semi Local", on our own server): no certificate to trust on the phone, the key never
-    // leaves it, the server sees only the app's ID, version and name. Nil: everything local over HTTPS with the
-    // phone's own trusted CA. Set by each signing.install call's `manifestServer`.
+    // leaves it, the server sees only the app's ID, version and name. Set by each signing.install (and resignAll)
+    // call's `manifestServer`; F75: there is no install without one (iOS's installer ignores a hand-trusted CA, so
+    // the old fully local HTTPS mode never worked), and without one the call answers no_server.
     static var manifestServer: String?
+    static let noServer = "no_server: installing needs a Signing Server: set one in Settings > Signing"
+
+    // `manifestServer` from a call's params: an https:// address, or nil.
+    static func takeServer(_ c: Bridge.Call) -> String? {
+        let ms = (c.params["manifestServer"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        manifestServer = (ms?.hasPrefix("https://") ?? false) ? ms : nil
+        return manifestServer
+    }
 
     static func install(_ c: Bridge.Call) {
         guard let (id, profile) = ready(c) else { return }
-        let ms = (c.params["manifestServer"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
-        manifestServer = (ms?.hasPrefix("https://") ?? false) ? ms : nil
-        guard manifestServer != nil || LocalTrust.trusted() else {
-            return Apt.reply(c, nil, "untrusted: set up Local Install in Settings > Signing first (install and trust Cydian's certificate)")
-        }
+        guard takeServer(c) != nil else { return Apt.reply(c, nil, noServer) }
         let options: SignOptions
         do { options = try SignOptions(json: c.params) } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
         let throttle = Throttle()
@@ -153,7 +158,8 @@ enum Sideload {
         }
     }
 
-    // Signs `input` (deleted after), serves it on the local HTTPS server and opens the itms-services link. `opened`
+    // Signs `input` (deleted after), serves it on the local HTTP server and opens the itms-services link (the
+    // manifest from `manifestServer`). `opened`
     // gets the result once iOS has been handed the link; `served` once iOS has fetched the whole IPA (or it expired
     // unfetched: false). Runs on SignBridge.queue.
     static func signAndOpen(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions,
@@ -179,55 +185,50 @@ enum Sideload {
                                   version: app.version, url: url, signed: Date(),
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored)
         emit("installing", 0)
-        let manifestPath = "/\(tok)/manifest.plist", ipaPath = "/\(tok)/app.ipa"
-        let remote = manifestServer
-        let server = remote != nil ? InstallServer.plain : InstallServer.secure
+        let ipaPath = "/\(tok)/app.ipa"
+        guard let remote = manifestServer else {
+            try? FileManager.default.removeItem(at: output)
+            opened(.failure(Failed(text: noServer))); served?(false)
+            return
+        }
+        let server = InstallServer.plain
         server.start { res in
             switch res {
             case .failure(let e):
                 try? FileManager.default.removeItem(at: output)
                 opened(.failure(Failed(text: "server: \(e.localizedDescription)"))); served?(false)
             case .success:
-                do {
-                    let manifest = try LocalCA.manifest(ipaURL: server.base + ipaPath, bundleID: app.bundleID,
-                                                        version: app.version, title: app.name)
-                    let once = Once()
-                    KeepAlive.shared.begin()
-                    let end = { (ok: Bool) in
-                        guard once.first() else { return }
-                        server.remove(manifestPath); server.remove(ipaPath)
-                        SignBridge.queue.asyncAfter(deadline: .now() + 60) {
-                            try? FileManager.default.removeItem(at: output)
-                            KeepAlive.shared.end() // a minute more: iOS may ask again for the last bytes
-                        }
-                        served?(ok)
-                    }
-                    server.serve(manifestPath, .init(type: "text/xml", body: .data(manifest), onServed: nil))
-                    server.serve(ipaPath, .init(type: "application/octet-stream", body: .file(output)) { end(true) })
-                    SignBridge.queue.asyncAfter(deadline: .now() + 15 * 60) { end(false) }
-                    let link: String
-                    if let remote = remote {
-                        var q = URLComponents(string: remote + "/sign/manifest")!
-                        q.queryItems = [URLQueryItem(name: "bundleid", value: app.bundleID), URLQueryItem(name: "version", value: app.version),
-                                        URLQueryItem(name: "title", value: app.name),
-                                        // port and path, not the URL: proxies refuse queries holding "http://127.0.0.1"
-                                        URLQueryItem(name: "port", value: String(server.port)),
-                                        URLQueryItem(name: "path", value: String(ipaPath.dropFirst()))]
-                        link = LocalCA.itmsURL(manifest: q.url!.absoluteString)
-                    } else {
-                        link = LocalCA.itmsURL(manifest: server.base + manifestPath)
-                    }
-                    SignBridge.queue.async {
-                        saveRecords(SignedRecords.adding(record, to: records()))
-                        reschedule()
-                    }
-                    DispatchQueue.main.async {
-                        UIApplication.shared.open(URL(string: link)!)
-                        opened(.success((app, record)))
-                    }
-                } catch {
+                guard var q = URLComponents(string: remote + "/sign/manifest") else {
                     try? FileManager.default.removeItem(at: output)
-                    opened(.failure(error)); served?(false)
+                    opened(.failure(Failed(text: noServer))); served?(false)
+                    return
+                }
+                q.queryItems = [URLQueryItem(name: "bundleid", value: app.bundleID), URLQueryItem(name: "version", value: app.version),
+                                URLQueryItem(name: "title", value: app.name),
+                                // port and path, not the URL: proxies refuse queries holding "http://127.0.0.1"
+                                URLQueryItem(name: "port", value: String(server.port)),
+                                URLQueryItem(name: "path", value: String(ipaPath.dropFirst()))]
+                let link = InstallManifest.itmsURL(manifest: q.url!.absoluteString)
+                let once = Once()
+                KeepAlive.shared.begin()
+                let end = { (ok: Bool) in
+                    guard once.first() else { return }
+                    server.remove(ipaPath)
+                    SignBridge.queue.asyncAfter(deadline: .now() + 60) {
+                        try? FileManager.default.removeItem(at: output)
+                        KeepAlive.shared.end() // a minute more: iOS may ask again for the last bytes
+                    }
+                    served?(ok)
+                }
+                server.serve(ipaPath, .init(type: "application/octet-stream", body: .file(output)) { end(true) })
+                SignBridge.queue.asyncAfter(deadline: .now() + 15 * 60) { end(false) }
+                SignBridge.queue.async {
+                    saveRecords(SignedRecords.adding(record, to: records()))
+                    reschedule()
+                }
+                DispatchQueue.main.async {
+                    UIApplication.shared.open(URL(string: link)!)
+                    opened(.success((app, record)))
                 }
             }
         }
@@ -268,9 +269,7 @@ enum Sideload {
 
     static func resignAll(_ c: Bridge.Call) {
         guard let (id, profile) = ready(c) else { return }
-        guard LocalTrust.trusted() else {
-            return Apt.reply(c, nil, "untrusted: set up Local Install in Settings > Signing first (install and trust Cydian's certificate)")
-        }
+        guard takeServer(c) != nil else { return Apt.reply(c, nil, noServer) }
         SignBridge.queue.async {
             let list = records()
             var done = [String](), failed = [[String: Any]]()

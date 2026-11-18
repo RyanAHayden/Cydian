@@ -1,23 +1,22 @@
 // The bridge calls for signing and installing IPAs on the phone (I6), sideload build only. In jailbreak mode they
 // answer code "jailbreak": there the N2 helper installs IPAs itself and none of this is needed.
 //
-//   signing.status              {mode, identity: {name, team, expires, profile: {...}} | null, trust: {ca, trusted, name},
-//                               identityProblem?}: F69, why a certificate that was imported doesn't show
+//   signing.status              {mode, identity: {name, team, expires, profile: {...}} | null, identityProblem?}: F69, why
+//                               a certificate that was imported doesn't show
 //   signing.import {p12, password, profile}   (both files base64) -> status; the .p12 goes into the Keychain
 //   signing.remove              forgets the identity, the kept .p12 and the profile -> status
 //   signing.export              F73: {p12, profile, password} (files base64) as imported, for the Signing Server when
 //                               Cydian updates itself (essential-ui.js installSelf, which asks the user first) | null
 //                               when there is no certificate or it was imported before F73
-//   signing.trust               makes the local CA if needed and opens its profile in Safari -> {url, signed}; F69:
-//                               the profile is CMS-signed with the user's certificate when one is imported
-//   signing.resetTrust          throws the local CA away (the user removes the old profile in Settings) -> status
-//   signing.testServer {open?}  a test page on the install server; open: in Safari, Cydian in the background -> {url}
-//   signing.install {url} (stream: {phase: "downloading"|"reading"|"signing"|"installing", progress})
+//   signing.install {url, manifestServer} (stream: {phase: "downloading"|"reading"|"signing"|"installing", progress})
 //                               downloads, signs and opens the itms-services link -> {bundleId, originalBundleId,
 //                               name, version, removed}; F14 moved it to Sideload.swift, which adds the user's edits
 //                               and the calls listed there
 //
-// Error codes: jailbreak, no_identity, untrusted, wrong_password, bad_p12, bad_profile, profile_expired,
+// F75: the old local HTTPS mode (signing.trust, resetTrust, testServer, its CA) is gone: installs always take the
+// manifest from the Signing Server (manifestServer), and without one signing.install answers no_server.
+//
+// Error codes: jailbreak, no_identity, no_server, wrong_password, bad_p12, bad_profile, profile_expired,
 // cert_expired, cert_not_in_profile, bad_ipa, encrypted, bad_url, network, too_large, keychain, server.
 // docs/signing.md, "On the phone (I6)".
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -50,57 +49,6 @@ enum SignBridge {
         }
         b.on("signing.export") { c in run(c) { export() } } // F73
         b.on("signing.remove") { c in run(c) { SignStore.removeIdentity(); return status() } }
-        b.on("signing.resetTrust") { c in run(c) { InstallServer.secure.stop(); LocalTrust.reset(); return status() } }
-        b.on("signing.trust") { c in
-            guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
-            queue.async {
-                do {
-                    let ca = try LocalTrust.ensureCA()
-                    _ = try LocalTrust.tlsIdentity()
-                    let plist = try LocalCA.mobileconfig(ca: ca, label: LocalTrust.label() ?? "iPhone")
-                    // F69: signed with the user's certificate when there is one, so iOS shows it Verified
-                    let signer = SignStore.identity().flatMap { try? KeychainIdentity($0) }
-                    let (profile, signed) = ProfileSign.profile(plist, id: signer)
-                    let path = "/\(token())/Cydian-Local-Install.mobileconfig"
-                    InstallServer.plain.serve(path, .init(type: "application/x-apple-aspen-config", body: .data(profile), onServed: nil),
-                                              ttl: 5 * 60)
-                    InstallServer.plain.start { res in
-                        switch res {
-                        case .failure(let e): Apt.reply(c, nil, "server: \(e.localizedDescription)")
-                        case .success:
-                            let url = InstallServer.plain.base + path
-                            DispatchQueue.main.async {
-                                UIApplication.shared.open(URL(string: url)!)
-                                c.reply(["url": url, "signed": signed], nil)
-                            }
-                        }
-                    }
-                } catch { Apt.reply(c, nil, text(error)) }
-            }
-        }
-        // A test page on the install server (Settings > Signing > Test Install Server): served over the same HTTPS
-        // and certificate as installs, with the same keep-alive. open: true also opens it in Safari, which puts Cydian
-        // in the background exactly as an install does. -> {url}
-        b.on("signing.testServer") { c in
-            guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
-            let open = c.params["open"] as? Bool ?? false
-            let path = "/\(token())/test.html"
-            let page = "<!doctype html><meta name=viewport content='width=device-width'><body style='font:17px -apple-system;padding:30px;text-align:center'><h2>Cydian's install server works</h2><p>Reached over HTTPS at 127.0.0.1 with Cydian's own certificate, while Cydian was in the background. Installs can reach it too. Go back to Cydian.</p>"
-            InstallServer.secure.serve(path, .init(type: "text/html; charset=utf-8", body: .data(Data(page.utf8)), onServed: nil), ttl: 3 * 60)
-            InstallServer.secure.start { res in
-                switch res {
-                case .failure(let e): Apt.reply(c, nil, "server: \(e.localizedDescription)")
-                case .success:
-                    let url = InstallServer.secure.base + path
-                    if open {
-                        KeepAlive.shared.begin()
-                        SignBridge.queue.asyncAfter(deadline: .now() + 120) { KeepAlive.shared.end() }
-                        DispatchQueue.main.async { UIApplication.shared.open(URL(string: url)!) }
-                    }
-                    c.reply(["url": url], nil)
-                }
-            }
-        }
         b.on("signing.install") { c in Sideload.install(c) } // F14: with the user's edits, keep-alive and a record
         Sideload.register(b) // F14: inspect, progress, installed, forget, resignAll, checkCertificate, remind
     }
@@ -132,9 +80,33 @@ enum SignBridge {
                     : "The certificate in the Keychain can't be read. Remove it and import it again."
             }
         }
-        out["trust"] = ["ca": LocalTrust.ca() != nil, "trusted": LocalTrust.ca() != nil && LocalTrust.trusted(),
-                        "name": LocalTrust.label() ?? ""] as [String: Any]
         return out
+    }
+
+    // ---- F75: the certificate that came inside Cydian's own IPA (BundledIdentity, native/sign/Handoff.swift)
+
+    // At launch, sideload build only: imports Payload/Cydian.app/cydian-identity.plist into the Keychain unless the
+    // Keychain already holds an identity or this same file was looked at before (its digest in UserDefaults; the
+    // bundle is read-only, so the file stays until the next update replaces it). Also clears the old Local Install's
+    // leftovers. Never throws; a file that doesn't import is remembered too, so it isn't tried on every launch.
+    static func importBundled() {
+        guard AppMode.current == .sideload else { return }
+        queue.async {
+            SignStore.removeLocalTrustLeftovers()
+            guard let url = Bundle.main.url(forResource: "cydian-identity", withExtension: "plist"),
+                  let data = try? Data(contentsOf: url) else { return }
+            let digest = BundledIdentity.digest(data)
+            let seen = UserDefaults.standard.string(forKey: BundledIdentity.seenKey)
+            guard BundledIdentity.shouldImport(digest: digest, seen: seen, hasIdentity: SignStore.identity() != nil) else { return }
+            UserDefaults.standard.set(digest, forKey: BundledIdentity.seenKey)
+            guard let c = BundledIdentity.parse(data) else { return }
+            do {
+                _ = try SignStore.importIdentity(p12: c.p12, password: c.password, profile: c.profile)
+                try confirmImport(p12: c.p12, password: c.password)
+            } catch {
+                NSLog("Cydian: the certificate inside the app didn't import: %@", text(error))
+            }
+        }
     }
 
     // ---- F73: the certificate for the Signing Server

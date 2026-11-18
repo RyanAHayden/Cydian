@@ -526,3 +526,11 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
   background: center / cover no-repeat; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
 .roulette-desc { font-size: 13px; line-height: 16px; color: var(--subtitle); }
 .roulette-actions { justify-content: flex-end; gap: 8px; }
+
+/* F165: a long description in its own group (screens/description.js): collapsed it shows its first 6 lines (20px each
+   inside 10px padding) with the 6th fading out; the "More"/"Less" row under it is Permissions' .perm-more. */
+.desc-cell { list-style: none; }
+.desc-text.collapsed { max-height: 140px; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 110px, transparent 130px); mask-image: linear-gradient(to bottom, #000 110px, transparent 130px); }
+.desc-link { color: #385487; overflow-wrap: anywhere; }
+html[data-theme="dark"] .desc-link { color: #8fb0e8; }

@@ -31,6 +31,7 @@ import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, dest
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { compareVersions } from "../core/apt.js";
 import { queueApp } from "./queue.js";
+import { descriptionGroup } from "./description.js";
 
 function img(url, cls) {
   const src = mediaUrl(url);
@@ -172,7 +173,7 @@ export async function renderAltSource(body, route, key) {
   page.append(head);
   body.replaceChildren(page);
 
-  if (meta.description) body.append(card([el("div", "pkg-description", meta.description)]));
+  if (meta.description) body.append(descriptionGroup(meta.description)); // F165: own group, long ones fold behind More
 
   // News, newest first: a card each; one about an app opens that app, one with a url opens it.
   if (meta.news.length) {
@@ -480,7 +481,7 @@ export function renderApp(body, route, pkg, source) {
   // F122: the source's screenshots, or (when it lists none) its GitHub repo's README and release pictures.
   body.append(previewSlot(`app:${pkg.key}:${pkg.row?.id ?? app.bundleIdentifier}`, { shots: altShots(app), gh: appGithub(app) }));
 
-  if (app.localizedDescription) body.append(card([el("div", "pkg-description", app.localizedDescription)]));
+  if (app.localizedDescription) body.append(descriptionGroup(app.localizedDescription)); // F165
 
   const details = [{ label: "Version", detail: v.version }];
   if (size) details.push({ label: "Size", detail: size });

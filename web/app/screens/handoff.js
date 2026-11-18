@@ -8,6 +8,7 @@ import { showSheet } from "../nav/sheet.js";
 import { qrSvg } from "../core/qr.js";
 import { sourceLinks, packageLinks, addLink, siteOrigin, formatOf, isIpaFormat } from "../core/handoff.js";
 import { settings } from "./settings.js";
+import { detectMode } from "../core/settings.js";
 import { showShareSheet, setShare } from "../nav/sharesheet.js";
 import { showHUD } from "../nav/hud.js";
 import { appIcon, loadAppIcons } from "../app-icons.js";
@@ -90,6 +91,11 @@ export const APP_TILES = {
   ESign: { letter: "E", color: "#2a6be0" },
   GBox: { letter: "G", color: "#22a45d" },
 };
+// F194: the sideload tools (every app that takes an IPA source). The jailbreak build's sheet leaves them out: it will
+// likely never use them (user 2026-11-18); the sideload IPA and the website keep them.
+export const SIDELOAD_TOOLS = new Set(["AltStore Classic", "AltStore", "SideStore", "Feather", "LiveContainer", "StikStore",
+  "TrollApps", "Scarlet", "ESign", "GBox"]);
+
 const tileOf = (app) => APP_TILES[app] ?? { letter: app.charAt(0).toUpperCase(), color: "#5a6270" };
 
 // The source's own URL, the one a person would paste into Add Source.
@@ -99,8 +105,10 @@ export function sourceUrlOf(source) {
 }
 
 // Pure: what the sheet lists. [{ kind: "copy", label, text } | { kind: "qr", label, link } | { kind: "open", label,
-// url, letter, color }]. app: true on an app's page.
-export function shareItems(source, { app = false, jailbroken = settings.jailbroken(), origin = siteOrigin(globalThis.location) } = {}) {
+// url, letter, color }]. app: true on an app's page. mode: "site" | "jailbreak" | "sideload" (core/settings.js
+// detectMode); the jailbreak build lists no SIDELOAD_TOOLS (F194).
+export function shareItems(source, { app = false, jailbroken = settings.jailbroken(), origin = siteOrigin(globalThis.location),
+  mode = detectMode() } = {}) {
   if (!source) return [];
   const items = [];
   const url = sourceUrlOf(source);
@@ -110,7 +118,7 @@ export function shareItems(source, { app = false, jailbroken = settings.jailbrok
   // An app's page lists them too (user 2026-11-17): they add the app's source to that app.
   const apt = formatOf(source) === "apt";
   if (apt && !jailbroken) return items;
-  for (const l of sourceLinks(source)) items.push({ kind: "open", label: l.app, url: l.url, ...tileOf(l.app) });
+  for (const l of sourceLinks(source)) if (!(mode === "jailbreak" && SIDELOAD_TOOLS.has(l.app))) items.push({ kind: "open", label: l.app, url: l.url, ...tileOf(l.app) });
   return items;
 }
 
@@ -130,6 +138,21 @@ export function setSourceShare(body, source, opts) {
   setShare(body, items.length ? () => showShareFor(source, opts) : null);
   // The apps' icons, fetched now so they're there by the time Share is tapped (cached after the first time).
   loadAppIcons(items.filter((it) => it.kind === "open").map((it) => it.label));
+}
+
+// F194: the Share button on an app page's header (screens/storepage.js storeHeader's `action`), in the spot the App
+// Store's price/install button had: the nav bar's action glyph on a bar button. Opens the same sheet. null when there
+// is nothing to share.
+export function headerShareButton(source, opts) {
+  const items = source ? shareItems(source, opts) : [];
+  if (!items.length) return null;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "bar-button bar-icon share-button store-head-share";
+  b.setAttribute("aria-label", "Share");
+  b.addEventListener("click", () => showShareFor(source, opts));
+  loadAppIcons(items.filter((it) => it.kind === "open").map((it) => it.label));
+  return b;
 }
 
 function copyText(text) {

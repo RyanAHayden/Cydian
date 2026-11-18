@@ -1,7 +1,7 @@
 // F76: what the Share sheet lists on a source's page and on an app's page (screens/handoff.js shareItems).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { shareItems, sourceUrlOf, APP_TILES } from "./handoff.js";
+import { shareItems, sourceUrlOf, APP_TILES, SIDELOAD_TOOLS, headerShareButton } from "./handoff.js";
 
 const ORIGIN = "https://cydian.dev";
 const APT = { key: "deb:https://repo.example/:./", uri: "https://repo.example/", dist: "./" };
@@ -49,4 +49,94 @@ test("every app the hand-offs name has its own tile", () => {
   for (const app of ["Cydia", "Sileo", "Zebra", "Irisin", "AltStore Classic", "AltStore", "SideStore", "Feather", "LiveContainer", "StikStore", "TrollApps", "Scarlet", "ESign", "GBox"]) {
     assert.ok(APP_TILES[app], app);
   }
+});
+
+// ---- F194: the jailbreak build's sheet leaves out the sideload tools; Share on an app page's header ---------------
+
+const SIDELOADERS = ["AltStore Classic", "AltStore", "SideStore", "Feather", "LiveContainer", "StikStore", "TrollApps", "Scarlet", "ESign", "GBox"];
+
+test("F194: the jailbreak build lists no sideload-tool hand-offs; the sideload IPA and the website still do", () => {
+  for (const app of SIDELOADERS) assert.ok(SIDELOAD_TOOLS.has(app), app);
+  for (const app of ["Cydia", "Sileo", "Zebra", "Irisin"]) assert.ok(!SIDELOAD_TOOLS.has(app), app);
+  for (const source of [ALT, { ...ALT, format: "esign" }, { ...ALT, format: "scarlet" }, { ...ALT, format: "gbox" }]) {
+    for (const app of [false, true]) {
+      const jb = shareItems(source, { app, origin: ORIGIN, jailbroken: true, mode: "jailbreak" });
+      assert.deepEqual(kinds(jb), ["copy", "qr"], `${source.format ?? "altstore"} app=${app}: Copy Link and the QR code only`);
+      for (const mode of ["sideload", "site"]) {
+        const opens = shareItems(source, { app, origin: ORIGIN, jailbroken: true, mode }).filter((i) => i.kind === "open");
+        assert.ok(opens.length > 0, `${mode} keeps them`);
+        assert.ok(opens.every((i) => SIDELOAD_TOOLS.has(i.label)));
+      }
+    }
+  }
+  // The full list on the sideload IPA, as on the website.
+  assert.deepEqual(kinds(shareItems(ALT, { origin: ORIGIN, jailbroken: false, mode: "sideload" })),
+    ["copy", "qr", "AltStore Classic", "AltStore", "SideStore", "Feather", "LiveContainer", "StikStore", "TrollApps"]);
+  // The APT managers stay in the jailbreak build.
+  assert.deepEqual(kinds(shareItems(APT, { origin: ORIGIN, jailbroken: true, mode: "jailbreak" })), ["copy", "qr", "Cydia", "Sileo", "Zebra", "Irisin"]);
+  // With no mode given it is the page's own (core/settings.js detectMode): no native bridge here, so the website's.
+  assert.deepEqual(kinds(shareItems(ALT, { origin: ORIGIN })), kinds(shareItems(ALT, { origin: ORIGIN, mode: "site" })));
+});
+
+// A small fake DOM: enough for the header button and nav/sharesheet.js showShareSheet.
+function fakeDom() {
+  const make = (tag) => {
+    const e = {
+      tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, style: { setProperty() {} }, dataset: {},
+      parentNode: null, _cls: new Set(), _text: "", hidden: false, type: "",
+      get className() { return [...e._cls].join(" "); },
+      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
+      classList: { add: (...c) => c.forEach((x) => e._cls.add(x)), contains: (c) => e._cls.has(c), toggle() {} },
+      get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
+      set textContent(v) { e._text = String(v); e.children = []; },
+      set innerHTML(v) { e._html = v; },
+      setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute: (k) => e.attrs[k] ?? null,
+      append(...c) { for (const x of c) { if (typeof x === "string") continue; x.parentNode = e; e.children.push(x); } },
+      remove() { if (e.parentNode) e.parentNode.children = e.parentNode.children.filter((y) => y !== e); e.parentNode = null; },
+      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
+      dispatch(t) { (e.listeners[t] ?? []).forEach((f) => f({ stopPropagation() {}, preventDefault() {} })); },
+      animate: () => ({ finished: Promise.resolve() }),
+      focus() {},
+    };
+    return e;
+  };
+  const body = make("body");
+  globalThis.document = { createElement: make, body, addEventListener() {}, removeEventListener() {} };
+  return body;
+}
+const all = (n, out = []) => { out.push(n); (n.children ?? []).forEach((c) => all(c, out)); return out; };
+
+test("F194: the app page header's Share button opens the share sheet with the source's hand-offs", async () => {
+  const saved = { document: globalThis.document, fetch: globalThis.fetch, localStorage: globalThis.localStorage };
+  globalThis.fetch = () => Promise.reject(new Error("offline in tests")); // the apps' icons: letters instead
+  globalThis.localStorage = { getItem: () => null, setItem() {} };
+  try {
+    for (const [mode, expected] of [["sideload", ["Copy Link", "Add on Another Device", "AltStore Classic", "AltStore", "SideStore"]],
+      ["jailbreak", ["Copy Link", "Add on Another Device"]]]) {
+      const body = fakeDom();
+      const b = headerShareButton(ALT, { app: true, origin: ORIGIN, mode });
+      assert.equal(b.tagName, "BUTTON");
+      for (const c of ["bar-button", "bar-icon", "share-button", "store-head-share"]) assert.ok(b.classList.contains(c), c);
+      assert.equal(b.getAttribute("aria-label"), "Share");
+      b.dispatch("click");
+      const sheet = all(body).find((n) => n._cls?.has("share-sheet"));
+      assert.ok(sheet, "the share sheet is open");
+      const labels = all(sheet).filter((n) => n._cls?.has("share-label")).map((n) => n.textContent);
+      assert.deepEqual(labels.slice(0, expected.length), expected, mode);
+      if (mode === "jailbreak") assert.equal(labels.length, 2, "no sideload tools in the jailbreak build");
+      else assert.ok(labels.includes("Feather"));
+    }
+    fakeDom();
+    assert.equal(headerShareButton(null, { origin: ORIGIN }), null, "nothing to share, no button");
+  } finally {
+    Object.assign(globalThis, saved);
+  }
+});
+
+test("F194: the app page puts Share on its header (storeHeader's action), not in the nav bar", async () => {
+  const { readFileSync } = await import("node:fs");
+  const alt = readFileSync(new URL("./altstore.js", import.meta.url), "utf8");
+  const app = alt.slice(alt.indexOf("export function renderApp("), alt.indexOf("export function storeLookup("));
+  assert.match(app, /storeHeader\(\{[^]*?action: headerShareButton\(source \?\? \{ key: pkg\.key \}, \{ app: true \}\)/);
+  assert.doesNotMatch(app, /setSourceShare\(/, "one Share, on the header");
 });

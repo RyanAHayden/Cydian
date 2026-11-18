@@ -47,3 +47,7 @@ html[data-theme="dark"] .perm-more .cell-label { color: #8fb0e8; }
 /* F122: the screenshots gallery (screens/altstore.js galleryImage): a landscape picture (a banner, an iPad or Mac
    screenshot) fills the width at its own aspect instead of a phone-tall crop. */
 .alt-shot.wide { height: auto; width: calc(100% - 24px); max-height: 360px; object-fit: contain; }
+
+/* F194: an app page's Share on the header's right edge (screens/handoff.js headerShareButton), where the iOS 6 App
+   Store's price/install button sat: the nav bar's bar button and action glyph (ios6.css .bar-button.share-button). */
+.store-head .store-head-share { flex: none; align-self: flex-start; margin-top: 2px; }

@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width">
+<link rel=stylesheet href="app/style.css"><link rel=stylesheet href="app/ios6.css"><link rel=stylesheet href="app/packages.css"><link rel=stylesheet href="app/altstore.css">
+<style>html,body{margin:0;height:auto!important;overflow:visible!important} .page{visibility:visible!important;position:static!important;transform:none!important} .page-body{position:static!important;overflow:visible!important;height:auto!important}</style></head>
+<body><div class="page"><div class="page-body grouped" id=b></div></div>
+<script type=module>
+// F194: the app page header with its Share button (the real storepage.js, handoff.js and CSS; made-up app).
+const q=new URLSearchParams(location.search);
+if(q.has('dark')) document.documentElement.dataset.theme='dark';
+const sp=await import('./app/screens/storepage.js');
+const {headerShareButton}=await import('./app/screens/handoff.js');
+const {el}=await import('./app/nav/ui.js');
+const icon=el('span','pkg-icon large alt-app-icon'); icon.append(el('span','pkg-letter','D'));
+const share=headerShareButton({key:'alt:https://alt.example/apps.json',kind:'altstore',uri:'https://alt.example/apps.json'},{app:true,origin:'https://example.org',mode:'sideload'});
+const h=sp.storeHeader({art:icon,name:'Delta',author:'Riley Testut',action:share,line:sp.headerLine({version:'1.6.3 (77)',size:'38.2 MB',price:'Free'})});
+h.setRating({average:4.5,count:1210,noun:'Ratings'});
+document.getElementById('b').append(h.head);
+if(q.has('pressed')) share.classList.add('is-pressed');
+if(q.has('open')) share.click();
+</script></body></html>

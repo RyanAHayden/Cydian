@@ -2,10 +2,11 @@
 // for APT packages (screens/browse.js renderPackage) and AltStore apps (screens/altstore.js renderApp) alike.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-//   storeHeader({ art, name, author, authorHref, line, mark })  -> { head, setRating(r), setLine(text), setAuthor(name, href) }
+//   storeHeader({ art, name, author, authorHref, line, mark, action })  -> { head, setRating(r), setLine(text), setAuthor(name, href) }
 //     The band at the top: the large glossy icon with its reflection, the name, the author, a stars row (only once
 //     setRating gets a rating) and "Version 2.1.3 · 412 kB · Free". No install button: Install / Modify stays the
-//     nav bar's right button (user 2026-11-18: "keep the install / modify button in the top right").
+//     nav bar's right button (user 2026-11-18: "keep the install / modify button in the top right"). `action`: an
+//     element for the header's right edge, where the App Store's install button sat (F194: an app page's Share).
 //   headerLine({ version, size, price })   -> "Version 2.1.3 · 412 kB · Free"
 //   storeTabs({ details, reviews, related }) -> { control, panes: { details, reviews, related }, select(i), nodes }
 //     The Details / Reviews / Related segmented control (ios6.css .store-segmented) over three panes. Details is
@@ -44,7 +45,7 @@ export function storeStars(rating, cls = "") {
   return s;
 }
 
-export function storeHeader({ art, name, author = null, authorHref = null, line = "", mark = null }) {
+export function storeHeader({ art, name, author = null, authorHref = null, line = "", mark = null, action = null }) {
   const head = el("div", "store-head");
   const icon = el("div", "store-icon");
   if (art) icon.append(art);
@@ -68,6 +69,7 @@ export function storeHeader({ art, name, author = null, authorHref = null, line 
   const lineEl = el("span", "store-head-line", line);
   text.append(rating, lineEl);
   head.append(icon, text);
+  if (action) head.append(action);
   return {
     head,
     // No rating, no stars row (the concept's "(212)" only when there is one to count).

@@ -5,9 +5,12 @@
 
 writes OUT/Packages, OUT/Packages.gz and OUT/Release for a flat repo whose .debs sit beside them under the names
 given (each DEB's base name is its Filename:). tools/release.sh runs it on every release and uploads the three files
-as assets of the release, next to the .debs, so the repo is
+as assets of the release, next to the .debs. GitHub serves them at
     https://github.com/RyanAHayden/Cydian/releases/latest/download/
-(GitHub redirects latest/download/<name> to the newest release's asset; apt and Cydian's fetch follow it).
+(latest/download/<name> redirects to the newest release's asset), and the repo's address is
+    https://cydian.dev/repo/
+where the Worker (worker/src/index.js `repo`) fetches the same asset and answers with it, no redirect: Zebra names
+its cache file after the final URL, and GitHub's signed one is too long for it (B17).
 
 --minimum sets X-Cydian-Minimum-Version, Cydian's own field (in the Release and in Cydian's Packages stanza): a
 running Cydian older than that must upgrade before anything else (web/app/core/essential.js). apt ignores X- fields.

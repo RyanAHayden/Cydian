@@ -23,6 +23,8 @@
 //                                           started, the body once it's done. The same POST with token and size starts it
 //   GET/PUT/DELETE /api/account/<id>       F97: Cydian Account's encrypted blob (src/account.js)
 //   GET  /api/fetch?url=&kind=ipa           F93: an IPA for the website's signer, streamed, up to MAX_UPLOAD_MB
+//   GET  /repo/<file>                       B17: Cydian's own flat APT repo (Release, Packages, Packages.gz, *.deb),
+//                                           the latest release's asset fetched here, redirects followed here
 //
 // Settings (wrangler.toml [vars]): HOST_IDS, the bundle IDs /sign/host takes ("*.cydian" = any ending in .cydian);
 // TTL (seconds, 600); MAX_UPLOAD_MB (512), the largest IPA /sign/upload and kind=ipa take ("0": no uploads). KV
@@ -123,6 +125,50 @@ export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promis
   }
   return r;
 }
+
+// ---- /repo/: Cydian's own APT repo (B17) -----------------------------------------------------------------------
+// The repo's files are assets of every GitHub release (tools/release.sh, tools/selfrepo.py), and
+// github.com/<repo>/releases/latest/download/<file> redirects to release-assets.githubusercontent.com/...?sig=&jwt=,
+// a URL Zebra 1.1.36 names its cache file after: too long, "the file name is invalid", the source shows red. Here
+// the Worker follows the redirect and answers with the file itself, so https://cydian.dev/repo/ has no redirect.
+// Only the repo's own names are fetched (anything else, InRelease, Packages.xz, icons: 404 without asking GitHub).
+// CYDIAN_REPO (owner/name) picks another GitHub repo's releases (default RyanAHayden/Cydian).
+export const SELF_REPO = "RyanAHayden/Cydian";
+const REPO_TYPES = { "Release": "text/plain; charset=utf-8", "Packages": "text/plain; charset=utf-8", "Packages.gz": "application/gzip" };
+export function repoFile(pathname) {
+  const m = /^\/repo\/([^/]+)$/.exec(pathname);
+  if (!m) return null;
+  let name;
+  try { name = decodeURIComponent(m[1]); } catch { return null; }
+  if (REPO_TYPES[name]) return { name, type: REPO_TYPES[name] };
+  return /^[A-Za-z0-9][A-Za-z0-9.+~_-]{0,200}\.deb$/.test(name) ? { name, type: "application/vnd.debian.binary-package" } : null;
+}
+export async function repo(req, u, env = {}, { fetcher = fetch, wait } = {}) {
+  if (u.pathname === "/repo" || u.pathname === "/repo/") {
+    if (u.pathname === "/repo") return Response.redirect(`${u.origin}/repo/`, 301);
+    return new Response("Cydian's own APT repo: add this address in Cydian, Sileo or Zebra.\n", { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=300" } });
+  }
+  const f = repoFile(u.pathname);
+  if (!f || !["GET", "HEAD"].includes(req.method)) return new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+  const name = /^[\w.-]+\/[\w.-]+$/.test(env.CYDIAN_REPO ?? "") ? env.CYDIAN_REPO : SELF_REPO;
+  const src = `https://github.com/${name}/releases/latest/download/${encodeURIComponent(f.name)}`;
+  let r;
+  try { r = await upstream(src, { fetcher, token: env.GITHUB_TOKEN ?? null, ...(wait ? { wait } : {}) }); } catch {
+    return new Response("GitHub didn't answer\n", { status: 502, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+  }
+  if (!r.ok) {
+    r.body?.cancel?.();
+    const status = r.status === 404 ? 404 : 502;
+    return new Response(status === 404 ? "Not found\n" : `GitHub answered HTTP ${r.status}\n`, { status, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+  }
+  // Release and Packages change with every release: clients ask again after 5 minutes; a .deb is named by version
+  // (Cydian.deb, the one fixed name, is never in Packages' Filename: apt fetches the versioned name).
+  const headers = { "Content-Type": f.type, "Cache-Control": `public, max-age=${f.name.endsWith(".deb") ? 3600 : 300}`, "X-Content-Type-Options": "nosniff", ...CORS };
+  for (const h of ["content-length", "last-modified", "etag"]) { const v = r.headers.get(h); if (v) headers[h] = v; }
+  if (req.method === "HEAD") { r.body?.cancel?.(); return new Response(null, { headers }); }
+  return new Response(r.body, { headers, encodeBody: "manual" });
+}
+
 async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null) {
   const target = httpUrl(u.searchParams.get("url") ?? "");
   if (!target) return fetchErr("bad_url", "Only http(s) URLs can be fetched.", 400);
@@ -317,6 +363,7 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null);
+    if (u.pathname === "/repo" || u.pathname.startsWith("/repo/")) return repo(req, u, env);
     if (u.pathname === "/healthz") return new Response("ok\n", { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
     if (u.pathname === "/sign/status") return json({ ok: true, ttl, worker: true, zsign: false, upload: uploadCap(env) });
     if (u.pathname.startsWith("/sign/up")) { const r = await uploads(req, u, env, ttl); if (r) return r; }

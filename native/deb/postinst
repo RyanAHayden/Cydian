@@ -4,4 +4,39 @@ uicache -p /var/jb/Applications/Cydian.app || true
 # N5: start the daily upgrade check (unload first so an upgrade picks up a changed job).
 launchctl unload /var/jb/Library/LaunchDaemons/com.ryha.cydian.upgrades.plist 2>/dev/null || true
 launchctl load /var/jb/Library/LaunchDaemons/com.ryha.cydian.upgrades.plist || true
+# B17: Cydian's own source moved from GitHub's releases/latest/download/ (whose redirect Zebra can't follow) to
+# cydian.dev/repo/, which serves the same files. Rewrite the old address in cydian.sources (the app's file, F33), or
+# drop its stanza when the new one is already there, so apt doesn't list Cydian twice. Plain sh (dash): the phone has
+# no awk. Stanzas are split by blank lines (deb822); every other stanza is copied as it is.
+src=/var/jb/etc/apt/sources.list.d/cydian.sources
+old=https://github.com/RyanAHayden/Cydian/releases/latest/download/
+new=https://cydian.dev/repo/
+b17_flush() {
+  [ -n "$stanza" ] || return 0
+  case $stanza in
+    *"$old"*) [ $have = 1 ] && { stanza=; return 0; }
+              stanza=$(printf '%s\n' "$stanza" | sed "s|$old|$new|g"); have=1 ;;
+  esac
+  [ $n = 0 ] || printf '\n'
+  printf '%s\n' "$stanza"; n=$((n + 1)); stanza=
+}
+if [ -f "$src" ] && grep -qF "$old" "$src"; then
+  have=0 n=0 stanza=
+  grep -qF "URIs: $new" "$src" && have=1
+  tmp="$src.b17.$$"
+  if {
+    while IFS= read -r line || [ -n "$line" ]; do
+      case $line in
+        *[![:space:]]*) stanza="${stanza:+$stanza
+}$line" ;;
+        *) b17_flush ;;
+      esac
+    done < "$src"
+    b17_flush
+  } > "$tmp"; then
+    if [ -s "$tmp" ]; then chmod 0644 "$tmp" && mv -f "$tmp" "$src"; else rm -f "$tmp" "$src"; fi
+  else
+    rm -f "$tmp"
+  fi
+fi
 exit 0

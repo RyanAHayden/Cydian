@@ -284,3 +284,50 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   assert.equal(await waitFor(async () => ++n, (v) => v === 3, 60000, {}, async () => {}), 3);
   console.log("worker reserved link: ok");
 }
+{
+  // B17: /repo/ serves Cydian's APT repo itself (the release asset fetched here, GitHub's redirect followed here):
+  // Zebra names its cache file after the final URL, and GitHub's signed one is too long for it.
+  const { repo, repoFile } = await import("./src/index.js");
+  assert.deepEqual(repoFile("/repo/Release"), { name: "Release", type: "text/plain; charset=utf-8" });
+  assert.equal(repoFile("/repo/Packages.gz").type, "application/gzip");
+  assert.equal(repoFile("/repo/com.ryha.cydian_0.3.0-12_iphoneos-arm64.deb").name, "com.ryha.cydian_0.3.0-12_iphoneos-arm64.deb");
+  for (const bad of ["/repo/InRelease", "/repo/Packages.xz", "/repo/..%2Fx.deb", "/repo/a/b.deb", "/repo/.deb", "/repo/%E0.deb"]) assert.equal(repoFile(bad), null, bad);
+  const seen = [];
+  const fetcher = async (url, o = {}) => {
+    seen.push(url);
+    assert.equal(o.redirect, "follow");
+    if (url.endsWith("/Release")) return new Response("Origin: Cydian\n", { headers: { "content-length": "15", "last-modified": "Wed, 18 Nov 2026 10:00:00 GMT" } });
+    if (url.endsWith("/Packages.gz")) return new Response(new Uint8Array([0x1f, 0x8b, 8]));
+    return new Response("no", { status: 404 });
+  };
+  const at = (path, init) => { const req = new Request("https://cydian.example" + path, init); return repo(req, new URL(req.url), {}, { fetcher, wait: async () => {} }); };
+  let r = await at("/repo/Release");
+  assert.equal(r.status, 200);
+  assert.equal(await r.text(), "Origin: Cydian\n");
+  assert.equal(r.headers.get("content-type"), "text/plain; charset=utf-8");
+  assert.equal(r.headers.get("last-modified"), "Wed, 18 Nov 2026 10:00:00 GMT");
+  assert.equal(seen.pop(), "https://github.com/RyanAHayden/Cydian/releases/latest/download/Release");
+  r = await at("/repo/Packages.gz");
+  assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [0x1f, 0x8b, 8]);
+  assert.equal(r.headers.get("content-type"), "application/gzip");
+  assert.equal(r.headers.get("content-encoding"), null);
+  assert.equal((await at("/repo/Release", { method: "HEAD" })).headers.get("content-length"), "15");
+  assert.equal((await at("/repo/x_1_iphoneos-arm64.deb")).status, 404); // GitHub's 404 passed on
+  const n = seen.length;
+  assert.equal((await at("/repo/InRelease")).status, 404);              // not asked of GitHub at all
+  assert.equal((await at("/repo/Release", { method: "POST" })).status, 404);
+  assert.equal(seen.length, n);
+  assert.equal((await at("/repo")).status, 301);
+  assert.equal((await at("/repo/")).status, 200);
+  const other = new Request("https://cydian.example/repo/Release");
+  await repo(other, new URL(other.url), { CYDIAN_REPO: "me/fork" }, { fetcher, wait: async () => {} });
+  assert.equal(seen.pop(), "https://github.com/me/fork/releases/latest/download/Release");
+  // upstream answers 503 three times: a 502 here, not GitHub's page
+  const down = new Request("https://cydian.example/repo/Release");
+  r = await repo(down, new URL(down.url), {}, { fetcher: async () => new Response("x", { status: 503 }), wait: async () => {} });
+  assert.equal(r.status, 502);
+  // the Worker routes /repo/ before the website's assets
+  const site = await w.fetch(new Request("https://cydian.example/repo/InRelease"), { ...env, ASSETS: { fetch: async () => new Response("asset") } });
+  assert.equal(site.status, 404);
+  console.log("worker repo: ok");
+}

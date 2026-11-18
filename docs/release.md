@@ -30,9 +30,14 @@ for a release.
 Like Cydia's apt.saurik.com, Cydian has a source of its own that is built in and can't be removed
 (`web/app/core/essential.js` `builtinSources`). The release script regenerates both on every release:
 
-- **APT repo** (the jailbreak app): `https://github.com/RyanAHayden/Cydian/releases/latest/download/`, a flat repo
-  (`dist ./`). Decision: release assets, not GitHub Pages. `latest/download/<name>` always redirects to the newest
-  published release's asset, so the URL never changes, there is no second branch or Pages setup to keep up, and the
+- **APT repo** (the jailbreak app, and what the website's Install Full Cydian sheet adds to Sileo and Zebra):
+  `https://cydian.dev/repo/`, a flat repo (`dist ./`). Its files are the latest release's assets: the Worker's
+  `/repo/<file>` fetches `https://github.com/RyanAHayden/Cydian/releases/latest/download/<file>`, follows GitHub's
+  redirect itself and answers with the file (B17; only `Release`, `Packages`, `Packages.gz` and `*.deb`). Zebra
+  can't take GitHub's address directly: the redirect ends at a signed `release-assets.githubusercontent.com` URL,
+  and Zebra 1.1.36 names its cache file after it ("the file name is invalid"). The .deb's postinst rewrites the old
+  GitHub address in phones' `cydian.sources`. Decision: release assets, not GitHub Pages. `latest/download/<name>`
+  always redirects to the newest published release's asset, so the URL never changes, there is no second branch or Pages setup to keep up, and the
   .debs are not committed to git. `Packages` names each .deb by its bare asset name (`Filename:
   com.ryha.cydian_0.1.3-12_iphoneos-arm64.deb`), which resolves against the same URL to the same release.
   Drafts and pre-releases don't count as latest, so a draft doesn't change what the app sees. The repo is unsigned,

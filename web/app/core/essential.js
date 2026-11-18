@@ -4,8 +4,8 @@
 //
 // The built-in source, like Cydia's apt.saurik.com: always in the list, first, with a lock instead of Delete; Manage
 // can't remove it and Export skips it. Which one, by build (builtinSources):
-//   jailbreak   Cydian's flat APT repo, https://github.com/RyanAHayden/Cydian/releases/latest/download/ (Packages,
-//               Release and the .debs are assets of every release, tools/release.sh and tools/selfrepo.py)
+//   jailbreak   Cydian's flat APT repo, https://cydian.dev/repo/ (Packages, Release and the .debs are assets of
+//               every release, tools/release.sh and tools/selfrepo.py; the Worker serves the latest one's, B17)
 //   sideload    Cydian's AltStore source, web/app/source.json on GitHub (tools/altsource.py)
 //   site        the same AltStore source (the site only installs IPAs)
 // withBuiltins wraps a backend's source calls: sources() puts the built-in first (a seed record until it is read),
@@ -24,7 +24,7 @@ import { altKey, seedRecord } from "./altstore.js";
 
 export const SELF_ID = "com.ryha.cydian";
 export const SELF_NAME = "Cydian";
-export const SELF_APT_URI = "https://github.com/RyanAHayden/Cydian/releases/latest/download/";
+export const SELF_APT_URI = "https://cydian.dev/repo/";
 export const SELF_ALT_URL = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json";
 export const SELF_SITE = "https://cydian.dev/";
 // The .debs that are essential whatever their control says (Cydian's helper is in Cydian's own package).

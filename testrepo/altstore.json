@@ -53,6 +53,15 @@
    "category": "utilities",
    "versions": [
     {
+     "version": "1.3.0",
+     "buildVersion": "4",
+     "date": "2026-11-17",
+     "size": 2331202,
+     "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/test-fixtures/test-alpha-1.3.0.ipa",
+     "localizedDescription": "Test update: Test Alpha 1.3, for the upgrade notification and badges.",
+     "minOSVersion": "15.0"
+    },
+    {
      "version": "1.2.0",
      "buildVersion": "3",
      "date": "2026-11-17",

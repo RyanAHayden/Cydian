@@ -2,11 +2,9 @@
 // page, and it works the same from the site and from the app bundle (file:// or a custom scheme). No DOM here:
 // the router gets a window-like object, which keeps it testable under `node --test`.
 
-import { tabsFor } from "./mode.js";
-
 export const ALL_TABS = ["home", "sources", "changes", "installed", "search", "settings"];
-// The tabs this build shows: the sideload app leaves out the apt-only ones (mode.js), and so does every route.
-export const TABS = tabsFor(ALL_TABS);
+// The tabs this build shows: every build (site, jailbreak, sideload) shows every tab (user 2026-11-17).
+export const TABS = ALL_TABS;
 export const DEFAULT_TAB = "home";
 // F123: Settings is no tab of its own any more, as in Cydia: the tab bar shows the other five, and Settings' pages
 // open on Home's stack (Home's Settings row), as #/home/settings/<…>. Its screen stays in TABS: it draws those pages.

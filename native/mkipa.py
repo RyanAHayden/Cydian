@@ -177,7 +177,7 @@ def check(path):
     if APP + "bridge.js" not in files:
         problems.append("bridge.js missing (cydianNative and the mode come from it)")
     web = {n[len(APP + "web/"):] for n in files if n.startswith(APP + "web/")}
-    for need in ("index.html", "app.js", "style.css", "router.js", "mode.js"):
+    for need in ("index.html", "app.js", "style.css", "router.js"):
         if need not in web:
             problems.append("web/%s missing from the bundle" % need)
     tests = sorted(n for n in web if n.endswith(".test.js"))

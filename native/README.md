@@ -31,8 +31,8 @@ A Swift shell around one WKWebView that shows `web/app/` from the app bundle (do
 - `Sources/mode.c`, `Sources/Mode.swift`: the mode, picked at launch (I2): `jailbreak` when the N2 helper is an
   executable file at `Jailbreak.helper` (`/var/jb/usr/libexec/cydian/cydian-helper` rootless, under roothide's
   jbroot, or at / rootful), else `sideload`. Swift calls `cydian_mode_at` through the bridging header. The page gets
-  it as `cydianNative.mode` (bridge.js's `@MODE@`, read by core/settings.js `detectMode`) and in `app.info`;
-  `web/app/mode.js` drops the apt-only tabs (Installed) in sideload mode.
+  it as `cydianNative.mode` (bridge.js's `@MODE@`, read by core/settings.js `detectMode`) and in `app.info`.
+  Every mode shows every tab (Installed holds the remembered apps in the sideload build).
 - `mkipa.py`, `Info-sideload.plist`, `entitlements-sideload.plist`: the sideload IPA (I2). Same executable, signed
   ad hoc with `get-task-allow` only, Info.plist plus the overlay (docs/sideload.md, "What I2 needs"), zipped as
   `Payload/Cydian.app` with no helper. Ship it unsigned/ad hoc: the user signs it with Feather, AltStore,

@@ -40,7 +40,7 @@ class Ipa(unittest.TestCase):
         for name in ("AppIcon60x60@2x.png", "AppIcon60x60@3x.png"):
             shutil.copy(os.path.join(HERE, "icon", name), self.app)
         copy_launch(self.app)
-        for name in ("index.html", "app.js", "style.css", "router.js", "mode.js", "nav/stack.js"):
+        for name in ("index.html", "app.js", "style.css", "router.js", "nav/stack.js"):
             self.write("web/" + name, b"x")
         self.write("bridge.js", b"x")
         # N8: the both-modes App Intents and a widget extension without controls.
@@ -146,12 +146,12 @@ class Ipa(unittest.TestCase):
         self.assertIn("URL scheme", p)
         self.assertIn(".ipa", p)
 
-    def test_tests_and_missing_mode_flagged(self):
+    def test_tests_and_missing_router_flagged(self):
         self.write("web/router.test.js", b"x")
-        os.remove(os.path.join(self.app, "web/mode.js"))
+        os.remove(os.path.join(self.app, "web/router.js"))
         p = " | ".join(self.problems())
         self.assertIn("tests shipped", p)
-        self.assertIn("web/mode.js missing", p)
+        self.assertIn("web/router.js missing", p)
 
     def test_missing_bridge_flagged(self):
         os.remove(os.path.join(self.app, "bridge.js"))

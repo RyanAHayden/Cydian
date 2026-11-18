@@ -3,17 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import vm from "node:vm";
-import { tabsFor, APT_ONLY_TABS } from "./mode.js";
 import { detectMode } from "./core/settings.js";
-
-const ALL = ["home", "sources", "changes", "installed", "search", "settings"];
-
-test("every build keeps every tab, Installed included (remembered apps, Cydian itself, My IPAs)", () => {
-  assert.deepEqual(tabsFor(ALL, "sideload"), ALL);
-  assert.deepEqual(APT_ONLY_TABS, []);
-  assert.deepEqual(tabsFor(ALL, "jailbreak"), ALL);
-  assert.deepEqual(tabsFor(ALL, "site"), ALL);
-});
 
 test("native/bridge.js sets cydianNative.mode from @MODE@, and detectMode reads it", () => {
   const src = readFileSync(join(import.meta.dirname, "../../native/bridge.js"), "utf8").replace("})(globalThis);", "})(this);");

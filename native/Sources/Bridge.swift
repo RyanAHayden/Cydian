@@ -35,12 +35,14 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
                      "markers": Jailbreak.markers], nil)
         }
         // The Appearance setting (F23, from screens/settings.js applyTheme): {style: auto|light|dark, theme,
-        // darkPalette: oled|gunmetal} (F198).
+        // darkPalette: oled|gunmetal|midnight|linen|nord|dracula} (F198, F200), lightPalette: classic|sepia|solarized
+        // (F214; an older page sends none: Classic).
         on("app.theme") { c in
             DispatchQueue.main.async {
                 if let w = c.web?.window { Theme.apply(style: c.params["style"] as? String ?? "auto",
                                                        theme: c.params["theme"] as? String ?? "light",
-                                                       darkPalette: c.params["darkPalette"] as? String ?? "oled", to: w) }
+                                                       darkPalette: c.params["darkPalette"] as? String ?? "oled",
+                                                       lightPalette: c.params["lightPalette"] as? String ?? "classic", to: w) }
                 c.reply(nil, nil)
             }
         }
@@ -179,23 +181,28 @@ enum Theme {
 
     static func style(_ s: String) -> UIUserInterfaceStyle { s == "dark" ? .dark : s == "light" ? .light : s == "auto" ? .unspecified : .light }
 
-    static var saved: (style: String, darkPalette: String) {
+    static var saved: (style: String, darkPalette: String, lightPalette: String) {
         let d = UserDefaults.standard.dictionary(forKey: savedKey) ?? [:]
-        return (d["style"] as? String ?? "light", d["darkPalette"] as? String ?? "oled")
+        return (d["style"] as? String ?? "light", d["darkPalette"] as? String ?? "oled",
+                d["lightPalette"] as? String ?? "classic")
     }
 
-    // The ground for the next launch: dark when the page last pinned Dark, or Automatic on a dark iPhone.
+    // The ground for the next launch: dark when the page last pinned Dark, or Automatic on a dark iPhone;
+    // F214: in light, the light palette's (Sepia's or Solarized Light's pinstripes, not the kit's blue-grey).
     static func launchGround(systemDark: Bool) -> Launch.Ground {
         let s = saved
-        return Launch.ground(dark: s.style == "dark" || (s.style == "auto" && systemDark), palette: s.darkPalette)
+        return Launch.ground(dark: s.style == "dark" || (s.style == "auto" && systemDark), palette: s.darkPalette,
+                             lightPalette: s.lightPalette)
     }
 
-    static func apply(style: String, theme: String, darkPalette: String, to window: UIWindow) {
+    static func apply(style: String, theme: String, darkPalette: String, lightPalette: String = "classic",
+                      to window: UIWindow) {
         window.overrideUserInterfaceStyle = Self.style(style)
-        let ground = Launch.ground(dark: theme == "dark", palette: darkPalette)
+        let ground = Launch.ground(dark: theme == "dark", palette: darkPalette, lightPalette: lightPalette)
         window.backgroundColor = ground.pattern
         if let web = window.rootViewController?.view as? WKWebView { Launch.paint(web, ground) }
-        UserDefaults.standard.set(["style": style, "darkPalette": darkPalette], forKey: savedKey)
+        UserDefaults.standard.set(["style": style, "darkPalette": darkPalette, "lightPalette": lightPalette],
+                                  forKey: savedKey)
         window.rootViewController?.setNeedsStatusBarAppearanceUpdate()
     }
 }

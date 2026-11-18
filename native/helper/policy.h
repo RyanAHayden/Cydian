@@ -16,9 +16,9 @@
 #define HELPER_EX_IOERR 74  /* F33: cydian.sources couldn't be read or written */
 
 enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, HV_HOLD, HV_UNHOLD, HV_SHOWHOLD,
-                   HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA };
+                   HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA, HV_SELFUPDATE };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
-                     "simulate, apply, respring, install-ipa"
+                     "simulate, apply, respring, install-ipa, selfupdate"
 
 /* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
  * Downgrade and Reinstall pick theirs), "-name" removes. apt gets "name", "name=version" and "name-" in one
@@ -60,6 +60,12 @@ struct helper_plan {
     char name_buf[HELPER_MAX_PACKAGES][HELPER_NAME_MAX + 1];
     char item_buf[HELPER_MAX_PACKAGES][HELPER_ITEM_MAX + 2];
 };
+
+/* F61: selfupdate <path>: dpkg -i of the one .deb the app downloaded (Cydian's own update). The path is absolute,
+ * of [A-Za-z0-9._/-], with no "." or ".." segment, ends in ".deb", at most HELPER_DEB_PATH_MAX bytes, and is a
+ * regular file (not a symlink) when the plan is made. */
+#define HELPER_DEB_PATH_MAX 1024
+int helper_deb_path_ok(const char *s);
 
 /* 1 if s is a package name the helper passes on: [a-z0-9][a-z0-9.+-]+, at most HELPER_NAME_MAX bytes. */
 int helper_name_ok(const char *s);

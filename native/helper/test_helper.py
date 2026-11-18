@@ -331,6 +331,40 @@ class Helper(unittest.TestCase):
         os.chmod(sb, 0o755)
         self.assertEqual(self.run_driver("plan", p, "3", "respring"), [sb, "sbreload"])
 
+    # --- F61: selfupdate <path.deb>, dpkg -i of Cydian's own update
+
+    def test_selfupdate_plan(self):
+        d = tempfile.mkdtemp(dir=self.tmp)
+        deb = os.path.join(d, "Cydian-0.2.0.deb")
+        with open(deb, "wb") as f:
+            f.write(b"!<arch>\n")
+        self.assertEqual(self.plan("selfupdate", deb),
+                         ["/var/jb/usr/bin/dpkg", "dpkg", "--force-confdef", "--force-confold", "--status-fd", "3", "-i", deb])
+        self.assertEqual(self.plan("selfupdate", deb, fd="-1")[1:], ["dpkg", "--force-confdef", "--force-confold", "-i", deb])
+        link = os.path.join(d, "link.deb")
+        os.symlink(deb, link)
+        os.makedirs(os.path.join(d, "dir.deb"))
+        cases = {
+            ("selfupdate",): "one .deb path",
+            ("selfupdate", deb, deb): "one .deb path",
+            ("selfupdate", "Cydian.deb"): "bad .deb path",  # relative
+            ("selfupdate", deb[:-4] + ".ipa"): "bad .deb path",
+            ("selfupdate", d + "/../x.deb"): "bad .deb path",
+            ("selfupdate", d + "/./x.deb"): "bad .deb path",
+            ("selfupdate", d + "/a b.deb"): "bad .deb path",
+            ("selfupdate", d + "/-o.deb;x"): "bad .deb path",
+            ("selfupdate", "/" + "a" * 1024 + ".deb"): "bad .deb path",
+            ("selfupdate", d + "/missing.deb"): "not a regular file",
+            ("selfupdate", link): "not a regular file",
+            ("selfupdate", d + "/dir.deb"): "not a regular file",
+        }
+        for words, msg in cases.items():
+            with self.subTest(words=words):
+                out = self.plan(*words)
+                self.assertEqual(len(out), 1, out)
+                self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
+        self.assertEqual(self.run_driver("known", "/nonexistent", "selfupdate", deb), ["all known"])
+
     def test_queue_known(self):
         p = self.fake_prefix()
         k = lambda *w: self.run_driver("known", p, *w)[0]

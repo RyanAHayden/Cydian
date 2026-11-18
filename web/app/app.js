@@ -301,6 +301,9 @@ if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.
 if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch")) getBackend().refreshSources(undefined, { filter: sourceFilter(settingsScreen.settings.deviceType()) }).catch(() => {});
 
+// F61: in the app, look for a new Cydian on GitHub (at most once a day) once the launch has settled.
+if (globalThis.cydianNative) setTimeout(() => settingsScreen.checkUpdates().catch(() => {}), 2000);
+
 // Upgrade alerts (F10): register the service worker and, if opted in, re-subscribe (iOS drops subscriptions now
 // and then). After first paint, so it never competes with the launch.
 if (!globalThis.cydianNative) setTimeout(() => startPush({ holds: () => settingsScreen.settings.holds.list() }).catch(() => {}), 3000);

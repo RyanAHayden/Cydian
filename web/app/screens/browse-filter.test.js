@@ -65,6 +65,6 @@ test("Browse's choice is a segmented scope bar at the top of the page, not a tit
     assert.doesNotThrow(() => readFileSync(new URL(`../icons/sections/${icon}.png`, import.meta.url)), icon);
   }
   assert.doesNotThrow(() => readFileSync(new URL("../icons/roulette.svg", import.meta.url)));
-  assert.match(css, /\.browse-hero \{[^}]*icons\/linen\.svg/, "the card on Notification Center's linen");
+  assert.match(css, /\.browse-hero \{[^}]*#141414 50%, #000 50%/, "the card on iOS 6's black glossy bar");
   assert.match(css, /\.browse-hero:active \.browse-hero-view \{/, "pressing the card presses View");
 });

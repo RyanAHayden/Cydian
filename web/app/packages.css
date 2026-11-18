@@ -449,11 +449,12 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
 .browse-scope { margin-bottom: -1px; }
 /* Tweak of the Day: one package on brushed slate (the concept's hero), the whole card a link. */
 .browse-hero-slot { margin: 10px 10px 0; }
-/* Its background is Notification Center's linen (SpringBoard's BulletinListLinen, redrawn as icons/linen.svg: threads
-   over #858a98 -> #303238 top to bottom, here the top part of that run). */
-.browse-hero { display: block; border-radius: 9.5px; overflow: hidden; border: 1px solid #3a3d45; color: #fff; text-decoration: none;
-  background: url("icons/linen.svg") 0 0 / 80px 80px, linear-gradient(#858a98, #5c606b);
-  background-origin: border-box; box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
+/* Its background is iOS 6's black glossy bar (UIButtonBarBlackOpaqueBackgroundTall, as behind Music's Now Playing):
+   a #575757 top line, #303030 -> #141414 down the top half, black below (user 2026-11-18: the linen was too much, a
+   white card too plain for the featured one). */
+.browse-hero { display: block; border-radius: 9.5px; overflow: hidden; border: 1px solid #000; color: #fff; text-decoration: none;
+  background: linear-gradient(#303030, #141414 50%, #000 50%); background-origin: border-box;
+  box-shadow: inset 0 1px 0 #575757, 0 1px 0 rgba(255,255,255,.5); }
 .browse-hero-kicker { display: block; padding: 9px 12px 0; font-size: 11px; font-weight: bold; letter-spacing: .08em; color: #c9d4e3;
   text-shadow: 0 -1px 0 rgba(0,0,0,.5); }
 .browse-hero-row { display: flex; gap: 12px; align-items: center; padding: 8px 12px 10px; }

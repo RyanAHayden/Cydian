@@ -10,7 +10,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **F162** Push a release once everything above is merged (user 2026-11-18: "add a task at the end to push release"). Follow docs/release.md: run tools/release.sh for the next version after v0.4.0 (minor bump), from an interactive shell with SWIFT_TOOLCHAIN and IOS_SDK, `--dry-run` first. It commits and pushes native/VERSION, builds the jailbreak .deb and sideload IPA from that commit, and publishes the GitHub release with the self-repo files. Then run tools/altsource.py update and commit it. Release notes: the user-facing changes since v0.4.0 from DONE.md, in short lines. Check afterwards: the iPhone 7 jailbreak build offers the update (selfupdate) and installs it, and Cydian's APT repo lists the new version. If the toolchain env is missing, stop and ask the user to run it (`! tools/release.sh`). | after: F166, F165, F163, F161, F160, F159, F158, F157, F155, F154 | test: the GitHub release exists with the .deb, .ipa and repo files; tools/check.sh passes
 
 ### Research (any time, parallel)
 

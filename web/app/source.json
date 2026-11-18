@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.5.0",
+          "date": "2026-11-18T15:17:44Z",
+          "localizedDescription": "Browse rebuilt: Featured, New and Top 25, Tweak of the Day, Collections, and Tweak Roulette\nInstalls show a progress page with a terminal-style log, ending on Open, Respring or Reload\nApp pages show App Store details, screenshots and links to that app and its source\nDrop-down reload bar like Cydia's, with live status and Cancel; it no longer blocks the app\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.5.0",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.5.0/Cydian.ipa",
+          "size": 4848829,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.4.0",
           "date": "2026-11-18T13:04:59Z",
           "localizedDescription": "**Home and Settings**\nSettings now sits at the bottom of Home, like Cydia; the tab bar is Home, Sources, Changes, Installed and Search.\nSettings rebuilt like iOS 6's Settings app: General, Display, Updates, Signing and About. Unused settings removed.\nThe Signing tile hides once signing is set up (it lives in Settings > Signing).\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.4.0",
@@ -167,14 +175,6 @@
           "localizedDescription": "Cydian shows itself in Installed at its real version, so its updates appear in Changes like any app.\nAutomatic appearance follows iOS, dark mode included (Light stays the default).\nFeatured opens Popular; the share sheet with Copy Link; the Reloading popup lasts as long as loading.\nFixes: the Add button's Paste state, the page shifting when typing in a popup.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.1",
           "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.1/Cydian.ipa",
           "size": 2613122,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.2.0",
-          "date": "2026-11-18T02:27:55Z",
-          "localizedDescription": "App pages: Install signs with your own certificate and installs; Download IPA keeps the file, on every older version too. No more hand-offs to AltStore, SideStore or Feather.\nInstalls in the app show only iOS's Install prompt.\nMark as Installed for apps installed another way.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.0",
-          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.0/Cydian.ipa",
-          "size": 2541172,
           "minOSVersion": "15.0"
         }
       ]

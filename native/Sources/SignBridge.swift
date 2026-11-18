@@ -8,7 +8,8 @@
 //   signing.resetTrust          throws the local CA away (the user removes the old profile in Settings) -> status
 //   signing.install {url} (stream: {phase: "downloading"|"reading"|"signing"|"installing", progress})
 //                               downloads, signs and opens the itms-services link -> {bundleId, originalBundleId,
-//                               name, version, removed}
+//                               name, version, removed}; F14 moved it to Sideload.swift, which adds the user's edits
+//                               and the calls listed there
 //
 // Error codes: jailbreak, no_identity, untrusted, wrong_password, bad_p12, bad_profile, profile_expired,
 // cert_expired, cert_not_in_profile, bad_ipa, encrypted, bad_url, network, too_large, keychain, server.
@@ -65,7 +66,8 @@ enum SignBridge {
                 } catch { Apt.reply(c, nil, text(error)) }
             }
         }
-        b.on("signing.install") { c in install(c) }
+        b.on("signing.install") { c in Sideload.install(c) } // F14: with the user's edits, keep-alive and a record
+        Sideload.register(b) // F14: inspect, progress, installed, forget, resignAll, checkCertificate, remind
     }
 
     static func status() -> [String: Any] {
@@ -79,8 +81,11 @@ enum SignBridge {
                                            "wildcard": p.isWildcard]
                 if let x = p.expires { prof["expires"] = iso.string(from: x) }
                 if let problem = p.problem(with: der) { prof["problem"] = problem.message }
+                prof["kind"] = p.kind.rawValue // F14
+                if let x = p.signatureExpiry(certificate: der) { ident["signatureExpires"] = iso.string(from: x) }
                 ident["profile"] = prof
             }
+            ident["revocation"] = Sideload.cachedRevocation(der) ?? NSNull() // F14: the last OCSP answer
             out["identity"] = ident
         } else {
             out["identity"] = NSNull()
@@ -88,69 +93,6 @@ enum SignBridge {
         out["trust"] = ["ca": LocalTrust.ca() != nil, "trusted": LocalTrust.ca() != nil && LocalTrust.trusted(),
                         "name": LocalTrust.label() ?? ""] as [String: Any]
         return out
-    }
-
-    static func install(_ c: Bridge.Call) {
-        guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
-        guard let url = Apt.httpURL(c.params["url"]) else { return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
-        guard let id = SignStore.identity(), let profile = SignStore.profile() else {
-            return Apt.reply(c, nil, "no_identity: import a certificate in Settings > Signing first")
-        }
-        guard LocalTrust.trusted() else {
-            return Apt.reply(c, nil, "untrusted: set up Local Install in Settings > Signing first (install and trust Cydian's certificate)")
-        }
-        let throttle = Throttle()
-        let emit = { (phase: String, p: Double) in
-            if throttle.pass(phase, p) { c.emitOnMain([["phase": phase, "progress": p]]) }
-        }
-        let tok = token()
-        let input = work.appendingPathComponent("\(tok)-in.ipa")
-        let output = work.appendingPathComponent("\(tok).ipa")
-        Download.start(url, to: input, max: maxIPA, progress: { emit("downloading", $0) }) { err in
-            if let e = err { return Apt.reply(c, nil, e) }
-            queue.async {
-                defer { try? FileManager.default.removeItem(at: input) }
-                do {
-                    let identity = try KeychainIdentity(id)
-                    if let p = profile.problem(with: identity.certificate) { throw p }
-                    let app = try IPASigner(profile: profile, identity: identity).sign(input, to: output) { emit($0, $1) }
-                    emit("installing", 0)
-                    let manifestPath = "/\(tok)/manifest.plist", ipaPath = "/\(tok)/app.ipa"
-                    let server = InstallServer.secure
-                    server.start { res in
-                        switch res {
-                        case .failure(let e):
-                            try? FileManager.default.removeItem(at: output)
-                            Apt.reply(c, nil, "server: \(e.localizedDescription)")
-                        case .success:
-                            do {
-                                let manifest = try LocalCA.manifest(ipaURL: server.base + ipaPath, bundleID: app.bundleID,
-                                                                    version: app.version, title: app.name)
-                                server.serve(manifestPath, .init(type: "text/xml", body: .data(manifest), onServed: nil))
-                                server.serve(ipaPath, .init(type: "application/octet-stream", body: .file(output)) {
-                                    // iOS has the whole IPA: the link is spent.
-                                    server.remove(manifestPath); server.remove(ipaPath)
-                                    queue.asyncAfter(deadline: .now() + 60) { try? FileManager.default.removeItem(at: output) }
-                                })
-                                queue.asyncAfter(deadline: .now() + 15 * 60) {
-                                    server.remove(manifestPath); server.remove(ipaPath)
-                                    try? FileManager.default.removeItem(at: output)
-                                }
-                                let link = LocalCA.itmsURL(manifest: server.base + manifestPath)
-                                DispatchQueue.main.async {
-                                    UIApplication.shared.open(URL(string: link)!)
-                                    c.reply(["bundleId": app.bundleID, "originalBundleId": app.originalBundleID,
-                                             "name": app.name, "version": app.version, "removed": app.removed], nil)
-                                }
-                            } catch { Apt.reply(c, nil, text(error)) }
-                        }
-                    }
-                } catch {
-                    try? FileManager.default.removeItem(at: output)
-                    Apt.reply(c, nil, text(error))
-                }
-            }
-        }
     }
 
     // ---- helpers

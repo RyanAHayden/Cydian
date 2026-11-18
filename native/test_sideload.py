@@ -1,0 +1,246 @@
+"""F14: what the sideload build does around signing, on Linux. native/sign/tests/sideload/main.swift (built with
+native/sign/ by the Swift toolchain, as native/test_sign.py builds it) checks the profile kinds, the user's edits
+(name, bundle ID across extensions, icon, extensions left out), the arm64e fix-up, the IPA inspector (entitlements,
+permissions, extensions, icon), the OCSP request and answers, the re-sign reminder and the record of signed apps.
+This file makes the fixtures (web/signer/testkit.py's throwaway CA, cryptography's OCSP builder), runs it, and reads
+what Swift wrote: the signed IPA, and the OCSP request. Without a Swift toolchain it skips and says so."""
+import datetime as dt
+import io
+import os
+import plistlib
+import shutil
+import struct
+import subprocess
+import sys
+import tempfile
+import unittest
+import zipfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "web"))
+
+from test_sign import SWIFTC, OPENSSL, T, macho, info, slots  # noqa: E402
+
+try:
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.x509 import ocsp
+except ImportError:  # pragma: no cover
+    x509 = None
+
+A = "Payload/Fixture.app/"
+PNG = b"\x89PNG\r\n\x1a\n" + b"\0\0\0\rIHDR" + b"\0" * 17 + b"fake icon"
+
+
+def fat_arm64e(versioned=False):
+    """A fat dylib with an arm64 slice and an arm64e one, the latter of the old ABI (subtype 2) unless versioned."""
+    thin = bytearray(macho(6))
+    e = bytearray(thin)
+    sub = 2 | (0x80000000 if versioned else 0)
+    struct.pack_into("<i", e, 8, struct.unpack("<i", struct.pack("<I", sub))[0])
+    head = struct.pack(">II", 0xCAFEBABE, 2)
+    head += struct.pack(">IIIII", 0x0100000C, 0, 0x4000, len(thin), 14)
+    head += struct.pack(">IIIII", 0x0100000C, sub, 0x4000 + 0x4000 * ((len(thin) + 0x3FFF) // 0x4000), len(e), 14)
+    off2 = struct.unpack_from(">I", head, 8 + 20 + 8)[0]
+    body = bytearray(off2 + len(e))
+    body[:len(head)] = head
+    body[0x4000:0x4000 + len(thin)] = thin
+    body[off2:] = e
+    return bytes(body)
+
+
+def edit_ipa():
+    """An app with two extensions, a framework with an old-ABI arm64e slice, localised names and permissions."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        def put(name, data, mode=0o100644):
+            zi = zipfile.ZipInfo(name, date_time=(2026, 11, 17, 0, 0, 0))
+            zi.create_system = 3
+            zi.external_attr = mode << 16
+            z.writestr(zi, data)
+        put("Payload/", b"", 0o40755)
+        put(A, b"", 0o40755)
+        put(A + "Info.plist", info(
+            "dev.cydian.fixture", "Fixture", CFBundleDisplayName="Fixture", MinimumOSVersion="15.0",
+            NSCameraUsageDescription="To scan codes.", NSLocalNetworkUsageDescription="To find your Mac.",
+            CFBundleIcons={"CFBundlePrimaryIcon": {"CFBundleIconFiles": ["AppIcon60x60"], "CFBundleIconName": "AppIcon"}}))
+        put(A + "Fixture", macho(), 0o100755)
+        put(A + "AppIcon60x60@2x.png", PNG)
+        put(A + "en.lproj/InfoPlist.strings",
+            '/* names */\n"CFBundleDisplayName" = "Fixture \\"EN\\"";\n// other\n"NSCameraUsageDescription" = "Scan";\n'.encode())
+        put(A + "de.lproj/InfoPlist.strings", '"CFBundleName" = "Fixtur";'.encode("utf-16"))
+        put(A + "fr.lproj/InfoPlist.strings", b'"Other" = "x";')
+        put(A + "Frameworks/Sub.framework/Info.plist", info("dev.cydian.sub", "Sub", "Sub", CFBundlePackageType="FMWK"))
+        put(A + "Frameworks/Sub.framework/Sub", fat_arm64e(), 0o100755)
+        put(A + "PlugIns/Share.appex/Info.plist", info(
+            "dev.cydian.fixture.share", "Share", "Share", CFBundlePackageType="XPC!",
+            NSExtension={"NSExtensionPointIdentifier": "com.apple.share-services"}))
+        put(A + "PlugIns/Share.appex/Share", macho(), 0o100755)
+        put(A + "PlugIns/Widget.appex/Info.plist", info(
+            "dev.cydian.fixture.widget", "Widget", "Widget", CFBundlePackageType="XPC!",
+            NSExtension={"NSExtensionPointIdentifier": "com.apple.widgetkit-extension"}))
+        put(A + "PlugIns/Widget.appex/Widget", macho(), 0o100755)
+    return buf.getvalue()
+
+
+def raw_profile(**plist):
+    """A profile's plist inside some bytes, as Profile reads it (the CMS isn't checked)."""
+    base = {"Name": "P", "UUID": "U", "TeamIdentifier": [T.TEAM],
+            "Entitlements": {"application-identifier": f"{T.TEAM}.*", "get-task-allow": False},
+            "ExpirationDate": dt.datetime(2030, 1, 1)}
+    base.update(plist)
+    return b"\x30\x80junk" + plistlib.dumps(base) + b"\0\0"
+
+
+def cd_identifier(blob):
+    off = struct.unpack_from(">I", blob, 20)[0]
+    return blob[off:blob.index(b"\0", off)].decode()
+
+
+@unittest.skipUnless(T and x509, "cryptography not installed: the fixtures can't be made")
+@unittest.skipUnless(SWIFTC, "no Swift toolchain (SWIFT_TOOLCHAIN or swiftc on PATH): native/sign/ F14 parts not tested")
+@unittest.skipUnless(OPENSSL, "openssl not on PATH")
+class Sideload(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="cydian-sideloadtest-")
+        cls.fx = os.path.join(cls.tmp, "fixtures")
+        cls.work = os.path.join(cls.tmp, "work")
+        os.makedirs(cls.fx)
+        key, cert, ca = T.identity()
+        ca_key = T._CA[0]
+        der = serialization.Encoding.DER
+        cls.cert, cls.ca = cert, ca
+
+        def w(name, data):
+            with open(os.path.join(cls.fx, name), "wb") as f:
+                f.write(data)
+        w("key.pem", key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                        serialization.NoEncryption()))
+        w("cert.der", cert.public_bytes(der))
+        w("ca.der", ca.public_bytes(der))
+        w("ca.pem", ca.public_bytes(serialization.Encoding.PEM))
+        w("profile.mobileprovision", T.profile(key, cert))
+        w("profile-explicit.mobileprovision", T.profile(key, cert, app_id="com.me.only"))
+        w("kind-adhoc.mobileprovision", raw_profile(ProvisionedDevices=["a", "b"]))
+        w("kind-enterprise.mobileprovision", raw_profile(ProvisionsAllDevices=True))
+        w("kind-distribution.mobileprovision", raw_profile())
+        w("edit.ipa", edit_ipa())
+        w("icon.png", PNG)
+        w("arm64e-old.macho", fat_arm64e())
+        w("arm64e-new.macho", fat_arm64e(versioned=True))
+        # A certificate with an OCSP responder in its AIA, as Apple's carry.
+        now = dt.datetime.now(dt.timezone.utc)
+        aia = (x509.CertificateBuilder().subject_name(cert.subject).issuer_name(ca.subject).public_key(key.public_key())
+               .serial_number(4242).not_valid_before(now - dt.timedelta(days=1)).not_valid_after(now + dt.timedelta(days=9))
+               .add_extension(x509.AuthorityInformationAccess([
+                   x509.AccessDescription(x509.oid.AuthorityInformationAccessOID.CA_ISSUERS,
+                                          x509.UniformResourceIdentifier("http://certs.apple.com/wwdrg3.der")),
+                   x509.AccessDescription(x509.oid.AuthorityInformationAccessOID.OCSP,
+                                          x509.UniformResourceIdentifier("http://ocsp.apple.com/ocsp03-wwdrg305"))]),
+                   critical=False)
+               .sign(ca_key, hashes.SHA256()))
+        w("aia.der", aia.public_bytes(der))
+
+        def answer(status, **kw):
+            b = (ocsp.OCSPResponseBuilder()
+                 .add_response(cert=cert, issuer=ca, algorithm=hashes.SHA1(), cert_status=status,
+                               this_update=now - dt.timedelta(hours=1), next_update=now + dt.timedelta(hours=1), **kw)
+                 .responder_id(ocsp.OCSPResponderEncoding.HASH, ca))
+            return b.sign(ca_key, hashes.SHA256()).public_bytes(der)
+        w("ocsp-good.der", answer(ocsp.OCSPCertStatus.GOOD, revocation_time=None, revocation_reason=None))
+        w("ocsp-revoked.der", answer(ocsp.OCSPCertStatus.REVOKED,
+                                     revocation_time=dt.datetime(2026, 11, 1, 12, 0, 0), revocation_reason=None))
+        w("ocsp-unknown.der", answer(ocsp.OCSPCertStatus.UNKNOWN, revocation_time=None, revocation_reason=None))
+        w("ocsp-trylater.der", ocsp.OCSPResponseBuilder.build_unsuccessful(
+            ocsp.OCSPResponseStatus.TRY_LATER).public_bytes(der))
+        _, other, _ = T.identity(name="Apple Development: Someone Else (ZZZZZ99999)")
+        w("other.der", other.public_bytes(der))
+
+        cls.binary = os.path.join(cls.tmp, "sideloadtest")
+        env = dict(os.environ)
+        shim = os.path.join(cls.tmp, "libshim")
+        if os.path.exists("/usr/lib/libncursesw.so.6") and not os.path.exists("/usr/lib/libncurses.so.6"):
+            os.makedirs(shim)
+            os.symlink("/usr/lib/libncursesw.so.6", os.path.join(shim, "libncurses.so.6"))
+            env["LD_LIBRARY_PATH"] = shim + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
+        sign = os.path.join(HERE, "sign")
+        sources = sorted(os.path.join(sign, f) for f in os.listdir(sign) if f.endswith(".swift"))
+        r = subprocess.run([SWIFTC, "-O", "-module-cache-path", os.path.join(cls.tmp, "modules"),
+                            "-import-objc-header", os.path.join(sign, "zlib-shim.h"), *sources,
+                            os.path.join(sign, "tests", "sideload", "main.swift"), "-lz", "-o", cls.binary],
+                           capture_output=True, text=True, env=env, timeout=600)
+        cls.build_error = None if r.returncode == 0 else (r.stdout + r.stderr)[-4000:]
+        cls.out = None
+        if cls.build_error is None:
+            cls.out = subprocess.run([cls.binary, cls.fx, cls.work], capture_output=True, text=True, timeout=600)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_swift(self):
+        self.assertIsNone(self.build_error, self.build_error)
+        self.assertEqual(self.out.returncode, 0, self.out.stdout + self.out.stderr)
+        self.assertIn("all passed", self.out.stdout)
+
+    def test_signed_with_edits(self):
+        """The IPA Swift signed with a new name, bundle ID and icon, and Widget.appex left out."""
+        self.assertIsNone(self.build_error, self.build_error)
+        with zipfile.ZipFile(os.path.join(self.work, "edited.ipa")) as z:
+            files = {n: z.read(n) for n in z.namelist() if not n.endswith("/")}
+        self.assertFalse([n for n in files if "Widget.appex" in n])
+        app = plistlib.loads(files[A + "Info.plist"])
+        self.assertEqual(app["CFBundleIdentifier"], "com.me.renamed")
+        self.assertEqual(app["CFBundleDisplayName"], "Renamed")
+        self.assertEqual(app["CFBundleIcons"]["CFBundlePrimaryIcon"], {"CFBundleIconFiles": ["CydianIcon60x60"]})
+        self.assertNotIn("CFBundleIconName", app)
+        share = plistlib.loads(files[A + "PlugIns/Share.appex/Info.plist"])
+        self.assertEqual(share["CFBundleIdentifier"], "com.me.renamed.share")
+        self.assertEqual(cd_identifier(slots(files[A + "PlugIns/Share.appex/Share"])[0]), "com.me.renamed.share")
+        self.assertEqual(cd_identifier(slots(files[A + "Fixture"])[0]), "com.me.renamed")
+        self.assertEqual(files[A + "CydianIcon60x60@2x.png"], PNG)
+        self.assertEqual(files[A + "CydianIcon60x60@3x.png"], PNG)
+        self.assertEqual(plistlib.loads(files[A + "en.lproj/InfoPlist.strings"]),
+                         {"CFBundleDisplayName": "Renamed", "NSCameraUsageDescription": "Scan"})
+        self.assertEqual(plistlib.loads(files[A + "de.lproj/InfoPlist.strings"]), {"CFBundleName": "Renamed"})
+        self.assertEqual(files[A + "fr.lproj/InfoPlist.strings"], b'"Other" = "x";')
+        cr = plistlib.loads(files[A + "_CodeSignature/CodeResources"])["files2"]
+        for f in ("CydianIcon60x60@2x.png", "en.lproj/InfoPlist.strings"):
+            self.assertIn(f, cr)
+        # the framework's arm64e slice: subtype 0x80000002 in the fat header and the slice header
+        sub = files[A + "Frameworks/Sub.framework/Sub"]
+        n = struct.unpack_from(">I", sub, 4)[0]
+        archs = [struct.unpack_from(">IIIII", sub, 8 + 20 * i) for i in range(n)]
+        e = [a for a in archs if a[1] & 0xFF == 2]
+        self.assertEqual(len(e), 1)
+        self.assertEqual(e[0][1], 0x80000002)
+        self.assertEqual(struct.unpack_from("<I", sub, e[0][2] + 8)[0], 0x80000002)
+        # each Mach-O verifies with openssl: the CMS over its CodeDirectory, against the test CA
+        for path in ("Fixture", "PlugIns/Share.appex/Share"):
+            s = slots(files[A + path])
+            cms, cd = os.path.join(self.tmp, "x.cms"), os.path.join(self.tmp, "x.cd")
+            with open(cms, "wb") as f:
+                f.write(s[0x10000][8:])
+            with open(cd, "wb") as f:
+                f.write(s[0])
+            r = subprocess.run([OPENSSL, "cms", "-verify", "-binary", "-inform", "DER", "-in", cms, "-content", cd,
+                                "-CAfile", os.path.join(self.fx, "ca.pem"), "-purpose", "any", "-out", os.devnull],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, path + ": " + r.stderr)
+
+    def test_ocsp_request(self):
+        """The OCSP request Swift built names the certificate as cryptography would."""
+        self.assertIsNone(self.build_error, self.build_error)
+        with open(os.path.join(self.work, "ocsp-request.der"), "rb") as f:
+            req = ocsp.load_der_ocsp_request(f.read())
+        want = ocsp.OCSPRequestBuilder().add_certificate(self.cert, self.ca, hashes.SHA1()).build()
+        self.assertEqual(req.serial_number, self.cert.serial_number)
+        self.assertEqual(req.issuer_name_hash, want.issuer_name_hash)
+        self.assertEqual(req.issuer_key_hash, want.issuer_key_hash)
+        self.assertIsInstance(req.hash_algorithm, hashes.SHA1)
+
+
+if __name__ == "__main__":
+    unittest.main()

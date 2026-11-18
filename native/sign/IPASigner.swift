@@ -11,6 +11,7 @@ struct SignedApp {
     let name: String
     let version: String
     let removed: [String]     // what was left out (extensions an explicit profile can't cover, leftovers)
+    var fixedArm64e: [String] = [] // binaries whose old-ABI arm64e slice was fixed up (F14, SignOptions.swift)
 }
 
 final class IPASigner {
@@ -18,6 +19,7 @@ final class IPASigner {
     let identity: SigningIdentity
     var time = Date()
     var maxMachO: UInt64 = 1 << 31   // a single binary held in memory while it's signed
+    var options = SignOptions()      // the user's edits (F14): name, bundle ID, icon, extensions left out
 
     init(profile: Profile, identity: SigningIdentity) {
         self.profile = profile
@@ -79,7 +81,7 @@ final class IPASigner {
         guard var main = bundles[appDir], let oldID = main.plist["CFBundleIdentifier"] as? String else {
             throw SignError("bad_ipa", "The app has no bundle ID.")
         }
-        let newID = try profile.bundleID(for: oldID)
+        let newID = try profile.bundleID(for: options.bundleID ?? oldID)
 
         // An explicit profile covers one app ID: extensions (and Watch apps) would need their own, so they go.
         var cut = [String]()
@@ -87,6 +89,13 @@ final class IPASigner {
             for dir in bundles.keys where dir != appDir && (dir.hasSuffix(".appex/") || dir.hasSuffix(".app/")) {
                 cut.append(dir)
             }
+        }
+        for path in options.removeExtensions { // the ones the user left out (F14)
+            let dir = appDir + path + "/"
+            guard bundles[dir] != nil, path.hasSuffix(".appex") || path.hasSuffix(".app") else {
+                throw SignError("bad_options", "The app has no extension \(path).")
+            }
+            cut.append(dir)
         }
         cut = cut.filter { c in !cut.contains { $0 != c && c.hasPrefix($0) } }
         for c in cut { removed.append(String(c.dropFirst(appDir.count).dropLast())); }
@@ -105,6 +114,7 @@ final class IPASigner {
                 at["WKAppBundleIdentifier"] = moved(id); ext["NSExtensionAttributes"] = at; pl["NSExtension"] = ext
             }
             pl.removeValue(forKey: "UISupportedDevices")
+            if dir == appDir { options.apply(toApp: &pl) }
             if !NSDictionary(dictionary: pl).isEqual(to: b.plist) {
                 changed[dir + "Info.plist"] = try PropertyListSerialization.data(fromPropertyList: pl, format: b.format, options: 0)
                 b.plist = pl
@@ -140,6 +150,23 @@ final class IPASigner {
             progress?("reading", Double(doneBytes) / Double(totalBytes))
         }
         for (path, d) in changed { files[path] = .data(d, mode: 0o100644) }
+        // The user's name in the app's own localisations, and the user's icon (F14).
+        if options.name != nil {
+            for e in kept where e.name.hasPrefix(appDir) && !e.isDirectory {
+                let rel = e.name.dropFirst(appDir.count).split(separator: "/")
+                guard rel.count == 2, rel[0].hasSuffix(".lproj"), rel[1] == "InfoPlist.strings" else { continue }
+                if let d = options.renamedStrings(try zip.data(e, limit: 1 << 20)) { files[e.name] = .data(d, mode: 0o100644) }
+            }
+        }
+        if let icon = options.icon { for f in options.iconFiles { files[appDir + f] = .data(icon, mode: 0o100644) } }
+
+        var fixedArm64e = [String]()
+        func fixed(_ path: String, _ data: Data) -> Data {
+            guard options.fixArm64e else { return data }
+            let (d, changed) = Arm64e.fixup(data)
+            if changed { fixedArm64e.append(String(path.dropFirst(appDir.count))) }
+            return d
+        }
 
         // Sign inside out: deepest bundles first, the app last.
         let dirs = bundles.keys.sorted { $0.split(separator: "/").count > $1.split(separator: "/").count }
@@ -152,7 +179,7 @@ final class IPASigner {
 
             // Loose Mach-Os of this bundle (dylibs in Frameworks/, helpers): signed with no entitlements.
             for path in machos.sorted() where path.hasPrefix(dir) && path != exe && !inner.contains(where: { path.hasPrefix($0) }) {
-                let data = try contents(path, files, zip)
+                let data = fixed(path, try contents(path, files, zip))
                 guard let ft = MachO.filetype(data), [2, 6, 8].contains(ft) else { continue } // executables, dylibs, bundles
                 let name = String(path.split(separator: "/").last!)
                 let ident = name.hasSuffix(".dylib") ? String(name.dropLast(6)) : name
@@ -165,7 +192,7 @@ final class IPASigner {
             files[dir + "_CodeSignature/CodeResources"] = .data(resources, mode: 0o100644)
             if let exe = exe {
                 guard files[exe] != nil else { throw SignError("bad_ipa", "\(exe.dropFirst(appDir.count)) is missing.") }
-                let data = try contents(exe, files, zip)
+                let data = fixed(exe, try contents(exe, files, zip))
                 let params = CodeSignParams(identifier: id, team: profile.team,
                                             entitlements: isApp ? profile.entitlements(for: id) : nil,
                                             infoPlist: infoData, codeResources: resources)
@@ -194,7 +221,7 @@ final class IPASigner {
         return SignedApp(bundleID: newID, originalBundleID: oldID,
                          name: main.plist["CFBundleDisplayName"] as? String ?? main.plist["CFBundleName"] as? String ?? "",
                          version: main.plist["CFBundleShortVersionString"] as? String ?? main.plist["CFBundleVersion"] as? String ?? "",
-                         removed: removed)
+                         removed: removed, fixedArm64e: fixedArm64e.sorted())
     }
 
     private func newPaths(_ files: [String: File], _ order: [String]) -> [String] {

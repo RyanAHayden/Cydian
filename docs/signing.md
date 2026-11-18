@@ -253,8 +253,63 @@ and OpenSSL cross-compiled into the app; this way neither. It writes what Apple'
   still compressed, only signed binaries, changed Info.plists and the new files are deflated. ZIP64 is read and
   written.
 
-Not done (F14 keeps them): Feather's arm64e fix-up, editing name, icon or ID before signing, an OCSP check of the
-certificate, dylib injection.
+F14 added the arm64e fix-up and the user's edits (below). Not done: dylib injection (not wanted).
+
+### Before and around signing (F14)
+
+`native/sign/SignOptions.swift`, `Inspect.swift`, `CertCheck.swift` (Linux-tested) and `native/Sources/Sideload.swift`
+(the phone half, which also took over `signing.install` from `SignBridge.swift`). The calls are listed at the top of
+`Sideload.swift`.
+
+- **Look first.** `signing.inspect {url}` downloads the IPA, keeps it 15 minutes under a token and answers what it is
+  and asks for: name, bundle ID, version, minimum iOS, size, its entitlements (read from the main executable's
+  current signature; none when unsigned), its privacy permissions (the `NS…UsageDescription` keys, with Settings'
+  names and the app's own reason), its extensions and Watch apps (path, ID, extension point), its icon (the PNG as it
+  is in the IPA: often Apple's CgBI form, which a browser can't draw), the entitlements the user's profile can't give
+  it (`missing`: the signed app goes without them), the ID it will be signed as, and the profile's kind (Development,
+  Ad Hoc, Enterprise, Distribution, as the site's `profileKind`).
+- **Edit.** `signing.install {token | url, name?, bundleId?, icon?, removeExtensions?, fixArm64e?}` signs with them:
+  the name goes into `CFBundleDisplayName`, `CFBundleName` and every `<lang>.lproj/InfoPlist.strings` that names
+  either (rewritten as a binary plist); the bundle ID is asked of the profile (I5's rules, so an explicit profile
+  still signs as its own ID) and extensions follow it (`old.share` -> `new.share`); the icon (a PNG the page sizes,
+  180x180 best) is written as `CydianIcon60x60@2x.png` and `@3x.png` and named in `CFBundleIcons` (and `~ipad`), with
+  `CFBundleIconName` dropped so iOS doesn't take the asset catalog's; `removeExtensions` leaves those bundles out
+  (an unknown path is refused). Bad input answers `bad_options`.
+- **arm64e fix-up**, on by default: Feather's `_locateMachosAndFixupArm64eSlice` (via LiveContainer's
+  `LCPatchMachOFixupARM64eSlice`, Apache-2.0): a fat binary's arm64e slice of the old pointer-auth ABI (subtype
+  exactly 2) gets `CPU_SUBTYPE_LIB64` in its own header and the fat header, which iOS 26 wants. Done on every Mach-O
+  the signer signs, before signing (Feather only does `.dylib`s and frameworks' executables; the change only touches
+  a fat file's old-ABI arm64e slice, so doing all of them costs nothing and covers bundles' and extensions' too); the reply lists the fixed ones in `fixedArm64e`.
+- **Keep-alive.** From the moment the itms-services link opens until iOS has fetched the whole IPA (plus a minute),
+  or the link expires, Cydian plays one second of silence on a loop (`AVAudioPlayer`, volume 0, mixed with other
+  audio; `UIBackgroundModes: audio` is in `Info-sideload.plist`), as Feather's `BackgroundAudioManager` does: the
+  install sheet sends Cydian to the background, and I6's `beginBackgroundTask` alone gives about 30 seconds.
+- **Install progress.** `signing.progress {bundleId}` streams iOS's own progress from the private
+  `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:` (looked up at run time, as Feather does) and
+  answers `installed: true/false` when it ends, `false` when none showed in 45 seconds, `null` when the API isn't
+  there. It is its own call because the bridge drops a call's stream once it has answered, and `signing.install`
+  answers as soon as iOS has the link.
+- **Re-sign All.** Every install is recorded in `Application Support/Signing/signed.json` (installed and original ID,
+  name, version, the IPA's URL, when, its signature's expiry (the earlier of the certificate's and the profile's),
+  and the edits). There is no IPA library: `signing.resignAll` downloads each again from its URL, signs it with the
+  current certificate and the same edits, and installs them one after another (the next once iOS has fetched the
+  previous IPA, or its link expired), answering which worked and which didn't. `signing.installed` lists the
+  records; `signing.forget {bundleId}` drops one.
+- **Revoked?** `signing.checkCertificate` asks the OCSP responder in the certificate's AIA extension (Apple's
+  `ocsp.apple.com`), over plain HTTP as OCSP is, with a request naming the certificate by its issuer (Apple's WWDR
+  intermediate from `certs/`) and serial: no nonce, unsigned. The answer is `good`, `revoked` (with `revokedAt`) or
+  `unknown`; its signature isn't checked (Feather's doesn't either): it's a warning, and iOS checks for itself when
+  the app opens. The last answer is cached and `signing.status` shows it as `identity.revocation`, beside
+  `identity.signatureExpires` and `profile.kind`. Asking is an internet call to Apple only when the page asks.
+- **Re-sign reminder.** `signing.remind {days}` (the Settings row F13 made) keeps one local notification at 10:00,
+  `days` before the earliest recorded signature expiry (or the certificate's and profile's, with no apps yet):
+  "Delta stops opening in 2 days. Open Cydian and tap Re-sign All." It moves after every install and `forget`; 0 turns
+  it off. The first call asks for notification permission.
+
+Not built from F14's original brief, and why: backloop.dev and api.palera.in installs (I6 chose the phone's own CA
+instead, above), so no backloop pack expiry check or genPlist URL encoding; Zsign-Package (I6's own signer replaces
+it). The page's side of all this (the look-first sheet, editing, Re-sign All, the revocation row, turning the
+reminder row on) is a follow-up task: the web app doesn't call the native signing bridge yet.
 
 ### Tests
 
@@ -273,3 +328,13 @@ constraints), the mobileconfig, the manifest and itms link, and the HTTP parsing
 also passed on the signed fixture and the signed Cydian.ipa (by hand, not in the gate).
 
 The phone half (Keychain, `NWListener`, opening the links) compiles in the native build but runs only on an iPhone.
+
+`native/test_sideload.py` (F14) builds the same way with `native/sign/tests/sideload/main.swift`: profile kinds,
+signature expiry, the bridge's options and their refusals, `.strings` parsing (UTF-8 and UTF-16), the arm64e fix-up
+on fat fixtures, the inspector, signing a fixture with two extensions, localised names and an old-ABI arm64e
+framework with a new name, ID and icon and one extension left out (Python then reads the IPA: the plists, the
+CodeDirectory identifiers, the icon files sealed in CodeResources, the fixed slice, `openssl cms -verify` against the
+test CA), an explicit profile overriding the asked-for ID, OCSP (the request checked by `cryptography`, answers made
+by its OCSP builder: good, revoked, unknown, another certificate's, tryLater), the reminder's date and words, and the
+record of signed apps. The phone half of F14 (audio, `LSApplicationWorkspace`, notifications, the OCSP fetch) is
+compiled by the native build only.

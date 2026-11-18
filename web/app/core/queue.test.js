@@ -189,3 +189,22 @@ test("createRepeatFilter: a status line the same as the one before shows once (C
     "info:same", "info:same", "error:boom", "error:boom",
   ]);
 });
+
+// F193: a row's swipe queues quietly (no Confirm sheet), and Undo puts the package back as it was.
+test("quiet adds say so; restore puts a job back or clears it, quietly", () => {
+  const q = createQueue();
+  const events = [];
+  q.subscribe((e) => events.push(e));
+  q.add({ op: "install", id: "a", version: "1" });
+  q.add({ op: "remove", id: "b", installed: "2" }, { quiet: true });
+  assert.equal(events[0].quiet, undefined);
+  assert.equal(events[1].quiet, true);
+  const before = q.get("a");
+  q.add({ op: "remove", id: "a", installed: "1" }, { quiet: true });
+  q.restore("a", before);
+  assert.deepEqual(q.get("a"), before);
+  assert.equal(events.at(-1).quiet, true);
+  q.restore("b", null);
+  assert.equal(q.get("b"), null);
+  assert.deepEqual(events.at(-1), { type: "clear", id: "b" });
+});

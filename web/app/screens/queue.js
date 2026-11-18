@@ -51,7 +51,7 @@ export function initQueue(ctx) {
     if (e.type === "add") {
       nameJobs([e.job.id]);
       if (confirm) confirm.refresh();
-      else if (!running) openConfirm();
+      else if (!running && !e.quiet) openConfirm(); // F193: a row's swipe queues without the sheet
     }
     if (e.type === "clear" && confirm) confirm.refresh();
     if (e.type !== "name") updateChrome();

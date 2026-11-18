@@ -124,14 +124,14 @@ test("Import from Safari: key out in the fragment, ciphertext back, into the Key
   assert.equal(opened, `https://test.example.ts.net/#/settings/signing-export.${key}`);
   // the website's export page (its own storage: the staged picks here)
   globalThis.cydianNative = fakeNative();
-  await saveIdentity({ p12: new Uint8Array([0x30, 1, 2]), profile: new Uint8Array([7, 8]), password: "pw", p12Name: "me.p12" });
+  await saveIdentity({ p12: new Uint8Array([0x30, 1, 2]), profile: new Uint8Array([7, 8]), password: "pass word", p12Name: "me.p12" });
   const link = await exportToApp(key);
   assert.match(link, /^cydian:\/\/signing-import#[A-Za-z0-9_-]+$/);
-  assert.equal(link.includes("pw"), false);
+  assert.equal(link.includes("pass word"), false); // a space: never in base64url by chance
   const n = fakeNative({ "signing.import": { identity: { name: "Me" } } });
   const st = await finishSafariImport(link, { native: n, storage });
   assert.deepEqual(st, { identity: { name: "Me" } });
-  assert.deepEqual(n.calls[0], { method: "signing.import", params: { p12: "MAEC", profile: "Bwg=", password: "pw" } });
+  assert.deepEqual(n.calls[0], { method: "signing.import", params: { p12: "MAEC", profile: "Bwg=", password: "pass word" } });
   // one use: the same link again finds no key
   await assert.rejects(finishSafariImport(link, { native: n, storage }), /Start again/);
 });

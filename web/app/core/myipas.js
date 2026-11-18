@@ -8,7 +8,8 @@
 // On the website there is no signer on the phone: the library is a list of links kept on this device
 // (siteEntries/addSiteUrl/removeSiteUrl over localStorage), handed to iFizBox or another sideloader on Install (F89).
 //
-//   stateOf(entry, { identity, site })   { kind: "signed" | "unsigned" | "broken" | "link" | "file", label }
+//   libraryMode(mode) / nativeLibrary(mode)   F212: "site" | "sideload" | "jailbreak"; whether the shell keeps it
+//   stateOf(entry, { site, jailbreak })  { kind: "signed" | "unsigned" | "broken" | "link" | "file" | "ready", label }
 //   libraryRows(entries, opts)           A to Z, with the subtitle the list shows
 //   ipaSubtitle(entry, opts)             "1.2 · 14.3 MB · Signed, ready to install"
 //   formatBytes(n)                       "14.3 MB"
@@ -27,7 +28,17 @@ import { validBundleId } from "./signing.js";
 
 export const MYIPAS = "myipas"; // the Installed tab's path segment for the library
 
+// F212: whose library My IPAs shows, from core/settings.js detectMode: "site" (this browser: links and kept files),
+// "sideload" (the shell's library, signed with the user's certificate) or "jailbreak" (the same shell library, in
+// /var/mobile/Documents, installed as it is by ifizbox-helper: no signing, no sideloader handoffs).
+export function libraryMode(mode) {
+  return mode === "sideload" || mode === "jailbreak" ? mode : "site";
+}
+// Whether the shell keeps the library (library.list/pick/add/delete): both app builds.
+export const nativeLibrary = (mode) => libraryMode(mode) !== "site";
+
 export const STATE_LABELS = {
+  ready: "Ready to install", // F212: the jailbreak app, which installs IPAs as they are
   signed: "Signed, ready to install",
   unsigned: "Not signed yet",
   broken: "Can't be read",
@@ -36,10 +47,12 @@ export const STATE_LABELS = {
 };
 
 // `identity`: whether a certificate is in the app (without one nothing counts as signed: the shell already answers
-// signed null then). `site`: the website's library, which never holds a signed copy.
-export function stateOf(entry, { site = false } = {}) {
+// signed null then). `site`: the website's library, which never holds a signed copy. `jailbreak` (F212): the
+// jailbreak app's, which isn't signed here (ifizbox-helper installs it as it is).
+export function stateOf(entry, { site = false, jailbreak = false } = {}) {
   if (site) return entry?.stored ? { kind: "file", label: STATE_LABELS.file } : { kind: "link", label: STATE_LABELS.link };
   if (entry?.error) return { kind: "broken", label: STATE_LABELS.broken };
+  if (jailbreak) return { kind: "ready", label: STATE_LABELS.ready };
   if (entry?.signed) return { kind: "signed", label: STATE_LABELS.signed };
   return { kind: "unsigned", label: STATE_LABELS.unsigned };
 }
@@ -235,9 +248,10 @@ export function libraryFooter(entries) {
 
 export const deleteLabel = (n) => (n > 0 ? `Delete (${n})` : "Delete");
 export const deleteButtonText = (n) => (n === 1 ? "Delete IPA" : `Delete ${n} IPAs`);
-export function deleteSheetTitle(n, { site = false, stored = true } = {}) {
+export function deleteSheetTitle(n, { site = false, stored = true, jailbreak = false } = {}) {
   const what = n === 1 ? "The IPA is" : `${n} IPAs are`;
   if (site) return stored ? `${what} deleted from this browser.` : "";
+  if (jailbreak) return `${what} deleted from this iPhone.`; // F212: no signed copies there
   return n === 1 ? "The IPA and its signed copy are deleted from this iPhone." : `${n} IPAs and their signed copies are deleted from this iPhone.`;
 }
 
@@ -287,10 +301,11 @@ export const allSelected = (s, files) => files.length > 0 && files.every((f) => 
 
 export const HOLD = { INSTALL: "Install", SIGN: "Sign Now", SAVE: "Save Signed IPA", DELETE: "Delete" };
 
-export function holdActions(entry, { site = false } = {}) {
+export function holdActions(entry, { site = false, jailbreak = false } = {}) {
   if (!entry?.file) return [];
   if (site) return [HOLD.INSTALL, HOLD.DELETE];
   if (entry.error) return [HOLD.DELETE];
+  if (jailbreak) return [HOLD.INSTALL, HOLD.DELETE]; // F212: nothing to sign or save signed there
   return [HOLD.INSTALL, HOLD.SIGN, HOLD.SAVE, HOLD.DELETE];
 }
 

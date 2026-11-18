@@ -53,11 +53,11 @@ test("F41: Home offers Themes only on a jailbroken type", () => {
   assert.equal(showsThemes("iphoneos-arm"), true);
 });
 
-test("F79: Home links to Install IPAs, except in the jailbreak app", async () => {
+test("F79/F212: Home links to Install IPAs in every build, the jailbreak app too", async () => {
   const { ipasTile } = await import("./home.js");
   assert.deepEqual(ipasTile("site"), { label: "Install IPAs", href: "#/installed/myipas" });
   assert.deepEqual(ipasTile("sideload"), { label: "Install IPAs", href: "#/installed/myipas" });
-  assert.equal(ipasTile("jailbreak"), null);
+  assert.deepEqual(ipasTile("jailbreak"), { label: "Install IPAs", href: "#/installed/myipas" });
 });
 
 test("Jailbroken? Get iFizBox.deb: iFizBox's APT repo in Sileo and Zebra", async () => {

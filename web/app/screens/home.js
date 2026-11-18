@@ -71,8 +71,8 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
   return { kind: "changes", label: "See What's New", href: format({ tab: "changes" }) };
 }
 
-// F79: Home's Install IPAs tile, beside Browse: the Installed tab's Install IPAs page (screens/myipas.js). Not in the
-// jailbreak app, which has no such page (apt installs there).
+// F79: Home's Install IPAs tile, beside Browse: the Installed tab's Install IPAs page (screens/myipas.js). F212: in the
+// jailbreak app too, now that the page lists /var/mobile/Documents' IPAs there and installs them with the helper.
 // F93 (as before F89): Install iFizBox App on the website, Not Jailbroken: with a certificate in Settings > Signing,
 // iFizBox's IPA signed in the browser and installed, carrying the certificate (Bring My Certificate), sources and
 // settings into its first launch; without one, Settings > Signing first. -> "install" | "signing"
@@ -175,8 +175,7 @@ export function askOnLocked(box, ask) {
 export const homeShowsFeatured = () => false;
 export const browseShowsFeatured = () => false;
 
-export function ipasTile(mode = "site") {
-  if (mode === "jailbreak") return null;
+export function ipasTile() { // F212: every build has the page; callers still pass the mode
   return { label: "Install IPAs", href: format({ tab: "installed", path: ["myipas"] }) };
 }
 

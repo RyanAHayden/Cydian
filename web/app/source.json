@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.2.9",
+          "date": "2026-11-18T04:18:52Z",
+          "localizedDescription": "Changes: app upgrades show (Available Upgrades, the tab and icon badge) with Upgrade (N); a background check posts a notification when updates come out.\nSources: Add never sticks pressed; tapping Manage while the Paste bubble is up opens Manage.\nInstalled: My IPAs as a button at the top.\nInstall errors say what went wrong.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.9",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.9/Cydian.ipa",
+          "size": 2703001,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.2.8",
           "date": "2026-11-18T03:46:11Z",
           "localizedDescription": "Importing from the website shows one popup (ends on Done); anything that could not be added shows in a passing banner.\nA website install brings its settings only on the first launch.\nThe Home Cydian App card; My IPAs (0.2.7).\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.8",
@@ -137,7 +145,8 @@
           "size": 2331028,
           "minOSVersion": "15.0"
         }
-      ]
+      ],
+      "minimumVersion": "0.2.9"
     }
   ],
   "news": []

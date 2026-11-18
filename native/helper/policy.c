@@ -370,6 +370,20 @@ static int userspace_reboot_plan(int argc, const char *prefix, struct helper_pla
     return 0;
 }
 
+/* F151: uicache: the console's Reload Data after an app was installed. uikittools' uicache -a from the prefix, which
+ * rebuilds the home screen's icon cache for every app there. */
+static int uicache_plan(int argc, const char *prefix, struct helper_plan *p, const char **err) {
+    if (argc != 1) { *err = "this verb takes no arguments"; return -1; }
+    if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/uicache", prefix) >= sizeof p->path) {
+        *err = "prefix too long"; return -1;
+    }
+    p->argv[0] = "uicache";
+    p->argv[1] = "-a";
+    p->argv[2] = NULL;
+    p->argc = 2;
+    return 0;
+}
+
 int helper_deb_path_ok(const char *s) {
     size_t n = strlen(s);
     if (n < 6 || n > HELPER_DEB_PATH_MAX || s[0] != '/' || strcmp(s + n - 4, ".deb")) return 0;
@@ -652,6 +666,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "apply-ask")) { p->verb = HV_APPLY_ASK; return queue_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "respring")) { p->verb = HV_RESPRING; return respring_plan(argc, prefix, p, err); }
     else if (!strcmp(verb, "userspace-reboot")) { p->verb = HV_USERSPACE_REBOOT; return userspace_reboot_plan(argc, prefix, p, err); }
+    else if (!strcmp(verb, "uicache")) { p->verb = HV_UICACHE; return uicache_plan(argc, prefix, p, err); }
     else if (!strcmp(verb, "install-ipa")) { p->verb = HV_INSTALL_IPA; return ipa_plan(argc, argv, p, err); }
     else if (!strcmp(verb, "rollbacks")) { p->verb = HV_ROLLBACKS; return rollback_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "rollback")) { p->verb = HV_ROLLBACK; return rollback_plan(argc, argv, prefix, status_fd, p, err); }

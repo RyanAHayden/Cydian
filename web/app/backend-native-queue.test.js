@@ -91,8 +91,8 @@ test("apply: the console streams apt's lines and status, then dpkg's status show
   const catalog = await loaded(backend);
   assert.deepEqual(catalog.installed().map((p) => [p.id, p.version]).sort(), [["apt", "2.6.0"], ["com.example.tweak", "0.9"]]);
   assert.deepEqual(catalog.queueInfo(["com.example.tweak", "bash"]), {
-    "com.example.tweak": { name: "Example Tweak", restart: true }, // the 0.9 build depends on mobilesubstrate
-    bash: { name: "bash", restart: false },
+    "com.example.tweak": { name: "Example Tweak", restart: true, kind: "tweak" }, // the 0.9 build depends on mobilesubstrate
+    bash: { name: "bash", restart: false, kind: "package" }, // F151: the console's finish button by kind
   });
 });
 

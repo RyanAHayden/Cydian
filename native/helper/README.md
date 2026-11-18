@@ -17,6 +17,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper notifications on|off                                     (F65: Upgrade Notifications)
     cydian-helper app-versions                                             (I4: installed apps' real versions)
     cydian-helper userspace-reboot                                         (N8: the Userspace Reboot intent)
+    cydian-helper uicache                                                  (F151: the console's Reload Data)
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
@@ -42,6 +43,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `install-paid` | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install /var/tmp/cydian-paid.XXXXXX/paid.deb`, `CYDIA=3 1` as for `apply`, after copying and checking the app's download (F57; below) |
 | `respring`  | `sbreload`, or `killall -9 backboardd` when the jailbreak has no sbreload (N4: Restart SpringBoard) |
 | `userspace-reboot` | `launchctl reboot userspace` (N8: the Userspace Reboot intent and control)              |
+| `uicache`   | `uicache -a`: rebuilds the home screen's icon cache (F151: the console's Reload Data after an app was installed) |
 
 **The queue (N4):** `simulate` and `apply` take items: `name` installs the newest, `name=version` that exact
 version (Reinstall, Downgrade and the Version History pick one), `-name` removes. apt gets `name`, `name=version`

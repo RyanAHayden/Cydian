@@ -244,6 +244,17 @@ function queueCalls(backend, q, call) {
       const r = await run(["respring"]);
       if (r.code !== 0) throw new BackendError("helper", `Couldn't restart SpringBoard (${r.code}): ${lastLine(r.stderr) || "no output"}`);
     },
+    // F151: the console's Reload Data (an app was installed): the helper's uicache verb rebuilds the home screen's
+    // icon cache.
+    async uicache() {
+      const r = await run(["uicache"]);
+      if (r.code !== 0) throw new BackendError("helper", `Couldn't reload the home screen (${r.code}): ${lastLine(r.stderr) || "no output"}`);
+    },
+    // F151: the console's Reboot Device: launchctl reboot userspace (the helper's N8 verb), which keeps the jailbreak.
+    async userspaceReboot() {
+      const r = await run(["userspace-reboot"]);
+      if (r.code !== 0) throw new BackendError("helper", `Couldn't reboot (${r.code}): ${lastLine(r.stderr) || "no output"}`);
+    },
   };
 }
 

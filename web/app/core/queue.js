@@ -11,7 +11,7 @@
 //   queueWords(jobs)          -> ["com.a", "com.b=1.0", "-com.c"]   cydian-helper simulate|apply <words>
 //   parseSimulation(text)     -> { installs, reinstalls, upgrades, downgrades, removes, essential, download }
 //   parseStatusLine(line)     -> { type: "status" | "error" | "conffile" | "finish", ... } (apt's Status-Fd, $CYDIA)
-//   finishOf(levels...)       -> the highest of return | reopen | restart | reload | reboot
+//   finishOf(levels...)       -> the highest of return | uicache | reopen | restart | reload | reboot
 //   CONFFILE_TITLE, CONFFILE_BUTTONS, conffileMessage(file), conffileAnswer(index), conffileLine(file, answer)
 //                             F63: the Configuration Upgrade alert and the word it answers (keep | new)
 //   createRunLog(storage)     -> the console logs Settings shows
@@ -175,10 +175,12 @@ export function createRepeatFilter() {
   };
 }
 
-// Cydia's finish levels, lowest first; the button shows the highest reached.
-const FINISH = ["return", "reopen", "restart", "reload", "reboot"];
+// Cydia's finish levels, lowest first; the button shows the highest reached. F151: uicache (Reload Data: the home
+// screen's icon cache rebuilt, for an app) between return and reopen.
+const FINISH = ["return", "uicache", "reopen", "restart", "reload", "reboot"];
 export const FINISH_LABEL = {
-  return: "Return to Cydian", reopen: "Close Cydian", restart: "Restart SpringBoard", reload: "Reload SpringBoard", reboot: "Reboot Device",
+  return: "Return to Cydian", uicache: "Reload Data", reopen: "Close Cydian", restart: "Restart SpringBoard", reload: "Reload SpringBoard",
+  reboot: "Reboot Device",
 };
 export function finishOf(...levels) {
   let best = 0;

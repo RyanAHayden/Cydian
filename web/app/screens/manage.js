@@ -6,6 +6,8 @@
 //   #/sources/manage/sources             the edit list: Add, the red minus and Delete, drag the grabber to reorder
 //   #/sources/manage/io                  Export (share text, save a file, QR code) and Import (file or the clipboard)
 //   #/sources/manage/io/review           what an import found: new ones (ticked), already listed, can't add; Add
+//   #/sources/manage/hidden              F104: what's hidden, sections (Section Visibility) and authors (Hide
+//                                        Packages by <author>), each with a switch to show it again
 //   #/sources/manage/recommended/<key>   one not added yet, read from its URL: its apps (F52) or packages (F54), and Add
 //
 // Source keys always hold a ':' (deb:..., alt:...), so "manage" can't be one. The parsing, export text and order
@@ -34,7 +36,7 @@ import {
 import { copyText, nativePaste } from "../nav/menu.js";
 import { builtinFirst, isBuiltin, exportable } from "../core/essential.js";
 import { lockMark } from "../nav/lock.js";
-import { settings } from "./settings.js";
+import { settings, createSwitch } from "./settings.js";
 
 export const SEGMENT = "manage";
 export const isManage = (route) => route.path[0] === SEGMENT;
@@ -51,6 +53,7 @@ function page(route) {
   const p = route.path.slice(1);
   if (!p.length) return "root";
   if (p[0] === "sources" && p.length === 1) return "sources";
+  if (p[0] === "hidden" && p.length === 1) return "hidden";
   if (p[0] === "recommended" && p.length === 2) return "preview";
   if (p[0] === "io") {
     if (p.length === 1) return "io";
@@ -64,6 +67,7 @@ export function nav(route, ctx) {
     case "root": return { title: "Manage", right: { label: "Add", onClick: () => addSource(ctx) } }; // F52
     case "sources": return { title: "Sources", style: "plain", right: { label: "Add", onClick: () => addSource(ctx) } };
     case "io": return { title: "Import & Export" };
+    case "hidden": return { title: "Hidden" };
     case "review": return { title: "Import", right: { label: "Add", onClick: () => addPicked(ctx) } };
     case "preview": return { title: RECOMMENDED_SOURCES.find((r) => recommendedSeed(r).key === route.path[2])?.name || "Source",
       right: { label: "Add", onClick: () => addFromPreview(route, ctx) } };
@@ -76,6 +80,7 @@ export function render(body, route, ctx) {
     case "root": return renderRoot(body, ctx);
     case "sources": return renderSources(body);
     case "io": return renderIO(body, route, ctx);
+    case "hidden": return renderHidden(body);
     case "review": return renderReview(body);
     case "preview": return renderPreview(body, route);
     default: body.append(el("p", "empty", "Nothing here."));
@@ -104,6 +109,7 @@ function renderRoot(body, ctx) {
   const rows = [
     { label: "Sources", href: here("sources") },
     { label: "Import & Export", href: here("io") },
+    hiddenRow(),
   ];
   const rec = el("div", "manage-rec");
   body.replaceChildren(grouped([{ rows, footer: "Add, delete and reorder your sources, or move them to another phone "
@@ -114,6 +120,49 @@ function renderRoot(body, ctx) {
     const detail = body.querySelector(".cell .cell-inner");
     if (detail && !detail.querySelector(".cell-detail")) detail.insertBefore(el("span", "cell-detail", String(n)), detail.querySelector(".cell-check"));
   }).catch(() => {});
+}
+
+// ---- F104: Hidden: hidden sections and authors -------------------------------------------------------------------
+
+// The Manage row: how many sections and authors are hidden.
+export function hiddenRow(sections = settings.hiddenSections.list(), authors = settings.hiddenAuthors.list()) {
+  const n = sections.length + authors.length;
+  return { label: "Hidden", detail: n ? String(n) : undefined, href: here("hidden") };
+}
+
+// The page's groups: { header, footer, items: [{ kind, name }] }; empty kinds are left out.
+export function hiddenGroups(sections, authors) {
+  const out = [];
+  if (sections.length) out.push({ header: "Sections", items: sections.map((name) => ({ kind: "section", name })) });
+  if (authors.length) out.push({ header: "Authors", items: authors.map((name) => ({ kind: "author", name })) });
+  return out;
+}
+
+function renderHidden(body) {
+  const draw = () => {
+    const groups = hiddenGroups(settings.hiddenSections.list(), settings.hiddenAuthors.list());
+    if (!groups.length) {
+      body.replaceChildren(grouped([{ footer: "Nothing is hidden. Hide a section with Edit on Sections, or an author "
+        + "with Hide Packages by on their page." }]));
+      return;
+    }
+    const ul = grouped(groups.map((g) => ({ header: g.header, rows: g.items.map((it) => ({ label: it.name, chevron: false })) }))
+      .concat([{ footer: "Hidden packages are left out of lists, Search and Changes. Switch one on to show it again." }]));
+    const cells = ul.querySelectorAll(".cell .cell-inner");
+    groups.flatMap((g) => g.items).forEach((it, i) => {
+      const inner = cells[i];
+      if (!inner) return;
+      inner.classList.add("has-switch");
+      inner.append(createSwitch({ label: `Show ${it.name}`, checked: false, onToggle: (on) => {
+        if (!on) return;
+        if (it.kind === "section") settings.hiddenSections.set(it.name, false);
+        else settings.hiddenAuthors.set(it.name, false);
+        setTimeout(draw, 250); // the switch slides on, then the row goes
+      } }));
+    });
+    body.replaceChildren(ul);
+  };
+  draw();
 }
 
 // ---- Sources: the edit list ------------------------------------------------------------------------------------

@@ -20,7 +20,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { constants as osConstants, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,6 +73,18 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       return read(join(prefix, "var/lib/apt/lists", name));
     },
     "apt.dpkgStatus": () => read(join(prefix, "var/lib/dpkg/status")),
+    // F104: Apt.swift installDates: { package: mtime seconds } of var/lib/dpkg/info/<pkg>[:arch].list.
+    "apt.installDates"() {
+      const dir = join(prefix, "var/lib/dpkg/info");
+      const out = {};
+      if (!existsSync(dir)) return out;
+      for (const name of readdirSync(dir)) {
+        if (!name.endsWith(".list")) continue;
+        const pkg = name.slice(0, -5).split(":")[0];
+        if (pkg) out[pkg] = Math.max(out[pkg] ?? 0, Math.round(statSync(join(dir, name)).mtimeMs / 1000));
+      }
+      return out;
+    },
     "net.fetch"({ url }) {
       if (!/^https?:\/\//i.test(url ?? "")) return fail("bad_url: not an http(s) URL");
       const r = netGet(url);

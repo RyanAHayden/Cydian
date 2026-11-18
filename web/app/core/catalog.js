@@ -9,6 +9,9 @@
 //   c.sections(key, { hidden: true })      -> every section, hidden ones too, each with `hidden` (edit mode)
 //   c.setHidden(names)                     -> Section Visibility: these sections drop out of sections, list,
 //                                             search and author (and so Changes); package() and has() still see them
+//   c.setHiddenAuthors(names)              -> Hide by Author (F104, Zebra's filters): packages whose Author or
+//                                             Maintainer is one of these drop out like hidden sections' (author()
+//                                             still lists them, so the author page can show them again)
 //   c.list(key | "*", section | "*")       -> [row], sorted by name ("*": All Sources / All Packages)
 //   c.search(query)                        -> [row], best matches first
 //   c.author(name)                         -> [row]: every package whose Author or Maintainer is `name`
@@ -30,6 +33,7 @@
 //                                             package, against every source and the installed list; null if unknown
 //   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
 //   c.installed()                          -> [row] installed, sorted by name, each with `installed` (its version)
+//                                             and `size` (F104: Installed-Size in bytes, or null)
 //   c.upgrades(holds, { dpkgHolds })       -> { available: [row], ignored: [row] } (Changes, core/installed.js)
 //   c.loadAlt(key, json, ios, format)      -> an AltStore source (F9, core/altstore.js): each app a row, its
 //                                             candidate the newest version iOS `ios` runs; apps none runs on left out
@@ -260,6 +264,7 @@ export function createCatalog() {
   const sorted = new Map();  // key -> rows sorted by name (cache)
   let hidden = new Set();    // Section Visibility (Cydia's CydiaSections Hidden): section names left out of lists
   const shown = new Map();   // key -> sorted rows outside hidden sections (cache)
+  let hiddenAuthors = new Set(); // F104: lower-cased author/maintainer names whose packages are left out of lists
   let device = null;         // F17: the device rows are judged for (core/compat.js), or null before one is set
   let fitFilter = false;     // and whether rows that can't work on it are left out
   const fitting = new Map(); // key -> sorted rows that can work on the device (cache)
@@ -347,6 +352,16 @@ export function createCatalog() {
     return hidden.size;
   }
 
+  // F104: Hide by Author. Names compare lower-cased, as author() does.
+  function setHiddenAuthors(names) {
+    hiddenAuthors = new Set((Array.isArray(names) ? names : []).filter((n) => typeof n === "string" && n.trim())
+      .map((n) => n.trim().toLowerCase()));
+    shown.clear();
+    return hiddenAuthors.size;
+  }
+  const byHiddenAuthor = (r) => hiddenAuthors.size > 0 && (hiddenAuthors.has(r._a) || hiddenAuthors.has(r._m));
+  const isHidden = (r) => hidden.has(r.section) || byHiddenAuthor(r);
+
   // id -> entry for a source, or the merge of all of them: the newest version wins; on a tie, the first source
   // loaded keeps it (apt's default: equal pins, first listed).
   function entries(key) {
@@ -385,10 +400,10 @@ export function createCatalog() {
 
   // fitOf without the hidden sections: what every list, Search and Changes draw from.
   function visibleOf(key) {
-    if (!hidden.size) return fitOf(key);
+    if (!hidden.size && !hiddenAuthors.size) return fitOf(key);
     let rows = shown.get(key);
     if (!rows) {
-      rows = fitOf(key).filter((r) => !hidden.has(r.section));
+      rows = fitOf(key).filter((r) => !isHidden(r));
       shown.set(key, rows);
     }
     return rows;
@@ -398,7 +413,7 @@ export function createCatalog() {
   // are listed too, each marked; without it they are left out.
   function sections(key = ALL, { hidden: withHidden = false } = {}) {
     const counts = new Map();
-    for (const r of fitOf(key)) counts.set(r.section, (counts.get(r.section) ?? 0) + 1);
+    for (const r of fitOf(key)) if (!byHiddenAuthor(r)) counts.set(r.section, (counts.get(r.section) ?? 0) + 1);
     const list = [...counts].filter(([name]) => withHidden || !hidden.has(name))
       .map(([name, count]) => (withHidden ? { name, count, hidden: hidden.has(name) } : { name, count }))
       .sort((a, b) => collator.compare(a.name, b.name));
@@ -425,7 +440,7 @@ export function createCatalog() {
     const inSection = sectionTest(section);
     const hits = [];
     for (const r of rowsOf(key)) {
-      if (hidden.has(r.section)) continue;
+      if (isHidden(r)) continue;
       if (!words.every((w) => r._hay.includes(w))) continue;
       if (inSection && !inSection(r)) continue;
       if (installed === "installed" && !statusById.has(r.id)) continue;
@@ -454,7 +469,8 @@ export function createCatalog() {
   function author(name) {
     const n = String(name ?? "").trim().toLowerCase();
     if (!n) return [];
-    return visibleOf(ALL).filter((r) => r._a === n || r._m === n).map(slim);
+    // F104: a hidden author's own page still lists their packages (hidden sections and misfits stay out).
+    return fitOf(ALL).filter((r) => !hidden.has(r.section) && (r._a === n || r._m === n)).map(slim);
   }
 
   function pkg(id, key = ALL) {
@@ -609,6 +625,7 @@ export function createCatalog() {
       const e = all.get(p.id);
       return { id: p.id, name: p.name, short: p.short, version: p.version, section: p.section,
         icon: e?.row.icon ?? null, key: e?.row.key ?? null, author: p.author, installed: p.version, held: p.held,
+        size: installedBytes(statusById.get(p.id)),
         compat: e ? e.row.compat : (device && statusById.has(p.id) ? compatCode(statusById.get(p.id), device) : null) };
     });
   }
@@ -620,17 +637,23 @@ export function createCatalog() {
     return findUpgrades(installedPkgs, (id) => { const e = all.get(id); return e ? slim(e.row) : null; }, holds, opts);
   }
 
-  return { load, loadAlt, altSource, remove, setHidden, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
+  return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
     categories, browse, popular,
     setInstalled, installed, upgrades, setDevice,
     deps, aptProblems, queueInfo };
+}
+
+// F104: a status stanza's Installed-Size (dpkg writes KiB) in bytes, or null.
+export function installedBytes(st) {
+  const n = Number(String(st?.["installed-size"] ?? "").trim());
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 1024) : null;
 }
 
 // Runs a catalog operation by name: the worker's entry point. Unknown ops throw.
 export function runCatalog(catalog, op, args = []) {
   const f = { load: catalog.load, loadAlt: catalog.loadAlt, altSource: catalog.altSource, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
     search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys,
-    versions: catalog.versions, setHidden: catalog.setHidden, setInstalled: catalog.setInstalled,
+    versions: catalog.versions, setHidden: catalog.setHidden, setHiddenAuthors: catalog.setHiddenAuthors, setInstalled: catalog.setInstalled,
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular,
     deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo }[op];

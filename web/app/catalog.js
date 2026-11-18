@@ -5,6 +5,7 @@
 //   catalog.sections(key)  catalog.list(key, section)  catalog.search(q)  catalog.author(name)
 //   catalog.package(id, key)  catalog.has(names)       // all promises; key "*" = All Sources
 //   catalog.changes()  catalog.onChange(f)             // the Changes tab (core/changes.js)
+//   catalog.setHiddenAuthors(names)                    // Hide by Author (F104): sent like the hidden sections
 //   catalog.setHidden(names)                           // Section Visibility: sent to the worker before the next question
 //   catalog.setDevice(device, { filter })              // Works on my phone (F17, device.js): likewise
 //   catalog.installed()  catalog.upgrades(holds)       // dpkg's status file (F7): rows or null; { available, ignored }
@@ -175,6 +176,17 @@ function setHidden(names) {
   for (const f of changeListeners) f(); // the Changes tab redraws without the hidden sections
 }
 
+// Hide by Author (F104): the hidden author names, sent like the hidden sections (core/catalog.js setHiddenAuthors).
+let hiddenAuthors = [];
+let hiddenAuthorsSent = true;
+function setHiddenAuthors(names) {
+  const next = [...new Set(names ?? [])].sort();
+  if (JSON.stringify(next) === JSON.stringify(hiddenAuthors)) return;
+  hiddenAuthors = next;
+  hiddenAuthorsSent = false;
+  for (const f of changeListeners) f();
+}
+
 // Works on my phone (F17): the device every row is judged for, and whether what can't work is left out. Sent like
 // the hidden sections, ahead of the next question (core/catalog.js setDevice).
 let device = null;
@@ -234,6 +246,10 @@ const ask = async (op, args) => {
     hiddenSent = true;
     await getParser().catalog("setHidden", [hidden]);
   }
+  if (!hiddenAuthorsSent) {
+    hiddenAuthorsSent = true;
+    await getParser().catalog("setHiddenAuthors", [hiddenAuthors]);
+  }
   if (!deviceSent) {
     deviceSent = true;
     await getParser().catalog("setDevice", device ? [device.device, { filter: device.filter }] : [null]);
@@ -246,6 +262,7 @@ export const catalog = {
   status: (key) => loaded.get(key) ?? null,
   sections: (key = ALL, opts) => ask("sections", opts ? [key, opts] : [key]),
   setHidden,
+  setHiddenAuthors,
   setDevice,
   list: (key = ALL, section = ALL) => ask("list", [key, section]),
   search: (q, filters) => ask("search", filters ? [q, filters] : [q]), // F35: core/catalog.js search filters

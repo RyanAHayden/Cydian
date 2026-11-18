@@ -431,14 +431,6 @@ function renderRoot(body) {
   who.rel = "noopener";
   by.append(who);
   words.append(by);
-  // A nod to the original, in the by-line's own style (the "not affiliated" note is in About).
-  const nod = el("p", "home-by home-nod", "inspired by ");
-  const cydia = el("a", null, "saurik's Cydia");
-  cydia.href = "https://cydia.saurik.com/";
-  cydia.target = "_blank";
-  cydia.rel = "noopener";
-  nod.append(cydia);
-  words.append(nod);
   head.append(icon, words);
   const hintBox = el("div", "home-hint-box");
   const drawHint = () => {

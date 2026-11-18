@@ -502,14 +502,14 @@ export function firstLoadFilter(type) {
 // F43: refreshes the never-loaded sources in `list` (firstLoadFilter), once each per `tried` (a Set of keys the
 // caller keeps, so a source whose fetch throws isn't asked again on every visit). `begin()` runs before the fetch
 // and returns what ends it (the screen's HUD). Resolves to the refreshed records, or null when nothing needed it.
-export async function loadNeverLoaded(backend, list, type, { tried = new Set(), begin = () => () => {} } = {}) {
+export async function loadNeverLoaded(backend, list, type, { tried = new Set(), begin = () => () => {}, onEach } = {}) {
   const want = firstLoadFilter(type);
   const keys = new Set((Array.isArray(list) ? list : []).filter((s) => want(s) && !tried.has(s.key)).map((s) => s.key));
   if (!keys.size) return null;
   for (const k of keys) tried.add(k);
-  const end = begin();
+  const end = begin(keys);
   try {
-    return await backend.refreshSources(undefined, { filter: (s) => keys.has(s?.key) });
+    return await backend.refreshSources(onEach, { filter: (s) => keys.has(s?.key) });
   } finally {
     end();
   }

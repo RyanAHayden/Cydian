@@ -28,6 +28,7 @@ const state = {
   body: null,      // the root page's scroller
   busy: false,     // a refresh is running
   tried: new Set(), // F43: keys first-loaded this session (core/sources.js loadNeverLoaded)
+  loading: new Set(), // keys being refreshed right now: their rows spin, the Sources badge spins (Cydia)
   query: "",        // F19: the search box's text
   bar: null,        // F19: the search box, kept across redraws so typing keeps its focus
   box: null,        // F19: where the list goes, under the search box
@@ -103,9 +104,11 @@ async function firstLoad(ctx) {
   state.busy = true;
   let hide = () => {};
   try {
+    let each = () => {};
     const done = await loadNeverLoaded(getBackend(), state.sources, settings.deviceType(), {
       tried: state.tried,
-      begin: () => (hide = ctx?.showHUD ? ctx.showHUD("Reloading Data") : () => {}),
+      begin: (keys) => { each = markLoading(ctx, [...(keys ?? [])]); hide = ctx?.showHUD ? ctx.showHUD("Reloading Data") : () => {}; },
+      onEach: (d) => each(d),
     });
     if (done) {
       state.sources = await getBackend().sources();
@@ -114,9 +117,31 @@ async function firstLoad(ctx) {
   } catch {
     // a failed first load leaves the rows as they were; Refresh shows the error
   } finally {
+    clearLoading(ctx);
     linger(hide);
     state.busy = false;
   }
+}
+
+// Loading marks: the rows of `keys` spin and the Sources tab's badge spins until each answers (onEach), as
+// Cydia does. Returns onEach for refreshSources.
+function markLoading(ctx, keys) {
+  for (const k of keys) state.loading.add(k);
+  ctx?.setBadge?.("sources", state.loading.size ? "spinner" : null);
+  for (const li of document.querySelectorAll(".source-row")) li.classList.toggle("is-loading", state.loading.has(li.dataset.key));
+  return (done) => {
+    state.loading.delete(done?.key);
+    const i = state.sources?.findIndex((s) => s.key === done?.key) ?? -1;
+    if (i >= 0) state.sources[i] = done;
+    const li = document.querySelector(`.source-row[data-key="${CSS.escape(String(done?.key))}"]`);
+    if (li) li.classList.remove("is-loading");
+    if (!state.loading.size) ctx?.setBadge?.("sources", null);
+  };
+}
+function clearLoading(ctx) {
+  state.loading.clear();
+  ctx?.setBadge?.("sources", null);
+  for (const li of document.querySelectorAll(".source-row.is-loading")) li.classList.remove("is-loading");
 }
 
 // The HUD stays exactly as long as the loading, then a second more before its usual fade.
@@ -223,7 +248,10 @@ function draw() {
 function decorate(li, source, backend) {
   li.classList.add("source-row");
   li.dataset.key = source.key;
-  if (source.error) li.querySelector(".cell-subtitle")?.classList.add("cell-error");
+  const loading = state.loading.has(source.key);
+  li.classList.toggle("is-loading", loading);
+  // a source shows as failed only once a load has actually failed, not while one is under way
+  if (source.error && !loading) li.querySelector(".cell-subtitle")?.classList.add("cell-error");
   // F16a: a source only its own app can read (an encrypted GBox one) says so under its name; its page says why.
   if (source.unsupported && !source.error) li.querySelector(".cell-subtitle")?.classList.add("cell-error");
   // CydiaIcon.png loads behind the letter and replaces it once it's there (Cydia: unknown.png, then the icon).
@@ -330,13 +358,16 @@ async function refresh(ctx) {
   state.busy = true;
   const hide = ctx.showHUD("Reloading Data");
   try {
-    await getBackend().refreshSources(undefined, { filter: sourceFilter(settings.deviceType()) }); // F41: only what's shown
+    const filter = sourceFilter(settings.deviceType());
+    const onEach = markLoading(ctx, (state.sources ?? []).filter(filter ?? (() => true)).map((x) => x.key));
+    await getBackend().refreshSources(onEach, { filter }); // F41: only what's shown
     state.sources = await getBackend().sources();
     draw();
   } catch (e) {
     hide();
     await showAlert({ title: "Error", message: e.message, buttons: ["OK"] });
   } finally {
+    clearLoading(ctx);
     linger(hide);
     state.busy = false;
   }

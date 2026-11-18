@@ -1,5 +1,6 @@
 // The tab bar: one item per tab, icon drawn in CSS (ios6.css masks a gradient with an SVG glyph per tab), and a
-// red count badge per item. setBadge(tab, n) shows n (a number or short text); 0, "" or null hides it.
+// red count badge per item. setBadge(tab, n) shows n (a number or short text), "spinner" a spinner (Cydia's
+// Sources tab while refreshing); 0, "" or null hides it.
 
 export function createTabbar(el, tabs, titleOf) {
   const items = {};
@@ -25,8 +26,10 @@ export function createTabbar(el, tabs, titleOf) {
       const badge = items[tab] && items[tab].querySelector(".badge");
       if (!badge) return;
       const show = n !== 0 && n != null && n !== "";
+      const spin = n === "spinner"; // Cydia's Sources badge while sources refresh: white spokes, no number
       badge.hidden = !show;
-      badge.textContent = show ? String(n) : "";
+      badge.classList.toggle("spinning", spin);
+      badge.textContent = show && !spin ? String(n) : "";
       items[tab].setAttribute("aria-label", titleOf(tab) + (show ? `, ${n} new` : ""));
     },
   };

@@ -269,6 +269,18 @@ class GuardTest(Base):
         codes = [self.post(password="wrong").status_code for _ in range(3)]
         self.assertEqual(codes, [400, 400, 429])
 
+    def test_host_signed_ipa(self):
+        # Cydian's own update, signed on the phone: hosted for its ttl and installable; other apps refused.
+        own = T.ipa(bundle_id="com.ryha.cydian", name="Cydian", version="0.2.2.1")
+        r = self.c.post("/sign/host", data=own, content_type="application/octet-stream")
+        self.assertEqual(r.status_code, 200, r.json)
+        token = r.json["manifest"].split("/sign/")[1].split("/")[0]
+        self.assertEqual(r.json["bundleId"], "com.ryha.cydian")
+        self.assertEqual(self.c.get(f"/sign/{token}/app.ipa").data, own)
+        other = self.c.post("/sign/host", data=T.ipa(bundle_id="com.someone.app"), content_type="application/octet-stream")
+        self.assertEqual((other.status_code, other.json["code"]), (403, "not_allowed"))
+        self.assertEqual(self.c.post("/sign/host", data=b"", content_type="application/octet-stream").status_code, 413)
+
     def test_loopback_manifest(self):
         # Semi Local: a manifest for an IPA the phone serves itself over HTTP at 127.0.0.1; nothing else accepted.
         ok = self.c.get("/sign/manifest", query_string={"bundleid": "com.ryha.openmx", "version": "0.16.0", "title": "openMX",

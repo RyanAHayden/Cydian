@@ -102,18 +102,19 @@ export async function serverStatus(server = getServer()) {
 }
 
 // F72: an IPA of Cydian itself (its GitHub releases, where Cydian's own source points).
-export const isSelfIpa = (url) => /^https:\/\/github\.com\/RyanAHayden\/Cydian\/releases\//i.test(String(url ?? ""));
+// Only Cydian's own IPA files count: a release's Cydian.ipa, or the test source's cydian-<version>.ipa. Other files
+// under the same releases (the test-fixtures pre-release's Test Alpha, Test Beta...) are ordinary apps.
+export const isSelfIpa = (url) => /^https:\/\/github\.com\/RyanAHayden\/Cydian\/releases\/(?:latest\/)?download\/(?:[^/]+\/)?(?:Cydian|cydian-[\d.]+)\.ipa$/i
+  .test(String(url ?? ""));
 
 // Signs `url` (an IPA) on the server and opens the install link it answers with. Resolves true once the link is
 // opened; false after an error, which it shows in an alert.
 export async function signAndInstall({ url, name = "", onInstalled = () => {} }) {
   // F72: Cydian's own IPA never goes through the local install server (iOS closes Cydian, and the server with it,
   // as it starts installing): essential-ui.js signs it on the Signing Server or sends the user to cydian.dev.
-  if (localSigning() && isSelfIpa(url)) {
-    const { installSelfNow } = await import("./essential-ui.js");
-    const version = /\/download\/v(\d+(?:\.\d+)*)\//.exec(url)?.[1] ?? null;
-    return ["installing", "site"].includes(await installSelfNow({ ipa: url, version }));
-  }
+  // Cydian's own IPA: signed here on the phone like any app, then hosted on the Signing Server (host: true) since
+  // iOS closes Cydian, and its install server, while it installs over it. Straight to iOS's Install prompt.
+  if (localSigning() && isSelfIpa(url)) return installOnDevice({ url, name: name || "Cydian", onInstalled, host: true });
   // F68: look first (signing.inspect), then the sheet with its edits signs and installs (signing-sheet.js).
   if (localSigning()) {
     const { inspectAndInstall } = await import("./signing-sheet.js");
@@ -260,14 +261,14 @@ const openRoute = (path) => { location.hash = format({ tab: "settings", path }).
 // F68: `params` replaces { url } with the look-first sheet's { token, name?, bundleId?, icon?, removeExtensions? }
 // (core/signing.js installParams); `after(result, h)` runs with the HUD still up once iOS has the link (the sheet
 // follows iOS's own progress there) and hides it itself.
-export async function installOnDevice({ url, name = "", onInstalled = () => {}, params = null, after = null },
+export async function installOnDevice({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false },
   { native, hud = liveHUD, alert = showAlert, go = openRoute, later = setTimeout } = {}) {
   const h = hud("Downloading");
   let result;
   try {
     // manifestServer: the signing server hands iOS the manifest while Cydian serves the IPA over plain HTTP at
     // 127.0.0.1 (no certificate to trust on the phone; the server sees only the app's ID, version and name).
-    result = await bridge(native).call("signing.install", { ...(params ?? { url }), manifestServer: getServer() }, (ev) => {
+    result = await bridge(native).call("signing.install", { ...(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}) }, (ev) => {
       const t = phaseLabel(ev);
       if (t) h.set(t);
     });

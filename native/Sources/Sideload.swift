@@ -100,11 +100,16 @@ enum Sideload {
     // leaves it, the server sees only the app's ID, version and name. Nil: everything local over HTTPS with the
     // phone's own trusted CA. Set by each signing.install call's `manifestServer`.
     static var manifestServer: String?
+    // Set (to the Signing Server) when the IPA is Cydian itself: iOS closes Cydian, and its install server with it, as
+    // it installs over it, so the signed IPA goes up to the server's POST /sign/host and installs from there. Signing
+    // still happens here; the key never leaves the phone. Set by each signing.install call's `host`.
+    static var hostServer: String?
 
     static func install(_ c: Bridge.Call) {
         guard let (id, profile) = ready(c) else { return }
         let ms = (c.params["manifestServer"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
         manifestServer = (ms?.hasPrefix("https://") ?? false) ? ms : nil
+        hostServer = (c.params["host"] as? Bool ?? false) ? manifestServer : nil
         guard manifestServer != nil || LocalTrust.trusted() else {
             return Apt.reply(c, nil, "untrusted: set up Local Install in Settings > Signing first (install and trust Cydian's certificate)")
         }
@@ -156,6 +161,35 @@ enum Sideload {
     // Signs `input` (deleted after), serves it on the local HTTPS server and opens the itms-services link. `opened`
     // gets the result once iOS has been handed the link; `served` once iOS has fetched the whole IPA (or it expired
     // unfetched: false). Runs on SignBridge.queue.
+    // Cydian's own update: upload the IPA signed here to the server, which holds it for its 10 minutes and answers the
+    // itms-services link; then iOS installs from the server, unaffected by Cydian closing.
+    static func hostAndOpen(_ output: URL, server: String, app: SignedApp, record: SignedRecord,
+                            opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void, served: ((Bool) -> Void)?) {
+        var req = URLRequest(url: URL(string: server + "/sign/host")!)
+        req.httpMethod = "POST"
+        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 300
+        URLSession.shared.uploadTask(with: req, fromFile: output) { data, resp, error in
+            try? FileManager.default.removeItem(at: output)
+            let json = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any]
+            guard error == nil, (resp as? HTTPURLResponse)?.statusCode == 200, let itms = json?["itms"] as? String,
+                  let link = URL(string: itms) else {
+                let why = (json?["error"] as? String) ?? error?.localizedDescription ?? "the server didn't answer"
+                opened(.failure(Failed(text: "server: \(why)"))); served?(false)
+                return
+            }
+            SignBridge.queue.async {
+                saveRecords(SignedRecords.adding(record, to: records()))
+                reschedule()
+            }
+            DispatchQueue.main.async {
+                UIApplication.shared.open(link)
+                opened(.success((app, record)))
+                served?(true)
+            }
+        }.resume()
+    }
+
     static func signAndOpen(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions,
                             emit: @escaping (String, Double) -> Void,
                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
@@ -179,6 +213,10 @@ enum Sideload {
                                   version: app.version, url: url, signed: Date(),
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored)
         emit("installing", 0)
+        if let host = hostServer {
+            hostAndOpen(output, server: host, app: app, record: record, opened: opened, served: served)
+            return
+        }
         let manifestPath = "/\(tok)/manifest.plist", ipaPath = "/\(tok)/app.ipa"
         let remote = manifestServer
         let server = remote != nil ? InstallServer.plain : InstallServer.secure

@@ -291,8 +291,8 @@ export async function installSelf(row, deps) {
     return "installing";
   }
   const { index } = await alert({ title: `Install ${v}`,
-    message: `${SELF_REASON} Open cydian.dev in Safari and tap Install Cydian App: the site signs it with your `
-      + "certificate there.", buttons: ["Cancel", "Open cydian.dev"], cancel: 0 });
+    message: "Add your certificate in Settings > Signing, or install it from cydian.dev in Safari.",
+    buttons: ["Cancel", "Open Safari"], cancel: 0 });
   if (index !== 1) return "cancelled";
   await open(SELF_SITE);
   return "site";

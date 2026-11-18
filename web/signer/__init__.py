@@ -7,6 +7,7 @@ itms-services:// link the phone installs from. docs/signing.md is the long versi
   GET  /sign/job/<job>            {status: downloading | signing | done (+ the fields above) | error (+ error, code,
                                   httpStatus)}: the phone polls it, so no one request outlasts a proxy's timeout
   GET  /sign/<token>/manifest.plist   the install manifest iOS reads (until the token expires)
+  POST /sign/host                    an IPA the phone signed itself (Cydian's own only) -> its itms-services link
   GET  /sign/manifest?bundleid=&version=&title=&port=&path=   a manifest for an IPA the phone serves at 127.0.0.1:<port>/<path>
   GET  /sign/<token>/app.ipa          the signed IPA (HEAD and Range too), until the token expires
   GET  /sign/status                   {ok, zsign, maxBytes, ttl, jobs}: Settings > Signing asks if this server signs
@@ -250,6 +251,42 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
     def status():
         return answer({"ok": True, "zsign": bool(zsign_path()), "maxBytes": MAX_BYTES, "ttl": int(db().ttl),
                        "jobs": True})
+
+    @bp.post("/sign/host")
+    def host():
+        """Hosts an IPA the phone signed itself, for its 10 minutes, and answers its itms-services link: Cydian's own
+        update in the sideload app (iOS closes Cydian, and its local install server, while it installs the new one).
+        The key never leaves the phone; only the signed IPA comes here. Only the bundle IDs in CYDIAN_HOST_IDS
+        (Cydian's own by default), so this is no general file host."""
+        if not limiter.allow(request.remote_addr or "?"):
+            return answer({"error": "Too many requests from this address: wait a few minutes.", "code": "rate_limited"},
+                          429, **{"Retry-After": "60"})
+        size = request.content_length or 0
+        if size <= 0 or size > MAX_BYTES:
+            return err(SignError("too_large", "Send the signed IPA as the request body (up to the size limit).", 413))
+        if not db().room():
+            return err(SignError("busy", "This server is holding too many apps: try again in a few minutes.", 503))
+        work = db().workdir()
+        try:
+            path = os.path.join(work, "hosted.ipa")
+            with open(path, "wb") as f:
+                left = size
+                while left > 0:
+                    chunk = request.stream.read(min(1 << 20, left))
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    left -= len(chunk)
+            app = ipa_mod.inspect(path, MAX_UNZIPPED)
+            allowed = os.environ.get("CYDIAN_HOST_IDS", "com.ryha.cydian").split(",")
+            if app.bundle_id not in allowed:
+                raise SignError("not_allowed", "This server hosts only Cydian's own signed app.", 403)
+            token = db().put(path, app.bundle_id, app.name, app.version)
+            return answer(_done(base_url(), token, app, db().ttl))
+        except SignError as e:
+            return err(e)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
 
     @bp.get("/sign/manifest")
     def loopback_manifest():

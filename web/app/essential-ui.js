@@ -16,7 +16,7 @@ import { detectMode } from "./core/settings.js";
 import { parseStatus } from "./core/installed.js";
 import { showAlert } from "./nav/alert.js";
 import { settings } from "./screens/settings.js";
-import { getServer, pollJob } from "./signing-client.js";
+import { getServer, pollJob, installOnDevice } from "./signing-client.js";
 import { signBody, errorText } from "./core/signing.js";
 
 const native = () => globalThis.cydianNative;
@@ -76,7 +76,13 @@ async function signOnServer({ url, identity, server }) {
   return body.itms;
 }
 
-export function installSelfNow(row) {
+export async function installSelfNow(row) {
+  // The sideload app signs its own update on the phone and hosts it on the Signing Server (signing.install host:
+  // true): straight to iOS's Install prompt, the key never leaves the phone. installSelf's paths stay for the rest.
+  if (detectMode() === "sideload" && row?.ipa && globalThis.cydianNative?.call) {
+    const ok = await installOnDevice({ url: row.ipa, name: "Cydian", host: true });
+    return ok ? "installing" : "failed";
+  }
   return installSelf(row, { exportIdentity, server: getServer(), signOnServer, alert: showAlert, open: openOutside, storage: storage() });
 }
 

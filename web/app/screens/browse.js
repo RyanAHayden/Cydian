@@ -619,7 +619,10 @@ async function packageActions(route, button) {
     const v = st.ipa.versions[0];
     // I5: with the user's own certificate (Settings > Signing), Install signs this app and installs it.
     if (await signIfReady(st.ipa, v, recordApp(pkg, source, v))) return;
+    // Install at the top right installs: the first row (signed with the user's certificate, the source's signed
+    // link, or the jailbreak). Download IPA and older versions are on the page, not in a menu in between.
     const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v), undefined, st.ipa.name);
+    if (rows[0] && rows[0].label !== "Download IPA") return rows[0].onClick();
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });
     if (many) actions.push({ label: "Version History", run: () => go(versionsHref(route, id)) });
     return sheet(options.itms ? "" : "Install signs it with your own certificate: add one in Settings > Signing. Download IPA keeps the file.", actions);

@@ -326,11 +326,11 @@ test("installSelf: a server error is said plainly", async () => {
   assert.deepEqual(s.log.at(-1).slice(0, 3), ["alert", "Couldn't Sign Cydian", "The signing server answered HTTP 500."]);
 });
 
-test("installSelf: without a certificate to send, it explains why and offers cydian.dev, never the local server", async () => {
+test("installSelf: without a certificate to send, it offers Settings > Signing or cydian.dev, never the local server", async () => {
   const s = selfDeps({ answers: [1] });
   assert.equal(await installSelf(ROW, s.deps), "site");
-  assert.match(s.log[0][2], /can't install itself from this iPhone/);
-  assert.match(s.log[0][2], /Install Cydian App/);
+  assert.match(s.log[0][2], /Settings > Signing/);
+  assert.match(s.log[0][2], /cydian\.dev/);
   assert.deepEqual(s.log[1], ["open", SELF_SITE]);
   assert.ok(!s.log.some((l) => l[0] === "sign"));
   const no = selfDeps({ answers: [0] });

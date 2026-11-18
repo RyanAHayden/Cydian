@@ -10,7 +10,8 @@
 // and app.js. Featured banners from sources' sileo-featured.json sit above the tiles (F20, screens/extras.js).
 //
 // Routes below the tab: help, featured, sources (More Package Sources), guides/<id>, credits, wishlist (F102), and browse (F46): Browse's list
-// (Popular, then the categories), browse/popular, browse/category:<name>, and below those browse.js's tokens
+// (F124: New, Recently Updated, Popular, Featured, Free Apps / Tweaks / Themes, then the categories), browse/<list id>
+// (core/catalog.js BROWSE_LISTS: new, updated, popular, featured, free-apps...), browse/category:<name>, and below those browse.js's tokens
 // (package:<id>, author:<name>, versions:<id>), as in the Search tab.
 import { grouped } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
@@ -22,7 +23,10 @@ import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
 import { currentDevice } from "../device.js";
 import { signAndInstall, signingReady, getBring, deviceStatus, getServer } from "../signing-client.js";
-import { homeFeatured } from "./extras.js";
+import { homeFeatured, featuredRefs } from "./extras.js";
+import { browseList, browseListsFor, FRESH_DAYS } from "../core/catalog.js";
+import { dayOf, dayTitle } from "../core/changes.js";
+import { isAltKey } from "../core/altstore.js";
 import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 import { refreshInBackground } from "./sources.js";
@@ -133,11 +137,11 @@ export function deviceHint(type, mode = "site") {
 // F41: whether Home offers Themes (the tile, Featured's Browse Themes). Not Jailbroken lists apps only (F37).
 export const showsThemes = (type) => type !== "none";
 
-// F46: what a route under browse/ shows: { page: "root" | "popular" | "category" | "package" (browse.js's own
-// pages, below a list), value }.
+// F46: what a route under browse/ shows: { page: "root" | "list" | "category" | "browse" (browse.js's own pages,
+// below a list), value }. F124: "list" is one of Browse's lists, by id (core/catalog.js BROWSE_LISTS).
 export function browsePage(path) {
   if (path.length === 1) return { page: "root" };
-  if (path.length === 2 && path[1] === "popular") return { page: "popular" };
+  if (path.length === 2 && browseList(path[1])) return { page: "list", value: path[1] };
   if (path.length === 2 && path[1].startsWith("category:")) return { page: "category", value: path[1].slice(9) };
   return { page: "browse" };
 }
@@ -146,7 +150,7 @@ export function nav(route, ctx) {
   if (route.path[0] === "browse") {
     const b = browsePage(route.path);
     if (b.page === "root") return { title: "Browse" };
-    if (b.page === "popular") return { title: "Popular", style: "plain" };
+    if (b.page === "list") return { title: browseList(b.value).title, style: "plain" };
     if (b.page === "category") return { title: b.value || "Browse", style: "plain" };
     return browse.nav(route);
   }
@@ -462,11 +466,12 @@ function renderRoot(body) {
   };
   drawApp();
 
-  // F46: Browse, full width under Featured and Themes.
-  // F79: Install IPAs beside it, where the build has the page.
+  // F46: Browse, under Featured and Themes. F124: a row of its own, full width and taller, with what it holds
+  // (user 2026-11-18: "browse should be bigger"); F79's Install IPAs, which sat beside it, gets its own row below.
   const ipas = ipasTile(settings.mode);
-  const browseRow = tileRow("halves", tile({ label: "Browse", href: format({ tab: "home", path: ["browse"] }), glyph: "browse" }),
-    ...(ipas ? [tile({ label: ipas.label, href: ipas.href, glyph: "install" })] : []));
+  const browseRow = tileRow("stack browse", tile({ label: "Browse", subtitle: BROWSE_SUBTITLE,
+    href: format({ tab: "home", path: ["browse"] }), glyph: "browse" }));
+  const ipasRow = ipas ? tileRow("halves", tile({ label: ipas.label, href: ipas.href, glyph: "install" })) : null;
 
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));
   state.tile = stateRow.querySelector("a");
@@ -491,6 +496,7 @@ function renderRoot(body) {
     ...(debRow ? [debRow] : []),
     ...lockedFeatured,
     browseRow,
+    ...(ipasRow ? [ipasRow] : []),
     stateRow,
   );
   body.append(home);
@@ -504,7 +510,7 @@ function renderRoot(body) {
   // Settings (F123: unlocked like Home, as its tab was).
   if (browsingLocked({ mode: settings.mode })) {
     const settingsGroup = groups[links.findIndex((g) => g.rows[0]?.label === "Settings")];
-    const locked = [...lockedFeatured, browseRow, stateRow, ...groups.filter((g) => g !== settingsGroup)];
+    const locked = [...lockedFeatured, browseRow, ...(ipasRow ? [ipasRow] : []), stateRow, ...groups.filter((g) => g !== settingsGroup)];
     for (const box of locked) box.classList.add("home-locked");
     home.addEventListener("click", async (e) => {
       if (!e.target.closest?.(".home-locked")) return;
@@ -636,8 +642,9 @@ function renderFeatured(body) {
 
 // ---- Browse (F46) ----------------------------------------------------------------------------------------
 
-// Browse's own page: Popular, then the merged categories (core/catalog.js mergeCategories) with their counts. The
-// catalog leaves Themes and Tweaks out while Settings > Device is Not Jailbroken.
+// Browse's own page: F124's lists (New, Recently Updated, Popular, Featured, Free Apps / Tweaks / Themes), then the
+// merged categories (core/catalog.js mergeCategories) with their counts. The catalog leaves Themes and Tweaks out
+// while Settings > Device is Not Jailbroken, and so do the lists (browseListsFor).
 async function renderBrowse(body) {
   const box = el("div");
   const spin = el("div", "loading");
@@ -652,25 +659,66 @@ async function renderBrowse(body) {
     box.replaceChildren(el("p", "empty", e.message));
     return;
   }
-  box.replaceChildren(grouped(browseGroups(cats)));
+  box.replaceChildren(grouped(browseGroups(cats, { jailbroken: showsThemes(settings.deviceType()) })));
 }
 
-// The groups of Browse's page for `cats` ([{ name, count }]).
-export function browseGroups(cats) {
-  const popular = { rows: [{ label: "Popular", href: format({ tab: "home", path: ["browse", "popular"] }) }],
-    footer: "Packages the most sources list, then the newest updates." };
-  if (!cats.length) return [popular, { footer: "Add a source to browse its packages." }];
-  return [popular, {
+// Home's Browse tile's second line.
+export const BROWSE_SUBTITLE = "New, Updated, Popular, Categories";
+
+// The groups of Browse's page for `cats` ([{ name, count }]): the lists (Free Tweaks and Themes only `jailbroken`),
+// then the categories.
+export function browseGroups(cats, { jailbroken = true } = {}) {
+  const lists = { rows: browseListsFor(jailbroken).map((l) => ({ label: l.title, href: format({ tab: "home", path: ["browse", l.id] }) })),
+    footer: `New and Recently Updated reach back ${FRESH_DAYS} days. Popular: what the most sources list.` };
+  if (!cats.length) return [lists, { footer: "Add a source to browse its packages." }];
+  return [lists, {
     header: "Categories",
     rows: cats.map((c) => ({ label: c.name, detail: String(c.count), href: format({ tab: "home", path: ["browse", `category:${c.name}`] }) })),
   }];
 }
 
+// F124: New and Recently Updated under a header per day, newest first (the Changes tab's day titles).
+export function dayHeaders(rows, now = Date.now()) {
+  const out = [];
+  let day = null;
+  for (const r of rows) {
+    const d = dayOf(r.seen);
+    if (d !== day) { day = d; out.push({ header: dayTitle(d, now) }); }
+    out.push(r);
+  }
+  return out;
+}
+
+// F124, Featured: the sources' banners (sileo-featured.json), then the AltStore sources' featured apps.
+async function featuredRows() {
+  const [refs, sources] = await Promise.all([featuredRefs().catch(() => []), getBackend().sources().catch(() => [])]);
+  const alts = await Promise.all(sources.filter((s) => isAltKey(s.key)).map((s) => catalog.altSource(s.key).catch(() => null)));
+  const appRefs = alts.flatMap((a) => (a?.featured ?? []).map((r) => ({ key: r.key, id: r.id })));
+  return catalog.featured([...refs, ...appRefs]);
+}
+
+// Each list's rows and how it reads (browse.js renderSearchableList).
+const LIST_VIEW = {
+  new: { rows: () => catalog.fresh("new"), headers: dayHeaders,
+    empty: `Nothing new in the last ${FRESH_DAYS} days. Packages your sources add show up here after a refresh.` },
+  updated: { rows: () => catalog.fresh("updated"), headers: dayHeaders,
+    empty: `No updates in the last ${FRESH_DAYS} days. New versions show up here after a refresh.` },
+  popular: { rows: () => catalog.popular() },
+  featured: { rows: featuredRows, empty: "None of your sources features packages." },
+  "free-apps": { rows: () => catalog.free("apps"), letters: true },
+  "free-tweaks": { rows: () => catalog.free("tweaks"), letters: true },
+  "free-themes": { rows: () => catalog.free("themes"), letters: true },
+};
+
 function renderBrowseRoute(body, route, ctx) {
   const b = browsePage(route.path);
   if (b.page === "root") return renderBrowse(body);
-  if (b.page === "popular") return browse.renderList(body, route, () => catalog.popular(), false);
-  if (b.page === "category") return browse.renderList(body, route, () => catalog.browse(b.value), true);
+  if (b.page === "list") {
+    const v = LIST_VIEW[b.value];
+    return browse.renderSearchableList(body, route, v.rows, { letters: Boolean(v.letters), headers: v.headers ?? null,
+      empty: v.empty, label: `Search ${browseList(b.value).title}` });
+  }
+  if (b.page === "category") return browse.renderSearchableList(body, route, () => catalog.browse(b.value), { letters: true, label: `Search ${b.value}` });
   return browse.render(body, route, ctx);
 }
 

@@ -424,3 +424,4 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
    as UISearchBar does over an indexed table on iOS 6. */
 .page-body[data-section-index] > .installed-search, .page-body[data-section-index] > .installed-scope { padding-right: 24px; }
 .page-body[data-section-index] > .installed-top { margin-right: 24px; }
+.page-body[data-section-index] > .list-search { padding-right: 24px; } /* F124: Browse's list search ends before the A–Z index */

@@ -1,0 +1,88 @@
+/* F151: the install progress page (nav/progress.js), Cydia's Running/Complete screen cleaner and more like a terminal.
+   The black page and black nav bar are queue.css's .console. Step lines (apt's status fd) in bold Helvetica Neue,
+   apt's/dpkg's/the scripts' own output in monospace grey (#a9a9a9, Cydia's), errors red with a red x badge, warnings
+   yellow with a warning badge. The bottom button is the 4S's UIAlertSheetBlackButton over black, sampled
+   (ref/4s/artwork/Shared@2x): #f1f1f1 top edge, #e3e3e3 -> #bdbdbd to the middle, a hard step to flat #a5a5a5, a
+   #d3d3d3 bottom edge, a 2.5px black ring and a rgba(211,211,211,.19) line under it; pressed is
+   UIAlertSheetBlackButtonPressed: #c7cde9 edge, #818fce -> #253eaa, then #001d9d -> #1354cd, #2c68d4 edge. */
+
+.progress-body { display: flex; flex-direction: column; padding-bottom: 0; }
+.progress-scroll {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: calc(var(--nav-h) + 14px) max(12px, env(safe-area-inset-right)) 14px max(12px, env(safe-area-inset-left));
+}
+.progress-out { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; cursor: text; }
+
+/* ---- lines ---- */
+.pl { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pl-raw { font: 11px/15px ui-monospace, "SF Mono", Menlo, monospace; color: #a9a9a9; }
+.pl-step {
+  margin-top: 7px; font: bold 13px/17px "Helvetica Neue", Helvetica, sans-serif; color: #fff;
+}
+.pl-step:first-child { margin-top: 0; }
+.pl-raw + .pl-step { margin-top: 9px; }
+.pl-error, .pl-warning {
+  position: relative; margin: 5px 0; padding-left: 19px;
+  font: bold 12px/16px "Helvetica Neue", Helvetica, sans-serif;
+}
+.pl-error { color: #ff453a; }
+.pl-warning { color: #ffd60a; }
+.pl-error::before, .pl-warning::before {
+  content: ""; position: absolute; left: 0; top: 2px; width: 13px; height: 13px; background: no-repeat center / 13px 13px;
+}
+/* the critical badge: a red disc with a white x */
+.pl-error::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12.5' fill='%23e0251b'/%3E%3Cpath d='M8.5 8.5l9 9M17.5 8.5l-9 9' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+/* the warning badge: a yellow triangle with a black ! */
+.pl-warning::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M13 1.5L25 24H1z' fill='%23ffcc00' stroke='%23ffcc00' stroke-linejoin='round' stroke-width='2'/%3E%3Cpath d='M13 9v7' stroke='%23000' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='13' cy='20.2' r='1.7'/%3E%3C/svg%3E");
+}
+
+/* a terminal's block cursor under the last line while it runs (opacity only) */
+.progress-cursor {
+  display: block; width: 7px; height: 13px; margin-top: 3px; background: #a9a9a9;
+  animation: progress-blink 1s steps(1, end) infinite;
+}
+.progress-cursor[hidden] { display: none; }
+@keyframes progress-blink { 50% { opacity: 0; } }
+
+/* back to the newest line, while the user reads further up */
+.progress-jump {
+  position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: calc(98px + env(safe-area-inset-bottom));
+  padding: 4px 11px; border: 0; border-radius: 12px; cursor: pointer; touch-action: manipulation;
+  font: bold 12px/16px "Helvetica Neue", Helvetica, sans-serif; color: #000; background: rgba(229,229,229,.92);
+}
+.progress-jump[hidden] { display: none; }
+
+/* ---- the bottom: status and bar while it runs, the finish button once it has ended ---- */
+.progress-foot {
+  flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px max(21px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(21px, env(safe-area-inset-left));
+  background: #000;
+}
+.progress-status {
+  min-height: 16px; max-width: 100%; color: #fff; font: bold 12px/16px "Helvetica Neue", Helvetica, sans-serif;
+  text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Cydia's bar: 158px, a 1px white border, 6px radius, a 4px #eee fill */
+.progress-track { width: 158px; height: 12px; padding: 3px; border: 1px solid #fff; border-radius: 6px; box-sizing: border-box; }
+.progress-track[hidden] { display: none; }
+.progress-fill { height: 4px; width: 100%; border-radius: 2px; background: #eee; transform-origin: left; transform: scaleX(0); transition: transform .2s linear; }
+
+.progress-finish {
+  width: 100%; max-width: 360px; height: 44px; margin: 2px 0 0; padding: 0 12px; border: 0; border-radius: 10px;
+  cursor: pointer; touch-action: manipulation;
+  font: bold 20px/44px "Helvetica Neue", Helvetica, sans-serif; color: #000; text-shadow: 0 1px 0 rgba(255,255,255,.45);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 0 0 2.5px #000, 0 3.5px 0 0 rgba(211,211,211,.19);
+  background: linear-gradient(#f1f1f1, #f1f1f1 .5px, #e3e3e3 .5px, #dfdfdf 8%, #d7d7d7 18%, #cbcbcb 31%, #c0c0c0 44%,
+    #bdbdbd 50%, #a5a5a5 50%, #a5a5a5 calc(100% - .5px), #d3d3d3 calc(100% - .5px));
+}
+.progress-finish:active, .progress-finish.is-pressed {
+  color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4);
+  background: linear-gradient(#c7cde9, #c7cde9 .5px, #818fce .5px, #7a8acb 8%, #6577c3 18%, #485db8 31%, #2b45ae 44%,
+    #253eaa 50%, #001d9d 50%, #04229e 56%, #1330a7 69%, #1940b4 82%, #1354cd calc(100% - .5px), #2c68d4 calc(100% - .5px));
+}
+.progress-finish[hidden] { display: none; }
+.progress-finish:disabled { opacity: .6; }

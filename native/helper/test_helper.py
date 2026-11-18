@@ -330,6 +330,7 @@ class Helper(unittest.TestCase):
             ("simulate", "ab/stable"): "bad package name",
             ("respring", "now"): "takes no arguments",
             ("userspace-reboot", "now"): "takes no arguments",
+            ("uicache", "-a"): "takes no arguments",
             ("apply", *[f"p{i:03d}" for i in range(257)]): "too many",
         }
         for words, msg in cases.items():
@@ -353,6 +354,11 @@ class Helper(unittest.TestCase):
         p = tempfile.mkdtemp(dir=self.tmp)
         self.assertEqual(self.run_driver("plan", p, "3", "userspace-reboot"),
                          [f"{p}/usr/bin/launchctl", "launchctl", "reboot", "userspace"])
+
+    def test_uicache_plan(self):
+        # F151: the console's Reload Data: uicache -a from the prefix, fixed words.
+        p = tempfile.mkdtemp(dir=self.tmp)
+        self.assertEqual(self.run_driver("plan", p, "3", "uicache"), [f"{p}/usr/bin/uicache", "uicache", "-a"])
 
     # --- F61: selfupdate <path.deb>, dpkg -i of Cydian's own update
 

@@ -31,6 +31,13 @@ WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for i
   3. *Uploading*: the signed IPA to `POST /sign/upload` in 20 MB parts (KV holds 25 MB a value), kept 10 minutes
      (`TTL`), served at `/sign/up/<token>/manifest.plist` and `app.ipa` (Range too).
   4. iOS's install prompt (`itms-services`), with a banner saying to press Install.
+  F121: when the bundle ID it will be signed as is known at the tap (an explicit profile, or a wildcard one for
+  Cydian's own IPA or a caller's `bundleId`; `expectedBundleId`, from the profile kept in memory, `identityNow`),
+  step 4 comes first, inside the tap: the website makes its own token, opens
+  `/sign/up/<token>/manifest.plist?bundleid=&version=&title=` (the Worker answers it from the query), reserves the
+  token (`POST /sign/upload?token=`, no size), then signs and uploads into it (`&token=&size=`). The Worker holds
+  iOS's `app.ipa` up to 2 minutes: headers once the upload has started, the body once it's done. A different bundle
+  ID out of zsign, a failed reservation, or more than 110 s fall back to the Ready to Install alert.
   Download IPA is its own row. F92 removed the hand-offs that followed Install (Open in Cydian, Get in AltStore /
   SideStore / Feather); the nav bar's Share (F76) still offers the source to those sideloaders. The app still opens a
   `cydian://install?url=<ipa>&name=…` link (`incoming.js`: Install IPAs, "Install IPA", then `signAndInstall`) for

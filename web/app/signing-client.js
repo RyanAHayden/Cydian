@@ -19,7 +19,7 @@
 import { showBanner } from "./nav/banner.js";
 import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError } from "./core/signing.js";
 import { format } from "./router.js";
-import { IPA_MAX } from "./core/websign.js";
+import { IPA_MAX, CYDIAN_ID, profileInfo, targetBundleId } from "./core/websign.js";
 import { detectMode } from "./core/settings.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
@@ -30,6 +30,10 @@ const SERVER_KEY = "cydian.signingServer";
 // .p12 itself never goes to the web view's storage). F93: the website keeps them in IndexedDB (this browser only:
 // they never leave it but inside Cydian's own IPA with Bring My Certificate), as it did before F89.
 let staged = null;
+// F121: the website's identity as last read from or written to IndexedDB, for Install's tap to use without waiting
+// (identityNow); warmed when this module loads on the website.
+let known = null;
+export const identityNow = () => known;
 const DB = "cydian-signing", STORE = "identity", KEY = "current", BRING_KEY = "cydian.bringCertificate";
 
 function openDb() {
@@ -56,7 +60,7 @@ async function tx(mode, fn) {
 }
 
 export async function loadIdentity() {
-  if (browserSigning()) { try { return (await tx("readonly", (st) => st.get(KEY))) ?? null; } catch { return null; } }
+  if (browserSigning()) { try { return (known = (await tx("readonly", (st) => st.get(KEY))) ?? null); } catch { return null; } }
   return staged ? { ...staged } : null;
 }
 
@@ -64,6 +68,7 @@ export async function saveIdentity(patch) {
   if (browserSigning()) {
     const next = { ...((await loadIdentity()) ?? {}), ...patch, savedAt: Date.now() };
     await tx("readwrite", (st) => st.put(next, KEY));
+    known = next;
     return next;
   }
   staged = { ...(staged ?? {}), ...patch, savedAt: Date.now() };
@@ -71,13 +76,14 @@ export async function saveIdentity(patch) {
 }
 
 export async function clearIdentity() {
-  if (browserSigning()) { await tx("readwrite", (st) => st.delete(KEY)); return; }
+  if (browserSigning()) { known = null; await tx("readwrite", (st) => st.delete(KEY)); return; }
   staged = null;
 }
 
 export async function signingReady({ native, wait = sleep } = {}) {
   if (browserSigning()) {
-    const id = await loadIdentity();
+    // F121: from memory when it's there, so Install Cydian App's tap reaches iOS's prompt without a wait in between
+    const id = known ?? (await loadIdentity());
     return Boolean(id?.p12 && id?.profile && id.passwordOk !== false);
   }
   if (!localSigning()) return false;
@@ -128,8 +134,8 @@ export const isSelfIpa = (url) => /^https:\/\/github\.com\/RyanAHayden\/Cydian\/
 // Signs `url` (an IPA) on the phone and installs it. Resolves true once iOS was asked to install; false after an
 // error, which it shows in an alert; false in the jailbreak app (its pages use the helper, so this is only a guard).
 // F93: on the website, signs it in the browser (signInBrowser); `bring` (Install Cydian App) carries the certificate.
-export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false }) {
-  if (browserSigning()) return signInBrowser({ url, name, onInstalled, bring });
+export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "" }) {
+  if (browserSigning()) return signInBrowser({ url, name, onInstalled, bring, bundleId, version });
   if (!localSigning()) {
     await showAlert({ title: "Can't Install Here", message: "Apps are signed in the Cydian app. Open this one in Cydian, AltStore, SideStore or Feather.", buttons: ["OK"] });
     return false;
@@ -327,7 +333,9 @@ export async function installFromLibrary({ file, name = "", onInstalled = () => 
 //       HUD "Downloading" (the IPA through the Worker's /api/fetch?kind=ipa: most hosts send no CORS headers),
 //       "Signing" (signing-worker.js: zsign as WebAssembly, with the certificate from IndexedDB), "Uploading" (the
 //       signed IPA to the Worker's /sign/upload, in parts, kept 10 minutes), then a Ready to Install alert whose
-//       Install tap opens iOS's install prompt (itms-services, from the tap). true once iOS was asked; false after an error, shown in an alert (zsign's own reason when
+//       Install tap opens iOS's install prompt (itms-services, from the tap). F121: when the bundle ID is known at the
+//       tap (expectedBundleId; `bundleId` is the app's own ID where the caller knows it), iOS's prompt opens at once
+//       instead, for a link the upload fills later, and there's no alert. true once iOS was asked; false after an error, shown in an alert (zsign's own reason when
 //       it can't sign the app). bring: Cydian's own IPA carries the certificate (cydian-identity.plist), and always
 //       the website's sources and settings (web/transfer.link): the app imports both on its first launch.
 //
@@ -398,8 +406,10 @@ export async function downloadIpa(url, { base = "", fetcher = globalThis.fetch, 
 }
 
 // The signed IPA to the Worker (POST /sign/upload, each part, done): the install link's answer { itms, ... }.
-export async function uploadSigned(bytes, { bundleId, name, version }, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, wait = undefined } = {}) {
-  const q = new URLSearchParams({ bundleid: bundleId, version: String(version || "1.0").slice(0, 64), title: String(name || bundleId).slice(0, 200), size: String(bytes.length) });
+// F121: `token` uploads into the reserved early link instead of a new one.
+export async function uploadSigned(bytes, { bundleId, name, version }, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, wait = undefined, token = null } = {}) {
+  const q = new URLSearchParams({ bundleid: bundleId, version: String(version || "1.0").slice(0, 64), title: String(name || bundleId).slice(0, 200), size: String(bytes.length),
+    ...(token ? { token } : {}) });
   const call = async (path, init) => {
     let res;
     try { res = await retrying(() => fetcher(`${base}${path}`, { cache: "no-store", ...init }), { wait }); } catch {
@@ -416,11 +426,67 @@ export async function uploadSigned(bytes, { bundleId, name, version }, { base = 
   return call(`/sign/upload/${up.token}/done`, { method: "POST" });
 }
 
+// ---- F121: Install opens iOS's install prompt inside its own tap, before signing ----------------------------------
+//
+// Safari opens an itms-services link only inside the user's tap, and signing outlasts it: so the link opens first,
+// for a token the website makes itself (/sign/up/<token>/manifest.plist), and the Worker holds iOS's requests until
+// the upload is there (app.ipa, up to 2 minutes; the manifest answers from its URL's query, the reservation just
+// binds the token to the app). That needs the
+// bundle ID the app will be signed as before it's downloaded: an explicit profile's, or a wildcard profile's for an
+// app whose own ID is known (Cydian's, or the caller's bundleId). Otherwise, and whenever the early link can't be
+// used (another bundle ID came out, the reservation failed, it took too long), the Ready to Install alert as before.
+
+export const EARLY_WINDOW = 110 * 1000; // under the Worker's 2-minute app.ipa wait (worker/src/index.js IPA_WAIT)
+
+// The bundle ID `id`'s profile signs this app as, when it's known before signing; else null.
+export function expectedBundleId(id, { url = "", bundleId = null } = {}) {
+  if (!id?.p12 || !id?.profile) return null;
+  try {
+    const { appId } = profileInfo(id.profile instanceof Uint8Array ? id.profile : new Uint8Array(id.profile));
+    if (!appId) return null;
+    if (!appId.includes("*")) return appId;
+    const own = bundleId || (isSelfIpa(url) ? CYDIAN_ID : null);
+    return own ? targetBundleId(appId, own) : null;
+  } catch { return null; }
+}
+
+const hexToken = () => [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("");
+const itmsFor = (manifest) => "itms-services://?action=download-manifest&url=" + encodeURIComponent(manifest);
+
+// The early link: { token, itms, manifest } (nothing sent yet). The manifest's URL carries the app (bundle ID,
+// version, title), so the Worker answers iOS at once, before the reservation lands.
+export function earlyLink(origin, { bundleId, name = "", version = "" }) {
+  const q = new URLSearchParams({ bundleid: bundleId, version: String(version || "1.0").slice(0, 64), title: String(name || bundleId).slice(0, 200) });
+  const token = hexToken(), manifest = `${origin}/sign/up/${token}/manifest.plist?${q}`;
+  return { token, manifest, itms: itmsFor(manifest) };
+}
+
+// POST /sign/upload?token= without a size: the Worker's manifest answers from then on. true once reserved.
+export async function reserveUpload(token, { bundleId, name, version }, { base = "", fetcher = globalThis.fetch, wait = undefined } = {}) {
+  const q = new URLSearchParams({ bundleid: bundleId, version: String(version || "1.0").slice(0, 64), title: String(name || bundleId).slice(0, 200), token });
+  try {
+    const res = await retrying(() => fetcher(`${base}/sign/upload?${q}`, { method: "POST", cache: "no-store" }), { wait });
+    return res.ok;
+  } catch { return false; }
+}
+
 const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof ArrayBuffer ? b.slice(0) : new Uint8Array(b ?? []).buffer);
 
-export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false },
+export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "" },
   { hud = liveHUD, alert = showAlert, open = (u) => { location.href = u; }, go = openRoute,
-    identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "" } = {}) {
+    identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "",
+    now = identityNow, origin = () => new URL(base || "/", globalThis.location?.href).origin, clock = Date.now } = {}) {
+  // F121: before anything waits, while Safari still counts this as the user's tap: iOS's install prompt, for a link
+  // whose app comes later. Only when the bundle ID it will be signed as is known now (expectedBundleId).
+  const expected = expectedBundleId(now(), { url, bundleId });
+  let early = null;
+  if (expected) {
+    try {
+      early = { ...earlyLink(origin(), { bundleId: expected, name, version }), bundleId: expected, at: clock() };
+      open(early.itms);
+    } catch { early = null; }
+  }
+  const reserved = early ? reserveUpload(early.token, { bundleId: expected, name: name || expected, version }, { base, fetcher }) : null;
   const id = await identity();
   if (!id?.p12 || !id?.profile) {
     await alert({ title: "No Certificate", message: "Add your certificate, its password and provisioning profile in Settings > Signing.", buttons: ["OK"] });
@@ -438,12 +504,20 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
       { onProgress: (t) => h.set(t) });
     h.set("Uploading");
     const ipaBytes = signed.ipa instanceof Uint8Array ? signed.ipa : new Uint8Array(signed.ipa);
-    const body = await uploadSigned(ipaBytes, signed, { base, fetcher, onProgress: pct("Uploading") });
-    h.hide();
+    // the early link takes this app only if it came out with the reserved bundle ID (iOS already has its manifest)
+    const intoEarly = early && signed.bundleId === early.bundleId && (await reserved);
+    const body = await uploadSigned(ipaBytes, signed, { base, fetcher, onProgress: pct("Uploading"), token: intoEarly ? early.token : null });
     onInstalled({ ...body, bundleId: signed.bundleId, name: signed.name, version: signed.version });
+    const app = name || signed.name || "The app";
+    if (intoEarly && clock() - early.at < EARLY_WINDOW) {
+      // iOS's prompt was asked for at the tap and its download now gets the app: nothing more to tap here
+      if (h.done) h.done("Installing"); else h.hide();
+      return true;
+    }
+    h.hide();
     // The install link opens from the alert's Install tap (onTap runs inside the click): opened by script long after
     // the first tap, Safari asked "Open this page in iTunes?" first, or refused it as an invalid address.
-    const app = name || signed.name || "The app";
+    // F121: also the fallback when the early link couldn't be used, or iOS may have given up waiting for it.
     const { index } = await alert({ title: "Ready to Install", message: `${app} is signed. Tap Install, then Install again when iOS asks.`,
       buttons: ["Cancel", "Install"], cancel: 0, onTap: (i) => { if (i === 1) open(body.itms); } });
     return index === 1;
@@ -459,3 +533,6 @@ async function websiteTransfer() {
   const [{ websitePayload }, { encodeLink }] = await Promise.all([import("./screens/importlink.js"), import("./core/transfer.js")]);
   return encodeLink(await websitePayload({ identity: false })); // the certificate goes as cydian-identity.plist (bring)
 }
+
+// F121: Install's tap needs the profile at once (identityNow), so the website reads it as soon as this module loads.
+if (browserSigning() && globalThis.indexedDB) loadIdentity().catch(() => {});

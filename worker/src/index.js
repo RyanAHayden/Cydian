@@ -16,6 +16,11 @@
 //                                           holds 25 MB a value, a Worker request ~100 MB), POST /sign/upload/<token>/done
 //                                           -> {itms, ...}; GET /sign/up/<token>/manifest.plist and app.ipa (HEAD,
 //                                           Range) for TTL seconds, like /sign/host
+//                                           F121: &token=<48 hex> without size reserves the website's own token, whose
+//                                           link it opened inside the Install tap: manifest.plist answers at once from
+//                                           its own query (bundleid, version, title), else once the reservation lands
+//                                           (up to 15 s); app.ipa holds up to 2 minutes: headers once the upload has
+//                                           started, the body once it's done. The same POST with token and size starts it
 //   GET/PUT/DELETE /api/account/<id>       F97: Cydian Account's encrypted blob (src/account.js)
 //   GET  /api/fetch?url=&kind=ipa           F93: an IPA for the website's signer, streamed, up to MAX_UPLOAD_MB
 //
@@ -180,10 +185,20 @@ async function uploads(req, u, env, ttl) {
     if (!max) return fail("not_allowed", "This server doesn't take apps signed on the website.", 403);
     const app = appOf(u.searchParams), size = Number(u.searchParams.get("size"));
     if (!app) return fail("bad_request", "Send bundleid, version and title in the query.");
+    // F121: the website may name its own token (opened as an install link inside the Install tap, before it signs) and
+    // reserve it without a size (the signed size isn't known yet); the same POST with the size starts the upload.
+    const own = u.searchParams.get("token");
+    if (own !== null && !TOKEN.test(own)) return fail("bad_request", "A token is 48 hex digits.");
+    const before = own ? await metaOf(env, own) : null;
+    if (before && (!before.reserved || before.parts || before.bundleId !== app.bundleId)) return fail("bad_request", "That token is taken.", 409);
+    if (!u.searchParams.has("size") && own) {
+      if (!before) await env.HOSTED.put(upKey(own), "", { expirationTtl: ttl, metadata: { ...app, reserved: true, done: false } });
+      return json({ token: own, reserved: true, expiresIn: ttl });
+    }
     if (!Number.isSafeInteger(size) || size < 4) return fail("bad_request", "Send the IPA's size in bytes (size=).");
     if (size > max) return fail("too_large", tooBig(max), 413);
-    const t = token(), parts = Math.ceil(size / PART);
-    await env.HOSTED.put(upKey(t), "", { expirationTtl: ttl, metadata: { ...app, size, parts, partSize: PART, done: false } });
+    const t = own ?? token(), parts = Math.ceil(size / PART);
+    await env.HOSTED.put(upKey(t), "", { expirationTtl: ttl, metadata: { ...app, ...(own ? { reserved: true } : {}), size, parts, partSize: PART, done: false } });
     return json({ token: t, partSize: PART, parts, expiresIn: ttl });
   }
   const p = /^\/sign\/upload\/([0-9a-f]{48})\/(\d{1,4}|done)$/.exec(u.pathname);
@@ -191,6 +206,7 @@ async function uploads(req, u, env, ttl) {
     const meta = await metaOf(env, p[1]);
     if (!meta) return fail("gone", "That upload has expired. Install again.", 404);
     if (meta.done) return fail("bad_request", "That upload is finished.", 409);
+    if (!meta.parts) return fail("bad_request", "Send the size first (POST /sign/upload with token and size).", 409);
     if (p[2] === "done") {
       for (let i = 0; i < meta.parts; i++) {
         const got = await metaOf(env, p[1], i);
@@ -212,9 +228,26 @@ async function uploads(req, u, env, ttl) {
   }
   const h = /^\/sign\/up\/([0-9a-f]{48})\/(manifest\.plist|app\.ipa)$/.exec(u.pathname);
   if (h && (req.method === "GET" || req.method === "HEAD")) {
-    const meta = await metaOf(env, h[1]);
-    if (!meta?.done) return fail("gone", "That install link has expired.", 404);
-    if (h[2] === "manifest.plist") return plist(manifest({ url: `${u.origin}/sign/up/${h[1]}/app.ipa`, ...meta }));
+    // F121: a reserved link is opened before its upload. Its manifest answers at once from the link's own query (the
+    // website knows the bundle ID it will sign as), else from the reservation, waited for (the website sends it just
+    // after opening the link); app.ipa answers its headers once the upload has started (its size known), and its body
+    // once it's done (bodyWait). A plain upload's link is only made once it's done, so nothing there waits.
+    const started = (m) => !m || m.done || !m.reserved || (m.parts && !req.headers.get("Range"));
+    const t0 = Date.now();
+    let meta;
+    if (h[2] === "manifest.plist") {
+      meta = await metaOf(env, h[1]);
+      const asked = appOf(u.searchParams);
+      if (!meta && asked) return plist(manifest({ url: `${u.origin}/sign/up/${h[1]}/app.ipa`, ...asked }));
+      if (!meta) meta = await waitFor(() => metaOf(env, h[1]), (m) => Boolean(m), MANIFEST_WAIT, env);
+      if (!meta?.done && !meta?.reserved) return fail("gone", "That install link has expired.", 404);
+      return plist(manifest({ url: `${u.origin}/sign/up/${h[1]}/app.ipa`, ...meta }));
+    }
+    meta = await waitFor(() => metaOf(env, h[1]), started, IPA_WAIT, env);
+    if (!meta?.done && !(meta?.reserved && meta.parts && !req.headers.get("Range"))) {
+      return fail("gone", meta ? "The app wasn't uploaded in time. Install again." : "That install link has expired.", 404);
+    }
+    let bodyWait = meta.done ? null : () => waitFor(() => metaOf(env, h[1]), (m) => !m || m.done, Math.max(0, IPA_WAIT - (Date.now() - t0)), env);
     const n = meta.size;
     let start = 0, end = n - 1, status = 200;
     const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get("Range") ?? "");
@@ -231,6 +264,11 @@ async function uploads(req, u, env, ttl) {
     const last = Math.floor(end / meta.partSize);
     const body = new ReadableStream({
       async pull(c) {
+        if (bodyWait) {
+          const m = await bodyWait();
+          bodyWait = null;
+          if (!m?.done) { c.error(new Error("not uploaded in time")); return; }
+        }
         if (i > last) { c.close(); return; }
         const data = await env.HOSTED.get(partKey(h[1], i), { type: "arrayBuffer" });
         if (!data) { c.error(new Error("expired")); return; }
@@ -247,6 +285,20 @@ async function uploads(req, u, env, ttl) {
     return new Response(body, { status, headers });
   }
   return null;
+}
+
+// F121: how long a reserved link's requests wait (ms), and how often they look again. iOS asks for the manifest the
+// moment the link opens, before the website's reservation lands; app.ipa after Install in iOS's prompt, while the
+// website still signs and uploads. env.WAIT_SCALE (tests) shrinks the waits.
+export const MANIFEST_WAIT = 15000, IPA_WAIT = 120000, POLL = 1500;
+const TOKEN = /^[0-9a-f]{48}$/;
+export async function waitFor(read, ok, ms, env = {}, sleep = (t) => new Promise((r) => setTimeout(r, t))) {
+  const scale = Number(env.WAIT_SCALE ?? 1) || 0, end = Date.now() + ms * scale;
+  for (;;) {
+    const v = await read();
+    if (ok(v) || Date.now() + POLL * scale > end) return v;
+    await sleep(POLL * scale);
+  }
 }
 
 async function metaOf(env, t, part = null) {

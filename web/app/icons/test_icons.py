@@ -13,12 +13,18 @@ SIZES = {
     HERE / "icon-180.png": 180,
     HERE / "icon-192.png": 192,
     HERE / "icon-512.png": 512,
+    HERE / "icon-web-180.png": 180,
+    HERE / "icon-web-192.png": 192,
+    HERE / "icon-web-512.png": 512,
+    HERE / "icon-web-1024.png": 1024,
     HERE / "icon-glossy-76.png": 76,
     HERE / "icon-glossy-152.png": 152,
     HERE / "icon-glossy-228.png": 228,
     ROOT / "native/icon/AppIcon60x60.png": 60,
     ROOT / "native/icon/AppIcon60x60@2x.png": 120,
     ROOT / "native/icon/AppIcon60x60@3x.png": 180,
+    ROOT / "native/icon/AppIconLite60x60@2x.png": 120,
+    ROOT / "native/icon/AppIconLite60x60@3x.png": 180,
 }
 
 
@@ -57,12 +63,18 @@ class Icons(unittest.TestCase):
         app = HERE.parent
         manifest = json.loads((app / "manifest.json").read_text())
         srcs = [i["src"].split("?")[0] for i in manifest["icons"]]  # ?v=N makes iOS fetch a changed icon afresh
-        self.assertIn("icons/icon-192.png", srcs)
-        self.assertIn("icons/icon-512.png", srcs)
+        self.assertIn("icons/icon-web-192.png", srcs)  # the website's home-screen icon has the WEB sash
+        self.assertIn("icons/icon-web-512.png", srcs)
         for s in srcs:
             self.assertTrue((app / s).is_file(), s)
-        self.assertIn('href="icons/icon-180.png?v=', (app / "index.html").read_text())
+        self.assertIn('href="icons/icon-web-180.png?v=', (app / "index.html").read_text())
         self.assertIn('"icons/icon-glossy-76.png"', (app / "screens/home.js").read_text())  # Home header: 1x/2x/3x PNGs
+
+    def test_ipa_takes_the_lite_icon(self):
+        # The sideload IPA has the LITE sash; the .deb keeps the plain icon (native/build.sh bundle()).
+        build = (ROOT / "native/build.sh").read_text()
+        self.assertIn("icon=AppIconLite60x60", build)
+        self.assertIn("icon=AppIcon60x60;", build)
 
 
 if __name__ == "__main__":

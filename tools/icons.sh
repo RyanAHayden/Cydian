@@ -7,7 +7,11 @@
 #                                       iOS 6's rounded corners and gloss baked in
 #   web/app/icons/icon-{180,192,512}.png  apple-touch-icon (180) and the web manifest (192, 512), flat
 #   web/app/icons/icon-glossy-{76,152,228}.png  the glossy variant at the Home header's 76pt, 1x/2x/3x
-#   native/icon/AppIcon60x60{,@2x,@3x}.png  the native app's home-screen icon (60/120/180), flat
+#   native/icon/AppIcon60x60{,@2x,@3x}.png  the jailbreak app's home-screen icon (60/120/180), flat
+#   web/app/icons/icon-web-{180,192,512,1024}.png  the website's home-screen icon (apple-touch-icon, manifest): a
+#                                       blue WEB sash across the top-right corner, so it isn't taken for the app
+#   native/icon/AppIconLite60x60{@2x,@3x}.png  the sideload IPA's icon: a red LITE sash, as old trial apps had (the
+#                                       .deb keeps the plain one; native/build.sh picks)
 #
 # Needs rsvg-convert (librsvg). Run it after editing the master and commit what it writes.
 set -euo pipefail
@@ -55,6 +59,29 @@ python3 tools/launch_images.py "$dir/launch" >/dev/null
 # The Home header shows the glossy icon at 76pt: PNGs at 1x/2x/3x (Safari can draw an SVG <img> with an embedded
 # picture at low resolution, which looked blurry and smeared on the phone).
 for n in 76 152 228; do png "$dir/icon-glossy.svg" "$n" "$dir/icon-glossy-$n.png"; done
+# sashed <text> <top colour> <bottom colour>: the master with a ribbon across the top-right corner (SVG on stdout).
+sashed() {
+  echo '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">'
+  perl -0pe 's/<!--.*?-->\n?//gs; s/^.*?<svg[^>]*>\n//s; s/<\/svg>.*//s' "$master"
+  cat <<SVG
+  <defs><linearGradient id="sash" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="$2"/><stop offset="1" stop-color="$3"/></linearGradient></defs>
+  <g transform="translate(1024,0) rotate(45)">
+    <rect x="-520" y="200" width="1040" height="180" fill="url(#sash)"/>
+    <rect x="-520" y="200" width="1040" height="6" fill="#fff" fill-opacity=".35"/>
+    <rect x="-520" y="374" width="1040" height="6" fill="#000" fill-opacity=".25"/>
+    <text x="0" y="333" text-anchor="middle" font-family="Helvetica Neue" font-weight="bold" font-size="124" letter-spacing="6" fill="#fff">$1</text>
+  </g>
+</svg>
+SVG
+}
+web=$(mktemp --suffix=.svg) lite=$(mktemp --suffix=.svg)
+trap 'rm -f "$bg" "$web" "$lite"' EXIT
+sashed WEB '#5b95e5' '#1d58b8' > "$web"
+sashed LITE '#ef4b3f' '#b3170f' > "$lite"
+for n in 180 192 512 1024; do png "$web" "$n" "$dir/icon-web-$n.png"; done
+png "$lite" 120 native/icon/AppIconLite60x60@2x.png
+png "$lite" 180 native/icon/AppIconLite60x60@3x.png
+
 png "$master" 60 native/icon/AppIcon60x60.png
 png "$master" 120 native/icon/AppIcon60x60@2x.png
 png "$master" 180 native/icon/AppIcon60x60@3x.png

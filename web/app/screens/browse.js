@@ -37,6 +37,7 @@ import { addSource } from "./manage.js";
 import { featuredStrip, paymentGroup } from "./extras.js";
 import { installQueue } from "../queue.js";
 import { queuedFor, MODE_LABEL } from "../core/queue.js";
+import { hasRollback, rollbackSlot } from "./rollback.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -534,6 +535,8 @@ async function renderPackage(body, route, key, id, ctx) {
   }
   const installedEl = await installedGroup(st.package || id);
   if (installedEl) body.append(installedEl);
+  // F71: the copies N7's daemon kept, filled in when the helper answers (screens/rollback.js).
+  if (installedEl && hasRollback()) body.append(rollbackSlot(st.package || id, { installed: installedOf(history), name: pkg.row?.name }));
   if (depReport?.problems.length) body.append(depProblemsGroup(depReport, route, ctx));
   if (depRows.length) body.append(grouped([{ header: "Depends", rows: depRows }]));
   if (conflicts.length) body.append(grouped([{ header: "Conflicts", rows: conflicts }]));

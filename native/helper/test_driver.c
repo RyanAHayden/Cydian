@@ -8,6 +8,11 @@
  *   test_driver ipapath <dir> <path>...        F59: print "ok" or "bad" per path (helper_ipa_path_ok)
  *   test_driver plistid <file>                 F59: the Info.plist's CFBundleIdentifier, or "bad"
  *   test_driver appsync <prefix>               F59: "yes" or "no"
+ *   test_driver debname <id> <file>...         F71: the version in each stored .deb name, or "bad"
+ *   test_driver rbfile <dir> <id> <version> <root_uid>   F71: the stored .deb's path, or "error: ..."
+ *   test_driver rblist <dir> <id> <root_uid>   F71: helper_rollback_list's lines, then "count: <n>" (or "error: ...")
+ *   test_driver control <id> <version> <text>  F71: "ok" or "bad" (helper_control_matches; \n in text is a newline)
+ *   test_driver rbverify <prefix> <deb> <id> <version>   F71: "ok" or "error: ..." (runs <prefix>/usr/bin/dpkg-deb)
  *   test_driver spawn <helper> [args]...       spawn helper, print its streams as "1: ...", "2: ...", "3: ..."
  *                                              lines, then "exit: <code>"
  * SPDX-License-Identifier: GPL-3.0-or-later */
@@ -18,6 +23,7 @@
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -103,6 +109,29 @@ int main(int argc, char **argv) {
         printf("%s\n", helper_ipa_plist_id(buf, n, id, sizeof id) ? "bad" : id);
     } else if (!strcmp(cmd, "appsync") && argc == 3) {
         printf("%s\n", helper_ipa_appsync(argv[2]) ? "yes" : "no");
+    } else if (!strcmp(cmd, "debname") && argc >= 3) {
+        char ver[HELPER_VERSION_MAX + 1];
+        for (int i = 3; i < argc; i++) printf("%s\n", helper_deb_name_version(argv[i], argv[2], ver, sizeof ver) ? ver : "bad");
+    } else if (!strcmp(cmd, "rbfile") && argc == 6) {
+        char out[PATH_MAX];
+        if (helper_rollback_file(argv[2], argv[3], argv[4], (uid_t)atol(argv[5]), out, sizeof out, &err)) printf("error: %s\n", err);
+        else printf("%s\n", out);
+    } else if (!strcmp(cmd, "rblist") && argc == 5) {
+        static char out[1 << 16];
+        int n = helper_rollback_list(argv[2], argv[3], (uid_t)atol(argv[4]), out, sizeof out, &err);
+        if (n < 0) printf("error: %s\n", err);
+        else printf("%scount: %d\n", out, n);
+    } else if (!strcmp(cmd, "control") && argc == 5) {
+        static char text[1 << 16];
+        size_t j = 0;
+        for (const char *q = argv[4]; *q && j + 1 < sizeof text; q++) {
+            if (q[0] == '\\' && q[1] == 'n') { text[j++] = '\n'; q++; } else text[j++] = *q;
+        }
+        text[j] = 0;
+        printf("%s\n", helper_control_matches(text, argv[2], argv[3]) ? "ok" : "bad");
+    } else if (!strcmp(cmd, "rbverify") && argc == 6) {
+        if (helper_rollback_verify(argv[2], argv[3], argv[4], argv[5], &err)) printf("error: %s\n", err);
+        else printf("ok\n");
     } else if (!strcmp(cmd, "spawn") && argc >= 3) {
         return spawn(argc - 2, argv + 2);
     } else return 2;

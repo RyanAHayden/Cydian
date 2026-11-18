@@ -10,6 +10,7 @@
 #include <strings.h>
 #include <sys/file.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 int helper_name_ok(const char *s) {
@@ -259,6 +260,217 @@ static int selfupdate_plan(int argc, char *const argv[], const char *prefix, int
     return 0;
 }
 
+/* --- F71: Roll Back to a .deb N7's daemon kept */
+
+#ifndef CYDIAN_ROOT_UID
+#define CYDIAN_ROOT_UID 0
+#endif
+
+int helper_deb_name_version(const char *file, const char *id, char *ver, size_t size) {
+    size_t il = strlen(id), fl = strlen(file);
+    if (!il || fl < il + 8 || memcmp(file, id, il) || file[il] != '_' || strcmp(file + fl - 4, ".deb")) return 0;
+    const char *v = file + il + 1, *end = file + fl - 4, *us = NULL;
+    for (const char *q = v; q < end; q++)
+        if (*q == '_') { if (us) return 0; us = q; } /* exactly two "_": a version never has one */
+    if (!us || us == v || us + 1 == end) return 0;
+    for (const char *q = us + 1; q < end; q++)
+        if (!((*q >= 'a' && *q <= 'z') || (*q >= '0' && *q <= '9') || *q == '-')) return 0;
+    size_t at = 0;
+    for (const char *q = v; q < us; q++) {
+        char c = *q;
+        if (c == '%') {
+            if (us - q < 3 || q[1] != '3' || (q[2] != 'a' && q[2] != 'A')) return 0;
+            c = ':';
+            q += 2;
+        }
+        if (at + 1 >= size) return 0;
+        ver[at++] = c;
+    }
+    ver[at] = 0;
+    return helper_version_ok(ver);
+}
+
+/* A real directory (lstat: no link), owned by root_uid, not writable by group or others. */
+static int safe_dir(const char *path, uid_t root_uid) {
+    struct stat st;
+    return !lstat(path, &st) && S_ISDIR(st.st_mode) && st.st_uid == root_uid && !(st.st_mode & 022);
+}
+
+static int safe_deb(const char *path, uid_t root_uid) {
+    struct stat st;
+    return !lstat(path, &st) && S_ISREG(st.st_mode) && st.st_uid == root_uid && !(st.st_mode & 022) && st.st_nlink == 1;
+}
+
+/* Open <dir>/<id> after the checks; *missing says the folder simply isn't there (nothing stored). */
+static DIR *open_store(const char *dir, const char *id, uid_t root_uid, char *path, size_t size, int *missing,
+                       const char **err) {
+    struct stat st;
+    *missing = 0;
+    if (!helper_name_ok(id)) { *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return NULL; }
+    if ((size_t)snprintf(path, size, "%s/%s", dir, id) >= size) { *err = "prefix too long"; return NULL; }
+    if (lstat(dir, &st) && errno == ENOENT) { *missing = 1; return NULL; }
+    if (!safe_dir(dir, root_uid)) { *err = "the rollback folder isn't a root-owned directory only root can write"; return NULL; }
+    if (lstat(path, &st) && errno == ENOENT) { *missing = 1; return NULL; }
+    if (!safe_dir(path, root_uid)) { *err = "the package's rollback folder isn't a root-owned directory only root can write"; return NULL; }
+    DIR *d = opendir(path);
+    if (!d) *err = "can't read the rollback folder";
+    return d;
+}
+
+int helper_rollback_file(const char *dir, const char *id, const char *version, uid_t root_uid, char *out, size_t size,
+                         const char **err) {
+    char path[PATH_MAX], ver[HELPER_VERSION_MAX + 1], file[PATH_MAX];
+    int missing;
+    if (!helper_version_ok(version)) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-])"; return -1; }
+    DIR *d = open_store(dir, id, root_uid, path, sizeof path, &missing, err);
+    if (!d) {
+        if (missing) *err = "no stored .deb of that version (Roll Back keeps only what automatic updates replaced)";
+        return -1;
+    }
+    struct dirent *e;
+    int found = 0, unsafe = 0;
+    while (!found && (e = readdir(d))) {
+        if (!helper_deb_name_version(e->d_name, id, ver, sizeof ver) || strcmp(ver, version)) continue;
+        if ((size_t)snprintf(file, sizeof file, "%s/%s", path, e->d_name) >= sizeof file) continue;
+        if (!safe_deb(file, root_uid)) { unsafe = 1; continue; }
+        found = 1;
+    }
+    closedir(d);
+    if (!found) {
+        *err = unsafe ? "the stored .deb isn't a plain root-owned file only root can write"
+                      : "no stored .deb of that version (Roll Back keeps only what automatic updates replaced)";
+        return -1;
+    }
+    if ((size_t)snprintf(out, size, "%s", file) >= size) { *err = "path too long"; return -1; }
+    return 0;
+}
+
+int helper_rollback_list(const char *dir, const char *id, uid_t root_uid, char *out, size_t size, const char **err) {
+    char path[PATH_MAX], ver[HELPER_VERSION_MAX + 1], file[PATH_MAX];
+    int missing, n = 0;
+    size_t used = 0;
+    if (size) out[0] = 0;
+    DIR *d = open_store(dir, id, root_uid, path, sizeof path, &missing, err);
+    if (!d) return missing ? 0 : -1;
+    struct dirent *e;
+    while (n < HELPER_ROLLBACK_MAX && (e = readdir(d))) {
+        if (!helper_deb_name_version(e->d_name, id, ver, sizeof ver)) continue;
+        if ((size_t)snprintf(file, sizeof file, "%s/%s", path, e->d_name) >= sizeof file || !safe_deb(file, root_uid)) continue;
+        int w = snprintf(out + used, size - used, "%s %s\n", ver, e->d_name);
+        if (w < 0 || (size_t)w >= size - used) break;
+        used += (size_t)w;
+        n++;
+    }
+    closedir(d);
+    return n;
+}
+
+int helper_control_matches(const char *text, const char *id, const char *version) {
+    int pkg = 0, ver = 0;
+    const char *l = text;
+    while (*l) {
+        const char *e = strchr(l, '\n');
+        size_t len = e ? (size_t)(e - l) : strlen(l);
+        while (len && (l[len - 1] == '\r' || l[len - 1] == ' ' || l[len - 1] == '\t')) len--;
+        const char *want = NULL;
+        int *hit = NULL;
+        size_t skip = 0;
+        if (len > 8 && !strncmp(l, "Package:", 8)) { want = id; hit = &pkg; skip = 8; }
+        else if (len > 8 && !strncmp(l, "Version:", 8)) { want = version; hit = &ver; skip = 8; }
+        if (want) {
+            const char *v = l + skip;
+            size_t vl = len - skip;
+            while (vl && (*v == ' ' || *v == '\t')) { v++; vl--; }
+            if (*hit || strlen(want) != vl || memcmp(want, v, vl)) return 0; /* twice, or another value */
+            *hit = 1;
+        }
+        if (!e) break;
+        l = e + 1;
+    }
+    return pkg && ver;
+}
+
+int helper_rollback_verify(const char *prefix, const char *deb, const char *id, const char *version, const char **err) {
+    char tool[PATH_MAX], path_env[PATH_MAX + 16];
+    if ((size_t)snprintf(tool, sizeof tool, "%s/usr/bin/dpkg-deb", prefix) >= sizeof tool) { *err = "prefix too long"; return -1; }
+    snprintf(path_env, sizeof path_env, "PATH=%s/usr/bin:/usr/bin:/bin", prefix);
+    int fds[2];
+    if (pipe(fds)) { *err = "can't read the .deb's control (pipe)"; return -1; }
+    pid_t pid = fork();
+    if (pid < 0) { close(fds[0]); close(fds[1]); *err = "can't read the .deb's control (fork)"; return -1; }
+    if (pid == 0) {
+        int null = open("/dev/null", O_RDWR);
+        if (null < 0 || dup2(null, 0) < 0 || dup2(null, 2) < 0 || dup2(fds[1], 1) < 0) _exit(126);
+        char *const argv[] = {"dpkg-deb", "-f", (char *)deb, "Package", "Version", NULL};
+        char *const env[] = {path_env, "LANG=C", NULL};
+        execve(tool, argv, env);
+        _exit(126);
+    }
+    close(fds[1]);
+    char buf[8192];
+    size_t used = 0;
+    for (;;) {
+        ssize_t r = read(fds[0], buf + used, sizeof buf - 1 - used);
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) break;
+        used += (size_t)r;
+        if (used == sizeof buf - 1) break;
+    }
+    buf[used] = 0;
+    close(fds[0]);
+    int st;
+    while (waitpid(pid, &st, 0) < 0)
+        if (errno != EINTR) { *err = "can't read the .deb's control (wait)"; return -1; }
+    if (!WIFEXITED(st) || WEXITSTATUS(st)) { *err = "dpkg-deb couldn't read the stored .deb's control"; return -1; }
+    if (!helper_control_matches(buf, id, version)) { *err = "the stored .deb's control isn't that package and version"; return -1; }
+    return 0;
+}
+
+/* rollbacks <id> | rollback <id> <version>. rollbacks runs nothing (main.c prints helper_rollback_list); rollback
+ * plans apt-get install of the stored file, as apply does (downgrades allowed, Cydia's CYDIA fd kept). */
+static int rollback_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
+                         const char **err) {
+    static char status_apt[64], keep_fd[64];
+    int list = p->verb == HV_ROLLBACKS;
+    if (list ? argc != 2 : argc != 3) { *err = list ? "rollbacks takes a package name" : "rollback takes a package name and a version"; return -1; }
+    if (!helper_name_ok(argv[1])) { *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return -1; }
+    if (!list && !helper_version_ok(argv[2])) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-])"; return -1; }
+    char dir[PATH_MAX];
+    if ((size_t)snprintf(dir, sizeof dir, "%s%s", prefix, HELPER_ROLLBACK_DIR) >= sizeof dir) { *err = "prefix too long"; return -1; }
+    snprintf(p->name_buf[0], sizeof p->name_buf[0], "%s", argv[1]);
+    if (list) {
+        snprintf(p->path, sizeof p->path, "%s", dir);
+        p->argv[0] = argv[0];
+        p->argv[1] = p->name_buf[0];
+        p->argv[2] = NULL;
+        p->argc = 2;
+        return 0;
+    }
+    snprintf(p->item_buf[0], sizeof p->item_buf[0], "%s", argv[2]);
+    if (helper_rollback_file(dir, argv[1], argv[2], CYDIAN_ROOT_UID, p->deb, sizeof p->deb, err)) return -1;
+    if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/apt-get", prefix) >= sizeof p->path) {
+        *err = "prefix too long"; return -1;
+    }
+    int k = 0;
+    const char **a = p->argv;
+    a[k++] = "apt-get";
+    a[k++] = "-y";
+    a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confdef";
+    a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confold";
+    a[k++] = "--allow-downgrades";
+    if (status_fd >= 0) {
+        snprintf(keep_fd, sizeof keep_fd, "APT::Keep-Fds::=%d", status_fd);
+        snprintf(status_apt, sizeof status_apt, "APT::Status-Fd=%d", status_fd);
+        a[k++] = "-o"; a[k++] = keep_fd;
+        a[k++] = "-o"; a[k++] = status_apt;
+    }
+    a[k++] = "install";
+    a[k++] = p->deb; /* absolute: apt-get reads an argument with a "/" as a file */
+    a[k] = NULL;
+    p->argc = k;
+    return 0;
+}
+
 int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
                 const char **err) {
     static char status_apt[64], status_dpkg[16];
@@ -280,6 +492,8 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "apply")) { p->verb = HV_APPLY; return queue_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "respring")) { p->verb = HV_RESPRING; return respring_plan(argc, prefix, p, err); }
     else if (!strcmp(verb, "install-ipa")) { p->verb = HV_INSTALL_IPA; return ipa_plan(argc, argv, p, err); }
+    else if (!strcmp(verb, "rollbacks")) { p->verb = HV_ROLLBACKS; return rollback_plan(argc, argv, prefix, status_fd, p, err); }
+    else if (!strcmp(verb, "rollback")) { p->verb = HV_ROLLBACK; return rollback_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "selfupdate")) { p->verb = HV_SELFUPDATE; return selfupdate_plan(argc, argv, prefix, status_fd, p, err); }
     else { *err = "unknown verb (" HELPER_VERBS ")"; return -1; }
 

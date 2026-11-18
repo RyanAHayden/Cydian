@@ -221,7 +221,7 @@ final class IPASigner {
         return SignedApp(bundleID: newID, originalBundleID: oldID,
                          name: main.plist["CFBundleDisplayName"] as? String ?? main.plist["CFBundleName"] as? String ?? "",
                          version: main.plist["CFBundleShortVersionString"] as? String ?? main.plist["CFBundleVersion"] as? String ?? "",
-                         removed: removed, fixedArm64e: fixedArm64e.sorted())
+                         removed: removed.sorted(), fixedArm64e: fixedArm64e.sorted())
     }
 
     private func newPaths(_ files: [String: File], _ order: [String]) -> [String] {

@@ -38,6 +38,12 @@ WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for i
   token (`POST /sign/upload?token=`, no size), then signs and uploads into it (`&token=&size=`). The Worker holds
   iOS's `app.ipa` up to 2 minutes: headers once the upload has started, the body once it's done. A different bundle
   ID out of zsign, a failed reservation, or more than 110 s fall back to the Ready to Install alert.
+  R14 measured it on the iPhone 7 (iOS 15.8.8, `wrangler tail`): the prompt opens straight from the tap (manifest
+  fetched 0.6 s after it, no "Open in iTunes?"), and Safari keeps downloading, signing and uploading behind iOS's
+  alert. iOS's installer (`com.apple.appstored`) never gives up on a held `app.ipa`; it retries. It sends a HEAD and
+  drops it after 30 s of silence, a second HEAD (30 s), then a GET it drops at 60 s *from the request's start*
+  (headers sent part-way don't reset it), then HEAD/GET pairs again. A link whose upload finished 300 s after the
+  Install tap still got its app. Each retry is a new request, so the Worker's 2-minute wait per request never runs out.
   Download IPA is its own row. F92 removed the hand-offs that followed Install (Open in Cydian, Get in AltStore /
   SideStore / Feather); the nav bar's Share (F76) still offers the source to those sideloaders. The app still opens a
   `cydian://install?url=<ipa>&name=…` link (`incoming.js`: Install IPAs, "Install IPA", then `signAndInstall`) for

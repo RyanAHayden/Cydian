@@ -201,6 +201,7 @@ enum Web {
         w.scrollView.contentInsetAdjustmentBehavior = .never
         w.scrollView.bounces = false
         if #available(iOS 16.4, *) { w.isInspectable = true }
+        MomentumTap.attach(to: w) // F153: a quick tap on a coasting list opens the row
         return w
     }
 }

@@ -16,12 +16,14 @@
   if (m) dark = m[1] === "darkTheme";
   var root = document.documentElement;
   root.setAttribute("data-theme", dark ? "dark" : "light");
-  // Each tone's theme: dark is OLED Black unless Gunmetal is chosen; light is Classic (the kit's), the only light
-  // theme so far: a second one adds its name here, beside its ios6.css block.
-  var palette = dark ? (d === "gunmetal" ? "gunmetal" : "oled") : (l === "classic" ? l : "classic");
+  // Each tone's theme (the first is the default): a new theme adds its name here, beside its ios6.css or
+  // palettes.css block (F200), and its top-bar colour below.
+  var darks = ["oled", "gunmetal", "midnight", "linen", "nord", "dracula"], lights = ["classic", "sepia", "solarized"];
+  var palette = dark ? (darks.indexOf(d) >= 0 ? d : darks[0]) : (lights.indexOf(l) >= 0 ? l : lights[0]);
   root.setAttribute("data-palette", palette);
   // The browser's top bar too (screens/settings.js THEME_COLORS): index.html's meta says light until now.
-  var color = { classic: "#4f698b", oled: "#000", gunmetal: "#5f656f" }[palette];
+  var color = { classic: "#4f698b", oled: "#000", gunmetal: "#5f656f", midnight: "#0a1424", linen: "#000",
+    nord: "#2e3440", dracula: "#21222c", sepia: "#7a5c36", solarized: "#2a74a8" }[palette];
   var metas = document.querySelectorAll('meta[name="theme-color"]:not([media])');
   for (var i = 0; i < metas.length; i++) metas[i].setAttribute("content", color);
 })();

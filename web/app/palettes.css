@@ -1,0 +1,445 @@
+/* More themes for Settings > Theme (F200, user 2026-11-18), beside ios6.css's Classic, OLED Black and Gunmetal.
+   Each is a token block keyed by <html data-palette>; no rule here changes a shape, so the kit's gloss and bevels
+   stay and only their colours move. The mockup's exact values could not be read (its artifact needs a signed-in
+   browser), so the colours are each palette's published ones (Nord, Dracula, Solarized), iBooks 2012's sepia page
+   and iOS 6's Notification Center linen, put into the steps OLED Black and Gunmetal use (ground, bar gloss split at
+   half, table, edge, divider shadow and highlight).
+
+   Dark ones override OLED Black's block (html[data-theme="dark"], ios6.css), so every dark rule repaints. Light
+   ones override :root's kit tokens (pinstripe, tables, text) and add --lt-* tokens for the nav bar, its buttons and
+   the back arrow, the only light chrome with fixed colours that changes; the tab bar stays the kit's black. */
+
+/* ---- Dark ---- */
+
+/* Midnight: deep navy ground and bars, navy tables, cool blue-grey text. */
+html[data-theme="dark"][data-palette="midnight"] {
+  --pin-dark: #0a1424;
+  --pin-light: #0c172a;
+  --head: #c3cde0;
+  --emboss: 0 -1px 0 rgba(0,0,0,.8);
+  --detail: #7fb0ff;
+  --field-text: #c3cde0;
+  --field-hint: #66738c;
+  --text: #fff;
+  --subtitle: #93a0ba;
+  --table: #121d31;
+  --table-edge: #050a14;
+  --table-inset: rgba(255,255,255,.05);
+  --divider: #0a1322;
+  --divider-hi: rgba(255,255,255,.05);
+  --count: #3d5583;
+  --plain: #0c1628;
+  --keyline: #1a2740;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%235f6f8e' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+  --category: linear-gradient(rgba(42,58,90,.94), rgba(30,44,70,.94) 5%, rgba(22,34,56,.94) 94%, rgba(8,14,26,.94) 96%);
+  --dk-ground: #0a1424;
+  --dk-nav-bar:
+    linear-gradient(#050a14, #050a14) bottom / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.18), rgba(255,255,255,.18)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#2c3d5f, #18253e 50%, #0f1a2f 51%, #0a1424) bottom / 100% 44px no-repeat,
+    #0a1424;
+  --dk-nav-shadow: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,0));
+  --dk-tabbar: linear-gradient(#1a2740, #1a2740) top / 100% 1px no-repeat, #070e1b;
+  --dk-btn-edge: #050a14;
+  --dk-btn: linear-gradient(#34476b, #142038);
+  --dk-btn-pressed: linear-gradient(#1c2a44, #0a1222);
+  --dk-back: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzA1MGExNCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzA1MGExNCIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzM0NDc2YiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzE0MjAzOCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMTIiLz48cGF0aCBkPSJNMiAyOSAyMiAzUTIzLjUgMSAyNiAxSDM2UTQxIDEgNDEgNlY1MlE0MSA1NyAzNiA1N0gyNlEyMy41IDU3IDIyIDU1WiIgZmlsbD0idXJsKCNiKSIvPjxwYXRoIGQ9Ik00LjYgMjkgMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDZWNTJRMzkgNTUgMzYgNTVIMjYuNVEyNC44IDU1IDIzLjYgNTMuN1oiIGZpbGw9InVybCgjZikiLz48cGF0aCBkPSJNMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4zIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4K");
+  --dk-ctl-hi: rgba(255,255,255,.05);
+  --dk-seg: linear-gradient(#34476b, #1c2a44 90%, #142038);
+  --dk-seg-pressed: linear-gradient(#1c2a44, #0a1222);
+  --dk-sw-track: linear-gradient(#0a1322, #18253e);
+  --dk-sw-off: #93a0ba;
+  --dk-sw-on: linear-gradient(#1d56b8, #4a8ef0);
+  --dk-sw-knob: linear-gradient(#56688c, #26344f);
+  --dk-sw-knob-held: linear-gradient(#45577a, #1c2a44);
+  --dk-search-line: #050a14;
+  --dk-search-bar: linear-gradient(#1c2a44, #101b2f 7%, #0a1424);
+  --dk-search-fill: #0a1424;
+  --dk-field: #18253e;
+  --dk-field-edge: #050a14;
+  --dk-clear: #56688c;
+  --dk-index: #93a0ba;
+  --dk-link: #7fb0ff;
+  --dk-placeholder: #18253e;
+  --dk-store-head: linear-gradient(#1c2a44, #0f1a2f);
+  --dk-star-off: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%2334476b' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
+  --dk-dot: #34476b;
+  --dk-track: #0a1322;
+  --dk-bar-fill: linear-gradient(#93a0ba, #5f6f8e);
+  --dk-inset-box: #18253e;
+  --dk-green: #102a24;
+  --dk-glyph: #34476b;
+  --dk-dim: #56688c;
+  --dk-review-btn: linear-gradient(#34476b, #1c2a44);
+  --dk-warn-table: #2a2510;
+}
+
+/* Linen: iOS 6's Notification Center linen, drawn in CSS (--weave: fine light weft and dark warp threads over a
+   charcoal ground) behind charcoal tables; the kit's black bars over it. */
+html[data-theme="dark"][data-palette="linen"] {
+  --pin-dark: #34363b;
+  --pin-light: #383a3f;
+  --weave:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, rgba(0,0,0,0) 1px 2px, rgba(0,0,0,.06) 2px 3px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.09) 0 1px, rgba(255,255,255,.02) 1px 2px, rgba(0,0,0,0) 2px 3px),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.015) 0 1px, rgba(0,0,0,0) 1px 5px),
+    #36383d;
+  --head: #e1e3e8;
+  --emboss: 0 -1px 0 rgba(0,0,0,.85);
+  --detail: #a9c4f2;
+  --field-text: #d6d9e0;
+  --field-hint: #868a92;
+  --text: #fff;
+  --subtitle: #b9bdc5;
+  --table: #2a2c30;
+  --table-edge: #121315;
+  --table-inset: rgba(255,255,255,.06);
+  --divider: #1b1c1f;
+  --divider-hi: rgba(255,255,255,.06);
+  --count: #5d626c;
+  --plain: #2a2c30;
+  --keyline: #3a3c41;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23a2a6ae' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+  --category: linear-gradient(rgba(64,66,72,.94), rgba(50,52,57,.94) 5%, rgba(40,42,46,.94) 94%, rgba(18,19,21,.94) 96%);
+  --dk-ground: #36383d;
+  --dk-nav-bar: /* the kit's black bar: #4c4c4c to black, split at half */
+    linear-gradient(#000, #000) bottom / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.18), rgba(255,255,255,.18)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#4c4c4c, #262626 50%, #141414 51%, #000) bottom / 100% 44px no-repeat,
+    #000;
+  --dk-nav-shadow: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,0));
+  --dk-tabbar:
+    linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) top / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,.1)) 0 1px / 100% 1px no-repeat,
+    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% 48px no-repeat,
+    #000;
+  --dk-btn-edge: #111;
+  --dk-btn: linear-gradient(#4a4d54, #222428);
+  --dk-btn-pressed: linear-gradient(#2a2c30, #111214);
+  --dk-back: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzExMSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzExMSIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzRhNGQ1NCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzIyMjQyOCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMTIiLz48cGF0aCBkPSJNMiAyOSAyMiAzUTIzLjUgMSAyNiAxSDM2UTQxIDEgNDEgNlY1MlE0MSA1NyAzNiA1N0gyNlEyMy41IDU3IDIyIDU1WiIgZmlsbD0idXJsKCNiKSIvPjxwYXRoIGQ9Ik00LjYgMjkgMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDZWNTJRMzkgNTUgMzYgNTVIMjYuNVEyNC44IDU1IDIzLjYgNTMuN1oiIGZpbGw9InVybCgjZikiLz48cGF0aCBkPSJNMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4zIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4K");
+  --dk-ctl-hi: rgba(255,255,255,.06);
+  --dk-seg: linear-gradient(#55585f, #3a3c41 90%, #303236);
+  --dk-seg-pressed: linear-gradient(#3a3c41, #232528);
+  --dk-sw-track: linear-gradient(#1b1c1f, #303236);
+  --dk-sw-off: #a2a6ae;
+  --dk-sw-knob: linear-gradient(#6a6d74, #3a3c41);
+  --dk-sw-knob-held: linear-gradient(#55585f, #2a2c30);
+  --dk-search-line: #000;
+  --dk-search-bar: linear-gradient(#4c4c4c, #2a2a2a 7%, #1a1a1a);
+  --dk-search-fill: #1a1a1a;
+  --dk-field: #2a2c30;
+  --dk-field-edge: #121315;
+  --dk-clear: #6a6d74;
+  --dk-index: #b9bdc5;
+  --dk-link: #a9c4f2;
+  --dk-placeholder: #3a3c41;
+  --dk-store-head: linear-gradient(#3a3c41, #2a2c30);
+  --dk-star-off: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23585b62' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
+  --dk-dot: #585b62;
+  --dk-track: #1b1c1f;
+  --dk-bar-fill: linear-gradient(#b9bdc5, #8a8e96);
+  --dk-inset-box: #232528;
+  --dk-green: #243a2a;
+  --dk-glyph: #4a4d54;
+  --dk-dim: #6a6d74;
+  --dk-issue-table: #4a2a2a;
+  --dk-review-btn: linear-gradient(#4a4d54, #2a2c30);
+  --dk-warn-table: #3e3714;
+  --dk-warn-edge: #7a6c26;
+}
+/* The weave goes where the pinstripes go (ios6.css .page-body.grouped, packages.css .boot and .filter-drop-inner,
+   reviews.css .review-sheet), drawn by --weave alone. */
+html[data-theme="dark"][data-palette="linen"] :is(.page-body.grouped, .boot, .filter-drop-inner, .review-sheet) {
+  background: var(--weave);
+}
+
+/* Nord: Polar Night ground, bars and tables (#2e3440, #3b4252, #434c5e, #4c566a), Snow Storm text, Frost accents,
+   Aurora for status colours. */
+html[data-theme="dark"][data-palette="nord"] {
+  --pin-dark: #2e3440;
+  --pin-light: #313744;
+  --head: #d8dee9;
+  --emboss: 0 -1px 0 rgba(0,0,0,.5);
+  --detail: #88c0d0;
+  --field-text: #d8dee9;
+  --field-hint: #7b879b;
+  --text: #eceff4;
+  --subtitle: #aeb7c7;
+  --table: #3b4252;
+  --table-edge: #232831;
+  --table-inset: rgba(255,255,255,.05);
+  --divider: #2e3440;
+  --divider-hi: rgba(255,255,255,.05);
+  --count: #5e81ac;
+  --plain: #2e3440;
+  --keyline: #3b4252;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%237b879b' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+  --category: linear-gradient(rgba(76,86,106,.94), rgba(67,76,94,.94) 5%, rgba(59,66,82,.94) 94%, rgba(35,40,49,.94) 96%);
+  --dk-ground: #2e3440;
+  --dk-nav-bar:
+    linear-gradient(#1f232c, #1f232c) bottom / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.15), rgba(255,255,255,.15)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#4c566a, #3b4252 50%, #343a48 51%, #2b303b) bottom / 100% 44px no-repeat,
+    #2e3440;
+  --dk-nav-shadow: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,0));
+  --dk-tabbar: linear-gradient(#1f232c, #1f232c) top / 100% 1px no-repeat, linear-gradient(#3b4252, #2b303b) 0 1px / 100% 48px no-repeat, #2b303b;
+  --dk-btn-edge: #1f232c;
+  --dk-btn: linear-gradient(#4c566a, #2e3440);
+  --dk-btn-pressed: linear-gradient(#353c4a, #232831);
+  --dk-back: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzFmMjMyYyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzFmMjMyYyIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzRjNTY2YSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzJlMzQ0MCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMTIiLz48cGF0aCBkPSJNMiAyOSAyMiAzUTIzLjUgMSAyNiAxSDM2UTQxIDEgNDEgNlY1MlE0MSA1NyAzNiA1N0gyNlEyMy41IDU3IDIyIDU1WiIgZmlsbD0idXJsKCNiKSIvPjxwYXRoIGQ9Ik00LjYgMjkgMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDZWNTJRMzkgNTUgMzYgNTVIMjYuNVEyNC44IDU1IDIzLjYgNTMuN1oiIGZpbGw9InVybCgjZikiLz48cGF0aCBkPSJNMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4zIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4K");
+  --dk-ctl-hi: rgba(255,255,255,.05);
+  --dk-seg: linear-gradient(#4c566a, #3b4252 90%, #343a48);
+  --dk-seg-pressed: linear-gradient(#353c4a, #2b303b);
+  --dk-sw-track: linear-gradient(#2b303b, #3b4252);
+  --dk-sw-off: #aeb7c7;
+  --dk-sw-on: linear-gradient(#5e81ac, #88c0d0);
+  --dk-sw-knob: linear-gradient(#6b768c, #434c5e);
+  --dk-sw-knob-held: linear-gradient(#5b657a, #3b4252);
+  --dk-search-line: #1f232c;
+  --dk-search-bar: linear-gradient(#434c5e, #343a48 7%, #2b303b);
+  --dk-search-fill: #2b303b;
+  --dk-field: #3b4252;
+  --dk-field-edge: #232831;
+  --dk-clear: #6b768c;
+  --dk-index: #aeb7c7;
+  --dk-ok: #a3be8c;
+  --dk-bad: #eea2a8; /* Aurora red (#bf616a) lifted: on #3b4252 it is only 2.5:1 */
+  --dk-remove: #e6a58e;
+  --dk-link: #88c0d0;
+  --dk-placeholder: #434c5e;
+  --dk-store-head: linear-gradient(#434c5e, #3b4252);
+  --dk-star-off: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%234c566a' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
+  --dk-star-on: #ebcb8b;
+  --dk-dot: #4c566a;
+  --dk-track: #2e3440;
+  --dk-bar-fill: linear-gradient(#88c0d0, #5e81ac);
+  --dk-inset-box: #343a48;
+  --dk-green: #34403a;
+  --dk-glyph: #4c566a;
+  --dk-dim: #6b768c;
+  --dk-issue-head: #e5b4b9;
+  --dk-issue-table: #4a3439;
+  --dk-review-btn-text: #d8dee9;
+  --dk-review-btn: linear-gradient(#4c566a, #3b4252);
+  --dk-warn-table: #4a4434;
+  --dk-warn-edge: #8a7a50;
+  --dk-warn-text: #ebcb8b;
+}
+
+/* Dracula: #282a36 ground, #44475a bars and lines, #f8f8f2 text, purple headers, pink details, cyan links, green and
+   red status. Its comment colour (#6272a4) is too dim for subtitles on a table, so they take a lighter blue-grey. */
+html[data-theme="dark"][data-palette="dracula"] {
+  --pin-dark: #282a36;
+  --pin-light: #2b2d3a;
+  --head: #bd93f9;
+  --emboss: 0 -1px 0 rgba(0,0,0,.6);
+  --detail: #ff79c6;
+  --field-text: #f8f8f2;
+  --field-hint: #6272a4;
+  --text: #f8f8f2;
+  --subtitle: #a4abcf;
+  --table: #343746;
+  --table-edge: #191a21;
+  --table-inset: rgba(255,255,255,.05);
+  --divider: #282a36;
+  --divider-hi: rgba(255,255,255,.04);
+  --count: #6272a4;
+  --plain: #282a36;
+  --keyline: #3a3d4d;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%236272a4' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+  --category: linear-gradient(rgba(80,84,106,.94), rgba(68,71,90,.94) 5%, rgba(56,59,76,.94) 94%, rgba(25,26,33,.94) 96%);
+  --dk-ground: #282a36;
+  --dk-nav-bar:
+    linear-gradient(#15161c, #15161c) bottom / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.15), rgba(255,255,255,.15)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#4f5268, #383b4c 50%, #2c2e3b 51%, #21222c) bottom / 100% 44px no-repeat,
+    #21222c;
+  --dk-nav-shadow: linear-gradient(rgba(0,0,0,.4), rgba(0,0,0,0));
+  --dk-tabbar: linear-gradient(#15161c, #15161c) top / 100% 1px no-repeat, linear-gradient(#383b4c, #21222c) 0 1px / 100% 48px no-repeat, #21222c;
+  --dk-btn-edge: #15161c;
+  --dk-btn: linear-gradient(#5a5e78, #2c2e3b);
+  --dk-btn-pressed: linear-gradient(#383b4c, #1e1f28);
+  --dk-back: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzE1MTYxYyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzE1MTYxYyIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzVhNWU3OCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzJjMmUzYiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMTIiLz48cGF0aCBkPSJNMiAyOSAyMiAzUTIzLjUgMSAyNiAxSDM2UTQxIDEgNDEgNlY1MlE0MSA1NyAzNiA1N0gyNlEyMy41IDU3IDIyIDU1WiIgZmlsbD0idXJsKCNiKSIvPjxwYXRoIGQ9Ik00LjYgMjkgMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDZWNTJRMzkgNTUgMzYgNTVIMjYuNVEyNC44IDU1IDIzLjYgNTMuN1oiIGZpbGw9InVybCgjZikiLz48cGF0aCBkPSJNMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4zIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4K");
+  --dk-ctl-hi: rgba(255,255,255,.04);
+  --dk-seg: linear-gradient(#5a5e78, #44475a 90%, #383b4c);
+  --dk-seg-pressed: linear-gradient(#383b4c, #282a36);
+  --dk-sw-track: linear-gradient(#21222c, #383b4c);
+  --dk-sw-off: #a4abcf;
+  --dk-sw-on: linear-gradient(#8a5fe0, #bd93f9);
+  --dk-sw-knob: linear-gradient(#6c708c, #44475a);
+  --dk-sw-knob-held: linear-gradient(#5a5e78, #383b4c);
+  --dk-search-line: #15161c;
+  --dk-search-bar: linear-gradient(#44475a, #343746 7%, #282a36);
+  --dk-search-fill: #282a36;
+  --dk-field: #44475a;
+  --dk-field-edge: #191a21;
+  --dk-clear: #6272a4;
+  --dk-index: #bd93f9;
+  --dk-ok: #50fa7b;
+  --dk-bad: #ff7b7b; /* Dracula red (#ff5555) lifted: on #343746 it is 3.8:1 */
+  --dk-remove: #ff8585;
+  --dk-link: #8be9fd;
+  --dk-placeholder: #44475a;
+  --dk-store-head: linear-gradient(#44475a, #343746);
+  --dk-star-off: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%2344475a' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
+  --dk-star-on: #ffb86c;
+  --dk-dot: #44475a;
+  --dk-track: #21222c;
+  --dk-bar-fill: linear-gradient(#bd93f9, #8a5fe0);
+  --dk-inset-box: #2c2e3b;
+  --dk-green: #1f3a2a;
+  --dk-glyph: #6272a4;
+  --dk-dim: #6272a4;
+  --dk-issue-head: #ff9a9a;
+  --dk-issue-table: #4a2630;
+  --dk-review-btn-text: #f8f8f2;
+  --dk-review-btn: linear-gradient(#5a5e78, #44475a);
+  --dk-warn-table: #3e3a20;
+  --dk-warn-edge: #8a8440;
+  --dk-warn-text: #f1fa8c;
+}
+
+/* ---- Light ---- */
+
+/* Sepia: iBooks 2012's sepia page (cream paper, warm brown ink) with a leather-brown nav bar in the kit's shape. */
+html[data-theme="light"][data-palette="sepia"] {
+  --pin-dark: #e6d9bd;
+  --pin-light: #ebdfc5;
+  --head: #6b5434;
+  --emboss: 0 1px 0 rgba(255,250,235,.75);
+  --detail: #8a5a2b;
+  --field-text: #6b5434;
+  --field-hint: #b8a787;
+  --select: linear-gradient(#c9a26e, #93652f);
+  --text: #3b2f22;
+  --subtitle: #806b52;
+  --table: #fbf4e4;
+  --table-edge: #c2b08a;
+  --table-inset: rgba(90,66,36,.2);
+  --divider: #dccdab;
+  --divider-hi: #fffaf0;
+  --count: #b39a70;
+  --plain: #fbf4e4;
+  --keyline: #e5d9be;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23947d5c' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+  --category: linear-gradient(rgba(128,100,64,.9), rgba(146,118,80,.9) 2%, rgba(190,166,128,.9) 5%,
+    rgba(156,128,90,.9) 8%, rgba(184,160,122,.9) 94%, rgba(150,124,88,.9) 96%);
+  --lt-ground: #d2bf9c;
+  --lt-nav-bar:
+    linear-gradient(#3e2e1a, #3e2e1a) bottom / 100% 1px no-repeat,
+    linear-gradient(#f5ecdc, #f5ecdc) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#d2bf9c, #8c6c43) bottom / 100% 44px no-repeat,
+    linear-gradient(#7a5c36, #6a4e2c);
+  --lt-btn-edge: #5a4224;
+  --lt-btn-edge-top: #3f3a33;
+  --lt-btn: linear-gradient(#c4a77d, #7f5f36);
+  --lt-btn-pressed: linear-gradient(#b39469, #5f4424);
+  --lt-search-line: #9a8462;
+  --lt-search-bar: linear-gradient(#c9b893, #e2d5b8 7%, #c7b48e);
+  --lt-scope-fill: linear-gradient(#c7b48e, #bba882);
+  --lt-field-edge: #b8a37c;
+  --lt-field-edge-top: #9a8462;
+  --lt-store-head: linear-gradient(#fdf9ef, #ece2cb);
+  --lt-store-edge: #c2b08a;
+  --lt-seg: linear-gradient(#fdf9ef, #fdf9ef 5%, #e0d2b4 90%, #d2c19e);
+  --lt-seg-pressed: linear-gradient(#ece2cb, #d2c19e 90%, #c5b28c);
+  --lt-seg-edge: #b8a37c;
+  --lt-back: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzNmM2EzMyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzVhNDIyNCIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2M0YTc3ZCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzdmNWYzNiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=");
+  --lt-back-pressed: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzNhMzUzMCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzRhMzYxYyIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2IzOTQ2OSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzVmNDQyNCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=");
+}
+
+/* Solarized Light: base3 (#fdf6e3) tables on base2 (#eee8d5) pinstripes, base02/base01 text, blue (#268bd2) for
+   details and a Solarized-blue nav bar in the kit's shape. */
+html[data-theme="light"][data-palette="solarized"] {
+  --pin-dark: #e9e2cd;
+  --pin-light: #eee8d5;
+  --head: #4d6168; /* base01 (#586e75) a step darker: 4.4:1 on base2 */
+  --emboss: 0 1px 0 rgba(253,246,227,.8);
+  --detail: #1b6fab; /* blue (#268bd2) darkened: 3.4:1 on base3 is too faint for text */
+  --field-text: #586e75;
+  --field-hint: #93a1a1;
+  --select: linear-gradient(#5aa9e0, #1f73b0);
+  --text: #073642;
+  --subtitle: #586e75;
+  --table: #fdf6e3;
+  --table-edge: #c9c1aa;
+  --table-inset: rgba(7,54,66,.15);
+  --divider: #e2dbc4;
+  --divider-hi: #fffcf2;
+  --count: #93a1a1;
+  --plain: #fdf6e3;
+  --keyline: #eee8d5;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%2393a1a1' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+  --category: linear-gradient(rgba(88,110,117,.9), rgba(101,123,131,.9) 2%, rgba(147,161,161,.9) 5%,
+    rgba(112,132,138,.9) 8%, rgba(140,155,156,.9) 94%, rgba(106,126,132,.9) 96%);
+  --lt-ground: #9fcbea;
+  --lt-nav-bar:
+    linear-gradient(#0f3d5c, #0f3d5c) bottom / 100% 1px no-repeat,
+    linear-gradient(#e6f2fa, #e6f2fa) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#9fcbea, #2f7fb8) bottom / 100% 44px no-repeat,
+    linear-gradient(#2a74a8, #22679b);
+  --lt-btn-edge: #1d4f73;
+  --lt-btn-edge-top: #2f3a40;
+  --lt-btn: linear-gradient(#79b3dd, #22679b);
+  --lt-btn-pressed: linear-gradient(#6aa0c8, #1a547f);
+  --lt-search-line: #93a1a1;
+  --lt-search-bar: linear-gradient(#ddd6c1, #eee8d5 7%, #dcd5bf);
+  --lt-scope-fill: linear-gradient(#dcd5bf, #d3cbb3);
+  --lt-field-edge: #c9c1aa;
+  --lt-field-edge-top: #93a1a1;
+  --lt-store-head: linear-gradient(#fffcf2, #eee8d5);
+  --lt-store-edge: #c9c1aa;
+  --lt-seg: linear-gradient(#fffcf2, #fffcf2 5%, #e4ddc8 90%, #d6cfb8);
+  --lt-seg-pressed: linear-gradient(#eee8d5, #d6cfb8 90%, #cac2aa);
+  --lt-seg-edge: #b9b29c;
+  --lt-back: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzJmM2E0MCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzFkNGY3MyIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzc5YjNkZCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzIyNjc5YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=");
+  --lt-back-pressed: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzJhMzQzYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzE2M2Y1ZCIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzZhYTBjOCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzFhNTQ3ZiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=");
+}
+
+/* The light palettes' chrome: ios6.css's nav bar, bar buttons and back arrow, with their colours from the --lt-*
+   tokens above (shapes, borders and shadows unchanged; the blue Done stays the kit's, as on iOS 6). Each new light
+   palette adds its name to this list. */
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) { background: var(--lt-ground); }
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .navbar { background: var(--lt-nav-bar); }
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .bar-button:not(.back):not(.done) {
+  border-color: var(--lt-btn-edge); border-top-color: var(--lt-btn-edge-top);
+  background: var(--lt-btn); background-origin: border-box;
+}
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .bar-button:not(.back):not(.done):is(:active, .is-pressed) {
+  background: var(--lt-btn-pressed); background-origin: border-box;
+}
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .bar-button.back { border-image-source: var(--lt-back); }
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .bar-button.back:is(:active, .is-pressed) {
+  border-image-source: var(--lt-back-pressed);
+}
+/* packages.css's search bar, its scope bar and segments (as bar buttons), and its Cancel */
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .search-bar {
+  background: linear-gradient(var(--lt-search-line), var(--lt-search-line)) bottom / 100% 1px no-repeat, var(--lt-search-bar);
+}
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .search-bar.has-scope { background: var(--lt-search-bar); }
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .search-scope {
+  background: linear-gradient(var(--lt-search-line), var(--lt-search-line)) bottom / 100% 1px no-repeat, var(--lt-scope-fill);
+}
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .search-field {
+  border-color: var(--lt-field-edge); border-top-color: var(--lt-field-edge-top);
+}
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) :is(.scope-segment, .scope-filter:not(.done), .search-cancel) {
+  border-color: var(--lt-btn-edge); border-top-color: var(--lt-btn-edge-top);
+  background: var(--lt-btn); background-origin: border-box;
+}
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) :is(.scope-segment.selected, .scope-segment:active, .scope-filter:not(.done):is(.selected, :active), .search-cancel:active) {
+  background: var(--lt-btn-pressed); background-origin: border-box;
+}
+/* packages.css's package-page header band and ios6.css's App Store segmented control (its blue selected segment
+   stays the kit's) */
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .store-head {
+  background: var(--lt-store-head); border-bottom-color: var(--lt-store-edge);
+}
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .store-segmented { border-color: var(--lt-seg-edge); }
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .store-segment:not(.selected) {
+  color: var(--head); background: var(--lt-seg); background-origin: border-box;
+}
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .store-segment:not(.selected) + .store-segment:not(.selected) { border-left-color: var(--lt-seg-edge); }
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .store-segment:active:not(.selected) {
+  background: var(--lt-seg-pressed); background-origin: border-box;
+}

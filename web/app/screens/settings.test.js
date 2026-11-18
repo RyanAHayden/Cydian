@@ -279,8 +279,9 @@ test("F205: Settings root, General and Theme rows carry iOS 6 tiles where iOS 6 
   assert.deepEqual(rows(["display"]).map((r) => r[0]), ["Light", "Dark"]); // the old route
   // each theme list: a checked row per theme, each with its swatch
   assert.deepEqual(rows(["theme", "darkTheme"]).map((r) => [r[0], r[1]]),
-    [["OLED Black", "cell-icon theme-swatch"], ["Gunmetal", "cell-icon theme-swatch"]]);
-  assert.deepEqual(rows(["theme", "lightTheme"]).map((r) => [r[0], r[1]]), [["Classic", "cell-icon theme-swatch"]]);
+    ["OLED Black", "Gunmetal", "Midnight", "Linen", "Nord", "Dracula"].map((t) => [t, "cell-icon theme-swatch"]));
+  assert.deepEqual(rows(["theme", "lightTheme"]).map((r) => [r[0], r[1]]),
+    ["Classic", "Sepia", "Solarized Light"].map((t) => [t, "cell-icon theme-swatch"]));
 });
 
 // F199: Settings > Theme: Mode (segmented Automatic / Light / Dark) under its header, then Themes with Light and Dark

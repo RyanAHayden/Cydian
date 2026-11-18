@@ -1,0 +1,47 @@
+[
+  {"wait": 3000},
+  {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.appearance','dark'); localStorage.setItem('ifizbox.darkTheme','midnight'); 'ok'"},
+  {"nav": "#/changes", "ms": 15000},
+  {"eval": "[document.documentElement.dataset.theme, document.documentElement.dataset.palette, document.querySelector('meta[name=theme-color]').content].join(' | ')"},
+  {"shot": "midnight-changes"},
+  {"nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance", "ms": 12000},
+  {"shot": "midnight-package"},
+
+  {"eval": "localStorage.setItem('ifizbox.darkTheme','linen'); 'ok'"},
+  {"nav": "#/changes", "ms": 12000},
+  {"eval": "[document.documentElement.dataset.theme, document.documentElement.dataset.palette].join(' | ')"},
+  {"shot": "linen-changes"},
+  {"nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance", "ms": 12000},
+  {"shot": "linen-package"},
+  {"nav": "#/home/settings/theme", "ms": 8000},
+  {"shot": "linen-theme-settings"},
+
+  {"eval": "localStorage.setItem('ifizbox.darkTheme','nord'); 'ok'"},
+  {"nav": "#/changes", "ms": 12000},
+  {"shot": "nord-changes"},
+  {"nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance", "ms": 12000},
+  {"shot": "nord-package"},
+
+  {"eval": "localStorage.setItem('ifizbox.darkTheme','dracula'); 'ok'"},
+  {"nav": "#/changes", "ms": 12000},
+  {"shot": "dracula-changes"},
+  {"nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance", "ms": 12000},
+  {"shot": "dracula-package"},
+  {"nav": "#/home/settings/theme/darkTheme", "ms": 8000},
+  {"shot": "dark-theme-list"},
+
+  {"eval": "localStorage.setItem('ifizbox.appearance','light'); localStorage.setItem('ifizbox.lightTheme','sepia'); 'ok'"},
+  {"nav": "#/changes", "ms": 12000},
+  {"eval": "[document.documentElement.dataset.theme, document.documentElement.dataset.palette, document.querySelector('meta[name=theme-color]').content].join(' | ')"},
+  {"shot": "sepia-changes"},
+  {"nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance", "ms": 12000},
+  {"shot": "sepia-package"},
+
+  {"eval": "localStorage.setItem('ifizbox.lightTheme','solarized'); 'ok'"},
+  {"nav": "#/changes", "ms": 12000},
+  {"shot": "solarized-changes"},
+  {"nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance", "ms": 12000},
+  {"shot": "solarized-package"},
+  {"nav": "#/home/settings/theme/lightTheme", "ms": 8000},
+  {"shot": "light-theme-list"}
+]

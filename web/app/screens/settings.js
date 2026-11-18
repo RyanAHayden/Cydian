@@ -58,7 +58,9 @@ export const settings = createSettings({ mode: detectMode(), helper: globalThis.
 
 // Light: the top of the blue status bar under the nav bar; dark: "Status Bar (Black)".
 // By palette (F198): OLED Black's status bar is #000, Gunmetal's the top of its bar. ios6.css --dk-ground matches.
-export const THEME_COLORS = { classic: "#4f698b", oled: "#000", gunmetal: "#5f656f" };
+// F200: the palettes.css ones, each its bar's status-bar colour.
+export const THEME_COLORS = { classic: "#4f698b", oled: "#000", gunmetal: "#5f656f", midnight: "#0a1424", linen: "#000",
+  nord: "#2e3440", dracula: "#21222c", sepia: "#7a5c36", solarized: "#2a74a8" };
 
 const defOf = (key) => SETTINGS.find((d) => d.key === key);
 const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? String(v);

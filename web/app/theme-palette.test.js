@@ -15,12 +15,13 @@ const mem = (init) => {
 };
 
 test("paletteFor: classic in light; OLED Black in dark unless Gunmetal is chosen", () => {
-  assert.deepEqual(DARK_PALETTES, ["oled", "gunmetal"]);
+  assert.deepEqual(DARK_PALETTES, ["oled", "gunmetal", "midnight", "linen", "nord", "dracula"]);
   assert.equal(paletteFor("light", "gunmetal"), "classic");
   assert.equal(paletteFor("dark", null), "oled");
   assert.equal(paletteFor("dark", "gunmetal"), "gunmetal");
   assert.equal(paletteFor("dark", "neon"), "oled");
-  assert.deepEqual(THEME_COLORS, { classic: "#4f698b", oled: "#000", gunmetal: "#5f656f" });
+  assert.deepEqual(Object.keys(THEME_COLORS).sort(), [...LIGHT_PALETTES, ...DARK_PALETTES].sort()); // F200: one per theme
+  assert.deepEqual([THEME_COLORS.classic, THEME_COLORS.oled, THEME_COLORS.gunmetal], ["#4f698b", "#000", "#5f656f"]);
 });
 
 // theme-boot.js in a sandbox: what it puts on <html> before first paint for a stored Appearance and dark theme.
@@ -96,21 +97,22 @@ test("applyTheme: data-palette and a black theme-color for OLED Black, Gunmetal 
 // F199: every combination of Mode, light theme, dark theme, system and preview, through the one rule (themeState),
 // theme-boot.js before first paint, and the settings store's own stored values.
 test("F199: themeState, theme-boot.js and the store agree for every Mode, theme pair, system and preview", () => {
-  const lights = [null, "classic", "sepia"];
-  const darks = [null, "oled", "gunmetal", "neon"];
+  const lights = [null, "classic", "sepia", "solarized", "neon"];
+  const darks = [null, "oled", "gunmetal", "midnight", "linen", "nord", "dracula", "neon"];
   const previews = [[null, ""], ["light", "#/home/settings/theme/lightTheme"], ["dark", "#/home/settings/theme/darkTheme"]];
   for (const appearance of [null, "auto", "light", "dark", "bogus"]) {
     for (const lightTheme of lights) for (const darkTheme of darks) for (const systemDark of [false, true]) for (const [preview, hash] of previews) {
       const store = createSettings({ storage: mem({ "ifizbox.appearance": appearance, "ifizbox.lightTheme": lightTheme, "ifizbox.darkTheme": darkTheme }) });
       const got = themeState({ appearance: store.get("appearance"), lightTheme: store.get("lightTheme"), darkTheme: store.get("darkTheme"), preview }, systemDark);
       const tone = preview ?? (appearance === "dark" || (appearance === "auto" && systemDark) ? "dark" : "light");
-      const want = { theme: tone, palette: tone === "dark" ? (darkTheme === "gunmetal" ? "gunmetal" : "oled") : "classic" };
+      const known = (list, v) => (v && v !== "neon" ? v : list);
+      const want = { theme: tone, palette: tone === "dark" ? known("oled", darkTheme) : known("classic", lightTheme) };
       const what = JSON.stringify({ appearance, lightTheme, darkTheme, systemDark, preview });
       assert.deepEqual(got, want, what);
       assert.deepEqual(boot({ appearance, lightTheme, darkTheme, systemDark, hash }), { ...want, color: THEME_COLORS[want.palette] }, what);
     }
   }
-  assert.deepEqual(LIGHT_PALETTES, ["classic"]);
+  assert.deepEqual(LIGHT_PALETTES, ["classic", "sepia", "solarized"]);
 });
 
 // ---- the stylesheets ----

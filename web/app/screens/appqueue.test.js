@@ -53,13 +53,13 @@ test("app page (F80): installed, Modify's sheet offers Upgrade (and Downgrade); 
   const base = { queue: q, add, mode: "sideload", ready: async () => true, store };
   let sheet = null;
   assert.equal(await appPageAction(pkg, null, { ...base, ask: async (o) => { sheet = o; return 0; } }), true);
-  assert.deepEqual(sheet.buttons, ["Upgrade"]); // installed 1, newest 2: Modify offers Upgrade
+  assert.deepEqual(sheet.buttons, ["Upgrade", "Mark as Not Installed"]); // F94: then Mark as Not Installed; installed 1, newest 2: Modify offers Upgrade
   assert.equal(q.get("com.x.a").mode, "upgrade");
   assert.equal(appNavLabel({ queued: Boolean(q.get("com.x.a")), installed: "1", newest: "2" }), "Modify");
 
   let asked = null;
   assert.equal(await appPageAction(pkg, null, { ...base, ask: async (o) => { asked = o; return 1; } }), true);
-  assert.deepEqual(asked.buttons, ["Clear", "Upgrade"]);
+  assert.deepEqual(asked.buttons, ["Clear", "Upgrade", "Mark as Not Installed"]);
   assert.equal(added.length, 2); // Upgrade: queued again, Confirm opens
   assert.equal(await appPageAction(pkg, null, { ...base, ask: async () => 0 }), true);
   assert.equal(q.size, 0); // Clear
@@ -70,13 +70,13 @@ test("app page (F80): installed, Modify's sheet offers Upgrade (and Downgrade); 
   const answers = [1, 0];
   const seen = [];
   await appPageAction(two, null, { ...base, ask: async (o) => { seen.push(o.buttons); return answers.shift(); } });
-  assert.deepEqual(seen, [["Upgrade", "Downgrade"], ["0.9"]]);
+  assert.deepEqual(seen, [["Upgrade", "Downgrade", "Mark as Not Installed"], ["0.9"]]);
   assert.equal(q.get("com.x.a").version, "0.9");
   q.clearAll();
 
   // Where the queue doesn't apply, the page does what it did before.
   assert.equal(await appPageAction(pkg, null, { ...base, mode: "jailbreak" }), false);
-  assert.equal(await appPageAction(pkg, null, { ...base, mode: "site" }), false); // F89: the website hands apps on
+  assert.equal(await appPageAction(pkg, null, { ...base, mode: "site", ask: async () => 0 }), false); // F94: Upgrade: the page installs it
   assert.equal(await appPageAction(pkg, null, { ...base, ready: async () => false }), false);
   const itms = { ...pkg, stanza: { ...pkg.stanza, ipa: { ...pkg.stanza.ipa, versions: [{ version: "2", downloadURL: "itms-services://?x" }] } } };
   assert.equal(await appPageAction(itms, null, base), false);

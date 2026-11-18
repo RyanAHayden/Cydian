@@ -84,7 +84,7 @@ test("app page: the Signature row, and Modify's Re-sign queues a resign job", as
     signedOf: async (id) => installed.apps.find((a) => a.bundleId === id) ?? null };
   let sheet = null;
   assert.equal(await appPageAction(pkg, null, { ...base, ask: async (o) => { sheet = o; return 1; } }), true);
-  assert.deepEqual(sheet.buttons, ["Reinstall", "Re-sign"]);
+  assert.deepEqual(sheet.buttons, ["Reinstall", "Re-sign", "Mark as Not Installed"]); // F94
   assert.deepEqual([q.get("b").mode, q.get("b").version, q.get("b").url], ["resign", "2.0", null]);
   // signed but never recorded as installed: the sheet still offers Re-sign
   q.clearAll();
@@ -95,7 +95,7 @@ test("app page: the Signature row, and Modify's Re-sign queues a resign job", as
   // not signed by Cydian: no Re-sign
   q.clearAll();
   await appPageAction(pkg, null, { ...base, signedOf: async () => null, ask: async (o) => { sheet = o; return -1; } });
-  assert.deepEqual(sheet.buttons, ["Reinstall"]);
+  assert.deepEqual(sheet.buttons, ["Reinstall", "Mark as Not Installed"]);
 });
 
 test("Confirm's run: a resign job goes through signing.resign {bundleId}, Cydian's hosted and last; a failure stops the run", async () => {

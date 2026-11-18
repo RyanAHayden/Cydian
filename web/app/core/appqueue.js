@@ -26,6 +26,11 @@
 //   resignJob({ bundleId, name, version }) -> such a job, from a signing.installed record or a Needs Re-sign row
 //   APP_MODES, APP_MODE_LABEL -> Confirm's Modifications for apps: core/queue.js's modes, Remove out, Re-sign in
 //   modifyActions({ ..., signed }) -> "Re-sign" last for an app Cydian signed
+// F94: Modify's last button for an installed app, per build (user 2026-11-18):
+//   modifyActions({ ..., build }) -> build "sideload" or "site": "Mark as Not Installed" (the phone can't remove apps:
+//       it forgets core/installed.js's record, as the Installed section's row does); "jailbreak": "Remove" (apt's
+//       queued remove); none given: neither
+//   MARK_NOT_INSTALLED, destructiveOf(buttons) -> that button's index for showActionSheet's `destructive` (red), or -1
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { modeOf } from "./queue.js";
 import { compareVersions } from "./apt.js";
@@ -124,13 +129,20 @@ export function appNavLabel({ queued = false, installed = null, newest = null } 
 }
 
 // Modify's sheet. Queued: Clear, or queue it again. Installed: Upgrade (a newer one is out) or Reinstall, and
-// Downgrade when the source has an older version than the installed one (`older`). No Remove: the sideload app
-// can't delete apps.
-export function modifyActions({ queued = false, installed = null, newest = null, older = false, signed = false } = {}) {
+// Downgrade when the source has an older version than the installed one (`older`). F94: then, for an installed app,
+// Mark as Not Installed where the phone can't remove apps (the sideload app, the website), Remove in the jailbreak build.
+export const MARK_NOT_INSTALLED = "Mark as Not Installed";
+export function modifyActions({ queued = false, installed = null, newest = null, older = false, signed = false, build = null } = {}) {
   const resign = signed ? ["Re-sign"] : []; // F91: an app Cydian signed can be signed again, as it is
-  if (queued) return ["Clear", verb({ installed, newest }), ...resign];
+  const last = installed == null ? [] : build === "jailbreak" ? ["Remove"] : build === "sideload" || build === "site" ? [MARK_NOT_INSTALLED] : [];
+  if (queued) return ["Clear", verb({ installed, newest }), ...resign, ...last];
   if (installed == null) return [verb({ installed, newest }), ...resign];
-  return [verb({ installed, newest }), ...(older ? ["Downgrade"] : []), ...resign];
+  return [verb({ installed, newest }), ...(older ? ["Downgrade"] : []), ...resign, ...last];
+}
+
+// F94: the red (destructive) button of a Modify sheet: Mark as Not Installed or Remove.
+export function destructiveOf(buttons = []) {
+  return buttons.findIndex((b) => b === MARK_NOT_INSTALLED || b === "Remove");
 }
 
 // ---- F91: re-signs ------------------------------------------------------------------------------------------------

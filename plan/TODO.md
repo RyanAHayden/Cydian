@@ -10,7 +10,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **F94** Modify's sheet offers Mark as Not Installed where the phone can't remove apps (user 2026-11-18: 'we still need to be able to mark as not installed in the popup menu for modify when not jailbroken'): on the website and in the sideload app, an installed app's Modify sheet lists Upgrade/Reinstall, Downgrade, Re-sign (F91) and then Mark as Not Installed (red, destructive), which forgets the app's record (core/installed.js removeInstall) as the Installed section's row does; the jailbreak build keeps Remove instead (queued apt remove). t: node tests for modifyActions per build and the record removed. | files: web/app/core/appqueue.js, web/app/screens/altstore.js
 - [~] **T2** Deploy: `deploy.sh` of our own design (TrueNAS: pull main and rebuild when it changes), the public URL behind Cloudflare Tunnel, `README.md` setup. The NAS side needs a human (ssh truenas). Write the steps and block on them. | files: deploy.sh, README.md | after: F5 — From the F3 review: set CYDIAN_PROXY_HOPS for the Cloudflare Tunnel hop(s), or every visitor shares one rate-limit bucket (request.remote_addr would be the tunnel). BLOCKED: needs the user to run the NAS steps in README (Deploy section): clone on TrueNAS, .env with CYDIAN_PROXY_HOPS=1, first ./deploy.sh, cron job, Cloudflared app + public hostname; and approve publishing
 
 ### Research (any time, parallel)

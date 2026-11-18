@@ -48,6 +48,16 @@ function barButton(label, cls = "") {
 }
 
 let ctxRef = null;
+// F86: who waits for a Confirm sheet (either kind) to go away, and how: "confirm" | "cancel" | "closed".
+let confirmWaiters = [];
+function confirmEnded(how) {
+  const w = confirmWaiters;
+  confirmWaiters = [];
+  for (const f of w) f(how);
+}
+// The Essential Upgrade alert (essential-ui.js) waits here after queuing: Cancel brings it back when forced.
+export const whenConfirmEnds = () => new Promise((resolve) => confirmWaiters.push(resolve));
+
 let confirm = null;   // the open Confirm sheet: { refresh(), close() }
 let running = false;  // a console is up: nothing else opens over it
 
@@ -136,12 +146,12 @@ export function openConfirm() {
   const m = modal({ title: "Confirm", left: cancel, right: ok, cls: "confirm-sheet" });
   let generation = 0;
   let ready = null; // { jobs, plan, ids } once apt agreed
-  const close = () => { confirm = null; updateChrome(); return m.close(); };
-  cancel.addEventListener("click", () => { installQueue.clearAll(); close(); });
+  const close = (how = "closed") => { confirm = null; updateChrome(); confirmEnded(how); return m.close(); };
+  cancel.addEventListener("click", () => { installQueue.clearAll(); close("cancel"); });
   ok.addEventListener("click", () => {
     if (!ready) return;
     const run = ready;
-    close().then(() => runConsole(run));
+    close("confirm").then(() => runConsole(run));
   });
 
   async function refresh() {
@@ -149,7 +159,7 @@ export function openConfirm() {
     ready = null;
     ok.hidden = true;
     const jobs = installQueue.list();
-    if (!jobs.length) { close(); return; }
+    if (!jobs.length) { close("cancel"); return; }
     m.setTitle("Confirm");
     m.scroll.replaceChildren(loading("Checking with apt"));
     let r, err = null;
@@ -305,15 +315,15 @@ export function openAppConfirm(queue = appQueue) {
   const m = modal({ title: "Confirm", left: cancel, right: ok, cls: "confirm-sheet" });
   // A Clear (here or on an app page's Modify) or a run's progress redraws it; an add redraws it through queueApp.
   const off = queue.subscribe((e) => { if (e.type !== "add") refresh(); });
-  const close = () => { off(); if (appConfirm === sheet) appConfirm = null; return m.close(); };
-  cancel.addEventListener("click", () => { close(); queue.clearAll(); });
+  const close = (how = "closed") => { off(); if (appConfirm === sheet) appConfirm = null; confirmEnded(how); return m.close(); };
+  cancel.addEventListener("click", () => { close("cancel"); queue.clearAll(); });
   ok.addEventListener("click", () => {
     const jobs = queue.list();
-    close().then(() => runAppQueue(jobs, { queue }));
+    close("confirm").then(() => runAppQueue(jobs, { queue }));
   });
   function refresh() {
     const jobs = queue.list();
-    if (!jobs.length) { close(); return; }
+    if (!jobs.length) { close("cancel"); return; }
     const names = {};
     for (const j of jobs) {
       if (j.name) names[j.id] = j.name;

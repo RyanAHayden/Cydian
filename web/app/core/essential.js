@@ -218,9 +218,10 @@ export function essentialAlert({ forced = false, minimum = null } = {}) {
 //   alert(spec) -> { index }
 //   complete(all)          Complete Upgrade: every upgrade in Changes
 //   essentialOnly(rows)    Essential Only
+//                          either may resolve "cancelled" (F86: Confirm's Cancel): forced, the alert comes back
 //   lock(prompt)           forced only: block the UI; prompt() shows the alert again (a tap on the block)
 // }
-// Resolves "unknown" | "none" | "ignored" | "complete" | "essential".
+// Resolves "unknown" | "none" | "ignored" | "cancelled" | "complete" | "essential".
 export async function runEssential(deps) {
   let info;
   try { info = await deps.gather(); } catch { info = null; }
@@ -232,9 +233,11 @@ export async function runEssential(deps) {
   const ask = async () => {
     for (;;) {
       const { index } = await deps.alert(essentialAlert({ forced, minimum: info.minimum }));
-      if (index === 0) { await deps.complete(all); return "complete"; }
-      if (index === 1) { await deps.essentialOnly(essential); return "essential"; }
-      if (!forced) return "ignored";
+      let r = null;
+      if (index === 0) r = (await deps.complete(all)) === "cancelled" ? "cancelled" : "complete";
+      else if (index === 1) r = (await deps.essentialOnly(essential)) === "cancelled" ? "cancelled" : "essential";
+      else if (!forced) return "ignored";
+      if (r && (r !== "cancelled" || !forced)) return r;
     }
   };
   if (forced) deps.lock?.(ask);
@@ -296,4 +299,19 @@ export async function installSelf(row, deps) {
   if (index !== 1) return "cancelled";
   await open(SELF_SITE);
   return "site";
+}
+
+// F86: Complete Upgrade and Essential Only queue like Cydia's: the rows go in the install queue (the jailbreak
+// build's apt queue, the sideload build's app queue, Cydian last there since installing it closes the app) and
+// Confirm opens over them; the button's answer waits for Confirm. deps: {
+//   queue(rows) -> how many were queued (async allowed); queuing opens Confirm (screens/queue.js)
+//   confirmed() -> "confirm" | "cancel" | "closed"        how the Confirm sheet went away (whenConfirmEnds)
+//   fallback(rows) -> anything                            nothing could be queued (sideload: no IPA to sign)
+// }
+// Resolves "queued" (Confirm ran it, or Continue Queuing kept it) | "cancelled" (Cancel cleared it) | the fallback's.
+export async function queueEssential(rows, deps) {
+  let n = 0;
+  try { n = Number(await deps.queue(rows)) || 0; } catch { n = 0; }
+  if (!n) return deps.fallback ? deps.fallback(rows) : "failed";
+  return (await deps.confirmed()) === "cancel" ? "cancelled" : "queued";
 }

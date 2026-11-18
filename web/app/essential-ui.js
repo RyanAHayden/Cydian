@@ -4,11 +4,13 @@
 //   jailbreak   catalog.upgrades (apt's lists) + dpkg's status (Essential: yes) + the built-in repo's minimum.
 //               Complete Upgrade and Essential Only queue the upgrades (N4), and the Confirm sheet opens.
 //   sideload    Cydian's own AltStore source, read once per launch: Cydian's newest version and its minimum.
-//               Changes in the sideload build has no other upgrades, so Complete Upgrade and Essential Only both
-//               install Cydian: signed on the Signing Server, never through the local install server (installSelf).
+//               F86: Complete Upgrade queues every upgrade Changes lists (Upgrade (N)'s queueUpgrades), Essential
+//               Only just Cydian, in the app queue, and F80's Confirm opens (Cydian last: installing it closes the
+//               app). Nothing could be queued (no Cydian.ipa in the source): installSelfNow says why.
+// Either build, forced (below the minimum): Confirm's Cancel brings the alert back (core/essential.js queueEssential).
 // Nothing found to read (the built-in source never loaded, offline): resolves "unknown", and app.js falls back on
 // F61's GitHub check.
-import { runEssential, installSelf, selfFromAltSource, selfUpgradeRow, essentialIds, essentialUpgrades, minimumOf,
+import { runEssential, queueEssential, installSelf, selfFromAltSource, selfUpgradeRow, essentialIds, essentialUpgrades, minimumOf,
   isBuiltin, saveInfo, loadInfo, withSelfUpgrade, SELF_ALT_URL, SELF_ID } from "./core/essential.js";
 import { getBackend } from "./backend.js";
 import { catalog } from "./catalog.js";
@@ -90,10 +92,43 @@ export async function installSelfNow(row) {
 
 function queueAll(rows) {
   const q = getBackend().queue;
-  if (typeof q !== "function") return showAlert({ title: "Can't Upgrade", message: "This build has no install queue.", buttons: ["OK"] });
+  if (typeof q !== "function") { showAlert({ title: "Can't Upgrade", message: "This build has no install queue.", buttons: ["OK"] }); return 0; }
+  let n = 0;
   for (const r of rows) {
-    if (r?.id && r.version) q.call(getBackend(), { op: "install", id: r.id, version: r.version, installed: r.installed ?? null, name: r.name ?? null });
+    if (r?.id && r.version) { q.call(getBackend(), { op: "install", id: r.id, version: r.version, installed: r.installed ?? null, name: r.name ?? null }); n++; }
   }
+  return n;
+}
+
+// ---- sideload: the app queue (F80) ----------------------------------------------------------------------------
+
+// Complete Upgrade: what Changes' Upgrade (N) would queue, read when the button is tapped (the alert doesn't wait
+// for the catalog): every app upgrade, with Cydian's own row on top. Unreadable: just the rows the alert had.
+async function sideloadAll(rows) {
+  try {
+    const { withAppUpgrades } = await import("./app-updates.js");
+    const holds = settings.holds.list();
+    await catalog.ensure?.();
+    const self = rows.find((r) => r.id === SELF_ID) ?? null;
+    const u = await withAppUpgrades(withSelfUpgrade(await catalog.upgrades(holds), self), holds);
+    return u.available?.length ? u.available : rows;
+  } catch { return rows; }
+}
+
+async function queueApps(rows) {
+  const { queueUpgrades } = await import("./screens/changes.js");
+  return (await queueUpgrades(rows)).length;
+}
+
+// One button of the alert: queue, open Confirm, wait for it. -> "queued" | "cancelled" | installSelfNow's answer.
+async function queueButton(mode, rows, { everything = false } = {}) {
+  const { whenConfirmEnds } = await import("./screens/queue.js");
+  const self = (list) => list.find((r) => r.id === SELF_ID) ?? list[0];
+  if (mode === "sideload") {
+    const list = everything ? await sideloadAll(rows) : rows;
+    return queueEssential(list, { queue: queueApps, confirmed: whenConfirmEnds, fallback: (l) => installSelfNow(self(l)) });
+  }
+  return queueEssential(rows, { queue: queueAll, confirmed: whenConfirmEnds });
 }
 
 // ---- forced: nothing else is usable ---------------------------------------------------------------------------
@@ -133,12 +168,11 @@ let running = null;
 export function startEssential() {
   const mode = detectMode();
   if (mode !== "sideload" && mode !== "jailbreak") return Promise.resolve("site");
-  const self = (rows) => rows.find((r) => r.id === SELF_ID) ?? rows[0];
   return (running ??= runEssential({
     gather: () => gather(mode),
     alert: showAlert,
     lock,
-    complete: (all) => (mode === "sideload" ? installSelfNow(self(all)) : queueAll(all)),
-    essentialOnly: (rows) => (mode === "sideload" ? installSelfNow(self(rows)) : queueAll(rows)),
+    complete: (all) => queueButton(mode, all, { everything: true }),
+    essentialOnly: (rows) => queueButton(mode, rows),
   }).finally(() => { running = null; }));
 }

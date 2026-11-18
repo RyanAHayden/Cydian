@@ -86,3 +86,11 @@ html[data-theme="dark"] .home-links .cell + .cell { border-top-color: var(--divi
 .app-offer .table.grouped { background: #eefff0; }
 html[data-theme="dark"] .app-offer .table.grouped { background: #2f4a36; }
 .app-offer .home-glyph { background-color: #37a94a; }
+
+/* Home's Cydian App card (screens/home.js tileRow "green stack"): one green table, two full-width rows with a line
+   of explanation each. */
+.home-row.stack > .table { flex: 1; }
+.home-stack > .cell + .cell { border-top: 1px solid var(--tile-edge, rgba(0,0,0,.12)); }
+.home-stack .home-tile { min-height: 58px; }
+.home-tile-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.home-tile-text .cell-subtitle { font-size: 13px; font-weight: normal; color: var(--subtitle); }

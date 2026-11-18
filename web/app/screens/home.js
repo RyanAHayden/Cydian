@@ -172,19 +172,28 @@ function wrap(frag) {
 }
 
 // One tile: a cell link with a glyph, a bold label and the chevron. External links open in a new tab.
-function tile({ label, href, glyph, external = false }) {
+function tile({ label, href, glyph, external = false, subtitle = null }) {
   const li = el("li", "cell");
   const a = el("a", "cell-inner chevron home-tile");
   a.href = href;
   if (external) { a.target = "_blank"; a.rel = "noopener"; }
-  a.append(el("span", "cell-icon home-glyph glyph-" + glyph), el("span", "cell-label", label));
+  a.append(el("span", "cell-icon home-glyph glyph-" + glyph));
+  if (subtitle) {
+    const text = el("span", "home-tile-text");
+    text.append(el("span", "cell-label", label), el("span", "cell-subtitle", subtitle));
+    a.append(text);
+  } else a.append(el("span", "cell-label", label));
   li.append(a);
   return li;
 }
 
 function tileRow(cls, ...tiles) {
   const row = el("div", "home-row " + cls);
-  if (cls === "pair") {
+  if (cls.split(" ").includes("stack")) { // one table, the tiles as full-width rows under each other
+    const ul = el("ul", "table grouped home-tiles home-stack");
+    ul.append(...tiles);
+    row.append(ul);
+  } else if (cls === "pair") {
     const ul = el("ul", "table home-pair");
     ul.append(...tiles);
     row.append(ul);
@@ -258,9 +267,9 @@ function renderRoot(body) {
   // Settings > Signing first when there's none; jailbroken, the release's .deb for the device's arch.
   // One green split button (user 2026-11-17): Install Cydian App | Send Settings (Open in Cydian App: the certificate,
   // sources and settings into the app).
-  const sendTile = tile({ label: "Send Settings", href: format({ tab: "home" }), glyph: "send" });
-  const appRow = tileRow("pair", tile({ label: APP_LABEL, href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }), sendTile);
-  appRow.classList.add("green");
+  const sendTile = tile({ label: "Send Settings to App", subtitle: "Your certificate, sources and settings", href: format({ tab: "home" }), glyph: "send" });
+  const appRow = tileRow("green stack", tile({ label: "Install Cydian App", subtitle: "Signed with your certificate",
+    href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }), sendTile);
   const appLink = appRow.querySelector("a");
   let offer = null;
   appLink.addEventListener("click", (e) => {

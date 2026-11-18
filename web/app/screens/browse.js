@@ -25,7 +25,7 @@ import { settings, createSwitch } from "./settings.js";
 import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js";
 import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
-import { renderAltSource, renderApp, installRows, formatDate, osRange } from "./altstore.js";
+import { renderAltSource, renderApp, installRows, formatDate, osRange, appPageAction } from "./altstore.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { signingReady, signingAvailable, signAndInstall, localSigning } from "../signing-client.js";
 import { installOptions } from "../core/altstore.js";
@@ -617,6 +617,8 @@ async function packageActions(route, button) {
   const actions = [];
   if (st.kind === "ipa" && st.ipa) {
     const v = st.ipa.versions[0];
+    // F80: Install / Upgrade / Reinstall queue the app and open Confirm; Modify while it's queued (altstore.js).
+    if (await appPageAction(pkg, source)) return;
     // I5: with the user's own certificate (Settings > Signing), Install signs this app and installs it.
     if (await signIfReady(st.ipa, v, recordApp(pkg, source, v))) return;
     // Install at the top right installs: the first row (signed with the user's certificate, the source's signed

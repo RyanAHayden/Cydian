@@ -29,6 +29,8 @@ import { catalog } from "../catalog.js";
 import { installQueue, runLogs } from "../queue.js";
 import { MODES, MODE_LABEL, changeCount, parseStatusLine, consoleText, finishOf, FINISH_LABEL, runTitle, CONFFILE_TITLE,
   CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine } from "../core/queue.js";
+import { appQueue } from "../app-queue.js";
+import { appPlan, runOrder, sizeText, SELF_ID } from "../core/appqueue.js";
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 
@@ -283,6 +285,113 @@ function rawOutput(text) {
   const pre = el("pre", "table grouped confirm-raw", String(text ?? "").trim() || "(no output)");
   g.append(pre);
   return g;
+}
+
+// ---- the sideload app's (and the website's) queue: apps signed on the phone (F80) -------------------------------
+//
+// Cydia's flow without apt: an app page's Install / Upgrade / Reinstall (altstore.js appPageAction) and Changes'
+// Upgrade (N) queue apps (app-queue.js) and open this Confirm sheet: Statistics (the download), Modifications
+// (Install, Upgrade... with the names, and a tweak's dependencies once tweaks have them: core/appqueue.js appPlan),
+// the Queue (tap one to clear it) and Continue Queuing; Cancel at the top left clears the queue, Confirm at the top
+// right installs it in turn (runAppQueue), each signed on the phone, Cydian itself last.
+
+let appConfirm = null;  // the open Confirm sheet for apps: { refresh(), close() }
+let appRunning = false; // Confirm's installs are going: queuing adds without opening a second sheet
+
+// Queues an app (a core/appqueue.js job) and opens Confirm, or redraws the open one. -> the job.
+export function queueApp(job, { queue = appQueue, open = openAppConfirm } = {}) {
+  const j = queue.add(job);
+  if (!appRunning) open(queue);
+  return j;
+}
+
+export function openAppConfirm(queue = appQueue) {
+  if (appConfirm) { appConfirm.refresh(); return; }
+  if (!queue.size) return;
+  const cancel = barButton("Cancel");
+  const ok = barButton("Confirm", "done");
+  const m = modal({ title: "Confirm", left: cancel, right: ok, cls: "confirm-sheet" });
+  // A Clear (here or on an app page's Modify) or a run's progress redraws it; an add redraws it through queueApp.
+  const off = queue.subscribe((e) => { if (e.type !== "add") refresh(); });
+  const close = () => { off(); if (appConfirm === sheet) appConfirm = null; return m.close(); };
+  cancel.addEventListener("click", () => { close(); queue.clearAll(); });
+  ok.addEventListener("click", () => {
+    const jobs = queue.list();
+    close().then(() => runAppQueue(jobs, { queue }));
+  });
+  function refresh() {
+    const jobs = queue.list();
+    if (!jobs.length) { close(); return; }
+    const names = {};
+    for (const j of jobs) {
+      if (j.name) names[j.id] = j.name;
+      for (const d of j.deps ?? []) if (d?.name) names[d.id] = d.name;
+    }
+    m.scroll.replaceChildren(statistics(appPlan(jobs)), modifications(appPlan(jobs), names), appQueueGroup(jobs, queue), continueGroup(close));
+  }
+  const sheet = { refresh, close };
+  appConfirm = sheet;
+  refresh();
+}
+
+// The queue as asked: mode and version on the right, the download size under the name; a tap offers Clear.
+function appQueueGroup(jobs, queue) {
+  return grouped([{ header: "Queue", rows: jobs.map((j) => ({
+    label: j.name || j.id,
+    subtitle: sizeText(j.size),
+    detail: MODE_LABEL[j.mode] + (j.version ? ` ${j.version}` : ""),
+    onClick: async () => {
+      const i = await showActionSheet({ title: j.name || j.id, buttons: ["Clear"], destructive: 0 });
+      if (i === 0) queue.clear(j.id);
+    },
+  })), footer: jobs.some((j) => j.id === SELF_ID)
+    ? "Tap an app to take it out of the queue. Cydian installs last: iOS closes it while it installs."
+    : "Tap an app to take it out of the queue." }]);
+}
+
+// One app: signed on the phone in the sideload app (installOnDevice; Cydian's own IPA through signAndInstall, which
+// hosts it on the Signing Server), on the Signing Server on the website (signAndInstall). True once iOS was asked.
+async function installApp(job) {
+  const sc = await import("../signing-client.js");
+  if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" });
+  return sc.signAndInstall({ url: job.url, name: job.name || "" });
+}
+
+// F30/I3: the version Install put on the phone, so Installed and Changes follow it (Cydian records itself).
+async function recordApp(job) {
+  if (job.id === SELF_ID) return;
+  const { apps, recordInstall } = await import("../core/installed.js");
+  await recordInstall(await apps(), { id: job.id, name: job.name, version: job.version, key: job.key, source: job.source,
+    sourceName: job.sourceName || "", icon: job.icon });
+}
+
+// The sideload app's first install with something missing opens the Signing walkthrough (F75) instead: nothing runs.
+async function readyToInstall() {
+  const sc = await import("../signing-client.js");
+  return !(sc.localSigning() && await sc.firstInstallCheck());
+}
+
+// Confirm's run: each app in turn (runOrder: Cydian last), each one out of the queue once iOS has it; the first
+// failure (its alert already shown) stops the run and leaves the rest queued. -> how many were installed.
+export async function runAppQueue(jobs, { queue = appQueue, install = installApp, record = recordApp, ready = readyToInstall } = {}) {
+  if (appRunning) return 0;
+  appRunning = true;
+  let done = 0;
+  try {
+    if (!(await ready())) return 0;
+    for (const j of runOrder(jobs)) {
+      if (!queue.get(j.id)) continue; // cleared meanwhile
+      let ok = false;
+      try { ok = await install(j); } catch { ok = false; }
+      if (!ok) break;
+      done++;
+      queue.clear(j.id);
+      try { await record(j); } catch { /* no store: Installed won't list it */ }
+    }
+  } finally {
+    appRunning = false;
+  }
+  return done;
 }
 
 // ---- the console -----------------------------------------------------------------------------------------------

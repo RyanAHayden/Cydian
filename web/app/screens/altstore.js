@@ -11,19 +11,21 @@ import { catalog, ALL } from "../catalog.js";
 import { getBackend } from "../backend.js";
 import { mediaUrl } from "./depiction.js";
 import { installOptions } from "../core/altstore.js";
-import { compareVersions } from "../core/apt.js";
 import { settings } from "./settings.js";
 import { displayName, githubAvatarUrl } from "../core/sources.js";
 import { compat } from "../core/compat.js";
 import { currentDevice, compatBadge } from "../device.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall } from "../core/installed.js";
-import { signAndInstall } from "../signing-client.js";
+import { signAndInstall, localSigning, signingReady } from "../signing-client.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { setSourceShare } from "./handoff.js";
 import { openIpaInstall } from "./ipa-install.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
+import { appQueue } from "../app-queue.js";
+import { appJob, appNavLabel, modifyActions } from "../core/appqueue.js";
+import { queueApp } from "./queue.js";
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -82,9 +84,10 @@ function card(children, cls = "") {
 //     the site, the phone itself in the sideload app; without a certificate it says how to add one)
 //   - always: Download IPA, to keep the file
 // `opener` opens a URL outside the app (window.open on the site). `onInstall` runs first on any of them (F30: the
-// Installed tab's record).
+// Installed tab's record). F80: `queue`, when given, is what "Signed with your certificate" does instead (the app page
+// queues the app and opens Confirm: appPageAction); it resolves false to sign and install straight away as before.
 export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {},
-  _unused = null, name = "") {
+  queue = null, name = "") {
   const o = installOptions(version, sourceUrl);
   const rows = [];
   if (o.download && ipaInstallAvailable()) {
@@ -92,7 +95,9 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   } else if (o.itms) {
     rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
   } else if (o.download) {
-    rows.push({ label: "Install", subtitle: "Signed with your certificate", onClick: () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() }) });
+    const direct = () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() });
+    rows.push({ label: "Install", subtitle: "Signed with your certificate",
+      onClick: queue ? async () => { if (!(await queue())) direct(); } : direct });
   }
   if (o.download) rows.push({ label: "Download IPA", subtitle: decodeURIComponent(o.download.split("/").pop() || ""), onClick: () => opener(o.download) });
   return { rows, options: o };
@@ -192,12 +197,12 @@ function trackingSection(app, pkg, source) {
       : [{ label: "Mark as Installed", onClick: () => (versions.length > 1 ? pick() : mark(versions[0] ?? "")) }];
     // The nav bar's button says what it will do, as Cydia's does: Upgrade when a newer version is out than the one
     // installed, Reinstall when it's the same, Install when it isn't installed.
-    const newest = versions[0];
-    const label = !rec ? "Install" : rec.version && newest && compareVersions(newest, rec.version) > 0 ? "Upgrade" : "Reinstall";
+    // F80: Modify while the app is queued, as Cydia's does (core/appqueue.js appNavLabel).
+    const label = appNavLabel({ queued: Boolean(appQueue.get(app.bundleIdentifier)), installed: rec ? rec.version || "" : null, newest: versions[0] });
     // (the Share icon sits beside it in the same corner: find the button by its label)
     const relabel = () => {
       const b = [...document.querySelectorAll(".nav-stack.is-active .nav-item.is-top .nav-right .bar-button")]
-        .find((x) => /^(Install|Upgrade|Reinstall)$/.test(x.textContent));
+        .find((x) => /^(Install|Upgrade|Reinstall|Modify)$/.test(x.textContent));
       if (b) b.textContent = label;
       return Boolean(b);
     };
@@ -211,7 +216,37 @@ function trackingSection(app, pkg, source) {
     if (i >= 0) mark(versions[i]);
   }
   draw();
+  // F80: queuing or clearing this app relabels the nav button (Modify); the page gone, it stops listening.
+  let shown = false;
+  const off = appQueue.subscribe((e) => {
+    if (!box.isConnected) { if (shown) off(); return; }
+    shown = true;
+    if (e.type === "clearAll" || e.id === app.bundleIdentifier || e.job?.id === app.bundleIdentifier) draw();
+  });
   return box;
+}
+
+// F80: the app page's nav button (browse.js packageActions) and its Install row, where the phone signs (the sideload
+// app) or the user's certificate is saved (the website): Install / Upgrade / Reinstall queue the app and open Confirm
+// (screens/queue.js); while it is queued the button reads Modify and offers Clear, as Cydia's does. False when the
+// queue doesn't apply (the jailbreak build, a source-signed link, no IPA, no certificate on the website): the caller
+// does what it did before.
+export async function appPageAction(pkg, source, { queue = appQueue, ask = showActionSheet, add = queueApp,
+  mode = detectMode(), ready = () => localSigning() || signingReady(), store = apps } = {}) {
+  const app = pkg?.stanza?.ipa;
+  if (mode === "jailbreak" || !app) return false;
+  let rec = null;
+  try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
+  const job = appJob(pkg, { installed: rec ? rec.version || null : null, source: source ? displayName(source) : null });
+  if (!job || !(await ready())) return false;
+  const newest = app.versions[0]?.version ?? null;
+  const state = { queued: Boolean(queue.get(job.id)), installed: rec ? rec.version || "" : null, newest };
+  if (!state.queued) { add(job, { queue }); return true; }
+  const buttons = modifyActions(state);
+  const i = await ask({ title: app.name, buttons });
+  if (buttons[i] === "Clear") queue.clear(job.id);
+  else if (i >= 0) add(job, { queue });
+  return true;
 }
 
 export function renderApp(body, route, pkg, source) {
@@ -273,7 +308,7 @@ export function renderApp(body, route, pkg, source) {
     apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: v.version, key: pkg.key,
       source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
   };
-  const { rows, options } = installRows(v, app.sourceUrl, undefined, record, undefined, app.name);
+  const { rows, options } = installRows(v, app.sourceUrl, undefined, record, record ? () => appPageAction(pkg, source) : null, app.name);
   body.append(grouped([{ header: "Install", rows,
     footer: options.download && ipaInstallAvailable() ? IPA_FOOTER
       : options.itms ? "Installs over the air with the source's signed link."

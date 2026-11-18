@@ -673,9 +673,11 @@ export function notifyRows(st, now = Date.now()) {
   };
   const off = st.backgroundOn !== false && (!st.badges || !st.alerts || !st.backgroundRefresh);
   return { header: "Update Alerts", rows: [
-    { label: "Check in the Background", detail: onOff(st.backgroundOn !== false), toggle: true },
-    { label: "Icon Badge", detail: onOff(st.badges) }, { label: "Notifications", detail: onOff(st.alerts) },
-    { label: "Background App Refresh", detail: onOff(st.backgroundRefresh) },
+    // switch rows (our iOS 6 switch, notifySection): ours to flip, or iOS's (flipping opens its Settings)
+    { label: "Check in the Background", detail: onOff(st.backgroundOn !== false), on: st.backgroundOn !== false, toggle: "ours" },
+    { label: "Icon Badge", detail: onOff(st.badges), on: Boolean(st.badges), toggle: "ios" },
+    { label: "Notifications", detail: onOff(st.alerts), on: Boolean(st.alerts), toggle: "ios" },
+    { label: "Background App Refresh", detail: onOff(st.backgroundRefresh), on: Boolean(st.backgroundRefresh), toggle: "ios" },
     { label: "Last Background Check", detail: ago(st.lastCheck) },
     ...(off ? [{ label: "Turn On in Settings", chevron: true, open: true }] : [])],
     footer: off ? "iOS asks only once: anything left off is turned on in Settings > Notifications > Cydian, and Settings > General > Background App Refresh."
@@ -688,10 +690,29 @@ function notifySection() {
   Promise.resolve(n.call("app.notifyStatus", {})).then((st) => {
     const g = notifyRows(st);
     if (!g) return;
-    g.rows = g.rows.map((r) => (r.open ? { label: r.label, chevron: true, onClick: () => n.call("app.openSettings", {}) }
-      : r.toggle ? { ...r, onClick: () => Promise.resolve(n.call("updates.background", { on: st.backgroundOn === false }))
-        .then(() => box.replaceWith(notifySection()), () => {}) } : r));
-    box.replaceChildren(grouped([g]));
+    const openIOS = () => {
+      n.call("app.openSettings", {});
+      // back from iOS Settings: show what was changed there
+      const back = () => { if (document.visibilityState !== "visible") return; document.removeEventListener("visibilitychange", back); box.replaceWith(notifySection()); };
+      document.addEventListener("visibilitychange", back);
+    };
+    const switches = g.rows.map((r) => r.toggle);
+    g.rows = g.rows.map((r) => (r.open ? { label: r.label, chevron: true, onClick: openIOS }
+      : r.toggle ? { label: r.label } : r));
+    const frag = grouped([g]);
+    // Our iOS 6 switch in each switch row, in place of an On/Off text.
+    frag.querySelectorAll(".cell").forEach((li, i) => {
+      const kind = switches[i];
+      if (!kind) return;
+      const r = notifyRows(st).rows[i];
+      const sw = createSwitch({ label: r.label, checked: r.on, onToggle: (on) => {
+        if (kind === "ours") Promise.resolve(n.call("updates.background", { on })).then(() => box.replaceWith(notifySection()), () => {});
+        else openIOS();
+      } });
+      li.querySelector(".cell-inner").append(sw);
+      li.querySelector(".cell-inner").classList.add("has-switch");
+    });
+    box.replaceChildren(frag);
   }, () => {});
   return box;
 }

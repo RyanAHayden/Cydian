@@ -26,7 +26,7 @@ import { homeFeatured } from "./extras.js";
 import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 import { refreshInBackground } from "./sources.js";
-import { promptFirstVisit, markCydianInstalled } from "../websign-gate.js";
+import { markCydianInstalled, browsingLocked, askToBrowse } from "../websign-gate.js";
 import { GUIDES, guideRows, JAILBREAK_INFO_URL } from "./guides.js";
 
 const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
@@ -239,8 +239,7 @@ const state = { tile: null, seq: 0, redraw: null };
 export function init() {
   // Sources tells when a refresh starts and each time one ends (screens/sources.js markLoading): repaint the tile.
   globalThis.addEventListener?.("cydian:refreshing", () => refreshState());
-  // F96: on the website, "Install Cydian First" at launch until Cydian is installed or the user says Not Now.
-  if (settings.mode === "site" && globalThis.document) setTimeout(() => { promptFirstVisit({ mode: settings.mode, install: installCydian }); }, 600);
+  // F96: no question at launch (user 2026-11-18); Home's rows below the Cydian App card are locked instead (renderRoot).
   // The root page stays in the stack while other tabs add or remove sources: look again whenever Home shows.
   globalThis.addEventListener?.("hashchange", () => {
     if (/^#\/home\/?$/.test(globalThis.location.hash)) refreshState();
@@ -453,8 +452,21 @@ function renderRoot(body) {
     ],
   }, { header: "User Guides", rows: guideRows(format) },
   { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }]);
-  for (const group of list.children) group.classList.add("home-links");
+  const groups = [...list.children]; // the fragment empties once appended
+  for (const group of groups) group.classList.add("home-links");
   home.append(list);
+  // The website before Cydian is installed: everything below the Cydian App card is locked; a tap asks first.
+  if (browsingLocked({ mode: settings.mode })) {
+    const locked = [browseRow, stateRow, ...groups];
+    for (const box of locked) box.classList.add("home-locked");
+    home.addEventListener("click", async (e) => {
+      if (!e.target.closest?.(".home-locked")) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const r = await askToBrowse({ install: installCydian });
+      if (r === "browse") for (const box of locked) box.classList.remove("home-locked");
+    }, true);
+  }
   // Cydia's line at the bottom of Home: the device, iOS, the installed version and the language
   // ("iPhone4,1, iOS 6.1.3, Cydia 1.1.9 (en-us)").
   const foot = el("p", "home-version", footLine({ ios: currentDevice().ios, web: !globalThis.cydianNative }));

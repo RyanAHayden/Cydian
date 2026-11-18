@@ -88,7 +88,7 @@ function updateChrome() {
 
 // ---- a modal sheet with Cancel on the left and a Done-style button on the right ----------------------------------
 
-function modal({ title, left = null, right = null, cls = "" }) {
+export function modal({ title, left = null, right = null, cls = "" }) {
   const sheet = el("div", `sheet ${cls}`.trim());
   sheet.setAttribute("role", "dialog");
   sheet.setAttribute("aria-modal", "true");

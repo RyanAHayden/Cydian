@@ -19,6 +19,9 @@ import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall } from "../core/installed.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { openInGroup } from "./handoff.js";
+import { openIpaInstall } from "./ipa-install.js";
+import { ipaInstallAvailable } from "../ipa-install.js";
+import { IPA_FOOTER } from "../core/ipainstall.js";
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -74,10 +77,15 @@ function card(children, cls = "") {
 // sideloader, and the raw IPA. `opener` opens a URL outside the app (window.open on the site). `onInstall` runs
 // first on any of them (F30: the Installed tab's record).
 // F37: `sideloader` (Settings > Sideloader; null in the jailbreak app) puts a Get row first, handing the IPA to it.
+// F67: the jailbreak build puts Install first: the IPA installed through the helper (screens/ipa-install.js), the
+// console titled with `name`.
 export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {},
-  sideloader = settings.isShown("sideloader") ? settings.get("sideloader") : null) {
+  sideloader = settings.isShown("sideloader") ? settings.get("sideloader") : null, name = "") {
   const o = installOptions(version, sourceUrl);
   const rows = [];
+  if (o.download && ipaInstallAvailable()) {
+    rows.push({ label: o.itms ? "Install IPA" : "Install", subtitle: "With the jailbreak", onClick: () => { onInstall(); openIpaInstall({ url: o.download, name }); } });
+  }
   if (o.itms) rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
   const get = !o.itms && sideloader ? sideloaderLink(version, sideloader) : null;
   if (get) {
@@ -237,9 +245,10 @@ export function renderApp(body, route, pkg, source) {
     apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: v.version, key: pkg.key,
       source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
   };
-  const { rows, options } = installRows(v, app.sourceUrl, undefined, record);
+  const { rows, options } = installRows(v, app.sourceUrl, undefined, record, undefined, app.name);
   body.append(grouped([{ header: "Install", rows,
-    footer: options.itms ? "Installs over the air with the source's signed link."
+    footer: options.download && ipaInstallAvailable() ? IPA_FOOTER
+      : options.itms ? "Installs over the air with the source's signed link."
       : "This app isn't signed for your iPhone: a sideloader signs it on the phone with your Apple ID. Adding the source there lists this app." }]));
 
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on

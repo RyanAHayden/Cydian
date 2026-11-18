@@ -29,6 +29,8 @@ import { renderAltSource, renderApp, installRows, formatDate, osRange } from "./
 import { showActionSheet } from "../nav/actionsheet.js";
 import { signingReady, signingAvailable, signAndInstall, localSigning } from "../signing-client.js";
 import { installOptions } from "../core/altstore.js";
+import { ipaInstallAvailable } from "../ipa-install.js";
+import { IPA_FOOTER } from "../core/ipainstall.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
 import { openInGroup } from "./handoff.js";
@@ -615,7 +617,7 @@ async function packageActions(route, button) {
     const v = st.ipa.versions[0];
     // I5: with the user's own certificate (Settings > Signing), Install signs this app and installs it.
     if (await signIfReady(st.ipa, v, recordApp(pkg, source, v))) return;
-    const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v));
+    const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v), undefined, st.ipa.name);
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });
     if (many) actions.push({ label: "Version History", run: () => go(versionsHref(route, id)) });
     // Sign with My Certificate tries the signing itself: if the certificate isn't usable the signer's own error says
@@ -625,6 +627,7 @@ async function packageActions(route, button) {
       actions.push({ label: "Sign with My Certificate", run: () => (url ? signAndInstall({ url, name: st.ipa.name, onInstalled: () => recordApp(pkg, source, v)?.() })
         : go(format({ tab: "settings", path: ["signing"] }))) });
     }
+    if (options.download && ipaInstallAvailable()) return sheet(IPA_FOOTER, actions); // F67
     return sheet(options.itms ? "" : "This app needs signing: a sideloader signs it on the iPhone with your Apple ID, or add your own certificate in Settings > Signing.", actions);
   }
   const installed = installedOf(history);

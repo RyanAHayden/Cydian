@@ -1,0 +1,77 @@
+// F67: the jailbreak build's IPA install over F59's bridge call (native/Sources/Apt.swift IPAInstall):
+//
+//   ipaInstallAvailable()            -> true in the jailbreak build (the sideload build keeps signing.install)
+//   await installIpa(url, onEvent)   -> { code: 0, stdout, stderr, bundleId }; onEvent({ fd, line }) streams the
+//                                       helper's lines; rejects with Error("<code>: <message>") and err.code
+//                                       (core/ipainstall.js ipaError explains them)
+//
+// It talks to cydianNative directly (as signing-client.js does), not through backend-native.js, whose error mapping
+// would fold no_adhoc and bad_ipa into "network".
+// SPDX-License-Identifier: GPL-3.0-or-later
+import { detectMode } from "./core/settings.js";
+import { ipaStatus, ipaError } from "./core/ipainstall.js";
+
+export const ipaInstallAvailable = (mode = detectMode()) => mode === "jailbreak" && Boolean(globalThis.cydianNative?.call);
+
+export async function installIpa(url, onEvent = null, { native = globalThis.cydianNative } = {}) {
+  if (!native?.call) throw Object.assign(new Error("sideload: no native bridge"), { code: "sideload" });
+  try {
+    return await native.call("ipa.install", { url, stream: Boolean(onEvent) }, onEvent ?? undefined);
+  } catch (e) {
+    const msg = e?.message || String(e);
+    const m = msg.match(/^([a-z_]+): /);
+    throw Object.assign(e instanceof Error ? e : new Error(msg), { code: e?.code || m?.[1] || "install" });
+  }
+}
+
+// The console's run, without the DOM (screens/ipa-install.js draws `view`; the tests bring their own):
+//   view.line(type, text)   type "info" | "status" | "error" | "warning": one console line
+//   view.status(text)       the white line over the bar
+//   view.progress(percent)  0..100
+// Resolves { ok, bundleId, error: core/ipainstall.js ipaError's answer or null, log: the console's text }.
+export async function runIpaInstall({ url, name = "" }, view, { native = globalThis.cydianNative } = {}) {
+  const log = [];
+  const line = (type, text) => {
+    log.push(type === "error" ? `E: ${text}` : type === "status" ? `» ${text}` : text);
+    view.line(type, text);
+  };
+  view.progress(0);
+  view.status("Preparing");
+  line("info", url);
+  let result = null;
+  let error = null;
+  let lastStatus = "";
+  const said = new Set(); // the helper's own "cydian-helper: " lines, not repeated at the end
+  try {
+    result = await installIpa(url, ({ fd, line: raw }) => {
+      const text = String(raw ?? "").replace(/\s+$/, "");
+      if (!text) return;
+      if (fd === "status") {
+        const s = ipaStatus(text);
+        if (!s) { line("info", text); return; }
+        if (s.error) { line("error", s.text); return; }
+        if (s.percent != null) view.progress(s.percent);
+        view.status(s.text);
+        if (s.text !== lastStatus) line("status", s.text); // installd repeats "Installing" with each percent
+        lastStatus = s.text;
+        return;
+      }
+      if (fd === "err" && /^cydian-helper: /.test(text)) said.add(text.slice(15));
+      line(fd === "err" && /^cydian-helper: /.test(text) ? "error" : fd === "err" && /^(W:|warning)/i.test(text) ? "warning" : "info", text);
+    }, { native });
+  } catch (e) {
+    error = ipaError(e, name);
+  }
+  if (error) {
+    const first = error.code === "no_adhoc" ? error.detail || error.title : error.message;
+    if (!(error.code === "no_adhoc" && said.has(error.detail))) line("error", first);
+    for (const l of error.lines) line(error.code === "no_adhoc" ? "warning" : "info", l);
+    view.status(error.title);
+  } else {
+    const id = result?.bundleId || "";
+    line("status", id ? `Installed ${name || id} (${id})` : `Installed ${name || "the app"}`);
+    view.status("Done");
+  }
+  view.progress(100);
+  return { ok: !error, bundleId: result?.bundleId || "", error, log: log.join("\n") };
+}

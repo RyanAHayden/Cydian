@@ -290,6 +290,15 @@ class Helper(unittest.TestCase):
                           "com.a.b=2", "com.d-"])
         self.assertEqual(len(self.plan("apply", *[f"p{i:03d}" for i in range(256)])), 2 + 12 + 256)
 
+    def test_apply_ask_plan(self):
+        """F63: apply-ask is apply without the conffile options, and needs the status fd to ask on."""
+        self.assertEqual(self.plan("apply-ask", "com.a.b", "-com.d"),
+                         ["/var/jb/usr/bin/apt-get", "apt-get", "-y", "--reinstall", "--allow-downgrades", "-o",
+                          "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3", "install", "com.a.b", "com.d-"])
+        self.assertEqual(self.plan("apply-ask", "com.a.b", fd="-1"), ["error: apply-ask needs the status fd (3) to ask on"])
+        self.assertEqual(self.plan("apply-ask", "ab-"), ["error: bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"])
+        self.assertEqual(self.plan("apply-ask"), ["error: no packages"])
+
     def test_queue_refusals(self):
         cases = {
             ("apply",): "no packages",
@@ -449,6 +458,36 @@ class Helper(unittest.TestCase):
         out = self.run_driver("spawn", helper, "apply", "-com.repo.tweak", driver=app)
         self.assertIn("2: cydian-helper: unknown package: com.repo.tweak", out)
         self.assertEqual(out[-1], "exit: 64")
+
+    def test_chain_apply_ask(self):
+        """F63: apt-get gets a pipe for stdin and only the answers Y and N reach it; the helper ends when apt does,
+        even while the app holds its end open."""
+        p, app, helper = self.chain_prefix()
+
+        def ask(mode, answers, *words):
+            r = subprocess.run([app, "spawn-ask", mode, helper, *words], capture_output=True, text=True, timeout=30,
+                               env={**os.environ, "TEST_ANSWERS": answers})
+            self.assertEqual(r.returncode, 0, r.stderr)
+            return r.stdout.splitlines()
+
+        out = ask("close", "Z,D,maybe,Y", "apply-ask", "com.repo.tweak=1")
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y --reinstall --allow-downgrades -o APT::Keep-Fds::=3 "
+                      "-o APT::Status-Fd=3 install com.repo.tweak=1", out)
+        self.assertIn("1: stdin: Y", out)
+        self.assertEqual(out.count("2: cydian-helper: ignored an answer that isn't Y or N"), 3, out)
+        self.assertIn("CYDIA=3 1", next(l for l in out if l.startswith("1: env: ")))
+        self.assertEqual(out[-1], "exit: 7")
+        fds = next(l for l in out if l.startswith("2: fds: ")).split()[2:]
+        self.assertEqual([f for f in fds if int(f) > 3 and f != "255"], [], fds)  # the answer fd stays the helper's
+
+        out = ask("keep", "N", "apply-ask", "com.repo.tweak")  # the app's end stays open: apt's exit ends it
+        self.assertIn("1: stdin: N", out)
+        self.assertEqual(out[-1], "exit: 7")
+        out = ask("close", "", "apply-ask", "com.repo.tweak")  # the app gave up: apt reads end of file
+        self.assertIn("1: stdin: eof", out)
+        # plain apply still reads /dev/null even from a pipe
+        out = ask("close", "Y", "apply", "com.repo.tweak")
+        self.assertIn("1: stdin: eof", out)
 
     def test_chain_holds(self):
         p, app, helper = self.chain_prefix()

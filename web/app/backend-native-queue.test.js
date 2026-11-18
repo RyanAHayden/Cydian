@@ -3,7 +3,7 @@
 // status after the run, and a downgrade by version.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { copyFileSync, readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createNativeBackend } from "./backend-native.js";
 import { createCatalog, ALL } from "./core/catalog.js";
@@ -102,6 +102,38 @@ test("apply: a failing run resolves with apt's exit code and its error on stderr
   const r = await backend.apply([{ op: "install", id: "bash", version: null }], (e) => events.push(e));
   assert.equal(r.code, 100);
   assert.ok(events.some((e) => e.fd === "err" && /returned an error code/.test(e.line)));
+});
+
+test("F63 apply asks about a conffile both sides changed, and waits for the console's answer", async (t) => {
+  for (const [answer, kept] of [["new", "new /etc/example.conf"], ["keep", "keep /etc/example.conf"]]) {
+    const { backend, native, fx } = setup(t, { env: { FAKE_CONFFILE: "/etc/example.conf" } });
+    const events = [];
+    const asked = [];
+    const r = await backend.apply([{ op: "install", id: "com.example.tweak", version: "0.9" }], (e) => {
+      events.push(e);
+      const s = e.fd === "status" ? parseStatusLine(e.line) : null;
+      if (s?.type === "conffile") { asked.push(s); backend.answerConffile(answer); }
+    });
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(native.calls.find((c) => c.method === "helper.run").params.words, ["apply-ask", "com.example.tweak=0.9"]);
+    assert.deepEqual(asked.map((s) => s.file), ["/etc/example.conf"]);
+    assert.equal(readFileSync(join(fx.prefix, "var/fake-conffiles"), "utf8"), `${kept}\n`);
+    assert.equal(events.some((e) => /Installing new version of config file/.test(e.line)), answer === "new");
+  }
+});
+
+test("F63 answerConffile: only keep or new, and only while an apply waits", async (t) => {
+  const { backend } = setup(t);
+  await assert.rejects(backend.answerConffile("keep"), (e) => e.code === "helper" && /no install is waiting/.test(e.message));
+  await assert.rejects(backend.answerConffile("Z"), (e) => e.code === "helper" && /keep or new/.test(e.message));
+});
+
+test("F63 apply without a console keeps the old conffile (plain apply, --force-confold)", async (t) => {
+  const { backend, native, fx } = setup(t, { env: { FAKE_CONFFILE: "/etc/example.conf" } });
+  const r = await backend.apply([{ op: "install", id: "com.example.tweak", version: "0.9" }]);
+  assert.equal(r.code, 0);
+  assert.equal(native.calls.at(-1).params.words[0], "apply");
+  assert.equal(readFileSync(join(fx.prefix, "var/fake-conffiles"), "utf8"), "keep /etc/example.conf\n");
 });
 
 test("respring runs the helper's respring verb", async (t) => {

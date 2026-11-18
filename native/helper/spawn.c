@@ -36,8 +36,14 @@ static int high_pipe(int p[2]) {
 
 int cydian_helper_spawn(const char *helper, const char *const args[], pid_t *pid, int *out_fd, int *err_fd,
                         int *status_fd) {
-    int pipes[3][2], made = 0, rc;
-    for (; made < 3; made++)
+    return cydian_helper_spawn_in(helper, args, pid, NULL, out_fd, err_fd, status_fd);
+}
+
+int cydian_helper_spawn_in(const char *helper, const char *const args[], pid_t *pid, int *in_fd, int *out_fd,
+                           int *err_fd, int *status_fd) {
+    /* pipes[3] is the child's stdin (F63), made only when in_fd asks for it */
+    int pipes[4][2], made = 0, rc, want = in_fd ? 4 : 3;
+    for (; made < want; made++)
         if ((rc = high_pipe(pipes[made]))) goto fail;
 
     size_t n = 0;
@@ -51,7 +57,8 @@ int cydian_helper_spawn(const char *helper, const char *const args[], pid_t *pid
     posix_spawnattr_t attr;
     posix_spawn_file_actions_init(&fa);
     posix_spawnattr_init(&attr);
-    posix_spawn_file_actions_addopen(&fa, 0, "/dev/null", O_RDONLY, 0);
+    if (in_fd) posix_spawn_file_actions_adddup2(&fa, pipes[3][0], 0);
+    else posix_spawn_file_actions_addopen(&fa, 0, "/dev/null", O_RDONLY, 0);
     for (int i = 0; i < 3; i++) posix_spawn_file_actions_adddup2(&fa, pipes[i][1], i + 1);
 #ifdef __APPLE__
     /* Nothing of the app's leaks into the root process: only the fds set up above survive. */
@@ -66,6 +73,10 @@ int cydian_helper_spawn(const char *helper, const char *const args[], pid_t *pid
     free(argv);
     if (rc) goto fail;
     for (int i = 0; i < 3; i++) close(pipes[i][1]);
+    if (in_fd) {
+        close(pipes[3][0]);
+        *in_fd = pipes[3][1];
+    }
     *out_fd = pipes[0][0];
     *err_fd = pipes[1][0];
     *status_fd = pipes[2][0];

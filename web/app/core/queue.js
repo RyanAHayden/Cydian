@@ -12,6 +12,8 @@
 //   parseSimulation(text)     -> { installs, reinstalls, upgrades, downgrades, removes, essential, download }
 //   parseStatusLine(line)     -> { type: "status" | "error" | "conffile" | "finish", ... } (apt's Status-Fd, $CYDIA)
 //   finishOf(levels...)       -> the highest of return | reopen | restart | reload | reboot
+//   CONFFILE_TITLE, CONFFILE_BUTTONS, conffileMessage(file), conffileAnswer(index), conffileLine(file, answer)
+//                             F63: the Configuration Upgrade alert and the word it answers (keep | new)
 //   createRunLog(storage)     -> the console logs Settings shows
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -115,7 +117,9 @@ export const changeCount = (plan) => MODES.reduce((n, m) => n + plan[`${m}s`].le
 // the finish word maintainer scripts write to $CYDIA. Anything else on that fd is plain information.
 //   { type: "status", pkg, percent, text, download? }   white bold; the percent moves the progress bar
 //   { type: "error", pkg, text }                        red
-//   { type: "conffile", file, text }                    (stdin is /dev/null: dpkg keeps the old copy, confold)
+//   { type: "conffile", file, text }                    dpkg asks about a conffile both sides changed (F63:
+//                                                       apply-ask waits for conffileAnswer's word; plain apply
+//                                                       keeps the old copy, --force-confold)
 //   { type: "finish", finish }                          raises the finish button
 //   { type: "info", text }
 export function parseStatusLine(line) {
@@ -139,6 +143,18 @@ export function parseStatusLine(line) {
   if (m) return { type: "status", pkg: m[2].trim(), text: `${m[1].trim()} ${m[2].trim()}` };
   return { type: "info", text: s };
 }
+
+// F63: Cydia's Configuration Upgrade alert (CONFIGURATION_UPGRADE, CONFIGURATION_UPGRADE_EX, KEEP_OLD_COPY,
+// ACCEPT_NEW_COPY). Keep is first and is the cancel button: dpkg's own default.
+export const CONFFILE_TITLE = "Configuration Upgrade";
+export const CONFFILE_BUTTONS = ["Keep My Old Copy", "Accept The New Copy"];
+export const conffileMessage = (file) =>
+  `The following file has been changed by both the package maintainer and by you (or for you by a script).\n\n${file}`;
+// The alert's button index -> the word backend.answerConffile takes (anything but Accept keeps).
+export const conffileAnswer = (index) => (index === 1 ? "new" : "keep");
+// The console's line once answered.
+export const conffileLine = (file, answer) =>
+  answer === "new" ? `Configuration file ${file}: installing the package's new copy` : `Configuration file ${file}: keeping your copy`;
 
 // Only the text after the last carriage return shows, so progress-bar lines collapse into one (Cydia's console).
 export const consoleText = (line) => String(line ?? "").split("\r").filter((p) => p !== "").pop() ?? "";

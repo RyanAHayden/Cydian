@@ -6,8 +6,9 @@
 //                                              buttons: ["Cancel", "Add Source"], cancel: 0 });
 //
 // Resolves with the tapped button's index and the field's text. Return in the field taps the last button,
-// Escape taps `cancel`. All text goes in through textContent.
-export function showAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0 } = {}) {
+// Escape taps `cancel`. All text goes in through textContent. `stacked` stacks two buttons whose titles don't fit
+// side by side, as UIAlertView does (F63's Keep My Old Copy / Accept The New Copy).
+export function showAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "alert-scrim";
@@ -47,7 +48,7 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
       } else box.append(field);
     }
     const row = document.createElement("div");
-    row.className = "alert-buttons" + (buttons.length > 2 ? " stacked" : "");
+    row.className = "alert-buttons" + (buttons.length > 2 || stacked ? " stacked" : "");
     buttons.forEach((label, i) => {
       const b = document.createElement("button");
       b.type = "button";

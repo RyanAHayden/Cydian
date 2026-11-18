@@ -76,6 +76,10 @@ enum Apt {
                 catch { reply(c, nil, "helper: \(error.localizedDescription)") }
             }
         }
+        // F63: helper.answer {answer: "keep" | "new"} answers the running apply-ask's Configuration Upgrade question.
+        b.on("helper.answer") { c in
+            work(c) { () throws -> Any? in try Helper.answer(c.params["answer"] as? String ?? ""); return true }
+        }
         // F59: ipa.install {url} (stream: helper lines as helper.run's, after a "dlstatus:ipa:0:Downloading" one).
         b.on("ipa.install") { c in
             guard AppMode.current == .jailbreak else {
@@ -213,7 +217,22 @@ extension Bridge.Call {
 // cydian-helper as root through native/helper/spawn.c (the persona spawn attributes, allowed by the
 // com.apple.private.persona-mgmt entitlement). Its fds 1, 2 and 3 (apt's status lines) are read to the end on
 // three threads; with `emit`, every finished line goes to the page as { fd: "out" | "err" | "status", line }.
+// stdin is /dev/null, except for apply-ask (F63): a pipe that helper.answer writes into until the helper ends.
 enum Helper {
+    // F63: the stdin of the running apply-ask (one console runs at a time), or -1.
+    static var answerFd: Int32 = -1
+    static let answerLock = NSLock()
+
+    // F63: the console's answer to dpkg's conffile question (apt's pmconffile: line): keep -> "N" (Keep My Old
+    // Copy), new -> "Y" (Accept The New Copy). cydian-helper passes on only those two lines.
+    static func answer(_ word: String) throws {
+        guard let line = ["keep": "N\n", "new": "Y\n"][word] else { throw BridgeError("helper", "answer is keep or new") }
+        answerLock.lock(); defer { answerLock.unlock() }
+        guard answerFd >= 0 else { throw BridgeError("helper", "no install is waiting for an answer") }
+        let n = line.withCString { write(answerFd, $0, 2) }
+        if n != 2 { throw BridgeError("helper", "the install isn't listening: \(String(cString: strerror(errno)))") }
+    }
+
     static func run(_ words: [String], emit: (([[String: Any]]) -> Void)?) throws -> [String: Any] {
         let path = Jailbreak.helper
         guard FileManager.default.isExecutableFile(atPath: path) else {
@@ -224,12 +243,26 @@ enum Helper {
         defer { for p in cargs { free(p) } }
         var pid: pid_t = 0
         var fds: (Int32, Int32, Int32) = (-1, -1, -1)
+        // F63: apply-ask gets a pipe on its stdin, which helper.answer writes the console's answers into.
+        let ask = words.first == "apply-ask"
+        var input: Int32 = -1
         let rc = cargs.withUnsafeBufferPointer { buf -> Int32 in
             buf.baseAddress!.withMemoryRebound(to: UnsafePointer<CChar>?.self, capacity: buf.count) { args in
-                cydian_helper_spawn(path, args, &pid, &fds.0, &fds.1, &fds.2)
+                ask ? cydian_helper_spawn_in(path, args, &pid, &input, &fds.0, &fds.1, &fds.2)
+                    : cydian_helper_spawn(path, args, &pid, &fds.0, &fds.1, &fds.2)
             }
         }
         if rc != 0 { throw BridgeError("helper", "can't start cydian-helper: \(String(cString: strerror(rc)))") }
+        if ask {
+            _ = fcntl(input, F_SETNOSIGPIPE, 1) // an answer after the helper is gone is EPIPE, not a dead app
+            answerLock.lock(); answerFd = input; answerLock.unlock()
+        }
+        defer {
+            if ask {
+                answerLock.lock(); if answerFd == input { answerFd = -1 }; answerLock.unlock()
+                close(input)
+            }
+        }
 
         let names = ["out", "err", "status"]
         var collected = [Data(), Data(), Data()]

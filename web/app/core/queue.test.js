@@ -163,3 +163,15 @@ test("runTitle names the jobs", () => {
   assert.equal(runTitle([{ op: "install", mode: "install", id: "a", name: "Alpha" }, { op: "remove", mode: "remove", id: "b" }]), "Install Alpha, Remove b");
   assert.equal(runTitle([1, 2, 3, 4].map((i) => ({ mode: "install", id: `p${i}` }))), "Install p1, Install p2 and 2 more");
 });
+
+test("F63 the Configuration Upgrade alert: Cydia's words, and only Accept installs the new copy", async () => {
+  const { CONFFILE_TITLE, CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine } = await import("./queue.js");
+  assert.equal(CONFFILE_TITLE, "Configuration Upgrade");
+  assert.deepEqual(CONFFILE_BUTTONS, ["Keep My Old Copy", "Accept The New Copy"]);
+  assert.match(conffileMessage("/var/jb/etc/x.conf"), /changed by both the package maintainer and by you[\s\S]*\n\n\/var\/jb\/etc\/x\.conf$/);
+  assert.equal(conffileAnswer(0), "keep");
+  assert.equal(conffileAnswer(1), "new");
+  assert.equal(conffileAnswer(undefined), "keep");
+  assert.equal(conffileLine("/e", "new"), "Configuration file /e: installing the package's new copy");
+  assert.equal(conffileLine("/e", "keep"), "Configuration file /e: keeping your copy");
+});

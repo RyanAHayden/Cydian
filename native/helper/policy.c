@@ -146,8 +146,9 @@ static int source_plan(int argc, char *const argv[], const char *prefix, struct 
 static int queue_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
                       const char **err) {
     static char status_apt[64], keep_fd[64];
-    int n = argc - 1, apply = p->verb == HV_APPLY;
+    int n = argc - 1, apply = p->verb == HV_APPLY || p->verb == HV_APPLY_ASK;
     if (n < 1) { *err = "no packages"; return -1; }
+    if (p->verb == HV_APPLY_ASK && status_fd < 0) { *err = "apply-ask needs the status fd (3) to ask on"; return -1; }
     if (n > HELPER_MAX_PACKAGES) { *err = "too many package names"; return -1; }
     for (int i = 0; i < n; i++) {
         const char *w = argv[i + 1];
@@ -178,8 +179,10 @@ static int queue_plan(int argc, char *const argv[], const char *prefix, int stat
     a[k++] = "apt-get";
     if (apply) {
         a[k++] = "-y";
-        a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confdef";
-        a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confold";
+        if (p->verb == HV_APPLY) { /* F63: apply-ask leaves the conffile question to dpkg, answered through main.c */
+            a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confdef";
+            a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confold";
+        }
     } else {
         a[k++] = "-s";
     }
@@ -198,6 +201,13 @@ static int queue_plan(int argc, char *const argv[], const char *prefix, int stat
     p->packages = p->names;
     p->npackages = n;
     return 0;
+}
+
+/* F63: dpkg's conffile prompt reads a line; only "Y" (install the package's copy) and "N" (keep yours) get through,
+ * with an optional trailing \r. */
+int helper_answer_ok(const char *line, size_t len) {
+    if (len && line[len - 1] == '\r') len--;
+    return len == 1 && (line[0] == 'Y' || line[0] == 'N');
 }
 
 /* N4: respring: Restart SpringBoard at the end of a run. sbreload when the jailbreak has it, else killall
@@ -490,6 +500,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "removesource")) { p->verb = HV_REMOVESOURCE; return source_plan(argc, argv, prefix, p, err); }
     else if (!strcmp(verb, "simulate")) { p->verb = HV_SIMULATE; return queue_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "apply")) { p->verb = HV_APPLY; return queue_plan(argc, argv, prefix, status_fd, p, err); }
+    else if (!strcmp(verb, "apply-ask")) { p->verb = HV_APPLY_ASK; return queue_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "respring")) { p->verb = HV_RESPRING; return respring_plan(argc, prefix, p, err); }
     else if (!strcmp(verb, "install-ipa")) { p->verb = HV_INSTALL_IPA; return ipa_plan(argc, argv, p, err); }
     else if (!strcmp(verb, "rollbacks")) { p->verb = HV_ROLLBACKS; return rollback_plan(argc, argv, prefix, status_fd, p, err); }
@@ -579,7 +590,7 @@ static int first_missing(const struct helper_plan *p, const char *found) {
 }
 
 int helper_first_unknown(const char *prefix, const struct helper_plan *p) {
-    int queue = p->verb == HV_SIMULATE || p->verb == HV_APPLY;
+    int queue = p->verb == HV_SIMULATE || p->verb == HV_APPLY || p->verb == HV_APPLY_ASK;
     if (p->verb != HV_INSTALL && p->verb != HV_REMOVE && p->verb != HV_HOLD && p->verb != HV_UNHOLD && !queue) return -1;
     char found[HELPER_MAX_PACKAGES] = {0};
     char path[PATH_MAX];

@@ -9,6 +9,7 @@
 //
 // `net`: URL -> string | { status, body, headers } for net.fetch / net.packages (a missing URL answers 404;
 // net: null means offline, every request fails with "network: ..."). `env` goes to the helper (FAKE_FAIL=update).
+// F63: helper.run of apply-ask gives the helper a stdin pipe, which helper.answer { answer: keep | new } writes to.
 // F59: ipa.install downloads into `ipaDir` (default: beside the prefix, ipa-cache/) and runs install-ipa there.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { spawn } from "node:child_process";
@@ -33,6 +34,7 @@ const read = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null);
 export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = FAKE_HELPER, mode = "jailbreak",
   ipaDir = join(dirname(prefix ?? "."), "ipa-cache") } = {}) {
   const calls = [];
+  let answerTo = null; // F63: the running apply-ask's stdin
   const fail = (msg) => Promise.reject(new Error(msg));
 
   function netGet(url) {
@@ -81,8 +83,13 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       return new Promise((resolve, reject) => {
         const child = spawn(helper, words, {
           env: { PATH: process.env.PATH, CYDIAN_PREFIX: prefix, FAKE_REMOTE: remote, CYDIAN_IPA_DIR: ipaDir, ...env },
-          stdio: ["ignore", "pipe", "pipe", "pipe"],
+          // F63: apply-ask gets a stdin pipe for helper.answer, as Helper.run in Apt.swift gives it.
+          stdio: [words[0] === "apply-ask" ? "pipe" : "ignore", "pipe", "pipe", "pipe"],
         });
+        if (child.stdin) {
+          child.stdin.on("error", () => {}); // an answer after the helper ended
+          answerTo = child.stdin;
+        }
         const text = { out: "", err: "" };
         const pending = { out: "", err: "", status: "" };
         const feed = (fd) => (chunk) => {
@@ -98,10 +105,19 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
         child.stdio[3].on("data", feed("status"));
         child.on("error", (e) => reject(new Error(`helper: can't start cydian-helper: ${e.message}`)));
         child.on("close", (code) => {
+          if (child.stdin) { if (answerTo === child.stdin) answerTo = null; child.stdin.destroy(); }
           if (stream && onEvent) for (const fd of ["out", "err", "status"]) if (pending[fd]) onEvent({ fd, line: pending[fd] });
           resolve({ code: code ?? 128, stdout: text.out, stderr: text.err });
         });
       });
+    },
+    // F63: like Helper.answer in Apt.swift: keep -> "N", new -> "Y" on the running apply-ask's stdin.
+    "helper.answer"({ answer }) {
+      const line = { keep: "N\n", new: "Y\n" }[answer];
+      if (!line) return fail("helper: answer is keep or new");
+      if (!answerTo) return fail("helper: no install is waiting for an answer");
+      answerTo.write(line);
+      return true;
     },
     // F59: like IPAInstall.run in Apt.swift: download as <UUID>.ipa into ipaDir, cydian-helper install-ipa, remove
     // the download; the helper's exit code picks the error code.

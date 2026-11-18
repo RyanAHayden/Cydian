@@ -7,6 +7,8 @@
 #   FAKE_FAIL      a verb that fails like apt does (exit 100, "E: ..." on stderr); simulate fails with an unmet
 #                  dependency of the first item on FAKE_MISSING (default com.example.missing), as apt-get -s does
 #   FAKE_SLOW      seconds apply waits before each package, so a walk-through sees the console mid-run
+#   FAKE_CONFFILE  a conffile path both the user and the package changed (F63): apply keeps it quietly, apply-ask
+#                  asks on fd 3 (pmconffile:) and reads Y or N from stdin, as dpkg does through the real helper
 #   FAKE_FINISH    apply writes "finish:$FAKE_FINISH" to fd 3, as a maintainer script does through $CYDIA (N4)
 #   CYDIAN_IPA_DIR install-ipa's one directory (F59; the real one's HELPER_IPA_DIR). install-ipa reads the IPA's
 #                  bundle id like ipa.c and "installs" it into $CYDIAN_PREFIX/var/fake-installed-ipas:
@@ -24,7 +26,7 @@ status=$prefix/var/lib/dpkg/status
 st() { { printf '%s\n' "$1" >&3; } 2>/dev/null || true; }
 refuse() { echo "cydian-helper: $1" >&2; exit 64; }
 verb=${1:-}
-VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, respring, install-ipa, selfupdate, rollbacks, rollback"
+VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback"
 [ -n "$verb" ] || refuse "no verb ($VERBS)"
 shift
 sources=$prefix/etc/apt/sources.list.d/cydian.sources
@@ -105,7 +107,7 @@ Components: $*"
     exit 0 ;;
   update|upgrade|configure|showhold) [ $# -eq 0 ] || refuse "this verb takes no arguments" ;;
   install|remove|hold|unhold) [ $# -ge 1 ] || refuse "no package names" ;;
-  simulate|apply) [ $# -ge 1 ] || refuse "no packages" ;;
+  simulate|apply|apply-ask) [ $# -ge 1 ] || refuse "no packages" ;;
   respring) [ $# -eq 0 ] || refuse "this verb takes no arguments"; echo "sbreload (fake)"; exit 0 ;;
   install-ipa)
     # F59: policy.c's helper_ipa_path_ok, then ipa.c's steps without installd.
@@ -232,7 +234,40 @@ stanza_of() {
 }
 # dpkg's status without package $1.
 drop_pkg() { awk -v p="$1" "$FIELDS"' BEGIN { RS = ""; ORS = "\n\n" } field("Package") != p' "$status"; }
-if [ "$verb" = simulate ] || [ "$verb" = apply ]; then
+# F63: dpkg's conffile question for $FAKE_CONFFILE, once per run (after the first install item's unpack). apply
+# keeps the old copy silently (--force-confold); apply-ask asks on fd 3 as apt's pmconffile: line and reads the
+# answer as the real helper relays it: only "Y" or "N" lines count (others: the helper's warning), end of file is
+# dpkg's error. The outcome goes into $CYDIAN_PREFIX/var/fake-conffiles as "keep <file>" or "new <file>".
+asked=
+conffile() {
+  [ -n "${FAKE_CONFFILE:-}" ] && [ -z "$asked" ] || return 0
+  asked=1
+  f=$FAKE_CONFFILE
+  if [ "$verb" = apply ]; then echo "keep $f" >> "$prefix/var/fake-conffiles"; return 0; fi
+  echo ""
+  echo "Configuration file '$f'"
+  echo " ==> Modified (by you or by a script) since installation."
+  echo " ==> Package distributor has shipped an updated version."
+  echo " The default action is to keep your current version."
+  echo "*** ${f##*/} (Y/I/N/O/D/Z) [default=N] ?"
+  st "pmconffile:$f:60:'$f' '$f.dpkg-new' 1 1"
+  while :; do
+    if ! IFS= read -r ans <&5; then
+      echo "dpkg: error processing package $1 (--configure):"
+      echo " end of file on stdin at conffile prompt"
+      echo "E: Sub-process /usr/bin/dpkg returned an error code (1)" >&2
+      exit 100
+    fi
+    case $ans in
+      Y) echo "Installing new version of config file $f ..."; echo "new $f" >> "$prefix/var/fake-conffiles"; return 0 ;;
+      N) echo "keep $f" >> "$prefix/var/fake-conffiles"; return 0 ;;
+      *) echo "cydian-helper: ignored an answer that isn't Y or N" >&2 ;;
+    esac
+  done
+}
+exec 5<&0
+if [ "$verb" = simulate ] || [ "$verb" = apply ] || [ "$verb" = apply-ask ]; then
+  [ "$verb" != apply-ask ] || { : >&3; } 2>/dev/null || refuse "apply-ask needs the status fd (3) to ask on"
   seen=" "
   for w in "$@"; do
     one_line "$w" || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"
@@ -312,6 +347,7 @@ I $name $ver $old" ;;
       echo "Get:1 https://fake.example ./ $name $ver [100 B]"
       st "pmstatus:$name:50:Preparing $name"
       echo "Unpacking $name ($ver)${old:+ over ($old)} ..."
+      conffile "$name"
       new=$(stanza_of "$name" "$ver")
       { drop_pkg "$name"
         printf '%s\n' "$new" | awk 'NR == 1 { print; print "Status: install ok installed"; next } { print }'
@@ -320,8 +356,8 @@ I $name $ver $old" ;;
       st "pmstatus:$name:100:Installed $name"
     fi
     mv "$status.new" "$status"
-  done
-  if [ "${FAKE_FAIL:-}" = apply ]; then
+  done || exit $? # conffile's end-of-file error, from inside the loop's subshell
+  if [ "${FAKE_FAIL:-}" = apply ] || [ "${FAKE_FAIL:-}" = "$verb" ]; then
     echo "dpkg: error processing package ${1#-} (--configure):"
     echo "E: Sub-process /usr/bin/dpkg returned an error code (1)" >&2
     exit 100

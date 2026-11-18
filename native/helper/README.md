@@ -8,6 +8,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper hold <pkg>... | unhold <pkg>... | showhold
     cydian-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
     cydian-helper simulate <item>... | apply <item>... | respring          (N4: the install queue)
+    cydian-helper apply-ask <item>...                                      (F63: apply that asks about conffiles)
     cydian-helper install-ipa <path>                                      (F59: an IPA, through installd)
     cydian-helper selfupdate <path.deb>                                    (F61: Cydian updates itself)
     cydian-helper rollbacks <pkg> | rollback <pkg> <version>              (F71: Roll Back to a kept .deb)
@@ -26,6 +27,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `removesource` | runs nothing: drops the stanza for that URI and suite from `cydian.sources`              |
 | `simulate`  | `apt-get -s --reinstall --allow-downgrades install <items>`: the Confirm sheet's plan (N4)       |
 | `apply`     | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --reinstall --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <items>`, with `CYDIA=3 1` in its environment when fd 3 is open (N4) |
+| `apply-ask` | `apt-get -y --reinstall --allow-downgrades -o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install <items>` (no conffile options; refused without fd 3), `CYDIA=3 1`, as a child whose stdin is a pipe the helper feeds (F63; below) |
 | `install-ipa` | runs no apt: installs one IPA through `LSApplicationWorkspace installApplication:withOptions:error:` as AppSync's `appinst` does (`ipa.c`, F59; below) |
 | `selfupdate` | `dpkg --force-confdef --force-confold [--status-fd 3] -i <path>`: Cydian's own update (F61). The path is absolute, `[A-Za-z0-9._/-]`, no `.`/`..` segment, ends in `.deb`, at most 1024 bytes, and a regular file (not a symlink). Any .deb is accepted: the caller check is the boundary, and Cydian can already install anything through `addsource` + `install` |
 | `rollbacks` | runs nothing: `<version> <file>` per line for each .deb of the package N7's daemon kept in `/var/jb/var/cache/cydian/rollback/<pkg>/` that `rollback` would take (F71; below) |
@@ -41,6 +43,18 @@ removals to dpkg's status. `--reinstall` makes an item naming the installed vers
 is what lets `-y` take an older version on purpose. Cydia's finish protocol: maintainer scripts write `finish:restart`
 (and so on) to the fd named in `$CYDIA`; `APT::Keep-Fds` keeps fd 3 open through apt and dpkg, so those lines arrive
 beside apt's status lines and raise the console's finish button.
+
+**Configuration Upgrade (F63):** `apply-ask` is `apply` without `--force-confdef`/`--force-confold`, so when a
+conffile was changed by both the user and the package, dpkg asks (apt reports it on fd 3 as
+`pmconffile:<file>:<percent>:'<old>' '<new>' 1 1`) and reads the answer from its stdin. The helper does not `execve`
+apt here: it forks it with a pipe on its stdin and copies over, from its own stdin (the app's pipe,
+`cydian_helper_spawn_in`), only the lines `Y` (accept the new copy) and `N` (keep the old one), `\r` allowed; any
+other line is dropped with `cydian-helper: ignored an answer that isn't Y or N` on stderr, so dpkg's `D` (diff
+through a pager) and `Z` (a root shell) can't be reached. When the app closes its end, apt's stdin is closed too
+(a question after that fails as dpkg does at end of file, and `configure` finishes the package). The helper exits
+with apt's status when apt-get ends, even while the app's end is still open. Maintainer scripts that read stdin
+read this pipe too (as under Cydia, which runs apt the same way); with nothing written they wait, where `apply`'s
+`/dev/null` gave them end of file. The app (`Apt.swift` `helper.answer {answer: keep|new}`) writes `N` or `Y`.
 
 **Roll Back (F71):** N7's daemon keeps the .debs automatic updates replace in `<prefix>/var/cache/cydian/rollback/<pkg>/`,
 named as apt's archive cache names them, `<pkg>_<version>_<arch>.deb` with the epoch's `:` as `%3a`. `rollbacks <pkg>`
@@ -90,7 +104,7 @@ as `pmstatus:<id>:<percent>:<text>`, `Installed <id>` on stdout. The helper is s
   installs). Virtual packages (only in `Provides:`) are refused for that reason; install the real one.
 - **Caller:** real and effective uid 0 (only the entitled app can arrange that), and the parent's executable
   (`proc_pidpath(getppid())`) is the same device + inode as `/var/jb/Applications/Cydian.app/Cydian`.
-- **Process:** stdin `/dev/null`, cwd `/`, fds above 2 closed (3 kept when open, for status), signals default,
+- **Process:** stdin `/dev/null` (apply-ask: the relay's pipe, above), cwd `/`, fds above 2 closed (3 kept when open, for status), signals default,
   umask 022, and its own environment (`PATH` with the prefix first, `HOME=/var/root`, `LANG=C`,
   `DEBIAN_FRONTEND=noninteractive`; nothing from the caller such as `APT_CONFIG`).
 - **Exit:** 64 refused arguments (and install-ipa: not an IPA or not the app's file), 69 install-ipa can't
@@ -108,7 +122,8 @@ Files:
 - `entitlements.plist`: the helper's (F59, appinst's); `../build.sh` signs with it.
 - `main.c`: the helper. `CYDIAN_PREFIX` (default `/var/jb`) and `CYDIAN_ROOT_UID` (default 0) are compile-time
   only; the tests change them, the shipped build must not.
-- `spawn.c/.h`: the app's side, `cydian_helper_spawn()`: pipes on the child's fds 1-3, `/dev/null` stdin,
+- `spawn.c/.h`: the app's side, `cydian_helper_spawn()`: pipes on the child's fds 1-3, `/dev/null` stdin (or a
+  pipe, `cydian_helper_spawn_in()`, F63),
   `POSIX_SPAWN_CLOEXEC_DEFAULT` and the persona attributes (99, override, uid/gid 0) on Apple. For the Swift shell
   to call (N3); on Linux it spawns as the current user, for the tests.
 - `test_driver.c`, `test_helper.py`: unit tests and the whole chain on Linux (stand-in Cydian → helper → stand-in

@@ -17,13 +17,19 @@
 
 enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, HV_HOLD, HV_UNHOLD, HV_SHOWHOLD,
                    HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA, HV_SELFUPDATE,
-                   HV_ROLLBACKS, HV_ROLLBACK };
+                   HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
-                     "simulate, apply, respring, install-ipa, selfupdate, rollbacks, rollback"
+                     "simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback"
 
 /* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
  * Downgrade and Reinstall pick theirs), "-name" removes. apt gets "name", "name=version" and "name-" in one
  * apt-get install, so one run does the whole queue, as Cydia's does. */
+/* F63: apply-ask is apply without --force-confdef/--force-confold, so dpkg asks about a conffile changed by both the
+ * user and the package (Cydia's Configuration Upgrade alert). It needs the status fd (the question arrives there as
+ * apt's pmconffile: line). main.c runs apt-get as a child with a pipe on its stdin and copies over only the lines
+ * "Y" (accept the new copy) and "N" (keep the old one) from the helper's own stdin, so the caller can't answer
+ * dpkg's D (diff) or Z (a root shell). helper_answer_ok says which lines those are. */
+int helper_answer_ok(const char *line, size_t len);
 #define HELPER_VERSION_MAX 255
 #define HELPER_ITEM_MAX (HELPER_NAME_MAX + 1 + HELPER_VERSION_MAX)
 

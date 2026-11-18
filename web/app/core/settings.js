@@ -3,7 +3,7 @@
 // `get()`. Both modes and the site run this same file, so a setting means the same everywhere.
 //
 //   const s = createSettings({ mode: detectMode() });
-//   s.get("appearance");            // "auto" | "light" | "dark"
+//   s.get("appearance");            // "auto" | "light" | "dark" (light unless chosen: iOS 6 was light)
 //   s.set("appearance", "dark");    // stored at localStorage["cydian.appearance"], listeners told
 //   s.onChange((key, value) => …);  // returns an unsubscribe function
 //   s.sections();                   // [{ id, title, footer, settings: [def…] }], only the rows this mode shows
@@ -50,7 +50,7 @@ export const SECTIONS = [
 // picks one option; its footer shows there), "holds" (pushes the held packages). `default` is a value, or a function of the mode.
 export const SETTINGS = [
   {
-    key: "appearance", section: "appearance", kind: "choice", feature: "appearance", modes: ALL, default: "auto",
+    key: "appearance", section: "appearance", kind: "choice", feature: "appearance", modes: ALL, default: "light",
     label: "Appearance",
     options: [{ value: "auto", label: "Automatic" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }],
     footer: "Automatic follows the iPhone's own Light or Dark setting.",

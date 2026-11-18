@@ -292,6 +292,7 @@ if (isAddPath(location.pathname)) {
   history.replaceState(null, "", location.pathname.replace(/add\/?$/, "") + format({ tab: "sources", path: ["manage", "sources"] }));
 }
 router.start();
+document.getElementById("boot")?.remove(); // the first page is drawn: the loading screen goes
 if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.

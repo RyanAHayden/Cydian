@@ -9,8 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <!-- Light: the top of the blue status bar; dark: "Status Bar (Black)". screens/settings.js repaints both when
        Appearance is fixed to Light or Dark. -->
-  <meta name="theme-color" content="#4f698b" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#5f656f" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#4f698b">
   <meta name="color-scheme" content="light dark">
   <!-- We draw our own dark theme: the Dark Reader extension must leave the page alone. -->
   <meta name="darkreader-lock">
@@ -20,15 +19,15 @@
   <link rel="apple-touch-icon" href="icons/icon-180.png?v=2">
   <!-- Launch images for the home-screen app, one per iPhone screen (tools/launch_images.py): the app's empty frame, as
        Cydia's Default.png was. ?v= changes when they do: iOS keeps launch images by URL. -->
-  <link rel="apple-touch-startup-image" media="screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1179x2556.png?v=3">
-  <link rel="apple-touch-startup-image" media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1290x2796.png?v=3">
-  <link rel="apple-touch-startup-image" media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1170x2532.png?v=3">
-  <link rel="apple-touch-startup-image" media="screen and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1284x2778.png?v=3">
-  <link rel="apple-touch-startup-image" media="screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1125x2436.png?v=3">
-  <link rel="apple-touch-startup-image" media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="icons/launch/launch-828x1792.png?v=3">
-  <link rel="apple-touch-startup-image" media="screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="icons/launch/launch-750x1334.png?v=3">
-  <link rel="apple-touch-startup-image" media="screen and (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1206x2622.png?v=3">
-  <link rel="apple-touch-startup-image" media="screen and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1320x2868.png?v=3">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1179x2556.png?v=4">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1290x2796.png?v=4">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1170x2532.png?v=4">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1284x2778.png?v=4">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1125x2436.png?v=4">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="icons/launch/launch-828x1792.png?v=4">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="icons/launch/launch-750x1334.png?v=4">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1206x2622.png?v=4">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/launch/launch-1320x2868.png?v=4">
   <script src="theme-boot.js"></script>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="ios6.css">
@@ -44,6 +43,9 @@
 <body>
   <header class="navbar" id="navbar"></header>
   <main id="screens"></main>
+  <!-- Shown until the app draws its first page (app.js removes it): Home's look while it loads, as the launch
+       screen has it, so opening the Home Screen app never shows an empty window. -->
+  <div id="boot" class="boot"><div class="loading"><span class="loading-spinner"></span><span>Loading</span></div></div>
   <nav class="tabbar" id="tabbar" aria-label="Tabs"></nav>
 </body>
 </html>

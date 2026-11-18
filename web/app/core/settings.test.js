@@ -12,7 +12,7 @@ const keysOf = (s) => s.visible().map((d) => d.key);
 
 test("defaults with nothing stored", () => {
   const s = createSettings({ storage: memStorage(), mode: "site" });
-  assert.equal(s.get("appearance"), "auto");
+  assert.equal(s.get("appearance"), "light"); // Light unless chosen, dark iPhones too
   assert.equal(s.get("arch"), DEFAULT_ARCH);
   assert.equal(s.get("checkUpdates"), "launch");
   assert.equal(s.get("notifications"), "summary");
@@ -47,7 +47,7 @@ test("values persist in storage under cydian.<key> and a new store reads them ba
 
 test("a stored value that is not an option reads as the default", () => {
   const s = createSettings({ storage: memStorage({ "cydian.appearance": "purple", "cydian.arch": "x86" }) });
-  assert.equal(s.get("appearance"), "auto");
+  assert.equal(s.get("appearance"), "light");
   assert.equal(s.get("arch"), DEFAULT_ARCH);
 });
 

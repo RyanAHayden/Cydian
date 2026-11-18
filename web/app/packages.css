@@ -49,9 +49,9 @@
 
 /* ---- loading ---- */
 .loading { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 40px 20px; font-size: 17px; color: var(--head); text-shadow: var(--emboss); }
-.loading-spinner {
-  width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid rgba(127,127,127,.3); border-top-color: #7f7f7f;
-  animation: hud-spin .8s linear infinite;
+.loading-spinner { /* UIActivityIndicatorView, gray: 12 spokes fading round, turned a spoke at a time */
+  width: 20px; height: 20px; flex: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%23808080' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(0 10 10)' opacity='1.00'/%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(30 10 10)' opacity='0.93'/%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(60 10 10)' opacity='0.86'/%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(90 10 10)' opacity='0.79'/%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(120 10 10)' opacity='0.71'/%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(150 10 10)' opacity='0.64'/%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(180 10 10)' opacity='0.57'/%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(210 10 10)' opacity='0.50'/%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(240 10 10)' opacity='0.43'/%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(270 10 10)' opacity='0.36'/%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(300 10 10)' opacity='0.29'/%3E%3Cline x1='10' y1='2' x2='10' y2='6' transform='rotate(330 10 10)' opacity='0.21'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+  animation: hud-spin .96s steps(12) infinite;
 }
 .depiction-slot .loading { margin: 20px; }
 
@@ -331,3 +331,9 @@ html[data-theme="dark"] .action-button.cancel { /* UIAlertSheetBlackCancelButton
 html[data-theme="dark"] .section-index { color: #9aa3b2; }
 html[data-theme="dark"] .section-index.held { background: rgba(255,255,255,.15); }
 .page-body[data-section-index] .pkg-row > .cell-inner { padding-right: 26px; } /* rows end before the index, as UITableView's */
+
+/* Before the app's first page (index.html #boot): the pinstripes between the bars with Loading in the middle. */
+.boot {
+  position: fixed; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
+  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
+}

@@ -729,6 +729,12 @@ async function renderPackage(body, route, key, id, ctx) {
     const altSrc = sources.find((s) => s.key === pkg.key);
     // F181: its Related tab is the same as a package's: the source's other apps in that category.
     const { details } = renderApp(body, route, pkg, altSrc, { related: (pane) => relatedPane(pane, route, pkg, id) });
+    // F102 for apps: their nav button installs at once (no sheet to hold Wish List), so it's a row on the page.
+    const wishLi = grouped([{ rows: [{ label: wishLabel(wishlist().has(id)), onClick: () => {
+      wishlist().set(id, !wishlist().has(id));
+      wishLi.querySelector(".cell-label").replaceChildren(wishLabel(wishlist().has(id)));
+    } }] }]);
+    details.append(wishLi);
     if (detectMode() === "jailbreak") installedAppGroup(st.ipa.bundleIdentifier).then((g) => { if (g && details.isConnected) details.append(g); });
     rememberPackage(body, route, { id, pkg, source: altSrc, history: await catalog.history(id, key).catch(() => null) });
     return;

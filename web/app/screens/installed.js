@@ -46,7 +46,7 @@
 // opening the same #installed/wishlist page. Edit was already on the right, so nothing had to move.
 import * as browse from "./browse.js";
 import * as myipas from "./myipas.js";
-import { grouped, plain, placeholder } from "../nav/ui.js";
+import { grouped, plain, placeholder, segments } from "../nav/ui.js";
 import { format } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
 import { showAlert } from "../nav/alert.js";
@@ -127,25 +127,6 @@ export async function autoInstalled(native = globalThis.cydianNative) {
   } catch { return null; }
 }
 
-// Search's segmented control (packages.css .scope-segments), labels -> onPick(value) when another is tapped.
-function segments(values, labels, current, onPick) {
-  const seg = Object.assign(document.createElement("div"), { className: "scope-segments" });
-  seg.setAttribute("role", "tablist");
-  const buttons = values.map((v) => {
-    const b = Object.assign(document.createElement("button"), { type: "button", className: "scope-segment", textContent: labels[v] ?? v });
-    b.setAttribute("role", "tab");
-    b.addEventListener("click", () => {
-      if (b.classList.contains("selected")) return;
-      for (const o of buttons) { o.classList.toggle("selected", o === b); o.setAttribute("aria-selected", String(o === b)); }
-      onPick(v);
-    });
-    b.classList.toggle("selected", v === current);
-    b.setAttribute("aria-selected", String(v === current));
-    return b;
-  });
-  seg.append(...buttons);
-  return seg;
-}
 
 // Cydia's User | Expert | Recent, in the nav bar in place of the title (app.js titleView).
 function modeControl(modes, current, onPick) {

@@ -445,19 +445,15 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
 .wish-button .wish-count { flex: none; margin-left: .25em; }
 
 /* ---- F154: Browse (screens/browse.js renderBrowseHome), from docs/concepts/browse/ in the app's own look. ---- */
-/* The title as a drop-down: the nav bar's own title text with a small white triangle; the action sheet picks. */
-.browse-filter { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 0 4px; border: 0; background: none;
-  font: inherit; color: inherit; text-shadow: inherit; line-height: 44px; cursor: pointer; }
-.browse-filter-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.browse-filter-arrow { flex: none; width: 0; height: 0; margin-top: 2px; border: 5px solid transparent; border-bottom: 0;
-  border-top: 6px solid #fff; filter: drop-shadow(0 -1px 0 rgba(0,0,0,.5)); }
-.browse-filter:active { opacity: .7; }
+/* Featured | New | Top 25: Search's scope bar at the top of the page (screens/browse.js filterBar). */
+.browse-scope { margin-bottom: -1px; }
 /* Tweak of the Day: one package on brushed slate (the concept's hero), the whole card a link. */
 .browse-hero-slot { margin: 10px 10px 0; }
-.browse-hero { display: block; border-radius: 9.5px; overflow: hidden; border: 1px solid #3a4450; color: #fff; text-decoration: none;
-  background: linear-gradient(rgba(255,255,255,.12), rgba(255,255,255,0) 45%),
-    repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, rgba(0,0,0,.03) 1px 2px), linear-gradient(#56657a, #2c3644);
-  background-origin: border-box; box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
+/* Its background is Notification Center's linen (SpringBoard's BulletinListLinen, redrawn as icons/linen.svg: threads
+   over #858a98 -> #303238 top to bottom, here the top part of that run). */
+.browse-hero { display: block; border-radius: 9.5px; overflow: hidden; border: 1px solid #3a3d45; color: #fff; text-decoration: none;
+  background: url("icons/linen.svg") 0 0 / 80px 80px, linear-gradient(#858a98, #5c606b);
+  background-origin: border-box; box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
 .browse-hero-kicker { display: block; padding: 9px 12px 0; font-size: 11px; font-weight: bold; letter-spacing: .08em; color: #c9d4e3;
   text-shadow: 0 -1px 0 rgba(0,0,0,.5); }
 .browse-hero-row { display: flex; gap: 12px; align-items: center; padding: 8px 12px 10px; }
@@ -482,6 +478,9 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
 .roulette-pill.grey { border-color: #8c8c8c; color: #385487; text-shadow: 0 1px 0 #fff;
   background: linear-gradient(#fdfdfd, #e3e3e3 50%, #d8d8d8 51%, #e4e4e4); background-origin: border-box; }
 .roulette-pill:active { filter: brightness(.85); }
+.browse-hero:active .browse-hero-view { /* the whole card is the link: pressing it presses View */
+  border-color: #144d11; background: linear-gradient(#5aa845, #24801b 50%, #1b7313 51%, #217a17); background-origin: border-box;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.35); }
 /* Rows with a section icon (Collections, New This Week, the Roulette row): the icon draws its own corners. */
 .browse-icon-row .cell-icon { position: relative; overflow: hidden; background: transparent center / cover no-repeat; }
 .browse-icon-row .cell-inner, .browse-ph { min-height: 58px; }

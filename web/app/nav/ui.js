@@ -123,3 +123,23 @@ export function placeholder(kind = "list", rows = kind === "list" ? 9 : 4) {
 
 // F157: one grouped/plain cell on its own, for a screen that builds its own table (screens/guides.js).
 export const row = (r) => cell(r);
+
+// Search's segmented control (packages.css .scope-segments), labels -> onPick(value) when another is tapped.
+export function segments(values, labels, current, onPick) {
+  const seg = Object.assign(document.createElement("div"), { className: "scope-segments" });
+  seg.setAttribute("role", "tablist");
+  const buttons = values.map((v) => {
+    const b = Object.assign(document.createElement("button"), { type: "button", className: "scope-segment", textContent: labels[v] ?? v });
+    b.setAttribute("role", "tab");
+    b.addEventListener("click", () => {
+      if (b.classList.contains("selected")) return;
+      for (const o of buttons) { o.classList.toggle("selected", o === b); o.setAttribute("aria-selected", String(o === b)); }
+      onPick(v);
+    });
+    b.classList.toggle("selected", v === current);
+    b.setAttribute("aria-selected", String(v === current));
+    return b;
+  });
+  seg.append(...buttons);
+  return seg;
+}

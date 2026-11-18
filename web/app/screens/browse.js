@@ -10,7 +10,7 @@
 // e.g. #/sources/deb%3Ahttps%3A%2F%2Frepo.chariz.com%2F%3A.%2F/section%3ATweaks/package%3Acom.example.tweak
 //
 // Lists come from the catalog in the parse worker (catalog.js); long ones are virtualised (nav/vlist.js).
-import { grouped, placeholder, el } from "../nav/ui.js";
+import { grouped, placeholder, el, segments } from "../nav/ui.js";
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
 import { showSheet } from "../nav/sheet.js";
@@ -1186,9 +1186,9 @@ export function withBase(html, url) {
 
 // ---- Browse (F154) -----------------------------------------------------------------------------------------
 //
-// Home's Browse page, rebuilt from the approved concept (docs/concepts/browse/browse.dc.html): the nav bar's title
-// is a filter drop-down ("Featured ▾": a tap opens an action sheet with Featured, New, Top 25; the title shows the
-// choice). Featured: the Tweak of the Day card, the Tweak Roulette row, New This Week, Collections, All Categories.
+// Home's Browse page, rebuilt from the approved concept (docs/concepts/browse/browse.dc.html): Featured | New | Top 25
+// as a segmented control in a bar at the top of the page, as iOS 6 puts one under the nav bar (in the title's place it
+// overlapped Back; a title drop-down isn't iOS 6, user 2026-11-18). Featured: the Tweak of the Day card, the Tweak Roulette row, New This Week, Collections, All Categories.
 // New: F124's New list; Top 25: F124's Popular, ranked. No horizontal scroller. Placeholders while loading.
 // home.js routes browse/ here (and the pages below it: collection:<id>, categories, roulette).
 
@@ -1202,43 +1202,27 @@ export const TOP_LIMIT = 25;
 export const WEEK_DAYS = 7;
 const SECTION_ICON = (name) => `icons/sections/${name}.png`;
 
-// The choice lives for the session (the drop-down's title and the page draw from it); the page and its button on screen.
-const browseHome = { filter: "featured", button: null, page: null };
+// The choice lives for the session; the page on screen.
+const browseHome = { filter: "featured", page: null };
 export const browseFilterNow = () => browseHome.filter;
 
-// The Browse page's nav bar: "Browse" (the back button of the pages above it) and the drop-down in the title's place.
+// The Browse page's nav bar: "Browse" (also the back button of the pages above it).
 export function browseHomeNav() {
-  return { title: "Browse", titleView: globalThis.document ? filterButton() : undefined };
+  return { title: "Browse" };
 }
 
-function filterButton() {
-  const b = el("button", "browse-filter");
-  b.type = "button";
-  b.setAttribute("aria-haspopup", "menu");
-  paintFilter(b);
-  b.addEventListener("click", () => chooseFilter());
-  browseHome.button = b;
-  return b;
+// The bar at the top of the page: Featured | New | Top 25 (Search's scope bar and segments).
+function filterBar() {
+  const bar = el("div", "search-scope browse-scope");
+  bar.append(segments(BROWSE_FILTERS.map((f) => f.id), Object.fromEntries(BROWSE_FILTERS.map((f) => [f.id, f.label])),
+    browseHome.filter, (id) => setBrowseFilter(id)));
+  return bar;
 }
 
-function paintFilter(b) {
-  const label = browseFilter(browseHome.filter).label;
-  b.replaceChildren(el("span", "browse-filter-label", label), el("span", "browse-filter-arrow"));
-  b.setAttribute("aria-label", `Showing ${label}. Change`);
-}
-
-// The title's tap: the action sheet of the three; -> the index picked, or -1 (Cancel).
-export async function chooseFilter({ sheet = showActionSheet } = {}) {
-  const i = await sheet({ buttons: BROWSE_FILTERS.map((f) => f.label) });
-  if (i >= 0) setBrowseFilter(BROWSE_FILTERS[i].id);
-  return i;
-}
-
-// Shows filter `id` (unknown ids: Featured): the title says it and the page on screen redraws in place.
+// Shows filter `id` (unknown ids: Featured): the page on screen redraws in place, its bar showing the choice.
 export function setBrowseFilter(id) {
   const f = browseFilter(id);
   browseHome.filter = f.id;
-  if (browseHome.button) paintFilter(browseHome.button);
   if (browseHome.page?.body.isConnected) drawBrowseHome(browseHome.page);
   return f.id;
 }
@@ -1267,7 +1251,8 @@ function drawBrowseHome(page) {
   const featured = browseHome.filter === "featured";
   body.classList.toggle("grouped", featured);
   body.classList.toggle("plain", !featured);
-  body.replaceChildren();
+  page.bar = filterBar();
+  body.replaceChildren(page.bar);
   body.scrollTop = 0;
   return featured ? drawFeatured(page, turn) : drawFilterList(page, turn);
 }
@@ -1281,11 +1266,11 @@ async function drawFilterList(page, turn) {
     await catalog.ensure();
     rows = await v.rows();
   } catch (e) {
-    if (turn === page.turn) body.replaceChildren(el("p", "empty", e.message));
+    if (turn === page.turn) body.replaceChildren(page.bar, el("p", "empty", e.message));
     return;
   }
   if (turn !== page.turn || !body.isConnected) return;
-  body.replaceChildren();
+  body.replaceChildren(page.bar);
   if (!rows.length) { body.append(el("p", "empty", v.empty)); return; }
   const items = v.ranked ? rows.map((r, i) => ({ ...r, rank: i + 1 })) : page.headers ? page.headers(rows) : rows;
   page.list = packageList(body, route, items, { letters: false, decorate: v.ranked ? rankRow : null });

@@ -15,6 +15,8 @@
 //   signing.resignAll (stream: {index, count, name, phase, progress}) -> {done: [bundleId], failed: [{bundleId, name, error}]}
 //   signing.checkCertificate     -> {status: "good" | "revoked" | "unknown", checked, revokedAt?}
 //   signing.remind {days}        -> {at | null}: the re-sign reminder, 0 = off
+// F77: My IPAs' library.* calls are MyIPAs.swift; they install through serveAndOpen, and Re-sign All signs an app
+// recorded from there (url "library:<file>") from the library's file.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import AVFoundation
 import Foundation
@@ -224,7 +226,15 @@ enum Sideload {
             hostAndOpen(output, server: host, app: app, record: record, opened: opened, served: served)
             return
         }
-        let ipaPath = "/\(tok)/app.ipa"
+        serveAndOpen(output, app: app, record: record, opened: opened, served: served)
+    }
+
+    // F77: the second half of signAndOpen, for an IPA signed already (My IPAs' signed copy): serves `output` (deleted
+    // after) on the local HTTP server, records it and opens the itms-services link with the manifestServer's manifest.
+    static func serveAndOpen(_ output: URL, app: SignedApp, record: SignedRecord,
+                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
+                             served: ((Bool) -> Void)? = nil) {
+        let ipaPath = "/\(SignBridge.token())/app.ipa"
         guard let remote = manifestServer else {
             try? FileManager.default.removeItem(at: output)
             opened(.failure(Failed(text: noServer))); served?(false)
@@ -327,22 +337,30 @@ enum Sideload {
                     failed.append(["bundleId": r.bundleID, "name": r.name,
                                    "error": (e as? Failed)?.text ?? SignBridge.text(e)])
                 }
+                let signThat = { (file: URL) in
+                    signAndOpen(file, url: r.url, id: id, profile: profile, options: SignOptions(r.options), emit: emit,
+                                opened: { if case .failure(let e) = $0 { SignBridge.queue.async { fail(e) } } },
+                                served: { ok in
+                                    SignBridge.queue.async {
+                                        if ok { done.append(r.bundleID) }
+                                        else if !failed.contains(where: { $0["bundleId"] as? String == r.bundleID }) {
+                                            fail(Failed(text: "cancelled: iOS didn't fetch it"))
+                                        }
+                                        step(i + 1)
+                                    }
+                                })
+                }
+                // F77: an app installed from My IPAs signs from the library's file, not a download.
+                if MyIPAs.fileOf(r.url) != nil {
+                    do {
+                        if let file = try MyIPAs.copyForResign(r.url) { return signThat(file) }
+                    } catch { fail(Failed(text: "gone: \(r.name) isn't in My IPAs any more")); return step(i + 1) }
+                }
                 guard let url = Apt.httpURL(r.url) else { fail(Failed(text: "bad_url: \(r.url)")); return step(i + 1) }
                 download(url, emit: emit) { res in
                     switch res {
                     case .failure(let e): fail(e); step(i + 1)
-                    case .success(let file):
-                        signAndOpen(file, url: r.url, id: id, profile: profile, options: SignOptions(r.options), emit: emit,
-                                    opened: { if case .failure(let e) = $0 { SignBridge.queue.async { fail(e) } } },
-                                    served: { ok in
-                                        SignBridge.queue.async {
-                                            if ok { done.append(r.bundleID) }
-                                            else if !failed.contains(where: { $0["bundleId"] as? String == r.bundleID }) {
-                                                fail(Failed(text: "cancelled: iOS didn't fetch it"))
-                                            }
-                                            step(i + 1)
-                                        }
-                                    })
+                    case .success(let file): signThat(file)
                     }
                 }
             }

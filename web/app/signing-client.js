@@ -356,3 +356,63 @@ export async function installOnDevice({ url, name = "", onInstalled = () => {}, 
   later(() => (h.done ? h.done("Done") : h.hide()), 1200);
   return true;
 }
+
+// ---- My IPAs (F77): the user's own IPAs, signed on the phone (native/Sources/MyIPAs.swift, library.*) ----------
+//
+//   await libraryCall(method, params, onEvent, native)   one library.* call ("list", "add", "pick", "options",
+//                                      "sign", "install", "export", "delete")
+//   await serverReachable(server)      true when <server>/sign/status answers within a few seconds
+//   await installFromLibrary({ file, name, signed, onInstalled })
+//                                      Install on an IPA's page: signs if needed (offline is fine), then, with the
+//                                      Signing Server reachable, installs; offline it says so and keeps the signed copy.
+//                                      Resolves "installed" | "offline" | false (an error, shown) | null (walkthrough)
+
+export async function libraryCall(method, params = {}, onEvent, native) {
+  return bridge(native).call(`library.${method}`, params, onEvent);
+}
+
+export async function serverReachable(server = getServer(), { timeout = 6000, fetcher = globalThis.fetch } = {}) {
+  if (globalThis.navigator && navigator.onLine === false) return false;
+  const ctl = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), timeout) : null;
+  try {
+    const r = await fetcher(`${server}/sign/status`, { cache: "no-store", signal: ctl?.signal });
+    return Boolean(r?.ok);
+  } catch { return false; } finally { if (timer) clearTimeout(timer); }
+}
+
+export const offlineText = (name, server) => `${name || "The app"} is signed and kept in My IPAs. Installing needs a connection ` +
+  `to the Signing Server (${hostOf(server)}), which hands iOS the install manifest. Install it again once you're online.`;
+
+const hostOf = (server) => { try { return new URL(server).host; } catch { return String(server ?? ""); } };
+
+export async function installFromLibrary({ file, name = "", onInstalled = () => {} },
+  { native, hud = liveHUD, alert = showAlert, go = openRoute, check = firstInstallCheck, reachable = serverReachable,
+    follow = null, later = setTimeout } = {}) {
+  if (await check({ native })) return null;
+  const server = getServer();
+  const h = hud("Signing");
+  const onEvent = (ev) => { const t = phaseLabel(ev); if (t) h.set(t); };
+  const fail = async (e) => {
+    h.hide();
+    const why = deviceError(e, name);
+    await alert({ title: why.title, message: why.message, buttons: ["OK"] });
+    if (why.open === "signing") go(["signing"]);
+    return false;
+  };
+  // Sign first: nothing here needs the network, so an offline phone still ends with a signed copy.
+  try { await libraryCall("sign", { file }, onEvent, native); } catch (e) { return fail(e); }
+  if (!(await reachable(server))) {
+    h.hide();
+    await alert({ title: "No Connection", message: offlineText(name, server), buttons: ["OK"] });
+    return "offline";
+  }
+  h.set("Installing");
+  let result;
+  try { result = await libraryCall("install", { file, manifestServer: server }, onEvent, native); } catch (e) { return fail(e); }
+  onInstalled(result);
+  const followInstall = follow ?? (await import("./signing-sheet.js")).followInstall;
+  if (result?.bundleId) followInstall(bridge(native), result.bundleId, h, { later });
+  else later(() => (h.done ? h.done("Done") : h.hide()), 1200);
+  return "installed";
+}

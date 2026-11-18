@@ -7,7 +7,10 @@
 // page instead (core/installed.js apps(), recorded on the device), newest first, with an Upgrade badge when a
 // source has a newer version; Edit or a left swipe deletes one the user removed from the phone. On the site the
 // dpkg list above stays for jailbroken phones, one row down at #installed/dpkg. Jailbreak mode is F7 unchanged.
+//
+// F77: a My IPAs row under the apps opens the user's own IPAs (screens/myipas.js, #installed/myipas/...).
 import * as browse from "./browse.js";
+import * as myipas from "./myipas.js";
 import { grouped, plain } from "../nav/ui.js";
 import { format } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
@@ -26,10 +29,11 @@ const appView = { body: null, route: null, seq: 0, editing: false, right: null }
 // Records apps (F30) rather than reading dpkg: everywhere but the jailbreak app.
 export const recordsApps = (mode = detectMode()) => mode !== "jailbreak";
 
-// Which page a route is: "apps" (F30's list), "dpkg" (the status file's packages) or a browse.js page.
+// Which page a route is: "apps" (F30's list), "dpkg" (the status file's packages), "myipas" (F77) or a browse.js page.
 export function pageKind(route, mode = detectMode()) {
   if (!recordsApps(mode)) return route.path.length ? "browse" : "dpkg";
   if (!route.path.length) return "apps";
+  if (route.path[0] === myipas.MYIPAS) return "myipas";
   return route.path.length === 1 && route.path[0] === DPKG && mode === "site" ? "dpkg" : "browse";
 }
 
@@ -44,6 +48,7 @@ export function init() {
 export function nav(route) {
   const kind = pageKind(route);
   if (kind === "browse") return browse.nav(route);
+  if (kind === "myipas") return myipas.nav(route);
   if (kind === "apps") {
     return { title: "Installed", style: "plain",
       right: { label: appView.editing ? "Done" : "Edit", onClick: (e) => setEditing(!appView.editing, e.currentTarget) } };
@@ -58,6 +63,10 @@ export function render(body, route, ctx) {
   const kind = pageKind(route);
   if (kind === "browse") {
     browse.render(body, route, ctx);
+    return;
+  }
+  if (kind === "myipas") {
+    myipas.render(body, route, ctx);
     return;
   }
   if (kind === "apps") {
@@ -181,6 +190,7 @@ function drawApps(rows, cands, site, hasStatus) {
       href: cands.has(r.id) ? format({ tab: route.tab, path: [...route.path, `package:${r.id}`] }) : null,
     })),
   }];
+  sections.push({ header: "Your Own IPAs", rows: [myIpasRow(route, site)] });
   if (site) {
     sections.push({ header: "Jailbroken iPhone", rows: [hasStatus
       ? { label: "dpkg Status File", subtitle: "Packages installed with apt", href: format({ tab: route.tab, path: [DPKG] }) }
@@ -196,6 +206,12 @@ function drawApps(rows, cands, site, hasStatus) {
   if (!rows.length) {
     body.prepend(note("No apps yet. Apps you install from an app's page are listed here, on this device."));
   }
+}
+
+// F77: the row that opens My IPAs.
+export function myIpasRow(route, site) {
+  return { label: "My IPAs", subtitle: site ? "Links to IPAs, signed by the Signing Server" : "IPAs you add, signed on this iPhone",
+    href: format({ tab: route.tab, path: [myipas.MYIPAS] }) };
 }
 
 // Delete controls as on the Sources tab (sources.css styles .source-row: the red minus, Delete, the swipe).

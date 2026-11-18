@@ -52,6 +52,7 @@ enum Incoming {
     private static var pending: String?
 
     static func receive(_ url: URL) {
+        if MyIPAs.receive(url) { return } // F77: an .ipa file goes into My IPAs, which then sends cydian://myipas
         guard IncomingLink.accepts(url) else { return }
         pending = url.absoluteString
         notify(tries: 50)

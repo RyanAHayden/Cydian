@@ -4,6 +4,9 @@
 <plist version="1.0">
 <dict>
 	<key>UIBackgroundModes</key><array><string>audio</string></array>
+	<!-- F77: Documents (My IPAs) shows in Files under On My iPhone > Cydian; IPAs dropped there are listed. -->
+	<key>UIFileSharingEnabled</key><true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key><true/>
 	<key>CFBundleDocumentTypes</key><array>
 		<dict>
 			<key>CFBundleTypeName</key><string>iOS App</string>

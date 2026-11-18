@@ -1,0 +1,277 @@
+// F77: My IPAs, the bridge for web/app/screens/myipas.js (sideload build). The library itself (where files live,
+// what counts as signed) is native/sign/Library.swift; this file adds the phone's parts: the Files picker, the share
+// sheet, downloads, and installing a signed copy through Sideload's install server and the Signing Server's manifest.
+//
+//   library.list                    -> {ipas: [entry], identity: bool}   (entry: IPALibrary.json)
+//   library.add {url} (stream: {phase: "downloading", progress})  -> {file, ipas}
+//   library.pick                    the iOS Files picker (.ipa, several at once) -> {files: [name], ipas} ([] on Cancel)
+//   library.options {file, name?, bundleId?, icon?, removeExtensions?, fixArm64e?}  Sign Options -> entry
+//   library.sign {file} (stream: {phase: "signing", progress})   signs offline into the signed copy -> entry
+//   library.install {file, manifestServer} (stream as signing.install)  signs if needed, then installs
+//                                   -> signing.install's reply + {file}; the signed copy stays either way
+//   library.export {file}           the share sheet (Save to Files, AirDrop...) for the signed copy -> {shared: bool}
+//   library.delete {file}           the IPA, its signed copy and options -> {ipas}
+//
+// Other apps' .ipa (Open in Cydian, AirDrop, Files: the document type in Info-sideload.plist) land in the library
+// too: MyIPAs.receive copies the file in and hands the page cydian://myipas?file=<name> (web/app/incoming.js).
+// SPDX-License-Identifier: GPL-3.0-or-later
+import Foundation
+import UIKit
+import UniformTypeIdentifiers
+
+enum MyIPAs {
+    static let library: IPALibrary = {
+        let fm = FileManager.default
+        let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("MyIPAs", isDirectory: true)
+        var lib = IPALibrary(root: docs, store: support)
+        lib.iconFix = smallPNG
+        return lib
+    }()
+
+    static func register(_ b: Bridge) {
+        b.on("library.list") { c in SignBridge.run(c) { list() } }
+        b.on("library.add") { c in add(c) }
+        b.on("library.pick") { c in pick(c) }
+        b.on("library.options") { c in
+            SignBridge.run(c) {
+                let file = c.params["file"] as? String ?? ""
+                try library.setOptions(file, try SignOptions(json: c.params))
+                return library.json(file, certificate: certificate())
+            }
+        }
+        b.on("library.sign") { c in
+            guard let (id, profile) = Sideload.ready(c) else { return }
+            let emit = emitter(c)
+            SignBridge.queue.async {
+                do {
+                    let file = c.params["file"] as? String ?? ""
+                    _ = try signIfNeeded(file, id: id, profile: profile, emit: emit)
+                    Apt.reply(c, library.json(file, certificate: certificate()), nil)
+                } catch { Apt.reply(c, nil, SignBridge.text(error)) }
+            }
+        }
+        b.on("library.install") { c in install(c) }
+        b.on("library.export") { c in export(c) }
+        b.on("library.delete") { c in
+            SignBridge.run(c) {
+                try library.delete(c.params["file"] as? String ?? "")
+                return list()
+            }
+        }
+    }
+
+    static func certificate() -> Data? { SignStore.identity().flatMap(SignStore.certificateDER) }
+
+    static func list() -> [String: Any] {
+        library.sweep()
+        let cert = certificate()
+        return ["ipas": library.files().map { library.json($0, certificate: cert) }, "identity": cert != nil]
+    }
+
+    static func emitter(_ c: Bridge.Call) -> (String, Double) -> Void {
+        let throttle = Throttle()
+        return { phase, p in if throttle.pass(phase, p) { c.emitOnMain([["phase": phase, "progress": p]]) } }
+    }
+
+    // The signed copy, signed now when there is none that fits. Runs on SignBridge.queue.
+    static func signIfNeeded(_ file: String, id: SecIdentity, profile: Profile, emit: @escaping (String, Double) -> Void) throws -> IPALibrary.Signed {
+        let identity = try KeychainIdentity(id)
+        if let s = library.signed(file, certificate: identity.certificate) { return s }
+        if let p = profile.problem(with: identity.certificate) { throw p }
+        if let why = try library.details(file).error { throw SignError("bad_ipa", why) }
+        return try library.sign(file, signer: IPASigner(profile: profile, identity: identity), certificate: identity.certificate,
+                                expires: profile.signatureExpiry(certificate: identity.certificate), work: SignBridge.work,
+                                progress: { emit($0, $1) })
+    }
+
+    // ---- adding
+
+    static func add(_ c: Bridge.Call) {
+        guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: not in the jailbreak app") }
+        guard let url = Apt.httpURL(c.params["url"]) else { return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
+        let tmp = SignBridge.work.appendingPathComponent("\(SignBridge.token())-add.ipa")
+        let emit = emitter(c)
+        Download.start(url, to: tmp, max: SignBridge.maxIPA, progress: { emit("downloading", $0) }) { err in
+            if let e = err { try? FileManager.default.removeItem(at: tmp); return Apt.reply(c, nil, e) }
+            SignBridge.queue.async {
+                do {
+                    // A link that doesn't end in .ipa (a redirect, ?download=1): named after the app inside.
+                    var name = url.lastPathComponent
+                    if !name.lowercased().hasSuffix(".ipa"), let d = try? Inspect.ipa(tmp) {
+                        name = [d.name, d.version].filter { !$0.isEmpty }.joined(separator: " ")
+                    }
+                    let file = try library.add(tmp, name: name, move: true)
+                    var out = list()
+                    out["file"] = file
+                    Apt.reply(c, out, nil)
+                } catch {
+                    try? FileManager.default.removeItem(at: tmp)
+                    Apt.reply(c, nil, "internal: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    static func pick(_ c: Bridge.Call) {
+        guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: not in the jailbreak app") }
+        DispatchQueue.main.async {
+            guard let top = topController() else { return c.reply(nil, "internal: no window to show the picker in") }
+            let types = [UTType("com.apple.itunes.ipa"), UTType(filenameExtension: "ipa")].compactMap { $0 }
+            let picker = UIDocumentPickerViewController(forOpeningContentTypes: types.isEmpty ? [.data] : types, asCopy: true)
+            picker.allowsMultipleSelection = true
+            let d = PickDelegate { urls in
+                SignBridge.queue.async {
+                    var files = [String]()
+                    for u in urls where u.pathExtension.lowercased() == "ipa" {
+                        if let f = try? library.add(u, name: u.lastPathComponent, move: true) { files.append(f) }
+                    }
+                    var out = list()
+                    out["files"] = files
+                    Apt.reply(c, out, nil)
+                }
+            }
+            picker.delegate = d
+            objc_setAssociatedObject(picker, &PickDelegate.key, d, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            top.present(picker, animated: true)
+        }
+    }
+
+    // An .ipa another app handed over (Info-sideload.plist's document type): into the library, then the page opens
+    // it. False for anything else. One already in Documents (tapped in Files) just opens.
+    static func receive(_ url: URL) -> Bool {
+        guard url.isFileURL, url.pathExtension.lowercased() == "ipa", AppMode.current == .sideload else { return false }
+        SignBridge.queue.async {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            let docs = library.root.standardizedFileURL.resolvingSymlinksInPath().path
+            let dir = url.standardizedFileURL.resolvingSymlinksInPath().deletingLastPathComponent().path
+            let file: String?
+            if dir == docs, IPALibrary.validName(url.lastPathComponent) {
+                file = url.lastPathComponent
+            } else {
+                // iOS's Documents/Inbox copy is ours to move; anything else is copied.
+                let inbox = dir == docs + "/Inbox"
+                file = try? library.add(url, name: url.lastPathComponent, move: inbox)
+            }
+            guard let f = file, var q = URLComponents(string: "cydian://myipas") else { return }
+            q.queryItems = [URLQueryItem(name: "file", value: f)]
+            if let link = q.url { DispatchQueue.main.async { Incoming.receive(link) } }
+        }
+        return true
+    }
+
+    // ---- installing
+
+    static func install(_ c: Bridge.Call) {
+        guard let (id, profile) = Sideload.ready(c) else { return }
+        guard Sideload.takeServer(c) != nil else { return Apt.reply(c, nil, Sideload.noServer) }
+        Sideload.hostServer = nil
+        let emit = emitter(c)
+        let file = c.params["file"] as? String ?? ""
+        SignBridge.queue.async {
+            let s: IPALibrary.Signed
+            do { s = try signIfNeeded(file, id: id, profile: profile, emit: emit) } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
+            // The server deletes what it served: it gets a copy, and the signed copy stays for next time.
+            let out = SignBridge.work.appendingPathComponent("\(SignBridge.token())-lib.ipa")
+            do { try FileManager.default.copyItem(at: library.signedURL(file), to: out) } catch {
+                return Apt.reply(c, nil, "internal: \(error.localizedDescription)")
+            }
+            let record = SignedRecord(bundleID: s.bundleID, originalBundleID: s.originalBundleID, name: s.name, version: s.version,
+                                      url: libraryURL(file), signed: s.signed, expires: s.expires, options: s.options)
+            emit("installing", 0)
+            Sideload.serveAndOpen(out, app: s.app, record: record, opened: { r in
+                switch r {
+                case .failure(let e): Apt.reply(c, nil, (e as? Sideload.Failed)?.text ?? SignBridge.text(e))
+                case .success(let (app, rec)):
+                    var j: [String: Any] = ["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": app.name,
+                                            "version": app.version, "removed": app.removed, "fixedArm64e": app.fixedArm64e, "file": file]
+                    if let x = rec.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
+                    Apt.reply(c, j, nil)
+                }
+            })
+        }
+    }
+
+    // Where a signed record says the app came from, so Re-sign All (Sideload.resignAll) signs it from the library again.
+    static let scheme = "library:"
+    static func libraryURL(_ file: String) -> String { scheme + (file.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? file) }
+    static func fileOf(_ recordURL: String) -> String? {
+        guard recordURL.hasPrefix(scheme) else { return nil }
+        return String(recordURL.dropFirst(scheme.count)).removingPercentEncoding
+    }
+
+    // Re-sign All's input for a record made here: a copy of the library's IPA (signAndOpen deletes its input).
+    static func copyForResign(_ recordURL: String) throws -> URL? {
+        guard let file = fileOf(recordURL) else { return nil }
+        let src = try library.url(file)
+        let tmp = SignBridge.work.appendingPathComponent("\(SignBridge.token())-in.ipa")
+        try FileManager.default.copyItem(at: src, to: tmp)
+        return tmp
+    }
+
+    // ---- Save Signed IPA
+
+    static func export(_ c: Bridge.Call) {
+        guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: not in the jailbreak app") }
+        let file = c.params["file"] as? String ?? ""
+        SignBridge.queue.async {
+            guard let s = library.signed(file, certificate: certificate()) else {
+                return Apt.reply(c, nil, "not_signed: sign it first (Sign Now)")
+            }
+            // Named for the person saving it: "<App> <version> (signed).ipa" in a folder of its own.
+            let dir = SignBridge.work.appendingPathComponent("export-\(SignBridge.token())", isDirectory: true)
+            let name = IPALibrary.safeName("\([s.name, s.version].filter { !$0.isEmpty }.joined(separator: " ")) (signed)")
+            let out = dir.appendingPathComponent(name)
+            do {
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                try FileManager.default.copyItem(at: library.signedURL(file), to: out)
+            } catch { return Apt.reply(c, nil, "internal: \(error.localizedDescription)") }
+            DispatchQueue.main.async {
+                guard let top = topController() else { return c.reply(nil, "internal: no window to show the share sheet in") }
+                let vc = UIActivityViewController(activityItems: [out], applicationActivities: nil)
+                vc.completionWithItemsHandler = { _, done, _, _ in
+                    SignBridge.queue.asyncAfter(deadline: .now() + 60) { try? FileManager.default.removeItem(at: dir) }
+                    c.reply(["shared": done], nil)
+                }
+                if let pop = vc.popoverPresentationController { pop.sourceView = top.view; pop.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.maxY, width: 1, height: 1) }
+                top.present(vc, animated: true)
+            }
+        }
+    }
+
+    // ---- helpers
+
+    static func topController() -> UIViewController? {
+        let root = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.windows.first(where: \.isKeyWindow) ?? ($0 as? UIWindowScene)?.windows.first }
+            .first?.rootViewController
+        var top = root
+        while let p = top?.presentedViewController { top = p }
+        return top
+    }
+
+    // Any PNG UIKit reads (Apple's CgBI form too) as a plain 120x120 PNG for the list; nil when it doesn't read.
+    static func smallPNG(_ data: Data) -> Data? {
+        guard let img = UIImage(data: data), img.size.width > 0, img.size.height > 0 else { return nil }
+        let side: CGFloat = 120
+        let fmt = UIGraphicsImageRendererFormat()
+        fmt.scale = 1
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: fmt).pngData { _ in
+            img.draw(in: CGRect(x: 0, y: 0, width: side, height: side))
+        }
+    }
+}
+
+final class PickDelegate: NSObject, UIDocumentPickerDelegate {
+    static var key = 0
+    private let done: ([URL]) -> Void
+    private var finished = false
+    init(_ done: @escaping ([URL]) -> Void) { self.done = done }
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { finish(urls) }
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { finish([]) }
+    private func finish(_ urls: [URL]) {
+        guard !finished else { return }
+        finished = true
+        done(urls)
+    }
+}

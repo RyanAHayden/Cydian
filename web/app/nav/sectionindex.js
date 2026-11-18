@@ -33,12 +33,15 @@ export function createSectionIndex(scroller, list) {
   el.addEventListener("pointerdown", (e) => {
     e.preventDefault();
     el.setPointerCapture?.(e.pointerId);
+    // A fling still running would keep gliding the list under the jumps (iOS keeps its momentum while scrollTop is
+    // set): overflow hidden ends it at once, and scrollTop still works while it's hidden.
+    scroller.style.overflowY = "hidden";
     el.classList.add("held");
     last = null;
     jump(e.clientY);
   });
   el.addEventListener("pointermove", (e) => { if (el.classList.contains("held")) jump(e.clientY); });
-  const end = () => { el.classList.remove("held"); last = null; };
+  const end = () => { el.classList.remove("held"); last = null; scroller.style.overflowY = ""; };
   el.addEventListener("pointerup", end);
   el.addEventListener("pointercancel", end);
   return { el, destroy: () => { el.remove(); delete scroller.dataset.sectionIndex; } };

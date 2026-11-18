@@ -68,7 +68,7 @@ export function showAddQR(link) {
 // The iOS 6 share sheet (nav/sharesheet.js) takes the Open In group's place there: Copy Link (the source's URL), Add
 // on Another Device (the QR code of the /add link), then the apps that take the source (core/handoff.js
 // sourceLinks), under the same rule as openInGroup: APT managers only for a phone set to Jailbroken. An app's page
-// gets the first two only: Cydian installs the app itself.
+// lists them too: they add its source to that app (Cydian's own Install stays the way to install it here).
 
 // Each app's tile: its initial on a colour close to its own icon's (no copied icons).
 export const APP_TILES = {
@@ -104,7 +104,7 @@ export function shareItems(source, { app = false, jailbroken = settings.jailbrok
   if (url) items.push({ kind: "copy", label: "Copy Link", text: url });
   const add = addLink(source, origin);
   if (add) items.push({ kind: "qr", label: "Add on Another Device", link: add });
-  if (app) return items;
+  // An app's page lists them too (user 2026-11-17): they add the app's source to that app.
   const apt = formatOf(source) === "apt";
   if (apt && !jailbroken) return items;
   for (const l of sourceLinks(source)) items.push({ kind: "open", label: l.app, url: l.url, ...tileOf(l.app) });

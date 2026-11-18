@@ -31,9 +31,9 @@ test("an APT source: the four managers on a jailbroken phone, only the link and 
   assert.deepEqual(kinds(shareItems(dist, { origin: ORIGIN, jailbroken: true })), ["copy", "qr", "Irisin"]);
 });
 
-test("an app's page: Copy Link and Add on Another Device only, whatever the source or phone", () => {
-  assert.deepEqual(kinds(shareItems(ALT, { app: true, origin: ORIGIN, jailbroken: true })), ["copy", "qr"]);
-  assert.deepEqual(kinds(shareItems({ key: ALT.key }, { app: true, origin: ORIGIN })), ["copy", "qr"]); // no record yet: its key
+test("an app's page: Copy Link, Add on Another Device, then the apps that take its source", () => {
+  assert.deepEqual(kinds(shareItems(ALT, { app: true, origin: ORIGIN, jailbroken: true })), kinds(shareItems(ALT, { origin: ORIGIN, jailbroken: true })));
+  assert.deepEqual(kinds(shareItems(ALT, { app: true, origin: ORIGIN })).slice(0, 2), ["copy", "qr"]);
 });
 
 test("other IPA formats get their own app first; nothing to share without an http URL", () => {

@@ -98,6 +98,15 @@ export function upgradeAll(queue, available) {
 // Sideload Upgrade (N) (F80): every available upgrade with an IPA as an app queue job (core/appqueue.js appJob, the
 // version Changes shows; Cydian's own row carries its IPA), queued through `add` (screens/queue.js queueApp: the first
 // opens Confirm, the rest redraw it). -> jobs queued.
+// The Home Screen icon's Upgrade All (native Shortcut): every available upgrade, ignored ones left out, queued,
+// and Confirm opens. -> the jobs queued.
+export async function upgradeEverything() {
+  await catalog.ensure();
+  const holds = settings.holds.list();
+  const u = await withAppUpgrades(await upgradesWithSelf(await catalog.upgrades(holds)), holds);
+  return queueUpgrades(u.available);
+}
+
 export async function queueUpgrades(available = [], { pkgOf = (id) => catalog.package(id), add = null } = {}) {
   add ??= (await import("./queue.js")).queueApp;
   const jobs = [];

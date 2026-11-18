@@ -57,7 +57,7 @@ enum BackgroundCheck {
 
     @discardableResult
     static func schedule() -> Bool {
-        guard registered else { return false }
+        guard registered, !UserDefaults.standard.bool(forKey: offKey) else { return false }
         let r = BGAppRefreshTaskRequest(identifier: taskID)
         r.earliestBeginDate = Date(timeIntervalSinceNow: interval)
         do { try BGTaskScheduler.shared.submit(r); return true } catch { return false }
@@ -87,8 +87,11 @@ enum BackgroundCheck {
 
     // ---- the task
 
+    static let lastRunKey = "cydian.backgroundCheck.lastRun"
+    static let offKey = "cydian.backgroundCheck.off" // Settings > Update Alerts > Check in the Background, off
     private static func run(_ task: BGAppRefreshTask) {
         schedule() // the next one first, so a check cut short still has a successor
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastRunKey) // Settings shows it
         let check = Check()
         task.expirationHandler = { check.cancel() }
         check.start { ok in task.setTaskCompleted(success: ok) }
@@ -135,6 +138,12 @@ enum BackgroundCheck {
                 group.notify(queue: BackgroundCheck.queue) { [self] in
                     if isFinished { return }
                     let found = UpdateCheck.updates(watch, offers: offers)
+                    // The icon badge is every update available, seen or not, each time (a notification only for new ones).
+                    UNUserNotificationCenter.current().getNotificationSettings { st in
+                        guard st.badgeSetting == .enabled else { return }
+                        if #available(iOS 16.0, *) { UNUserNotificationCenter.current().setBadgeCount(found.count) }
+                        else { DispatchQueue.main.async { UIApplication.shared.applicationIconBadgeNumber = found.count } }
+                    }
                     let known = BackgroundCheck.loadKnown()
                     guard !UpdateCheck.fresh(found, known: known).isEmpty else { return finish(true) }
                     post(found) { posted in

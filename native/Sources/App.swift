@@ -37,10 +37,17 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         w.makeKeyAndVisible()
         window = w
         if let u = options.urlContexts.first?.url { Incoming.receive(u) } // F75: launched by a cydian:// link
+        if let item = options.shortcutItem { Shortcut.perform(item.type) } // launched from the icon's Upgrade All
         Replaced.watch()
     }
 
     // F75: a cydian:// link while Cydian runs (Open in Cydian App and Open in Cydian on the website).
+    func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem,
+                     completionHandler: @escaping (Bool) -> Void) {
+        Shortcut.perform(shortcutItem.type)
+        completionHandler(true)
+    }
+
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         for c in URLContexts { Incoming.receive(c.url) }
     }

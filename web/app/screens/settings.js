@@ -74,7 +74,7 @@ function draw({ el, route }) {
   else if (key === "signing") drawSigning(el);
   else if (key === LOGS) el.replaceChildren(logsPage(route.path[1], () => draw({ el, route })));
   else if (key) el.replaceChildren(listPage(key));
-  else el.replaceChildren(rootPage(), signingSection(), sideloadingSection(), openInAppSection(), ipaSection(), logsSection(detectMode()), aboutSection());
+  else el.replaceChildren(rootPage(), signingSection(), sideloadingSection(), openInAppSection(), ipaSection(), notifySection(), logsSection(detectMode()), aboutSection());
   el.scrollTop = top;
 }
 
@@ -658,6 +658,42 @@ export function checkUpdates({ manual = false, always = false } = {}) {
     }),
   }, { manual, always }).catch(() => "error").finally(() => { hide(); checking = null; redrawAll(); });
   return checking;
+}
+
+// The sideload app: what iOS lets Cydian do for update alerts (badges, notifications, Background App Refresh) and
+// when the background check last ran. A "no" given once can only be changed in iOS Settings: the row opens it.
+export function notifyRows(st, now = Date.now()) {
+  if (!st) return null;
+  const onOff = (v) => (v ? "On" : "Off");
+  const ago = (iso) => {
+    const t = Date.parse(iso ?? "");
+    if (Number.isNaN(t)) return "Not yet";
+    const m = Math.round((now - t) / 60000);
+    return m < 1 ? "Just now" : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+  };
+  const off = st.backgroundOn !== false && (!st.badges || !st.alerts || !st.backgroundRefresh);
+  return { header: "Update Alerts", rows: [
+    { label: "Check in the Background", detail: onOff(st.backgroundOn !== false), toggle: true },
+    { label: "Icon Badge", detail: onOff(st.badges) }, { label: "Notifications", detail: onOff(st.alerts) },
+    { label: "Background App Refresh", detail: onOff(st.backgroundRefresh) },
+    { label: "Last Background Check", detail: ago(st.lastCheck) },
+    ...(off ? [{ label: "Turn On in Settings", chevron: true, open: true }] : [])],
+    footer: off ? "iOS asks only once: anything left off is turned on in Settings > Notifications > Cydian, and Settings > General > Background App Refresh."
+      : "iOS decides when the background check runs, usually every few hours. It badges every update and notifies only about new ones." };
+}
+function notifySection() {
+  const box = document.createElement("div");
+  const n = globalThis.cydianNative;
+  if (detectMode() !== "sideload" || !n?.call) return box;
+  Promise.resolve(n.call("app.notifyStatus", {})).then((st) => {
+    const g = notifyRows(st);
+    if (!g) return;
+    g.rows = g.rows.map((r) => (r.open ? { label: r.label, chevron: true, onClick: () => n.call("app.openSettings", {}) }
+      : r.toggle ? { ...r, onClick: () => Promise.resolve(n.call("updates.background", { on: st.backgroundOn === false }))
+        .then(() => box.replaceWith(notifySection()), () => {}) } : r));
+    box.replaceChildren(grouped([g]));
+  }, () => {});
+  return box;
 }
 
 function aboutSection() {

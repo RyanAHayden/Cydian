@@ -461,7 +461,8 @@ enum Sideload {
             center.add(UNNotificationRequest(identifier: reminderID, content: content,
                                              trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
         }
-        if ask { center.requestAuthorization(options: [.alert, .sound]) { ok, _ in if ok { schedule() } } }
+        // Badges too: iOS asks once, so a first ask without them left the icon badge off for good (user 2026-11-18).
+        if ask { center.requestAuthorization(options: [.alert, .badge, .sound]) { ok, _ in if ok { schedule() } } }
         else { schedule() }
         return at
     }

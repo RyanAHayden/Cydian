@@ -350,6 +350,14 @@ if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.setting
 // F75: cydian:// links from the website (Open in Cydian App, F89's Open in Cydian on an app page).
 if (globalThis.cydianNative) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
 
+// The Home Screen icon's long-press Upgrade All (native Shortcut.perform): Changes, every upgrade queued, Confirm.
+globalThis.cydianShortcut = async (type) => {
+  if (type !== "upgrade") return;
+  location.hash = "#/changes";
+  (await import("./screens/changes.js")).upgradeEverything().catch(() => {});
+};
+if (globalThis.cydianPendingShortcut) { globalThis.cydianShortcut(globalThis.cydianPendingShortcut); globalThis.cydianPendingShortcut = null; }
+
 if (globalThis.cydianNative) {
   // Every launch (Home's Reload is one) and every return: Cydian's source first (the Essential Upgrade alert); when
   // that found nothing to say, GitHub's release, without the once-a-day wait (user 2026-11-17: only Settings' Check

@@ -42,7 +42,12 @@ export async function openOutside(url) {
 export async function readSelfInfo() {
   // A fresh copy: raw.githubusercontent.com caches for 5 minutes, and a query of its own skips that cache.
   const info = selfFromAltSource(await getBackend().text(`${SELF_ALT_URL}?t=${Date.now()}`));
-  if (info) saveInfo(storage(), info);
+  if (info) {
+    saveInfo(storage(), info);
+    // Changes counts Cydian's own upgrade from this (upgradesWithSelf): it may have counted before it was read at
+    // launch (user 2026-11-18: the 0.3.8 banner came, Changes had no row and no badge).
+    globalThis.dispatchEvent?.(new Event("cydian:self-info"));
+  }
   return info;
 }
 

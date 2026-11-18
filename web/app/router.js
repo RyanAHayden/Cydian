@@ -49,10 +49,20 @@ export function mounted(route) {
 // A link from `from` to another tab's page, as a push on from's own stack: back to from's page, inside the same
 // mount when from already shows that tab. Null when `to` stays in from's tab (or is a tab's root: a plain switch).
 // A Settings page (Home's settings/…) linked from another tab mounts as "~settings"; Settings' root switches to Home.
+// F143: a link that leaves the pages it is on for another branch of their tab (Manage's More Sources > a source,
+// #/sources/manage/… -> #/sources/<key>) is a push too: it mounts the tab again on top (#/sources/manage/…/~sources/
+// <key>), so Back returns to Manage instead of the tab's root (or Home, when Manage is mounted there). The innermost
+// mount is the one a link stays in. A link up to a page the route stands on stays a pop.
 export function mountLink(from, to) {
   if (from && from.tab !== "home" && inHome(to)) to = { tab: IN_HOME, path: to.path.slice(1) };
-  if (!from || to.tab === from.tab || !to.path.length) return null;
-  const k = from.path.indexOf(MOUNT + to.tab);
+  if (!from || !to.path.length) return null;
+  if (to.tab === from.tab && to.path.length <= from.path.length && to.path.every((s, i) => s === from.path[i])) return null;
+  const k = from.path.lastIndexOf(MOUNT + to.tab);
+  if (to.tab === from.tab && k < 0 && from.path.some(isMount)) return null; // back to the tab's own pages (Home > About)
+  const inner = k >= 0 ? from.path.slice(k + 1) : to.tab === from.tab ? from.path : null;
+  const branches = inner && inner.length && inner[0] !== to.path[0] && !inner.some(isMount);
+  if (branches) return { tab: from.tab, path: [...from.path, MOUNT + to.tab, ...to.path] };
+  if (to.tab === from.tab && k < 0) return null; // within the tab: a plain push, pop or sibling
   const base = k >= 0 ? from.path.slice(0, k) : from.path;
   return { tab: from.tab, path: [...base, MOUNT + to.tab, ...to.path] };
 }

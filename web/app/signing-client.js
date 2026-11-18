@@ -19,6 +19,7 @@ import { DEFAULT_SERVER, normalizeServer, signBody, errorText, toBase64, phaseLa
 import { format } from "./router.js";
 import { detectMode } from "./core/settings.js";
 import { showHUD } from "./nav/hud.js";
+import { showBanner } from "./nav/banner.js";
 import { showAlert } from "./nav/alert.js";
 
 const DB = "cydian-signing";
@@ -149,6 +150,8 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {} })
   if (label) label.textContent = "Installing";
   else hide = showHUD("Installing");
   onInstalled(body);
+  // On the website Safari asks first ("… would like to install …"): say which button to press.
+  if (!globalThis.cydianNative) showBanner({ title: "Cydian", message: `Press Install to put ${name || "the app"} on your iPhone.` });
   location.href = body.itms;
   setTimeout(() => (hide.done ? hide.done("Done") : hide()), 1200); // iOS asks "Install …?": end on a checkmark, then fade
   return true;

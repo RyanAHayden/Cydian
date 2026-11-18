@@ -1,6 +1,8 @@
 # Cydian's install server (src/index.js). Deploy your own: worker/README.md.
 name = "cydian-sign"
 main = "src/index.js"
+# The website: web/app/ served as static assets (index.html for app routes like /add).
+assets = { directory = "../web/app", binding = "ASSETS", not_found_handling = "single-page-application", run_worker_first = ["/sign/*", "/api/*", "/healthz"] }
 compatibility_date = "2026-11-01"
 
 [vars]

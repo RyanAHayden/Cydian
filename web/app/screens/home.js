@@ -5,11 +5,11 @@
 //   - a full-width green tile for the current state (stateTile: Add a Source, n Upgrades Available, ...; Cydia's
 //     Manage Account)
 //   - a grouped list like Cydia's help links: Upgrading & Jailbreaking Help (our page), Find Extensions for
-//     Applications (Search), More Package Sources (a curated list, one tap adds a source), About
+//     Applications (Search), More Package Sources (a curated list, one tap adds a source); User Guides (screens/guides.js); Credits
 // Every tile and row is a .cell-inner link, so it gets the table cells' held look (blue selection) from ios6.css
 // and app.js. Featured banners from sources' sileo-featured.json sit above the tiles (F20, screens/extras.js).
 //
-// Routes below the tab: help, featured, sources (More Package Sources), about, and browse (F46): Browse's list
+// Routes below the tab: help, featured, sources (More Package Sources), guides/<id>, credits, and browse (F46): Browse's list
 // (Popular, then the categories), browse/popular, browse/category:<name>, and below those browse.js's tokens
 // (package:<id>, author:<name>, versions:<id>), as in the Search tab.
 import { grouped } from "../nav/ui.js";
@@ -26,6 +26,7 @@ import { homeFeatured } from "./extras.js";
 import { homeOffer, debUrl, debAlert, APP_LABEL, APP_NAME, REPO_URL, APP_IPA_URL } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 import { refreshInBackground } from "./sources.js";
+import { GUIDES, guideRows, JAILBREAK_INFO_URL } from "./guides.js";
 
 const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
 
@@ -98,7 +99,8 @@ export function nav(route, ctx) {
     return browse.nav(route);
   }
   switch (route.path[0]) {
-    case "about": return { title: "About" };
+    case "credits": return { title: "Credits" };
+    case "guides": return { title: GUIDES[route.path[1]]?.title ?? "User Guides" };
     case "help": return { title: "Help" };
     case "featured": return { title: "Featured" };
     case "sources": return { title: "More Sources" };
@@ -116,9 +118,11 @@ export function nav(route, ctx) {
 // About, laid out like Cydia's on the 4S (ref/4s/screens/cydia-about.png): centred lines in groups with a blank line
 // between them, and one wide Close button.
 async function showAbout(ctx) {
+  const version = (await globalThis.cydianNative?.call?.("app.info", {}).catch(() => null))?.version;
   await ctx.showAlert({
     title: "About Cydian",
-    message: "Version 0.1\nFree and open source\n\nRyan Hayden (Fizlo)\n\nInspired by Cydia\nby Jay Freeman (saurik)\nNot affiliated with SaurikIT",
+    message: `${version ? `Version ${version}` : "Cydian Web"}\nFree and open source`
+      + "\n\nRyan Hayden (Fizlo)\n\nInspired by Cydia\nby Jay Freeman (saurik)\nNot affiliated with SaurikIT",
     buttons: ["Close"],
   });
 }
@@ -400,16 +404,16 @@ function renderRoot(body) {
     stateRow,
   );
   body.append(home);
+  // Cydia's list below the tiles: the help links, User Guides, then Credits / Thank You (About is the nav button).
   const list = grouped([{
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
       { label: "Find Extensions for Applications", href: format({ tab: "search" }), chevron: true },
       { label: "More Package Sources", href: format({ tab: "home", path: ["sources"] }) },
-      { label: "About", href: format({ tab: "home", path: ["about"] }) },
     ],
-  }]);
-  const group = list.firstChild;
-  group.classList.add("home-links");
+  }, { header: "User Guides", rows: guideRows(format) },
+  { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }]);
+  for (const group of list.children) group.classList.add("home-links");
   home.append(list);
   // Cydia's line at the bottom of Home: the device, iOS, the installed version and the language
   // ("iPhone4,1, iOS 6.1.3, Cydia 1.1.9 (en-us)").
@@ -458,11 +462,35 @@ function renderHelp(body) {
         + "or updated since the last refresh. Hold a package in Settings to keep it at its version.",
     },
     {
+      header: "Jailbreaking",
+      // ponytail: the site isn't up yet; drop "Coming Soon" once it is.
+      rows: [{ label: "jailbreakme.dev", detail: "Coming Soon", chevron: true, onClick: () => window.open(JAILBREAK_INFO_URL, "_blank", "noopener") }],
+      footer: "Which jailbreak works on your iPhone and iOS version, and how to run it.",
+    },
+    {
       header: "Before You Upgrade iOS",
       footer: "A jailbreak supports only the iOS versions it was made for. Check that one exists for the "
         + "version you are about to install, and keep a list of your packages so you can put them back.",
     },
   ])));
+}
+
+// Credits / Thank You (Cydia's credits.html: who it thanks), with what Cydian is and its version.
+function renderCredits(body) {
+  const rows = [{ label: "Version", detail: "Cydian Web" }, { label: "License", detail: "GPL-3.0+" },
+    { label: "Source Code", detail: "GitHub", chevron: true, onClick: () => window.open(REPO_URL, "_blank", "noopener") }];
+  body.append(wrap(grouped([
+    { header: "Cydian", rows, footer: "A package manager with the iOS 6 look, for modern iPhones, by Ryan Hayden (Fizlo)." },
+    {
+      header: "Special Thanks",
+      footer: "Jay Freeman (saurik), for Cydia, whose look and GPLv3 source Cydian follows. Not affiliated with "
+        + "SaurikIT. Teehan+Lax, for the iOS 6 GUI kit. Riley Testut, for AltStore's source format. The Procursus, "
+        + "Dopamine and palera1n teams, for today's jailbreaks.",
+    },
+  ])));
+  globalThis.cydianNative?.call?.("app.info", {}).then((i) => {
+    if (i?.version) body.querySelector(".cell-detail").textContent = i.version;
+  }, () => {});
 }
 
 function renderFeatured(body) {
@@ -562,13 +590,8 @@ function renderSources(body, ctx) {
 
 export function render(el, route, ctx) {
   switch (route.path[0]) {
-    case "about":
-      el.append(wrap(grouped([
-        { header: "Cydian", rows: [{ label: "Version", detail: "0.1" }, { label: "License", detail: "GPL-3.0+" }] },
-        { rows: [{ label: "Source Code", detail: "GitHub", onClick: () => window.open(REPO_URL, "_blank", "noopener") }] },
-        { footer: "A package manager with the iOS 6 look, for modern iPhones." },
-      ])));
-      return;
+    case "credits": return renderCredits(el);
+    case "guides": el.append(wrap(grouped(GUIDES[route.path[1]]?.sections ?? [{ rows: guideRows(format) }]))); return;
     case "help": return renderHelp(el);
     case "featured": return renderFeatured(el);
     case "sources": return renderSources(el, ctx);

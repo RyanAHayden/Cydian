@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { GUIDES, guideRows } from "./guides.js";
 import { stateTile, nav, CURATED_SOURCES, deviceHint, DEVICE_HINT, showsThemes } from "./home.js";
 
 const src = (extra = {}) => ({ key: "deb:https://a/:./", uri: "https://a/", ...extra });
@@ -23,6 +24,13 @@ test("Home state tile: the text and target follow the sources and upgrades", () 
 test("Home pages: titles below the root, and curated sources are flat repos with Cydia keys", () => {
   assert.equal(nav({ tab: "home", path: [] }, {}).left.label, "About");
   assert.equal(nav({ tab: "home", path: ["help"] }).title, "Help");
+  assert.equal(nav({ tab: "home", path: ["credits"] }).title, "Credits");
+  // Every User Guides row opens a guide that exists, titled by it.
+  for (const r of guideRows((x) => x.path.join("/"))) {
+    const [, id] = r.href.split("/");
+    assert.ok(GUIDES[id]?.sections.length, id);
+    assert.equal(nav({ tab: "home", path: ["guides", id] }).title, GUIDES[id].title);
+  }
   assert.equal(nav({ tab: "home", path: ["sources"] }).title, "More Sources");
   for (const s of CURATED_SOURCES) {
     assert.match(s.uri, /^https:\/\/.+\/$/);

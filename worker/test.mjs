@@ -37,3 +37,10 @@ assert.equal((await go("/sign/host/" + "0".repeat(48) + "/app.ipa")).status, 404
 r = await go("/sign/host?bundleid=com.ryha.cydian&version=1", { method: "POST", body: new Uint8Array([1, 2]), headers: { "Content-Length": "2" } });
 assert.equal(r.status, 400); // not a zip
 console.log("worker: ok");
+import { httpUrl } from "./src/index.js";
+assert.equal(httpUrl("ftp://x"), null);
+assert.equal(httpUrl("https://u:p@x/"), null);
+assert.ok(httpUrl("https://repo.example/"));
+const bad = await go("/api/fetch?url=file:///etc/passwd");
+assert.equal(bad.status, 400);
+console.log("worker fetch: ok");

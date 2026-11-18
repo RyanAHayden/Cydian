@@ -1,5 +1,6 @@
-// Cydian's install server as a Cloudflare Worker: what iOS needs from a server when the app signs on the phone.
-// Nothing here signs, and no key or certificate ever comes here (docs: worker/README.md).
+// cydian.dev as one Cloudflare Worker: the website (web/app/ as static assets), its fetch proxy (/api/fetch), and
+// what iOS needs from a server when the app signs on the phone (/sign/*). Nothing here signs, and no key or
+// certificate ever comes here (worker/README.md).
 //
 //   GET  /sign/status                       {ok, ttl, worker: true}: Settings > Signing asks if this server answers
 //   GET  /sign/manifest?bundleid=&version=&title=&port=&path=
@@ -49,6 +50,47 @@ export function loopbackUrl(q) {
   return `http://127.0.0.1:${Number(port)}/${path.replace(/^\/+/, "")}`;
 }
 
+// ---- /api/fetch: the website's fetch proxy (APT and AltStore sources don't let a page read them) ----------------
+// ?url=<URL>: the body. ?url=<repo dir>&kind=packages: the repo's Packages as gzip-encoded text, Packages.gz first,
+// then plain Packages (gzipped here). Cloudflare's fetch can't reach private or loopback addresses, which is the SSRF
+// guard the old server had to build itself. ponytail: no .xz/.bz2 (no decompressor here); the app reads those itself.
+const CYDIA = { "User-Agent": "Telesphoreo APT-HTTP/1.0.592", "X-Machine": "iPhone14,2", "X-Firmware": "16.5" };
+const SAFE = { "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox", "Cache-Control": "no-store", ...CORS };
+const PASS = ["image/png", "image/jpeg", "image/gif", "image/webp", "text/plain", "application/json"];
+const fetchErr = (code, error, status = 502) => new Response(JSON.stringify({ error, code }), { status, headers: { "Content-Type": "application/json", ...SAFE } });
+export function httpUrl(raw) {
+  try { const u = new URL(raw); return /^https?:$/.test(u.protocol) && !u.username && !u.password ? u : null; } catch { return null; }
+}
+async function upstream(url) {
+  return fetch(url, { headers: CYDIA, redirect: "follow", cf: { cacheTtl: 0 }, signal: AbortSignal.timeout(30000) });
+}
+async function apiFetch(u) {
+  const target = httpUrl(u.searchParams.get("url") ?? "");
+  if (!target) return fetchErr("bad_url", "Only http(s) URLs can be fetched.", 400);
+  const kind = u.searchParams.get("kind") ?? "";
+  try {
+    if (kind === "packages") {
+      const dir = target.href.endsWith("/") ? target.href : target.href + "/";
+      for (const [name, gz] of [["Packages.gz", true], ["Packages", false]]) {
+        const r = await upstream(dir + name);
+        if (!r.ok) continue;
+        const body = gz ? r.body : r.body.pipeThrough(new CompressionStream("gzip"));
+        return new Response(body, { encodeBody: "manual", headers: { ...SAFE, "Content-Type": "text/plain; charset=utf-8",
+          "Content-Encoding": "gzip", "X-Source-URL": encodeURI(r.url), "Vary": "Accept-Encoding" } });
+      }
+      return fetchErr("not_found", "This repo has no Packages.gz or Packages file.", 404);
+    }
+    if (kind) return fetchErr("bad_url", `unknown kind ${kind}`, 400);
+    const r = await upstream(target.href);
+    if (!r.ok) return fetchErr("upstream", `upstream answered HTTP ${r.status}`, r.status >= 400 && r.status < 600 ? r.status : 502);
+    const ctype = (r.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    return new Response(r.body, { headers: { ...SAFE, "Content-Type": PASS.includes(ctype) ? r.headers.get("content-type") : "application/octet-stream",
+      "X-Source-URL": encodeURI(r.url), ...(r.headers.get("last-modified") ? { "Last-Modified": r.headers.get("last-modified") } : {}) } });
+  } catch (e) {
+    return fetchErr("network", String(e?.message ?? e), 502);
+  }
+}
+
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 export default {
@@ -57,6 +99,8 @@ export default {
     const ttl = Math.max(60, Number(env.TTL) || 600);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
+    if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u);
+    if (u.pathname === "/healthz") return new Response("ok\n", { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
     if (u.pathname === "/sign/status") return json({ ok: true, ttl, worker: true, zsign: false });
 
     if (u.pathname === "/sign/manifest" && req.method === "GET") {
@@ -103,6 +147,9 @@ export default {
       return new Response(req.method === "HEAD" ? null : data, { headers: { ...headers, "Content-Length": String(data.byteLength) } });
     }
 
+    // Everything else is the website (web/app/, Workers static assets: revalidated on every load, so a phone never
+    // keeps an old file). /add?url=… and other app routes fall back to index.html (single-page application).
+    if (env.ASSETS && !u.pathname.startsWith("/sign")) return env.ASSETS.fetch(req);
     return fail("not_found", "Nothing here. This is Cydian's install server (github.com/RyanAHayden/Cydian).", 404);
   },
 };

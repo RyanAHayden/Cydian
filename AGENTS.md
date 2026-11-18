@@ -5,7 +5,8 @@ Cydian: a package manager with the iOS 6 Cydia look, for modern iPhones. Two fro
 1. `web/app/`: **the one frontend** (HTML, CSS, vanilla JS modules, no build step). It runs on the public site and
    inside the jailbreak app. `core/` is pure JS (parsing, versions, Changes, upgrades), tested with `node --test`.
    The UI only talks to a backend interface: `backend-http.js` on the site, `backend-native.js` in the app.
-   `web/app.py` (Flask) is thin: it serves `web/app/`, runs the SSRF-safe fetch proxy and cache, and Web Push.
+   cydian.dev is one Cloudflare Worker (`worker/`): `web/app/` as static assets, the fetch proxy (`/api/fetch`)
+   and the install server (`/sign/*`). No server of our own; the website signs nothing (only the app does).
 2. `native/`: jailbreak app, a Swift shell around a WKWebView running `web/app/`, plus a root helper for apt.
    Rootless iOS 15+ up to the coming iOS 27 jailbreak. Shape and feel rules: `docs/native.md`. It must hold
    120 Hz: animate only transform/opacity, virtualise long lists, parse in a Web Worker.

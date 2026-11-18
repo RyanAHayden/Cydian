@@ -2,9 +2,8 @@
 extensions <BRAND_NAME>Share.appex, <BRAND_NAME>Widget.appex), named from native/brand.env, never the old name.
 
 - No tracked file outside plan/ and journal/ names an old-named build output or asset (the .ipa, .deb, .app, the
-  extensions, the icon, the test source's IPAs), except web/app/source.json's versions[] entries for releases
-  published before F180 (their files really are named that; tools/altsource.py update drops them at the next
-  release, test_altsource.py).
+  extensions, the icon, the test source's IPAs). F180a: web/app/source.json too, versions[] included (the 0.9.4
+  release's update dropped the entries for releases published under the old name).
 - The build and release scripts take the names from BRAND_NAME: none spells <BRAND_NAME>.ipa/.deb/.app in its code.
 The old name is spelled in pieces so this file passes its own grep."""
 import json
@@ -22,12 +21,6 @@ import brand  # noqa: E402
 OLD = "Cy" + "dian"
 OLD_ASSET = re.compile(OLD + r"(?:\.(?:ipa|deb|app)\b|Share|Widget|Icon)|test-fixtures/" + OLD.lower() + r"-", re.I)
 SKIP = ("plan/", "journal/")
-# Releases before F180 carry the IPA under the old name; the next release's update drops these entries.
-LAST_OLD = (0, 9, 3)
-
-
-def version(s):
-    return tuple(int(x) for x in s.split("."))
 
 
 class NoOldAssetNames(unittest.TestCase):
@@ -35,7 +28,7 @@ class NoOldAssetNames(unittest.TestCase):
         files = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True).stdout.decode().split("\0")
         bad = []
         for rel in files:
-            if not rel or rel.startswith(SKIP) or rel == "web/app/source.json":
+            if not rel or rel.startswith(SKIP):
                 continue
             if OLD_ASSET.search(rel):
                 bad.append(f"{rel}: the file name")
@@ -51,19 +44,14 @@ class NoOldAssetNames(unittest.TestCase):
                     bad.append(f"{rel}:{n}: {line.strip()[:100]}")
         self.assertEqual(bad, [], "old-named build outputs or release assets (F180: use BRAND_NAME)")
 
-    def test_source_json_only_published_old_ipas(self):
+    def test_source_json_only_own_ipas(self):
+        """F180a: every versions[] entry of the built-in source is its release's <BRAND_NAME>.ipa."""
         with open(os.path.join(ROOT, "web", "app", "source.json")) as f:
             data = json.load(f)
-        text = json.dumps({k: v for k, v in data.items() if k != "apps"})
-        self.assertIsNone(OLD_ASSET.search(text))
+        self.assertIsNone(OLD_ASSET.search(json.dumps(data)))
         for app in data["apps"]:
-            for k, v in app.items():
-                if k != "versions":
-                    self.assertIsNone(OLD_ASSET.search(json.dumps(v)), k)
             for v in app["versions"]:
-                if OLD_ASSET.search(json.dumps(v)):
-                    self.assertLessEqual(version(v["version"]), LAST_OLD, f"v{v['version']} names an old asset")
-                    self.assertRegex(v["downloadURL"], r"/releases/download/v%s/%s\.ipa$" % (re.escape(v["version"]), OLD))
+                self.assertRegex(v["downloadURL"], r"/releases/download/v%s/%s\.ipa$" % (re.escape(v["version"]), re.escape(brand.NAME)))
 
 
 class NamesFromBrand(unittest.TestCase):

@@ -72,6 +72,19 @@ class UpdateTest(unittest.TestCase):
         data["apps"][0]["bundleIdentifier"] = "com.example.other"
         self.assertEqual(len(altsource.check(data)), 2)
 
+    def test_check_wants_exactly_own_ipa(self):
+        """F180a: versions[0] is its release's <NAME>.ipa, not any other IPA of that release."""
+        for name in ("Cy" + "dian.ipa", "Other.ipa", altsource.NAME + "-1.0.0.ipa"):
+            data = altsource.build("1.0.0", 10, "2026-11-18T00:00:00Z")
+            data["apps"][0]["versions"][0]["downloadURL"] = altsource.REPO + "/releases/download/v1.0.0/" + name
+            self.assertEqual(len(altsource.check(data)), 1, name)
+
+    def test_published_source_lists_only_own_ipas(self):
+        """F180a: web/app/source.json lists only <NAME>.ipa entries (update dropped the old-named ones)."""
+        with open(altsource.SOURCE) as f:
+            versions = json.load(f)["apps"][0]["versions"]
+        self.assertEqual([v["version"] for v in versions if not altsource.is_own_ipa(v)], [])
+
 
 if __name__ == "__main__":
     unittest.main()

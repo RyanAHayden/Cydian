@@ -51,7 +51,7 @@ test("F128: page titles for the iOS 6-style routes and the old ones", async () =
   assert.equal(t("general"), "General");
   assert.equal(t("display"), "Display");
   assert.equal(t("updates"), "Updates");
-  assert.equal(t("about"), "About");
+  assert.notEqual(t("about"), "About"); // F183: no About page
   assert.equal(t("general", "device"), "Device");
   assert.equal(t("updates", "holds"), "Ignored Upgrades");
   assert.equal(t("signing"), "Signing");
@@ -181,4 +181,46 @@ test("B20: window focus doesn't redraw the Signing page unless the certificate c
   assert.equal(redraws, 1);
   on.visibilitychange();
   assert.equal(redraws, 2);
+});
+
+// F183: no About page (no Check for Updates, no Skip This Version); the root ends with Home's version line.
+function fakeElement(tag) {
+  const e = {
+    tagName: String(tag).toUpperCase(), children: [], attrs: {}, style: {}, dataset: {}, className: "", textContent: "", hidden: false,
+    classList: { add: (...c) => { e.className = [e.className, ...c].filter(Boolean).join(" "); }, remove() {}, toggle() {}, contains: (c) => e.className.split(" ").includes(c) },
+    append(...k) { for (const c of k) if (c && typeof c === "object") { if (c.tagName === "#FRAG") e.children.push(...c.children); else e.children.push(c); } },
+    prepend(...k) { e.append(...k); }, replaceChildren(...k) { e.children = []; e.append(...k); },
+    setAttribute(a, v) { e.attrs[a] = v; }, getAttribute: (a) => e.attrs[a] ?? null, removeAttribute(a) { delete e.attrs[a]; },
+    addEventListener() {}, removeEventListener() {}, querySelector: () => null, querySelectorAll: () => [], closest: () => null,
+    remove() {}, replaceWith() {}, isConnected: true, scrollTop: 0, firstChild: null,
+  };
+  return e;
+}
+const texts = (n, out = []) => { if (n.textContent) out.push(n.textContent); for (const c of n.children ?? []) texts(c, out); return out; };
+
+test("F183: the about route is gone and Settings' root ends with the version line", async () => {
+  // The root's sections fill in later (certificate, signer status) against this fake DOM: it stays (each test file
+  // runs in its own process).
+  globalThis.document = { createElement: fakeElement, createTextNode: (t) => ({ textContent: t }), createDocumentFragment: () => fakeElement("#frag"),
+    head: null, body: fakeElement("body"), documentElement: fakeElement("html"), querySelector: () => null, querySelectorAll: () => [],
+    addEventListener() {} };
+  const { render, nav } = await import("./settings.js");
+  const { footLine } = await import("./home.js");
+  assert.equal(nav({ path: ["about"] }).title, "Settings");
+  const root = fakeElement("div");
+  render(root, { tab: "home", path: [] });
+  const [foot, commit] = root.children.slice(-2);
+  assert.equal(foot.className, "home-version");
+  assert.equal(commit.className, "home-version home-commit");
+  assert.match(foot.textContent, /^iPhone, (iOS [^,]+, )?iFizBox Web \(/); // the website's line, as Home's
+  assert.equal(foot.textContent.replace(/iOS [^,]+, /, ""), footLine({ web: true }));
+  for (const t of texts(root)) assert.doesNotMatch(t, /^About$|Check for Updates|Skip This Version/);
+});
+
+test("F183: settings.js has no About page or update check left", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  for (const gone of ["aboutPage", "aboutRow", "checkUpdates", "setSkip", "Check for Updates", "Skip This Version", '"about"']) {
+    assert.equal(src.includes(gone), false, gone);
+  }
 });

@@ -1,24 +1,17 @@
-// The Essential Upgrade alert on launch (F72), bound to the real backend, catalog, bridge and alerts. The logic is
-// core/essential.js; app.js calls startEssential() once the launch has settled, in the app only.
+// iFizBox's own update, bound to the real backend, bridge and storage (F72, F183). The logic is core/essential.js
+// and core/selfupdate.js; app.js calls lookForUpdates() on every launch, Home's Reload and return, in the app only.
+// Nothing pops up (user 2026-11-18): a newer iFizBox is only a row on top of Changes, with its badge.
 //
-//   jailbreak   catalog.upgrades (apt's lists) + dpkg's status (Essential: yes) + the built-in repo's minimum.
-//               Complete Upgrade and Essential Only queue the upgrades (N4), and the Confirm sheet opens.
-//   sideload    iFizBox's own AltStore source, read once per launch: iFizBox's newest version and its minimum.
-//               F86: Complete Upgrade queues every upgrade Changes lists (Upgrade (N)'s queueUpgrades), Essential
-//               Only just iFizBox, in the app queue, and F80's Confirm opens (iFizBox last: installing it closes the
-//               app). Nothing could be queued (no Cydian.ipa in the source): installSelfNow says why.
-// Either build, forced (below the minimum): Confirm's Cancel brings the alert back (core/essential.js queueEssential).
-// Nothing found to read (the built-in source never loaded, offline): resolves "unknown", and app.js falls back on
-// F61's GitHub check.
-import { showBanner } from "./nav/banner.js";
-import { runEssential, queueEssential, installSelf, selfFromAltSource, selfUpgradeRow, essentialIds, essentialUpgrades, minimumOf,
-  isBuiltin, saveInfo, loadInfo, withSelfUpgrade, SELF_ALT_URL, SELF_ID } from "./core/essential.js";
+//   sideload    iFizBox's own AltStore source and GitHub's latest release, both read every time; Changes' row takes
+//               whichever is newer (upgradesWithSelf). Installing it (Changes' Upgrade, the app queue) signs it on
+//               the phone (installSelfNow).
+//   jailbreak   GitHub's release is read and kept; the row itself is apt's, from iFizBox's built-in repo.
+import { installSelf, selfFromAltSource, selfUpgradeRow, saveInfo, loadInfo, withSelfUpgrade, selfInfoWith, lookForSelfUpdate,
+  SELF_ALT_URL } from "./core/essential.js";
+import { checkForUpdates, fetchRelease, newerRelease } from "./core/selfupdate.js";
 import { getBackend } from "./backend.js";
-import { catalog } from "./catalog.js";
 import { detectMode } from "./core/settings.js";
-import { parseStatus } from "./core/installed.js";
 import { showAlert } from "./nav/alert.js";
-import { settings } from "./screens/settings.js";
 import { installOnDevice } from "./signing-client.js";
 import { NAME } from "./brand.js";
 
@@ -52,12 +45,14 @@ export async function readSelfInfo() {
   return info;
 }
 
-// Changes (sideload): the upgrades with iFizBox's own row on top, from what the last launch read.
+// Changes (sideload): the upgrades with iFizBox's own row on top, from what the last check read: its source, or
+// GitHub's release when that is newer (F183).
 export async function upgradesWithSelf(upgrades) {
   if (detectMode() !== "sideload") return upgrades;
-  const info = loadInfo(storage());
+  const current = await appVersion();
+  const info = selfInfoWith(loadInfo(storage()), newerRelease(storage(), current));
   if (!info) return upgrades;
-  return withSelfUpgrade(upgrades, selfUpgradeRow(info, await appVersion()));
+  return withSelfUpgrade(upgrades, selfUpgradeRow(info, current));
 }
 
 export async function installSelfNow(row) {
@@ -70,102 +65,17 @@ export async function installSelfNow(row) {
   return installSelf(row, { alert: showAlert, open: openOutside });
 }
 
-// ---- jailbreak: the queue -----------------------------------------------------------------------------------
+// ---- launch, Home's Reload, a return ----------------------------------------------------------------------------
 
-function queueAll(rows) {
-  const q = getBackend().queue;
-  if (typeof q !== "function") { showAlert({ title: "Can't Upgrade", message: "This build has no install queue.", buttons: ["OK"] }); return 0; }
-  let n = 0;
-  for (const r of rows) {
-    if (r?.id && r.version) { q.call(getBackend(), { op: "install", id: r.id, version: r.version, installed: r.installed ?? null, name: r.name ?? null }); n++; }
-  }
-  return n;
-}
-
-// ---- sideload: the app queue (F80) ----------------------------------------------------------------------------
-
-// Complete Upgrade: what Changes' Upgrade (N) would queue, read when the button is tapped (the alert doesn't wait
-// for the catalog): every app upgrade, with iFizBox's own row on top. Unreadable: just the rows the alert had.
-async function sideloadAll(rows) {
-  try {
-    const { withAppUpgrades } = await import("./app-updates.js");
-    const holds = settings.holds.list();
-    await catalog.ensure?.();
-    const self = rows.find((r) => r.id === SELF_ID) ?? null;
-    const u = await withAppUpgrades(withSelfUpgrade(await catalog.upgrades(holds), self), holds);
-    return u.available?.length ? u.available : rows;
-  } catch { return rows; }
-}
-
-async function queueApps(rows) {
-  const { queueUpgrades } = await import("./screens/changes.js");
-  return (await queueUpgrades(rows)).length;
-}
-
-// One button of the alert: queue, open Confirm, wait for it. -> "queued" | "cancelled" | installSelfNow's answer.
-async function queueButton(mode, rows, { everything = false } = {}) {
-  const { whenConfirmEnds } = await import("./screens/queue.js");
-  const self = (list) => list.find((r) => r.id === SELF_ID) ?? list[0];
-  if (mode === "sideload") {
-    const list = everything ? await sideloadAll(rows) : rows;
-    return queueEssential(list, { queue: queueApps, confirmed: whenConfirmEnds, fallback: (l) => installSelfNow(self(l)) });
-  }
-  return queueEssential(rows, { queue: queueAll, confirmed: whenConfirmEnds });
-}
-
-// ---- forced: nothing else is usable ---------------------------------------------------------------------------
-// A clear block over the screens and tab bar (under the HUD, the Confirm sheet and alerts): a tap asks again.
-let block = null;
-function lock(prompt) {
-  if (block) return;
-  block = document.createElement("div");
-  block.className = "essential-block";
-  Object.assign(block.style, { position: "fixed", inset: "0", zIndex: "10", background: "transparent" });
-  block.setAttribute("aria-label", `${NAME} needs to upgrade itself first`);
-  block.addEventListener("click", () => prompt().catch(() => {}));
-  document.body.append(block);
-}
-
-// ---- launch -------------------------------------------------------------------------------------------------
-
-async function gather(mode) {
-  if (mode === "sideload") {
-    const [info, current] = await Promise.all([readSelfInfo(), appVersion()]);
-    if (!info) return null;
-    const row = selfUpgradeRow(info, current);
-    return { current, minimum: info.minimum, essential: row ? [row] : [], all: row ? [row] : [] };
-  }
-  const backend = getBackend();
-  const list = await backend.sources();
-  const self = list.find(isBuiltin);
-  if (!self || self.updated == null) return null; // never read: F61 still checks GitHub
-  await catalog.ensure();
-  const [upgrades, status, current] = await Promise.all([
-    catalog.upgrades(settings.holds.list()), backend.dpkgStatus?.().catch(() => null) ?? null, appVersion()]);
-  const ids = essentialIds(status ? parseStatus(status) : []);
-  return { current, minimum: minimumOf(self), essential: essentialUpgrades(upgrades.available, ids), all: upgrades.available };
-}
-
-// A iFizBox update that isn't required: the iOS 6 banner, "iFizBox X is out", with Upgrade (queues it, Confirm opens).
-// Once per version per session, so coming back to iFizBox doesn't show it again.
-let bannered = null;
-function bannerOnce(rows, upgrade) {
-  const v = rows.find((r) => r.id === SELF_ID)?.version ?? rows[0]?.version ?? "";
-  if (!v || bannered === v) return;
-  bannered = v;
-  showBanner({ title: NAME, message: `${NAME} ${v} is out.`, action: { label: "Upgrade", onClick: upgrade } });
-}
-
+// Silent whatever it finds (F183): reads iFizBox's source (sideload) and GitHub's release, then Changes counts
+// again (cydian:self-info). One at a time. Resolves core/essential.js lookForSelfUpdate's answer.
 let running = null;
-export function startEssential() {
+export function lookForUpdates() {
   const mode = detectMode();
-  if (mode !== "sideload" && mode !== "jailbreak") return Promise.resolve("site");
-  return (running ??= runEssential({
-    gather: () => gather(mode),
-    alert: showAlert,
-    lock,
-    complete: (all) => queueButton(mode, all, { everything: true }),
-    essentialOnly: (rows) => queueButton(mode, rows),
-    ...(mode === "sideload" ? { notify: bannerOnce } : {}),
+  return (running ??= lookForSelfUpdate({
+    mode,
+    readSource: () => readSelfInfo(),
+    checkRelease: () => checkForUpdates({ mode, storage: storage(), current: appVersion, release: () => fetchRelease({ native: native() }) }),
+    changed: () => globalThis.dispatchEvent?.(new Event("cydian:self-info")),
   }).finally(() => { running = null; }));
 }

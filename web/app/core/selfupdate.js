@@ -1,25 +1,17 @@
-// iFizBox updates itself (F61). In the app only (sideload and jailbreak builds): on launch and at most once a day, read
-// GitHub's latest release, compare its tag (vX.Y.Z) with the app's own version (Bridge.swift app.info `version`,
-// CFBundleShortVersionString) and, when it's newer, ask with an iOS 6 alert: "iFizBox X.Y.Z Is Available", the first
-// lines of the release notes, Later / Install. Later asks again on the next launch a day on; Settings > About has
-// Check for Updates and Skip This Version (screens/settings.js aboutSection).
+// iFizBox's own update check (F61, F183). In the app only (sideload and jailbreak builds): every launch, every Home
+// Reload and every return to the app read GitHub's latest release and keep it (no once-a-day wait). Nothing pops up:
+// a newer iFizBox shows only as an upgrade row in Changes and its badge (essential-ui.js upgradesWithSelf, with
+// iFizBox's own AltStore source), installed from there like any app upgrade.
+//   sideload   the row takes the release's Cydian.ipa when GitHub is newer than the source
+//   jailbreak  apt lists iFizBox's upgrade from its built-in repo (served from that same release); the release is
+//              only recorded
+// Also here: the version compare and the release parse, which Home's Install offers use too (debFor, appoffer.js).
 //
-// Install, by build:
-//   sideload   the release's Cydian.ipa, signed on the phone with the user's certificate and installed over the
-//              running app (F58's installOnDevice: same bundle ID com.ryha.cydian, so its data stays). No certificate
-//              in the Keychain: an alert says so and Settings > Signing opens.
-//              F72: given `installSelf` (core/essential.js), that takes over: iOS closes iFizBox, and the local install
-//              server with it, as soon as the install starts, so iFizBox's own IPA is signed on the Signing Server.
-//   jailbreak  the release's .deb for this device's architecture, downloaded by the shell (selfupdate.download) and
-//              installed with `cydian-helper selfupdate <path>` (dpkg -i, N2), then an offer to close iFizBox so the
-//              next launch runs the new build (Cydia's own "Close Cydia" after finish:reopen).
-//
-// Pure: everything that touches the network, the bridge, storage or the screen comes in through `deps`, so node
-// tests drive every path (selfupdate.test.js). app.js and screens/settings.js wire the real ones.
-import { NAME, GITHUB_REPO } from "../brand.js";
+// Pure: everything that touches the network, the bridge or storage comes in through `deps`, so node tests drive
+// every path (selfupdate.test.js). essential-ui.js wires the real ones.
+import { GITHUB_REPO } from "../brand.js";
 
 export const RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
-export const DAY = 24 * 60 * 60 * 1000;
 export const STORE_KEY = "cydian.selfupdate";
 const NOTE_LINES = 4;
 
@@ -40,8 +32,8 @@ export function compareVersions(a, b) {
 
 export const isNewer = (latest, current) => parseVersion(latest) != null && compareVersions(latest, current) > 0;
 
-// The first `n` lines of a release's notes worth showing in an alert: Markdown headings, rules, images and blank
-// lines dropped, list bullets and emphasis taken off.
+// The first `n` lines of a release's notes worth showing (a Changes row's short line): Markdown headings, rules,
+// images and blank lines dropped, list bullets and emphasis taken off.
 export function noteLines(body, n = NOTE_LINES) {
   const out = [];
   for (const raw of String(body ?? "").split(/\r?\n/)) {
@@ -93,10 +85,9 @@ export function installPath(mode) {
 }
 
 // ---- the state kept between launches ------------------------------------------------------------------------
-//   lastCheck  ms of the last automatic check (the once-a-day gate)
-//   laterAt    ms when Later was tapped; laterVersion the version it was for
-//   skip       the version Skip This Version is on
-//   latest     the newest release seen: { version, notes, url, ipa, debs }
+//   lastCheck  ms of the last check
+//   latest     the newest release seen: { version, tag, notes, url, ipa, debs }
+//   current    the app's own version at that check
 
 export function loadState(storage) {
   try {
@@ -108,40 +99,14 @@ export function loadState(storage) {
 export function saveState(storage, patch) {
   const next = { ...loadState(storage), ...patch };
   for (const k of Object.keys(next)) if (next[k] == null) delete next[k];
-  try { storage?.setItem(STORE_KEY, JSON.stringify(next)); } catch { /* full or private: asks again next time */ }
+  try { storage?.setItem(STORE_KEY, JSON.stringify(next)); } catch { /* full or private: read again next time */ }
   return next;
 }
 
-// The once-a-day gate: an automatic check runs when none ran in the last day (or the clock went back).
-export function dueForCheck(state, now) {
-  const last = Number(state?.lastCheck);
-  return !Number.isFinite(last) || last <= 0 || now - last >= DAY || now < last;
-}
-
-// Whether an automatic check offers `release` to a user on `current`: newer, not skipped, and not put off with
-// Later in the last day.
-export function shouldOffer(release, current, state, now) {
-  if (!release || !isNewer(release.version, current)) return false;
-  if (state?.skip && compareVersions(state.skip, release.version) === 0) return false;
-  const later = Number(state?.laterAt);
-  if (Number.isFinite(later) && later > 0 && now - later < DAY && now >= later) return false;
-  return true;
-}
-
-// Skip This Version (Settings > About): on for `version`, or off (null).
-export function setSkip(storage, version) {
-  return saveState(storage, { skip: version || null });
-}
-
-// ---- the alert ----------------------------------------------------------------------------------------------
-
-export function offerAlert(release) {
-  return {
-    title: `${NAME} ${release.version} Is Available`,
-    message: release.notes?.length ? release.notes.join("\n") : `A new version of ${NAME} is out.`,
-    buttons: ["Later", "Install"],
-    cancel: 0,
-  };
+// The release the last check kept, when it is newer than `current`; else null.
+export function newerRelease(storage, current) {
+  const latest = loadState(storage).latest;
+  return latest?.version && current && isNewer(latest.version, current) ? latest : null;
 }
 
 // The release as JSON from GitHub: in the app through the shell's net.fetch (no CORS, its own User-Agent, which
@@ -164,110 +129,18 @@ export async function fetchRelease({ native, fetch: f = globalThis.fetch, url = 
 //   mode, storage, now()             build, where the state lives, the clock
 //   current()   -> "0.1.0"           the app's own version (app.info)
 //   release()   -> parseRelease(...) the latest release (fetchRelease)
-//   alert(spec) -> { index }         nav/alert.js showAlert
-//   install(release)                 runInstall bound to the real bridge (below)
 // }
-// Automatic (on launch): nothing unless due; failures are silent. Manual (Check for Updates): always asks GitHub,
-// says when it's up to date or couldn't be reached, and offers the release even if skipped or put off.
-// Resolves what happened: "site" | "not-due" | "error" | "current" | "skipped" | "later" | "install".
-// always: every launch and Reload (user 2026-11-17): no once-a-day or Later wait, but silent when there's nothing new
-// or GitHub doesn't answer; a version the user chose to skip stays skipped.
-export async function checkForUpdates(deps, { manual = false, always = false } = {}) {
+// Every time it is called (F183: launch, Home's Reload, a return), silent whatever happens: no alert, ever. It keeps
+// the release so Changes can list it. Resolves "site" | "error" | "current" | "newer".
+export async function checkForUpdates(deps) {
   const { mode, storage, now = Date.now } = deps;
   if (!installPath(mode)) return "site";
-  const t = now();
-  let state = loadState(storage);
-  if (!manual && !always && !dueForCheck(state, t)) return "not-due";
   let release, current;
   try {
     [release, current] = await Promise.all([deps.release(), deps.current()]);
-  } catch (e) {
-    if (manual) await deps.alert({ title: "Couldn't Check for Updates", message: e?.message || "GitHub didn't answer.", buttons: ["OK"] });
+  } catch {
     return "error";
   }
-  state = saveState(storage, { ...(manual ? {} : { lastCheck: t }), latest: release ?? null, current: current || null });
-  const newer = release && isNewer(release.version, current);
-  if (!newer) {
-    if (manual) await deps.alert({ title: `${NAME} Is Up to Date`, message: `${NAME} ${current || ""} is the newest version.`.replace("  ", " "), buttons: ["OK"] });
-    return "current";
-  }
-  if (always && !manual && state.skip && compareVersions(state.skip, release.version) === 0) return "skipped";
-  if (!manual && !always && !shouldOffer(release, current, state, t)) {
-    return state.skip && compareVersions(state.skip, release.version) === 0 ? "skipped" : "later";
-  }
-  const { index } = await deps.alert(offerAlert(release));
-  if (index !== 1) {
-    saveState(storage, { laterAt: t, laterVersion: release.version });
-    return "later";
-  }
-  saveState(storage, { laterAt: null, laterVersion: null });
-  await deps.install(release);
-  return "install";
-}
-
-// ---- the install --------------------------------------------------------------------------------------------
-// deps (by path):
-//   sideload:  status() -> { identity }       signing-client.js deviceStatus
-//              installOnDevice({ url, name }) signing-client.js: signs, installs, explains its own errors
-//   jailbreak: native                          the bridge: selfupdate.download, helper(words, onEvent), app.quit
-//              arch                            core/settings.js bridgeArch / getArch
-//              hud(text) -> { set, hide }
-//   both:      alert(spec) -> { index }, go(path)  open a Settings page (["signing"])
-// Resolves "installed" | "no-certificate" | "no-asset" | "failed" | "site".
-export async function runInstall(release, mode, deps) {
-  const path = installPath(mode);
-  if (path === "sideload") return installSideload(release, deps);
-  if (path === "jailbreak") return installJailbreak(release, deps);
-  return "site";
-}
-
-async function installSideload(release, { status, installOnDevice, installSelf, alert, go }) {
-  if (!release.ipa) {
-    await alert({ title: "Can't Install", message: `${NAME} ${release.version} has no Cydian.ipa on GitHub.`, buttons: ["OK"] });
-    return "no-asset";
-  }
-  // F72: iFizBox's own IPA can't come through the local install server (iOS closes iFizBox, and the server, as it
-  // starts installing): installSelf (core/essential.js) signs it on the Signing Server or opens cydian.dev.
-  if (installSelf) {
-    const r = await installSelf({ version: release.version, ipa: release.ipa });
-    return r === "installing" || r === "site" ? "installed" : r === "no-asset" ? "no-asset" : "failed";
-  }
-  let st = null;
-  try { st = await status(); } catch { /* the signer didn't answer: as if no certificate, Settings > Signing says why */ }
-  if (!st?.identity) {
-    await alert({ title: "No Certificate", message: `To install ${NAME} ${release.version}, add your certificate in Settings > Signing. ${NAME} signs its update with it on this iPhone.`, buttons: ["OK"] });
-    go(["signing"]);
-    return "no-certificate";
-  }
-  return (await installOnDevice({ url: release.ipa, name: NAME })) ? "installed" : "failed";
-}
-
-const lastLine = (s) => String(s ?? "").trim().split(/\r?\n/).filter(Boolean).at(-1) ?? "";
-
-async function installJailbreak(release, { native, arch, hud, alert }) {
-  const url = debFor(release, arch);
-  if (!url) {
-    await alert({ title: "Can't Install", message: `${NAME} ${release.version} has no .deb for ${arch || "this iPhone"} on GitHub.`, buttons: ["OK"] });
-    return "no-asset";
-  }
-  const h = hud("Downloading");
-  let r;
-  try {
-    const { path } = await native.call("selfupdate.download", { url });
-    h.set("Installing");
-    r = await native.helper(["selfupdate", path], () => {});
-  } catch (e) {
-    h.hide();
-    await alert({ title: "Couldn't Update", message: e?.message || "The download failed.", buttons: ["OK"] });
-    return "failed";
-  }
-  h.hide();
-  if (r?.code !== 0) {
-    await alert({ title: "Couldn't Update", message: `dpkg failed (${r?.code}): ${lastLine(r?.stderr) || lastLine(r?.stdout) || "no output"}`, buttons: ["OK"] });
-    return "failed";
-  }
-  const { index } = await alert({ title: `${NAME} Updated`, message: `${NAME} ${release.version} is installed. Close ${NAME} and open it again to use it.`,
-    buttons: ["Later", `Close ${NAME}`], cancel: 0 });
-  if (index === 1) await native.call("app.quit", {}).catch(() => {});
-  return "installed";
+  saveState(storage, { lastCheck: now(), latest: release ?? null, current: current || null });
+  return release && isNewer(release.version, current) ? "newer" : "current";
 }

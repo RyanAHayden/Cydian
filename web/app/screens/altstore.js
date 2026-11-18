@@ -11,6 +11,7 @@ import { catalog, ALL } from "../catalog.js";
 import { getBackend } from "../backend.js";
 import { mediaUrl } from "./depiction.js";
 import { installOptions } from "../core/altstore.js";
+import { appLinks, appGithub, altShots, loadPreviews, dedupeShots } from "../core/previews.js";
 import { settings } from "./settings.js";
 import { displayName, githubAvatarUrl } from "../core/sources.js";
 import { compat } from "../core/compat.js";
@@ -479,19 +480,8 @@ export function renderApp(body, route, pkg, source) {
     if (v.localizedDescription) body.lastChild.querySelector(".table").after(el("p", "group-footer alt-whatsnew", v.localizedDescription));
   }
 
-  if (app.screenshots.length) {
-    const strip = el("div", "alt-shots");
-    for (const s of app.screenshots) {
-      const pic = img(s.url, "alt-shot");
-      if (pic) {
-        if (s.width && s.height) pic.style.aspectRatio = `${s.width} / ${s.height}`;
-        strip.append(pic);
-      }
-    }
-    const g = el("div", "group");
-    g.append(el("h2", "group-header", "Screenshots"), strip);
-    body.append(g);
-  }
+  // F122: the source's screenshots, or (when it lists none) its GitHub repo's README and release pictures.
+  body.append(previewSlot(`app:${pkg.key}:${pkg.row?.id ?? app.bundleIdentifier}`, { shots: altShots(app), gh: appGithub(app) }));
 
   if (app.localizedDescription) body.append(card([el("div", "pkg-description", app.localizedDescription)]));
 
@@ -508,10 +498,93 @@ export function renderApp(body, route, pkg, source) {
   // Version History (F29): its own page (browse.js renderVersions), every versions[] entry, older ones installable.
   body.append(grouped([{ rows: [{ label: "Version History", href: deeper(route, `versions:${pkg.row.id}`) }] }]));
 
-  // Which source it came from: opens that source's page.
+  // Links (F122): the source it came from (its page in Sources), then the developer's site and GitHub repo.
   const sourceName = app.sourceName || (source ? displayName(source) : "") || app.sourceUrl;
-  body.append(grouped([{ header: "Source", rows: [{ label: sourceName, subtitle: app.sourceUrl,
-    href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) }] }]));
+  body.append(linksGroup({ label: sourceName, subtitle: app.sourceUrl,
+    href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) }, appLinks(app)));
   setSourceShare(body, source ?? { key: pkg.key }, { app: true }); // F76: Copy Link and Add on Another Device only
   body.append(grouped([{ footer: `${app.bundleIdentifier}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
+}
+
+// ---- Links and the screenshots gallery (F122), shared with browse.js's package pages ---------------------------
+
+// A link out opens in its own app or Safari (app.js's window.open in the Home Screen app, LinkOut in the shell).
+export const openOut = (url) => window.open(url, "_blank", "noopener");
+
+// The Links group: `source` (a row opening the source's page, or null) and core/previews.js's links, in that order.
+export function linksGroup(source, links) {
+  const rows = [];
+  if (source) rows.push({ ...source, chevron: true });
+  for (const l of links) rows.push({ label: l.label, subtitle: l.detail || l.url, onClick: () => openOut(l.url), chevron: true });
+  const g = grouped([{ header: "Links", rows }]);
+  g.firstElementChild?.classList.add("links-group");
+  return g;
+}
+
+// One picture of the gallery: lazy, sized by the source's width/height or, failing that, the picture's own; an https
+// picture its host won't serve to us (hotlink rules) tries once more through the site's proxy.
+export function galleryImage(s, { backend = getBackend } = {}) {
+  const src = mediaUrl(s.url);
+  if (!src) return null;
+  const i = el("img", "alt-shot");
+  i.alt = "";
+  i.decoding = "async";
+  i.loading = "lazy";
+  i.referrerPolicy = "no-referrer";
+  const ratio = (w, h) => {
+    i.style.aspectRatio = `${w} / ${h}`;
+    i.classList.toggle("wide", w > h);
+  };
+  if (s.width && s.height) ratio(s.width, s.height);
+  i.onload = () => {
+    if (i.naturalWidth && i.naturalWidth < 120 && i.naturalHeight < 120) return gone(i); // an icon after all
+    if (!(s.width && s.height) && i.naturalWidth && i.naturalHeight) ratio(i.naturalWidth, i.naturalHeight);
+  };
+  let retried = false;
+  i.onerror = () => {
+    const b = backend();
+    if (!retried && b.kind === "http" && b.assetUrl && /^https:/i.test(s.url)) { retried = true; i.src = b.assetUrl(s.url); return; }
+    gone(i);
+  };
+  i.src = src;
+  return i;
+}
+
+function gone(i) {
+  const group = i.closest(".shots-group");
+  i.remove();
+  if (group && !group.querySelector(".alt-shot")) group.remove();
+}
+
+export function galleryGroup(shots) {
+  const strip = el("div", "alt-shots");
+  for (const s of shots) {
+    const pic = galleryImage(s);
+    if (pic) strip.append(pic);
+  }
+  if (!strip.childElementCount) return null;
+  const g = el("div", "group shots-group");
+  g.append(el("h2", "group-header", "Screenshots"), strip);
+  return g;
+}
+
+// Text for core/previews.js: GitHub's raw and API hosts answer with CORS, so on the site the browser asks them
+// itself (its own rate limit, not the proxy's shared one) and goes through the proxy only when that fails to connect.
+export function previewText(url, { backend = getBackend(), fetchFn = globalThis.fetch } = {}) {
+  if (backend.kind === "http" && fetchFn && /^https:\/\/(raw\.githubusercontent\.com|api\.github\.com)\//.test(url)) {
+    return fetchFn(url, { headers: /api\.github/.test(url) ? { Accept: "application/vnd.github+json" } : {} }).then(
+      (r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))),
+      () => backend.text(url));
+  }
+  return backend.text(url);
+}
+
+// The gallery's place on a page, filled once the pictures are known (at once for a source's own; after a fetch for
+// a depiction page's or a GitHub repo's, cached per app by core/previews.js).
+export function previewSlot(key, sources) {
+  const slot = el("div", "preview-slot");
+  const fill = (shots) => { const g = galleryGroup(shots); slot.replaceChildren(...(g ? [g] : [])); };
+  if (sources.shots?.length) { fill(dedupeShots(sources.shots)); return slot; }
+  loadPreviews(key, sources, { text: (u) => previewText(u) }).then(fill).catch(() => {});
+  return slot;
 }

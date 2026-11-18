@@ -95,12 +95,17 @@ function parseVersion(v, legacy = false) {
 // 1.x: screenshotURLs.
 function parseScreenshots(app) {
   let list = app.screenshots ?? app.screenshotURLs;
-  if (list && !Array.isArray(list) && typeof list === "object") list = [...(list.iphone ?? []), ...(list.ipad ?? [])];
+  // F122: each keeps which device it is for (`device`), when the source split them.
+  if (list && !Array.isArray(list) && typeof list === "object") {
+    const of = (l, device) => (Array.isArray(l) ? l : []).map((s) => ({ s, device }));
+    list = [...of(list.iphone, "iphone"), ...of(list.ipad, "ipad")];
+  } else if (Array.isArray(list)) list = list.map((s) => ({ s, device: null }));
   if (!Array.isArray(list)) return [];
-  return list.map((s) => {
-    if (typeof s === "string") return httpUrl(s) ? { url: s.trim(), width: null, height: null } : null;
+  return list.map(({ s, device }) => {
+    const d = device ? { device } : {};
+    if (typeof s === "string") return httpUrl(s) ? { url: s.trim(), width: null, height: null, ...d } : null;
     const url = httpUrl(s?.imageURL ?? s?.url);
-    return url ? { url, width: num(s.width), height: num(s.height) } : null;
+    return url ? { url, width: num(s.width), height: num(s.height), ...d } : null;
   }).filter(Boolean);
 }
 

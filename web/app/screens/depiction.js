@@ -1,6 +1,6 @@
 // Native rendering of Sileo's JSON depictions (a package's `SileoDepiction:` field): the view classes Sileo
 // documents (DepictionTabView, StackView, HeaderView, MarkdownView, ImageView, ScreenshotsView, TableTextView,
-// TableButtonView, …) drawn as plain DOM in the iOS 6 style. Nothing from the depiction is ever injected as
+// TableButtonView, RatingView, ReviewView, WebView, …) drawn as plain DOM in the iOS 6 style. Nothing from the depiction is ever injected as
 // HTML: markdown is parsed here, and raw-HTML markdown (`useRawFormat`) goes through an allowlist sanitiser.
 // Unknown classes are skipped. Styles: packages.css (.dep-*).
 //
@@ -182,6 +182,59 @@ const VIEWS = {
     s.style.height = `${Math.min(200, Number(v.spacing) || 0)}px`;
     return s;
   },
+  // F103: Sileo-only views.
+  DepictionRatingView(v) {
+    const box = el("div", "dep-rating");
+    box.style.textAlign = ALIGN[v.alignment] ?? "left";
+    box.append(stars(v.rating));
+    return box;
+  },
+  // Sileo builds it from a Subheader (title), a Label (author), a Rating and a Markdown view; here in one grouped cell.
+  DepictionReviewView(v, opts) {
+    const cell = el("div", "dep-review");
+    const head = el("div", "dep-review-head");
+    head.append(el("span", "dep-review-title", v.title ?? ""), stars(v.rating));
+    cell.append(head);
+    if (v.author) cell.append(el("div", "dep-review-author", `by ${v.author}`));
+    const body = el("div", "dep-markdown dep-review-body");
+    if (v.useRawFormat) body.append(sanitizeHtml(String(v.markdown ?? ""), opts));
+    else body.append(markdown(String(v.markdown ?? ""), opts));
+    cell.append(body);
+    return cell;
+  },
+  // An embedded page in a sandboxed iframe (scripts, no same-origin: it can't reach the app or its storage), at the
+  // width/height aspect, no wider than the column. https as it is; http through the backend (the app loads it
+  // direct). The site's proxy serves no HTML (worker/src/index.js PASS: it is not an open web proxy), so where http
+  // would go through it the page is offered as a link row instead.
+  DepictionWebView(v) {
+    const url = webUrl(v.URL);
+    if (!url) return document.createDocumentFragment();
+    if (url.proxied) {
+      const a = el("a", "dep-row dep-button-row", "Web Page");
+      a.href = url.original;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      return a;
+    }
+    const box = el("div", "dep-web");
+    box.style.textAlign = ALIGN[v.alignment] ?? "center";
+    const f = el("iframe");
+    f.setAttribute("sandbox", "allow-scripts");
+    f.setAttribute("referrerpolicy", "no-referrer");
+    f.setAttribute("loading", "lazy");
+    f.title = "Web content";
+    f.src = url.src;
+    const w = Number(v.width) > 0 ? Number(v.width) : 300;
+    const h = Number(v.height) > 0 ? Number(v.height) : 150;
+    f.style.width = `min(100%, ${w}px)`;
+    f.style.aspectRatio = `${w} / ${h}`;
+    box.append(f);
+    return box;
+  },
+  // Sileo shows `view` only when Sileo is at least `minVersion`; Cydian draws every view it knows, so it always shows.
+  DepictionMinVersionForceView(v, opts) {
+    return view(v.view, opts);
+  },
   DepictionVideoView(v) {
     const url = safeLink(v.URL);
     if (!url) return document.createDocumentFragment();
@@ -192,6 +245,30 @@ const VIEWS = {
     return a;
   },
 };
+
+// Five stars, the filled ones clipped to rating/5 (halves and fractions show as part of a star).
+export function stars(rating) {
+  const r = Math.max(0, Math.min(5, Number(rating) || 0));
+  const s = el("span", "dep-stars");
+  s.setAttribute("role", "img");
+  s.setAttribute("aria-label", `${Math.round(r * 10) / 10} out of 5 stars`);
+  const fill = el("span", "dep-stars-fill");
+  fill.style.width = `${(r / 5) * 100}%`;
+  s.append(fill);
+  return s;
+}
+
+// A web page URL for DepictionWebView: { src, proxied, original }, or null for anything but http(s).
+export function webUrl(url) {
+  const s = String(url ?? "").trim();
+  if (/^https:\/\/[^\s]+$/i.test(s)) return { src: s, proxied: false, original: s };
+  if (/^http:\/\/[^\s]+$/i.test(s)) {
+    const b = getBackend();
+    const src = b.assetUrl ? b.assetUrl(s) : s;
+    return { src, proxied: src !== s, original: s };
+  }
+  return null;
+}
 
 function linkRow(label, action, opts, cls) {
   const a = el("a", cls, label);

@@ -375,3 +375,21 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
   background: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103); /* .badge's red */
 }
 .pkg-row[data-change="resign"] .pkg-version::before { content: none; }
+/* F103: Sileo's RatingView, ReviewView and WebView. Stars are drawn the iOS 6 App Store way: five grey stars, the
+   filled ones dark, clipped to the rating (a fraction shows as part of a star). */
+.dep-rating { margin: 4px 12px; line-height: 0; }
+.dep-stars {
+  --star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23c4c4c4' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
+  --star-on: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23666' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
+  position: relative; display: inline-block; flex: none; vertical-align: middle; width: 70px; height: 14px;
+  background: var(--star) left center / 14px 14px repeat-x;
+}
+.dep-stars-fill { position: absolute; inset: 0 auto 0 0; background: var(--star-on) left center / 14px 14px repeat-x; }
+.dep-review { margin: 6px 10px; padding: 8px 10px; background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px;
+  box-shadow: inset 0 .5px .5px var(--table-inset); }
+.dep-review-head { display: flex; align-items: center; gap: 8px; }
+.dep-review-title { flex: 1; min-width: 0; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dep-review-author { font-size: 13px; line-height: 17px; color: var(--subtitle); }
+.dep-review-body { padding: 0; }
+.dep-web { padding: 6px 12px; line-height: 0; }
+.dep-web iframe { display: inline-block; max-width: 100%; height: auto; border: 0; background: #fff; }

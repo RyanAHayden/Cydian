@@ -69,3 +69,51 @@ test("B13: Purchased only for a signed-in account; signed out shows the price", 
   assert.equal(priceDetail({ price: "$1.99", purchased: false, available: true }, true), "$1.99");
   assert.equal(priceDetail({ price: null, purchased: false, available: true }, false), "Paid");
 });
+
+// B33: Search's Other Sources leaves out rows not built for this device while the Filter hides incompatible
+// packages (Show Incompatible off), keeps them (with "Other device") when it's on, and draws nothing when all go.
+function fakeEl(tag) {
+  const e = {
+    tagName: tag.toUpperCase(), children: [], style: { setProperty() {} }, attrs: {}, textContent: "", className: "",
+    classList: { add() {}, remove() {}, contains: () => false, toggle() {} },
+    setAttribute(k, v) { e.attrs[k] = v; }, addEventListener() {},
+    append(...kids) { e.children.push(...kids); },
+    replaceChildren(...kids) { e.children = [...kids]; },
+  };
+  return e;
+}
+const texts = (n) => (typeof n === "string" ? [n] : [...(n.textContent ? [n.textContent] : []), ...(n.children ?? []).flatMap(texts)]);
+
+async function otherSources(hide, data) {
+  const { discoveryGroup } = await import("./extras.js");
+  const saved = globalThis.document;
+  globalThis.document = { createElement: fakeEl, createDocumentFragment: () => fakeEl("#fragment"), createTextNode: (t) => t };
+  try {
+    const g = discoveryGroup(null, { hideIncompatible: () => hide, search: async () => ({ data }), sources: async () => [],
+      arch: () => "iphoneos-arm64", wait: 0 });
+    await g.search("you");
+    return texts(g.el);
+  } finally { globalThis.document = saved; }
+}
+const pkg = (id, name, architecture) => ({ package_id: id, name, version: "1", architecture,
+  repository: { uri: "https://tinyapps.example/", name: "Tinyapps", suite: "./" } });
+const mixed = [pkg("com.a.good", "Good", "iphoneos-arm64"), pkg("com.a.rootful", "Rootful", "iphoneos-arm")];
+
+test("B33: Show Incompatible off (filter on) leaves out Other Sources rows built for another device", async () => {
+  const t = await otherSources(true, mixed);
+  assert.ok(t.includes("Good"));
+  assert.ok(!t.includes("Rootful"));
+  assert.ok(!t.includes("Other device"));
+});
+
+test("B33: Show Incompatible on (filter off) keeps them, marked Other device", async () => {
+  const t = await otherSources(false, mixed);
+  assert.ok(t.includes("Good"));
+  assert.ok(t.includes("Rootful"));
+  assert.ok(t.includes("Other device"));
+});
+
+test("B33: every row hidden draws no Other Sources group at all", async () => {
+  const t = await otherSources(true, [mixed[1]]);
+  assert.deepEqual(t, []);
+});

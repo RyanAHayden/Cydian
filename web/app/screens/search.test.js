@@ -207,3 +207,10 @@ test("B23: Sources' refresh names apt's failed sources in a banner, never an ale
   shown[0].onTap();
   assert.deepEqual(went, [format({ tab: "sources", path: [] })]);
 });
+
+test("B33: Other Sources follows Show Incompatible, and the switch's setting runs the search again", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("./search.js", import.meta.url), "utf8");
+  assert.match(src, /discoveryGroup\(ctx, \{ hideIncompatible: compatFilterOn \}\)/);
+  assert.match(src, /\["worksOnMyPhone",[^\]]*\]\.includes\(key\)/, "worksOnMyPhone changes rerun run(), which redraws Other Sources");
+});

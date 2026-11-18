@@ -125,7 +125,13 @@ const canisterApi = () => (canister ??= createCanister({ getJson: async (u) => J
 
 // Search's "Other Sources" group: packages from sources the user hasn't added. `.search(q)` redraws it; a newer
 // call wins. Failures stay quiet (one footer line): Canister is an extra, local search is the main thing.
-export function discoveryGroup(ctx) {
+// B33: rows not built for this device (archOk false) are left out while the Filter's Show Incompatible is off
+// (`hideIncompatible()` true, device.js compatFilterOn(), passed in by search.js), as incompatible packages from
+// added sources are; Search runs `.search(q)` again when that switch changes. All hidden: no group at all.
+// `search`, `sources`, `arch` and `wait` are seams for the tests.
+const defaultHideIncompatible = () => settings.get("worksOnMyPhone") === true;
+export function discoveryGroup(ctx, { hideIncompatible = defaultHideIncompatible, search: ask = (q) => canisterApi().search(q),
+  sources = () => getBackend().sources(), arch = getArch, wait = 450 } = {}) {
   const box = el("div", "discovery");
   let seq = 0;
   async function search(q) {
@@ -134,17 +140,18 @@ export function discoveryGroup(ctx) {
     // 2+ characters, even CJK: Canister finds nothing for one character (F106, core/canister.js askable()).
     if (!askable(q)) return;
     // Local results come every 120 ms of typing; Canister only once typing has stopped a moment.
-    await new Promise((r) => setTimeout(r, 450));
+    await new Promise((r) => setTimeout(r, wait));
     if (turn !== seq) return;
     let json, have;
     try {
-      [json, have] = await Promise.all([canisterApi().search(q), getBackend().sources().catch(() => [])]);
+      [json, have] = await Promise.all([ask(q), Promise.resolve().then(sources).catch(() => [])]);
     } catch (e) {
       if (turn === seq) box.replaceChildren(grouped([{ footer: `Other sources: ${e.message}` }]));
       return;
     }
     if (turn !== seq || !json) return;
-    const rows = mapResults(json, { have, arch: getArch() }).filter((r) => !r.repo.added).slice(0, 25);
+    const hide = hideIncompatible();
+    const rows = mapResults(json, { have, arch: arch() }).filter((r) => !r.repo.added && (r.archOk || !hide)).slice(0, 25);
     if (!rows.length) return;
     box.replaceChildren(grouped([{
       header: "Other Sources",

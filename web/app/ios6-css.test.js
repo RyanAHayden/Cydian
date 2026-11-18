@@ -34,3 +34,20 @@ test("while a banner shows, sheets move below it and end higher", () => {
   const z = (src, sel) => Number(new RegExp(`(^|\\n)${sel.replace(".", "\\.")}\\s*\\{[^}]*z-index:\\s*(\\d+)`).exec(src)?.[2]);
   assert.ok(z(css, ".banner") > z(pk, ".sheet"), "the banner must sit above sheets");
 });
+
+// B26: the reload bar (z-index 49) covered a sheet's nav bar the same way. Sheets move down by its 44 pt under
+// has-reload, and by banner + 44 pt under has-reload.has-banner, and the bar stays above the sheets.
+test("while the reload bar shows, sheets move below it and end higher", () => {
+  const find = (s) => rules.find((x) => x.sel.split(",").some((p) => p.trim() === s));
+  const r = find("html.has-reload .sheet");
+  assert.ok(r, "no html.has-reload .sheet rule");
+  assert.match(r.decl, /translate\s*:\s*0 44px/);
+  assert.match(r.decl, /bottom\s*:\s*44px/);
+  const rb = find("html.has-reload.has-banner .sheet");
+  assert.ok(rb, "no html.has-reload.has-banner .sheet rule");
+  assert.match(rb.decl, /translate\s*:\s*0 calc\(var\(--banner-h, 44px\) \+ 44px\)/);
+  assert.match(rb.decl, /bottom\s*:\s*calc\(var\(--banner-h, 44px\) \+ 44px\)/);
+  const pk = readFileSync(new URL("./packages.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const z = (src, sel) => Number(new RegExp(`(^|\\n)${sel.replace(".", "\\.")}\\s*\\{[^}]*z-index:\\s*(\\d+)`).exec(src)?.[2]);
+  assert.ok(z(css, ".reload-bar") > z(pk, ".sheet"), "the reload bar must sit above sheets");
+});

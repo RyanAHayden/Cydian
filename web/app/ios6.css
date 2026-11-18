@@ -570,6 +570,10 @@ html.has-reload #screens { bottom: 44px; }
 html.has-reload.has-banner #navbar, html.has-reload.has-banner #screens { transform: translateY(calc(var(--banner-h, 44px) + 44px)); }
 html.has-reload.has-banner #screens { bottom: calc(var(--banner-h, 44px) + 44px); }
 html.has-banner .reload-bar { top: var(--banner-h, 44px); }
+/* B26: a reload runs in the background (pull to refresh, the launch refresh), so a sheet (package page, depiction,
+   queue) can be open under the bar: sheets move down and end higher by its 44 pt too, as B25 does for the banner. */
+html.has-reload .sheet { translate: 0 44px; bottom: 44px; }
+html.has-reload.has-banner .sheet { translate: 0 calc(var(--banner-h, 44px) + 44px); bottom: calc(var(--banner-h, 44px) + 44px); }
 @media (prefers-reduced-motion: reduce) { .reload-spinner { animation-duration: 3s; } }
 
 /* ---- F181: the package page's Details / Reviews / Related (screens/storepage.js segmented): UISegmentedControl's

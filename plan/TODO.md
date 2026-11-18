@@ -34,7 +34,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **B26** (follow-up, low) The reload bar (nav/reloadbar.js, .reload-bar z-index 49) would cover a sheet's nav bar the way the banner did before B25: html.has-reload moves only #navbar and #screens. If a reload can run while a sheet is open, give .sheet the same translate/bottom under has-reload (and has-reload.has-banner) as B25 gave it under has-banner (ios6.css, after the has-banner .sheet rule). | files: web/app/ios6.css, web/app/ios6-css.test.js | after: B25
 ### Parked
 - [ ] **F21** (later) Ideas from feature research, journal/2026-11-17-feature-research, not scheduled: iPad layout and keyboard shortcuts (⌘F search, ⌘R refresh; Zebra #1892); block authors/packages from lists and upgrades (Zebra #1037, #998); 'worked for me' compatibility votes per package and iOS version (Sileo #249; needs moderation); malware check of installed packages against the F19 list; Bootstrap Install mode for broken bootstraps (Irisin); uicache from the app; localisation; self-update for the IPA build. See `journal/2026-11-17-feature-research/reports/Sideloader and package manager features.md`.
 - [ ] **F15** (follow-up, later) idevice install route (R5, docs/sideload.md): IDeviceKit + idevice (MIT, xcframework built from source) behind an Advanced switch: import a pairing file, LocalDevVPN loopback, AFC upload + installation_proxy with progress. The one route with no internet and no TLS, and it can update Cydian itself. | files: native/sideload/idevice/**

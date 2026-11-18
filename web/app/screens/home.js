@@ -333,7 +333,8 @@ function renderRoot(body) {
   const head = el("div", "home-head");
   const icon = el("img", "home-icon");
   // The website shows its WEB icon (the home-screen one), so it's never taken for the app (user 2026-11-18).
-  const g = globalThis.cydianNative ? "icon-glossy" : "icon-web-glossy";
+  // The sideload app shows its LITE icon (its Home Screen icon), the jailbreak app the plain one.
+  const g = !globalThis.cydianNative ? "icon-web-glossy" : settings.mode === "sideload" ? "icon-lite-glossy" : "icon-glossy";
   icon.src = `icons/${g}-76.png`;
   icon.srcset = `icons/${g}-76.png 1x, icons/${g}-152.png 2x, icons/${g}-228.png 3x`;
   icon.width = icon.height = 76;
@@ -696,14 +697,32 @@ export function render(el, route, ctx) {
 export const CYDIAN_APT_REPO = "https://github.com/RyanAHayden/Cydian/releases/latest/download/";
 export const JAILBROKEN_SHEET = { title: "Install Cydian with your jailbreak's package manager: it keeps Cydian updated.",
   buttons: ["Add to Sileo", "Add to Zebra", "Copy Repo URL", "Download .deb"] };
-export const repoLinks = (repo = CYDIAN_APT_REPO) => ({
-  sileo: `sileo://source/${repo}`, zebra: `zbra://sources/add/${repo}` });
+export const CYDIAN_PACKAGE = "com.ryha.cydian";
+export const repoLinks = (repo = CYDIAN_APT_REPO, id = CYDIAN_PACKAGE) => ({
+  sileo: `sileo://source/${repo}`, zebra: `zbra://sources/add/${repo}`,
+  // their pages for a package, once the repo is there
+  sileoPackage: `sileo://package/${id}`, zebraPackage: `zbra://packages/${id}` });
+
+// Sileo and Zebra can't add a repo and open a package in one link: after Add to Sileo/Zebra, coming back here asks
+// to open Cydian's page there (the alert's tap opens it, as Safari requires), so Get is one tap away (user 2026-11-18).
+function offerPackageOnReturn(name, link) {
+  let away = false;
+  const onVis = async () => {
+    if (document.visibilityState === "hidden") { away = true; return; }
+    if (!away) return;
+    document.removeEventListener("visibilitychange", onVis);
+    await showAlert({ title: `Open Cydian in ${name}?`, message: `Cydian's repo is in ${name} now. Its page there has Get.`,
+      buttons: ["Not Now", `Open in ${name}`], cancel: 0, colors: { 1: "green" },
+      onTap: (i) => { if (i === 1) location.href = link; } });
+  };
+  document.addEventListener("visibilitychange", onVis);
+}
 async function jailbrokenSheet() {
   const { showActionSheet } = await import("../nav/actionsheet.js");
   const i = await showActionSheet(JAILBROKEN_SHEET);
   const links = repoLinks();
-  if (i === 0) location.href = links.sileo;
-  else if (i === 1) location.href = links.zebra;
+  if (i === 0) { offerPackageOnReturn("Sileo", links.sileoPackage); location.href = links.sileo; }
+  else if (i === 1) { offerPackageOnReturn("Zebra", links.zebraPackage); location.href = links.zebra; }
   else if (i === 2) {
     try { await navigator.clipboard.writeText(CYDIAN_APT_REPO); } catch { /* shown below anyway */ }
     await showAlert({ title: "Repo URL Copied", message: CYDIAN_APT_REPO, buttons: ["OK"] });

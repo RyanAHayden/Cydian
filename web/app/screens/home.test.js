@@ -63,6 +63,7 @@ test("F79: Home links to Install IPAs, except in the jailbreak app", async () =>
 test("Jailbroken? Get Cydian.deb: Cydian's APT repo in Sileo and Zebra", async () => {
   const { repoLinks, CYDIAN_APT_REPO, JAILBROKEN_SHEET } = await import("./home.js");
   assert.equal(CYDIAN_APT_REPO, "https://github.com/RyanAHayden/Cydian/releases/latest/download/");
-  assert.deepEqual(repoLinks("https://r/"), { sileo: "sileo://source/https://r/", zebra: "zbra://sources/add/https://r/" });
+  assert.deepEqual(repoLinks("https://r/"), { sileo: "sileo://source/https://r/", zebra: "zbra://sources/add/https://r/",
+    sileoPackage: "sileo://package/com.ryha.cydian", zebraPackage: "zbra://packages/com.ryha.cydian" });
   assert.deepEqual(JAILBROKEN_SHEET.buttons, ["Add to Sileo", "Add to Zebra", "Copy Repo URL", "Download .deb"]);
 });

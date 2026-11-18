@@ -71,8 +71,11 @@ class Icons(unittest.TestCase):
         for s in srcs:
             self.assertTrue((app / s).is_file(), s)
         self.assertIn('href="icons/icon-web-180.png?v=', (app / "index.html").read_text())
-        home = (app / "screens/home.js").read_text()  # Home header: 1x/2x/3x PNGs, the WEB one on the website
-        self.assertIn('"icon-glossy" : "icon-web-glossy"', home)
+        home = (app / "screens/home.js").read_text()  # Home header: 1x/2x/3x PNGs: WEB on the website, LITE in the sideload app
+        self.assertIn('"icon-web-glossy"', home)
+        self.assertIn('"icon-lite-glossy"', home)
+        for n in (76, 152, 228):
+            self.assertTrue((HERE / f"icon-lite-glossy-{n}.png").is_file(), n)
         self.assertNotIn("(Web)", home)
         self.assertIn('rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png', (app / "index.html").read_text())
 

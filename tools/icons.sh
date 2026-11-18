@@ -90,6 +90,16 @@ trap 'rm -f "$bg" "$web" "$lite" "$webg"' EXIT
   echo '</g></svg>'
 } > "$webg"
 for n in 76 152 228; do png "$webg" "$n" "$dir/icon-web-glossy-$n.png"; done
+# The sideload app's Home header shows its LITE icon the same way (user 2026-11-18).
+liteg=$(mktemp --suffix=.svg)
+trap 'rm -f "$bg" "$web" "$lite" "$webg" "$liteg"' EXIT
+{
+  echo '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">'
+  echo '<defs><clipPath id="ios6-mask"><rect width="1024" height="1024" rx="180" ry="180"/></clipPath></defs><g clip-path="url(#ios6-mask)">'
+  perl -0pe 's/^.*?<svg[^>]*>\n//s; s/<\/svg>.*//s' "$lite"
+  echo '</g></svg>'
+} > "$liteg"
+for n in 76 152 228; do png "$liteg" "$n" "$dir/icon-lite-glossy-$n.png"; done
 png "$lite" 120 native/icon/AppIconLite60x60@2x.png
 png "$lite" 180 native/icon/AppIconLite60x60@3x.png
 

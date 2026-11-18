@@ -25,7 +25,9 @@
 .alt-app-icon img.loaded { opacity: 1; }
 .alt-whatsnew { white-space: pre-wrap; text-align: left; }
 
-.alt-shots { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+.alt-shots { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding-bottom: 4px;
+  scrollbar-width: none; } /* the page dots under it are the indicator (iOS 6 page control), not a scrollbar */
+.alt-shots::-webkit-scrollbar { display: none; }
 .alt-shot { flex: none; height: 360px; aspect-ratio: 9 / 19.5; object-fit: cover; border-radius: 10px; scroll-snap-align: start;
   border: 1px solid rgba(0,0,0,.2); background: rgba(0,0,0,.05); }
 

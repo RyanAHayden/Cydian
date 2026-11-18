@@ -326,8 +326,8 @@ export async function installFromLibrary({ file, name = "", onInstalled = () => 
 //   await signInBrowser({ url, name, onInstalled, bring }, deps)
 //       HUD "Downloading" (the IPA through the Worker's /api/fetch?kind=ipa: most hosts send no CORS headers),
 //       "Signing" (signing-worker.js: zsign as WebAssembly, with the certificate from IndexedDB), "Uploading" (the
-//       signed IPA to the Worker's /sign/upload, in parts, kept 10 minutes), then iOS's install prompt
-//       (itms-services). true once iOS was asked; false after an error, shown in an alert (zsign's own reason when
+//       signed IPA to the Worker's /sign/upload, in parts, kept 10 minutes), then a Ready to Install alert whose
+//       Install tap opens iOS's install prompt (itms-services, from the tap). true once iOS was asked; false after an error, shown in an alert (zsign's own reason when
 //       it can't sign the app). bring: Cydian's own IPA carries the certificate (cydian-identity.plist), and always
 //       the website's sources and settings (web/transfer.link): the app imports both on its first launch.
 //
@@ -419,8 +419,8 @@ export async function uploadSigned(bytes, { bundleId, name, version }, { base = 
 const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof ArrayBuffer ? b.slice(0) : new Uint8Array(b ?? []).buffer);
 
 export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false },
-  { hud = liveHUD, alert = showAlert, banner = showBanner, open = (u) => { location.href = u; }, go = openRoute,
-    identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "", later = setTimeout } = {}) {
+  { hud = liveHUD, alert = showAlert, open = (u) => { location.href = u; }, go = openRoute,
+    identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "" } = {}) {
   const id = await identity();
   if (!id?.p12 || !id?.profile) {
     await alert({ title: "No Certificate", message: "Add your certificate, its password and provisioning profile in Settings > Signing.", buttons: ["OK"] });
@@ -439,13 +439,14 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     h.set("Uploading");
     const ipaBytes = signed.ipa instanceof Uint8Array ? signed.ipa : new Uint8Array(signed.ipa);
     const body = await uploadSigned(ipaBytes, signed, { base, fetcher, onProgress: pct("Uploading") });
-    h.set("Installing");
+    h.hide();
     onInstalled({ ...body, bundleId: signed.bundleId, name: signed.name, version: signed.version });
-    // Safari asks first ("… would like to install …"): say which button to press.
-    banner({ title: "Cydian", message: `Press Install to put ${name || signed.name || "the app"} on your iPhone.`, duration: 5000 });
-    open(body.itms);
-    later(() => (h.done ? h.done("Done") : h.hide()), 1200);
-    return true;
+    // The install link opens from the alert's Install tap (onTap runs inside the click): opened by script long after
+    // the first tap, Safari asked "Open this page in iTunes?" first, or refused it as an invalid address.
+    const app = name || signed.name || "The app";
+    const { index } = await alert({ title: "Ready to Install", message: `${app} is signed. Tap Install, then Install again when iOS asks.`,
+      buttons: ["Cancel", "Install"], cancel: 0, onTap: (i) => { if (i === 1) open(body.itms); } });
+    return index === 1;
   } catch (e) {
     h.hide();
     await alert({ title: name ? `Couldn't Install ${name}` : "Couldn't Install", message: String(e?.message ?? e), buttons: ["OK"] });

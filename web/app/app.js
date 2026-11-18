@@ -314,6 +314,9 @@ if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.setting
 // F72: in the app, once the launch has settled, the Essential Upgrade alert when Cydian (or, jailbroken, apt, dpkg or
 // another Essential: yes package) has an upgrade on Cydian's built-in source. It replaces F61's own popup: only when
 // that source couldn't be read does F61 look on GitHub (at most once a day).
+// F75: cydian:// links from the website (Import from Safari coming back, Open in Cydian App).
+if (globalThis.cydianNative) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
+
 if (globalThis.cydianNative) {
   setTimeout(() => startEssential().then((r) => (r === "unknown" ? settingsScreen.checkUpdates() : r)).catch(() => {}), 2000);
 }

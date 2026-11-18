@@ -4,6 +4,9 @@ itms-services:// link the phone installs from. docs/signing.md is the long versi
   POST /sign                      JSON {url, p12, profile (both base64), password}
                                   -> {itms, manifest, expiresIn, bundleId, name, version}
   POST /sign  with "async": true  -> 202 {job, status, poll} at once, once the certificate checks pass (F47)
+  POST /sign  with "bring": true  F75: when the IPA is Cydian's own (com.ryha.cydian, no other app), the .p12, password
+                                  and profile go inside it as Payload/<App>.app/cydian-identity.plist, which the app
+                                  imports on its first launch (Install Cydian App on the website asks for it)
   GET  /sign/job/<job>            {status: downloading | signing | done (+ the fields above) | error (+ error, code,
                                   httpStatus)}: the phone polls it, so no one request outlasts a proxy's timeout
   GET  /sign/<token>/manifest.plist   the install manifest iOS reads (until the token expires)
@@ -15,7 +18,8 @@ itms-services:// link the phone installs from. docs/signing.md is the long versi
 The certificate, its key, the password and the profile live in this request's memory and go to zsign through
 memfd (signer/zsign.py): never a file, never a log line. The downloaded and the signed IPA are on disk in
 CYDIAN_SIGN_DIR (a private temp folder by default): the download only while the job runs, the signed one under a
-random 256-bit token for TTL seconds. CORS is open on /sign so
+random 256-bit token for TTL seconds (with bring, that signed copy of Cydian holds the certificate for those
+minutes, as the app on the phone then does until its next update). CORS is open on /sign so
 any copy of the page can use any signing server (the user's own, docs/signing.md).
 
 The store is this process's memory: run one gunicorn worker (threads are fine), as the Dockerfile does.
@@ -331,7 +335,10 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
             url = body.get("url")
             if not isinstance(url, str) or not url:
                 raise SignError("bad_url", "No IPA URL was sent.")
-            identity = load_p12(_b64(body.get("p12"), "p12"), body.get("password") or "")
+            p12_bytes = _b64(body.get("p12"), "p12")
+            identity = load_p12(p12_bytes, body.get("password") or "")
+            # F75: Install Cydian App asks for the certificate inside the app (Cydian's own IPA only, see _run)
+            bring = (p12_bytes, body.get("password") or "") if body.get("bring") is True else None
             profile_bytes = _b64(body.get("profile"), "profile")
             profile = parse_profile(profile_bytes)
             check(identity, profile)
@@ -348,7 +355,7 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
                 # timeout (Cloudflare 100 s, Nginx 60 s). The checks above already ran, so a bad pair still fails
                 # in this response. The thread owns the job slot from here.
                 job_id = registry.new()
-                args = (db(), fetcher, binary_path, url, identity, profile, profile_bytes, base, job_id)
+                args = (db(), fetcher, binary_path, url, identity, profile, profile_bytes, base, job_id, bring)
                 try:
                     threading.Thread(target=background, args=args, name="cydian-sign-job", daemon=True).start()
                 except BaseException:
@@ -359,28 +366,28 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
                 return answer({"job": job_id, "status": "downloading", "poll": 1}, 202,
                               Location=f"{base}/sign/job/{job_id}")
             try:
-                token, app = _run(db(), fetcher, binary_path, url, identity, profile, profile_bytes)
+                token, app = _run(db(), fetcher, binary_path, url, identity, profile, profile_bytes, bring=bring)
             finally:
                 jobs.release()
         except SignError as e:
             return err(e)
         finally:
-            body = identity = None  # noqa: F841 - drop the references to the key and password at once
+            body = identity = p12_bytes = bring = None  # noqa: F841 - drop the references to the key and password at once
         return answer(_done(base, token, app, db().ttl))
 
-    def background(store_, fetcher_, binary_path, url, identity, profile, profile_bytes, base, job_id):
+    def background(store_, fetcher_, binary_path, url, identity, profile, profile_bytes, base, job_id, bring=None):
         end = ("error", {"error": "The signing server failed while signing this app.", "code": "internal",
                          "httpStatus": 500})  # a crash must still end the job, without echoing anything secret
         try:
             token, app = _run(store_, fetcher_, binary_path, url, identity, profile, profile_bytes,
-                              on_phase=lambda phase: registry.set(job_id, phase))
+                              on_phase=lambda phase: registry.set(job_id, phase), bring=bring)
             end = ("done", _done(base, token, app, store_.ttl))
         except SignError as e:
             end = ("error", {"error": str(e), "code": e.code, "httpStatus": e.status})
         except Exception:  # noqa: BLE001
             pass
         finally:
-            identity = None  # noqa: F841
+            identity = bring = None  # noqa: F841
             jobs.release()  # before the job says it ended: a poll that sees "done" may sign again at once
             registry.set(job_id, *end)
 
@@ -431,13 +438,19 @@ def _done(base: str, token: str, app, ttl: float) -> dict:
             "name": app.name, "version": app.version}
 
 
-def _run(store: Store, fetcher, binary, url, identity, profile, profile_bytes, on_phase=lambda phase: None):
+def _run(store: Store, fetcher, binary, url, identity, profile, profile_bytes, on_phase=lambda phase: None,
+         bring=None):
+    """`bring`: (p12, password) when the request asked for the certificate inside the app (F75): only an IPA whose
+    own bundle ID is Cydian's gets it, as Payload/<App>.app/cydian-identity.plist with the profile, before zsign
+    seals the bundle. Any other app is signed as if it hadn't been asked."""
     work = store.workdir()
     try:
         src, out = os.path.join(work, "in.ipa"), os.path.join(work, "out.ipa")
         on_phase("downloading")
         ipa_mod.download(fetcher, url, src, MAX_BYTES, DOWNLOAD_TIMEOUT)
         app = ipa_mod.inspect(src, MAX_UNZIPPED)
+        if bring and app.bundle_id == ipa_mod.CYDIAN_BUNDLE_ID:
+            ipa_mod.add_identity(src, bring[0], bring[1], profile_bytes)
         bundle_id = target_bundle_id(profile, app.bundle_id)
         on_phase("signing")
         zsign.sign(binary, src, out, identity.unlocked_p12(), profile_bytes, work,

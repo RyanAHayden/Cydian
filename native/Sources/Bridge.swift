@@ -48,6 +48,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         SignBridge.register(self) // I6: sign and install IPAs on the phone, sideload build (SignBridge.swift)
         Notifications.register(self) // F65: app.badge, the icon badge (Notifications.swift)
         Prefs.register(self) // F70: prefs.set, N7's settings for the daemon (below)
+        Incoming.register(self) // F75: cydian:// links for the page, app.takeURL and app.gunzip (App.swift)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }

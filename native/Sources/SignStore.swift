@@ -2,8 +2,7 @@
 // synced or backed up) and is used there. F73: the imported .p12 file and its password are also kept, as one Keychain
 // generic-password item (this device only), so signing.export can hand them to the Signing Server when Cydian updates
 // itself (essential-ui.js installSelf); signing.remove deletes it with the identity. The profile is a plain file in
-// Application Support (it holds no secret). Also the keys of the phone's local install CA
-// (native/sign/LocalCA.swift), made in the Keychain and never exported. docs/signing.md, "On the phone (I6)".
+// Application Support (it holds no secret). docs/signing.md, "On the phone (I6)".
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 import Security
@@ -127,25 +126,22 @@ enum SignStore {
         SecItemDelete(p12Query as CFDictionary)
     }
 
-    // ---- keys made on the phone (the local install CA and its TLS key)
-
-    static func key(tag: String, create: Bool) -> SecKey? {
-        let t = Data(tag.utf8)
-        let q: [String: Any] = [kSecClass as String: kSecClassKey, kSecAttrApplicationTag as String: t,
-                                kSecAttrKeyClass as String: kSecAttrKeyClassPrivate, kSecReturnRef as String: true]
-        var out: CFTypeRef?
-        if SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let k = out { return (k as! SecKey) } // swiftlint:disable:this force_cast
-        guard create else { return nil }
-        let attrs: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeySizeInBits as String: 256,
-            kSecPrivateKeyAttrs as String: [kSecAttrIsPermanent as String: true, kSecAttrApplicationTag as String: t,
-                                            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly],
-        ]
-        return SecKeyCreateRandomKey(attrs as CFDictionary, nil)
-    }
+    // ---- F75: what the old local HTTPS install mode left behind (its CA and TLS keys, their certificates)
 
     static func deleteKey(tag: String) {
         SecItemDelete([kSecClass as String: kSecClassKey, kSecAttrApplicationTag as String: Data(tag.utf8)] as CFDictionary)
+    }
+
+    // Once per launch at most, cheap when there is nothing: the CA and TLS keys, the TLS certificate and the two
+    // DER files of 0.1.x's Local Install, which nothing uses any more. The user removes the old profile in Settings.
+    static func removeOldInstallCA() {
+        let ca = dir.appendingPathComponent("localca.der"), leaf = dir.appendingPathComponent("localtls.der")
+        guard FileManager.default.fileExists(atPath: ca.path) || FileManager.default.fileExists(atPath: leaf.path) else { return }
+        deleteKey(tag: "com.ryha.cydian.localca")
+        deleteKey(tag: "com.ryha.cydian.localtls")
+        SecItemDelete([kSecClass as String: kSecClassCertificate, kSecAttrLabel as String: "Cydian local install TLS"] as CFDictionary)
+        try? FileManager.default.removeItem(at: ca)
+        try? FileManager.default.removeItem(at: leaf)
     }
 }
 
@@ -192,101 +188,5 @@ struct KeychainIdentity: SigningIdentity {
             throw SignError("keychain", "The Keychain couldn't sign: \(err?.takeRetainedValue().localizedDescription ?? "?")")
         }
         return sig as Data
-    }
-}
-
-struct KeychainCertKey: CertKey {
-    let key: SecKey
-    var publicKey: Data {
-        guard let pub = SecKeyCopyPublicKey(key), let d = SecKeyCopyExternalRepresentation(pub, nil) else { return Data() }
-        return d as Data
-    }
-    func sign(_ message: Data) throws -> Data {
-        var err: Unmanaged<CFError>?
-        guard let sig = SecKeyCreateSignature(key, .ecdsaSignatureMessageX962SHA256, message as CFData, &err) else {
-            throw SignError("keychain", "The Keychain couldn't sign: \(err?.takeRetainedValue().localizedDescription ?? "?")")
-        }
-        return sig as Data
-    }
-}
-
-// The phone's own install CA (LocalCA.swift): made once, installed by the user as a profile and trusted in Settings >
-// General > About > Certificate Trust Settings. The TLS certificate it issues is renewed a month before it ends.
-enum LocalTrust {
-    static let caTag = "com.ryha.cydian.localca"
-    static let tlsTag = "com.ryha.cydian.localtls"
-    static var caURL: URL { SignStore.dir.appendingPathComponent("localca.der") }
-    static var leafURL: URL { SignStore.dir.appendingPathComponent("localtls.der") }
-    static let leafLabel = "Cydian local install TLS"
-
-    static func ca() -> Data? { try? Data(contentsOf: caURL) }
-
-    // The CA, made if there is none yet.
-    static func ensureCA() throws -> Data {
-        if let d = ca(), SignStore.key(tag: caTag, create: false) != nil { return d }
-        guard let key = SignStore.key(tag: caTag, create: true) else { throw SignError("keychain", "Couldn't make a key for the local CA.") }
-        let label = String(format: "%04X", UInt16.random(in: 0...0xFFFF))
-        let der = try LocalCA.makeCA(key: KeychainCertKey(key: key), label: "iPhone \(label)")
-        try der.write(to: caURL, options: .atomic)
-        try? FileManager.default.removeItem(at: leafURL)
-        return der
-    }
-
-    // The install server's TLS identity: the leaf certificate in the Keychain beside its key, so iOS pairs them.
-    static func tlsIdentity() throws -> SecIdentity {
-        let ca = try ensureCA()
-        guard let caKey = SignStore.key(tag: caTag, create: false) else { throw SignError("keychain", "The local CA's key is gone.") }
-        var leaf = try? Data(contentsOf: leafURL)
-        if let l = leaf, let c = try? Certificate(der: l), (c.notAfter ?? .distantPast) > Date().addingTimeInterval(30 * 86400),
-           c.issuer == (try Certificate(der: ca)).subject {
-            // still good
-        } else {
-            leaf = nil
-        }
-        if leaf == nil {
-            SignStore.deleteKey(tag: tlsTag)
-            SecItemDelete([kSecClass as String: kSecClassCertificate, kSecAttrLabel as String: leafLabel] as CFDictionary)
-            guard let k = SignStore.key(tag: tlsTag, create: true) else { throw SignError("keychain", "Couldn't make the TLS key.") }
-            let der = try LocalCA.makeLeaf(key: KeychainCertKey(key: k).publicKey, ca: ca, caKey: KeychainCertKey(key: caKey))
-            guard let cert = SecCertificateCreateWithData(nil, der as CFData) else { throw SignError("internal", "Bad TLS certificate.") }
-            let st = SecItemAdd([kSecClass as String: kSecClassCertificate, kSecValueRef as String: cert,
-                                 kSecAttrLabel as String: leafLabel,
-                                 kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly] as CFDictionary, nil)
-            guard st == errSecSuccess || st == errSecDuplicateItem else { throw SignError("keychain", "The Keychain refused the TLS certificate (\(st)).") }
-            try der.write(to: leafURL, options: .atomic)
-            leaf = der
-        }
-        let q: [String: Any] = [kSecClass as String: kSecClassIdentity, kSecMatchLimit as String: kSecMatchLimitAll,
-                                kSecReturnRef as String: true]
-        var out: CFTypeRef?
-        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let all = out as? [SecIdentity],
-              let id = all.first(where: { SignStore.certificateDER($0) == leaf }) else {
-            throw SignError("keychain", "The Keychain didn't pair the TLS certificate with its key.")
-        }
-        return id
-    }
-
-    // Whether iOS trusts the local CA for TLS to 127.0.0.1: the user installed the profile and turned on full trust.
-    static func trusted() -> Bool {
-        guard let ca = ca() else { return false }
-        let leafDER = (try? Data(contentsOf: leafURL)) ?? (try? tlsIdentity()).flatMap(SignStore.certificateDER)
-        guard let leaf = leafDER, let lc = SecCertificateCreateWithData(nil, leaf as CFData), let cc = SecCertificateCreateWithData(nil, ca as CFData)
-        else { return false }
-        var trust: SecTrust?
-        guard SecTrustCreateWithCertificates([lc, cc] as CFArray, SecPolicyCreateSSL(true, "127.0.0.1" as CFString), &trust) == errSecSuccess,
-              let t = trust else { return false }
-        return SecTrustEvaluateWithError(t, nil)
-    }
-
-    static func label() -> String? {
-        ca().flatMap { try? Certificate(der: $0) }?.commonName
-    }
-
-    static func reset() {
-        SignStore.deleteKey(tag: caTag)
-        SignStore.deleteKey(tag: tlsTag)
-        SecItemDelete([kSecClass as String: kSecClassCertificate, kSecAttrLabel as String: leafLabel] as CFDictionary)
-        try? FileManager.default.removeItem(at: caURL)
-        try? FileManager.default.removeItem(at: leafURL)
     }
 }

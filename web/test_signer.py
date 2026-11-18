@@ -460,6 +460,64 @@ def code_signature(binary: bytes):
     return cd, cms, {"identifier": ident, "team": team, "pages_ok": ok, "n_code": n_code}
 
 
+class BringTest(Base):
+    """F75: "bring": true puts the .p12, password and profile inside Cydian's own IPA (com.ryha.cydian only, never
+    another app) as Payload/<App>.app/cydian-identity.plist, before zsign seals it. zsign is a copy here, so this runs
+    everywhere; what goes in is read back from the signed IPA the install link serves."""
+
+    def setUp(self):
+        super().setUp()
+        self.seen = []
+
+        def fake_sign(binary, src, out, p12, profile, work, bundle_id=None, timeout=300.0, entitlements=None):
+            with zipfile.ZipFile(src) as z:
+                self.seen.append(sorted(z.namelist()))  # what zsign was given to seal
+            shutil.copyfile(src, out)
+
+        patch = mock.patch.object(signer.zsign, "sign", fake_sign)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def signed(self, ipa, **extra):
+        Handler.routes = {"/app.ipa": ipa}
+        r = self.post(**extra)
+        self.assertEqual(r.status_code, 200, r.json)
+        token = r.json["manifest"].split("/sign/")[1].split("/")[0]
+        got = self.c.get(f"/sign/{token}/app.ipa")
+        data = got.data
+        got.close()
+        return zipfile.ZipFile(io.BytesIO(data))
+
+    def test_cydian_with_bring_carries_the_identity(self):
+        z = self.signed(T.ipa("com.ryha.cydian", "Cydian"), bring=True)
+        name = "Payload/Cydian.app/cydian-identity.plist"
+        self.assertIn(name, z.namelist())
+        self.assertIn(name, self.seen[0])  # added before signing, so the seal covers it
+        doc = plistlib.loads(z.read(name))
+        self.assertEqual(doc, {"p12": P12, "password": "hunter2", "profile": PROFILE})
+
+    def test_only_cydian_and_only_when_asked(self):
+        for ipa, extra in [(T.ipa("com.ryha.cydian", "Cydian"), {}),
+                           (T.ipa("com.ryha.cydian", "Cydian"), {"bring": "yes"}),
+                           (T.ipa("dev.cydian.fixture", "Fixture"), {"bring": True}),
+                           (T.ipa("com.ryha.cydian.share", "Cydian"), {"bring": True})]:
+            with self.subTest(extra=extra):
+                z = self.signed(ipa, **extra)
+                self.assertFalse([n for n in z.namelist() if n.endswith(ipa_mod.IDENTITY_FILE)])
+
+    def test_async_job_brings_too(self):
+        Handler.routes = {"/app.ipa": T.ipa("com.ryha.cydian", "Cydian")}
+        r = self.post(bring=True, **{"async": True})
+        self.assertEqual(r.status_code, 202, r.json)
+        import time
+        deadline = time.monotonic() + 10
+        while (j := self.c.get(f"/sign/job/{r.json['job']}").json)["status"] not in ("done", "error"):
+            self.assertLess(time.monotonic(), deadline)
+            time.sleep(0.01)
+        self.assertEqual(j["status"], "done", j)
+        self.assertIn("Payload/Cydian.app/cydian-identity.plist", self.seen[0])
+
+
 @unittest.skipUnless(ZSIGN, "zsign not installed (set CYDIAN_ZSIGN or put zsign on PATH): signing itself not run")
 class SignTest(Base):
     def sign_and_fetch(self, **post):

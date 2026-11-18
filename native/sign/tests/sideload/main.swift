@@ -208,4 +208,41 @@ test("signed records") {
     check(JSONSerialization.isValidJSONObject(a.json), "json")
 }
 
+// F75: Cydian's own IPA with the user's certificate inside (BundledIdentity), the cydian:// links the shell takes,
+// and gunzip for cydian://import on an iOS without DecompressionStream.
+test("bundled identity: first launch imports, once") {
+    let plist = try PropertyListSerialization.data(fromPropertyList: ["p12": Data([0x30, 1, 2]), "password": "pw",
+                                                                      "profile": Data([0x30, 9])], format: .xml, options: 0)
+    let c = BundledIdentity.parse(plist)
+    check(c?.p12 == Data([0x30, 1, 2]) && c?.password == "pw" && c?.profile == Data([0x30, 9]), "parsed")
+    check(BundledIdentity.parse(Data("nope".utf8)) == nil, "not a plist")
+    let noProfile = try PropertyListSerialization.data(fromPropertyList: ["p12": Data([1])], format: .xml, options: 0)
+    check(BundledIdentity.parse(noProfile) == nil, "no profile")
+    let d = BundledIdentity.digest(plist)
+    check(d.count == 64, "sha-256 hex")
+    check(BundledIdentity.shouldImport(digest: d, seen: nil, hasIdentity: false), "first launch, empty Keychain: import")
+    check(!BundledIdentity.shouldImport(digest: d, seen: nil, hasIdentity: true), "Keychain holds one: keep it")
+    check(!BundledIdentity.shouldImport(digest: d, seen: d, hasIdentity: false), "same file again (removed since): ignored")
+    check(BundledIdentity.shouldImport(digest: "other", seen: d, hasIdentity: false), "an update's new file, empty Keychain: import")
+}
+
+test("incoming cydian:// links") {
+    check(IncomingLink.accepts(URL(string: "cydian://import?d=H4sI")!), "import")
+    check(IncomingLink.accepts(URL(string: "cydian://signing-import#abc")!), "signing-import")
+    check(!IncomingLink.accepts(URL(string: "cydian://other")!), "other host")
+    check(!IncomingLink.accepts(URL(string: "https://import/x")!), "other scheme")
+    check(!IncomingLink.accepts(URL(string: "cydian://import?d=" + String(repeating: "A", count: 600_000))!), "too long")
+}
+
+test("gunzip") {
+    let a = try gunzip(Data(base64Encoded: "H4sIAAAAAAAC/6tWKlOyMtRRKs4vLUpOLVayilbKKCkpKLbS1y9KLcjXS61IzC3ISdVXiq0FAGw/tQcrAAAA")!)
+    check(String(decoding: a, as: UTF8.self) == #"{"v":1,"sources":["https://repo.example/"]}"#, "plain member")
+    let b = try gunzip(Data(base64Encoded: "H4sICAAAAAAC/2EuanNvbgDLS8xNTQEAh8zgcQUAAAA=")!)
+    check(String(decoding: b, as: UTF8.self) == "named", "with a file name")
+    var bad = [UInt8](Data(base64Encoded: "H4sICAAAAAAC/2EuanNvbgDLS8xNTQEAh8zgcQUAAAA=")!)
+    bad[bad.count - 6] ^= 1
+    check((try? gunzip(Data(bad))) == nil, "crc checked")
+    check((try? gunzip(Data("not gzip at all, long enough".utf8))) == nil, "not gzip")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

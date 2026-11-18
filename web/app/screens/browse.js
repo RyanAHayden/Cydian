@@ -658,7 +658,9 @@ async function packageActions(route, button) {
 // signing took over (whatever its outcome: errors are shown in an alert).
 async function signIfReady(app, v, record) {
   const url = installOptions(v, app.sourceUrl).download;
-  if (!url || !(await signingReady())) return false;
+  // F75: in the app, Install goes straight to signAndInstall, which opens the Signing walkthrough at the missing step
+  // when the certificate or the server isn't there yet (no sheet first, no alert)
+  if (!url || (!localSigning() && !(await signingReady()))) return false;
   await signAndInstall({ url, name: app.name, onInstalled: () => record?.() });
   return true;
 }

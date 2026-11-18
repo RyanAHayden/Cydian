@@ -1,37 +1,35 @@
-// F69: Settings > Signing in the sideload build, as one walkthrough page (Home's Signing tile opens it too): numbered
-// steps, each collapsible, each with a drawing of the iOS screen to tap, and a green tick once it's done.
-//   1  Import your certificate: the .p12, its .mobileprovision and the password (settings.js certificateBlock)
-//   2  Download the install profile: Cydian's local CA as a .mobileconfig, signed with the certificate from step 1
-//   3  Install it: Settings > General > VPN & Device Management > Cydian Local Install > Install
-//   4  Trust its root: Settings > General > About > Certificate Trust Settings > the switch on
-//   Check: signing.status again; trust.trusted ticks 3 and 4 (iOS tells an app only whether it trusts the CA, so an
-//   installed but untrusted profile can't be told from a missing one).
+// F69, F75: Settings > Signing in the sideload build, as one walkthrough page (Home's Signing tile opens it too, and
+// so does the first Install with something missing): numbered steps, each collapsible, a green tick once done.
+//   1  Import your certificate: Select All Files (or the three rows' own Browse), or Import from Safari when it is
+//      already on the website (core/transfer.js): settings.js certificateBlock
+//   2  A Signing Server: cydian.dev unless the user runs their own; it hands iOS the manifest for the IPA Cydian
+//      serves at 127.0.0.1 (native/Sources/Sideload.swift). There is no install without one (F75: the old local
+//      HTTPS mode is gone; iOS's installer ignores a hand-trusted certificate).
 //
-//   stepStates(status, { open })   pure: [{ id, n, title, done, current, open }] (signing.test.js)
-//   drawWalkthrough(el, opts)      the page; settings.js passes the certificate block, the actions and the rest
+//   stepStates(status, { open, server })   pure: [{ id, n, title, done, current, open }] (signing.test.js)
+//   missingStep(status, server)            the first step not done ("certificate" | "server") or null: Install opens
+//                                          the page there (signing-client.js signAndInstall)
+//   walkOpen / openAt(id)                  the expand/collapse state kept across redraws; openAt opens one step only
+//   drawWalkthrough(el, opts)              the page; settings.js passes the certificate block, the server rows, …
 //
-// The pictures are our own iOS 6-style mock screens in HTML (mockScreen), not Apple screenshots. A step's picture can
-// be swapped for a screenshot of the user's own: put it at web/app/icons/signing/<step id>.png (SHOTS below).
+// The certificate step's picture is today's iOS file picker drawn in HTML (modernPicker), not an Apple screenshot.
+// A real screenshot of the user's own replaces it: web/app/icons/steps/select-files.png (SHOTS below).
 import { statusReady } from "../signing-client.js";
+import { normalizeServer } from "../core/signing.js";
 
 export const STEPS = [
   { id: "certificate", title: "Import Your Certificate" },
-  { id: "download", title: "Download the Install Profile" },
-  { id: "install", title: "Install the Profile" },
-  { id: "trust", title: "Trust Its Certificate" },
+  { id: "server", title: "Signing Server" },
 ];
 
-// Each step's state from a signing.status answer (null: the signer didn't answer, nothing is known to be done).
-// `open`: { [id]: true | false } the user's own expand/collapse taps, which win; otherwise only the first step not
-// done yet is open.
-export function stepStates(status, { open = {} } = {}) {
-  const trust = (status && typeof status === "object" ? status.trust : null) ?? {};
-  const done = {
-    certificate: statusReady(status),
-    download: Boolean(trust.ca || trust.trusted),
-    install: Boolean(trust.trusted),
-    trust: Boolean(trust.trusted),
-  };
+// A server installs can use: an https:// address (the shell takes no other for the manifest).
+export const serverReady = (server) => /^https:\/\//.test(normalizeServer(server) ?? "");
+
+// Each step's state from a signing.status answer (null: the signer didn't answer, nothing is known to be done) and
+// the Signing Server. `open`: { [id]: true | false } the user's own expand/collapse taps, which win; otherwise only
+// the first step not done yet is open.
+export function stepStates(status, { open = {}, server = null } = {}) {
+  const done = { certificate: statusReady(status), server: serverReady(server) };
   const current = STEPS.find((s) => !done[s.id])?.id ?? null;
   return STEPS.map((s, i) => ({
     id: s.id, n: i + 1, title: s.title, done: done[s.id], current: s.id === current,
@@ -39,8 +37,16 @@ export function stepStates(status, { open = {} } = {}) {
   }));
 }
 
+export const missingStep = (status, server) => stepStates(status, { server }).find((s) => !s.done)?.id ?? null;
+
 // Every step done: Install signs and installs straight away.
 export const allDone = (states) => states.every((s) => s.done);
+
+export const walkOpen = {};
+export function openAt(id) {
+  for (const k of Object.keys(walkOpen)) delete walkOpen[k];
+  for (const s of STEPS) walkOpen[s.id] = s.id === id;
+}
 
 // ---- drawing --------------------------------------------------------------------------------------------------
 
@@ -63,124 +69,62 @@ function style() {
 }
 style();
 
-// A user's own screenshot for a step, used instead of the drawing when it loads.
-const SHOTS = (id) => new URL(`../icons/signing/${id}.png`, import.meta.url).href;
+const SHOT = () => new URL("../icons/steps/select-files.png", import.meta.url).href;
 
-// A small iOS 6 screen: { title, back, right, groups: [{ header, rows: [{ label, detail, sub, chevron, toggle,
-// tap }], footer }], sheet: { text, buttons: [label], tap } }. `tap` marks what to touch (a pulsing ring).
-export function mockScreen({ title = "", back = null, right = null, groups = [], sheet = null }) {
-  const scr = h("div", "mock-screen");
+// Today's iOS document picker (the iOS 26 look: large title, a rounded list, blue filled checkmark circles) with
+// the three files selected and Open to tap.
+export function modernPicker(files = [["cert.p12", "3 KB"], ["profile.mobileprovision", "12 KB"], ["password.txt", "9 bytes"]]) {
+  const scr = h("div", "mp-screen");
   scr.setAttribute("role", "img");
-  scr.setAttribute("aria-label", `${title} screen`);
-  const bar = h("div", "mock-bar");
-  if (back) bar.append(h("span", "mock-back", back));
-  bar.append(h("span", "mock-title", title));
-  if (right) {
-    const r = h("span", "mock-right" + (right.tap ? " mock-tap" : ""), right.label);
-    bar.append(r);
+  scr.setAttribute("aria-label", "The iOS file picker with your three files selected and Open highlighted");
+  const bar = h("div", "mp-bar");
+  bar.append(h("span", "mp-cancel", "Cancel"), h("span", "mp-count", `${files.length} Selected`), h("span", "mp-open mock-tap", "Open"));
+  const search = h("div", "mp-search", "Search");
+  const list = h("ul", "mp-list");
+  for (const [name, size] of files) {
+    const li = h("li", "mp-row");
+    const ext = name.split(".").pop();
+    const icon = h("span", `mp-icon mp-${ext}`, ext === "mobileprovision" ? "" : ext.toUpperCase());
+    const text = h("span", "mp-text");
+    text.append(h("span", "mp-name", name), h("span", "mp-sub", `Today · ${size}`));
+    li.append(h("span", "mp-check"), icon, text);
+    list.append(li);
   }
-  const body = h("div", "mock-body");
-  for (const g of groups) {
-    if (g.header) body.append(h("div", "mock-header", g.header));
-    const ul = h("ul", "mock-table");
-    for (const r of g.rows ?? []) {
-      const li = h("li", "mock-row" + (r.tap ? " mock-tap" : "") + (r.center ? " mock-center" : ""));
-      const text = h("span", "mock-text");
-      text.append(h("span", "mock-label", r.label));
-      if (r.sub) text.append(h("span", "mock-sub", r.sub));
-      li.append(text);
-      if (r.detail) li.append(h("span", "mock-detail" + (r.verified ? " mock-verified" : ""), r.detail));
-      if (r.toggle != null) {
-        const sw = h("span", "mock-switch" + (r.toggle ? " is-on" : ""));
-        sw.append(h("span", "mock-knob"));
-        li.append(sw);
-      }
-      if (r.chevron) li.append(h("span", "mock-chevron"));
-      ul.append(li);
-    }
-    if (g.rows?.length) body.append(ul);
-    if (g.footer) body.append(h("div", "mock-footer", g.footer));
-  }
-  scr.append(bar, body);
-  if (sheet) {
-    const shade = h("div", "mock-shade");
-    const box = h("div", "mock-alert");
-    box.append(h("div", "mock-alert-text", sheet.text));
-    const btns = h("div", "mock-alert-buttons");
-    sheet.buttons.forEach((b, i) => btns.append(h("span", "mock-alert-button" + (i === sheet.tap ? " mock-tap" : ""), b)));
-    box.append(btns);
-    shade.append(box);
-    scr.append(shade);
-  }
+  scr.append(bar, h("div", "mp-title", "Recents"), search, list);
   return scr;
 }
 
-// The picture for a step: the user's screenshot when there is one, else the drawing. Each slot is looked for once.
-const shots = new Map(); // id -> true (it loaded) | false (none)
-function picture(id, spec) {
-  const fig = h("figure", "step-picture");
-  fig.append(mockScreen(spec));
-  if (shots.get(id) === false || typeof Image === "undefined") return fig;
+// The certificate step's picture: the user's screenshot when there is one, else the drawing. Looked for once.
+let shot = null; // true (it loaded) | false (none) | null (not tried)
+function picture() {
+  const fig = h("figure", "step-picture step-picture-modern");
+  fig.append(modernPicker());
+  if (shot === false || typeof Image === "undefined") return fig;
   const img = new Image();
   img.alt = "";
   img.className = "step-shot";
-  img.onload = () => { shots.set(id, true); fig.replaceChildren(img); };
-  img.onerror = () => { shots.set(id, false); };
-  img.src = SHOTS(id);
+  img.onload = () => { shot = true; fig.replaceChildren(img); };
+  img.onerror = () => { shot = false; };
+  img.src = SHOT();
   return fig;
 }
 
-// What each step says and shows. `ctx`: { status, signer (the certificate's name), caName }.
-function stepContent(id, ctx) {
-  const who = ctx.signer || "your name";
-  switch (id) {
-    case "certificate":
-      return { text: "Tap Browse and pick your certificate's files (or their .zip) in the picker that opens.",
-      picture: { title: "Recents", back: "Cancel", right: { label: "Open", tap: true },
-        groups: [{ rows: [{ label: "Certificates.zip", sub: "Archive", tap: true }, { label: "Me.p12", sub: "Certificate" },
-          { label: "Me.mobileprovision", sub: "Profile" }, { label: "password.txt", sub: "Text" }] }] } };
-    case "download":
-      return {
-        text: "Download Profile opens Cydian's install profile in Safari: tap Allow, then come back here. It holds Cydian's own "
-          + "certificate for this iPhone's address (127.0.0.1) only. "
-          + (ctx.status?.identity ? `It's signed with your certificate, so iOS shows it as Verified by ${who}.` : "Import your certificate first and iOS shows it as Verified with your name, not Unsigned."),
-        picture: { title: "Safari", groups: [{ rows: [{ label: "127.0.0.1", center: true }] }],
-          sheet: { text: "This website is trying to download a configuration profile. Do you want to allow this?", buttons: ["Ignore", "Allow"], tap: 1 } },
-      };
-    case "install":
-      return {
-        text: "Open Settings > General > VPN & Device Management, tap Cydian Local Install under Downloaded Profile, then Install "
-          + "(top right) and enter your passcode.",
-        picture: { title: "Install Profile", back: "Cancel", right: { label: "Install", tap: true },
-          groups: [{ rows: [{ label: "Cydian Local Install", sub: "Cydian" }] },
-            { rows: [{ label: "Signed by", detail: ctx.status?.identity ? who : "Not Signed", verified: Boolean(ctx.status?.identity) },
-              { label: "Description", detail: "Local install" }, { label: "Contains", detail: "Certificate" }, { label: "More Details", chevron: true }] }] },
-      };
-    case "trust":
-      return {
-        text: "Open Settings > General > About > Certificate Trust Settings and turn on the switch for "
-          + `${ctx.caName ? `“${ctx.caName}”` : "Cydian Local Install CA"}. iOS asks once more: Continue.`,
-        picture: { title: "Certificate Trust Settings", back: "About",
-          groups: [{ rows: [{ label: "Trust Store Version", detail: "2026" }] },
-            { header: "ENABLE FULL TRUST FOR ROOT CERTIFICATES", rows: [{ label: ctx.caName || "Cydian Local Install CA", toggle: true, tap: true }] }] },
-      };
-    default:
-      return { text: "" };
-  }
-}
+const TEXT = {
+  certificate: "Tap Select All Files, select your .p12, .mobileprovision and password file (or their .zip), then tap Open.",
+  server: "Keep cydian.dev, or tap it to enter your own Signing Server.",
+};
 
-// The page. opts: { status, failure (text when the signer didn't answer), certificate (element: the Browse rows),
-// actions: { download(), check(), test() }, open (the expand/collapse state, kept by the caller across redraws),
-// extra (elements under the steps: the Keychain's details, Remove Certificate) }.
-export function drawWalkthrough(el, { status = null, failure = "", certificate = null, actions = {}, open = {}, extra = [] } = {}) {
+// The page. opts: { status, failure (text when the signer didn't answer), certificate (element: Select All Files and
+// the rows), server (element: the server rows), serverUrl, actions: { importSafari() }, open (walkOpen), extra
+// (elements under the steps: the Keychain's details, Remove Certificate) }.
+export function drawWalkthrough(el, { status = null, failure = "", certificate = null, server = null, serverUrl = null,
+  actions = {}, open = walkOpen, extra = [] } = {}) {
   style();
-  const states = stepStates(status, { open });
-  const ctx = { status, signer: status?.identity?.name ?? "", caName: status?.trust?.name ?? "" };
+  const states = stepStates(status, { open, server: serverUrl });
   const page = h("div", "walkthrough");
-  const intro = h("p", "group-footer walk-intro", allDone(states)
-    ? "All set: Install on an app's page signs it with your certificate and installs it on this iPhone."
-    : "Once, before the first install. Install signs apps with your certificate on this iPhone and installs them from Cydian itself, so iOS has to trust Cydian's own certificate first.");
-  page.append(intro);
+  page.append(h("p", "group-footer walk-intro", allDone(states)
+    ? "All set: Install signs apps with your certificate on this iPhone."
+    : "Two steps before the first install."));
   if (failure) page.append(h("p", "group-footer walk-failure", `The signer didn't answer: ${failure}`));
   if (status?.identityProblem) page.append(h("p", "group-footer walk-failure", status.identityProblem));
   const list = h("ol", "walk-steps");
@@ -195,16 +139,18 @@ export function drawWalkthrough(el, { status = null, failure = "", certificate =
     head.append(badge, h("span", "walk-title", s.title), h("span", "walk-disclosure"));
     const body = h("div", "walk-body");
     body.hidden = !s.open;
-    const c = stepContent(s.id, ctx);
-    body.append(h("p", "walk-text", c.text));
-    if (s.id === "certificate" && certificate) body.append(certificate);
-    if (c.picture) body.append(picture(s.id, c.picture));
-    if (s.id === "download" && actions.download) {
-      const b = h("button", "walk-action", s.done ? "Download Again" : "Download Profile");
-      b.type = "button";
-      b.addEventListener("click", () => actions.download());
-      body.append(b);
+    body.append(h("p", "walk-text", TEXT[s.id]));
+    if (s.id === "certificate") {
+      if (certificate) body.append(certificate);
+      body.append(picture());
+      if (actions.importSafari) {
+        const b = h("button", "walk-action walk-secondary", "Import from Safari");
+        b.type = "button";
+        b.addEventListener("click", () => actions.importSafari());
+        body.append(b, h("p", "group-footer walk-note", "Added it on the website already? Import from Safari brings it over."));
+      }
     }
+    if (s.id === "server" && server) body.append(server);
     head.addEventListener("click", () => {
       const now = body.hidden;
       body.hidden = !now;
@@ -214,22 +160,7 @@ export function drawWalkthrough(el, { status = null, failure = "", certificate =
     li.append(head, body);
     list.append(li);
   }
-  page.append(list);
-  const check = h("div", "walk-check");
-  const cb = h("button", "walk-action walk-check-button", "Check");
-  cb.type = "button";
-  if (actions.check) cb.addEventListener("click", () => actions.check());
-  check.append(cb);
-  if (actions.test) {
-    const tb = h("button", "walk-action walk-test", "Test Install Server");
-    tb.type = "button";
-    tb.addEventListener("click", () => actions.test());
-    check.append(tb);
-  }
-  check.append(h("p", "group-footer", states.find((s) => s.id === "trust").done
-    ? `iOS trusts ${ctx.caName ? `“${ctx.caName}”` : "Cydian's certificate"}.`
-    : "Check asks iOS whether it trusts Cydian's certificate yet: steps 3 and 4 tick together, since iOS only says whether it trusts it."));
-  page.append(check, ...extra);
+  page.append(list, ...extra);
   const top = el.scrollTop;
   el.replaceChildren(page);
   el.scrollTop = top;

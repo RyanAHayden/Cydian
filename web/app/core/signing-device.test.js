@@ -1,8 +1,8 @@
-// F58: the sideload build's Signing rows from signing.status (I6), the Local Install steps, the HUD's phase labels
+// F58: the sideload build's Signing rows from signing.status (I6), the HUD's phase labels
 // and what each error code leads to.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { deviceSummary, localInstallSection, phaseLabel, deviceError } from "./signing.js";
+import { deviceSummary, phaseLabel, deviceError } from "./signing.js";
 
 const fmt = { locale: "en-US", timeZone: "UTC", now: new Date("2026-11-17T00:00:00Z") };
 const identity = {
@@ -42,25 +42,6 @@ test("expired dates are problems; a missing profile is one too", () => {
   assert.match(bare.problems[0], /No provisioning profile/);
 });
 
-test("Local Install: the set-up row and the two Settings steps until trusted", () => {
-  for (const [trust, state] of [[undefined, "Not Set Up"], [{ ca: false, trusted: false }, "Not Set Up"], [{ ca: true, trusted: false, name: "x" }, "Not Trusted Yet"]]) {
-    const s = localInstallSection(trust);
-    assert.equal(s.header, "Local Install");
-    assert.deepEqual(s.rows[0], { label: "Status", detail: state });
-    assert.equal(s.rows.find((r) => r.label === "Set Up").action, "trust");
-    assert.equal(s.rows.find((r) => r.label === "Install the Profile").subtitle, "Settings > General > VPN & Device Management");
-    assert.equal(s.rows.find((r) => r.label === "Turn On Full Trust").subtitle, "Settings > General > About > Certificate Trust Settings");
-    assert.equal(s.rows.find((r) => r.label === "Check Again").action, "refresh");
-    assert.equal(s.rows.at(-1).action, "test"); // Test Install Server
-  }
-});
-
-test("Local Install once trusted: Ready, no steps, and the server test", () => {
-  const s = localInstallSection({ ca: true, trusted: true, name: "Cydian Local Install CA (iPhone 1234)" });
-  assert.deepEqual(s.rows, [{ label: "Status", detail: "Ready" }, { label: "Test Install Server", action: "test" }]);
-  assert.match(s.footer, /Cydian Local Install CA \(iPhone 1234\)/);
-});
-
 test("phase labels for the HUD", () => {
   assert.equal(phaseLabel({ phase: "downloading", progress: 0 }), "Downloading");
   assert.equal(phaseLabel({ phase: "downloading", progress: 0.423 }), "Downloading 42%");
@@ -71,9 +52,9 @@ test("phase labels for the HUD", () => {
   assert.equal(phaseLabel(null), null);
 });
 
-test("error codes: untrusted and no_identity lead to Settings > Signing, the rest say the signer's words", () => {
+test("error codes: no_server and no_identity lead to Settings > Signing, the rest say the signer's words", () => {
   const err = (code, message) => Object.assign(new Error(message), { code });
-  assert.deepEqual([deviceError(err("untrusted", "set up")).open, deviceError(err("untrusted", "x")).title], ["signing", "Set Up Local Install"]);
+  assert.deepEqual([deviceError(err("no_server", "x")).open, deviceError(err("no_server", "x")).title], ["signing", "No Signing Server"]);
   assert.deepEqual([deviceError(err("no_identity", "x")).open, deviceError(err("no_identity", "x")).title], ["signing", "No Certificate"]);
   const net = deviceError(err("network", "the server answered 404"), "Delta");
   assert.deepEqual(net, { title: "Couldn't Install Delta", open: null, message: "The server answered 404" });

@@ -284,6 +284,9 @@ Everything below comes from reading code, not from a phone. There is no phone in
   tested.
 - Whether a user-installed, fully trusted root CA would let Cydian make its own cert for a local manifest
   (that would remove backloop.dev). Not checked. It also needs the user to install a profile, which is heavy UX.
+  Answered later (F75, 2026-11-17): it doesn't. I6 built it; Safari reached the HTTPS server with that certificate
+  fine, but iOS's installer ignored the hand-trusted root and every install failed. Removed; the app takes the
+  manifest from the Signing Server instead (docs/signing.md, "The install step").
 - Whether iOS checks revocation for the backloop TLS cert, which would make Fully Local fail once the CA revokes
   it but before `notAfter`.
 - The expired pack (`notAfter 2026-10-29`) is what `https://backloop.dev/pack.json` served on 2026-11-17. I

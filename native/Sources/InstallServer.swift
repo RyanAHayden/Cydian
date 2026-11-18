@@ -1,7 +1,8 @@
-// The sideload build's install server (I6, docs/signing.md "Installing"): HTTPS on the loopback interface only, with
-// the phone's own CA-issued certificate (SignStore.swift LocalTrust), serving one signed IPA's itms-services
-// manifest and the IPA to iOS's installer. Plus, while the user sets up trust, plain HTTP on loopback serving the
-// CA's configuration profile to Safari. Nothing listens on Wi-Fi or cellular, and every path has a random token.
+// The sideload build's install server (I6, docs/signing.md "Installing"): plain HTTP on the loopback interface only,
+// serving one signed IPA to iOS's installer while the Signing Server hands iOS the manifest pointing at it
+// (Sideload.swift, GET /sign/manifest). F75: no HTTPS server any more: iOS's installer ignores a hand-trusted CA, so
+// the old local mode with the phone's own certificate never worked. Nothing listens on Wi-Fi or cellular, and every
+// path has a random token.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 import Network
@@ -15,31 +16,19 @@ final class InstallServer {
     private var listener: NWListener?
     private var routes = [String: Route]()
     private(set) var port: UInt16 = 0
-    private let tls: Bool
     private var idle: DispatchWorkItem?
     private var task: UIBackgroundTaskIdentifier = .invalid
 
-    static let secure = InstallServer(tls: true)
-    static let plain = InstallServer(tls: false)
+    static let plain = InstallServer()
 
-    private init(tls: Bool) { self.tls = tls }
+    private init() {}
 
     // Starts listening if it isn't (a random free port), then calls back with the port.
     func start(_ done: @escaping (Result<UInt16, Error>) -> Void) {
         queue.async {
             if let l = self.listener, l.state == .ready { return done(.success(self.port)) }
             do {
-                let params: NWParameters
-                if self.tls {
-                    let opts = NWProtocolTLS.Options()
-                    let id = try LocalTrust.tlsIdentity()
-                    guard let sid = sec_identity_create(id) else { throw SignError("internal", "No TLS identity.") }
-                    sec_protocol_options_set_local_identity(opts.securityProtocolOptions, sid)
-                    sec_protocol_options_set_min_tls_protocol_version(opts.securityProtocolOptions, .TLSv12)
-                    params = NWParameters(tls: opts, tcp: NWProtocolTCP.Options())
-                } else {
-                    params = NWParameters.tcp
-                }
+                let params = NWParameters.tcp
                 params.requiredInterfaceType = .loopback
                 params.acceptLocalOnly = true
                 params.allowLocalEndpointReuse = true
@@ -48,7 +37,7 @@ final class InstallServer {
                 params.requiredLocalEndpoint = NWEndpoint.hostPort(host: NWEndpoint.Host("127.0.0.1"), port: .any)
                 let l = try NWListener(using: params)
                 var answered = false
-                l.stateUpdateHandler = { st in // the two servers live as long as the app
+                l.stateUpdateHandler = { st in // the server lives as long as the app
                     switch st {
                     case .ready:
                         self.port = l.port?.rawValue ?? 0
@@ -85,7 +74,7 @@ final class InstallServer {
 
     func remove(_ path: String) { queue.async { self.routes.removeValue(forKey: path) } }
 
-    var base: String { "\(tls ? "https" : "http")://127.0.0.1:\(port)" }
+    var base: String { "http://127.0.0.1:\(port)" }
 
     // ---- connections
 

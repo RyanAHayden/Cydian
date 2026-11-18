@@ -128,3 +128,58 @@ test("the undo bar's line, and when the first-run hint plays", () => {
   assert.equal(swipeHintDue({ queue: true, logs: 2 }), false);    // has run a queue before
   assert.equal(swipeHintDue({ queue: true, reduce: true }), false);
 });
+
+// F213: the sideload build queues AltStore apps from a row: the app page's job, Install / Upgrade / Cancel.
+import { rowAppJob } from "./altstore.js";
+
+const appPkg = (versions, extra = {}) => ({ key: "alt:https://s/", row: { id: "com.x.app", name: "App" },
+  stanza: { kind: "ipa", ipa: { bundleIdentifier: "com.x.app", name: "App", sourceUrl: "https://s/apps.json", sourceName: "S",
+    iconURL: "https://s/a.png", versions, ...extra } } });
+const storeOf = (recs) => async () => ({ all: async () => recs });
+
+test("F213: an app row's job in the sideload build: as the app page's, with the installed record", async () => {
+  const p = appPkg([{ version: "2.0", downloadURL: "https://s/a2.ipa" }, { version: "1.0", downloadURL: "https://s/a1.ipa" }]);
+  const fresh = await rowAppJob(p, null, { store: storeOf([]), mode: "sideload" });
+  assert.equal(fresh.installed, null);
+  assert.equal(fresh.newest, "2.0");
+  assert.equal(fresh.job.id, "com.x.app");
+  assert.equal(fresh.job.url, "https://s/a2.ipa");
+  assert.equal(fresh.job.installed, null);
+  const old = await rowAppJob(p, null, { store: storeOf([{ id: "com.x.app", version: "1.0" }]), mode: "sideload" });
+  assert.equal(old.installed, "1.0");
+  assert.equal(old.job.installed, "1.0");
+  const unknown = await rowAppJob(p, null, { store: storeOf([{ id: "com.x.app", version: "" }]), mode: "sideload" });
+  assert.equal(unknown.installed, "");
+  // The website and the jailbreak build queue nothing from here; a source-signed link has no job.
+  assert.equal(await rowAppJob(p, null, { store: storeOf([]), mode: "site" }), null);
+  assert.equal(await rowAppJob(p, null, { store: storeOf([]), mode: "jailbreak" }), null);
+  assert.equal(await rowAppJob({ row: { id: "t" }, stanza: { package: "t" } }, null, { store: storeOf([]), mode: "sideload" }), null);
+  const itms = await rowAppJob(appPkg([{ version: "1.0", downloadURL: "itms-services://?action=download-manifest&url=https://s/m.plist" }]), null,
+    { store: storeOf([]), mode: "sideload" });
+  assert.equal(itms.job, null);
+});
+
+test("F213: an app row's swipe and hold menu in the sideload build: Install, Upgrade, Cancel; none on the site", () => {
+  const app = { id: "com.x.app", name: "App", version: "2.0", kind: "ipa", key: "alt:https://s/" };
+  const job = { id: "com.x.app", name: "App", version: "2.0", url: "https://s/a2.ipa" };
+  assert.deepEqual(rowSwipeAction(app, { apps: true, job, installed: null, newest: "2.0" }), { kind: "add", label: "Install", job });
+  assert.deepEqual(rowSwipeAction(app, { apps: true, job, installed: "1.0", newest: "2.0" }), { kind: "add", label: "Upgrade", job });
+  assert.deepEqual(rowSwipeAction(app, { apps: true, job, installed: "1.0", newest: "2.0", queued: true }), { kind: "cancel", label: "Cancel" });
+  assert.deepEqual(rowSwipeAction(app, { apps: true, job: null, queued: true }), { kind: "cancel", label: "Cancel" });
+  // Up to date, installed at an unknown version, or nothing to sign: no swipe (Reinstall stays on the app page).
+  assert.equal(rowSwipeAction(app, { apps: true, job, installed: "2.0", newest: "2.0" }), null);
+  assert.equal(rowSwipeAction(app, { apps: true, job, installed: "", newest: "2.0" }), null);
+  assert.equal(rowSwipeAction(app, { apps: true, job: null, newest: "2.0" }), null);
+  // The website (no queue at all): nothing; tweaks in the sideload build: nothing; the jailbreak build's apps: nothing.
+  assert.equal(rowSwipeAction(app, { newest: "2.0" }), null);
+  assert.equal(rowSwipeAction({ id: "com.t", name: "T", key: KEY }, { apps: true, job, newest: "1.0" }), null);
+  assert.equal(rowSwipeAction(app, { queue: true, newest: "2.0" }), null);
+  // The hold menu: the same item, then Share and Source.
+  assert.deepEqual(rowMenuItems(app, { apps: true, job, newest: "2.0" }).map((i) => i.label), ["Install", "Share", "Source"]);
+  assert.deepEqual(rowMenuItems(app, { apps: true, job, installed: "1.0", newest: "2.0" }).map((i) => i.label), ["Upgrade", "Share", "Source"]);
+  assert.deepEqual(rowMenuItems(app, { apps: true, job, queued: true }).map((i) => i.label), ["Cancel", "Share", "Source"]);
+  assert.deepEqual(rowMenuItems(app, { job, newest: "2.0" }).map((i) => i.label), ["Share", "Source"]);
+  assert.deepEqual(rowMenuItems({ id: "com.t", key: KEY }, { apps: true, job, newest: "1.0" }).map((i) => i.label), ["Share", "Source"]);
+  // The undo bar names an app's queued mode with the app queue's labels.
+  assert.equal(swipeMessage({ kind: "cancel" }, "App", { mode: "resign" }, { resign: "Re-sign" }), "Re-sign App cancelled");
+});

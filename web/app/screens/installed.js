@@ -206,7 +206,9 @@ function navInfo(route) {
     return { title: recordsApps() ? "Installed" : "Apps", style: "plain", // F87: "Apps" one row down in the jailbreak app
       // F127: User | Recent on the apps list's root (the jailbreak app's Apps page stays newest first).
       titleView: recordsApps() ? modeControl(APP_MODES, appView.mode, (m) => { appView.mode = m; redrawApps(); }) : undefined,
-      right: { label: appView.editing ? "Done" : "Edit", onClick: (e) => setEditing(!appView.editing, e.currentTarget) } };
+      // Add (Install IPAs' Files / From URL), not Edit: a row still deletes with a swipe (user 2026-11-18).
+      right: recordsApps() ? { label: "Add", onClick: () => myipas.addMenu() }
+        : { label: appView.editing ? "Done" : "Edit", onClick: (e) => setEditing(!appView.editing, e.currentTarget) } };
   }
   const info = { title: recordsApps() ? "dpkg Status" : "Installed", style: "plain" };
   // F127: Cydia's User | Expert | Recent in place of the title.

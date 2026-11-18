@@ -344,7 +344,7 @@ const refresh = () => { if (view.body?.isConnected) load(); };
 // Sources refreshed or changed: Browse counts again.
 catalog.onChange?.(() => { if (view.browse?.isConnected) loadBrowse(); });
 
-async function addMenu() {
+export async function addMenu() {
   if (site()) {
     // F197: the picker opens from the sheet's tap (Safari opens a file input only inside the user's tap).
     const i = await showActionSheet({ buttons: ["Choose File", "From URL"] });

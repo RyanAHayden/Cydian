@@ -43,7 +43,7 @@ test("Confirm's run: each app in turn, Cydian last, each cleared and recorded; a
   assert.equal(q.size, 2);
 });
 
-test("app page (F80): Install queues the app; queued, the button reads Modify and its sheet offers Clear or queues again", async () => {
+test("app page (F80): installed, Modify's sheet offers Upgrade (and Downgrade); queued, Clear or queue again", async () => {
   const pkg = { key: "alt:k", row: { id: "com.x.a", name: "A" }, stanza: { kind: "ipa", ipa: { bundleIdentifier: "com.x.a", name: "A",
     sourceUrl: "https://s/", versions: [{ version: "2", downloadURL: "https://s/a.ipa" }] } } };
   const q = createAppQueue();
@@ -51,7 +51,9 @@ test("app page (F80): Install queues the app; queued, the button reads Modify an
   const added = [];
   const add = (j, o) => { added.push(j); o.queue.add(j); };
   const base = { queue: q, add, mode: "sideload", ready: async () => true, store };
-  assert.equal(await appPageAction(pkg, null, { ...base, ask: async () => assert.fail("no sheet before it's queued") }), true);
+  let sheet = null;
+  assert.equal(await appPageAction(pkg, null, { ...base, ask: async (o) => { sheet = o; return 0; } }), true);
+  assert.deepEqual(sheet.buttons, ["Upgrade"]); // installed 1, newest 2: Modify offers Upgrade
   assert.equal(q.get("com.x.a").mode, "upgrade");
   assert.equal(appNavLabel({ queued: Boolean(q.get("com.x.a")), installed: "1", newest: "2" }), "Modify");
 
@@ -61,8 +63,16 @@ test("app page (F80): Install queues the app; queued, the button reads Modify an
   assert.equal(added.length, 2); // Upgrade: queued again, Confirm opens
   assert.equal(await appPageAction(pkg, null, { ...base, ask: async () => 0 }), true);
   assert.equal(q.size, 0); // Clear
-  assert.equal(await appPageAction(pkg, null, { ...base, ask: async () => -1 }), true); // not queued: queues again
-  assert.equal(q.size, 1);
+  assert.equal(await appPageAction(pkg, null, { ...base, ask: async () => -1 }), true); // Cancel: nothing queued
+  assert.equal(q.size, 0);
+  // An older version on the source: Downgrade, then which version
+  const two = { ...pkg, stanza: { ...pkg.stanza, ipa: { ...pkg.stanza.ipa, versions: [{ version: "2", downloadURL: "https://s/a2.ipa" }, { version: "0.9", downloadURL: "https://s/a09.ipa" }] } } };
+  const answers = [1, 0];
+  const seen = [];
+  await appPageAction(two, null, { ...base, ask: async (o) => { seen.push(o.buttons); return answers.shift(); } });
+  assert.deepEqual(seen, [["Upgrade", "Downgrade"], ["0.9"]]);
+  assert.equal(q.get("com.x.a").version, "0.9");
+  q.clearAll();
 
   // Where the queue doesn't apply, the page does what it did before.
   assert.equal(await appPageAction(pkg, null, { ...base, mode: "jailbreak" }), false);

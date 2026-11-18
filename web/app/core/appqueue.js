@@ -104,12 +104,19 @@ function verb({ installed, newest }) {
   return installed && newest && compareVersions(newest, installed) > 0 ? "Upgrade" : "Reinstall";
 }
 
+// Cydia's nav button: Install when the app isn't installed, Modify once it is or while it's queued (its sheet then
+// says what to do: docs/cydia-4s/queue-82.png, queue-84.png).
 export function appNavLabel({ queued = false, installed = null, newest = null } = {}) {
-  return queued ? "Modify" : verb({ installed, newest });
+  return queued || installed != null ? "Modify" : verb({ installed, newest });
 }
 
-export function modifyActions({ queued = false, installed = null, newest = null } = {}) {
-  return queued ? ["Clear", verb({ installed, newest })] : [verb({ installed, newest })];
+// Modify's sheet. Queued: Clear, or queue it again. Installed: Upgrade (a newer one is out) or Reinstall, and
+// Downgrade when the source has an older version than the installed one (`older`). No Remove: the sideload app
+// can't delete apps.
+export function modifyActions({ queued = false, installed = null, newest = null, older = false } = {}) {
+  if (queued) return ["Clear", verb({ installed, newest })];
+  if (installed == null) return [verb({ installed, newest })];
+  return [verb({ installed, newest }), ...(older ? ["Downgrade"] : [])];
 }
 
 // F84: signing.install's params for a Custom Install job. The look's token holds the downloaded IPA on the phone for

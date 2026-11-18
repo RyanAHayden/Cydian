@@ -25,6 +25,7 @@ import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { appQueue } from "../app-queue.js";
 import { appJob, appNavLabel, modifyActions } from "../core/appqueue.js";
+import { compareVersions } from "../core/apt.js";
 import { queueApp } from "./queue.js";
 
 function el(tag, cls, text) {
@@ -255,12 +256,20 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   if (!job || !(await ready())) return false;
   if (version) { add(job, { queue }); return true; }
   const newest = app.versions[0]?.version ?? null;
-  const state = { queued: Boolean(queue.get(job.id)), installed: rec ? rec.version || "" : null, newest };
-  if (!state.queued) { add(job, { queue }); return true; }
+  const installed = rec ? rec.version || "" : null;
+  const older = installed ? app.versions.map((x) => x.version).filter((v) => v && compareVersions(v, installed) < 0) : [];
+  const state = { queued: Boolean(queue.get(job.id)), installed, newest, older: older.length > 0 };
+  if (!state.queued && installed == null) { add(job, { queue }); return true; }
+  // Modify (installed or queued), as Cydia's: Upgrade/Reinstall, Downgrade (then which version), or Clear.
   const buttons = modifyActions(state);
   const i = await ask({ title: app.name, buttons });
+  if (i < 0) return true;
   if (buttons[i] === "Clear") queue.clear(job.id);
-  else if (i >= 0) add(job, { queue });
+  else if (buttons[i] === "Downgrade") {
+    const j = await ask({ title: "Downgrade to", buttons: older });
+    const pick = j >= 0 ? appJob(pkg, { installed, version: older[j], source: source ? displayName(source) : null }) : null;
+    if (pick) add(pick, { queue });
+  } else add(job, { queue });
   return true;
 }
 

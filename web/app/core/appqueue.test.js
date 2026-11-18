@@ -56,9 +56,12 @@ test("runOrder: as queued, Cydian itself last", () => {
 
 test("the app page's nav button: Modify while queued, else Install / Upgrade / Reinstall; Modify offers Clear first", () => {
   assert.equal(appNavLabel({}), "Install");
-  assert.equal(appNavLabel({ installed: "1", newest: "2" }), "Upgrade");
-  assert.equal(appNavLabel({ installed: "2", newest: "2" }), "Reinstall");
-  assert.equal(appNavLabel({ installed: "", newest: "2" }), "Reinstall"); // marked installed, version unknown
+  assert.equal(appNavLabel({ installed: "1", newest: "2" }), "Modify"); // installed: Modify, as Cydia's
+  assert.equal(appNavLabel({ installed: "2", newest: "2" }), "Modify");
+  assert.equal(appNavLabel({ installed: "", newest: "2" }), "Modify"); // marked installed, version unknown
+  assert.deepEqual(modifyActions({ installed: "1", newest: "2" }), ["Upgrade"]);
+  assert.deepEqual(modifyActions({ installed: "2", newest: "2", older: true }), ["Reinstall", "Downgrade"]);
+  assert.deepEqual(modifyActions({}), ["Install"]);
   assert.equal(appNavLabel({ queued: true, installed: "1", newest: "2" }), "Modify");
   assert.equal(appNavLabel({ queued: true }), "Modify");
   assert.deepEqual(modifyActions({ queued: true, installed: "1", newest: "2" }), ["Clear", "Upgrade"]);

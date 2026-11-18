@@ -40,7 +40,8 @@ export async function openOutside(url) {
 // ---- sideload: Cydian's own AltStore source -----------------------------------------------------------------
 
 export async function readSelfInfo() {
-  const info = selfFromAltSource(await getBackend().text(SELF_ALT_URL));
+  // A fresh copy: raw.githubusercontent.com caches for 5 minutes, and a query of its own skips that cache.
+  const info = selfFromAltSource(await getBackend().text(`${SELF_ALT_URL}?t=${Date.now()}`));
   if (info) saveInfo(storage(), info);
   return info;
 }

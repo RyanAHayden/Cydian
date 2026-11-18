@@ -380,10 +380,10 @@ if (globalThis.cydianNative) {
     if (last && last !== v) showBanner({ title: "Cydian", message: `Updated to ${v}.`, duration: 4000 });
   }).catch(() => {});
   // Back in the foreground after a while: look again (an essential update can come out while Cydian sits in the
-  // background, and iOS rarely cold-launches it). ponytail: at most every 10 minutes.
+  // background, and iOS rarely cold-launches it).
   let lastEssential = Date.now();
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "visible" || Date.now() - lastEssential < 10 * 60 * 1000) return;
+    if (document.visibilityState !== "visible" || Date.now() - lastEssential < 60 * 1000) return; // every return, once a minute at most
     lastEssential = Date.now();
     lookForUpdates();
   });

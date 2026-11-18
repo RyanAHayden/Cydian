@@ -197,6 +197,7 @@ enum Sideload {
             }
             DispatchQueue.main.async {
                 UIApplication.shared.open(link)
+                CloseForUpdate.afterPrompt()
                 opened(.success((app, record)))
                 served?(true)
             }
@@ -550,5 +551,30 @@ enum Workspace {
         typealias F = @convention(c) (NSObject, Selector, NSString) -> Bool
         let f = unsafeBitCast(method_getImplementation(m), to: F.self)
         return f(ws, sel, id as NSString)
+    }
+}
+
+// iOS doesn't finish installing a new Cydian over the one that's running (user 2026-11-18: the update waited until
+// Cydian was closed by hand). Once iOS's "would like to install Cydian" prompt has been answered (Cydian becomes
+// active again), Cydian leaves a notification and closes, so the install finishes; the notification opens the new one.
+enum CloseForUpdate {
+    static var token: NSObjectProtocol?
+    static func afterPrompt() {
+        var resigned = false
+        let nc = NotificationCenter.default
+        let off = nc.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in resigned = true }
+        token.map(nc.removeObserver)
+        token = nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            guard resigned else { return } // the prompt hasn't shown yet
+            token.map(nc.removeObserver); token = nil; nc.removeObserver(off)
+            let c = UNMutableNotificationContent()
+            c.title = "Cydian"
+            c.body = "Updating Cydian. Tap to open it when it's done."
+            let req = UNNotificationRequest(identifier: "cydian.updating", content: c,
+                                            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 8, repeats: false))
+            UNUserNotificationCenter.current().add(req) { _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { exit(0) }
+            }
+        }
     }
 }

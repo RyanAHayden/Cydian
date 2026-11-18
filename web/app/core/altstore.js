@@ -551,7 +551,9 @@ export function withAltSources(calls, backend, opts = {}) {
           return next;
         }),
       ]);
-      return [...(apt ?? []), ...alts];
+      const out = [...(apt ?? []), ...alts];
+      if (apt?.failed) out.failed = apt.failed; // B23: the sources apt-get update failed on (backend-native)
+      return out;
     },
   };
 }

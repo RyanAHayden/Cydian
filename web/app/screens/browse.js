@@ -200,6 +200,8 @@ async function drawSections(page) {
       body.prepend(featuredStrip(source)); // F20: the source's sileo-featured.json banners, above its sections
       setSourceShare(body, source);
       body.append(grouped([{ footer: healthOf(source).label }])); // F19: last reached, last Release, Not Responding
+      // B23: what apt-get update said about it (the jailbreak app), when the catalog's own load didn't fail
+      if (source.aptError && source.aptError !== status?.error) body.append(el("p", "empty source-apt-error", source.aptError));
     }
   }
 }

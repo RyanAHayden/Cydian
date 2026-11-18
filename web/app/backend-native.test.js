@@ -120,6 +120,41 @@ test("a failed apt-get update is an error with apt's message, not a silent refre
   await assert.rejects(backend.refreshSources(), (e) => e.code === "helper" && /Could not get lock/.test(e.message));
 });
 
+test("B23: apt-get update failing on one source (exit 100) refreshes the rest and marks that one", async (t) => {
+  const { backend } = setup(t, { net: null, env: { FAKE_DEAD: "https://havoc.app/" } });
+  const seen = [];
+  const out = await backend.refreshSources((s) => seen.push(s.key));
+  assert.deepEqual(seen.sort(), [PROCURSUS, HAVOC].sort());
+  const by = Object.fromEntries(out.map((s) => [s.key, s]));
+  assert.equal(by[PROCURSUS].error, null);
+  assert.equal(by[PROCURSUS].count, 2, "the source that answered is read from apt's lists as usual");
+  assert.equal(by[HAVOC].error, "apt-get update couldn't fetch Packages (525)");
+  assert.equal(by[HAVOC].aptError, by[HAVOC].error);
+  assert.deepEqual(out.failed.map((f) => [f.key, f.message]), [[HAVOC, "apt-get update couldn't fetch Packages (525)"]]);
+  const kept = Object.fromEntries((await backend.sources()).map((s) => [s.key, s]));
+  assert.equal(kept[HAVOC].error, by[HAVOC].error, "kept, so its row says Not Responding");
+
+  // Only Procursus read back (F99's one source): Havoc's failure is still in `failed`, for the banner.
+  const one = await backend.refreshSources(() => {}, { filter: (s) => s.key === PROCURSUS });
+  assert.deepEqual(one.map((s) => s.key), [PROCURSUS]);
+  assert.equal(one[0].error, null);
+  assert.deepEqual(one.failed.map((f) => f.key), [HAVOC]);
+});
+
+test("B23: a source that comes back loses its apt error", async (t) => {
+  const fx = makeFixture();
+  t.after(fx.cleanup);
+  const indexedDB = fakeIndexedDB();
+  const make = (env) => createNativeBackend({ native: createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: null, env }),
+    sourceOptions: { indexedDB } });
+  await make({ FAKE_DEAD: "https://havoc.app/" }).refreshSources();
+  const out = await make({}).refreshSources();
+  const h = out.find((s) => s.key === HAVOC);
+  assert.equal(h.error, null);
+  assert.equal(h.aptError, null);
+  assert.deepEqual(out.failed, []);
+});
+
 test("apt's lists, dpkg's status and the holds go into the same core as the site", async (t) => {
   const { backend } = setup(t, { net: null });
   await backend.refreshSources();

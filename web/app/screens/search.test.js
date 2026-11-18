@@ -109,6 +109,7 @@ test("F99: Other Sources' Add Source & Install: add, refresh that source, open t
       backend, catalog, go: (href) => log.push(["go", href]),
       showHUD: (label) => { log.push(["hud", label]); return () => log.push(["hide", label]); },
       showAlert: async (a) => { log.push(["alert", a.title, a.message]); return { index: 0 }; },
+      banner: (b) => log.push(["banner", b]),
     };
     return { log, deps };
   }
@@ -136,4 +137,73 @@ test("F99: Other Sources' Add Source & Install: add, refresh that source, open t
   ({ log, deps } = setup({ addError: Object.assign(new Error("Not a repository"), { title: "Verification Error" }) }));
   assert.equal(await addSourceAndInstall(row, deps), "error");
   assert.deepEqual(log.map((l) => l[0]), ["hud", "add", "hide", "alert"], "a refused source stops there, HUD gone");
+});
+
+test("B23: Add Source & Install goes on when apt-get update failed on another source; only its own failure stops it", async () => {
+  const { addSourceAndInstall } = await import("./extras.js");
+  const { format } = await import("../router.js");
+  const row = { id: "com.ex.tweak", name: "Tweak", version: "1.0",
+    repo: { uri: "https://repo.ex.test/", name: "Mineek's Repo", flat: true, dist: "./" } };
+  const KEY = "deb:https://repo.ex.test/:./";
+  const DEAD = { key: "deb:https://cydian.dev/repo/:./", uri: "https://cydian.dev/repo/", name: null,
+    message: "apt-get update couldn't fetch Packages (525)" };
+  function setup(failed) {
+    const log = [];
+    const deps = {
+      backend: {
+        addSource: async (uri) => ({ key: KEY, uri }),
+        sources: async () => [],
+        refreshSources: async () => {
+          const mine = failed.find((f) => f.key === KEY);
+          return Object.assign([{ key: KEY, error: mine?.message ?? null, aptError: mine?.message ?? null }], { failed });
+        },
+        queue: (job) => log.push(["queue", job.id]),
+      },
+      catalog: { ensure: async () => {}, package: async () => ({ key: KEY, stanza: { version: "1.0" } }) },
+      go: (href) => log.push(["go", href]),
+      showHUD: () => () => {},
+      showAlert: async (a) => { log.push(["alert", a.title, a.message]); return { index: 0 }; },
+      banner: (b) => log.push(["banner", b]),
+      sold: () => false,
+    };
+    return { log, deps };
+  }
+
+  // The iPhone 7, 2026-11-18: the added repo refreshed fine, only the old cydian.dev/repo 525'd.
+  let { log, deps } = setup([DEAD]);
+  assert.equal(await addSourceAndInstall(row, deps), "queued");
+  assert.ok(!log.some((l) => l[0] === "alert"), "no alert for another source's failure");
+  const b = log.find((l) => l[0] === "banner")[1];
+  assert.equal(b.title, "Source Failed to Refresh");
+  assert.match(b.message, /cydian\.dev\/repo/);
+  assert.ok(b.duration > 0, "goes away by itself");
+  assert.deepEqual(log.filter((l) => l[0] !== "banner").map((l) => l[0]), ["go", "queue"]);
+  b.onTap();
+  assert.deepEqual(log.at(-1), ["go", format({ tab: "sources", path: [] })], "tapping it opens Sources");
+
+  // The added source itself failed: the blocking alert, nothing queued, no banner.
+  ({ log, deps } = setup([{ key: KEY, uri: row.repo.uri, name: "Mineek's Repo", message: "apt-get update couldn't fetch Packages (404 Not Found)" }, DEAD]));
+  assert.equal(await addSourceAndInstall(row, deps), "error");
+  assert.deepEqual(log.map((l) => l[0]), ["alert"]);
+  assert.equal(log[0][2], "Mineek's Repo was added, but refreshing it failed: apt-get update couldn't fetch Packages (404 Not Found)");
+
+  // Nothing failed: no banner.
+  ({ log, deps } = setup([]));
+  assert.equal(await addSourceAndInstall(row, deps), "queued");
+  assert.ok(!log.some((l) => l[0] === "banner" || l[0] === "alert"));
+});
+
+test("B23: Sources' refresh names apt's failed sources in a banner, never an alert", async () => {
+  const { bannerFailed } = await import("./sources.js");
+  const { format } = await import("../router.js");
+  const shown = [];
+  const went = [];
+  const opts = { banner: (b) => shown.push(b), go: (h) => went.push(h) };
+  assert.equal(bannerFailed([], opts), false, "nothing failed");
+  assert.equal(bannerFailed(undefined, opts), false, "the website's refresh has no `failed`");
+  assert.equal(shown.length, 0);
+  assert.equal(bannerFailed(Object.assign([], { failed: [{ key: "k", uri: "https://cydian.dev/repo/", name: "Old Repo", message: "x" }] }), opts), true);
+  assert.equal(shown[0].message, "Old Repo: tap to see Sources.");
+  shown[0].onTap();
+  assert.deepEqual(went, [format({ tab: "sources", path: [] })]);
 });

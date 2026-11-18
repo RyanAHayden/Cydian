@@ -6,6 +6,9 @@
 #   FAKE_REMOTE    what "the repos" hold: FAKE_REMOTE/lists/* is what apt-get update writes into the lists dir
 #   FAKE_FAIL      a verb that fails like apt does (exit 100, "E: ..." on stderr); simulate fails with an unmet
 #                  dependency of the first item on FAKE_MISSING (default com.example.missing), as apt-get -s does
+#   FAKE_DEAD      repo URIs (space separated, as in apt's sources) that update can't fetch (B23): their lists aren't
+#                  copied, stdout gets apt's "Err:<n> <uri> ./ Packages" and reason line, stderr "E: Failed to fetch ..."
+#                  and "E: Some index files failed to download", and update exits 100, as apt does on a dead source
 #   FAKE_SLOW      seconds apply waits before each package, so a walk-through sees the console mid-run
 #   FAKE_CONFFILE  a conffile path both the user and the package changed (F63): apply keeps it quietly, apply-ask
 #                  asks on fd 3 (pmconffile:) and reads Y or N from stdin, as dpkg does through the real helper
@@ -504,14 +507,29 @@ fi
 case $verb in
   update)
     n=0
+    dead=""
+    for u in ${FAKE_DEAD:-}; do dead="$dead $(printf '%s' "$u" | sed 's#^[a-z]*://##; s#/*$##; s#/#_#g')_"; done
     for f in "${FAKE_REMOTE:?}"/lists/*; do
       [ -f "$f" ] || continue
+      skip=""
+      for d in $dead; do case ${f##*/} in "$d"*) skip=1 ;; esac; done
+      [ -n "$skip" ] && continue
       n=$((n + 1))
       echo "Get:$n ${f##*/}"
       st "dlstatus:$n:50:Retrieving file $n"
       cp "$f" "$lists/"
     done
+    for u in ${FAKE_DEAD:-}; do
+      n=$((n + 1))
+      echo "Err:$n ${u%/} ./ Packages"
+      echo "  525  <none> [IP: 192.0.2.1 443]"
+    done
     echo "Reading package lists..."
+    if [ -n "${FAKE_DEAD:-}" ]; then
+      for u in $FAKE_DEAD; do echo "E: Failed to fetch ${u%/}/./Packages  525  <none> [IP: 192.0.2.1 443]" >&2; done
+      echo "E: Some index files failed to download. They have been ignored, or old ones used instead." >&2
+      exit 100
+    fi
     ;;
   showhold)
     awk '/^Package:/ { p = $2 } /^Status: hold / { print p }' "$status" ;;

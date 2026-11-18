@@ -34,6 +34,8 @@ import {
   isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore, isFreePrice,
 } from "../core/payment.js";
 import { NAME } from "../brand.js";
+import { showBanner } from "../nav/banner.js";
+import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
 
 const pkgHref = (key, id) => format({ tab: "sources", path: [key, `package:${id}`] });
 
@@ -204,7 +206,10 @@ async function offer(r, ctx) {
 // Resolves to what happened: "error" | "missing" | "queued" | "paid" (B19).
 // B19: a paid package the source's vendor sells (`sold`, soldByVendor) is not queued (apt can't fetch it): its page
 // opens on the Purchase group and nav bar price (B11), and the answer is "paid".
-export async function addSourceAndInstall(r, { backend, catalog, showHUD: hud, showAlert: alert, go, sold = soldByVendor }) {
+// B23: apt-get update failing on other sources doesn't stop it: those are named in a banner (`banner`, nav/banner.js,
+// which opens Sources when tapped) and the install goes on. Only the added source's own failure is an alert.
+export async function addSourceAndInstall(r, { backend, catalog, showHUD: hud, showAlert: alert, go, sold = soldByVendor,
+  banner = showBanner }) {
   let hide = hud("Verifying URL");
   let added;
   try {
@@ -223,7 +228,13 @@ export async function addSourceAndInstall(r, { backend, catalog, showHUD: hud, s
       key = (await backend.sources()).find((s) => normalRepo(s.uri) === want)?.key ?? null;
     }
     const only = (s) => s.key === key;
-    await backend.refreshSources(() => {}, { filter: only });
+    const rows = await backend.refreshSources(() => {}, { filter: only });
+    const mine = (rows ?? []).find(only);
+    const own = mine?.aptError || (rows?.failed ?? []).find((f) => f.key === key)?.message;
+    if (own) throw new Error(own);
+    const others = (rows?.failed ?? []).filter((f) => f.key !== key);
+    const words = failedBanner(others);
+    if (words) banner({ ...words, duration: FAILED_BANNER_MS, onTap: () => go(format({ tab: "sources", path: [] })) });
     await catalog.ensure();
     pkg = key ? await catalog.package(r.id, key) : null;
   } catch (e) {

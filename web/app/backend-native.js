@@ -54,6 +54,7 @@ import { queueWords, parseSimulation, mergePlans } from "./core/queue.js";
 import { installQueue } from "./queue.js";
 import { NAME } from "./brand.js";
 import { reviewsApi, reviewsBase } from "./core/reviews.js";
+import { updateFailures, failureFor } from "./core/aptupdate.js";
 
 // The one apt source file iFizBox writes (cydian-helper addsource/removesource, F33).
 const CYDIAN_SOURCES = /(^|\/)sources\.list\.d\/cydian\.sources$/;
@@ -129,10 +130,15 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
     // F19: apt's source files ([{ path, text }]): which jailbreak wrote them tells Recommended what to offer.
     aptSourceFiles: async () => (await call("apt.sources")) ?? [],
     // apt-get update through the helper; throws BackendError("helper") with apt's last error line when it fails.
+    // B23: `failures` are the sources apt couldn't fetch (core/aptupdate.js). When apt failed only on those (exit
+    // 100, "E: Some index files failed to download") it is no error: the rest updated, and refreshSources marks them.
     async update(onEvent) {
       const r = await backend.helper(["update"], onEvent);
-      if (r.code !== 0) throw new BackendError("helper", `apt-get update failed (${r.code}): ${lastLine(r.stderr) || "no output"}`);
-      return r;
+      const failures = updateFailures(r.stdout, r.stderr);
+      if (r.code !== 0 && !(r.code === 100 && failures.length)) {
+        throw new BackendError("helper", `apt-get update failed (${r.code}): ${lastLine(r.stderr) || "no output"}`);
+      }
+      return { ...r, failures };
     },
   };
   if ((sourceOptions.mode ?? detectMode()) === "jailbreak") Object.assign(backend, queueCalls(backend, sourceOptions.queue ?? installQueue, call));
@@ -497,14 +503,22 @@ function nativeSourceCalls(backend, call, opts) {
     // saved (F99's Add Source & Install refreshes one); apt-get update itself still updates all of apt's sources.
     // F150: `signal` (the reload bar's Cancel): once aborted, apt-get update (already running) is left to end
     // and no list is read back.
+    // B23: a source apt-get update couldn't fetch gets apt's reason as its `error` (its row says Not Responding, F19,
+    // even when apt kept its old lists), and the answer's `failed` lists every such source, filtered out or not:
+    // [{ key, uri, name, message }] (key null for a URI no listed source has), for the caller's banner.
     async refreshSources(onEach = () => {}, { filter, signal } = {}) {
       await migrateAdded();
-      await backend.update();
-      if (signal?.aborted) return [];
+      const { failures = [] } = (await backend.update()) ?? {};
+      if (signal?.aborted) return Object.assign([], { failed: [] });
       const db = await store();
-      const sources = (await list()).filter(filter ?? (() => true));
-      return Promise.all(sources.map(async (s) => {
+      const all = await list();
+      const failed = failedSources(all, failures);
+      const sources = all.filter(filter ?? (() => true));
+      const rows = await Promise.all(sources.map(async (s) => {
         const fields = await refreshSource(backend, s, { arch: arch(), count });
+        const apt = failureFor(s, failures);
+        fields.aptError = apt ? apt.message : null;
+        if (apt) fields.error = apt.message;
         const cur = await db.get(s.key);
         const { file, ...rest } = s;
         const next = { ...cur, ...rest, ...fields, ...healthFields(cur, fields) }; // F19: reachedAt, failures
@@ -513,6 +527,18 @@ function nativeSourceCalls(backend, call, opts) {
         onEach(shown);
         return shown;
       }));
+      return Object.assign(rows, { failed });
     },
   };
+}
+
+// B23: apt's failures as sources: one entry per listed source apt named, then any URI no listed source has.
+function failedSources(sources, failures) {
+  const out = new Map();
+  for (const f of failures) {
+    const s = sources.find((x) => failureFor(x, [f]));
+    const k = s ? s.key : `uri:${f.uri}`;
+    if (!out.has(k)) out.set(k, { key: s?.key ?? null, uri: s?.uri ?? f.uri, name: s?.name || s?.origin || null, message: f.message });
+  }
+  return [...out.values()];
 }

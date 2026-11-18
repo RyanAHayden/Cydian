@@ -21,6 +21,8 @@ import { recommendedSeen, jailbreakName } from "../core/recommended.js";
 import { builtinFirst, isBuiltin } from "../core/essential.js";
 import { lockMark } from "../nav/lock.js";
 import { reloadSteps } from "../core/reloadsteps.js";
+import { showBanner } from "../nav/banner.js";
+import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
 
 export const title = "Sources";
 
@@ -190,7 +192,9 @@ export async function refreshInBackground(ctx) {
     state.sources = await getBackend().sources();
     const filter = sourceFilter(settings.deviceType());
     run = startRun(ctx, state.sources.filter(filter ?? (() => true)).map((x) => x.key));
-    if (await run.until(getBackend().refreshSources(run.onEach, { filter, signal: run.signal }))) return "cancelled";
+    const job = getBackend().refreshSources(run.onEach, { filter, signal: run.signal });
+    if (await run.until(job)) return "cancelled";
+    bannerFailed(await job);
     state.sources = await getBackend().sources();
     if (state.box?.isConnected) draw();
     if (await run.until(run.data())) return "cancelled";
@@ -200,6 +204,15 @@ export async function refreshInBackground(ctx) {
     if (!run?.cancelled) { clearLoading(ctx); run?.end(); }
     state.busy = false;
   }
+}
+
+// B23: the sources apt-get update failed on (refreshSources' `failed`, the jailbreak app) in a banner that goes by
+// itself and opens Sources when tapped, never an alert: their rows are marked (Not Responding) for Edit to remove.
+export function bannerFailed(rows, { banner = showBanner, go = (href) => { location.hash = href.replace(/^#/, ""); } } = {}) {
+  const words = failedBanner(rows?.failed);
+  if (!words) return false;
+  banner({ ...words, duration: FAILED_BANNER_MS, onTap: () => go(format({ tab: "sources", path: [] })) });
+  return true;
 }
 
 // ---- F150: one refresh under the reload bar -----------------------------------------------------------------
@@ -459,7 +472,9 @@ async function refresh(ctx) {
   try {
     const filter = sourceFilter(settings.deviceType());
     run = startRun(ctx, (state.sources ?? []).filter(filter ?? (() => true)).map((x) => x.key));
-    if (await run.until(getBackend().refreshSources(run.onEach, { filter, signal: run.signal }))) return; // F41: only what's shown
+    const job = getBackend().refreshSources(run.onEach, { filter, signal: run.signal });
+    if (await run.until(job)) return; // F41: only what's shown
+    bannerFailed(await job);
     state.sources = await getBackend().sources();
     draw();
     await run.until(run.data());

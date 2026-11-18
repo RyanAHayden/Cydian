@@ -15,7 +15,8 @@ import { NAME } from "../brand.js";
 const ownIcon = () => (!globalThis.cydianNative ? "icons/icon-web-glossy-76.png"
   : detectMode() === "sideload" ? "icons/icon-lite-glossy-76.png" : "icons/icon-glossy-76.png");
 
-export function showBanner({ title = NAME, message = "", icon = ownIcon(), duration = 0, action = null } = {}) {
+// `onTap` (B23): a tap on the banner hides it and runs onTap (the refresh-failure banner opens Sources).
+export function showBanner({ title = NAME, message = "", icon = ownIcon(), duration = 0, action = null, onTap = null } = {}) {
   current?.();
   const b = document.createElement("div");
   b.className = "banner";
@@ -47,7 +48,7 @@ export function showBanner({ title = NAME, message = "", icon = ownIcon(), durat
     const a = b.animate([{ transform: "none" }, { transform: "translateY(-100%)" }], { duration: 250, easing: "ease-in", fill: "forwards" });
     a.finished.then(() => b.remove(), () => b.remove());
   };
-  b.addEventListener("click", hide);
+  b.addEventListener("click", () => { hide(); onTap?.(); });
   if (duration > 0) setTimeout(hide, duration);
   // Back after leaving the page (the user pressed Open or Install and iOS took over): it has done its job.
   let away = false;

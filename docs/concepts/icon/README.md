@@ -11,3 +11,9 @@ starburst; the blue rounds recolour it with an SVG filter).
 - `round4-globe-*.svg`: matched to OpenAppMkt's globe (white rim, dark outline, slate grid); `a` became the icon.
 
 Reference images (Cydia's icon, OpenAppMkt's) are not kept here: third-party art, reference only (AGENTS.md).
+
+## Dark-mode icon (shelved 2026-11-18)
+
+`dark/gen.py` builds six dark starburst variants of the real icon (same `tools/icon_bg.py` generator, other colour
+ramps; globe shape unchanged): 1 navy, 2 midnight (white globe), 3 black burst (blue halo), 4 twilight, 5 deep sea,
+6 chrome. `dark/sheet.jpg` shows them in that order. Favourites so far: 3, then 2. Not wired into `tools/icons.sh`.

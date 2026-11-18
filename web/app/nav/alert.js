@@ -11,7 +11,9 @@
 // F96: `countdown: { button, seconds }` greys that button out for `seconds`, its title counting down ("I Understand
 // (5)"), before it can be tapped.
 // `colors`: { [button index]: "green" | "red" } (sources.css .alert-button.green/.red): the way to go, and the one to avoid.
-export function showAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null, colors = {} } = {}) {
+// `onTap(index)` runs inside the tap's own click (before the promise resolves), for what Safari only allows from a
+// user gesture, such as opening an itms-services link.
+export function showAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null, colors = {}, onTap = null } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "alert-scrim";
@@ -125,6 +127,7 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
       field?.blur();
       const a = scrim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: "ease-in", fill: "forwards" });
       a.finished.then(() => scrim.remove(), () => scrim.remove());
+      onTap?.(index);
       resolve({ index, value });
     }
   });

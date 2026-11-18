@@ -112,6 +112,25 @@ test("zsign WebAssembly signs a tiny IPA, sealing Cydian's bring files", { skip:
     "Payload/Tiny.app/cydian-identity.plist", "Payload/Tiny.app/web/transfer.link"]) assert.ok(has(r.ipa, n), n);
 });
 
+test("zsign WebAssembly signs the executable itself: the profile's entitlements and a CMS signature", { skip: !existsSync(WASM) && "no vendor/zsign" }, async () => {
+  // zsign signs each Mach-O in a MAP_SHARED mapping; emscripten writes it back at munmap through the mapping's fd,
+  // which zsign had closed (tools/zsign-wasm/fs-mmap.patch): the app kept its old signature and iOS refused it.
+  const { default: real } = await import(WASM);
+  let exe = null;
+  const createZsign = async (o) => {
+    const zs = await real(o);
+    const main = zs.callMain;
+    zs.callMain = (args) => { try { return main(args); } finally { exe = zs.FS.readFile("/w/app/Payload/Tiny.app/Tiny"); } };
+    return zs;
+  };
+  await runSignJob(createZsign, { ipa: fx("tiny-cydian.ipa"), p12: P12, profile: PROFILE, password: "hunter2" });
+  assert.ok(has(exe, "<string>TESTTEAM42.com.ryha.cydian</string>"), "application-identifier in the signed executable");
+  assert.ok(has(exe, "<key>get-task-allow</key><false/>"));
+  assert.ok(!has(exe, "<key>get-task-allow</key><true/>") && !has(exe, "application-groups"));
+  const b = Buffer.from(exe), cms = b.indexOf(Buffer.from([0xfa, 0xde, 0x0b, 0x01]));
+  assert.ok(cms > 0 && b.readUInt32BE(cms + 4) > 1000, "a real CMS blob, not ad-hoc's empty one");
+});
+
 test("zsign WebAssembly: a wrong password says so", { skip: !existsSync(WASM) && "no vendor/zsign" }, async (t) => {
   const { default: createZsign } = await import(WASM);
   // emscripten on node sets process.exitCode when main() fails (a browser's worker just throws): keep this run's

@@ -34,7 +34,8 @@ function deps(over = {}) {
   const log = { hud: [], alerts: [], opened: [], banners: [], went: [], jobs: [] };
   const d = {
     hud: (t) => { log.hud.push(t); return { set: (x) => log.hud.push(x), hide: () => log.hud.push("hide"), done: (x) => log.hud.push("done " + x) }; },
-    alert: async (a) => { log.alerts.push(a); return { index: 0 }; },
+    // Ready to Install: Install is tapped (onTap, inside the tap); other alerts: OK
+    alert: async (a) => { log.alerts.push(a); const index = a.title === "Ready to Install" ? 1 : 0; a.onTap?.(index); return { index }; },
     banner: (b) => log.banners.push(b.message),
     open: (u) => log.opened.push(u),
     go: (p) => log.went.push(p.join("/")),
@@ -56,7 +57,7 @@ test("Install on the website: download, sign in the worker, upload in parts, iOS
   const { d, log } = deps({ fetcher: srv.fetcher });
   let recorded = null;
   assert.equal(await signInBrowser({ url: "https://apps.example/Delta.ipa", name: "Delta", onInstalled: (r) => { recorded = r; } }, d), true);
-  assert.deepEqual(log.hud, ["Downloading", "Downloading 99%", "Signing", "Signing", "Uploading", "Uploading 50%", "Uploading 100%", "Installing", "done Done"]);
+  assert.deepEqual(log.hud, ["Downloading", "Downloading 99%", "Signing", "Signing", "Uploading", "Uploading 50%", "Uploading 100%", "hide"]);
   assert.equal(srv.calls[0], "GET /api/fetch?url=https%3A%2F%2Fapps.example%2FDelta.ipa&kind=ipa");
   assert.deepEqual(srv.calls[2], { bundleid: "com.you.delta", version: "1.2", title: "Delta", size: "7" });
   assert.deepEqual(srv.parts, [[0x50, 0x4b, 1, 2], [3, 4, 5]]);
@@ -66,10 +67,17 @@ test("Install on the website: download, sign in the worker, upload in parts, iOS
   assert.ok(job.p12 instanceof ArrayBuffer && job.profile instanceof ArrayBuffer);
   assert.equal(job.password, "pw");
   assert.equal(job.bring, null);
+  // the install link opens from the Ready to Install alert's Install tap, not by script after the upload
+  assert.deepEqual(log.alerts.map((a) => [a.title, a.buttons]), [["Ready to Install", ["Cancel", "Install"]]]);
+  assert.match(log.alerts[0].message, /Delta is signed/);
   assert.deepEqual(log.opened, ["itms-services://?action=download-manifest&url=x"]);
-  assert.match(log.banners[0], /Press Install to put Delta/);
   assert.equal(recorded.bundleId, "com.you.delta");
-  assert.deepEqual(log.alerts, []);
+});
+
+test("Ready to Install's Cancel: nothing opens; false", async () => {
+  const { d, log } = deps({ fetcher: fakeServer().fetcher, alert: async (a) => { a.onTap?.(0); return { index: 0 }; } });
+  assert.equal(await signInBrowser({ url: "https://apps.example/Delta.ipa", name: "Delta" }, d), false);
+  assert.deepEqual(log.opened, []);
 });
 
 test("Install Cydian App: Cydian's IPA carries the certificate (bring) and the website's link", async () => {

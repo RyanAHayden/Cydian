@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.1.8",
+          "date": "2026-11-18T02:12:11Z",
+          "localizedDescription": "Mark as Installed on app pages: apps installed another way are followed for updates (Change Installed Version, Mark as Not Installed).\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.8",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.8/Cydian.ipa",
+          "size": 2510101,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.7",
           "date": "2026-11-18T02:08:32Z",
           "localizedDescription": "Signing and installing end on a Done checkmark that fades, so it is clear the app was handed to iOS.\nThe Signing walkthrough moves to the next step by itself when you come back from Settings.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.7",

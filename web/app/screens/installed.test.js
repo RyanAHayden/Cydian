@@ -615,3 +615,46 @@ test("Remove from List on a remembered app iFizBox signed forgets the signature 
   await forgetApp({ id: "com.example.plain", signed: null }, native, async (id) => removed.push(id));
   assert.deepEqual(calls, []);
 });
+
+// ---- B52: the root's Apps count follows a Delete on the Apps page ------------------------------------------------
+import { refreshAppCount, appsRowSubtitle } from "./installed.js";
+
+test("B52: a Delete under the Apps page updates the root's Apps count; the cell goes at 0", async () => {
+  const { grouped } = await import("../nav/ui.js");
+  const body = withDom(() => { // the root's Apps cell as draw() makes it
+    const b = document.createElement("div");
+    const g = grouped([{ rows: [{ label: "Apps", subtitle: appsRowSubtitle(2), href: "#/installed/apps" }] }]);
+    g.children[0].classList.add("installed-top");
+    b.append(g);
+    return b;
+  });
+  const sub = () => body.querySelector(".installed-top").querySelector(".cell-subtitle").textContent;
+  assert.equal(sub(), "2 apps installed from an app page");
+  const view = { body, rows: [], appCount: 2, seq: 1 };
+  let redraws = 0;
+  const redraw = () => { redraws++; };
+  await refreshAppCount({ view, mode: "jailbreak", count: async () => 1, redraw });
+  assert.equal(view.appCount, 1);
+  assert.equal(sub(), "1 app installed from an app page", "in place, the list keeps its scroll");
+  assert.equal(redraws, 0);
+  await refreshAppCount({ view, mode: "jailbreak", count: async () => 1, redraw });
+  assert.equal(redraws, 0, "same count: nothing");
+  await refreshAppCount({ view, mode: "jailbreak", count: async () => 0, redraw });
+  assert.equal(view.appCount, 0);
+  assert.equal(redraws, 1, "the cell goes: the page draws again");
+  await refreshAppCount({ view, mode: "jailbreak", count: async () => 3, redraw });
+  assert.equal(redraws, 2, "the cell comes back: the page draws again");
+});
+
+test("B52: no count refresh off the jailbreak app, before the root is drawn, or when load() runs meanwhile", async () => {
+  let counted = 0;
+  const count = async () => { counted++; return 5; };
+  const fail = () => assert.fail("no redraw");
+  await refreshAppCount({ view: { body: {}, rows: [], appCount: 1, seq: 0 }, mode: "sideload", count, redraw: fail });
+  await refreshAppCount({ view: { body: null, appCount: 1, seq: 0 }, mode: "jailbreak", count, redraw: fail });
+  await refreshAppCount({ view: { body: {}, appCount: 0, seq: 0 }, mode: "jailbreak", count, redraw: fail }); // rows not read yet
+  assert.equal(counted, 0);
+  const view = { body: {}, rows: [], appCount: 1, seq: 0 };
+  await refreshAppCount({ view, mode: "jailbreak", count: async () => { view.seq++; return 5; }, redraw: fail });
+  assert.equal(view.appCount, 1, "load()'s own count wins");
+});

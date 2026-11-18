@@ -64,19 +64,24 @@ phonectl size | sender | tap X Y | swipe X1 Y1 X2 Y2 [secs] | home | lock | shot
   (IOSurfaceRootUserClient) `IOSurfaceCreate` returns NULL, and without `com.apple.QuartzCore.global-capture` the
   screenshot is black.
 - `shot -` writes the PNG to stdout; ui-7.sh uses that so a setuid run leaves no root-owned file on the phone.
-- Rebuild and reinstall: `PHONE_SUDO_PASS=<ask the user> tools/phonectl/build.sh` (needs `IOS_SDK` and ld64.lld
-  like `native/build.sh`; signs on the phone with its `ldid`). It survives reboots (it's in `/var/jb`).
+- Rebuild and reinstall: `PHONE_SUDO_PASS=x tools/phonectl/build.sh` (needs `IOS_SDK` and ld64.lld like
+  `native/build.sh`; signs on the phone with its `ldid`). The script still insists on `PHONE_SUDO_PASS`, but sudo
+  is passwordless now and ignores it, so any value does. It survives reboots (it's in `/var/jb`).
 
 ## Installing Cydian on it
 
 ```sh
 native/build.sh deb                                 # -> native/build/Cydian.deb
 scp native/build/Cydian.deb 7:/tmp/
-ssh 7 'sudo apt-get install -y /tmp/Cydian.deb'     # apt resolves Depends; plain dpkg -i doesn't
+ssh 7 'sudo -n apt-get install -y /tmp/Cydian.deb'  # apt resolves Depends; plain dpkg -i doesn't
 ssh 7 'launchctl list | grep com.ryha.cydian'       # the upgrades daemon
 ```
 
-`sudo` reads the password from stdin with `sudo -S -p ""`. Remove with `sudo apt-get remove -y com.ryha.cydian`.
+`sudo` needs no password (passwordless rule since 2026-11-18); scripts use `sudo -n` so they fail instead of
+hanging at a prompt if the rule is ever gone. Remove with `sudo apt-get remove -y com.ryha.cydian`.
+
+Cydian is installed on the phone: `com.ryha.cydian` 0.3.8-791 (checked 2026-11-18 with
+`ssh 7 dpkg-query -W com.ryha.cydian`). Check the version before assuming what a test runs.
 
 ## What's installed
 

@@ -34,6 +34,7 @@ import { upgradesWithSelf } from "../essential-ui.js";
 import { withAppUpgrades } from "../app-updates.js";
 import { appJob, resignJob } from "../core/appqueue.js";
 import { needsResign, resignWindow } from "../core/signing.js";
+import { vendorSoldIds } from "./extras.js";
 
 export const title = "Changes";
 
@@ -76,7 +77,7 @@ async function badge(upgrades, resign) {
 export function nav(route, ctx) {
   if (route.path.length) return browse.nav(route);
   const info = { title: "Changes", style: "plain", left: { label: "Refresh", onClick: () => refresh(ctx) } };
-  if (canUpgrade()) info.right = { label: upgradeLabel(0), onClick: () => upgradeAll(queueFn(), state.data?.upgrades.available) };
+  if (canUpgrade()) info.right = { label: upgradeLabel(0), onClick: () => upgradeAll(queueFn(), state.data?.upgrades.available, state.data?.vendorSold) };
   // The sideload app: Upgrade (N) queues each app's new IPA and opens Confirm (F80), signed on the phone in turn.
   else if (detectMode() === "sideload") info.right = { label: upgradeLabel(0), onClick: () => queueAll(state.data?.upgrades.available, state.data?.resign) };
   return info;
@@ -123,12 +124,14 @@ export function queueResigns(rows = [], { add }) {
 
 // One install job per available upgrade, as browse.js's Upgrade action queues it. F87: not the jailbreak app's
 // remembered apps (`remembered`, app-updates.js): apt has no package by an app's bundle id; their row opens the app page.
-export const upgradeJobs = (available = []) =>
-  available.filter((r) => r?.id && r.version && !r.remembered).map((r) => ({ op: "install", id: r.id, version: r.version, installed: r.installed ?? null, name: r.name ?? null }));
+// B19: nor the ids in `skip`, paid packages their vendor sells (extras.js vendorSoldIds): apt can't fetch them, and
+// their rows still open the page with its Download & Install.
+export const upgradeJobs = (available = [], skip = null) =>
+  available.filter((r) => r?.id && r.version && !r.remembered && !skip?.has(r.id)).map((r) => ({ op: "install", id: r.id, version: r.version, installed: r.installed ?? null, name: r.name ?? null }));
 
 // Queues them all; the first add opens Confirm (screens/queue.js initQueue), the rest refresh it. -> jobs queued.
-export function upgradeAll(queue, available) {
-  const jobs = upgradeJobs(available);
+export function upgradeAll(queue, available, skip = null) {
+  const jobs = upgradeJobs(available, skip);
   if (!queue) return [];
   for (const job of jobs) queue(job);
   return jobs;
@@ -300,22 +303,30 @@ async function installedNow() {
   return installedIds(rows, recs);
 }
 
+// B19: the available upgrades a vendor sells, which Upgrade (N) leaves out (only where it queues; none on failure).
+async function vendorSoldNow(upgrades) {
+  if (!canUpgrade() || !(upgrades?.available ?? []).some((r) => r?.paid)) return new Set();
+  const sources = await Promise.resolve().then(() => getBackend().sources()).catch(() => []);
+  return vendorSoldIds(upgrades.available, sources).catch(() => new Set());
+}
+
 async function load() {
   const seq = ++state.seq;
-  let groups, upgrades, installed, resign;
+  let groups, upgrades, installed, resign, vendorSold;
   try {
     await catalog.ensure();
     [groups, upgrades, installed] = await Promise.all([catalog.changes(), catalog.upgrades(settings.holds.list()), installedNow()]);
     upgrades = await upgradesWithSelf(upgrades); // F72: the sideload build lists Cydian's own upgrade here
     upgrades = await withAppUpgrades(upgrades, settings.holds.list()); // I3: the apps Install remembered (app-updates.js)
     resign = await resignNow(upgrades); // F91
+    vendorSold = await vendorSoldNow(upgrades); // B19
   } catch (e) {
     if (seq === state.seq && state.note) { state.ph?.remove(); state.note.textContent = e.message; state.note.hidden = false; }
     return;
   }
   if (seq !== state.seq) return;
   badge(upgrades, resign);
-  state.data = { groups, upgrades, installed, resign };
+  state.data = { groups, upgrades, installed, resign, vendorSold };
   draw();
 }
 
@@ -323,10 +334,10 @@ async function load() {
 function draw() {
   const body = state.body;
   if (!body || !state.data) return;
-  const { groups, upgrades, installed, resign = [] } = state.data;
+  const { groups, upgrades, installed, resign = [], vendorSold = null } = state.data;
   state.ph?.remove();
   state.ph = null;
-  drawUpgradeButton(canUpgrade() ? upgradeJobs(upgrades.available).length : upgrades.available.length + resign.length); // F87: what Upgrade queues; F91: re-signs too
+  drawUpgradeButton(canUpgrade() ? upgradeJobs(upgrades.available, vendorSold).length : upgrades.available.length + resign.length); // F87: what Upgrade queues; F91: re-signs too
   const scope = scopeOf(state.scope, installed);
   drawScope(scope);
   const items = itemsOf(groups, undefined, upgrades, { query: state.query, scope, installed, resign });

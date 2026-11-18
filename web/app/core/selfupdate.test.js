@@ -333,3 +333,17 @@ test("runInstall jailbreak: failures", async () => {
 test("runInstall: the site has nothing to install", async () => {
   assert.equal(await runInstall(release, "site", installDeps().deps), "site");
 });
+
+test("always (every launch): offers even right after a check or a Later, silent when current, a skipped version stays skipped", async () => {
+  const { checkForUpdates } = await import("./selfupdate.js");
+  const store = new Map();
+  const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+  const alerts = [];
+  const deps = (version) => ({ mode: "sideload", storage, now: () => 1000, current: async () => "0.3.0",
+    release: async () => ({ version, assets: [] }), alert: async (a) => { alerts.push(a); return { index: 0 }; }, install: async () => {} });
+  assert.equal(await checkForUpdates(deps("0.3.1"), { always: true }), "later"); // offered; Later pressed
+  assert.equal(await checkForUpdates(deps("0.3.1"), { always: true }), "later"); // offered again at once
+  assert.equal(alerts.length, 2);
+  assert.equal(await checkForUpdates(deps("0.3.0"), { always: true }), "current");
+  assert.equal(alerts.length, 2); // nothing new: no alert
+});

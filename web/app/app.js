@@ -349,7 +349,13 @@ if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.setting
 if (globalThis.cydianNative) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
 
 if (globalThis.cydianNative) {
-  setTimeout(() => startEssential().then((r) => (r === "unknown" ? settingsScreen.checkUpdates() : r)).catch(() => {}), 2000);
+  // Every launch (Home's Reload is one) and every return: Cydian's source first (the Essential Upgrade alert); when
+  // that found nothing to say, GitHub's release, without the once-a-day wait (user 2026-11-17: only Settings' Check
+  // for Updates showed it).
+  const lookForUpdates = () => startEssential()
+    .then((r) => (["complete", "essential", "ignored"].includes(r) ? r : settingsScreen.checkUpdates({ always: true })))
+    .catch(() => {});
+  setTimeout(lookForUpdates, 2000);
   // The first launch after Cydian updated itself (iOS closed the old one as it installed this one): say so.
   appVersion().then((v) => {
     if (!v) return;
@@ -363,7 +369,7 @@ if (globalThis.cydianNative) {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible" || Date.now() - lastEssential < 10 * 60 * 1000) return;
     lastEssential = Date.now();
-    startEssential().catch(() => {});
+    lookForUpdates();
   });
 }
 

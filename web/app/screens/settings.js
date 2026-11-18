@@ -770,7 +770,7 @@ function updateHUD(text) {
 
 let checking = null;
 // The automatic launch check, or Check for Updates (manual, with a Checking HUD until the first alert). One at a time.
-export function checkUpdates({ manual = false } = {}) {
+export function checkUpdates({ manual = false, always = false } = {}) {
   if (checking) return checking;
   const mode = detectMode();
   if (!installPath(mode)) return Promise.resolve("site");
@@ -788,7 +788,7 @@ export function checkUpdates({ manual = false } = {}) {
       installSelf: (row) => import("../essential-ui.js").then((m) => m.installSelfNow(row)), // F72
       native, arch: getArch(), hud: updateHUD,
     }),
-  }, { manual }).catch(() => "error").finally(() => { hide(); checking = null; redrawAll(); });
+  }, { manual, always }).catch(() => "error").finally(() => { hide(); checking = null; redrawAll(); });
   return checking;
 }
 

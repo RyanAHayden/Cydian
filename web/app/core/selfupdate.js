@@ -169,12 +169,14 @@ export async function fetchRelease({ native, fetch: f = globalThis.fetch, url = 
 // Automatic (on launch): nothing unless due; failures are silent. Manual (Check for Updates): always asks GitHub,
 // says when it's up to date or couldn't be reached, and offers the release even if skipped or put off.
 // Resolves what happened: "site" | "not-due" | "error" | "current" | "skipped" | "later" | "install".
-export async function checkForUpdates(deps, { manual = false } = {}) {
+// always: every launch and Reload (user 2026-11-17): no once-a-day or Later wait, but silent when there's nothing new
+// or GitHub doesn't answer; a version the user chose to skip stays skipped.
+export async function checkForUpdates(deps, { manual = false, always = false } = {}) {
   const { mode, storage, now = Date.now } = deps;
   if (!installPath(mode)) return "site";
   const t = now();
   let state = loadState(storage);
-  if (!manual && !dueForCheck(state, t)) return "not-due";
+  if (!manual && !always && !dueForCheck(state, t)) return "not-due";
   let release, current;
   try {
     [release, current] = await Promise.all([deps.release(), deps.current()]);
@@ -188,7 +190,8 @@ export async function checkForUpdates(deps, { manual = false } = {}) {
     if (manual) await deps.alert({ title: "Cydian Is Up to Date", message: `Cydian ${current || ""} is the newest version.`.replace("  ", " "), buttons: ["OK"] });
     return "current";
   }
-  if (!manual && !shouldOffer(release, current, state, t)) {
+  if (always && !manual && state.skip && compareVersions(state.skip, release.version) === 0) return "skipped";
+  if (!manual && !always && !shouldOffer(release, current, state, t)) {
     return state.skip && compareVersions(state.skip, release.version) === 0 ? "skipped" : "later";
   }
   const { index } = await deps.alert(offerAlert(release));

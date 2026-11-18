@@ -124,6 +124,7 @@ class Release(unittest.TestCase):
         self.assertIn("X-Cydian-Minimum-Version: %s\n" % VERSION, release)
         self.assertIn(" %s %d Packages\n" % (hashlib.sha256(packages.encode()).hexdigest(), len(packages)), release)
         self.assertIn("releases/latest/download/", r.stdout)
+        self.assertIn("apt repo: https://cydian.dev/repo/", r.stdout)  # B17
         with open(os.path.join(out, "source.json")) as f:
             src = json.load(f)
         with open(os.path.join(ROOT, "web", "app", "source.json")) as f:

@@ -65,6 +65,7 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 | `GET /sign/manifest?bundleid=&version=&title=&port=&path=` | the manifest for `http://127.0.0.1:<port>/<path>` |
 | `POST /sign/host?bundleid=&version=&title=` (body: the IPA) | `{itms, manifest, expiresIn}` |
 | `GET /sign/host/<token>/manifest.plist`, `/app.ipa` | what that link fetches |
+| `GET /repo/<file>` | Cydian's own APT repo (`Release`, `Packages`, `Packages.gz`, `*.deb`): the latest GitHub release's asset, fetched here so clients get no redirect (Zebra can't take GitHub's). `CYDIAN_REPO` (owner/name) for another repo's releases |
 
 `node test.mjs` checks them against an in-memory KV. cydian.dev's own deploy: `npx wrangler deploy -c wrangler.cydian.toml`.
 

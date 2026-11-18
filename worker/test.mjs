@@ -97,3 +97,15 @@ import { PART, uploadCap } from "./src/index.js";
   assert.equal((await site("/sign/nothing")).status, 404);
   console.log("worker upload: ok");
 }
+{
+  const { upstream, releaseFile } = await import("./src/index.js");
+  assert.ok(releaseFile("https://github.com/RyanAHayden/Cydian/releases/download/v0.3.6/Cydian.ipa"));
+  assert.equal(releaseFile("https://raw.githubusercontent.com/o/r/main/source.json"), false);
+  const answers = [429, 503, 200];
+  const seen = [];
+  const r = await upstream("https://github.com/o/r/releases/download/v1/a.ipa", { wait: async () => {},
+    fetcher: async (u, o) => { seen.push(o.cf.cacheTtl); return new Response("x", { status: answers.shift(), headers: {} }); } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(seen, [86400, 86400, 86400]); // retried twice, cached at the edge
+  console.log("worker upstream: ok");
+}

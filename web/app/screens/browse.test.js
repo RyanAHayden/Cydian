@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseToken, token, pageOf, nav, formatSize, withBase, escapeHtml, installedAppSection } from "./browse.js";
+import { parseToken, token, pageOf, nav, withBase, escapeHtml, installedAppSection } from "./browse.js";
+import { sizeText as formatSize } from "../core/appqueue.js";
 import { withLetterHeaders } from "../nav/vlist.js";
 import { parse, format } from "../router.js";
 

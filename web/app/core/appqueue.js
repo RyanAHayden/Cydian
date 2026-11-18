@@ -38,7 +38,7 @@ import { installOptions } from "./altstore.js";
 
 export const SELF_ID = "com.ryha.cydian";
 
-// altstore.js formatSize's words, here so core needs no screen.
+// A download or installed size in Cydia's words ("109 kB", "4.7 MB"), for the Queue and the package and app pages.
 export function sizeText(bytes) {
   const n = Number(bytes);
   if (!Number.isFinite(n) || n <= 0) return null;

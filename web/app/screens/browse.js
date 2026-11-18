@@ -47,6 +47,7 @@ import { hasRollback, rollbackSlot } from "./rollback.js";
 import { autoMarkShown, AUTO_MARK_LABEL, AUTO_MARK_FOOTER } from "../core/automark.js";
 import { createWishlist, wishLabel, wishRows, WISH_EMPTY } from "../core/wishlist.js";
 import { filterRows } from "../core/changes.js";
+import { sizeText as formatSize } from "../core/appqueue.js";
 
 const ROW_HEIGHT = 58;
 
@@ -514,13 +515,6 @@ async function renderAuthor(body, route, name) {
 }
 
 // ---- the package page --------------------------------------------------------------------------------------
-
-export function formatSize(bytes) {
-  const n = Number(bytes);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} kB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
 
 const httpUrl = (u) => (/^https?:\/\//i.test(String(u ?? "").trim()) ? String(u).trim() : null);
 

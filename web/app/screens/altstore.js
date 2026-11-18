@@ -27,7 +27,7 @@ import { openIpaInstall } from "./ipa-install.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { appQueue } from "../app-queue.js";
-import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, destructiveOf } from "../core/appqueue.js";
+import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, destructiveOf, sizeText as formatSize } from "../core/appqueue.js";
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { compareVersions } from "../core/apt.js";
 import { queueApp } from "./queue.js";
@@ -46,13 +46,6 @@ function img(url, cls) {
 }
 
 const deeper = (route, seg) => format({ tab: route.tab, path: [...route.path, seg] });
-
-export function formatSize(bytes) {
-  const n = Number(bytes);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} kB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
 
 // "com.apple.developer.kernel.increased-memory-limit" -> "Increased Memory Limit" (the full name goes below).
 const entitlementLabel = (name) => (String(name).split(".").pop() || String(name)).replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());

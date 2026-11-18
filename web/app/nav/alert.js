@@ -2,7 +2,7 @@
 // a gloss, bold title, message, an optional text field and one or two buttons side by side (three or more
 // stack). Pops in with the iOS bounce, by transform/opacity only.
 //
-//   const { index, value } = await showAlert({ title, message, input: { placeholder, value, type },
+//   const { index, value } = await showAlert({ title, message, input: { placeholder, value, type, paste? },
 //                                              buttons: ["Cancel", "Add Source"], cancel: 0 });
 //
 // Resolves with the tapped button's index and the field's text. Return in the field taps the last button,
@@ -30,7 +30,21 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
       field.spellcheck = false;
       field.setAttribute("autocorrect", "off");
       field.setAttribute("aria-label", title);
-      box.append(field);
+      if (input.paste) {
+        // A Paste button inside the field's row: iOS asks with its own Paste bubble when it's tapped, and
+        // input.paste(text) turns what was copied into the field's value ("" leaves the field as it is).
+        const row = document.createElement("div");
+        row.className = "alert-field-row";
+        const paste = Object.assign(document.createElement("button"), { type: "button", className: "alert-paste", textContent: "Paste" });
+        paste.addEventListener("click", async () => {
+          let text = "";
+          try { text = await navigator.clipboard.readText(); } catch { return; }
+          const v = input.paste(text);
+          if (v) { field.value = v; field.focus({ preventScroll: true }); }
+        });
+        row.append(field, paste);
+        box.append(row);
+      } else box.append(field);
     }
     const row = document.createElement("div");
     row.className = "alert-buttons" + (buttons.length > 2 ? " stacked" : "");

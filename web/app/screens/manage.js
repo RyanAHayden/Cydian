@@ -256,7 +256,7 @@ export async function addSource(ctx, prefill = null) {
   const { index, value } = await showAlert({
     title: "Enter APT URL",
     message: dist || "Or an app source (.json): AltStore, ESign, Scarlet or GBox.",
-    input: { placeholder: "https://", value: prefill?.url || "https://", type: "url" },
+    input: { placeholder: "https://", value: prefill?.url || "https://", type: "url", paste: cleanSourceUrl },
     buttons: ["Cancel", "Add Source"],
     cancel: 0,
   });

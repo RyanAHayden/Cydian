@@ -117,3 +117,13 @@
 .rec-get.added, .rec-get:disabled { border-color: #c4c4c9; color: #9a9aa0; background: #fff; cursor: default; }
 .rec-apps { margin-top: 10px; } /* a preview's apps under its grouped head */
 .rec-packages .pkg-row > .cell-inner::after { content: none; } /* F54: a repo not added yet has no package pages: no chevron */
+
+/* The Add Source alert's field with its Paste button beside it (nav/alert.js input.paste). */
+.alert-field-row { display: flex; gap: 6px; margin: 6px 0 12px; }
+.alert-field-row .alert-field { flex: 1; min-width: 0; margin: 0; }
+.alert-paste {
+  flex: none; height: 31px; padding: 0 10px; border-radius: 5px; cursor: pointer; font: inherit; font-size: 14px; font-weight: bold; color: #fff;
+  text-shadow: 0 -1px 0 rgba(0,0,0,.8); border: 1px solid rgba(19,29,57,.9);
+  background: linear-gradient(#b4b9c8, #5f6882 49%, #596484 51%, #4d597a); background-origin: border-box;
+}
+.alert-paste:active { background: linear-gradient(#8a90a3, #3f4863 49%, #39446a 51%, #2f3a5c); background-origin: border-box; }

@@ -9,9 +9,6 @@
 //
 // One bar at a time: showing another hides the first. `doc` is for the tests.
 
-const SPOKES = Array.from({ length: 12 }, (_, i) =>
-  `<line x1="10" y1="2.6" x2="10" y2="6.4" transform="rotate(${i * 30} 10 10)" opacity="${(1 - i / 14).toFixed(2)}"/>`).join("");
-
 let current = null;
 
 export function showReloadBar(text = "", { onCancel = null, doc = globalThis.document } = {}) {
@@ -21,7 +18,7 @@ export function showReloadBar(text = "", { onCancel = null, doc = globalThis.doc
   bar.className = "reload-bar";
   bar.setAttribute("role", "status");
   bar.setAttribute("aria-live", "polite");
-  bar.innerHTML = `<svg class="reload-spinner" viewBox="0 0 20 20" aria-hidden="true"><g stroke="#fff" stroke-width="1.9" stroke-linecap="round">${SPOKES}</g></svg>`
+  bar.innerHTML = '<span class="reload-spinner" aria-hidden="true"></span>' // F166: UIKit's white spinner (ios6.css)
     + '<span class="reload-text"></span>';
   const label = bar.querySelector?.(".reload-text") ?? null;
   const cancel = doc.createElement("button");

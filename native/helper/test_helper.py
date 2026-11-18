@@ -731,5 +731,236 @@ class InstallIpa(unittest.TestCase):
                 self.assert_clean(work)
 
 
+@unittest.skipUnless(CC, "no C compiler on this machine")
+class Rollback(unittest.TestCase):
+    """F71: rollbacks <id> / rollback <id> <version> over N7's store (<prefix>/var/cache/cydian/rollback/<id>/), with
+    this test's user standing in for root (CYDIAN_ROOT_UID) and a stand-in dpkg-deb that prints the fake .deb's
+    text as its control."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp()
+        cls.uid = str(os.getuid())
+        cls.driver = os.path.join(cls.tmp, "test_driver")
+        build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"], [f"-DCYDIAN_ROOT_UID={os.getuid()}"])
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp)
+
+    def run_driver(self, *args, driver=None):
+        r = subprocess.run([driver or self.driver, *args], capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout.splitlines()
+
+    def prefix(self):
+        p = tempfile.mkdtemp(dir=self.tmp)
+        os.chmod(p, 0o755)
+        bin_ = os.path.join(p, "usr/bin")
+        os.makedirs(bin_)
+        dpkg_deb = os.path.join(bin_, "dpkg-deb")  # dpkg-deb -f <deb> Package Version
+        with open(dpkg_deb, "w") as f:
+            f.write('#!/bin/sh\n[ "$1" = -f ] && [ "$3" = Package ] && [ "$4" = Version ] && [ $# -eq 4 ] || exit 2\n'
+                    'case $(head -c 4 "$2") in junk) echo "dpkg-deb: error: not a debian archive" >&2; exit 2 ;; esac\n'
+                    'cat "$2"\n')
+        os.chmod(dpkg_deb, 0o755)
+        return p
+
+    def store(self, p, pkg="com.example.tweak", files=None):
+        d = os.path.join(p, "var/cache/cydian/rollback", pkg)
+        os.makedirs(d, exist_ok=True)
+        for q in (os.path.join(p, "var/cache/cydian/rollback"), d):
+            os.chmod(q, 0o755)
+        files = files if files is not None else {"0.9": "0.9", "1:1.0~b1": "1%3a1.0~b1"}
+        for ver, spelled in files.items():
+            path = os.path.join(d, f"{pkg}_{spelled}_iphoneos-arm64.deb")
+            with open(path, "w") as f:
+                f.write(f"Package: {pkg}\nVersion: {ver}\n")
+            os.chmod(path, 0o644)
+        return d
+
+    def test_deb_names(self):
+        good = {"com.a_1.0_iphoneos-arm64.deb": "1.0", "com.a_1%3a2.0~b1+x-2_iphoneos-arm64.deb": "1:2.0~b1+x-2",
+                "com.a_2%3A1_all.deb": "2:1"}
+        bad = ["com.a_1.0.deb", "com.a_1.0_.deb", "com.a__arm64.deb", "com.ab_1.0_arm64.deb", "com.a_1.0_arm64.ipa",
+               "com.a_x1_arm64.deb", "com.a_1_0_arm64.deb", "com.a_1%3_arm64.deb", "com.a_1%2f2_arm64.deb",
+               "com.a_1.0_arm/64.deb", "com.a_1.0_ARM.deb", "com.a_1 0_arm64.deb", "com.a.b_1.0_arm64.deb",
+               "com.a_1.0_arm64.deb.part", ".com.a_1.0_arm64.deb", "com.a_" + "1" * 256 + "_arm64.deb"]
+        self.assertEqual(self.run_driver("debname", "com.a", *good), list(good.values()))
+        self.assertEqual(self.run_driver("debname", "com.a", *bad), ["bad"] * len(bad))
+
+    def test_control(self):
+        c = lambda text, pkg="com.a", ver="1:1.0": self.run_driver("control", pkg, ver, text)[0]
+        self.assertEqual(c("Package: com.a\nVersion: 1:1.0\n"), "ok")
+        self.assertEqual(c("Version: 1:1.0\r\nPackage:  com.a \n"), "ok")
+        self.assertEqual(c("Package: com.a.evil\nVersion: 1:1.0\n"), "bad")
+        self.assertEqual(c("Package: com.\nVersion: 1:1.0\n"), "bad")
+        self.assertEqual(c("Package: com.a\nVersion: 1:1.01\n"), "bad")
+        self.assertEqual(c("Package: com.a\n"), "bad")
+        self.assertEqual(c("Version: 1:1.0\n"), "bad")
+        self.assertEqual(c(""), "bad")
+        self.assertEqual(c("Package: com.a\nPackage: other\nVersion: 1:1.0\n"), "bad")
+
+    def test_file(self):
+        p = self.prefix()
+        d = self.store(p)
+        root = os.path.join(p, "var/cache/cydian/rollback")
+        f = lambda ver, pkg="com.example.tweak", uid=self.uid: self.run_driver("rbfile", root, pkg, ver, uid)[0]
+        self.assertEqual(f("0.9"), f"{d}/com.example.tweak_0.9_iphoneos-arm64.deb")
+        self.assertEqual(f("1:1.0~b1"), f"{d}/com.example.tweak_1%3a1.0~b1_iphoneos-arm64.deb")
+        self.assertIn("no stored .deb", f("1.0"))
+        self.assertIn("no stored .deb", f("0.9", pkg="com.example.other"))  # no folder
+        self.assertIn("bad version", f("x"))
+        self.assertIn("bad package name", f("0.9", pkg="../x"))
+        self.assertIn("isn't a root-owned directory", f("0.9", uid=str(os.getuid() + 1)))  # another owner
+
+    def test_file_refuses_unsafe(self):
+        p = self.prefix()
+        root = os.path.join(p, "var/cache/cydian/rollback")
+        d = self.store(p, files={})
+        name = lambda v: os.path.join(d, f"com.example.tweak_{v}_iphoneos-arm64.deb")
+        other = os.path.join(self.tmp, "elsewhere.deb")
+        open(other, "w").close()
+        os.symlink(other, name("1"))
+        with open(name("2"), "w") as f:
+            f.write("x")
+        os.chmod(name("2"), 0o664)  # group-writable
+        with open(name("3"), "w") as f:
+            f.write("x")
+        os.link(name("3"), os.path.join(self.tmp, f"hard-{os.path.basename(p)}"))  # two links
+        os.makedirs(name("4"))
+        f = lambda ver: self.run_driver("rbfile", root, "com.example.tweak", ver, self.uid)[0]
+        for ver in "1234":
+            with self.subTest(ver=ver):
+                self.assertIn("isn't a plain root-owned file", f(ver))
+        self.assertEqual(self.run_driver("rblist", root, "com.example.tweak", self.uid), ["count: 0"])
+        # a writable or linked folder refuses everything in it
+        self.store(p, files={"5": "5"})
+        self.assertTrue(f("5").startswith("/"))
+        os.chmod(d, 0o775)
+        self.assertIn("package's rollback folder isn't", f("5"))
+        os.chmod(d, 0o755)
+        os.chmod(root, 0o777)
+        self.assertIn("the rollback folder isn't", f("5"))
+        self.assertIn("error: ", self.run_driver("rblist", root, "com.example.tweak", self.uid)[0])
+        os.chmod(root, 0o755)
+        q = self.prefix()
+        self.store(q, files={"5": "5"})
+        os.symlink(d, os.path.join(q, "var/cache/cydian/rollback/com.example.link"))
+        self.assertIn("isn't a root-owned directory",
+                      self.run_driver("rbfile", os.path.join(q, "var/cache/cydian/rollback"), "com.example.link", "5", self.uid)[0])
+
+    def test_list(self):
+        p = self.prefix()
+        d = self.store(p)
+        root = os.path.join(p, "var/cache/cydian/rollback")
+        open(os.path.join(d, "com.example.tweak_1.0_iphoneos-arm64.deb.tmp"), "w").close()
+        open(os.path.join(d, "README"), "w").close()
+        out = self.run_driver("rblist", root, "com.example.tweak", self.uid)
+        self.assertEqual(out[-1], "count: 2")
+        self.assertEqual(sorted(out[:-1]), ["0.9 com.example.tweak_0.9_iphoneos-arm64.deb",
+                                            "1:1.0~b1 com.example.tweak_1%3a1.0~b1_iphoneos-arm64.deb"])
+        self.assertEqual(self.run_driver("rblist", root, "com.example.none", self.uid), ["count: 0"])
+        self.assertEqual(self.run_driver("rblist", os.path.join(p, "nope"), "com.example.tweak", self.uid), ["count: 0"])
+        self.assertIn("bad package name", self.run_driver("rblist", root, "-x", self.uid)[0])
+
+    def test_verify(self):
+        p = self.prefix()
+        d = self.store(p)
+        deb = os.path.join(d, "com.example.tweak_0.9_iphoneos-arm64.deb")
+        v = lambda path=deb, pkg="com.example.tweak", ver="0.9", prefix=p: self.run_driver("rbverify", prefix, path, pkg, ver)[0]
+        self.assertEqual(v(), "ok")
+        self.assertIn("isn't that package and version", v(ver="1:1.0~b1"))
+        self.assertIn("isn't that package and version", v(pkg="com.example.other"))
+        with open(deb, "w") as f:
+            f.write("Package: com.example.evil\nVersion: 0.9\n")  # the name says tweak, the control says otherwise
+        self.assertIn("isn't that package and version", v())
+        with open(deb, "w") as f:
+            f.write("junk")
+        self.assertIn("dpkg-deb couldn't read", v())
+        self.assertIn("dpkg-deb couldn't read", v(prefix=self.tmp))  # no dpkg-deb at all
+
+    def test_plan(self):
+        p = self.prefix()
+        d = self.store(p)
+        plan = lambda *w, fd="3": self.run_driver("plan", p, fd, *w)
+        deb = f"{d}/com.example.tweak_1%3a1.0~b1_iphoneos-arm64.deb"
+        fixed = ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", "--allow-downgrades"]
+        self.assertEqual(plan("rollback", "com.example.tweak", "1:1.0~b1"),
+                         [f"{p}/usr/bin/apt-get", "apt-get", *fixed, "-o", "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3",
+                          "install", deb])
+        self.assertEqual(plan("rollback", "com.example.tweak", "1:1.0~b1", fd="-1")[1:], ["apt-get", *fixed, "install", deb])
+        self.assertEqual(plan("rollbacks", "com.example.tweak"),
+                         [f"{p}/var/cache/cydian/rollback", "rollbacks", "com.example.tweak"])
+        cases = {
+            ("rollback",): "a package name and a version",
+            ("rollback", "com.example.tweak"): "a package name and a version",
+            ("rollback", "com.example.tweak", "0.9", "x"): "a package name and a version",
+            ("rollback", "-o", "0.9"): "bad package name",
+            ("rollback", "com.example.tweak", "-o"): "bad version",
+            ("rollback", "com.example.tweak", "0.9/../x"): "bad version",
+            ("rollback", "com.example.tweak", "2.0"): "no stored .deb",
+            ("rollbacks",): "rollbacks takes a package name",
+            ("rollbacks", "a", "b"): "rollbacks takes a package name",
+            ("rollbacks", "A"): "bad package name",
+        }
+        for words, msg in cases.items():
+            with self.subTest(words=words):
+                out = plan(*words)
+                self.assertEqual(len(out), 1, out)
+                self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
+        self.assertEqual(self.run_driver("known", p, "rollback", "com.example.tweak", "0.9"), ["all known"])
+
+    def chain(self):
+        p = self.prefix()
+        os.makedirs(os.path.join(p, "Applications/Cydian.app"))
+        app = os.path.join(p, "Applications/Cydian.app/Cydian")
+        shutil.copy(self.driver, app)
+        apt = os.path.join(p, "usr/bin/apt-get")
+        with open(apt, "w") as f:
+            f.write('#!/bin/sh\necho "argv: $0 $*"\necho "env: $(env | sort | tr \'\\n\' \' \')"\n'
+                    'echo "pmstatus:com.example.tweak:50:Installing" >&3\nexit 0\n')
+        os.chmod(apt, 0o755)
+        helper = os.path.join(p, "cydian-helper")
+        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"', f"-DCYDIAN_ROOT_UID={os.getuid()}"])
+        return p, app, helper
+
+    def test_chain(self):
+        p, app, helper = self.chain()
+        d = self.store(p)
+        out = self.run_driver("spawn", helper, "rollbacks", "com.example.tweak", driver=app)
+        self.assertEqual(out[-1], "exit: 0")
+        self.assertEqual(sorted(out[:-1]), ["1: 0.9 com.example.tweak_0.9_iphoneos-arm64.deb",
+                                            "1: 1:1.0~b1 com.example.tweak_1%3a1.0~b1_iphoneos-arm64.deb"])
+        self.assertEqual(self.run_driver("spawn", helper, "rollbacks", "com.example.none", driver=app), ["exit: 0"])
+        out = self.run_driver("spawn", helper, "rollback", "com.example.tweak", "0.9", driver=app)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y -o Dpkg::Options::=--force-confdef -o "
+                      "Dpkg::Options::=--force-confold --allow-downgrades -o APT::Keep-Fds::=3 -o APT::Status-Fd=3 "
+                      f"install {d}/com.example.tweak_0.9_iphoneos-arm64.deb", out)
+        self.assertIn("CYDIA=3 1", next(l for l in out if l.startswith("1: env: ")))
+        self.assertIn("3: pmstatus:com.example.tweak:50:Installing", out)
+        self.assertEqual(out[-1], "exit: 0")
+
+    def test_chain_refuses(self):
+        p, app, helper = self.chain()
+        d = self.store(p)
+        with open(os.path.join(d, "com.example.tweak_0.9_iphoneos-arm64.deb"), "w") as f:
+            f.write("Package: com.example.evil\nVersion: 0.9\n")
+        cases = [
+            (app, ["rollback", "com.example.tweak", "0.9"], "isn't that package and version", 64),
+            (app, ["rollback", "com.example.tweak", "3.0"], "no stored .deb", 64),
+            (app, ["rollback", "com.example.tweak", "--force-all"], "bad version", 64),
+            (app, ["rollbacks", "../etc"], "bad package name", 64),
+            (self.driver, ["rollback", "com.example.tweak", "1:1.0~b1"], "isn't Cydian", 77),
+            (self.driver, ["rollbacks", "com.example.tweak"], "isn't Cydian", 77),
+        ]
+        for parent, words, msg, code in cases:
+            with self.subTest(words=words):
+                out = self.run_driver("spawn", helper, *words, driver=parent)
+                self.assertTrue(any(l.startswith("2: cydian-helper: ") and msg in l for l in out), out)
+                self.assertEqual(out[-1], f"exit: {code}")
+                self.assertFalse(any(l.startswith("1: ") for l in out), out)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper simulate <item>... | apply <item>... | respring          (N4: the install queue)
     cydian-helper install-ipa <path>                                      (F59: an IPA, through installd)
     cydian-helper selfupdate <path.deb>                                    (F61: Cydian updates itself)
+    cydian-helper rollbacks <pkg> | rollback <pkg> <version>              (F71: Roll Back to a kept .deb)
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
@@ -27,6 +28,8 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `apply`     | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --reinstall --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <items>`, with `CYDIA=3 1` in its environment when fd 3 is open (N4) |
 | `install-ipa` | runs no apt: installs one IPA through `LSApplicationWorkspace installApplication:withOptions:error:` as AppSync's `appinst` does (`ipa.c`, F59; below) |
 | `selfupdate` | `dpkg --force-confdef --force-confold [--status-fd 3] -i <path>`: Cydian's own update (F61). The path is absolute, `[A-Za-z0-9._/-]`, no `.`/`..` segment, ends in `.deb`, at most 1024 bytes, and a regular file (not a symlink). Any .deb is accepted: the caller check is the boundary, and Cydian can already install anything through `addsource` + `install` |
+| `rollbacks` | runs nothing: `<version> <file>` per line for each .deb of the package N7's daemon kept in `/var/jb/var/cache/cydian/rollback/<pkg>/` that `rollback` would take (F71; below) |
+| `rollback`  | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install /var/jb/var/cache/cydian/rollback/<pkg>/<pkg>_<ver>_<arch>.deb`, `CYDIA=3 1` as for `apply` (F71; below) |
 | `respring`  | `sbreload`, or `killall -9 backboardd` when the jailbreak has no sbreload (N4: Restart SpringBoard) |
 
 **The queue (N4):** `simulate` and `apply` take items: `name` installs the newest, `name=version` that exact
@@ -38,6 +41,18 @@ removals to dpkg's status. `--reinstall` makes an item naming the installed vers
 is what lets `-y` take an older version on purpose. Cydia's finish protocol: maintainer scripts write `finish:restart`
 (and so on) to the fd named in `$CYDIA`; `APT::Keep-Fds` keeps fd 3 open through apt and dpkg, so those lines arrive
 beside apt's status lines and raise the console's finish button.
+
+**Roll Back (F71):** N7's daemon keeps the .debs automatic updates replace in `<prefix>/var/cache/cydian/rollback/<pkg>/`,
+named as apt's archive cache names them, `<pkg>_<version>_<arch>.deb` with the epoch's `:` as `%3a`. `rollbacks <pkg>`
+lists them; `rollback <pkg> <version>` installs one. Checks: the name and version rules of the queue; the `rollback`
+folder and `<pkg>/` are real directories (`lstat`, no links) owned by root and not group/other writable; the file's
+name parses as `<pkg>_<version>_<arch>.deb` (arch `[a-z0-9-]`, exactly two `_`) with that version; it is a regular
+root-owned file, not group/other writable, with one link. Then, just before the exec, `<prefix>/usr/bin/dpkg-deb -f
+<file> Package Version` (stdin and stderr `/dev/null`, `PATH` and `LANG=C` only) must print exactly `Package: <pkg>`
+and `Version: <version>`, so a file whose name lies is refused. apt-get (not `dpkg -i`) takes the file by its
+absolute path, so dependencies the old version needs come from the sources, and `--allow-downgrades` lets `-y` take
+an older version. Since everything on the path is root's and only root can write it, mobile can't swap the file
+between the checks and apt. A missing folder lists nothing (exit 0); anything refused is exit 64 with the reason.
 
 **Sources (F33):** sources added in the app go into `cydian.sources` and nowhere else, so `apt-get update` and
 installs use them; the app never edits apt's other files. Checks: the URI is `http://` or `https://` (lower case), a

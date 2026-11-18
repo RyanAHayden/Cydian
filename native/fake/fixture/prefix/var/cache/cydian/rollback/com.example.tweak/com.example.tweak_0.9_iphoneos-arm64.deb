@@ -1,0 +1,8 @@
+Package: com.example.tweak
+Section: Tweaks
+Installed-Size: 90
+Maintainer: Example Dev <dev@example.com>
+Architecture: iphoneos-arm64
+Version: 0.9
+Name: Example Tweak
+Description: an example tweak

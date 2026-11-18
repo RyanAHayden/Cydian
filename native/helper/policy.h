@@ -16,9 +16,10 @@
 #define HELPER_EX_IOERR 74  /* F33: cydian.sources couldn't be read or written */
 
 enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, HV_HOLD, HV_UNHOLD, HV_SHOWHOLD,
-                   HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA, HV_SELFUPDATE };
+                   HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA, HV_SELFUPDATE,
+                   HV_ROLLBACKS, HV_ROLLBACK };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
-                     "simulate, apply, respring, install-ipa, selfupdate"
+                     "simulate, apply, respring, install-ipa, selfupdate, rollbacks, rollback"
 
 /* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
  * Downgrade and Reinstall pick theirs), "-name" removes. apt gets "name", "name=version" and "name-" in one
@@ -59,6 +60,7 @@ struct helper_plan {
     char removing[HELPER_MAX_PACKAGES];
     char name_buf[HELPER_MAX_PACKAGES][HELPER_NAME_MAX + 1];
     char item_buf[HELPER_MAX_PACKAGES][HELPER_ITEM_MAX + 2];
+    char deb[PATH_MAX]; /* F71 rollback: the stored .deb apt-get installs (also in argv) */
 };
 
 /* F61: selfupdate <path>: dpkg -i of the one .deb the app downloaded (Cydian's own update). The path is absolute,
@@ -66,6 +68,35 @@ struct helper_plan {
  * regular file (not a symlink) when the plan is made. */
 #define HELPER_DEB_PATH_MAX 1024
 int helper_deb_path_ok(const char *s);
+
+/* F71: Roll Back. N7's daemon keeps .debs in <prefix>HELPER_ROLLBACK_DIR/<id>/, named as apt's archive cache
+ * names them: <id>_<version>_<arch>.deb, the epoch's ':' as "%3a".
+ *   rollbacks <id>            runs nothing: prints "<version> <file>" for each stored .deb of id the helper would
+ *                             install (a missing folder prints nothing)
+ *   rollback <id> <version>   apt-get -y (conffile options) --allow-downgrades [-o APT::Keep-Fds::=3 -o
+ *                             APT::Status-Fd=3] install <the stored .deb's absolute path>
+ * The folder and <id>/ must be real directories (no links) owned by root and not group/other writable, the file
+ * a regular root-owned file, not group/other writable, with one link; then (main.c, before the exec)
+ * helper_rollback_verify reads its control through dpkg-deb: Package must be id and Version the version asked. */
+#ifndef HELPER_ROLLBACK_DIR
+#define HELPER_ROLLBACK_DIR "/var/cache/cydian/rollback"
+#endif
+#define HELPER_ROLLBACK_MAX 64 /* stored .debs listed per package, at most */
+/* The version in a stored .deb's name for id ("%3a" back to ':'), into ver; 1, or 0 when the name isn't
+ * <id>_<version>_<arch>.deb with a version helper_version_ok takes and an arch of [a-z0-9-]. */
+int helper_deb_name_version(const char *file, const char *id, char *ver, size_t size);
+/* The stored .deb of id at version under dir (<prefix>HELPER_ROLLBACK_DIR), checked as above (root_uid owns it),
+ * as an absolute path into out. 0, or -1 + *err. */
+int helper_rollback_file(const char *dir, const char *id, const char *version, uid_t root_uid, char *out, size_t size,
+                         const char **err);
+/* Every stored .deb of id under dir that helper_rollback_file would take, "<version> <file>\n" each, into out.
+ * Returns how many (0 for a missing folder), or -1 + *err (bad id, or a folder that fails the checks). */
+int helper_rollback_list(const char *dir, const char *id, uid_t root_uid, char *out, size_t size, const char **err);
+/* 1 if dpkg-deb's "Package: ...\nVersion: ...\n" output names exactly id and version. */
+int helper_control_matches(const char *text, const char *id, const char *version);
+/* Run <prefix>/usr/bin/dpkg-deb -f <deb> Package Version (stdin /dev/null, stderr dropped, an environment of our
+ * own) and check it with helper_control_matches. 0, or -1 + *err. */
+int helper_rollback_verify(const char *prefix, const char *deb, const char *id, const char *version, const char **err);
 
 /* 1 if s is a package name the helper passes on: [a-z0-9][a-z0-9.+-]+, at most HELPER_NAME_MAX bytes. */
 int helper_name_ok(const char *s);

@@ -8,6 +8,8 @@
  *   cydian-helper install-ipa <path>            (F59: an IPA the app downloaded, installed through installd as
  *                                                AppSync's appinst does; ipa.c. Exit 69: can't install ad hoc)
  *   cydian-helper selfupdate <path.deb>                                 (F61: dpkg -i of Cydian's own update)
+ *   cydian-helper rollbacks <pkg> | rollback <pkg> <version>  (F71: the .debs N7's daemon kept, and apt-get install
+ *                                                              of one, after dpkg-deb shows its control matches)
  *
  * No setuid bit: Cydian spawns it as root with the persona spawn attributes (spawn.c), which the kernel allows
  * only because Cydian is signed with com.apple.private.persona-mgmt. Run by anything else it is plain mobile and
@@ -109,12 +111,26 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    if (plan.verb == HV_ROLLBACKS) {
+        static char list[HELPER_ROLLBACK_MAX * (HELPER_NAME_MAX + 2 * HELPER_VERSION_MAX + 64)];
+        if (helper_rollback_list(plan.path, plan.argv[1], CYDIAN_ROOT_UID, list, sizeof list, &err) < 0) {
+            fprintf(stderr, "cydian-helper: %s\n", err);
+            return HELPER_EX_USAGE;
+        }
+        fputs(list, stdout);
+        return 0;
+    }
+    if (plan.verb == HV_ROLLBACK && helper_rollback_verify(prefix, plan.deb, plan.name_buf[0], plan.item_buf[0], &err)) {
+        fprintf(stderr, "cydian-helper: %s\n", err);
+        return HELPER_EX_USAGE;
+    }
+
     static char path_env[PATH_MAX * 2];
     snprintf(path_env, sizeof path_env,
              "PATH=%1$s/usr/bin:%1$s/bin:%1$s/usr/sbin:%1$s/sbin:/usr/bin:/bin:/usr/sbin:/sbin", prefix);
     /* N4: Cydia's finish protocol. Maintainer scripts write "finish:restart" (and so on) to the fd named in CYDIA;
      * apply keeps fd 3 open through apt (APT::Keep-Fds) so those lines reach the console beside apt's status. */
-    char *cydia_env = plan.verb == HV_APPLY && status_fd >= 0 ? "CYDIA=3 1" : NULL;
+    char *cydia_env = (plan.verb == HV_APPLY || plan.verb == HV_ROLLBACK) && status_fd >= 0 ? "CYDIA=3 1" : NULL;
     char *env[] = {path_env, "HOME=/var/root", "USER=root", "LOGNAME=root", "LANG=C", "DEBIAN_FRONTEND=noninteractive",
                    cydia_env, NULL};
     if (plan.verb == HV_INSTALL_IPA) {

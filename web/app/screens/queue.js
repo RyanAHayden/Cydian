@@ -284,7 +284,17 @@ function rawOutput(text) {
 
 const MAX_LINES = 1500; // lines kept on screen; the log keeps everything (trimmed only past core/queue.js's cap)
 
-async function runConsole({ jobs, ids }) {
+// F71: Roll Back runs in the same console: one stored .deb through backend.rollback, outside the queue (whatever is
+// queued stays queued). False when a console is already up.
+export function runRollback({ id, version, installed = null, name = "" }) {
+  if (running) return false;
+  const jobs = [{ op: "install", id, version, installed, name, mode: "rollback" }];
+  runConsole({ jobs, ids: [id], keepQueue: true, title: (names) => `Roll Back ${name || names[id] || id} to ${version}`,
+    run: (onEvent) => getBackend().rollback(id, version, onEvent) });
+  return true;
+}
+
+async function runConsole({ jobs, ids, keepQueue = false, title = null, run = (onEvent) => getBackend().apply(jobs, onEvent) }) {
   running = true;
   updateChrome();
   const close = barButton("Close");
@@ -333,7 +343,7 @@ async function runConsole({ jobs, ids }) {
 
   let result = null, error = null;
   try {
-    result = await getBackend().apply(jobs, ({ fd, line: raw }) => {
+    result = await run(({ fd, line: raw }) => {
       if (fd === "status") {
         const s = parseStatusLine(raw);
         if (s.type === "finish") { finish = finishOf(finish, s.finish); return; }
@@ -369,10 +379,10 @@ async function runConsole({ jobs, ids }) {
   m.setTitle("Complete");
   statusText.textContent = ok ? "Done" : "Failed";
 
-  runLogs.add({ title: runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] }))), jobs: jobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode })),
+  runLogs.add({ title: title ? title(names) : runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] }))), jobs: jobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode })),
     code: error ? -1 : result.code, text: log.join("\n") });
   // A run that went through empties the queue; one apt stopped keeps it, so Confirm can show what's left to fix.
-  if (ok) installQueue.clearAll();
+  if (ok && !keepQueue) installQueue.clearAll();
   catalog.reloadInstalled?.().catch(() => {});
 
   const done = () => { running = false; updateChrome(); return m.close(); };

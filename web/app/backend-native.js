@@ -15,6 +15,10 @@
 // it, apply(jobs, onEvent) runs it with the console streaming, respring() restarts SpringBoard. All through
 // cydian-helper's simulate | apply | respring verbs (native/helper/README.md).
 //
+// Roll Back (F71, jailbreak build): rollbacks(id) lists the .debs N7's daemon kept when automatic updates replaced
+// a version (cydian-helper rollbacks), [{ version, file }] newest first; rollback(id, version, onEvent) installs one
+// (cydian-helper rollback: apt-get install of the stored file, downgrades allowed), streaming like apply.
+//
 // Errors from the shell come as "<code>: <message>" (bridge.js turns them into errors with a `code`); here they
 // become BackendError with the same codes the proxy uses (network, timeout, too_large, upstream, not_found, ...).
 //
@@ -30,7 +34,7 @@ import { BackendError } from "./backend-http.js";
 import { verifySource, refreshSource, openSourceStore, sortSources } from "./core/sources.js";
 import { parseAptSources, listNamesFor } from "./core/aptsources.js";
 import { healthFields } from "./core/health.js";
-import { DEFAULT_ARCH } from "./core/apt.js";
+import { DEFAULT_ARCH, compareVersions } from "./core/apt.js";
 import { withAltSources } from "./core/altstore.js";
 import { detectMode } from "./core/settings.js";
 import { queueWords, parseSimulation } from "./core/queue.js";
@@ -151,11 +155,37 @@ function queueCalls(backend, q) {
     },
     // onEvent({ fd: "out" | "err" | "status", line }) as it runs. -> { code, stdout, stderr }
     apply: (jobs, onEvent) => run(["apply", ...queueWords(jobs)], onEvent),
+    // F71: [] when nothing is stored, or the helper can't list (not installed, or an older one without the verb).
+    async rollbacks(id) {
+      let r;
+      try {
+        r = await backend.helper(["rollbacks", id]);
+      } catch {
+        return [];
+      }
+      if (r.code !== 0) return [];
+      return parseRollbacks(r.stdout);
+    },
+    // -> { code, stdout, stderr } like apply; a refusal (64: not stored, control doesn't match) is an error.
+    rollback: (id, version, onEvent) => run(["rollback", id, version], onEvent),
     async respring() {
       const r = await run(["respring"]);
       if (r.code !== 0) throw new BackendError("helper", `Couldn't restart SpringBoard (${r.code}): ${lastLine(r.stderr) || "no output"}`);
     },
   };
+}
+
+// cydian-helper rollbacks' "<version> <file>" lines -> [{ version, file }], newest version first, each version once.
+export function parseRollbacks(text) {
+  const seen = new Set();
+  const out = [];
+  for (const line of String(text ?? "").split("\n")) {
+    const m = line.trim().match(/^(\d[A-Za-z0-9.+~:-]*) (\S+\.deb)$/);
+    if (!m || seen.has(m[1])) continue;
+    seen.add(m[1]);
+    out.push({ version: m[1], file: m[2] });
+  }
+  return out.sort((a, b) => compareVersions(b.version, a.version));
 }
 
 // The app.info `cf` number, asked once when first needed: get() is it (or null: an older shell, or no answer) once

@@ -17,6 +17,8 @@ A Swift shell around one WKWebView that shows `web/app/` from the app bundle (do
   apt's lists) and `fixture/`. `web/app/backend-native.test.js` uses it; N4's queue tests can too.
 - `Info.plist` (with `CADisableMinimumFrameDurationOnPhone`), `entitlements.plist`, `VERSION`, `icon/` (`icon.svg`
   and the PNGs made from it with `rsvg-convert -w 120|180`), `deb/` (control, postinst, prerm).
+- `daemon/` (N5): `cydian-upgrades`, a launchd daemon in the .deb. Once a day it runs `apt-get update`, sets the icon
+  badge to the upgrade count and posts "n Upgrades" when something is new (daemon/README.md).
 - `build.sh` / `make package` → `build/Cydian.deb`: rootless (`/var/jb/Applications/Cydian.app`, and the helper at
   `/var/jb/usr/libexec/cydian/cydian-helper`, 0755, no setuid),
   `iphoneos-arm64`, arm64, iOS 15+. Version is `VERSION-<commit count>`; CFBundleVersion is the commit count.

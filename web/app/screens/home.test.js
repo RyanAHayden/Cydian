@@ -39,7 +39,8 @@ test("Home pages: titles below the root, and curated sources are flat repos with
 });
 
 test("F37: Home's hint shows while Not Jailbroken and taps through to Settings > Device", () => {
-  assert.deepEqual(deviceHint("none"), { text: DEVICE_HINT, href: "#/settings/device" });
+  assert.equal(deviceHint("none"), null, "the website: no hint (Jailbroken? Get Cydian.deb instead)");
+  assert.deepEqual(deviceHint("none", "jailbreak"), { text: DEVICE_HINT, href: "#/settings/device" });
   assert.equal(DEVICE_HINT, "Showing apps for iPhones without a jailbreak. Jailbroken? Settings > Device.");
   assert.equal(deviceHint("iphoneos-arm64"), null);
   assert.equal(deviceHint("iphoneos-arm"), null);
@@ -57,4 +58,11 @@ test("F79: Home links to Install IPAs, except in the jailbreak app", async () =>
   assert.deepEqual(ipasTile("site"), { label: "Install IPAs", href: "#/installed/myipas" });
   assert.deepEqual(ipasTile("sideload"), { label: "Install IPAs", href: "#/installed/myipas" });
   assert.equal(ipasTile("jailbreak"), null);
+});
+
+test("Jailbroken? Get Cydian.deb: Cydian's APT repo in Sileo and Zebra", async () => {
+  const { repoLinks, CYDIAN_APT_REPO, JAILBROKEN_SHEET } = await import("./home.js");
+  assert.equal(CYDIAN_APT_REPO, "https://github.com/RyanAHayden/Cydian/releases/latest/download/");
+  assert.deepEqual(repoLinks("https://r/"), { sileo: "sileo://source/https://r/", zebra: "zbra://sources/add/https://r/" });
+  assert.deepEqual(JAILBROKEN_SHEET.buttons, ["Add to Sileo", "Add to Zebra", "Copy Repo URL", "Download .deb"]);
 });

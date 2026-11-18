@@ -96,8 +96,9 @@ export function ipasTile(mode = "site") {
 export const DEVICE_HINT = "Showing apps for iPhones without a jailbreak. Jailbroken? Settings > Device.";
 export function deviceHint(type, mode = "site") {
   if (type !== "none") return null;
-  // The sideload build is always Not Jailbroken: nothing to change there, so no hint.
-  if (mode === "sideload") return null;
+  // The sideload build is always Not Jailbroken: nothing to change there, so no hint. Nor on the website (user
+  // 2026-11-18: it's obviously the web; jailbroken visitors get "Jailbroken? Get Cydian.deb" in the Cydian App card).
+  if (mode === "sideload" || mode === "site") return null;
   return { text: DEVICE_HINT, href: format({ tab: "settings", path: ["device"] }) };
 }
 
@@ -390,8 +391,12 @@ function renderRoot(body) {
   // One green split button (user 2026-11-17): Install Cydian App | Send Settings (Open in Cydian App: the
   // certificate, sources and settings into the app).
   const sendTile = tile({ label: "Send Settings to Cydian", subtitle: "Your certificate, sources and settings", href: format({ tab: "home" }), glyph: "send" });
+  // The website: jailbroken visitors get Cydian from its own APT repo (Sileo, Zebra) or as a .deb (user 2026-11-18).
+  const debTile = settings.mode === "site" ? tile({ label: "Jailbroken? Get Cydian.deb", subtitle: "For Sileo, Zebra or Filza",
+    href: format({ tab: "home" }), glyph: "install" }) : null;
+  debTile?.querySelector("a").addEventListener("click", (e) => { e.preventDefault(); e.stopImmediatePropagation(); jailbrokenSheet(); }, true);
   const appRow = tileRow("green stack", tile({ label: "Install Cydian App", subtitle: "Signed with your certificate",
-    href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }), sendTile);
+    href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }), sendTile, ...(debTile ? [debTile] : []));
   const appLink = appRow.querySelector("a");
   const appSub = appLink.querySelector(".cell-subtitle");
   let offer = null;
@@ -676,6 +681,30 @@ export function render(el, route, ctx) {
 
 // I7: Cydian's .deb for a jailbroken visitor's arch: the latest release's asset for it (GitHub's API, which answers
 // browsers), else the rootless Cydian.deb. Safari downloads it to Files, where Sileo or Filza installs it.
+// "Jailbroken? Get Cydian.deb": Cydian's own APT repo (tools/release.sh: a flat repo beside each release's assets)
+// added in Sileo or Zebra, which then keep Cydian updated; or the URL to paste elsewhere; or the .deb itself.
+export const CYDIAN_APT_REPO = "https://github.com/RyanAHayden/Cydian/releases/latest/download/";
+export const JAILBROKEN_SHEET = { title: "Install Cydian with your jailbreak's package manager: it keeps Cydian updated.",
+  buttons: ["Add to Sileo", "Add to Zebra", "Copy Repo URL", "Download .deb"] };
+export const repoLinks = (repo = CYDIAN_APT_REPO) => ({
+  sileo: `sileo://source/${repo}`, zebra: `zbra://sources/add/${repo}` });
+async function jailbrokenSheet() {
+  const { showActionSheet } = await import("../nav/actionsheet.js");
+  const i = await showActionSheet(JAILBROKEN_SHEET);
+  const links = repoLinks();
+  if (i === 0) location.href = links.sileo;
+  else if (i === 1) location.href = links.zebra;
+  else if (i === 2) {
+    try { await navigator.clipboard.writeText(CYDIAN_APT_REPO); } catch { /* shown below anyway */ }
+    await showAlert({ title: "Repo URL Copied", message: CYDIAN_APT_REPO, buttons: ["OK"] });
+  } else if (i === 3) {
+    const { showActionSheet: pick } = await import("../nav/actionsheet.js");
+    const kinds = [["Rootless (Dopamine, palera1n)", "iphoneos-arm64"], ["Roothide", "iphoneos-arm64e"], ["Rootful (checkra1n, older)", "iphoneos-arm"]];
+    const k = await pick({ title: "Which jailbreak?", buttons: kinds.map(([l]) => l) });
+    if (k >= 0) installDeb(kinds[k][1]);
+  }
+}
+
 async function installDeb(arch) {
   let release = null;
   try { release = await fetchRelease(); } catch { /* the plain rootless .deb below */ }

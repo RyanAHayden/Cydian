@@ -3,6 +3,7 @@
 //   featuredStrip(source)       the source page's banners (sileo-featured.json), filled in when they land
 //   homeFeatured()              Home's banners: a couple from each source
 //   paymentGroup(st, source)    a paid package's Price row; in the app Sign In / Buy / Download & Install
+//   paidStateOf(box)            B11: what the package page's nav bar button does for that paid package
 //   discoveryGroup()            Search's "Other Sources" list (Canister), with Add Source; .search(q). In the
 //                               jailbreak app Add Source & Install (F99): add, refresh it, open the page, queue
 //
@@ -309,18 +310,73 @@ const vendorPage = (st, base) => {
 
 // The package page's purchase group, for packages tagged cydia::commercial on a source with a payment_endpoint.
 // Empty (and stays empty) otherwise.
-export function paymentGroup(st, source, ctx) {
+// B11: in the app, `onState(state)` hears what the nav bar button should do whenever the group is drawn (paidNav's
+// shape, or null when the source has no vendor after all); paidStateOf(box) answers the latest one.
+export function paymentGroup(st, source, ctx, { onState = null } = {}) {
   const box = el("div", "payment-box");
   if (!isCommercial(st) || !source) return box;
   const draw = (sections) => { box.replaceChildren(grouped(sections)); };
+  const app = getBackend().kind === "native";
+  const publish = app ? trackPaidState(box, onState) : () => {};
   (async () => {
     const base = await vendorOf(source);
-    if (!base || !box.isConnected && box.parentNode == null) return;
-    if (getBackend().kind !== "native") return drawSite(st, source, base, draw);
-    return drawApp(st, source, base, draw, ctx, box);
-  })().catch((e) => draw([{ header: "Purchase", footer: e.message }]));
+    if (!base || !box.isConnected && box.parentNode == null) return publish(null);
+    if (!app) return drawSite(st, source, base, draw);
+    return drawApp(st, source, base, draw, ctx, box, publish);
+  })().catch((e) => {
+    draw([{ header: "Purchase", footer: e.message }]);
+    publish(paidNav(null, false, { note: e.message }));
+  });
   return box;
 }
+
+// ---- B11: the nav bar button of a paid package ------------------------------------------------------------
+//
+// Plain apt can't fetch a paid deb (Havoc answers apt with 418; it comes only through paid.install after the
+// vendor authorizes it), so queuing one can only fail. The nav bar button does the Purchase group's next step
+// instead: Cydia showed the price there until the package was bought, then Install.
+
+const paidStates = new WeakMap(); // payment box -> { current, ready: Promise, resolve }
+
+function trackPaidState(box, onState) {
+  let resolve;
+  const entry = { current: undefined, ready: new Promise((r) => { resolve = r; }) };
+  entry.resolve = resolve;
+  paidStates.set(box, entry);
+  return (state) => {
+    entry.current = state;
+    entry.resolve(state);
+    onState?.(state);
+  };
+}
+
+// The state the nav bar button acts on: null when the box isn't a vendor's paid package in the app (the button
+// then works as for any package); waits for the vendor's first answer.
+export function paidStateOf(box) {
+  const entry = box && paidStates.get(box);
+  if (!entry) return Promise.resolve(null);
+  return entry.current !== undefined ? Promise.resolve(entry.current) : entry.ready;
+}
+
+// From the vendor's package info: the button's label, and the actions its sheet offers (the Purchase group's own
+// row: Sign In, Buy, or Download & Install), `install` set only once the vendor lets this account download it.
+// `info` null: the vendor couldn't be asked; nothing to offer, and `note` says why.
+export function paidNav(info, signedIn, { vendorName = "the vendor", signIn = null, buy = null, install = null,
+  signInLabel = null, note = null } = {}) {
+  const price = info?.price ?? null;
+  const priced = price && !isFreePrice(price);
+  if (!info) return { label: "Install", purchased: false, install: null, actions: [], note: note ?? null };
+  if (!info.available) return { label: priced ? price : "Install", purchased: false, install: null, actions: [],
+    note: `Not available to buy from ${vendorName}.` };
+  if (!signedIn) return { label: priced ? price : "Install", purchased: false, install: null,
+    actions: signIn ? [{ label: signInLabel || `Sign In to ${vendorName}`, run: signIn }] : [], note: `Sold by ${vendorName}. Sign in to buy or install it.` };
+  if (!info.purchased) return { label: priced ? price : "Install", purchased: false, install: null,
+    actions: buy ? [{ label: buyLabel(price), run: buy }] : [], note: `Sold by ${vendorName}.` };
+  return { label: "Install", purchased: true, install,
+    actions: install ? [{ label: "Download & Install", run: install }] : [], note: null };
+}
+
+const buyLabel = (price) => `Buy${price ? ` for ${isFreePrice(price) ? "Free" : price}` : ""}`;
 
 async function drawSite(st, source, base, draw) {
   const host = new URL(base).hostname.replace(/^www\./, "");
@@ -372,10 +428,10 @@ export function priceDetail(info, signedIn) {
   return info?.price ?? "Paid";
 }
 
-async function drawApp(st, source, base, draw, ctx, box) {
+async function drawApp(st, source, base, draw, ctx, box, publish = () => {}) {
   const client = clientFor(base);
   const id = st.package;
-  const refresh = () => drawApp(st, source, base, draw, ctx, box);
+  const refresh = () => drawApp(st, source, base, draw, ctx, box, publish);
   const fail = async (e) => {
     const buttons = e.recoveryUrl ? ["OK", "More Info"] : ["OK"];
     const { index } = await showAlert({ title: "Purchase", message: e.message, buttons });
@@ -388,25 +444,32 @@ async function drawApp(st, source, base, draw, ctx, box) {
     [vendor, signedIn] = await Promise.all([client.info().catch(() => null), client.signedIn()]);
     info = await client.packageInfo(id);
   } catch (e) {
+    publish(paidNav(null, false, { note: e.message }));
     if (e instanceof NeedsShell) return draw([{ header: "Purchase", rows: [{ label: "Price", detail: "Paid" }], footer: e.message }]);
     return draw([{ header: "Purchase", footer: e.message }]);
   }
   const name = vendor?.name || new URL(base).hostname;
   const rows = [{ label: "Price", detail: priceDetail(info, signedIn) }];
   const signIn = busy("Signing In", () => vendorSignIn(client));
+  const buy = busy("Purchasing", async () => {
+    const r = await client.purchase(id);
+    if (r.status === "action") await shell("auth.session", { url: r.url, callbackScheme: "sileo" });
+    else if (r.status !== "done") throw new Error("The purchase did not go through.");
+  });
+  const install = () => downloadAndInstall(st, source, client, box, ctx, fail);
+  // B11: the nav bar button offers the same step as the row below (paidNav), so both stay in step.
+  const nav = paidNav(info, signedIn, { vendorName: name, signIn, buy, install, signInLabel: vendor?.banner?.button || null });
   if (!info.available) rows.push({ label: "Not available to buy" });
-  else if (!signedIn) rows.push({ label: vendor?.banner?.button || `Sign In to ${name}`, onClick: signIn });
-  else if (!info.purchased) {
-    rows.push({ label: `Buy${info.price ? ` for ${isFreePrice(info.price) ? "Free" : info.price}` : ""}`, onClick: busy("Purchasing", async () => {
-      const r = await client.purchase(id);
-      if (r.status === "action") await shell("auth.session", { url: r.url, callbackScheme: "sileo" });
-      else if (r.status !== "done") throw new Error("The purchase did not go through.");
-    }) });
-  } else {
-    rows.push({ label: "Download & Install", onClick: () => downloadAndInstall(st, source, client, box, ctx, fail) });
-  }
+  for (const a of nav.actions) rows.push({ label: a.label, onClick: a.run });
   if (signedIn) rows.push({ label: `Sign Out of ${name}`, onClick: busy("Signing Out", () => client.signOut()) });
   draw([{ header: "Purchase", rows, footer: vendor?.banner && !signedIn ? vendor.banner.message : `Sold by ${name}.` }]);
+  publish(nav);
+}
+
+// B11: true when `st` is a paid package on a source whose vendor sells it (payment_endpoint): apt can't fetch it.
+export async function soldByVendor(st, source) {
+  if (!isCommercial(st) || !source) return false;
+  return (await vendorOf(source).catch(() => null)) != null;
 }
 
 // F74: authorize (under a HUD: the vendor can refuse), then paid.install in the install queue's console, streamed

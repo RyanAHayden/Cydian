@@ -40,7 +40,7 @@ import { rememberedApps } from "../app-updates.js";
 import { openInGroup, setSourceShare } from "./handoff.js";
 import { healthOf } from "../core/health.js";
 import { addSource } from "./manage.js";
-import { featuredStrip, paymentGroup } from "./extras.js";
+import { featuredStrip, paymentGroup, paidStateOf, soldByVendor } from "./extras.js";
 import { installQueue } from "../queue.js";
 import { queuedFor, MODE_LABEL } from "../core/queue.js";
 import { hasRollback, rollbackSlot } from "./rollback.js";
@@ -660,7 +660,9 @@ async function renderPackage(body, route, key, id, ctx) {
   }
 
   body.replaceChildren(headGroup);
-  if (!pkg.installedOnly) body.append(paymentGroup(st, source, ctx)); // F20: price; in the app Sign In, Buy, Install
+  // F20: price; in the app Sign In, Buy, Install. B11: in the app its state also drives the nav bar button.
+  const payBox = pkg.installedOnly ? null : paymentGroup(st, source, ctx, { onState: (s) => paidButton(body, s) });
+  if (payBox) body.append(payBox);
   const later = [];
   if (groups.length) later.push(...groups);
   body.append(grouped(later));
@@ -696,7 +698,7 @@ async function renderPackage(body, route, key, id, ctx) {
   body.append(grouped([{ header: "Details", rows: details }]));
   // F29: Version History, every version the sources offer (Downgrade's list); and Modify once it's installed.
   const history = await catalog.history(id, key).catch(() => null);
-  rememberPackage(body, route, { id, key, pkg, source, history });
+  rememberPackage(body, route, { id, key, pkg, source, history, payBox });
   if (history?.versions.length) body.append(versionHistoryRow(route, id, history));
   body.append(grouped([{ header: "Works on My Phone", rows: [{ label: compatBadge(fitCode) }],
     footer: fit.detail }]));
@@ -750,7 +752,18 @@ function rememberPackage(body, route, page) {
   for (const [k, p] of packagePages) if (!p.body.isConnected) packagePages.delete(k);
   packagePages.set(format(route), { body, route, ...page });
   const installed = page.pkg.stanza.kind !== "ipa" && page.history?.versions.some((v) => v.installed);
-  setRightLabel(body, installed ? "Modify" : "Install");
+  setRightLabel(body, buttonLabel(body, installed));
+}
+
+// B11: a paid package a vendor sells (extras.js paidNav) shows its price on the button until it's bought, as Cydia
+// did; Install once the vendor lets this account download it; Modify once it's installed, as for any package.
+const paidLabels = new WeakMap(); // page body -> label
+const buttonLabel = (body, installed) => installed ? "Modify" : paidLabels.get(body) ?? "Install";
+function paidButton(body, state) {
+  if (state) paidLabels.set(body, state.label);
+  else paidLabels.delete(body);
+  const page = [...packagePages.values()].find((p) => p.body === body);
+  if (page) setRightLabel(body, buttonLabel(body, page.history?.versions.some((v) => v.installed)));
 }
 
 // N11: a run (install, upgrade, remove) re-reads dpkg (catalog.reloadInstalled), which fires catalog.onChange. A
@@ -765,7 +778,7 @@ export async function refreshPackagePages(pages = packagePages, { history = (id,
     const h = await history(p.id, p.key).catch(() => null);
     if (!h || !p.body.isConnected) continue;
     p.history = h;
-    label(p.body, h.versions.some((v) => v.installed) ? "Modify" : "Install");
+    label(p.body, buttonLabel(p.body, h.versions.some((v) => v.installed)));
   }
 }
 catalog.onChange(() => { refreshPackagePages().catch(() => {}); });
@@ -827,6 +840,14 @@ async function packageActions(route, button) {
   }
   const installed = installedOf(history);
   const queue = queueOf({ installed, name: pkg.row?.name });
+  // B11: apt can't fetch a paid package its vendor sells, so the sheet offers the Purchase group's step instead.
+  const paid = queue ? await paidStateOf(page.payBox) : null;
+  if (paid) {
+    if (!page.body.isConnected) return;
+    const { actions: paidSheet, title } = paidActions(paid, { id: st.package || id, version: st.version, installed, queue,
+      queued: !!installQueue.get(st.package || id) });
+    return sheet(title, paidSheet);
+  }
   const older = installed ? history.versions.filter((v) => v.keys.length && compareVersions(v.version, installed) < 0) : [];
   // Cydia's first action on a queued package: Clear (N4).
   if (queue && installQueue.get(st.package || id)) actions.push({ label: "Clear", run: () => installQueue.clear(st.package || id) });
@@ -858,6 +879,24 @@ async function packageActions(route, button) {
     ? "Packages install on the iPhone, from Cydian's jailbreak app or another package manager."
     : "Installing from Cydian comes with its install queue, which this build doesn't have yet.";
   return sheet(title, actions);
+}
+
+// B11: the nav bar sheet of a paid package its vendor sells, in the app (`paid`: extras.js paidNav). Not installed:
+// the Purchase group's step (Sign In, Buy, Download & Install). Installed: Upgrade or Reinstall through Download &
+// Install (it fetches the page's version, `version`) once bought, and Remove through the queue; no Downgrade, since
+// the vendor only hands out the current deb. Add to / Remove from Wish List as for any package.
+export function paidActions(paid, { id, version, installed, queue, queued = false, wish = wishlist() }) {
+  const actions = [];
+  if (queued) actions.push({ label: "Clear", run: () => installQueue.clear(id) });
+  if (installed) {
+    if (paid.install && version && compareVersions(version, installed) > 0) actions.push({ label: "Upgrade", run: paid.install });
+    else if (paid.install && version === installed) actions.push({ label: "Reinstall", run: paid.install });
+    actions.push({ label: "Remove", run: () => queue({ op: "remove", id }) });
+  } else {
+    actions.push(...paid.actions);
+  }
+  if (!installed || wish.has(id)) actions.push({ label: wishLabel(wish.has(id)), run: () => wish.set(id, !wish.has(id)) });
+  return { actions, title: installed && paid.install ? "" : paid.note ?? "" };
 }
 
 // I5: in the sideload app, sign `v` on the phone and install it when the version has an IPA. True when signing took
@@ -960,12 +999,14 @@ async function renderVersions(body, route, key, id) {
   const site = getBackend().kind === "http";
   const installed = installedOf(history);
   const queue = queueOf({ installed, name: history.name });
+  // B11: a paid package its vendor sells only installs through its page's Download & Install, never apt.
+  const vendorPaid = queue && isPaid(st) ? await soldByVendor(st, sources.find((s) => s.key === pkg.key)) : false;
   const cells = history.versions.map((v) => {
     const tags = [];
     if (v.candidate) tags.push("Latest");
     if (v.installed) tags.push("Installed");
     const actions = [];
-    if (queue && v.keys.length) {
+    if (queue && !vendorPaid && v.keys.length) {
       const label = v.version === installed ? "Reinstall" : installed && compareVersions(v.version, installed) < 0 ? "Downgrade" : "Install";
       actions.push({ label, run: () => queue({ op: "install", id, version: v.version }) });
     }
@@ -978,7 +1019,7 @@ async function renderVersions(body, route, key, id) {
       onClick: actions.length ? () => sheet(`${history.name} ${v.version}`, actions) : null,
     });
   });
-  const how = queue ? "Tap one to install it." : site ? "Tap one for its .deb. Installing an older one is Downgrade, in the jailbreak app." : "Installing an older one is Downgrade, which comes with the install queue.";
+  const how = vendorPaid ? "It's sold by its source: install it with Download & Install on its page." : queue ? "Tap one to install it." : site ? "Tap one for its .deb. Installing an older one is Downgrade, in the jailbreak app." : "Installing an older one is Downgrade, which comes with the install queue.";
   body.append(versionsGroup(cells, `Every version of ${history.name} your sources offer. ${how}`));
 }
 

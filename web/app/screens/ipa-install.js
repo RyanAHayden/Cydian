@@ -23,6 +23,7 @@ import { ipaInstallAvailable, runIpaInstall } from "../ipa-install.js";
 import { ipaUrl, ipaName, looksLikeIpa, IPA_FOOTER } from "../core/ipainstall.js";
 import { apps, recordInstall } from "../core/installed.js";
 import { NAME } from "../brand.js";
+import { rowIcon } from "../icons/rowicons.js";
 
 let running = false;
 
@@ -110,7 +111,7 @@ async function askIpaUrl(value = "") {
 // The Settings root's section (jailbreak build only; nothing elsewhere).
 export function ipaSection(available = ipaInstallAvailable()) {
   if (!available) return document.createDocumentFragment();
-  return grouped([{ header: "Install IPA", rows: [{ label: "Install from URL", onClick: () => askIpaUrl() }],
+  return grouped([{ header: "Install IPA", rows: [{ label: "Install from URL", onClick: () => askIpaUrl(), icon: rowIcon("ipa") }],
     footer: IPA_FOOTER }]);
 }
 

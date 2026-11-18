@@ -36,6 +36,7 @@ import { MODES, MODE_LABEL, changeCount, runTitle, createRepeatFilter, CONFFILE_
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 import { NAME } from "../brand.js";
+import { rowIcon } from "../icons/rowicons.js";
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 
@@ -647,7 +648,7 @@ export function logsTitle(id) {
 export function logsSection(mode) {
   const list = runLogs.list();
   if (mode !== "jailbreak" && !list.length) return document.createDocumentFragment();
-  return grouped([{ header: "Console", rows: [{ label: "Console Logs", detail: list.length ? String(list.length) : "None", href: format(settingsRoute([LOGS])) }],
+  return grouped([{ header: "Console", rows: [{ label: "Console Logs", detail: list.length ? String(list.length) : "None", href: format(settingsRoute([LOGS])), icon: rowIcon("logs") }],
     footer: "The output of every install, upgrade and removal, kept on this iPhone." }]);
 }
 

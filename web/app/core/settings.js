@@ -7,7 +7,7 @@
 //   s.set("appearance", "dark");    // stored at localStorage["ifizbox.appearance"], listeners told
 //   s.onChange((key, value) => …);  // returns an unsubscribe function
 //   s.sections();                   // [{ id, page, title, footer, settings: [def…] }], only the rows this mode shows
-//   s.pages();                      // [{ id, title, sections }]: Settings' root rows (General, Display, Updates…)
+//   s.pages();                      // [{ id, title, sections }]: Settings' root rows (General, Theme, Updates…)
 //   s.holds.set("com.example.tweak", true);  // Ignore upgrades, kept on the device (jailbreak: also a dpkg hold)
 //   await s.holds.sync();                    // jailbreak: take dpkg's holds (apt-mark showhold) as the list
 //   s.hiddenSections.set("Themes", true);    // Section Visibility (F24): listeners hear ("hiddenSections", list)
@@ -42,12 +42,12 @@ const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
 const onOff = [{ value: false, label: "Off" }, { value: true, label: "On" }];
 
-// F128: laid out like iOS 6's Settings app. The root is one list of short rows, one per page (General, Display,
+// F128: laid out like iOS 6's Settings app. The root is one list of short rows, one per page (General, Theme,
 // Updates); each page holds its groups (SECTIONS, in order), a group's footer says in a line what its rows do. The
 // "signing" page has no root row of its own: its group goes on Settings > Signing (screens/settings.js).
 export const PAGES = [
   { id: "general", title: "General" },
-  { id: "display", title: "Display" },
+  { id: "theme", title: "Theme" }, // F205: was Display (route "display"); Compatibility Marks moved to General
   { id: "updates", title: "Updates" },
   { id: "signing", title: "Signing" },
 ];
@@ -56,8 +56,7 @@ export const SECTIONS = [
   { id: "device", page: "general" },
   { id: "compat", page: "general" },
   { id: "sources", page: "general" },
-  { id: "appearance", page: "display", title: "Appearance" },
-  { id: "display", page: "display" },
+  { id: "appearance", page: "theme", title: "Appearance" },
   { id: "updates", page: "updates" },
   { id: "notifications", page: "updates" },
   { id: "automatic", page: "updates", title: "Automatic Installs" },
@@ -117,9 +116,10 @@ export const SETTINGS = [
   },
   {
     // F35: the check, X or ? beside every package in lists, Search and the package page.
-    key: "compatMarks", section: "display", kind: "toggle", feature: "compat", modes: ALL, default: true,
+    key: "compatMarks", section: "compat", kind: "toggle", feature: "compat", modes: ALL, default: true,
     label: "Compatibility Marks", options: onOff,
-    footer: "Compatibility Marks put a check, an X or a ? beside each package.",
+    // F205: shares the compat group's footer with Works on My Phone now, so short (the pair stays under 120).
+    footer: "Marks put a check, an X or a ? by each package.",
   },
   {
     // The site's picker (F17): the app knows its iOS version from the bridge.

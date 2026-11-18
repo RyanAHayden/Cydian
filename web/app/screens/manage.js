@@ -43,6 +43,7 @@ import { builtinFirst, isBuiltin, exportable } from "../core/essential.js";
 import { lockMark } from "../nav/lock.js";
 import { settings, createSwitch } from "./settings.js";
 import { NAME } from "../brand.js";
+import { rowIcon } from "../icons/rowicons.js";
 
 export const SEGMENT = "manage";
 export const isManage = (route) => route.path[0] === SEGMENT;
@@ -109,13 +110,13 @@ const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 
 function renderRoot(body, ctx) {
   const rows = [
-    { label: "Sources", href: here("sources") },
-    { label: "Import & Export", href: here("io") },
-    hiddenRow(),
+    { label: "Sources", href: here("sources"), icon: rowIcon("sources") },
+    { label: "Import & Export", href: here("io"), icon: rowIcon("transfer") },
+    { ...hiddenRow(), icon: rowIcon("hidden") },
   ];
   const jailbroken = settings.deviceType() !== "none";
   body.replaceChildren(grouped([{ rows, footer: "Add, delete and reorder your sources, or move them to another phone "
-    + "or package manager." }, { rows: [{ label: "Recommended", href: here("recommended"), cls: "rec-entry" }],
+    + "or package manager." }, { rows: [{ label: "Recommended", href: here("recommended"), cls: "rec-entry", icon: rowIcon("recommended") }],
     footer: jailbroken ? "Tweak repos that suit your jailbreak, and app sources." : "App sources to add in one tap." }]));
   // The badge: how many aren't added yet.
   recRows().then((rs) => {
@@ -375,15 +376,15 @@ function renderIO(body, route, ctx) {
   });
   body.replaceChildren(grouped([
     { header: "Export", rows: [
-      { label: "Share List", onClick: () => shareList() },
-      { label: "Copy to Clipboard", onClick: () => copyList() },
-      { label: "Save as File", onClick: () => saveFile() },
-      { label: "Show QR Code", onClick: () => showQR() },
+      { label: "Share List", onClick: () => shareList(), icon: rowIcon("share") },
+      { label: "Copy to Clipboard", onClick: () => copyList(), icon: rowIcon("copy") },
+      { label: "Save as File", onClick: () => saveFile(), icon: rowIcon("saveFile") },
+      { label: "Show QR Code", onClick: () => showQR(), icon: rowIcon("qr") },
     ], footer: `Every source's URL, one per line. Another phone's ${NAME} reads it back (Import), and so do most `
       + "package managers, one URL at a time." },
     { header: "Import", rows: [
-      { label: "From File", onClick: () => file.click() },
-      { label: "From Clipboard", onClick: (e) => importClipboard(e.currentTarget, route, ctx) },
+      { label: "From File", onClick: () => file.click(), icon: rowIcon("fromFile") },
+      { label: "From Clipboard", onClick: (e) => importClipboard(e.currentTarget, route, ctx), icon: rowIcon("fromClipboard") },
     ], footer: `Reads ${NAME}'s export, a list of URLs, AltStore, SideStore and Feather source lists (JSON), `
       + "Sileo's .sources and Cydia's .list. You see which are new before anything is added." },
   ]), file);

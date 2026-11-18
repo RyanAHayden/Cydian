@@ -16,6 +16,7 @@ import { websiteInstallsOn, setWebsiteInstalls, acceptWebsiteInstalls, firstVisi
   browsingLocked, askToBrowse } from "../websign-gate.js";
 import { createSwitch } from "./settings.js";
 import { NAME } from "../brand.js";
+import { rowIcon } from "../icons/rowicons.js";
 
 export const LOCK_HOME_LABEL = `Lock Home Until ${NAME} Is Installed`;
 export const LOCK_HOME_FOOTER = `Home's rows below Install ${NAME} App and the other tabs stay locked, and ask to install `
@@ -43,21 +44,21 @@ export function websiteSection({ mode = detectMode(), storage, alert = showAlert
   if (mode !== "site") return box;
   const draw = () => {
     const locked = browsingLocked({ mode, storage });
-    const lock = switchRow(grouped([{ header: "Website", rows: [{ label: LOCK_HOME_LABEL }], footer: LOCK_HOME_FOOTER }]),
+    const lock = switchRow(grouped([{ header: "Website", rows: [{ label: LOCK_HOME_LABEL, icon: rowIcon("lockHome") }], footer: LOCK_HOME_FOOTER }]),
       LOCK_HOME_LABEL, createSwitch({ label: LOCK_HOME_LABEL, checked: firstVisitState(storage) !== "later",
         onToggle: (want) => setFirstVisit(want ? "ask" : "later", storage) }));
     let installs;
     if (locked) {
       // No switch while locked: a padlocked row (home.css .home-locked) that asks first.
       installs = grouped([{ header: "Other Apps", footer: WEBSITE_INSTALLS_FOOTER,
-        rows: [{ label: WEBSITE_INSTALLS_LABEL, chevron: true, onClick: (e) => { e?.preventDefault?.(); return askToBrowse({ install, alert, storage }); } }] }]);
+        rows: [{ label: WEBSITE_INSTALLS_LABEL, chevron: true, icon: rowIcon("websiteApps"), onClick: (e) => { e?.preventDefault?.(); return askToBrowse({ install, alert, storage }); } }] }]);
       installs.querySelector(".group")?.classList.add("home-locked", "website-locked");
     } else {
       const sw = createSwitch({ label: WEBSITE_INSTALLS_LABEL, checked: websiteInstallsOn(storage), onToggle: async (want) => {
         if (!want) { setWebsiteInstalls(false, storage); return; }
         if (!(await acceptWebsiteInstalls({ alert, storage }))) sw.setAttribute("aria-checked", "false"); // Cancel: back off
       } });
-      installs = switchRow(grouped([{ header: "Other Apps", rows: [{ label: WEBSITE_INSTALLS_LABEL }], footer: WEBSITE_INSTALLS_FOOTER }]),
+      installs = switchRow(grouped([{ header: "Other Apps", rows: [{ label: WEBSITE_INSTALLS_LABEL, icon: rowIcon("websiteApps") }], footer: WEBSITE_INSTALLS_FOOTER }]),
         WEBSITE_INSTALLS_LABEL, sw);
     }
     box.replaceChildren(lock, installs);

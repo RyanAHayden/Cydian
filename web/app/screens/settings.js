@@ -1,12 +1,14 @@
 // Settings (F13; at the bottom of Home since F123), laid out like iOS 6's Settings app (F128, docs/settings.md):
-// the root is one list of short rows (iFizBox Account; General, Display, Updates; Signing; Console Logs), each
+// the root is one list of short rows (iFizBox Account; General, Theme, Updates; Signing; Console Logs), each
 // opening its own page. The settings' rows come from core/settings.js (which ones this mode shows, defaults,
 // storage, which page they're on); this file only draws them:
-//   choice  one row per option, the chosen one checked (Display > Appearance: Automatic / Light / Dark)
+//   choice  one row per option, the chosen one checked (Theme > Appearance: Automatic / Light / Dark)
 //   toggle  the iOS 6 switch (ios6.css .switch)
 //   list    the current value as detail; pushes <page>/<key>, a page of checked options
 //   holds   the ignored packages' count; pushes <page>/holds
-// Routes below Settings: <page> (general, display, updates), <page>/<key>, signing[/<key>], account,
+// F205: rows carry iOS 6 Settings' 29pt tiles (icons/rowicons.js): every root row, and each setting that names a
+// thing (SETTING_ICONS); Appearance's choices and plain values stay bare, as iOS 6 leaves them.
+// Routes below Settings: <page> (general, theme, updates; "display", Theme's old id, still opens Theme), <page>/<key>, signing[/<key>], account,
 // logs[/<id>], and the older <key> and holds, which links from elsewhere use. F183: the root ends with Home's
 // version line (version-foot.js); there is no About page and no manual update check (every launch and Reload checks).
 // It also owns the theme: init() puts the Appearance setting on <html data-theme> and the theme-color metas, and
@@ -33,6 +35,7 @@ import { versionLines } from "./version-foot.js";
 import { ipaSection } from "./ipa-install.js";
 import { otherLinksOn, setOtherLinks } from "../core/otherlinks.js";
 import { NAME, GITHUB_REPO } from "../brand.js";
+import { rowIcon, SETTING_ICONS, PAGE_ICONS } from "../icons/rowicons.js";
 
 export const title = "Settings";
 
@@ -59,8 +62,12 @@ const defOf = (key) => SETTINGS.find((d) => d.key === key);
 const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? String(v);
 
 const TITLES = { holds: "Ignored Upgrades", signing: "Signing", account: `${NAME} Account` };
+// F205: pages that were renamed, old id -> new, so a saved link still lands (Display became Theme).
+const OLD_PAGES = { display: "theme" };
+const pathOf = (route) => { const [first, second] = route.path; return [OLD_PAGES[first] ?? first, second]; };
+
 export function nav(route) {
-  const [first, second] = route.path;
+  const [first, second] = pathOf(route);
   if (first === LOGS) return { title: logsTitle(second) }; // N4: Console Logs
   if (first === "signing" && second === HELP) return { title: HELP_TITLE }; // F134: the walkthrough
   const key = second ?? first;
@@ -93,7 +100,7 @@ export function render(el, route) {
 
 function draw({ el, route }) {
   style();
-  const [first, second] = route.path;
+  const [first, second] = pathOf(route);
   const top = el.scrollTop;
   if (first === LOGS) el.replaceChildren(logsPage(second, () => draw({ el, route })));
   else if (first === "account") drawAccount(el); // F97
@@ -111,13 +118,13 @@ function draw({ el, route }) {
 function rootPage() {
   const frag = document.createDocumentFragment();
   const pageRows = settings.pages().filter((p) => p.id !== "signing")
-    .map((p) => ({ label: p.title, href: format(settingsRoute([p.id])) }));
+    .map((p) => ({ label: p.title, href: format(settingsRoute([p.id])), ...(PAGE_ICONS[p.id] ? { icon: rowIcon(PAGE_ICONS[p.id]) } : {}) }));
   frag.append(accountSection(), grouped([{ rows: pageRows }]), signingSection(), openInAppSection(), ipaSection(),
     logsSection(detectMode()), ...versionLines());
   return frag;
 }
 
-// A page under the root (General, Display, Updates): its groups, then what other parts of the app add there.
+// A page under the root (General, Theme, Updates): its groups, then what other parts of the app add there.
 function groupPage(id) {
   const frag = settingsGroups(settings.sections().filter((s) => s.page === id), id);
   if (id === "general") frag.append(sideloadingSection()); // F83, sideload build
@@ -131,18 +138,20 @@ function settingsGroups(list, page) {
   const switches = [];
   const sections = list.map((s) => {
     const rows = [];
+    // F205: a setting's tile (SETTING_ICONS); a choice's option rows stay bare.
+    const icon = (d) => (SETTING_ICONS[d.key] ? { icon: rowIcon(SETTING_ICONS[d.key]) } : {});
     for (const d of s.settings) {
       if (d.kind === "choice") {
         const v = settings.get(d.key);
         for (const o of d.options) rows.push({ label: o.label, checked: o.value === v, onClick: () => settings.set(d.key, o.value) });
       } else if (d.kind === "toggle") {
         switches.push([rows.length, d]);
-        rows.push({ label: d.label });
+        rows.push({ label: d.label, ...icon(d) });
       } else if (d.kind === "list") {
-        rows.push({ label: d.label, detail: optionLabel(d, settings.get(d.key)), href: format(settingsRoute([page, d.key])) });
+        rows.push({ label: d.label, detail: optionLabel(d, settings.get(d.key)), href: format(settingsRoute([page, d.key])), ...icon(d) });
       } else if (d.kind === "holds") {
         const n = settings.holds.list().length;
-        rows.push({ label: d.label, detail: n ? String(n) : "None", href: format(settingsRoute([page, "holds"])) });
+        rows.push({ label: d.label, detail: n ? String(n) : "None", href: format(settingsRoute([page, "holds"])), ...icon(d) });
       }
     }
     return { header: s.title, footer: s.footer, rows, id: s.id, switches: switches.splice(0) };
@@ -393,7 +402,7 @@ const OTHER_LINKS_FOOTER = `AltStore, SideStore, Feather and other sideloaders' 
 function sideloadingSection(mode = detectMode()) {
   const box = document.createElement("div");
   if (mode !== "sideload") return box;
-  const frag = grouped([{ header: "Sideloading", rows: [{ label: "Open Other Apps' Links" }], footer: OTHER_LINKS_FOOTER }]);
+  const frag = grouped([{ header: "Sideloading", rows: [{ label: "Open Other Apps' Links", icon: rowIcon("otherLinks") }], footer: OTHER_LINKS_FOOTER }]);
   const cell = frag.querySelector(".cell-inner");
   cell?.append(createSwitch({ label: "Open Other Apps' Links", checked: otherLinksOn(), onToggle: (on) => setOtherLinks(on) }));
   cell?.classList.add("has-switch");
@@ -602,7 +611,7 @@ function browseButton(accept, multiple, onFiles) {
 // the phone; the server sees the app's ID, version and name).
 
 // F128: the root's Signing row, the certificate as its detail (the page explains the rest).
-const signingRow = (box, detail) => box.replaceChildren(grouped([{ rows: [{ label: "Signing", detail, href: format(settingsRoute(["signing"])) }] }]));
+const signingRow = (box, detail) => box.replaceChildren(grouped([{ rows: [{ label: "Signing", detail, href: format(settingsRoute(["signing"])), icon: rowIcon("signing") }] }]));
 function deviceSigningSection(box) {
   const fill = (detail) => signingRow(box, detail);
   fill("");
@@ -709,10 +718,10 @@ async function deviceSigningState(el) {
 const serverGroup = (el) => {
   const server = getServer();
   return grouped([{ header: "Signing Server", rows: [
-    serverRow({ server, fallback: defaultServer(), ask: () => askServer(el) }),
-    { label: "Check Server", onClick: () => checkServer() },
+    { ...serverRow({ server, fallback: defaultServer(), ask: () => askServer(el) }), icon: rowIcon("server") },
+    { label: "Check Server", onClick: () => checkServer(), icon: rowIcon("checkServer") },
     // Nothing depends on our own server: anyone can run their own, free (worker/README.md's Deploy to Cloudflare).
-    { label: "Run Your Own", subtitle: "Free on Cloudflare, about a minute", chevron: true,
+    { label: "Run Your Own", subtitle: "Free on Cloudflare, about a minute", chevron: true, icon: rowIcon("runYourOwn"),
       onClick: () => window.open(RUN_YOUR_OWN, "_blank", "noopener") }] }]);
 };
 
@@ -824,7 +833,7 @@ function certificateGroup(el, { rows, has, staged, notes = [], footer }) {
   return frag;
 }
 
-const helpGroup = () => grouped([{ rows: [{ label: HELP_TITLE, href: format(settingsRoute(["signing", HELP])) }] }]);
+const helpGroup = () => grouped([{ rows: [{ label: HELP_TITLE, href: format(settingsRoute(["signing", HELP])), icon: rowIcon("help") }] }]);
 
 // The page from its parts, in signingLayout's order, keeping the scroll position.
 function showSigningPage(el, layout, parts) {
@@ -922,7 +931,7 @@ function siteAppSection(id) {
     footer: `${NAME} as an app, signed here with this certificate. It signs apps on the iPhone itself.` }]);
   frag.firstChild.classList.add("app-offer");
   frag.querySelector(".cell-icon")?.classList.add("home-glyph", "glyph-install");
-  const bring = grouped([{ rows: [{ label: "Bring My Certificate" }],
+  const bring = grouped([{ rows: [{ label: "Bring My Certificate", icon: rowIcon("syncCert") }],
     footer: `Puts a copy of your certificate inside the app, so ${NAME} has it on first launch.` }]);
   const cell = bring.querySelector(".cell-inner");
   cell?.append(createSwitch({ label: "Bring my certificate into the app", checked: getBring(), onToggle: (on) => setBring(on) }));

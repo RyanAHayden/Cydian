@@ -96,14 +96,18 @@ export function initScroller(screens) {
   const stopGlide = () => { cancelAnimationFrame(glide); glide = 0; };
   document.addEventListener("pointerdown", (e) => { if (e.target !== sb) stopGlide(); }, { capture: true, passive: true });
   // Hitting an end with speed left: the page runs on past it and springs back, like UIScrollView's bounce. A
-  // scroller can't scroll past its ends from script, so the page body itself moves (transform only), showing the
+  // scroller can't scroll past its ends from script, so what's in the page body moves (transform only), showing the
   // background behind it as the rubber band does. Farther the faster, up to 80 px.
   function bounce(el, v) {
     const d = Math.min(80, Math.abs(v) * 22) * (v < 0 ? 1 : -1);
     if (Math.abs(d) < 4) return;
     // Out quickly (the speed it hit with), then UIKit's slow settle back (user 2026-11-17: 520 ms snapped too fast).
-    el.animate([{ transform: "none", easing: "cubic-bezier(.15,.6,.35,1)" }, { transform: `translateY(${d}px)`, offset: 0.2,
-      easing: "cubic-bezier(.3,0,.15,1)" }, { transform: "none" }], { duration: 950 });
+    // The content inside moves, not the scroller: the gap it opens shows the page's own background (pinstripes or
+    // white), not the black behind the page (user 2026-11-17).
+    for (const c of el.children) {
+      c.animate([{ transform: "none", easing: "cubic-bezier(.15,.6,.35,1)" }, { transform: `translateY(${d}px)`, offset: 0.2,
+        easing: "cubic-bezier(.3,0,.15,1)" }, { transform: "none" }], { duration: 950 });
+    }
   }
 
   function fling(v) {

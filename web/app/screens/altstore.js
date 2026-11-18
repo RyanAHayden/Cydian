@@ -249,7 +249,22 @@ export function renderApp(body, route, pkg, source) {
       ...perm.privacy.map((p) => ({ label: p.name, subtitle: p.description || null })),
       ...perm.entitlements.map((e) => ({ label: entitlementLabel(e.name), subtitle: e.description || e.name })),
     ];
-    body.append(grouped([{ header: "Permissions", rows, footer: "What this app asks for, as its source lists it." }]));
+    // The first few, then a row that opens the rest in place (user 2026-11-17), the iOS 6 table look.
+    const FEW = 3;
+    const footer = "What this app asks for, as its source lists it.";
+    const more = rows.length - FEW;
+    const group = grouped([{ header: "Permissions", footer,
+      rows: more > 1 ? [...rows.slice(0, FEW), { label: `${more} More Permissions`, onClick: () => open() }] : rows }]).firstElementChild;
+    function open() {
+      const ul = group.querySelector("ul");
+      const toggle = ul.lastElementChild;
+      const extra = grouped([{ rows: rows.slice(FEW) }]).querySelector("ul");
+      const added = [...extra.children];
+      toggle.replaceWith(...added);
+      for (const li of added) li.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250 });
+    }
+    if (more > 1) group.querySelector("ul").lastElementChild.classList.add("perm-more");
+    body.append(group);
   }
 
   // F30: without a jailbreak (the site, the sideload build) nothing can ask the phone what it has, so tapping an

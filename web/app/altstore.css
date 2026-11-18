@@ -28,3 +28,14 @@
 .alt-shots { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
 .alt-shot { flex: none; height: 360px; aspect-ratio: 9 / 19.5; object-fit: cover; border-radius: 10px; scroll-snap-align: start;
   border: 1px solid rgba(0,0,0,.2); background: rgba(0,0,0,.05); }
+
+/* Permissions' "N More Permissions" row (screens/altstore.js): centred in iOS 6's table-button blue, a small down
+   chevron after it; tapping lists the rest in place. */
+.perm-more .cell-inner { justify-content: center; }
+.perm-more .cell-label { flex: none; color: #385487; font-weight: bold; text-align: center; }
+.perm-more .cell-label::after {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 0 3px 8px; vertical-align: middle;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg);
+}
+.perm-more .cell-inner:active .cell-label, .perm-more .cell-inner.is-pressed .cell-label { color: #fff; }
+html[data-theme="dark"] .perm-more .cell-label { color: #8fb0e8; }

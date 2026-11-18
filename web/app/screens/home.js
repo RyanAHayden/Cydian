@@ -20,6 +20,7 @@ import { sourceKey } from "../core/sources.js";
 import { settings } from "./settings.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
+import { currentDevice } from "../device.js";
 import { signAndInstall, signingAvailable, signingReady } from "../signing-client.js";
 import { homeFeatured } from "./extras.js";
 
@@ -301,7 +302,18 @@ function renderRoot(body) {
   const group = list.firstChild;
   group.classList.add("home-links");
   home.append(list);
+  // Cydia's line at the bottom of Home: the device, iOS, the installed version and the language
+  // ("iPhone4,1, iOS 6.1.3, Cydia 1.1.9 (en-us)").
+  const foot = el("p", "home-version", footLine({ ios: currentDevice().ios }));
+  home.append(foot);
+  globalThis.cydianNative?.call?.("app.info", {}).then((i) => { foot.textContent = footLine(i ?? {}); }, () => {});
   refreshState();
+}
+
+// The Home footer: "iPhone17,3, iOS 26.1, Cydian 0.1.1 (en-us)"; on the website "iPhone, iOS 26.1, Cydian Web (en-us)".
+export function footLine({ machine = "", ios = "", version = "" } = {}, lang = globalThis.navigator?.language ?? "en") {
+  const app = version ? `Cydian ${version}` : "Cydian Web";
+  return [machine || "iPhone", ios ? `iOS ${ios}` : "", app].filter(Boolean).join(", ") + ` (${String(lang).toLowerCase()})`;
 }
 
 // Our own help page: what Cydian lists, for which jailbreaks, and how upgrades reach the phone.

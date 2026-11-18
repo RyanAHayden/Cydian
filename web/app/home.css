@@ -75,3 +75,6 @@ html[data-theme="dark"] .home-links .cell + .cell { border-top-color: var(--divi
   font-size: 15px; line-height: 19px; color: var(--head); text-shadow: var(--emboss);
   text-decoration: none; -webkit-tap-highlight-color: transparent;
 }
+
+/* Cydia's footer line under Home's links: small, centred, embossed grey. */
+.home-version { margin: 14px 10px 6px; font-size: 13px; line-height: 16px; text-align: center; color: var(--head); text-shadow: var(--emboss); }

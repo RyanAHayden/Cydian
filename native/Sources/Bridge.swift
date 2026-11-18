@@ -27,6 +27,8 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             let info = Bundle.main.infoDictionary ?? [:]
             c.reply(["version": info["CFBundleShortVersionString"] ?? "", "build": info["CFBundleVersion"] ?? "",
                      "ios": UIDevice.current.systemVersion, "jailbreak": Jailbreak.type, "mode": AppMode.current.rawValue,
+                     // the model identifier (iPhone17,3), as Cydia's Home footer shows it
+                     "machine": { var u = utsname(); uname(&u); return withUnsafeBytes(of: &u.machine) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) } }(),
                      // F49: Telesphoreo's suite is ios/<this %.2f> (core/altstore.js coreFoundationDist)
                      "cf": kCFCoreFoundationVersionNumber,
                      // F56: which jailbreak's marker files exist (core/recommended.js jailbreakFromMarkers)

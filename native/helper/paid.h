@@ -19,4 +19,9 @@
  * HELPER_EX_EXEC with *err set. */
 int helper_install_paid(const char *prefix, struct helper_plan *plan, char *const env[], const char **err);
 
+/* N9: do a simulate-deb or install-deb plan: copy the caller's .deb from HELPER_DEB_DIR into a fresh root-owned
+ * directory (as install-paid, no control check), run the plan's apt-get on the copy, remove the directory. Same
+ * returns as helper_install_paid. */
+int helper_local_deb(const char *prefix, struct helper_plan *plan, char *const env[], const char **err);
+
 #endif

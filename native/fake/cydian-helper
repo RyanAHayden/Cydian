@@ -23,6 +23,10 @@
 #   install-paid (F57) takes a "downloaded .deb" from $CYDIAN_PAID_DIR (the real one's HELPER_PAID_DIR): a plain text
 #                  control stanza as rollback's, checked to be the package and version asked, then written into
 #                  dpkg's status like rollback does. FAKE_FAIL=install-paid fails like apt (exit 100)
+#   simulate-deb/install-deb (N9) take a shared ".deb" from $CYDIAN_DEB_DIR (the real one's HELPER_DEB_DIR): a plain
+#                  text control stanza as install-paid's, no check of what it is. Its Depends: (names, comma separated)
+#                  are resolved as apt would: installed ones skipped, ones in apt's lists installed too, any other an
+#                  unmet dependency (exit 100). FAKE_FAIL=install-deb fails like apt (exit 100)
 # Status lines go to fd 3 when it is open, like apt's APT::Status-Fd. SPDX-License-Identifier: GPL-3.0-or-later
 set -u
 prefix=${CYDIAN_PREFIX:?}
@@ -31,7 +35,7 @@ status=$prefix/var/lib/dpkg/status
 st() { { printf '%s\n' "$1" >&3; } 2>/dev/null || true; }
 refuse() { echo "cydian-helper: $1" >&2; exit 64; }
 verb=${1:-}
-VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid, userspace-reboot"
+VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid, userspace-reboot, simulate-deb, install-deb"
 [ -n "$verb" ] || refuse "no verb ($VERBS)"
 shift
 sources=$prefix/etc/apt/sources.list.d/cydian.sources
@@ -244,6 +248,67 @@ print(v)' "$1")
       echo; } > "$status.new" && mv "$status.new" "$status"
     echo "Setting up $2 ($3) ..."
     st "pmstatus:$2:100:Installed $2"
+    exit 0 ;;
+  simulate-deb|install-deb)
+    # N9: policy.c's local_deb_plan (helper_paid_path_ok over HELPER_DEB_DIR), then paid.c's copy and apt-get.
+    [ $# -eq 1 ] || refuse "$verb takes one .deb path"
+    dir=${CYDIAN_DEB_DIR:?}
+    case $1 in "$dir"/*) name=${1#"$dir"/} ;; *) name= ;; esac
+    { one_line "$1" && [ ${#name} -le 255 ] && printf '%s' "$name" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]*\.deb' &&
+      case $name in *..*) false ;; esac; } || refuse "bad .deb path (only $dir/<name>.deb)"
+    { [ -f "$1" ] && [ ! -L "$1" ] && [ -s "$1" ]; } || refuse "can't open the .deb (missing, or a link)"
+    deb=$(sed '1{/^!<arch>$/d}' "$1")
+    pkg=$(printf '%s\n' "$deb" | sed -n 's/^Package:[ \t]*//p' | head -n 1)
+    ver=$(printf '%s\n' "$deb" | sed -n 's/^Version:[ \t]*//p' | head -n 1)
+    deps=$(printf '%s\n' "$deb" | sed -n 's/^Depends:[ \t]*//p' | head -n 1 | tr ',' ' ')
+    [ -n "$pkg" ] && [ -n "$ver" ] || { echo "E: Invalid archive signature" >&2; echo "E: Could not read meta data from $1" >&2; exit 100; }
+    echo "Reading package lists..."
+    echo "Note, selecting '$pkg' instead of '$1'"
+    # the newest-listed version of $1 in apt's lists (versions_in below isn't defined yet here)
+    # Line by line: the fixture's lists have stanzas parted by a line of spaces, which awk's paragraph mode misses.
+    lv() { cat "$lists"/*_Packages 2>/dev/null | awk -v p="$1" '/^Package:/ { if (name == p && v != "") { print v; done = 1; exit }
+        name = $2; v = "" } /^Version:/ { v = $2 } END { if (!done && name == p && v != "") print v }'; }
+    stanza_of() { cat "$lists"/*_Packages 2>/dev/null | awk -v p="$1" '/^Package:/ { if (on) exit; on = ($2 == p) }
+        /^[ \t]*$/ { if (on) exit; next } on { print }'; }
+    need=
+    for d in $deps; do
+      grep -qx "Package: $d" "$status" 2>/dev/null && continue
+      if cat "$lists"/*_Packages 2>/dev/null | grep -qx "Package: $d"; then need="$need $d"; continue; fi
+      echo "The following packages have unmet dependencies:"
+      echo " $pkg : Depends: $d but it is not installable"
+      echo "E: Unable to correct problems, you have held broken packages." >&2
+      exit 100
+    done
+    if [ "$verb" = simulate-deb ]; then
+      for d in $need; do v=$(lv "$d"); echo "Inst $d ($v Fake:1.0/stable [iphoneos-arm64])"; done
+      old=$(awk -v p="$pkg" 'BEGIN { RS = "" } { n = split($0, l, "\n"); name = ""; v = ""
+          for (i = 1; i <= n; i++) { if (l[i] ~ /^Package:/) { name = l[i]; sub(/^Package:[ \t]*/, "", name) }
+            if (l[i] ~ /^Version:/) { v = l[i]; sub(/^Version:[ \t]*/, "", v) } }
+          if (name == p) { print v; exit } }' "$status" 2>/dev/null)
+      if [ -n "$old" ]; then echo "Inst $pkg [$old] ($ver local-deb [iphoneos-arm64])"
+      else echo "Inst $pkg ($ver local-deb [iphoneos-arm64])"; fi
+      for d in $need; do v=$(lv "$d"); echo "Conf $d ($v Fake:1.0/stable [iphoneos-arm64])"; done
+      echo "Conf $pkg ($ver local-deb [iphoneos-arm64])"
+      exit 0
+    fi
+    st "pmstatus:$pkg:50:Preparing $pkg"
+    echo "Unpacking $pkg ($ver) ..."
+    if [ "${FAKE_FAIL:-}" = install-deb ]; then
+      echo "E: Sub-process /usr/bin/dpkg returned an error code (1)" >&2
+      exit 100
+    fi
+    for d in $need $pkg; do
+      if [ "$d" = "$pkg" ]; then stanza=$deb
+      else stanza=$(stanza_of "$d"); fi
+      { awk -v p="$d" 'BEGIN { RS = ""; ORS = "\n\n" } { n = split($0, l, "\n"); name = ""
+          for (i = 1; i <= n; i++) if (l[i] ~ /^Package:/) { name = l[i]; sub(/^Package:[ \t]*/, "", name) }
+          if (name != p) print }' "$status"
+        printf '%s\n' "$stanza" | awk 'NR == 1 { print; print "Status: install ok installed"; next } { print }'
+        echo; } > "$status.new" && mv "$status.new" "$status"
+      echo "Setting up $d ..."
+    done
+    st "pmstatus:$pkg:100:Installed $pkg"
+    [ -n "${FAKE_FINISH:-}" ] && st "finish:$FAKE_FINISH"
     exit 0 ;;
   *) refuse "unknown verb ($VERBS)" ;;
 esac

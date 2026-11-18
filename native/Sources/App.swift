@@ -53,6 +53,7 @@ enum Incoming {
     private static var pending: String?
 
     static func receive(_ url: URL) {
+        if SharedInbox.receive(url) { return } // N9: shared .ipa/.deb files and the share extension's links
         if MyIPAs.receive(url) { return } // F77: an .ipa file goes into My IPAs, which then sends cydian://myipas
         guard IncomingLink.accepts(url) || OtherLink.accepts(url) else { return } // F83: other sideloaders' links too
         pending = url.absoluteString

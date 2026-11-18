@@ -709,3 +709,6 @@ async function saveOptions(file) {
 }
 
 export { STATE_LABELS };
+
+// N9: an IPA shared with Cydian (share.js): Install, as the IPA page's button does (signs, installs, remembers it).
+export const installLibraryFile = (file) => install(file);

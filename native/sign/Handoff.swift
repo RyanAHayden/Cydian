@@ -7,7 +7,7 @@
 //                      the bundle is read-only, so its digest is remembered and the same file is never looked at again.
 //   IncomingLink       which cydian:// links the shell hands to the page: cydian://import?d=… (sources and settings)
 //                      and cydian://signing-import#… (Import from Safari's ciphertext), cydian://myipas (F77) and
-//                      cydian://add?url=… (N8's Add Source intent); nothing else, nothing huge.
+//                      cydian://add?url=… (N8's Add Source intent), cydian://shared?route=… (N9); nothing else, nothing huge.
 //   gunzip(_:)         a gzip member's contents, for the page on an iOS without DecompressionStream (app.gunzip)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
@@ -36,7 +36,8 @@ enum BundledIdentity {
 
 enum IncomingLink {
     // myipas: F77, an .ipa opened in Cydian; add: N8, the Add Source intent (cydian://add?url=…)
-    static let hosts: Set<String> = ["import", "signing-import", "myipas", "add"]
+    // shared: N9, a shared item's route (native/share/, web/app/share.js)
+    static let hosts: Set<String> = ["import", "signing-import", "myipas", "add", "shared"]
     static let maxLength = 512 * 1024
 
     static func accepts(_ url: URL) -> Bool {

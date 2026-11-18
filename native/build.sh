@@ -68,7 +68,8 @@ ln -sfn "$tc/usr/lib/swift/clang" "$rd/clang"
   -import-objc-header Sources/Cydian-Bridging-Header.h \
   -emit-const-values-path "$out/Cydian.swiftconstvalues" \
   -Xfrontend -const-gather-protocols-file -Xfrontend intents/protocols.json \
-  -module-name Cydian -c Sources/*.swift sign/*.swift intents/*.swift intents/App/*.swift -o "$out/Cydian.o"
+  -module-name Cydian -c Sources/*.swift sign/*.swift intents/*.swift intents/App/*.swift share/*.swift share/App/*.swift \
+  -o "$out/Cydian.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/availability.c -o "$out/availability.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/mode.c -o "$out/mode.o"
 # The app's half of the root helper (cydian_helper_spawn), and the helper itself (N2's native/helper/).
@@ -122,6 +123,9 @@ bundle() {
   python3 intents/metadata.py build "$out/Cydian.swiftconstvalues" "$app/Metadata.appintents" "${only[@]}" >/dev/null
   SWIFTC=$swiftc SDK=$sdk RD=$rd LLD=$lld OUT=$out VERSION=$version BUILD=$build LDID=$ldid RCODESIGN=$rcodesign \
     widget/build.sh "$variant" "$app"
+  # N9: the share extension (share/build.sh): a shared link -> cydian://share?url=…
+  SWIFTC=$swiftc SDK=$sdk RD=$rd LLD=$lld OUT=$out VERSION=$version BUILD=$build LDID=$ldid RCODESIGN=$rcodesign \
+    share/build.sh "$variant" "$app"
   [ -z "$overlay" ] || python3 mkipa.py plist "$app/Info.plist" "$overlay" "$app/Info.plist"
   printf 'APPL????' > "$app/PkgInfo"
 }

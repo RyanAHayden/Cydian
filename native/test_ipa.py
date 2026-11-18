@@ -134,8 +134,13 @@ class Ipa(unittest.TestCase):
         self.assertIn("no code signature", p)
 
     def test_jailbreak_plist_flagged(self):
+        # Without the sideload overlay. N9 put the cydian:// scheme and the .ipa/.deb types in the base Info.plist (the
+        # jailbreak build takes shared files and the share extension's links too), so drop them to see they're checked.
+        info = plistlib.loads(plist())
+        info.pop("CFBundleURLTypes", None)
+        info.pop("CFBundleDocumentTypes", None)
         with open(os.path.join(self.app, "Info.plist"), "wb") as f:
-            f.write(plist())  # without the sideload overlay
+            f.write(plistlib.dumps(info))
         p = " | ".join(self.problems())
         self.assertIn("UIBackgroundModes", p)
         self.assertIn("URL scheme", p)

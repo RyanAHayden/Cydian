@@ -13,6 +13,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper selfupdate <path.deb>                                    (F61: Cydian updates itself)
     cydian-helper rollbacks <pkg> | rollback <pkg> <version>              (F71: Roll Back to a kept .deb)
     cydian-helper install-paid <path.deb> <pkg> <version>                 (F57: a paid package's .deb)
+    cydian-helper simulate-deb <path.deb> | install-deb <path.deb>         (N9: a .deb shared with Cydian)
     cydian-helper notifications on|off                                     (F65: Upgrade Notifications)
     cydian-helper userspace-reboot                                         (N8: the Userspace Reboot intent)
 
@@ -118,6 +119,15 @@ directory; a plain file, one link, the directory owner's and not root's, at most
 must be the name and `Version` the version asked (rollback's check), so a vendor's or a swapped file can't install
 something else. Then apt-get installs the copy (dependencies from the sources), and the directory goes. Exit 64 for
 a refused path, file or control, 74 couldn't copy, else apt's.
+
+**Shared .debs (N9):** `simulate-deb <path>` and `install-deb <path>` take one file,
+`/var/mobile/Library/Caches/com.ryha.cydian/deb/<name>.deb` (`HELPER_DEB_DIR`, where the shell stages a .deb another
+app shared, `../share/App/ShareBridge.swift`; name as install-paid's). `paid.c` copies it as install-paid does into a
+root-owned `/var/tmp/cydian-deb.XXXXXX/deb.deb`, with no control check (any .deb, as `selfupdate`: the caller check is
+the boundary), then runs `apt-get -s --reinstall --allow-downgrades install <copy>` (the Confirm sheet's plan) or
+`apt-get -y` (conffile options) `--reinstall --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install
+<copy>` with `CYDIA=3 1` (the console), so apt pulls dependencies from the sources (`apt install ./file.deb`). Exit 64
+for a refused path or file, 74 couldn't copy, else apt's.
 
 - **Arguments:** only the verb and package names. A name matches `[a-z0-9][a-z0-9.+-]+` (so never an option), is
   at most 255 bytes, at most 256 of them, and must be known: for `install` a `Package:` line in dpkg's status or an

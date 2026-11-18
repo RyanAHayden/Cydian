@@ -18,10 +18,10 @@
 enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, HV_HOLD, HV_UNHOLD, HV_SHOWHOLD,
                    HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA, HV_SELFUPDATE,
                    HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK, HV_INSTALL_PAID, HV_NOTIFICATIONS,
-                   HV_USERSPACE_REBOOT };
+                   HV_USERSPACE_REBOOT, HV_SIMULATE_DEB, HV_INSTALL_DEB };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
                      "simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid, " \
-                     "notifications, userspace-reboot"
+                     "notifications, userspace-reboot, simulate-deb, install-deb"
 
 /* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
  * Downgrade and Reinstall pick theirs), "-name" removes. apt gets "name", "name=version" and "name-" in one
@@ -121,6 +121,19 @@ int helper_rollback_verify(const char *prefix, const char *deb, const char *id, 
 /* 1 if path is <dir>/<name> with name [A-Za-z0-9][A-Za-z0-9._-]* ending in ".deb", at most HELPER_IPA_NAME_MAX
  * bytes, no "..". */
 int helper_paid_path_ok(const char *dir, const char *path);
+
+/* N9: simulate-deb <path> | install-deb <path>: a .deb another app handed Cydian (Open in Cydian, the share sheet),
+ * which the app copied into <HELPER_DEB_DIR>/<name>.deb (name as helper_paid_path_ok). paid.c copies it into a
+ * root-owned work directory as install-paid does, then runs apt-get on the copy, so apt resolves its dependencies
+ * from the sources (`apt install ./file.deb`):
+ *   simulate-deb  apt-get -s --reinstall --allow-downgrades install <copy>       (the Confirm sheet's plan)
+ *   install-deb   apt-get -y (conffile options) --reinstall --allow-downgrades [-o APT::Keep-Fds::=3 -o
+ *                 APT::Status-Fd=3] install <copy>, CYDIA=3 1 as for apply           (the console)
+ * No control check: any .deb is accepted, as selfupdate does; the caller check is the boundary. Tests build with
+ * their own -DHELPER_DEB_DIR. */
+#ifndef HELPER_DEB_DIR
+#define HELPER_DEB_DIR "/var/mobile/Library/Caches/com.ryha.cydian/deb"
+#endif
 
 /* 1 if s is a package name the helper passes on: [a-z0-9][a-z0-9.+-]+, at most HELPER_NAME_MAX bytes. */
 int helper_name_ok(const char *s);

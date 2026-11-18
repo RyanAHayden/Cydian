@@ -320,12 +320,15 @@ if (standalone) {
 router.start();
 // First launch of a Cydian installed from the website: its signed copy carries the website's sources, settings and
 // certificate as web/transfer.link (the Signing Server's bring + transfer); import them once, no question.
+// Each install from the website carries its own link, so a reinstall or an update sent from there brings the
+// website's latest along too: imported whenever the link differs from the last one imported.
 if (globalThis.cydianNative) {
-  let done = null;
-  try { done = localStorage.getItem("cydian.transferDone"); } catch { /* private */ }
-  if (!done) fetch("transfer.link", { cache: "no-store" }).then((r) => (r.ok ? r.text() : null)).then(async (link) => {
-    if (!link || !link.startsWith("cydian://import?")) return;
-    try { localStorage.setItem("cydian.transferDone", "1"); } catch { /* asks again next launch */ }
+  let last = null;
+  try { last = localStorage.getItem("cydian.transferDone"); } catch { /* private */ }
+  fetch("transfer.link", { cache: "no-store" }).then((r) => (r.ok ? r.text() : null)).then(async (link) => {
+    link = link?.trim();
+    if (!link || !link.startsWith("cydian://import?") || link === last) return;
+    try { localStorage.setItem("cydian.transferDone", link); } catch { /* imports again next launch */ }
     const { handleIncoming } = await import("./incoming.js");
     await handleIncoming(link.trim());
   }).catch(() => {});

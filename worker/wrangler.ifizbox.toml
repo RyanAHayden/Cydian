@@ -6,9 +6,9 @@ main = "src/index.js"
 assets = { directory = "../web/app", binding = "ASSETS", not_found_handling = "single-page-application", run_worker_first = ["/sign/*", "/api/*", "/healthz", "/repo", "/repo/*"] }
 compatibility_date = "2026-11-01"
 routes = [
-  # ifizbox.com and www: zone routes over the zone's proxied DNS records (as cydian.dev had); sign: a custom domain.
-  { pattern = "ifizbox.com/*", zone_name = "ifizbox.com" },
-  { pattern = "www.ifizbox.com/*", zone_name = "ifizbox.com" },
+  # Custom domains: Cloudflare makes their DNS records and certificates (the zone needs no records of its own for them).
+  { pattern = "ifizbox.com", custom_domain = true },
+  { pattern = "www.ifizbox.com", custom_domain = true },
   { pattern = "sign.ifizbox.com", custom_domain = true },
 ]
 

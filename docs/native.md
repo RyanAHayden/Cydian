@@ -202,7 +202,8 @@ folder in the Files app. Paste the table here when it exists.
 - The app gets those four entitlements. It runs one small helper, `/var/jb/usr/libexec/cydian/cydian-helper`, as
   root through the persona attributes. The helper has no setuid bit.
 - The helper keeps N2's allowlist: only `apt-get update|install|remove|upgrade` and `dpkg --configure -a`, package
-  names matching `[a-z0-9.+-]+`, no options from the caller. Then it `execv`s apt from the resolved prefix. So all
+  names matching `[a-z0-9.+-]+`, no options from the caller (N4 added the queue's `simulate`/`apply`, one
+  `apt-get [-s] install` over `name`, `name=version` and `-name` items, and `respring`: native/helper/README.md). Then it `execv`s apt from the resolved prefix. So all
   root work goes through one checked place even though the app could spawn anything.
 - **Caller check:** without a setuid bit the helper can't become root unless an entitled process spawns it. Any other
   process running it gets plain `mobile`, and apt fails on the lock files. So the check that matters is the

@@ -34,6 +34,8 @@ import { openInGroup } from "./handoff.js";
 import { healthOf } from "../core/health.js";
 import { addSource } from "./manage.js";
 import { featuredStrip, paymentGroup } from "./extras.js";
+import { installQueue } from "../queue.js";
+import { queuedFor, MODE_LABEL } from "../core/queue.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -267,6 +269,8 @@ function iconSrc(item) {
 
 function bindRow(row, item, route) {
   const r = row._;
+  row._item = item;
+  row.dataset.id = item.id;
   r.a.href = deeper(route, token("package", item.id));
   r.name.textContent = item.name;
   r.version.textContent = item.version;
@@ -276,6 +280,7 @@ function bindRow(row, item, route) {
   const flagged = Boolean(item.exact && isIncompatible(item.compat));
   r.name.classList.toggle("incompatible", flagged);
   r.desc.textContent = flagged && item.why ? item.why : item.short;
+  markQueued(row);
   r.letter.textContent = indexLetter(item.name) === "#" ? item.name.charAt(0) : indexLetter(item.name);
   r.icon.style.background = tint(item.section);
   const src = iconSrc(item);
@@ -288,6 +293,33 @@ function bindRow(row, item, route) {
     if (r.img.dataset.url) { r.img.removeAttribute("src"); delete r.img.dataset.url; }
   }
 }
+
+// N4: a queued package's row says so at once, in every list (Zebra #1992, #1892): Cydia's "Queued for <mode>" in
+// place of the description, and data-queued for queue.css's tint. Rows on screen are redrawn on every change.
+function markQueued(row) {
+  const item = row._item;
+  if (!item) return;
+  const job = installQueue.get(item.id);
+  if (job) row.dataset.queued = job.mode; else delete row.dataset.queued;
+  if (job) row._.desc.textContent = queuedFor(job.mode);
+  else if (row._.desc.textContent.startsWith("Queued for ")) {
+    const flagged = Boolean(item.exact && isIncompatible(item.compat));
+    row._.desc.textContent = flagged && item.why ? item.why : item.short;
+  }
+}
+
+// The package page's "Package Queue" row (Cydia's), shown while the package is queued.
+function fillQueueSlot(slot) {
+  const job = installQueue.get(slot.dataset.id);
+  slot.replaceChildren(job ? grouped([{ header: "Package Queue", rows: [{ label: MODE_LABEL[job.mode] + (job.version && job.mode !== "remove" ? ` ${job.version}` : ""),
+    detail: "Queued" }], footer: "Confirm from the Installed tab's Queue button, or tap Modify > Clear." }]) : "");
+}
+
+installQueue.subscribe(() => {
+  if (!globalThis.document) return;
+  for (const row of document.querySelectorAll(".pkg-row[data-id]")) markQueued(row);
+  for (const slot of document.querySelectorAll(".package-queue-slot[data-id]")) fillQueueSlot(slot);
+});
 
 function loadIcon(row, item) {
   const src = iconSrc(item);
@@ -491,6 +523,12 @@ async function renderPackage(body, route, key, id, ctx) {
   if (history?.versions.length) body.append(versionHistoryRow(route, id, history));
   body.append(grouped([{ header: "Works on My Phone", rows: [{ label: compatBadge(fitCode) }],
     footer: fit.detail }]));
+  if (queueOf()) {
+    const slot = el("div", "package-queue-slot");
+    slot.dataset.id = st.package || id;
+    fillQueueSlot(slot);
+    body.append(slot);
+  }
   const installedEl = await installedGroup(st.package || id);
   if (installedEl) body.append(installedEl);
   if (depReport?.problems.length) body.append(depProblemsGroup(depReport, route, ctx));
@@ -529,7 +567,8 @@ function rememberPackage(body, route, page) {
 }
 
 const installedOf = (history) => history?.versions.find((v) => v.installed)?.version ?? null;
-const queueOf = () => { const b = getBackend(); return typeof b.queue === "function" ? (job) => b.queue(job) : null; };
+// N4: `extra` ({ installed, name }) goes with every job, so the queue knows the mode (Reinstall, Downgrade...) at once.
+const queueOf = (extra = {}) => { const b = getBackend(); return typeof b.queue === "function" ? (job) => b.queue({ ...extra, ...job }) : null; };
 const isPaid = (st) => /(^|,)\s*cydia::commercial\s*(,|$)/.test(st?.tag ?? "");
 const versionsHref = (route, id) => deeper(route, token("versions", id));
 const go = (href) => { location.hash = href.replace(/^#/, ""); };
@@ -576,12 +615,17 @@ async function packageActions(route, button) {
     if (!options.itms && signingAvailable()) actions.push({ label: "Sign with My Certificate", run: () => go(format({ tab: "settings", path: ["signing"] })) });
     return sheet(options.itms ? "" : "This app needs signing: a sideloader signs it on the iPhone with your Apple ID, or add your own certificate in Settings > Signing.", actions);
   }
-  const queue = queueOf();
   const installed = installedOf(history);
+  const queue = queueOf({ installed, name: pkg.row?.name });
   const older = installed ? history.versions.filter((v) => v.keys.length && compareVersions(v.version, installed) < 0) : [];
+  // Cydia's first action on a queued package: Clear (N4).
+  if (queue && installQueue.get(st.package || id)) actions.push({ label: "Clear", run: () => installQueue.clear(st.package || id) });
   if (queue) {
     if (installed) {
-      actions.push({ label: "Reinstall", run: () => queue({ op: "install", id, version: installed }) });
+      // Cydia's order: Upgrade or Reinstall (only what a source can download), then Remove, then Downgrade.
+      const newest = history.versions.find((v) => v.keys.length);
+      if (newest && compareVersions(newest.version, installed) > 0) actions.push({ label: "Upgrade", run: () => queue({ op: "install", id, version: newest.version }) });
+      if (history.versions.some((v) => v.installed && v.keys.length)) actions.push({ label: "Reinstall", run: () => queue({ op: "install", id, version: installed }) });
       actions.push({ label: "Remove", run: () => queue({ op: "remove", id }) });
       if (older.length) actions.push({ label: "Downgrade", run: () => sheet("", older.map((v) => ({ label: v.version, run: () => queue({ op: "install", id, version: v.version }) }))) });
     } else {
@@ -682,10 +726,10 @@ async function renderVersions(body, route, key, id) {
     body.append(versionsGroup(cells, `Every version ${history.name}'s source lists.${off ? " Greyed ones don't run on this iPhone or have no download." : ""}`));
     return;
   }
-  const queue = queueOf();
   const st = pkg.stanza;
   const site = getBackend().kind === "http";
   const installed = installedOf(history);
+  const queue = queueOf({ installed, name: history.name });
   const cells = history.versions.map((v) => {
     const tags = [];
     if (v.candidate) tags.push("Latest");

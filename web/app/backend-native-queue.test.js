@@ -1,0 +1,123 @@
+// N4: the install queue's backend calls against the fake helper (native/fake/cydian-helper simulate | apply |
+// respring): what apt would change, apt's refusal explained in F18's words, the console's streamed lines, dpkg's
+// status after the run, and a downgrade by version.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { copyFileSync, readdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { createNativeBackend } from "./backend-native.js";
+import { createCatalog, ALL } from "./core/catalog.js";
+import { repoLayout } from "./core/apt.js";
+import { createQueue, parseStatusLine, finishOf } from "./core/queue.js";
+import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
+import { fakeIndexedDB } from "../../native/fake/fake-indexeddb.mjs";
+
+// apt-get update already ran: the remote lists are in apt's lists directory (plus an older Example Tweak).
+function setup(t, { env = {}, mode = "jailbreak" } = {}) {
+  const fx = makeFixture();
+  t.after(fx.cleanup);
+  const lists = join(fx.prefix, "var/lib/apt/lists");
+  for (const f of readdirSync(join(fx.remote, "lists"))) copyFileSync(join(fx.remote, "lists", f), join(lists, f));
+  writeFileSync(join(lists, "old.example_._Packages"), "Package: com.example.tweak\nVersion: 0.9\nArchitecture: iphoneos-arm64\n" +
+    "Name: Example Tweak\nDepends: mobilesubstrate\nFilename: debs/t_0.9.deb\nSize: 90\nDescription: an example tweak\n");
+  const native = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: null, env });
+  const queue = createQueue();
+  const backend = createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB(), mode, queue } });
+  return { fx, native, backend, queue };
+}
+
+test("queue() exists in the jailbreak build only, and marks the package in the shared queue", async (t) => {
+  const { backend, queue } = setup(t);
+  const seen = [];
+  queue.subscribe((e) => seen.push(e.type));
+  backend.queue({ op: "install", id: "bash", version: "5.2" });
+  assert.equal(queue.get("bash").mode, "install");
+  assert.deepEqual(seen, ["add"]);
+  const side = setup(t, { mode: "sideload" }).backend;
+  assert.equal(typeof side.queue, "undefined");
+  assert.equal(typeof side.apply, "undefined");
+});
+
+test("simulate: apt-get -s over the queue, as the Confirm sheet's five lists", async (t) => {
+  const { backend, native } = setup(t);
+  const jobs = [
+    { op: "install", id: "bash", version: null },
+    { op: "install", id: "com.example.tweak", version: "0.9" },
+    { op: "install", id: "apt", version: "2.7.0" },
+    { op: "remove", id: "com.example.held" },
+  ];
+  const r = await backend.simulate(jobs);
+  assert.deepEqual(native.calls.at(-1).params.words, ["simulate", "bash", "com.example.tweak=0.9", "apt=2.7.0", "-com.example.held"]);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.plan.installs, [{ id: "bash", from: null, to: "5.2" }]);
+  assert.deepEqual(r.plan.downgrades, [{ id: "com.example.tweak", from: "1.0", to: "0.9" }]);
+  assert.deepEqual(r.plan.upgrades.map((e) => e.id), ["apt"]);
+  assert.deepEqual(r.plan.removes, [{ id: "com.example.held", from: "1.0", to: null }]);
+  assert.match(r.output, /NOTE: This is only a simulation!/);
+});
+
+test("simulate: apt's refusal comes back with its output, and F18 explains it above", async (t) => {
+  const { backend } = setup(t, { env: { FAKE_FAIL: "simulate", FAKE_MISSING: "mobilesubstrate" } });
+  const r = await backend.simulate([{ op: "install", id: "com.example.tweak", version: null }]);
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 100);
+  assert.match(r.output, /unmet dependencies/);
+  assert.match(r.output, /E: Unable to correct problems/);
+  const catalog = await loaded(backend);
+  const problems = catalog.aptProblems(r.output);
+  assert.equal(problems.length, 1);
+  assert.equal(problems[0].kind, "missing");
+  assert.match(problems[0].sentence, /Example Tweak needs mobilesubstrate/);
+  assert.deepEqual(problems[0].action, { kind: "add-source", name: "ElleKit", url: "https://ellekit.space/", label: "Add ElleKit" });
+});
+
+test("a refused item (unknown package) is an error with the helper's words, never silent", async (t) => {
+  const { backend } = setup(t);
+  await assert.rejects(backend.simulate([{ op: "remove", id: "bash" }]), (e) => e.code === "helper" && /unknown package: bash/.test(e.message));
+});
+
+test("apply: the console streams apt's lines and status, then dpkg's status shows the new state", async (t) => {
+  const { backend } = setup(t, { env: { FAKE_FINISH: "restart" } });
+  const events = [];
+  const r = await backend.apply([{ op: "install", id: "com.example.tweak", version: "0.9" }, { op: "remove", id: "com.example.held" }],
+    (e) => events.push(e));
+  assert.equal(r.code, 0);
+  const out = events.filter((e) => e.fd === "out").map((e) => e.line);
+  assert.ok(out.includes("Unpacking com.example.tweak (0.9) over (1.0) ..."));
+  assert.ok(out.includes("Removing com.example.held (1.0) ..."));
+  const status = events.filter((e) => e.fd === "status").map((e) => parseStatusLine(e.line));
+  assert.deepEqual(status.find((s) => s.type === "status" && s.percent === 100), { type: "status", pkg: "com.example.tweak", percent: 100, text: "Installed com.example.tweak" });
+  assert.equal(finishOf(...status.filter((s) => s.type === "finish").map((s) => s.finish)), "restart");
+  const catalog = await loaded(backend);
+  assert.deepEqual(catalog.installed().map((p) => [p.id, p.version]).sort(), [["apt", "2.6.0"], ["com.example.tweak", "0.9"]]);
+  assert.deepEqual(catalog.queueInfo(["com.example.tweak", "bash"]), {
+    "com.example.tweak": { name: "Example Tweak", restart: true }, // the 0.9 build depends on mobilesubstrate
+    bash: { name: "bash", restart: false },
+  });
+});
+
+test("apply: a failing run resolves with apt's exit code and its error on stderr", async (t) => {
+  const { backend } = setup(t, { env: { FAKE_FAIL: "apply" } });
+  const events = [];
+  const r = await backend.apply([{ op: "install", id: "bash", version: null }], (e) => events.push(e));
+  assert.equal(r.code, 100);
+  assert.ok(events.some((e) => e.fd === "err" && /returned an error code/.test(e.line)));
+});
+
+test("respring runs the helper's respring verb", async (t) => {
+  const { backend, native } = setup(t);
+  await backend.respring();
+  assert.deepEqual(native.calls.at(-1).params.words, ["respring"]);
+});
+
+async function loaded(backend) {
+  const catalog = createCatalog();
+  for (const s of await backend.sources()) {
+    const layout = repoLayout(s);
+    const texts = await Promise.all(layout.packages.map(async (f) => (await backend.packages(f.slice(0, -8))).text));
+    catalog.load(s.key, texts.join("\n\n"), layout.root);
+  }
+  catalog.load("deb:https://old.example/:./", (await backend.packages("https://old.example/")).text, "https://old.example/");
+  catalog.setInstalled(await backend.dpkgStatus());
+  return catalog;
+}

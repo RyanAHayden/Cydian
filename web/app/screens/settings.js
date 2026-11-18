@@ -14,6 +14,7 @@ import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, summary, profileKind, DEFAULT_SERVER } from "../core/signing.js";
 import { sortCertFiles, findPassword } from "../core/certfiles.js";
+import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus } from "../signing-client.js";
 
 export const title = "Settings";
@@ -32,6 +33,7 @@ export function nav(route) {
   const key = route.path[0];
   if (key === "holds") return { title: "Ignored Upgrades" };
   if (key === "signing") return { title: "Signing" };
+  if (key === LOGS) return { title: logsTitle(route.path[1]) }; // N4: Console Logs
   if (key && defOf(key)) return { title: defOf(key).label };
   return { title: "Settings" };
 }
@@ -61,8 +63,9 @@ function draw({ el, route }) {
   const top = el.scrollTop;
   if (key === "holds") el.replaceChildren(holdsPage());
   else if (key === "signing") drawSigning(el);
+  else if (key === LOGS) el.replaceChildren(logsPage(route.path[1], () => draw({ el, route })));
   else if (key) el.replaceChildren(listPage(key));
-  else el.replaceChildren(rootPage(), signingSection(), pushSection());
+  else el.replaceChildren(rootPage(), signingSection(), pushSection(), logsSection(detectMode()));
   el.scrollTop = top;
 }
 

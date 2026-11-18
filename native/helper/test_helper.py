@@ -271,6 +271,72 @@ class Helper(unittest.TestCase):
         empty = tempfile.mkdtemp(dir=self.tmp)
         self.assertEqual(self.run_driver("known", empty, "install", "ab")[0], "ab")
 
+    # --- N4: the install queue (simulate / apply / respring)
+
+    def test_queue_plan(self):
+        apply_fixed = ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold",
+                       "--reinstall", "--allow-downgrades", "-o", "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3"]
+        self.assertEqual(self.plan("apply", "com.a.b", "com.c=1:1.0~b1+x-2", "-com.d"),
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *apply_fixed, "install", "com.a.b", "com.c=1:1.0~b1+x-2",
+                          "com.d-"])
+        self.assertEqual(self.plan("apply", "com.a.b", fd="-1")[2:], ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o",
+                         "Dpkg::Options::=--force-confold", "--reinstall", "--allow-downgrades", "install", "com.a.b"])
+        # simulate: apt-get -s, no status fd even when one is open (nothing to report)
+        self.assertEqual(self.plan("simulate", "com.a.b=2", "-com.d"),
+                         ["/var/jb/usr/bin/apt-get", "apt-get", "-s", "--reinstall", "--allow-downgrades", "install",
+                          "com.a.b=2", "com.d-"])
+        self.assertEqual(len(self.plan("apply", *[f"p{i:03d}" for i in range(256)])), 2 + 12 + 256)
+
+    def test_queue_refusals(self):
+        cases = {
+            ("apply",): "no packages",
+            ("simulate",): "no packages",
+            ("apply", "ab-"): "bad package name",  # apt would read it as a removal
+            ("apply", "ab+"): "bad package name",
+            ("apply", "--purge"): "bad package name",
+            ("apply", "-"): "bad package name",
+            ("apply", "--ab"): "bad package name",
+            ("apply", "-o"): "bad package name",
+            ("apply", "-ab=1.0"): "bad package name",  # a removal takes no version
+            ("apply", "ab=x1"): "bad version",
+            ("apply", "ab="): "bad version",
+            ("apply", "ab=1 2"): "bad version",
+            ("apply", "ab=1/2"): "bad version",
+            ("apply", "ab=1=2"): "bad version",
+            ("apply", "ab=" + "1" * 256): "bad version",
+            ("apply", "Ab=1"): "bad package name",
+            ("apply", "ab:arm64"): "bad package name",
+            ("apply", "ab", "-ab"): "named twice",
+            ("apply", "ab=1", "ab=2"): "named twice",
+            ("simulate", "ab/stable"): "bad package name",
+            ("respring", "now"): "takes no arguments",
+            ("apply", *[f"p{i:03d}" for i in range(257)]): "too many",
+        }
+        for words, msg in cases.items():
+            with self.subTest(words=words[:4]):
+                out = self.plan(*words)
+                self.assertEqual(len(out), 1, out)
+                self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
+
+    def test_respring_plan(self):
+        p = tempfile.mkdtemp(dir=self.tmp)
+        self.assertEqual(self.run_driver("plan", p, "3", "respring"), [f"{p}/usr/bin/killall", "killall", "-9", "backboardd"])
+        os.makedirs(os.path.join(p, "usr/bin"))
+        sb = os.path.join(p, "usr/bin/sbreload")
+        with open(sb, "w") as f:
+            f.write("#!/bin/sh\n")
+        os.chmod(sb, 0o755)
+        self.assertEqual(self.run_driver("plan", p, "3", "respring"), [sb, "sbreload"])
+
+    def test_queue_known(self):
+        p = self.fake_prefix()
+        k = lambda *w: self.run_driver("known", p, *w)[0]
+        self.assertEqual(k("apply", "com.repo.tweak=1", "installed.one", "-half"), "all known")
+        self.assertEqual(k("simulate", "-com.repo.tweak"), "com.repo.tweak")  # a removal must be installed
+        self.assertEqual(k("simulate", "installed.one", "-com.repo.tweak2"), "com.repo.tweak2")
+        self.assertEqual(k("apply", "com.repo=1"), "com.repo")
+        self.assertEqual(k("apply", "-libstdc++", "notreal"), "notreal")
+
     # --- caller check
 
     def test_caller(self):
@@ -329,6 +395,23 @@ class Helper(unittest.TestCase):
 
         out = self.run_driver("spawn", helper, "configure", driver=app)
         self.assertIn(f"1: argv: {p}/usr/bin/dpkg --force-confdef --force-confold --status-fd 3 --configure -a", out)
+
+    def test_chain_queue(self):
+        """N4: apply gets CYDIA="3 1" (Cydia's finish fd) and keeps fd 3; simulate gets neither."""
+        p, app, helper = self.chain_prefix()
+        out = self.run_driver("spawn", helper, "apply", "com.repo.tweak=1", "-installed.one", driver=app)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y -o Dpkg::Options::=--force-confdef -o "
+                      "Dpkg::Options::=--force-confold --reinstall --allow-downgrades -o APT::Keep-Fds::=3 "
+                      "-o APT::Status-Fd=3 install com.repo.tweak=1 installed.one-", out)
+        env = next(l for l in out if l.startswith("1: env: ")).split(" ", 2)[2]
+        self.assertIn("CYDIA=3 1", env)
+        self.assertIn("3: pmstatus:com.repo.tweak:50.0:Installing", out)
+        out = self.run_driver("spawn", helper, "simulate", "com.repo.tweak", driver=app)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -s --reinstall --allow-downgrades install com.repo.tweak", out)
+        self.assertNotIn("CYDIA=", next(l for l in out if l.startswith("1: env: ")))
+        out = self.run_driver("spawn", helper, "apply", "-com.repo.tweak", driver=app)
+        self.assertIn("2: cydian-helper: unknown package: com.repo.tweak", out)
+        self.assertEqual(out[-1], "exit: 64")
 
     def test_chain_holds(self):
         p, app, helper = self.chain_prefix()

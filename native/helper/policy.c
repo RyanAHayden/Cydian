@@ -23,6 +23,17 @@ int helper_name_ok(const char *s) {
     return 1;
 }
 
+int helper_version_ok(const char *s) {
+    size_t n = strlen(s);
+    if (n < 1 || n > HELPER_VERSION_MAX || !(s[0] >= '0' && s[0] <= '9')) return 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = s[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || strchr(".+~:-", c)))
+            return 0;
+    }
+    return 1;
+}
+
 static int alnum(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'); }
 
 /* 1 if the "/"-separated path s (length n) has a "." or ".." segment ("" segments are fine: "a//b"). */
@@ -101,6 +112,88 @@ static int source_plan(int argc, char *const argv[], const char *prefix, struct 
     return 0;
 }
 
+/* N4: simulate|apply <item>...: one apt-get install over the whole queue. simulate is apt-get -s (prints the
+ * Inst/Remv/Conf lines the Confirm sheet lists, or apt's refusal); apply runs it, with Cydia's CYDIA fd kept open
+ * for maintainer scripts (APT::Keep-Fds, main.c sets CYDIA="3 1") and downgrades allowed, as Downgrade asks for an
+ * older version on purpose. --reinstall makes an item naming the installed version (Reinstall) do something. */
+static int queue_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
+                      const char **err) {
+    static char status_apt[64], keep_fd[64];
+    int n = argc - 1, apply = p->verb == HV_APPLY;
+    if (n < 1) { *err = "no packages"; return -1; }
+    if (n > HELPER_MAX_PACKAGES) { *err = "too many package names"; return -1; }
+    for (int i = 0; i < n; i++) {
+        const char *w = argv[i + 1];
+        int rm = w[0] == '-';
+        const char *name = rm ? w + 1 : w;
+        const char *eq = rm ? NULL : strchr(name, '=');
+        size_t len = eq ? (size_t)(eq - name) : strlen(name);
+        if (len > HELPER_NAME_MAX) { *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return -1; }
+        memcpy(p->name_buf[i], name, len);
+        p->name_buf[i][len] = 0;
+        /* An install of a name ending in - or + would read to apt as a removal or an install modifier. */
+        if (!helper_name_ok(p->name_buf[i]) || (!rm && (name[len - 1] == '-' || name[len - 1] == '+'))) {
+            *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return -1;
+        }
+        if (eq && !helper_version_ok(eq + 1)) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-])"; return -1; }
+        for (int j = 0; j < i; j++)
+            if (!strcmp(p->name_buf[j], p->name_buf[i])) { *err = "a package is named twice"; return -1; }
+        p->names[i] = p->name_buf[i];
+        p->removing[i] = (char)rm;
+        if (rm) snprintf(p->item_buf[i], sizeof p->item_buf[i], "%s-", p->name_buf[i]);
+        else snprintf(p->item_buf[i], sizeof p->item_buf[i], "%s", name);
+    }
+    if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/apt-get", prefix) >= sizeof p->path) {
+        *err = "prefix too long"; return -1;
+    }
+    int k = 0;
+    const char **a = p->argv;
+    a[k++] = "apt-get";
+    if (apply) {
+        a[k++] = "-y";
+        a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confdef";
+        a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confold";
+    } else {
+        a[k++] = "-s";
+    }
+    a[k++] = "--reinstall";
+    a[k++] = "--allow-downgrades";
+    if (apply && status_fd >= 0) {
+        snprintf(keep_fd, sizeof keep_fd, "APT::Keep-Fds::=%d", status_fd);
+        snprintf(status_apt, sizeof status_apt, "APT::Status-Fd=%d", status_fd);
+        a[k++] = "-o"; a[k++] = keep_fd;
+        a[k++] = "-o"; a[k++] = status_apt;
+    }
+    a[k++] = "install";
+    for (int i = 0; i < n; i++) a[k++] = p->item_buf[i];
+    a[k] = NULL;
+    p->argc = k;
+    p->packages = p->names;
+    p->npackages = n;
+    return 0;
+}
+
+/* N4: respring: Restart SpringBoard at the end of a run. sbreload when the jailbreak has it, else killall
+ * backboardd (which takes SpringBoard with it), both from the prefix. */
+static int respring_plan(int argc, const char *prefix, struct helper_plan *p, const char **err) {
+    if (argc != 1) { *err = "this verb takes no arguments"; return -1; }
+    if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/sbreload", prefix) >= sizeof p->path) {
+        *err = "prefix too long"; return -1;
+    }
+    int k = 0;
+    if (access(p->path, X_OK) == 0) {
+        p->argv[k++] = "sbreload";
+    } else {
+        snprintf(p->path, sizeof p->path, "%s/usr/bin/killall", prefix);
+        p->argv[k++] = "killall";
+        p->argv[k++] = "-9";
+        p->argv[k++] = "backboardd";
+    }
+    p->argv[k] = NULL;
+    p->argc = k;
+    return 0;
+}
+
 int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
                 const char **err) {
     static char status_apt[64], status_dpkg[16];
@@ -118,6 +211,9 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "showhold")) { p->verb = HV_SHOWHOLD; wants_packages = 0; }
     else if (!strcmp(verb, "addsource")) { p->verb = HV_ADDSOURCE; return source_plan(argc, argv, prefix, p, err); }
     else if (!strcmp(verb, "removesource")) { p->verb = HV_REMOVESOURCE; return source_plan(argc, argv, prefix, p, err); }
+    else if (!strcmp(verb, "simulate")) { p->verb = HV_SIMULATE; return queue_plan(argc, argv, prefix, status_fd, p, err); }
+    else if (!strcmp(verb, "apply")) { p->verb = HV_APPLY; return queue_plan(argc, argv, prefix, status_fd, p, err); }
+    else if (!strcmp(verb, "respring")) { p->verb = HV_RESPRING; return respring_plan(argc, prefix, p, err); }
     else { *err = "unknown verb (" HELPER_VERBS ")"; return -1; }
 
     int n = argc - 1;
@@ -202,12 +298,20 @@ static int first_missing(const struct helper_plan *p, const char *found) {
 }
 
 int helper_first_unknown(const char *prefix, const struct helper_plan *p) {
-    if (p->verb != HV_INSTALL && p->verb != HV_REMOVE && p->verb != HV_HOLD && p->verb != HV_UNHOLD) return -1;
+    int queue = p->verb == HV_SIMULATE || p->verb == HV_APPLY;
+    if (p->verb != HV_INSTALL && p->verb != HV_REMOVE && p->verb != HV_HOLD && p->verb != HV_UNHOLD && !queue) return -1;
     char found[HELPER_MAX_PACKAGES] = {0};
     char path[PATH_MAX];
     snprintf(path, sizeof path, "%s/var/lib/dpkg/status", prefix);
     scan(path, p, found);
-    if (p->verb != HV_INSTALL || first_missing(p, found) < 0) return first_missing(p, found);
+    if (queue) {
+        /* A removal must be installed; only installs may be found in apt's lists. */
+        for (int i = 0; i < p->npackages; i++)
+            if (p->removing[i] && !found[i]) return i;
+    } else if (p->verb != HV_INSTALL || first_missing(p, found) < 0) {
+        return first_missing(p, found);
+    }
+    if (first_missing(p, found) < 0) return -1;
 
     snprintf(path, sizeof path, "%s/var/lib/apt/lists", prefix);
     DIR *d = opendir(path);

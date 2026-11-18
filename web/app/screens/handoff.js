@@ -10,6 +10,7 @@ import { sourceLinks, packageLinks, addLink, siteOrigin, formatOf, isIpaFormat }
 import { settings } from "./settings.js";
 import { showShareSheet, setShare } from "../nav/sharesheet.js";
 import { showHUD } from "../nav/hud.js";
+import { appIcon, loadAppIcons } from "../app-icons.js";
 
 // pkg: an id for a package's page; leave it out on a source's page.
 // Only the visitor's format: APT managers run on jailbroken iPhones, so a phone set to Not Jailbroken (Settings >
@@ -70,7 +71,8 @@ export function showAddQR(link) {
 // sourceLinks), under the same rule as openInGroup: APT managers only for a phone set to Jailbroken. An app's page
 // lists them too: they add its source to that app (Cydian's own Install stays the way to install it here).
 
-// Each app's tile: its initial on a colour close to its own icon's (no copied icons).
+// Each app's tile: its real icon once app-icons.js has fetched it, until then (and for apps without one) its initial on
+// a colour close to its icon's.
 export const APP_TILES = {
   Cydia: { letter: "C", color: "#8b5a2b" },
   Sileo: { letter: "S", color: "#5e5ce6" },
@@ -115,7 +117,7 @@ export function showShareFor(source, opts) {
   const items = shareItems(source, opts).map((it) => {
     if (it.kind === "copy") return { label: it.label, glyph: "copy", onSelect: () => copyText(it.text) };
     if (it.kind === "qr") return { label: it.label, glyph: "qr", onSelect: () => showAddQR(it.link) };
-    return { label: it.label, letter: it.letter, color: it.color, onSelect: () => { location.href = it.url; } };
+    return { label: it.label, letter: it.letter, color: it.color, image: appIcon(it.label), onSelect: () => { location.href = it.url; } };
   });
   return showShareSheet({ items });
 }
@@ -123,7 +125,10 @@ export function showShareFor(source, opts) {
 // From a page's render: shows the nav bar's Share button (screens' nav() puts nav/sharesheet.js shareButton there)
 // once there is something to share.
 export function setSourceShare(body, source, opts) {
-  setShare(body, source && shareItems(source, opts).length ? () => showShareFor(source, opts) : null);
+  const items = source ? shareItems(source, opts) : [];
+  setShare(body, items.length ? () => showShareFor(source, opts) : null);
+  // The apps' icons, fetched now so they're there by the time Share is tapped (cached after the first time).
+  loadAppIcons(items.filter((it) => it.kind === "open").map((it) => it.label));
 }
 
 function copyText(text) {

@@ -6,7 +6,8 @@
 //
 //   const i = await showShareSheet({ items: [
 //     { label: "Copy Link", glyph: "copy", onSelect: () => … },          // a system activity: white glyph, grey rim
-//     { label: "Sileo", letter: "S", color: "#6a5bd8", onSelect: … },    // an app: its initial on its colour
+//     { label: "Sileo", letter: "S", color: "#6a5bd8", onSelect: … },    // an app: its initial on its colour,
+//     { label: "Sileo", image: "data:image/png;…", onSelect: … },        // or its icon (app-icons.js, a data: URL)
 //   ] });
 //   // i: the tapped item's index (its onSelect has run), or -1 for Cancel, a tap on the dim or Escape
 //
@@ -41,6 +42,9 @@ function iconOf(item) {
   if (item.glyph && GLYPHS[item.glyph]) {
     box.classList.add("system");
     box.innerHTML = `<svg viewBox="0 0 36 36" aria-hidden="true">${GLYPHS[item.glyph]}</svg>`; // our own constant markup
+  } else if (/^data:image\//.test(item.image ?? "")) {
+    box.classList.add("app", "has-image");
+    box.append(Object.assign(new Image(), { src: item.image, alt: "", className: "share-image" }));
   } else {
     box.classList.add("app");
     if (/^#[0-9a-f]{3,8}$/i.test(item.color ?? "")) box.style.setProperty("--share-tint", item.color);

@@ -415,6 +415,9 @@ input.sign-value { border: 0; padding: 0; margin: 0; background: none; font: inh
   content: ""; position: absolute; left: -6px; right: -6px; top: -26px; height: 54px; border-radius: 50%;
   background: linear-gradient(rgba(255,255,255,.5), rgba(255,255,255,.14));
 }
+.share-icon.has-image { background: none; }
+.share-icon.has-image::after { content: none; } /* the app's own icon, as iOS 6 shows it: no gloss added */
+.share-image { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; }
 .share-letter {
   position: relative; font-size: 32px; font-weight: bold; line-height: 1; color: #fff;
   text-shadow: 0 -1px 0 rgba(0,0,0,.35);

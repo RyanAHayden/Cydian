@@ -264,3 +264,18 @@ Each one is filed with `agent-runner plan add`, with its files and test.
    the narrowing cache only if it's over 16 ms.
 8. **F104 (low): Installed sort by Recent and Size**, and Hide by Author. Filed together as low. They're small and
    nobody asked for them.
+
+## Search cost, measured (R12)
+
+`core/catalog.js search()` timed per keystroke in desktop node 26 (Ryzen 7 9800X3D) with every default source loaded,
+2026-11-18 (`journal/2026-11-18-r12-search-cost/bench.mjs`; 6 typed queries, 39 keystrokes, median of 15 runs each):
+
+| Load | Rows | Typical keystroke | One-letter query | Worst single run |
+| --- | --- | --- | --- | --- |
+| arm64 (what a modern phone reads) | 2,614 | 0.24 ms | 0.5–0.7 ms | 1.6 ms |
+| arm + arm64, every APT source twice (heaviest) | 12,919 | 1.25 ms | 3.4–4.3 ms | 7 ms |
+
+Every keystroke is far below the ~16 ms threshold, so **the narrowing cache (proposal 3) was not filed**. The
+scan over `_hay` is ~1 ms per 10k rows. One-letter queries cost the most because they sort thousands of hits, and
+F101's single-Latin-character skip (proposal 4) removes those. The 4S is a reference device only and never runs
+Cydian, so search was not timed on it. It wasn't timed on a modern iPhone either: no task allows driving one.

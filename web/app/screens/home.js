@@ -29,13 +29,13 @@ import { featuredRefs } from "./extras.js";
 import { browseList, browseListsFor, FRESH_DAYS, collection } from "../core/catalog.js";
 import { dayOf, dayTitle } from "../core/changes.js";
 import { isAltKey } from "../core/altstore.js";
-import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
+import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME, ownBuilds, APP_APT_REPO } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 import { refreshInBackground } from "./sources.js";
 import { markiFizBoxInstalled, browsingLocked, askToBrowse } from "../websign-gate.js";
 import * as guides from "./guides.js";
 import { guideRows, JAILBREAK_INFO_URL } from "./guides.js";
-import { NAME, DOMAIN } from "../brand.js";
+import { NAME } from "../brand.js";
 
 const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
 
@@ -524,7 +524,8 @@ function renderRoot(body) {
   // certificate, sources and settings into the app).
   // The website: jailbroken visitors get iFizBox from its own APT repo (Sileo, Zebra) or as a .deb (user 2026-11-18).
   // Its own purple tile (user 2026-11-18): the full iFizBox, for a jailbroken phone, from iFizBox's APT repo or a .deb.
-  const debTile = settings.mode === "site" ? tile({ label: `Install Full ${NAME}`, subtitle: "Jailbroken: tweaks, themes and apt",
+  // F178: the website only; never in the sideload (lite) app, which offers no .deb or APT repo (core/appoffer.js ownBuilds).
+  const debTile = settings.mode === "site" && ownBuilds(settings.mode).deb ? tile({ label: `Install Full ${NAME}`, subtitle: "Jailbroken: tweaks, themes and apt",
     href: format({ tab: "home" }), glyph: "jailbreak" }) : null;
   debTile?.querySelector("a").addEventListener("click", (e) => { e.preventDefault(); e.stopImmediatePropagation(); jailbrokenSheet(); }, true);
   const appRow = tileRow("green stack", tile({ label: `Install ${NAME} App`, subtitle: "Signed with your certificate",
@@ -864,7 +865,7 @@ export function render(el, route, ctx) {
 // added in Sileo or Zebra, which then keep iFizBox updated; or the URL to paste elsewhere; or the .deb itself.
 // B17: <DOMAIN>/repo/ (the Worker serves the release assets itself): GitHub's latest/download redirect ends at a
 // signed URL too long for Zebra's cache file name.
-export const IFIZBOX_APT_REPO = `https://${DOMAIN}/repo/`;
+export const IFIZBOX_APT_REPO = APP_APT_REPO;
 export const JAILBROKEN_SHEET = { title: `Install ${NAME} with your jailbreak's package manager: it keeps ${NAME} updated.`,
   buttons: ["Add to Sileo", "Add to Zebra", "Copy Repo URL", "Download .deb"] };
 const IFIZBOX_PACKAGE = "com.ryha.ifizbox";

@@ -6,7 +6,7 @@
 // can't remove it and Export skips it. Which one, by build (builtinSources):
 //   jailbreak   iFizBox's flat APT repo, https://<DOMAIN>/repo/ (Packages, Release and the .debs are assets of
 //               every release, tools/release.sh and tools/selfrepo.py; the Worker serves the latest one's, B17)
-//   sideload    iFizBox's AltStore source, web/app/source.json on GitHub (tools/altsource.py)
+//   sideload    iFizBox's AltStore source, https://<DOMAIN>/repo/source.json (web/app/source.json, tools/altsource.py)
 //   site        the same AltStore source (the site only installs IPAs)
 // withBuiltins wraps a backend's source calls: sources() puts the built-in first (a seed record until it is read),
 // removeSource refuses it, and refreshSources adds it back (apt's sources in the app) if it went missing.
@@ -18,14 +18,15 @@
 // For IPAs only iFizBox itself (com.ryha.ifizbox from its own source) is ever essential.
 import { compareVersions, isNewer, parseVersion } from "./selfupdate.js";
 import { altKey, seedRecord } from "./altstore.js";
-import { NAME, GITHUB_REPO, DOMAIN } from "../brand.js";
+import { NAME, DOMAIN } from "../brand.js";
 
 export const SELF_ID = "com.ryha.ifizbox";
 const SELF_NAME = NAME;
 // F172: brand.js DOMAIN. A phone that still lists the old host's repo keeps it as an ordinary source (it is no longer
 // the built-in, so it can be swiped away); nothing rewrites it (user 2026-11-18: no support for the old name).
 export const SELF_APT_URI = `https://${DOMAIN}/repo/`;
-export const SELF_ALT_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/web/app/source.json`;
+// F178: the AltStore source at the site too (the Worker's /repo/source.json serves the deployed web/app/source.json).
+export const SELF_ALT_URL = `https://${DOMAIN}/repo/source.json`;
 export const SELF_SITE = `https://${DOMAIN}/`;
 export const MIN_FIELD = "x-ifizbox-minimum-version"; // the Release field, lower-cased as core/apt.js keeps them
 const LOCKED_TEXT = `${NAME}'s own source is built in and can't be removed.`;

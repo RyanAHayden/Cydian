@@ -39,8 +39,11 @@ class SourceTest(unittest.TestCase):
         block = js[js.index("DEFAULT_ALT_SOURCES = dedupeUrls(["):]
         first = re.search(r'["`](https?://[^"`]+)["`]', block).group(1)
         with open(os.path.join(ROOT, "native", "brand.env")) as f:
-            repo = re.search(r"^BRAND_GITHUB_REPO=(\S+)", f.read(), re.M).group(1)
-        self.assertEqual(first.replace("${GITHUB_REPO}", repo), f"https://raw.githubusercontent.com/{repo}/main/web/app/source.json")
+            domain = re.search(r"^BRAND_DOMAIN=(\S+)", f.read(), re.M).group(1)
+        # F178: the site's /repo/source.json, not raw.githubusercontent.com
+        self.assertEqual(first.replace("${DOMAIN}", domain), f"https://{domain}/repo/source.json")
+        self.assertEqual(altsource.SOURCE_URL, f"https://{domain}/repo/source.json")
+        self.assertEqual(self.data.get("sourceURL"), altsource.SOURCE_URL)
 
 
 class UpdateTest(unittest.TestCase):

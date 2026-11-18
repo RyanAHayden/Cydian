@@ -24,6 +24,8 @@ import { openSeenStore, recordRefresh, dayGroups } from "./core/changes.js";
 import { looksLikeStatus } from "./core/installed.js";
 import { isAltKey } from "./core/altstore.js";
 import { allSaved } from "./core/ipainfo.js";
+import { hiddenAltApps } from "./core/appoffer.js";
+import { detectMode } from "./core/settings.js";
 
 export { ALL };
 
@@ -113,7 +115,8 @@ async function loadSource(source, arch, sig) {
     // The candidate is the newest version this phone's iOS runs (core/altstore.js), so the iOS is in the signature.
     // F16a: the record's `format` (Scarlet, ESign, GBox…) picks the reader in the worker.
     try {
-      const count = await getParser().catalog("loadAlt", [source.key, undefined, device?.device.ios ?? null, source.format ?? null], await altText(source));
+      // F178: the jailbreak app never lists the lite iFizBox IPA (core/appoffer.js hiddenAltApps).
+      const count = await getParser().catalog("loadAlt", [source.key, undefined, device?.device.ios ?? null, source.format ?? null, hiddenAltApps(detectMode())], await altText(source));
       loaded.set(source.key, { sig, count, error: null });
     } catch (e) {
       loaded.set(source.key, { sig, count: loaded.get(source.key)?.count ?? 0, error: e?.message || String(e) });

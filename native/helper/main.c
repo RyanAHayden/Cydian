@@ -5,6 +5,8 @@
  *   cydian-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
  *   cydian-helper simulate <item>... | apply <item>... | respring      (N4: the install queue; item: name,
  *                                                                        name=version or -name)
+ *   cydian-helper install-ipa <path>            (F59: an IPA the app downloaded, installed through installd as
+ *                                                AppSync's appinst does; ipa.c. Exit 69: can't install ad hoc)
  *
  * No setuid bit: Cydian spawns it as root with the persona spawn attributes (spawn.c), which the kernel allows
  * only because Cydian is signed with com.apple.private.persona-mgmt. Run by anything else it is plain mobile and
@@ -17,6 +19,7 @@
  * couldn't be written, 126 exec failed, else apt's/dpkg's status.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later */
+#include "ipa.h"
 #include "policy.h"
 
 #include <errno.h>
@@ -113,6 +116,11 @@ int main(int argc, char *argv[]) {
     char *cydia_env = plan.verb == HV_APPLY && status_fd >= 0 ? "CYDIA=3 1" : NULL;
     char *env[] = {path_env, "HOME=/var/root", "USER=root", "LOGNAME=root", "LANG=C", "DEBIAN_FRONTEND=noninteractive",
                    cydia_env, NULL};
+    if (plan.verb == HV_INSTALL_IPA) {
+        int rc = helper_install_ipa(prefix, plan.path, status_fd, env, &err);
+        if (rc) fprintf(stderr, "cydian-helper: %s\n", err);
+        return rc;
+    }
     execve(plan.path, (char *const *)plan.argv, env);
     fprintf(stderr, "cydian-helper: %s: %s\n", plan.path, strerror(errno));
     return HELPER_EX_EXEC;

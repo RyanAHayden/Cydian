@@ -8,6 +8,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper hold <pkg>... | unhold <pkg>... | showhold
     cydian-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
     cydian-helper simulate <item>... | apply <item>... | respring          (N4: the install queue)
+    cydian-helper install-ipa <path>                                      (F59: an IPA, through installd)
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
@@ -23,6 +24,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `removesource` | runs nothing: drops the stanza for that URI and suite from `cydian.sources`              |
 | `simulate`  | `apt-get -s --reinstall --allow-downgrades install <items>`: the Confirm sheet's plan (N4)       |
 | `apply`     | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --reinstall --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <items>`, with `CYDIA=3 1` in its environment when fd 3 is open (N4) |
+| `install-ipa` | runs no apt: installs one IPA through `LSApplicationWorkspace installApplication:withOptions:error:` as AppSync's `appinst` does (`ipa.c`, F59; below) |
 | `respring`  | `sbreload`, or `killall -9 backboardd` when the jailbreak has no sbreload (N4: Restart SpringBoard) |
 
 **The queue (N4):** `simulate` and `apply` take items: `name` installs the newest, `name=version` that exact
@@ -49,6 +51,21 @@ an exclusive `flock` on `sources.list.d` (made if missing), read the file (`O_NO
 is removed. Nothing changed: nothing is written. stdout says `Added|Removed <uri> <suite>: cydian.sources updated`
 or `nothing to change`; exit 0, 64 refused, 74 couldn't write.
 
+**IPAs (F59):** `install-ipa <path>` takes one file, `/var/mobile/Library/Caches/com.ryha.cydian/ipa/<name>.ipa`
+(`HELPER_IPA_DIR`, where Apt.swift's `ipa.install` downloads; name `[A-Za-z0-9][A-Za-z0-9._-]*.ipa`, at most 255
+bytes). `ipa.c` opens it with `O_NOFOLLOW` through the real directory (iOS's `/var` -> `/private/var` aside, no
+link), and wants a plain file with one link, owned by the directory's owner and not root, at most 8 GiB. It copies it
+into a root-owned `/var/tmp/cydian-ipa.XXXXXX/app.ipa` (`HELPER_IPA_WORK`), and `<prefix>/usr/bin/unzip` unpacks that
+**as the file's owner** (mobile, never root) into `pkg/`, so a hostile zip's links or `../` can only write where mobile
+can. The bundle id comes from `Payload/<the one>.app/Info.plist` (`O_NOFOLLOW`, CFPropertyList, `[A-Za-z0-9.-]`). With
+AppSync Unified (its installd dylib in `Library/MobileSubstrate/DynamicLibraries` or `usr/lib/TweakInject`), installd
+gets the root-owned copy with `{CFBundleIdentifier}`, as appinst. Without it, `<prefix>/usr/bin/ldid -s` signs the
+`.app` ad hoc (as TrollStore Lite; also as mobile) and installd gets the unpacked `.app` with `PackageType: Developer`;
+that tree is mobile's, the same trust as mobile running appinst. No ldid, or installd refuses the ad hoc app: exit
+**69** with a line saying to install AppSync Unified (or ldid), or to sign the IPA for this iPhone. Progress on fd 3
+as `pmstatus:<id>:<percent>:<text>`, `Installed <id>` on stdout. The helper is signed with `entitlements.plist` here
+(appinst's: `allowedSPI` Install and InstallForLaunchServices, installd's mach-lookup, `platform-application`).
+
 - **Arguments:** only the verb and package names. A name matches `[a-z0-9][a-z0-9.+-]+` (so never an option), is
   at most 255 bytes, at most 256 of them, and must be known: for `install` a `Package:` line in dpkg's status or an
   apt `*_Packages` list, for `remove`, `hold` and `unhold` in dpkg's status. The last rule stops apt from reading
@@ -59,7 +76,8 @@ or `nothing to change`; exit 0, 64 refused, 74 couldn't write.
 - **Process:** stdin `/dev/null`, cwd `/`, fds above 2 closed (3 kept when open, for status), signals default,
   umask 022, and its own environment (`PATH` with the prefix first, `HOME=/var/root`, `LANG=C`,
   `DEBIAN_FRONTEND=noninteractive`; nothing from the caller such as `APT_CONFIG`).
-- **Exit:** 64 refused arguments, 77 refused caller, 74 `cydian.sources` not written, 126 exec failed, anything
+- **Exit:** 64 refused arguments (and install-ipa: not an IPA or not the app's file), 69 install-ipa can't
+  install ad hoc, 77 refused caller, 74 `cydian.sources` (or install-ipa's copy) not written, 126 exec failed, anything
   else is apt's/dpkg's.
 - **Output:** apt's stdout/stderr are the console; fd 3 carries `pmstatus:`/`dlstatus:` lines (apt) or dpkg's
   status lines for the progress bar.
@@ -68,6 +86,9 @@ Files:
 
 - `policy.c/.h`: the checks (names, verbs → argv, known packages, caller, source URIs/suites/components) and the
   `cydian.sources` edit. Pure enough to test on Linux.
+- `ipa.c/.h`: install-ipa (F59). Off iOS its installd step only prints what it would install, so the rest is tested
+  on Linux (`test_helper.py` InstallIpa).
+- `entitlements.plist`: the helper's (F59, appinst's); `../build.sh` signs with it.
 - `main.c`: the helper. `CYDIAN_PREFIX` (default `/var/jb`) and `CYDIAN_ROOT_UID` (default 0) are compile-time
   only; the tests change them, the shipped build must not.
 - `spawn.c/.h`: the app's side, `cydian_helper_spawn()`: pipes on the child's fds 1-3, `/dev/null` stdin,

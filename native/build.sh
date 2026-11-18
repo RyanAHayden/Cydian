@@ -114,9 +114,16 @@ if [ "$what" != ipa ]; then
   # Only the .deb has it: the IPA's app finds no helper and runs in sideload mode (Sources/mode.c).
   libexec=$root/var/jb/usr/libexec/cydian
   mkdir -p "$libexec"
-  clang "${hflags[@]}" -fuse-ld=lld --ld-path="$lld" -Wl,-adhoc_codesign -o "$libexec/cydian-helper" helper/main.c helper/policy.c
+  clang "${hflags[@]}" -fuse-ld=lld --ld-path="$lld" -Wl,-adhoc_codesign -o "$libexec/cydian-helper" helper/main.c helper/policy.c \
+    helper/ipa.c -framework CoreFoundation -lobjc
   chmod 0755 "$libexec/cydian-helper"
-  if [ -n "$ldid" ]; then "$ldid" -S "$libexec/cydian-helper"; fi
+  # F59: appinst's entitlements, for install-ipa's installApplication:withOptions:error: (helper/entitlements.plist).
+  if [ -n "$ldid" ]; then
+    "$ldid" -Shelper/entitlements.plist "$libexec/cydian-helper"
+  elif [ -n "$rcodesign" ]; then
+    "$rcodesign" sign --entitlements-xml-file helper/entitlements.plist "$libexec/cydian-helper" >/dev/null \
+      2>"$out/rcodesign.log" || { cat "$out/rcodesign.log" >&2; exit 1; }
+  fi
   # N5: the background upgrade check (daemon/README.md), a launchd daemon; jailbreak only.
   daemon/stage.sh "$root" "$sdk" "$lld" "$ldid" "$rcodesign"
   sed -e "s/@VERSION@/$version-$build/" deb/control > "$out/debian/control"

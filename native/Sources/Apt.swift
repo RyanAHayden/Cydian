@@ -76,6 +76,15 @@ enum Apt {
                 catch { reply(c, nil, "helper: \(error.localizedDescription)") }
             }
         }
+        // F59: ipa.install {url} (stream: helper lines as helper.run's, after a "dlstatus:ipa:0:Downloading" one).
+        b.on("ipa.install") { c in
+            guard AppMode.current == .jailbreak else {
+                return reply(c, nil, "sideload: the sideload build installs IPAs through signing.install")
+            }
+            guard let url = httpURL(c.params["url"]) else { return reply(c, nil, "bad_url: not an http(s) URL") }
+            let stream = (c.params["stream"] as? Bool) ?? false
+            IPAInstall.run(url, emit: stream ? { c.emitOnMain($0) } : nil) { reply(c, $0, $1) }
+        }
         b.on("haptic.tap") { c in
             DispatchQueue.main.async {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -258,5 +267,63 @@ enum Helper {
         let code: Int32 = (status & 0x7F) == 0 ? (status >> 8) & 0xFF : 128 + (status & 0x7F)
         return ["code": Int(code), "stdout": String(decoding: collected[0], as: UTF8.self),
                 "stderr": String(decoding: collected[1], as: UTF8.self)]
+    }
+}
+
+// F59: ipa.install, the jailbreak build's IPA install (the sideload build signs and installs with signing.install,
+// SignBridge.swift). Downloads the IPA into the one directory cydian-helper takes IPAs from (native/helper/policy.h
+// HELPER_IPA_DIR: this no-container app's own Caches) as <UUID>.ipa, runs `cydian-helper install-ipa <path>` (as
+// AppSync's appinst does; ad hoc signed with ldid first when AppSync Unified isn't there, native/helper/ipa.c) and
+// removes the download. Replies {code: 0, stdout, stderr, bundleId}, or an error:
+//   bad_url, network, timeout, not_found (HTTP >= 400)          the download
+//   bad_ipa   (helper exit 64) not an IPA, or not the app's own file
+//   no_adhoc  (exit 69) the jailbreak can't install ad hoc apps: no AppSync Unified and no ldid, or installd
+//             refused the ad hoc signed app. The message says what to install.
+//   install   (exit 1 or 74) installd refused it, or the helper couldn't copy or unpack it
+//   helper    no helper, or it refused the caller (exit 77)
+// The message is the helper's own last "cydian-helper: " line.
+enum IPAInstall {
+    static let dir = "/var/mobile/Library/Caches/com.ryha.cydian/ipa" // = HELPER_IPA_DIR
+
+    static let session: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.timeoutIntervalForRequest = 60
+        cfg.timeoutIntervalForResource = 60 * 60 // an IPA can be a few GB
+        cfg.httpAdditionalHeaders = Apt.session.configuration.httpAdditionalHeaders
+        return URLSession(configuration: cfg)
+    }()
+
+    static func run(_ url: URL, emit: (([[String: Any]]) -> Void)?, done: @escaping (Any?, String?) -> Void) {
+        let fm = FileManager.default
+        do {
+            try fm.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        } catch { return done(nil, "install: can't make \(dir): \(error.localizedDescription)") }
+        emit?([["fd": "status", "line": "dlstatus:ipa:0:Downloading"]])
+        session.downloadTask(with: url) { tmp, resp, err in
+            if let e = err as? URLError { return done(nil, "\(e.code == .timedOut ? "timeout" : "network"): \(e.localizedDescription)") }
+            if let e = err { return done(nil, "network: \(e.localizedDescription)") }
+            guard let tmp = tmp, let http = resp as? HTTPURLResponse else { return done(nil, "network: no HTTP answer") }
+            if http.statusCode >= 400 { return done(nil, "not_found: HTTP \(http.statusCode) for \(url.absoluteString)") }
+            let path = dir + "/" + UUID().uuidString + ".ipa"
+            do { try FileManager.default.moveItem(atPath: tmp.path, toPath: path) }
+            catch { return done(nil, "install: can't keep the download: \(error.localizedDescription)") }
+            DispatchQueue.global(qos: .userInitiated).async {
+                defer { try? FileManager.default.removeItem(atPath: path) }
+                do {
+                    let r = try Helper.run(["install-ipa", path], emit: emit)
+                    let code = r["code"] as? Int ?? 1
+                    let out = r["stdout"] as? String ?? "", errText = r["stderr"] as? String ?? ""
+                    if code == 0 {
+                        let id = out.split(separator: "\n").last { $0.hasPrefix("Installed ") }.map { String($0.dropFirst(10)) }
+                        return done(["code": 0, "stdout": out, "stderr": errText, "bundleId": id ?? ""], nil)
+                    }
+                    let why = errText.split(separator: "\n").last { $0.hasPrefix("cydian-helper: ") }
+                        .map { String($0.dropFirst(15)) } ?? "cydian-helper exited with \(code)"
+                    let kind = code == 64 ? "bad_ipa" : code == 69 ? "no_adhoc" : code == 77 ? "helper" : "install"
+                    done(nil, "\(kind): \(why)")
+                } catch let e as BridgeError { done(nil, e.text) }
+                catch { done(nil, "helper: \(error.localizedDescription)") }
+            }
+        }.resume()
     }
 }

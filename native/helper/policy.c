@@ -88,6 +88,32 @@ int helper_component_ok(const char *s) {
     return !dot_segment(s, n);
 }
 
+int helper_ipa_path_ok(const char *dir, const char *path) {
+    size_t d = strlen(dir);
+    if (!d || strncmp(path, dir, d) || path[d] != '/') return 0;
+    const char *name = path + d + 1;
+    size_t n = strlen(name);
+    if (n < 5 || n > HELPER_IPA_NAME_MAX || !alnum(name[0]) || strcmp(name + n - 4, ".ipa")) return 0;
+    for (size_t i = 0; i < n; i++)
+        if (!(alnum(name[i]) || strchr("._-", name[i]))) return 0;
+    return !strstr(name, "..");
+}
+
+/* F59: install-ipa <path>: one IPA from the app's download directory. Nothing is executed from here: main.c hands
+ * the plan to helper_install_ipa (ipa.c). */
+static int ipa_plan(int argc, char *const argv[], struct helper_plan *p, const char **err) {
+    if (argc != 2) { *err = "install-ipa takes one path"; return -1; }
+    if (!helper_ipa_path_ok(HELPER_IPA_DIR, argv[1])) {
+        *err = "bad IPA path (only " HELPER_IPA_DIR "/<name>.ipa)"; return -1;
+    }
+    if ((size_t)snprintf(p->path, sizeof p->path, "%s", argv[1]) >= sizeof p->path) { *err = "path too long"; return -1; }
+    p->argv[0] = argv[0];
+    p->argv[1] = argv[1];
+    p->argv[2] = NULL;
+    p->argc = 2;
+    return 0;
+}
+
 /* addsource <uri> <suite> [component...] | removesource <uri> <suite>: checked here, done by helper_sources_apply. */
 static int source_plan(int argc, char *const argv[], const char *prefix, struct helper_plan *p, const char **err) {
     int add = p->verb == HV_ADDSOURCE;
@@ -214,6 +240,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "simulate")) { p->verb = HV_SIMULATE; return queue_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "apply")) { p->verb = HV_APPLY; return queue_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "respring")) { p->verb = HV_RESPRING; return respring_plan(argc, prefix, p, err); }
+    else if (!strcmp(verb, "install-ipa")) { p->verb = HV_INSTALL_IPA; return ipa_plan(argc, argv, p, err); }
     else { *err = "unknown verb (" HELPER_VERBS ")"; return -1; }
 
     int n = argc - 1;

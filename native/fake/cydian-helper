@@ -8,6 +8,11 @@
 #                  dependency of the first item on FAKE_MISSING (default com.example.missing), as apt-get -s does
 #   FAKE_SLOW      seconds apply waits before each package, so a walk-through sees the console mid-run
 #   FAKE_FINISH    apply writes "finish:$FAKE_FINISH" to fd 3, as a maintainer script does through $CYDIA (N4)
+#   CYDIAN_IPA_DIR install-ipa's one directory (F59; the real one's HELPER_IPA_DIR). install-ipa reads the IPA's
+#                  bundle id like ipa.c and "installs" it into $CYDIAN_PREFIX/var/fake-installed-ipas:
+#   FAKE_APPSYNC=1 AppSync Unified is there (the IPA goes to installd as it is); else FAKE_LDID=1 means ldid signs it
+#                  ad hoc first, and neither is exit 69 (can't install ad hoc). A bundle id ending in .refused makes
+#                  the fake installd refuse an ad hoc app (exit 69) or an AppSync one (exit 1)
 # Status lines go to fd 3 when it is open, like apt's APT::Status-Fd. SPDX-License-Identifier: GPL-3.0-or-later
 set -u
 prefix=${CYDIAN_PREFIX:?}
@@ -16,7 +21,7 @@ status=$prefix/var/lib/dpkg/status
 st() { { printf '%s\n' "$1" >&3; } 2>/dev/null || true; }
 refuse() { echo "cydian-helper: $1" >&2; exit 64; }
 verb=${1:-}
-VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, respring"
+VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, respring, install-ipa"
 [ -n "$verb" ] || refuse "no verb ($VERBS)"
 shift
 sources=$prefix/etc/apt/sources.list.d/cydian.sources
@@ -99,6 +104,61 @@ Components: $*"
   install|remove|hold|unhold) [ $# -ge 1 ] || refuse "no package names" ;;
   simulate|apply) [ $# -ge 1 ] || refuse "no packages" ;;
   respring) [ $# -eq 0 ] || refuse "this verb takes no arguments"; echo "sbreload (fake)"; exit 0 ;;
+  install-ipa)
+    # F59: policy.c's helper_ipa_path_ok, then ipa.c's steps without installd.
+    [ $# -eq 1 ] || refuse "install-ipa takes one path"
+    dir=${CYDIAN_IPA_DIR:?}
+    case $1 in "$dir"/*) name=${1#"$dir"/} ;; *) name= ;; esac
+    { one_line "$1" && [ ${#name} -le 255 ] && printf '%s' "$name" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]*\.ipa' &&
+      case $name in *..*) false ;; esac; } || refuse "bad IPA path (only $dir/<name>.ipa)"
+    { [ -f "$1" ] && [ ! -L "$1" ]; } || refuse "can't open the IPA (missing, or a link)"
+    st "pmstatus:ipa:5:Copying the IPA"
+    st "pmstatus:ipa:20:Unpacking"
+    id=$(python3 -I -c '
+import re, sys, zipfile
+try:
+    z = zipfile.ZipFile(sys.argv[1])
+except Exception:
+    sys.exit(9)
+apps = {n.split("/")[1] for n in z.namelist() if re.match(r"Payload/[^/]+\.app/", n)}
+if len(apps) != 1:
+    sys.exit(8)
+try:
+    text = z.read("Payload/%s/Info.plist" % apps.pop()).decode("utf-8", "replace")
+except KeyError:
+    sys.exit(7)
+m = re.search(r"<key>CFBundleIdentifier</key>\s*<string>([^<]*)</string>", text)
+v = m.group(1) if m else ""
+if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,254}", v):
+    sys.exit(7)
+print(v)' "$1")
+    case $? in
+      0) ;;
+      9) refuse "unzip couldn't unpack the IPA" ;;
+      8) refuse "not an IPA: no single Payload/<name>.app" ;;
+      *) refuse "no usable CFBundleIdentifier in the app's Info.plist" ;;
+    esac
+    if [ "${FAKE_APPSYNC:-}" = 1 ]; then
+      st "pmstatus:$id:50:Installing (AppSync Unified)"
+      echo "install ipa $id"
+      case $id in *.refused) echo "cydian-helper: installd: fake installd refused it" >&2
+        echo "cydian-helper: installd refused the app" >&2; exit 1 ;; esac
+    elif [ "${FAKE_LDID:-}" = 1 ]; then
+      st "pmstatus:$id:40:Signing ad hoc (ldid)"
+      echo "ldid -s Payload/$id.app (fake)"
+      st "pmstatus:$id:60:Installing (ad hoc signed)"
+      echo "install app $id (PackageType Developer)"
+      case $id in *.refused) echo "cydian-helper: installd: fake installd refused it" >&2
+        echo "cydian-helper: installd refused the ad hoc signed app: this jailbreak can't install ad hoc apps without AppSync Unified. Install AppSync Unified, or sign the IPA for this iPhone first" >&2
+        exit 69 ;; esac
+    else
+      echo "cydian-helper: AppSync Unified isn't installed and there's no ldid to sign the app ad hoc: install AppSync Unified or ldid, or sign the IPA for this iPhone first" >&2
+      exit 69
+    fi
+    echo "$id" >> "$prefix/var/fake-installed-ipas"
+    st "pmstatus:$id:100:Installed"
+    echo "Installed $id"
+    exit 0 ;;
   *) refuse "unknown verb ($VERBS)" ;;
 esac
 # N4: the versions of package $2 in file(s) $1..., one per line (status: installed ones only).

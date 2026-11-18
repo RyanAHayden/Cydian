@@ -151,3 +151,17 @@ test("Send Settings' import without a certificate never touches the Keychain", a
   assert.equal(calls.includes("signing.import"), false);
   assert.equal(await handleIncoming("cydian://import?d=AAAA", { ...u.deps, review: async () => "bad" }), "import");
 });
+
+test("B14 a tab's link opens that tab, cold or warm", async () => {
+  const { tabOf } = await import("./incoming.js");
+  const opened = [];
+  const u = ui();
+  for (const t of ["sources", "Changes", "home", "installed", "search", "settings"]) {
+    assert.equal(await handleIncoming(`cydian://${t}`, { ...u.deps, open: (h) => opened.push(h) }), "tab");
+  }
+  assert.deepEqual(opened, ["#/sources", "#/changes", "#/home", "#/installed", "#/search", "#/settings"]);
+  assert.equal(tabOf("cydian://sources/"), "sources");
+  assert.equal(tabOf("cydian://sources/x"), null);
+  assert.equal(tabOf("cydian://elsewhere"), null);
+  assert.equal(tabOf("https://sources"), null);
+});

@@ -34,6 +34,8 @@ tools/ui-7.sh N6 home
 tools/ui-7.sh unlock N6               # always, also after a failure
 ```
 
+- `open` takes any URL. `cydian://<tab>` (home, sources, changes, installed, search, settings) opens Cydian on
+  that tab, launched or already running (B14); the other `cydian://` links are listed in `web/app/incoming.js`.
 - Coordinates are screenshot pixels (750x1334; points x2), so read a spot off a screenshot and tap it.
 - From the top edge, `swipe 375 2 375 900 0.4` opens Notification Centre (checked 2026-11-18); `home` closes it.
 - **Control Centre doesn't open yet:** bottom-edge swipes (`375 1333 → 375 500`, 0.4 s and 0.8 s) do nothing.

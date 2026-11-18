@@ -461,3 +461,192 @@ export function deviceError(err, name = "") {
   }
   return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null, message };
 }
+
+// ---- Before and around signing, the page's side (F68) -----------------------------------------------------------
+// F14's bridge calls (native/Sources/Sideload.swift, docs/signing.md "Before and around signing (F14)") turned into
+// what the sideload build's pages show and send. Pure: signing-sheet.js and screens/signed-apps.js draw them.
+//
+//   isCgBI(bytes)                        the IPA's icon is Apple's CgBI PNG, which a browser can't draw
+//   inspectGroups(info)                  the look-first sheet's read-only groups from a signing.inspect answer
+//   installParams(info, edits)           signing.install's params: the token and only the edits that change something
+//   certificateWarnings(identity, now)   the red lines under Check Certificate (revoked; signature ends within 7 days)
+//   resignLabel(ev)                      Re-sign All's HUD text for one progress event
+//   signedAppRows(installed, now)        Signed Apps' rows from signing.installed
+//   syncReminder(get, call)              signing.remind {days} with Re-sign Reminder's value
+
+// Base64 to bytes (the bridge hands the IPA's icon over as base64).
+export function fromBase64(b64) {
+  const bin = atob(String(b64 ?? ""));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+// A PNG whose first chunk is CgBI (Xcode's "optimised" PNG: byte-swapped, premultiplied, no zlib header).
+export function isCgBI(buf) {
+  const b = bytesOf(buf);
+  return b.length > 16 && b[0] === 0x89 && b[1] === 0x50 && b[12] === 0x43 && b[13] === 0x67 && b[14] === 0x42 && b[15] === 0x49;
+}
+
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+const isoDay = (d) => (d instanceof Date && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : null);
+
+// Groups for nav/ui.js grouped(): what the app is, what it asks for, what it won't get. Extensions get their own
+// group (with switches) in the sheet, so they're not here; `extensions` is the list it draws them from.
+export function inspectGroups(info) {
+  const app = info?.app ?? {};
+  const groups = [];
+  const about = [
+    { label: "Version", detail: String(app.version ?? "") || "Unknown" },
+    { label: "Size", detail: app.size ? formatBytes(app.size) : "Unknown" },
+  ];
+  if (app.minimumOS) about.push({ label: "Needs iOS", detail: `${app.minimumOS} or later` });
+  if (info?.profileKind) about.push({ label: "Profile", detail: info.profileKind });
+  groups.push({ header: "App", rows: about });
+
+  const perms = Array.isArray(app.permissions) ? app.permissions : [];
+  groups.push({ header: "Permissions",
+    rows: perms.length ? perms.map((p) => ({ label: p.label || p.key, subtitle: p.text || null })) : [{ label: "None" }],
+    footer: perms.length ? "iOS asks you before the app can use these." : "The app asks for nothing iOS guards." });
+
+  const ents = Object.keys(app.entitlements ?? {}).sort();
+  const missing = new Set(Array.isArray(info?.missing) ? info.missing : []);
+  groups.push({ header: "Entitlements",
+    rows: ents.length ? ents.map((k) => ({ label: entitlementName(k), subtitle: k === entitlementName(k) ? null : k,
+      detail: missing.has(k) ? "Missing" : null })) : [{ label: "None" }],
+    footer: ents.length ? "What the app's own signature asks of iOS." : "The app isn't signed, or asks for nothing." });
+
+  if (missing.size) {
+    groups.push({ header: "Your Profile Can't Give It",
+      rows: [...missing].sort().map((k) => ({ label: entitlementName(k), subtitle: k === entitlementName(k) ? null : k })),
+      footer: `Signed with your profile, the app goes without ${missing.size === 1 ? "this" : "these"}: what needs ${missing.size === 1 ? "it" : "them"} (push, iCloud, app groups…) may not work.` });
+  }
+  return groups;
+}
+
+// Short names for the entitlements people meet most; anything else shows as its key.
+const ENTITLEMENT_NAMES = {
+  "aps-environment": "Push Notifications",
+  "com.apple.developer.icloud-container-identifiers": "iCloud Containers",
+  "com.apple.developer.icloud-services": "iCloud",
+  "com.apple.developer.ubiquity-kvstore-identifier": "iCloud Key-Value Store",
+  "com.apple.developer.ubiquity-container-identifiers": "iCloud Documents",
+  "com.apple.security.application-groups": "App Groups",
+  "com.apple.developer.associated-domains": "Associated Domains",
+  "com.apple.developer.healthkit": "HealthKit",
+  "com.apple.developer.homekit": "HomeKit",
+  "com.apple.developer.siri": "Siri",
+  "com.apple.developer.networking.networkextension": "Network Extensions",
+  "com.apple.developer.networking.wifi-info": "Wi-Fi Info",
+  "com.apple.developer.applesignin": "Sign in with Apple",
+  "com.apple.developer.in-app-payments": "Apple Pay",
+  "com.apple.developer.game-center": "Game Center",
+  "com.apple.developer.kernel.increased-memory-limit": "Increased Memory Limit",
+  "com.apple.developer.kernel.extended-virtual-addressing": "Extended Virtual Addressing",
+  "keychain-access-groups": "Keychain Sharing",
+  "get-task-allow": "Debugging",
+  "application-identifier": "App ID",
+  "com.apple.developer.team-identifier": "Team ID",
+};
+export const entitlementName = (k) => ENTITLEMENT_NAMES[k] ?? k;
+
+function formatBytes(n) {
+  const v = Number(n);
+  if (!(v > 0)) return "Unknown";
+  if (v < 1024 * 1024) return `${Math.max(1, Math.round(v / 1024))} KB`;
+  return `${(v / 1024 / 1024).toFixed(v < 100 * 1024 * 1024 ? 1 : 0)} MB`;
+}
+
+// signing.install's params from the inspect answer and the sheet's edits { name, bundleId, icon (base64 PNG),
+// removeExtensions: [path] }. Only what differs goes: a name or ID left as it was is not sent, so the signer keeps
+// I5's own rules for the ID (an explicit profile still signs as its own). Throws a message for an ID the signer
+// would refuse anyway (SignOptions.validBundleID), so the sheet can say so before anything is signed.
+export function installParams(info, edits = {}) {
+  if (!info?.token) throw new Error("The app wasn't looked at first.");
+  const app = info.app ?? {};
+  const p = { token: info.token };
+  const name = String(edits.name ?? "").trim();
+  if (name && name !== app.name) p.name = name;
+  const id = String(edits.bundleId ?? "").trim();
+  if (id && id !== (info.signsAs ?? app.bundleId)) {
+    if (!validBundleId(id)) throw new Error(`"${id}" isn't a bundle ID (letters, digits, - and ., like com.you.app).`);
+    p.bundleId = id;
+  }
+  if (typeof edits.icon === "string" && edits.icon) p.icon = edits.icon;
+  const known = new Set((app.extensions ?? []).map((e) => e.path));
+  const drop = [...new Set(edits.removeExtensions ?? [])].filter((x) => known.has(x)).sort();
+  if (drop.length) p.removeExtensions = drop;
+  return p;
+}
+
+// The signer's rule (native/sign/SignOptions.swift validBundleID).
+export function validBundleId(s) {
+  const v = String(s ?? "");
+  return v.length > 0 && v.length <= 155 && !v.startsWith(".") && !v.endsWith(".") && !v.includes("..") && /^[A-Za-z0-9.-]+$/.test(v);
+}
+
+// The bundle ID iOS will know the app by, for signing.progress: what signing.install answered, else what was asked
+// or what inspect said it would sign as.
+export const installedId = (result, params, info) => result?.bundleId || params?.bundleId || info?.signsAs || info?.app?.bundleId || "";
+
+const DAY = 24 * 60 * 60 * 1000;
+
+// The red warnings Settings > Signing shows under Check Certificate, from signing.status's identity:
+// revocation { status, revokedAt? } (the last OCSP answer) and signatureExpires (ISO; the earlier of the
+// certificate's and the profile's end). [] when nothing is wrong (or nothing is known).
+export function certificateWarnings(identity, now = new Date()) {
+  const out = [];
+  const rev = identity?.revocation;
+  if (rev?.status === "revoked") {
+    const day = isoDay(new Date(rev.revokedAt ?? ""));
+    out.push(`Apple has revoked this certificate${day ? ` (${day})` : ""}. Apps signed with it won't open; you need a new certificate.`);
+  }
+  const ends = identity?.signatureExpires ? new Date(identity.signatureExpires) : null;
+  if (ends && !Number.isNaN(ends.getTime())) {
+    const left = ends.getTime() - now.getTime();
+    if (left <= 0) out.push(`Signatures made now are already expired (${isoDay(ends)}): renew the certificate or profile.`);
+    else if (left < 7 * DAY) {
+      const days = Math.floor(left / DAY);
+      out.push(`Signatures end ${days < 1 ? "within a day" : `in ${plural(days, "day")}`} (${isoDay(ends)}), when the certificate or profile does. Renew it soon.`);
+    }
+  }
+  return out;
+}
+
+// The Check Certificate row's detail.
+export function revocationLabel(rev) {
+  return { good: "Good", revoked: "Revoked", unknown: "Unknown" }[rev?.status] ?? "Not Checked";
+}
+
+// Re-sign All's HUD text for a stream event { index, count, name, phase, progress }.
+export function resignLabel(ev) {
+  if (!ev || ev.count == null) return null;
+  const which = `${ev.name || "App"} (${Number(ev.index) + 1} of ${ev.count})`;
+  return `${phaseLabel(ev) ?? "Re-signing"} ${which}`;
+}
+
+// Signed Apps' rows from signing.installed's { apps: [{ bundleId, originalBundleId, name, version, expires }] },
+// soonest to expire first.
+export function signedAppRows(installed, now = new Date()) {
+  const apps = Array.isArray(installed?.apps) ? installed.apps : [];
+  const at = (a) => { const t = Date.parse(a.expires ?? ""); return Number.isNaN(t) ? Infinity : t; };
+  return [...apps].sort((a, b) => at(a) - at(b) || String(a.name).localeCompare(String(b.name))).map((a) => {
+    const t = at(a);
+    const days = Math.floor((t - now.getTime()) / DAY);
+    const detail = t === Infinity ? "" : t <= now.getTime() ? "Expired" : days < 1 ? "Today" : plural(days, "day");
+    const sub = [a.version ? `Version ${a.version}` : null, a.bundleId].filter(Boolean).join(" · ");
+    return { bundleId: a.bundleId, label: a.name || a.bundleId, subtitle: sub || null, detail, expiring: t !== Infinity && t - now.getTime() < 7 * DAY };
+  });
+}
+
+// signing.remind {days} with Re-sign Reminder's value (`get` reads a setting). Resolves the bridge's answer, or null
+// when there is no bridge or the call fails (an older shell without the call): the reminder is a nicety.
+export async function syncReminder(get, call) {
+  if (typeof call !== "function") return null;
+  const days = Number(get("resignReminder"));
+  try {
+    return await call("signing.remind", { days: Number.isFinite(days) && days > 0 ? Math.round(days) : 0 });
+  } catch {
+    return null;
+  }
+}

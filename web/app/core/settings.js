@@ -29,7 +29,8 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // data, app only), "notifications" (Notifications), "badge" (App icon badge), "auto-install" (the three
 // automatic-install rows), "rollback" (Keep previous versions), "resign" (Re-sign reminder, F14).
 // "compat": Works on My Phone (F17). "device": Device type and Sideloader (F37).
-export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device"]);
+// "resign": Re-sign Reminder, which F68 turns on (signing.remind, F14).
+export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device", "resign"]);
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];

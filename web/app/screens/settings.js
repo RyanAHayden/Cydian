@@ -18,6 +18,8 @@ import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus,
   localSigning, deviceStatus, importToDevice, removeFromDevice, setUpTrust, installOnDevice, signAndInstall, statusReady } from "../signing-client.js";
 import { drawWalkthrough } from "./signing.js";
+import { signingExtras } from "./signed-apps.js";
+import { syncReminder } from "../core/signing.js";
 import { signingRowShows, offerAfterImport, IMPORT_ALERT, APP_IPA_URL, APP_NAME, APP_LABEL } from "../core/appoffer.js";
 import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installPath, isNewer, compareVersions } from "../core/selfupdate.js";
 import { getArch } from "../backend.js";
@@ -260,7 +262,16 @@ export function init() {
   settings.onChange((key) => {
     if (key === "appearance") applyTheme();
     if (key === "allowZoom") applyZoom();
+    if (key === "resignReminder") remindNow();
   });
+  remindNow(); // F68: on launch too, so the notification follows the setting (and any change the shell missed)
+}
+
+// F68: Re-sign Reminder to the shell (signing.remind {days}, F14), sideload build only.
+function remindNow() {
+  if (!localSigning() || !settings.isShown("resignReminder")) return;
+  const n = globalThis.cydianNative;
+  syncReminder((k) => settings.get(k), n?.call ? (m, p) => n.call(m, p) : null);
 }
 
 // ---- Signing (I5) --------------------------------------------------------------------------------------------
@@ -541,7 +552,9 @@ function browseButton(accept, multiple, onFiles) {
 // sent anywhere.
 
 function deviceSigningSection(box) {
-  const fill = (detail) => box.replaceChildren(grouped([{ header: "Signing",
+  // F68: Re-sign Reminder's group just above already says Signing
+  const header = settings.isShown("resignReminder") ? undefined : "Signing";
+  const fill = (detail) => box.replaceChildren(grouped([{ header,
     rows: [{ label: "Certificate", detail, href: format({ tab: "settings", path: ["signing"] }) }],
     footer: "Your own certificate: Install signs AltStore apps with it on this iPhone." }]));
   fill("");
@@ -654,7 +667,7 @@ async function drawDeviceSigning(el) {
     certificate: certificateBlock(el, id, status ?? { identity: null }),
     actions: { download: () => setUpLocalInstall(), check: () => checkSigning(), test: () => testInstallServer() },
     open: walkOpen,
-    extra: sections.length ? [grouped(sections)] : [],
+    extra: [...(sections.length ? [grouped(sections)] : []), signingExtras({ identity: kept, redraw: redrawAll })],
   });
 }
 

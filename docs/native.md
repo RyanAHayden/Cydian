@@ -10,14 +10,15 @@ used: native code for root and apt, web for the UI. This time the web part is th
 ```
 web/app/            one frontend: HTML, CSS, vanilla JS (ES modules, no build step)
   core/             parsing, version compare, sections, Changes, upgrades: pure JS, tested with `node --test`
-  backend-http.js   on the site: talks to Flask (fetch proxy and cache, push)
+  backend-http.js   on the site: talks to the Worker (fetch proxy, install server)
   backend-native.js in the app: talks to Swift over window.webkit.messageHandlers
-web/app.py          Flask: serves web/app/, an SSRF-safe fetch proxy with a cache, Web Push. Thin.
+worker/             the Cloudflare Worker behind cydian.dev: serves web/app/, the SSRF-safe fetch proxy
+                    (/api/fetch) and the install server (/sign/*). Thin; no server of our own (F89).
 native/             Swift shell, root helper, daemon
 ```
 
 The UI never knows which backend it has. Both expose the same calls (`sources()`, `refresh()`, `packages()`,
-`installed()`, `queue()`, ...). On the site, raw `Packages` files come through the server's proxy. In the app they
+`installed()`, `queue()`, ...). On the site, raw `Packages` files come through the Worker's proxy (`/api/fetch`). In the app they
 come from apt's own lists on disk (after `apt-get update` through the helper), and installing goes through the
 helper. Parsing, Changes, upgrades and search all run in `core/` in both places.
 

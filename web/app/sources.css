@@ -110,7 +110,7 @@
 .source-row { touch-action: pan-y; }
 
 /* ---- Recommended (F52, screens/manage.js): Sources' rows with a round Add on the right instead of Delete.
-   sidedrop's GET look as the user asked for it: a white pill with blue bold text and a thin blue rim, filled blue
+   The GET look the user asked for: a white pill with blue bold text and a thin blue rim, filled blue
    with white text while held; "Added" greyed and inert once the source is in the list. No gloss or shadow. ---- */
 .rec-row .cell-inner { padding-right: 84px; }
 .rec-get {

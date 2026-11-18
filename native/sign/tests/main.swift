@@ -2,7 +2,7 @@
 // throwaway certificate (key held by openssl here, by the Keychain on the phone) and checks the signature verifies,
 // plus the pieces under it (hashes, DER entitlements, zip, profile rules, the local install CA).
 //   signtest <fixtures dir> <work dir>
-// Fixtures come from native/test_sign.py (web/signer/testkit.py's throwaway CA, certificate and profiles).
+// Fixtures come from native/test_sign.py (native/testkit.py's throwaway CA, certificate and profiles).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 

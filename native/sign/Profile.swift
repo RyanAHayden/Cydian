@@ -1,5 +1,6 @@
 // A provisioning profile (.mobileprovision) for the on-device signer (I6): the plist inside its CMS envelope, and the
-// same rules web/signer/identity.py (I5) applies, so the phone and the signing server sign an app the same way.
+// rules it signs by (which certificate, which App ID, which devices). The website's signer (core/websign.js, F93)
+// applies the same ones.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 

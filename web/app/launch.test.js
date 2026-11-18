@@ -35,11 +35,6 @@ test("Safari tabs and the native app keep the URL", () => {
   assert.equal(launchURL(win({ native: true })), null);
 });
 
-test("a notification tap keeps its page and drops the mark", () => {
-  assert.equal(launchURL(win({ url: "https://cydian.dev/?launch=push#/changes" })), "/#/changes");
-  assert.equal(launchURL(win({ standalone: false, url: "https://cydian.dev/?launch=push&a=1#/settings" })), "/?a=1#/settings");
-});
-
 test("navigationType falls back to performance.navigation", () => {
   assert.equal(navigationType({ performance: { navigation: { type: 1 } } }), "reload");
   assert.equal(navigationType({ performance: { navigation: { type: 0 } } }), "navigate");

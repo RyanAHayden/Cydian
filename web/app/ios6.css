@@ -78,8 +78,8 @@ html[data-theme="dark"] .navbar { /* gunmetal (user 2026-11-17): glossy split at
 }
 html[data-theme="dark"] .navbar::after { background: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,0)); }
 
-/* Bar buttons and the back arrow, from the 4S's UIKit art (UINavigationBarDefaultButton, ...Pressed, ...Back) by
-   way of sidedrop's versions, which the user picked (2026-11-17). background-origin: border-box matters: without
+/* Bar buttons and the back arrow, from the 4S's UIKit art (UINavigationBarDefaultButton, ...Pressed, ...Back), the
+   versions the user picked (2026-11-17). background-origin: border-box matters: without
    it the gradient tiles into the 1px border and its light top shows as a line along the bottom. */
 .bar-button {
   height: 29px; min-width: 50px; max-width: 100%; padding: 0 9px; overflow: hidden; white-space: nowrap;
@@ -217,7 +217,7 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
    (#fbfbfb to #cfcfcf, black edge at 49%) that slides across by transform. Same in both themes, as the kit's. */
 .cell-inner.has-switch { padding-right: 9px; }
 /* On/off switch. Size from the Teehan+Lax kit ("switch (off|on)"): 77x27 track, 25pt knob 1pt inside it, 50pt of
-   travel (a bigger knob over the outline looked too large). Colours from the 4S's UISwitch art by way of sidedrop.
+   travel (a bigger knob over the outline looked too large). Colours from the 4S's UISwitch art.
    Everything rides on --x (0 off, 50px on; settings.js sets it while dragging): the knob, the blue fill that ends at
    the knob's centre, and both labels move together, so ON and OFF behave the same when tapped or dragged. */
 .switch {
@@ -286,7 +286,7 @@ html[data-theme="dark"] .switch.is-held .sw-knob { background: linear-gradient(#
    the pinch gesture itself. */
 html.no-zoom, html.no-zoom body { touch-action: pan-x pan-y; }
 
-/* No grey tap flash anywhere: controls have their own pressed looks (sidedrop does the same). */
+/* No grey tap flash anywhere: controls have their own pressed looks. */
 * { -webkit-tap-highlight-color: transparent; }
 
 /* ---- Scroll indicator (nav/scroller.js): UIKit's UIScrollerIndicatorDefault, 5pt black at 50% with a 1pt 15% white

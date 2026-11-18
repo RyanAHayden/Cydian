@@ -2,8 +2,7 @@
 
 A launchd daemon in the jailbreak .deb (not in the sideload IPA). Once a day it runs `apt-get update`, counts the
 upgrades and sets the badge on Cydian's icon to that number. When an upgrade is new since the last notification, it
-also posts a local notification: "3 Upgrades" / "3 upgrades: A, B and C." (the same words as `web/push.py` and
-`web/app/device-check.js`).
+also posts a local notification: "3 Upgrades" / "3 upgrades: A, B and C.".
 
 - `auto.c`, `auto.h`: N7's decisions and the whole hourly run (below).
 - `upgrades.c`, `upgrades.h`: the rules, in plain C so they build and are tested on Linux (`test_daemon.py` through

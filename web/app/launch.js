@@ -3,10 +3,7 @@
 // left last time it was killed. No DOM here, so it runs under `node --test`.
 //
 // The rule runs once, when app.js loads. A return from the background never reloads the page, so it never gets
-// here; a reload (Home's Reload button, or iOS reloading the page) and back/forward keep the route. A notification
-// tap that opens the app (sw.js) marks its URL with ?launch=push and keeps the page it names.
-
-const PUSH_MARK = "launch";
+// here; a reload (Home's Reload button, or iOS reloading the page) and back/forward keep the route.
 
 // win: window-like ({ matchMedia, navigator, performance, location, cydianApp }).
 export function isStandaloneWeb(win) {
@@ -22,18 +19,12 @@ export function navigationType(win) {
   return old === 1 ? "reload" : old === 2 ? "back_forward" : old === 0 ? "navigate" : null;
 }
 
-// The URL to replace the current one with before the router starts, or null to leave it. It drops the push mark
-// everywhere, and sends a fresh standalone launch to Home. resumed: the page came back from the background or the
+// The URL to replace the current one with before the router starts, or null to leave it: a fresh standalone launch
+// goes to Home. resumed: the page came back from the background or the
 // back/forward cache (pageshow with persisted) rather than loading; it keeps its route.
 export function launchURL(win, { resumed = false } = {}) {
   const { pathname, search, hash } = win.location;
-  const params = new URLSearchParams(search);
-  const fromPush = params.has(PUSH_MARK);
-  params.delete(PUSH_MARK);
-  const rest = params.toString() ? "?" + params : "";
-  const fresh = !resumed && isStandaloneWeb(win) && !fromPush && navigationType(win) !== "reload" &&
+  const fresh = !resumed && isStandaloneWeb(win) && navigationType(win) !== "reload" &&
     navigationType(win) !== "back_forward";
-  if (fresh && hash !== "#/home") return pathname + rest + "#/home";
-  if (fromPush) return pathname + rest + hash;
-  return null;
+  return fresh && hash !== "#/home" ? pathname + search + "#/home" : null;
 }

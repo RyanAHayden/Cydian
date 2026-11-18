@@ -1,13 +1,12 @@
 """N5: cydian-upgrades' rules (upgrades.c) built with the host's C compiler and run through test_driver.c: the
-upgrade count from apt's plan, names from dpkg's status, the notification's words (checked against web/push.py's),
-when to notify and when a check is due; and the launchd job, entitlements and package scripts that ship it.
+upgrade count from apt's plan, names from dpkg's status, the notification's words, when to
+notify and when a check is due; and the launchd job, entitlements and package scripts that ship it.
 The daemon itself (main.m: apt, UserNotifications, launchd) only runs on a jailbroken phone: see the N5 journal."""
 import os
 import plistlib
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 
@@ -145,22 +144,6 @@ class Rules(unittest.TestCase):
         self.assertEqual(r["body"], "2 upgrades: Example Tweak and libfoo.")
         r = self.check(PLAN.replace("Inst libfoo", "Xnst libfoo"), STATUS)
         self.assertEqual((r["title"], r["body"]), ("1 Upgrade", "Example Tweak 1.2 is available."))
-
-    def test_same_words_as_the_server(self):
-        sys.path.insert(0, os.path.join(os.path.dirname(NATIVE), "web"))
-        try:
-            import push
-        except ImportError as e:
-            self.skipTest("web/push.py needs %s (tools/check.sh's .venv has it)" % e.name)
-        finally:
-            sys.path.pop(0)
-        for n in (1, 2, 3, 4, 7):
-            ups = [{"id": "pkg%d" % i, "version": "1.1", **({"name": "Name %d" % i} if i % 2 else {})} for i in range(n)]
-            status = "".join("Package: pkg%d\nStatus: install ok installed\nName: Name %d\n\n" % (i, i)
-                             for i in range(n) if i % 2)
-            r = self.check("".join(inst(i) for i in range(n)), status)
-            msg = push.message(ups, "id", 1)
-            self.assertEqual((r["title"], r["body"]), (msg["title"], msg["body"]), n)
 
     # --- when to notify
 

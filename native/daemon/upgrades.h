@@ -1,6 +1,6 @@
 /* cydian-upgrades' rules (N5), kept apart from the daemon's main so they build and are tested on Linux
  * (test_daemon.py): which lines of apt's plan are upgrades, the notification's words, when to notify and when a
- * check is due. The words are web/push.py's and web/app/device-check.js's, so all three say the same thing.
+ * check is due.
  * SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef CYDIAN_UPGRADES_H
 #define CYDIAN_UPGRADES_H

@@ -324,7 +324,7 @@ Add alert with Paste); an .ipa another app opens in Cydian (AirDrop, Files, Mail
 ### Tests
 
 `native/test_sign.py` builds `native/sign/` with `native/sign/tests/main.swift` for Linux (the Swift toolchain the
-native build uses; it skips and says so without one) and runs it against `web/signer/testkit.py`'s throwaway CA,
+native build uses; it skips and says so without one) and runs it against `native/testkit.py`'s throwaway CA,
 certificate and profiles, with openssl holding the key. It signs a fixture IPA with a framework, a loose dylib, an
 extension, localisations, a symlink and an old signature's leftovers, then re-signs the result, signs with an
 explicit profile, signs an unsigned and a fat binary, and, where the build made one, `native/build/Cydian.ipa`

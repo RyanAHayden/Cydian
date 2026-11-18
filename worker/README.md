@@ -69,4 +69,5 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 
 `node test.mjs` checks them against an in-memory KV. cydian.dev's own deploy: `npx wrangler deploy -c wrangler.cydian.toml`.
 
-The website's **Install** (no app to sign on) still signs on a server with zsign: `web/signer/`, run on cydian.dev.
+The website's **Install** (no app to sign on) signs in the browser (F93: zsign as WebAssembly, `web/app/vendor/zsign`)
+and uploads the signed IPA to `/sign/upload` (in parts, kept 10 minutes) for iOS's install prompt.

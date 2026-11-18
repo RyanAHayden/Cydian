@@ -597,7 +597,7 @@ async function addRecommended(row, ctx) {
   return true;
 }
 
-// sidedrop's GET look: a white pill with blue text, blue while held; "Added", greyed, once the source is listed.
+// The GET look: a white pill with blue text, blue while held; "Added", greyed, once the source is listed.
 function getButton(row, onAdd) {
   const b = el("button", "rec-get" + (row.added ? " added" : ""), row.added ? "Added" : "Add");
   b.type = "button";

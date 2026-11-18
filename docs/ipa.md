@@ -4,6 +4,10 @@
 > sideload IPA (plan I2-I4). It remembers the version you downloaded, checks sources in the background and posts
 > local notifications. When the root helper is present (jailbreak mode) it reads real installed versions instead.
 > The research below still holds for what an IPA can and can't see.
+>
+> Also out of date below (F89, F93): Web Push (F10) is gone with the website's server, the sideload IPA is signed by
+> the user's own tool (Feather, AltStore, SideStore), never through sidedrop (`docs/sideload.md`), and the website
+> signs in the browser. The text is kept as R4 wrote it.
 
 R4, 2026-11-17. **Verdict: drop it.** Don't build a non-jailbroken IPA now. F10 (PWA + Web Push) and F11 (the
 Shortcuts recipe) cover the job. The IPA's only real extras (a Home Screen widget, a check that never leaves the

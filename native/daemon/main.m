@@ -50,7 +50,7 @@
 #define CYDIAN_PREFIX "/var/jb"
 #endif
 #define BUNDLE_ID @"com.ryha.cydian"
-#define NOTE_ID @"cydian-upgrades" /* one notification, replaced by the next (device-check.js TAG) */
+#define NOTE_ID @"cydian-upgrades" /* one notification, replaced by the next */
 #define AUTO_NOTE_ID @"cydian-autoupdate" /* N7's: what installed by itself, or failed to */
 #define UPDATE_SECONDS 600
 #define SIMULATE_SECONDS 120

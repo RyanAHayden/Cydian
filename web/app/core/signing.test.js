@@ -6,7 +6,7 @@ import {
   bmpPassword, toBase64, APP_SERVER, LEGACY_SERVER,
 } from "./signing.js";
 
-// Throwaway certificates with fixed dates, written by web/signer/make_fixtures.py.
+// Throwaway certificates with fixed dates, written by the old web/signer/make_fixtures.py (gone with the server, 9905b05).
 const fx = (name) => new Uint8Array(readFileSync(new URL(`./fixtures/signing/${name}`, import.meta.url)));
 const PROFILE = fx("test.mobileprovision");
 const P12 = fx("test.p12");

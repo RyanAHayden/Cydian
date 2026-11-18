@@ -13,7 +13,7 @@
 // follows the system while Appearance is Automatic. theme-boot.js does the same before first paint.
 import { grouped } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
-import { createSettings, detectMode, themeFor, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
+import { createSettings, detectMode, themeFor, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind } from "../core/signing.js";
@@ -52,7 +52,8 @@ function style() {
 export const settings = createSettings({ mode: detectMode(), helper: globalThis.ifizboxNative?.helper, native: globalThis.ifizboxNative });
 
 // Light: the top of the blue status bar under the nav bar; dark: "Status Bar (Black)".
-const THEME_COLORS = { light: "#4f698b", dark: "#5f656f" }; // dark: the gunmetal bar's top
+// By palette (F198): OLED Black's status bar is #000, Gunmetal's the top of its bar. ios6.css --dk-ground matches.
+export const THEME_COLORS = { classic: "#4f698b", oled: "#000", gunmetal: "#5f656f" };
 
 const defOf = (key) => SETTINGS.find((d) => d.key === key);
 const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? String(v);
@@ -258,37 +259,48 @@ function holdsPage() {
 
 // ---- Theme ---------------------------------------------------------------------------------------------------
 
+// F198: the dark palette chosen (raw, as theme-boot.js reads it); F199's theme menu sets it. paletteFor() reads
+// anything but a known palette as OLED Black.
+export function darkTheme(win = globalThis) {
+  try { return win.localStorage?.getItem(DARK_THEME_KEY) ?? null; } catch { return null; }
+}
+
 export function applyTheme(doc = document, win = window) {
   const dark = win.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
   const appearance = settings.get("appearance");
   const theme = themeFor(appearance, dark);
+  const chosen = darkTheme(win);
+  const palette = paletteFor(theme, chosen);
   doc.documentElement.dataset.theme = theme;
-  // Both metas keep their media query so the browser picks one before any script runs; a fixed choice paints
-  // both with its own colour.
+  doc.documentElement.dataset.palette = palette; // F198: OLED Black or Gunmetal in dark, classic in light
+  // A meta with a media query (light or dark) is painted for its own scheme while Appearance is Automatic; a fixed
+  // choice, or a meta with none (index.html has one), takes the palette showing now.
   // A fresh meta element, not a changed one: Safari doesn't always repaint its top bar when only `content` changes.
   for (const m of doc.querySelectorAll('meta[name="theme-color"]')) {
-    const own = m.media.includes("dark") ? "dark" : "light";
-    const color = THEME_COLORS[appearance === "auto" ? own : theme];
+    const own = m.media?.includes("dark") ? "dark" : m.media?.includes("light") ? "light" : null;
+    const color = THEME_COLORS[appearance === "auto" && own ? paletteFor(own, chosen) : palette];
     if (m.content === color) continue;
     const fresh = m.cloneNode();
     fresh.content = color;
     m.replaceWith(fresh);
   }
-  tellShell(appearance, theme, win);
+  tellShell(appearance, theme, win, paletteFor("dark", chosen));
 }
 
 // The jailbreak/sideload shell (F23): native parts the page can't style (keyboard, <select> pickers, alerts,
 // the window behind the web view) follow the theme through the bridge's app.theme. Automatic sends "auto" so the
 // shell lets the system decide; pinning a style there would also pin prefers-color-scheme inside the web view and
 // Automatic would stop following the system. On the site there is no handler and this does nothing.
-export function themeMessage(appearance, theme) {
-  return { id: 0, method: "app.theme", params: { style: appearance === "auto" ? "auto" : theme, theme } };
+// F198: darkPalette is the dark palette chosen (oled or gunmetal), sent in light too: the shell keeps it to paint its
+// window at the next launch before the page runs (black for OLED Black), whichever way Automatic then goes.
+export function themeMessage(appearance, theme, darkPalette = "oled") {
+  return { id: 0, method: "app.theme", params: { style: appearance === "auto" ? "auto" : theme, theme, darkPalette } };
 }
 let lastSent = "";
-function tellShell(appearance, theme, win) {
+function tellShell(appearance, theme, win, darkPalette) {
   const h = win.webkit?.messageHandlers?.ifizbox;
   if (!h) return;
-  const msg = themeMessage(appearance, theme);
+  const msg = themeMessage(appearance, theme, darkPalette);
   const key = JSON.stringify(msg.params);
   if (key === lastSent) return;
   lastSent = key;

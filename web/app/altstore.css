@@ -41,7 +41,7 @@
 }
 .perm-more.up .cell-label::after { transform: rotate(-135deg); margin-bottom: -1px; }
 .perm-more .cell-inner.is-pressed .cell-label { color: #fff; }
-html[data-theme="dark"] .perm-more .cell-label { color: #8fb0e8; }
+html[data-theme="dark"] .perm-more .cell-label { color: var(--dk-link); }
 /* F96: the website's Install on the Website row before its warning was accepted: greyed out like a disabled cell
    (a tap opens the warning, websign-gate.js). */
 .websign-off .cell-label { color: var(--subtitle); }

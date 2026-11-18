@@ -568,3 +568,14 @@ export function themeFor(appearance, systemDark) {
   if (appearance === "light" || appearance === "dark") return appearance;
   return systemDark ? "dark" : "light";
 }
+
+// F198: the palette inside a tone, for <html data-palette> beside data-theme. Light has one (classic, the kit's);
+// dark has OLED Black (the default, user 2026-11-18) and Gunmetal (F13's). The dark one is stored raw at
+// localStorage["ifizbox.darkTheme"]; F199's theme menu sets it (anything else reads as OLED Black). theme-boot.js
+// keeps the same rule.
+export const DARK_PALETTES = ["oled", "gunmetal"];
+export const DARK_THEME_KEY = "ifizbox.darkTheme";
+export function paletteFor(theme, darkTheme) {
+  if (theme !== "dark") return "classic";
+  return DARK_PALETTES.includes(darkTheme) ? darkTheme : DARK_PALETTES[0];
+}

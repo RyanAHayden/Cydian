@@ -5,16 +5,16 @@
 /* ---- queued packages in every list: "Queued for <mode>" in the kit's detail blue ---- */
 .pkg-row[data-queued] .pkg-desc { color: var(--detail); font-weight: bold; }
 .pkg-row[data-queued="remove"] .pkg-desc { color: #b22a2a; }
-html[data-theme="dark"] .pkg-row[data-queued="remove"] .pkg-desc { color: #ff8a80; }
+html[data-theme="dark"] .pkg-row[data-queued="remove"] .pkg-desc { color: var(--dk-remove); }
 
 /* ---- Confirm ---- */
 .sheet-left { justify-self: start; display: flex; }
 .confirm-mods .cell-inner { align-items: flex-start; padding-top: 11px; padding-bottom: 11px; }
 .confirm-mods .cell-detail { white-space: pre-line; text-align: right; line-height: 20px; }
 .confirm-issues .group-header { color: #704d4d; }
-html[data-theme="dark"] .confirm-issues .group-header { color: #f0b8b8; }
+html[data-theme="dark"] .confirm-issues .group-header { color: var(--dk-issue-head); }
 .confirm-problem .table { background: #ffcccc; }
-html[data-theme="dark"] .confirm-problem .table { background: #5a3434; }
+html[data-theme="dark"] .confirm-problem .table { background: var(--dk-issue-table); }
 .confirm-raw, .console-log {
   margin: 0; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere;
   font: 11px/15px ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text;
@@ -55,5 +55,5 @@ html[data-theme="dark"] .confirm-problem .table { background: #5a3434; }
    at the right. */
 .confirm-continue .cell-inner { justify-content: center; position: relative; }
 .confirm-continue .cell-label { flex: none; color: #385487; font-weight: bold; text-align: center; }
-html[data-theme="dark"] .confirm-continue .cell-label { color: #8fb0e8; }
+html[data-theme="dark"] .confirm-continue .cell-label { color: var(--dk-link); }
 .confirm-continue .cell-inner.is-pressed .cell-label { color: #fff; }

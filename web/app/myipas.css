@@ -22,5 +22,5 @@
 }
 .install-ipas-browse .group + .group .cell.ph:nth-child(2n) .cell-label { width: 32%; }
 .install-ipas-browse .group:first-child .cell.ph .cell-label { color: inherit; background: none; width: auto; animation: none; }
-html[data-theme="dark"] .cell.ph .cell-detail, html[data-theme="dark"] .install-ipas-browse .group + .group .cell.ph .cell-label { background: #3a3d42; }
+html[data-theme="dark"] .cell.ph .cell-detail, html[data-theme="dark"] .install-ipas-browse .group + .group .cell.ph .cell-label { background: var(--dk-placeholder); }
 @keyframes ph-pulse { from { opacity: 1; } to { opacity: .45; } }

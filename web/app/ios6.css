@@ -26,12 +26,94 @@
   --category: linear-gradient(rgba(109,123,133,.9), rgba(133,145,153,.9) 2%, rgba(177,187,195,.9) 5%,
     rgba(140,154,165,.9) 8%, rgba(173,182,188,.9) 94%, rgba(137,149,158,.9) 96%);
 }
-/* Dark: our own theme in the iOS 6 spirit (F13). The kit's black bars ("Status Bar (Black)", the black menu and
-   tool bars, "Button (Black)") over gunmetal grouped tables, with white text at full contrast. The tab bar is
-   black in both. Values not from the kit are ours, picked to keep the light theme's steps (pinstripe, edge,
-   divider shadow and highlight) one shade apart. */
+/* Dark: our own themes in the iOS 6 spirit. <html data-theme> is the tone (light or dark), <html data-palette> the
+   palette inside it (F198): "oled" (OLED Black, the default dark one, user 2026-11-18) or "gunmetal" (F13's dark,
+   kept for the coming theme menu, F199). Every html[data-theme="dark"] rule across web/app/*.css paints with the
+   tokens below and none with a fixed colour, so a palette is just this block's values: the first block is OLED
+   Black (it also covers a dark page with no data-palette), the gunmetal block overrides what differs.
+   --dk-* tokens are dark-only (the light rules keep their kit colours). */
 html[data-theme="dark"] {
   color-scheme: dark;
+  /* OLED Black (the mockup, F198): pure black ground, bars and tab bar; near-black tables, no pinstripe, no emboss. */
+  --pin-dark: #000;
+  --pin-light: #000;
+  --head: #d6d6db;
+  --emboss: none;
+  --detail: #5fa2ff;
+  --field-text: #d6d6db;
+  --field-hint: #6e6e74;
+  --text: #fff;
+  --subtitle: #8d8d93;
+  --table: #0e0e0f;
+  --table-edge: #1f1f22;
+  --table-inset: transparent;
+  --divider: #1c1c1f;
+  --divider-hi: transparent;
+  --count: #48484e;
+  --plain: #000;
+  --keyline: #1c1c1f;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%2355555b' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
+  --category: linear-gradient(rgba(36,36,40,.94), rgba(22,22,24,.94) 5%, rgba(14,14,15,.94) 94%, rgba(0,0,0,.94) 96%);
+  /* Bars: the page behind everything, the nav bar (status bar under the notch, top highlight, gloss, base line), its
+     shadow, the tab bar, bar buttons and the back arrow. */
+  --dk-ground: #000;
+  --dk-nav-bar:
+    linear-gradient(#1a1a1c, #1a1a1c) bottom / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,.16)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#333336, #151517 50%, #070708 51%, #000) bottom / 100% 44px no-repeat,
+    #000;
+  --dk-nav-shadow: none;
+  --dk-tabbar: linear-gradient(#1c1c1e, #1c1c1e) top / 100% 1px no-repeat, #000;
+  --dk-btn-edge: #000;
+  --dk-btn: linear-gradient(#3a3a3e, #121214);
+  --dk-btn-pressed: linear-gradient(#1c1c1f, #050506);
+  --dk-back: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzAwMCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzAwMCIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzNhM2EzZSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzEyMTIxNCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMTIiLz48cGF0aCBkPSJNMiAyOSAyMiAzUTIzLjUgMSAyNiAxSDM2UTQxIDEgNDEgNlY1MlE0MSA1NyAzNiA1N0gyNlEyMy41IDU3IDIyIDU1WiIgZmlsbD0idXJsKCNiKSIvPjxwYXRoIGQ9Ik00LjYgMjkgMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDZWNTJRMzkgNTUgMzYgNTVIMjYuNVEyNC44IDU1IDIzLjYgNTMuN1oiIGZpbGw9InVybCgjZikiLz48cGF0aCBkPSJNMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4zIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4K");
+  --dk-ctl-hi: transparent;  /* the 1px light line under segmented controls */
+  --dk-seg: linear-gradient(#3a3a3e, #1c1c1f 90%, #121214);
+  --dk-seg-pressed: linear-gradient(#1c1c1f, #0a0a0b);
+  /* Switch */
+  --dk-sw-track: linear-gradient(#0e0e0f, #1f1f22);
+  --dk-sw-off: #8d8d93;
+  --dk-sw-on: linear-gradient(#0b4fb0, #3d8cf0);
+  --dk-sw-knob: linear-gradient(#55555b, #2a2a2e);
+  --dk-sw-knob-held: linear-gradient(#444449, #1f1f22);
+  /* Search bar, its scope bar and field, the section index */
+  --dk-search-line: #1a1a1c;
+  --dk-search-bar: linear-gradient(#1c1c1f, #0e0e0f 7%, #070708);
+  --dk-search-fill: #070708;
+  --dk-field: #1c1c1f;
+  --dk-field-edge: #2a2a2e;
+  --dk-clear: #55555b;
+  --dk-index: #8d8d93;
+  /* Status colours, links and the rest */
+  --dk-ok: #7fcf6f;
+  --dk-bad: #ff7b6b;
+  --dk-remove: #ff8a80;
+  --dk-link: #5fa2ff;
+  --dk-placeholder: #1c1c1f;
+  --dk-store-head: linear-gradient(#1c1c1f, #0a0a0b);
+  --dk-star-off: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%233a3a3e' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
+  --dk-star-on: #f0a03a;
+  --dk-dot: #3a3a3e;
+  --dk-track: #1f1f22;
+  --dk-bar-fill: linear-gradient(#8d8d93, #5f5f66);
+  --dk-inset-box: #161618;
+  --dk-green: #0f2414;
+  --dk-glyph: #3a3a3e;
+  --dk-dim: #55555b;
+  --dk-issue-head: #f0b8b8;
+  --dk-issue-table: #2a1212;
+  --dk-review-btn-text: #c9d6f0;
+  --dk-review-btn: linear-gradient(#3a3a3e, #1c1c1f);
+  --dk-warn-table: #241f08;
+  --dk-warn-edge: #5a4f1a;
+  --dk-warn-text: #fff3b0;
+}
+/* Gunmetal (F13, user 2026-11-17): the kit's black bars ("Status Bar (Black)", the black menu and tool bars,
+   "Button (Black)") over gunmetal grouped tables, with white text at full contrast. The tab bar is the light
+   theme's black one. Values not from the kit are ours, picked to keep the light theme's steps (pinstripe, edge,
+   divider shadow and highlight) one shade apart. */
+html[data-theme="dark"][data-palette="gunmetal"] {
   --pin-dark: #2b2e33;
   --pin-light: #303338;
   --head: #e4e8ef;
@@ -52,6 +134,51 @@ html[data-theme="dark"] {
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23c3c8d0' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
   --category: linear-gradient(rgba(40,42,46,.94), rgba(70,74,80,.94) 5%, rgba(52,55,60,.94) 8%, rgba(36,38,42,.94) 94%,
     rgba(20,21,24,.94) 96%);
+  --dk-ground: #5f656f;
+  --dk-nav-bar: /* glossy split at half, light top edge, near-black base line */
+    linear-gradient(#0b0c0e, #0b0c0e) bottom / 100% 1px no-repeat,
+    linear-gradient(#7a808a, #7a808a) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#5f656f, #3b4048 50%, #30343b 51%, #23262b) bottom / 100% 44px no-repeat,
+    #23262b;
+  --dk-nav-shadow: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,0));
+  --dk-tabbar: /* the light theme's .tabbar */
+    linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) top / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,.1)) 0 1px / 100% 1px no-repeat,
+    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% 48px no-repeat,
+    #000;
+  --dk-btn-edge: #111;
+  --dk-btn: linear-gradient(#4a4f58, #24272c);
+  --dk-btn-pressed: linear-gradient(#2a2d32, #121316);
+  --dk-back: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzExMSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzExMSIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzRhNGY1OCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzI0MjcyYyIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMTIiLz48cGF0aCBkPSJNMiAyOSAyMiAzUTIzLjUgMSAyNiAxSDM2UTQxIDEgNDEgNlY1MlE0MSA1NyAzNiA1N0gyNlEyMy41IDU3IDIyIDU1WiIgZmlsbD0idXJsKCNiKSIvPjxwYXRoIGQ9Ik00LjYgMjkgMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDZWNTJRMzkgNTUgMzYgNTVIMjYuNVEyNC44IDU1IDIzLjYgNTMuN1oiIGZpbGw9InVybCgjZikiLz48cGF0aCBkPSJNMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4zIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4K");
+  --dk-ctl-hi: rgba(255,255,255,.08);
+  --dk-seg: linear-gradient(#5a5f68, #3c4047 90%, #33363c);
+  --dk-seg-pressed: linear-gradient(#45494f, #2b2e33);
+  --dk-sw-track: linear-gradient(#2b2e33, #3c4047);
+  --dk-sw-off: #9aa0a8;
+  --dk-sw-knob: linear-gradient(#6a6f78, #3c4047);
+  --dk-sw-knob-held: linear-gradient(#55595f, #2e3136);
+  --dk-search-line: #000;
+  --dk-search-bar: linear-gradient(#4c4c4c, #2a2a2a 7%, #1a1a1a);
+  --dk-search-fill: #1a1a1a;
+  --dk-field: #2b2e33;
+  --dk-field-edge: #15171a;
+  --dk-clear: #6b6f75;
+  --dk-index: #9aa3b2;
+  --dk-link: #8fb0e8;
+  --dk-placeholder: #3a3d42;
+  --dk-store-head: linear-gradient(#41454c, #2b2e33);
+  --dk-star-off: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23666b73' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
+  --dk-dot: #5a606b;
+  --dk-track: #25272b;
+  --dk-bar-fill: linear-gradient(#b5bac2, #8a9099);
+  --dk-inset-box: #30333a;
+  --dk-green: #2f4a36;
+  --dk-glyph: #4a4d52;
+  --dk-dim: #6c7178;
+  --dk-issue-table: #5a3434;
+  --dk-review-btn: linear-gradient(#4a4f58, #3b3f46);
+  --dk-warn-table: #4a4115;
+  --dk-warn-edge: #8a7a2a;
 }
 body { color: var(--text); background: #000; }
 
@@ -73,14 +200,9 @@ body { color: var(--text); background: #000; }
 }
 /* Dark: "Status Bar (Black)" under the notch and the black menu bar ("Semi-transparent black bar", opaque):
    #4c4c4c to black at 52%, a 1px white-at-20% highlight on top, a 1px black-at-70% shadow at the bottom. */
-html[data-theme="dark"] .navbar { /* gunmetal (user 2026-11-17): glossy split at half, light top edge, near-black base line */
-  background:
-    linear-gradient(#0b0c0e, #0b0c0e) bottom / 100% 1px no-repeat,
-    linear-gradient(#7a808a, #7a808a) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
-    linear-gradient(#5f656f, #3b4048 50%, #30343b 51%, #23262b) bottom / 100% 44px no-repeat,
-    #23262b;
-}
-html[data-theme="dark"] .navbar::after { background: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,0)); }
+html[data-theme="dark"] .navbar { background: var(--dk-nav-bar); } /* the palette's (F198): OLED Black or gunmetal */
+html[data-theme="dark"] .navbar::after { background: var(--dk-nav-shadow); }
+html[data-theme="dark"] .tabbar { background: var(--dk-tabbar); }
 
 /* Bar buttons and the back arrow, from the 4S's UIKit art (UINavigationBarDefaultButton, ...Pressed, ...Back), the
    versions the user picked (2026-11-17). background-origin: border-box matters: without
@@ -98,10 +220,10 @@ html[data-theme="dark"] .navbar::after { background: linear-gradient(rgba(0,0,0,
   border-color: #1c2c4f; border-top-color: #30343c;
 }
 html[data-theme="dark"] .bar-button:not(.back):not(.done) {
-  border-color: #111; background: linear-gradient(#4a4f58, #24272c); background-origin: border-box;
+  border-color: var(--dk-btn-edge); background: var(--dk-btn); background-origin: border-box;
 }
 html[data-theme="dark"] .bar-button:not(.back):not(.done):active, html[data-theme="dark"] .bar-button:not(.back):not(.done).is-pressed {
-  background: linear-gradient(#2a2d32, #121316); background-origin: border-box;
+  background: var(--dk-btn-pressed); background-origin: border-box;
 }
 .bar-button.back {
   height: 30px; min-width: 0; max-width: 100%; padding: 0 5px 0 1px; line-height: 28px;
@@ -110,7 +232,7 @@ html[data-theme="dark"] .bar-button:not(.back):not(.done):active, html[data-them
   border-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzM1M2E0MyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzJkNDE1YiIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzk5YWFjMiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzQxNjE4ZSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=") 0 10 0 26 fill / 0 5px 0 13px;
 }
 .bar-button.back:active, .bar-button.back.is-pressed { border-image-source: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzMwMzQzYyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzFjMmM0ZiIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzhiOTdhZiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzI4M2U2YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo="); background: none; }
-html[data-theme="dark"] .bar-button.back { border-image-source: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzExMSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzExMSIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzRhNGY1OCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzI0MjcyYyIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMTIiLz48cGF0aCBkPSJNMiAyOSAyMiAzUTIzLjUgMSAyNiAxSDM2UTQxIDEgNDEgNlY1MlE0MSA1NyAzNiA1N0gyNlEyMy41IDU3IDIyIDU1WiIgZmlsbD0idXJsKCNiKSIvPjxwYXRoIGQ9Ik00LjYgMjkgMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDZWNTJRMzkgNTUgMzYgNTVIMjYuNVEyNC44IDU1IDIzLjYgNTMuN1oiIGZpbGw9InVybCgjZikiLz48cGF0aCBkPSJNMjMuNiA0LjNRMjQuOCAzIDI2LjUgM0gzNlEzOSAzIDM5IDYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4zIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4K"); }
+html[data-theme="dark"] .bar-button.back { border-image-source: var(--dk-back); }
 html[data-theme="dark"] .bar-button.back:active, html[data-theme="dark"] .bar-button.back.is-pressed { filter: brightness(.75); }
 
 /* ---- Tab bar: "Tab bar" ---- */
@@ -251,11 +373,11 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
 .sw-track::before, .sw-track::after, .sw-knob { transition: transform .2s ease; }
 .switch.is-held .sw-knob { background: linear-gradient(#bcbcbc, #e6e6e6); }
 .switch.is-dragging .sw-track::before, .switch.is-dragging .sw-track::after, .switch.is-dragging .sw-knob { transition: none; }
-html[data-theme="dark"] .sw-track { border-color: #111; background: linear-gradient(#2b2e33, #3c4047); box-shadow: inset 0 1px 3px rgba(0,0,0,.8); }
-html[data-theme="dark"] .sw-track::after { color: #9aa0a8; }
-html[data-theme="dark"] .sw-track::before { background: linear-gradient(#0b4fb0, #3d8cf0); }
-html[data-theme="dark"] .sw-knob { background: linear-gradient(#6a6f78, #3c4047); border-color: #111; }
-html[data-theme="dark"] .switch.is-held .sw-knob { background: linear-gradient(#55595f, #2e3136); }
+html[data-theme="dark"] .sw-track { border-color: var(--dk-btn-edge); background: var(--dk-sw-track); box-shadow: inset 0 1px 3px rgba(0,0,0,.8); }
+html[data-theme="dark"] .sw-track::after { color: var(--dk-sw-off); }
+html[data-theme="dark"] .sw-track::before { background: var(--dk-sw-on); }
+html[data-theme="dark"] .sw-knob { background: var(--dk-sw-knob); border-color: var(--dk-btn-edge); }
+html[data-theme="dark"] .switch.is-held .sw-knob { background: var(--dk-sw-knob-held); }
 @media (prefers-reduced-motion: reduce) { .sw-track::before, .sw-track::after, .sw-knob { transition: none; } }
 
 /* ---- Plain tables: "Scroll pane" ---- */
@@ -343,7 +465,7 @@ html.no-zoom, html.no-zoom body { touch-action: pan-x pan-y; }
 /* What's behind the page (Safari samples it for its top bar, and it shows in overscroll): the nav bar's colour for each
    theme, so switching theme repaints the top too. */
 html { background: #bdcbdc; }
-html[data-theme="dark"] { background: #5f656f; }
+html[data-theme="dark"] { background: var(--dk-ground); }
 
 /* UIMenuController (nav/menu.js): a black glossy callout with an arrow, white bold items split by hairlines. */
 .menu { position: fixed; z-index: 40; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
@@ -540,7 +662,7 @@ html.has-banner .sheet { translate: 0 var(--banner-h, 44px); bottom: var(--banne
 .ph-list .cell-inner { min-height: 58px; }
 .ph-page .ph-head { display: flex; gap: 12px; align-items: center; margin: 10px 9px; padding: 12px; border-radius: 8px; background: var(--table, #fff); border: 1px solid var(--table-edge, #a9abad); }
 .ph-icon-lg { width: 59px; height: 59px; border-radius: 12px; flex: none; }
-html[data-theme="dark"] .ph-box, html[data-theme="dark"] .ph-bar { background: #3a3d42; }
+html[data-theme="dark"] .ph-box, html[data-theme="dark"] .ph-bar { background: var(--dk-placeholder); }
 @keyframes ph-pulse { from { opacity: 1; } to { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .ph-box, .ph-bar { animation: none; } }
 .banner .banner-action { flex: none; margin-left: auto; margin-right: 4px; align-self: center; height: 30px; line-height: 28px; padding: 0 12px; font-size: 13px; }
@@ -611,12 +733,12 @@ html.has-reload.has-banner .sheet { translate: 0 calc(var(--banner-h, 44px) + 44
 .store-segment.selected + .store-segment, .store-segment + .store-segment.selected { border-left-color: #093786; }
 .store-segmented:has(.store-segment.selected:first-child) { border-left-color: #093786; }
 .store-segmented:has(.store-segment.selected:last-child) { border-right-color: #093786; }
-html[data-theme="dark"] .store-segmented { border-color: #111; box-shadow: 0 1px 0 rgba(255,255,255,.08); }
+html[data-theme="dark"] .store-segmented { border-color: var(--dk-btn-edge); box-shadow: 0 1px 0 var(--dk-ctl-hi); }
 html[data-theme="dark"] .store-segment:not(.selected) {
-  color: #e4e8ef; text-shadow: 0 -1px 0 rgba(0,0,0,.8); background: linear-gradient(#5a5f68, #3c4047 90%, #33363c); background-origin: border-box;
+  color: var(--head); text-shadow: var(--emboss); background: var(--dk-seg); background-origin: border-box;
 }
-html[data-theme="dark"] .store-segment + .store-segment { border-left-color: #111; }
-html[data-theme="dark"] .store-segment:active:not(.selected) { background: linear-gradient(#45494f, #2b2e33); background-origin: border-box; }
+html[data-theme="dark"] .store-segment + .store-segment { border-left-color: var(--dk-btn-edge); }
+html[data-theme="dark"] .store-segment:active:not(.selected) { background: var(--dk-seg-pressed); background-origin: border-box; }
 
 /* F193: the undo bar after a row's swipe (nav/undobar.js). The kit's "Semi-transparent black bar" (the keyboard
    toolbar: 44pt, black at 60% over #4c4c4c to #000 at 52%, a 20% white top highlight), docked above the tab bar and

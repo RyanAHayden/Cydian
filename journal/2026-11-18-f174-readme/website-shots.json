@@ -1,0 +1,22 @@
+[
+  {"wait": 6000},
+  {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); new Promise(res=>{const r=indexedDB.open('ifizbox-altsources');r.onsuccess=()=>{const db=r.result;const tx=db.transaction('sources','readwrite');const st=tx.objectStore('sources');const q=st.getAllKeys();q.onsuccess=()=>{const gone=q.result.filter(k=>/apptesters|ryuksign|crystall1ne|unbound/.test(k));gone.forEach(k=>st.delete(k));tx.oncomplete=()=>res(gone.join(' '))}}})"},
+  {"nav": "", "ms": 20000},
+  {"shot": "web-home"},
+  {"nav": "#/sources", "ms": 8000},
+  {"shot": "web-sources"},
+  {"nav": "#/changes", "ms": 8000},
+  {"shot": "web-changes"},
+  {"nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance", "ms": 9000},
+  {"shot": "web-app"},
+  {"nav": "#/search", "ms": 8000},
+  {"eval": "(()=>{const i=document.querySelector('.search-field input'); i.value='emulator'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+  {"wait": 3000},
+  {"shot": "web-search"},
+  {"nav": "#/installed", "ms": 8000},
+  {"shot": "web-installed"},
+  {"nav": "#/home/settings/signing", "ms": 8000},
+  {"shot": "web-signing"},
+  {"nav": "#/home/settings", "ms": 8000},
+  {"shot": "web-settings"}
+]

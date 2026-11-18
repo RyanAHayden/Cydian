@@ -21,7 +21,7 @@
 // The site never calls a vendor: it shows Canister's price and links to the vendor's page.
 import { getBackend, getArch } from "../backend.js";
 import { format, parse } from "../router.js";
-import { grouped } from "../nav/ui.js";
+import { grouped, el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { mediaUrl } from "./depiction.js";
@@ -32,13 +32,6 @@ import { createCanister, mapResults, priceFor, normalRepo, askable } from "../co
 import {
   isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore, isFreePrice,
 } from "../core/payment.js";
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-}
 
 const pkgHref = (key, id) => format({ tab: "sources", path: [key, `package:${id}`] });
 

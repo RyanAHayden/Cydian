@@ -5,7 +5,7 @@
 //                                         All Apps, Website; Share in the nav bar (F76)
 //   a package page whose stanza is an app (kind "ipa") -> renderApp
 // Styles: altstore.css. Every remote image goes through mediaUrl (http ones through the proxy on the site).
-import { grouped, placeholder } from "../nav/ui.js";
+import { grouped, placeholder, el } from "../nav/ui.js";
 import { format } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
 import { getBackend } from "../backend.js";
@@ -31,13 +31,6 @@ import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, dest
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { compareVersions } from "../core/apt.js";
 import { queueApp } from "./queue.js";
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-}
 
 function img(url, cls) {
   const src = mediaUrl(url);

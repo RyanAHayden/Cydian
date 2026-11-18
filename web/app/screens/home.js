@@ -13,7 +13,7 @@
 // (F124: New, Recently Updated, Popular, Featured, Free Apps / Tweaks / Themes, then the categories), browse/<list id>
 // (core/catalog.js BROWSE_LISTS: new, updated, popular, featured, free-apps...), browse/category:<name>, and below those browse.js's tokens
 // (package:<id>, author:<name>, versions:<id>), as in the Search tab.
-import { grouped } from "../nav/ui.js";
+import { grouped, el } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
@@ -308,13 +308,6 @@ function paintTile(t) {
 }
 
 // ---- DOM -------------------------------------------------------------------------------------------------
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-}
 
 // A page's content in one wrapper: the first child of a page stretches past its height (ios6.css rubber band), so
 // a bare list of groups would push every group after the first off the screen.

@@ -12,7 +12,7 @@
 // (AppSync Unified or ldid) or to sign the IPA. Each run is kept in Settings > Console Logs.
 // The sideload build has none of this: it keeps signing.install (signing-client.js).
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { grouped } from "../nav/ui.js";
+import { grouped, el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { modal } from "./queue.js";
@@ -23,13 +23,6 @@ import { apps, recordInstall } from "../core/installed.js";
 
 const MAX_LINES = 1500;
 let running = false;
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-}
 
 // The console sheet for one IPA. Resolves the run's result once it has ended (the sheet stays up until Close or
 // Return to Cydian). False when another IPA install's console is already up.

@@ -15,6 +15,8 @@
 // once it knows what to share, puts it left of the page's own right button; setShare(body, null) hides it.
 // All text goes in through textContent.
 
+import { el } from "./ui.js";
+
 const PER_PAGE = 9;
 
 const GLYPHS = {
@@ -29,13 +31,6 @@ const GLYPHS = {
     '<rect x="17" y="21" width="4" height="4"/><rect x="24" y="24" width="3" height="3"/><rect x="29" y="27" width="3" height="5"/>' +
     '<rect x="21" y="29" width="5" height="3"/><rect x="4" y="17" width="5" height="3"/><rect x="11" y="17" width="3" height="3"/></g>',
 };
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-}
 
 function iconOf(item) {
   const box = el("span", "share-icon");

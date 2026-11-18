@@ -18,7 +18,7 @@
 import { showSheet } from "./nav/sheet.js";
 import { showAlert } from "./nav/alert.js";
 import { liveHUD } from "./nav/hud.js";
-import { grouped } from "./nav/ui.js";
+import { grouped, el } from "./nav/ui.js";
 import { format, settingsRoute } from "./router.js";
 import { installOnDevice } from "./signing-client.js";
 import { createSwitch } from "./screens/settings.js";
@@ -34,13 +34,6 @@ function style() {
   link.rel = "stylesheet";
   link.href = new URL("./signsheet.css", import.meta.url).href;
   document.head.append(link);
-}
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
 }
 
 // An older shell answers "unknown method signing.inspect" (Bridge.swift).

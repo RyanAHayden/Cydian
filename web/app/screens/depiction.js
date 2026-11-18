@@ -6,6 +6,7 @@
 //
 //   const el = renderSileo(json, { open(url) })   // open: for depiction-… links (sub-depictions)
 import { getBackend } from "../backend.js";
+import { el } from "../nav/ui.js";
 
 // An image URL the page can load: https as it is, http through the backend (the site's proxy: an https page
 // can't load http images), data: as it is. Anything else (file:, javascript:) is refused.
@@ -20,13 +21,6 @@ export function mediaUrl(url) {
 }
 
 const safeLink = (url) => (/^(https?:|mailto:)/i.test(String(url ?? "").trim()) ? String(url).trim() : null);
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-}
 
 const ALIGN = ["left", "center", "right"];
 const COLOR = /^(#[0-9a-f]{3,8}|[a-z]+|rgba?\([\d\s.,%]+\))$/i;

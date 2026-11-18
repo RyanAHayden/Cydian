@@ -10,7 +10,7 @@
 // e.g. #/sources/deb%3Ahttps%3A%2F%2Frepo.chariz.com%2F%3A.%2F/section%3ATweaks/package%3Acom.example.tweak
 //
 // Lists come from the catalog in the parse worker (catalog.js); long ones are virtualised (nav/vlist.js).
-import { grouped, placeholder } from "../nav/ui.js";
+import { grouped, placeholder, el } from "../nav/ui.js";
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
 import { showSheet } from "../nav/sheet.js";
@@ -132,13 +132,6 @@ export function render(body, route, ctx) {
     default:
       body.append(Object.assign(document.createElement("p"), { className: "empty", textContent: "Nothing here." }));
   }
-}
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
 }
 
 function spinner(text = "Loading Packages") {

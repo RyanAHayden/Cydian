@@ -19,7 +19,7 @@ import { SECTION_GROUPS, searchable } from "../core/catalog.js";
 import { displayName, sourcesFor, loadNeverLoaded } from "../core/sources.js";
 import { orderSources, loadOrder } from "../core/sourcelist.js";
 import { getBackend } from "../backend.js";
-import { grouped } from "../nav/ui.js";
+import { grouped, el } from "../nav/ui.js";
 import { discoveryGroup } from "./extras.js";
 
 export const title = "Search";
@@ -82,13 +82,6 @@ export function reselect() {
 export function nav(route) {
   if (route.path.length) return browse.nav(route);
   return { title: "Search", style: "plain" };
-}
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
 }
 
 export function render(body, route, ctx) {

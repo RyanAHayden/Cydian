@@ -19,7 +19,7 @@
 // While the queue holds packages: they are marked in every list (browse.js), the Installed tab's badge reads Q'd
 // and its nav bar has a Queue button that reopens Confirm. Styles: queue.css.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { grouped } from "../nav/ui.js";
+import { grouped, el } from "../nav/ui.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD, liveHUD } from "../nav/hud.js";
@@ -33,13 +33,6 @@ import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-}
 
 function barButton(label, cls = "") {
   const b = el("button", `bar-button${cls ? ` ${cls}` : ""}`, label);

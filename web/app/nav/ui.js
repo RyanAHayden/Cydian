@@ -7,7 +7,7 @@
 // A row with an href is a link (pushes when it points deeper into the tab); `chevron` defaults to on for links.
 // All text goes in through textContent.
 
-function el(tag, cls, text) {
+export function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
   if (text != null) e.textContent = text;

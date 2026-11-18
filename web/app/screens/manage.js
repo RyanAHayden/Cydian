@@ -14,7 +14,7 @@
 // live in core/sourcelist.js; the QR code in core/qr.js. A change here (add, delete, reorder) tells sources.js
 // through onSourcesChanged, so the tab's list is right when the user goes back.
 import { cleanSourceUrl } from "../core/sources.js";
-import { grouped, plain, collapse, placeholder } from "../nav/ui.js";
+import { grouped, plain, collapse, placeholder, el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showSheet } from "../nav/sheet.js";
 import { format } from "../router.js";
@@ -85,13 +85,6 @@ export function render(body, route, ctx) {
     case "preview": return renderPreview(body, route);
     default: body.append(el("p", "empty", "Nothing here."));
   }
-}
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
 }
 
 // The list in the user's order, as the Sources tab shows it (Not Jailbroken: AltStore sources only).

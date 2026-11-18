@@ -20,7 +20,7 @@
 // the certificate is needed, with Download IPA (altstore.js siteCertificateAlert).
 // Rules and labels: core/myipas.js.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { grouped, placeholder } from "../nav/ui.js";
+import { grouped, placeholder, el } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { catalog, ALL } from "../catalog.js";
 import { mergeCategories, indexLetter } from "../core/catalog.js";
@@ -142,13 +142,6 @@ function style() {
     link.href = new URL(f, import.meta.url).href;
     document.head.append(link);
   }
-}
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
 }
 
 const note = (text) => el("p", "empty", text);

@@ -12,7 +12,7 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import mkipa  # noqa: E402
-from test_native import fake_macho, plist  # noqa: E402
+from test_native import copy_launch, fake_macho, plist  # noqa: E402
 
 
 def signed_macho(entitlements):
@@ -39,6 +39,7 @@ class Ipa(unittest.TestCase):
         mkipa.merge_plist(base, os.path.join(HERE, "Info-sideload.plist"), os.path.join(self.app, "Info.plist"))
         for name in ("AppIcon60x60@2x.png", "AppIcon60x60@3x.png"):
             shutil.copy(os.path.join(HERE, "icon", name), self.app)
+        copy_launch(self.app)
         for name in ("index.html", "app.js", "style.css", "router.js", "mode.js", "nav/stack.js"):
             self.write("web/" + name, b"x")
         self.write("bridge.js", b"x")
@@ -73,6 +74,11 @@ class Ipa(unittest.TestCase):
         os.utime(os.path.join(self.app, "Info.plist"), (12345678, 12345678))
         mkipa.build(self.app, self.ipa, mtime=0)
         self.assertEqual(first, open(self.ipa, "rb").read())
+
+    def test_launch_screen_checked(self):
+        """N10: the IPA has the launch screen's images too."""
+        os.remove(os.path.join(self.app, "LaunchNavBar@2x.png"))
+        self.assertIn("launch image LaunchNavBar@2x.png missing", self.problems())
 
     def test_helper_flagged(self):
         self.write("cydian-helper", b"x", 0o755)

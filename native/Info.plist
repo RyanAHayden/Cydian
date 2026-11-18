@@ -31,7 +31,10 @@
 		</dict>
 	</dict>
 	<key>UILaunchScreen</key><dict>
-		<key>UIColorName</key><string></string>
+		<key>UIImageName</key><string>LaunchLoading</string>
+		<key>UIImageRespectsSafeAreaInsets</key><false/>
+		<key>UINavigationBar</key><dict><key>UIImageName</key><string>LaunchNavBar</string></dict>
+		<key>UITabBar</key><dict><key>UIImageName</key><string>LaunchTabBar</string></dict>
 	</dict>
 	<key>UIStatusBarStyle</key><string>UIStatusBarStyleLightContent</string>
 	<key>UIUserInterfaceStyle</key><string>Light</string>

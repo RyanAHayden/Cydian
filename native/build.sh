@@ -98,6 +98,8 @@ bundle() {
   (cd ../web/app && find . -type f ! -name '*.test.js' ! -name '.*' -print0) |
     while IFS= read -r -d '' f; do mkdir -p "$app/web/$(dirname "$f")" && cp "../web/app/$f" "$app/web/$f"; done
   cp icon/AppIcon60x60@2x.png icon/AppIcon60x60@3x.png "$app/"
+  # N10: the launch screen's images, loose PNGs that Info.plist's UILaunchScreen names (launch/make.py).
+  cp launch/Launch*@2x.png launch/Launch*@3x.png "$app/"
   cp bridge.js "$app/bridge.js"
   # Apple's WWDR intermediates and roots, public certificates the on-device signer puts in each CMS (I6).
   mkdir -p "$app/certs" && cp sign/certs/*.cer "$app/certs/"

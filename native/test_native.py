@@ -40,6 +40,16 @@ def plist(version="0.1.0", build="7"):
     return text.encode()
 
 
+def copy_launch(app):
+    """N10: the launch screen's loose PNGs (native/launch/) and one of the website's per-screen launch images."""
+    for name in sorted(os.listdir(os.path.join(HERE, "launch"))):
+        if name.endswith(".png"):
+            shutil.copy(os.path.join(HERE, "launch", name), app)
+    os.makedirs(os.path.join(app, "web/icons/launch"), exist_ok=True)
+    with open(os.path.join(app, "web/icons/launch/launch-1179x2556.png"), "wb") as f:
+        f.write(b"\x89PNG\r\n\x1a\n")
+
+
 class Deb(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -61,6 +71,7 @@ class Deb(unittest.TestCase):
         os.chmod(os.path.join(self.root, mkdeb.DAEMON_JOB[len("./"):]), 0o644)
         for name in ("AppIcon60x60@2x.png", "AppIcon60x60@3x.png"):
             shutil.copy(os.path.join(HERE, "icon", name), self.app)
+        copy_launch(self.app)
         for name in ("index.html", "app.js", "style.css", "router.js", "nav/stack.js"):
             self.write(self.app, "web/" + name, b"x")
         with open(os.path.join(HERE, "deb/control")) as f:
@@ -97,6 +108,10 @@ class Deb(unittest.TestCase):
         self.assertEqual([n for n, _ in members], ["debian-binary", "control.tar.xz", "data.tar.xz"])
         _, summary = mkdeb.check(self.deb)
         self.assertIn("0.1.0-7 (iphoneos-arm64)", summary)
+
+    def test_launch_image_missing_flagged(self):
+        os.remove(os.path.join(self.app, "LaunchTabBar@3x.png"))
+        self.assertIn("launch image LaunchTabBar@3x.png missing", self.problems())
 
     def test_relations_flagged(self):
         """F66: install-ipa needs unzip (Depends) and wants ldid (Recommends)."""
@@ -189,6 +204,36 @@ class Deb(unittest.TestCase):
 
 
 class Plists(unittest.TestCase):
+    def test_launch_screen_keys(self):
+        """N10: UILaunchScreen names the three images, no asset-catalog colour, and the images are in launch/."""
+        info = plistlib.loads(plist())
+        import launch_check
+        self.assertEqual(launch_check.problems(info, {}, "")[:1], ["launch image LaunchLoading@2x.png missing"])
+        files = {}
+        for name in os.listdir(os.path.join(HERE, "launch")):
+            if name.endswith(".png"):
+                with open(os.path.join(HERE, "launch", name), "rb") as f:
+                    files[name] = f.read()
+        files["web/icons/launch/launch-750x1334.png"] = b"\x89PNG"
+        self.assertEqual(launch_check.problems(info, files, ""), [])
+        info["UILaunchScreen"]["UIColorName"] = ""
+        self.assertIn("UIColorName", launch_check.problems(info, files, "")[0])
+        self.assertIn("no UILaunchScreen", launch_check.problems({}, files, "")[0])
+
+    def test_launch_images_match_make(self):
+        """native/launch/*.png are what launch/make.py makes from the website's launch images (rerun it if not)."""
+        sys.path.insert(0, os.path.join(HERE, "launch"))
+        import make
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        make.main(tmp)
+        for name in sorted(os.listdir(tmp)):
+            if name.endswith(".png"):
+                with open(os.path.join(tmp, name), "rb") as a, open(os.path.join(HERE, "launch", name), "rb") as b:
+                    self.assertEqual(a.read(), b.read(), name)
+        w, h, rows = make.read_png(os.path.join(HERE, "launch", "LaunchLoading@3x.png"))
+        self.assertEqual((w, h), (1320, 2868))
+
     def test_info_plist(self):
         p = plistlib.loads(plist())
         self.assertTrue(p["CADisableMinimumFrameDurationOnPhone"])

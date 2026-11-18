@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { browsePage, nav, BROWSE_SUBTITLE } from "./home.js";
-import { BROWSE_FILTERS, browseFilter, browseFilterNow, setBrowseFilter, filterView, TOP_LIMIT } from "./browse.js";
+import { BROWSE_FILTERS, browseFilter, browseFilterNow, setBrowseFilter, filterView, TOP_LIMIT, heroTint, storeLabel } from "./browse.js";
 
 test("the bar offers Featured, New and Top 25; the choice sticks and unknown ones mean Featured", () => {
   assert.deepEqual(BROWSE_FILTERS.map((f) => f.label), ["Featured", "New", "Top 25"]);
@@ -65,6 +65,14 @@ test("Browse's choice is a segmented scope bar at the top of the page, not a tit
     assert.doesNotThrow(() => readFileSync(new URL(`../icons/sections/${icon}.png`, import.meta.url)), icon);
   }
   assert.doesNotThrow(() => readFileSync(new URL("../icons/roulette.svg", import.meta.url)));
-  assert.match(css, /\.browse-hero \{[^}]*#141414 50%, #000 50%/, "the card on iOS 6's black glossy bar");
-  assert.match(css, /\.browse-hero:active \.browse-hero-view \{/, "pressing the card presses View");
+  assert.match(css, /\.browse-hero \{[^}]*var\(--hero-a/, "the banner takes the package's tint");
+  assert.doesNotMatch(css, /browse-hero-view/, "no green View pill");
+  assert.match(css, /a:active \.store-btn \{/, "pressing the card or cell presses the price button");
+});
+
+test("Tweak of the Day: a package keeps its banner tint; the price button says FREE or VIEW", () => {
+  assert.deepEqual(heroTint("com.a.b"), heroTint("com.a.b"));
+  assert.equal(new Set(["a", "b", "c", "d", "e", "f", "g", "h"].map((id) => heroTint(id)[0])).size > 1, true, "ids spread over the tints");
+  assert.equal(storeLabel({ paid: false }), "FREE");
+  assert.equal(storeLabel({ paid: true }), "VIEW");
 });

@@ -1383,24 +1383,39 @@ export function iconBox(row, cls) {
   return box;
 }
 
+// The banner's tint: one of a few deep iOS 6 hues, picked by the package id so a package keeps its colour.
+// ponytail: hashed, not sampled from the icon (icons are cross-origin; a canvas read would taint). Sample if it matters.
+const HERO_TINTS = [["#6b3fbf", "#3a1d7a"], ["#3f6fc4", "#1f3f80"], ["#2f8f8a", "#155552"], ["#c0443a", "#7a1d16"],
+  ["#c9772a", "#80420f"], ["#5a6b82", "#2e3a4b"], ["#3f9a3f", "#1d5c1d"]];
+export function heroTint(id) {
+  let h = 0;
+  for (const c of String(id ?? "")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return HERO_TINTS[h % HERO_TINTS.length];
+}
+
+// The store's price button (iOS 6 App Store): FREE, or VIEW for a paid package (the price is on its page).
+export const storeLabel = (row) => (row.paid ? "VIEW" : "FREE");
+
 // The Tweak of the Day card (null: its placeholder while the lists load). The whole card opens the package.
-function heroCard(row, { jailbroken = true, href = null } = {}) {
+export function heroCard(row, { jailbroken = true, href = null } = {}) {
   const card = el(row ? "a" : "div", "browse-hero");
   if (!row) { card.classList.add("is-loading"); card.setAttribute("aria-busy", "true"); card.setAttribute("aria-label", "Loading"); }
-  card.append(el("span", "browse-hero-kicker", jailbroken ? "TWEAK OF THE DAY" : "APP OF THE DAY"));
-  const main = el("span", "browse-hero-row");
   const words = el("span", "browse-hero-words");
+  words.append(el("span", "browse-hero-kicker", jailbroken ? "TWEAK OF THE DAY" : "APP OF THE DAY"));
+  const foot = el("span", "browse-hero-foot");
   if (row) {
     card.href = href;
-    main.append(iconBox(row, "browse-hero-icon"));
+    const [a, b] = heroTint(row.id);
+    card.style.setProperty("--hero-a", a);
+    card.style.setProperty("--hero-b", b);
+    card.append(iconBox(row, "browse-hero-icon"));
     words.append(el("span", "browse-hero-name", row.name), el("span", "browse-hero-desc", row.short || ""));
+    foot.append(el("span", "browse-hero-meta", [row.author, row.section].filter(Boolean).join(" · ")), el("span", "store-btn", storeLabel(row)));
   } else {
-    main.append(el("span", "browse-hero-icon ph-box"));
+    card.append(el("span", "browse-hero-icon ph-box"));
     words.append(el("span", "ph-bar ph-w60"), el("span", "ph-bar ph-sub ph-w70"));
   }
-  main.append(words);
-  const foot = el("span", "browse-hero-foot");
-  if (row) foot.append(el("span", "browse-hero-meta", [row.paid ? "Paid" : "Free", row.section].filter(Boolean).join(" · ")), el("span", "browse-hero-view", "View"));
-  card.append(main, foot);
+  words.append(foot);
+  card.append(words);
   return card;
 }

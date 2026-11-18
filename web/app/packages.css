@@ -454,41 +454,46 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
 /* ---- F154: Browse (screens/browse.js renderBrowseHome), from docs/concepts/browse/ in the app's own look. ---- */
 /* Featured | New | Top 25: Search's scope bar at the top of the page (screens/browse.js filterBar). */
 .browse-scope { margin-bottom: -1px; }
-/* Tweak of the Day: one package on brushed slate (the concept's hero), the whole card a link. */
+/* Tweak of the Day: an iOS 6 App Store banner (user 2026-11-18, concept B without the ribbon): the package's tint
+   (browse.js heroTint) with a soft light behind the icon and the bars' gloss on the top half, the icon reflected
+   under it, the words to its right, the store's price button at the bottom. The whole card is the link. */
 .browse-hero-slot { margin: 10px 10px 0; }
-/* Its background is iOS 6's black glossy bar (UIButtonBarBlackOpaqueBackgroundTall, as behind Music's Now Playing):
-   a #575757 top line, #303030 -> #141414 down the top half, black below (user 2026-11-18: the linen was too much, a
-   white card too plain for the featured one). */
-.browse-hero { display: block; border-radius: 9.5px; overflow: hidden; border: 1px solid #000; color: #fff; text-decoration: none;
-  background: linear-gradient(#303030, #141414 50%, #000 50%); background-origin: border-box;
-  box-shadow: inset 0 1px 0 #575757, 0 1px 0 rgba(255,255,255,.5); }
-.browse-hero-kicker { display: block; padding: 9px 12px 0; font-size: 11px; font-weight: bold; letter-spacing: .08em; color: #c9d4e3;
-  text-shadow: 0 -1px 0 rgba(0,0,0,.5); }
-.browse-hero-row { display: flex; gap: 12px; align-items: center; padding: 8px 12px 10px; }
-.browse-hero-icon { position: relative; flex: none; width: 57px; height: 57px; border-radius: 10px; overflow: hidden;
-  background: center / cover no-repeat; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.browse-hero { position: relative; display: flex; gap: 16px; min-height: 140px; padding: 16px 12px 12px 16px; border-radius: 9.5px;
+  overflow: hidden; border: 1px solid rgba(0,0,0,.55); color: #fff; text-decoration: none;
+  background: linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,.04) 50%, rgba(255,255,255,0) 50%),
+    radial-gradient(circle at 46px 52px, rgba(255,255,255,.3), rgba(255,255,255,0) 90px),
+    linear-gradient(var(--hero-a, #5a6b82), var(--hero-b, #2e3a4b));
+  background-origin: border-box; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 0 rgba(255,255,255,.6); }
+.browse-hero-icon { position: relative; flex: none; width: 72px; height: 72px; border-radius: 12.5px; overflow: hidden;
+  background: center / cover no-repeat; box-shadow: 0 2px 4px rgba(0,0,0,.55);
+  -webkit-box-reflect: below 2px linear-gradient(transparent 62%, rgba(255,255,255,.3)); }
 .browse-hero-icon img, .browse-icon-row .cell-icon img, .roulette-icon img { position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; opacity: 0; background: #fff; }
 .browse-hero-icon img.loaded, .browse-icon-row .cell-icon img.loaded, .roulette-icon img.loaded { opacity: 1; }
-.browse-hero-words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.browse-hero-name { font-size: 20px; font-weight: bold; text-shadow: 0 -1px 0 rgba(0,0,0,.5); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.browse-hero-desc { font-size: 13px; line-height: 17px; color: #dfe6ef; text-shadow: 0 -1px 0 rgba(0,0,0,.4);
+.browse-hero-words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; text-shadow: 0 -1px 0 rgba(0,0,0,.45); }
+.browse-hero-kicker { font-size: 11px; font-weight: bold; letter-spacing: .08em; color: rgba(255,255,255,.8); }
+.browse-hero-name { font-size: 24px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.browse-hero-desc { font-size: 13px; line-height: 17px; color: rgba(255,255,255,.9);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.browse-hero-foot { display: flex; justify-content: space-between; align-items: center; min-height: 24px; padding: 0 12px 11px; }
-.browse-hero-meta { font-size: 12px; color: #c9d4e3; text-shadow: 0 -1px 0 rgba(0,0,0,.5); }
+.browse-hero-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: auto; padding-top: 8px; min-height: 24px; }
+.browse-hero-meta { min-width: 0; font-size: 12px; color: rgba(255,255,255,.8); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .browse-hero.is-loading .ph-bar, .browse-hero.is-loading .ph-box { background: rgba(255,255,255,.18); }
-.browse-hero.is-loading .browse-hero-icon { box-shadow: none; }
-/* The green pill (the concept's Install, here View: the package page installs), and Roulette's grey one. */
-.browse-hero-view, .roulette-pill { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 4px;
-  font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); text-decoration: none;
-  border: 1px solid #1d6a19; background: linear-gradient(#8fd96f, #3bab2f 50%, #2b9b21 51%, #35a52a); background-origin: border-box;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.35); cursor: pointer; }
-.roulette-pill.grey { border-color: #8c8c8c; color: #385487; text-shadow: 0 1px 0 #fff;
-  background: linear-gradient(#fdfdfd, #e3e3e3 50%, #d8d8d8 51%, #e4e4e4); background-origin: border-box; }
+.browse-hero.is-loading .browse-hero-icon { box-shadow: none; -webkit-box-reflect: none; }
+/* The iOS 6 App Store's price button (FREE / VIEW): grey-blue outline, a pale gradient, embossed slate text. The
+   card or cell around it is the link, so pressing that presses it. Drawn from memory of the store: the kit has none. */
+.store-btn { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 4px;
+  font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #5d6b81; text-shadow: 0 1px 0 #fff;
+  border: 1px solid #8f9aab; background: linear-gradient(#fdfdfe, #e2e6ec); background-origin: border-box; }
+a:active .store-btn { background: linear-gradient(#d6dbe3, #eceff3); background-origin: border-box; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+/* The store cell (Roulette's "You landed on"): icon, name over author · section, the price button. */
+.store-cell { min-height: 79px; gap: 11px; padding-top: 11px; padding-bottom: 11px; }
+.store-meta { font-size: 13px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.store-desc { display: block; min-height: 0; padding-top: 9px; padding-bottom: 10px; font-size: 15px; line-height: 19px; }
+/* Roulette's grey pill (Wish List). */
+.roulette-pill { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 4px;
+  font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #385487; text-shadow: 0 1px 0 #fff; cursor: pointer;
+  border: 1px solid #8c8c8c; background: linear-gradient(#fdfdfd, #e3e3e3 50%, #d8d8d8 51%, #e4e4e4); background-origin: border-box; }
 .roulette-pill:active { filter: brightness(.85); }
-.browse-hero:active .browse-hero-view { /* the whole card is the link: pressing it presses View */
-  border-color: #144d11; background: linear-gradient(#5aa845, #24801b 50%, #1b7313 51%, #217a17); background-origin: border-box;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.35); }
 /* Rows with a section icon (Collections, New This Week, the Roulette row): the icon draws its own corners. */
 .browse-icon-row .cell-icon { position: relative; overflow: hidden; background: transparent center / cover no-repeat; }
 .browse-icon-row .cell-inner, .browse-ph { min-height: 58px; }
@@ -529,10 +534,8 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
   box-shadow: inset 0 1px 0 rgba(255,255,255,.35); cursor: pointer; }
 .roulette-spin:active:not(:disabled) { background: linear-gradient(#5fb447, #23861a 50%, #187610 51%, #1f8015); background-origin: border-box; }
 .roulette-spin:disabled { opacity: .8; cursor: default; }
-.roulette-pick { min-height: 74px; gap: 12px; padding-top: 8px; padding-bottom: 8px; }
 .roulette-icon { position: relative; flex: none; width: 57px; height: 57px; border-radius: 10px; overflow: hidden;
   background: center / cover no-repeat; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
-.roulette-desc { font-size: 13px; line-height: 16px; color: var(--subtitle); }
 .roulette-actions { justify-content: flex-end; gap: 8px; }
 
 /* F165: a long description in its own group (screens/description.js): collapsed it shows its first 6 lines (20px each

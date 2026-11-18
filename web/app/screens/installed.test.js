@@ -497,7 +497,7 @@ test("B36: the installed-app page shows version, bundle ID, source and signature
 
 // ---- B46: Delete uninstalls where it can; Remove from List where it can't ----------------------------------------
 
-import { deleteAction, confirmDelete, withInstalled, statusText, DELETE, HOME_SCREEN } from "./installed.js";
+import { deleteAction, confirmDelete, forgetApp, withInstalled, statusText, DELETE, HOME_SCREEN } from "./installed.js";
 import { uninstallError } from "../backend-native.js";
 
 test("B46: which label and action each mode gets", () => {
@@ -602,4 +602,16 @@ test("B46: the native backend's uninstallApp runs the helper's uninstall-app and
   reply = { code: 1, stdout: "", stderr: "ifizbox-helper: test installd refused it\n" };
   await assert.rejects(b.uninstallApp("com.example.delta"), /Test installd refused it/);
   assert.equal(typeof createNativeBackend({ native: { call }, sourceOptions: { mode: "sideload" } }).uninstallApp, "undefined");
+});
+
+test("Remove from List on a remembered app iFizBox signed forgets the signature too (removed once, not twice)", async () => {
+  const calls = [];
+  const native = { call: async (m, a) => calls.push([m, a.bundleId]) };
+  const removed = [];
+  await forgetApp({ id: "com.example.app", signed: { bundleId: "com.example.app.x" } }, native, async (id) => removed.push(id));
+  assert.deepEqual(calls, [["signing.forget", "com.example.app.x"]]);
+  assert.deepEqual(removed, ["com.example.app"]);
+  calls.length = 0;
+  await forgetApp({ id: "com.example.plain", signed: null }, native, async (id) => removed.push(id));
+  assert.deepEqual(calls, []);
 });

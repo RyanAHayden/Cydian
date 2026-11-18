@@ -840,13 +840,16 @@ async function keptIpa(r) {
 
 // Forgets the row's app: a signed app the list doesn't remember through signing.forget (it stays installed, as on
 // Settings > Signed Apps; the list draws again), a remembered one through removeInstall (onAppsChange redraws).
-async function forgetApp(r, native = globalThis.ifizboxNative) {
+export async function forgetApp(r, native = globalThis.ifizboxNative, remove = async (id) => removeInstall(await apps(), id)) {
   if (r.signedOnly) {
     await native.call("signing.forget", { bundleId: r.id });
     if (appView.body) loadApps();
     return;
   }
-  await removeInstall(await apps(), r.id);
+  // A remembered app iFizBox also signed: forget the signature too, or it comes back as a signedOnly row (user
+  // 2026-11-18: 'they need to be removed twice').
+  if (r.signed && typeof native?.call === "function") await native.call("signing.forget", { bundleId: r.signed.bundleId ?? r.id });
+  await remove(r.id);
 }
 
 // What a sheet button does. `li`: the row, when the sheet came from the list (Remove fades it out).

@@ -92,7 +92,11 @@ export function withBuiltins(calls, builtins) {
         try { await calls.addSource(b.uri); } catch { /* offline: it stays a seed row; the next refresh tries again */ }
       }
       const out = await calls.refreshSources((s) => onEach(mark(s)), opts);
-      return Array.isArray(out) ? out.map(mark) : out;
+      if (!Array.isArray(out)) return out;
+      const rows = out.map(mark);
+      // B23: the sources apt-get update failed on (backend-native), the built-in named as in the list
+      if (out.failed) rows.failed = out.failed.map((f) => (f.key && keys().has(f.key) ? { ...f, name: f.name || SELF_NAME } : f));
+      return rows;
     },
   };
 }

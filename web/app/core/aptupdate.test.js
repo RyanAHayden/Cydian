@@ -68,3 +68,21 @@ test("B23: the banner names the failed sources and opens Sources", () => {
   assert.equal(failedBanner([{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }]).message, "A, B and 2 more: tap to see Sources.");
   assert.equal(failedBanner([{ name: "A" }, { name: "B" }]).title, "Sources Failed to Refresh");
 });
+
+test("B23: the built-ins wrapper (backend.js) passes `failed` on, the built-in by its name", async () => {
+  const { withBuiltins } = await import("./essential.js");
+  const { NAME } = await import("../brand.js");
+  const B = { key: "deb:https://self.test/repo/:./", uri: "https://self.test/repo/", name: NAME, builtin: true };
+  const calls = {
+    sources: async () => [B],
+    addSource: async () => B,
+    removeSource: async () => {},
+    refreshSources: async () => Object.assign([{ key: B.key }], {
+      failed: [{ key: B.key, uri: B.uri, name: null, message: "m" }, { key: null, uri: "https://x.test/", name: null, message: "n" }],
+    }),
+  };
+  const out = await withBuiltins(calls, [B]).refreshSources();
+  assert.equal(out[0].builtin, true);
+  assert.deepEqual(out.failed.map((f) => f.name), [NAME, null]);
+  assert.equal(failedBanner(out.failed).message, `${NAME} and x.test: tap to see Sources.`);
+});

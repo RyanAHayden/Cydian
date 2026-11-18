@@ -25,7 +25,8 @@ import { openIpaInstall } from "./ipa-install.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { appQueue } from "../app-queue.js";
-import { appJob, appNavLabel, modifyActions } from "../core/appqueue.js";
+import { appJob, appNavLabel, modifyActions, resignJob } from "../core/appqueue.js";
+import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { compareVersions } from "../core/apt.js";
 import { queueApp } from "./queue.js";
 
@@ -201,6 +202,19 @@ export async function renderAltSource(body, route, key) {
 
 // ---- the app page ----------------------------------------------------------------------------------------------
 
+// F91: Cydian's signing.installed record of this app (by installed or original bundle ID), in the sideload app; null
+// anywhere else, for an app Cydian didn't sign, or when the call fails.
+export async function signedRecordOf(id, { mode = detectMode(), native = globalThis.cydianNative } = {}) {
+  if (mode !== "sideload" || !id || typeof native?.call !== "function") return null;
+  try { return signedIndex(await native.call("signing.installed", {})).get(id) ?? null; } catch { return null; }
+}
+
+// F91: the Installed section's "Signature" row: the days left as the Installed tab's pill. Null without a date.
+export function signatureRow(record, { now = new Date(), window = resignWindow((k) => settings.get(k)) } = {}) {
+  const sig = record ? signatureState(record.expires, { now, window }) : null;
+  return sig ? { label: "Signature", detail: sig.long, cls: `sig-row-${sig.state}` } : null;
+}
+
 function trackingSection(app, pkg, source) {
   const box = el("div");
   const mark = (version) => apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version, key: pkg.key,
@@ -208,6 +222,7 @@ function trackingSection(app, pkg, source) {
   async function draw() {
     let rec = null;
     try { rec = (await (await apps()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
+    const sigRow = signatureRow(await signedRecordOf(app.bundleIdentifier)); // F91
     const versions = app.versions.map((x) => x.version).filter(Boolean);
     const rows = rec
       ? [{ label: "Installed Version", detail: rec.version || "Unknown" },
@@ -226,6 +241,7 @@ function trackingSection(app, pkg, source) {
       return Boolean(b);
     };
     if (!relabel()) setTimeout(relabel, 0);
+    if (sigRow) rows.splice(1, 0, sigRow);
     box.replaceChildren(grouped([{ header: "Installed", rows,
       footer: rec ? "Cydian follows this app for updates: they show in Changes." : "Installed it another way? Mark it, and Cydian follows it for updates." }]));
   }
@@ -254,7 +270,7 @@ function trackingSection(app, pkg, source) {
 // does what it did before. F85: `version` (Version History's row) queues that version instead of the newest, with no
 // Modify sheet: queuing it replaces whatever version of the app was queued.
 export async function appPageAction(pkg, source, { queue = appQueue, ask = showActionSheet, add = queueApp,
-  mode = detectMode(), ready = async () => true, store = apps, version = null } = {}) {
+  mode = detectMode(), ready = async () => true, store = apps, version = null, signedOf = (id) => signedRecordOf(id, { mode }) } = {}) {
   const app = pkg?.stanza?.ipa;
   if (mode !== "sideload" || !app) return false; // F89: the website signs nothing, so it queues nothing
   let rec = null;
@@ -265,13 +281,15 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   const newest = app.versions[0]?.version ?? null;
   const installed = rec ? rec.version || "" : null;
   const older = installed ? app.versions.map((x) => x.version).filter((v) => v && compareVersions(v, installed) < 0) : [];
-  const state = { queued: Boolean(queue.get(job.id)), installed, newest, older: older.length > 0 };
-  if (!state.queued && installed == null) { add(job, { queue }); return true; }
+  const signed = await Promise.resolve().then(() => signedOf(job.id)).catch(() => null); // F91: Modify offers Re-sign
+  const state = { queued: Boolean(queue.get(job.id)), installed, newest, older: older.length > 0, signed: Boolean(signed) };
+  if (!state.queued && installed == null && !state.signed) { add(job, { queue }); return true; }
   // Modify (installed or queued), as Cydia's: Upgrade/Reinstall, Downgrade (then which version), or Clear.
   const buttons = modifyActions(state);
   const i = await ask({ title: app.name, buttons });
   if (i < 0) return true;
   if (buttons[i] === "Clear") queue.clear(job.id);
+  else if (buttons[i] === "Re-sign") add({ ...resignJob(signed), id: job.id, icon: job.icon }, { queue });
   else if (buttons[i] === "Downgrade") {
     const j = await ask({ title: "Downgrade to", buttons: older });
     const pick = j >= 0 ? appJob(pkg, { installed, version: older[j], source: source ? displayName(source) : null }) : null;

@@ -13,6 +13,8 @@
 //   signing.installed            -> {apps: [record], next: {expires, apps} | null}
 //   signing.forget {bundleId}    -> {apps}
 //   signing.resignAll (stream: {index, count, name, phase, progress}) -> {done: [bundleId], failed: [{bundleId, name, error}]}
+//   signing.resign {bundleId} (stream and reply as resignAll, one app) -> F91's queue job "resign"; not_signed: when
+//        Cydian has no record of that app (by installed or original bundle ID)
 //   signing.checkCertificate     -> {status: "good" | "revoked" | "unknown", checked, revokedAt?}
 //   signing.remind {days}        -> {at | null}: the re-sign reminder, 0 = off
 // F77: My IPAs' library.* calls are MyIPAs.swift; they install through serveAndOpen, and Re-sign All signs an app
@@ -43,6 +45,7 @@ enum Sideload {
             }
         }
         b.on("signing.resignAll") { c in resignAll(c) }
+        b.on("signing.resign") { c in resignOne(c) }
         b.on("signing.checkCertificate") { c in checkCertificate(c) }
         b.on("signing.remind") { c in
             SignBridge.run(c) {
@@ -321,11 +324,23 @@ enum Sideload {
     // ---- Re-sign All: each recorded app downloaded again from its URL, signed as before, installed one by one (the
     // next starts once iOS has fetched the previous IPA, or that link expired).
 
-    static func resignAll(_ c: Bridge.Call) {
+    static func resignAll(_ c: Bridge.Call) { resign(c) { $0 } }
+
+    // F91: one app, from the queue's "resign" job: the same path with only its record.
+    static func resignOne(_ c: Bridge.Call) {
+        let bid = c.params["bundleId"] as? String ?? ""
+        guard !SignedRecords.only(records(), bundleID: bid).isEmpty else {
+            return Apt.reply(c, nil, "not_signed: Cydian has no record of signing \(bid.isEmpty ? "that app" : bid)")
+        }
+        resign(c) { SignedRecords.only($0, bundleID: bid) }
+    }
+
+    static func resign(_ c: Bridge.Call, pick: @escaping ([SignedRecord]) -> [SignedRecord]) {
         guard let (id, profile) = ready(c) else { return }
         guard takeServer(c) != nil else { return Apt.reply(c, nil, noServer) }
+        hostServer = (c.params["host"] as? Bool ?? false) ? manifestServer : nil // F91: Cydian's own re-sign is hosted
         SignBridge.queue.async {
-            let list = records()
+            let list = pick(records())
             var done = [String](), failed = [[String: Any]]()
             func step(_ i: Int) {
                 guard i < list.count else {

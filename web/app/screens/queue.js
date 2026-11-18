@@ -30,7 +30,7 @@ import { installQueue, runLogs } from "../queue.js";
 import { MODES, MODE_LABEL, changeCount, parseStatusLine, consoleText, finishOf, FINISH_LABEL, runTitle, CONFFILE_TITLE,
   CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
-import { appPlan, runOrder, sizeText, SELF_ID, customParams } from "../core/appqueue.js";
+import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 
@@ -218,12 +218,13 @@ function statistics(plan) {
 }
 
 // Cydia's Modifications: one row per non-empty list, its names one per line.
-function modifications(plan, names) {
+// F91: the app queue's Confirm passes its own modes (core/appqueue.js APP_MODES: Re-sign among them).
+function modifications(plan, names, modes = MODES, labels = MODE_LABEL) {
   const rows = [];
-  for (const mode of MODES) {
-    const list = plan[`${mode}s`];
+  for (const mode of modes) {
+    const list = plan[`${mode}s`] ?? [];
     if (!list.length) continue;
-    rows.push({ label: MODE_LABEL[mode], detail: list.map((e) => names[e.id] || e.id).join("\n") });
+    rows.push({ label: labels[mode], detail: list.map((e) => names[e.id] || e.id).join("\n") });
   }
   const frag = grouped([{ header: "Modifications", rows }]);
   frag.querySelectorAll(".cell").forEach((c) => c.classList.add("confirm-mods"));
@@ -330,7 +331,7 @@ export function openAppConfirm(queue = appQueue) {
       for (const d of j.deps ?? []) if (d?.name) names[d.id] = d.name;
     }
     // As Cydia's (docs/cydia-4s/queue-81.png): Continue Queuing first, then Statistics and Modifications.
-    m.scroll.replaceChildren(continueGroup(close), statistics(appPlan(jobs)), modifications(appPlan(jobs), names));
+    m.scroll.replaceChildren(continueGroup(close), statistics(appPlan(jobs)), modifications(appPlan(jobs), names, APP_MODES, APP_MODE_LABEL));
   }
   const sheet = { refresh, close };
   appConfirm = sheet;
@@ -342,6 +343,7 @@ export function openAppConfirm(queue = appQueue) {
 // hosts it on the Signing Server). The website queues nothing (F89). True once iOS was asked.
 async function installApp(job) {
   const sc = await import("../signing-client.js");
+  if (job.mode === "resign") return resignApp(job, { sc });
   if (job.options && sc.localSigning()) return installCustom(job, { sc });
   if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" });
   return sc.signAndInstall({ url: job.url, name: job.name || "" });
@@ -368,9 +370,42 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
     after, ...(sc.isSelfIpa(job.url) ? { host: true } : {}) });
 }
 
+// F91: a "resign" job: signing.resign {bundleId} signs the app again from the phone's record (Re-sign All's path,
+// one app) and opens iOS's install, the HUD following it; Cydian's own is hosted on the Signing Server, as its
+// install is (iOS closes Cydian). True once iOS was asked.
+export async function resignApp(job, { sc, native = globalThis.cydianNative, hud = null, alert = showAlert } = {}) {
+  sc ??= await import("../signing-client.js");
+  const { resignLabel, deviceError } = await import("../core/signing.js");
+  const h = hud ? hud("Re-signing") : liveHUD("Re-signing");
+  let r;
+  try {
+    if (!native?.call) throw new Error("Re-signing needs the Cydian app.");
+    r = await native.call("signing.resign", { bundleId: job.id, manifestServer: sc.getServer(), ...(job.id === SELF_ID ? { host: true } : {}) },
+      (ev) => { const t = resignLabel(ev); if (t) h.set(t.replace(/ \(1 of 1\)$/, "")); });
+  } catch (e) {
+    h.hide();
+    const why = deviceError(e, job.name || job.id);
+    await alert({ title: `Couldn't Re-sign ${job.name || job.id}`, message: why.message, buttons: ["OK"] });
+    return false;
+  }
+  h.hide();
+  const failed = Array.isArray(r?.failed) ? r.failed : [];
+  if (failed.length || !(r?.done ?? []).length) {
+    await alert({ title: `Couldn't Re-sign ${job.name || job.id}`, message: failed.map((f) => f.error || "failed").join("\n") || "Nothing was signed.", buttons: ["OK"] });
+    return false;
+  }
+  return true;
+}
+
+function liveHUD(text) {
+  const hide = showHUD(text);
+  const label = typeof document === "undefined" ? null : [...document.querySelectorAll(".hud-label")].at(-1);
+  return { set: (t) => { if (label) label.textContent = t; }, hide };
+}
+
 // F30/I3: the version Install put on the phone, so Installed and Changes follow it (Cydian records itself).
 async function recordApp(job) {
-  if (job.id === SELF_ID) return;
+  if (job.id === SELF_ID || job.mode === "resign") return; // F91: a re-sign changes no version
   const { apps, recordInstall } = await import("../core/installed.js");
   await recordInstall(await apps(), { id: job.id, name: job.name, version: job.version, key: job.key, source: job.source,
     sourceName: job.sourceName || "", icon: job.icon });

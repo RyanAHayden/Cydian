@@ -13,6 +13,11 @@
 // F87: in the jailbreak app, apps Cydian remembers (core/installed.js) are on an Apps page one row down
 // (#installed/apps, the row above dpkg's packages, there only when it has any), listed at the version on the phone
 // (app-updates.js rememberedApps, I4) with the note where it differs from what Cydian remembered.
+//
+// F91: in the sideload app every app Cydian signed (signing.installed) shows its signature's days left on the right,
+// a small pill (core/signing.js signatureState; packages.css .sig-pill): green outside the re-sign window (Settings >
+// Signing > Re-sign Reminder), amber inside it, red once expired. Signed apps the list doesn't remember (My IPAs,
+// Custom Install as another ID) are listed under them, without Delete (Signed Apps in Settings forgets those).
 import * as browse from "./browse.js";
 import * as myipas from "./myipas.js";
 import { grouped, plain, placeholder } from "../nav/ui.js";
@@ -23,6 +28,8 @@ import { detectMode } from "../core/settings.js";
 import { apps, appRows, appUpgrades, removeInstall, onAppsChange } from "../core/installed.js";
 import { mediaUrl } from "./depiction.js";
 import { rememberedApps } from "../app-updates.js";
+import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
+import { settings } from "./settings.js";
 
 export const title = "Installed";
 
@@ -183,6 +190,34 @@ export function appListRows(records, candidateOf) {
   return appUpgrades(appRows(records), candidateOf).map((r) => (r.actual === null ? { ...r, upgrade: null } : r));
 }
 
+// F91: each row's signature ({ state, text, long } or none) from signing.installed, by bundle ID (installed or
+// original), and the signed apps no row stands for, as rows of their own (`signedOnly`). -> { rows, extra }
+export function withSignatures(rows, installed, { now = new Date(), window } = {}) {
+  const index = signedIndex(installed);
+  const used = new Set();
+  const out = rows.map((r) => {
+    const a = index.get(r.id);
+    if (!a) return r;
+    used.add(a.bundleId);
+    const sig = signatureState(a.expires, { now, window });
+    return sig ? { ...r, sig } : r;
+  });
+  const extra = [];
+  for (const a of Array.isArray(installed?.apps) ? installed.apps : []) {
+    if (!a?.bundleId || used.has(a.bundleId)) continue;
+    used.add(a.bundleId);
+    extra.push({ id: a.bundleId, name: a.name || a.bundleId, version: a.version || "", signedOnly: true,
+      sig: signatureState(a.expires, { now, window }) ?? undefined });
+  }
+  return { rows: out, extra };
+}
+
+// signing.installed in the sideload app; null anywhere else or when the call fails.
+async function signedApps(native = globalThis.cydianNative) {
+  if (detectMode() !== "sideload" || typeof native?.call !== "function") return null;
+  try { return await native.call("signing.installed", {}); } catch { return null; }
+}
+
 async function loadApps() {
   const seq = ++appView.seq;
   let rows;
@@ -193,9 +228,10 @@ async function loadApps() {
     return;
   }
   const site = detectMode() === "site";
-  const hasStatus = site ? await catalog.hasStatus() : false;
+  const [hasStatus, signed] = await Promise.all([site ? catalog.hasStatus() : false, signedApps()]);
   if (seq !== appView.seq) return;
   if (!recordsApps()) rows = rows.filter((r) => !r?.self); // Cydian's own row is dpkg's there
+  appView.signed = signed; // F91
   drawApps(appListRows(rows, () => null), new Map(), site, hasStatus);
   // The upgrade badges wait on the sources; the list doesn't.
   if (!rows.length) return;
@@ -205,16 +241,21 @@ async function loadApps() {
   drawApps(appListRows(rows, (id) => cands.get(id) ?? null), cands, site, hasStatus);
 }
 
-function drawApps(rows, cands, site, hasStatus) {
+function drawApps(listRows, cands, site, hasStatus) {
   const body = appView.body;
   const route = appView.route;
+  // F91: the signature pill in place of the version (the version stays in the subtitle).
+  const signed = appView.signed ? withSignatures(listRows, appView.signed, { window: resignWindow((k) => settings.get(k)) }) : { rows: listRows, extra: [] };
+  const rows = signed.rows;
   const sections = [{
-    rows: rows.map((r) => ({
-      label: r.name, subtitle: appSubtitle(r), detail: r.upgrade || r.actual === null ? undefined : r.version,
+    rows: [...rows.map((r) => ({
+      label: r.name, subtitle: r.sig && !r.upgrade && r.version ? [`Version ${r.version}`, appSubtitle(r)].filter(Boolean).join(" · ") : appSubtitle(r),
+      detail: r.sig && !r.upgrade ? r.sig.text : r.upgrade || r.actual === null ? undefined : r.version,
       badge: r.upgrade ? "Upgrade" : undefined, icon: { text: r.name.charAt(0).toUpperCase() },
       // The app page, while a source still has the app.
       href: cands.has(r.id) ? format({ tab: route.tab, path: [...route.path, `package:${r.id}`] }) : null,
-    })),
+    })), ...signed.extra.map((r) => ({ label: r.name, subtitle: [r.version ? `Version ${r.version}` : null, "Signed by Cydian"].filter(Boolean).join(" · "),
+      detail: r.sig?.text, icon: { text: r.name.charAt(0).toUpperCase() } }))],
   }];
   if (site) {
     sections.push({ header: "Jailbroken iPhone", rows: [hasStatus
@@ -225,6 +266,7 @@ function drawApps(rows, cands, site, hasStatus) {
   ul.classList.toggle("editing", appView.editing);
   const cells = ul.querySelectorAll(":scope > .cell");
   rows.forEach((r, i) => decorateApp(cells[i], r));
+  [...rows, ...signed.extra].forEach((r, i) => { if (r.sig && !r.upgrade) sigPill(cells[i], r.sig); });
   attachRowGestures(ul);
   body.classList.replace("grouped", "plain");
   // F87: no Install IPAs tile on the jailbreak app's Apps page (My IPAs is a sideload page).
@@ -232,6 +274,15 @@ function drawApps(rows, cands, site, hasStatus) {
   if (!rows.length) {
     ul.before(note("No apps yet. Apps you install from an app's page are listed here, on this device.")); // under My IPAs
   }
+}
+
+// F91: the row's detail drawn as the signature pill.
+function sigPill(li, sig) {
+  const d = li?.querySelector(".cell-detail");
+  if (!d) return;
+  d.classList.add("sig-pill");
+  d.dataset.sig = sig.state;
+  d.title = sig.long;
 }
 
 // F77: the row that opens My IPAs; F79: the page is Install IPAs (Browse, then My IPAs).

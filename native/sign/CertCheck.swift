@@ -169,6 +169,13 @@ enum SignedRecords {
         return (try? d.decode([SignedRecord].self, from: data)) ?? []
     }
 
+    // F91: the record of one app, for signing.resign: by the bundle ID it was installed as, else its original one.
+    static func only(_ list: [SignedRecord], bundleID: String) -> [SignedRecord] {
+        guard !bundleID.isEmpty else { return [] }
+        if let r = list.first(where: { $0.bundleID == bundleID }) { return [r] }
+        return list.first(where: { $0.originalBundleID == bundleID }).map { [$0] } ?? []
+    }
+
     // The earliest expiry of the apps, and their names, for the reminder.
     static func nextExpiry(_ list: [SignedRecord]) -> (Date, [String])? {
         guard let first = list.compactMap(\.expires).min() else { return nil }

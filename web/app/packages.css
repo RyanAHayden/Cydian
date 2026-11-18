@@ -356,3 +356,22 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
 .search-results { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; position: relative; }
 .page-body.search-root::before { display: none; } /* the always-bounce spacer (ios6.css) belongs to the results now */
 .search-results::before { content: ""; float: left; width: 1px; margin-right: -1px; height: calc(100% + 1px); }
+
+/* F91: a signature's days left (Installed, Changes' Needs Re-sign, the app page's Signature row): the tab bar's red
+   count badge (ios6.css .badge, its gloss and shadow) without the white ring, in green outside the re-sign window,
+   amber inside it and red once expired. */
+.sig-pill,
+.cell[class*="sig-row-"] .cell-detail,
+.pkg-row[data-change="resign"] .pkg-version {
+  display: inline-block; flex: none; align-self: center; min-width: 20px; height: 20px; padding: 0 7px; border-radius: 10px;
+  font-size: 13px; font-weight: bold; line-height: 20px; letter-spacing: -.02em; color: #fff; text-align: center;
+  box-shadow: 0 1px 1.5px rgba(0,0,0,.45);
+  background: linear-gradient(#b8eda6, #4fc232 48.8%, #3cb11d 50.5%, #24900a); /* ok */
+}
+.sig-pill[data-sig="soon"], .cell.sig-row-soon .cell-detail, .pkg-row[data-change="resign"][data-sig="soon"] .pkg-version {
+  background: linear-gradient(#fde0a0, #f6a724 48.8%, #f2990b 50.5%, #c97900);
+}
+.sig-pill[data-sig="expired"], .cell.sig-row-expired .cell-detail, .pkg-row[data-change="resign"][data-sig="expired"] .pkg-version {
+  background: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103); /* .badge's red */
+}
+.pkg-row[data-change="resign"] .pkg-version::before { content: none; }

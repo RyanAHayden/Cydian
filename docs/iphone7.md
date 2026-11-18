@@ -141,3 +141,16 @@ stanzas back out of `sileo.sources` and Zebra.
 
 Sileo 2.5 drops a repo whose Release has no `Components:` field. Zebra 1.1.36 can't read files that redirect to very
 long URLs (GitHub release assets; B17).
+
+## Test IPAs: AppSync Unified and a fakesigned app (R21)
+
+AppSync Unified 116.0 (`ai.akemi.appsyncunified`, rootless) is installed since 2026-11-18, from the upstream GitHub
+release (github.com/akemin-dayo/AppSync, release 116.0; cydia.akemi.ai answered Cloudflare 522 that day). It worked
+right after install, with no userspace reboot. Leave it installed: the helper's `install-ipa` uses it.
+
+installd still wants an `application-identifier` entitlement, even with AppSync: `native/testkit.py ipa()`'s unsigned
+binary fails with "Application is missing the application-identifier entitlement". Fakesign the binary on the phone
+with `ldid -Sent.xml <binary>` (an `ent.xml` with `application-identifier` `<TEAM>.<bundle id>` and
+`com.apple.developer.team-identifier` `<TEAM>`, any 10 characters), zip it back into `Payload/<Name>.app/`, and serve
+it as in N11. `ifizbox://install?url=…&name=…` then installs it through the helper and remembers it in Installed > Apps.
+Uninstall a test app afterwards (Installed > Apps, swipe, Delete).

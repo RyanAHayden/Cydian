@@ -674,3 +674,48 @@ html[data-theme="dark"] .store-review-response { background: #30333a; border-col
 
 /* The Related tab's rows: the package's icon in the cell's icon box. */
 .store-related-icon { overflow: hidden; }
+
+/* F193: swipe a package row left to queue it (nav/rowswipe.js). The row's content slides over the pinstripes, sunk
+   in, with UITableView's editing control on the right (the kit's "Add Icon (green)" and "remove Icon",
+   ref/teehanlax/ios6/sheet.svg: 23pt, a 2pt white rim, a 1.5pt drop shadow at 65%). It scales up once the swipe is
+   armed. Cancel (a queued row) is the same control in grey with an x. pan-y: horizontal moves are ours, vertical the
+   list's. Transform and opacity only. */
+.pkg-row { touch-action: pan-y; }
+.pkg-row.swiping > .cell-inner { position: relative; z-index: 1; background-color: var(--plain); will-change: transform; }
+.row-swipe {
+  display: none; position: absolute; inset: 0;
+  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
+  box-shadow: inset 0 3px 4px -2px rgba(0,0,0,.45), inset 0 -2px 3px -2px rgba(0,0,0,.3);
+}
+.pkg-row.swiping > .row-swipe { display: block; }
+.row-swipe-control {
+  position: absolute; top: 50%; right: 24px; width: 23px; height: 23px; margin-top: -11.5px; box-sizing: border-box;
+  border: 2px solid #fff; border-radius: 50%; overflow: hidden;
+  background: linear-gradient(#51b14f, #3ba739 46.5%); background-origin: border-box;
+  box-shadow: 0 1.5px 3.5px rgba(0,0,0,.5);
+  transform: scale(.85); transition: transform .16s ease-out, opacity .16s ease-out;
+}
+.row-swipe:not([data-kind]) .row-swipe-control, .row-swipe[data-kind=""] .row-swipe-control { opacity: 0; } /* still asking what it does */
+.row-swipe.armed .row-swipe-control { transform: scale(1.18); }
+/* The lower gloss: from the middle down, its top edge arched (the kit's "gloss" shape). */
+.row-swipe-control::before {
+  content: ""; position: absolute; left: -2px; right: -2px; top: 50%; bottom: -2px;
+  border-radius: 50% 50% 0 0 / 5px 5px 0 0; background: linear-gradient(#0f930d, #1f9b1d);
+}
+/* The glyph: the kit's 13 x 3pt white bars, a 0.5pt dark line above (color-burn at 30%, drawn as plain black). */
+.row-swipe-control::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(#fff, #fff) center / 13px 3px no-repeat, linear-gradient(#fff, #fff) center / 3px 13px no-repeat;
+  filter: drop-shadow(0 -.5px 0 rgba(0,0,0,.3));
+}
+.row-swipe[data-kind="remove"] .row-swipe-control {
+  background: linear-gradient(#dd878d, #c73741 48%, #bd1321 50%, #bd1321); background-origin: border-box;
+}
+.row-swipe[data-kind="remove"] .row-swipe-control::before, .row-swipe[data-kind="cancel"] .row-swipe-control::before { display: none; }
+.row-swipe[data-kind="remove"] .row-swipe-control::after { background: linear-gradient(#fff, #fff) center / 13px 3px no-repeat; }
+.row-swipe[data-kind="cancel"] .row-swipe-control {
+  background: linear-gradient(#c2c2c2, #8d8d8d 48%, #7b7b7b 50%, #7b7b7b); background-origin: border-box;
+}
+.row-swipe[data-kind="cancel"] .row-swipe-control::after { transform: rotate(45deg); }
+/* The first-run hint shows the control at rest size. */
+.row-swipe.hint .row-swipe-control { transform: none; transition-duration: 0s; }

@@ -60,6 +60,9 @@ import { showShareSheet } from "../nav/sharesheet.js";
 import { showHUD } from "../nav/hud.js";
 import { packageLinks as managerLinks, siteOrigin, formatOf } from "../core/handoff.js";
 import { APP_TILES } from "./handoff.js";
+import { attachRowSwipe, playHint } from "../nav/rowswipe.js";
+import { showUndoBar } from "../nav/undobar.js";
+import { runLogs } from "../queue.js";
 
 const ROW_HEIGHT = 58;
 
@@ -374,14 +377,16 @@ function loadIcon(row, item) {
 export function packageList(body, route, rows, { letters = true, decorate = null } = {}) {
   rememberNames(rows.filter((r) => r.id));
   const items = letters ? withLetterHeaders(rows, (r) => indexLetter(r.name)) : rows;
+  let swipe = null; // F193: a recycled row drops any swipe it was in
   const list = createVList(body, {
     items, rowHeight: ROW_HEIGHT, headerHeight: 23,
     createRow,
-    bindRow: (row, item) => { bindRow(row, item, route); decorate?.(row, item); },
+    bindRow: (row, item) => { swipe?.reset(row); bindRow(row, item, route); decorate?.(row, item); },
     idle: loadIcon,
   });
   list.el.classList.add("pkg-vlist"); // placeholder rows show through wherever real rows aren't drawn yet
   attachRowMenu(list.el, route); // F192: hold a row for Install / Share / Source
+  swipe = attachQueueSwipe(list.el, route); // F193: swipe a row left to queue it
   // Sorted by name with A–Z headers: Cydia's index down the right edge, instead of the scroll indicator.
   if (letters && body.parentElement) createSectionIndex(body, list);
   return list;
@@ -454,6 +459,102 @@ async function runRowMenuItem(it, item, { installed, name }) {
       : { label: s.label, letter: s.letter, color: s.color, onSelect: () => { location.href = s.url; } });
     return showShareSheet({ items });
   }
+}
+
+// ---- F193: swipe a package row left to queue it ---------------------------------------------------------------
+// What the swipe does, from F192's rowMenuItems (the same states): its queue item, or null when it has none (the
+// website and the sideload build have no queue; AltStore apps, unbought paid packages and ones no source can download
+// get nothing). kind: the control behind the row: "add" (UITableView's green +, Install / Upgrade), "remove" (the red
+// minus) or "cancel" (the same control in grey: take a queued one back out).
+export function rowSwipeAction(item, opts = {}) {
+  const it = rowMenuItems(item, opts).find((i) => i.kind === "queue" || i.kind === "cancel");
+  if (!it) return null;
+  if (it.kind === "cancel") return { kind: "cancel", label: "Cancel" };
+  return { kind: it.label === "Remove" ? "remove" : "add", label: it.label, job: it.job };
+}
+
+// The undo bar's line: "Install Foo queued"; for a cancel, what was taken out: "Install Foo cancelled".
+export function swipeMessage(action, name, prev = null) {
+  if (action.kind === "cancel") return `${MODE_LABEL[prev?.mode] ?? "Queue for"} ${name} cancelled`;
+  return `${action.label} ${name} queued`;
+}
+
+// The first-run hint plays once, for someone who has never queued anything (no flag, nothing queued, no console log
+// kept), on a phone that has a queue, and never with reduced motion.
+export const SWIPE_HINT_KEY = "cydian.swipeHint";
+export function swipeHintDue({ seen = false, queued = 0, logs = 0, queue = false, reduce = false } = {}) {
+  return queue && !seen && !queued && !logs && !reduce;
+}
+
+const hintStore = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
+function markHintSeen() { try { hintStore()?.setItem(SWIPE_HINT_KEY, "1"); } catch { /* private mode: shows again */ } }
+let hintPlayed = false; // this session, whatever the storage says
+installQueue.subscribe((e) => { if (e.type === "add" && globalThis.document) markHintSeen(); });
+
+// Installed and newest versions per package, asked at the touch: a short cache so a scroll's touches don't ask twice.
+const swipeHistory = new Map(); // id -> { at, p }
+function historyFor(id) {
+  const hit = swipeHistory.get(id);
+  if (hit && Date.now() - hit.at < 20000) return hit.p;
+  const p = catalog.history(id, ALL).catch(() => null);
+  swipeHistory.set(id, { at: Date.now(), p });
+  if (swipeHistory.size > 200) swipeHistory.delete(swipeHistory.keys().next().value);
+  return p;
+}
+
+function attachQueueSwipe(listEl, route) {
+  if (!queueOf()) return null; // no queue here: nothing to swipe to
+  const listKey = route.tab === "sources" ? route.path[0] ?? null : null;
+  const swipe = attachRowSwipe(listEl, {
+    rowSelector: ".pkg-row",
+    // Not while editing, on a Wish List row (its left swipe shows Delete), a held row, or a row with no page.
+    canStart: (row) => !!row._item?.id && !!row._.a.getAttribute("href") && !row.classList.contains("armed")
+      && !row.classList.contains("wish-row") && !row.classList.contains("is-held") && !row.closest(".editing"),
+    prepare: async (row) => {
+      const item = row._item;
+      const history = item.kind !== "ipa" ? await historyFor(item.id) : null;
+      const installed = installedOf(history);
+      const newest = history ? history.versions.find((v) => v.keys.length)?.version ?? null : item.version || null;
+      const action = rowSwipeAction(item, { queue: true, installed, newest, queued: !!installQueue.get(item.id), listKey });
+      return action && { ...action, item, installed };
+    },
+    kindOf: (a) => a.kind,
+    commit: (row, a) => {
+      const { item, installed } = a;
+      const name = item.name || item.id;
+      const prev = installQueue.get(item.id);
+      if (a.kind === "cancel") installQueue.clear(item.id);
+      else installQueue.add({ ...a.job, installed, name }, { quiet: true });
+      markHintSeen();
+      showUndoBar({ message: swipeMessage(a, name, prev), onUndo: () => installQueue.restore(item.id, prev) });
+    },
+  });
+  // The touch that starts a swipe also counts as having seen the hint.
+  listEl.addEventListener("pointermove", () => { if (swipe.active) markHintSeen(); }, { passive: true });
+  maybeHint(listEl);
+  return swipe;
+}
+
+// F193's first-run hint: ~0.7 s after the list opens, its top row on screen eases left by 44pt and back, once.
+function maybeHint(listEl) {
+  let seen = false;
+  try { seen = !!hintStore()?.getItem(SWIPE_HINT_KEY); } catch { /* unreadable: treat as unseen */ }
+  const reduce = !!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (hintPlayed || !swipeHintDue({ seen, queued: installQueue.size, logs: seen ? 0 : runLogs.list().length, queue: true, reduce })) return;
+  setTimeout(() => {
+    if (hintPlayed || !listEl.isConnected) return;
+    const rows = [...listEl.querySelectorAll(".pkg-row:not([hidden])")].filter((r) => r._item?.id && r._.a.getAttribute("href"));
+    const view = listEl.parentElement?.getBoundingClientRect();
+    let first = null, top = Infinity;
+    for (const r of rows) {
+      const b = r.getBoundingClientRect();
+      if (b.height && b.top >= (view?.top ?? 0) - 1 && b.top < top && b.bottom <= innerHeight) { first = r; top = b.top; }
+    }
+    if (!first) return; // not on screen (another tab's list), or empty: the next list tries
+    hintPlayed = true;
+    markHintSeen();
+    playHint(first, { distance: 44, duration: 1100, kind: "add" });
+  }, 700);
 }
 
 // Exported for Home's Browse (F46).

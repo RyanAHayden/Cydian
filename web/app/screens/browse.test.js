@@ -95,3 +95,36 @@ test("a held row's Share: Copy Link to the site's package page, the managers onl
   assert.deepEqual(packageShareItems(pkg, src, { origin: "https://cydian.dev", mode: "site", jailbroken: false }).map((i) => i.label), ["Copy Link"]);
   assert.deepEqual(packageShareItems({}, src, { origin: "https://cydian.dev", mode: "site" }), []);
 });
+
+// F193: swiping a row left does F192's queue item, from the same states; the control and the undo bar's line.
+import { rowSwipeAction, swipeMessage, swipeHintDue } from "./browse.js";
+
+test("a row's swipe: green + for Install / Upgrade, red minus for Remove, grey x for Cancel, nothing without a queue item", () => {
+  const pkg = { id: "com.x", name: "X", version: "1.0", key: KEY };
+  assert.deepEqual(rowSwipeAction(pkg, { queue: true, newest: "1.0" }),
+    { kind: "add", label: "Install", job: { op: "install", id: "com.x", version: "1.0" } });
+  assert.deepEqual(rowSwipeAction(pkg, { queue: true, installed: "0.9", newest: "1.0" }),
+    { kind: "add", label: "Upgrade", job: { op: "install", id: "com.x", version: "1.0" } });
+  assert.deepEqual(rowSwipeAction(pkg, { queue: true, installed: "1.0", newest: "1.0" }),
+    { kind: "remove", label: "Remove", job: { op: "remove", id: "com.x" } });
+  assert.deepEqual(rowSwipeAction(pkg, { queue: true, installed: "1.0", queued: true }), { kind: "cancel", label: "Cancel" });
+  // Share and Source stay in the hold menu: no queue, nothing downloadable, a paid or AltStore package: no swipe.
+  assert.equal(rowSwipeAction(pkg, { queue: false, newest: "1.0" }), null);
+  assert.equal(rowSwipeAction(pkg, { queue: true, newest: null }), null);
+  assert.equal(rowSwipeAction({ ...pkg, paid: true }, { queue: true, newest: "1.0" }), null);
+  assert.equal(rowSwipeAction({ ...pkg, kind: "ipa" }, { queue: true, newest: "1.0" }), null);
+  assert.equal(rowSwipeAction({}, { queue: true }), null);
+});
+
+test("the undo bar's line, and when the first-run hint plays", () => {
+  assert.equal(swipeMessage({ kind: "add", label: "Install" }, "X"), "Install X queued");
+  assert.equal(swipeMessage({ kind: "add", label: "Upgrade" }, "X"), "Upgrade X queued");
+  assert.equal(swipeMessage({ kind: "remove", label: "Remove" }, "X"), "Remove X queued");
+  assert.equal(swipeMessage({ kind: "cancel", label: "Cancel" }, "X", { mode: "remove" }), "Remove X cancelled");
+  assert.equal(swipeHintDue({ queue: true }), true);
+  assert.equal(swipeHintDue({ queue: false }), false);           // the website: nothing to swipe to
+  assert.equal(swipeHintDue({ queue: true, seen: true }), false);
+  assert.equal(swipeHintDue({ queue: true, queued: 1 }), false);  // has queued something
+  assert.equal(swipeHintDue({ queue: true, logs: 2 }), false);    // has run a queue before
+  assert.equal(swipeHintDue({ queue: true, reduce: true }), false);
+});

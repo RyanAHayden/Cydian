@@ -6,6 +6,7 @@
 //   q.add({ op: "install", id, version, installed })  // installed: the version on the phone, or null
 //   q.add({ op: "remove", id })
 //   q.list() -> [job]   q.get(id)   q.clear(id)   q.clearAll()   q.subscribe(fn) -> unsubscribe
+//   q.add(job, { quiet: true })   q.restore(id, job | null)   F193: a swipe's add and its Undo (no Confirm sheet)
 //   job: { op, id, version, mode, name }   mode: install | reinstall | upgrade | downgrade | remove
 //
 //   queueWords(jobs)          -> ["com.a", "com.b=1.0", "-com.c"]   cydian-helper simulate|apply <words>
@@ -45,13 +46,20 @@ export function createQueue() {
   const emit = (event) => { for (const f of [...listeners]) { try { f(event); } catch { /* a listener's bug isn't the queue's */ } } };
   return {
     // A package is queued once: queuing it again replaces what it was queued for (Cydia's marks work the same).
-    add({ op, id, version = null, installed = null, name = null }) {
+    // F193: `quiet` (a row's swipe) tells listeners not to open the Confirm sheet for it.
+    add({ op, id, version = null, installed = null, name = null }, { quiet = false } = {}) {
       if (op !== "install" && op !== "remove") throw new Error(`unknown queue op ${op}`);
       if (!id) throw new Error("no package id");
       const job = { op, id, version: op === "remove" ? null : version || null, mode: modeOf({ op, version, installed }), name: name || null };
       jobs.set(id, job);
-      emit({ type: "add", job });
+      emit(quiet ? { type: "add", job, quiet } : { type: "add", job });
       return job;
+    },
+    // F193's Undo: put a package back as it was, a job get() returned before (or null: not queued). Quiet.
+    restore(id, job) {
+      if (!job) return this.clear(id);
+      jobs.set(id, { ...job });
+      emit({ type: "add", job: jobs.get(id), quiet: true });
     },
     get: (id) => jobs.get(id) ?? null,
     list: () => [...jobs.values()],

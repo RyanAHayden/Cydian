@@ -613,3 +613,23 @@ html[data-theme="dark"] .store-segment:not(.selected) {
 }
 html[data-theme="dark"] .store-segment + .store-segment { border-left-color: #111; }
 html[data-theme="dark"] .store-segment:active:not(.selected) { background: linear-gradient(#45494f, #2b2e33); background-origin: border-box; }
+
+/* F193: the undo bar after a row's swipe (nav/undobar.js). The kit's "Semi-transparent black bar" (the keyboard
+   toolbar: 44pt, black at 60% over #4c4c4c to #000 at 52%, a 20% white top highlight), docked above the tab bar and
+   sliding up from behind it; the message on the left, the blue bar button (.bar-button.done) Undo on the right. */
+.undo-bar {
+  position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 2; height: 44px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 max(6px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+  background:
+    linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) top / 100% 1px no-repeat,
+    linear-gradient(rgba(76,76,76,.6), rgba(0,0,0,.6) 52%);
+  opacity: 0; transform: translate3d(0,100%,0); pointer-events: none;
+  transition: transform .3s cubic-bezier(.25,.1,.25,1), opacity .3s cubic-bezier(.25,.1,.25,1);
+}
+.undo-bar.shown { opacity: 1; transform: none; pointer-events: auto; }
+.undo-bar-text {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #fff; font-size: 14px; font-weight: bold; text-shadow: 0 -1px 0 rgba(0,0,0,.6);
+}
+.undo-bar-button { flex: none; }

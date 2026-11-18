@@ -90,6 +90,9 @@ exec 9>&-
 fetch "https://github.com/zhlynn/zsign/archive/$ZSIGN_COMMIT.tar.gz" "$ZSIGN_SHA256" "$CACHE/zsign-$ZSIGN_COMMIT.tar.gz"
 tar xzf "$CACHE/zsign-$ZSIGN_COMMIT.tar.gz" -C "$WORK"
 SRC=$WORK/zsign-$ZSIGN_COMMIT/src
+# Patches for the WebAssembly build (tools/zsign-wasm/*.patch, in name order): fs-mmap keeps a mapped file's fd open
+# until munmap, which is when emscripten writes the signed Mach-O back.
+for p in tools/zsign-wasm/*.patch; do patch -s -d "$WORK/zsign-$ZSIGN_COMMIT" -p1 <"$p"; done
 OBJ=$WORK/obj
 mkdir -p "$OBJ"
 CFLAGS=(-O2 -Wno-unused-result -Wno-deprecated-declarations -ffile-prefix-map="$WORK"=/src -ffile-prefix-map="$PWD"=/cydian)

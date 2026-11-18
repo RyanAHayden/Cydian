@@ -391,13 +391,15 @@ function renderRoot(body) {
   // Settings > Signing first when there's none; jailbroken, the release's .deb for the device's arch.
   // One green split button (user 2026-11-17): Install Cydian App | Send Settings (Open in Cydian App: the
   // certificate, sources and settings into the app).
-  const sendTile = tile({ label: "Send Settings to Cydian", subtitle: "Your certificate, sources and settings", href: format({ tab: "home" }), glyph: "send" });
   // The website: jailbroken visitors get Cydian from its own APT repo (Sileo, Zebra) or as a .deb (user 2026-11-18).
-  const debTile = settings.mode === "site" ? tile({ label: "Jailbroken? Get Cydian.deb", subtitle: "For Sileo, Zebra or Filza",
-    href: format({ tab: "home" }), glyph: "install" }) : null;
+  // Its own purple tile (user 2026-11-18): the full Cydian, for a jailbroken phone, from Cydian's APT repo or a .deb.
+  const debTile = settings.mode === "site" ? tile({ label: "Install Full Cydian", subtitle: "Jailbroken: tweaks, themes and apt",
+    href: format({ tab: "home" }), glyph: "jailbreak" }) : null;
   debTile?.querySelector("a").addEventListener("click", (e) => { e.preventDefault(); e.stopImmediatePropagation(); jailbrokenSheet(); }, true);
   const appRow = tileRow("green stack", tile({ label: "Install Cydian App", subtitle: "Signed with your certificate",
-    href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }), sendTile, ...(debTile ? [debTile] : []));
+    href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }));
+  // No Send Settings to Cydian (user 2026-11-18): Install Cydian App already carries the certificate and settings.
+  const debRow = debTile ? tileRow("purple", debTile) : null;
   const appLink = appRow.querySelector("a");
   const appSub = appLink.querySelector(".cell-subtitle");
   let offer = null;
@@ -407,18 +409,10 @@ function renderRoot(body) {
     if (!offer) return;
     installCydian({ offer });
   }, true);
-  // F75: Send Settings (Open in Cydian App), the split button's right half (the website, not jailbroken).
-  const openRow = sendTile;
-  openRow.querySelector("a").addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    import("./importlink.js").then((m) => m.openInApp());
-  }, true);
   const drawApp = () => {
     const type = settings.deviceType();
     offer = homeOffer({ mode: settings.mode, deviceType: type });
     appRow.hidden = !offer;
-    openRow.hidden = !(settings.mode === "site" && type === "none");
     if (appSub) appSub.textContent = offer?.action === "deb" ? "The .deb for your jailbreak" : "Signed with your certificate";
   };
   drawApp();
@@ -451,6 +445,7 @@ function renderRoot(body) {
     halves,
     ...lockedTop,
     appRow,
+    ...(debRow ? [debRow] : []),
     ...lockedFeatured,
     browseRow,
     stateRow,

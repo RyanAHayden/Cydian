@@ -58,16 +58,9 @@ function showType(button) {
   button.addEventListener("pointercancel", () => { button.textContent = "Add"; button.classList.remove("done"); }, { once: true });
 }
 
-async function addFromClipboard(ctx, button) {
-  // The app: UIPasteboard, no Paste bubble, so no Type either. Only awaited there: on the website any await before
-  // readText could lose the tap.
-  const pasted = globalThis.cydianNative ? await nativePaste() : null;
-  if (pasted != null) {
-    if (!button.isConnected || !/^#\/sources\/?$/.test(location.hash)) return;
-    const url = cleanSourceUrl(pasted);
-    manage.addSource(ctx, url ? { url } : null);
-    return;
-  }
+// `native` and `open` are for tests (screens/addsource.test.js): the bridge, and manage.addSource.
+export async function addFromClipboard(ctx, button, { native = globalThis.cydianNative, open = manage.addSource } = {}) {
+  if (native) return addFromPasteboard(ctx, button, native, open);
   reset(button);
   button.textContent = "Type";
   button.classList.add("done"); // the blue Done look (sources.css)
@@ -85,6 +78,26 @@ async function addFromClipboard(ctx, button) {
   if (elsewhere || !button.isConnected || !/^#\/sources\/?$/.test(location.hash)) return;
   const url = cleanSourceUrl(text);
   manage.addSource(ctx, url ? { url } : null);
+}
+
+// The app (F105): UIPasteboard, no Paste bubble, so no Type. Enter APT URL opens inside the tap, the field "https://"
+// with the keyboard up, and takes the copied source URL when the bridge answers. Opened after that round trip (as
+// ffaf27e did) the alert came outside the tap: WKWebView raised no keyboard and the button kept its pressed look.
+// No URL copied, or the read refused (iOS's Allow Paste denied, no clipboard.read): the field stays to type in. Never
+// navigator.clipboard here: after an await it would bring back WebKit's bubble without Type.
+async function addFromPasteboard(ctx, button, native, open) {
+  button.textContent = "Add";
+  button.classList.remove("done");
+  reset(button);
+  const shown = open(ctx, null); // showAlert builds the alert before its first await
+  const field = [...document.querySelectorAll(".alert-field")].pop();
+  const start = field?.value;
+  let typed = false;
+  field?.addEventListener("input", () => { typed = true; }, { once: true });
+  const url = cleanSourceUrl((await nativePaste(native)) ?? "");
+  // Only an untouched field still on screen: never over what the user started typing.
+  if (url && field?.isConnected && !typed && field.value === start) field.value = url;
+  return shown;
 }
 
 export function nav(route, ctx) {

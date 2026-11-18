@@ -13,7 +13,7 @@
 //                                             Maintainer is one of these drop out like hidden sections' (author()
 //                                             still lists them, so the author page can show them again)
 //   c.list(key | "*", section | "*")       -> [row], sorted by name ("*": All Sources / All Packages)
-//   c.search(query)                        -> [row], best matches first
+//   c.search(query)                        -> [row], best matches first (nothing for one Latin character)
 //   c.author(name)                         -> [row]: every package whose Author or Maintainer is `name`
 //   c.package(id, key | "*")               -> { stanza, key, others: [{ key, version }] } or null; a package
 //                                             no source carries but dpkg has installed comes from its status
@@ -215,6 +215,24 @@ export function mergeCategories(rows, { jailbroken = true } = {}) {
 export function rankPopular(items, limit = 50) {
   return [...items].sort((a, b) => b.sources - a.sources || (b.date ?? 0) - (a.date ?? 0) || compareNames(a.row, b.row))
     .slice(0, limit);
+}
+
+// Search (F101, docs/sileo-zebra.md 'Search'). Zebra's short-query rule: one Latin character (code point below
+// U+0100) is too broad to search, locally or on Canister; one CJK (or other non-Latin) character is a word.
+export function searchable(query) {
+  const q = String(query ?? "").trim();
+  if (!q) return false;
+  const chars = [...q];
+  return chars.length > 1 || chars[0].codePointAt(0) >= 0x100;
+}
+
+// Does `s` hold `q` at the start of a word (after a character that is not a letter or digit)? "board" starts a
+// word in "snow board" and "com.x.board", not in "keyboard". The start of `s` itself is the prefix tier's.
+export function wordStart(s, q) {
+  for (let i = s.indexOf(q, 1); i > 0; i = s.indexOf(q, i + 1)) {
+    if (!/[\p{L}\p{N}]/u.test(s[i - 1])) return true;
+  }
+  return false;
 }
 
 // ---- Version History (F29) ---------------------------------------------------------------------------------
@@ -425,20 +443,38 @@ export function createCatalog() {
     return (section === ALL ? rows : rows.filter((r) => r.section === section)).map(slim);
   }
 
+  // F101: id -> how many (counted) sources list it, rankPopular's measure; rebuilt when the merge is.
+  let spread = null, spreadOf = null;
+  function sourceCounts() {
+    const all = entries(ALL);
+    if (spreadOf === all) return spread;
+    spread = new Map();
+    for (const [k, { byId }] of sources) {
+      if (!counts(k)) continue;
+      for (const id of byId.keys()) spread.set(id, (spread.get(id) ?? 0) + 1);
+    }
+    spreadOf = all;
+    return spread;
+  }
+
   // Every word must appear somewhere (name, id, description, author or maintainer). Ranked: exact name or id,
-  // then name or id starting with the query, then the query inside the name or id, then the rest; by name within.
+  // then name or id starting with the query, then the query starting a word in the name or id (F101), then the
+  // query inside the name or id, then author or maintainer, then the rest. Within a tier (Sileo): the name
+  // closest in length to the query, then the most sources listing it, then by name. One Latin character finds
+  // nothing (searchable(), Zebra's rule).
   // Search's filters (F35, all optional): `section` a section name or a SECTION_GROUPS group ("group:Tweaks"),
   // `source` a source key, `installed` "installed" | "not", `price` "free" | "paid". With the Works on My Phone
   // filter on, what can't work drops out, except an exact name or id match: that one stays, marked `exact`, with
   // `why` ("Needs iOS 15 or earlier") for the row's subtitle.
   function search(query, { limit = 2000, section = null, source = null, installed = null, price = null } = {}) {
     const q = String(query ?? "").trim().toLowerCase();
-    if (!q) return [];
+    if (!searchable(q)) return [];
     const words = q.split(/\s+/);
     const key = source && sources.has(source) ? source : ALL;
     if (source && key === ALL) return []; // a source that isn't loaded has nothing
     const inSection = sectionTest(section);
     const hits = [];
+    const listed = sourceCounts();
     for (const r of rowsOf(key)) {
       if (isHidden(r)) continue;
       if (!words.every((w) => r._hay.includes(w))) continue;
@@ -447,16 +483,19 @@ export function createCatalog() {
       if (installed === "not" && statusById.has(r.id)) continue;
       if (price === "paid" && !r.paid) continue;
       if (price === "free" && r.paid) continue;
-      let rank = 4;
+      let rank = 5;
       if (r._n === q || r._id === q) rank = 0;
       else if (r._n.startsWith(q) || r._id.startsWith(q)) rank = 1;
-      else if (r._n.includes(q) || r._id.includes(q)) rank = 2;
-      else if (r._a.includes(q) || r._m.includes(q)) rank = 3;
+      else if (r._n.includes(q) || r._id.includes(q)) rank = wordStart(r._n, q) || wordStart(r._id, q) ? 2 : 3;
+      else if (r._a.includes(q) || r._m.includes(q)) rank = 4;
       if (fitFilter && rank !== 0 && isIncompatible(r.compat)) continue;
-      hits.push([rank, r]);
+      // One number sorts by tier, then length gap, then sources (most first); rows come in name order (rowsOf)
+      // and the sort is stable, so name breaks the last tie without the collator. Twice R12's ~4 ms otherwise.
+      const gap = Math.min(Math.abs(r._n.length - q.length), 9999);
+      hits.push([rank * 1e8 + gap * 1e4 + (9999 - Math.min(listed.get(r.id) ?? 0, 9999)), rank, r]);
     }
-    hits.sort((a, b) => a[0] - b[0] || compareNames(a[1], b[1]));
-    return hits.slice(0, limit).map(([rank, r]) => {
+    hits.sort((a, b) => a[0] - b[0]);
+    return hits.slice(0, limit).map(([, rank, r]) => {
       const out = slim(r);
       if (rank === 0 && isIncompatible(r.compat)) {
         out.exact = true;

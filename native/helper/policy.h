@@ -31,6 +31,9 @@ enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, H
  * "Y" (accept the new copy) and "N" (keep the old one) from the helper's own stdin, so the caller can't answer
  * dpkg's D (diff) or Z (a root shell). helper_answer_ok says which lines those are. */
 int helper_answer_ok(const char *line, size_t len);
+/* F64: the console's Cancel on apply-ask's stdin: the line "C" (\r allowed), which the helper turns into SIGINT for
+ * apt-get instead of passing it on. */
+int helper_cancel_ok(const char *line, size_t len);
 #define HELPER_VERSION_MAX 255
 #define HELPER_ITEM_MAX (HELPER_NAME_MAX + 1 + HELPER_VERSION_MAX)
 

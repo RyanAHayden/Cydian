@@ -60,6 +60,12 @@ with apt's status when apt-get ends, even while the app's end is still open. Mai
 read this pipe too (as under Cydia, which runs apt the same way); with nothing written they wait, where `apply`'s
 `/dev/null` gave them end of file. The app (`Apt.swift` `helper.answer {answer: keep|new}`) writes `N` or `Y`.
 
+**Cancel (F64):** a `C` line on `apply-ask`'s stdin (`\r` allowed) is never passed to apt: the helper sends apt-get
+`SIGINT`, as Ctrl-C would, and says `cydian-helper: cancelled: stopping apt-get` on stderr. While apt downloads that
+ends it (nothing unpacked; partial files stay in `archives/partial` for next time) with exit 130. The app
+(`Apt.swift` `helper.cancel`) sends it only before apt's first `pmstatus:` line on fd 3, so dpkg never starts; should
+it race one, apt's own SIGINT handler lets the running dpkg call finish and stops after it.
+
 **Roll Back (F71):** N7's daemon keeps the .debs automatic updates replace in `<prefix>/var/cache/cydian/rollback/<pkg>/`,
 named as apt's archive cache names them, `<pkg>_<version>_<arch>.deb` with the epoch's `:` as `%3a`. `rollbacks <pkg>`
 lists them; `rollback <pkg> <version>` installs one. Checks: the name and version rules of the queue; the `rollback`

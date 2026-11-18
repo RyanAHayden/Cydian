@@ -80,6 +80,11 @@ enum Apt {
         b.on("helper.answer") { c in
             work(c) { () throws -> Any? in try Helper.answer(c.params["answer"] as? String ?? ""); return true }
         }
+        // F64: helper.cancel stops the running apply-ask while apt still downloads (Cydia's Cancel on the progress
+        // page); an error once dpkg has started (apt's first pmstatus: line), or when nothing runs.
+        b.on("helper.cancel") { c in
+            work(c) { () throws -> Any? in try Helper.cancel(); return true }
+        }
         // F59: ipa.install {url} (stream: helper lines as helper.run's, after a "dlstatus:ipa:0:Downloading" one).
         b.on("ipa.install") { c in
             guard AppMode.current == .jailbreak else {
@@ -218,10 +223,24 @@ extension Bridge.Call {
 // com.apple.private.persona-mgmt entitlement). Its fds 1, 2 and 3 (apt's status lines) are read to the end on
 // three threads; with `emit`, every finished line goes to the page as { fd: "out" | "err" | "status", line }.
 // stdin is /dev/null, except for apply-ask (F63): a pipe that helper.answer writes into until the helper ends.
+// F64: helper.cancel writes "C" into the same pipe. The helper runs as root, so the app (mobile) can't signal it or
+// apt-get itself (kill is EPERM across users); the helper turns the line into SIGINT for apt-get.
 enum Helper {
     // F63: the stdin of the running apply-ask (one console runs at a time), or -1.
     static var answerFd: Int32 = -1
     static let answerLock = NSLock()
+    // F64: the running apply-ask has had a pmstatus:/pmconffile:/pmerror: line on fd 3: dpkg is at work, so Cancel
+    // is refused (Cydia's Cancel goes away there too). Guarded by answerLock.
+    static var dpkgStarted = false
+
+    // F64: Cancel while apt is still downloading (only dlstatus: lines so far).
+    static func cancel() throws {
+        answerLock.lock(); defer { answerLock.unlock() }
+        guard answerFd >= 0 else { throw BridgeError("helper", "no install is running") }
+        guard !dpkgStarted else { throw BridgeError("helper", "dpkg is already installing; it can't be stopped halfway") }
+        let n = "C\n".withCString { write(answerFd, $0, 2) }
+        if n != 2 { throw BridgeError("helper", "the install isn't listening: \(String(cString: strerror(errno)))") }
+    }
 
     // F63: the console's answer to dpkg's conffile question (apt's pmconffile: line): keep -> "N" (Keep My Old
     // Copy), new -> "Y" (Accept The New Copy). cydian-helper passes on only those two lines.
@@ -255,7 +274,7 @@ enum Helper {
         if rc != 0 { throw BridgeError("helper", "can't start cydian-helper: \(String(cString: strerror(rc)))") }
         if ask {
             _ = fcntl(input, F_SETNOSIGPIPE, 1) // an answer after the helper is gone is EPIPE, not a dead app
-            answerLock.lock(); answerFd = input; answerLock.unlock()
+            answerLock.lock(); answerFd = input; dpkgStarted = false; answerLock.unlock()
         }
         defer {
             if ask {
@@ -270,6 +289,8 @@ enum Helper {
         let group = DispatchGroup()
         for (i, fd) in [fds.0, fds.1, fds.2].enumerated() {
             group.enter()
+            // F64: apply-ask's status lines are split even without emit, to see when dpkg starts.
+            let watch = ask && i == 2
             Thread.detachNewThread {
                 var all = Data(), pending = Data()
                 var buf = [UInt8](repeating: 0, count: 16384)
@@ -278,14 +299,18 @@ enum Helper {
                     if n < 0 && errno == EINTR { continue }
                     if n <= 0 { break }
                     all.append(contentsOf: buf[0..<n])
-                    guard let emit = emit else { continue }
+                    guard emit != nil || watch else { continue }
                     pending.append(contentsOf: buf[0..<n])
                     var lines: [[String: Any]] = []
                     while let nl = pending.firstIndex(of: 0x0A) {
-                        lines.append(["fd": names[i], "line": String(decoding: pending[pending.startIndex..<nl], as: UTF8.self)])
+                        let text = String(decoding: pending[pending.startIndex..<nl], as: UTF8.self)
+                        if watch && (text.hasPrefix("pmstatus:") || text.hasPrefix("pmconffile:") || text.hasPrefix("pmerror:")) {
+                            answerLock.lock(); if answerFd == input { dpkgStarted = true }; answerLock.unlock()
+                        }
+                        lines.append(["fd": names[i], "line": text])
                         pending = Data(pending[(nl + 1)...])
                     }
-                    if !lines.isEmpty { emit(lines) }
+                    if let emit = emit, !lines.isEmpty { emit(lines) }
                 }
                 if let emit = emit, !pending.isEmpty { emit([["fd": names[i], "line": String(decoding: pending, as: UTF8.self)]]) }
                 close(fd)

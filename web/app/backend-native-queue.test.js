@@ -136,6 +136,35 @@ test("F63 apply without a console keeps the old conffile (plain apply, --force-c
   assert.equal(readFileSync(join(fx.prefix, "var/fake-conffiles"), "utf8"), "keep /etc/example.conf\n");
 });
 
+test("F64 cancelApply while apt downloads stops the run before dpkg: nothing changes", async (t) => {
+  const { backend, fx } = setup(t, { env: { FAKE_DLWAIT: "20" } });
+  const before = readFileSync(join(fx.prefix, "var/lib/dpkg/status"), "utf8");
+  const events = [];
+  let cancelling = null;
+  const started = Date.now();
+  const r = await backend.apply([{ op: "install", id: "com.example.tweak", version: "0.9" }], (e) => {
+    events.push(e);
+    if (e.fd === "status" && e.line.startsWith("dlstatus:") && !cancelling) cancelling = backend.cancelApply();
+  });
+  await cancelling;
+  assert.equal(r.code, 130); // 128 + SIGINT
+  assert.ok(Date.now() - started < 15000, "Cancel ends the wait, not the fake's 20 s download");
+  assert.equal(events.some((e) => e.fd === "status" && e.line.startsWith("pmstatus:")), false);
+  assert.equal(readFileSync(join(fx.prefix, "var/lib/dpkg/status"), "utf8"), before);
+});
+
+test("F64 cancelApply: refused once dpkg runs, and when nothing runs", async (t) => {
+  const { backend } = setup(t);
+  await assert.rejects(backend.cancelApply(), (e) => e.code === "helper" && /no install is running/.test(e.message));
+  const refusals = [];
+  const r = await backend.apply([{ op: "install", id: "com.example.tweak", version: "0.9" }], (e) => {
+    if (e.fd === "status" && e.line.startsWith("pmstatus:") && !refusals.length) refusals.push(backend.cancelApply().then(() => null, (err) => err));
+  });
+  assert.equal(r.code, 0);
+  const [err] = await Promise.all(refusals);
+  assert.ok(err?.code === "helper" && /already installing/.test(err.message), String(err));
+});
+
 test("respring runs the helper's respring verb", async (t) => {
   const { backend, native } = setup(t);
   await backend.respring();

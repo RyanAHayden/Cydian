@@ -10,6 +10,8 @@
 // `net`: URL -> string | { status, body, headers } for net.fetch / net.packages (a missing URL answers 404;
 // net: null means offline, every request fails with "network: ..."). `env` goes to the helper (FAKE_FAIL=update).
 // F63: helper.run of apply-ask gives the helper a stdin pipe, which helper.answer { answer: keep | new } writes to.
+// F64: helper.cancel stops the running apply-ask (SIGTERM to its process group; exit 130 like the real helper's
+// SIGINT to apt) until its first pmstatus: line.
 // F59: ipa.install downloads into `ipaDir` (default: beside the prefix, ipa-cache/) and runs install-ipa there.
 // F57: paid packages (native/Sources/Paid.swift): `vendors` (native/fake/fake-vendor.mjs) answer net.request,
 // auth.session and paid.install's download; `device` is device.info's answer (null: the UDID can't be read);
@@ -19,7 +21,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { constants as osConstants, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,6 +44,7 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
   const calls = [];
   const keychain = new Map(); // F57
   let answerTo = null; // F63: the running apply-ask's stdin
+  let running = null;  // F64: the running apply-ask: { child, dpkg } (dpkg: a pmstatus: line was seen)
   const fail = (msg) => Promise.reject(new Error(msg));
 
   function netGet(url) {
@@ -93,7 +96,10 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
             CYDIAN_PAID_DIR: paidDir, ...env },
           // F63: apply-ask gets a stdin pipe for helper.answer, as Helper.run in Apt.swift gives it.
           stdio: [words[0] === "apply-ask" ? "pipe" : "ignore", "pipe", "pipe", "pipe"],
+          detached: true, // F64: its own process group, so Cancel's signal reaches a sleep in the fake too
         });
+        const run = words[0] === "apply-ask" ? { child, dpkg: false } : null;
+        if (run) running = run;
         if (child.stdin) {
           child.stdin.on("error", () => {}); // an answer after the helper ended
           answerTo = child.stdin;
@@ -106,14 +112,19 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
           if (!stream || !onEvent) return;
           const lines = (pending[fd] + s).split("\n");
           pending[fd] = lines.pop();
+          if (run && fd === "status" && lines.some((l) => /^pm(status|conffile|error):/.test(l))) run.dpkg = true;
           for (const line of lines) onEvent({ fd, line });
         };
         child.stdout.on("data", feed("out"));
         child.stderr.on("data", feed("err"));
         child.stdio[3].on("data", feed("status"));
         child.on("error", (e) => reject(new Error(`helper: can't start cydian-helper: ${e.message}`)));
-        child.on("close", (code) => {
+        child.on("close", (code, signal) => {
           if (child.stdin) { if (answerTo === child.stdin) answerTo = null; child.stdin.destroy(); }
+          if (running === run) running = null;
+          // A helper killed by a signal: 128 + its number, as Helper.run reports it.
+          // F64: a cancelled run is 130, apt-get's 128 + SIGINT through the real helper.
+          if (code == null && signal) code = run?.cancelled ? 130 : 128 + (osConstants.signals[signal] ?? 0);
           if (stream && onEvent) for (const fd of ["out", "err", "status"]) if (pending[fd]) onEvent({ fd, line: pending[fd] });
           resolve({ code: code ?? 128, stdout: text.out, stderr: text.err });
         });
@@ -125,6 +136,16 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       if (!line) return fail("helper: answer is keep or new");
       if (!answerTo) return fail("helper: no install is waiting for an answer");
       answerTo.write(line);
+      return true;
+    },
+    // F64: like Helper.cancel in Apt.swift, while apt still downloads. The real helper turns the "C" line into SIGINT
+    // for apt-get (after resetting every signal to its default); here the fake helper's process group gets SIGTERM,
+    // since a test runner started in the background leaves SIGINT ignored in its children.
+    "helper.cancel"() {
+      if (!running) return fail("helper: no install is running");
+      if (running.dpkg) return fail("helper: dpkg is already installing; it can't be stopped halfway");
+      running.cancelled = true;
+      process.kill(-running.child.pid, "SIGTERM");
       return true;
     },
     // F59: like IPAInstall.run in Apt.swift: download as <UUID>.ipa into ipaDir, cydian-helper install-ipa, remove

@@ -9,6 +9,8 @@
 #   FAKE_SLOW      seconds apply waits before each package, so a walk-through sees the console mid-run
 #   FAKE_CONFFILE  a conffile path both the user and the package changed (F63): apply keeps it quietly, apply-ask
 #                  asks on fd 3 (pmconffile:) and reads Y or N from stdin, as dpkg does through the real helper
+#   FAKE_DLWAIT    seconds apply waits after its download pass, before the first pmstatus: line (F64: Cancel's window;
+#                  like apt, apply fetches every install item first, dlstatus: lines, then hands them to dpkg)
 #   FAKE_FINISH    apply writes "finish:$FAKE_FINISH" to fd 3, as a maintainer script does through $CYDIA (N4)
 #   CYDIAN_IPA_DIR install-ipa's one directory (F59; the real one's HELPER_IPA_DIR). install-ipa reads the IPA's
 #                  bundle id like ipa.c and "installs" it into $CYDIAN_PREFIX/var/fake-installed-ipas:
@@ -367,6 +369,13 @@ I $name $ver $old" ;;
     exit 0
   fi
   echo "Reading package lists..."
+  # Like apt: everything is downloaded first (dlstatus: lines), then dpkg runs (pmstatus: lines).
+  printf '%s\n' "$plan" | while read -r kind name ver old; do
+    [ "$kind" = I ] || continue
+    st "dlstatus:$name:20:Retrieving $name"
+    echo "Get:1 https://fake.example ./ $name $ver [100 B]"
+  done
+  [ -n "${FAKE_DLWAIT:-}" ] && sleep "$FAKE_DLWAIT"
   printf '%s\n' "$plan" | while read -r kind name ver old; do
     [ -n "$kind" ] || continue
     [ -n "${FAKE_SLOW:-}" ] && sleep "$FAKE_SLOW"
@@ -375,8 +384,6 @@ I $name $ver $old" ;;
       echo "Removing $name ($ver) ..."
       drop_pkg "$name" > "$status.new"
     else
-      st "dlstatus:$name:20:Retrieving $name"
-      echo "Get:1 https://fake.example ./ $name $ver [100 B]"
       st "pmstatus:$name:50:Preparing $name"
       echo "Unpacking $name ($ver)${old:+ over ($old)} ..."
       conffile "$name"

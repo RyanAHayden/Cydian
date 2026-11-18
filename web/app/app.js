@@ -13,6 +13,7 @@ import { TABS, BAR_TABS, createRouter, format, parent, mounted } from "./router.
 import { createStacks, swipeCommits } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transition.js";
 import { attachEdgeSwipe } from "./nav/swipe.js";
+import { keepRow, ghostFor } from "./nav/selection.js";
 import { createTabbar, tapTab, scrollToTop } from "./nav/tabbar.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
@@ -127,10 +128,31 @@ function makePage(tab, path) {
   return { el: page, body, shade, item, title, back: info.back ?? title }; // back: the label pages above it show
 }
 
-const pairOf = (top, below) => ({
+// withSelect (F163): a pop, so the row that opened `top` (below.selected, nav/selection.js) fades with it. Its
+// copy may be laid again here (the list re-rendered while hidden): that is the one layout a pop's start costs.
+const pairOf = (top, below, withSelect = false) => ({
   top: { page: top.page.el, shade: top.page.shade, item: top.page.item },
-  below: { page: below.page.el, shade: below.page.shade, item: below.page.item },
+  below: { page: below.page.el, shade: below.page.shade, item: below.page.item,
+    select: withSelect ? ghostFor(below.selected, below.page.el) : null },
 });
+
+// F163: the row tapped to push a page stays blue on the page below until that page comes back. lastPress is the
+// last row a finger went down on (the press handler below); a push that follows it within PRESS_MS opened it.
+const PRESS_MS = 1500;
+let lastPress = null; // { el, at }
+function keepSelected(entry) {
+  const press = lastPress;
+  lastPress = null;
+  if (!press || performance.now() - press.at > PRESS_MS || !press.el.matches(".cell-inner")) return;
+  if (!press.el.isConnected || !entry.page.el.contains(press.el)) return;
+  unselect(entry);
+  entry.selected = keepRow(press.el);
+}
+function unselect(entry) {
+  if (!entry?.selected) return;
+  entry.selected.mark?.remove();
+  entry.selected = null;
+}
 
 function setTop(entry, on) {
   entry.page.el.classList.toggle("is-top", on);
@@ -156,8 +178,8 @@ function drop(entries) {
 let running = null;      // the slide in progress: { finish() }
 let swipedBack = false;  // the swipe already slid the pop; the route change that follows only cleans up
 
-function slide(top, below, p0, p1, cleanup, opts) {
-  const pair = pairOf(top, below);
+function slide(top, below, p0, p1, cleanup, { withSelect = false, ...opts } = {}) {
+  const pair = pairOf(top, below, withSelect);
   setMoving(pair, true);
   setProgress(pair, p0);
   running = animate(pair, p0, p1, {
@@ -186,14 +208,16 @@ const router = createRouter({
     }
     if (r.kind === "push" && r.from) {
       setTop(r.to, true);
+      keepSelected(r.from);
       slide(r.to, r.from, 0, 1, () => setTop(r.from, false));
     } else if (r.kind === "pop" && !swipedBack && !(webBack && !ownBack)) {
       const [old, ...deeper] = r.removed;
       drop(deeper);
       setTop(r.to, true);
-      slide(old, r.to, 1, 0, () => drop([old]));
+      slide(old, r.to, 1, 0, () => { drop([old]); unselect(r.to); }, { withSelect: true });
     } else {
       drop(r.removed);
+      unselect(r.to); // back on top without a slide (a swipe already faded it, a web back, a tab): no blue left
       for (const e of all) setTop(e, e === r.to);
     }
     swipedBack = false;
@@ -240,7 +264,7 @@ attachEdgeSwipe(edgeEl, {
   begin() {
     const all = stacks.stack(stacks.activeTab());
     const [top, below] = [all.at(-1), all.at(-2)];
-    gesture = { pair: pairOf(top, below), top, below, width: screensEl.clientWidth };
+    gesture = { pair: pairOf(top, below, true), top, below, width: screensEl.clientWidth };
     setMoving(gesture.pair, true, false);
     return gesture.width;
   },
@@ -260,10 +284,11 @@ attachEdgeSwipe(edgeEl, {
     slide(top, below, p, commit ? 0 : 1, () => {
       if (!commit) return;
       swipedBack = true;
+      unselect(below); // faded out with the swipe
       setTop(below, true);
       setTop(top, false); // hidden until the route change drops it
       goBack();
-    }, { duration, easing: EASE_OUT });
+    }, { duration, easing: EASE_OUT, withSelect: true });
   },
 });
 
@@ -313,11 +338,12 @@ document.addEventListener("pointerdown", (e) => {
   unpress();
   const el = e.target.closest?.(PRESSABLE);
   if (!e.isPrimary) return; // one finger's button at a time, as UIKit does
+  lastPress = null;
   // A new press clears any other still showing (a quick tap's lingering 140 ms included): one held look at a time.
-  for (const other of document.querySelectorAll(".is-pressed")) if (other !== el) other.classList.remove("is-pressed");
+  for (const other of document.querySelectorAll(".is-pressed")) if (other !== el && !other.classList.contains("sel-ghost")) other.classList.remove("is-pressed");
   // While a row shows its Delete (a swipe), a tap on a row only puts the Delete away: no blue, as Cydia.
   const delShown = el?.closest("ul")?.querySelector(":scope > .armed") && !el.matches(".del-confirm");
-  if (el && !el.disabled && !delShown) { pressed = el; pressedAt = performance.now(); el.classList.add("is-pressed"); }
+  if (el && !el.disabled && !delShown) { pressed = el; pressedAt = performance.now(); el.classList.add("is-pressed"); lastPress = { el, at: pressedAt }; }
 }, { passive: true });
 for (const type of ["pointerup", "pointercancel", "pointerleave"]) document.addEventListener(type, unpress, { passive: true });
 document.addEventListener("pointermove", (e) => {
@@ -326,7 +352,7 @@ document.addEventListener("pointermove", (e) => {
 // A held row lets go the moment its list scrolls (UIKit cancels the cell's highlight when the pan starts); iOS's
 // pointercancel alone can come late or not at all after a long hold.
 // F153: not while a tap stops a coasting list (its last scroll events come after the touch-down); that tap opens the row.
-document.addEventListener("scroll", () => { if (pressed && !heldTap()) { pressed.classList.remove("is-pressed"); pressed = null; } }, { capture: true, passive: true });
+document.addEventListener("scroll", () => { if (pressed && !heldTap()) { pressed.classList.remove("is-pressed"); pressed = null; lastPress = null; } }, { capture: true, passive: true });
 // The search fields' clear button (packages.css .search-field::after): a tap at the field's right end, while it has
 // text, empties it and searches again (the field's own input listener), keeping the keyboard up.
 document.addEventListener("click", (e) => {

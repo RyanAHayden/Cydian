@@ -211,3 +211,106 @@ export async function removeSiteEntry(entry, { storage = globalThis.localStorage
   removeSiteUrl(storage, entry.file);
   if (entry?.stored) await store.remove(entry.file);
 }
+
+// ---- F208: managing the list: total size, the edit and swipe states, deleting several ------------------------------
+//
+//   totalSize(entries)                     bytes of every IPA (a link counts 0: nothing is kept)
+//   libraryFooter(entries)                 "3 IPAs · 120 MB" under the list, "" when it is empty
+//   deleteLabel(n) / deleteSheetTitle(n, { site })   the toolbar's "Delete (2)", the confirm sheet's button
+//   listState(), listStep(state, action)   the list's edit, swipe and selection state, as data (see listStep)
+//   holdActions(entry, { site })           a held row's sheet: Install, Sign Now, Save Signed IPA, Delete
+//   deleteEntries(entries, { site, storage, store, call })   deletes each (record and stored file) ->
+//                                          { deleted: [file], failed: [{ file, message, error }], ipas }
+
+export function totalSize(entries) {
+  return (entries ?? []).reduce((sum, e) => sum + (Number.isFinite(Number(e?.size)) && Number(e?.size) > 0 ? Number(e.size) : 0), 0);
+}
+
+export function libraryFooter(entries) {
+  const n = (entries ?? []).filter((e) => e && e.file).length;
+  if (!n) return "";
+  const size = formatBytes(totalSize(entries));
+  return [`${n} ${n === 1 ? "IPA" : "IPAs"}`, size || null].filter(Boolean).join(" · ");
+}
+
+export const deleteLabel = (n) => (n > 0 ? `Delete (${n})` : "Delete");
+export const deleteButtonText = (n) => (n === 1 ? "Delete IPA" : `Delete ${n} IPAs`);
+export function deleteSheetTitle(n, { site = false, stored = true } = {}) {
+  const what = n === 1 ? "The IPA is" : `${n} IPAs are`;
+  if (site) return stored ? `${what} deleted from this browser.` : "";
+  return n === 1 ? "The IPA and its signed copy are deleted from this iPhone." : `${n} IPAs and their signed copies are deleted from this iPhone.`;
+}
+
+// The list's state: `editing` (Edit tapped: red minus on every row, taps select), `armed` (the one row showing its
+// red Delete: a left swipe, or its minus tapped), `selected` (files ticked for the toolbar's Delete (n)).
+export const listState = () => ({ editing: false, armed: null, selected: [] });
+
+// One step. Actions: { type: "edit" | "done" } | { type: "swipe", file, dir: "left" | "right" } | { type: "minus", file }
+// | { type: "tap", file } (a tap on a row's body) | { type: "selectAll", files } | { type: "deselectAll" }
+// | { type: "deleted", files } | { type: "list", files } (the list redrawn: drop what is gone).
+// A tap outside editing with no Delete showing is the row's own link: the state stays (the screen lets it through).
+export function listStep(s, a) {
+  const sel = new Set(s.selected);
+  switch (a?.type) {
+    case "edit": return { editing: true, armed: null, selected: [] };
+    case "done": return listState();
+    case "swipe":
+      if (s.editing) return s; // edit mode has its minus for that
+      if (a.dir === "left") return { ...s, armed: a.file };
+      return s.armed ? { ...s, armed: null } : s;
+    case "minus":
+      if (!s.editing) return s;
+      return { ...s, armed: s.armed === a.file ? null : a.file };
+    case "tap":
+      if (s.armed) return { ...s, armed: null }; // a tap only puts the Delete away
+      if (!s.editing) return s;
+      if (sel.has(a.file)) sel.delete(a.file); else sel.add(a.file);
+      return { ...s, selected: [...sel] };
+    case "selectAll": return s.editing ? { ...s, armed: null, selected: [...new Set(a.files ?? [])] } : s;
+    case "deselectAll": return { ...s, selected: [] };
+    case "deleted": {
+      const gone = new Set(a.files ?? []);
+      return { ...s, armed: gone.has(s.armed) ? null : s.armed, selected: s.selected.filter((f) => !gone.has(f)) };
+    }
+    case "list": {
+      const have = new Set(a.files ?? []);
+      return { ...s, armed: have.has(s.armed) ? s.armed : null, selected: s.selected.filter((f) => have.has(f)) };
+    }
+    default: return s;
+  }
+}
+
+// Whether a tap on a row's body opens its page (true) or is the list's (false: editing, or a Delete is showing).
+export const tapOpens = (s) => !s.editing && !s.armed;
+// Select All turns into Deselect All once everything is ticked.
+export const allSelected = (s, files) => files.length > 0 && files.every((f) => s.selected.includes(f));
+
+export const HOLD = { INSTALL: "Install", SIGN: "Sign Now", SAVE: "Save Signed IPA", DELETE: "Delete" };
+
+export function holdActions(entry, { site = false } = {}) {
+  if (!entry?.file) return [];
+  if (site) return [HOLD.INSTALL, HOLD.DELETE];
+  if (entry.error) return [HOLD.DELETE];
+  return [HOLD.INSTALL, HOLD.SIGN, HOLD.SAVE, HOLD.DELETE];
+}
+
+// Deletes `entries` one by one. The website: removeSiteEntry (its record, and a kept IPA's bytes in IndexedDB).
+// The app: `call("delete", { file })` (signing-client.js libraryCall: the shell deletes the IPA, its signed copy and
+// options, and answers { ipas }). One failing doesn't stop the rest. `ipas`: the list after (the last answer, or
+// the website's own list).
+export async function deleteEntries(entries, { site = false, storage = globalThis.localStorage, store = null, call } = {}) {
+  const deleted = [], failed = [];
+  let ipas = null;
+  for (const e of entries ?? []) {
+    if (!e?.file) continue;
+    try {
+      if (site) await removeSiteEntry(e, { storage, store: e.stored ? (typeof store === "function" ? await store() : store) : null });
+      else { const r = await call("delete", { file: e.file }); if (Array.isArray(r?.ipas)) ipas = r.ipas; }
+      deleted.push(e.file);
+    } catch (err) {
+      failed.push({ file: e.file, message: String(err?.message ?? err), error: err });
+    }
+  }
+  if (site) ipas = siteEntries(storage);
+  return { deleted, failed, ipas };
+}

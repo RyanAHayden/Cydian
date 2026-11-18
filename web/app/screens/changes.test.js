@@ -74,15 +74,18 @@ test("Changes (F62): Upgrade (N) queues every available upgrade, never the ignor
   assert.equal(nav({ tab: "changes", path: [] }).right, undefined); // node: the site
 });
 
-test("sideload Upgrade (N): each app's newest IPA in turn, Cydian last, stops at a failure", async () => {
-  const { upgradeApps } = await import("./changes.js");
-  const pkg = (id) => ({ stanza: { ipa: { name: id, versions: [{ downloadURL: `https://x/${id}.ipa` }] } } });
-  const seen = [];
-  const n = await upgradeApps([{ id: "com.ryha.cydian" }, { id: "a" }, { id: "b" }],
-    { pkgOf: async (id) => pkg(id), install: async ({ url }) => { seen.push(url); return true; } });
-  assert.equal(n, 3);
-  assert.deepEqual(seen, ["https://x/a.ipa", "https://x/b.ipa", "https://x/com.ryha.cydian.ipa"]);
-  seen.length = 0;
-  assert.equal(await upgradeApps([{ id: "a" }, { id: "b" }], { pkgOf: async (id) => pkg(id), install: async ({ url }) => { seen.push(url); return false; } }), 0);
-  assert.equal(seen.length, 1);
+test("sideload Upgrade (N) (F80): every app upgrade with an IPA queued for Confirm; Cydian's row by its own IPA", async () => {
+  const { queueUpgrades } = await import("./changes.js");
+  const pkg = (id) => ({ key: "alt:k", row: { id, name: id }, stanza: { kind: "ipa", ipa: { bundleIdentifier: id, name: id.toUpperCase(),
+    sourceUrl: "https://s/", versions: [{ version: "2", downloadURL: `https://x/${id}.ipa`, size: 10 }, { version: "1", downloadURL: `https://x/${id}-1.ipa` }] } } });
+  const added = [];
+  const jobs = await queueUpgrades([
+    { id: "com.ryha.cydian", name: "Cydian", version: "0.9", installed: "0.8", ipa: "https://github.com/x/Cydian.ipa" },
+    { id: "a", version: "2", installed: "1" }, { id: "gone", version: "3", installed: "1" }, null],
+  { pkgOf: async (id) => (id === "a" ? pkg(id) : null), add: (job) => added.push(job) });
+  assert.deepEqual(added, jobs);
+  assert.deepEqual(jobs.map((j) => `${j.id}=${j.version} from ${j.installed} ${j.url}`),
+    ["com.ryha.cydian=0.9 from 0.8 https://github.com/x/Cydian.ipa", "a=2 from 1 https://x/a.ipa"]);
+  assert.equal(jobs[1].name, "A");
+  assert.deepEqual(await queueUpgrades(undefined, { add: () => assert.fail("nothing to queue") }), []);
 });

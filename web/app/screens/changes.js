@@ -13,6 +13,8 @@
 // queue). It queues every Available Upgrade, never the ignored ones, through N4's queue (one install job each, with
 // the installed version so the queue reads it as an upgrade), which opens the Confirm sheet: Cydia's dist-upgrade.
 // Hidden while there are none, as Cydia's is.
+// F80: the sideload app's Upgrade (N) queues every available app upgrade too, in the app queue (app-queue.js), and
+// opens the same Confirm (screens/queue.js openAppConfirm), which installs them in turn, Cydian last.
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
 import { getBackend } from "../backend.js";
@@ -24,6 +26,7 @@ import { sourceFilter } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
 import { upgradesWithSelf } from "../essential-ui.js";
 import { withAppUpgrades } from "../app-updates.js";
+import { appJob } from "../core/appqueue.js";
 
 export const title = "Changes";
 
@@ -64,8 +67,8 @@ export function nav(route, ctx) {
   if (route.path.length) return browse.nav(route);
   const info = { title: "Changes", style: "plain", left: { label: "Refresh", onClick: () => refresh(ctx) } };
   if (canUpgrade()) info.right = { label: upgradeLabel(0), onClick: () => upgradeAll(queueFn(), state.data?.upgrades.available) };
-  // The sideload app: Upgrade (N) installs each app's newest IPA in turn, signed on the phone (iOS asks for each).
-  else if (detectMode() === "sideload") info.right = { label: upgradeLabel(0), onClick: () => upgradeApps(state.data?.upgrades.available) };
+  // The sideload app: Upgrade (N) queues each app's new IPA and opens Confirm (F80), signed on the phone in turn.
+  else if (detectMode() === "sideload") info.right = { label: upgradeLabel(0), onClick: () => queueUpgrades(state.data?.upgrades.available) };
   return info;
 }
 
@@ -90,20 +93,26 @@ export function upgradeAll(queue, available) {
   return jobs;
 }
 
-// Sideload Upgrade (N): one install after another, Cydian itself last (installing it closes the app).
-// ponytail: sequential and stops at the first failure; a queue screen like the jailbreak build's if people want one.
-export async function upgradeApps(available = [], { pkgOf = (id) => catalog.package(id), install = null } = {}) {
-  install ??= (await import("../signing-client.js")).signAndInstall;
-  const list = [...available].filter((r) => r?.id).sort((a, b) => (a.id === "com.ryha.cydian") - (b.id === "com.ryha.cydian"));
-  let done = 0;
-  for (const r of list) {
-    const p = await pkgOf(r.id).catch(() => null);
-    const url = p?.stanza?.ipa?.versions?.[0]?.downloadURL;
-    if (!url) continue;
-    if (!(await install({ url, name: r.name ?? p.stanza.ipa.name ?? "" }))) break;
-    done++;
+// Sideload Upgrade (N) (F80): every available upgrade with an IPA as an app queue job (core/appqueue.js appJob, the
+// version Changes shows; Cydian's own row carries its IPA), queued through `add` (screens/queue.js queueApp: the first
+// opens Confirm, the rest redraw it). -> jobs queued.
+export async function queueUpgrades(available = [], { pkgOf = (id) => catalog.package(id), add = null } = {}) {
+  add ??= (await import("./queue.js")).queueApp;
+  const jobs = [];
+  for (const r of available ?? []) {
+    if (!r?.id) continue;
+    const p = await Promise.resolve().then(() => pkgOf(r.id)).catch(() => null);
+    let job = p ? appJob(p, { installed: r.installed ?? null, version: r.version ?? null }) : null;
+    if (!job && typeof r.ipa === "string" && /^https?:\/\//.test(r.ipa)) {
+      job = { id: r.id, name: r.name ?? null, version: r.version ?? null, installed: r.installed ?? null, url: r.ipa, size: null,
+        icon: r.icon ?? null, key: r.key ?? null };
+    }
+    if (!job) continue;
+    job = { ...job, id: r.id, name: job.name || r.name || null };
+    jobs.push(job);
   }
-  return done;
+  for (const job of jobs) add(job);
+  return jobs;
 }
 
 const queueFn = () => { const b = getBackend(); return typeof b.queue === "function" ? (job) => b.queue(job) : null; };

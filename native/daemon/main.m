@@ -26,6 +26,7 @@
 
 #include "auto.h"
 #include "upgrades.h"
+#include "quiet.h"
 
 #include <netinet/in.h>
 #include <notify.h>
@@ -341,6 +342,8 @@ static void e_notify(void *ctx, int kind, int badge, const char *title, const ch
     struct phone *p = ctx;
     if (p->dry) { printf("%s\n%s\n", title ? title : "", body ? body : ""); return; }
     if (!p->center) return;
+    /* F65: Upgrade Notifications off (quiet.h): N5's notification becomes a badge-only update. */
+    kind = quiet_kind(kind, access(CYDIAN_PREFIX QUIET_FILE, F_OK) == 0);
     if (kind == AUTO_NOTE_BADGE) setBadge(p->center, badge);
     else post(p->center, kind == AUTO_NOTE_UPGRADES ? NOTE_ID : AUTO_NOTE_ID, badge, title, body);
 }

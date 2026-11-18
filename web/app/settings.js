@@ -1,0 +1,47 @@
+// F65: the jailbreak app's side of N5's upgrade daemon (native/daemon/), wired up by app.js.
+//
+//   const up = createUpgradeNotices({ settings, native: globalThis.cydianNative, current: () => router.current() });
+//   up.badge("changes", n);   // beside the tab badge: 0 while the Changes tab is on screen clears the icon badge
+//   up.start();               // once at launch: Upgrade Notifications off reaches the daemon again
+//
+// The daemon sets Cydian's icon badge to the upgrades it found. Once the Changes tab shows no upgrades (the
+// user installed them, or ignored them), the page asks the shell to clear it (Notifications.swift app.badge, which
+// also takes the "3 Upgrades" notification away). Only while the Changes tab is the one shown: a count of 0 worked out
+// in the background, before the sources have loaded, would otherwise wipe a badge that is right. A zero counted
+// while another tab is shown clears it when the user opens Changes.
+// Elsewhere (the site, the sideload build) both do nothing.
+import { detectMode } from "./core/settings.js";
+import { parse } from "./router.js";
+
+export function createUpgradeNotices({ settings, native = globalThis.cydianNative, current, win = globalThis.window } = {}) {
+  const on = Boolean(native && typeof native.call === "function") && detectMode({ cydianNative: native }) === "jailbreak";
+  let count = null; // the Changes tab's last count
+  let cleared = false; // the icon badge is 0 as far as we know (until the next count above 0)
+  const onChanges = () => (current?.() ?? (win ? parse(win.location.hash) : null))?.tab === "changes";
+
+  function clear() {
+    if (!on || cleared || count !== 0 || !onChanges()) return false;
+    cleared = true;
+    Promise.resolve(native.call("app.badge", { count: 0 })).catch(() => { cleared = false; });
+    return true;
+  }
+
+  return {
+    // Same arguments as ctx.setBadge. Returns true when it asked the shell to clear the icon badge.
+    badge(tab, n) {
+      if (tab !== "changes") return false;
+      count = typeof n === "number" ? n : Number(n) || 0;
+      if (count > 0) cleared = false;
+      return clear();
+    },
+    // Returns true when it looked at the launch state (jailbreak app only).
+    start() {
+      if (!on) return false;
+      win?.addEventListener?.("hashchange", () => setTimeout(clear, 0)); // after the router has moved
+      if (settings?.isShown?.("upgradeNotifications") && settings.get("upgradeNotifications") === false) {
+        settings.upgradeNotifications.sync().catch(() => {});
+      }
+      return true;
+    },
+  };
+}

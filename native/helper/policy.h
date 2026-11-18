@@ -17,9 +17,10 @@
 
 enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, HV_HOLD, HV_UNHOLD, HV_SHOWHOLD,
                    HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA, HV_SELFUPDATE,
-                   HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK, HV_INSTALL_PAID };
+                   HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK, HV_INSTALL_PAID, HV_NOTIFICATIONS };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
-                     "simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid"
+                     "simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid, " \
+                     "notifications"
 
 /* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
  * Downgrade and Reinstall pick theirs), "-name" removes. apt gets "name", "name=version" and "name-" in one
@@ -148,6 +149,13 @@ int helper_component_ok(const char *s);
  * temp file in the same directory, renamed over the old one (mode 0644). *changed says whether anything changed
  * (an add of a source that is there as is, or a remove of one that isn't, leaves the file alone). 0, or -1 + *err. */
 int helper_sources_apply(const struct helper_plan *plan, int *changed, const char **err);
+
+/* F65: notifications on|off, the app's Upgrade Notifications switch for N5's daemon (native/daemon/main.m reads
+ * the file). off creates <prefix>HELPER_NOTIFY_OFF (an empty file, 0644; its folder made 0755 if missing), on
+ * deletes it. Nothing is executed: path is the file, argv the verb and on/off. A symlink or anything but a regular
+ * file at the path is refused, never followed. 0, or -1 + *err (main.c exits HELPER_EX_IOERR). */
+#define HELPER_NOTIFY_OFF "/var/lib/cydian/upgrades.off"
+int helper_notify_apply(const struct helper_plan *plan, const char **err);
 
 /* Every package of an install (and every install item of simulate/apply) must be named "Package: <name>" in dpkg's status or one of apt's *_Packages lists;
  * of a remove, hold or unhold (and a "-name" item), in dpkg's status. That keeps apt from reading a name it doesn't know as a regex or a modifier

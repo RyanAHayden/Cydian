@@ -13,6 +13,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper selfupdate <path.deb>                                    (F61: Cydian updates itself)
     cydian-helper rollbacks <pkg> | rollback <pkg> <version>              (F71: Roll Back to a kept .deb)
     cydian-helper install-paid <path.deb> <pkg> <version>                 (F57: a paid package's .deb)
+    cydian-helper notifications on|off                                     (F65: Upgrade Notifications)
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
@@ -32,6 +33,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `install-ipa` | runs no apt: installs one IPA through `LSApplicationWorkspace installApplication:withOptions:error:` as AppSync's `appinst` does (`ipa.c`, F59; below) |
 | `selfupdate` | `dpkg --force-confdef --force-confold [--status-fd 3] -i <path>`: Cydian's own update (F61). The path is absolute, `[A-Za-z0-9._/-]`, no `.`/`..` segment, ends in `.deb`, at most 1024 bytes, and a regular file (not a symlink). Any .deb is accepted: the caller check is the boundary, and Cydian can already install anything through `addsource` + `install` |
 | `rollbacks` | runs nothing: `<version> <file>` per line for each .deb of the package N7's daemon kept in `/var/jb/var/cache/cydian/rollback/<pkg>/` that `rollback` would take (F71; below) |
+| `notifications` | runs nothing: `off` creates `/var/jb/var/lib/cydian/upgrades.off` (empty, 0644; the folder 0755 if missing), `on` deletes it (F65, Settings' Upgrade Notifications; N5's daemon reads it, `../daemon/quiet.h`). A symlink or anything but a regular file there is refused (exit 74), never followed. Prints `Upgrade notifications on\|off` |
 | `rollback`  | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install /var/jb/var/cache/cydian/rollback/<pkg>/<pkg>_<ver>_<arch>.deb`, `CYDIA=3 1` as for `apply` (F71; below) |
 | `install-paid` | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install /var/tmp/cydian-paid.XXXXXX/paid.deb`, `CYDIA=3 1` as for `apply`, after copying and checking the app's download (F57; below) |
 | `respring`  | `sbreload`, or `killall -9 backboardd` when the jailbreak has no sbreload (N4: Restart SpringBoard) |

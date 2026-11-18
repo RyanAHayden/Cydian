@@ -463,9 +463,11 @@ test("F16a: an APT repo found by detection goes to the wrapped calls; dist repos
 test("permissions listed twice (2.0 and 1.x, or a repeated key) show once, keeping a description", async () => {
   const { parseAltSource } = await import("./altstore.js");
   const src = { name: "S", apps: [{ name: "A", bundleIdentifier: "a", versions: [{ version: "1", downloadURL: "https://x/a.ipa" }],
-    appPermissions: { privacy: { NSCameraUsageDescription: "" }, entitlements: ["com.apple.developer.healthkit", "com.apple.developer.healthkit"] },
+    appPermissions: { privacy: { NSCameraUsageDescription: "" }, entitlements: ["com.apple.developer.healthkit", "com.apple.developer.healthkit", "application-identifier", "get-task-allow"] },
     permissions: [{ type: "camera", usageDescription: "Scans codes." }, { type: "photos" }] }] };
+  src.apps[0].appPermissions.privacy.NSBluetoothAlwaysUsageDescription = "To connect";
+  src.apps[0].appPermissions.privacy.NSBluetoothPeripheralUsageDescription = "To connect"; // Discord's pair: one Bluetooth
   const p = parseAltSource(src).apps[0].permissions;
-  assert.deepEqual(p.privacy.map((x) => [x.name, x.description]), [["Camera", "Scans codes."], ["Photos", ""]]);
+  assert.deepEqual(p.privacy.map((x) => [x.name, x.description]), [["Camera", "Scans codes."], ["Bluetooth", "To connect"], ["Photos", ""]]);
   assert.equal(p.entitlements.length, 1);
 });

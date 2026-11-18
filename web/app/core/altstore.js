@@ -153,7 +153,9 @@ function parsePermissions(app) {
     }
     return [...seen.values()];
   };
-  return { entitlements: once(out.entitlements), privacy: once(out.privacy) };
+  // Every signed app has these (its own ID, its team, debugging): not something it asks for.
+  const plumbing = /^(application-identifier|com\.apple\.developer\.team-identifier|team-identifier|get-task-allow|keychain-access-groups|com\.apple\.security\.application-groups)$/;
+  return { entitlements: once(out.entitlements.filter((e) => !plumbing.test(e.name))), privacy: once(out.privacy) };
 }
 
 function parseApp(a) {

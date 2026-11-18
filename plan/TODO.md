@@ -10,7 +10,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **R11** Learn from Sileo and Zebra (user 2026-11-18: 'should we see how they do searches and other stuff and get some tips from it?'). Read github.com/Sileo/Sileo (BSD-4-Clause: its advertising clause is GPL-incompatible, so ideas only, never its code) and github.com/zbrateam/Zebra (GPL-3.0 like Cydian: code may be reused with credit in the file and Credits). Write docs/sileo-zebra.md: how each does search (ranking, history, Canister global search, filters), native depictions (Sileo's JSON depiction format: which repos ship them, what views it has), featured banners (sileo-featured.json), the Payment Provider API (paid packages: login, purchase, download auth; what R10 needs), the queue and dependency resolution UI, source refresh speed and caching, and anything else worth having; for each, what Cydian does today and a concrete proposal in Cydian's iOS 6 style. End with a ranked list of follow-up tasks (add them with plan add, each with files and a test line). No app code in this task. | files: docs/sileo-zebra.md
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)

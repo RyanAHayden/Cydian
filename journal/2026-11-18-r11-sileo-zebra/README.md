@@ -57,3 +57,8 @@ The result is `docs/sileo-zebra.md`. No app code was changed.
 - **The follow-up ids.** They were filed from this worktree's `plan/TODO.md`, which is behind origin/main. On main,
   the second F96 became F97. If main already has an F98–F104 or a B10, the runner's merge has to settle the
   duplicate ids.
+
+## Finishing
+- The first `agent-runner done` passed the gate but stopped with "no task 'R11'", because the task line was only
+  on origin/main. I cherry-picked 944b492, the plan commit that adds R11, onto task/R11 (main itself was not
+  merged or rebased) and ran `done` again.

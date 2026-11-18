@@ -187,9 +187,9 @@ export const recordsApps = (mode = detectMode()) => mode !== "jailbreak";
 export function pageKind(route, mode = detectMode()) {
   if (route.path.length === 1 && route.path[0] === WISH) return "wishlist"; // F125, in every mode
   if (isAppPage(route, mode)) return "app"; // B36
+  if (route.path[0] === myipas.MYIPAS) return "myipas"; // F209: ifizbox://myipas in the jailbreak app too
   if (!recordsApps(mode)) return !route.path.length ? "dpkg" : route.path.length === 1 && route.path[0] === APPS ? "apps" : "browse";
   if (!route.path.length) return "apps";
-  if (route.path[0] === myipas.MYIPAS) return "myipas";
   return route.path.length === 1 && route.path[0] === DPKG && mode === "site" ? "dpkg" : "browse";
 }
 

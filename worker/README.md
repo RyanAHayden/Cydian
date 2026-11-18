@@ -52,6 +52,10 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 - `TTL`: seconds a held update stays (600), and an app the website signed in the browser.
 - `MAX_UPLOAD_MB`: the largest IPA the website signs in the browser (512): it downloads through `/api/fetch?kind=ipa`
   and comes back signed to `/sign/upload`, in 20 MB parts, for `TTL` seconds. `0` turns website signing off here.
+- `GITHUB_TOKEN` (optional, a secret: `npx wrangler secret put GITHUB_TOKEN`): a GitHub token with **no permissions**
+  (public repositories only). GitHub limits anonymous downloads per address, and a Worker's address is shared with
+  other sites, so the website's downloads of IPAs on GitHub releases can get "429". With the token, those retry
+  through GitHub's API, limited per token instead. A copy on your own PC doesn't need it (your address is yours).
 
 ## Routes
 

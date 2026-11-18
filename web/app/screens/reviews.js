@@ -6,7 +6,8 @@
 //     The ratings card (ours, the depiction's and the App Store's merged, core/reviews.js mergeReviews) with Tap to
 //     Rate under it, Write a Review, the reviews (ours first, newest first, "by name – Version – date", each with
 //     Report; then the depiction's), More Reviews for the next page, and a footer saying where they come from.
-//     `depiction`: core/previews.js sileoRatings(); `appStore`: { average, count } (core/applookup.js); both may be
+//     `depiction`: core/previews.js sileoRatings(); `appStore`: { average, count, reviews? } (core/applookup.js; B37:
+//     its written reviews drawn as an "App Store Reviews" group after ours and the depiction's); both may be
 //     null or a promise. `renderText(review)`: the body of a depiction's review (ours are always plain text).
 //     `first`: page 0 already asked for (the page's header stars), so it isn't asked twice; `onRating(r)`: the merged
 //     rating each time it is drawn again after a post (the header and the Rating tile follow).
@@ -213,6 +214,14 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
       });
       parts.push(more);
     }
+  }
+  // B37: the App Store's written reviews, newest first, as a group of their own (plain text: reviewCell's textContent).
+  if (merged.appStoreReviews.length) {
+    const g = el("div", "group store-reviews-group store-reviews-appstore");
+    const l = el("div", "table grouped store-review-list");
+    l.append(...merged.appStoreReviews.map((rv, i) => reviewCell(rv, i)));
+    g.append(el("h2", "group-header", merged.appStoreLabel), l);
+    parts.push(g);
   }
   const foot = el("p", "group-footer store-reviews-footer", merged.footer);
   parts.push(foot);

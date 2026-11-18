@@ -100,6 +100,23 @@ test("merging: ours alone keep the bar chart; with others, a count-weighted aver
   assert.equal(mergeReviews({ ours: { enabled: true, count: 0, reviews: [] } }).rating, null);
 });
 
+test("B37: the App Store's written reviews are a third list with its own label, not mixed into ours", () => {
+  const now = Date.UTC(2026, 10, 18);
+  const ours = { enabled: true, average: 4, count: 1, histogram: [0, 1, 0, 0, 0], reviews: [{ id: "a1", stars: 4, title: "Mine", name: "Ann", text: "x", date: now, updated: now }] };
+  const appStore = { average: 4.76, count: 28385, noun: "Ratings", reviews: [{ appStore: true, title: "Cool update", author: "D", rating: 5, version: "2.0.1", at: Date.UTC(2026, 10, 17, 12), text: "y" }] };
+  let m = mergeReviews({ ours, appStore, now });
+  assert.deepEqual(m.reviews.map((r) => r.title), ["Mine"]);
+  assert.deepEqual(m.appStoreReviews, [{ appStore: true, title: "Cool update", author: "D", rating: 5, version: "2.0.1", date: "Nov 17", text: "y" }]);
+  assert.equal(m.appStoreLabel, "App Store Reviews");
+  assert.equal(m.rating.count, 28386);
+  // reviews but no rating (a lookup without one): still from the App Store
+  m = mergeReviews({ appStore: { reviews: appStore.reviews }, now });
+  assert.equal(m.rating, null);
+  assert.equal(m.appStoreReviews.length, 1);
+  assert.equal(m.footer, "Ratings and reviews from the App Store.");
+  assert.deepEqual(mergeReviews({}).appStoreReviews, []);
+});
+
 test("dates and our review's cell: 'by name – Version – date', Anonymous without a name", () => {
   const now = Date.UTC(2026, 10, 18);
   assert.equal(reviewDate(Date.UTC(2026, 0, 3, 12), now), "Jan 3");

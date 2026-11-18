@@ -21,6 +21,12 @@
 //   shortText(text, max)                  -> the first paragraphs up to about `max` characters, or null when it all fits
 //   lookupApp(bundleId, { country, get, store, now }) -> Promise<parsed | null>, cached per bundle ID for a week
 //                                              in `store` (localStorage-like); a failed fetch is not cached
+//   storeTrackId(store)                   -> parseLookup's trackId, else the id in its trackViewUrl, else null (B37)
+//   reviewsFeedUrl(id, country)           -> Apple's customer-reviews RSS (JSON), newest first (null: bad input)
+//   workerReviewsUrl(id, country)         -> /api/appreviews?… (the website asks the Worker: cached at the edge a day)
+//   parseStoreReviews(json | text, now)   -> [{ appStore: true, title, author, rating, version, date, text }] plain
+//                                              text, newest first, at most 50; [] when it isn't the feed
+//   storeReviews(id, { country, get, now }) -> Promise<[review]>, kept in memory a day per id; [] when it fails
 
 const str = (v) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
 const httpsUrl = (u) => (/^https?:\/\//i.test(str(u)) ? str(u).replace(/^http:/i, "https:") : null);
@@ -56,6 +62,7 @@ export function parseLookup(input) {
   const rating = Number(r.averageUserRating);
   return {
     trackName: str(r.trackName),
+    trackId: /^\d{1,15}$/.test(str(r.trackId)) ? str(r.trackId) : null,
     trackViewUrl: httpsUrl(r.trackViewUrl),
     developer: str(r.artistName) || str(r.sellerName),
     category: str(r.primaryGenreName),
@@ -85,14 +92,16 @@ const sameText = (a, b) => str(a).replace(/\s+/g, " ").toLowerCase() === str(b).
 //   developer (source developerName wins), category (source category wins), rating (the App Store's own),
 //   screenshots (only when the source lists none), description (under the source's, unless it's the same text),
 //   version and minimumOs (facts: the App Store's, beside the source's own version).
-// need "link": nothing but the App Store link (the source gave screenshots and developer).
+// need "link": the App Store link and its rating only (the source gave screenshots and developer). B37: the rating is
+// the App Store's whatever `need` is (a source never has one of its own).
 export function mergeDetails(app, store, need = "full") {
   const out = { developer: null, category: null, rating: null, ratingCount: null, screenshots: [], description: null,
     version: null, minimumOs: null, trackViewUrl: store?.trackViewUrl ?? null };
-  if (!store || need !== "full") return out;
+  if (!store) return out;
+  if (store.rating != null) { out.rating = store.rating; out.ratingCount = store.ratingCount ?? null; }
+  if (need !== "full") return out;
   if (!str(app?.developerName) && store.developer) out.developer = store.developer;
   if (!sourceCategory(app) && store.category) out.category = store.category;
-  if (store.rating != null) { out.rating = store.rating; out.ratingCount = store.ratingCount; }
   if (!hasShots(app)) out.screenshots = store.screenshots;
   if (store.description && !sameText(store.description, app?.localizedDescription)) out.description = store.description;
   out.version = store.version || null;
@@ -209,3 +218,59 @@ export async function lookupApp(bundleId, { country: c = "us", get, store = null
   try { store?.setItem(key, JSON.stringify(v)); } catch { /* full or private: memory only */ }
   return app;
 }
+
+// ---- B37: the App Store's written reviews (Apple's customer-reviews RSS, JSON) ----------------------------------
+
+const TRACK = /^\d{1,15}$/;
+
+export function storeTrackId(store) {
+  if (TRACK.test(str(store?.trackId))) return str(store.trackId);
+  const m = /\/id(\d{1,15})(?:[/?#]|$)/.exec(str(store?.trackViewUrl));
+  return m ? m[1] : null;
+}
+
+export function reviewsFeedUrl(id, c = "us") {
+  if (!TRACK.test(str(id))) return null;
+  return `https://itunes.apple.com/${country(c)}/rss/customerreviews/id=${str(id)}/sortby=mostrecent/json`;
+}
+
+export function workerReviewsUrl(id, c = "us", base = "") {
+  if (!TRACK.test(str(id))) return null;
+  return `${base}/api/appreviews?${new URLSearchParams({ id: str(id), country: country(c) })}`;
+}
+
+// Every field is { label: "…" } in Apple's feed; one entry alone comes as an object, not a list. An older feed puts
+// the app itself first (no im:rating): skipped. Text stays plain (the tab draws it with textContent).
+const label = (v) => str(v?.label);
+export function parseStoreReviews(input) {
+  let json = input;
+  if (typeof input === "string") { try { json = JSON.parse(input); } catch { return []; } }
+  let entries = json?.feed?.entry;
+  if (entries && !Array.isArray(entries)) entries = [entries];
+  if (!Array.isArray(entries)) return [];
+  const out = [];
+  for (const e of entries) {
+    const rating = Number(label(e?.["im:rating"]));
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) continue;
+    const at = Date.parse(label(e?.updated));
+    out.push({ appStore: true, title: label(e?.title).slice(0, 200), author: label(e?.author?.name).slice(0, 100) || null, rating,
+      version: label(e?.["im:version"]).slice(0, 64) || null, at: Number.isFinite(at) ? at : null, text: label(e?.content).slice(0, 6000) });
+    if (out.length >= 50) break;
+  }
+  return out.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+}
+
+const reviewMemory = new Map();
+export const STORE_REVIEWS_TTL = 24 * 3600 * 1000;
+// get(id, country) -> Promise<text>: the Worker's /api/appreviews on the site, Apple directly in the app.
+export async function storeReviews(id, { country: c = "us", get, now = Date.now() } = {}) {
+  if (!TRACK.test(str(id)) || typeof get !== "function") return [];
+  const key = `${country(c)}.${str(id)}`;
+  const m = reviewMemory.get(key);
+  if (m && now - m.at < STORE_REVIEWS_TTL) return m.reviews;
+  let reviews;
+  try { reviews = parseStoreReviews(await get(str(id), country(c))); } catch { return []; }
+  reviewMemory.set(key, { at: now, reviews });
+  return reviews;
+}
+export function clearStoreReviewsMemory() { reviewMemory.clear(); }

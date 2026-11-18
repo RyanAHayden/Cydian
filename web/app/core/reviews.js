@@ -10,7 +10,8 @@
 //     list() answers { enabled: false, ... } when the server keeps no reviews (an older or self-hosted Worker,
 //     anything that isn't its JSON), so the tab still shows the depiction's and the App Store's.
 //   reviewsBase(mode)                         "" on the website (its own origin), the app's server in the app
-//   mergeReviews({ ours, depiction, appStore }) -> { rating, reviews, footer }  one ratings card and one list
+//   mergeReviews({ ours, depiction, appStore }) -> { rating, reviews, appStoreReviews, appStoreLabel, footer }  one
+//     ratings card, one list (ours, the depiction's) and B37's App Store reviews (appStore.reviews) as a list of its own
 //   reviewDate(ms, now)                       "Nov 14" this year, "Nov 14, 2025" before
 //
 // Our reviews carry { ours: true, id } so the tab can offer Report on them; a depiction's carry what
@@ -121,7 +122,14 @@ export function mergeReviews({ ours = null, depiction = null, appStore = null, n
       from: parts.map((p) => p.label(p.count)).join(", ").replace(/^./, (c) => c.toUpperCase()) + "." };
   }
   const reviews = [...(ours?.reviews ?? []).map((rv) => ourReview(rv, now)), ...(depiction?.reviews ?? [])];
-  const said = [ours?.enabled ? "reviews written here" : null, depiction ? "the package's depiction" : null, counted(appStore) ? "the App Store" : null].filter(Boolean);
+  // B37: the App Store's written reviews (core/applookup.js parseStoreReviews) as a third list, under its own label.
+  const appStoreReviews = (Array.isArray(appStore?.reviews) ? appStore.reviews : []).map((rv) => appStoreReview(rv, now));
+  const fromStore = counted(appStore) || appStoreReviews.length > 0;
+  const said = [ours?.enabled ? "reviews written here" : null, depiction ? "the package's depiction" : null, fromStore ? "the App Store" : null].filter(Boolean);
   const footer = said.length ? `Ratings and reviews from ${said.length > 1 ? `${said.slice(0, -1).join(", ")} and ${said.at(-1)}` : said[0]}.` : "No ratings or reviews yet.";
-  return { rating, reviews, footer };
+  return { rating, reviews, appStoreReviews, appStoreLabel: "App Store Reviews", footer };
 }
+
+// B37: one App Store review as the tab's cell: "by name – Version 2.0.1 – Nov 17" (plain text, drawn with textContent).
+export const appStoreReview = (rv, now = Date.now()) => ({ appStore: true, title: rv.title, author: rv.author || null,
+  rating: rv.rating ?? null, version: rv.version || null, date: rv.at ? reviewDate(rv.at, now) : null, text: rv.text });

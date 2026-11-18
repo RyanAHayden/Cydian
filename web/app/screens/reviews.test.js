@@ -180,3 +180,19 @@ test("a server without reviews: no Tap to Rate or Write a Review, the others' ra
   await byText(fresh, "Write a Review").click();
   assert.equal(sheets[0].initial, null);
 });
+
+test("B37: the App Store's written reviews as their own group after ours, plain text, with the App Store's rating", async () => {
+  const pane = document.createElement("div");
+  const api = fakeApi([], { enabled: false });
+  const reviews = [{ appStore: true, title: "Cool update", author: "Deltatusigma", rating: 5, version: "2.0.1",
+    at: Date.UTC(2026, 10, 17, 12), text: "<b>not markup</b>" }];
+  await reviewsTab(pane, { id: "com.rileytestut.Delta", api, appStore: Promise.resolve({ average: 4.76, count: 28385, noun: "Ratings", reviews }), now });
+  assert.equal(one(pane, "store-ratings-big").textContent, "4.8");
+  const g = one(pane, "store-reviews-appstore");
+  assert.ok(g, "an App Store Reviews group");
+  assert.equal(one(g, "group-header").textContent, "App Store Reviews");
+  assert.equal(one(g, "store-review-title").textContent, "1. Cool update");
+  assert.equal(one(g, "store-review-by").textContent, "by Deltatusigma – Version 2.0.1 – Nov 17");
+  assert.equal(one(g, "store-review-text").textContent, "<b>not markup</b>", "drawn as text, never markup");
+  assert.equal(one(pane, "store-reviews-footer").textContent, "Ratings and reviews from the App Store.");
+});

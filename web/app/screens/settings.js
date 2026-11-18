@@ -586,6 +586,26 @@ async function setUpLocalInstall() {
   }
 }
 
+// Test Install Server: first from inside Cydian (is the server up, does WebKit trust its certificate), then, if
+// asked, in Safari with Cydian in the background, as during a real install. Each outcome names the cause.
+async function testInstallServer() {
+  const native = globalThis.cydianNative;
+  let url;
+  try { url = (await native.call("signing.testServer", {})).url; } catch (e) {
+    await alertOK("Server Didn't Start", deviceError(e).message); return;
+  }
+  let inside;
+  try {
+    const r = await fetch(url, { cache: "no-store" });
+    inside = r.ok ? "Cydian reached its install server, and the certificate is trusted." : `The server answered ${r.status}.`;
+  } catch (e) {
+    inside = `Cydian couldn't reach its own install server (${e.message}): either it isn't running or this iPhone doesn't trust its certificate yet (Settings > General > About > Certificate Trust Settings).`;
+  }
+  const { index } = await showAlert({ title: "Install Server", message: `${url.replace(/\/[^/]+\/test\.html$/, "")}\n\n${inside}\n\nNext: open it in Safari. Cydian goes to the background as during an install. A page saying it works means installs can reach it; "can't connect" means the server stops in the background; a certificate warning means iOS doesn't trust it.`,
+    buttons: ["Done", "Test in Safari"], cancel: 0 });
+  if (index === 1) { try { await native.call("signing.testServer", { open: true }); } catch (e) { await alertOK("Couldn't Open", deviceError(e).message); } }
+}
+
 async function removeDeviceCertificate() {
   const { index } = await showAlert({ title: "Remove Certificate?", message: "The certificate, its key and the profile are deleted from this iPhone's Keychain.",
     buttons: ["Cancel", "Remove"], cancel: 0 });
@@ -619,7 +639,7 @@ async function drawDeviceSigning(el) {
   }
   if (status) {
     const local = localInstallSection(status.trust);
-    const act = { trust: () => setUpLocalInstall(), refresh: () => redrawAll() };
+    const act = { trust: () => setUpLocalInstall(), refresh: () => redrawAll(), test: () => testInstallServer() };
     sections.push({ ...local, rows: local.rows.map(({ action, ...r }) => (action ? { ...r, onClick: act[action] } : r)) });
   } else {
     sections.push({ header: "Local Install", footer: `The signer didn't answer: ${deviceError(failure).message}` });

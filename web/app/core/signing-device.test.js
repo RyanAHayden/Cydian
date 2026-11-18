@@ -50,13 +50,14 @@ test("Local Install: the set-up row and the two Settings steps until trusted", (
     assert.equal(s.rows.find((r) => r.label === "Set Up").action, "trust");
     assert.equal(s.rows.find((r) => r.label === "Install the Profile").subtitle, "Settings > General > VPN & Device Management");
     assert.equal(s.rows.find((r) => r.label === "Turn On Full Trust").subtitle, "Settings > General > About > Certificate Trust Settings");
-    assert.equal(s.rows.at(-1).action, "refresh");
+    assert.equal(s.rows.find((r) => r.label === "Check Again").action, "refresh");
+    assert.equal(s.rows.at(-1).action, "test"); // Test Install Server
   }
 });
 
-test("Local Install once trusted: Ready, no steps", () => {
+test("Local Install once trusted: Ready, no steps, and the server test", () => {
   const s = localInstallSection({ ca: true, trusted: true, name: "Cydian Local Install CA (iPhone 1234)" });
-  assert.deepEqual(s.rows, [{ label: "Status", detail: "Ready" }]);
+  assert.deepEqual(s.rows, [{ label: "Status", detail: "Ready" }, { label: "Test Install Server", action: "test" }]);
   assert.match(s.footer, /Cydian Local Install CA \(iPhone 1234\)/);
 });
 

@@ -418,7 +418,7 @@ export function deviceSummary(identity, { now = new Date(), locale, timeZone } =
 export function localInstallSection(trust) {
   const t = trust ?? {};
   if (t.trusted) {
-    return { header: "Local Install", rows: [{ label: "Status", detail: "Ready" }],
+    return { header: "Local Install", rows: [{ label: "Status", detail: "Ready" }, { label: "Test Install Server", action: "test" }],
       footer: `iOS trusts ${t.name ? `“${t.name}”` : "Cydian's local certificate"}: Install signs apps on this iPhone and installs them from it. Nothing leaves the phone.` };
   }
   return {
@@ -429,6 +429,7 @@ export function localInstallSection(trust) {
       { label: "Install the Profile", subtitle: "Settings > General > VPN & Device Management" },
       { label: "Turn On Full Trust", subtitle: "Settings > General > About > Certificate Trust Settings" },
       { label: "Check Again", action: "refresh" },
+      { label: "Test Install Server", action: "test" },
     ],
     footer: "Once, before the first install: iOS installs apps only from an HTTPS address it trusts, so Cydian makes its own "
       + "certificate, good for this iPhone's own address (localhost) only, and you trust it in Settings. Then come back here.",

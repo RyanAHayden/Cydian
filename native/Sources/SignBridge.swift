@@ -6,6 +6,7 @@
 //   signing.remove              forgets the identity and the profile -> status
 //   signing.trust               makes the local CA if needed and opens its profile in Safari -> {url}
 //   signing.resetTrust          throws the local CA away (the user removes the old profile in Settings) -> status
+//   signing.testServer {open?}  a test page on the install server; open: in Safari, Cydian in the background -> {url}
 //   signing.install {url} (stream: {phase: "downloading"|"reading"|"signing"|"installing", progress})
 //                               downloads, signs and opens the itms-services link -> {bundleId, originalBundleId,
 //                               name, version, removed}; F14 moved it to Sideload.swift, which adds the user's edits
@@ -64,6 +65,29 @@ enum SignBridge {
                         }
                     }
                 } catch { Apt.reply(c, nil, text(error)) }
+            }
+        }
+        // A test page on the install server (Settings > Signing > Test Install Server): served over the same HTTPS
+        // and certificate as installs, with the same keep-alive. open: true also opens it in Safari, which puts Cydian
+        // in the background exactly as an install does. -> {url}
+        b.on("signing.testServer") { c in
+            guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
+            let open = c.params["open"] as? Bool ?? false
+            let path = "/\(token())/test.html"
+            let page = "<!doctype html><meta name=viewport content='width=device-width'><body style='font:17px -apple-system;padding:30px;text-align:center'><h2>Cydian's install server works</h2><p>Reached over HTTPS at 127.0.0.1 with Cydian's own certificate, while Cydian was in the background. Installs can reach it too. Go back to Cydian.</p>"
+            InstallServer.secure.serve(path, .init(type: "text/html; charset=utf-8", body: .data(Data(page.utf8)), onServed: nil), ttl: 3 * 60)
+            InstallServer.secure.start { res in
+                switch res {
+                case .failure(let e): Apt.reply(c, nil, "server: \(e.localizedDescription)")
+                case .success:
+                    let url = InstallServer.secure.base + path
+                    if open {
+                        KeepAlive.shared.begin()
+                        SignBridge.queue.asyncAfter(deadline: .now() + 120) { KeepAlive.shared.end() }
+                        DispatchQueue.main.async { UIApplication.shared.open(URL(string: url)!) }
+                    }
+                    c.reply(["url": url], nil)
+                }
             }
         }
         b.on("signing.install") { c in Sideload.install(c) } // F14: with the user's edits, keep-alive and a record

@@ -9,7 +9,12 @@
 let current = null;
 
 // `action`: { label, onClick } puts a small blue button at the banner's right (Upgrade); a tap on it runs onClick.
-export function showBanner({ title = "Cydian", message = "", icon = "icons/icon-glossy-76.png", duration = 0, action = null } = {}) {
+// Cydian's own icon for where it runs: WEB on the website, LITE in the sideload app, plain in the jailbreak app.
+import { detectMode } from "../core/settings.js";
+export const ownIcon = () => (!globalThis.cydianNative ? "icons/icon-web-glossy-76.png"
+  : detectMode() === "sideload" ? "icons/icon-lite-glossy-76.png" : "icons/icon-glossy-76.png");
+
+export function showBanner({ title = "Cydian", message = "", icon = ownIcon(), duration = 0, action = null } = {}) {
   current?.();
   const b = document.createElement("div");
   b.className = "banner";

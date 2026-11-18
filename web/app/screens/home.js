@@ -333,7 +333,8 @@ function renderRoot(body) {
   const head = el("div", "home-head");
   const icon = el("img", "home-icon");
   // The website shows its WEB icon (the home-screen one), so it's never taken for the app (user 2026-11-18).
-  const g = globalThis.cydianNative ? "icon-glossy" : "icon-web-glossy";
+  // The sideload app shows its LITE icon (its Home Screen icon), the jailbreak app the plain one.
+  const g = !globalThis.cydianNative ? "icon-web-glossy" : settings.mode === "sideload" ? "icon-lite-glossy" : "icon-glossy";
   icon.src = `icons/${g}-76.png`;
   icon.srcset = `icons/${g}-76.png 1x, icons/${g}-152.png 2x, icons/${g}-228.png 3x`;
   icon.width = icon.height = 76;

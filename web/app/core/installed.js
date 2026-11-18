@@ -181,7 +181,7 @@ function selfRecord(native = globalThis.cydianNative) {
   if (!native?.call) return Promise.resolve(null);
   selfInfo ??= Promise.resolve().then(() => native.call("app.info", {})).then((i) => (i?.mode === "jailbreak" || !i?.version ? null
     : { id: SELF_ID, name: "Cydian", version: String(i.version), key: null, source: null, sourceName: "Cydian",
-      icon: "icons/icon-glossy-76.png", date: 0, self: true }), () => null);
+      icon: "icons/icon-lite-glossy-76.png", date: 0, self: true }), () => null); // the sideload app's LITE icon
   return selfInfo;
 }
 export function withSelf(store, native) {

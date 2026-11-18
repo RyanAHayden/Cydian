@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.3.0",
+          "date": "2026-11-18T04:31:18Z",
+          "localizedDescription": "Install IPAs: browse apps from your sources by category, search them, and keep your own IPAs; linked from Home.\nLinks into another tab slide in.\nSources Add: while iOS shows Paste, the button reads Type (blue): tap it to type a source in.\nCydian checks for essential updates again when you come back to it.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.0",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.0/Cydian.ipa",
+          "size": 2705463,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.2.9",
           "date": "2026-11-18T04:18:52Z",
           "localizedDescription": "Changes: app upgrades show (Available Upgrades, the tab and icon badge) with Upgrade (N); a background check posts a notification when updates come out.\nSources: Add never sticks pressed; tapping Manage while the Paste bubble is up opens Manage.\nInstalled: My IPAs as a button at the top.\nInstall errors say what went wrong.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.9",
@@ -145,8 +153,7 @@
           "size": 2331028,
           "minOSVersion": "15.0"
         }
-      ],
-      "minimumVersion": "0.2.9"
+      ]
     }
   ],
   "news": []

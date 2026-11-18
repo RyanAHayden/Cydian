@@ -1,10 +1,14 @@
-// Look first, then sign (F68): the sideload build's Install on an AltStore app. signing.inspect downloads the IPA and
+// Look first, then sign (F68): the sideload build's Custom Install on an AltStore app (F81: plain Install signs
+// straight away, signing-client.js signAndInstall; this sheet is the app page's "Custom Install" row). signing.inspect downloads the IPA and
 // says what it is and asks for; this sheet shows that as an iOS 6 grouped table (its permissions, its entitlements,
 // what the user's profile can't give it, its extensions with a switch each to leave one out) with the Name, Bundle
-// ID and Icon to sign it as; Sign & Install sends signing.install {token, ...edits} (core/signing.js installParams)
+// ID and Icon to sign it as; Install (top right) sends signing.install {token, ...edits} (core/signing.js installParams)
 // and then follows iOS's own install with signing.progress {bundleId}. docs/signing.md "Before and around signing".
 //
 //   await inspectAndInstall({ url, name, onInstalled })   true once iOS was asked to install, false otherwise
+//   await customInstall({ url, name, onInstalled })       the same, after F75's first-install check (the row's tap)
+//
+// The sheet's buttons (F81, user 2026-11-17): Install at the top right of its nav bar, a red Cancel at the bottom.
 //
 // The bridge is globalThis.cydianNative; an older shell without signing.inspect installs straight away as before.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -81,6 +85,31 @@ export async function inspectAndInstall({ url, name = "", onInstalled = () => {}
       onClose: () => { if (!started) resolve(false); },
     });
   });
+}
+
+// The Custom Install row's tap: the Signing walkthrough first when something is missing (F75), else the sheet.
+export async function customInstall(opts, { check = null, inspect = inspectAndInstall } = {}) {
+  const missing = check ? await check() : await (await import("./signing-client.js")).firstInstallCheck();
+  if (missing) return false;
+  return inspect(opts);
+}
+
+// The sheet's chrome (F81): `right` (the nav bar's right side) gets Install, done-styled, in place of Done; `box` (the
+// scroll content) ends with a red Cancel. -> { install, cancel }.
+export function signSheetButtons({ right, box, onInstall, onCancel, doc = document }) {
+  const install = doc.createElement("button");
+  install.type = "button";
+  install.className = "bar-button done ss-install";
+  install.textContent = "Install";
+  install.addEventListener("click", () => onInstall());
+  right?.replaceChildren(install);
+  const cancel = doc.createElement("button");
+  cancel.type = "button";
+  cancel.className = "ss-cancel";
+  cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => onCancel());
+  box.append(cancel);
+  return { install, cancel };
 }
 
 // signing.progress {bundleId}: iOS's own progress on the HUD until it says installed (or gives up), then it goes.
@@ -215,16 +244,10 @@ export function openSignSheet(info, { onSign, onClose = () => {}, fallbackName =
     box.append(eg);
   }
 
-  const go = el("button", "ss-sign", "Sign & Install");
-  go.type = "button";
-  go.addEventListener("click", () => onSign?.({ ...edits, removeExtensions: [...edits.removeExtensions] }));
-  box.append(go);
-
   const close = showSheet({ title: edits.name || "Install", body: box, onClose });
-  // The sheet's only bar button closes it without installing: Cancel, not Done.
   const sheetEl = box.closest(".sheet");
-  const done = sheetEl?.querySelector(".sheet-right .bar-button");
-  if (done) { done.textContent = "Cancel"; done.classList.remove("done"); }
+  signSheetButtons({ right: sheetEl?.querySelector(".sheet-right"), box,
+    onInstall: () => onSign?.({ ...edits, removeExtensions: [...edits.removeExtensions] }), onCancel: () => close() });
   sheetEl?.classList.add("sign-sheet-modal");
   return close;
 }

@@ -134,11 +134,9 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {}, b
   if (localSigning() && isSelfIpa(url)) return installOnDevice({ url, name: name || "Cydian", onInstalled, host: true });
   // F75: the first Install with something missing opens the Signing walkthrough at that step, not an alert.
   if (localSigning() && await firstInstallCheck()) return false;
-  // F68: look first (signing.inspect), then the sheet with its edits signs and installs (signing-sheet.js).
-  if (localSigning()) {
-    const { inspectAndInstall } = await import("./signing-sheet.js");
-    return inspectAndInstall({ url, name, onInstalled });
-  }
+  // F81: one tap: Install signs and installs straight away. The look-first sheet (F68, signing-sheet.js) is the app
+  // page's Custom Install row (signing-sheet.js customInstall).
+  if (localSigning()) return installOnDevice({ url, name, onInstalled });
   const id = await loadIdentity();
   if (!id?.p12 || !id?.profile) {
     await showAlert({ title: "No Certificate", message: "Add your certificate and provisioning profile in Settings > Signing.", buttons: ["OK"] });

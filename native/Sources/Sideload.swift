@@ -331,18 +331,29 @@ enum Sideload {
         DispatchQueue.main.async { Apt.reply(c, ["opened": Workspace.open(bid)], nil) }
     }
 
+    // B28: once progress was seen, a nil read doesn't end the watch at once: iOS drops the progress object for a moment
+    // between its download and install steps (big IPAs), and an update's old app (or a new one's placeholder) answers
+    // isInstalled true all along. Only nil for `nilGrace` seconds in a row ends it (`nilGraceDone` once it reached 100%).
+    static let nilGrace: TimeInterval = 6, nilGraceDone: TimeInterval = 1.5
+
     // nil: the private API isn't there, so it can't be told.
     static func watch(_ bid: String, onProgress: @escaping (Double) -> Void, done: @escaping (Bool?) -> Void) {
         guard Workspace.available else { return done(nil) }
         let start = Date()
         var seen = false, last = -1
+        var nilSince: Date?
         func tick() {
             if let p = Workspace.installProgress(bid) {
                 seen = true
+                nilSince = nil
                 let pct = Int(p.fractionCompleted * 100)
                 if pct != last { last = pct; onProgress(p.fractionCompleted) }
             } else if seen {
-                return done(Workspace.isInstalled(bid))
+                let since = nilSince ?? Date()
+                nilSince = since
+                if Date().timeIntervalSince(since) >= (last >= 100 ? nilGraceDone : nilGrace) {
+                    return done(Workspace.isInstalled(bid))
+                }
             } else if Date().timeIntervalSince(start) > 45 {
                 return done(false)
             }

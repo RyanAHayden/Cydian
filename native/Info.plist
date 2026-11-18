@@ -39,7 +39,6 @@
 		<key>UITabBar</key><dict><key>UIImageName</key><string>LaunchTabBar</string></dict>
 	</dict>
 	<key>UIStatusBarStyle</key><string>UIStatusBarStyleLightContent</string>
-	<key>UIUserInterfaceStyle</key><string>Light</string>
 	<key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
 	<key>CADisableMinimumFrameDurationOnPhone</key><true/>
 </dict>

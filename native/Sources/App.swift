@@ -28,6 +28,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // N10: the pinstripes, not black, behind everything: nothing dark shows between the launch screen and the page.
         w.backgroundColor = Launch.pinstripes
         w.rootViewController = WebController()
+        // Light until the page says otherwise (Settings > Appearance, Light by default): Automatic then lets the window
+        // follow iOS, dark included (Theme.apply). Info.plist has no UIUserInterfaceStyle, which would pin it to light.
+        w.overrideUserInterfaceStyle = .light
         w.makeKeyAndVisible()
         window = w
     }

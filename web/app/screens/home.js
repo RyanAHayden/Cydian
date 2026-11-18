@@ -227,7 +227,7 @@ function renderRoot(body) {
   // Themes beside Featured when jailbroken; while Not Jailbroken (F41) a Signing tile takes its place, the way to
   // the user's own certificate (Settings > Signing), which is what installs apps without a jailbreak.
   const halves = tileRow("halves",
-    tile({ label: "Featured", href: format({ tab: "home", path: ["featured"] }), glyph: "featured" }),
+    tile({ label: "Featured", href: format({ tab: "home", path: ["browse", "popular"] }), glyph: "featured" }), // Popular, not every package
     tile({ label: "Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }), glyph: "themes" }),
     tile({ label: "Signing", href: format({ tab: "settings", path: ["signing"] }), glyph: "signing" }));
   const drawThemes = () => {

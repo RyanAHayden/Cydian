@@ -619,10 +619,12 @@ export const STATUS_EVERY = 500, STATUS_MIN_SHOW = 400, STATUS_ASK_WITHIN = 60 *
 // The log's steps in order, and how far a status got: 0 waiting, 1 downloading, 2 downloaded.
 export const installSteps = (app) => [
   "Waiting for iOS…",
-  `iOS is downloading ${app || "the app"}…`,
-  "Downloaded. iOS is installing it: watch the Home Screen (Safari can't see the install itself).",
+  "iOS is asking: tap Install.",
+  `iOS is installing ${app || "the app"}. Press Home to watch it on the Home Screen.`,
 ];
-export const installStage = (s) => (s?.finished ? 2 : s?.started || s?.manifest ? 1 : 0);
+// The page completes once iOS starts the download (Cydia's Complete, Return under it): Safari can't see the rest, and
+// "iOS is downloading…" left people waiting on a page with nothing more to show (user 2026-11-18).
+export const installStage = (s) => (s?.finished || s?.started ? 2 : s?.manifest ? 1 : 0);
 export const notAskedText = "iOS didn't ask for the app. Tap Install again.";
 
 export function watchInstall(token, h, { base = "", fetcher = globalThis.fetch, app = "", itms = "", open = () => {}, alert = showAlert,

@@ -28,17 +28,16 @@ const texts = (log) => log.map((l) => l[1]);
 test("installStage and the steps", () => {
   assert.equal(installStage(S(false, false, false)), 0);
   assert.equal(installStage(S(true, false, false)), 1);
-  assert.equal(installStage(S(false, true, false)), 1);
+  assert.equal(installStage(S(false, true, false)), 2, "iOS started the download: the page completes");
   assert.equal(installStage(S(true, true, true)), 2);
   const [wait, down, done] = installSteps("Delta");
   assert.equal(wait, "Waiting for iOS…");
-  assert.equal(down, "iOS is downloading Delta…");
-  assert.match(done, /^Downloaded\. iOS is installing it: watch the Home Screen/);
-  assert.match(done, /Safari can't see/);
+  assert.equal(down, "iOS is asking: tap Install.");
+  assert.equal(done, "iOS is installing Delta. Press Home to watch it on the Home Screen.");
 });
 
-test("a normal install steps through waiting, downloading, downloaded, polling every 500 ms", async () => {
-  const r = rig([S(false, false, false), S(false, false, false), S(true, false, false), S(true, true, false), S(true, true, false), S(true, true, true)]);
+test("a normal install steps through waiting, iOS asking, and completes once iOS starts the download, polling every 500 ms", async () => {
+  const r = rig([S(false, false, false), S(false, false, false), S(true, false, false), S(true, true, false)]);
   const w = watchInstall(TOKEN, r.h, r.opts);
   await w.first;
   assert.deepEqual(texts(r.log), ["Waiting for iOS…"]);

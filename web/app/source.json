@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.3.6",
+          "date": "2026-11-18T06:46:38Z",
+          "localizedDescription": "Icon badge fixed (badge permission is asked for); the background check keeps the badge current and Settings > Update Alerts shows what iOS allows, when it last checked, and a switch to turn background checks off.\nLong-press the Cydian icon: Upgrade All (N) queues every upgrade and opens Confirm.\nA new Cydian (not required) shows a banner with Upgrade instead of an alert; installed apps show Modify (Upgrade or Reinstall, Downgrade).\nUpdating Cydian: a banner says it will close, and it closes itself so iOS finishes.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.6",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.6/Cydian.ipa",
+          "size": 3364671,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.3.5",
           "date": "2026-11-18T06:03:43Z",
           "localizedDescription": "Updates are checked every time you come back to Cydian, from a fresh copy of the source.\nAfter you tap Install on an update of Cydian, it closes so iOS can finish, with a notification to open the new version.\nThe website no longer needs a server of its own: Install hands apps to Cydian or another sideloader.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.5",
@@ -168,17 +176,8 @@
           "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.7/Cydian.ipa",
           "size": 2496201,
           "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.1.6",
-          "date": "2026-11-18T02:05:47Z",
-          "localizedDescription": "The app opens on Home loading (title, the Loading spinner, the tab bar), like Cydia, instead of a black screen.\nInstalls in the app: the manifest request gets past the server proxy (0.1.5), and Cydian's built-in source names the newest version.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.6",
-          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.6/Cydian.ipa",
-          "size": 2495422,
-          "minOSVersion": "15.0"
         }
-      ],
-      "minimumVersion": "0.3.5"
+      ]
     }
   ],
   "news": []

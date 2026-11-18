@@ -71,7 +71,7 @@ test("Jailbroken? Get Cydian.deb: Cydian's APT repo in Sileo and Zebra", async (
 test("F123/F135: Home's list starts with Settings in its own group, with its icon; Credits ends it", async () => {
   const { homeLinks } = await import("./home.js");
   const groups = homeLinks();
-  assert.deepEqual(groups[0], { rows: [{ label: "Settings", href: "#/home/settings", icon: { src: "icons/settings.svg" }, cls: "home-settings-row" }] });
+  assert.deepEqual(groups[0], { rows: [{ label: "Settings", href: "#/home/settings", icon: { cls: "home-glyph glyph-settings" }, cls: "home-settings-row" }] });
   assert.equal(groups[1].rows[0].label, "Upgrading & Jailbreaking Help", "the help links come right after Settings");
   assert.equal(groups[2].header, "User Guides");
   assert.equal(groups.at(-1).rows[0].label, "Credits / Thank You");

@@ -24,7 +24,7 @@ function fakeEl(tag) {
 }
 async function withDom(fn) {
   const saved = globalThis.document;
-  globalThis.document = { createElement: fakeEl };
+  globalThis.document = { createElement: fakeEl, createDocumentFragment: () => fakeEl("#fragment") };
   try { return await fn(); } finally { globalThis.document = saved; }
 }
 
@@ -32,20 +32,36 @@ test("F135: Settings is Home's first group, its row with our gear at the left", 
   const [first, ...rest] = homeLinks();
   assert.equal(first.rows.length, 1);
   assert.equal(first.rows[0].label, "Settings");
-  assert.equal(first.rows[0].icon.src, SETTINGS_ICON);
+  assert.equal(first.rows[0].icon.cls, SETTINGS_ICON);
   assert.ok(rest.every((g) => g.rows?.every((r) => r.label !== "Settings")), "Settings only once");
   assert.equal(rest.at(-1).rows[0].label, "Credits / Thank You");
 });
 
-test("F135: the gear is our own SVG, 29pt, grey, with its rounded square; Home's CSS sizes it in the row", () => {
-  assert.equal(SETTINGS_ICON, "icons/settings.svg");
-  const svg = read("../icons/settings.svg");
-  assert.match(svg, /viewBox="0 0 58 58"/);
-  assert.match(svg, /width="29" height="29"/);
-  assert.match(svg, /<rect[^>]+rx=/, "the icon's rounded square");
-  assert.match(svg, /stroke-dasharray/, "the gear's teeth");
-  assert.doesNotMatch(svg, /<image|base64/, "drawn, not a pasted bitmap");
-  assert.match(read("../home.css"), /\.home-settings-row \.cell-icon img \{[^}]*width: 100%/);
+test("F159: the Settings row's gear is a tile glyph with the tiles' padding, so it lines up with them", () => {
+  assert.equal(SETTINGS_ICON, "home-glyph glyph-settings");
+  const css = read("../home.css");
+  const rule = (sel) => css.match(new RegExp(sel.replace(/[.>]/g, (c) => "\\" + c) + " \\{([^}]*)\\}"))?.[1] ?? "";
+  const decl = (body, prop) => body.match(new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`))?.[1].trim();
+  const tile = rule(".home-tile"), row = rule(".home-settings-row > .cell-inner");
+  assert.ok(decl(tile, "padding"), "the tiles set their padding");
+  assert.equal(decl(row, "padding"), decl(tile, "padding"), "same left inset as the tiles");
+  assert.equal(decl(row, "gap"), decl(tile, "gap"), "same icon-label gap as the tiles");
+  const glyph = rule(".glyph-settings");
+  assert.match(glyph, /background-color: #8e8e93/, "a grey square");
+  assert.match(glyph, /url\("data:image\/svg\+xml,[^"]*fill='%23fff'/, "a white gear drawn inline, as the other glyphs");
+  assert.doesNotMatch(css, /settings\.svg/, "no full-bleed bitmap gear left");
+});
+
+test("F159: grouped() rows put an icon's cls on the cell-icon", async () => {
+  const { grouped } = await import("../nav/ui.js");
+  await withDom(async () => {
+    const frag = grouped([{ rows: homeLinks()[0].rows }]);
+    const find = (n, cls) => (n.className?.split?.(" ").includes(cls) ? n : (n.children ?? []).map((c) => find(c, cls)).find(Boolean));
+    const icon = find(frag, "cell-icon");
+    assert.ok(icon, "the Settings row draws an icon");
+    assert.deepEqual(icon.className.split(" "), ["cell-icon", "home-glyph", "glyph-settings"]);
+    assert.equal((icon.children ?? []).length, 0, "no <img>: the glyph is the span's own background");
+  });
 });
 
 test("F135: the jailbreak app's Home drops the banners and its Browse page shows them; the site and sideload keep Home's", () => {

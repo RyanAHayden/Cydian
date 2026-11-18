@@ -99,11 +99,15 @@ function card(children, cls = "") {
 // F96: on the website any app but Cydian gets websign-gate.js's rows instead (Install in Cydian, Download IPA, then
 // Install on the Website behind its warning); `appId` is the app's package id for the cydian:// link (else the page's
 // hash), `gate` makes the rows (tests).
+// F129: `bundleId` is the app's own bundle ID (appBundleId), handed to signAndInstall so a wildcard profile's website
+// install opens iOS's prompt from the Install tap (signing-client.js expectedBundleId); null where it isn't known.
+// `sign` is what signs and installs (signing-client.js signAndInstall; tests pass a fake).
 export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {},
   queue = null, name = "", { custom = localSigning() && !ipaInstallAvailable(), customize = null, jailbreak = ipaInstallAvailable(),
     ipaInstall = openIpaInstall, site = detectMode() === "site", needsCertificate = siteCertificateAlert, appId = null,
-    gate = siteGateRows } = {}) {
+    gate = siteGateRows, bundleId = null, sign = signAndInstall } = {}) {
   const o = installOptions(version, sourceUrl);
+  const own = { bundleId: bundleId || null, version: version?.version ?? "" };
   const rows = [];
   if (o.download && jailbreak) {
     // F88: the helper says whether it installed, so the record waits for its success (openIpaInstall's onInstalled)
@@ -113,15 +117,15 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
     rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
   } else if (o.download && site && !isSelfIpa(o.download)) {
     // F96: other apps go to Cydian first; Install on the Website (F93's browser signing) waits for the warning.
-    const install = () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() });
+    const install = () => sign({ url: o.download, name, ...own, onInstalled: () => onInstall() });
     return { rows: gate({ id: appId, install, download: downloadRow(o.download, opener) }), options: o, gated: true };
   } else if (o.download && site) {
     // F93: Install signs in the browser with the certificate in Settings > Signing (signing-client.js
     // signInBrowser). F92: no hand-offs follow it. F96: Cydian itself always installs from the website.
     rows.push({ label: "Install", subtitle: SITE_INSTALL_SUBTITLE,
-      onClick: () => signAndInstall({ url: o.download, name, onInstalled: () => { markCydianInstalled(); onInstall(); } }) });
+      onClick: () => sign({ url: o.download, name, ...own, onInstalled: () => { markCydianInstalled(); onInstall(); } }) });
   } else if (o.download) {
-    const direct = () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() });
+    const direct = () => sign({ url: o.download, name, ...own, onInstalled: () => onInstall() });
     rows.push({ label: "Install", subtitle: "Signed with your certificate",
       onClick: queue ? async () => { if (!(await queue())) direct(); } : direct });
   }
@@ -133,6 +137,10 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   if (o.download) rows.push(downloadRow(o.download, opener));
   return { rows, options: o };
 }
+
+// F129: an app's own bundle ID: its AltStore bundleIdentifier, else its package row's id without the `~name` suffix
+// a source adds when two apps share one ID (core/altstore.js). null when neither is there.
+export const appBundleId = (app, rowId = null) => app?.bundleIdentifier || String(rowId ?? "").split("~")[0] || null;
 
 const downloadRow = (url, opener) => ({ label: "Download IPA", subtitle: decodeURIComponent(url.split("/").pop() || ""), onClick: () => opener(url) });
 
@@ -345,7 +353,8 @@ async function siteInstallVersion(pkg, v, source) {
   const app = pkg.stanza.ipa;
   const record = () => apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: v.version, key: pkg.key,
     source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
-  const { rows, gated } = installRows(v, app.sourceUrl, undefined, record, null, app.name, { appId: pkg.row?.id ?? pkg.stanza.package });
+  const { rows, gated } = installRows(v, app.sourceUrl, undefined, record, null, app.name, { appId: pkg.row?.id ?? pkg.stanza.package,
+    bundleId: appBundleId(app, pkg.row?.id) });
   // F96: once website installs are accepted the downgrade signs here; until then it's Install in Cydian.
   const first = gated && websiteInstallsOn() ? rows.find((r) => r.label === "Install on the Website") : rows[0];
   if (first && first.label !== "Download IPA") return first.onClick();
@@ -462,7 +471,8 @@ export function renderApp(body, route, pkg, source) {
   };
   const queued = detectMode() !== "jailbreak"; // the app queue (F80) and Custom Install (F84) aren't in the jailbreak build
   const { rows, options, gated } = installRows(v, app.sourceUrl, undefined, record, queued ? () => appPageAction(pkg, source) : null, app.name,
-    { ...(queued ? { customize: (o) => appPageCustom(pkg, source, o) } : {}), appId: pkg.row?.id ?? st.package ?? app.bundleIdentifier });
+    { ...(queued ? { customize: (o) => appPageCustom(pkg, source, o) } : {}), appId: pkg.row?.id ?? st.package ?? app.bundleIdentifier,
+      bundleId: appBundleId(app, pkg.row?.id) });
   body.append(grouped([{ header: "Install", rows,
     footer: gated ? SITE_GATE_FOOTER
       : options.download && ipaInstallAvailable() ? IPA_FOOTER

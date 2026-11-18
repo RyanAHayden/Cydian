@@ -26,7 +26,7 @@ import { settings, createSwitch } from "./settings.js";
 import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js";
 import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
-import { renderAltSource, renderApp, installRows, formatDate, osRange, appPageAction, appPageCustom } from "./altstore.js";
+import { renderAltSource, renderApp, installRows, appBundleId, formatDate, osRange, appPageAction, appPageCustom } from "./altstore.js";
 import { linksGroup, previewSlot } from "./altstore.js";
 import { packageLinks, packageGithub, aptShots, sileoShots } from "../core/previews.js";
 import { showActionSheet } from "../nav/actionsheet.js";
@@ -801,7 +801,8 @@ async function packageActions(route, button) {
     // Install at the top right installs: the first row (the source's signed link, or the jailbreak). Download IPA and
     // older versions are on the page, not in a menu in between. On the website the first row is Install (F92: the
     // certificate alert until F93's browser signing).
-    const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v), undefined, st.ipa.name);
+    const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v), undefined, st.ipa.name,
+      { bundleId: appBundleId(st.ipa, pkg.row?.id ?? id) });
     if (rows[0] && rows[0].label !== "Download IPA") return rows[0].onClick();
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });
     if (many) actions.push({ label: "Version History", run: () => go(versionsHref(route, id)) });
@@ -928,7 +929,7 @@ async function renderVersions(body, route, key, id) {
           if (queue && !customOffered && await queue()) return;
           if (!customOffered && await signIfReady(pkg.stanza.ipa ?? { name: history.name, sourceUrl: history.sourceUrl }, v, record)) return;
           const { rows, options } = installRows(v, history.sourceUrl, undefined, record, queue, history.name,
-            customize ? { customize } : undefined);
+            { ...(customize ? { customize } : {}), bundleId: appBundleId(pkg.stanza.ipa, history.id) });
           sheet(options.itms ? `${history.name} ${v.version}` : `${history.name} ${v.version}\nA sideloader signs it on the iPhone with your Apple ID.`,
             rows.map((r) => ({ label: r.label, run: r.onClick })));
         } : null,

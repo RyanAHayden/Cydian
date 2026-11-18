@@ -16,6 +16,8 @@
 //                             F63: the Configuration Upgrade alert and the word it answers (keep | new)
 //   createRunLog(storage)     -> the console logs Settings shows
 //   createRepeatFilter()      -> (type, text) -> false for a status line the same as the one before (C6)
+//   debUrlOf(history, version), isAbsoluteFilename(f), mergePlans(plans)
+//                             F131: a Filename that is a full URL, fetched by the shell instead of apt
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { compareVersions, parseRelations } from "./apt.js";
@@ -251,4 +253,45 @@ export function createRunLog(storage = null, { max = LOG_MAX, chars = LOG_CHARS,
 export function runTitle(jobs) {
   const parts = jobs.map((j) => `${MODE_LABEL[j.mode] ?? j.op} ${j.name || j.id}`);
   return parts.length > 3 ? `${parts.slice(0, 2).join(", ")} and ${parts.length - 2} more` : parts.join(", ");
+}
+
+// ---- F131: packages whose Filename is a full URL ------------------------------------------------------------------
+//
+// Some repos list `Filename: https://github.com/.../x.deb` (ios.jjolano.me). apt joins it to the repo's URL and 404s
+// ("Failed to fetch https://ios.jjolano.me/https://github.com/..."); Sileo fetches the link itself. Cydian does too:
+// the Confirm sheet gives such a job its `debUrl` (debUrlOf over catalog.history), and the native backend downloads
+// it (share.debFetch) and hands the file to cydian-helper simulate-deb / install-deb, beside apt's run for the rest.
+
+// A Filename apt can't fetch: an absolute URL rather than a path under the repo.
+export const isAbsoluteFilename = (filename) => /^[a-z][a-z0-9+.-]*:\/\//i.test(String(filename ?? ""));
+
+// catalog.history(id) ({ kind, versions: [{ version, keys, filename, debUrl, candidate }] }) and the job's version
+// (null: the newest a source offers, the page's candidate) -> the http(s) link to download, or null when apt can
+// fetch it (a relative Filename), the version isn't offered, or the link isn't http(s) (the shell only fetches those).
+export function debUrlOf(history, version = null) {
+  if (history?.kind !== "apt") return null;
+  const offered = (history.versions ?? []).filter((v) => v.keys?.length);
+  const v = version ? offered.find((o) => o.version === version) : offered.find((o) => o.candidate) ?? offered[0];
+  if (!v || !isAbsoluteFilename(v.filename)) return null;
+  return /^https?:\/\/[^/\s]+/i.test(v.debUrl ?? "") ? v.debUrl : null;
+}
+
+// Several apt-get -s plans (parseSimulation's) as one: each package once per list (the first plan's entry), the
+// essentials together, the first download size.
+export function mergePlans(plans) {
+  const out = { installs: [], reinstalls: [], upgrades: [], downgrades: [], removes: [], essential: [], download: null };
+  const seen = new Set();
+  for (const p of plans) {
+    if (!p) continue;
+    for (const mode of MODES) {
+      for (const e of p[`${mode}s`] ?? []) {
+        if (seen.has(`${mode}:${e.id}`)) continue;
+        seen.add(`${mode}:${e.id}`);
+        out[`${mode}s`].push(e);
+      }
+    }
+    for (const id of p.essential ?? []) if (!out.essential.includes(id)) out.essential.push(id);
+    out.download ??= p.download ?? null;
+  }
+  return out;
 }

@@ -15,6 +15,9 @@
 // it, apply(jobs, onEvent) runs it with the console streaming, respring() restarts SpringBoard. All through
 // cydian-helper's simulate | apply | respring verbs (native/helper/README.md).
 // F64: cancelApply() stops a running apply before dpkg starts (helper.cancel).
+// F131: a job with `debUrl` (its Filename is a full URL, which apt joins to the repo's URL and 404s on) is downloaded
+// by the shell (share.debFetch) and run through cydian-helper simulate-deb / install-deb (share.debSimulate,
+// share.debInstall: native/share/App/ShareBridge.swift), before apt's apply over the rest (linkedDebs below).
 //
 // Roll Back (F71, jailbreak build): rollbacks(id) lists the .debs N7's daemon kept when automatic updates replaced
 // a version (cydian-helper rollbacks), [{ version, file }] newest first; rollback(id, version, onEvent) installs one
@@ -45,7 +48,7 @@ import { healthFields } from "./core/health.js";
 import { DEFAULT_ARCH, compareVersions } from "./core/apt.js";
 import { withAltSources } from "./core/altstore.js";
 import { detectMode } from "./core/settings.js";
-import { queueWords, parseSimulation } from "./core/queue.js";
+import { queueWords, parseSimulation, mergePlans } from "./core/queue.js";
 import { installQueue } from "./queue.js";
 
 // The one apt source file Cydian writes (cydian-helper addsource/removesource, F33).
@@ -152,19 +155,54 @@ function queueCalls(backend, q, call) {
     }
     return r;
   };
+  const joinOut = (a, b) => [a, b].filter(Boolean).join(a?.endsWith("\n") ? "" : "\n");
+  const links = linkedDebs(q, call);
+  const aptSimulate = async (jobs) => {
+    const r = await run(["simulate", ...queueWords(jobs)]);
+    return { ok: r.code === 0, code: r.code, plan: parseSimulation(r.stdout), output: joinOut(r.stdout, r.stderr) };
+  };
+  const aptApply = (jobs, onEvent) => run([onEvent ? "apply-ask" : "apply", ...queueWords(jobs)], onEvent);
   return {
     // { op: "install" | "remove", id, version, installed, name }: browse.js's package page and Version History.
     queue: (job) => q.add(job),
     // -> { ok, code, plan (core/queue.js parseSimulation), output: apt's stdout then stderr }
+    // F131: an install job with `debUrl` (its Filename is a full URL apt can't fetch; screens/queue.js sets it) is
+    // downloaded by the shell and asked about with simulate-deb; apt's simulate takes the rest. `issues`: sentences
+    // for the Cannot Comply sheet when a link couldn't be downloaded or gave another package.
     async simulate(jobs) {
-      const r = await run(["simulate", ...queueWords(jobs)]);
-      const output = [r.stdout, r.stderr].filter(Boolean).join(r.stdout?.endsWith("\n") ? "" : "\n");
-      return { ok: r.code === 0, code: r.code, plan: parseSimulation(r.stdout), output };
+      const linked = jobs.filter(isLinked);
+      if (!linked.length) return aptSimulate(jobs);
+      const rest = jobs.filter((j) => !isLinked(j));
+      const parts = [];
+      const issues = [];
+      for (const j of linked) {
+        const r = await links.simulate(j);
+        if (r.issue) issues.push(r.issue);
+        parts.push(r);
+      }
+      if (rest.length) parts.push(await aptSimulate(rest));
+      const failed = parts.find((p) => !p.ok);
+      return { ok: !failed, code: failed?.code ?? 0, plan: mergePlans(parts.map((p) => p.plan)),
+        output: parts.map((p) => p.output).filter(Boolean).join("\n"), ...(issues.length ? { issues } : {}) };
     },
     // onEvent({ fd: "out" | "err" | "status", line }) as it runs. -> { code, stdout, stderr }
     // F63: with onEvent it is apply-ask: a conffile changed by both you and the package arrives as a pmconffile:
     // status line, and the run waits for answerConffile. Without one nobody could answer, so dpkg keeps your copy.
-    apply: (jobs, onEvent) => run([onEvent ? "apply-ask" : "apply", ...queueWords(jobs)], onEvent),
+    // F131: linked jobs first, one install-deb each (anything queued may depend on them, and apt can't fetch them),
+    // then apt's apply over the rest; the first that fails ends the run with its code.
+    async apply(jobs, onEvent) {
+      const linked = jobs.filter(isLinked);
+      if (!linked.length) return aptApply(jobs, onEvent);
+      const rest = jobs.filter((j) => !isLinked(j));
+      let out = { code: 0, stdout: "", stderr: "" };
+      const add = (r) => { out = { code: r.code, stdout: joinOut(out.stdout, r.stdout), stderr: joinOut(out.stderr, r.stderr) }; };
+      for (const j of linked) {
+        add(await links.install(j, onEvent));
+        if (out.code !== 0) return out;
+      }
+      if (rest.length) add(await aptApply(rest, onEvent));
+      return out;
+    },
     // F63: the Configuration Upgrade answer for the running apply: "keep" (Keep My Old Copy) or "new".
     answerConffile: async (answer) => { await call("helper.answer", { answer }); },
     // F64: Cancel the running apply while apt is still downloading. Rejects BackendError("helper") once dpkg has
@@ -200,6 +238,81 @@ function queueCalls(backend, q, call) {
     async respring() {
       const r = await run(["respring"]);
       if (r.code !== 0) throw new BackendError("helper", `Couldn't restart SpringBoard (${r.code}): ${lastLine(r.stderr) || "no output"}`);
+    },
+  };
+}
+
+// F131: a queued install whose Filename is a full URL (core/queue.js debUrlOf), as the Confirm sheet marks it.
+const isLinked = (j) => j?.op === "install" && typeof j.debUrl === "string" && /^https?:\/\//i.test(j.debUrl);
+
+// F131: the links' downloads. share.debFetch puts each in the helper's .deb folder (native/share/App/ShareBridge.swift)
+// once per job and link; simulate asks share.debSimulate (cydian-helper simulate-deb: apt-get -s install ./file.deb)
+// and install runs share.debInstall (install-deb, which removes the file). A file that went (a day's sweep) is fetched
+// again. Clearing a job, or the queue, discards what it had downloaded.
+function linkedDebs(q, call) {
+  const staged = new Map(); // job id -> { url, file }
+  const discard = (id) => {
+    const s = staged.get(id);
+    if (!s) return;
+    staged.delete(id);
+    call("share.discard", { file: s.file, kind: "deb" }).catch(() => {});
+  };
+  q.subscribe?.((e) => {
+    if (e.type === "clear") discard(e.id);
+    else if (e.type === "clearAll") for (const id of [...staged.keys()]) discard(id);
+    else if (e.type === "add" && staged.has(e.job.id)) discard(e.job.id); // queued for something else now
+  });
+  const fetchFor = async (j, again = false) => {
+    const s = staged.get(j.id);
+    if (s && s.url === j.debUrl && !again) return s.file;
+    if (s) discard(j.id);
+    const r = await call("share.debFetch", { url: j.debUrl });
+    if (!r?.file) throw new BackendError("network", `${j.debUrl} gave nothing to install`);
+    staged.set(j.id, { url: j.debUrl, file: r.file });
+    return r.file;
+  };
+  const gone = (e) => /^gone:/.test(String(e?.message ?? e));
+  const clean = (e) => String(e?.message ?? e).replace(/^[a-z_]+: /, "");
+  const label = (j) => j.name || j.id;
+  const empty = () => parseSimulation("");
+  return {
+    async simulate(j) {
+      let r;
+      try {
+        let file = await fetchFor(j);
+        try {
+          r = await call("share.debSimulate", { file });
+        } catch (e) {
+          if (!gone(e)) throw e;
+          file = await fetchFor(j, true);
+          r = await call("share.debSimulate", { file });
+        }
+      } catch (e) {
+        discard(j.id);
+        return { ok: false, code: -1, plan: empty(), output: `E: ${label(j)}: ${clean(e)} (${j.debUrl})`,
+          issue: `Couldn't download ${label(j)} from ${j.debUrl}, where its source says it is: ${clean(e)}` };
+      }
+      if (r.package && r.package !== j.id) {
+        discard(j.id);
+        return { ok: false, code: -1, plan: empty(), output: r.output ?? "",
+          issue: `The link ${j.debUrl} gave ${r.package}, not ${label(j)}, so Cydian won't install it.` };
+      }
+      return { ok: Boolean(r.ok), code: r.code ?? (r.ok ? 0 : -1), plan: parseSimulation(r.stdout), output: r.output ?? "" };
+    },
+    async install(j, onEvent) {
+      onEvent?.({ fd: "status", line: `dlstatus:${j.id}:0:Downloading ${j.debUrl}` });
+      let file = await fetchFor(j);
+      const run = (f) => call("share.debInstall", { file: f, stream: Boolean(onEvent) }, onEvent);
+      let r;
+      try {
+        r = await run(file);
+      } catch (e) {
+        if (!gone(e)) { staged.delete(j.id); throw e; }
+        file = await fetchFor(j, true);
+        r = await run(file);
+      }
+      staged.delete(j.id); // install-deb's file is removed once it ran
+      return { code: r?.code ?? -1, stdout: r?.stdout ?? "", stderr: r?.stderr ?? "" };
     },
   };
 }

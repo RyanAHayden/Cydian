@@ -6,7 +6,7 @@
 //   #/sources/manage/io/paste            a text box for a pasted list; Next checks it
 //   #/sources/manage/io[/paste]/review   what an import found: new ones (ticked), already listed, can't add; Add
 //   #/sources/manage/recommended         core/recommended.js: sources as Sources draws them, a round Add on each
-//   #/sources/manage/recommended/<key>   one not added yet, read from its URL: its apps, and Add (F52)
+//   #/sources/manage/recommended/<key>   one not added yet, read from its URL: its apps (F52) or packages (F54), and Add
 //
 // Source keys always hold a ':' (deb:..., alt:...), so "manage" can't be one. The parsing, export text and order
 // live in core/sourcelist.js; the QR code in core/qr.js. A change here (add, delete, reorder) tells sources.js
@@ -15,12 +15,14 @@ import { grouped, plain, collapse } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showSheet } from "../nav/sheet.js";
 import { format } from "../router.js";
-import { getBackend } from "../backend.js";
+import { getBackend, getParser, getArch } from "../backend.js";
+import { repoLayout } from "../core/apt.js";
+import { packageList } from "./browse.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor } from "../core/sources.js";
 import { altRecord, parseSource } from "../core/altstore.js";
 import {
   exportText, clipboardText, parseImport, reviewImport, orderSources, loadOrder, saveOrder, recommendedRows, recommendedSeed,
-  EXPORT_FILENAME,
+  packagePreview, EXPORT_FILENAME,
 } from "../core/sourcelist.js";
 import { qrSvg } from "../core/qr.js";
 import { sourceWarning, warningAlert } from "../core/warnings.js";
@@ -605,8 +607,8 @@ async function renderRecommended(body, ctx) {
   });
 }
 
-// A recommended source before it is added: its apps as read from its URL (an AltStore source), or what it is
-// (a tweak repo, whose Packages only Refresh reads, after it is added). Add in the nav bar adds it and opens
+// A recommended source before it is added: its apps as read from its URL (an AltStore source), or its packages
+// by section (a tweak repo, F54: its Packages parsed in the worker). Add in the nav bar adds it and opens
 // its real page.
 async function previewRow(route) {
   const key = route.path[2];
@@ -628,12 +630,7 @@ async function renderPreview(body, route) {
   }
   const head = { header: row.label, rows: [{ label: row.subtitle, subtitle: row.rec.why }],
     footer: row.added ? "This source is in your list." : "Tap Add to put it in your Sources." };
-  if (row.rec.jailbreak) {
-    body.replaceChildren(grouped([head, { rows: [], footer: "A tweak repo: its packages show under Sources once it is "
-      + "added and refreshed." }]));
-    body.classList.add("manage-why");
-    return;
-  }
+  if (row.rec.jailbreak) return renderRepoPreview(body, route, row, head);
   body.replaceChildren(el("p", "empty", "Loading Source"));
   let p;
   try {
@@ -664,4 +661,67 @@ async function renderPreview(body, route) {
   });
   body.append(ul);
   body.classList.add("manage-why");
+}
+
+// ---- A tweak repo's preview (F54) -----------------------------------------------------------------------------
+// Its Packages, fetched as Refresh fetches it (backend.packages: .xz, .bz2, .gz or plain, decompressed off the page)
+// and parsed in the worker (core/parser.js), summed up by core/sourcelist.js packagePreview: the packages for this
+// iPhone's arch under Cydia's section names, in a virtualised list (nav/vlist.js via browse.js packageList), as
+// the Sources tab shows them once added. Rows don't open a package page: that needs the repo in the catalog, so
+// Add first. Read once per visit, like the AltStore previews.
+
+const repoPreviews = new Map(); // key -> Promise<{ total, sections }>
+
+async function loadRepoPreview(row) {
+  const arch = getArch();
+  const id = `${row.key} ${arch}`;
+  if (!repoPreviews.has(id)) {
+    const p = (async () => {
+      const layout = repoLayout(row.record, arch);
+      const stanzas = [];
+      let firstError = null;
+      for (const file of layout.packages) {
+        try {
+          const { text } = await getBackend().packages(file.slice(0, -"Packages".length));
+          stanzas.push(...(await getParser().packages(text, layout.root)));
+        } catch (e) {
+          firstError ??= e;
+        }
+      }
+      if (!stanzas.length && firstError) throw firstError;
+      return packagePreview(stanzas, arch);
+    })();
+    repoPreviews.set(id, p);
+    p.catch(() => repoPreviews.delete(id)); // a failed read is tried again next visit
+  }
+  return repoPreviews.get(id);
+}
+
+async function renderRepoPreview(body, route, row, head) {
+  body.classList.add("manage-why");
+  body.replaceChildren(grouped([head]), el("p", "empty", "Loading Packages"));
+  let preview;
+  try {
+    preview = await loadRepoPreview(row);
+  } catch (e) {
+    body.replaceChildren(grouped([head]), el("p", "empty", e?.message || String(e)));
+    return;
+  }
+  if (!body.isConnected) return;
+  const summary = { rows: [], footer: `${plural(preview.total, "package")} in ${plural(preview.sections.length, "section")}`
+    + (row.added ? "." : ". Add it to install them; its packages then show under Sources.") };
+  body.replaceChildren(grouped([head, summary]));
+  if (!preview.total) {
+    body.append(el("p", "empty", "No packages for this iPhone."));
+    return;
+  }
+  const items = preview.sections.flatMap((s) => [{ header: `${s.name} (${s.packages.length.toLocaleString()})` },
+    ...s.packages.map((p) => ({ ...p, version: "", section: s.name, key: row.key }))]);
+  const list = packageList(body, route, items, {
+    letters: false,
+    // Not in the catalog yet, so no package page to open.
+    decorate: (r) => { r._.a.removeAttribute("href"); r._.a.setAttribute("aria-disabled", "true"); },
+  });
+  list.el.classList.add("rec-packages");
+  body.append(list.el);
 }

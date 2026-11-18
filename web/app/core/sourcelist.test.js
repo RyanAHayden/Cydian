@@ -248,3 +248,29 @@ test("QR: zbarimg decodes the export of the default list", { skip: !zbar && "zba
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ---- F54: a tweak repo's preview -------------------------------------------------------------------------------
+
+test("packagePreview: this arch, visible, newest version, sections and names A to Z", async () => {
+  const { packagePreview } = await import("./sourcelist.js");
+  const { parsePackages } = await import("./apt.js");
+  const text = [
+    "Package: com.a.zeta\nName: Zeta\nVersion: 1.0\nArchitecture: iphoneos-arm64\nSection: Tweaks\nDescription: old\n",
+    "Package: com.a.zeta\nName: Zeta\nVersion: 1.2\nArchitecture: iphoneos-arm64\nSection: Tweaks\nDescription: new one\n long text\nIcon: icons/z.png\n",
+    "Package: com.a.alpha\nName: alpha\nVersion: 2\nArchitecture: all\nSection: Tweaks\nTag: cydia::commercial\n",
+    "Package: com.a.rootful\nName: Rootful\nVersion: 1\nArchitecture: iphoneos-arm\nSection: Tweaks\n",
+    "Package: com.a.lib\nVersion: 1\nArchitecture: iphoneos-arm64\nSection: Development\nTag: role::cydia\n",
+    "Package: com.a.theme\nName: Glass\nVersion: 1\nArchitecture: iphoneos-arm64\nSection: Themes_(SpringBoard)\n",
+    "Package: com.a.none\nName: Loose\nVersion: 1\nArchitecture: iphoneos-arm64\n",
+  ].join("\n");
+  const p = packagePreview(parsePackages(text, "https://repo.example/"), "iphoneos-arm64");
+  assert.equal(p.total, 4);
+  assert.deepEqual(p.sections.map((s) => s.name), ["(No Section)", "Themes (SpringBoard)", "Tweaks"]);
+  const tweaks = p.sections.at(-1).packages;
+  assert.deepEqual(tweaks.map((r) => r.name), ["alpha", "Zeta"]);
+  assert.equal(tweaks[0].paid, true);
+  assert.equal(tweaks[1].short, "new one");
+  assert.equal(tweaks[1].icon, "https://repo.example/icons/z.png");
+  assert.equal(packagePreview(parsePackages(text, null), "iphoneos-arm").total, 2); // rootful: Rootful and alpha (all), none of the arm64 ones
+  assert.deepEqual(packagePreview([], "iphoneos-arm64"), { total: 0, sections: [] });
+});

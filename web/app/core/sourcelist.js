@@ -14,6 +14,8 @@
 import { parseListFile, parseDeb822File } from "./aptsources.js";
 import { normalizeSourceUrl, sourceKey, sourceIcons, sourceSubtitle } from "./sources.js";
 import { sourceWarning } from "./warnings.js";
+import { description, matchesArch, compareVersions } from "./apt.js";
+import { sectionName, isVisible, compareNames } from "./catalog.js";
 import { altKey, isAltKey, normalizeAltUrl, looksLikeAltUrl, seedRecord } from "./altstore.js";
 
 export const EXPORT_FILENAME = "cydian-sources.txt";
@@ -245,4 +247,33 @@ export function recommendedRows(recs, sources, { jailbroken = true, previews = n
       count: typeof record.count === "number" ? record.count : null, added: Boolean(listed), input: recommendedInput(rec),
     };
   });
+}
+
+// ---- Tweak repo preview (F54) ----------------------------------------------------------------------------------
+//
+//   packagePreview(stanzas, arch) -> { total, sections: [{ name, packages: [{ id, name, short, icon, paid }] }] }
+//   What a tweak repo holds before it is added: its Packages parsed in the worker (core/parser.js packages), then
+//   kept as Cydia would list them: packages for this arch, visible ones only (no cydia::obsolete, enduser roles),
+//   one row per package (the newest version's name and description), grouped by Cydia's section names, sections
+//   and names A to Z.
+export function packagePreview(stanzas, arch) {
+  const newest = new Map();
+  for (const st of stanzas ?? []) {
+    if (!st?.package || (arch && !matchesArch(st, arch)) || !isVisible(st)) continue;
+    const had = newest.get(st.package);
+    if (!had || compareVersions(st.version ?? "", had.version ?? "") > 0) newest.set(st.package, st);
+  }
+  const bySection = new Map();
+  for (const st of newest.values()) {
+    const section = sectionName(st.section);
+    const tags = String(st.tag ?? "").split(",").map((t) => t.trim());
+    const row = { id: st.package, name: st.name || st.package, short: description(st).short, icon: st.iconUrl ?? null,
+      paid: tags.includes("cydia::commercial") };
+    if (!bySection.has(section)) bySection.set(section, []);
+    bySection.get(section).push(row);
+  }
+  const names = new Intl.Collator("en", { sensitivity: "base", numeric: true });
+  const sections = [...bySection].map(([name, packages]) => ({ name, packages: packages.sort(compareNames) }))
+    .sort((a, b) => names.compare(a.name, b.name));
+  return { total: newest.size, sections };
 }

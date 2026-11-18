@@ -21,3 +21,10 @@ Trimmed apt index files for `node --test` (`web/app/core/apt.test.js`). Taken fr
   pulled): newer, equal and older candidates, a `~` pre-release, an epoch bump on the second repo, a candidate for
   the wrong arch and one tagged `cydia::obsolete`, and candidates for packages that are only in config-files or
   not installed.
+
+## Signing
+
+- `missing-exe.ipa` (B21): `web/app/core/fixtures/signing/tiny-cydian.ipa` plus `YTUHD.bundle/` and
+  `Frameworks/Kit.framework/`, each with an XML Info.plist naming an executable (`YTUHD`, `Kit`) that isn't in the
+  IPA, as modded IPAs inject tweak bundles (YouMod). Signed by `native/test_sign.py` (the on-device signer) and
+  `web/app/websign-missing-exe.test.js` (zsign WebAssembly): both seal those files as resources of the app.

@@ -12,6 +12,7 @@ struct SignedApp {
     let version: String
     let removed: [String]     // what was left out (extensions an explicit profile can't cover, leftovers)
     var fixedArm64e: [String] = [] // binaries whose old-ABI arm64e slice was fixed up (F14, SignOptions.swift)
+    var skipped: [String] = []     // B21: nested bundles whose executable is missing, sealed as resources
 }
 
 final class IPASigner {
@@ -20,6 +21,8 @@ final class IPASigner {
     var time = Date()
     var maxMachO: UInt64 = 1 << 31   // a single binary held in memory while it's signed
     var options = SignOptions()      // the user's edits (F14): name, bundle ID, icon, extensions left out
+    // What signing skipped and why (B21), a line each; on the phone the device log, as the shell's other notes.
+    var log: (String) -> Void = { NSLog("\(Brand.name): " + $0.replacingOccurrences(of: "%", with: "%%")) }
 
     init(profile: Profile, identity: SigningIdentity) {
         self.profile = profile
@@ -67,6 +70,8 @@ final class IPASigner {
 
         // Bundles: any folder under the app with its own Info.plist and an executable.
         var bundles = [String: BundleInfo]()
+        var skipped = [String]()
+        let names = Set(zip.entries.map(\.name))
         for e in zip.entries where e.name.hasPrefix(appDir) && e.name.hasSuffix("/Info.plist") && !dropped(e.name) {
             let dir = String(e.name.dropLast("Info.plist".count))
             let ext = dir.dropLast().split(separator: ".").last ?? ""
@@ -76,6 +81,15 @@ final class IPASigner {
             guard let pl = try? PropertyListSerialization.propertyList(from: try zip.data(e, limit: 16 << 20), format: &format) as? [String: Any]
             else { if dir == appDir { throw SignError("bad_ipa", "The app's Info.plist can't be read.") }; continue }
             if dir != appDir && pl["CFBundleExecutable"] == nil { continue } // a resource bundle: sealed as files
+            // B21: a nested bundle naming an executable that isn't there (a tweak's .bundle in a modded IPA, YouMod's
+            // YTUHD.bundle) has nothing to sign: sealed as files like a resource bundle, as zsign and Feather do.
+            // The app's own executable missing stays an error (below).
+            if dir != appDir, let exe = pl["CFBundleExecutable"] as? String, !names.contains(dir + exe) {
+                let rel = String(dir.dropFirst(appDir.count).dropLast())
+                skipped.append(rel)
+                log("Skipped \(rel): its executable \(exe) is missing, sealed as resources")
+                continue
+            }
             bundles[dir] = BundleInfo(dir: dir, plist: pl, format: format)
         }
         guard var main = bundles[appDir], let oldID = main.plist["CFBundleIdentifier"] as? String else {
@@ -221,7 +235,7 @@ final class IPASigner {
         return SignedApp(bundleID: newID, originalBundleID: oldID,
                          name: main.plist["CFBundleDisplayName"] as? String ?? main.plist["CFBundleName"] as? String ?? "",
                          version: main.plist["CFBundleShortVersionString"] as? String ?? main.plist["CFBundleVersion"] as? String ?? "",
-                         removed: removed.sorted(), fixedArm64e: fixedArm64e.sorted())
+                         removed: removed.sorted(), fixedArm64e: fixedArm64e.sorted(), skipped: skipped.sorted())
     }
 
     private func newPaths(_ files: [String: File], _ order: [String]) -> [String] {

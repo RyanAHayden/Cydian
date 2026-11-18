@@ -149,15 +149,26 @@ export function signSheetButtons({ right, box, onInstall, onCancel, doc = docume
 // signing.progress {bundleId}: iOS's own progress on the HUD until it says installed (or gives up), then it goes.
 // F155: on the progress page (a HUD with finish, nav/progress.js progressHUD) an installed app ends it on
 // "Open <name>" instead (signing.openApp; Close at the top right still just closes).
+const FOLLOW_AGAIN = 3; // B27: signing.progress calls again after one ended mid-install
+
 export async function followInstall(native, bundleId, h, { later = setTimeout, name = "" } = {}) {
   if (!bundleId) { later(h.hide, 2500); return null; }
   let r = null;
-  try {
-    r = await native.call("signing.progress", { bundleId }, (ev) => {
-      const pct = Math.round(Number(ev?.progress) * 100);
-      h.set(pct > 0 && pct < 100 ? `Installing ${pct}%` : "Installing");
-    });
-  } catch { /* an older shell, or the private API gone: the HUD just goes */ }
+  // B27: the shell's watch answers {installed: false} as soon as one look finds no install progress, which iOS
+  // gives between its stages (user 2026-11-18: the page said Complete over "Installing 72%"). An answer that came
+  // while the percent was still under 100 isn't the end: follow it again (a few times; a round that sees no more
+  // progress ends it as before).
+  for (let round = 0; ; round++) {
+    let mid = false;
+    try {
+      r = await native.call("signing.progress", { bundleId }, (ev) => {
+        const pct = Math.round(Number(ev?.progress) * 100);
+        mid = pct > 0 && pct < 100;
+        h.set(mid ? `Installing ${pct}%` : "Installing");
+      });
+    } catch { r = null; /* an older shell, or the private API gone: the HUD just goes */ }
+    if (!mid || r?.installed === true || round >= FOLLOW_AGAIN) break;
+  }
   if (r?.installed === true && typeof h.finish === "function") {
     h.set("Installed");
     h.finish({ label: openLabel(name), status: "Installed", action: () => openInstalled(native, bundleId) });

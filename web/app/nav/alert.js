@@ -8,7 +8,9 @@
 // Resolves with the tapped button's index and the field's text. Return in the field taps the last button,
 // Escape taps `cancel`. All text goes in through textContent. `stacked` stacks two buttons whose titles don't fit
 // side by side, as UIAlertView does (F63's Keep My Old Copy / Accept The New Copy).
-export function showAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false } = {}) {
+// F96: `countdown: { button, seconds }` greys that button out for `seconds`, its title counting down ("I Understand
+// (5)"), before it can be tapped.
+export function showAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "alert-scrim";
@@ -58,6 +60,17 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
       row.append(b);
     });
     box.append(row);
+    let tick = null;
+    if (countdown && row.children[countdown.button]) {
+      const b = row.children[countdown.button];
+      let left = Math.max(0, Math.ceil(countdown.seconds ?? 5));
+      const draw = () => {
+        b.disabled = left > 0;
+        b.textContent = left > 0 ? `${buttons[countdown.button]} (${left})` : buttons[countdown.button];
+      };
+      draw();
+      if (left > 0) tick = setInterval(() => { left -= 1; draw(); if (left <= 0) { clearInterval(tick); tick = null; } }, 1000);
+    }
     scrim.append(box);
     document.body.append(scrim);
     // Two buttons whose titles don't fit side by side stack, as UIAlertView does with long titles (user 2026-11-18:
@@ -98,12 +111,13 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
       { transform: "scale(1.02)", offset: 0.8 },
       { transform: "scale(1)" },
     ], { duration: 360, easing: "ease-out" });
-    (field || row.lastChild).focus({ preventScroll: true });
+    (field || [...row.children].reverse().find((b) => !b.disabled) || row.lastChild).focus({ preventScroll: true });
 
     let done = false;
     function close(index) {
       if (done) return;
       done = true;
+      if (tick) clearInterval(tick);
       document.removeEventListener("keydown", onKey);
       if (vv) { vv.removeEventListener("resize", fit); vv.removeEventListener("scroll", fit); }
       const value = field ? field.value : undefined;

@@ -17,7 +17,8 @@ import { compat } from "../core/compat.js";
 import { currentDevice, compatBadge } from "../device.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall, onAppsChange } from "../core/installed.js";
-import { signAndInstall, localSigning } from "../signing-client.js";
+import { signAndInstall, localSigning, isSelfIpa } from "../signing-client.js";
+import { siteGateRows, markCydianInstalled, websiteInstallsOn, SITE_GATE_FOOTER } from "../websign-gate.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { setSourceShare } from "./handoff.js";
@@ -94,9 +95,13 @@ function card(children, cls = "") {
 // F81: where the phone signs (the sideload app), any version with an IPA also gets "Custom Install": the look-first
 // sheet (signing-sheet.js customInstall) to change the bundle ID, name or icon, or leave extensions out. `custom`
 // overrides whether it shows, `customize` what it runs (tests; F84: the app page's appPageCustom, which queues).
+// F96: on the website any app but Cydian gets websign-gate.js's rows instead (Install in Cydian, Download IPA, then
+// Install on the Website behind its warning); `appId` is the app's package id for the cydian:// link (else the page's
+// hash), `gate` makes the rows (tests).
 export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {},
   queue = null, name = "", { custom = localSigning() && !ipaInstallAvailable(), customize = null, jailbreak = ipaInstallAvailable(),
-    ipaInstall = openIpaInstall, site = detectMode() === "site", needsCertificate = siteCertificateAlert } = {}) {
+    ipaInstall = openIpaInstall, site = detectMode() === "site", needsCertificate = siteCertificateAlert, appId = null,
+    gate = siteGateRows } = {}) {
   const o = installOptions(version, sourceUrl);
   const rows = [];
   if (o.download && jailbreak) {
@@ -105,11 +110,15 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
       onClick: () => ipaInstall({ url: o.download, name, onInstalled: () => onInstall() }) });
   } else if (o.itms) {
     rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
+  } else if (o.download && site && !isSelfIpa(o.download)) {
+    // F96: other apps go to Cydian first; Install on the Website (F93's browser signing) waits for the warning.
+    const install = () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() });
+    return { rows: gate({ id: appId, install, download: downloadRow(o.download, opener) }), options: o, gated: true };
   } else if (o.download && site) {
     // F93: Install signs in the browser with the certificate in Settings > Signing (signing-client.js
-    // signInBrowser). F92: no hand-offs follow it.
+    // signInBrowser). F92: no hand-offs follow it. F96: Cydian itself always installs from the website.
     rows.push({ label: "Install", subtitle: SITE_INSTALL_SUBTITLE,
-      onClick: () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() }) });
+      onClick: () => signAndInstall({ url: o.download, name, onInstalled: () => { markCydianInstalled(); onInstall(); } }) });
   } else if (o.download) {
     const direct = () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() });
     rows.push({ label: "Install", subtitle: "Signed with your certificate",
@@ -120,9 +129,11 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
     rows.push({ label: "Custom Install", subtitle: "Bundle ID, name, icon, extensions",
       onClick: () => run({ url: o.download, name, onInstalled: () => onInstall() }) });
   }
-  if (o.download) rows.push({ label: "Download IPA", subtitle: decodeURIComponent(o.download.split("/").pop() || ""), onClick: () => opener(o.download) });
+  if (o.download) rows.push(downloadRow(o.download, opener));
   return { rows, options: o };
 }
+
+const downloadRow = (url, opener) => ({ label: "Download IPA", subtitle: decodeURIComponent(url.split("/").pop() || ""), onClick: () => opener(url) });
 
 // ---- the source page -------------------------------------------------------------------------------------------
 
@@ -333,7 +344,9 @@ async function siteInstallVersion(pkg, v, source) {
   const app = pkg.stanza.ipa;
   const record = () => apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: v.version, key: pkg.key,
     source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
-  const first = installRows(v, app.sourceUrl, undefined, record, null, app.name).rows[0];
+  const { rows, gated } = installRows(v, app.sourceUrl, undefined, record, null, app.name, { appId: pkg.row?.id ?? pkg.stanza.package });
+  // F96: once website installs are accepted the downgrade signs here; until then it's Install in Cydian.
+  const first = gated && websiteInstallsOn() ? rows.find((r) => r.label === "Install on the Website") : rows[0];
   if (first && first.label !== "Download IPA") return first.onClick();
 }
 
@@ -447,10 +460,11 @@ export function renderApp(body, route, pkg, source) {
       source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
   };
   const queued = detectMode() !== "jailbreak"; // the app queue (F80) and Custom Install (F84) aren't in the jailbreak build
-  const { rows, options } = installRows(v, app.sourceUrl, undefined, record, queued ? () => appPageAction(pkg, source) : null, app.name,
-    queued ? { customize: (o) => appPageCustom(pkg, source, o) } : undefined);
+  const { rows, options, gated } = installRows(v, app.sourceUrl, undefined, record, queued ? () => appPageAction(pkg, source) : null, app.name,
+    { ...(queued ? { customize: (o) => appPageCustom(pkg, source, o) } : {}), appId: pkg.row?.id ?? st.package ?? app.bundleIdentifier });
   body.append(grouped([{ header: "Install", rows,
-    footer: options.download && ipaInstallAvailable() ? IPA_FOOTER
+    footer: gated ? SITE_GATE_FOOTER
+      : options.download && ipaInstallAvailable() ? IPA_FOOTER
       : options.itms ? "Installs over the air with the source's signed link."
       : localSigning() ? "Install queues it and opens Confirm, which signs it with your own certificate (Settings > Signing) and installs it. Custom Install first lets you change its bundle ID, name, icon or extensions. Download IPA keeps the file."
       : options.download ? SITE_INSTALL_FOOTER : null }]));

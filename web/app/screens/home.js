@@ -26,6 +26,7 @@ import { homeFeatured } from "./extras.js";
 import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 import { refreshInBackground } from "./sources.js";
+import { promptFirstVisit, markCydianInstalled } from "../websign-gate.js";
 import { GUIDES, guideRows, JAILBREAK_INFO_URL } from "./guides.js";
 
 const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
@@ -67,10 +68,19 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
 // F93 (as before F89): Install Cydian App on the website, Not Jailbroken: with a certificate in Settings > Signing,
 // Cydian's IPA signed in the browser and installed, carrying the certificate (Bring My Certificate), sources and
 // settings into its first launch; without one, Settings > Signing first. -> "install" | "signing"
-export async function installApp({ ready = signingReady, install = signAndInstall, bring = getBring, go = (h) => { location.hash = h; } } = {}) {
+// F96: once iOS was asked to install it, the website stops asking "Install Cydian First" (websign-gate.js).
+export async function installApp({ ready = signingReady, install = signAndInstall, bring = getBring, go = (h) => { location.hash = h; },
+  installed = markCydianInstalled } = {}) {
   if (!(await ready())) { go(format({ tab: "settings", path: ["signing"] }).replace(/^#/, "")); return "signing"; }
-  install({ url: APP_IPA_URL, name: APP_NAME, bring: bring() });
+  install({ url: APP_IPA_URL, name: APP_NAME, bring: bring(), onInstalled: () => installed() });
   return "install";
+}
+
+// F96: Home's Install Cydian App tile's action, also the first-visit prompt's Install Cydian: Not Jailbroken, signed
+// in the browser (installApp); jailbroken, the .deb for the device's arch (installDeb).
+export function installCydian({ offer = homeOffer({ mode: settings.mode, deviceType: settings.deviceType() }) } = {}) {
+  if (!offer) return null;
+  return offer.action === "deb" ? installDeb(offer.arch) : installApp();
 }
 
 // Home's Signing tile (Settings > Signing) where something signs: the sideload app and, F93, the website (in the
@@ -229,6 +239,8 @@ const state = { tile: null, seq: 0, redraw: null };
 export function init() {
   // Sources tells when a refresh starts and each time one ends (screens/sources.js markLoading): repaint the tile.
   globalThis.addEventListener?.("cydian:refreshing", () => refreshState());
+  // F96: on the website, "Install Cydian First" at launch until Cydian is installed or the user says Not Now.
+  if (settings.mode === "site" && globalThis.document) setTimeout(() => { promptFirstVisit({ mode: settings.mode, install: installCydian }); }, 600);
   // The root page stays in the stack while other tabs add or remove sources: look again whenever Home shows.
   globalThis.addEventListener?.("hashchange", () => {
     if (/^#\/home\/?$/.test(globalThis.location.hash)) refreshState();
@@ -388,8 +400,7 @@ function renderRoot(body) {
     e.preventDefault();
     e.stopImmediatePropagation();
     if (!offer) return;
-    if (offer.action === "deb") installDeb(offer.arch);
-    else installApp();
+    installCydian({ offer });
   }, true);
   // F75: Send Settings (Open in Cydian App), the split button's right half (the website, not jailbroken).
   const openRow = sendTile;
@@ -658,5 +669,5 @@ async function installDeb(arch) {
   try { release = await fetchRelease(); } catch { /* the plain rootless .deb below */ }
   const url = debUrl(arch, { release, debFor });
   const { index } = await showAlert(debAlert(arch, url));
-  if (url && index === 1) location.href = url;
+  if (url && index === 1) { markCydianInstalled(); location.href = url; } // F96: its download is as far as the website sees
 }

@@ -48,6 +48,9 @@
 .alert-button:active, .alert-button.is-pressed {
   background: linear-gradient(#6d7da3, #3c4e7d 49%, #22325e 51%, #2f3f6c); background-origin: border-box;
 }
+/* F96: a button held back by a countdown (showAlert's `countdown`): greyed out, not pressable, until it ends. */
+.alert-button:disabled { cursor: default; color: rgba(255,255,255,.45); text-shadow: none;
+  background: linear-gradient(#b4b9c8, #5f6882 49%, #596484 51%, #4d597a); background-origin: border-box; }
 
 /* ---- Done: "Button (Gloss Blue)" ---- */
 .bar-button.done {

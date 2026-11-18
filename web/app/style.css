@@ -30,6 +30,11 @@ a, img { -webkit-user-drag: none; }
 .nav-left { justify-self: start; min-width: 0; max-width: calc(100% - 8px); display: flex; } /* room before the title (not on the button: a % of a shrink-to-fit box truncated every label) */ /* capped to its column: a long Back label ends in "…" */
 .nav-right { justify-self: end; min-width: 0; max-width: 100%; display: flex; gap: 5px; }
 .nav-title { margin: 0; max-width: calc(100vw - 180px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* F210: an icon left of the page's own right button (nav/navbar.js addNavIcon): drawn first, but after it in the DOM.
+   The title's cap leaves both (equal) side columns room for the icon, 5px and a "Reinstall" button (34+5+70+2x9). */
+.nav-right > .nav-icon-left { order: 1; flex: none; }
+.nav-right > .nav-after-icon { order: 2; }
+.nav-item.has-nav-icon .nav-title { max-width: calc(100vw - 240px); }
 
 /* Screens: one .tab-stack per tab, its .pages stacked root first; each page scrolls on its own. */
 #screens { position: fixed; inset: 0; z-index: 1; overflow: hidden; }

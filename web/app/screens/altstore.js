@@ -39,7 +39,10 @@ import { needsCheck, savedInfo, withIpaInfo, checkIpa, ipaInfoUrl } from "../cor
 import { PUBLIC_SITE } from "../core/handoff.js";
 import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText,
   storeTrackId, storeReviews, reviewsFeedUrl, workerReviewsUrl } from "../core/applookup.js";
-import { NAME } from "../brand.js";
+import { NAME, BUNDLE_ID } from "../brand.js";
+import { addNavIcon } from "../nav/navbar.js";
+import { haptic } from "../nav/haptic.js";
+import { showHUD } from "../nav/hud.js";
 
 function img(url, cls) {
   const src = mediaUrl(url);
@@ -278,6 +281,67 @@ function trackingSection(app, pkg, source) {
     if (e.type === "clearAll" || e.id === app.bundleIdentifier || e.job?.id === app.bundleIdentifier) draw();
   });
   return box;
+}
+
+// ---- F210: the nav bar's one-tap Installed toggle, left of Install / Modify ----------------------------------------
+// Not installed: an outline circled checkmark; a tap marks the app installed at the source's latest version (the record
+// trackingSection's Mark as Installed writes, no version picker). Installed (by iFizBox or marked): filled; a tap
+// forgets it (removeInstall, as Mark as Not Installed). No sheet: a haptic tick and a HUD, and the Installed section,
+// the nav label and Changes follow through onAppsChange. Hidden for iFizBox's own app and an app with nothing to mark.
+export const MARK_INSTALLED_LABEL = "Mark as Installed";
+export const MARK_NOT_INSTALLED_LABEL = "Mark as Not Installed";
+
+const markRecordOf = (app, pkg, source, version) => ({ id: app.bundleIdentifier, name: app.name, version, key: pkg?.key ?? null,
+  source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL });
+
+export function markToggleApplies(app) {
+  const id = String(app?.bundleIdentifier ?? "");
+  if (!id || !app.versions?.some((x) => x?.version)) return false;
+  if (id === BUNDLE_ID || id.startsWith(`${BUNDLE_ID}.`)) return false; // iFizBox itself: always listed as it is
+  return !app.versions.some((x) => isSelfIpa(x?.downloadURL));
+}
+
+async function markedRecord(app, store) {
+  try { return (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { return null; }
+}
+
+// One tap's work: true when the app is now marked installed, false when it was forgotten.
+export async function toggleMarked(app, pkg, source, { store = apps } = {}) {
+  const s = await store();
+  if ((await s.all()).some((r) => r.id === app.bundleIdentifier)) {
+    await removeInstall(s, app.bundleIdentifier);
+    return false;
+  }
+  await recordInstall(s, markRecordOf(app, pkg, source, app.versions.map((x) => x.version).find(Boolean) ?? ""));
+  return true;
+}
+
+const markFeedback = (text) => showHUD("").done(text, 900);
+
+// The button. `refresh()` redraws it from the record (renderApp calls it on every onAppsChange).
+export function markToggle(app, pkg, source, { store = apps, buzz = haptic, feedback = markFeedback } = {}) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "bar-button bar-icon mark-toggle";
+  const show = (on) => {
+    b.classList.toggle("is-marked", on);
+    b.setAttribute("aria-label", on ? MARK_NOT_INSTALLED_LABEL : MARK_INSTALLED_LABEL);
+  };
+  show(false);
+  let busy = false;
+  b.addEventListener("click", async () => {
+    if (busy) return;
+    busy = true;
+    try { buzz(); } catch { /* no haptics here */ }
+    try {
+      const on = await toggleMarked(app, pkg, source, { store });
+      show(on);
+      feedback(on ? "Marked as Installed" : "Marked as Not Installed");
+    } catch { /* no store: nothing changed */ } finally { busy = false; }
+  });
+  b.refresh = async () => show(Boolean(await markedRecord(app, store)));
+  b.refreshed = b.refresh();
+  return b;
 }
 
 // F80: the app page's nav button (browse.js packageActions) and its Install row, where the phone signs (the sideload
@@ -588,6 +652,12 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.
   // F88: in the jailbreak app too (an IPA installed by another tool, or before iFizBox recorded installs).
   details.append(trackingSection(app, pkg, source));
+  // F210: and the same in one tap from the nav bar.
+  if (markToggleApplies(app)) {
+    const toggle = markToggle(app, pkg, source);
+    if (!addNavIcon(body, toggle, "mark")) setTimeout(() => addNavIcon(body, toggle, "mark"), 0);
+    const offMark = onAppsChange(() => { if (body.isConnected && toggle.isConnected) toggle.refresh(); else offMark(); });
+  }
 
   if (needsCheck(v) && !keptInfo) {
     const bundleId = appBundleId(app, pkg.row?.id);

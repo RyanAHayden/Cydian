@@ -1,0 +1,34 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<base href="../../web/app/">
+<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="ios6.css"><link rel="stylesheet" href="altstore.css">
+<style>
+ .row { position: relative; height: 44px; margin-bottom: 8px; }
+ .row .nav-item { visibility: visible; }
+ .row.navbar { position: relative; }
+</style></head>
+<body style="margin:0;background:#c5ccd4">
+<script>
+const rows = [
+  ["Featured", "Delta", "Install", false],
+  ["Featured", "Delta", "Reinstall", true],
+  ["AltStore Source", "Provenance Emulator Long Name", "Install", false],
+  ["AltStore Source", "Provenance Emulator Long Name", "Reinstall", true],
+  ["Back", "No toggle (before)", "Install", null],
+];
+for (const [back, title, label, marked] of rows) {
+  const bar = document.createElement("div"); bar.className = "row navbar";
+  bar.style.height = "44px";
+  const item = document.createElement("div"); item.className = "nav-item";
+  item.innerHTML = `<div class="nav-left"><button class="bar-button back">${back}</button></div><h1 class="nav-title">${title}</h1><div class="nav-right"><button class="bar-button">${label}</button></div>`;
+  if (marked !== null) {
+    const b = document.createElement("button");
+    b.className = "bar-button bar-icon mark-toggle nav-icon-left" + (marked ? " is-marked" : "");
+    item.querySelector(".nav-right .bar-button").classList.add("nav-after-icon");
+    item.querySelector(".nav-right").append(b);
+    item.classList.add("has-nav-icon");
+  }
+  bar.append(item); document.body.append(bar);
+}
+</script>
+</body></html>

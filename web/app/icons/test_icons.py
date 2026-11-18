@@ -17,6 +17,9 @@ SIZES = {
     HERE / "icon-web-192.png": 192,
     HERE / "icon-web-512.png": 512,
     HERE / "icon-web-1024.png": 1024,
+    HERE / "icon-web-glossy-76.png": 76,
+    HERE / "icon-web-glossy-152.png": 152,
+    HERE / "icon-web-glossy-228.png": 228,
     HERE / "icon-glossy-76.png": 76,
     HERE / "icon-glossy-152.png": 152,
     HERE / "icon-glossy-228.png": 228,
@@ -68,7 +71,10 @@ class Icons(unittest.TestCase):
         for s in srcs:
             self.assertTrue((app / s).is_file(), s)
         self.assertIn('href="icons/icon-web-180.png?v=', (app / "index.html").read_text())
-        self.assertIn('"icons/icon-glossy-76.png"', (app / "screens/home.js").read_text())  # Home header: 1x/2x/3x PNGs
+        home = (app / "screens/home.js").read_text()  # Home header: 1x/2x/3x PNGs, the WEB one on the website
+        self.assertIn('"icon-glossy" : "icon-web-glossy"', home)
+        self.assertNotIn("(Web)", home)
+        self.assertIn('rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png', (app / "index.html").read_text())
 
     def test_ipa_takes_the_lite_icon(self):
         # The sideload IPA has the LITE sash; the .deb keeps the plain icon (native/build.sh bundle()).

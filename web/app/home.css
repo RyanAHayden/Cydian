@@ -20,7 +20,6 @@ html[data-theme="dark"] .home {
 .home-icon { flex: none; width: 76px; height: 76px; border-radius: 13px; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
 .home-words { min-width: 0; }
 .home-title { margin: 0; font-size: 21px; font-weight: normal; line-height: 26px; color: var(--text); text-shadow: var(--emboss); }
-.home-title-web { margin-left: 6px; font-size: 15px; color: var(--subtitle, #7d8590); }
 .home-by { margin: 2px 0 0; font-size: 17px; line-height: 21px; color: var(--text); text-shadow: var(--emboss); }
 .home-by a { color: var(--by); font-weight: bold; text-decoration: none; }
 .home-nod { margin-top: 0; font-size: 15px; line-height: 19px; }

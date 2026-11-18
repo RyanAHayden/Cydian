@@ -331,14 +331,14 @@ function renderRoot(body) {
   const home = el("div", "home");
   const head = el("div", "home-head");
   const icon = el("img", "home-icon");
-  icon.src = "icons/icon-glossy-76.png";
-  icon.srcset = "icons/icon-glossy-76.png 1x, icons/icon-glossy-152.png 2x, icons/icon-glossy-228.png 3x";
+  // The website shows its WEB icon (the home-screen one), so it's never taken for the app (user 2026-11-18).
+  const g = globalThis.cydianNative ? "icon-glossy" : "icon-web-glossy";
+  icon.src = `icons/${g}-76.png`;
+  icon.srcset = `icons/${g}-76.png 1x, icons/${g}-152.png 2x, icons/${g}-228.png 3x`;
   icon.width = icon.height = 76;
   icon.alt = "";
   const words = el("div", "home-words");
   const title = el("h2", "home-title", "Welcome to Cydian");
-  // The website says so beside it, greyed, so it's never taken for the app (user 2026-11-18).
-  if (!globalThis.cydianNative) title.append(el("span", "home-title-web", "(Web)"));
   words.append(title);
   const by = el("p", "home-by", "by ");
   const who = el("a", null, "Ryan Hayden (Fizlo)"); // as Cydia's "Jay Freeman (saurik)"

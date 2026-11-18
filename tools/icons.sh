@@ -10,6 +10,7 @@
 #   native/icon/AppIcon60x60{,@2x,@3x}.png  the jailbreak app's home-screen icon (60/120/180), flat
 #   web/app/icons/icon-web-{180,192,512,1024}.png  the website's home-screen icon (apple-touch-icon, manifest): a
 #                                       blue WEB sash across the top-right corner, so it isn't taken for the app
+#   web/app/icons/icon-web-glossy-{76,152,228}.png  the WEB icon with iOS 6 corners, for the website's Home header
 #   native/icon/AppIconLite60x60{@2x,@3x}.png  the sideload IPA's icon: a red LITE sash, as old trial apps had (the
 #                                       .deb keeps the plain one; native/build.sh picks)
 #
@@ -79,6 +80,16 @@ trap 'rm -f "$bg" "$web" "$lite"' EXIT
 sashed WEB '#5b95e5' '#1d58b8' > "$web"
 sashed LITE '#ef4b3f' '#b3170f' > "$lite"
 for n in 180 192 512 1024; do png "$web" "$n" "$dir/icon-web-$n.png"; done
+# The website's Home header shows the WEB icon too, glossy (iOS 6 corners) like icon-glossy-*.png.
+webg=$(mktemp --suffix=.svg)
+trap 'rm -f "$bg" "$web" "$lite" "$webg"' EXIT
+{
+  echo '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">'
+  echo '<defs><clipPath id="ios6-mask"><rect width="1024" height="1024" rx="180" ry="180"/></clipPath></defs><g clip-path="url(#ios6-mask)">'
+  perl -0pe 's/^.*?<svg[^>]*>\n//s; s/<\/svg>.*//s' "$web"
+  echo '</g></svg>'
+} > "$webg"
+for n in 76 152 228; do png "$webg" "$n" "$dir/icon-web-glossy-$n.png"; done
 png "$lite" 120 native/icon/AppIconLite60x60@2x.png
 png "$lite" 180 native/icon/AppIconLite60x60@3x.png
 

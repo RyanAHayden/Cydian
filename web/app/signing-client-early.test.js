@@ -142,3 +142,23 @@ test("reserveUpload and uploadSigned with a token", async () => {
   await uploadSigned(new Uint8Array([0x50, 0x4b, 1]), { bundleId: "com.a" }, { fetcher: srv.fetcher, token: "d".repeat(48) });
   assert.equal(srv.calls.find((c) => "size" in c.q).q.token, "d".repeat(48));
 });
+
+test("F132: a slow sign/upload still lands in the early link for minutes (iOS retries app.ipa 5+ minutes): no alert", async () => {
+  assert.ok(EARLY_WINDOW >= 5 * 60 * 1000 && EARLY_WINDOW <= 10 * 60 * 1000, String(EARLY_WINDOW)); // R14's retries; the upload TTL
+  for (const late of [111 * 1000, 5 * 60 * 1000, EARLY_WINDOW - 1]) {
+    let calls = 0;
+    const srv = fakeServer();
+    const { d, log } = deps(idFor("com.you.*"), { fetcher: srv.fetcher, clock: () => (calls++ ? late : 0) });
+    assert.equal(await signInBrowser({ url: SELF, name: "Cydian" }, d), true);
+    assert.deepEqual(log.alerts, [], `alert after ${late} ms`);
+    assert.equal(log.opened.length, 1);
+    assert.equal(log.hud.at(-1), "done Installing");
+  }
+  // at the window: Ready to Install, opening the same link again
+  let calls = 0;
+  const srv = fakeServer();
+  const { d, log } = deps(idFor("com.you.*"), { fetcher: srv.fetcher, clock: () => (calls++ ? EARLY_WINDOW : 0) });
+  assert.equal(await signInBrowser({ url: SELF, name: "Cydian" }, d), true);
+  assert.deepEqual(log.alerts, ["Ready to Install"]);
+  assert.equal(log.opened.length, 2);
+});

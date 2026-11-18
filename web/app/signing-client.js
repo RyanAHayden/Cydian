@@ -436,7 +436,10 @@ export async function uploadSigned(bytes, { bundleId, name, version }, { base = 
 // app whose own ID is known (Cydian's, or the caller's bundleId). Otherwise, and whenever the early link can't be
 // used (another bundle ID came out, the reservation failed, it took too long), the Ready to Install alert as before.
 
-export const EARLY_WINDOW = 110 * 1000; // under the Worker's 2-minute app.ipa wait (worker/src/index.js IPA_WAIT)
+// F132: iOS's installer retries a held app.ipa for at least 5 minutes (R14, docs/signing.md: HEAD 30 s, HEAD 30 s,
+// GET 60 s, then HEAD/GET pairs), each request held up to the Worker's IPA_WAIT; so the early link stays good for
+// about the upload's TTL (600 s from the reservation, worker/src/index.js), with room to spare. Past it, the alert.
+export const EARLY_WINDOW = 8 * 60 * 1000;
 
 // The bundle ID `id`'s profile signs this app as, when it's known before signing; else null.
 export function expectedBundleId(id, { url = "", bundleId = null } = {}) {

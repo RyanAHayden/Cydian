@@ -36,15 +36,20 @@ export async function openIpaInstall({ url, name = "", onInstalled = () => {}, n
   const title = name || ipaName(url);
   const page = openProgress();
   page.onClose(() => { running = false; });
+  // F188: Cancel at the top right from the first line to the end (Done once it has ended): it stops the run and the
+  // page closes, back where Install was tapped.
+  const ctl = new AbortController();
+  page.stoppable?.(() => ctl.abort());
   const view = {
     line(type, text) { page.line(type === "status" ? "step" : type === "info" ? "raw" : type, text); },
     status(text) { page.status(text); },
     progress(pct) { page.progress(pct); },
   };
 
-  const r = await runIpaInstall({ url, name: title }, view, native ? { native } : undefined);
+  const r = await runIpaInstall({ url, name: title }, view, { ...(native ? { native } : {}), signal: ctl.signal });
   runLogs.add({ title: `Install ${title}`, jobs: [{ op: "install", id: r.bundleId || url, version: null, mode: "ipa" }],
     code: r.ok ? 0 : -1, text: r.log });
+  if (r.cancelled) return r;
   if (r.ok) { try { onInstalled(r); } catch { /* the record is a nicety */ } }
 
   const backend = getBackend();

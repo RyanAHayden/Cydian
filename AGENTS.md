@@ -20,8 +20,9 @@ Shortcuts recipes live in `docs/shortcuts.md`.
 
 - Gate: `tools/check.sh` (every `test_*.py`). It must pass before `done`. Add the `native/` builds (jailbreak and
   sideload) to it once they exist.
-- Python: stdlib first (`bz2`, `lzma`, `gzip`, `email`-style parsing), then what `web/requirements.txt` already
-  has. Ask in the journal before adding a dependency.
+- Python: stdlib only (`bz2`, `lzma`, `gzip`, `email`-style parsing); the gate needs no pip packages. Local
+  reference tools (`tools/themecmp.py`, `tools/kitmatch.py`) may use Pillow/numpy. Ask in the journal before
+  adding a dependency.
 - Look and feel: **iOS 6 is the base style, 100%**. iOS 5 elements only where the user asks for one. Source of
   truth: the Teehan+Lax GUI PSDs, converted in `ref/teehanlax/ios6/` (and `ios5/`): `sheet.svg` (vector, layer
   names as `<title>`), `original-2x.png` (Photoshop's composite), `img/` (bitmaps) and `img-hd/` (bitmaps upscaled

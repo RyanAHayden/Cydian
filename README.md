@@ -28,15 +28,17 @@ cydian.dev is a single Cloudflare Worker, with no server of our own:
 
 - the website: `web/app/` as static assets, revalidated on every load (a phone never keeps an old file);
 - `/api/fetch`: the website's fetch proxy (APT and AltStore sources don't let a page read them);
-- `/sign/manifest`, `/sign/host`: what iOS needs when the app signs on the phone (also at sign.cydian.dev).
+- `/sign/manifest`, `/sign/host`: what iOS needs when the app signs on the phone (also at sign.cydian.dev);
+- `/sign/upload`: holds an app the website signed in the browser for iOS's install prompt (F93).
 
 Deploys: Cloudflare builds every push to `main` itself (Workers Builds, connected to this repo; deploy command
 `tools/buildinfo.sh && cd worker && npx wrangler deploy -c wrangler.cydian.toml`). By hand, from a clean checkout:
 the same command (needs `npx wrangler login` on the cydian.dev Cloudflare account once). Anyone can run their own copy for free and point Cydian at it:
 `worker/README.md` (a Deploy to Cloudflare button).
 
-Signing happens only in the app, on the iPhone. The website signs nothing: it browses, and hands apps to Cydian or
-another sideloader.
+Signing happens on the user's own device: in the app on the iPhone, or on the website in the browser (F93: zsign as
+WebAssembly, `web/app/vendor/zsign`). No server signs anything; Cydian Account (`docs/account.md`) only keeps an
+end-to-end encrypted copy of the certificate for sync.
 
 ## License
 

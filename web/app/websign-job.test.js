@@ -120,3 +120,17 @@ test("zsign WebAssembly: a wrong password says so", { skip: !existsSync(WASM) &&
   await assert.rejects(runSignJob(createZsign, { ipa: fx("tiny-cydian.ipa"), p12: P12, profile: PROFILE, password: "nope" }),
     (e) => e.code === "sign_failed" && /password/.test(e.message));
 });
+
+test("app extensions come out before zsign signs (their entitlements wouldn't match: iOS refuses the app)", async () => {
+  const { removeTree } = await import("./websign-job.js");
+  const tree = { "/a/PlugIns": "dir", "/a/PlugIns/S.appex": "dir", "/a/PlugIns/S.appex/S": "file", "/a/Info.plist": "file" };
+  const FS = {
+    stat: (p) => { if (!(p in tree)) throw new Error("ENOENT"); return { mode: tree[p] }; },
+    isDir: (m) => m === "dir",
+    readdir: (p) => [".", "..", ...Object.keys(tree).filter((k) => k.startsWith(p + "/") && !k.slice(p.length + 1).includes("/")).map((k) => k.slice(p.length + 1))],
+    rmdir: (p) => { delete tree[p]; }, unlink: (p) => { delete tree[p]; },
+  };
+  removeTree(FS, "/a/PlugIns");
+  removeTree(FS, "/a/Watch"); // not there: fine
+  assert.deepEqual(Object.keys(tree), ["/a/Info.plist"]);
+});

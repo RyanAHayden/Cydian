@@ -102,7 +102,11 @@ export function firstVisitState(storage = store()) {
   const v = read(storage, FIRST_KEY);
   return v === "later" || v === "installed" ? v : "ask";
 }
-export function setFirstVisit(state, storage = store()) { write(storage, FIRST_KEY, state === "ask" ? null : state); }
+export function setFirstVisit(state, storage = store()) {
+  write(storage, FIRST_KEY, state === "ask" ? null : state);
+  // the tab bar and Home follow (app.js, screens/home.js)
+  globalThis.dispatchEvent?.(new Event("cydian:browse-lock"));
+}
 export const markCydianInstalled = (storage = store()) => setFirstVisit("installed", storage);
 
 export const shouldAskFirst = ({ mode = "site", storage = store() } = {}) => mode === "site" && firstVisitState(storage) === "ask";
@@ -130,14 +134,18 @@ export async function promptFirstVisit({ mode, install, alert = showAlert, stora
 // Home on the website while Cydian isn't installed (user 2026-11-18): nothing pops up at launch; everything below the
 // Cydian App card is locked (greyed, a lock in place of the chevron). A tap on a locked row asks: Install Cydian, or
 // Ignore, which counts down from 5 before it can be tapped and then unlocks browsing for good in this browser.
-export const browsingLocked = ({ mode = "site", storage = store() } = {}) => mode === "site" && firstVisitState(storage) === "ask";
+// Only Browse Anyway unlocks it ("later"): installing Cydian from here doesn't (user 2026-11-18: someone who installs
+// through the website likely never comes back, so the website keeps pointing at the app).
+export const browsingLocked = ({ mode = "site", storage = store() } = {}) => mode === "site" && firstVisitState(storage) !== "later";
 export const BROWSE_GATE = {
   title: "Install Cydian First",
   message: "Apps installed in the Cydian app are signed and installed on the iPhone itself: much faster than this "
     + "website, with no upload and no limits.\n\nYou can browse the website anyway, but installing here is slow and can fail on big apps.",
-  // stacked, as iOS 6 stacks three: Cancel closes it and Home stays locked (user 2026-11-18)
-  buttons: ["Install Cydian", "Ignore", "Cancel"],
+  // stacked, as iOS 6 stacks three: Cancel closes it and Home stays locked (user 2026-11-18). Install Cydian green,
+  // Browse Anyway red (the one we'd rather nobody pressed), and it counts down first.
+  buttons: ["Install Cydian", "Browse Anyway", "Cancel"],
   cancel: 2,
+  colors: { 0: "green", 1: "red" },
 };
 // -> "browse" (Ignore: unlocked from now on; Settings > Signing locks it again) | "install" | null (Cancel)
 export async function askToBrowse({ install, alert = showAlert, storage = store() } = {}) {

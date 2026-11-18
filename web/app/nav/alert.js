@@ -10,7 +10,8 @@
 // side by side, as UIAlertView does (F63's Keep My Old Copy / Accept The New Copy).
 // F96: `countdown: { button, seconds }` greys that button out for `seconds`, its title counting down ("I Understand
 // (5)"), before it can be tapped.
-export function showAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null } = {}) {
+// `colors`: { [button index]: "green" | "red" } (sources.css .alert-button.green/.red): the way to go, and the one to avoid.
+export function showAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null, colors = {} } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "alert-scrim";
@@ -54,7 +55,7 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
     buttons.forEach((label, i) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "alert-button" + (i === cancel && buttons.length > 1 ? " cancel" : "");
+      b.className = "alert-button" + (i === cancel && buttons.length > 1 ? " cancel" : "") + (colors[i] ? ` ${colors[i]}` : "");
       b.textContent = label;
       b.addEventListener("click", () => close(i));
       row.append(b);

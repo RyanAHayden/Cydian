@@ -310,6 +310,7 @@ test("B21: a nested bundle or framework without its executable is sealed as reso
     let app = try signer.sign(fixtures.appendingPathComponent("missing-exe.ipa"), to: out)
     check(app.skipped == ["Frameworks/Kit.framework", "YTUHD.bundle"], "skipped \(app.skipped)")
     check(logged.contains("Skipped YTUHD.bundle: its executable YTUHD is missing, sealed as resources"), "log \(logged)")
+    check(logged.contains { $0.hasPrefix("Signed Tiny.app (") } && logged.contains { $0.hasPrefix("Read ") }, "console log \(logged)")
     let f = try entries(out)
     let a = "Payload/Tiny.app/"
     check(f[a + "YTUHD.bundle/_CodeSignature/CodeResources"] == nil && f[a + "YTUHD.bundle/YTUHD"] == nil, "nothing made in the bundle")

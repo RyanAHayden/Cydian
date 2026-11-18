@@ -248,6 +248,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
     // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
     result = await bridge(native).call("signing.install", { ...(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}) }, (ev) => {
+      if (ev?.log) h.page?.raw?.(ev.log); // the shell's console lines (Sideload.swift install's log)
       const t = phaseLabel(ev);
       if (t) h.set(t);
     });

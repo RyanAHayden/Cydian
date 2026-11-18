@@ -132,6 +132,8 @@ enum Sideload {
         let emit = { (phase: String, p: Double) in
             if throttle.pass(phase, p) { c.emitOnMain([["phase": phase, "progress": p]]) }
         }
+        // The progress page's console (signing-client.js): what each step did, a line each.
+        let log = { (s: String) in c.emitOnMain([["log": s]]) }
         let finish = { (r: Result<(SignedApp, SignedRecord), Error>) in
             switch r {
             case .failure(let e): Apt.reply(c, nil, SignBridge.text(e))
@@ -147,18 +149,27 @@ enum Sideload {
                 guard let p = prepared.removeValue(forKey: tok) else {
                     return Apt.reply(c, nil, "gone: that IPA was looked at more than 15 minutes ago; start again")
                 }
-                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, emit: emit, opened: finish)
+                log("Using the IPA downloaded for the look-first sheet (\(p.url))")
+                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, emit: emit, log: log, opened: finish)
             }
             return
         }
         guard let url = Apt.httpURL(c.params["url"]) else { return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
+        log("Downloading \(url.absoluteString)")
         download(url, emit: emit) { res in
             switch res {
             case .failure(let e): finish(.failure(e))
             case .success(let file):
-                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, emit: emit, opened: finish)
+                log("Downloaded \(Sideload.size(file))")
+                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, emit: emit, log: log, opened: finish)
             }
         }
+    }
+
+    // "12.3 MB" for a file, for the console.
+    static func size(_ file: URL) -> String {
+        let n = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? Int64
+        return n.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "? bytes"
     }
 
     struct Failed: LocalizedError { let text: String; var errorDescription: String? { text } } // the text, not "Sideload.Failed error 1"
@@ -210,7 +221,7 @@ enum Sideload {
     }
 
     static func signAndOpen(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions,
-                            emit: @escaping (String, Double) -> Void,
+                            emit: @escaping (String, Double) -> Void, log: ((String) -> Void)? = nil,
                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
                             served: ((Bool) -> Void)? = nil) {
         let tok = SignBridge.token()
@@ -219,10 +230,18 @@ enum Sideload {
         let app: SignedApp, identity: KeychainIdentity
         do {
             identity = try KeychainIdentity(id)
+            if let log = log {
+                let cert = try? Certificate(der: identity.certificate)
+                log("Certificate: \(cert?.commonName ?? "?") (team \(cert?.team ?? profile.team))")
+                log("Profile: \(profile.name), \(profile.kind.rawValue), app ID \(profile.appID)"
+                    + (profile.expires.map { ", expires \(ISO8601DateFormatter().string(from: $0))" } ?? ""))
+            }
             if let p = profile.problem(with: identity.certificate) { throw p }
             let signer = IPASigner(profile: profile, identity: identity)
             signer.options = options
+            if let log = log { let nslog = signer.log; signer.log = { nslog($0); log($0) } }
             app = try signer.sign(input, to: output) { emit($0, $1) }
+            log?("Signed \(app.name) \(app.version) as \(app.bundleID), \(Sideload.size(output))")
         } catch {
             try? FileManager.default.removeItem(at: output)
             opened(.failure(error)); served?(false)
@@ -233,15 +252,16 @@ enum Sideload {
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored)
         emit("installing", 0)
         if let host = hostServer {
+            log?("Uploading to \(host)/sign/host (\(app.name) replaces this app, so iOS installs it from the server)")
             hostAndOpen(output, server: host, app: app, record: record, opened: opened, served: served)
             return
         }
-        serveAndOpen(output, app: app, record: record, opened: opened, served: served)
+        serveAndOpen(output, app: app, record: record, log: log, opened: opened, served: served)
     }
 
     // F77: the second half of signAndOpen, for an IPA signed already (My IPAs' signed copy): serves `output` (deleted
     // after) on the local HTTP server, records it and opens the itms-services link with the manifestServer's manifest.
-    static func serveAndOpen(_ output: URL, app: SignedApp, record: SignedRecord,
+    static func serveAndOpen(_ output: URL, app: SignedApp, record: SignedRecord, log: ((String) -> Void)? = nil,
                              opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
                              served: ((Bool) -> Void)? = nil) {
         let ipaPath = "/\(SignBridge.token())/app.ipa"
@@ -268,6 +288,8 @@ enum Sideload {
                                 URLQueryItem(name: "port", value: String(server.port)),
                                 URLQueryItem(name: "path", value: String(ipaPath.dropFirst()))]
                 let link = InstallManifest.itmsURL(manifest: q.url!.absoluteString)
+                log?("Serving the IPA at http://127.0.0.1:\(server.port)\(ipaPath)")
+                log?("Manifest: \(q.url!.absoluteString)")
                 let once = Once()
                 KeepAlive.shared.begin()
                 let end = { (ok: Bool) in
@@ -286,6 +308,7 @@ enum Sideload {
                     reschedule()
                 }
                 DispatchQueue.main.async {
+                    log?("Handing iOS the install link; it asks \"Install \(app.name)?\"")
                     UIApplication.shared.open(URL(string: link)!)
                     opened(.success((app, record)))
                 }

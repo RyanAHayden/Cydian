@@ -18,7 +18,7 @@
 //                                on the website signs in the browser (signInBrowser)
 import { showBanner } from "./nav/banner.js";
 import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError } from "./core/signing.js";
-import { format } from "./router.js";
+import { format, settingsRoute } from "./router.js";
 import { IPA_MAX } from "./core/websign.js";
 import { detectMode } from "./core/settings.js";
 import { showHUD } from "./nav/hud.js";
@@ -217,7 +217,7 @@ function liveHUD(text) {
   return { set: (t) => { if (label) label.textContent = t; }, hide, done: (t) => hide.done(t) };
 }
 
-const openRoute = (path) => { location.hash = format({ tab: "settings", path }).replace(/^#/, ""); };
+const openRoute = (path) => { location.hash = format(settingsRoute(path)).replace(/^#/, ""); };
 
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an
 // error, which an alert explains (no_server and no_identity then open Settings > Signing).

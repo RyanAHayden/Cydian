@@ -14,7 +14,7 @@ import { grouped, placeholder } from "../nav/ui.js";
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
 import { showSheet } from "../nav/sheet.js";
-import { format } from "../router.js";
+import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
 import { catalog, ALL } from "../catalog.js";
 import { NO_SECTION, indexLetter, parseAuthor, simpleSection } from "../core/catalog.js";
@@ -947,7 +947,7 @@ function depActionRow(p, route, ctx) {
   switch (a.kind) {
     case "open": return { label: a.label, href: deeper(route, token("package", a.id)) };
     case "add-source": return { label: a.label, subtitle: a.url, chevron: true, onClick: () => addSource(ctx, { url: a.url }) };
-    case "settings": return getBackend().kind === "http" ? { label: a.label, href: format({ tab: "settings", path: ["iosVersion"] }) } : null;
+    case "settings": return getBackend().kind === "http" ? { label: a.label, href: format(settingsRoute(["iosVersion"])) } : null;
     case "remove": {
       const q = queueOf();
       if (q) return { label: a.label, onClick: () => q({ op: "remove", id: a.id }) };

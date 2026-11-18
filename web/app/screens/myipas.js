@@ -25,7 +25,7 @@ import * as browse from "./browse.js";
 import { catalog, ALL } from "../catalog.js";
 import { mergeCategories, indexLetter } from "../core/catalog.js";
 import { withLetterHeaders } from "../nav/vlist.js";
-import { format } from "../router.js";
+import { format, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { showHUD } from "../nav/hud.js";
@@ -522,7 +522,7 @@ async function signNow(entry, body, route) {
     hide();
     const why = deviceError(e, entry.name);
     await showAlert({ title: why.open ? why.title : `Couldn't Sign ${entry.name || ""}`.trim(), message: why.message, buttons: ["OK"] });
-    if (why.open === "signing") location.hash = format({ tab: "settings", path: ["signing"] }).replace(/^#/, "");
+    if (why.open === "signing") location.hash = format(settingsRoute(["signing"])).replace(/^#/, "");
     return;
   }
   if (hide.done) hide.done("Signed"); else hide();

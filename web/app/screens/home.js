@@ -13,7 +13,7 @@
 // (Popular, then the categories), browse/popular, browse/category:<name>, and below those browse.js's tokens
 // (package:<id>, author:<name>, versions:<id>), as in the Search tab.
 import { grouped } from "../nav/ui.js";
-import { format } from "../router.js";
+import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { sourceKey, sourcesFor } from "../core/sources.js";
@@ -21,7 +21,7 @@ import { settings } from "./settings.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
 import { currentDevice } from "../device.js";
-import { signAndInstall, signingReady, getBring } from "../signing-client.js";
+import { signAndInstall, signingReady, getBring, deviceStatus, getServer } from "../signing-client.js";
 import { homeFeatured } from "./extras.js";
 import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
@@ -71,7 +71,7 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
 // F96: once iOS was asked to install it, the website stops asking "Install Cydian First" (websign-gate.js).
 export async function installApp({ ready = signingReady, install = signAndInstall, bring = getBring, go = (h) => { location.hash = h; },
   installed = markCydianInstalled } = {}) {
-  if (!(await ready())) { go(format({ tab: "settings", path: ["signing"] }).replace(/^#/, "")); return "signing"; }
+  if (!(await ready())) { go(format(settingsRoute(["signing"])).replace(/^#/, "")); return "signing"; }
   install({ url: APP_IPA_URL, name: APP_NAME, bring: bring(), onInstalled: () => installed() });
   return "install";
 }
@@ -84,8 +84,37 @@ export function installCydian({ offer = homeOffer({ mode: settings.mode, deviceT
 }
 
 // Home's Signing tile (Settings > Signing) where something signs: the sideload app and, F93, the website (in the
-// browser). The jailbreak app shows Themes there.
-export const showsSigningTile = (mode) => mode === "sideload" || mode === "site";
+// browser). The jailbreak app shows Themes there. F123: only while signing isn't set up (user 2026-11-18: "when
+// signing is setup it should be hidden in settings"); after that it lives in Settings > Signing alone.
+export const showsSigningTile = (mode, setUp = false) => (mode === "sideload" || mode === "site") && !setUp;
+
+// F123: whether signing is set up, for the Signing tile. The website: a certificate and profile saved, password
+// right (signingReady). The sideload app: every step of Settings > Signing's walkthrough done (signing.js
+// missingStep: the certificate on the device and an https Signing Server). Anything that fails counts as not set up.
+export async function signingSetUp(mode, { ready = signingReady, status = () => deviceStatus(), server = getServer,
+  missing = async (st, sv) => (await import("./signing.js")).missingStep(st, sv) } = {}) {
+  try {
+    if (mode === "site") return Boolean(await ready());
+    if (mode === "sideload") return (await missing(await status(), server())) == null;
+  } catch { /* the signer didn't answer */ }
+  return false;
+}
+
+// F123: Home's list below the tiles, as Cydia's: the help links, User Guides, then Settings in its own group (it left
+// the tab bar; its pages open on Home's stack, router.js settingsRoute) above Credits / Thank You.
+export function homeLinks() {
+  return [{
+    rows: [
+      { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
+      { label: "Find Extensions for Applications", href: format({ tab: "search" }), chevron: true },
+      // Manage Sources (user 2026-11-18), opened on Home's own stack (router mountLink): Back comes home.
+      { label: "More Package Sources", href: format({ tab: "sources", path: ["manage"] }) },
+      { label: "Wish List", href: format({ tab: "home", path: ["wishlist"] }) }, // F102: browse.js renderWishlist
+    ],
+  }, { header: "User Guides", rows: guideRows(format) },
+  { rows: [{ label: "Settings", href: format(settingsRoute()) }] },
+  { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }];
+}
 
 export function ipasTile(mode = "site") {
   if (mode === "jailbreak") return null;
@@ -99,7 +128,7 @@ export function deviceHint(type, mode = "site") {
   // The sideload build is always Not Jailbroken: nothing to change there, so no hint. Nor on the website (user
   // 2026-11-18: it's obviously the web; jailbroken visitors get "Jailbroken? Get Cydian.deb" in the Cydian App card).
   if (mode === "sideload" || mode === "site") return null;
-  return { text: DEVICE_HINT, href: format({ tab: "settings", path: ["device"] }) };
+  return { text: DEVICE_HINT, href: format(settingsRoute(["device"])) };
 }
 
 // F41: whether Home offers Themes (the tile, Featured's Browse Themes). Not Jailbroken lists apps only (F37).
@@ -371,14 +400,30 @@ function renderRoot(body) {
   const halves = tileRow("halves",
     tile({ label: "Featured", href: format({ tab: "home", path: ["browse", "popular"] }), glyph: "featured" }), // Popular, not every package
     tile({ label: "Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }), glyph: "themes" }),
-    tile({ label: "Signing", href: format({ tab: "settings", path: ["signing"] }), glyph: "signing" }));
+    tile({ label: "Signing", href: format(settingsRoute(["signing"])), glyph: "signing" }));
+  let setUp = true; // hidden until signingSetUp answers: no tile flashing in and out once it is set up
   const drawThemes = () => {
     const themes = showsThemes(settings.deviceType());
     halves.children[1].hidden = !themes;
-    halves.children[2].hidden = themes || !showsSigningTile(settings.mode);
+    halves.children[2].hidden = themes || !showsSigningTile(settings.mode, setUp);
+    for (const row of lockedTop) row.hidden = !showsSigningTile(settings.mode, setUp);
   };
+  // Asked again each time Home's root comes back (Settings > Signing is on Home's stack: Back from it lands here).
+  const checkSigning = async () => {
+    if (!showsSigningTile(settings.mode)) return;
+    const now = await signingSetUp(settings.mode);
+    if (now !== setUp && halves.isConnected) { setUp = now; drawThemes(); }
+  };
+  const onHash = () => {
+    if (!halves.isConnected) { removeEventListener("hashchange", onHash); return; }
+    if (/^#\/home\/?$/.test(location.hash)) checkSigning();
+  };
+  addEventListener("hashchange", onHash);
+  const lockedNow = browsingLocked({ mode: settings.mode });
+  const lockedTop = lockedNow ? [tileRow("halves", tile({ label: "Signing", href: format(settingsRoute(["signing"])), glyph: "signing" }))] : [];
   drawHint();
   drawThemes();
+  checkSigning();
   const offHint = settings.onChange((key) => {
     if (key !== "device") return;
     if (!hintBox.isConnected) { offHint(); return; }
@@ -398,7 +443,7 @@ function renderRoot(body) {
     href: format({ tab: "home" }), glyph: "jailbreak" }) : null;
   debTile?.querySelector("a").addEventListener("click", (e) => { e.preventDefault(); e.stopImmediatePropagation(); jailbrokenSheet(); }, true);
   const appRow = tileRow("green stack", tile({ label: "Install Cydian App", subtitle: "Signed with your certificate",
-    href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }));
+    href: format(settingsRoute(["signing"])), glyph: "install" }));
   // No Send Settings to Cydian (user 2026-11-18): Install Cydian App already carries the certificate and settings.
   const debRow = debTile ? tileRow("purple", debTile) : null;
   const appLink = appRow.querySelector("a");
@@ -430,8 +475,6 @@ function renderRoot(body) {
   const featured = { box: homeFeatured() }; // F20: sources' sileo-featured.json banners, a couple from each
   // Locked Home (the website before Cydian is installed): Signing full width where Featured | Signing was, and
   // Featured down among the locked rows (user 2026-11-18). Ignore puts the usual row back.
-  const lockedNow = browsingLocked({ mode: settings.mode });
-  const lockedTop = lockedNow ? [tileRow("halves", tile({ label: "Signing", href: format({ tab: "settings", path: ["signing"] }), glyph: "signing" }))] : [];
   const lockedFeatured = lockedNow ? [tileRow("halves", tile({ label: "Featured", href: format({ tab: "home", path: ["browse", "popular"] }), glyph: "featured" }))] : [];
   if (lockedNow) halves.hidden = true;
 
@@ -453,22 +496,16 @@ function renderRoot(body) {
   );
   body.append(home);
   // Cydia's list below the tiles: the help links, User Guides, then Credits / Thank You (About is the nav button).
-  const list = grouped([{
-    rows: [
-      { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
-      { label: "Find Extensions for Applications", href: format({ tab: "search" }), chevron: true },
-      // Manage Sources (user 2026-11-18), opened on Home's own stack (router mountLink): Back comes home.
-      { label: "More Package Sources", href: format({ tab: "sources", path: ["manage"] }) },
-      { label: "Wish List", href: format({ tab: "home", path: ["wishlist"] }) }, // F102: browse.js renderWishlist
-    ],
-  }, { header: "User Guides", rows: guideRows(format) },
-  { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }]);
+  const links = homeLinks();
+  const list = grouped(links);
   const groups = [...list.children]; // the fragment empties once appended
   for (const group of groups) group.classList.add("home-links");
   home.append(list);
-  // The website before Cydian is installed: everything below the Cydian App card is locked; a tap asks first.
+  // The website before Cydian is installed: everything below the Cydian App card is locked; a tap asks first. Not
+  // Settings (F123: unlocked like Home, as its tab was).
   if (browsingLocked({ mode: settings.mode })) {
-    const locked = [...lockedFeatured, browseRow, stateRow, ...groups];
+    const settingsGroup = groups[links.findIndex((g) => g.rows[0]?.label === "Settings")];
+    const locked = [...lockedFeatured, browseRow, stateRow, ...groups.filter((g) => g !== settingsGroup)];
     for (const box of locked) box.classList.add("home-locked");
     home.addEventListener("click", async (e) => {
       if (!e.target.closest?.(".home-locked")) return;
@@ -503,6 +540,7 @@ function renderRoot(body) {
     drawHint();
     drawThemes();
     drawApp();
+    checkSigning();
     await refreshState();
     const box = homeFeatured();
     await box.ready; // extras.js homeFeatured: its banners are drawn (or there are none)

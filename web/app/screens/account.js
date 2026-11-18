@@ -15,7 +15,7 @@
 // certificate) in localStorage.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped } from "../nav/ui.js";
-import { format } from "../router.js";
+import { format, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { copyText } from "../nav/menu.js";
@@ -182,7 +182,7 @@ export function lastSyncedText(t, now = Date.now()) {
 export function accountSection() {
   const box = document.createElement("div");
   const fill = (detail) => box.replaceChildren(grouped([{ rows: [{ label: "Cydian Account", detail,
-    href: format({ tab: "settings", path: ["account"] }) }] }]));
+    href: format(settingsRoute(["account"])) }] }]));
   fill("");
   accountSync().status().then((s) => fill(s.signedIn ? "On" : "Off")).catch(() => fill("Off"));
   return box;
@@ -303,7 +303,7 @@ async function deleteFlow(el) {
 // cydian://account?k=… : the Account page, and Sign In With Key filled in.
 export async function signInFromLink(url, { open = (hash) => { location.hash = hash.replace(/^#/, ""); } } = {}) {
   const bytes = parseKey(url);
-  open(format({ tab: "settings", path: ["account"] }));
+  open(format(settingsRoute(["account"])));
   if (!bytes) { await alertOK("Can't Sign In", "That account link is damaged."); return; }
   const s = await accountSync().status().catch(() => ({}));
   const code = url.replace(/^.*[?&]k=([^&#]+).*$/, "$1");

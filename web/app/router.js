@@ -8,11 +8,19 @@ export const ALL_TABS = ["home", "sources", "changes", "installed", "search", "s
 // The tabs this build shows: the sideload app leaves out the apt-only ones (mode.js), and so does every route.
 export const TABS = tabsFor(ALL_TABS);
 export const DEFAULT_TAB = "home";
+// F123: Settings is no tab of its own any more, as in Cydia: the tab bar shows the other five, and Settings' pages
+// open on Home's stack (Home's Settings row), as #/home/settings/<…>. Its screen stays in TABS: it draws those pages.
+export const BAR_TABS = TABS.filter((t) => t !== "settings");
+const IN_HOME = "settings"; // Home's path segment that holds the Settings screen's pages
+// The route to a Settings page (path below Settings' root): on Home's stack.
+export const settingsRoute = (path = []) => ({ tab: "home", path: [IN_HOME, ...path] });
+const inHome = (route) => route.tab === "home" && route.path[0] === IN_HOME;
 
 // "#/sources/a%20b/c" -> { tab: "sources", path: ["a b", "c"] }. Anything unknown lands on the default tab.
 export function parse(hash) {
   const parts = String(hash || "").replace(/^#/, "").split("/").filter(Boolean).map(safeDecode);
   const [tab, ...path] = parts;
+  if (tab === IN_HOME) return settingsRoute(path); // links made before F123 (#/settings/signing) and format({ tab: "settings" })
   return TABS.includes(tab) ? { tab, path } : { tab: DEFAULT_TAB, path: [] };
 }
 
@@ -31,16 +39,20 @@ export function prefixes(path) {
 // in; Back comes back): #/home/~installed/myipas is Installed's myipas page on Home's stack.
 const MOUNT = "~";
 const isMount = (seg) => typeof seg === "string" && seg.startsWith(MOUNT) && TABS.includes(seg.slice(1));
-// The screen a route shows: its innermost "~tab" and the path after it, or the route itself.
+// The screen a route shows: its innermost "~tab" and the path after it, or the route itself; Home's settings/… is
+// the Settings screen's (F123).
 export function mounted(route) {
+  let r = route;
   for (let i = route.path.length - 1; i >= 0; i--) {
-    if (isMount(route.path[i])) return { tab: route.path[i].slice(1), path: route.path.slice(i + 1) };
+    if (isMount(route.path[i])) { r = { tab: route.path[i].slice(1), path: route.path.slice(i + 1) }; break; }
   }
-  return route;
+  return inHome(r) ? { tab: IN_HOME, path: r.path.slice(1) } : r;
 }
 // A link from `from` to another tab's page, as a push on from's own stack: back to from's page, inside the same
 // mount when from already shows that tab. Null when `to` stays in from's tab (or is a tab's root: a plain switch).
+// A Settings page (Home's settings/…) linked from another tab mounts as "~settings"; Settings' root switches to Home.
 export function mountLink(from, to) {
+  if (from && from.tab !== "home" && inHome(to)) to = { tab: IN_HOME, path: to.path.slice(1) };
   if (!from || to.tab === from.tab || !to.path.length) return null;
   const k = from.path.indexOf(MOUNT + to.tab);
   const base = k >= 0 ? from.path.slice(0, k) : from.path;

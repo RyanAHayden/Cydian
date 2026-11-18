@@ -7,7 +7,7 @@
 // It also owns the theme: init() puts the Appearance setting on <html data-theme> and the theme-color metas, and
 // follows the system while Appearance is Automatic. theme-boot.js does the same before first paint.
 import { grouped } from "../nav/ui.js";
-import { format } from "../router.js";
+import { format, settingsRoute } from "../router.js";
 import { createSettings, detectMode, themeFor, SETTINGS } from "../core/settings.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
@@ -96,10 +96,10 @@ function rootPage() {
         switches.push([rows.length, d]);
         rows.push({ label: d.label });
       } else if (d.kind === "list") {
-        rows.push({ label: d.label, detail: optionLabel(d, settings.get(d.key)), href: format({ tab: "settings", path: [d.key] }) });
+        rows.push({ label: d.label, detail: optionLabel(d, settings.get(d.key)), href: format(settingsRoute([d.key])) });
       } else if (d.kind === "holds") {
         const n = settings.holds.list().length;
-        rows.push({ label: d.label, detail: n ? String(n) : "None", href: format({ tab: "settings", path: ["holds"] }) });
+        rows.push({ label: d.label, detail: n ? String(n) : "None", href: format(settingsRoute(["holds"])) });
       }
     }
     return { header: s.title, footer: s.footer, rows, id: s.id, switches: switches.splice(0) };
@@ -517,7 +517,7 @@ function deviceSigningSection(box) {
   // F68: Re-sign Reminder's group just above already says Signing
   const header = settings.isShown("resignReminder") ? undefined : "Signing";
   const fill = (detail) => box.replaceChildren(grouped([{ header,
-    rows: [{ label: "Certificate", detail, href: format({ tab: "settings", path: ["signing"] }) }],
+    rows: [{ label: "Certificate", detail, href: format(settingsRoute(["signing"])) }],
     footer: "Your own certificate: Install signs AltStore apps with it on this iPhone." }]));
   fill("");
   Promise.all([deviceStatus().catch(() => null), loadIdentity()]).then(([st, id]) => {
@@ -653,7 +653,7 @@ export function checkUpdates({ manual = false, always = false } = {}) {
   const mode = detectMode();
   if (!installPath(mode)) return Promise.resolve("site");
   const native = globalThis.cydianNative;
-  const go = (path) => { location.hash = format({ tab: "settings", path }).replace(/^#/, ""); };
+  const go = (path) => { location.hash = format(settingsRoute(path)).replace(/^#/, ""); };
   const hide = manual ? showHUD("Checking") : () => {};
   const alert = (spec) => { hide(); return showAlert(spec); };
   checking = checkForUpdates({
@@ -757,7 +757,7 @@ function aboutSection() {
 
 function siteSigningSection(box) {
   const fill = (detail) => box.replaceChildren(grouped([{ header: "Signing",
-    rows: [{ label: "Certificate", detail, href: format({ tab: "settings", path: ["signing"] }) }],
+    rows: [{ label: "Certificate", detail, href: format(settingsRoute(["signing"])) }],
     footer: "Your own certificate: Install signs apps with it, here in the browser." }]));
   fill("");
   loadIdentity().then((id) => {

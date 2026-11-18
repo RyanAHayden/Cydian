@@ -9,7 +9,7 @@
 // { title, back (the back button's label above it; else the title), style: "grouped" | "plain", left: { label, onClick }, right: { label, onClick } | [several] } and `init(ctx)`,
 // run once at start (e.g. to set the tab's badge). ctx: { go, back, setBadge, showHUD }.
 import { detectMode } from "./core/settings.js";
-import { TABS, createRouter, format, parent, mounted } from "./router.js";
+import { TABS, BAR_TABS, createRouter, format, parent, mounted } from "./router.js";
 import { createStacks, swipeCommits } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transition.js";
 import { attachEdgeSwipe } from "./nav/swipe.js";
@@ -42,7 +42,8 @@ const screensEl = document.getElementById("screens");
 const navbarEl = document.getElementById("navbar");
 const tabStacks = {};
 const navStacks = {};
-for (const tab of TABS) {
+// F123: one stack per tab-bar tab; Settings' pages live on Home's (router.js settingsRoute).
+for (const tab of BAR_TABS) {
   tabStacks[tab] = Object.assign(document.createElement("div"), { className: "tab-stack" });
   tabStacks[tab].dataset.tab = tab;
   screensEl.append(tabStacks[tab]);
@@ -53,7 +54,7 @@ for (const tab of TABS) {
 
 // F65: the icon badge N5's daemon sets goes once the Changes tab shows no upgrades (jailbreak app only).
 const upgradeNotices = createUpgradeNotices({ settings: settingsScreen.settings, current: () => router.current() }); // called only once the screens init, after router exists
-const tabbar = createTabbar(document.getElementById("tabbar"), TABS, (t) => SCREENS[t].title);
+const tabbar = createTabbar(document.getElementById("tabbar"), BAR_TABS, (t) => SCREENS[t].title);
 const ctx = {
   go: (route) => router.go(route),
   back: () => goBack(),
@@ -62,7 +63,7 @@ const ctx = {
   showAlert,
 };
 
-const stacks = createStacks({ tabs: TABS, create: makePage });
+const stacks = createStacks({ tabs: BAR_TABS, create: makePage });
 
 function button(spec, cls) {
   const b = document.createElement("button");
@@ -165,7 +166,7 @@ const router = createRouter({
     const r = stacks.sync(route);
     const all = stacks.stack(r.tab);
     if (r.kind === "tab") {
-      for (const t of TABS) {
+      for (const t of BAR_TABS) {
         tabStacks[t].classList.toggle("is-active", t === r.tab);
         navStacks[t].classList.toggle("is-active", t === r.tab);
       }
@@ -255,15 +256,16 @@ attachEdgeSwipe(edgeEl, {
 });
 
 // Tab taps go through selectTab so each tab keeps its place; the href is there for no-JS fallbacks and a11y.
-for (const tab of TABS) tabbar.items[tab].href = format({ tab });
-// The website before Cydian is installed (websign-gate.js browsingLocked): only Home and Settings in the tab bar; the
-// others are dimmed with a lock, and a tap asks Install Cydian First (user 2026-11-18). Ignore unlocks them all.
-const OPEN_TABS = new Set(["home", "settings"]);
+for (const tab of BAR_TABS) tabbar.items[tab].href = format({ tab });
+// The website before Cydian is installed (websign-gate.js browsingLocked): only Home in the tab bar (Settings is on
+// Home's stack since F123, so it stays reachable); the others are dimmed with a lock, and a tap asks Install Cydian
+// First (user 2026-11-18). Ignore unlocks them all.
+const OPEN_TABS = new Set(["home"]);
 let gate = null;
 const lockTabs = async () => {
   gate ??= await import("./websign-gate.js");
   const locked = gate.browsingLocked({ mode: detectMode() });
-  for (const t of TABS) tabbar.items[t].classList.toggle("tab-locked", locked && !OPEN_TABS.has(t));
+  for (const t of BAR_TABS) tabbar.items[t].classList.toggle("tab-locked", locked && !OPEN_TABS.has(t));
 };
 if (!(globalThis.cydianApp || globalThis.cydianNative)) { lockTabs(); addEventListener("cydian:browse-lock", lockTabs); }
 

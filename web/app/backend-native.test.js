@@ -102,6 +102,19 @@ test("refreshSources runs apt-get update through the helper, then counts from ap
   assert.equal(pk.source, "apt:apt.procurs.us_dists_1800_main_binary-iphoneos-arm64_Packages");
 });
 
+test("refreshSources { filter } reads back and saves only the sources it keeps (C5)", async (t) => {
+  const { backend, native } = setup(t, { net: null });
+  const seen = [];
+  const out = await backend.refreshSources((s) => seen.push(s.key), { filter: (s) => s.key === HAVOC });
+  assert.ok(native.calls.some((c) => c.method === "helper.run" && c.params.words[0] === "update"));
+  assert.deepEqual(seen, [HAVOC]);
+  assert.deepEqual(out.map((s) => s.key), [HAVOC]);
+  assert.equal(out[0].count, 2);
+  const after = Object.fromEntries((await backend.sources()).map((s) => [s.key, s]));
+  assert.equal(after[HAVOC].count, 2);
+  assert.equal(after[PROCURSUS].count, undefined); // not read, not saved
+});
+
 test("a failed apt-get update is an error with apt's message, not a silent refresh", async (t) => {
   const { backend } = setup(t, { env: { FAKE_FAIL: "update" } });
   await assert.rejects(backend.refreshSources(), (e) => e.code === "helper" && /Could not get lock/.test(e.message));

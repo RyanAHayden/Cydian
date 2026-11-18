@@ -352,12 +352,13 @@ function nativeSourceCalls(backend, call, opts) {
       return (await store()).remove(key);
     },
     // Device-only sources into cydian.sources, apt-get update, then every source's count and Release from apt's
-    // lists (all at once), saved as each lands.
-    async refreshSources(onEach = () => {}) {
+    // lists (all at once), saved as each lands. `filter` (F41, C5): only the sources it keeps are read back and
+    // saved (F99's Add Source & Install refreshes one); apt-get update itself still updates all of apt's sources.
+    async refreshSources(onEach = () => {}, { filter } = {}) {
       await migrateAdded();
       await backend.update();
       const db = await store();
-      const sources = await list();
+      const sources = (await list()).filter(filter ?? (() => true));
       return Promise.all(sources.map(async (s) => {
         const fields = await refreshSource(backend, s, { arch: arch(), count });
         const cur = await db.get(s.key);

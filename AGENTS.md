@@ -45,7 +45,9 @@ Shortcuts recipes live in `docs/shortcuts.md`.
   `ln -s "$(git rev-parse --path-format=absolute --git-common-dir)/../ref" ref`.
 - The server fetches URLs visitors type in. Every fetch goes through the SSRF guard (F3): no private, loopback or
   link-local addresses, size and time caps.
-- The iPhone 4S (iOS 6, jailbroken) is the test device: `ssh 4s` (see R1). Only touch it when your task says so.
+- The iPhone 4S (iOS 6, jailbroken) is a reference device only: `ssh 4s` (see R1). It shows how iOS 6 and Cydia look
+  and behave. It will never run Cydian (the app or the site), so never test, benchmark or time Cydian on it.
+  Only touch it when your task says so.
   Never run `apt-get upgrade`, `dpkg -i` or `rm` on it unless the task says so. It can't be re-jailbroken
   easily.
   Only one agent may drive its screen at a time. Taps, swipes, opening URLs and screenshots go through

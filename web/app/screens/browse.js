@@ -25,7 +25,7 @@ import { settings, createSwitch } from "./settings.js";
 import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js";
 import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
-import { renderAltSource, renderApp, installRows, formatDate, osRange, appPageAction } from "./altstore.js";
+import { renderAltSource, renderApp, installRows, formatDate, osRange, appPageAction, appPageCustom } from "./altstore.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { signingReady, signingAvailable, signAndInstall, localSigning } from "../signing-client.js";
 import { installOptions } from "../core/altstore.js";
@@ -731,8 +731,17 @@ async function renderVersions(body, route, key, id) {
         notes: v.localizedDescription || null,
         unavailable: !can,
         onClick: can ? async () => {
-          if (await signIfReady(pkg.stanza.ipa ?? { name: history.name, sourceUrl: history.sourceUrl }, v, recordApp(pkg, source, v))) return;
-          const { rows, options } = installRows(v, history.sourceUrl, undefined, recordApp(pkg, source, v));
+          const record = recordApp(pkg, source, v);
+          // F85: Install and Custom Install go through the queue (Confirm) like the app page's (F84): that version's job.
+          // Where Custom Install is on offer (the sideload app) the sheet comes first so it can be picked; elsewhere a
+          // tap queues the version, or (no queue: the jailbreak build, no certificate) does what it did before.
+          const queue = record ? () => appPageAction(pkg, source, { version: v.version }) : null;
+          const customize = record ? (o) => appPageCustom(pkg, source, o, { version: v.version }) : null;
+          const customOffered = localSigning() && !ipaInstallAvailable();
+          if (queue && !customOffered && await queue()) return;
+          if (!customOffered && await signIfReady(pkg.stanza.ipa ?? { name: history.name, sourceUrl: history.sourceUrl }, v, record)) return;
+          const { rows, options } = installRows(v, history.sourceUrl, undefined, record, queue, history.name,
+            customize ? { customize } : undefined);
           sheet(options.itms ? `${history.name} ${v.version}` : `${history.name} ${v.version}\nA sideloader signs it on the iPhone with your Apple ID.`,
             rows.map((r) => ({ label: r.label, run: r.onClick })));
         } : null,

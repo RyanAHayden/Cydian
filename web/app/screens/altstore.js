@@ -238,15 +238,17 @@ function trackingSection(app, pkg, source) {
 // app) or the user's certificate is saved (the website): Install / Upgrade / Reinstall queue the app and open Confirm
 // (screens/queue.js); while it is queued the button reads Modify and offers Clear, as Cydia's does. False when the
 // queue doesn't apply (the jailbreak build, a source-signed link, no IPA, no certificate on the website): the caller
-// does what it did before.
+// does what it did before. F85: `version` (Version History's row) queues that version instead of the newest, with no
+// Modify sheet: queuing it replaces whatever version of the app was queued.
 export async function appPageAction(pkg, source, { queue = appQueue, ask = showActionSheet, add = queueApp,
-  mode = detectMode(), ready = () => localSigning() || signingReady(), store = apps } = {}) {
+  mode = detectMode(), ready = () => localSigning() || signingReady(), store = apps, version = null } = {}) {
   const app = pkg?.stanza?.ipa;
   if (mode === "jailbreak" || !app) return false;
   let rec = null;
   try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
-  const job = appJob(pkg, { installed: rec ? rec.version || null : null, source: source ? displayName(source) : null });
+  const job = appJob(pkg, { installed: rec ? rec.version || null : null, version, source: source ? displayName(source) : null });
   if (!job || !(await ready())) return false;
+  if (version) { add(job, { queue }); return true; }
   const newest = app.versions[0]?.version ?? null;
   const state = { queued: Boolean(queue.get(job.id)), installed: rec ? rec.version || "" : null, newest };
   if (!state.queued) { add(job, { queue }); return true; }
@@ -260,15 +262,15 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
 // F84: the app page's Custom Install, where the phone signs: the options sheet (signing-sheet.js customInstall), whose
 // Install queues the app with those options (kept on the job) and opens Confirm, as Install does. Elsewhere (no job:
 // a source-signed link; not the sideload app) it signs straight away as F81's did. `opts` is installRows' { url,
-// name, onInstalled }. -> what customInstall resolved.
-export async function appPageCustom(pkg, source, opts, { queue = appQueue, add = queueApp, mode = detectMode(), store = apps,
+// name, onInstalled }. -> what customInstall resolved. F85: `version` (Version History's row) queues that version.
+export async function appPageCustom(pkg, source, opts, { queue = appQueue, add = queueApp, mode = detectMode(), store = apps, version = null,
   custom = async (o) => (await import("../signing-sheet.js")).customInstall(o) } = {}) {
   const app = pkg?.stanza?.ipa;
   let job = null;
   if (app && mode === "sideload") {
     let rec = null;
     try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
-    job = appJob(pkg, { installed: rec ? rec.version || null : null, source: source ? displayName(source) : null });
+    job = appJob(pkg, { installed: rec ? rec.version || null : null, version, source: source ? displayName(source) : null });
   }
   if (!job) return custom(opts);
   return custom({ url: job.url, name: opts?.name || job.name || "", queue: (options) => add({ ...job, options }, { queue }) });

@@ -100,3 +100,24 @@ test("F134: the walkthrough is How Signing Works, a page below Signing", async (
   assert.equal(nav({ path: ["signing", "help"] }).title, "How Signing Works");
   assert.equal(nav({ path: ["signing", "showExpiry"] }).title, "Show Expiry Dates");
 });
+
+// F149: the certificate's Password row reads as a field: a "Required" hint, not the file rows' "None", and a tap
+// anywhere on the row (not its Browse button) puts the caret in it.
+test("F149: Password row placeholder and tap-to-focus", async () => {
+  const { passwordPlaceholder, focusOnRowTap } = await import("./settings.js");
+  assert.equal(passwordPlaceholder(null, null), "Required");
+  assert.equal(passwordPlaceholder({ profile: {} }, new Uint8Array(1)), "Required");
+  assert.equal(passwordPlaceholder({ profile: {} }, null), "Not Kept");
+  assert.notEqual(passwordPlaceholder(null, null), "None");
+
+  let onClick = null, focused = 0;
+  const li = { addEventListener: (type, fn) => { if (type === "click") onClick = fn; } };
+  const input = { focus: () => { focused++; } };
+  assert.equal(focusOnRowTap(li, input), li);
+  onClick({ target: { closest: () => null } }); // the row's label or padding
+  assert.equal(focused, 1);
+  onClick({ target: { closest: (sel) => (sel === ".sign-browse" ? {} : null) } }); // Browse: its picker, not the field
+  assert.equal(focused, 1);
+  onClick({ target: input }); // the field itself focuses on its own
+  assert.equal(focused, 1);
+});

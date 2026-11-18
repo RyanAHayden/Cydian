@@ -427,7 +427,22 @@ if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.
 // Refresh on Launch: in the background, with the Sources tab's spinning red badge (screens/sources.js).
-if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch")) SCREENS.sources.refreshInBackground?.(ctx);
+const refreshOnLaunch = () => settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch");
+if (refreshOnLaunch()) SCREENS.sources.refreshInBackground?.(ctx);
+
+// In the app, back from the background after more than 2 minutes counts as a fresh open (user 2026-11-18): Home's
+// root, and the launch refresh again. iOS rarely cold-launches it, so without this it opens wherever it was left.
+// ponytail: an alert or sheet left open stays over Home; close them here if that turns out to bother.
+if (globalThis.cydianNative) {
+  let hiddenAt = 0;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
+    if (!hiddenAt || Date.now() - hiddenAt < 2 * 60 * 1000) return;
+    hiddenAt = 0;
+    router.go({ tab: "home", path: [] });
+    if (refreshOnLaunch()) SCREENS.sources.refreshInBackground?.(ctx);
+  });
+}
 
 // F72: in the app, once the launch has settled, the Essential Upgrade alert when iFizBox (or, jailbroken, apt, dpkg or
 // another Essential: yes package) has an upgrade on iFizBox's built-in source. It replaces F61's own popup: only when

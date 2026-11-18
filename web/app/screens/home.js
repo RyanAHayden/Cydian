@@ -60,6 +60,13 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
   return { kind: "changes", label: "See What's New", href: format({ tab: "changes" }) };
 }
 
+// F79: Home's Install IPAs tile, beside Browse: the Installed tab's Install IPAs page (screens/myipas.js). Not in the
+// jailbreak app, which has no such page (apt installs there).
+export function ipasTile(mode = "site") {
+  if (mode === "jailbreak") return null;
+  return { label: "Install IPAs", href: format({ tab: "installed", path: ["myipas"] }) };
+}
+
 // F37: the one-line hint Home shows while Settings > Device is Not Jailbroken, or null. `type` is deviceType().
 export const DEVICE_HINT = "Showing apps for iPhones without a jailbreak. Jailbroken? Settings > Device.";
 export function deviceHint(type, mode = "site") {
@@ -306,7 +313,10 @@ function renderRoot(body) {
   addEventListener("hashchange", onShow);
 
   // F46: Browse, full width under Featured and Themes.
-  const browseRow = tileRow("halves", tile({ label: "Browse", href: format({ tab: "home", path: ["browse"] }), glyph: "browse" }));
+  // F79: Install IPAs beside it, where the build has the page.
+  const ipas = ipasTile(settings.mode);
+  const browseRow = tileRow("halves", tile({ label: "Browse", href: format({ tab: "home", path: ["browse"] }), glyph: "browse" }),
+    ...(ipas ? [tile({ label: ipas.label, href: ipas.href, glyph: "install" })] : []));
 
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));
   state.tile = stateRow.querySelector("a");

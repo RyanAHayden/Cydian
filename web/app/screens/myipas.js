@@ -1,7 +1,14 @@
 // F77: My IPAs, under Installed (#/installed/myipas): the user's own IPAs, signed with their certificate.
+// F79: the page is Install IPAs now, linked from Home (a tile) and Installed (its tile button): Browse first (the
+// apps of the user's AltStore sources: Search, All Apps, then by category, browse.js's lists and app pages below),
+// then My IPAs, the user's own. Add (nav bar) as before.
 //
-//   #/installed/myipas                      the library: a plain list, icon, name, version, size and state;
-//                                           Add (nav bar) -> action sheet Browse / From URL
+//   #/installed/myipas                      Install IPAs: Browse (grouped), then My IPAs: icon, name, version,
+//                                           size and state; Add (nav bar) -> action sheet Files / From URL
+//   #/installed/myipas/search               Search Apps: a search bar over the AltStore apps
+//   #/installed/myipas/apps                 All Apps, A-Z
+//   #/installed/myipas/category:<name>      one Browse category's apps (core/catalog.js browseCategory)
+//   .../package:<id> and deeper             browse.js's pages (an app's page, Version History)
 //   #/installed/myipas/ipa:<file>           an IPA's page, like a package page: header, Install (nav bar), Sign
 //                                           Options, Sign Now, Save Signed IPA, details, Delete
 //   #/installed/myipas/ipa:<file>/options   Sign Options: name, bundle ID, icon, extensions, arm64e fix-up
@@ -11,7 +18,10 @@
 // Add is From URL only, the list is links kept on this device, and Install signs through the Signing Server.
 // Rules and labels: core/myipas.js.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { grouped, plain } from "../nav/ui.js";
+import { grouped } from "../nav/ui.js";
+import * as browse from "./browse.js";
+import { catalog, ALL } from "../catalog.js";
+import { mergeCategories } from "../core/catalog.js";
 import { format } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
@@ -26,13 +36,25 @@ import { localSigning, libraryCall, installFromLibrary, signAndInstall } from ".
 
 export { MYIPAS };
 
-const view = { body: null, route: null, seq: 0 };
+const view = { body: null, browse: null, route: null, seq: 0, browseSeq: 0 };
 const known = new Map(); // file -> the last entry seen (titles, the page before its list call answers)
 
-// Which My IPAs page a route under Installed is: "list", "ipa", "options", or null (not one of ours).
+export const PAGE_TITLE = "Install IPAs";
+
+// F79: Browse's own segments below the page: Search, All Apps, a category.
+function browseSeg(seg) {
+  if (seg === "search" || seg === "apps") return { page: seg };
+  if (typeof seg === "string" && seg.startsWith("category:")) return { page: "category", value: seg.slice(9) };
+  return null;
+}
+
+// Which page a route under Installed is: "list" (Install IPAs), "ipa", "options", F79's "search", "apps",
+// "category" and "browse" (browse.js's pages below them), or null (not one of ours).
 export function pageOf(route) {
   if (route.path[0] !== MYIPAS) return null;
   if (route.path.length === 1) return { page: "list" };
+  const b = browseSeg(route.path[1]);
+  if (b) return route.path.length === 2 ? b : { page: "browse" };
   const file = fileOfToken(route.path[1]);
   if (!file) return { page: "missing" };
   if (route.path.length === 2) return { page: "ipa", file };
@@ -45,7 +67,11 @@ const site = () => !localSigning();
 export function nav(route) {
   const p = pageOf(route);
   switch (p?.page) {
-    case "list": return { title: "My IPAs", style: "plain", right: { label: "Add", onClick: () => addMenu() } };
+    case "list": return { title: PAGE_TITLE, right: { label: "Add", onClick: () => addMenu() } };
+    case "search": return { title: "Search Apps", style: "plain" };
+    case "apps": return { title: "All Apps", style: "plain" };
+    case "category": return { title: p.value || "Apps", style: "plain" };
+    case "browse": return browse.nav(route);
     case "ipa": return { title: known.get(p.file)?.name || p.file.replace(/\.ipa$/i, ""),
       right: { label: "Install", onClick: () => install(p.file) } };
     case "options": return { title: "Sign Options", right: { label: "Save", onClick: (e) => saveOptions(p.file, e.currentTarget) } };
@@ -60,12 +86,23 @@ export function render(body, route, ctx) {
   style();
   const p = pageOf(route);
   if (p?.page === "list") {
-    view.body = body;
+    // One wrapper (the first child of a page stretches, ios6.css): Browse, then the library.
+    const page = el("div", "install-ipas");
+    view.browse = el("div", "install-ipas-browse");
+    view.body = el("div", "install-ipas-mine");
     view.route = route;
-    body.append(note("Loading"));
+    view.browse.append(grouped(browseGroups(null)));
+    view.body.append(note("Loading"));
+    page.append(view.browse, view.body);
+    body.append(page);
+    loadBrowse();
     load();
     return;
   }
+  if (p?.page === "search") return renderSearch(body, route);
+  if (p?.page === "apps") return browse.renderList(body, route, async () => appsOf(await catalog.list(ALL, ALL)), true);
+  if (p?.page === "category") return browse.renderList(body, route, async () => appsOf(await catalog.browse(p.value)), true);
+  if (p?.page === "browse") return browse.render(body, route, ctx);
   if (p?.page === "ipa") return renderIpa(body, route, p.file);
   if (p?.page === "options") return renderOptions(body, route, p.file);
   body.append(note("Nothing here."));
@@ -120,21 +157,101 @@ async function load() {
 function draw(list) {
   const body = view.body;
   const rows = libraryRows(list, { site: site() });
-  const ul = plain([{ rows: rows.map((r) => ({
+  const frag = grouped([{ header: "My IPAs", rows: rows.map((r) => ({
     label: r.title, subtitle: r.subtitle, icon: { text: r.title.charAt(0).toUpperCase() },
     href: format({ tab: "installed", path: ipaPath(r.file) }),
-  })) }]);
-  const cells = ul.querySelectorAll(":scope > .cell");
+  })), footer: rows.length ? "" : libraryEmptyText(site()) }]);
+  const cells = frag.querySelectorAll(".cell");
   rows.forEach((r, i) => {
     cells[i].classList.add("myipa-row", `is-${r.state.kind}`);
     putIcon(cells[i].querySelector(".cell-icon"), r.icon);
   });
-  body.replaceChildren(ul);
-  if (!rows.length) {
-    body.prepend(note(site()
-      ? "No IPAs yet. Tap Add to keep a link to an IPA here: the Signing Server signs it with your certificate when you install it."
-      : "No IPAs yet. Tap Add to choose one in Files or download one, or put IPAs in Files under On My iPhone > Cydian."));
+  body.replaceChildren(frag);
+}
+
+export function libraryEmptyText(site) {
+  return site
+    ? "No IPAs yet. Tap Add to keep a link to an IPA here: the Signing Server signs it with your certificate when you install it."
+    : "No IPAs yet. Tap Add to choose one in Files or download one, or put IPAs in Files under On My iPhone > Cydian.";
+}
+
+// ---- F79: Browse, the apps of the user's AltStore sources ------------------------------------------------------
+
+// The catalog's rows that are AltStore apps (core/catalog.js slim: kind "ipa"); APT packages stay out.
+export const appsOf = (rows) => (rows ?? []).filter((r) => r?.kind === "ipa");
+
+const browseHref = (seg) => format({ tab: "installed", path: [MYIPAS, seg] });
+
+// Install IPAs' Browse groups for `apps` (AltStore app rows), or null while the catalog loads: Search and All Apps,
+// then the categories with their counts. No apps: a line saying where they come from.
+export function browseGroups(apps) {
+  const top = [{ label: "Search Apps", href: browseHref("search") }];
+  if (apps == null) {
+    return [{ header: "Browse", rows: [...top, { label: "Loading Apps", chevron: false }] }];
   }
+  if (!apps.length) {
+    return [{ header: "Browse", rows: top,
+      footer: "Add an AltStore source in Sources to browse its apps here. Every app installs signed with your certificate." }];
+  }
+  return [
+    { header: "Browse", rows: [...top, { label: "All Apps", detail: String(apps.length), href: browseHref("apps") }] },
+    { rows: mergeCategories(apps, { jailbroken: false }).map((c) => ({ label: c.name, detail: String(c.count), href: browseHref(`category:${c.name}`) })),
+      footer: "Apps from your AltStore sources, signed with your certificate when you install one." },
+  ];
+}
+
+async function loadBrowse() {
+  const seq = ++view.browseSeq;
+  let apps;
+  try {
+    await catalog.ensure();
+    apps = appsOf(await catalog.list(ALL, ALL));
+  } catch (e) {
+    if (seq === view.browseSeq && view.browse) view.browse.replaceChildren(grouped([{ header: "Browse", footer: e.message }]));
+    return;
+  }
+  if (seq !== view.browseSeq || !view.browse) return;
+  view.browse.replaceChildren(grouped(browseGroups(apps)));
+}
+
+// Search Apps: Search's bar (packages.css) over the AltStore apps only, results as browse.js rows.
+function renderSearch(body, route) {
+  const bar = el("form", "search-bar");
+  bar.setAttribute("role", "search");
+  const field = el("label", "search-field");
+  const input = Object.assign(el("input"), { type: "search", placeholder: "Search Apps", autocomplete: "off", spellcheck: false });
+  input.setAttribute("autocapitalize", "off");
+  input.setAttribute("autocorrect", "off");
+  input.setAttribute("aria-label", "Search apps: name, description or developer");
+  input.enterKeyHint = "search";
+  field.append(input);
+  bar.append(field);
+  const hint = el("p", "empty search-note", "App names, descriptions and developers.");
+  body.append(bar, hint);
+  const list = browse.packageList(body, route, [], { letters: false });
+  body.append(list.el);
+  let seq = 0;
+  let timer = 0;
+  async function run() {
+    const q = input.value.trim();
+    const mine = ++seq;
+    if (!q) { list.setItems([]); hint.textContent = "App names, descriptions and developers."; return; }
+    let rows;
+    try {
+      await catalog.ensure();
+      rows = appsOf(await catalog.search(q));
+    } catch (e) {
+      if (mine === seq) hint.textContent = e.message;
+      return;
+    }
+    if (mine !== seq) return;
+    browse.rememberNames(rows);
+    list.setItems(rows);
+    hint.textContent = rows.length ? "" : "No Results";
+  }
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 120); });
+  bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); run(); input.blur(); });
+  setTimeout(() => { if (input.isConnected) input.focus(); }, 350); // after the push animation
 }
 
 // An IPA's icon on a placeholder box (the letter stays under it): Apple's CgBI PNG doesn't draw in a browser, but the
@@ -153,14 +270,17 @@ function putIcon(box, b64) {
 
 const refresh = () => { if (view.body?.isConnected) load(); };
 
+// Sources refreshed or changed: Browse counts again.
+catalog.onChange?.(() => { if (view.browse?.isConnected) loadBrowse(); });
+
 async function addMenu() {
   if (site()) return addFromUrl();
-  const i = await showActionSheet({ buttons: ["Browse", "From URL"] });
-  if (i === 0) return browse();
+  const i = await showActionSheet({ buttons: ["Files", "From URL"] }); // F79: Browse is the page's own section now
+  if (i === 0) return pickFiles();
   if (i === 1) return addFromUrl();
 }
 
-async function browse() {
+async function pickFiles() {
   let r;
   try { r = await libraryCall("pick", {}); } catch (e) {
     await showAlert({ title: "Couldn't Add", message: deviceError(e).message, buttons: ["OK"] });

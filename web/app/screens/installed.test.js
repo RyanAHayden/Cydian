@@ -29,5 +29,5 @@ test("installed tab: My IPAs pages without a jailbreak (F77)", async () => {
   assert.equal(pageKind(r("myipas"), "jailbreak"), "browse");
   const { myIpasRow } = await import("./installed.js");
   assert.equal(myIpasRow(r(), false).href, "#/installed/myipas");
-  assert.equal(myIpasRow(r(), false).label, "My IPAs");
+  assert.equal(myIpasRow(r(), false).label, "Install IPAs"); // F79: the page is Install IPAs now
 });

@@ -22,6 +22,11 @@
 // F104: the dpkg list has a scope bar as on iOS 6's Usage screen: Name (A–Z, as before), Recent (newest install
 // first, by the mtime of dpkg's info/<pkg>.list, which the jailbreak app reads: apt.installDates in Apt.swift;
 // the site's uploaded status file has no dates, so no Recent there) and Size (Installed-Size, largest first).
+//
+// F125: the Wish List lives here (it was a row on Home): a Wish List row with its count (a grey count badge) on the
+// root, under the installed lists (beside Apps above dpkg's packages in the jailbreak app, so it isn't hundreds of rows
+// down; a Packages section under the apps elsewhere), opens #installed/wishlist: the wished packages as a package
+// list, Edit (the red minus, then Delete) or a left swipe removes one, as on the apps list.
 import * as browse from "./browse.js";
 import * as myipas from "./myipas.js";
 import { grouped, plain, placeholder } from "../nav/ui.js";
@@ -34,11 +39,13 @@ import { mediaUrl } from "./depiction.js";
 import { rememberedApps } from "../app-updates.js";
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { settings } from "./settings.js";
+import { wishRows, wishCount, WISH_EMPTY } from "../core/wishlist.js";
 
 export const title = "Installed";
 
 export const DPKG = "dpkg"; // the site's path segment for the status file's packages
 export const APPS = "apps"; // F87: the jailbreak app's path segment for the remembered apps
+export const WISH = "wishlist"; // F125: the Wish List page's path segment
 
 const state = { body: null, route: null, list: null, seq: 0, dates: null };
 
@@ -102,6 +109,7 @@ export const recordsApps = (mode = detectMode()) => mode !== "jailbreak";
 
 // Which page a route is: "apps" (F30's list), "dpkg" (the status file's packages), "myipas" (F77) or a browse.js page.
 export function pageKind(route, mode = detectMode()) {
+  if (route.path.length === 1 && route.path[0] === WISH) return "wishlist"; // F125, in every mode
   if (!recordsApps(mode)) return !route.path.length ? "dpkg" : route.path.length === 1 && route.path[0] === APPS ? "apps" : "browse";
   if (!route.path.length) return "apps";
   if (route.path[0] === myipas.MYIPAS) return "myipas";
@@ -114,12 +122,22 @@ export function init() {
     if (appView.body) loadApps();
   });
   onAppsChange(() => { if (appView.body) loadApps(); });
+  // F125: the count on the Wish List row, and the Wish List page, follow the list (the package page's sheet, a Delete).
+  browse.wishlist().onChange(() => {
+    if (wishView.body) loadWish();
+    if (state.body && state.rows !== undefined) draw();
+    if (appView.body) loadApps();
+  });
 }
 
 export function nav(route) {
   const kind = pageKind(route);
   if (kind === "browse") return browse.nav(route);
   if (kind === "myipas") return myipas.nav(route);
+  if (kind === "wishlist") {
+    return { title: "Wish List", style: "plain",
+      right: { label: wishView.editing ? "Done" : "Edit", onClick: (e) => setWishEditing(!wishView.editing, e.currentTarget) } };
+  }
   if (kind === "apps") {
     return { title: recordsApps() ? "Installed" : "Apps", style: "plain", // F87: "Apps" one row down in the jailbreak app
       right: { label: appView.editing ? "Done" : "Edit", onClick: (e) => setEditing(!appView.editing, e.currentTarget) } };
@@ -138,6 +156,13 @@ export function render(body, route, ctx) {
   }
   if (kind === "myipas") {
     myipas.render(body, route, ctx);
+    return;
+  }
+  if (kind === "wishlist") {
+    wishView.body = body;
+    wishView.route = route;
+    body.append(placeholder("list"));
+    loadWish();
     return;
   }
   if (kind === "apps") {
@@ -198,12 +223,15 @@ function draw() {
     return;
   }
   body.classList.replace("grouped", "plain");
+  // F87's Apps row and F125's Wish List row, on the root (not the site's dpkg page one row down).
+  const top = [appCount ? appsRow(state.route, appCount) : null,
+    state.route.path.length ? null : wishListRow(state.route, wishCount(browse.wishlist().list(), rows.map((r) => r.id)))].filter(Boolean);
   if (!rows.length) {
-    body.replaceChildren(note("No packages."));
+    body.replaceChildren(...(top.length ? [grouped([{ rows: top }])] : []), note("No packages."));
     return;
   }
   body.replaceChildren();
-  if (appCount) body.append(appsRow(state.route, appCount));
+  if (top.length) body.append(grouped([{ rows: top }]));
   // F104: the scope bar goes in before the list measures where it starts.
   const scopes = sortScopes(Boolean(state.dates));
   const by = scopes.includes(sortBy) ? sortBy : "name";
@@ -225,8 +253,14 @@ async function jailbreakAppCount() {
 }
 
 function appsRow(route, n) {
-  return grouped([{ rows: [{ label: "Apps", subtitle: n === 1 ? "1 app installed from an app page" : `${n} apps installed from an app page`,
-    href: format({ tab: route.tab, path: [...route.path, APPS] }) }] }]);
+  return { label: "Apps", subtitle: n === 1 ? "1 app installed from an app page" : `${n} apps installed from an app page`,
+    href: format({ tab: route.tab, path: [...route.path, APPS] }) };
+}
+
+// F125: Installed's Wish List row; `n` (wished, not installed) as the grey count badge, none at 0.
+export function wishListRow(route, n) {
+  return { label: "Wish List", subtitle: "Packages to install later", badge: n > 0 ? String(n) : undefined,
+    href: format({ tab: route.tab, path: [WISH] }) };
 }
 
 // A file picker for the status file; the read stays in the browser.
@@ -305,11 +339,20 @@ async function loadApps() {
     return;
   }
   const site = detectMode() === "site";
+  // F125: the Wish List count leaves out what dpkg has; the worker answers once the sources are in, so the list
+  // doesn't wait on it (the row is drawn again when it does).
+  const installedIds = catalog.installed().then((x) => (x ?? []).map((r) => r.id), () => []);
   const [hasStatus, signed] = await Promise.all([site ? catalog.hasStatus() : false, signedApps()]);
   if (seq !== appView.seq) return;
   if (!recordsApps()) rows = rows.filter((r) => !r?.self); // Cydian's own row is dpkg's there
   appView.signed = signed; // F91
   drawApps(appListRows(rows, () => null), new Map(), site, hasStatus);
+  const ids = await installedIds;
+  if (seq !== appView.seq) return;
+  if (ids.length) {
+    appView.installedIds = ids;
+    drawApps(appListRows(rows, () => null), new Map(), site, hasStatus);
+  }
   // The upgrade badges wait on the sources; the list doesn't.
   if (!rows.length) return;
   let cands;
@@ -339,6 +382,7 @@ function drawApps(listRows, cands, site, hasStatus) {
       ? { label: "dpkg Status File", subtitle: "Packages installed with apt", href: format({ tab: route.tab, path: [DPKG] }) }
       : { label: "Choose Status File", subtitle: "See the packages a jailbroken iPhone has", onClick: () => chooseStatus() }] });
   }
+  sections.push({ header: "Packages", rows: [wishListRow(route, wishCount(browse.wishlist().list(), appView.installedIds ?? []))] }); // F125
   const ul = plain(sections);
   ul.classList.toggle("editing", appView.editing);
   const cells = ul.querySelectorAll(":scope > .cell");
@@ -464,4 +508,114 @@ function removeApp(li, r) {
       await showAlert({ title: "Error", message: e.message, buttons: ["OK"] });
     }
   }, 250);
+}
+
+// ---- F125: the Wish List page --------------------------------------------------------------------------------
+
+const wishView = { body: null, route: null, list: null, seq: 0, editing: false };
+
+// The wished packages the sources carry, as a plain package list; installed ones drop off the list for good (as
+// browse.js renderWishlist, F102).
+async function loadWish() {
+  const seq = ++wishView.seq;
+  let rows;
+  try {
+    await catalog.ensure();
+    const installed = ((await catalog.installed().catch(() => null)) ?? []).map((r) => r.id);
+    browse.wishlist().prune(installed);
+    const ids = browse.wishlist().list();
+    const found = await Promise.all(ids.map((id) => catalog.package(id).then((p) => (p && !p.installedOnly ? p.row : null), () => null)));
+    rows = wishRows(ids, found, installed);
+  } catch (e) {
+    if (seq === wishView.seq) wishView.body.replaceChildren(note(e.message));
+    return;
+  }
+  if (seq !== wishView.seq) return;
+  drawWish(rows);
+}
+
+function drawWish(rows) {
+  const body = wishView.body;
+  browse.dropList(body, wishView.list);
+  wishView.list = null;
+  body.classList.replace("grouped", "plain");
+  if (!rows.length) { body.replaceChildren(note(WISH_EMPTY)); return; }
+  body.replaceChildren();
+  const list = browse.packageList(body, wishView.route, rows, { letters: false, decorate: decorateWish });
+  list.el.classList.add("wish-list");
+  list.el.classList.toggle("editing", wishView.editing);
+  attachWishGestures(list.el);
+  wishView.list = list;
+  body.append(list.el);
+}
+
+// The list's rows are pooled (vlist.js): the Delete controls go in once per row and act on whatever it shows now.
+function decorateWish(row, item) {
+  if (!row._wish) {
+    row._wish = true;
+    row.classList.add("source-row", "wish-row");
+    const toggle = Object.assign(document.createElement("button"), { type: "button", className: "del-toggle" });
+    toggle.addEventListener("click", (e) => { e.preventDefault(); armWish(row, !row.classList.contains("armed")); });
+    const confirm = Object.assign(document.createElement("button"), { type: "button", className: "del-confirm", textContent: "Delete" });
+    confirm.addEventListener("click", (e) => { e.preventDefault(); removeWish(row, row._item.id); });
+    row.append(toggle, confirm);
+    row._wishToggle = toggle;
+  }
+  row.classList.remove("armed", "removing");
+  row._wishToggle.setAttribute("aria-label", "Remove " + item.name);
+}
+
+function armWish(row, on) {
+  for (const other of row.parentNode?.querySelectorAll(".wish-row.armed") ?? []) if (other !== row) other.classList.remove("armed");
+  row.classList.toggle("armed", on);
+}
+
+// As the apps list's attachRowGestures: while editing, or while a row shows Delete, a tap only puts the Delete away;
+// a left swipe shows it, a right one hides it.
+function attachWishGestures(el) {
+  let start = null;
+  let swiped = false;
+  el.addEventListener("click", (e) => {
+    if (e.target.closest(".del-toggle, .del-confirm")) return;
+    const armed = el.querySelector(".wish-row.armed");
+    if (!(wishView.editing && e.target.closest(".wish-row")) && !armed && !swiped) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (armed && !swiped) armed.classList.remove("armed");
+    swiped = false;
+  }, true);
+  el.addEventListener("pointerdown", (e) => {
+    const row = e.target.closest(".wish-row");
+    swiped = false;
+    start = row && !wishView.editing && !e.target.closest(".del-confirm") ? { row, x: e.clientX, y: e.clientY } : null;
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { start = null; return; } // a scroll
+    if (Math.abs(dx) < 30 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    armWish(start.row, dx < 0);
+    swiped = true;
+    start = null;
+  });
+  const stop = () => { start = null; };
+  el.addEventListener("pointerup", stop);
+  el.addEventListener("pointercancel", stop);
+}
+
+function setWishEditing(on, button) {
+  wishView.editing = on;
+  wishView.list?.el.classList.toggle("editing", on);
+  for (const row of wishView.body?.querySelectorAll(".wish-row.armed") ?? []) row.classList.remove("armed");
+  if (button) {
+    button.textContent = on ? "Done" : "Edit";
+    button.classList.toggle("done", on);
+  }
+}
+
+// The row fades, then leaves the list; the page redraws from the list's change (init).
+function removeWish(row, id) {
+  row.classList.add("removing");
+  setTimeout(() => browse.wishlist().set(id, false), 250);
 }

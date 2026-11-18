@@ -242,3 +242,45 @@ test("githubShots: a README under another name is found through the API; a faile
   const shots = await githubShots({ owner: "o", repo: "r" }, async (u) => { if (u in files) return files[u]; throw new Error("404"); });
   assert.deepEqual(urls(shots), ["https://raw.githubusercontent.com/o/r/HEAD/docs/s.png"]);
 });
+
+// ---- F181: a Sileo depiction's rating, reviews and newest changelog entry ----------------------------------------
+import { sileoRatings, sileoWhatsNew } from "./previews.js";
+
+test("F181: sileoRatings: the RatingView's average, the ReviewViews as reviews, none without either", () => {
+  const dep = { class: "DepictionTabView", tabs: [
+    { tabname: "Details", class: "DepictionStackView", views: [{ class: "DepictionRatingView", rating: 4.5 }] },
+    { tabname: "Reviews", class: "DepictionStackView", views: [
+      { class: "DepictionReviewView", title: "Great", author: "Ann", rating: 5, markdown: "**Love** it" },
+      { class: "DepictionReviewView", title: "Meh", author: "Bo", rating: "2", markdown: "<b>ok</b>", useRawFormat: true },
+    ] },
+  ] };
+  assert.deepEqual(sileoRatings(dep), { average: 4.5, count: 2, noun: "Reviews", reviews: [
+    { title: "Great", author: "Ann", rating: 5, text: "**Love** it", raw: false },
+    { title: "Meh", author: "Bo", rating: 2, text: "<b>ok</b>", raw: true },
+  ] });
+  // No RatingView: the reviews' mean; a RatingView alone: no count.
+  assert.equal(sileoRatings({ views: dep.tabs[1].views }).average, 3.5);
+  assert.deepEqual(sileoRatings({ class: "DepictionRatingView", rating: 9 }), { average: 5, count: null, noun: "Reviews", reviews: [] });
+  assert.equal(sileoRatings({ class: "DepictionStackView", views: [{ class: "DepictionMarkdownView", markdown: "hi" }] }), null);
+  assert.equal(sileoRatings(null), null);
+  assert.equal(sileoRatings({ class: "DepictionRatingView", rating: "junk" }), null);
+});
+
+test("F181: sileoWhatsNew: the Changelog tab's first header and its text, up to the next", () => {
+  const tab = (views, tabname = "Changelog") => ({ class: "DepictionTabView", tabs: [{ tabname: "Details", views: [] }, { tabname, class: "DepictionStackView", views }] });
+  assert.deepEqual(sileoWhatsNew(tab([
+    { class: "DepictionSubheaderView", title: "2.1.3" },
+    { class: "DepictionMarkdownView", markdown: "- Fixes a stutter" },
+    { class: "DepictionLabelView", text: "New Bouncy preset" },
+    { class: "DepictionSubheaderView", title: "2.1.2" },
+    { class: "DepictionMarkdownView", markdown: "- older" },
+  ])), { title: "2.1.3", text: "- Fixes a stutter\nNew Bouncy preset" });
+  // One Markdown view holding every version under its own heading.
+  assert.deepEqual(sileoWhatsNew(tab([{ class: "DepictionMarkdownView", markdown: "## 1.2\n- fix\n- more\n\n## 1.1\n- old" }], "What's New")),
+    { title: "1.2", text: "- fix\n- more" });
+  // Stacks inside the tab are read in order.
+  assert.deepEqual(sileoWhatsNew(tab([{ class: "DepictionStackView", views: [{ class: "DepictionHeaderView", title: "v3" }, { class: "DepictionMarkdownView", markdown: "x" }] }])),
+    { title: "v3", text: "x" });
+  assert.equal(sileoWhatsNew(tab([{ class: "DepictionMarkdownView", markdown: "hi" }], "Screenshots")), null);
+  assert.equal(sileoWhatsNew({ class: "DepictionStackView", views: [] }), null);
+});

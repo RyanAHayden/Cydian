@@ -387,3 +387,12 @@ function sanitizeHtml(html, opts = {}) {
   copy(doc.body, frag);
   return frag;
 }
+
+// F181: a review's text for the package page's Reviews tab (screens/storepage.js), drawn as ReviewView draws it:
+// markdown, or raw HTML through the allowlist sanitiser. review: { text, raw }.
+export function reviewBody(review, opts = {}) {
+  const body = el("div", "dep-markdown dep-review-body store-review-text");
+  if (review.raw) body.append(sanitizeHtml(String(review.text ?? ""), opts));
+  else body.append(markdown(String(review.text ?? ""), opts));
+  return body;
+}

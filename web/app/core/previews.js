@@ -10,6 +10,7 @@
 //   altShots(app)                    -> [shot]  AltStore screenshots (v1 screenshotURLs, v2 strings/objects, iphone/ipad)
 //   aptShots(stanza)                 -> [shot]  Screenshots: (any separators) and Header:
 //   sileoShots(json)                 -> [shot]  every DepictionScreenshotsView, videos skipped (the depiction draws its own headerImage)
+//   sileoRatings(json), sileoWhatsNew(json)  F181: a depiction's rating, reviews and newest changelog entry (at the end)
 //   htmlShots(html, baseUrl)         -> [shot]  a Zebra/Cydia HTML depiction's <img>s, chrome and icons skipped
 //   readmeShots(markdown, gh)        -> [shot]  a GitHub README's images, relative ones resolved, badges/icons skipped
 //   releaseShots(release)            -> [shot]  the latest GitHub release's attached pictures (and its notes' images)
@@ -447,4 +448,84 @@ export async function loadPreviews(key, { shots = [], html = null, gh = null } =
   const out = dedupeShots(found).slice(0, MAX_SHOTS);
   if (key) keep(store, key, out, now);
   return out;
+}
+
+// ---- F181: ratings, reviews and What's New from a Sileo depiction ------------------------------------------------
+//
+//   sileoRatings(json)  -> { average, count, noun, reviews: [{ title, author, rating, text, raw }] } or null
+//     average: the first DepictionRatingView's rating (0-5), else the reviews' mean; count: how many reviews there
+//     are (a depiction says nothing about how many people rated), null without any. null when there's no rating.
+//   sileoWhatsNew(json) -> { title, text } or null: the newest entry of a "Changelog" / "What's New" tab: its first
+//     header and the text under it, up to the next header (a Markdown view's own "## 1.2" headings count too).
+
+const clampRating = (v) => (Number.isFinite(Number(v)) && str(v) !== "" ? Math.max(0, Math.min(5, Number(v))) : null);
+
+export function sileoRatings(json) {
+  let average = null;
+  const reviews = [];
+  walk(json, (v) => {
+    if (v.class === "DepictionRatingView" && average == null) average = clampRating(v.rating);
+    if (v.class === "DepictionReviewView") {
+      reviews.push({ title: str(v.title), author: str(v.author), rating: clampRating(v.rating), text: str(v.markdown), raw: v.useRawFormat === true });
+    }
+  });
+  const rated = reviews.filter((r) => r.rating != null);
+  if (average == null && rated.length) average = Math.round((rated.reduce((n, r) => n + r.rating, 0) / rated.length) * 10) / 10;
+  if (average == null && !reviews.length) return null;
+  return { average, count: reviews.length || null, noun: "Reviews", reviews };
+}
+
+// A tab's leaf views in reading order (stacks and tabs flattened).
+function leaves(v, out = [], depth = 0) {
+  if (!v || typeof v !== "object" || depth > 40) return out;
+  if (Array.isArray(v)) { for (const x of v) leaves(x, out, depth + 1); return out; }
+  if (Array.isArray(v.views)) { leaves(v.views, out, depth + 1); return out; }
+  if (v.class === "DepictionMinVersionForceView") return leaves(v.view, out, depth + 1);
+  out.push(v);
+  return out;
+}
+
+const CHANGES_TAB = /change|what.?s\s*new|release|history|updates?/i;
+const HEADER = new Set(["DepictionHeaderView", "DepictionSubheaderView"]);
+
+export function sileoWhatsNew(json) {
+  let tab = null;
+  walk(json, (v) => {
+    if (tab || v.class !== "DepictionTabView" || !Array.isArray(v.tabs)) return;
+    tab = v.tabs.find((t) => t && CHANGES_TAB.test(str(t.tabname))) ?? null;
+  });
+  if (!tab) return null;
+  let title = null;
+  const text = [];
+  for (const v of leaves(tab)) {
+    if (HEADER.has(v.class)) {
+      if (title != null || text.length) break;
+      title = str(v.title) || null;
+      continue;
+    }
+    const t = v.class === "DepictionMarkdownView" ? str(v.markdown) : v.class === "DepictionLabelView" ? str(v.text) : "";
+    if (!t) continue;
+    if (v.class === "DepictionMarkdownView" && /^\s{0,3}#{1,6}\s/m.test(t)) {
+      // "## 1.2\n- fix\n## 1.1 ..." in one view: its first heading and what follows, up to the next heading.
+      const lines = t.split("\n");
+      const at = lines.findIndex((l) => /^\s{0,3}#{1,6}\s/.test(l));
+      if (title == null && !text.length) {
+        title = lines[at].replace(/^\s{0,3}#{1,6}\s+/, "").replace(/\s*#+\s*$/, "").trim() || null;
+        const pre = lines.slice(0, at).join("\n").trim();
+        const rest = lines.slice(at + 1);
+        const end = rest.findIndex((l) => /^\s{0,3}#{1,6}\s/.test(l));
+        const body = (end < 0 ? rest : rest.slice(0, end)).join("\n").trim();
+        if (pre && !body) text.push(pre);
+        if (body) text.push(body);
+        if (end >= 0) break;
+        continue;
+      }
+      const before = lines.slice(0, at).join("\n").trim();
+      if (before) text.push(before);
+      break;
+    }
+    text.push(t);
+  }
+  const body = text.join("\n").trim();
+  return title || body ? { title, text: body } : null;
 }

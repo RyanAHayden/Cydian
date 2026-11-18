@@ -1,0 +1,14 @@
+Origin: Cydian Tests
+Label: Cydian Tests
+Suite: stable
+Version: 1.0
+Codename: tests
+Architectures: iphoneos-arm64 iphoneos-arm
+Components: main
+Description: Temporary test packages for Cydian (will be deleted)
+MD5Sum:
+ 53b7f6222c4913e23f6c9ac548649596 2463 Packages
+ 30b5ea12d39e74bf8b61b4c158aee1ac 848 Packages.gz
+SHA256:
+ e177fadc773654968f3778a7df2d6186064864cf0dba2a202471cc57067ada8b 2463 Packages
+ 005ebbcbe3bf69ec2b446a73a53651445ba651600cabf1f2278688da158c228b 848 Packages.gz

@@ -1,0 +1,80 @@
+Package: com.ryha.test.essential
+Name: Test Essential
+Version: 1.0
+Architecture: iphoneos-arm64
+Maintainer: Cydian Tests
+Author: Cydian Tests
+Section: Tweaks
+Description: Test: an essential package (old version)
+Essential: yes
+Filename: ./com.ryha.test.essential_1.0_iphoneos-arm64.deb
+Size: 596
+MD5sum: ab0328f482d0a7829bcca5c159f88a3e
+SHA256: 690bf08d3f13fc89f93c43521762fb88d7635dccea5347aed58cebea948d0299
+
+Package: com.ryha.test.essential
+Name: Test Essential
+Version: 1.1
+Architecture: iphoneos-arm64
+Maintainer: Cydian Tests
+Author: Cydian Tests
+Section: Tweaks
+Description: Test: an essential package; upgrading it is an Essential Upgrade
+Essential: yes
+Filename: ./com.ryha.test.essential_1.1_iphoneos-arm64.deb
+Size: 606
+MD5sum: 7066284d83223423f3e9eb195a3f6299
+SHA256: d1bed46f324cf1f24e2fa407301fb958e07a4b36dc8f3a8ea16ecde89024f365
+
+Package: com.ryha.test.tweak
+Name: Test Tweak
+Version: 1.0
+Architecture: iphoneos-arm64
+Maintainer: Cydian Tests
+Author: Cydian Tests
+Section: Tweaks
+Description: Test: a plain tweak, old version
+Filename: ./com.ryha.test.tweak_1.0_iphoneos-arm64.deb
+Size: 580
+MD5sum: f1a36c79afd7394fb0b6a7e01ed80919
+SHA256: 7ca412c2be0ab8ea8d2ae6b72f0cfeeec1753a26d77b2766f5c6829dff9024f9
+
+Package: com.ryha.test.tweak
+Name: Test Tweak
+Version: 1.1
+Architecture: iphoneos-arm64
+Maintainer: Cydian Tests
+Author: Cydian Tests
+Section: Tweaks
+Description: Test: a plain tweak, new version (shows in Changes)
+Filename: ./com.ryha.test.tweak_1.1_iphoneos-arm64.deb
+Size: 594
+MD5sum: ee19c777460618f55588db32fbbc95f7
+SHA256: 557faa894b267470137e967b2077286efeca43baef1c70c1bcc497040d98240b
+
+Package: com.ryha.test.brokendeps
+Name: Test Brokendeps
+Version: 1.0
+Architecture: iphoneos-arm64
+Maintainer: Cydian Tests
+Author: Cydian Tests
+Section: Tweaks
+Description: Test: depends on a package no source has (the dependency error)
+Depends: com.ryha.test.nowhere (>= 2.0)
+Filename: ./com.ryha.test.brokendeps_1.0_iphoneos-arm64.deb
+Size: 628
+MD5sum: 03576c89857aa19b61064eeef05c3b9e
+SHA256: 152cb50c96872127d9b030306a5a42d6e29c45e70c4304050d638916ab397ac1
+
+Package: com.ryha.test.rootful
+Name: Test Rootful
+Version: 1.0
+Architecture: iphoneos-arm
+Maintainer: Cydian Tests
+Author: Cydian Tests
+Section: Tweaks
+Description: Test: built for rootful jailbreaks only
+Filename: ./com.ryha.test.rootful_1.0_iphoneos-arm.deb
+Size: 588
+MD5sum: cec6397a680384c8c4a13c4d50eba693
+SHA256: 8e0349306036220dee07f31eb3a441a70e5987887e0092a97155dd9b7b02d561

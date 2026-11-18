@@ -807,6 +807,16 @@ async function drawSiteSigning(el) {
     footer: "Install downloads the app, signs it in this browser with your certificate, and leaves the signed app on "
       + `${location.host} for 10 minutes so iOS can install it. Your certificate, key and password stay in this browser.` });
   if (id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeSiteCertificate() }] });
-  el.replaceChildren(certificateBlock(el, id), ...siteAppSection(id), grouped(sections));
+  // The same walkthrough as the app's (user 2026-11-18: "the webpage one needs to match the ipa one"): step 1 the
+  // certificate, step 2 the server, which on the website is this site itself (it holds the signed app for iOS).
+  const ready = Boolean(id?.p12 && id?.profile && id?.passwordOk !== false);
+  const here = grouped([{ rows: [{ label: location.host, subtitle: "This site holds each signed app for iOS" }] }]);
+  drawWalkthrough(el, {
+    status: ready ? { identity: { website: true } } : null,
+    certificate: certificateBlock(el, id),
+    server: here, serverUrl: location.origin,
+    open: walkOpen,
+    extra: [...siteAppSection(id), grouped(sections)],
+  });
   el.scrollTop = top;
 }

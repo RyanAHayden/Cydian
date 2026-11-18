@@ -27,6 +27,8 @@
 //   c.browse(category)                     -> [row] in that Browse category, sorted by name
 //   c.popular({ limit })                   -> [row] ranked by how many sources list it, then newest (rankPopular),
 //                                             each with `sources` (that count)
+//   c.collection(id)                       -> F154: [row] in Browse's collection `id` (COLLECTIONS)
+//   c.roulette({ per })                    -> F154: Tweak Roulette's pool, [{ label, icon, rows }] (roulettePool)
 //   c.aptProblems(aptOutput)              -> N4: explainApt over the same index as deps (the Confirm sheet)
 //   c.queueInfo([id])                      -> N4: { id: { name, restart, kind } } for the queue's packages (F151: kind)
 //   c.deps(id, key | "*")                  -> F18 (core/deps.js explain): { ok, problems, targets } for an APT
@@ -279,6 +281,112 @@ export function freeKind(row) {
   if (row?.kind === "ipa" || sectionGroup(row?.section ?? "") === "Apps") return "apps";
   const c = browseCategory(row);
   return c === "Tweaks" ? "tweaks" : c === "Themes" ? "themes" : null;
+}
+
+// ---- Browse, rebuilt (F154) ---------------------------------------------------------------------------------
+
+// The local calendar day `t` falls on, "2026-11-18": the Tweak of the Day and Roulette's streak count by it.
+export function dayKey(t = Date.now()) {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// The day before "2026-11-18" ("2026-11-17"), by the calendar (DST-safe).
+export function dayBefore(key) {
+  const [y, m, d] = String(key).split("-").map(Number);
+  return dayKey(new Date(y, m - 1, d - 1, 12).getTime());
+}
+
+// FNV-1a over a string: the same number on every device and every load, so a day picks the same package everywhere.
+function hash32(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h >>> 0;
+}
+
+// Tweak of the Day: one of `rows` for `day` (dayKey), the same all day whatever order the rows come in (each id
+// once, sorted, then the day's hash picks one). Null for no rows.
+export function dailyPick(rows, day = dayKey()) {
+  const byId = new Map();
+  for (const r of rows ?? []) if (r?.id && !byId.has(r.id)) byId.set(r.id, r);
+  const ids = [...byId.keys()].sort();
+  return ids.length ? byId.get(ids[hash32(`cydian:${day}`) % ids.length]) : null;
+}
+
+// What a build's Browse is about: tweaks and themes where the phone is jailbroken, else apps (F37).
+export const browseKind = (row, jailbroken = true) => {
+  const k = freeKind(row);
+  return jailbroken ? k === "tweaks" || k === "themes" : k === "apps";
+};
+
+const lowSimple = (row) => simpleSection(String(row?.section ?? "").trim().toLowerCase());
+const says = (row, re) => re.test(`${row?.name ?? ""}\n${row?.short ?? ""}`);
+
+// Browse's Collections: each a filtered list (browse/collection:<id>) by section and the words in a row's name or
+// short description. `icon`: a file in icons/sections. `jailbreak`: the jailbroken build's four; the others are
+// the apps builds' (sideload, the website while Not Jailbroken).
+export const COLLECTIONS = [
+  { id: "lock-screen", title: "Lock Screen", subtitle: "Clocks, music and notifications", icon: "Widgets", jailbreak: true,
+    test: (r) => lowSimple(r) === "widgets" || says(r, /\block ?screen|lockscreen|cover ?sheet|notification/i) },
+  { id: "home-screen", title: "Home Screen", subtitle: "Layouts, docks and icon effects", icon: "Tweaks", jailbreak: true,
+    test: (r) => browseCategory(r) === "Tweaks" && says(r, /home ?screen|springboard|\bdock\b|\bicons?\b|folder|page/i) },
+  { id: "keyboard", title: "Keyboard", subtitle: "Swipes, sounds and layouts", icon: "Keyboards", jailbreak: true,
+    test: (r) => lowSimple(r) === "keyboards" || says(r, /keyboard/i) },
+  { id: "make-it-yours", title: "Make It Yours", subtitle: "Themes, fonts and wallpapers", icon: "Wallpaper", jailbreak: true,
+    test: (r) => ["themes", "wallpaper", "fonts", "ringtones"].includes(lowSimple(r)) || browseCategory(r) === "Themes" },
+  { id: "play", title: "Play", subtitle: "Games and emulators", icon: "Games",
+    test: (r) => ["Games", "Emulators"].includes(browseCategory(r)) },
+  { id: "create", title: "Create", subtitle: "Photo, video and music", icon: "Multimedia",
+    test: (r) => ["Photo & Video", "Entertainment"].includes(browseCategory(r)) },
+  { id: "connect", title: "Connect", subtitle: "Chat, social and messaging", icon: "Social",
+    test: (r) => browseCategory(r) === "Social" },
+  { id: "tools", title: "Tools", subtitle: "Utilities and developer tools", icon: "Utilities",
+    test: (r) => ["Utilities", "Developer"].includes(browseCategory(r)) },
+];
+export const collection = (id) => COLLECTIONS.find((c) => c.id === id) ?? null;
+export const collectionsFor = (jailbroken = true) => COLLECTIONS.filter((c) => Boolean(c.jailbreak) === Boolean(jailbroken));
+
+// Tweak Roulette's wheels: type (what kind of package, with its section icon), vibe (for fun), price (it always
+// rests on Free: every pick is free to try). The apps builds spin app categories.
+export const ROULETTE_TYPES = {
+  jailbreak: [
+    { label: "Tweak", icon: "Tweaks", test: (r) => browseCategory(r) === "Tweaks" },
+    { label: "Theme", icon: "Themes", test: (r) => browseCategory(r) === "Themes" },
+    { label: "Toy", icon: "Toys", test: (r) => ["toys", "fun"].includes(lowSimple(r)) },
+    { label: "Utility", icon: "Utilities", test: (r) => browseCategory(r) === "Utilities" || lowSimple(r) === "system" },
+  ],
+  apps: [
+    { label: "Game", icon: "Games", test: (r) => browseCategory(r) === "Games" },
+    { label: "Emulator", icon: "Entertainment", test: (r) => browseCategory(r) === "Emulators" },
+    { label: "Utility", icon: "Utilities", test: (r) => ["Utilities", "Developer"].includes(browseCategory(r)) },
+    { label: "Photo", icon: "Multimedia", test: (r) => browseCategory(r) === "Photo & Video" },
+    { label: "Social", icon: "Social", test: (r) => browseCategory(r) === "Social" },
+    { label: "Fun", icon: "Entertainment", test: (r) => ["Entertainment", "Lifestyle", "Other"].includes(browseCategory(r)) },
+  ],
+};
+export const ROULETTE_VIBES = ["Useful", "Pretty", "Silly", "Tiny", "Clever", "Hidden Gem"];
+export const ROULETTE_PRICES = ["Free", "Paid", "Free", "Free", "Paid", "Free"];
+const ROULETTE_PER = 150;
+
+// Rows -> the wheels' pool: [{ label, icon, rows }] per type, free rows only, at most `per` each (spread evenly
+// over the type's rows, by name, so the pool is the same between spins). An empty type stays on the wheel; a spin
+// never rests on it (spinPick).
+export function roulettePool(rows, { jailbroken = true, per = ROULETTE_PER } = {}) {
+  return ROULETTE_TYPES[jailbroken ? "jailbreak" : "apps"].map(({ label, icon, test }) => {
+    const all = rows.filter((r) => !r.paid && test(r));
+    const step = all.length > per ? all.length / per : 1;
+    const picked = step === 1 ? all : Array.from({ length: per }, (_, i) => all[Math.floor(i * step)]);
+    return { label, icon, rows: picked };
+  });
+}
+
+// One spin: a type that has packages, then one of its packages, both by `rand` (0 <= x < 1). -> { type, row }
+// (type: the index on the type wheel) or null when no type has any.
+export function spinPick(pool, rand = Math.random) {
+  const full = (pool ?? []).map((t, i) => [t, i]).filter(([t]) => t.rows?.length);
+  if (!full.length) return null;
+  const [t, type] = full[Math.min(full.length - 1, Math.floor(rand() * full.length))];
+  return { type, row: t.rows[Math.min(t.rows.length - 1, Math.floor(rand() * t.rows.length))] };
 }
 
 // Search (F101, docs/sileo-zebra.md 'Search'). Zebra's short-query rule: one Latin character (code point below
@@ -663,6 +771,16 @@ export function createCatalog() {
     return out;
   }
 
+  // F154, Browse's Collections (COLLECTIONS) and Tweak Roulette's pool (roulettePool), over what every list shows.
+  function collectionRows(id) {
+    const c = collection(id);
+    if (!c || (appsOnly && c.jailbreak)) return [];
+    return visibleOf(ALL).filter((r) => c.test(r)).map(slim);
+  }
+  function roulette({ per } = {}) {
+    return roulettePool(visibleOf(ALL), { jailbroken: !appsOnly, per }).map((t) => ({ ...t, rows: t.rows.map(slim) }));
+  }
+
   // Which of `names` the catalog has (for linking Depends on the package page): on a source, or installed (its
   // page then comes from the status stanza).
   const has = (names) => names.filter((n) => entries(ALL).has(n) || statusById.has(n));
@@ -778,7 +896,7 @@ export function createCatalog() {
   }
 
   return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
-    categories, browse, popular, free, featured,
+    categories, browse, popular, free, featured, collection: collectionRows, roulette,
     setInstalled, installed, upgrades, setDevice,
     deps, aptProblems, queueInfo };
 }
@@ -796,6 +914,7 @@ export function runCatalog(catalog, op, args = []) {
     versions: catalog.versions, setHidden: catalog.setHidden, setHiddenAuthors: catalog.setHiddenAuthors, setInstalled: catalog.setInstalled,
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular, free: catalog.free, featured: catalog.featured,
+    collection: catalog.collection, roulette: catalog.roulette,
     deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);

@@ -48,20 +48,16 @@ test("F135: the gear is our own SVG, 29pt, grey, with its rounded square; Home's
   assert.match(read("../home.css"), /\.home-settings-row \.cell-icon img \{[^}]*width: 100%/);
 });
 
-test("F135: the jailbreak app's Home drops the banners and its Browse page shows them; the site and sideload keep Home's", () => {
-  assert.equal(homeShowsFeatured("jailbreak"), false);
-  assert.equal(browseShowsFeatured("jailbreak"), true);
-  for (const m of ["site", "sideload"]) {
-    assert.equal(homeShowsFeatured(m), true, m);
+test("F154: no horizontal scroller of banners on Home or Browse, in any build", () => {
+  for (const m of ["jailbreak", "site", "sideload"]) {
+    assert.equal(homeShowsFeatured(m), false, m);
     assert.equal(browseShowsFeatured(m), false, m);
   }
-  // Home's root and Browse's page draw them by those answers (the render code itself needs the whole app's DOM).
-  const src = read("./home.js");
-  assert.match(src, /box: homeShowsFeatured\(settings\.mode\) \? homeFeatured\(\)/);
-  assert.match(src, /if \(!homeShowsFeatured\(settings\.mode\)\) return;\n\s+const box = homeFeatured\(\);/, "Reload doesn't bring them back");
-  const browse = src.slice(src.indexOf("async function renderBrowse(body)"));
-  assert.match(browse.slice(0, browse.indexOf("\n}\n")), /^\s+if \(browseShowsFeatured\(settings\.mode\)\) body\.append\(homeFeatured\(\)\);/m);
-  assert.ok(browse.indexOf("browseShowsFeatured") < browse.indexOf("box.replaceChildren(grouped"), "at the top, above the lists");
+  // Home's root, its Reload, its Featured page and Browse draw no homeFeatured() strip at all.
+  assert.doesNotMatch(read("./home.js"), /homeFeatured\(/);
+  const browse = read("./browse.js");
+  const home = browse.slice(browse.indexOf("// ---- Browse (F154)"));
+  assert.doesNotMatch(home, /homeFeatured|featuredStrip|featured-row/, "Browse's page: the Tweak of the Day card instead");
 });
 
 test("F135: placeholder cards the banners' size while they load, then the banners", () => withDom(async () => {

@@ -275,6 +275,8 @@ export const catalog = {
   // sources' own version dates only.
   free: (kind) => ask("free", [kind]),
   featured: (refs) => ask("featured", [refs]),
+  collection: (id) => ask("collection", [id]), // F154: Browse's Collections (core/catalog.js COLLECTIONS)
+  roulette: (opts) => ask("roulette", opts ? [opts] : []), // F154: Tweak Roulette's pool (core/catalog.js roulettePool)
   fresh: async (kind, now = Date.now()) => {
     const rows = await ask("list", [ALL, ALL]);
     const store = await seen();

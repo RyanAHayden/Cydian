@@ -4,7 +4,8 @@
 //
 //   sourceLinks(source)        -> [{ app, url }]  APT ({ uri, dist, components }) or AltStore ({ key: "alt:…" })
 //   packageLinks(id, source)   -> [{ app, url }]  an APT package, or an AltStore app (its source's add links)
-//   formatOf(source)           -> "apt" | "altstore"
+//   formatOf(source)           -> "apt" | "altstore" | "esign" | "scarlet" | "gbox" (F50: an alt: record's `format`)
+//   isIpaFormat(format)        -> true for every alt: (IPA) format
 //   addLink(source, origin)    -> "<origin>/add?url=…[&suite=…&component=…]"
 //   parseAddLink(search)       -> { url, dist?, components? } or null, from /add's query string
 //
@@ -20,7 +21,14 @@ const isHttp = (u) => /^https?:\/\/[^\s/?#]+/i.test(String(u ?? ""));
 const fragmentValue = (u) => String(u).replace(/[%&#+ ]/g, (c) => enc(c));
 const CYDIA_SHARE = "https://cydia.saurik.com/api/share#?source=";
 
-export const formatOf = (source) => (source?.kind === "altstore" || isAltKey(source?.key) ? "altstore" : "apt");
+// F50: alt: records keep their detected format (F16a, core/sources/detect.js FORMATS); one from before F16a has none
+// and is AltStore.
+const IPA_FORMATS = ["altstore", "esign", "scarlet", "gbox"];
+export const isIpaFormat = (format) => IPA_FORMATS.includes(format);
+export function formatOf(source) {
+  if (!(source?.kind === "altstore" || isAltKey(source?.key))) return "apt";
+  return isIpaFormat(source.format) ? source.format : "altstore";
+}
 const altUrl = (source) => source?.uri || String(source?.key ?? "").replace(/^alt:/, "");
 
 // APT managers. Only Irisin's link carries a suite and components; Cydia's share page, Sileo and Zebra add a flat
@@ -71,14 +79,36 @@ export const ALT_MANAGERS = [
   { app: "TrollApps", source: query("trollapps://add?url=") },
 ];
 
+// F50: IPA source formats other than AltStore's, each to its own app (checked 2026-11-17; journal/2026-11-17-f50-open-in-by-format).
+// None of the three is open source: the forms are the ones source sites send (fwuf.in's redirector, repo pages).
+//   Scarlet  scarlet://repo=<url>, raw (core/sources/detect.js unwrapLink reads the same form back)
+//   ESign    esign://addsource?url=<url>, raw as the sites send it; & and # escaped so they stay in the value
+//   GBox     gbox://AddSource/<url>, raw
+// ESign's JSON is AltStore 1.x plus its own fields, so the AltStore-format sideloaders follow ESign's own row.
+// Scarlet's and GBox's JSON is their own, so only that app. A record with `unsupported` (an encrypted GBox source)
+// gets only its own app, whatever the format.
+const queryValue = (u) => String(u).replace(/[&# ]/g, (c) => enc(c));
+export const OWN_APP = {
+  scarlet: { app: "Scarlet", source: (u) => `scarlet://repo=${u}` },
+  esign: { app: "ESign", source: (u) => `esign://addsource?url=${queryValue(u)}` },
+  gbox: { app: "GBox", source: (u) => `gbox://AddSource/${u}` },
+};
+const ALT_READABLE = new Set(["altstore", "esign"]);
+
 const keep = (list) => list.filter((l) => l.url);
+
+function ipaLinks(source) {
+  const url = altUrl(source);
+  if (!isHttp(url)) return [];
+  const fmt = formatOf(source);
+  const own = OWN_APP[fmt];
+  const managers = [...(own ? [own] : []), ...(ALT_READABLE.has(fmt) && !source.unsupported ? ALT_MANAGERS : [])];
+  return keep(managers.map((m) => ({ app: m.app, url: m.source(url) })));
+}
 
 export function sourceLinks(source) {
   if (!source) return [];
-  if (formatOf(source) === "altstore") {
-    const url = altUrl(source);
-    return isHttp(url) ? keep(ALT_MANAGERS.map((m) => ({ app: m.app, url: m.source(url) }))) : [];
-  }
+  if (isIpaFormat(formatOf(source))) return ipaLinks(source);
   if (!isHttp(source.uri)) return [];
   return keep(APT_MANAGERS.map((m) => ({ app: m.app, url: m.source(source) })));
 }
@@ -93,7 +123,7 @@ export function sourceLinks(source) {
 // An AltStore app has no per-app link in those apps: its row adds the app's source.
 export function packageLinks(id, source) {
   if (!id || !source) return [];
-  if (formatOf(source) === "altstore") return sourceLinks(source);
+  if (isIpaFormat(formatOf(source))) return sourceLinks(source);
   if (!isHttp(source.uri)) return [];
   const flat = isFlat(source.dist);
   const p = enc(id);
@@ -114,7 +144,7 @@ export function siteOrigin(location) {
 }
 
 export function addLink(source, origin = PUBLIC_SITE) {
-  const alt = formatOf(source) === "altstore";
+  const alt = isIpaFormat(formatOf(source));
   const url = alt ? altUrl(source) : source?.uri;
   if (!isHttp(url)) return null;
   let q = `url=${enc(url)}`;

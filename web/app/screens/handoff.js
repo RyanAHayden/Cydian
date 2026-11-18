@@ -5,12 +5,13 @@
 import { grouped } from "../nav/ui.js";
 import { showSheet } from "../nav/sheet.js";
 import { qrSvg } from "../core/qr.js";
-import { sourceLinks, packageLinks, addLink, siteOrigin, formatOf } from "../core/handoff.js";
+import { sourceLinks, packageLinks, addLink, siteOrigin, formatOf, isIpaFormat } from "../core/handoff.js";
 import { settings } from "./settings.js";
 
 // pkg: an id for a package's page; leave it out on a source's page.
 // Only the visitor's format: APT managers run on jailbroken iPhones, so a phone set to Not Jailbroken (Settings >
-// Device, F37) sees just the add link for an APT source; AltStore sources show the sideloaders to everyone.
+// Device, F37) sees just the add link for an APT source; IPA sources (AltStore, ESign, Scarlet, GBox: F50) show the
+// apps that read their format to everyone.
 export function openInGroup(source, { pkg = null, jailbroken = settings.jailbroken() } = {}) {
   const apt = formatOf(source) === "apt";
   const links = apt && !jailbroken ? [] : pkg ? packageLinks(pkg, source) : sourceLinks(source);
@@ -23,7 +24,7 @@ export function openInGroup(source, { pkg = null, jailbroken = settings.jailbrok
 
 function footerFor(source, pkg, shown) {
   if (!shown) return "Cydia, Sileo, Zebra and Irisin run on jailbroken iPhones. Jailbroken? Settings > Device.";
-  if (formatOf(source) === "altstore") {
+  if (isIpaFormat(formatOf(source))) {
     return pkg ? "Adds this app's source to that app, where it can install it." : "Adds this source to that app.";
   }
   const flat = !source.dist || String(source.dist).endsWith("/");

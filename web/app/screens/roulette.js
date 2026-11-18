@@ -289,14 +289,16 @@ function ticking(wheels) {
   return () => cancelAnimationFrame(frame);
 }
 
-// "You landed on": the package, then Wish List and View.
+// "You landed on": the package (a row that opens it, like any other), then Wish List and View.
 function resultCard(row, route) {
   rememberNames([row]);
+  const href = format({ tab: route.tab, path: [...route.path, token("package", row.id)] });
   const g = el("div", "group roulette-landed");
   g.append(el("h2", "group-header", "You landed on"));
   const ul = el("ul", "table grouped");
   const top = el("li", "cell");
-  const inner = el("div", "cell-inner roulette-pick");
+  const inner = el("a", "cell-inner chevron roulette-pick");
+  inner.href = href;
   const words = el("span", "cell-text");
   words.append(el("span", "cell-label", row.name), el("span", "roulette-desc", row.short || row.section || ""));
   inner.append(iconBox(row, "roulette-icon"), words);
@@ -313,7 +315,7 @@ function resultCard(row, route) {
   paintWish();
   wish.addEventListener("click", () => { wishlist().set(row.id, !wishlist().has(row.id)); paintWish(); });
   const view = el("a", "roulette-pill", "View");
-  view.href = format({ tab: route.tab, path: [...route.path, token("package", row.id)] });
+  view.href = href;
   bar.append(wish, view);
   actions.append(bar);
   ul.append(top, actions);

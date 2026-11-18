@@ -18,6 +18,10 @@
 // a small pill (core/signing.js signatureState; packages.css .sig-pill): green outside the re-sign window (Settings >
 // Signing > Re-sign Reminder), amber inside it, red once expired. Signed apps the list doesn't remember (My IPAs,
 // Custom Install as another ID) are listed under them, without Delete (Signed Apps in Settings forgets those).
+//
+// F104: the dpkg list has a scope bar as on iOS 6's Usage screen: Name (A–Z, as before), Recent (newest install
+// first, by the mtime of dpkg's info/<pkg>.list, which the jailbreak app reads: apt.installDates in Apt.swift;
+// the site's uploaded status file has no dates, so no Recent there) and Size (Installed-Size, largest first).
 import * as browse from "./browse.js";
 import * as myipas from "./myipas.js";
 import { grouped, plain, placeholder } from "../nav/ui.js";
@@ -36,7 +40,61 @@ export const title = "Installed";
 export const DPKG = "dpkg"; // the site's path segment for the status file's packages
 export const APPS = "apps"; // F87: the jailbreak app's path segment for the remembered apps
 
-const state = { body: null, route: null, list: null, seq: 0 };
+const state = { body: null, route: null, list: null, seq: 0, dates: null };
+
+// ---- F104: sorting the dpkg list --------------------------------------------------------------------------------
+
+export const SORTS = ["name", "recent", "size"];
+const SORT_LABEL = { name: "Name", recent: "Recent", size: "Size" };
+const SORT_KEY = "cydian.installedSort";
+
+// The scope bar's segments: Recent only where install dates can be read.
+export const sortScopes = (hasDates) => SORTS.filter((s) => s !== "recent" || hasDates);
+
+// rows (sorted by name, as catalog.installed gives them) in `by`'s order. `dates`: { id: seconds } (Recent);
+// packages without a date or size go last, by name.
+export function sortInstalled(rows, by, dates = null) {
+  if (by !== "recent" && by !== "size") return rows;
+  const val = by === "recent" ? (r) => Number(dates?.[r.id]) || 0 : (r) => Number(r.size) || 0;
+  return rows.map((r, i) => [val(r), i, r]).sort((a, b) => b[0] - a[0] || a[1] - b[1]).map((x) => x[2]);
+}
+
+// What a row shows beside its version under Recent or Size.
+export function sortDetail(r, by, dates = null, locale) {
+  if (by === "size") return browse.formatSize(r.size);
+  const t = by === "recent" ? Number(dates?.[r.id]) : 0;
+  return t > 0 ? new Date(t * 1000).toLocaleDateString(locale, { dateStyle: "medium" }) : null;
+}
+
+function readSort() {
+  try { const v = globalThis.localStorage?.getItem(SORT_KEY); return SORTS.includes(v) ? v : "name"; } catch { return "name"; }
+}
+function saveSort(v) {
+  try { globalThis.localStorage?.setItem(SORT_KEY, v); } catch { /* private mode: this session only */ }
+}
+let sortBy = readSort();
+
+// { package: seconds } from apt.installDates (the jailbreak app), or null where it can't be read.
+export async function installDates(native = globalThis.cydianNative) {
+  if (typeof native?.call !== "function" || typeof native?.dpkgStatus !== "function") return null;
+  try {
+    const d = await native.call("apt.installDates", {});
+    return d && typeof d === "object" && Object.keys(d).length ? d : null;
+  } catch { return null; }
+}
+
+function scopeBar(scopes, current, onPick) {
+  const bar = Object.assign(document.createElement("div"), { className: "search-scope installed-scope" });
+  const seg = Object.assign(document.createElement("div"), { className: "scope-segments" });
+  for (const s of scopes) {
+    const b = Object.assign(document.createElement("button"), { type: "button", className: "scope-segment", textContent: SORT_LABEL[s] });
+    b.classList.toggle("selected", s === current);
+    b.addEventListener("click", () => { if (s !== current) onPick(s); });
+    seg.append(b);
+  }
+  bar.append(seg);
+  return bar;
+}
 const appView = { body: null, route: null, seq: 0, editing: false, right: null };
 
 // Records apps (F30) rather than reading dpkg: everywhere but the jailbreak app.
@@ -111,16 +169,24 @@ async function load() {
   const seq = ++state.seq;
   let rows;
   let appCount = 0;
+  let dates = null;
   try {
     // F87: the Apps row has to be there before the list measures where it starts (vlist.js caches the offset).
-    [rows, appCount] = await Promise.all([catalog.installed(), recordsApps() ? 0 : jailbreakAppCount()]);
+    [rows, appCount, dates] = await Promise.all([catalog.installed(), recordsApps() ? 0 : jailbreakAppCount(), installDates()]);
   } catch (e) {
     if (seq === state.seq) state.body.replaceChildren(note(e.message));
     return;
   }
   if (seq !== state.seq) return;
-  const body = state.body;
-  state.list?.destroy();
+  Object.assign(state, { rows, appCount, dates });
+  draw();
+}
+
+// Draws the list from what load() read (F104: again when the sort changes, without asking the worker).
+function draw() {
+  const { rows, body } = state;
+  const appCount = state.appCount ?? 0;
+  browse.dropList(body, state.list);
   state.list = null;
   if (!rows) {
     const t = emptyText(catalog.statusSource());
@@ -138,7 +204,18 @@ async function load() {
   }
   body.replaceChildren();
   if (appCount) body.append(appsRow(state.route, appCount));
-  state.list = browse.packageList(body, state.route, rows);
+  // F104: the scope bar goes in before the list measures where it starts.
+  const scopes = sortScopes(Boolean(state.dates));
+  const by = scopes.includes(sortBy) ? sortBy : "name";
+  body.append(scopeBar(scopes, by, (s) => { sortBy = s; saveSort(s); draw(); }));
+  const dates = state.dates;
+  state.list = browse.packageList(body, state.route, sortInstalled(rows, by, dates), by === "name" ? undefined : {
+    letters: false,
+    decorate: (row, item) => {
+      const extra = sortDetail(item, by, dates);
+      row._.version.textContent = [item.version, extra].filter(Boolean).join(" · ");
+    },
+  });
   body.append(state.list.el);
 }
 

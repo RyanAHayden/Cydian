@@ -49,6 +49,8 @@ enum Apt {
             }
         }
         b.on("apt.dpkgStatus") { c in work(c) { () throws -> Any? in readText(Jailbreak.path("/var/lib/dpkg/status")) } }
+        // F104: when each package was installed or last upgraded, as Installed's Recent sort needs it.
+        b.on("apt.installDates") { c in work(c) { () throws -> Any? in installDates() } }
         b.on("net.fetch") { c in
             guard let url = httpURL(c.params["url"]) else { return reply(c, nil, "bad_url: not an http(s) URL") }
             get(url) { res in
@@ -103,6 +105,23 @@ enum Apt {
     }
 
     // ---- files
+
+    // F104: { package: seconds since 1970 } from the mtime of dpkg's info/<pkg>.list (info/<pkg>:<arch>.list on
+    // multiarch), which dpkg rewrites on every install or upgrade of the package.
+    static func installDates() -> [String: Double] {
+        let dir = Jailbreak.path("/var/lib/dpkg/info")
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: dir) else { return [:] }
+        var out: [String: Double] = [:]
+        for name in names where name.hasSuffix(".list") {
+            var pkg = String(name.dropLast(5))
+            if let colon = pkg.firstIndex(of: ":") { pkg = String(pkg[..<colon]) }
+            guard !pkg.isEmpty,
+                  let date = (try? fm.attributesOfItem(atPath: dir + "/" + name))?[.modificationDate] as? Date else { continue }
+            out[pkg] = max(out[pkg] ?? 0, date.timeIntervalSince1970.rounded())
+        }
+        return out
+    }
 
     static func readText(_ path: String) -> String? {
         guard let d = FileManager.default.contents(atPath: path) else { return nil }

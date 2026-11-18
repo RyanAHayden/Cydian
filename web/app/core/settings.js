@@ -10,6 +10,7 @@
 //   s.holds.set("com.example.tweak", true);  // Ignore upgrades, kept on the device (jailbreak: also a dpkg hold)
 //   await s.holds.sync();                    // jailbreak: take dpkg's holds (apt-mark showhold) as the list
 //   s.hiddenSections.set("Themes", true);    // Section Visibility (F24): listeners hear ("hiddenSections", list)
+//   s.hiddenAuthors.set("Jane Doe", true);  // Hide by Author (F104): listeners hear ("hiddenAuthors", list)
 //   s.autoMarked.set("com.example.tweak", true); // Update Automatically, for Only Packages I Mark (F70)
 //   s.recentSearches.add("snowboard");      // Search's Recent table (F100): last 5, newest first
 //   s.daemonPrefs();                         // { "cydian.autoInstall": "marked", … } for N7's daemon (F70)
@@ -196,6 +197,7 @@ const HOLDS_KEY = PREFIX + "holds";
 const HIDDEN_SECTIONS_KEY = PREFIX + "hiddenSections";
 const AUTO_MARKED_KEY = PREFIX + "autoMarked";
 const RECENT_SEARCHES_KEY = PREFIX + "recentSearches";
+const HIDDEN_AUTHORS_KEY = PREFIX + "hiddenAuthors";
 
 // F100: Search's Recent table (from Zebra): the last RECENT_MAX queries, newest first, no duplicates (a query
 // already there moves to the top; case and surrounding spaces don't make a new one). Pure, for the tests.
@@ -417,6 +419,31 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     replace: (names) => writeHidden((Array.isArray(names) ? names : []).filter((n) => typeof n === "string")),
   };
 
+  // Hide by Author (F104, Zebra's filters): author names whose packages drop out like hidden sections'. Kept on
+  // this device as a sorted JSON list; one name per author whatever its case (core/catalog.js compares lower-cased).
+  function readHiddenAuthors() {
+    try {
+      const list = JSON.parse(store.get(HIDDEN_AUTHORS_KEY) || "[]");
+      return Array.isArray(list) ? [...new Set(list.filter((n) => typeof n === "string" && n.trim()))].sort() : [];
+    } catch {
+      return [];
+    }
+  }
+  const hiddenAuthors = {
+    list: readHiddenAuthors,
+    has: (name) => readHiddenAuthors().some((n) => n.toLowerCase() === String(name ?? "").trim().toLowerCase()),
+    set(name, hide) {
+      const n = String(name ?? "").trim();
+      if (!n) return;
+      const list = readHiddenAuthors().filter((x) => x.toLowerCase() !== n.toLowerCase());
+      if (hide) list.push(n);
+      const sorted = [...new Set(list)].sort();
+      if (JSON.stringify(sorted) === JSON.stringify(readHiddenAuthors())) return;
+      store.set(HIDDEN_AUTHORS_KEY, JSON.stringify(sorted));
+      notify("hiddenAuthors", sorted);
+    },
+  };
+
   // F70: Only Packages I Mark's marks (the package page's Update Automatically), package ids kept on the device as
   // a sorted JSON list like holds; listeners hear ("autoMarked", list) on a change.
   function readMarked() {
@@ -487,6 +514,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     recentSearches,
     daemonPrefs,
     hiddenSections,
+    hiddenAuthors,
     upgradeNotifications,
     deviceType,
     jailbroken: () => deviceType() !== NOT_JAILBROKEN,

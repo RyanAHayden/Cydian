@@ -51,6 +51,9 @@ export const SECTION_ROW_HEIGHT = 46;
 // the worker's catalog before its next answer, so every list, Search and Changes leave them out.
 catalog.setHidden(settings.hiddenSections.list());
 settings.onChange((key, value) => { if (key === "hiddenSections") catalog.setHidden(value); });
+// Hide by Author (F104): the same, for authors hidden from their page (core/settings.js hiddenAuthors).
+catalog.setHiddenAuthors(settings.hiddenAuthors.list());
+settings.onChange((key, value) => { if (key === "hiddenAuthors") catalog.setHiddenAuthors(value); });
 // Works on My Phone (F17): the device and the filter reach the worker the same way.
 initDevice();
 
@@ -120,7 +123,7 @@ export function render(body, route, ctx) {
   switch (p.page) {
     case "sections": return isAltKey(p.key) ? renderAltSource(body, route, p.key) : renderSections(body, route, p.key);
     case "section": return renderList(body, route, () => catalog.list(p.key, p.value), true);
-    case "author": return renderList(body, route, () => catalog.author(p.value), true);
+    case "author": return renderAuthor(body, route, p.value);
     case "package": return renderPackage(body, route, p.key, p.value, ctx);
     case "versions": return renderVersions(body, route, p.key, p.value);
     default:
@@ -395,6 +398,49 @@ export async function renderWishlist(body, route) {
   body.replaceChildren();
   if (!rows.length) { body.append(el("p", "empty", WISH_EMPTY)); return; }
   const list = packageList(body, route, rows, { letters: false });
+  body.append(list.el);
+}
+
+// F104: an author's page: a Hide (or Show) Packages by <author> row, then their packages, which author() lists
+// even while hidden. Manage > Hidden lists the hidden ones too.
+export function authorToggleRow(name, hiddenNow) {
+  return { label: `${hiddenNow ? "Show" : "Hide"} Packages by ${name}`, chevron: false };
+}
+
+// A list drawn again in the same page: the old one stops listening, and its A–Z index goes (packageList adds one).
+const authorLists = new WeakMap();
+export function dropList(body, list) {
+  list?.destroy();
+  for (const ix of body.parentElement?.querySelectorAll(":scope > .section-index") ?? []) ix.remove();
+  delete body.dataset.sectionIndex;
+}
+
+async function renderAuthor(body, route, name) {
+  dropList(body, authorLists.get(body));
+  authorLists.delete(body);
+  body.replaceChildren(placeholder("list"));
+  let rows;
+  try {
+    await catalog.ensure();
+    rows = await catalog.author(name);
+  } catch (e) {
+    body.replaceChildren(el("p", "empty", e.message));
+    return;
+  }
+  body.replaceChildren();
+  // The row goes in before the list, which measures where it starts (vlist.js); a tap redraws the page.
+  if (name) {
+    const hiddenNow = settings.hiddenAuthors.has(name);
+    const g = grouped([{ rows: [{ ...authorToggleRow(name, hiddenNow), onClick: () => {
+      settings.hiddenAuthors.set(name, !hiddenNow);
+      renderAuthor(body, route, name);
+    } }], footer: hiddenNow ? "Hidden everywhere else: lists, Search and Changes." : null }]);
+    g.classList.add("author-hide");
+    body.append(g);
+  }
+  if (!rows.length) { body.append(el("p", "empty", "No packages.")); return; }
+  const list = packageList(body, route, rows);
+  authorLists.set(body, list);
   body.append(list.el);
 }
 

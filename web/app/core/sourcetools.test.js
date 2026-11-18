@@ -372,15 +372,15 @@ test("F56: the jailbreak is found for sure from its marker files under the jbroo
   assert.equal(jailbreakFromMarkers(undefined), null);
 });
 
-test("F19: each jailbreak gets its own tweak repos first; AltStore sources always; Other or none: all of them", () => {
+test("F19: each jailbreak gets its own tweak repos first; Other or none: all of them; F142: FIZL0 the only AltStore source", () => {
   const names = (jb) => recommendedFor(RECOMMENDED_SOURCES, jb).filter((r) => r.jailbreak).map((r) => r.name);
-  assert.deepEqual(names("palera1n"), ["Havoc", "Chariz", "ElleKit", "palera1n"]);
-  assert.deepEqual(names("dopamine"), ["Havoc", "Chariz", "ElleKit"]);
-  assert.deepEqual(names("nathanlr"), ["Havoc", "Chariz"]);
-  assert.equal(recommendedFor(RECOMMENDED_SOURCES, null), RECOMMENDED_SOURCES);
-  assert.equal(recommendedFor(RECOMMENDED_SOURCES, "other"), RECOMMENDED_SOURCES);
-  const alt = RECOMMENDED_SOURCES.filter((r) => !r.jailbreak).length;
-  assert.equal(recommendedFor(RECOMMENDED_SOURCES, "nathanlr").filter((r) => !r.jailbreak).length, alt);
+  assert.deepEqual(names("palera1n"), ["Havoc", "Chariz", "ElleKit", "palera1n", "Zebra"]);
+  assert.deepEqual(names("dopamine"), ["Havoc", "Chariz", "ElleKit", "Zebra"]);
+  assert.deepEqual(names("nathanlr"), ["Havoc", "Chariz", "Zebra"]);
+  // F142: no jailbreak picked gets every APT entry; AltStore sources other than FIZL0's own are left to the IPA.
+  const apt = RECOMMENDED_SOURCES.filter((r) => r.jailbreak).length;
+  for (const jb of [null, "other"]) assert.equal(recommendedFor(RECOMMENDED_SOURCES, jb).filter((r) => r.jailbreak).length, apt);
+  assert.deepEqual(recommendedFor(RECOMMENDED_SOURCES, "nathanlr").filter((r) => !r.jailbreak).map((r) => r.name), ["FIZL0"]);
   assert.ok(recommendedFor(RECOMMENDED_SOURCES, "dopamine")[0].jailbreak); // its own first
 });
 

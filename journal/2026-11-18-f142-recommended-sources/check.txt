@@ -1,0 +1,38 @@
+FIZL0: https://fizl0.github.io/apps/source.json
+    AltStore 'FIZL0': 3 apps: OpenTennis, Party Board, openMX
+Havoc: https://havoc.app/
+    APT Havoc: 541 packages (376 rootless), 286 paid; archs {'iphoneos-arm': 1950, 'iphoneos-arm64': 1804}; sections [('Tweaks', 422), ('Themes', 85), ('Development', 17), ('Applications', 17)]; rootless firmware min/max ('15.0', '27.0')
+Chariz: https://repo.chariz.com/
+    APT Chariz: 186 packages (84 rootless), 96 paid; archs {'iphoneos-arm': 920, 'iphoneos-arm64': 388}; sections [('Tweaks', 135), ('Themes', 18), ('System', 10), ('Development', 8), ('Utilities', 8), ('Terminal Support', 4)]; rootless firmware min/max ('15.0', '18.0')
+ElleKit: https://ellekit.space/
+    APT Official ElleKit builds: 2 packages (2 rootless), 0 paid; archs {'iphoneos-arm': 13, 'iphoneos-arm64': 22}; sections [('Tweak Injection', 1), ('Tweaks', 1)]; rootless firmware min/max ('15.0', 'open')
+palera1n: https://repo.palera.in/
+    APT palera1n: 18 packages (6 rootless), 0 paid; archs {'appletvos-arm64-rootless': 1, 'appletvos-arm64': 14, 'iphoneos-arm': 20, 'iphoneos-arm64': 8}; sections [('Tweaks', 5), ('System', 3), ('Development', 3), ('Libraries', 2), ('Tweak Injection', 1), ('Applications', 1)]; rootless firmware min/max ('17.0', 'open')
+Zebra: https://getzbra.com/repo/
+    APT Zebra: 1 packages (1 rootless), 0 paid; archs {'iphoneos-arm': 11, 'iphoneos-arm64': 8}; sections [('Packaging', 1)]; rootless firmware min/max ('9.0', 'open')
+AltStore: https://apps.altstore.io/
+    AltStore 'AltStore': 6 apps: AltStore, Clip, Delta
+SideStore: https://sidestore.io/apps-v2.json/
+    AltStore 'SideStore Offical': 1 apps: SideStore
+Feather: https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json
+    AltStore 'Feather Repository': 1 apps: Feather
+SideStore Team Picks: https://community-apps.sidestore.io/sidecommunity.json
+    AltStore 'SideStore Team Picks': 23 apps: 3Speak.tv - Acela, ActiveGS iOS, Countdown, Firebird Emu, Flappy Bird, MAME4iOS, Mini vMac, OldOS, PPSSPP, Play!, Ready, RetroArch, Rewound, ScummVM, StikNES, VCMI, XPatcher, blurt.blog, iDOS, iNDS, iSH, iTorrent, unc0ver
+StikDebug: https://stikdebug.xyz/index.json
+    AltStore 'StikDebug & More!': 2 apps: StikDebug, StikPair
+LiveContainer: https://github.com/LiveContainer/LiveContainer/releases/download/1.0/apps.json
+    AltStore 'LiveContainer': 1 apps: LiveContainer
+Provenance: https://provenance-emu.com/apps.json
+    AltStore 'Provenance Emulator': 4 apps: Provenance, Provenance Alpha, iCube, iFly
+Manic EMU: https://apps.manicemu.site/altstore
+    AltStore 'Manic EMU': 1 apps: Manic EMU v2.0.2
+DolphiniOS: https://altstore.oatmealdome.me/
+    AltStore "OatmealDome's AltStore Source": 2 apps: DolphiniOS, DolphiniOS (Public Beta)
+Flycast: https://github.com/chachillie/Flycast-iOS/raw/refs/heads/main/flycast-ios.json
+    AltStore 'Flycast-iOS26': 1 apps: Flycast
+UTM: https://alt.getutm.app
+    AltStore 'UTM Repository': 2 apps: UTM, UTM SE
+Amethyst: https://alt.crystall1ne.dev
+    AltStore 'crystall1ne.dev': 2 apps: Angel Aura Amethyst, PojavLauncher iOS
+PokeMMO: https://pokemmo.com/altstore
+    AltStore 'PokeMMO': 1 apps: PokeMMO

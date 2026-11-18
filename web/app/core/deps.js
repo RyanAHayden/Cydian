@@ -26,7 +26,7 @@
 import { parseRelations, satisfies, compareVersions } from "./apt.js";
 
 // Where well-known libraries live when none of the user's sources has them: rootless (iphoneos-arm64) builds,
-// checked against each repo's Packages file on 2026-11-17. Every repo here is also in core/recommended.js.
+// checked against each repo's Packages file on 2026-11-17. Every repo here is also in core/recommended.js (recommended.test.js).
 const ELLEKIT = { name: "ElleKit", url: "https://ellekit.space/" };
 const PALERA1N = { name: "palera1n", url: "https://repo.palera.in/" };
 const CHARIZ = { name: "Chariz", url: "https://repo.chariz.com/" };

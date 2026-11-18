@@ -1,30 +1,66 @@
 // Recommended (F45, Sources > Manage > Recommended): the curated sources, one tap to add. F52 dropped the games: this
 // page lists sources; a recommended game is a package and belongs on Home's Browse/Featured. This is the
-// one place the list lives: add, drop or reword an entry here and nothing else changes. Every entry says why it
-// is on the list. Each URL answered with a working source on 2026-11-17 (checked with curl).
+// one place the list lives: add, drop or reword an entry here and nothing else changes.
 //
 //   source: { kind: "source", url, name, why, jailbreak?, for? }   jailbreak: an APT repo (hidden on Not Jailbroken);
 //                                                                 for: the jailbreaks it suits (F19)
+//
+// F142: the list is what today's package managers and sideloaders ship, read from their source (CHECKED is when):
+//   APT (the jailbreak build)  Sileo's first-run repos (Sileo RepoManager.swift: Havoc, Chariz); Zebra's own repo
+//       (ZBBaseSource zebraSource) and its "utility" sources for palera1n and Dopamine (ElleKit, palera1n; its
+//       community list, api.getzbra.com/sources.json, is gone: 404); Dopamine's default.sources (Chariz, Havoc,
+//       ElleKit). Procursus and BigBoss are dist repos, which Recommended can't add, and every rootless jailbreak's
+//       bootstrap adds Procursus already.
+//   AltStore (the sideload IPA and the website): AltStore's and SideStore's own built-in sources, Feather's own, and
+//       every source both Feather's recommended list (Feather SourcesAddView.swift) and SideStore's defaults
+//       (sidestore.io/default-sources) carry. AltStore's recommended collections (cdn.altstore.io
+//       recommended-sources.json) are EU marketplace (PAL) sources, which a sideloaded app can't install from.
+//   FIZL0's own source stays, as the user asked. Every `why` says what the source actually carries, read from its
+//   Packages or source.json on CHECKED with tools/recommended_check.py (which re-checks them all).
+
+export const CHECKED = "2026-11-18";
 
 export const RECOMMENDED_SOURCES = [
-  { kind: "source", name: "FIZL0", url: "https://fizl0.github.io/apps/source.json",
+  { kind: "source", name: "FIZL0", url: "https://fizl0.github.io/apps/source.json", own: true,
     why: "openMX, OpenTennis and Party Board in one source: the games Cydian's default list is built around." },
-  { kind: "source", name: "AltStore", url: "https://apps.altstore.io/",
-    why: "The official AltStore source: AltStore, Delta and Clip, by Riley Testut." },
-  { kind: "source", name: "SideStore Team Picks", url: "https://community-apps.sidestore.io/sidecommunity.json",
-    why: "SideStore's hand-picked list of emulators and tools that sideload cleanly." },
-  { kind: "source", name: "Provenance", url: "https://provenance-emu.com/apps.json",
-    why: "The Provenance multi-system emulator, from its own developers." },
-  { kind: "source", name: "Feather", url: "https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json",
-    why: "Feather, the on-device signer Cydian's sideload installs go through." },
+  // ---- APT repos: the jailbreak build ----
   { kind: "source", name: "Havoc", url: "https://havoc.app/", jailbreak: true, for: ["dopamine", "palera1n", "nathanlr"],
-    why: "A large, actively maintained tweak store with rootless builds." },
+    why: "Havoc: over 500 paid and free tweaks, themes and apps, most with rootless builds, iOS 15 and later." },
   { kind: "source", name: "Chariz", url: "https://repo.chariz.com/", jailbreak: true, for: ["dopamine", "palera1n", "nathanlr"],
-    why: "A long-running tweak store with rootless builds of most of its packages." },
+    why: "Chariz: about 190 paid and free tweaks and themes, plus libraries like Cephei; rootless for iOS 15 to 17." },
   { kind: "source", name: "ElleKit", url: "https://ellekit.space/", jailbreak: true, for: ["dopamine", "palera1n"],
-    why: "The tweak injection library rootless jailbreaks use, from its own repo." },
+    why: "ElleKit: the tweak injection library rootless jailbreaks load tweaks with, and its legacy arm64e support." },
   { kind: "source", name: "palera1n", url: "https://repo.palera.in/", jailbreak: true, for: ["palera1n"],
-    why: "palera1n's official repo, for phones jailbroken with it." },
+    why: "palera1n: its loader, PreferenceLoader and a few tweaks (Battery17, FakePass, Cocha) for palera1n phones." },
+  { kind: "source", name: "Zebra", url: "https://getzbra.com/repo/", jailbreak: true, for: ["dopamine", "palera1n", "nathanlr"],
+    why: "Zebra: only the Zebra package manager itself, from its own developers." },
+  // ---- AltStore sources: the sideload IPA and the website ----
+  { kind: "source", name: "AltStore", url: "https://apps.altstore.io/",
+    why: "AltStore: AltStore, the Delta game emulator and the Clip clipboard manager, each with a beta, iOS 16+." },
+  { kind: "source", name: "SideStore", url: "https://sidestore.io/apps-v2.json/",
+    why: "SideStore: the SideStore app, an AltStore that refreshes its apps on the phone without a computer." },
+  { kind: "source", name: "Feather", url: "https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json",
+    why: "Feather: the Feather on-device IPA signer and installer." },
+  { kind: "source", name: "SideStore Team Picks", url: "https://community-apps.sidestore.io/sidecommunity.json",
+    why: "Over 20 apps SideStore's team picked: RetroArch, PPSSPP, Play!, MAME4iOS, ScummVM, iSH, iTorrent and more." },
+  { kind: "source", name: "StikDebug", url: "https://stikdebug.xyz/index.json",
+    why: "StikDebug and StikPair: turn on JIT for emulators on the phone, no computer needed." },
+  { kind: "source", name: "LiveContainer", url: "https://github.com/LiveContainer/LiveContainer/releases/download/1.0/apps.json",
+    why: "LiveContainer: runs other IPAs inside one app, past the free account's three-app limit." },
+  { kind: "source", name: "Provenance", url: "https://provenance-emu.com/apps.json",
+    why: "Provenance and its alpha builds, plus iCube (GameCube and Wii) and iFly (Dreamcast): retro emulators." },
+  { kind: "source", name: "Manic EMU", url: "https://apps.manicemu.site/altstore",
+    why: "Manic EMU: an all-in-one emulator, from NES and Game Boy to 3DS, GameCube and Wii, iOS 15+." },
+  { kind: "source", name: "DolphiniOS", url: "https://altstore.oatmealdome.me/",
+    why: "DolphiniOS and its public beta: the Dolphin GameCube and Wii emulator for iPhone." },
+  { kind: "source", name: "Flycast", url: "https://github.com/chachillie/Flycast-iOS/raw/refs/heads/main/flycast-ios.json",
+    why: "Flycast: the Sega Dreamcast, Naomi and Atomiswave emulator." },
+  { kind: "source", name: "UTM", url: "https://alt.getutm.app",
+    why: "UTM and UTM SE: virtual machines on the iPhone, for Windows, Linux and classic Mac OS." },
+  { kind: "source", name: "Amethyst", url: "https://alt.crystall1ne.dev",
+    why: "Angel Aura Amethyst and PojavLauncher: launchers that run Minecraft: Java Edition." },
+  { kind: "source", name: "PokeMMO", url: "https://pokemmo.com/altstore",
+    why: "PokeMMO: a free-to-play online multiplayer monster-catching RPG." },
 ];
 
 // ---- F19: recommended for the jailbreak ------------------------------------------------------------------------
@@ -71,13 +107,14 @@ export function jailbreakFromMarkers(markers) {
   return null;
 }
 
-// The entries for a jailbreak, its own first: AltStore sources stay (they suit any phone); an APT entry shows when
-// its `for` names the jailbreak, or always for "other"/null.
+// The entries for a jailbroken phone (F142: the jailbreak build lists APT repos): the APT entries whose `for` names
+// the jailbreak (every one for "other"/null), then FIZL0's own source (`own`). Other AltStore sources are for the
+// sideload IPA and the website (recommendedRows' jailbroken: false keeps only those).
 export function recommendedFor(recs, jailbreak) {
   const all = Array.isArray(recs) ? recs : [];
-  if (!jailbreak || jailbreak === "other") return all;
-  const apt = all.filter((r) => r.jailbreak && (!r.for || r.for.includes(jailbreak)));
-  return [...apt, ...all.filter((r) => !r.jailbreak)];
+  const any = !jailbreak || jailbreak === "other";
+  const apt = all.filter((r) => r.jailbreak && (any || !r.for || r.for.includes(jailbreak)));
+  return [...apt, ...all.filter((r) => !r.jailbreak && r.own)];
 }
 
 // The user's pick on Recommended (localStorage), else what was detected.

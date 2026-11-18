@@ -76,7 +76,7 @@ export function reviewText(r) {
 }
 
 export async function reviewAndImport(url, { native = globalThis.cydianNative, backend = getBackend(), store = settings,
-  alert = showAlert, hud = showHUD } = {}) {
+  alert = showAlert, hud = showHUD, banner = showBanner } = {}) {
   const gunzip = native?.call
     ? async (bytes) => (await native.call("app.gunzip", { data: toBase64(bytes) })).text
     : null;
@@ -113,10 +113,13 @@ export async function reviewAndImport(url, { native = globalThis.cydianNative, b
   for (const s of r.settings) { try { store.set(s.key, s.to); } catch { /* an option this build lacks */ } }
   for (const p of r.holds) { try { await store.holds.set(p, true); } catch { /* the helper refused */ } }
   if (r.server) setServer(r.server.to);
-  if (failed.length) {
-    hide();
-    await alert({ title: "Some Things Didn't Import", message: failed.join("\n\n"), buttons: ["OK"] });
-  } else if (hide.done) hide.done("Imported");
+  // One popup only: the HUD ends on its checkmark; anything that didn't go in is a banner, which goes by itself.
+  if (hide.done) hide.done("Imported");
   else hide();
+  if (failed.length) {
+    const names = failed.map((f) => f.split(": ")[0].replace(/^https?:\/\//, "").replace(/\/$/, ""));
+    banner({ title: "Cydian", duration: 6000,
+      message: `${names.length === 1 ? names[0] : `${names.length} items`} couldn't be added: ${failed.length === 1 ? "try it again in Sources" : names.slice(0, 3).join(", ")}.` });
+  }
   return "imported";
 }

@@ -100,9 +100,11 @@ test("review in the app: Import adds only the new, keeps the user's own, no dupl
   const backend = fakeBackend([{ key: "deb:https://a.example/:./" }]);
   const store = fakeStore({ appearance: "light", worksOnMyPhone: true }, ["two"]); // no Device in the app
   const u = ui();
-  assert.equal(await reviewAndImport(url, { native: null, backend, store, ...u.deps }), "imported"); // no question first
+  const banners = [];
+  assert.equal(await reviewAndImport(url, { native: null, backend, store, ...u.deps, banner: (b) => banners.push(b) }), "imported"); // no question first
   assert.equal(backend.added.length, 1); // b; a was listed; fail failed and is reported
-  assert.equal(u.alerts[0].title, "Some Things Didn't Import");
+  assert.equal(u.alerts.length, 0); // no second popup: a failed source is a banner after the checkmark
+  assert.match(banners[0].message, /fail\.example/);
   assert.equal(store.v.appearance, "dark");
   assert.equal("device" in store.v, false);
   assert.deepEqual(store.h, ["two", "one"]);

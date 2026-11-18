@@ -117,8 +117,8 @@ async function firstLoad(ctx) {
   }
 }
 
-// The HUD stays exactly as long as the loading, then 0.75 s more and its 0.25 s fade: about a second after it's done.
-const linger = (hide) => setTimeout(hide, 750);
+// The HUD stays exactly as long as the loading, then a second more before its usual fade.
+const linger = (hide) => setTimeout(hide, 1000);
 
 // ---- the list --------------------------------------------------------------------------------------------
 

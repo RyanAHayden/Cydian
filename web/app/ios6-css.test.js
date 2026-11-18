@@ -51,3 +51,33 @@ test("the banner sits under the nav bar, below it in z-order, without the safe-a
   assert.match(t.decl, /bottom\s*:\s*0/);
   assert.match(t.decl, /transform-origin\s*:\s*left/);
 });
+
+// B40 (checked on the iPhone 7, 0.9.7, ref/7/screens/b40-*.png): the reload bar shows whole, right on top of the tab
+// bar, and the last row scrolls clear of both. The geometry that makes it so: the strip's bottom edge is the tab bar's
+// top (both from --tab-h), it paints over the screens and under the tab bar, the scrollers' end room while it shows is
+// at least the strip's height, and over a sheet (no tab bar) it drops by exactly the tab bar's 49 pt, onto the home
+// indicator's inset, never below the screen.
+test("B40: the reload bar sits whole right above the tab bar, and the last row can scroll clear of it", () => {
+  const bar = rules.find((x) => x.sel === ".reload-bar");
+  assert.ok(bar, ".reload-bar missing");
+  assert.match(bar.decl, /position\s*:\s*fixed/);
+  assert.match(bar.decl, /bottom\s*:\s*var\(--tab-h\)/, "its bottom edge is the tab bar's top");
+  const h = Number(/(?:^|;)\s*height\s*:\s*(\d+)px/.exec(bar.decl)?.[1]);
+  assert.equal(h, 44);
+  assert.doesNotMatch(bar.decl, /(?:^|;)\s*(transform|translate|margin-bottom)\s*:/, "nothing shifts it off the tab bar when idle");
+  const tab = new RegExp(String.raw`(^|\n)\.tabbar\s*\{([^}]*)\}`).exec(base)?.[2] ?? "";
+  assert.match(tab, /bottom\s*:\s*0/);
+  assert.match(tab, /height\s*:\s*var\(--tab-h\)/, "the tab bar is exactly --tab-h tall");
+  assert.match(base, /--tab-h\s*:\s*calc\(49px \+ env\(safe-area-inset-bottom\)\)/);
+  const z = zOf(css, ".reload-bar");
+  assert.ok(z > zOf(base, "#screens"), "over the page, not behind it");
+  assert.ok(z < zOf(base, ".tabbar"), "under the tab bar, so it slides out from behind it");
+  const room = rules.find((x) => /^html\.has-reload :is\([^)]*\.page-body[^)]*\)::after$/.test(x.sel));
+  assert.ok(room, "the scrollers get room at their end while it shows");
+  assert.ok(Number(/height\s*:\s*(\d+)px/.exec(room.decl)?.[1]) >= h, "at least the strip's height");
+  assert.match(room.decl, /display\s*:\s*block/);
+  assert.match(room.decl, /clear\s*:\s*both/, "below the rubber-band float, not beside it");
+  const over = rules.find((x) => x.sel === "body:has(.sheet) .reload-bar");
+  assert.ok(over, "over a sheet");
+  assert.match(over.decl, /translate\s*:\s*0 calc\(var\(--tab-h\) - env\(safe-area-inset-bottom\)\)/, "down by the tab bar's 49 pt only");
+});

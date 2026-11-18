@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GUIDES, guideRows } from "./guides.js";
-import { stateTile, nav, CURATED_SOURCES, deviceHint, DEVICE_HINT, showsThemes } from "./home.js";
+import { stateTile, nav, CURATED_SOURCES, deviceHint, DEVICE_HINT, showsThemes, versionLimits } from "./home.js";
 
 const src = (extra = {}) => ({ key: "deb:https://a/:./", uri: "https://a/", ...extra });
 
@@ -107,4 +107,17 @@ test("F123: every Settings link in the screens goes through settingsRoute (Home'
       assert.doesNotMatch(readFileSync(join(d, f), "utf8"), /tab: "settings"/, f);
     }
   }
+});
+
+test("a refresh leaves the green tile as it was, and hides old failures meanwhile", () => {
+  const src = (o = {}) => ({ uri: "https://a/", ...o });
+  assert.equal(stateTile({ sources: [src()], refreshing: 2 }).label, "See What's New");
+  assert.equal(stateTile({ sources: [src({ error: "x" })], refreshing: 1 }).label, "See What's New");
+  assert.equal(stateTile({ sources: [src()], upgrades: 0, refreshing: 1 }).kind, "current");
+});
+
+test("the Home icon tells the website and Lite what they can't do; the jailbreak app has no popup", () => {
+  assert.match(versionLimits("web").message, /tweaks/);
+  assert.match(versionLimits("sideload").message, /update itself/);
+  assert.equal(versionLimits("jailbreak"), null);
 });

@@ -15,9 +15,11 @@ html[data-theme="dark"] .home {
   --by: #a9c4f2;
 }
 
-/* Icon and welcome: a 76px icon 16px in from the tiles, the words beside it. */
+/* Icon and welcome: a 57px icon (Cydia's, 4S shot halved) 16px in from the tiles, the words beside it. */
 .home-head { margin: 0 10px; display: flex; align-items: center; gap: 22px; padding: 11px 0 11px 16px; }
-.home-icon { flex: none; width: 76px; height: 76px; border-radius: 13px; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.home-icon { flex: none; width: 57px; height: 57px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.home-icon.tappable { cursor: pointer; }
+.home-icon.tappable:active { filter: brightness(.8); }
 .home-words { min-width: 0; }
 /* F152: the words as one block (lines still flush left, as Cydia's), centred across and down in the space between the
    icon and the tiles' right edge, as on Cydia's Home (4S: 32pt left of the block, 36pt right). Auto margins take the

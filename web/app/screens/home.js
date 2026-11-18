@@ -61,8 +61,8 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
     return { kind: "upgrades", label: `${upgrades} ${upgrades === 1 ? "Upgrade" : "Upgrades"} Available`, href: format({ tab: "changes" }) };
   }
   // While a refresh runs, its errors aren't known yet: no "failed" until a source has actually failed this time.
-  if (refreshing > 0) return { kind: "loading", label: "Refreshing Sources", href: format({ tab: "sources" }) };
-  const failed = sources.filter((s) => s.error).length;
+  // The tile keeps what it said (no "Refreshing Sources": user 2026-11-18, it's distracting); the bar shows the refresh.
+  const failed = refreshing > 0 ? 0 : sources.filter((s) => s.error).length;
   if (failed) {
     return { kind: "failed", label: `${failed} ${failed === 1 ? "Source" : "Sources"} Failed to Load`, href: format({ tab: "sources" }) };
   }
@@ -424,6 +424,13 @@ function tileRow(cls, ...tiles) {
   return row;
 }
 
+// The icon on the website and in the sideload (LITE) app: what that version can't do, the jailbreak app can.
+export function versionLimits(kind) {
+  if (kind === "web") return { title: `${NAME} Web`, message: "The website can't:\n• install tweaks or themes\n• see the apps on your phone\n• remove apps\n• keep signed copies of your IPAs\n• remind you to re-sign apps\n\nThe app does all of this." };
+  if (kind === "sideload") return { title: `${NAME} Lite`, message: "Without a jailbreak, Lite can't:\n• install tweaks or themes\n• see apps it didn't install\n• remove apps\n• update itself (reinstall it instead)\n\nApps it signs stop opening when your certificate expires: re-sign them before." };
+  return null;
+}
+
 function renderRoot(body) {
   const home = el("div", "home");
   const head = el("div", "home-head");
@@ -433,8 +440,15 @@ function renderRoot(body) {
   const g = !globalThis.cydianNative ? "icon-web-glossy" : settings.mode === "sideload" ? "icon-lite-glossy" : "icon-glossy";
   icon.src = `icons/${g}-76.png`;
   icon.srcset = `icons/${g}-76.png 1x, icons/${g}-152.png 2x, icons/${g}-228.png 3x`;
-  icon.width = icon.height = 76;
+  icon.width = icon.height = 57;
   icon.alt = "";
+  const limits = versionLimits(!globalThis.cydianNative ? "web" : settings.mode);
+  if (limits) {
+    icon.classList.add("tappable");
+    icon.alt = limits.title;
+    icon.setAttribute("role", "button");
+    icon.addEventListener("click", () => showAlert(limits));
+  }
   const words = el("div", "home-words");
   const title = el("h2", "home-title", `Welcome to ${NAME}`);
   words.append(title);

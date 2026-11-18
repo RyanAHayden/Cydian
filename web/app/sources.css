@@ -29,7 +29,8 @@
   outline: none;
 }
 .alert-buttons { position: relative; display: flex; gap: 8px; margin-top: 4px; }
-.alert-buttons.stacked { flex-direction: column; }
+.alert-buttons.stacked { flex-direction: column; gap: 9px; }
+.alert-buttons.stacked .alert-button { flex: none; height: 43px; } /* three or more stack at the full height, not squeezed (flex: 1 in a column) */
 /* Alert buttons as Cydia's UIAlertView draws them on the 4S (ref/4s/screens/cydia-about.png, sampled): opaque greys
    over the navy, a gloss split at half, a dark edge, no white line on top or below. These are the kit's "Button
    (continue)" values, which match the device. background-origin: border-box after every background. */

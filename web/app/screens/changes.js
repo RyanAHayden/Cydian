@@ -39,7 +39,12 @@ export function init(ctx) {
   onAppsChange(() => { if (state.body) load(); });
   settings.onChange((key) => { if (key === "holds") { if (state.body) load(); else badge(); } });
   // At launch, only with a status file: without one there are no upgrades, and no reason to load every source.
-  catalog.hasStatus().then((has) => { if (has) badge(); });
+  // Without one (the site, the sideload app) the remembered apps count, and Cydian itself in the app: badge at
+  // launch whenever there is anything installed to follow.
+  catalog.hasStatus().then((has) => {
+    if (has) return badge();
+    return apps().then((s) => s.all()).then((recs) => { if (recs.length) badge(); });
+  }).catch(() => {});
   // The app: take dpkg's holds (apt-mark showhold) as Ignored Upgrades; a change redraws through onChange.
   if (catalog.statusSource() === "native") settings.holds.sync().catch(() => {});
 }

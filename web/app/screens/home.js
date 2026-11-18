@@ -26,6 +26,8 @@ import { homeFeatured } from "./extras.js";
 import { homeOffer, debUrl, debAlert, APP_LABEL, APP_NAME, REPO_URL, APP_IPA_URL } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 
+const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
+
 export const title = "Home";
 
 // More Package Sources: well-known flat repos, added in one tap (core/sources.js addSource takes flat repos only, so
@@ -289,7 +291,8 @@ function renderRoot(body) {
     homeFeatured(), // F20: sources' sileo-featured.json banners, a couple from each
     tileRow("pair",
       tile({ label: "GitHub", href: REPO_URL, glyph: "github", external: true }),
-      tile({ label: "Sources", href: format({ tab: "sources" }), glyph: "sources" })),
+      // Cydia's pair was Facebook | Twitter: here GitHub | Discord (the community)
+      tile({ label: "Discord", href: DISCORD_URL, glyph: "discord", external: true })),
     halves,
     appRow,
     browseRow,

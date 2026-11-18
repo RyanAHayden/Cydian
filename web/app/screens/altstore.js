@@ -11,6 +11,7 @@ import { catalog, ALL } from "../catalog.js";
 import { getBackend } from "../backend.js";
 import { mediaUrl } from "./depiction.js";
 import { installOptions } from "../core/altstore.js";
+import { compareVersions } from "../core/apt.js";
 import { settings } from "./settings.js";
 import { displayName, githubAvatarUrl } from "../core/sources.js";
 import { compat } from "../core/compat.js";
@@ -189,6 +190,18 @@ function trackingSection(app, pkg, source) {
         ...(versions.length > 1 ? [{ label: "Change Installed Version", onClick: () => pick() }] : []),
         { label: "Mark as Not Installed", onClick: () => apps().then((store) => removeInstall(store, app.bundleIdentifier)).then(draw, () => {}) }]
       : [{ label: "Mark as Installed", onClick: () => (versions.length > 1 ? pick() : mark(versions[0] ?? "")) }];
+    // The nav bar's button says what it will do, as Cydia's does: Upgrade when a newer version is out than the one
+    // installed, Reinstall when it's the same, Install when it isn't installed.
+    const newest = versions[0];
+    const label = !rec ? "Install" : rec.version && newest && compareVersions(newest, rec.version) > 0 ? "Upgrade" : "Reinstall";
+    // (the Share icon sits beside it in the same corner: find the button by its label)
+    const relabel = () => {
+      const b = [...document.querySelectorAll(".nav-stack.is-active .nav-item.is-top .nav-right .bar-button")]
+        .find((x) => /^(Install|Upgrade|Reinstall)$/.test(x.textContent));
+      if (b) b.textContent = label;
+      return Boolean(b);
+    };
+    if (!relabel()) setTimeout(relabel, 0);
     box.replaceChildren(grouped([{ header: "Installed", rows,
       footer: rec ? "Cydian follows this app for updates: they show in Changes." : "Installed it another way? Mark it, and Cydian follows it for updates." }]));
   }

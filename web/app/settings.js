@@ -14,7 +14,8 @@ import { detectMode, DAEMON_KEYS, DAEMON_LISTS } from "./core/settings.js";
 import { parse } from "./router.js";
 
 export function createUpgradeNotices({ settings, native = globalThis.cydianNative, current, win = globalThis.window } = {}) {
-  const on = Boolean(native && typeof native.call === "function") && detectMode({ cydianNative: native }) === "jailbreak";
+  // Both app builds: the jailbreak app's daemon counts in the background too, the sideload app counts here.
+  const on = Boolean(native && typeof native.call === "function") && ["jailbreak", "sideload"].includes(detectMode({ cydianNative: native }));
   let count = null; // the Changes tab's last count
   let cleared = false; // the icon badge is 0 as far as we know (until the next count above 0)
   const onChanges = () => (current?.() ?? (win ? parse(win.location.hash) : null))?.tab === "changes";
@@ -30,7 +31,10 @@ export function createUpgradeNotices({ settings, native = globalThis.cydianNativ
     // Same arguments as ctx.setBadge. Returns true when it asked the shell to clear the icon badge.
     badge(tab, n) {
       if (tab !== "changes") return false;
-      count = typeof n === "number" ? n : Number(n) || 0;
+      const next = typeof n === "number" ? n : Number(n) || 0;
+      // the app icon shows the count too (Settings > App Icon Badge), not only the daemon's background checks
+      if (on && next > 0 && next !== count) Promise.resolve(native.call("app.badge", { count: next })).catch(() => {});
+      count = next;
       if (count > 0) cleared = false;
       return clear();
     },

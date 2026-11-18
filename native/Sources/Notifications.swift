@@ -68,11 +68,21 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
             DispatchQueue.main.async {
                 let center = UNUserNotificationCenter.current()
                 if n == 0 { center.removeDeliveredNotifications(withIdentifiers: [upgradesID]) }
-                if #available(iOS 16.0, *) {
-                    center.setBadgeCount(n) { e in c.reply(nil, e.map { "badge: \($0.localizedDescription)" }) }
-                } else {
-                    UIApplication.shared.applicationIconBadgeNumber = n
-                    c.reply(nil, nil)
+                let set = {
+                    if #available(iOS 16.0, *) {
+                        center.setBadgeCount(n) { e in c.reply(nil, e.map { "badge: \($0.localizedDescription)" }) }
+                    } else {
+                        UIApplication.shared.applicationIconBadgeNumber = n
+                        c.reply(nil, nil)
+                    }
+                }
+                // iOS shows an icon badge only with permission for badges: ask once, the first time there's a count.
+                center.getNotificationSettings { st in
+                    if n > 0 && st.authorizationStatus == .notDetermined {
+                        center.requestAuthorization(options: [.badge, .alert, .sound]) { _, _ in DispatchQueue.main.async(execute: set) }
+                    } else {
+                        DispatchQueue.main.async(execute: set)
+                    }
                 }
             }
         }

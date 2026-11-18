@@ -21,12 +21,13 @@ test("0 upgrades on the Changes tab clears the icon badge, once until the count 
   const up = createUpgradeNotices({ native, current: () => ({ tab, path: [] }), win: fakeWin() });
   assert.equal(up.badge("home", 0), false);
   assert.equal(up.badge("changes", 3), false);
+  assert.deepEqual(native.calls, [["app.badge", { count: 3 }]]); // the icon shows the count
   assert.equal(up.badge("changes", 0), true);
   assert.equal(up.badge("changes", 0), false); // already cleared
-  assert.deepEqual(native.calls, [["app.badge", { count: 0 }]]);
+  assert.deepEqual(native.calls, [["app.badge", { count: 3 }], ["app.badge", { count: 0 }]]);
   up.badge("changes", 2);
   assert.equal(up.badge("changes", null), true); // the tab bar's "none" is 0 too
-  assert.equal(native.calls.length, 2);
+  assert.equal(native.calls.filter((c) => c[1].count === 0).length, 2);
   tab = "home";
   up.badge("changes", 1);
   assert.equal(up.badge("changes", 0), false); // counted in the background: the badge stays
@@ -57,15 +58,16 @@ test("a failed clear is tried again next time", async () => {
   assert.equal(calls.length, 2);
 });
 
-test("the site and the sideload build do nothing", () => {
-  const side = fakeNative({ mode: "sideload" });
+test("the site does nothing; the sideload app sets the icon's count", () => {
   const changes = () => ({ tab: "changes", path: [] });
-  for (const native of [null, undefined, side]) {
+  for (const native of [null, undefined]) {
     const up = createUpgradeNotices({ native, current: changes, win: fakeWin() });
     assert.equal(up.badge("changes", 0), false);
     assert.equal(up.start(), false);
   }
-  assert.deepEqual(side.calls, []);
+  const side = fakeNative({ mode: "sideload" });
+  createUpgradeNotices({ native: side, current: changes, win: fakeWin() }).badge("changes", 4);
+  assert.deepEqual(side.calls, [["app.badge", { count: 4 }]]);
 });
 
 test("start: Upgrade Notifications off is written again; on, nothing runs", async () => {

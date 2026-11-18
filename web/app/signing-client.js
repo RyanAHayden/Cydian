@@ -113,7 +113,11 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {} })
     const version = /\/download\/v(\d+(?:\.\d+)*)\//.exec(url)?.[1] ?? null;
     return ["installing", "site"].includes(await installSelfNow({ ipa: url, version }));
   }
-  if (localSigning()) return installOnDevice({ url, name, onInstalled });
+  // F68: look first (signing.inspect), then the sheet with its edits signs and installs (signing-sheet.js).
+  if (localSigning()) {
+    const { inspectAndInstall } = await import("./signing-sheet.js");
+    return inspectAndInstall({ url, name, onInstalled });
+  }
   const id = await loadIdentity();
   if (!id?.p12 || !id?.profile) {
     await showAlert({ title: "No Certificate", message: "Add your certificate and provisioning profile in Settings > Signing.", buttons: ["OK"] });
@@ -250,14 +254,17 @@ const openRoute = (path) => { location.hash = format({ tab: "settings", path }).
 
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an
 // error, which an alert explains (untrusted and no_identity then open Settings > Signing).
-export async function installOnDevice({ url, name = "", onInstalled = () => {} },
+// F68: `params` replaces { url } with the look-first sheet's { token, name?, bundleId?, icon?, removeExtensions? }
+// (core/signing.js installParams); `after(result, h)` runs with the HUD still up once iOS has the link (the sheet
+// follows iOS's own progress there) and hides it itself.
+export async function installOnDevice({ url, name = "", onInstalled = () => {}, params = null, after = null },
   { native, hud = liveHUD, alert = showAlert, go = openRoute, later = setTimeout } = {}) {
   const h = hud("Downloading");
   let result;
   try {
     // manifestServer: the signing server hands iOS the manifest while Cydian serves the IPA over plain HTTP at
     // 127.0.0.1 (no certificate to trust on the phone; the server sees only the app's ID, version and name).
-    result = await bridge(native).call("signing.install", { url, manifestServer: getServer() }, (ev) => {
+    result = await bridge(native).call("signing.install", { ...(params ?? { url }), manifestServer: getServer() }, (ev) => {
       const t = phaseLabel(ev);
       if (t) h.set(t);
     });
@@ -270,6 +277,7 @@ export async function installOnDevice({ url, name = "", onInstalled = () => {} }
   }
   h.set("Installing");
   onInstalled(result);
+  if (after) { after(result, h); return true; }
   // iOS asks "Install …?" over the app: the HUD ends on a checkmark (signed and handed to iOS) and fades.
   later(() => (h.done ? h.done("Done") : h.hide()), 1200);
   return true;

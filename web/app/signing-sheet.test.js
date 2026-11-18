@@ -1,0 +1,227 @@
+// F68: the sideload build's look-first install (signing-sheet.js) and the page's side of F14's calls in
+// core/signing.js: the sheet's params, what it shows, the certificate warnings, Signed Apps, Re-sign All's HUD and
+// the re-sign reminder call. A fake cydianNative stands in for native/Sources/Sideload.swift.
+import { test, beforeEach, afterEach } from "node:test";
+import assert from "node:assert/strict";
+import { inspectAndInstall, followInstall } from "./signing-sheet.js";
+import { installOnDevice } from "./signing-client.js";
+import {
+  installParams, inspectGroups, isCgBI, fromBase64, certificateWarnings, revocationLabel, resignLabel, signedAppRows,
+  syncReminder, installedId, validBundleId, entitlementName,
+} from "./core/signing.js";
+import { createSettings, FEATURES } from "./core/settings.js";
+
+function fakeNative(answers = {}) {
+  const calls = [];
+  return {
+    mode: "sideload",
+    calls,
+    async call(method, params, onEvent) {
+      calls.push({ method, params });
+      const a = answers[method];
+      if (a instanceof Error) throw a;
+      return typeof a === "function" ? a(params, onEvent) : a ?? null;
+    },
+  };
+}
+const coded = (code, message) => Object.assign(new Error(message), { code });
+function fakeUI() {
+  const ui = { labels: [], hidden: 0, alerts: [], timers: [] };
+  ui.hud = (t) => { ui.labels.push(t); return { set: (x) => ui.labels.push(x), hide: () => { ui.hidden++; } }; };
+  ui.alert = async (a) => { ui.alerts.push(a); return { index: 0 }; };
+  ui.later = (f, ms) => ui.timers.push([f, ms]);
+  return ui;
+}
+
+// Delta as signing.inspect answers it (Sideload.swift inspect).
+const INFO = {
+  token: "tok1",
+  app: {
+    name: "Delta", bundleId: "com.rileytestut.Delta", version: "1.6", minimumOS: "14.0", size: 52_000_000,
+    entitlements: { "application-identifier": "X.com.rileytestut.Delta", "aps-environment": "production",
+      "com.apple.security.application-groups": ["group.com.rileytestut.Delta"] },
+    permissions: [{ key: "NSCameraUsageDescription", label: "Camera", text: "Scan QR codes." }],
+    extensions: [
+      { path: "PlugIns/DeltaWidget.appex", bundleId: "com.rileytestut.Delta.Widget", name: "Widget", point: "com.apple.widgetkit-extension" },
+      { path: "PlugIns/Share.appex", bundleId: "com.rileytestut.Delta.Share", name: "Share", point: "com.apple.share-services" },
+    ],
+  },
+  icon: null,
+  missing: ["aps-environment", "com.apple.security.application-groups"],
+  signsAs: "com.rileytestut.Delta",
+  profileKind: "Development",
+};
+
+let saved;
+beforeEach(() => { saved = globalThis.cydianNative; });
+afterEach(() => { globalThis.cydianNative = saved; });
+
+test("installParams: the token, and only the edits that change something", () => {
+  assert.deepEqual(installParams(INFO, { name: "Delta", bundleId: "com.rileytestut.Delta", icon: null, removeExtensions: [] }), { token: "tok1" });
+  assert.deepEqual(installParams(INFO, {}), { token: "tok1" });
+  assert.deepEqual(installParams(INFO, {
+    name: "  Delta 2 ", bundleId: "com.me.delta", icon: "iVBORw0KGgo=",
+    removeExtensions: ["PlugIns/Share.appex", "PlugIns/Share.appex", "PlugIns/Nope.appex"],
+  }), { token: "tok1", name: "Delta 2", bundleId: "com.me.delta", icon: "iVBORw0KGgo=", removeExtensions: ["PlugIns/Share.appex"] });
+  // the ID compared is the one it signs as (an explicit profile's), not the IPA's
+  assert.deepEqual(installParams({ ...INFO, signsAs: "com.team.fixed" }, { bundleId: "com.team.fixed" }), { token: "tok1" });
+  assert.throws(() => installParams(INFO, { bundleId: "com..bad" }), /isn't a bundle ID/);
+  assert.throws(() => installParams({ app: {} }, {}), /looked at/);
+  assert.equal(validBundleId("com.you.app-2"), true);
+  assert.equal(validBundleId(".com"), false);
+  assert.equal(validBundleId("com.you app"), false);
+});
+
+test("inspectGroups: app, permissions, entitlements (missing marked) and what the profile can't give", () => {
+  const g = inspectGroups(INFO);
+  assert.deepEqual(g.map((x) => x.header), ["App", "Permissions", "Entitlements", "Your Profile Can't Give It"]);
+  assert.deepEqual(g[0].rows.map((r) => `${r.label}=${r.detail}`), ["Version=1.6", "Size=49.6 MB", "Needs iOS=14.0 or later", "Profile=Development"]);
+  assert.deepEqual(g[1].rows, [{ label: "Camera", subtitle: "Scan QR codes." }]);
+  const ent = Object.fromEntries(g[2].rows.map((r) => [r.label, r.detail]));
+  assert.equal(ent["Push Notifications"], "Missing");
+  assert.equal(ent["App ID"], null);
+  assert.deepEqual(g[3].rows.map((r) => r.label), ["Push Notifications", "App Groups"]);
+  assert.equal(entitlementName("com.example.custom"), "com.example.custom");
+  const bare = inspectGroups({ token: "t", app: { name: "X" }, missing: [] });
+  assert.deepEqual(bare.map((x) => x.header), ["App", "Permissions", "Entitlements"]);
+  assert.deepEqual(bare[1].rows, [{ label: "None" }]);
+});
+
+test("isCgBI: Apple's CgBI PNG is told apart from a plain one", () => {
+  const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  const cgbi = new Uint8Array([...sig, 0, 0, 0, 4, 0x43, 0x67, 0x42, 0x49, 0x50, 0, 0x20, 2]);
+  const plain = new Uint8Array([...sig, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1]);
+  assert.equal(isCgBI(cgbi), true);
+  assert.equal(isCgBI(plain), false);
+  assert.equal(isCgBI(fromBase64(Buffer.from(cgbi).toString("base64"))), true);
+  assert.equal(isCgBI(new Uint8Array(4)), false);
+});
+
+test("Install: inspect, the sheet's edits, signing.install {token, ...edits}, then signing.progress for iOS's install", async () => {
+  const native = fakeNative({
+    "signing.inspect": (p, on) => { on({ phase: "downloading", progress: 0.5 }); return INFO; },
+    "signing.install": (p, on) => { on({ phase: "signing", progress: 0.3 }); return { bundleId: "com.me.delta", name: "Delta 2" }; },
+    "signing.progress": (p, on) => { on({ phase: "installing", progress: 0.4 }); on({ phase: "installing", progress: 1 }); return { installed: true }; },
+  });
+  globalThis.cydianNative = native;
+  const ui = fakeUI();
+  let shown = null;
+  const sheet = (info, { onSign }) => {
+    shown = info;
+    setTimeout(() => onSign({ name: "Delta 2", bundleId: "com.me.delta", icon: null, removeExtensions: ["PlugIns/DeltaWidget.appex"] }), 0);
+    return () => {};
+  };
+  const installed = [];
+  const install = (opts) => installOnDevice(opts, { native, hud: ui.hud, alert: ui.alert, later: ui.later });
+  const ok = await inspectAndInstall({ url: "https://example.com/Delta.ipa", name: "Delta", onInstalled: (r) => installed.push(r) },
+    { native, hud: ui.hud, alert: ui.alert, install, sheet, later: ui.later });
+  assert.equal(ok, true);
+  assert.equal(shown, INFO);
+  assert.deepEqual(native.calls.map((c) => c.method), ["signing.inspect", "signing.install", "signing.progress"]);
+  assert.deepEqual(native.calls[0].params, { url: "https://example.com/Delta.ipa" });
+  const { manifestServer, ...sent } = native.calls[1].params;
+  assert.deepEqual(sent, { token: "tok1", name: "Delta 2", bundleId: "com.me.delta", removeExtensions: ["PlugIns/DeltaWidget.appex"] });
+  assert.match(manifestServer, /^https:\/\//);
+  assert.deepEqual(native.calls[2].params, { bundleId: "com.me.delta" });
+  assert.deepEqual(installed, [{ bundleId: "com.me.delta", name: "Delta 2" }]);
+  // let the progress call finish (after() runs it without awaiting)
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Signing 30%", "Installing", "Installing 40%", "Installing", "Installed"]);
+  assert.equal(ui.timers.length, 1); // the HUD goes a moment after Installed
+});
+
+test("Install: Cancel on the sheet signs nothing; a bad ID is said before signing", async () => {
+  const native = fakeNative({ "signing.inspect": INFO });
+  const ui = fakeUI();
+  const cancel = (info, { onClose }) => { setTimeout(onClose, 0); return () => {}; };
+  assert.equal(await inspectAndInstall({ url: "https://e.com/a.ipa" }, { native, hud: ui.hud, alert: ui.alert, install: () => assert.fail(), sheet: cancel }), false);
+  assert.deepEqual(native.calls.map((c) => c.method), ["signing.inspect"]);
+
+  let tries = 0;
+  const bad = (info, { onSign, onClose }) => {
+    setTimeout(async () => { tries++; await onSign({ bundleId: "no spaces" }); onClose(); }, 0);
+    return () => {};
+  };
+  assert.equal(await inspectAndInstall({ url: "https://e.com/a.ipa" }, { native, hud: ui.hud, alert: ui.alert, install: () => assert.fail(), sheet: bad }), false);
+  assert.equal(tries, 1);
+  assert.equal(ui.alerts.at(-1).title, "Can't Sign");
+});
+
+test("Install: inspect's errors are alerts; an older shell without signing.inspect installs straight away", async () => {
+  const ui = fakeUI();
+  const failing = fakeNative({ "signing.inspect": coded("bad_url", "not an http(s) URL") });
+  assert.equal(await inspectAndInstall({ url: "x", name: "Delta" }, { native: failing, hud: ui.hud, alert: ui.alert, sheet: () => assert.fail() }), false);
+  assert.equal(ui.alerts[0].title, "Couldn't Install Delta");
+  assert.equal(ui.hidden, 1);
+
+  const old = fakeNative({ "signing.inspect": new Error("unknown method signing.inspect") });
+  const straight = [];
+  const r = await inspectAndInstall({ url: "https://e.com/a.ipa", name: "A" },
+    { native: old, hud: ui.hud, alert: ui.alert, install: (o) => { straight.push(o); return true; }, sheet: () => assert.fail() });
+  assert.equal(r, true);
+  assert.equal(straight[0].url, "https://e.com/a.ipa");
+  assert.equal(straight[0].params, undefined);
+});
+
+test("followInstall: no answer or no API just hides the HUD", async () => {
+  const ui = fakeUI();
+  const h = ui.hud("Installing");
+  assert.equal(await followInstall(fakeNative({ "signing.progress": { installed: false } }), "com.a", h, { later: ui.later }), false);
+  assert.equal(ui.hidden, 1);
+  assert.equal(await followInstall(fakeNative({ "signing.progress": new Error("unknown method") }), "com.a", h, { later: ui.later }), null);
+  assert.equal(ui.hidden, 2);
+  assert.equal(await followInstall(fakeNative(), "", h, { later: ui.later }), null);
+  assert.equal(ui.timers.length, 1);
+  assert.equal(installedId({}, { bundleId: "b" }, INFO), "b");
+  assert.equal(installedId(null, {}, INFO), "com.rileytestut.Delta");
+});
+
+test("certificateWarnings: revoked, and signatures ending within 7 days", () => {
+  const now = new Date("2026-11-17T12:00:00Z");
+  assert.deepEqual(certificateWarnings(null, now), []);
+  assert.deepEqual(certificateWarnings({ revocation: { status: "good" }, signatureExpires: "2027-01-01T00:00:00Z" }, now), []);
+  const rev = certificateWarnings({ revocation: { status: "revoked", revokedAt: "2026-11-10T08:00:00Z" } }, now);
+  assert.equal(rev.length, 1);
+  assert.match(rev[0], /revoked.*2026-11-10/);
+  assert.match(certificateWarnings({ signatureExpires: "2026-11-20T12:00:00Z" }, now)[0], /in 3 days \(2026-11-20\)/);
+  assert.match(certificateWarnings({ signatureExpires: "2026-11-17T20:00:00Z" }, now)[0], /within a day/);
+  assert.match(certificateWarnings({ signatureExpires: "2026-11-01T00:00:00Z" }, now)[0], /already expired/);
+  assert.deepEqual(certificateWarnings({ signatureExpires: "2026-11-24T12:00:01Z" }, now), []);
+  assert.equal(certificateWarnings({ revocation: { status: "revoked" }, signatureExpires: "2026-11-18T00:00:00Z" }, now).length, 2);
+  assert.equal(revocationLabel(null), "Not Checked");
+  assert.equal(revocationLabel({ status: "revoked" }), "Revoked");
+});
+
+test("Signed Apps' rows and Re-sign All's HUD text", () => {
+  const now = new Date("2026-11-17T12:00:00Z");
+  const rows = signedAppRows({ apps: [
+    { bundleId: "b", name: "Bravo", version: "2", expires: "2026-12-01T00:00:00Z" },
+    { bundleId: "a", name: "Alpha", version: "1", expires: "2026-11-19T00:00:00Z" },
+    { bundleId: "c", name: "", expires: null },
+  ] }, now);
+  assert.deepEqual(rows.map((r) => [r.label, r.detail, r.expiring]), [["Alpha", "1 day", true], ["Bravo", "13 days", false], ["c", "", false]]);
+  assert.equal(rows[0].subtitle, "Version 1 · a");
+  assert.deepEqual(signedAppRows(null), []);
+  assert.equal(resignLabel({ index: 0, count: 3, name: "Delta", phase: "signing", progress: 0.5 }), "Signing 50% Delta (1 of 3)");
+  assert.equal(resignLabel({ index: 2, count: 3, name: "Kodi", phase: "waiting" }), "Re-signing Kodi (3 of 3)");
+  assert.equal(resignLabel({}), null);
+});
+
+test("Re-sign Reminder: shown in the sideload build, and its value goes to signing.remind {days}", async () => {
+  assert.ok(FEATURES.has("resign"));
+  const store = new Map();
+  const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)) };
+  const s = createSettings({ storage, mode: "sideload" });
+  assert.equal(s.isShown("resignReminder"), true);
+  assert.equal(createSettings({ storage, mode: "jailbreak" }).isShown("resignReminder"), false);
+  const native = fakeNative({ "signing.remind": (p) => ({ at: p.days ? "2026-11-20T10:00:00Z" : null }) });
+  const call = (m, p) => native.call(m, p);
+  assert.deepEqual(await syncReminder(s.get, call), { at: "2026-11-20T10:00:00Z" });
+  s.set("resignReminder", 7);
+  await syncReminder(s.get, call);
+  s.set("resignReminder", 0);
+  assert.deepEqual(await syncReminder(s.get, call), { at: null });
+  assert.deepEqual(native.calls.map((c) => c.params), [{ days: 2 }, { days: 7 }, { days: 0 }]);
+  assert.equal(await syncReminder(s.get, null), null);
+  assert.equal(await syncReminder(s.get, async () => { throw new Error("unknown method"); }), null);
+});

@@ -324,8 +324,29 @@ F14 added the arm64e fix-up and the user's edits (below). Not done: dylib inject
 
 Not built from F14's original brief, and why: backloop.dev and api.palera.in installs (I6 chose the phone's own CA
 instead, above), so no backloop pack expiry check or genPlist URL encoding; Zsign-Package (I6's own signer replaces
-it). The page's side of all this (the look-first sheet, editing, Re-sign All, the revocation row, turning the
-reminder row on) is a follow-up task: the web app doesn't call the native signing bridge yet.
+it).
+
+### The page's side (F68)
+
+- **Install** on an AltStore app in the sideload build (`signing-client.js` `signAndInstall`, so the package page,
+  Sign with My Certificate and Version History alike) goes through `signing-sheet.js`: `signing.inspect` under a
+  Downloading HUD, then a sheet (iOS 6 grouped table, Cancel in its bar): the app's head, **Install As** (Name, Bundle
+  ID, Icon: Choose draws the picked image centred and cropped into a 180x180 canvas and sends that PNG), App
+  (version, size, minimum iOS, profile kind), Permissions, Entitlements (each one the profile lacks marked Missing),
+  **Your Profile Can't Give It** (red), and Extensions with a switch each (off leaves it out). The IPA's own icon is
+  shown when it's a plain PNG; Apple's CgBI PNG (most) can't be drawn, so a letter placeholder stands in.
+  **Sign & Install** sends `signing.install {token, ...}` with only what changed (`core/signing.js installParams`: a
+  name or ID left as it was isn't sent; a bad ID is refused before signing), then `signing.progress {bundleId}`
+  keeps the HUD on "Installing N%" until iOS says it's installed. A shell without `signing.inspect` installs as
+  before (straight `signing.install {url}`).
+- **Settings > Signing** (sideload, under the walkthrough; `screens/signed-apps.js`): Certificate Status with Check
+  Certificate (`signing.checkCertificate`; the row shows Good / Revoked / Unknown / Not Checked from
+  `identity.revocation`) and a red footer when the certificate is revoked or `identity.signatureExpires` is under 7
+  days away (`certificateWarnings`); Signed Apps from `signing.installed`, soonest to expire first, with Re-sign All
+  (`signing.resignAll`, one HUD whose label follows each app: "Signing 40% Delta (1 of 3)", then an alert for any that
+  failed) and a left swipe to Delete, which is `signing.forget`.
+- **Re-sign Reminder** shows (FEATURES has `resign`); its value goes to `signing.remind {days}` on every change and
+  at launch (`screens/settings.js remindNow`, `core/signing.js syncReminder`).
 
 ### Tests
 

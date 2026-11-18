@@ -899,3 +899,17 @@ export function previewSlot(key, sources) {
   loadPreviews(key, sources, { text: (u) => previewText(u) }).then(fill).catch(() => {});
   return slot;
 }
+
+// ---- F213: a list row's swipe and hold menu queue an app in the sideload build -------------------------------------
+// The job the app page's Install would queue (appPageAction: appJob with the installed record from the apps store),
+// for browse.js's row swipe and hold menu. -> { job, installed, newest } (job null: nothing to sign here: no IPA, a
+// source-signed link), or null when it isn't an app or this isn't the sideload build (F89: the website queues nothing).
+export async function rowAppJob(pkg, source, { store = apps, mode = detectMode() } = {}) {
+  const app = pkg?.stanza?.ipa;
+  if (mode !== "sideload" || !app) return null;
+  let rec = null;
+  try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
+  const installed = rec ? rec.version || "" : null;
+  const job = appJob(pkg, { installed: rec ? rec.version || null : null, source: source ? displayName(source) : null });
+  return { job, installed, newest: app.versions?.[0]?.version ?? null };
+}

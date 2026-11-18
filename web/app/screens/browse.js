@@ -63,6 +63,10 @@ import { APP_TILES } from "./handoff.js";
 import { attachRowSwipe, playHint } from "../nav/rowswipe.js";
 import { showUndoBar } from "../nav/undobar.js";
 import { runLogs } from "../queue.js";
+import { appQueue } from "../app-queue.js"; // F213: the sideload build's rows queue apps
+import { APP_MODE_LABEL } from "../core/appqueue.js";
+import { rowAppJob } from "./altstore.js";
+import { queueApp } from "./queue.js";
 
 const ROW_HEIGHT = 58;
 
@@ -400,11 +404,18 @@ export function packageList(body, route, rows, { letters = true, decorate = null
 // the list belongs to (Sources > a source), so Source isn't offered there. AltStore apps (kind "ipa") install from
 // their page, and a paid package its vendor sells goes through the page's Purchase step (B11), so neither gets a
 // queue item until installed.
-export function rowMenuItems(item, { queue = false, installed = null, newest = null, queued = false, listKey = null } = {}) {
+// F213: `apps` (the sideload build's app queue, app-queue.js) gives AltStore apps the item instead: `job` is what the
+// app page would queue (altstore.js rowAppJob), `installed` the apps store's version ("" when unknown), `queued` the
+// app queue holds it: Cancel, Install (not installed) or Upgrade (a newer version is out); none when up to date.
+export function rowMenuItems(item, { queue = false, installed = null, newest = null, queued = false, listKey = null, apps = false, job = null } = {}) {
   const items = [];
   const id = item?.id;
   if (!id) return items;
-  if (queue && item.kind !== "ipa") {
+  if (apps && item.kind === "ipa") {
+    if (queued) items.push({ kind: "cancel", label: "Cancel" });
+    else if (job && installed == null) items.push({ kind: "queue", label: "Install", job });
+    else if (job && installed && newest && compareVersions(newest, installed) > 0) items.push({ kind: "queue", label: "Upgrade", job });
+  } else if (queue && item.kind !== "ipa") {
     if (queued) items.push({ kind: "cancel", label: "Cancel" });
     else if (installed) {
       items.push(newest && compareVersions(newest, installed) > 0
@@ -438,6 +449,13 @@ function attachRowMenu(listEl, route) {
     // Not while editing or showing a Delete (Wish List), nor on rows with no page (an unadded repo's preview).
     if (!item?.id || !row._.a.getAttribute("href") || row.classList.contains("armed") || row.closest(".editing")) return;
     const x = e.clientX;
+    if (item.kind === "ipa" && queueKind() === "apps") { // F213: the sideload build's app queue
+      const st = await appRowState(item);
+      if (!row.isConnected || row._item !== item) return;
+      const items = rowMenuItems(item, { apps: true, ...st, listKey });
+      showMenu(row, items.map((it) => ({ label: it.label, onClick: () => runAppRowMenuItem(it, item, st) })), { x });
+      return;
+    }
     const queue = queueOf();
     const history = queue && item.kind !== "ipa" ? await catalog.history(item.id, ALL).catch(() => null) : null;
     if (!row.isConnected || row._item !== item) return; // scrolled away and rebound while history came
@@ -446,6 +464,36 @@ function attachRowMenu(listEl, route) {
     const items = rowMenuItems(item, { queue: !!queue, installed, newest, queued: !!installQueue.get(item.id), listKey });
     showMenu(row, items.map((it) => ({ label: it.label, onClick: () => runRowMenuItem(it, item, { installed, name: item.name }) })), { x });
   });
+}
+
+// F213: an app row's Install / Upgrade queues it and opens Confirm, as the app page's button does; Cancel clears it.
+function runAppRowMenuItem(it, item, st) {
+  if (it.kind === "cancel") return appQueue.clear(st.id);
+  if (it.kind === "queue") return queueApp(it.job);
+  return runRowMenuItem(it, item, { installed: null, name: item.name });
+}
+
+// F213: which queue a list's rows go to: the jailbreak build's apt queue, the sideload build's app queue, or none
+// (the website, F89).
+const queueKind = () => (queueOf() ? "apt" : detectMode() === "sideload" ? "apps" : null);
+
+// The app package and its source, asked at the touch (a short cache, as historyFor); the installed record and the
+// queue are read fresh each time. -> rowMenuItems' { id, job, installed, newest, queued }.
+const appRowPkg = new Map(); // id\nkey -> { at, p }
+async function appRowState(item) {
+  const k = `${item.id}\n${item.key || ALL}`;
+  let hit = appRowPkg.get(k);
+  if (!hit || Date.now() - hit.at > 20000) {
+    const p = Promise.all([catalog.package(item.id, item.key || ALL).catch(() => null), getBackend().sources().catch(() => [])])
+      .then(([pkg, sources]) => ({ pkg, source: sources.find((s) => s.key === pkg?.key) ?? null }));
+    hit = { at: Date.now(), p };
+    appRowPkg.set(k, hit);
+    if (appRowPkg.size > 200) appRowPkg.delete(appRowPkg.keys().next().value);
+  }
+  const { pkg, source } = await hit.p;
+  const r = await rowAppJob(pkg, source).catch(() => null);
+  const id = r?.job?.id || pkg?.stanza?.ipa?.bundleIdentifier || item.id;
+  return { id, job: r?.job ?? null, installed: r ? r.installed : null, newest: r?.newest ?? null, queued: !!appQueue.get(id) };
 }
 
 async function runRowMenuItem(it, item, { installed, name }) {
@@ -469,7 +517,8 @@ function showPackageShare(item, source) {
 // What the swipe does, from F192's rowMenuItems (the same states): its queue item, or null when it has none (the
 // website and the sideload build have no queue; AltStore apps, unbought paid packages and ones no source can download
 // get nothing). kind: the control behind the row: "add" (UITableView's green +, Install / Upgrade), "remove" (the red
-// minus) or "cancel" (the same control in grey: take a queued one back out).
+// minus) or "cancel" (the same control in grey: take a queued one back out). F213: in the sideload build (`apps`)
+// AltStore apps swipe to the app queue (add or cancel), and tweaks get nothing.
 export function rowSwipeAction(item, opts = {}) {
   const it = rowMenuItems(item, opts).find((i) => i.kind === "queue" || i.kind === "cancel");
   if (!it) return null;
@@ -478,8 +527,9 @@ export function rowSwipeAction(item, opts = {}) {
 }
 
 // The undo bar's line: "Install Foo queued"; for a cancel, what was taken out: "Install Foo cancelled".
-export function swipeMessage(action, name, prev = null) {
-  if (action.kind === "cancel") return `${MODE_LABEL[prev?.mode] ?? "Queue for"} ${name} cancelled`;
+// F213: `labels` APP_MODE_LABEL for an app (its modes add Re-sign).
+export function swipeMessage(action, name, prev = null, labels = MODE_LABEL) {
+  if (action.kind === "cancel") return `${labels[prev?.mode] ?? "Queue for"} ${name} cancelled`;
   return `${action.label} ${name} queued`;
 }
 
@@ -507,13 +557,14 @@ function historyFor(id) {
 }
 
 function attachQueueSwipe(listEl, route) {
-  if (!queueOf()) return null; // no queue here: nothing to swipe to
+  const kind = queueKind();
+  if (!kind) return null; // no queue here: nothing to swipe to
+  if (kind === "apps") return attachAppSwipe(listEl, route); // F213
   const listKey = route.tab === "sources" ? route.path[0] ?? null : null;
   const swipe = attachRowSwipe(listEl, {
     rowSelector: ".pkg-row",
     // Not while editing, on a Wish List row (its left swipe shows Delete), a held row, or a row with no page.
-    canStart: (row) => !!row._item?.id && !!row._.a.getAttribute("href") && !row.classList.contains("armed")
-      && !row.classList.contains("wish-row") && !row.classList.contains("is-held") && !row.closest(".editing"),
+    canStart: (row) => canSwipeRow(row),
     prepare: async (row) => {
       const item = row._item;
       const history = item.kind !== "ipa" ? await historyFor(item.id) : null;
@@ -539,15 +590,57 @@ function attachQueueSwipe(listEl, route) {
   return swipe;
 }
 
+const canSwipeRow = (row) => !!row._item?.id && !!row._.a.getAttribute("href") && !row.classList.contains("armed")
+  && !row.classList.contains("wish-row") && !row.classList.contains("is-held") && !row.closest(".editing");
+
+// F213: the sideload build's swipe, on AltStore app rows only (tweaks have no queue there): Install / Upgrade adds the
+// app page's job to the app queue quietly (no Confirm sheet, as F193), Cancel takes a queued one out; the undo bar
+// puts back what was there.
+appQueue.subscribe((e) => { if (e.type === "add" && globalThis.document) markHintSeen(); });
+function attachAppSwipe(listEl, route) {
+  const listKey = route.tab === "sources" ? route.path[0] ?? null : null;
+  const swipe = attachRowSwipe(listEl, {
+    rowSelector: ".pkg-row",
+    canStart: (row) => canSwipeRow(row) && row._item.kind === "ipa",
+    prepare: async (row) => {
+      const item = row._item;
+      const st = await appRowState(item);
+      const action = rowSwipeAction(item, { apps: true, ...st, listKey });
+      return action && { ...action, item, id: st.id };
+    },
+    kindOf: (a) => a.kind,
+    commit: (row, a) => {
+      const { item, id } = a;
+      const name = a.job?.name || item.name || item.id;
+      const prev = appQueue.get(id);
+      if (a.kind === "cancel") appQueue.clear(id);
+      else appQueue.add(a.job);
+      markHintSeen();
+      showUndoBar({ message: swipeMessage(a, prev?.name || name, prev, APP_MODE_LABEL), onUndo: () => restoreApp(id, prev) });
+    },
+  });
+  listEl.addEventListener("pointermove", () => { if (swipe.active) markHintSeen(); }, { passive: true });
+  maybeHint(listEl, () => appQueue.size, true);
+  return swipe;
+}
+
+// Undo: the queue as it was for that app (the job it held, or none).
+function restoreApp(id, prev) {
+  if (!prev) return appQueue.clear(id);
+  try { appQueue.add(prev); } catch { /* it can't be queued again: leave it out */ }
+}
+
 // F193's first-run hint: ~0.7 s after the list opens, its top row on screen eases left by 44pt and back, once.
-function maybeHint(listEl) {
+// F213: `queued` counts the queue the rows swipe to; `apps` keeps the hint to rows that swipe (app rows in sideload).
+function maybeHint(listEl, queued = () => installQueue.size, apps = false) {
   let seen = false;
   try { seen = !!hintStore()?.getItem(SWIPE_HINT_KEY); } catch { /* unreadable: treat as unseen */ }
   const reduce = !!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  if (hintPlayed || !swipeHintDue({ seen, queued: installQueue.size, logs: seen ? 0 : runLogs.list().length, queue: true, reduce })) return;
+  if (hintPlayed || !swipeHintDue({ seen, queued: queued(), logs: seen ? 0 : runLogs.list().length, queue: true, reduce })) return;
   setTimeout(() => {
     if (hintPlayed || !listEl.isConnected) return;
-    const rows = [...listEl.querySelectorAll(".pkg-row:not([hidden])")].filter((r) => r._item?.id && r._.a.getAttribute("href"));
+    const rows = [...listEl.querySelectorAll(".pkg-row:not([hidden])")].filter((r) => r._item?.id && r._.a.getAttribute("href")
+      && (!apps || r._item.kind === "ipa"));
     const view = listEl.parentElement?.getBoundingClientRect();
     let first = null, top = Infinity;
     for (const r of rows) {

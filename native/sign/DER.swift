@@ -29,14 +29,7 @@ enum DER {
     static func implicitCons(_ n: UInt8, _ body: Data) -> Data { tlv(0xA0 | n, body) }
     static func octets(_ d: Data) -> Data { tlv(0x04, d) }
     static func bits(_ d: Data) -> Data { tlv(0x03, Data([0]) + d) }
-    // A named bit string of one byte (key usage), with its trailing zero bits counted as unused, as DER wants.
-    static func namedBits(_ b: UInt8) -> Data {
-        var unused: UInt8 = 0
-        while unused < 7 && b & (1 << unused) == 0 { unused += 1 }
-        return tlv(0x03, Data([unused, b]))
-    }
     static func utf8(_ s: String) -> Data { tlv(0x0C, Data(s.utf8)) }
-    static func printable(_ s: String) -> Data { tlv(0x13, Data(s.utf8)) }
     static let null = Data([0x05, 0x00])
     static func bool(_ b: Bool) -> Data { Data([0x01, 0x01, b ? 0xFF : 0x00]) }
 
@@ -47,15 +40,6 @@ enum DER {
         if v >= 0 && bytes[0] & 0x80 != 0 { bytes.insert(0, at: 0) }
         if v < 0 && bytes[0] & 0x80 == 0 { bytes.insert(0xFF, at: 0) }
         return tlv(0x02, Data(bytes))
-    }
-
-    // An unsigned big-endian integer (serial numbers).
-    static func uint(_ raw: Data) -> Data {
-        var b = [UInt8](raw)
-        while b.count > 1 && b[0] == 0 { b.removeFirst() }
-        if b.isEmpty { b = [0] }
-        if b[0] & 0x80 != 0 { b.insert(0, at: 0) }
-        return tlv(0x02, Data(b))
     }
 
     static func oid(_ s: String) -> Data {

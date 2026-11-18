@@ -57,6 +57,20 @@ export function detectJailbreak(files) {
   return null;
 }
 
+// F56: the jailbreak from the marker files under the jbroot (Bridge.swift app.info `markers`, names relative to the
+// jbroot). A sure answer where detectJailbreak guesses from apt files: nathanlr first, since it also writes
+// .installed_dopamine; palera1n by its loader's dotfile, bootstrap or sources file; NekoJB and xia0o0o0o's jailbreak
+// (which write .installed_dopamine too, so Dopamine's own app skips them) are "other"; then Dopamine. null when
+// none is there (an older shell without `markers`, a rootful jailbreak, the site).
+export function jailbreakFromMarkers(markers) {
+  const has = new Set((Array.isArray(markers) ? markers : []).map((m) => String(m ?? "").replace(/^\/+/, "")));
+  if (has.has(".installed_nathanlr")) return "nathanlr";
+  if ([".installed_palera1n", ".palecursus_strapped", "etc/apt/sources.list.d/palera1n.sources"].some((m) => has.has(m))) return "palera1n";
+  if (has.has(".installed_nekojb") || has.has(".xia0o0o0o_jb_installed")) return "other";
+  if (has.has(".installed_dopamine")) return "dopamine";
+  return null;
+}
+
 // The entries for a jailbreak, its own first: AltStore sources stay (they suit any phone); an APT entry shows when
 // its `for` names the jailbreak, or always for "other"/null.
 export function recommendedFor(recs, jailbreak) {

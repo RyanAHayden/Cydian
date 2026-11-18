@@ -27,7 +27,7 @@ import {
 import { qrSvg } from "../core/qr.js";
 import { sourceWarning, warningAlert } from "../core/warnings.js";
 import {
-  RECOMMENDED_SOURCES, JAILBREAKS, jailbreakName, detectJailbreak, recommendedFor, savedJailbreak, saveJailbreak,
+  RECOMMENDED_SOURCES, JAILBREAKS, jailbreakName, detectJailbreak, jailbreakFromMarkers, recommendedFor, savedJailbreak, saveJailbreak,
   markRecommendedSeen,
 } from "../core/recommended.js";
 import { copyText } from "../nav/menu.js";
@@ -468,16 +468,22 @@ async function addPicked(ctx) {
 
 const previews = new Map(); // key -> { record fields read before adding (name, iconURL, count), apps }
 
-// F19: which jailbreak Recommended is for: the user's pick, else what apt's source files say (the jailbreak app;
-// core/recommended.js detectJailbreak), else null (every tweak repo, as before). { id, detected }.
+// F19: which jailbreak Recommended is for: the user's pick, else the jailbreak's marker files (F56, core/recommended.js
+// jailbreakFromMarkers), else what apt's source files say (the jailbreak app; detectJailbreak), else null (every tweak repo, as before). { id, detected }.
 let detectedJailbreak; // a promise, asked once per session
 export async function currentJailbreak() {
   const saved = savedJailbreak();
   if (saved) return { id: saved, detected: false };
   const backend = getBackend();
-  detectedJailbreak ??= backend.aptSourceFiles
+  // F56: the shell's marker files (app.info `markers`) answer for sure; apt's source files are the fallback.
+  const native = globalThis.cydianNative;
+  const fromMarkers = () => (native?.call
+    ? Promise.resolve().then(() => native.call("app.info", {})).then((i) => jailbreakFromMarkers(i?.markers), () => null)
+    : Promise.resolve(null));
+  const fromApt = () => (backend.aptSourceFiles
     ? backend.aptSourceFiles().then(detectJailbreak, () => null)
-    : Promise.resolve(null);
+    : Promise.resolve(null));
+  detectedJailbreak ??= fromMarkers().then((id) => id ?? fromApt());
   const id = await detectedJailbreak;
   return { id, detected: Boolean(id) };
 }

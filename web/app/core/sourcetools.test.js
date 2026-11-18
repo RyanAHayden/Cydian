@@ -7,7 +7,7 @@ import { sourceCalls, refreshSource, verifySource, openSourceStore } from "./sou
 import { healthOf, healthFields, releaseTime, fingerprint, withTimeout, pool, validatorCache, TimeoutError, QUIET_AFTER } from "./health.js";
 import { exportText, parseImport, reviewImport, filterSources } from "./sourcelist.js";
 import { sourceWarning, inputHost, SOURCE_WARNINGS, warningAlert } from "./warnings.js";
-import { RECOMMENDED_SOURCES, detectJailbreak, recommendedFor, savedJailbreak, saveJailbreak, recommendedSeen, markRecommendedSeen } from "./recommended.js";
+import { RECOMMENDED_SOURCES, detectJailbreak, jailbreakFromMarkers, recommendedFor, savedJailbreak, saveJailbreak, recommendedSeen, markRecommendedSeen } from "./recommended.js";
 import { createHttpBackend, BackendError } from "../backend-http.js";
 
 // The slice of IndexedDB that sources.js uses, in memory: several keyPath stores, get/getAll/put/delete, async
@@ -357,6 +357,19 @@ test("F19: the jailbreak is found from apt's source files", () => {
   assert.equal(detectJailbreak([{ path: "/var/jb/etc/apt/sources.list.d/default.sources", text: "URIs: https://example.com/\n" }]), null);
   assert.equal(detectJailbreak([]), null);
   assert.equal(detectJailbreak(undefined), null);
+});
+
+test("F56: the jailbreak is found for sure from its marker files under the jbroot", () => {
+  // nathanlr writes .installed_dopamine beside its own (usprebooter/main.m), so its marker wins
+  assert.equal(jailbreakFromMarkers([".installed_dopamine", ".installed_nathanlr"]), "nathanlr");
+  assert.equal(jailbreakFromMarkers([".installed_dopamine"]), "dopamine");
+  assert.equal(jailbreakFromMarkers(["/.installed_dopamine"]), "dopamine");
+  assert.equal(jailbreakFromMarkers([".installed_palera1n"]), "palera1n");
+  assert.equal(jailbreakFromMarkers([".palecursus_strapped"]), "palera1n");
+  assert.equal(jailbreakFromMarkers(["etc/apt/sources.list.d/palera1n.sources"]), "palera1n");
+  assert.equal(jailbreakFromMarkers([".installed_dopamine", ".installed_nekojb"]), "other");
+  assert.equal(jailbreakFromMarkers([]), null);
+  assert.equal(jailbreakFromMarkers(undefined), null);
 });
 
 test("F19: each jailbreak gets its own tweak repos first; AltStore sources always; Other or none: all of them", () => {

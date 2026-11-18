@@ -28,7 +28,9 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             c.reply(["version": info["CFBundleShortVersionString"] ?? "", "build": info["CFBundleVersion"] ?? "",
                      "ios": UIDevice.current.systemVersion, "jailbreak": Jailbreak.type, "mode": AppMode.current.rawValue,
                      // F49: Telesphoreo's suite is ios/<this %.2f> (core/altstore.js coreFoundationDist)
-                     "cf": kCFCoreFoundationVersionNumber], nil)
+                     "cf": kCFCoreFoundationVersionNumber,
+                     // F56: which jailbreak's marker files exist (core/recommended.js jailbreakFromMarkers)
+                     "markers": Jailbreak.markers], nil)
         }
         // The Appearance setting (F23, from screens/settings.js applyTheme): {style: auto|light|dark, theme}.
         on("app.theme") { c in
@@ -65,6 +67,23 @@ extension Jailbreak {
         if prefix == "/var/jb" { return "rootless" }
         return FileManager.default.fileExists(atPath: "/var/lib/dpkg/status") ? "rootful" : "none"
     }()
+}
+
+// F56: the marker files jailbreaks leave under the jbroot, for app.info `markers` (core/recommended.js
+// jailbreakFromMarkers decides). Each name read in the jailbreak's own source on 2026-11-17:
+//   .installed_dopamine   Dopamine (DOBootstrapper.m); nathanlr and NekoJB write it too
+//   .installed_nathanlr   nathanlr (usprebooter/main.m, beside its .installed_dopamine)
+//   .installed_palera1n   palera1n's loader (LREnvironment.swift); .palecursus_strapped is its bootstrap's
+//   etc/apt/sources.list.d/palera1n.sources   palera1n's loader (LRBootstrapper.swift)
+//   .installed_nekojb, .xia0o0o0o_jb_installed   jailbreaks Dopamine itself tells apart from its own
+// Paths relative to the jbroot, so roothide's random jbroot works as /var/jb does. Empty on a stock iPhone.
+extension Jailbreak {
+    static let markerFiles = [".installed_dopamine", ".installed_nathanlr", ".installed_palera1n", ".palecursus_strapped",
+                              "etc/apt/sources.list.d/palera1n.sources", ".installed_nekojb", ".xia0o0o0o_jb_installed"]
+    static var markers: [String] {
+        guard !prefix.isEmpty else { return [] }
+        return markerFiles.filter { FileManager.default.fileExists(atPath: path("/" + $0)) }
+    }
 }
 
 // Serves Bundle/web/* as cydian://app/*. A real origin (unlike file://), so ES modules, module workers and

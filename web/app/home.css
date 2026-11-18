@@ -11,8 +11,8 @@
 html[data-theme="dark"] .home {
   --tile: var(--table);
   --tile-edge: var(--table-edge);
-  --tile-green: #2f4a36;
-  --by: #a9c4f2;
+  --tile-green: var(--dk-green);
+  --by: var(--detail);
 }
 
 /* Icon and welcome: a 57px icon (Cydia's, 4S shot halved) 16px in from the tiles, the words beside it. */
@@ -57,7 +57,7 @@ html[data-theme="dark"] .home {
 .glyph-install { background-color: #2c9b3c; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M11 3h2v9.6l3.3-3.3 1.4 1.4L12 16.4l-5.7-5.7 1.4-1.4 3.3 3.3zM4 18h16v2H4z'/%3E%3C/svg%3E"); }
 .glyph-send { background-color: #2c9b3c; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M3 11h12.2l-4.6-4.6L12 5l7 7-7 7-1.4-1.4 4.6-4.6H3z'/%3E%3C/svg%3E"); }
 .home-row.green .home-glyph { background-color: #37a94a; }
-html[data-theme="dark"] .glyph-github { background-color: #4a4d52; }
+html[data-theme="dark"] .glyph-github { background-color: var(--dk-glyph); }
 .glyph-add { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z'/%3E%3C/svg%3E"); }
 .glyph-upgrades { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M12 2 3 11h6v10h6V11h6z'/%3E%3C/svg%3E"); }
 .glyph-failed { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M10 3h4l-.6 12h-2.8zm0 15h4v3h-4z'/%3E%3C/svg%3E"); }
@@ -90,7 +90,7 @@ html[data-theme="dark"] .home-links .cell + .cell { border-top-color: var(--divi
 /* I7: Settings > Signing's Install iFizBox App row, once the certificate works: Home's green tile (the account tile's
    #eefff0, its green glyph) as a grouped row. */
 .app-offer .table.grouped { background: #eefff0; }
-html[data-theme="dark"] .app-offer .table.grouped { background: #2f4a36; }
+html[data-theme="dark"] .app-offer .table.grouped { background: var(--dk-green); }
 .app-offer .home-glyph { background-color: #37a94a; }
 
 /* Home's iFizBox App card (screens/home.js tileRow "green stack"): one green table, two full-width rows with a line
@@ -136,7 +136,7 @@ html[data-theme="dark"] .app-offer .table.grouped { background: #2f4a36; }
   border: 0 !important; transform: none !important; width: 12px !important; height: 15px !important;
 }
 .home-locked .cell-inner:active, .home-locked .cell-inner.is-pressed { background: none !important; }
-html[data-theme="dark"] .home-locked .cell-label, html[data-theme="dark"] .home-locked .cell-detail { color: #6c7178 !important; }
+html[data-theme="dark"] .home-locked .cell-label, html[data-theme="dark"] .home-locked .cell-detail { color: var(--dk-dim) !important; }
 
 /* "Install Full iFizBox" (the website, for a jailbroken phone): its own purple tile, an open padlock for the glyph
    (drawn here: an unlocked lock, jailbreak's usual sign; not anyone's artwork). */

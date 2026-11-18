@@ -34,11 +34,13 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
                      // F56: which jailbreak's marker files exist (core/recommended.js jailbreakFromMarkers)
                      "markers": Jailbreak.markers], nil)
         }
-        // The Appearance setting (F23, from screens/settings.js applyTheme): {style: auto|light|dark, theme}.
+        // The Appearance setting (F23, from screens/settings.js applyTheme): {style: auto|light|dark, theme,
+        // darkPalette: oled|gunmetal} (F198).
         on("app.theme") { c in
             DispatchQueue.main.async {
                 if let w = c.web?.window { Theme.apply(style: c.params["style"] as? String ?? "auto",
-                                                       theme: c.params["theme"] as? String ?? "light", to: w) }
+                                                       theme: c.params["theme"] as? String ?? "light",
+                                                       darkPalette: c.params["darkPalette"] as? String ?? "oled", to: w) }
                 c.reply(nil, nil)
             }
         }
@@ -167,11 +169,33 @@ enum WebKitFeature {
 // What the shell draws itself follows the page's theme: the keyboard, <select> pickers, alerts and menus through the
 // window's interface style. Automatic leaves the style to the system, so the
 // page's prefers-color-scheme (which follows the window's traits) keeps tracking it. The status bar stays light
-// text in both themes: it sits on the blue nav bar in light and on the gunmetal "Status Bar (Black)" in dark.
+// text in both themes: it sits on the blue nav bar in light and on the black (OLED Black) or gunmetal bar in dark.
 // The bars themselves are web/app/'s (R3 (a)): the shell draws no UINavigationBar or UITabBar.
+// F198: the window and web view behind the page take the palette's ground (black for OLED Black), and the shell keeps
+// the last {style, darkPalette} so the next launch paints that ground before the page has run (no light or grey
+// flash on a dark launch). Light until the page has said anything.
 enum Theme {
-    static func apply(style: String, theme: String, to window: UIWindow) {
-        window.overrideUserInterfaceStyle = style == "dark" ? .dark : style == "light" ? .light : .unspecified
+    static let savedKey = "ifizbox.shellTheme"
+
+    static func style(_ s: String) -> UIUserInterfaceStyle { s == "dark" ? .dark : s == "light" ? .light : s == "auto" ? .unspecified : .light }
+
+    static var saved: (style: String, darkPalette: String) {
+        let d = UserDefaults.standard.dictionary(forKey: savedKey) ?? [:]
+        return (d["style"] as? String ?? "light", d["darkPalette"] as? String ?? "oled")
+    }
+
+    // The ground for the next launch: dark when the page last pinned Dark, or Automatic on a dark iPhone.
+    static func launchGround(systemDark: Bool) -> Launch.Ground {
+        let s = saved
+        return Launch.ground(dark: s.style == "dark" || (s.style == "auto" && systemDark), palette: s.darkPalette)
+    }
+
+    static func apply(style: String, theme: String, darkPalette: String, to window: UIWindow) {
+        window.overrideUserInterfaceStyle = Self.style(style)
+        let ground = Launch.ground(dark: theme == "dark", palette: darkPalette)
+        window.backgroundColor = ground.pattern
+        if let web = window.rootViewController?.view as? WKWebView { Launch.paint(web, ground) }
+        UserDefaults.standard.set(["style": style, "darkPalette": darkPalette], forKey: savedKey)
         window.rootViewController?.setNeedsStatusBarAppearanceUpdate()
     }
 }

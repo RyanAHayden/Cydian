@@ -321,6 +321,10 @@ centred between the bars, so the Loading block can sit up to about 10 pt off; th
 - The cover and the launch images are the light theme. With Appearance set to Dark the page switches to dark when
   the cover fades (the stored theme lives in the web view's localStorage, which the native side can't read before
   the page loads).
+- F198: the shell keeps the last `app.theme` (`{style, darkPalette}`, UserDefaults `ifizbox.shellTheme`). When that
+  was dark (Dark, or Automatic on a dark iPhone), the window and web view start on the palette's ground (black for
+  OLED Black, the dark pinstripes for Gunmetal) instead of the light pinstripes. `Theme.apply` repaints them on every
+  change. The system launch screen itself is still light.
 
 **Checked by the builds:** `mkdeb.py check` and `mkipa.py check` (through `native/launch_check.py`) refuse a bundle
 whose `UILaunchScreen` doesn't name the three images, lacks any of their @2x/@3x PNGs, has a `UIColorName`, or has

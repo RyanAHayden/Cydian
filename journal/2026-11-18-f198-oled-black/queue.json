@@ -1,0 +1,8 @@
+[
+  {"wait": 4000},
+  {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.appearance','dark'); 'ok'"},
+  {"nav": "#/changes", "ms": 15000},
+  {"eval": "import('./screens/queue.js').then(m=>{m.queueApp({id:'com.provenance-emu.provenance',name:'Provenance',version:'3.3.0',url:'https://example.invalid/p.ipa',size:1076363264,sourceName:'Provenance'}); m.queueApp({id:'com.example.mercury',name:'Mercury',version:'3.8.3',installed:'3.8.2',url:'https://example.invalid/m.ipa',size:52428800,sourceName:'Example'}); return 'queued'})"},
+  {"wait": 3000},
+  {"shot": "oled-queue"}
+]

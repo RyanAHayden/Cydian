@@ -1,6 +1,8 @@
 // The same server as the Cloudflare Worker (src/index.js), on any machine with Node 22: the website (web/app/),
 // /api/fetch, /api/applookup, /api/ipainfo and /sign/*. For people who'd rather run it on their own PC or in Docker than on Cloudflare.
 //   node worker/node.mjs            PORT (8787), HOST (0.0.0.0), WEB (../web/app), HOST_IDS, TTL as in wrangler.toml
+//   F187: reviews (/reviews/*) in SQLite at REVIEWS_DB (reviews.db, "off" for none); REVIEWS_ADMIN, REVIEWS_SALT,
+//   REVIEW_DAILY, REPORT_HIDE as the Worker's.
 // iOS takes the install manifest only over HTTPS with a trusted certificate: put it behind Tailscale
 // (`tailscale serve --bg 8787`), a Cloudflare Tunnel or Caddy with a domain (worker/README.md).
 import http from "node:http";
@@ -52,6 +54,17 @@ const LOOKUP_CACHE = {
 setInterval(() => { const now = Date.now(); for (const [k, e] of looked) if (e.until < now) looked.delete(k); }, 3_600_000).unref();
 
 const env = { HOSTED, ASSETS, LOOKUP_CACHE, HOST_IDS: process.env.HOST_IDS ?? "*.cydian", TTL: process.env.TTL ?? "600", MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB };
+
+// F187: F182's reviews in a SQLite file (node:sqlite, Node 22.5+) with D1's API, kept across restarts. Without
+// node:sqlite, or with REVIEWS_DB=off, /reviews/* answers as a Worker with no D1 binding does.
+const REVIEWS_DB = process.env.REVIEWS_DB || "reviews.db";
+if (REVIEWS_DB !== "off") {
+  try {
+    const { d1 } = await import("./src/d1-sqlite.js");
+    env.REVIEWS = d1(REVIEWS_DB);
+    for (const k of ["REVIEWS_ADMIN", "REVIEWS_SALT", "REVIEW_DAILY", "REPORT_HIDE"]) if (process.env[k]) env[k] = process.env[k];
+  } catch (e) { console.warn(`reviews off: ${e?.message ?? e}`); }
+}
 const server = http.createServer(async (inc, out) => {
   try {
     const proto = inc.headers["x-forwarded-proto"] ?? "http";
@@ -67,4 +80,4 @@ const server = http.createServer(async (inc, out) => {
   }
 });
 const port = Number(process.env.PORT ?? 8787);
-server.listen(port, process.env.HOST ?? "0.0.0.0", () => console.log(`cydian: http://${process.env.HOST ?? "0.0.0.0"}:${port} (web: ${WEB})`));
+server.listen(port, process.env.HOST ?? "0.0.0.0", () => console.log(`cydian: http://${process.env.HOST ?? "0.0.0.0"}:${port} (web: ${WEB}${env.REVIEWS ? `, reviews: ${REVIEWS_DB}` : ""})`));

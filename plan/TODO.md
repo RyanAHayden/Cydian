@@ -29,7 +29,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **F187** (follow-up, low) worker/node.mjs (and the Docker image) keeps F182 reviews: pass env.REVIEWS = d1(process.env.REVIEWS_DB ?? 'reviews.db') from worker/src/d1-sqlite.js (node:sqlite), REVIEWS_ADMIN from the environment; document it in worker/README.md. | files: worker/node.mjs, worker/README.md, worker/Dockerfile | after: F182
 ### Parked
 - [ ] **F21** (later) Ideas from feature research, journal/2026-11-17-feature-research, not scheduled: iPad layout and keyboard shortcuts (⌘F search, ⌘R refresh; Zebra #1892); block authors/packages from lists and upgrades (Zebra #1037, #998); 'worked for me' compatibility votes per package and iOS version (Sileo #249; needs moderation); malware check of installed packages against the F19 list; Bootstrap Install mode for broken bootstraps (Irisin); uicache from the app; localisation; self-update for the IPA build. See `journal/2026-11-17-feature-research/reports/Sideloader and package manager features.md`.
 - [ ] **F15** (follow-up, later) idevice install route (R5, docs/sideload.md): IDeviceKit + idevice (MIT, xcframework built from source) behind an Advanced switch: import a pairing file, LocalDevVPN loopback, AFC upload + installation_proxy with progress. The one route with no internet and no TLS, and it can update Cydian itself. | files: native/sideload/idevice/**

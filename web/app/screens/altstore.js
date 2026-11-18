@@ -5,7 +5,7 @@
 //                                         All Apps, Website; Share in the nav bar (F76)
 //   a package page whose stanza is an app (kind "ipa") -> renderApp
 // Styles: altstore.css. Every remote image goes through mediaUrl (http ones through the proxy on the site).
-import { grouped } from "../nav/ui.js";
+import { grouped, placeholder } from "../nav/ui.js";
 import { format } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
 import { getBackend } from "../backend.js";
@@ -114,7 +114,7 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
 // ---- the source page -------------------------------------------------------------------------------------------
 
 export async function renderAltSource(body, route, key) {
-  body.append(el("p", "empty", "Loading Source"));
+  body.append(placeholder("page"));
   let meta, source;
   try {
     await catalog.ensure();

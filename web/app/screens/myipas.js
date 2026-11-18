@@ -18,7 +18,7 @@
 // Add is From URL only, the list is links kept on this device, and Install signs through the Signing Server.
 // Rules and labels: core/myipas.js.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { grouped } from "../nav/ui.js";
+import { grouped, placeholder } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { catalog, ALL } from "../catalog.js";
 import { mergeCategories, indexLetter } from "../core/catalog.js";
@@ -269,8 +269,7 @@ function searchBar(placeholder, onQuery) {
 // All Apps and a category: their list with a search bar that narrows this list only.
 export const matchApp = (r, q) => [r.name, r.short, r.author, r.id].some((v) => String(v ?? "").toLowerCase().includes(q.toLowerCase()));
 async function renderFiltered(body, route, fetchRows, placeholder) {
-  const wait = el("div", "loading");
-  wait.append(el("span", "loading-spinner"), el("span", null, "Loading"));
+  const wait = placeholder("list");
   body.append(wait);
   let rows;
   try { await catalog.ensure(); rows = await fetchRows(); } catch (e) { wait.replaceWith(note(e.message)); return; }
@@ -444,7 +443,7 @@ function header(entry) {
 const hostOf = (u) => { try { return new URL(u).host; } catch { return ""; } };
 
 async function renderIpa(body, route, file) {
-  body.append(note("Loading"));
+  body.append(placeholder("page"));
   let entry, identity;
   try { ({ entry, identity } = await entryOf(file)); } catch (e) {
     body.replaceChildren(note(deviceError(e).message));
@@ -587,7 +586,7 @@ async function install(file) {
 const edits = new Map(); // file -> the options page's edits until Save
 
 async function renderOptions(body, route, file) {
-  body.append(note("Loading"));
+  body.append(placeholder("page", 5));
   let entry;
   try { ({ entry } = await entryOf(file)); } catch (e) {
     body.replaceChildren(note(deviceError(e).message));

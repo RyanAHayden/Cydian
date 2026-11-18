@@ -73,3 +73,33 @@ export function collapse(li) {
     el.animate([{ transform: `translateY(${h}px)` }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
   }
 }
+
+// Placeholders while a page loads (user 2026-11-17: show loading as little as possible): the shape of what's coming
+// with pulsing grey bars (ios6.css .ph-*), swapped for the real content in place, instead of a spinner.
+//   placeholder("list")  rows like a package list: an icon box, a name bar and a description bar
+//   placeholder("page")  a package or source page: a header card, then rows
+export function placeholder(kind = "list", rows = kind === "list" ? 9 : 4) {
+  const wrap = el("div", `ph ph-${kind}`);
+  wrap.setAttribute("aria-busy", "true");
+  wrap.setAttribute("aria-label", "Loading");
+  if (kind === "page") {
+    const head = el("div", "ph-head");
+    head.append(el("span", "ph-box ph-icon-lg"), el("span", "ph-lines"));
+    head.lastChild.append(el("span", "ph-bar ph-w60"), el("span", "ph-bar ph-w40"), el("span", "ph-bar ph-w30"));
+    wrap.append(head);
+  }
+  const ul = el("ul", kind === "list" ? "table plain" : "table grouped");
+  for (let i = 0; i < rows; i++) {
+    const li = el("li", "cell");
+    const inner = el("div", "cell-inner");
+    if (kind === "list") inner.append(el("span", "ph-box ph-icon"));
+    const lines = el("span", "ph-lines");
+    lines.append(el("span", `ph-bar ${["ph-w50", "ph-w35", "ph-w60", "ph-w40"][i % 4]}`));
+    if (kind === "list") lines.append(el("span", "ph-bar ph-sub ph-w70"));
+    inner.append(lines);
+    li.append(inner);
+    ul.append(li);
+  }
+  wrap.append(ul);
+  return wrap;
+}

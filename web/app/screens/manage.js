@@ -12,7 +12,7 @@
 // live in core/sourcelist.js; the QR code in core/qr.js. A change here (add, delete, reorder) tells sources.js
 // through onSourcesChanged, so the tab's list is right when the user goes back.
 import { cleanSourceUrl } from "../core/sources.js";
-import { grouped, plain, collapse } from "../nav/ui.js";
+import { grouped, plain, collapse, placeholder } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showSheet } from "../nav/sheet.js";
 import { format } from "../router.js";
@@ -651,7 +651,7 @@ async function renderPreview(body, route) {
   const head = { header: row.label, rows: [{ label: row.subtitle, subtitle: row.rec.why }],
     footer: row.added ? "This source is in your list." : "Tap Add to put it in your Sources." };
   if (row.rec.jailbreak) return renderRepoPreview(body, route, row, head);
-  body.replaceChildren(el("p", "empty", "Loading Source"));
+  body.replaceChildren(placeholder("page"));
   let p;
   try {
     p = await loadPreview(row);
@@ -719,7 +719,7 @@ async function loadRepoPreview(row) {
 
 async function renderRepoPreview(body, route, row, head) {
   body.classList.add("manage-why");
-  body.replaceChildren(grouped([head]), el("p", "empty", "Loading Packages"));
+  body.replaceChildren(grouped([head]), placeholder("list", 6));
   let preview;
   try {
     preview = await loadRepoPreview(row);

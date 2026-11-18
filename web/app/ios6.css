@@ -470,3 +470,17 @@ input.sign-value { border: 0; padding: 0; margin: 0; background: none; font: inh
 html.has-banner #navbar, html.has-banner #screens { transform: translateY(var(--banner-h, 44px)); }
 
 /* A bar button iOS left stuck in :active (Sources' Add after the Paste bubble): drawn as normal until touched again. */
+
+/* nav/ui.js placeholder(): grey bars that pulse where a loading page's content will be. */
+.ph-box, .ph-bar { display: block; background: #dcdfe3; animation: ph-pulse 1.2s ease-in-out infinite alternate; }
+.ph-icon { width: 29px; height: 29px; border-radius: 6px; flex: none; margin-right: 10px; }
+.ph-lines { display: flex; flex-direction: column; gap: 7px; flex: 1; min-width: 0; }
+.ph-bar { height: 13px; border-radius: 6px; }
+.ph-bar.ph-sub { height: 10px; }
+.ph-w30 { width: 30%; } .ph-w35 { width: 35%; } .ph-w40 { width: 40%; } .ph-w50 { width: 50%; } .ph-w60 { width: 60%; } .ph-w70 { width: 70%; }
+.ph-list .cell-inner { min-height: 58px; }
+.ph-page .ph-head { display: flex; gap: 12px; align-items: center; margin: 10px 9px; padding: 12px; border-radius: 8px; background: var(--table, #fff); border: 1px solid var(--table-edge, #a9abad); }
+.ph-icon-lg { width: 59px; height: 59px; border-radius: 12px; flex: none; }
+html[data-theme="dark"] .ph-box, html[data-theme="dark"] .ph-bar { background: #3a3d42; }
+@keyframes ph-pulse { from { opacity: 1; } to { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .ph-box, .ph-bar { animation: none; } }

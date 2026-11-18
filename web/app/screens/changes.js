@@ -15,6 +15,7 @@
 // Hidden while there are none, as Cydia's is.
 // F80: the sideload app's Upgrade (N) queues every available app upgrade too, in the app queue (app-queue.js), and
 // opens the same Confirm (screens/queue.js openAppConfirm), which installs them in turn, Cydian last.
+import { placeholder } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
 import { getBackend } from "../backend.js";
@@ -143,8 +144,10 @@ export function render(body, route, ctx) {
   state.data = null;
   drawUpgradeButton(0);
   body.append(...filterBar());
-  state.note = note("Loading Changes");
-  body.append(state.note);
+  state.note = note("");
+  state.note.hidden = true; // errors and "no changes" show here; while loading, placeholder rows
+  state.ph = placeholder("list");
+  body.append(state.note, state.ph);
   load();
 }
 
@@ -255,7 +258,7 @@ async function load() {
     upgrades = await upgradesWithSelf(upgrades); // F72: the sideload build lists Cydian's own upgrade here
     upgrades = await withAppUpgrades(upgrades, settings.holds.list()); // I3: the apps Install remembered (app-updates.js)
   } catch (e) {
-    if (seq === state.seq && state.note) { state.note.textContent = e.message; state.note.hidden = false; }
+    if (seq === state.seq && state.note) { state.ph?.remove(); state.note.textContent = e.message; state.note.hidden = false; }
     return;
   }
   if (seq !== state.seq) return;
@@ -269,6 +272,8 @@ function draw() {
   const body = state.body;
   if (!body || !state.data) return;
   const { groups, upgrades, installed } = state.data;
+  state.ph?.remove();
+  state.ph = null;
   drawUpgradeButton(upgrades.available.length);
   const scope = scopeOf(state.scope, installed);
   drawScope(scope);

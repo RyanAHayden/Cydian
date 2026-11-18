@@ -11,7 +11,7 @@
 // F77: a My IPAs row under the apps opens the user's own IPAs (screens/myipas.js, #installed/myipas/...).
 import * as browse from "./browse.js";
 import * as myipas from "./myipas.js";
-import { grouped, plain } from "../nav/ui.js";
+import { grouped, plain, placeholder } from "../nav/ui.js";
 import { format } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
 import { showAlert } from "../nav/alert.js";
@@ -72,13 +72,13 @@ export function render(body, route, ctx) {
   if (kind === "apps") {
     appView.body = body;
     appView.route = route;
-    body.append(note("Loading"));
+    body.append(placeholder("list", 6));
     loadApps();
     return;
   }
   state.body = body;
   state.route = route;
-  body.append(note("Loading Packages"));
+  body.append(placeholder("list"));
   load();
 }
 

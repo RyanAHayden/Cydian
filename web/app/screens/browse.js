@@ -10,7 +10,7 @@
 // e.g. #/sources/deb%3Ahttps%3A%2F%2Frepo.chariz.com%2F%3A.%2F/section%3ATweaks/package%3Acom.example.tweak
 //
 // Lists come from the catalog in the parse worker (catalog.js); long ones are virtualised (nav/vlist.js).
-import { grouped } from "../nav/ui.js";
+import { grouped, placeholder } from "../nav/ui.js";
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
 import { showSheet } from "../nav/sheet.js";
@@ -156,7 +156,7 @@ function renderSections(body, route, key) {
 async function drawSections(page) {
   const { body, route, key, editing } = page;
   const turn = ++page.draw; // an Edit tapped while the worker answers: only the last draw lands
-  body.replaceChildren(spinner());
+  body.replaceChildren(placeholder("list", 7));
   let data;
   try {
     await catalog.ensure();
@@ -353,7 +353,7 @@ export function packageList(body, route, rows, { letters = true, decorate = null
 
 // Exported for Home's Browse (F46).
 export async function renderList(body, route, fetchRows, letters) {
-  body.append(spinner());
+  body.append(placeholder("list"));
   let rows;
   try {
     await catalog.ensure();
@@ -380,7 +380,7 @@ export function formatSize(bytes) {
 const httpUrl = (u) => (/^https?:\/\//i.test(String(u ?? "").trim()) ? String(u).trim() : null);
 
 async function renderPackage(body, route, key, id, ctx) {
-  body.append(spinner("Loading"));
+  body.append(placeholder("page"));
   let pkg, sources;
   try {
     await catalog.ensure();
@@ -704,7 +704,7 @@ function versionsGroup(cells, footer) {
 // entry with its date, size, iOS range and notes; one this iPhone runs installs from its own row when it has an
 // IPA (or a signed link); the others are greyed.
 async function renderVersions(body, route, key, id) {
-  body.append(spinner("Loading"));
+  body.append(placeholder("page"));
   let history, pkg, sources;
   try {
     await catalog.ensure();

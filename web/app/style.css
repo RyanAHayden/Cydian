@@ -13,6 +13,9 @@ body {
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 button { font: inherit; color: inherit; margin: 0; }
+/* B24: holding a link (every package row is an <a>) or an image starts WebKit's drag, which lifted a black box with
+   the row drawn skewed. allowsLinkPreview=false and -webkit-touch-callout:none don't stop the drag; this does. */
+a, img { -webkit-user-drag: none; }
 
 /* Nav bar: 44px below the status bar (or the notch). */
 .navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 3; height: var(--nav-h); }

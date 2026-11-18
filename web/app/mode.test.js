@@ -8,9 +8,9 @@ import { detectMode } from "./core/settings.js";
 
 const ALL = ["home", "sources", "changes", "installed", "search", "settings"];
 
-test("sideload drops the apt-only tabs, the others keep every tab", () => {
-  assert.deepEqual(tabsFor(ALL, "sideload"), ALL.filter((t) => !APT_ONLY_TABS.includes(t)));
-  assert.ok(!tabsFor(ALL, "sideload").includes("installed"));
+test("every build keeps every tab, Installed included (remembered apps, Cydian itself, My IPAs)", () => {
+  assert.deepEqual(tabsFor(ALL, "sideload"), ALL);
+  assert.deepEqual(APT_ONLY_TABS, []);
   assert.deepEqual(tabsFor(ALL, "jailbreak"), ALL);
   assert.deepEqual(tabsFor(ALL, "site"), ALL);
 });
@@ -29,13 +29,13 @@ test("native/bridge.js sets cydianNative.mode from @MODE@, and detectMode reads 
   assert.equal(detectMode(raw), "jailbreak");
 });
 
-test("in sideload mode the router has no apt-only tabs, and their deep links land on home", async () => {
+test("in sideload mode the router has Installed too", async () => {
   globalThis.cydianNative = { mode: "sideload" };
   try {
     const r = await import("./router.js?sideload"); // a fresh copy, so TABS is worked out under this mode
-    assert.ok(!r.TABS.includes("installed"));
+    assert.ok(r.TABS.includes("installed"));
     assert.ok(r.TABS.includes("settings"));
-    assert.deepEqual(r.parse("#/installed"), { tab: "home", path: [] });
+    assert.deepEqual(r.parse("#/installed"), { tab: "installed", path: [] });
     assert.deepEqual(r.parse("#/changes"), { tab: "changes", path: [] });
   } finally {
     delete globalThis.cydianNative;

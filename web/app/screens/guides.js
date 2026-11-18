@@ -1,4 +1,4 @@
-// Home's User Guides, as Cydia's Home had them below More Package Sources (cydia.saurik.com/ui/ios~iphone/1.1/home/:
+// Home's User Guides, as Cydia's Home had them below Recommended Sources (cydia.saurik.com/ui/ios~iphone/1.1/home/:
 // Frequently Asked Questions, Copying Files to/from Device, OpenSSH Access How-To, Root Password How-To), rewritten
 // for today's rootless jailbreaks. F157 (user 2026-11-18, the approved concept): each guide is an iOS 6 app page
 // built from ios6.css's grouped tables (styles in guides.css):
@@ -31,7 +31,7 @@ export const LINKS = {
   installed: { label: "Installed", href: () => format({ tab: "installed" }) },
   ipas: { label: "Install IPAs", href: () => format({ tab: "installed", path: ["myipas"] }) },
   add: { label: "Add a Source", href: () => format({ tab: "sources", path: ["manage", "sources"] }) },
-  more: { label: "More Package Sources", href: () => format({ tab: "sources", path: ["manage"] }) },
+  more: { label: "Recommended Sources", href: () => format({ tab: "sources", path: ["manage", "recommended"] }) },
   help: { label: "Upgrading & Jailbreaking Help", href: () => format({ tab: "home", path: ["help"] }) },
   openssh: { label: "OpenSSH Access How-To", href: () => format({ tab: "home", path: ["guides", "openssh"] }) },
   password: { label: "Root Password How-To", href: () => format({ tab: "home", path: ["guides", "password"] }) },
@@ -111,7 +111,7 @@ export const FAQ = [
   },
   {
     id: "addsource", group: "Sources", q: "Adding a source",
-    a: "Sources > Manage > Sources > Add, then type the source's address. More Package Sources lists a few to start "
+    a: "Sources > Manage > Sources > Add, then type the source's address. Recommended Sources lists a few to start "
       + "with: one tap adds one.",
     next: ["add", "more"],
   },
@@ -123,7 +123,7 @@ export const FAQ = [
   },
   {
     id: "moresources", group: "Sources", q: "Where do I find more sources?",
-    a: "More Package Sources lists ones we checked. Developers often post their source's address on their site.",
+    a: "Recommended Sources lists ones we checked. Developers often post their source's address on their site.",
     next: ["more", "add"],
   },
 ];

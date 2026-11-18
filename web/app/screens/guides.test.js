@@ -92,7 +92,7 @@ test("F157: the FAQ's groups, answer pages and their Next rows", () => {
   assert.equal(g.linkRow("refresh").href, "#/sources");
   assert.equal(g.linkRow("installed").href, "#/installed");
   assert.equal(g.linkRow("add").href, "#/sources/manage/sources");
-  assert.equal(g.linkRow("more").href, "#/sources/manage");
+  assert.equal(g.linkRow("more").href, "#/sources/manage/recommended");
   assert.equal(g.linkRow("help").href, "#/home/help");
 
   // an answer page: the question heading, the answer in a cell, then Next

@@ -287,7 +287,7 @@ function pressBack(h) {
 test("F143: Home > Manage > a source (More Sources) > Back is Manage, Back again is Home", async () => {
   const { mounted } = await import("./router.js");
   const h = stackHarness("#/home");
-  h.win.location.hash = format({ tab: "sources", path: ["manage"] }); // Home's More Package Sources row
+  h.win.location.hash = format({ tab: "sources", path: ["manage"] }); // Home's Recommended Sources row
   assert.equal(h.win.location.hash, "#/home/~sources/manage");
   h.win.location.hash = format({ tab: "sources", path: ["bigboss"] }); // a source in Manage's More Sources
   assert.equal(h.win.location.hash, "#/home/~sources/manage/~sources/bigboss");

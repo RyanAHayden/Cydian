@@ -5,11 +5,11 @@
 //   - a full-width green tile for the current state (stateTile: Add a Source, n Upgrades Available, ...; Cydia's
 //     Manage Account)
 //   - a grouped list like Cydia's help links: Upgrading & Jailbreaking Help (our page), Find Extensions for
-//     Applications (Search), More Package Sources (a curated list, one tap adds a source); User Guides (screens/guides.js); Credits
+//     Applications (Search), Recommended Sources (a curated list, one tap adds a source); User Guides (screens/guides.js); Credits
 // Every tile and row is a .cell-inner link, so it gets the table cells' held look (blue selection) from ios6.css
 // and app.js. No featured banners above the tiles (F154: Browse's Tweak of the Day card instead).
 //
-// Routes below the tab: help, featured, sources (More Package Sources), guides/<id>, credits, wishlist (F102), and browse (F46): Browse's list
+// Routes below the tab: help, featured, sources (Recommended Sources), guides/<id>, credits, wishlist (F102), and browse (F46): Browse's list
 // (F124: New, Recently Updated, Popular, Featured, Free Apps / Tweaks / Themes, then the categories), browse/<list id>
 // (core/catalog.js BROWSE_LISTS: new, updated, popular, featured, free-apps...), browse/category:<name>, and below those browse.js's tokens
 // (package:<id>, author:<name>, versions:<id>), as in the Search tab.
@@ -41,7 +41,7 @@ const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Di
 
 export const title = "Home";
 
-// More Package Sources: well-known flat repos, added in one tap (core/sources.js addSource takes flat repos only, so
+// Recommended Sources: well-known flat repos, added in one tap (core/sources.js addSource takes flat repos only, so
 // the dist ones among the defaults can't be offered here). Each answered with a Release on 2026-11-17.
 export const CURATED_SOURCES = [
   { name: "Chariz", uri: "https://repo.chariz.com/", blurb: "tweaks and themes, free and paid" },
@@ -128,8 +128,8 @@ export function homeLinks() {
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
       { label: "Find Extensions for Applications", href: format({ tab: "search" }), chevron: true },
-      // Manage Sources (user 2026-11-18), opened on Home's own stack (router mountLink): Back comes home.
-      { label: "More Package Sources", href: format({ tab: "sources", path: ["manage"] }) },
+      // Sources > Manage > Recommended, straight there (user 2026-11-18), on Home's own stack (router mountLink): Back comes home.
+      { label: "Recommended Sources", href: format({ tab: "sources", path: ["manage", "recommended"] }) },
     ],
   }, { header: "User Guides", rows: guideRows(format, guidesLite()) },
   { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }];
@@ -137,7 +137,7 @@ export function homeLinks() {
 
 // F156: Home's link rows that stay open on the locked website (user 2026-11-18: "dont lock credits and thank you or
 // jailbreaking help"): Settings (F123), Upgrading & Jailbreaking Help, the User Guides and Credits / Thank You. They
-// need no install and help people get to one. Find Extensions and More Package Sources stay locked.
+// need no install and help people get to one. Find Extensions and Recommended Sources stay locked.
 const OPEN_WHILE_LOCKED = new Set(["settings", "help", "guides", "credits"]);
 export function openWhileLocked(href) {
   if (!href?.startsWith?.("#/")) return false;
@@ -799,7 +799,7 @@ function renderBrowseRoute(body, route, ctx) {
   return browse.render(body, route, ctx);
 }
 
-// More Package Sources: one row per curated repo; a tap asks, checks the repo and adds it. Listed ones are ticked.
+// Recommended Sources: one row per curated repo; a tap asks, checks the repo and adds it. Listed ones are ticked.
 function renderSources(body, ctx) {
   const box = el("div");
   body.append(box);

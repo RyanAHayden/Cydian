@@ -1,5 +1,5 @@
 // F156: on the locked website (before iFizBox is installed), Home's help, User Guides and Credits / Thank You rows
-// stay open like Settings; Find Extensions for Applications and More Package Sources stay locked and ask first.
+// stay open like Settings; Find Extensions for Applications and Recommended Sources stay locked and ask first.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 // Imported before the fake DOM goes in: loading signing.js with a document links its stylesheet into document.head.
@@ -53,9 +53,9 @@ async function tap(box, target) {
 // F157: the website Not Jailbroken (the default here) shows the lite User Guides: no OpenSSH or Root Password rows.
 const OPEN = ["Settings", "Upgrading & Jailbreaking Help", "Frequently Asked Questions", "Copying Files to/from Device",
   "Credits / Thank You"];
-const LOCKED = ["Find Extensions for Applications", "More Package Sources"];
+const LOCKED = ["Find Extensions for Applications", "Recommended Sources"];
 
-test("F156: help, User Guides and Credits stay open on the locked Home; Find Extensions and More Package Sources ask", async () => {
+test("F156: help, User Guides and Credits stay open on the locked Home; Find Extensions and Recommended Sources ask", async () => {
   const saved = globalThis.document;
   globalThis.document = fakeDom();
   try {

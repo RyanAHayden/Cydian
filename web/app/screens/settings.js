@@ -16,7 +16,8 @@ import { parseProfile, checkP12Password, summary, profileKind, DEFAULT_SERVER, d
 import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus,
-  localSigning, deviceStatus, importToDevice, removeFromDevice, setUpTrust, installOnDevice } from "../signing-client.js";
+  localSigning, deviceStatus, importToDevice, removeFromDevice, setUpTrust, installOnDevice, signAndInstall } from "../signing-client.js";
+import { signingRowShows, offerAfterImport, IMPORT_ALERT, APP_IPA_URL, APP_NAME, APP_LABEL } from "../core/appoffer.js";
 import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installPath, isNewer, compareVersions } from "../core/selfupdate.js";
 import { getArch } from "../backend.js";
 
@@ -299,6 +300,7 @@ const alertOK = (title, message) => showAlert({ title, message, buttons: ["OK"] 
 // Everything picked at once: the .p12 and profile are checked and saved as if picked alone, then the password is
 // found among any text files (or the empty password), unless the saved one already opens the certificate.
 async function chooseFiles(el, files, slot) {
+  const before = await loadIdentity();
   const hide = showHUD("Reading");
   let found;
   try { found = await sortCertFiles(files); } catch { found = { p12: null, profile: null, passwords: [] }; }
@@ -319,6 +321,26 @@ async function chooseFiles(el, files, slot) {
   if (id?.p12) await recheckPassword(el, false);
   if (localSigning()) await importIfComplete(el, false);
   redrawAll();
+  await offerApp(before);
+}
+
+// I7: right after an import that made the certificate work (website only), offer Cydian itself: Not Now / Install,
+// which signs the app's IPA with that certificate through the signing server and installs it.
+const installApp = () => signAndInstall({ url: APP_IPA_URL, name: APP_NAME });
+async function offerApp(before) {
+  if (!offerAfterImport({ mode: detectMode(), before, after: await loadIdentity() })) return;
+  const { index } = await showAlert(IMPORT_ALERT);
+  if (index === 1) await installApp();
+}
+
+// I7: the green Install Cydian App row on the Signing page, once the certificate works (website only).
+function appOfferSection(id) {
+  if (!signingRowShows({ mode: detectMode(), identity: id })) return [];
+  const frag = grouped([{ rows: [{ label: APP_LABEL, onClick: installApp, icon: { text: "" } }],
+    footer: "Cydian as an app on your Home Screen, signed with this certificate: it signs apps on the iPhone itself, no server." }]);
+  frag.firstChild.classList.add("app-offer");
+  frag.querySelector(".cell-icon")?.classList.add("home-glyph", "glyph-install");
+  return [frag];
 }
 
 async function chooseP12(el, f, redraw = true) {
@@ -417,7 +439,7 @@ async function drawSigning(el) {
       + "Run your own with docker compose up (docs/signing.md) and put its address here.",
   });
   if (id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeCertificate(el) }] });
-  el.replaceChildren(certificateBlock(el, id), grouped(sections));
+  el.replaceChildren(certificateBlock(el, id), ...appOfferSection(id), grouped(sections));
   el.scrollTop = top;
 }
 
@@ -448,8 +470,14 @@ function certificateBlock(el, id, status = null) {
   // entry) sends all three to the Keychain.
   const save = async (done = false) => {
     clearTimeout(timer);
+    const before = await loadIdentity();
     await saveIdentity({ password: input.value });
     await recheckPassword(el, false);
+    // I7: the password that made the certificate work: show the Install Cydian App row and offer it.
+    if (!localSigning() && offerAfterImport({ mode: detectMode(), before, after: await loadIdentity() })) {
+      redrawAll();
+      await offerApp(before);
+    }
     if (localSigning()) {
       const now = await loadIdentity();
       if (now?.passwordOk === true || (done && now?.passwordOk !== false)) await importIfComplete(el, true);

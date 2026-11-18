@@ -50,8 +50,9 @@ build=$(git rev-list --count HEAD 2>/dev/null || echo 1)
 export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct 2>/dev/null || echo 0)}
 out=build
 mkdir -p "$out"
-# The ubuntu24.04 toolchain wants libncurses.so.6; Arch ships only the wide one.
-if ldd "$swiftc" | grep -q 'libncurses.so.6 => not found'; then
+# The ubuntu24.04 toolchain wants libncurses.so.6; Arch ships only the wide one. ldd's whole output is read first:
+# `ldd | grep -q` under pipefail fails when grep quits early and ldd dies of SIGPIPE (it did under a loaded gate, I7).
+if [[ "$(ldd "$swiftc" 2>/dev/null || true)" == *'libncurses.so.6 => not found'* ]]; then
   mkdir -p "$out/libshim" && ln -sf /usr/lib/libncursesw.so.6 "$out/libshim/libncurses.so.6"
   export LD_LIBRARY_PATH=$PWD/$out/libshim${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 fi

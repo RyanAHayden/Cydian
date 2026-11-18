@@ -32,9 +32,14 @@ test("requests are built as the spec writes them", () => {
   assert.deepEqual(JSON.parse(info.body), { udid: "u1", device: "iPhone7,2" }); // token optional: left out
   assert.deepEqual(JSON.parse(buildRequest(base, "purchase", { packageId: "a.b", token: "t", secret: "s" }).body),
     { token: "t", payment_secret: "s" });
+  // B10: udid and device in the purchase too, architecture in authorize_download (as Sileo and Zebra send them).
+  assert.deepEqual(JSON.parse(buildRequest(base, "purchase", { packageId: "a.b", token: "t", secret: "s", udid: "u", device: "d" }).body),
+    { token: "t", udid: "u", device: "d", payment_secret: "s" });
   assert.deepEqual(JSON.parse(buildRequest(base, "authorize_download",
-    { packageId: "a.b", token: "t", udid: "u", device: "d", version: "1.0.1", repo: "https://repo.example.com" }).body),
-  { token: "t", udid: "u", device: "d", version: "1.0.1", repo: "https://repo.example.com" });
+    { packageId: "a.b", token: "t", udid: "u", device: "d", version: "1.0.1", repo: "https://repo.example.com", architecture: "iphoneos-arm64" }).body),
+  { token: "t", udid: "u", device: "d", version: "1.0.1", repo: "https://repo.example.com", architecture: "iphoneos-arm64" });
+  assert.deepEqual(JSON.parse(buildRequest(base, "authorize_download", { packageId: "a.b", token: "t", architecture: "" }).body),
+    { token: "t" }); // unknown architecture: left out, not sent empty
   assert.deepEqual(JSON.parse(buildRequest(base, "sign_out", { token: "t", udid: "u" }).body), { token: "t" });
   assert.throws(() => buildRequest(base, "purchase", { packageId: "a.b", token: "t" }), /payment secret/);
   assert.throws(() => buildRequest(base, "user_info", {}), /sign in/);
@@ -133,10 +138,10 @@ test("against a fake vendor: price, sign in, buy, authorize the download, sign o
   assert.equal((await client.packageInfo("com.paid.tweak")).purchased, true);
   assert.deepEqual(seen.at(-1).body, { token: "good-token", udid: "UDID1", device: "iPhone10,6" });
   assert.deepEqual(await client.purchase("com.paid.tweak"), { status: "action", url: "https://vendor.example/checkout?s=1" });
-  assert.deepEqual(seen.at(-1).body, { token: "good-token", payment_secret: "good-secret" });
-  const url = await client.authorizeDownload("com.paid.tweak", { version: "1.0.1", repo: "https://havoc.app/" });
+  assert.deepEqual(seen.at(-1).body, { token: "good-token", udid: "UDID1", device: "iPhone10,6", payment_secret: "good-secret" });
+  const url = await client.authorizeDownload("com.paid.tweak", { version: "1.0.1", repo: "https://havoc.app/", architecture: "iphoneos-arm64" });
   assert.equal(url, "https://vendor.example/dl/com.paid.tweak?v=1.0.1&key=once");
-  assert.deepEqual(seen.at(-1).body, { token: "good-token", udid: "UDID1", device: "iPhone10,6", version: "1.0.1", repo: "https://havoc.app/" });
+  assert.deepEqual(seen.at(-1).body, { token: "good-token", udid: "UDID1", device: "iPhone10,6", version: "1.0.1", repo: "https://havoc.app/", architecture: "iphoneos-arm64" });
 
   await client.signOut();
   assert.deepEqual(seen.at(-1), { method: "POST", path: "/api/sileo/sign_out", type: "application/json", body: { token: "good-token" } });

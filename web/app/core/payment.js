@@ -57,12 +57,14 @@ function pkgPath(id) {
   return `package/${encodeURIComponent(id)}/`;
 }
 
-// The request one call sends. `opts`: { token, secret, udid, device, packageId, version, repo }.
+// The request one call sends. `opts`: { token, secret, udid, device, packageId, version, repo, architecture }.
+// Like Sileo and Zebra (B10, docs/sileo-zebra.md), every POST but sign_out carries udid and device, and
+// authorize_download the package's architecture, so a vendor serving rootful and rootless debs picks the right one.
 // Fields the spec marks optional (token on package_info) are left out when unknown rather than sent empty.
 export function buildRequest(base, action, opts = {}) {
   const b = parseEndpoint(base);
   if (!b) throw new Error(`not an https payment endpoint: ${base}`);
-  const { token, secret, udid, device, packageId, version, repo } = opts;
+  const { token, secret, udid, device, packageId, version, repo, architecture } = opts;
   const who = () => clean({ token, udid, device });
   let path, body = null, method = "POST";
   switch (action) {
@@ -72,10 +74,10 @@ export function buildRequest(base, action, opts = {}) {
     case "package_info": path = pkgPath(packageId) + "info"; body = who(); break;
     case "purchase":
       need(token, "token"); need(secret, "payment secret");
-      path = pkgPath(packageId) + "purchase"; body = { token, payment_secret: secret }; break;
+      path = pkgPath(packageId) + "purchase"; body = { ...clean({ token, udid, device }), payment_secret: String(secret) }; break;
     case "authorize_download":
       need(token, "token");
-      path = pkgPath(packageId) + "authorize_download"; body = clean({ token, udid, device, version, repo }); break;
+      path = pkgPath(packageId) + "authorize_download"; body = clean({ token, udid, device, version, repo, architecture }); break;
     default: throw new Error(`unknown payment action: ${action}`);
   }
   return { method, url: b + path, headers: method === "GET" ? { Accept: "application/json" } : { ...JSON_HEADERS },
@@ -210,11 +212,12 @@ export function createPaymentClient({ base, request, device = () => ({}), creden
     packageInfo: async (packageId) => parsePackageInfo(await send("package_info", { ...(await who()), packageId })),
     async purchase(packageId) {
       const c = (await credentials?.load(vendor)) ?? {};
-      return parsePurchase(await send("purchase", { token: c.token, secret: c.secret, packageId }));
+      return parsePurchase(await send("purchase", { ...(await who()), secret: c.secret, packageId }));
     },
     // The one-time https URL the .deb downloads from (expires in a minute or two: fetch it straight away).
-    async authorizeDownload(packageId, { version, repo } = {}) {
-      const d = await send("authorize_download", { ...(await who()), packageId, version, repo });
+    // `architecture`: the package's own (its stanza's Architecture), not the device's guess.
+    async authorizeDownload(packageId, { version, repo, architecture } = {}) {
+      const d = await send("authorize_download", { ...(await who()), packageId, version, repo, architecture });
       if (typeof d.url !== "string" || !/^https:\/\//i.test(d.url)) throw new PaymentError(parseReply(502, { error: "the vendor gave no https download URL" }));
       return d.url;
     },

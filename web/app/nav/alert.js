@@ -45,7 +45,7 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
         paste.addEventListener("click", async () => {
           // F146: the app reads UIPasteboard through the bridge (no WebKit Paste bubble); the website asks Safari.
           // (menu.js nativePaste, inline so alert.js keeps no imports.)
-          const native = globalThis.cydianNative;
+          const native = globalThis.ifizboxNative;
           let text = null;
           if (native?.call) try { text = String((await native.call("clipboard.read", {})) ?? ""); } catch { /* old shell */ }
           if (text == null) try { text = await navigator.clipboard.readText(); } catch { return; }

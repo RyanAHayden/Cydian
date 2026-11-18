@@ -59,7 +59,7 @@ test("no http(s) URL, credentials, file: and other schemes", () => {
   assert.deepEqual(P("altstore://source?url=file:///etc/passwd"), ["AltStore", "other", null]);
   assert.deepEqual(P("feather://install/javascript:alert(1)"), ["Feather", "other", null]);
   assert.deepEqual(P("altstore://source?url=https://u:p@x.example/s.json"), ["AltStore", "other", null]);
-  for (const l of ["cydian://add?url=" + SRC, "sileo://source/" + SRC, "livecontainer://source?url=" + SRC, SRC, "", null, "x".repeat(9000)]) {
+  for (const l of ["ifizbox://add?url=" + SRC, "sileo://source/" + SRC, "livecontainer://source?url=" + SRC, SRC, "", null, "x".repeat(9000)]) {
     assert.equal(parseOtherLink(l), null, String(l).slice(0, 40));
   }
 });
@@ -67,7 +67,7 @@ test("no http(s) URL, credentials, file: and other schemes", () => {
 test("the same schemes in Info-sideload.plist, App.swift and OTHER_SCHEMES", () => {
   const root = new URL("../../../", import.meta.url);
   const plist = readFileSync(new URL("native/Info-sideload.plist", root), "utf8");
-  const block = plist.match(/com\.ryha\.cydian\.other<\/string>\s*<key>CFBundleURLSchemes<\/key><array>(.*?)<\/array>/s)?.[1] ?? "";
+  const block = plist.match(/com\.ryha\.ifizbox\.other<\/string>\s*<key>CFBundleURLSchemes<\/key><array>(.*?)<\/array>/s)?.[1] ?? "";
   const inPlist = [...block.matchAll(/<string>([^<]+)<\/string>/g)].map((m) => m[1]);
   const swift = readFileSync(new URL("native/Sources/App.swift", root), "utf8");
   const set = swift.match(/enum OtherLink \{\s*static let schemes: Set<String> = \[(.*?)\]/s)?.[1] ?? "";
@@ -75,7 +75,7 @@ test("the same schemes in Info-sideload.plist, App.swift and OTHER_SCHEMES", () 
   const sorted = (a) => [...a].sort();
   assert.deepEqual(sorted(inPlist), sorted(OTHER_SCHEMES));
   assert.deepEqual(sorted(inSwift), sorted(OTHER_SCHEMES));
-  assert.ok(!OTHER_SCHEMES.includes("cydian"));
+  assert.ok(!OTHER_SCHEMES.includes("ifizbox"));
 });
 
 test("Open Other Apps' Links: on by default, off is remembered", () => {

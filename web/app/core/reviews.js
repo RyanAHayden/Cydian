@@ -5,7 +5,7 @@
 //   LIMITS                                   the server's caps: title 80, name 30, text 2000 (characters)
 //   checkDraft({ stars, title, name, text, version }) -> { ok, draft } | { ok: false, error, field }
 //   deviceToken({ storage, native, rand })   -> Promise<token>  this device's one random token, made once: the app's
-//     Keychain (native reviews.token.get/set) where the shell has it, else localStorage (`cydian.reviewToken`)
+//     Keychain (native reviews.token.get/set) where the shell has it, else localStorage (`ifizbox.reviewToken`)
 //   reviewsApi({ base, fetcher, token })     -> { list(id, page), post(id, draft), report(id, reviewId) }
 //     list() answers { enabled: false, ... } when the server keeps no reviews (an older or self-hosted Worker,
 //     anything that isn't its JSON), so the tab still shows the depiction's and the App Store's.
@@ -18,7 +18,7 @@
 import { ACCOUNT_BASE } from "./account.js";
 
 export const LIMITS = { title: 80, name: 30, text: 2000, version: 64 };
-export const TOKEN_KEY = "cydian.reviewToken";
+export const TOKEN_KEY = "ifizbox.reviewToken";
 const TOKEN = /^[A-Za-z0-9_-]{32,128}$/;
 const chars = (s) => [...String(s ?? "")].length;
 
@@ -36,7 +36,7 @@ export function checkDraft({ stars, title = "", name = "", text = "", version = 
 
 const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-export async function deviceToken({ storage = globalThis.localStorage, native = globalThis.cydianNative,
+export async function deviceToken({ storage = globalThis.localStorage, native = globalThis.ifizboxNative,
   rand = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n)) } = {}) {
   const valid = (t) => (typeof t === "string" && TOKEN.test(t) ? t : null);
   let kept = null;

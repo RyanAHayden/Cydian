@@ -1,9 +1,9 @@
 // N9: the share sheet and Open in iFizBox, the pure part (share.js draws it). The shell (native/share/) has already
 // classified what was shared and picked its route (native/share/Share.swift ShareRouter); it hands the page
-// cydian://shared?route=…, or N8's cydian://add?url=… for an APT repo or AltStore source (incoming.js).
+// ifizbox://shared?route=…, or N8's ifizbox://add?url=… for an APT repo or AltStore source (incoming.js).
 //
 //   parseShared(url)          -> { route, file, url, name, title, message } | null for a link that isn't one
-//       route  "helper-ipa"   jailbreak: install the IPA through cydian-helper (file: staged by the shell, or url)
+//       route  "helper-ipa"   jailbreak: install the IPA through ifizbox-helper (file: staged by the shell, or url)
 //              "sign-ipa"     sideload: the IPA in My IPAs (file) or a link to add there (url), signed on the phone
 //              "deb"          jailbreak: Confirm sheet (simulate-deb), console (install-deb); file, or url to fetch
 //              "refuse"       an alert: title, message (a .deb in the sideload app, no AppSync, unknown things)
@@ -17,7 +17,7 @@ const FILE = /^[A-Za-z0-9][^/\\\0]{0,250}\.(ipa|deb)$/i;
 export function parseShared(url) {
   let u;
   try { u = new URL(String(url ?? "")); } catch { return null; }
-  if (u.protocol !== "cydian:" || u.hostname !== "shared") return null;
+  if (u.protocol !== "ifizbox:" || u.hostname !== "shared") return null;
   const q = u.searchParams;
   const route = q.get("route");
   if (!ROUTES.includes(route)) return null;

@@ -9,7 +9,7 @@
 # zsign is github.com/zhlynn/zsign at the commit (and tarball hash) the old signer's Dockerfile pinned; OpenSSL is the
 # 3.5 LTS release below, built static for wasm32 (no asm, no threads, no sockets in use: zsign's OCSP check -C is
 # never called), with the legacy provider built in (no-module) so older .p12 files (RC2) still open. Both sources are
-# downloaded, checked against their SHA-256 and built in a temp dir; the cache (~/.cache/cydian-zsign-wasm) keeps the
+# downloaded, checked against their SHA-256 and built in a temp dir; the cache (~/.cache/ifizbox-zsign-wasm) keeps the
 # OpenSSL build between runs. vendor/zsign/SOURCE records what was built; the licences sit beside it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -46,7 +46,7 @@ fi
 [ "$PROBE" = 1 ] && exit 0
 
 EMCC_VERSION=$(emcc --version | head -n1)
-CACHE=${XDG_CACHE_HOME:-$HOME/.cache}/cydian-zsign-wasm
+CACHE=${XDG_CACHE_HOME:-$HOME/.cache}/ifizbox-zsign-wasm
 mkdir -p "$CACHE"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
@@ -95,7 +95,7 @@ SRC=$WORK/zsign-$ZSIGN_COMMIT/src
 for p in tools/zsign-wasm/*.patch; do patch -s -d "$WORK/zsign-$ZSIGN_COMMIT" -p1 <"$p"; done
 OBJ=$WORK/obj
 mkdir -p "$OBJ"
-CFLAGS=(-O2 -Wno-unused-result -Wno-deprecated-declarations -ffile-prefix-map="$WORK"=/src -ffile-prefix-map="$PWD"=/cydian)
+CFLAGS=(-O2 -Wno-unused-result -Wno-deprecated-declarations -ffile-prefix-map="$WORK"=/src -ffile-prefix-map="$PWD"=/ifizbox)
 INC=(-I"$SRC" -I"$SRC/common" -I"$SRC/third-party/zlib" -I"$SSL_PREFIX/include")
 objs=()
 for f in "$SRC"/third-party/zlib/*.c "$SRC"/third-party/minizip/{ioapi,zip,unzip}.c; do
@@ -103,7 +103,7 @@ for f in "$SRC"/third-party/zlib/*.c "$SRC"/third-party/minizip/{ioapi,zip,unzip
   emcc "${CFLAGS[@]}" "${INC[@]}" -c "$f" -o "$o"
   objs+=("$o")
 done
-for f in "$SRC"/*.cpp "$SRC"/common/*.cpp tools/zsign-wasm/cydian.cpp; do
+for f in "$SRC"/*.cpp "$SRC"/common/*.cpp tools/zsign-wasm/ifizbox.cpp; do
   o=$OBJ/$(basename "$(dirname "$f")")-$(basename "$f" .cpp).o
   em++ -std=c++11 "${CFLAGS[@]}" "${INC[@]}" -DZSIGN_VERSION="${ZSIGN_COMMIT:0:7}-wasm" -c "$f" -o "$o"
   objs+=("$o")
@@ -116,7 +116,7 @@ em++ "${objs[@]}" "$SSL_PREFIX/lib/libcrypto.a" -o "$OUT/zsign.js" \
   -O2 -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createZsign -sENVIRONMENT=worker,node \
   -sINVOKE_RUN=0 -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=4GB -sSTACK_SIZE=4MB \
   -sFORCE_FILESYSTEM=1 -sEXPORTED_RUNTIME_METHODS=callMain,FS,ccall -sNO_DISABLE_EXCEPTION_CATCHING \
-  -sEXPORTED_FUNCTIONS=_main,_cydian_unzip,_cydian_plist_json
+  -sEXPORTED_FUNCTIONS=_main,_ifizbox_unzip,_ifizbox_plist_json
 
 chmod 644 "$OUT/zsign.wasm" "$OUT/zsign.js"
 cp "$WORK/zsign-$ZSIGN_COMMIT/LICENSE" "$OUT/LICENSE.zsign"

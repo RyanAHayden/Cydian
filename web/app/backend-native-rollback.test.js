@@ -1,4 +1,4 @@
-// F71: Roll Back's backend calls against the fake bridge and fake helper (native/fake/cydian-helper rollbacks |
+// F71: Roll Back's backend calls against the fake bridge and fake helper (native/fake/ifizbox-helper rollbacks |
 // rollback): the stored copies listed newest first, one installed into dpkg's status with the console's lines, and
 // the helper's refusals as errors. The package page's rows come from screens/rollback.js rollbackRows.
 import { test } from "node:test";
@@ -19,7 +19,7 @@ function setup(t, { env = {}, mode = "jailbreak", helper } = {}) {
   const native = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: null, env, ...(helper ? { helper } : {}) });
   const queue = createQueue();
   const backend = createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB(), mode, queue } });
-  const store = join(fx.prefix, "var/cache/cydian/rollback", ID);
+  const store = join(fx.prefix, "var/cache/ifizbox/rollback", ID);
   const put = (spelled, control) => writeFileSync(join(store, `${ID}_${spelled}_iphoneos-arm64.deb`), control);
   return { fx, native, backend, queue, store, put };
 }
@@ -41,7 +41,7 @@ test("rollbacks: the stored copies, newest first, epochs spelled as apt's cache 
 });
 
 test("rollbacks: no helper, or the sideload build, offers nothing", async (t) => {
-  const { backend } = setup(t, { helper: "/nonexistent/cydian-helper" });
+  const { backend } = setup(t, { helper: "/nonexistent/ifizbox-helper" });
   assert.deepEqual(await backend.rollbacks(ID), []);
   const side = setup(t, { mode: "sideload" }).backend;
   assert.equal(typeof side.rollbacks, "undefined");
@@ -73,7 +73,7 @@ test("rollback: a version that isn't stored, a control that doesn't match, or a 
   mkdirSync(join(store, "..", "com.example.link"));
   symlinkSync(join(store, `${ID}_0.9_iphoneos-arm64.deb`), join(store, "..", "com.example.link", "com.example.link_0.9_iphoneos-arm64.deb"));
   const cases = [
-    [ID, "2.0", /cydian-helper rollback failed \(64\): cydian-helper: no stored \.deb of that version/],
+    [ID, "2.0", /ifizbox-helper rollback failed \(64\): ifizbox-helper: no stored \.deb of that version/],
     [ID, "0.8", /control isn't that package and version/],
     [ID, "0.7", /control isn't that package and version/],
     [ID, "--force-all", /bad version/],

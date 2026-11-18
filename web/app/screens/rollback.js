@@ -1,6 +1,6 @@
 // Roll Back (F71, jailbreak build): the package page's group listing the .debs N7's daemon kept when automatic
-// updates replaced a version (<prefix>/var/cache/cydian/rollback/<id>/), through backend.rollbacks(id). Tapping one
-// asks first, then installs it in the install queue's console (screens/queue.js runRollback: cydian-helper rollback,
+// updates replaced a version (<prefix>/var/cache/ifizbox/rollback/<id>/), through backend.rollbacks(id). Tapping one
+// asks first, then installs it in the install queue's console (screens/queue.js runRollback: ifizbox-helper rollback,
 // apt-get install of the stored file). The group fills in once the helper answers, so the page never waits for it;
 // with nothing stored (or no helper) it stays empty.
 //

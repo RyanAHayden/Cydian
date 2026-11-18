@@ -32,16 +32,16 @@ test("Install group: Custom Install under Install where the phone signs; not on 
 });
 
 test("Install group: by default Custom Install shows only in the sideload app", () => {
-  const saved = globalThis.cydianNative;
+  const saved = globalThis.ifizboxNative;
   try {
-    delete globalThis.cydianNative;
+    delete globalThis.ifizboxNative;
     assert.ok(!labels(installRows(V, null).rows).includes("Custom Install"));
-    globalThis.cydianNative = { mode: "sideload", call: async () => ({}) };
+    globalThis.ifizboxNative = { mode: "sideload", call: async () => ({}) };
     assert.ok(labels(installRows(V, null).rows).includes("Custom Install"));
-    globalThis.cydianNative = { mode: "jailbreak", call: async () => ({}) };
+    globalThis.ifizboxNative = { mode: "jailbreak", call: async () => ({}) };
     assert.ok(!labels(installRows(V, null).rows).includes("Custom Install"));
   } finally {
-    if (saved === undefined) delete globalThis.cydianNative; else globalThis.cydianNative = saved;
+    if (saved === undefined) delete globalThis.ifizboxNative; else globalThis.ifizboxNative = saved;
   }
 });
 

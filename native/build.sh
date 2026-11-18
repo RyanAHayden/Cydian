@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Build iFizBox on Linux (no Mac, no Theos): the Swift shell around web/app/, arm64, iOS 15+, as two artifacts from
 # one executable (task I2; the app picks its mode at launch, native/Sources/mode.c):
-#   native/build/Cydian.deb  jailbreak: rootless, iphoneos-arm64, jailbreak entitlements; checked by mkdeb.py
-#   native/build/Cydian.ipa  sideload: no helper, get-task-allow only, ad hoc signed; checked by mkipa.py.
+#   native/build/iFizBox.deb  jailbreak: rootless, iphoneos-arm64, jailbreak entitlements; checked by mkdeb.py
+#   native/build/iFizBox.ipa  sideload: no helper, get-task-allow only, ad hoc signed; checked by mkipa.py.
 #                            The user signs it with their own tool (docs/sideload.md, "What I2 needs").
 #
 #   build.sh [all|deb|ipa]  build and check both (default) or one; `make package|deb|ipa` run this
@@ -54,7 +54,7 @@ build=$(git rev-list --count HEAD 2>/dev/null || echo 1)
 export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct 2>/dev/null || echo 0)}
 out=build
 mkdir -p "$out"
-# Clang's module cache records its absolute path: one built before the checkout moved (F170: ~/runs/Cydian became
+# Clang's module cache records its absolute path: one built before the checkout moved (F170: ~/runs/iFizBox became
 # ~/runs/iFizBox) fails with "precompiled file ... was compiled with module cache path". Start it again then.
 if [ -d "$out/modules" ] && [ "$(cat "$out/modules/.path" 2>/dev/null)" != "$PWD/$out/modules" ]; then rm -rf "$out/modules"; fi
 mkdir -p "$out/modules" && printf '%s' "$PWD/$out/modules" > "$out/modules/.path"
@@ -73,23 +73,23 @@ ln -sfn "$tc/usr/lib/swift/clang" "$rd/clang"
 "$swiftc" -parse-as-library -O -wmo -swift-version 5 -runtime-compatibility-version none \
   -target "$target" -sdk "$sdk" -resource-dir "$rd" -I "$rd/shims" -module-cache-path "$out/modules" \
   -Xcc -Wno-nullability-completeness -Xcc -Wno-nullability-inferred-on-nested-type \
-  -import-objc-header Sources/Cydian-Bridging-Header.h \
-  -emit-const-values-path "$out/Cydian.swiftconstvalues" \
+  -import-objc-header Sources/iFizBox-Bridging-Header.h \
+  -emit-const-values-path "$out/iFizBox.swiftconstvalues" \
   -Xfrontend -const-gather-protocols-file -Xfrontend intents/protocols.json \
-  -module-name Cydian -c Sources/*.swift sign/*.swift intents/*.swift intents/App/*.swift share/*.swift share/App/*.swift \
-  -o "$out/Cydian.o"
+  -module-name iFizBox -c Sources/*.swift sign/*.swift intents/*.swift intents/App/*.swift share/*.swift share/App/*.swift \
+  -o "$out/iFizBox.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/availability.c -o "$out/availability.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/mode.c -o "$out/mode.o"
-# The app's half of the root helper (cydian_helper_spawn), and the helper itself (N2's native/helper/).
+# The app's half of the root helper (ifizbox_helper_spawn), and the helper itself (N2's native/helper/).
 hflags=(-target "$target" -isysroot "$sdk" -std=c11 -Wall -Wextra -Werror -O2)
 clang "${hflags[@]}" -c helper/spawn.c -o "$out/spawn.o"
-clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/Cydian.o" "$out/availability.o" \
+clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/iFizBox.o" "$out/availability.o" \
   "$out/mode.o" "$out/spawn.o" -L "$sdk/usr/lib/swift" -lz -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
-  -Wl,-weak_framework,AppIntents -o "$out/Cydian"
+  -Wl,-weak_framework,AppIntents -o "$out/iFizBox"
 # N8: AppIntents is iOS 16+ and weak (above), so iFizBox still launches on iOS 15. Nothing else may need it strongly.
 if command -v llvm-objdump >/dev/null || [ -x "$tc/usr/bin/llvm-objdump" ]; then
   od=$(command -v llvm-objdump || echo "$tc/usr/bin/llvm-objdump")
-  strong=$("$od" --macho --dylibs-used "$out/Cydian" | grep -E '/(AppIntents|_AppIntents_[A-Za-z]+)\.framework/' | grep -v 'weak)' || true)
+  strong=$("$od" --macho --dylibs-used "$out/iFizBox" | grep -E '/(AppIntents|_AppIntents_[A-Za-z]+)\.framework/' | grep -v 'weak)' || true)
   [ -z "$strong" ] || { echo "native build: AppIntents linked strongly ($BRAND_NAME would not launch on iOS 15): $strong" >&2; exit 1; }
 fi
 
@@ -99,19 +99,19 @@ if [ -z "$rcodesign$ldid" ] && [ -x "$HOME/.cargo/bin/rcodesign" ]; then rcodesi
 
 SIDELOAD_INTENTS=CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent # N8: the both-modes intents
 
-# bundle <Cydian.app dir> <entitlements> <Info.plist overlay or "">: the executable signed ad hoc with the
+# bundle <iFizBox.app dir> <entitlements> <Info.plist overlay or "">: the executable signed ad hoc with the
 # entitlements (the jailbreak trusts ad hoc code; a sideload signer re-signs it), web/app/, icons, Info.plist.
 bundle() {
   local app=$1 ents=$2 overlay=$3
   mkdir -p "$app/web"
-  cp "$out/Cydian" "$app/Cydian"
+  cp "$out/iFizBox" "$app/iFizBox"
   if [ -n "$ldid" ]; then
-    "$ldid" -S"$ents" "$app/Cydian"
+    "$ldid" -S"$ents" "$app/iFizBox"
   elif [ -n "$rcodesign" ]; then
-    "$rcodesign" sign --entitlements-xml-file "$ents" "$app/Cydian" >/dev/null 2>"$out/rcodesign.log" ||
+    "$rcodesign" sign --entitlements-xml-file "$ents" "$app/iFizBox" >/dev/null 2>"$out/rcodesign.log" ||
       { cat "$out/rcodesign.log" >&2; exit 1; }
   else
-    echo "native build: WARNING no ldid or rcodesign; $app/Cydian is ad hoc signed without entitlements" >&2
+    echo "native build: WARNING no ldid or rcodesign; $app/iFizBox is ad hoc signed without entitlements" >&2
   fi
   # web/app/ goes in as it is, minus the tests and the website's zsign WebAssembly (F93: the app signs natively).
   (cd ../web/app && find . -type f ! -name '*.test.js' ! -name '.*' ! -path './vendor/zsign/*' -print0) |
@@ -131,10 +131,10 @@ bundle() {
   local variant=jailbreak only=()
   [ -z "$overlay" ] || { variant=sideload; only=(--only "$SIDELOAD_INTENTS"); }
   rm -rf "$app/Metadata.appintents"
-  python3 intents/metadata.py build "$out/Cydian.swiftconstvalues" "$app/Metadata.appintents" "${only[@]}" >/dev/null
+  python3 intents/metadata.py build "$out/iFizBox.swiftconstvalues" "$app/Metadata.appintents" "${only[@]}" >/dev/null
   SWIFTC=$swiftc SDK=$sdk RD=$rd LLD=$lld OUT=$out VERSION=$version BUILD=$build LDID=$ldid RCODESIGN=$rcodesign \
     widget/build.sh "$variant" "$app"
-  # N9: the share extension (share/build.sh): a shared link -> cydian://share?url=…
+  # N9: the share extension (share/build.sh): a shared link -> ifizbox://share?url=…
   SWIFTC=$swiftc SDK=$sdk RD=$rd LLD=$lld OUT=$out VERSION=$version BUILD=$build LDID=$ldid RCODESIGN=$rcodesign \
     share/build.sh "$variant" "$app"
   [ -z "$overlay" ] || python3 mkipa.py plist "$app/Info.plist" "$overlay" "$app/Info.plist"
@@ -145,35 +145,35 @@ if [ "$what" != ipa ]; then
   root=$out/root
   rm -rf "$root" "$out/debian"
   mkdir -p "$out/debian"
-  bundle "$root/var/jb/Applications/Cydian.app" entitlements.plist ""
-  # cydian-helper: plain 0755, no setuid (the app spawns it as root through the persona attributes); ad hoc signed.
+  bundle "$root/var/jb/Applications/iFizBox.app" entitlements.plist ""
+  # ifizbox-helper: plain 0755, no setuid (the app spawns it as root through the persona attributes); ad hoc signed.
   # Only the .deb has it: the IPA's app finds no helper and runs in sideload mode (Sources/mode.c).
-  libexec=$root/var/jb/usr/libexec/cydian
+  libexec=$root/var/jb/usr/libexec/ifizbox
   mkdir -p "$libexec"
-  clang "${hflags[@]}" -fuse-ld=lld --ld-path="$lld" -Wl,-adhoc_codesign -o "$libexec/cydian-helper" helper/main.c helper/policy.c \
+  clang "${hflags[@]}" -fuse-ld=lld --ld-path="$lld" -Wl,-adhoc_codesign -o "$libexec/ifizbox-helper" helper/main.c helper/policy.c \
     helper/ipa.c helper/paid.c -framework CoreFoundation -lobjc
-  chmod 0755 "$libexec/cydian-helper"
+  chmod 0755 "$libexec/ifizbox-helper"
   # F59: appinst's entitlements, for install-ipa's installApplication:withOptions:error: (helper/entitlements.plist).
   if [ -n "$ldid" ]; then
-    "$ldid" -Shelper/entitlements.plist "$libexec/cydian-helper"
+    "$ldid" -Shelper/entitlements.plist "$libexec/ifizbox-helper"
   elif [ -n "$rcodesign" ]; then
-    "$rcodesign" sign --entitlements-xml-file helper/entitlements.plist "$libexec/cydian-helper" >/dev/null \
+    "$rcodesign" sign --entitlements-xml-file helper/entitlements.plist "$libexec/ifizbox-helper" >/dev/null \
       2>"$out/rcodesign.log" || { cat "$out/rcodesign.log" >&2; exit 1; }
   fi
   # N5: the background upgrade check (daemon/README.md), a launchd daemon; jailbreak only.
   daemon/stage.sh "$root" "$sdk" "$lld" "$ldid" "$rcodesign"
   sed -e "s/@VERSION@/$version-$build/" "${brand_sed[@]}" deb/control > "$out/debian/control"
   cp deb/postinst deb/prerm "$out/debian/"
-  python3 mkdeb.py build "$root" "$out/debian" "$out/Cydian.deb"
-  python3 mkdeb.py check "$out/Cydian.deb"
-  echo "$out/Cydian.deb ($(du -h "$out/Cydian.deb" | cut -f1))"
+  python3 mkdeb.py build "$root" "$out/debian" "$out/iFizBox.deb"
+  python3 mkdeb.py check "$out/iFizBox.deb"
+  echo "$out/iFizBox.deb ($(du -h "$out/iFizBox.deb" | cut -f1))"
 fi
 
 if [ "$what" != deb ]; then
   ipa=$out/ipa
   rm -rf "$ipa"
-  bundle "$ipa/Cydian.app" entitlements-sideload.plist Info-sideload.plist
-  python3 mkipa.py build "$ipa/Cydian.app" "$out/Cydian.ipa"
-  python3 mkipa.py check "$out/Cydian.ipa"
-  echo "$out/Cydian.ipa ($(du -h "$out/Cydian.ipa" | cut -f1))"
+  bundle "$ipa/iFizBox.app" entitlements-sideload.plist Info-sideload.plist
+  python3 mkipa.py build "$ipa/iFizBox.app" "$out/iFizBox.ipa"
+  python3 mkipa.py check "$out/iFizBox.ipa"
+  echo "$out/iFizBox.ipa ($(du -h "$out/iFizBox.ipa" | cut -f1))"
 fi

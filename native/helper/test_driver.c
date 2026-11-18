@@ -36,8 +36,8 @@
 static int spawn(int argc, char **argv, const char *ask) {
     pid_t pid;
     int fds[3], in = -1;
-    int rc = ask ? cydian_helper_spawn_in(argv[0], (const char *const *)argv + 1, &pid, &in, &fds[0], &fds[1], &fds[2])
-                 : cydian_helper_spawn(argv[0], (const char *const *)argv + 1, &pid, &fds[0], &fds[1], &fds[2]);
+    int rc = ask ? ifizbox_helper_spawn_in(argv[0], (const char *const *)argv + 1, &pid, &in, &fds[0], &fds[1], &fds[2])
+                 : ifizbox_helper_spawn(argv[0], (const char *const *)argv + 1, &pid, &fds[0], &fds[1], &fds[2]);
     if (rc) { printf("spawn error: %s\n", strerror(rc)); return 1; }
     (void)argc;
     if (ask) {

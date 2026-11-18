@@ -122,7 +122,7 @@ class Extract(unittest.TestCase):
         env = dict(os.environ, XDG_DATA_HOME=os.path.join(self.dir, "xdg"))
         r = run(self.write_xip(data), env=env)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertTrue(os.path.isdir(os.path.join(self.dir, "xdg", "cydian", "iPhoneOS.sdk", "usr", "lib")))
+        self.assertTrue(os.path.isdir(os.path.join(self.dir, "xdg", "ifizbox", "iPhoneOS.sdk", "usr", "lib")))
 
     def test_refuses_existing_dest(self):
         data, _ = fixture()

@@ -34,12 +34,12 @@ static int high_pipe(int p[2]) {
     return e;
 }
 
-int cydian_helper_spawn(const char *helper, const char *const args[], pid_t *pid, int *out_fd, int *err_fd,
+int ifizbox_helper_spawn(const char *helper, const char *const args[], pid_t *pid, int *out_fd, int *err_fd,
                         int *status_fd) {
-    return cydian_helper_spawn_in(helper, args, pid, NULL, out_fd, err_fd, status_fd);
+    return ifizbox_helper_spawn_in(helper, args, pid, NULL, out_fd, err_fd, status_fd);
 }
 
-int cydian_helper_spawn_in(const char *helper, const char *const args[], pid_t *pid, int *in_fd, int *out_fd,
+int ifizbox_helper_spawn_in(const char *helper, const char *const args[], pid_t *pid, int *in_fd, int *out_fd,
                            int *err_fd, int *status_fd) {
     /* pipes[3] is the child's stdin (F63), made only when in_fd asks for it */
     int pipes[4][2], made = 0, rc, want = in_fd ? 4 : 3;

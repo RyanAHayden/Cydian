@@ -13,7 +13,7 @@ const json = (b, status = 200) => new Response(JSON.stringify(b), { status, head
 function fakeServer({ ipa = IPA, fetchStatus = 200, uploadStatus = 200 } = {}) {
   const calls = [], parts = [];
   const fetcher = async (url, init = {}) => {
-    const u = new URL(url, "https://cydian.example");
+    const u = new URL(url, "https://ifizbox.example");
     calls.push(`${init.method ?? "GET"} ${u.pathname}${u.pathname === "/api/fetch" ? "?" + u.searchParams : ""}`);
     if (u.pathname === "/api/fetch") return fetchStatus === 200 ? new Response(ipa, { headers: { "Content-Length": String(ipa.length) } }) : json({ code: "upstream", error: "upstream answered HTTP 404" }, fetchStatus);
     if (u.pathname === "/sign/upload") {
@@ -45,7 +45,7 @@ function deps(over = {}) {
       onProgress("Signing");
       return { ok: true, ipa: new Uint8Array([0x50, 0x4b, 1, 2, 3, 4, 5]), bundleId: "com.you.delta", name: "Delta", version: "1.2" };
     },
-    transfer: async () => "cydian://import?d=xyz",
+    transfer: async () => "ifizbox://import?d=xyz",
     later: (f) => f(),
     ...over,
   };
@@ -83,10 +83,10 @@ test("Ready to Install's Cancel: nothing opens; false", async () => {
 test("Install iFizBox App: iFizBox's IPA carries the certificate (bring) and the website's link", async () => {
   const srv = fakeServer();
   const { d, log } = deps({ fetcher: srv.fetcher });
-  await signInBrowser({ url: "https://github.com/RyanAHayden/iFizBox/releases/latest/download/Cydian.ipa", name: "iFizBox", bring: true }, d);
-  assert.deepEqual(log.jobs[0].bring, { identity: true, transfer: "cydian://import?d=xyz" });
-  await signInBrowser({ url: "https://github.com/RyanAHayden/iFizBox/releases/latest/download/Cydian.ipa", name: "iFizBox", bring: false }, d);
-  assert.deepEqual(log.jobs[1].bring, { identity: false, transfer: "cydian://import?d=xyz" }, "Bring My Certificate off: sources and settings only");
+  await signInBrowser({ url: "https://github.com/RyanAHayden/iFizBox/releases/latest/download/iFizBox.ipa", name: "iFizBox", bring: true }, d);
+  assert.deepEqual(log.jobs[0].bring, { identity: true, transfer: "ifizbox://import?d=xyz" });
+  await signInBrowser({ url: "https://github.com/RyanAHayden/iFizBox/releases/latest/download/iFizBox.ipa", name: "iFizBox", bring: false }, d);
+  assert.deepEqual(log.jobs[1].bring, { identity: false, transfer: "ifizbox://import?d=xyz" }, "Bring My Certificate off: sources and settings only");
 });
 
 test("no certificate: an alert, then Settings > Signing; nothing downloads", async () => {

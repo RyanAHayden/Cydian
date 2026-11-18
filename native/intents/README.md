@@ -5,16 +5,16 @@ iFizBox's actions for Shortcuts, Siri, Spotlight and the Action button, with not
 
 | intent | modes | does | returns |
 |---|---|---|---|
-| Check for Updates | both | jailbreak: `cydian-helper update`, then installed (dpkg status) vs the newest in apt's lists, holds left out; sideload: the apps Install remembered (I3's list) against their sources | one line per update (`Name 1.0 → 1.1`), dialog "3 Updates: …" |
-| Add Source (URL) | both | opens iFizBox (`openAppWhenRun`) and hands the page `cydian://add?url=…`: the Add Source alert, filled in | – |
-| Restore My Packages (file) | both | opens iFizBox; jailbreak: adds the file's sources (`addsource`), `update`, installs what isn't installed and some source has (`apply`, newest versions), holds; sideload: its sources as a `cydian://import` link (Import's review alert) | dialog with what happened |
+| Check for Updates | both | jailbreak: `ifizbox-helper update`, then installed (dpkg status) vs the newest in apt's lists, holds left out; sideload: the apps Install remembered (I3's list) against their sources | one line per update (`Name 1.0 → 1.1`), dialog "3 Updates: …" |
+| Add Source (URL) | both | opens iFizBox (`openAppWhenRun`) and hands the page `ifizbox://add?url=…`: the Add Source alert, filled in | – |
+| Restore My Packages (file) | both | opens iFizBox; jailbreak: adds the file's sources (`addsource`), `update`, installs what isn't installed and some source has (`apply`, newest versions), holds; sideload: its sources as a `ifizbox://import` link (Import's review alert) | dialog with what happened |
 | Install All Updates | jailbreak | the check, then `apply` of every upgrade (pulls new dependencies in, unlike `upgrade`) | the installed `Name version` lines; dialog says "Respring to finish" on `finish:` |
-| Respring | jailbreak | `cydian-helper respring` | – |
-| Userspace Reboot | jailbreak | `cydian-helper userspace-reboot` (`launchctl reboot userspace`, N8's helper verb) | – |
-| Export My Packages | jailbreak | sources (sources.list, `*.list`, `*.sources`), packages not Auto-Installed (apt's extended_states), holds | a JSON file, `cydian-backup` version 1 |
+| Respring | jailbreak | `ifizbox-helper respring` | – |
+| Userspace Reboot | jailbreak | `ifizbox-helper userspace-reboot` (`launchctl reboot userspace`, N8's helper verb) | – |
+| Export My Packages | jailbreak | sources (sources.list, `*.list`, `*.sources`), packages not Auto-Installed (apt's extended_states), holds | a JSON file, `ifizbox-backup` version 1 |
 
 - `Core.swift`: what each does, Foundation only, tested on Linux (`test_intents.py` builds `tests/main.swift` with it
-  and `../sign/Updates.swift`, against `../fake/cydian-helper`). Also `WidgetShare`, the App Group snapshot the widget
+  and `../sign/Updates.swift`, against `../fake/ifizbox-helper`). Also `WidgetShare`, the App Group snapshot the widget
   reads. `IntentHost` is the phone (helper, files under the prefix, sideload update fetch).
 - `App/Intents.swift`: the `AppIntent` structs and the `AppShortcutsProvider`, `@available(iOS 16)`; `App/Host.swift`:
   `PhoneHost` (spawns the real helper through `../helper/spawn.c`; the widget builds it too); `App/WidgetStore.swift`:
@@ -25,9 +25,9 @@ iFizBox's actions for Shortcuts, Siri, Spotlight and the Action button, with not
 
 ## Metadata without Xcode
 
-iOS reads an app's intents from `Cydian.app/Metadata.appintents/` (`extract.actionsdata`, `version.json`), which
+iOS reads an app's intents from `iFizBox.app/Metadata.appintents/` (`extract.actionsdata`, `version.json`), which
 Xcode's macOS-only `appintentsmetadataprocessor` writes. On Linux: `build.sh` compiles with
-`-emit-const-values-path build/Cydian.swiftconstvalues` and `-const-gather-protocols-file intents/protocols.json`
+`-emit-const-values-path build/iFizBox.swiftconstvalues` and `-const-gather-protocols-file intents/protocols.json`
 (the swift.org toolchain has both), and `metadata.py build` turns that JSON into the two files. The sideload IPA gets
 `--only CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent` (`build.sh` `SIDELOAD_INTENTS`), so the
 jailbreak-only intents and their App Shortcuts never show there; `mkipa.py check` refuses an IPA with another set.

@@ -105,7 +105,7 @@ export function optionsParams(info, edits = {}) {
 
 // ---- the website's library: links, on this device -----------------------------------------------------------
 
-const SITE_KEY = "cydian.myIpas";
+const SITE_KEY = "ifizbox.myIpas";
 
 export function siteEntries(storage = globalThis.localStorage) {
   let list = [];
@@ -147,7 +147,7 @@ export function removeSiteUrl(storage, file) {
 export const SITE_FILE_MAX = 400 * 1024 * 1024;
 const MB = (n) => Math.round(n / 1048576);
 
-const IPA_DB = "cydian-myipas", IPA_STORE = "files";
+const IPA_DB = "ifizbox-myipas", IPA_STORE = "files";
 
 export function memoryIpaStore() {
   const m = new Map();

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the R3 navigation spike as an unsigned IPA on Linux (no Mac, no Theos), for sideloading on a stock
-# ProMotion iPhone: the measurement needs no jailbreak. Output: native/spike/build/CydianSpike.ipa.
+# ProMotion iPhone: the measurement needs no jailbreak. Output: native/spike/build/iFizBoxSpike.ipa.
 #
 # Needs:
 #   SWIFT_TOOLCHAIN  a swift.org Linux toolchain (6.4.x to match the SDK's compiler), the dir holding usr/bin/swiftc
@@ -39,16 +39,16 @@ rm -rf "$rd/shims" && cp -r "$tc/usr/lib/swift/shims" "$rd/shims"
 ln -sfn "$tc/usr/lib/swift/clang" "$rd/clang"
 "$swiftc" -parse-as-library -O -wmo -swift-version 5 -runtime-compatibility-version none \
   -target "$target" -sdk "$sdk" -resource-dir "$rd" -I "$rd/shims" -module-cache-path "$out/modules" \
-  -module-name CydianSpike -c Sources/*.swift -o "$out/CydianSpike.o"
-app=$out/ipa/Payload/CydianSpike.app
+  -module-name iFizBoxSpike -c Sources/*.swift -o "$out/iFizBoxSpike.o"
+app=$out/ipa/Payload/iFizBoxSpike.app
 rm -rf "$out/ipa"
 mkdir -p "$app/web"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/availability.c -o "$out/availability.o"
-clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/CydianSpike.o" "$out/availability.o" \
-  -L "$sdk/usr/lib/swift" -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -o "$app/CydianSpike"
+clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/iFizBoxSpike.o" "$out/availability.o" \
+  -L "$sdk/usr/lib/swift" -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -o "$app/iFizBoxSpike"
 cp web/* "$app/web/"
 build=$(git rev-list --count HEAD 2>/dev/null || echo 1)
 sed -e "s/@BUILD@/$build/" -e "s/@MIN@/$min/" Info.plist > "$app/Info.plist"
-rm -f "$out/CydianSpike.ipa"
-(cd "$out/ipa" && zip -qr -X ../CydianSpike.ipa Payload)
-echo "$out/CydianSpike.ipa ($(du -h "$out/CydianSpike.ipa" | cut -f1))"
+rm -f "$out/iFizBoxSpike.ipa"
+(cd "$out/ipa" && zip -qr -X ../iFizBoxSpike.ipa Payload)
+echo "$out/iFizBoxSpike.ipa ($(du -h "$out/iFizBoxSpike.ipa" | cut -f1))"

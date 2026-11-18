@@ -2,7 +2,7 @@
 // Needs the fake bridge below installed before the page's modules run. window.runScenario('A'|'B') resolves to
 // rAF interval stats per phase: the same numbers the app's meter collects on a phone.
 window.__samples = {};
-window.webkit = { messageHandlers: { cydian: { postMessage(m) {
+window.webkit = { messageHandlers: { ifizbox: { postMessage(m) {
   if (m.method === 'meter.samples') (window.__samples[m.params.phase] ||= []).push(...m.params.ms);
   return Promise.resolve(null);
 } } } };

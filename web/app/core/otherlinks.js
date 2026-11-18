@@ -99,7 +99,7 @@ export function parseOtherLink(link) {
   return { app, scheme, action, url: action === "other" ? null : url };
 }
 
-const KEY = "cydian.otherLinks";
+const KEY = "ifizbox.otherLinks";
 export function otherLinksOn(storage = globalThis.localStorage) {
   try { return storage?.getItem(KEY) !== "off"; } catch { return true; }
 }

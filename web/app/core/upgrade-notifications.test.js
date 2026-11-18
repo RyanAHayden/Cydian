@@ -1,5 +1,5 @@
 // F65: Settings' Upgrade Notifications (jailbreak app only), mirrored to N5's daemon through
-// `cydian-helper notifications on|off`.
+// `ifizbox-helper notifications on|off`.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createSettings } from "./settings.js";
@@ -31,7 +31,7 @@ test("each change runs the helper; the same value again runs nothing", async () 
   const s = createSettings({ storage, mode: "jailbreak", helper });
   s.set("upgradeNotifications", false);
   assert.equal(await s.upgradeNotifications.pending, true);
-  assert.equal(storage.map.get("cydian.upgradeNotifications"), "false");
+  assert.equal(storage.map.get("ifizbox.upgradeNotifications"), "false");
   s.set("upgradeNotifications", false);
   s.set("upgradeNotifications", true);
   assert.equal(await s.upgradeNotifications.pending, true);
@@ -55,10 +55,10 @@ test("a helper that fails puts the switch back and tells listeners", async () =>
 
 test("sync() writes the stored value; no helper (or another mode) is a no-op", async () => {
   const helper = fakeHelper();
-  const s = createSettings({ storage: memStorage({ "cydian.upgradeNotifications": "false" }), mode: "jailbreak", helper });
+  const s = createSettings({ storage: memStorage({ "ifizbox.upgradeNotifications": "false" }), mode: "jailbreak", helper });
   assert.equal(await s.upgradeNotifications.sync(), true);
   assert.deepEqual(helper.calls, ["notifications off"]);
-  const failing = createSettings({ storage: memStorage({ "cydian.upgradeNotifications": "false" }), mode: "jailbreak", helper: fakeHelper(1) });
+  const failing = createSettings({ storage: memStorage({ "ifizbox.upgradeNotifications": "false" }), mode: "jailbreak", helper: fakeHelper(1) });
   assert.equal(await failing.upgradeNotifications.sync(), false);
   assert.equal(failing.get("upgradeNotifications"), false); // nothing to undo to at launch: it stays
   const other = fakeHelper();

@@ -1,5 +1,5 @@
 // The bridge calls behind web/app/backend-native.js (N3): apt's sources and lists, dpkg's status, network fetches
-// (the page's origin is cydian://app, so repos without CORS headers are fetched here), cydian-helper and the haptic
+// (the page's origin is ifizbox://app, so repos without CORS headers are fetched here), ifizbox-helper and the haptic
 // tick. Every reply is plain JSON types; errors are "<code>: <message>" strings that native/bridge.js turns into
 // errors with a `code` (the proxy's codes: bad_url, network, timeout, too_large, not_found, helper).
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -20,16 +20,16 @@ enum Jailbreak {
     }()
 
     static func path(_ p: String) -> String { prefix + p }
-    // F40: what native/bridge.js tells the page as cydianNative.jailbreak. A prefix (/var/jb, or roothide's
+    // F40: what native/bridge.js tells the page as ifizboxNative.jailbreak. A prefix (/var/jb, or roothide's
     // jbroot) is rootless; none is rootful.
     static var kind: String { prefix.isEmpty ? "rootful" : "rootless" }
-    static var helper: String { path("/usr/libexec/cydian/cydian-helper") }
+    static var helper: String { path("/usr/libexec/ifizbox/ifizbox-helper") }
 }
 
 enum Apt {
     static let maxBody = 64 << 20 // the proxy's cap is smaller; BigBoss' plain Packages is ~20 MB
 
-    // native/bridge.js, before any page script runs: it defines cydianNative, which modules read as they load.
+    // native/bridge.js, before any page script runs: it defines ifizboxNative, which modules read as they load.
     // Its @JAILBREAK@ becomes the detected jailbreak type (F40), @MODE@ the build's mode (I2, Mode.swift).
     static func installScript(_ ucc: WKUserContentController) {
         guard let url = Bundle.main.url(forResource: "bridge", withExtension: "js"),
@@ -99,7 +99,7 @@ enum Apt {
             IPAInstall.run(url, emit: stream ? { c.emitOnMain($0) } : nil) { reply(c, $0, $1) }
         }
         // F196: ipa.cancel, the IPA install page's Cancel (web/app/screens/ipa-install.js): stops ipa.install's download,
-        // or keeps cydian-helper from starting; an error once the helper runs (it can't be stopped halfway) or when
+        // or keeps ifizbox-helper from starting; an error once the helper runs (it can't be stopped halfway) or when
         // no IPA install runs. ipa.install then answers "cancelled: Cancelled".
         b.on("ipa.cancel") { c in
             work(c) { () throws -> Any? in try IPAInstall.cancel(); return true }
@@ -178,7 +178,7 @@ enum Apt {
         let cfg = URLSessionConfiguration.default
         cfg.timeoutIntervalForRequest = 30
         cfg.timeoutIntervalForResource = 120
-        cfg.httpAdditionalHeaders = ["User-Agent": "Cydian/\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "")"]
+        cfg.httpAdditionalHeaders = ["User-Agent": "\(Brand.name)/\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "")"]
         return URLSession(configuration: cfg)
     }()
 
@@ -264,7 +264,7 @@ extension Bridge.Call {
     }
 }
 
-// cydian-helper as root through native/helper/spawn.c (the persona spawn attributes, allowed by the
+// ifizbox-helper as root through native/helper/spawn.c (the persona spawn attributes, allowed by the
 // com.apple.private.persona-mgmt entitlement). Its fds 1, 2 and 3 (apt's status lines) are read to the end on
 // three threads; with `emit`, every finished line goes to the page as { fd: "out" | "err" | "status", line }.
 // stdin is /dev/null, except for apply-ask (F63): a pipe that helper.answer writes into until the helper ends.
@@ -288,7 +288,7 @@ enum Helper {
     }
 
     // F63: the console's answer to dpkg's conffile question (apt's pmconffile: line): keep -> "N" (Keep My Old
-    // Copy), new -> "Y" (Accept The New Copy). cydian-helper passes on only those two lines.
+    // Copy), new -> "Y" (Accept The New Copy). ifizbox-helper passes on only those two lines.
     static func answer(_ word: String) throws {
         guard let line = ["keep": "N\n", "new": "Y\n"][word] else { throw BridgeError("helper", "answer is keep or new") }
         answerLock.lock(); defer { answerLock.unlock() }
@@ -300,7 +300,7 @@ enum Helper {
     static func run(_ words: [String], emit: (([[String: Any]]) -> Void)?) throws -> [String: Any] {
         let path = Jailbreak.helper
         guard FileManager.default.isExecutableFile(atPath: path) else {
-            throw BridgeError("helper", "cydian-helper is not installed at \(path)")
+            throw BridgeError("helper", "ifizbox-helper is not installed at \(path)")
         }
         var cargs: [UnsafeMutablePointer<CChar>?] = words.map { strdup($0) }
         cargs.append(nil)
@@ -312,11 +312,11 @@ enum Helper {
         var input: Int32 = -1
         let rc = cargs.withUnsafeBufferPointer { buf -> Int32 in
             buf.baseAddress!.withMemoryRebound(to: UnsafePointer<CChar>?.self, capacity: buf.count) { args in
-                ask ? cydian_helper_spawn_in(path, args, &pid, &input, &fds.0, &fds.1, &fds.2)
-                    : cydian_helper_spawn(path, args, &pid, &fds.0, &fds.1, &fds.2)
+                ask ? ifizbox_helper_spawn_in(path, args, &pid, &input, &fds.0, &fds.1, &fds.2)
+                    : ifizbox_helper_spawn(path, args, &pid, &fds.0, &fds.1, &fds.2)
             }
         }
-        if rc != 0 { throw BridgeError("helper", "can't start cydian-helper: \(String(cString: strerror(rc)))") }
+        if rc != 0 { throw BridgeError("helper", "can't start ifizbox-helper: \(String(cString: strerror(rc)))") }
         if ask {
             _ = fcntl(input, F_SETNOSIGPIPE, 1) // an answer after the helper is gone is EPIPE, not a dead app
             answerLock.lock(); answerFd = input; dpkgStarted = false; answerLock.unlock()
@@ -374,8 +374,8 @@ enum Helper {
 }
 
 // F59: ipa.install, the jailbreak build's IPA install (the sideload build signs and installs with signing.install,
-// SignBridge.swift). Downloads the IPA into the one directory cydian-helper takes IPAs from (native/helper/policy.h
-// HELPER_IPA_DIR: this no-container app's own Caches) as <UUID>.ipa, runs `cydian-helper install-ipa <path>` (as
+// SignBridge.swift). Downloads the IPA into the one directory ifizbox-helper takes IPAs from (native/helper/policy.h
+// HELPER_IPA_DIR: this no-container app's own Caches) as <UUID>.ipa, runs `ifizbox-helper install-ipa <path>` (as
 // AppSync's appinst does; ad hoc signed with ldid first when AppSync Unified isn't there, native/helper/ipa.c) and
 // removes the download. Replies {code: 0, stdout, stderr, bundleId}, or an error:
 //   bad_url, network, timeout, not_found (HTTP >= 400)          the download
@@ -384,9 +384,9 @@ enum Helper {
 //             refused the ad hoc signed app. The message says what to install.
 //   install   (exit 1 or 74) installd refused it, or the helper couldn't copy or unpack it
 //   helper    no helper, or it refused the caller (exit 77)
-// The message is the helper's own last "cydian-helper: " line.
+// The message is the helper's own last "ifizbox-helper: " line.
 enum IPAInstall {
-    static let dir = "/var/mobile/Library/Caches/com.ryha.cydian/ipa" // = HELPER_IPA_DIR
+    static let dir = "/var/mobile/Library/Caches/com.ryha.ifizbox/ipa" // = HELPER_IPA_DIR
 
     static let session: URLSession = {
         let cfg = URLSessionConfiguration.default
@@ -404,7 +404,7 @@ enum IPAInstall {
     static func cancel() throws {
         runLock.lock(); defer { runLock.unlock() }
         guard let r = running, !r.cancelled else { throw BridgeError("helper", "no IPA install is running") }
-        guard !r.helper else { throw BridgeError("helper", "cydian-helper is already installing the IPA; it can't be stopped halfway") }
+        guard !r.helper else { throw BridgeError("helper", "ifizbox-helper is already installing the IPA; it can't be stopped halfway") }
         r.cancelled = true
         r.task?.cancel()
     }
@@ -442,8 +442,8 @@ enum IPAInstall {
                         let id = out.split(separator: "\n").last { $0.hasPrefix("Installed ") }.map { String($0.dropFirst(10)) }
                         return done(["code": 0, "stdout": out, "stderr": errText, "bundleId": id ?? ""], nil)
                     }
-                    let why = errText.split(separator: "\n").last { $0.hasPrefix("cydian-helper: ") }
-                        .map { String($0.dropFirst(15)) } ?? "cydian-helper exited with \(code)"
+                    let why = errText.split(separator: "\n").last { $0.hasPrefix("ifizbox-helper: ") }
+                        .map { String($0.dropFirst(16)) } ?? "ifizbox-helper exited with \(code)"
                     let kind = code == 64 ? "bad_ipa" : code == 69 ? "no_adhoc" : code == 77 ? "helper" : "install"
                     done(nil, "\(kind): \(why)")
                 } catch let e as BridgeError { done(nil, e.text) }

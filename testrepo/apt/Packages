@@ -2,8 +2,8 @@ Package: com.ryha.test.essential
 Name: Test Essential
 Version: 1.0
 Architecture: iphoneos-arm64
-Maintainer: Cydian Tests
-Author: Cydian Tests
+Maintainer: iFizBox Tests
+Author: iFizBox Tests
 Section: Tweaks
 Description: Test: an essential package (old version)
 Essential: yes
@@ -16,8 +16,8 @@ Package: com.ryha.test.essential
 Name: Test Essential
 Version: 1.1
 Architecture: iphoneos-arm64
-Maintainer: Cydian Tests
-Author: Cydian Tests
+Maintainer: iFizBox Tests
+Author: iFizBox Tests
 Section: Tweaks
 Description: Test: an essential package; upgrading it is an Essential Upgrade
 Essential: yes
@@ -30,8 +30,8 @@ Package: com.ryha.test.tweak
 Name: Test Tweak
 Version: 1.0
 Architecture: iphoneos-arm64
-Maintainer: Cydian Tests
-Author: Cydian Tests
+Maintainer: iFizBox Tests
+Author: iFizBox Tests
 Section: Tweaks
 Description: Test: a plain tweak, old version
 Filename: ./com.ryha.test.tweak_1.0_iphoneos-arm64.deb
@@ -43,8 +43,8 @@ Package: com.ryha.test.tweak
 Name: Test Tweak
 Version: 1.1
 Architecture: iphoneos-arm64
-Maintainer: Cydian Tests
-Author: Cydian Tests
+Maintainer: iFizBox Tests
+Author: iFizBox Tests
 Section: Tweaks
 Description: Test: a plain tweak, new version (shows in Changes)
 Filename: ./com.ryha.test.tweak_1.1_iphoneos-arm64.deb
@@ -56,8 +56,8 @@ Package: com.ryha.test.brokendeps
 Name: Test Brokendeps
 Version: 1.0
 Architecture: iphoneos-arm64
-Maintainer: Cydian Tests
-Author: Cydian Tests
+Maintainer: iFizBox Tests
+Author: iFizBox Tests
 Section: Tweaks
 Description: Test: depends on a package no source has (the dependency error)
 Depends: com.ryha.test.nowhere (>= 2.0)
@@ -70,8 +70,8 @@ Package: com.ryha.test.rootful
 Name: Test Rootful
 Version: 1.0
 Architecture: iphoneos-arm
-Maintainer: Cydian Tests
-Author: Cydian Tests
+Maintainer: iFizBox Tests
+Author: iFizBox Tests
 Section: Tweaks
 Description: Test: built for rootful jailbreaks only
 Filename: ./com.ryha.test.rootful_1.0_iphoneos-arm.deb

@@ -155,7 +155,7 @@ test("F144: the jailbreak build (no aptAllowed given) keeps APT sources", async 
 });
 
 test("F144: siteJailbroken reads Settings > Device (unset: Not Jailbroken)", () => {
-  const store = (v) => ({ getItem: (k) => (k === "cydian.device" ? v : null) });
+  const store = (v) => ({ getItem: (k) => (k === "ifizbox.device" ? v : null) });
   assert.equal(siteJailbroken(store(null)), false);
   assert.equal(siteJailbroken(store("none")), false);
   assert.equal(siteJailbroken(store("iphoneos-arm64")), true);

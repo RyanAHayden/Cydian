@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Publish a iFizBox release on GitHub (T6), the one F61's self-update reads (web/app/core/selfupdate.js): tag
 # v<native/VERSION> on RyanAHayden/iFizBox, with these assets:
-#   Cydian.ipa                       the sideload build (parseRelease's `ipa`)
-#   Cydian.deb                       the rootless jailbreak build (debFor's fallback, iphoneos-arm64 only)
+#   iFizBox.ipa                       the sideload build (parseRelease's `ipa`)
+#   iFizBox.deb                       the rootless jailbreak build (debFor's fallback, iphoneos-arm64 only)
 #   <pkg>_<ver>_<arch>.deb           the same .deb under Debian's name (debFor's exact-arch match), e.g.
-#                                    com.ryha.cydian_0.2.0-412_iphoneos-arm64.deb
+#                                    com.ryha.ifizbox_0.2.0-412_iphoneos-arm64.deb
 #   <pkg>_<ver>_<arch>.deb           any other arch build found in --dist under that name (roothide, rootful)
 #   Packages, Packages.gz, Release   iFizBox's own flat APT repo over those .debs (F72, tools/selfrepo.py): the
 #                                    jailbreak app's built-in source, https://cydian.dev/repo/ (the Worker
 #                                    serves releases/latest/download/ of RyanAHayden/iFizBox without the redirect)
-# Then it points iFizBox's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new Cydian.ipa, the
+# Then it points iFizBox's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new iFizBox.ipa, the
 # sideload app's and the site's built-in source (F72), versions[] newest first: commit web/app/source.json afterwards.
 # Run it only when a person asks for a release. How to cut one: docs/release.md.
 #
@@ -17,19 +17,19 @@
 #     --dry-run   build (or read --dist), check and print what would be published; publish nothing, no network
 #     --notes F   the release notes (Markdown; the first 4 lines show in the app's update alert). Default: the
 #                 commit subjects since the last v* tag, then the standard footer about the two files
-#     --dist DIR  publish DIR/Cydian.deb and DIR/Cydian.ipa as they are instead of running `make -C native package`
+#     --dist DIR  publish DIR/iFizBox.deb and DIR/iFizBox.ipa as they are instead of running `make -C native package`
 #     --draft     create the release as a draft (the app ignores drafts until it is published on GitHub)
-#     --minimum V the oldest iFizBox that may keep running without upgrading first (F72): X-Cydian-Minimum-Version in
+#     --minimum V the oldest iFizBox that may keep running without upgrading first (F72): X-iFizBox-Minimum-Version in
 #                 the Release and iFizBox's stanza, "minimumVersion" in the AltStore source. Recorded only: since
 #                 F183 the app never blocks or pops up on it. Default: none
 #     --out DIR   also leave the repo files, the notes and the updated AltStore source (source.json) in DIR; a dry
 #                 run writes the source there only, never into web/app/source.json
-#   CYDIAN_RELEASE_REPO  owner/name to publish on (default RyanAHayden/iFizBox)
+#   IFIZBOX_RELEASE_REPO  owner/name to publish on (default RyanAHayden/iFizBox)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . native/brand.env # F170: BRAND_NAME for the release title and notes
 
-repo=${CYDIAN_RELEASE_REPO:-RyanAHayden/iFizBox}
+repo=${IFIZBOX_RELEASE_REPO:-RyanAHayden/iFizBox}
 dry=0 notes= dist= draft=() minimum= out=
 while [ $# -gt 0 ]; do
   case $1 in
@@ -75,7 +75,7 @@ if [ -z "$dist" ]; then
   make -s -C native package
   dist=native/build
 fi
-deb=$dist/Cydian.deb ipa=$dist/Cydian.ipa
+deb=$dist/iFizBox.deb ipa=$dist/iFizBox.ipa
 [ -f "$deb" ] || die "no $deb"
 [ -f "$ipa" ] || die "no $ipa"
 
@@ -93,10 +93,10 @@ with tarfile.open(fileobj=io.BytesIO(ctl)) as t:
     m = next(x for x in t.getmembers() if x.name.lstrip("./") == "control")
     fields = mkdeb.control_fields(t.extractfile(m).read().decode())
 problems = []
-problems += ["Cydian.deb: " + p for p in mkdeb.check(deb)[0]]
-problems += ["Cydian.ipa: " + p for p in mkipa.check(ipa)[0]]
+problems += ["iFizBox.deb: " + p for p in mkdeb.check(deb)[0]]
+problems += ["iFizBox.ipa: " + p for p in mkipa.check(ipa)[0]]
 if fields.get("Version", "").split("-")[0] != version:
-    problems.append("Cydian.deb Version %r is not native/VERSION %s" % (fields.get("Version"), version))
+    problems.append("iFizBox.deb Version %r is not native/VERSION %s" % (fields.get("Version"), version))
 try:
     z = zipfile.ZipFile(ipa)
     plist = next(n for n in z.namelist() if n.endswith(".app/Info.plist") and n.count("/") == 2)
@@ -104,7 +104,7 @@ try:
 except (StopIteration, zipfile.BadZipFile, plistlib.InvalidFileException):
     short = None
 if short != version:
-    problems.append("Cydian.ipa CFBundleShortVersionString %r is not native/VERSION %s" % (short, version))
+    problems.append("iFizBox.ipa CFBundleShortVersionString %r is not native/VERSION %s" % (short, version))
 print("%s_%s_%s.deb" % (fields.get("Package"), fields.get("Version"), fields.get("Architecture")))
 for p in problems:
     print("problem: " + p)
@@ -121,10 +121,10 @@ fi
 
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
-cp "$ipa" "$stage/Cydian.ipa"
-cp "$deb" "$stage/Cydian.deb"
+cp "$ipa" "$stage/iFizBox.ipa"
+cp "$deb" "$stage/iFizBox.deb"
 cp "$deb" "$stage/$debname"
-# Other arch builds named like Debian's files (com.ryha.cydian_<ver>_iphoneos-arm64e.deb) ride along.
+# Other arch builds named like Debian's files (com.ryha.ifizbox_<ver>_iphoneos-arm64e.deb) ride along.
 extra=()
 pkg=${debname%%_*}
 for f in "$dist/${pkg}"_*_*.deb; do
@@ -149,14 +149,14 @@ else
   {
     git log --no-merges --format='- %s' ${prev:+"$prev.."}"$sha" | grep -v '^- plan:' | head -n 30 || true
     echo
-    echo "Cydian.ipa is unsigned: sign it with your own certificate (Feather, AltStore, SideStore, or $BRAND_NAME's own"
-    echo "Settings > Signing). Cydian.deb ($debname) is the rootless jailbreak build."
+    echo "iFizBox.ipa is unsigned: sign it with your own certificate (Feather, AltStore, SideStore, or $BRAND_NAME's own"
+    echo "Settings > Signing). iFizBox.deb ($debname) is the rootless jailbreak build."
   } > "$stage/notes.md"
 fi
 
 echo "release: $repo $tag at $sha"
-echo "release: assets: Cydian.ipa Cydian.deb $debname ${extra[*]:+${extra[*]} }${repofiles[*]}"
-if [ "$repo" = RyanAHayden/iFizBox ]; then aptrepo=https://cydian.dev/repo/; else aptrepo="https://github.com/$repo/releases/latest/download/ (a Worker with CYDIAN_REPO=$repo serves it at /repo/)"; fi
+echo "release: assets: iFizBox.ipa iFizBox.deb $debname ${extra[*]:+${extra[*]} }${repofiles[*]}"
+if [ "$repo" = RyanAHayden/iFizBox ]; then aptrepo=https://cydian.dev/repo/; else aptrepo="https://github.com/$repo/releases/latest/download/ (a Worker with IFIZBOX_REPO=$repo serves it at /repo/)"; fi
 echo "release: apt repo: $aptrepo, from https://github.com/$repo/releases/latest/download/${minimum:+ (minimum $minimum)}"
 echo "release: notes:"
 sed 's/^/  /' "$stage/notes.md"
@@ -176,7 +176,7 @@ if [ $dry = 1 ]; then
   exit 0
 fi
 
-assets=("$stage/Cydian.ipa" "$stage/Cydian.deb" "$stage/$debname")
+assets=("$stage/iFizBox.ipa" "$stage/iFizBox.deb" "$stage/$debname")
 for b in "${extra[@]}"; do assets+=("$stage/$b"); done
 for f in "${repofiles[@]}"; do assets+=("$stage/$f"); done
 gh release create "$tag" --repo "$repo" --target "$sha" --title "$BRAND_NAME $version" --notes-file "$stage/notes.md" \
@@ -186,4 +186,4 @@ echo "release: published https://github.com/$repo/releases/tag/$tag"
 python3 tools/altsource.py update "$version" "$ipa" "${altargs[@]}"
 python3 tools/altsource.py check
 [ -z "$out" ] || cp web/app/source.json "$out/source.json"
-echo "release: web/app/source.json now names $tag's Cydian.ipa: commit it"
+echo "release: web/app/source.json now names $tag's iFizBox.ipa: commit it"

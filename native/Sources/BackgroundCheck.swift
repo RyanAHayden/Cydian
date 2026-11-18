@@ -19,12 +19,12 @@ import UIKit
 import UserNotifications
 
 enum BackgroundCheck {
-    static let taskID = "com.ryha.cydian.updates"
-    static let watchKey = "cydian.updates.watch" // UserDefaults: [UpdateCheck.Watched] as JSON
-    static let knownKey = "cydian.updates.known" // UserDefaults: ["<id> <version>"]
+    static let taskID = "com.ryha.ifizbox.updates"
+    static let watchKey = "ifizbox.updates.watch" // UserDefaults: [UpdateCheck.Watched] as JSON
+    static let knownKey = "ifizbox.updates.known" // UserDefaults: ["<id> <version>"]
     static let interval: TimeInterval = 4 * 3600
     static let maxBytes = 8 << 20 // AltStore's own source is about 1 MB; the biggest seen (F9) under 8 MB
-    private static let queue = DispatchQueue(label: "com.ryha.cydian.updates")
+    private static let queue = DispatchQueue(label: "com.ryha.ifizbox.updates")
     private static var registered = false
 
     static var permitted: Bool {
@@ -49,7 +49,7 @@ enum BackgroundCheck {
             queue.async {
                 let known = UpdateCheck.mergeKnown(old: loadKnown(), oldWatch: loadWatch(), page: page, newWatch: apps)
                 save(apps, known: known)
-                if apps.contains(where: { $0.id != "com.ryha.cydian" }) { askOnce() }
+                if apps.contains(where: { $0.id != "com.ryha.ifizbox" }) { askOnce() }
                 Apt.reply(c, ["scheduled": schedule()], nil)
             }
         }
@@ -87,8 +87,8 @@ enum BackgroundCheck {
 
     // ---- the task
 
-    static let lastRunKey = "cydian.backgroundCheck.lastRun"
-    static let offKey = "cydian.backgroundCheck.off" // Settings > Update Alerts > Check in the Background, off
+    static let lastRunKey = "ifizbox.backgroundCheck.lastRun"
+    static let offKey = "ifizbox.backgroundCheck.off" // Settings > Update Alerts > Check in the Background, off
     private static func run(_ task: BGAppRefreshTask) {
         schedule() // the next one first, so a check cut short still has a successor
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastRunKey) // Settings shows it

@@ -5,6 +5,6 @@
 	<!-- The sideload IPA (I2): get-task-allow only, like Feather. The user's signer swaps in its own profile's. -->
 	<key>get-task-allow</key><true/>
 	<!-- N8: the App Group the widget extension reads the update count from (intents/App/WidgetStore.swift) -->
-	<key>com.apple.security.application-groups</key><array><string>group.com.ryha.cydian</string></array>
+	<key>com.apple.security.application-groups</key><array><string>group.com.ryha.ifizbox</string></array>
 </dict>
 </plist>

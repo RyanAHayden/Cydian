@@ -1,4 +1,4 @@
-// The JS-to-Swift bridge (docs/native.md, R3 "Bridge"), the cydian://app scheme serving the bundled web/app/, and
+// The JS-to-Swift bridge (docs/native.md, R3 "Bridge"), the ifizbox://app scheme serving the bundled web/app/, and
 // the switch for WebKit's private 60 fps rendering preference. Taken from native/spike/Sources/Bridge.swift.
 import UIKit
 import WebKit
@@ -12,7 +12,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         let reply: (Any?, String?) -> Void
 
         func emit(_ events: [[String: Any]]) {
-            web?.callAsyncJavaScript("cydianNative.emit(id, events)", arguments: ["id": id, "events": events],
+            web?.callAsyncJavaScript("ifizboxNative.emit(id, events)", arguments: ["id": id, "events": events],
                                      in: nil, in: .page, completionHandler: nil)
         }
     }
@@ -50,12 +50,12 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             DispatchQueue.main.async { ClipboardRead.read(auto: c.params["auto"] as? Bool ?? false) { c.reply($0, nil) } }
         }
         SelfUpdate.register(self) // F72: app.openURL (below)
-        Apt.register(self) // N3: apt's files, the network, cydian-helper, haptic.tap (Apt.swift)
+        Apt.register(self) // N3: apt's files, the network, ifizbox-helper, haptic.tap (Apt.swift)
         Paid.register(self) // F57: vendors' calls, UDID, Keychain, sign-in sheet, paid installs (Paid.swift)
         SignBridge.register(self) // I6: sign and install IPAs on the phone, sideload build (SignBridge.swift)
         Notifications.register(self) // F65: app.badge, the icon badge (Notifications.swift)
         Prefs.register(self) // F70: prefs.set, N7's settings for the daemon (below)
-        Incoming.register(self) // F75: cydian:// links for the page, app.takeURL and app.gunzip (App.swift)
+        Incoming.register(self) // F75: ifizbox:// links for the page, app.takeURL and app.gunzip (App.swift)
         BackgroundCheck.register(self) // I3: updates.watch, the sideload build's background update check
         ShareBridge.register(self) // N9: share.*, what the share sheet and Open in iFizBox handed over (share/App/)
         AccountKey.register(self) // F97: account.key.*, the iFizBox Account key in the Keychain (Account.swift)
@@ -102,10 +102,10 @@ extension Jailbreak {
     }
 }
 
-// Serves Bundle/web/* as cydian://app/*. A real origin (unlike file://), so ES modules, module workers and
+// Serves Bundle/web/* as ifizbox://app/*. A real origin (unlike file://), so ES modules, module workers and
 // IndexedDB behave as on the site, and nothing ever comes from the network.
 final class AppScheme: NSObject, WKURLSchemeHandler {
-    static let scheme = "cydian"
+    static let scheme = "ifizbox"
     static func url(_ page: String) -> URL { URL(string: "\(scheme)://app/\(page)")! }
     private let root = Bundle.main.resourceURL!.appendingPathComponent("web").standardizedFileURL
 
@@ -193,15 +193,15 @@ enum SelfUpdate {
 }
 
 // F70: N7's daemon (native/daemon/main.m e_settings) reads the automatic-install settings from iFizBox's preferences,
-// com.ryha.cydian for user mobile through cfprefsd, not from the web view's localStorage. web/app/settings.js
+// com.ryha.ifizbox for user mobile through cfprefsd, not from the web view's localStorage. web/app/settings.js
 // createPrefsMirror sends them here at launch and on every change:
-//   prefs.set {values: {"cydian.<key>": string | bool | number | [string] | null}} -> nil   null removes the key
+//   prefs.set {values: {"ifizbox.<key>": string | bool | number | [string] | null}} -> nil   null removes the key
 // Only the daemon's keys (core/settings.js DAEMON_KEYS, DAEMON_LISTS) are taken; anything else is refused.
 enum Prefs {
-    static let domain = "com.ryha.cydian" as CFString
-    static let scalars: Set<String> = ["cydian.checkUpdates", "cydian.cellular", "cydian.autoInstall",
-                                       "cydian.autoInstallIdle", "cydian.respring", "cydian.keepVersions"]
-    static let lists: Set<String> = ["cydian.holds", "cydian.autoMarked"]
+    static let domain = "com.ryha.ifizbox" as CFString
+    static let scalars: Set<String> = ["ifizbox.checkUpdates", "ifizbox.cellular", "ifizbox.autoInstall",
+                                       "ifizbox.autoInstallIdle", "ifizbox.respring", "ifizbox.keepVersions"]
+    static let lists: Set<String> = ["ifizbox.holds", "ifizbox.autoMarked"]
 
     // The value to store, or nil to remove the key; .none when the value isn't one this key takes.
     static func value(_ key: String, _ v: Any) -> CFPropertyList?? {

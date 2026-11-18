@@ -46,7 +46,7 @@ test("?install keeps the other params and asks even after Browse Anyway (firstVi
 });
 
 test("?install never asks in the app or the native shells, and leaves their URL alone", async () => {
-  for (const [mode, extra] of [["jailbreak", {}], ["sideload", {}], ["site", { cydianNative: {} }], ["site", { cydianApp: true }]]) {
+  for (const [mode, extra] of [["jailbreak", {}], ["sideload", {}], ["site", { ifizboxNative: {} }], ["site", { ifizboxApp: true }]]) {
     const win = fakeWin("/?install", extra);
     assert.equal((await launch(win, mode)).length, 0, mode);
     assert.deepEqual(win.replaced, [], mode);

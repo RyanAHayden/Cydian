@@ -47,22 +47,22 @@ test("F128: exactly these settings remain, and the retired ones are gone", () =>
 });
 
 test("F128: the migration drops the retired settings' stored values and keeps everything else", () => {
-  const old = { "cydian.sideloader": "altstore", "cydian.checkUpdates": "6h", "cydian.cellular": "false",
-    "cydian.notifications": "each", "cydian.badge": "false", "cydian.appearance": "dark", "cydian.allowZoom": "true", "cydian.showExpiry": "false",
-    "cydian.holds": '["com.a"]', "cydian.keepVersions": "2", "other.key": "x" };
+  const old = { "ifizbox.sideloader": "altstore", "ifizbox.checkUpdates": "6h", "ifizbox.cellular": "false",
+    "ifizbox.notifications": "each", "ifizbox.badge": "false", "ifizbox.appearance": "dark", "ifizbox.allowZoom": "true", "ifizbox.showExpiry": "false",
+    "ifizbox.holds": '["com.a"]', "ifizbox.keepVersions": "2", "other.key": "x" };
   const storage = memStorage(old);
   const s = createSettings({ storage, mode: "jailbreak" });
-  for (const k of RETIRED) assert.equal(storage.map.has("cydian." + k), false, k);
+  for (const k of RETIRED) assert.equal(storage.map.has("ifizbox." + k), false, k);
   assert.deepEqual([...storage.map.keys()].sort(),
-    ["cydian.appearance", "cydian.holds", "cydian.keepVersions", "cydian.showExpiry", "other.key"]);
+    ["ifizbox.appearance", "ifizbox.holds", "ifizbox.keepVersions", "ifizbox.showExpiry", "other.key"]);
   assert.equal(s.get("appearance"), "dark");
   assert.equal(s.get("showExpiry"), false);
   assert.equal(s.get("keepVersions"), 2);
   assert.deepEqual(s.holds.list(), ["com.a"]);
   // run again: nothing left to drop; storage without removeItem or that throws doesn't break it
   assert.deepEqual(dropRetired(storage), []);
-  assert.deepEqual(dropRetired(memStorage({ "cydian.badge": "true" })), ["badge"]);
-  const plain = { getItem: (k) => (k === "cydian.badge" ? "true" : null), setItem() {} };
+  assert.deepEqual(dropRetired(memStorage({ "ifizbox.badge": "true" })), ["badge"]);
+  const plain = { getItem: (k) => (k === "ifizbox.badge" ? "true" : null), setItem() {} };
   assert.doesNotThrow(() => createSettings({ storage: plain }));
   const broken = { getItem() { throw new Error("denied"); }, setItem() { throw new Error("quota"); }, removeItem() { throw new Error("no"); } };
   assert.doesNotThrow(() => createSettings({ storage: broken }));
@@ -107,15 +107,15 @@ test("refresh on launch is off on the site and on in the app", () => {
   assert.equal(createSettings({ storage: memStorage(), mode: "sideload" }).get("refreshOnLaunch"), true);
 });
 
-test("values persist in storage under cydian.<key> and a new store reads them back", () => {
+test("values persist in storage under ifizbox.<key> and a new store reads them back", () => {
   const storage = memStorage();
   const a = createSettings({ storage, mode: "jailbreak" });
   a.set("appearance", "dark");
   a.set("arch", "iphoneos-arm");
   a.set("refreshOnLaunch", false);
   a.set("keepVersions", 2);
-  assert.equal(storage.map.get("cydian.appearance"), "dark");
-  assert.equal(storage.map.get("cydian.arch"), "iphoneos-arm"); // where backend.js getArch() reads it
+  assert.equal(storage.map.get("ifizbox.appearance"), "dark");
+  assert.equal(storage.map.get("ifizbox.arch"), "iphoneos-arm"); // where backend.js getArch() reads it
   const b = createSettings({ storage, mode: "jailbreak" });
   assert.equal(b.get("appearance"), "dark");
   assert.equal(b.get("arch"), "iphoneos-arm");
@@ -124,7 +124,7 @@ test("values persist in storage under cydian.<key> and a new store reads them ba
 });
 
 test("a stored value that is not an option reads as the default", () => {
-  const s = createSettings({ storage: memStorage({ "cydian.appearance": "purple", "cydian.arch": "x86" }) });
+  const s = createSettings({ storage: memStorage({ "ifizbox.appearance": "purple", "ifizbox.arch": "x86" }) });
   assert.equal(s.get("appearance"), "light");
   assert.equal(s.get("arch"), DEFAULT_ARCH);
 });
@@ -164,10 +164,10 @@ test("holds: per package, sorted, stored on the device", () => {
   assert.deepEqual(createSettings({ storage }).holds.list(), ["com.a"]);
   s.holds.replace(["z", "y", "y"]); // what apt-mark showhold reports, in jailbreak mode
   assert.deepEqual(s.holds.list(), ["y", "z"]);
-  assert.deepEqual(createSettings({ storage: memStorage({ "cydian.holds": "{bad" }) }).holds.list(), []);
+  assert.deepEqual(createSettings({ storage: memStorage({ "ifizbox.holds": "{bad" }) }).holds.list(), []);
 });
 
-// A stand-in for the bridge's cydianNative.helper: records the words, answers like cydian-helper and apt-mark.
+// A stand-in for the bridge's ifizboxNative.helper: records the words, answers like ifizbox-helper and apt-mark.
 function fakeHelper({ held = [], fail = new Set() } = {}) {
   const calls = [];
   const dpkg = new Set(held);
@@ -205,20 +205,20 @@ test("holds in jailbreak mode: a refused hold puts dpkg's list back", async () =
   assert.deepEqual(f.calls, ["hold com.a", "showhold"]);
 
   const g = fakeHelper({ fail: new Set(["unhold", "showhold"]) });
-  const t = createSettings({ storage: memStorage({ "cydian.holds": '["com.a"]' }), mode: "jailbreak", helper: g.helper });
+  const t = createSettings({ storage: memStorage({ "ifizbox.holds": '["com.a"]' }), mode: "jailbreak", helper: g.helper });
   assert.equal(await t.holds.set("com.a", false), false);
   assert.deepEqual(t.holds.list(), ["com.a"]); // showhold failed too: the list as it was
 });
 
 test("holds.sync takes apt-mark showhold's list, and tells listeners only of a change", async () => {
   const f = fakeHelper({ held: ["z.pkg", "a.pkg"] });
-  const s = createSettings({ storage: memStorage({ "cydian.holds": '["old.pkg"]' }), mode: "jailbreak", helper: f.helper });
+  const s = createSettings({ storage: memStorage({ "ifizbox.holds": '["old.pkg"]' }), mode: "jailbreak", helper: f.helper });
   const heard = [];
   s.onChange((k, v) => heard.push([k, v]));
   assert.deepEqual(await s.holds.sync(), ["a.pkg", "z.pkg"]);
   assert.deepEqual(await s.holds.sync(), ["a.pkg", "z.pkg"]);
   assert.deepEqual(heard, [["holds", ["a.pkg", "z.pkg"]]]);
-  const broken = createSettings({ storage: memStorage({ "cydian.holds": '["k"]' }), mode: "jailbreak",
+  const broken = createSettings({ storage: memStorage({ "ifizbox.holds": '["k"]' }), mode: "jailbreak",
     helper: fakeHelper({ fail: new Set(["showhold"]) }).helper });
   await assert.rejects(broken.holds.sync());
   assert.deepEqual(broken.holds.list(), ["k"]);
@@ -275,10 +275,10 @@ test("mode-dependent footers", () => {
 
 test("detectMode: the bridge says, otherwise the site", () => {
   assert.equal(detectMode({}), "site");
-  assert.equal(detectMode({ cydianNative: {} }), "jailbreak");
-  assert.equal(detectMode({ cydianNative: { mode: "sideload" } }), "sideload");
-  assert.equal(detectMode({ cydianNative: { mode: "jailbreak" } }), "jailbreak");
-  assert.equal(detectMode({ cydianNative: { mode: "weird" } }), "jailbreak");
+  assert.equal(detectMode({ ifizboxNative: {} }), "jailbreak");
+  assert.equal(detectMode({ ifizboxNative: { mode: "sideload" } }), "sideload");
+  assert.equal(detectMode({ ifizboxNative: { mode: "jailbreak" } }), "jailbreak");
+  assert.equal(detectMode({ ifizboxNative: { mode: "weird" } }), "jailbreak");
   assert.throws(() => createSettings({ mode: "weird" }));
 });
 
@@ -305,7 +305,7 @@ test("hidden sections: sorted, stored on the device, listeners told only on a ch
   assert.deepEqual(s.hiddenSections.list(), ["Addons"]);
   s.hiddenSections.replace(["b", "a", "a", 3]);
   assert.deepEqual(s.hiddenSections.list(), ["a", "b"]);
-  assert.deepEqual(createSettings({ storage: memStorage({ "cydian.hiddenSections": "{bad" }) }).hiddenSections.list(), []);
+  assert.deepEqual(createSettings({ storage: memStorage({ "ifizbox.hiddenSections": "{bad" }) }).hiddenSections.list(), []);
 });
 
 test("Works on My Phone (F17): on by default everywhere; the site picks an iOS version, Automatic by default", () => {
@@ -327,17 +327,17 @@ test("device type defaults: Not Jailbroken on the site and in the sideload build
   assert.equal(createSettings({ storage: memStorage(), mode: "site" }).deviceType(), "none");
   assert.equal(createSettings({ storage: memStorage(), mode: "site" }).jailbroken(), false);
   assert.equal(createSettings({ storage: memStorage(), mode: "sideload" }).deviceType(), "none");
-  assert.equal(createSettings({ storage: memStorage({ "cydian.device": "iphoneos-arm" }), mode: "sideload" }).deviceType(), "none");
+  assert.equal(createSettings({ storage: memStorage({ "ifizbox.device": "iphoneos-arm" }), mode: "sideload" }).deviceType(), "none");
   // jailbreak app: the detected type, never the site's choice
-  const storage = memStorage({ "cydian.device": "none" });
+  const storage = memStorage({ "ifizbox.device": "none" });
   const jb = createSettings({ storage, mode: "jailbreak", native: { jailbreak: "rootful" } });
   assert.equal(jb.deviceType(), "iphoneos-arm");
   assert.equal(jb.jailbroken(), true);
-  assert.equal(storage.map.get("cydian.arch"), "iphoneos-arm", "the detected type is where getArch() reads it");
+  assert.equal(storage.map.get("ifizbox.arch"), "iphoneos-arm", "the detected type is where getArch() reads it");
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", native: { arch: "iphoneos-arm64" } }).deviceType(), "iphoneos-arm64");
   // a shell that doesn't say: the stored architecture, else rootless
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", native: {} }).deviceType(), DEFAULT_ARCH);
-  assert.equal(createSettings({ storage: memStorage({ "cydian.arch": "iphoneos-arm" }), mode: "jailbreak" }).deviceType(), "iphoneos-arm");
+  assert.equal(createSettings({ storage: memStorage({ "ifizbox.arch": "iphoneos-arm" }), mode: "jailbreak" }).deviceType(), "iphoneos-arm");
 });
 
 test("the Device row shows on the site only; the app hides the choice", () => {
@@ -360,20 +360,20 @@ test("picking a jailbroken type on the site sets the architecture too, and liste
   s.onChange((k, v) => heard.push([k, v]));
   s.set("device", "iphoneos-arm");
   assert.equal(s.deviceType(), "iphoneos-arm");
-  assert.equal(storage.map.get("cydian.arch"), "iphoneos-arm");
+  assert.equal(storage.map.get("ifizbox.arch"), "iphoneos-arm");
   assert.deepEqual(heard, [["device", "iphoneos-arm"], ["arch", "iphoneos-arm"]]);
   heard.length = 0;
   s.set("device", "none");
   assert.equal(s.deviceType(), "none");
-  assert.equal(storage.map.get("cydian.arch"), "iphoneos-arm", "Not Jailbroken leaves the architecture alone");
+  assert.equal(storage.map.get("ifizbox.arch"), "iphoneos-arm", "Not Jailbroken leaves the architecture alone");
   assert.deepEqual(heard, [["device", "none"]]);
   assert.throws(() => s.set("device", "iphoneos-armv7"));
 });
 
 test("a site visitor who had picked an Architecture keeps it as their device type", () => {
-  assert.equal(createSettings({ storage: memStorage({ "cydian.arch": "iphoneos-arm" }), mode: "site" }).deviceType(), "iphoneos-arm");
-  assert.equal(createSettings({ storage: memStorage({ "cydian.arch": "iphoneos-arm", "cydian.device": "none" }), mode: "site" }).deviceType(), "none");
-  assert.equal(createSettings({ storage: memStorage({ "cydian.arch": "x86" }), mode: "site" }).deviceType(), "none");
+  assert.equal(createSettings({ storage: memStorage({ "ifizbox.arch": "iphoneos-arm" }), mode: "site" }).deviceType(), "iphoneos-arm");
+  assert.equal(createSettings({ storage: memStorage({ "ifizbox.arch": "iphoneos-arm", "ifizbox.device": "none" }), mode: "site" }).deviceType(), "none");
+  assert.equal(createSettings({ storage: memStorage({ "ifizbox.arch": "x86" }), mode: "site" }).deviceType(), "none");
 });
 
 test("F38: Roothide is a device type on the site and a bridge type in the app (iphoneos-arm64e)", () => {
@@ -381,7 +381,7 @@ test("F38: Roothide is a device type on the site and a bridge type in the app (i
   const s = createSettings({ storage, mode: "site" });
   s.set("device", "iphoneos-arm64e");
   assert.equal(s.deviceType(), "iphoneos-arm64e");
-  assert.equal(storage.map.get("cydian.arch"), "iphoneos-arm64e");
+  assert.equal(storage.map.get("ifizbox.arch"), "iphoneos-arm64e");
   assert.equal(bridgeArch({ jailbreak: "roothide" }), "iphoneos-arm64e");
   assert.equal(bridgeArch({ jailbreak: "none" }), null);
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", native: { jailbreak: "roothide" } }).deviceType(), "iphoneos-arm64e");
@@ -406,10 +406,10 @@ test("F70: Update Automatically marks: sorted, unique, stored on the device, lis
   s.autoMarked.set("a.pkg", true); // no change
   assert.deepEqual(s.autoMarked.list(), ["a.pkg", "b.pkg"]);
   assert.equal(s.autoMarked.has("b.pkg"), true);
-  assert.equal(storage.map.get("cydian.autoMarked"), JSON.stringify(["a.pkg", "b.pkg"]));
+  assert.equal(storage.map.get("ifizbox.autoMarked"), JSON.stringify(["a.pkg", "b.pkg"]));
   s.autoMarked.set("b.pkg", false);
   assert.deepEqual(heard, [["autoMarked", ["b.pkg"]], ["autoMarked", ["a.pkg", "b.pkg"]], ["autoMarked", ["a.pkg"]]]);
-  storage.map.set("cydian.autoMarked", "not json");
+  storage.map.set("ifizbox.autoMarked", "not json");
   assert.deepEqual(s.autoMarked.list(), []);
 });
 
@@ -420,21 +420,21 @@ test("F70: the mark's switch shows only for Only Packages I Mark, in the jailbre
   assert.equal(autoMarkShown(s), true);
   s.set("autoInstall", "all");
   assert.equal(autoMarkShown(s), false);
-  const site = createSettings({ storage: memStorage({ "cydian.autoInstall": "marked" }), mode: "site" });
+  const site = createSettings({ storage: memStorage({ "ifizbox.autoInstall": "marked" }), mode: "site" });
   assert.equal(autoMarkShown(site), false);
   assert.equal(autoMarkShown(null), false);
 });
 
 test("F70: daemonPrefs: the daemon's keys with their typed values, unpicked ones null, the lists as arrays", () => {
-  const storage = memStorage({ "cydian.keepVersions": "bogus" });
+  const storage = memStorage({ "ifizbox.keepVersions": "bogus" });
   const s = createSettings({ storage, mode: "jailbreak" });
-  const keys = [...DAEMON_KEYS, ...DAEMON_LISTS, ...RETIRED_DAEMON_KEYS].map((k) => "cydian." + k);
+  const keys = [...DAEMON_KEYS, ...DAEMON_LISTS, ...RETIRED_DAEMON_KEYS].map((k) => "ifizbox." + k);
   const first = s.daemonPrefs();
   assert.deepEqual(Object.keys(first).sort(), keys.sort());
   // Nothing picked: null everywhere (the daemon's defaults), empty lists; the retired ones always null (F128).
-  for (const k of [...DAEMON_KEYS, ...RETIRED_DAEMON_KEYS]) assert.equal(first["cydian." + k], null, k);
-  assert.deepEqual(first["cydian.holds"], []);
-  assert.deepEqual(first["cydian.autoMarked"], []);
+  for (const k of [...DAEMON_KEYS, ...RETIRED_DAEMON_KEYS]) assert.equal(first["ifizbox." + k], null, k);
+  assert.deepEqual(first["ifizbox.holds"], []);
+  assert.deepEqual(first["ifizbox.autoMarked"], []);
   s.set("autoInstall", "marked");
   s.set("autoInstallIdle", false);
   s.set("keepVersions", 2);
@@ -442,21 +442,21 @@ test("F70: daemonPrefs: the daemon's keys with their typed values, unpicked ones
   s.autoMarked.set("com.a", true);
   s.holds.replace(["com.z", "com.h"]);
   assert.deepEqual(s.daemonPrefs(), {
-    "cydian.autoInstall": "marked", "cydian.autoInstallIdle": false,
-    "cydian.respring": "locked", "cydian.keepVersions": 2, "cydian.holds": ["com.h", "com.z"], "cydian.autoMarked": ["com.a"],
-    "cydian.checkUpdates": null, "cydian.cellular": null,
+    "ifizbox.autoInstall": "marked", "ifizbox.autoInstallIdle": false,
+    "ifizbox.respring": "locked", "ifizbox.keepVersions": 2, "ifizbox.holds": ["com.h", "com.z"], "ifizbox.autoMarked": ["com.a"],
+    "ifizbox.checkUpdates": null, "ifizbox.cellular": null,
   });
-  assert.deepEqual(s.daemonPrefs(["keepVersions"]), { "cydian.keepVersions": 2 });
-  assert.deepEqual(s.daemonPrefs(["holds", "appearance"]), { "cydian.holds": ["com.h", "com.z"] }); // not the daemon's: left out
+  assert.deepEqual(s.daemonPrefs(["keepVersions"]), { "ifizbox.keepVersions": 2 });
+  assert.deepEqual(s.daemonPrefs(["holds", "appearance"]), { "ifizbox.holds": ["com.h", "com.z"] }); // not the daemon's: left out
 });
 
 // F134: Display > Zoom went (zoom stays off), and Settings > Signing has Show Expiry Dates, a switch, on by default.
 test("F134: allowZoom is retired: its stored value is dropped and nothing shows or travels it", async () => {
   assert.ok(RETIRED.includes("allowZoom"));
-  const storage = memStorage({ "cydian.allowZoom": "true", "cydian.appearance": "dark" });
+  const storage = memStorage({ "ifizbox.allowZoom": "true", "ifizbox.appearance": "dark" });
   const s = createSettings({ storage, mode: "site" });
-  assert.equal(storage.map.has("cydian.allowZoom"), false);
-  assert.equal(storage.map.get("cydian.appearance"), "dark");
+  assert.equal(storage.map.has("ifizbox.allowZoom"), false);
+  assert.equal(storage.map.get("ifizbox.appearance"), "dark");
   assert.equal(s.isShown("allowZoom"), false);
   assert.throws(() => s.get("allowZoom"), /allowZoom/);
   const { TRAVELS } = await import("./settings.js");

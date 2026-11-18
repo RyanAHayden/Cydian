@@ -155,7 +155,7 @@ export function drawWalkthrough(el, { status = null, failure = "", certificate =
   const states = stepStates(status, { open, server: serverUrl });
   const page = h("div", "walkthrough");
   page.append(h("p", "group-footer walk-intro", allDone(states)
-    ? `All set: Install signs apps with your certificate ${globalThis.cydianNative ? "on this iPhone" : "in this browser"}.`
+    ? `All set: Install signs apps with your certificate ${globalThis.ifizboxNative ? "on this iPhone" : "in this browser"}.`
     : "Two steps before the first install."));
   if (failure) page.append(h("p", "group-footer walk-failure", `The signer didn't answer: ${failure}`));
   if (status?.identityProblem) page.append(h("p", "group-footer walk-failure", status.identityProblem));

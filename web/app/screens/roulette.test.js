@@ -50,7 +50,7 @@ test("the record is kept in storage beside the settings, and a broken one reads 
   const st = memStorage();
   saveSpins(recordSpin(readSpins(st), "2026-11-18"), st);
   assert.deepEqual(readSpins(st), { last: "2026-11-18", streak: 1, best: 1, spins: 1 });
-  assert.match(ROULETTE_KEY, /^cydian\./);
+  assert.match(ROULETTE_KEY, /^ifizbox\./);
   assert.deepEqual(readSpins(memStorage({ [ROULETTE_KEY]: "{oops" })), { last: null, streak: 0, best: 0, spins: 0 });
   assert.deepEqual(readSpins(memStorage({ [ROULETTE_KEY]: '{"last":"x","streak":-3}' })), { last: null, streak: 0, best: 0, spins: 0 });
   const throwing = { getItem() { throw new Error("no"); }, setItem() { throw new Error("no"); } };

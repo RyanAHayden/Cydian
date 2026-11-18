@@ -5,15 +5,15 @@
 //                                       helper's lines; rejects with Error("<code>: <message>") and err.code
 //                                       (core/ipainstall.js ipaError explains them)
 //
-// It talks to cydianNative directly (as signing-client.js does), not through backend-native.js, whose error mapping
+// It talks to ifizboxNative directly (as signing-client.js does), not through backend-native.js, whose error mapping
 // would fold no_adhoc and bad_ipa into "network".
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { detectMode } from "./core/settings.js";
 import { ipaStatus, ipaError } from "./core/ipainstall.js";
 
-export const ipaInstallAvailable = (mode = detectMode()) => mode === "jailbreak" && Boolean(globalThis.cydianNative?.call);
+export const ipaInstallAvailable = (mode = detectMode()) => mode === "jailbreak" && Boolean(globalThis.ifizboxNative?.call);
 
-export async function installIpa(url, onEvent = null, { native = globalThis.cydianNative } = {}) {
+export async function installIpa(url, onEvent = null, { native = globalThis.ifizboxNative } = {}) {
   if (!native?.call) throw Object.assign(new Error("sideload: no native bridge"), { code: "sideload" });
   try {
     return await native.call("ipa.install", { url, stream: Boolean(onEvent) }, onEvent ?? undefined);
@@ -32,7 +32,7 @@ export async function installIpa(url, onEvent = null, { native = globalThis.cydi
 // F188: `signal` (the page's Cancel) ends the run at once: it resolves { ok: false, cancelled: true } without waiting
 // for ipa.install and nothing more is drawn (F196: the page also asks the shell's ipa.cancel to stop it,
 // screens/ipa-install.js stopIpaInstall).
-export async function runIpaInstall({ url, name = "" }, view, { native = globalThis.cydianNative, signal = null } = {}) {
+export async function runIpaInstall({ url, name = "" }, view, { native = globalThis.ifizboxNative, signal = null } = {}) {
   const log = [];
   const line = (type, text) => {
     log.push(type === "error" ? `E: ${text}` : type === "status" ? `» ${text}` : text);
@@ -44,7 +44,7 @@ export async function runIpaInstall({ url, name = "" }, view, { native = globalT
   let result = null;
   let error = null;
   let lastStatus = "";
-  const said = new Set(); // the helper's own "cydian-helper: " lines, not repeated at the end
+  const said = new Set(); // the helper's own "ifizbox-helper: " lines, not repeated at the end
   const stopped = () => Boolean(signal?.aborted);
   const cancelled = () => {
     log.push("» Cancelled");
@@ -67,8 +67,8 @@ export async function runIpaInstall({ url, name = "" }, view, { native = globalT
         lastStatus = s.text;
         return;
       }
-      if (fd === "err" && /^cydian-helper: /.test(text)) said.add(text.slice(15));
-      line(fd === "err" && /^cydian-helper: /.test(text) ? "error" : fd === "err" && /^(W:|warning)/i.test(text) ? "warning" : "info", text);
+      if (fd === "err" && /^ifizbox-helper: /.test(text)) said.add(text.slice(16));
+      line(fd === "err" && /^ifizbox-helper: /.test(text) ? "error" : fd === "err" && /^(W:|warning)/i.test(text) ? "warning" : "info", text);
     }, { native });
     job.catch(() => {}); // after Cancel no one waits for it
     result = await (signal ? Promise.race([job, aborted.then(() => null)]) : job);

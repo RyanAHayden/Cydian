@@ -1,5 +1,5 @@
-// N9: the share extension (PlugIns/CydianShare.appex). Safari's Share button, a link in Notes or Messages: it takes
-// the one web link (or the text, which the shell searches for a link) and opens iFizBox with cydian://share?url=…
+// N9: the share extension (PlugIns/iFizBoxShare.appex). Safari's Share button, a link in Notes or Messages: it takes
+// the one web link (or the text, which the shell searches for a link) and opens iFizBox with ifizbox://share?url=…
 // (or ?text=…). iFizBox decides what it is (../Share.swift: an APT repo or AltStore source opens Add Source, an .ipa
 // or .deb link its install route) and says so there; this sheet only shows "Opening iFizBox" for a moment.
 //
@@ -44,7 +44,7 @@ final class ShareViewController: UIViewController {
         }
     }
 
-    // The first web link among the attachments, else the first text: as cydian://share?url=… or ?text=….
+    // The first web link among the attachments, else the first text: as ifizbox://share?url=… or ?text=….
     private func shared(_ done: @escaping (URL?) -> Void) {
         let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).flatMap { $0.attachments ?? [] }
         let url = UTType.url.identifier, text = UTType.plainText.identifier
@@ -65,7 +65,7 @@ final class ShareViewController: UIViewController {
 
     static func link(_ name: String, _ value: String) -> URL? {
         var c = URLComponents()
-        c.scheme = "cydian"
+        c.scheme = "ifizbox"
         c.host = "share"
         c.queryItems = [URLQueryItem(name: name, value: value)]
         c.percentEncodedQuery = c.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")

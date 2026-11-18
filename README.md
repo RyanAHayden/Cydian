@@ -10,7 +10,7 @@ affiliated with Cydia or SaurikIT (Cydia is SaurikIT's trademark).
 - **Shortcuts**: daily upgrade checks and auto-updating.
 
 Work is planned in `plan/TODO.md` and run with [agent-runner](https://github.com/FIZL0/agent-runner):
-`tmux new -s cydian agent-runner run 3`.
+`tmux new -s ifizbox agent-runner run 3`.
 
 Not affiliated with Cydia or SaurikIT. No Apple artwork is included, and the look is redrawn in CSS. The one exception
 is Cydia's section icons and purpose badges (`web/app/icons/sections/`), by Jay Freeman (saurik), copied from

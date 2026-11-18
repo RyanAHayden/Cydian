@@ -1,4 +1,4 @@
-// F40: native/bridge.js passes the shell's jailbreak type on as cydianNative.jailbreak, and bridgeArch reads it.
+// F40: native/bridge.js passes the shell's jailbreak type on as ifizboxNative.jailbreak, and bridgeArch reads it.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -11,13 +11,13 @@ const src = readFileSync(join(import.meta.dirname, "../../native/bridge.js"), "u
 
 // What Apt.swift's installScript does: replace @JAILBREAK@ with Jailbreak.kind.
 function load(kind) {
-  const ctx = vm.createContext({ webkit: { messageHandlers: { cydian: { postMessage: () => Promise.resolve(null) } } } });
+  const ctx = vm.createContext({ webkit: { messageHandlers: { ifizbox: { postMessage: () => Promise.resolve(null) } } } });
   const text = kind === undefined ? src : src.replaceAll("@JAILBREAK@", kind);
   vm.runInContext(text.replace("})(globalThis);", "})(this);"), ctx);
-  return ctx.cydianNative;
+  return ctx.ifizboxNative;
 }
 
-test("bridge.js: cydianNative.jailbreak from the shell's prefix", () => {
+test("bridge.js: ifizboxNative.jailbreak from the shell's prefix", () => {
   assert.equal(load("rootless").jailbreak, "rootless");
   assert.equal(load("rootful").jailbreak, "rootful");
   assert.equal(bridgeArch(load("rootless")), "iphoneos-arm64");

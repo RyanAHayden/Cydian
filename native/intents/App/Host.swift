@@ -1,7 +1,7 @@
 // N8: the phone's IntentHost, for the app's intents (Intents.swift) and the widget extension's controls
 // (native/widget/). Foundation and the C spawn only (no UIKit, AppIntents or Apt.swift), so the widget builds it too.
 //   PhoneHost.shared   jailbroken: the N2 helper is where this jailbreak keeps it (Sources/mode.c, as AppMode);
-//                      helper: cydian-helper as root through helper/spawn.c, its fds 1, 2 and 3 read to the end;
+//                      helper: ifizbox-helper as root through helper/spawn.c, its fds 1, 2 and 3 read to the end;
 //                      sideloadUpdates: I3's remembered apps (BackgroundCheck's list) against their sources, now.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
@@ -20,8 +20,8 @@ final class PhoneHost: IntentHost {
         return FileManager.default.fileExists(atPath: "/var/jb") ? "/var/jb" : ""
     }()
 
-    var helperPath: String { prefix + "/usr/libexec/cydian/cydian-helper" }
-    lazy var jailbroken: Bool = cydian_mode_at(helperPath) == 1
+    var helperPath: String { prefix + "/usr/libexec/ifizbox/ifizbox-helper" }
+    lazy var jailbroken: Bool = ifizbox_mode_at(helperPath) == 1
 
     func read(_ path: String) -> String? {
         guard let d = FileManager.default.contents(atPath: prefix + path) else { return nil }
@@ -32,7 +32,7 @@ final class PhoneHost: IntentHost {
 
     func helper(_ words: [String]) throws -> HelperResult {
         let path = helperPath
-        guard FileManager.default.isExecutableFile(atPath: path) else { throw IntentFailure("cydian-helper is not installed at \(path).") }
+        guard FileManager.default.isExecutableFile(atPath: path) else { throw IntentFailure("ifizbox-helper is not installed at \(path).") }
         var cargs: [UnsafeMutablePointer<CChar>?] = words.map { strdup($0) }
         cargs.append(nil)
         defer { for p in cargs { free(p) } }
@@ -40,10 +40,10 @@ final class PhoneHost: IntentHost {
         var fds: (Int32, Int32, Int32) = (-1, -1, -1)
         let rc = cargs.withUnsafeBufferPointer { buf -> Int32 in
             buf.baseAddress!.withMemoryRebound(to: UnsafePointer<CChar>?.self, capacity: buf.count) { args in
-                cydian_helper_spawn(path, args, &pid, &fds.0, &fds.1, &fds.2)
+                ifizbox_helper_spawn(path, args, &pid, &fds.0, &fds.1, &fds.2)
             }
         }
-        if rc != 0 { throw IntentFailure("Can't start cydian-helper: \(String(cString: strerror(rc))).") }
+        if rc != 0 { throw IntentFailure("Can't start ifizbox-helper: \(String(cString: strerror(rc))).") }
         var collected = [Data(), Data(), Data()]
         let lock = NSLock()
         let group = DispatchGroup()
@@ -74,7 +74,7 @@ final class PhoneHost: IntentHost {
     // I3's list (BackgroundCheck.watchKey) against each source, fetched now; a source that fails is skipped, as the
     // background check does.
     func sideloadUpdates() throws -> [UpdateCheck.Found] {
-        guard let d = UserDefaults.standard.data(forKey: "cydian.updates.watch"),
+        guard let d = UserDefaults.standard.data(forKey: "ifizbox.updates.watch"),
               let watch = try? JSONDecoder().decode([UpdateCheck.Watched].self, from: d), !watch.isEmpty else { return [] }
         let v = ProcessInfo.processInfo.operatingSystemVersion
         let ios = "\(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"

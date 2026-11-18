@@ -6,10 +6,10 @@
 //                                                              sideload: the apps Install remembered (host.sideloadUpdates)
 //   IntentsCore.installAllUpdates(host)     -> InstallReport  jailbreak: the check, then `apply` of every upgrade
 //   IntentsCore.respring / userspaceReboot  jailbreak: the helper's verbs
-//   IntentsCore.addSourceLink(url)          -> cydian://add?url=… for the page's Add Source alert (both modes)
+//   IntentsCore.addSourceLink(url)          -> ifizbox://add?url=… for the page's Add Source alert (both modes)
 //   IntentsCore.exportBackup(host)          -> Data  jailbreak: sources, manually installed packages and holds (JSON)
 //   IntentsCore.restore(data, host)         -> RestoreReport  jailbreak: sources, apt update, installs, holds;
-//                                              sideload: its sources as a cydian://import link (Import's review alert)
+//                                              sideload: its sources as a ifizbox://import link (Import's review alert)
 // Upgrades are what web/app/core's Changes would list: an installed package (dpkg status "install ok installed")
 // whose newest version in apt's lists is newer (DebVersion, native/sign/Updates.swift), held ones left out.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -22,8 +22,8 @@ struct HelperResult {
     let status: String // fd 3: apt's status lines and maintainer scripts' finish: lines
 }
 
-// What the intents need from the phone. The app's (App/Host.swift) spawns the real cydian-helper as root; the tests'
-// runs native/fake/cydian-helper over a fixture prefix.
+// What the intents need from the phone. The app's (App/Host.swift) spawns the real ifizbox-helper as root; the tests'
+// runs native/fake/ifizbox-helper over a fixture prefix.
 protocol IntentHost {
     var jailbroken: Bool { get }
     var prefix: String { get }                      // the jailbreak's root ("/var/jb", roothide's jbroot, "" rootful)
@@ -87,7 +87,7 @@ struct BackupPackage: Codable, Hashable {
 
 // The Export My Packages file. `format` and `version` say what it is; a newer version is refused, not misread.
 struct Backup: Codable, Equatable {
-    static let formatName = "cydian-backup"
+    static let formatName = "ifizbox-backup"
     var format = Backup.formatName
     var version = 1
     var created: String
@@ -255,14 +255,14 @@ enum IntentsCore {
 
     // ---- Add Source
 
-    // cydian://add?url=… (and suite/component for a dist repo, core/handoff.js parseAddLink): the page opens its
+    // ifizbox://add?url=… (and suite/component for a dist repo, core/handoff.js parseAddLink): the page opens its
     // Add Source alert filled in, so the user still sees the URL, iFizBox's source warnings and Verifying URL.
     static func addSourceLink(_ url: URL, suite: String? = nil, components: [String] = []) throws -> URL {
         let s = url.absoluteString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https", let host = url.host, !host.isEmpty
         else { throw IntentFailure("A source is an http:// or https:// URL.") }
         var c = URLComponents()
-        c.scheme = "cydian"
+        c.scheme = "ifizbox"
         c.host = "add"
         var q = [URLQueryItem(name: "url", value: s)]
         if let suite, !suite.isEmpty, !suite.hasSuffix("/") {
@@ -388,10 +388,10 @@ enum IntentsCore {
         var r = RestoreReport()
         guard host.jailbroken else {
             guard !b.sources.isEmpty else { throw IntentFailure("That backup has no sources.") }
-            r.importLink = "cydian://import?d=" + base64url(try gzip(try importPayload(b)))
+            r.importLink = "ifizbox://import?d=" + base64url(try gzip(try importPayload(b)))
             return r
         }
-        // 1. the sources this phone doesn't have yet, into iFizBox's own file (cydian-helper addsource)
+        // 1. the sources this phone doesn't have yet, into iFizBox's own file (ifizbox-helper addsource)
         let have = Set(sources(host).map(\.key))
         for s in b.sources where !have.contains(s.key) {
             let res = try host.helper(["addsource", BackupSource.normal(s.uri), s.suite] + s.components)
@@ -430,9 +430,9 @@ enum IntentsCore {
 // ---- What the app shares with the widget (App Group defaults; the widget reads, the app writes)
 
 enum WidgetShare {
-    static let group = "group.com.ryha.cydian"
-    static let key = "cydian.widget.updates" // {count: Int, names: [String], checked: Double (seconds since 1970)}
-    static let kind = "CydianUpdates"        // the widget's kind, for reloads
+    static let group = "group.com.ryha.ifizbox"
+    static let key = "ifizbox.widget.updates" // {count: Int, names: [String], checked: Double (seconds since 1970)}
+    static let kind = "iFizBoxUpdates"        // the widget's kind, for reloads
 
     struct Snapshot: Equatable {
         var count: Int

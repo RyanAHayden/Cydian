@@ -2,17 +2,17 @@
 // Reload and every return to the app read GitHub's latest release and keep it (no once-a-day wait). Nothing pops up:
 // a newer iFizBox shows only as an upgrade row in Changes and its badge (essential-ui.js upgradesWithSelf, with
 // iFizBox's own AltStore source), installed from there like any app upgrade.
-//   sideload   the row takes the release's Cydian.ipa when GitHub is newer than the source
+//   sideload   the row takes the release's iFizBox.ipa when GitHub is newer than the source
 //   jailbreak  apt lists iFizBox's upgrade from its built-in repo (served from that same release); the release is
 //              only recorded
 // Also here: the version compare and the release parse, which Home's Install offers use too (debFor, appoffer.js).
 //
 // Pure: everything that touches the network, the bridge or storage comes in through `deps`, so node tests drive
 // every path (selfupdate.test.js). essential-ui.js wires the real ones.
-import { GITHUB_REPO } from "../brand.js";
+import { GITHUB_REPO, NAME } from "../brand.js";
 
 export const RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
-export const STORE_KEY = "cydian.selfupdate";
+export const STORE_KEY = "ifizbox.selfupdate";
 const NOTE_LINES = 4;
 
 // "v1.2.3", "1.2", "1.2.3-beta" -> [1, 2, 3] (missing parts are 0; anything after the numbers is ignored).
@@ -55,7 +55,7 @@ export function parseRelease(json) {
   if (!v) return null;
   const assets = Array.isArray(json.assets) ? json.assets.filter((a) => a && typeof a.name === "string" && typeof a.browser_download_url === "string") : [];
   const url = (a) => a.browser_download_url;
-  const ipa = assets.find((a) => a.name === "Cydian.ipa") ?? assets.find((a) => /\.ipa$/i.test(a.name));
+  const ipa = assets.find((a) => a.name === `${NAME}.ipa`) ?? assets.find((a) => /\.ipa$/i.test(a.name));
   return {
     version: v.join("."),
     tag: json.tag_name,
@@ -68,14 +68,14 @@ export function parseRelease(json) {
 
 // The .deb for this architecture (core/settings.js bridgeArch: iphoneos-arm64 rootless, iphoneos-arm64e roothide,
 // iphoneos-arm rootful): the asset naming exactly that arch (Debian's name_version_arch.deb), else a plain
-// Cydian.deb, which is the rootless build (native/build.sh), so only for iphoneos-arm64. Null when none fits.
+// iFizBox.deb, which is the rootless build (native/build.sh), so only for iphoneos-arm64. Null when none fits.
 export function debFor(release, arch) {
   const debs = release?.debs ?? [];
   if (arch) {
     const exact = debs.find((d) => new RegExp(`[_-]${arch.replace(/[^a-z0-9-]/g, "")}\\.deb$`, "i").test(d.name));
     if (exact) return exact.url;
   }
-  if (!arch || arch === "iphoneos-arm64") return debs.find((d) => d.name === "Cydian.deb")?.url ?? null;
+  if (!arch || arch === "iphoneos-arm64") return debs.find((d) => d.name === `${NAME}.deb`)?.url ?? null;
   return null;
 }
 

@@ -6,6 +6,6 @@
 	<key>com.apple.private.security.no-container</key><true/>
 	<key>com.apple.private.security.no-sandbox</key><true/>
 	<key>com.apple.private.usernotifications.bundle-identifiers</key>
-	<array><string>com.ryha.cydian</string></array>
+	<array><string>com.ryha.ifizbox</string></array>
 </dict>
 </plist>

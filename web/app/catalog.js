@@ -212,16 +212,16 @@ function setIpaInfo(map) {
 }
 
 // ---- Installed (F7): dpkg's status file, parsed in the worker beside the catalog. In the app the native
-// backend reads it (N3: `cydianNative.dpkgStatus()` resolves to the text of /var/lib/dpkg/status, or
+// backend reads it (N3: `ifizboxNative.dpkgStatus()` resolves to the text of /var/lib/dpkg/status, or
 // /var/jb/var/lib/dpkg/status rootless; core/installed.js STATUS_PATHS); on the site the visitor uploads it and
 // it is kept in IndexedDB on the device, never sent anywhere. ----
 const STATUS_KEY = "dpkg:status";
 let statusSent = null; // Promise of the worker's installed count (-1: no status file), once sent
 
-export const statusSource = () => (typeof globalThis.cydianNative?.dpkgStatus === "function" ? "native" : "upload");
+export const statusSource = () => (typeof globalThis.ifizboxNative?.dpkgStatus === "function" ? "native" : "upload");
 
 async function statusText() {
-  if (statusSource() === "native") return (await globalThis.cydianNative.dpkgStatus()) ?? null;
+  if (statusSource() === "native") return (await globalThis.ifizboxNative.dpkgStatus()) ?? null;
   const db = await indexCache();
   return (db && (await db.get(STATUS_KEY))?.value) ?? null;
 }

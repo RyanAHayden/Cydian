@@ -25,8 +25,8 @@ function fakeHUD() {
 }
 
 let saved;
-beforeEach(() => { saved = globalThis.cydianNative; });
-afterEach(() => { if (saved === undefined) delete globalThis.cydianNative; else globalThis.cydianNative = saved; });
+beforeEach(() => { saved = globalThis.ifizboxNative; });
+afterEach(() => { if (saved === undefined) delete globalThis.ifizboxNative; else globalThis.ifizboxNative = saved; });
 
 test("installFromLibrary: library.install's log (the bundle ID it installs as) reaches the console", async () => {
   const native = fakeNative({

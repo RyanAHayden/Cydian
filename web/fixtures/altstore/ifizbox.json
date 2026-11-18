@@ -1,6 +1,6 @@
 {
   "name": "iFizBox",
-  "identifier": "com.ryha.cydian",
+  "identifier": "com.ryha.ifizbox",
   "subtitle": "A package manager with the iOS 6 look",
   "description": "iFizBox's own source: the iFizBox app for iPhones without a jailbreak.",
   "iconURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/main/web/app/icons/icon-180.png",
@@ -9,7 +9,7 @@
   "apps": [
     {
       "name": "iFizBox",
-      "bundleIdentifier": "com.ryha.cydian",
+      "bundleIdentifier": "com.ryha.ifizbox",
       "developerName": "Ryan Hayden",
       "subtitle": "Packages and apps with the iOS 6 look",
       "localizedDescription": "iFizBox lists apps from AltStore-style sources and, on a jailbroken iPhone, tweaks and themes from APT repos, with the iOS 6 look. The app signs apps on your iPhone with your own certificate (no server) and scrolls at 120Hz. Free and open source (GPL-3.0-or-later).",
@@ -20,8 +20,8 @@
         {
           "version": "0.1.1",
           "date": "2026-11-18T01:04:53Z",
-          "localizedDescription": "Cydian 0.1.1. Release notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.1.1",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.1/Cydian.ipa",
+          "localizedDescription": "iFizBox 0.1.1. Release notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.1.1",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.1.1/iFizBox.ipa",
           "size": 2331028,
           "minOSVersion": "15.0"
         }

@@ -1,4 +1,4 @@
-/* F57: cydian-helper install-paid <path> <id> <version>: a paid package's .deb that the app downloaded from the
+/* F57: ifizbox-helper install-paid <path> <id> <version>: a paid package's .deb that the app downloaded from the
  * vendor's one-time URL (Paid.swift paid.install).
  *
  *   1. Open the .deb without following links: a regular file, one link, owned by the user who owns its directory
@@ -65,7 +65,7 @@ static int run_on_copy(const char *prefix, struct helper_plan *plan, char *const
                        const char *id, const char *version, const char **err) {
     char work[PATH_MAX], copy[PATH_MAX], src[PATH_MAX];
     snprintf(src, sizeof src, "%s", plan->deb);
-    if ((size_t)snprintf(work, sizeof work, "%s/cydian-%s.XXXXXX", HELPER_PAID_WORK, tag) >= sizeof work) {
+    if ((size_t)snprintf(work, sizeof work, "%s/ifizbox-%s.XXXXXX", HELPER_PAID_WORK, tag) >= sizeof work) {
         *err = "work path too long"; return HELPER_EX_IOERR;
     }
     if (!mkdtemp(work)) { *err = "can't make a work directory"; return HELPER_EX_IOERR; }
@@ -85,7 +85,7 @@ static int run_on_copy(const char *prefix, struct helper_plan *plan, char *const
     if (pid < 0) { remove_work(work, copy); *err = "can't run apt-get (fork)"; return HELPER_EX_EXEC; }
     if (pid == 0) {
         execve(plan->path, (char *const *)plan->argv, env);
-        fprintf(stderr, "cydian-helper: %s: %s\n", plan->path, strerror(errno));
+        fprintf(stderr, "ifizbox-helper: %s: %s\n", plan->path, strerror(errno));
         _exit(HELPER_EX_EXEC);
     }
     int st;

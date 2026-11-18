@@ -27,15 +27,15 @@ Cydia look reference only and never runs iFizBox.
 ```sh
 tools/ui-7.sh lock N6                 # take the lock (fails, naming the holder, if someone else has it)
 tools/ui-7.sh N6 shot before          # screenshot -> ref/7/screens/before.png (750x1334)
-tools/ui-7.sh N6 open cydian://sources
+tools/ui-7.sh N6 open ifizbox://sources
 tools/ui-7.sh N6 tap 375 600          # screenshot pixels, portrait
 tools/ui-7.sh N6 swipe 375 2 375 900 0.4   # from the top edge: Notification Centre
 tools/ui-7.sh N6 home
 tools/ui-7.sh unlock N6               # always, also after a failure
 ```
 
-- `open` takes any URL. `cydian://<tab>` (home, sources, changes, installed, search, settings) opens iFizBox on
-  that tab, launched or already running (B14); the other `cydian://` links are listed in `web/app/incoming.js`.
+- `open` takes any URL. `ifizbox://<tab>` (home, sources, changes, installed, search, settings) opens iFizBox on
+  that tab, launched or already running (B14); the other `ifizbox://` links are listed in `web/app/incoming.js`.
 - Coordinates are screenshot pixels (750x1334; points x2), so read a spot off a screenshot and tap it.
 - From the top edge, `swipe 375 2 375 900 0.4` opens Notification Centre (checked 2026-11-18); `home` closes it.
 - **Control Centre doesn't open yet:** bottom-edge swipes (`375 1333 → 375 500`, 0.4 s and 0.8 s) do nothing.
@@ -70,17 +70,39 @@ phonectl size | sender | tap X Y | swipe X1 Y1 X2 Y2 [secs] | home | lock | shot
 ## Installing iFizBox on it
 
 ```sh
-native/build.sh deb                                 # -> native/build/Cydian.deb
-scp native/build/Cydian.deb 7:/tmp/
-ssh 7 'sudo -n apt-get install -y /tmp/Cydian.deb'  # apt resolves Depends; plain dpkg -i doesn't
-ssh 7 'launchctl list | grep com.ryha.cydian'       # the upgrades daemon
+native/build.sh deb                                  # -> native/build/iFizBox.deb (tools/check.sh builds it too)
+scp native/build/iFizBox.deb 7:/tmp/
+ssh 7 'sudo -n apt-get install -y /tmp/iFizBox.deb'  # apt resolves Depends; plain dpkg -i doesn't
+ssh 7 'launchctl list | grep com.ryha.ifizbox'       # the app and the upgrades daemon
 ```
 
 `sudo` needs no password (passwordless rule since 2026-11-18); scripts use `sudo -n` so they fail instead of
-hanging at a prompt if the rule is ever gone. Remove with `sudo apt-get remove -y com.ryha.cydian`.
+hanging at a prompt if the rule is ever gone. Remove with `sudo apt-get remove -y com.ryha.ifizbox`.
 
-iFizBox is installed on the phone: `com.ryha.cydian` 0.3.8-791 (checked 2026-11-18 with
-`ssh 7 dpkg-query -W com.ryha.cydian`). Check the version before assuming what a test runs.
+iFizBox is installed on the phone: `com.ryha.ifizbox` 0.9.2-1152, built from F171 (checked 2026-11-18 with
+`ssh 7 dpkg-query -W com.ryha.ifizbox`). Leave it installed: later tasks test iFizBox here. A build from before
+F171 has the old package ID, so it installs beside iFizBox instead of over it: don't install one on this phone; if
+one is there, remove it and its files as below. Check the version before assuming
+what a test runs. To reinstall a newer build, install the new .deb over it as above (`--allow-downgrades` if its version is lower).
+
+Where it lives (F171 renamed every path; the old-name package and all its files were removed from the phone):
+
+| | |
+|---|---|
+| App | `/var/jb/Applications/iFizBox.app` |
+| Root helper, upgrades daemon | `/var/jb/usr/libexec/ifizbox/ifizbox-helper`, `ifizbox-upgrades` |
+| launchd job | `/var/jb/Library/LaunchDaemons/com.ryha.ifizbox.upgrades.plist` |
+| Its APT sources | `/var/jb/etc/apt/sources.list.d/ifizbox.sources` |
+| State, caches | `/var/jb/var/lib/ifizbox/`, `/var/jb/var/cache/ifizbox/` |
+| WebView data | `/var/mobile/Library/WebKit/com.ryha.ifizbox` (localStorage, IndexedDB; made by postinst), `/var/mobile/Library/{Caches,HTTPStorages}/com.ryha.ifizbox`, `Cookies/com.ryha.ifizbox.binarycookies`, `Saved Application State/com.ryha.ifizbox.savedState` |
+
+A fully clean removal (what F171 did for the old package): `apt-get remove`, then delete the sources file, the
+state and cache folders and the WebView data above, the app's leftover containers (folders under
+`/var/mobile/Containers/{Data/Application,Shared/AppGroup,Data/PluginKitPlugin}/` whose
+`.com.apple.mobile_container_manager.metadata.plist` names the bundle ID), and run `uicache -a`.
+
+Until a release built after F171 is out, the newest GitHub release (v0.9.2) still ships the old package ID: if the
+app offers it as an update, don't install it on this phone.
 
 ## What's installed
 

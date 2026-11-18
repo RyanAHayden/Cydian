@@ -257,7 +257,7 @@ export async function addSourceAndInstall(r, { backend, catalog, showHUD: hud, s
 
 // ---- paid packages ---------------------------------------------------------------------------------------
 
-const native = () => globalThis.cydianNative?.call ? globalThis.cydianNative : null;
+const native = () => globalThis.ifizboxNative?.call ? globalThis.ifizboxNative : null;
 
 class NeedsShell extends Error {
   constructor(method) {

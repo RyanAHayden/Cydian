@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import w, { manifest, allowed, loopbackUrl, appOf } from "./src/index.js";
 const store = new Map();
-const env = { HOST_IDS: "*.cydian", TTL: "600", HOSTED: {
+const env = { HOST_IDS: "*.ifizbox", TTL: "600", HOSTED: {
   put: async (k, v, o) => store.set(k, { v, m: o.metadata }),
   get: async (k) => store.get(k)?.v ?? null,
   getWithMetadata: async (k) => ({ value: null, metadata: store.get(k)?.m ?? null }) } };
@@ -16,25 +16,25 @@ assert.match(t, /<string>A &amp; B<\/string>/);
 assert.equal((await go("/sign/manifest?bundleid=com.a&port=80&path=../../etc")).status, 200); // a path on the phone
 assert.equal((await go("/sign/manifest?bundleid=com.a&port=x&path=a")).status, 400);
 assert.equal(loopbackUrl(new URLSearchParams("port=1&path=a b")), null);
-assert.ok(allowed("com.ryha.cydian") && allowed("com.team.cydian") && !allowed("com.evil.app"));
+assert.ok(allowed("com.ryha.ifizbox") && allowed("com.team.ifizbox") && !allowed("com.evil.app"));
 assert.equal(appOf(new URLSearchParams("bundleid=a/b")), null);
 
 const ipa = new Uint8Array([0x50, 0x4b, 3, 4, 1, 2, 3, 4, 5, 6]);
 r = await go("/sign/host?bundleid=com.evil.app&version=1", { method: "POST", body: ipa, headers: { "Content-Length": "10" } });
 assert.equal(r.status, 403);
-r = await go("/sign/host?bundleid=com.ryha.cydian&version=0.3.2&title=iFizBox", { method: "POST", body: ipa, headers: { "Content-Length": "10" } });
+r = await go("/sign/host?bundleid=com.ryha.ifizbox&version=0.3.2&title=iFizBox", { method: "POST", body: ipa, headers: { "Content-Length": "10" } });
 const j = await r.json();
 assert.match(j.itms, /^itms-services:\/\/\?action=download-manifest&url=https%3A%2F%2Fsign\.example%2Fsign%2Fhost%2F[0-9a-f]{48}%2Fmanifest\.plist$/);
 t = await (await go(new URL(j.manifest).pathname)).text();
 assert.match(t, /\/app\.ipa<\/string>/);
-assert.match(t, /<string>com\.ryha\.cydian<\/string>/);
+assert.match(t, /<string>com\.ryha\.ifizbox<\/string>/);
 const ipaPath = new URL(j.manifest).pathname.replace("manifest.plist", "app.ipa");
 assert.deepEqual(new Uint8Array(await (await go(ipaPath)).arrayBuffer()), ipa);
 r = await go(ipaPath, { headers: { Range: "bytes=2-4" } });
 assert.equal(r.status, 206);
 assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [3, 4, 1]);
 assert.equal((await go("/sign/host/" + "0".repeat(48) + "/app.ipa")).status, 404);
-r = await go("/sign/host?bundleid=com.ryha.cydian&version=1", { method: "POST", body: new Uint8Array([1, 2]), headers: { "Content-Length": "2" } });
+r = await go("/sign/host?bundleid=com.ryha.ifizbox&version=1", { method: "POST", body: new Uint8Array([1, 2]), headers: { "Content-Length": "2" } });
 assert.equal(r.status, 400); // not a zip
 console.log("worker: ok");
 import { httpUrl } from "./src/index.js";
@@ -99,7 +99,7 @@ import { PART, uploadCap } from "./src/index.js";
 }
 {
   const { upstream, releaseFile } = await import("./src/index.js");
-  assert.ok(releaseFile("https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.6/Cydian.ipa"));
+  assert.ok(releaseFile("https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.6/iFizBox.ipa"));
   assert.equal(releaseFile("https://raw.githubusercontent.com/o/r/main/source.json"), false);
   const answers = [429, 503, 200];
   const seen = [];
@@ -141,7 +141,7 @@ import { account, MAX_ACCOUNT, rateLimiter, kvKey, bindingLimiter } from "./src/
     delete: async (k) => { kv.delete(k); } } };
   const id = "ab".repeat(32);
   const send = (method, { body, headers = {}, limit = rateLimiter({ rate: 1000, writes: 1000 }), path = `/api/account/${id}` } = {}) =>
-    account(new Request("https://cydian.example" + path, { method, body, headers }), aenv, { limit });
+    account(new Request("https://ifizbox.example" + path, { method, body, headers }), aenv, { limit });
   const blob = (n, fill = 7) => new Uint8Array(n).fill(fill);
 
   assert.equal((await send("GET")).status, 404);
@@ -173,7 +173,7 @@ import { account, MAX_ACCOUNT, rateLimiter, kvKey, bindingLimiter } from "./src/
   // the size cap: by the header, and by what really came
   assert.equal((await send("PUT", { body: blob(MAX_ACCOUNT + 1), headers: { "If-Match": '"2"' } })).status, 413);
   const big = new ReadableStream({ start(c) { c.enqueue(blob(MAX_ACCOUNT)); c.enqueue(blob(10)); c.close(); } });
-  r = await account(new Request(`https://cydian.example/api/account/${id}`, { method: "PUT", body: big, duplex: "half",
+  r = await account(new Request(`https://ifizbox.example/api/account/${id}`, { method: "PUT", body: big, duplex: "half",
     headers: { "If-Match": '"2"' } }), aenv, { limit: rateLimiter({ rate: 9, writes: 9 }) });
   assert.equal(r.status, 413);
   assert.equal((await send("PUT", { body: blob(MAX_ACCOUNT), headers: { "If-Match": '"2"' } })).status, 200);
@@ -194,7 +194,7 @@ import { account, MAX_ACCOUNT, rateLimiter, kvKey, bindingLimiter } from "./src/
     const k = used.get(key) ?? 0; used.set(key, k + 1); return { success: k < n }; } }; };
   const all = fakeRL(3), wr = fakeRL(1); // the refused write still took one from all
   const benv = { ...aenv, ACCOUNT_RATE_LIMIT: all, ACCOUNT_WRITE_LIMIT: wr };
-  const bsend = (method, opts = {}) => account(new Request(`https://cydian.example/api/account/${id}`, { method, ...opts }), benv);
+  const bsend = (method, opts = {}) => account(new Request(`https://ifizbox.example/api/account/${id}`, { method, ...opts }), benv);
   assert.equal((await bsend("DELETE")).status, 200);
   assert.equal((await bsend("DELETE")).status, 429, "writes run out first");
   assert.equal((await bsend("GET")).status, 404);
@@ -209,12 +209,12 @@ import { account, MAX_ACCOUNT, rateLimiter, kvKey, bindingLimiter } from "./src/
   const fb = rateLimiter({ rate: 1, writes: 1 });
   assert.equal(await bindingLimiter(broken, null, fb).allow("x", false), true);
   assert.equal(await bindingLimiter(broken, null, fb).allow("x", false), false);
-  assert.equal((await account(new Request(`https://cydian.example/api/account/${id}`), { ...aenv, ACCOUNT_RATE_LIMIT: broken })).status, 404);
-  // through the Worker: the route, and CORS for the app's cydian://app page
-  const pre = await w.fetch(new Request(`https://cydian.example/api/account/${id}`, { method: "OPTIONS" }), aenv);
+  assert.equal((await account(new Request(`https://ifizbox.example/api/account/${id}`), { ...aenv, ACCOUNT_RATE_LIMIT: broken })).status, 404);
+  // through the Worker: the route, and CORS for the app's ifizbox://app page
+  const pre = await w.fetch(new Request(`https://ifizbox.example/api/account/${id}`, { method: "OPTIONS" }), aenv);
   assert.match(pre.headers.get("Access-Control-Allow-Methods"), /PUT/);
   assert.match(pre.headers.get("Access-Control-Allow-Headers"), /If-Match/);
-  assert.equal((await w.fetch(new Request(`https://cydian.example/api/account/${id}`), aenv)).headers.get("Access-Control-Expose-Headers"), "ETag");
+  assert.equal((await w.fetch(new Request(`https://ifizbox.example/api/account/${id}`), aenv)).headers.get("Access-Control-Expose-Headers"), "ETag");
   console.log("worker account: ok");
 }
 
@@ -232,17 +232,17 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   // iOS asks for the manifest before the reservation lands: it waits, then answers with the reserved app
   const early = at(`/sign/up/${tok}/manifest.plist`);
   await new Promise((r) => setTimeout(r, 5));
-  let r = await at(`/sign/upload?bundleid=com.ryha.cydian&version=0.4&title=iFizBox&token=${tok}`, { method: "POST" });
+  let r = await at(`/sign/upload?bundleid=com.ryha.ifizbox&version=0.4&title=iFizBox&token=${tok}`, { method: "POST" });
   assert.deepEqual(await r.json(), { token: tok, reserved: true, expiresIn: 600 });
   r = await early;
   assert.equal(r.status, 200);
-  assert.match(await r.text(), new RegExp(`<string>com\\.ryha\\.cydian</string>[\\s\\S]*/sign/up/${tok}/app\\.ipa|/sign/up/${tok}/app\\.ipa[\\s\\S]*<string>com\\.ryha\\.cydian</string>`));
+  assert.match(await r.text(), new RegExp(`<string>com\\.ryha\\.ifizbox</string>[\\s\\S]*/sign/up/${tok}/app\\.ipa|/sign/up/${tok}/app\\.ipa[\\s\\S]*<string>com\\.ryha\\.ifizbox</string>`));
   // a reserved token can't be taken for another app, nor its parts sent before its size
   assert.equal((await at(`/sign/upload?bundleid=com.other&size=6&token=${tok}`, { method: "POST" })).status, 409);
   assert.equal((await at(`/sign/upload/${tok}/0`, { method: "PUT", body: app })).status, 409);
   // app.ipa holds while the website signs; its headers come once the upload starts, its body once it's done
   const held = at(`/sign/up/${tok}/app.ipa`);
-  r = await at(`/sign/upload?bundleid=com.ryha.cydian&version=0.4&title=iFizBox&token=${tok}&size=${app.length}`, { method: "POST" });
+  r = await at(`/sign/upload?bundleid=com.ryha.ifizbox&version=0.4&title=iFizBox&token=${tok}&size=${app.length}`, { method: "POST" });
   assert.equal((await r.json()).parts, 1);
   r = await held;
   assert.equal(r.status, 200);
@@ -260,7 +260,7 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   assert.equal(r.status, 206);
   assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [9, 8]);
   // started once: the token is taken now
-  assert.equal((await at(`/sign/upload?bundleid=com.ryha.cydian&size=6&token=${tok}`, { method: "POST" })).status, 409);
+  assert.equal((await at(`/sign/upload?bundleid=com.ryha.ifizbox&size=6&token=${tok}`, { method: "POST" })).status, 409);
   // the link's own query: the manifest answers at once, before any reservation
   const t3 = "ef".repeat(24), t3s = Date.now();
   r = await go(`/sign/up/${t3}/manifest.plist?bundleid=com.you.delta&version=1.2&title=Delta`);
@@ -290,7 +290,7 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   const { repo, repoFile } = await import("./src/index.js");
   assert.deepEqual(repoFile("/repo/Release"), { name: "Release", type: "text/plain; charset=utf-8" });
   assert.equal(repoFile("/repo/Packages.gz").type, "application/gzip");
-  assert.equal(repoFile("/repo/com.ryha.cydian_0.3.0-12_iphoneos-arm64.deb").name, "com.ryha.cydian_0.3.0-12_iphoneos-arm64.deb");
+  assert.equal(repoFile("/repo/com.ryha.ifizbox_0.3.0-12_iphoneos-arm64.deb").name, "com.ryha.ifizbox_0.3.0-12_iphoneos-arm64.deb");
   for (const bad of ["/repo/InRelease", "/repo/Packages.xz", "/repo/..%2Fx.deb", "/repo/a/b.deb", "/repo/.deb", "/repo/%E0.deb"]) assert.equal(repoFile(bad), null, bad);
   const seen = [];
   const fetcher = async (url, o = {}) => {
@@ -300,7 +300,7 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
     if (url.endsWith("/Packages.gz")) return new Response(new Uint8Array([0x1f, 0x8b, 8]));
     return new Response("no", { status: 404 });
   };
-  const at = (path, init) => { const req = new Request("https://cydian.example" + path, init); return repo(req, new URL(req.url), {}, { fetcher, wait: async () => {} }); };
+  const at = (path, init) => { const req = new Request("https://ifizbox.example" + path, init); return repo(req, new URL(req.url), {}, { fetcher, wait: async () => {} }); };
   let r = await at("/repo/Release");
   assert.equal(r.status, 200);
   assert.equal(await r.text(), "Origin: iFizBox\n");
@@ -319,15 +319,15 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   assert.equal(seen.length, n);
   assert.equal((await at("/repo")).status, 301);
   assert.equal((await at("/repo/")).status, 200);
-  const other = new Request("https://cydian.example/repo/Release");
-  await repo(other, new URL(other.url), { CYDIAN_REPO: "me/fork" }, { fetcher, wait: async () => {} });
+  const other = new Request("https://ifizbox.example/repo/Release");
+  await repo(other, new URL(other.url), { IFIZBOX_REPO: "me/fork" }, { fetcher, wait: async () => {} });
   assert.equal(seen.pop(), "https://github.com/me/fork/releases/latest/download/Release");
   // upstream answers 503 three times: a 502 here, not GitHub's page
-  const down = new Request("https://cydian.example/repo/Release");
+  const down = new Request("https://ifizbox.example/repo/Release");
   r = await repo(down, new URL(down.url), {}, { fetcher: async () => new Response("x", { status: 503 }), wait: async () => {} });
   assert.equal(r.status, 502);
   // the Worker routes /repo/ before the website's assets
-  const site = await w.fetch(new Request("https://cydian.example/repo/InRelease"), { ...env, ASSETS: { fetch: async () => new Response("asset") } });
+  const site = await w.fetch(new Request("https://ifizbox.example/repo/InRelease"), { ...env, ASSETS: { fetch: async () => new Response("asset") } });
   assert.equal(site.status, 404);
   console.log("worker repo: ok");
 }
@@ -345,7 +345,7 @@ import { appLookup } from "./src/index.js";
   const fetcher = async (url, o) => { asked.push({ url, ttl: o.cf.cacheTtl }); return new Response(JSON.stringify(FIXTURE), { headers: { "Content-Type": "text/javascript" } }); };
   const kept = new Map();
   const cache = { match: async (k) => kept.get(k.url)?.clone(), put: async (k, r) => { kept.set(k.url, r); } };
-  const at = (q, f = fetcher) => appLookup(new URL("https://cydian.example/api/applookup?" + q), {}, { fetcher: f, cache });
+  const at = (q, f = fetcher) => appLookup(new URL("https://ifizbox.example/api/applookup?" + q), {}, { fetcher: f, cache });
   let r = await at("bundleId=com.example.flight&country=GB");
   assert.equal(r.status, 200);
   assert.match(r.headers.get("Cache-Control"), /max-age=86400/);
@@ -367,7 +367,7 @@ import { appLookup } from "./src/index.js";
   assert.equal((await at("bundleId=com.gone", async () => { throw new Error("offline"); })).status, 502);
   assert.equal((await at("bundleId=com.down")).status, 200); // a failure isn't cached
   // through the router, with node.mjs's kind of cache in env
-  const routed = await w.fetch(new Request("https://cydian.example/api/applookup?bundleId=a/b"), { LOOKUP_CACHE: cache });
+  const routed = await w.fetch(new Request("https://ifizbox.example/api/applookup?bundleId=a/b"), { LOOKUP_CACHE: cache });
   assert.equal(routed.status, 400);
   console.log("worker applookup: ok");
 }
@@ -436,7 +436,7 @@ import { plistInfo } from "./src/ipainfo.js";
   files["/full.ipa"] = plain;
   const kept = new Map();
   const cache = { match: async (k) => kept.get(k.url)?.clone(), put: async (k, r) => { kept.set(k.url, r); } };
-  const at = (url, f = fetcher) => ipaInfo(new URL("https://cydian.example/api/ipainfo?" + new URLSearchParams({ url })), {}, { fetcher: f, cache });
+  const at = (url, f = fetcher) => ipaInfo(new URL("https://ifizbox.example/api/ipainfo?" + new URLSearchParams({ url })), {}, { fetcher: f, cache });
   let r = await at("https://dl.example/plain.ipa");
   assert.equal(r.status, 200);
   assert.match(r.headers.get("Cache-Control"), /max-age=2592000/);
@@ -457,11 +457,11 @@ import { plistInfo } from "./src/ipainfo.js";
   assert.deepEqual(await code("https://dl.example/gone.ipa"), [422, "not_found"]);
   assert.deepEqual(await code("https://dl.example/down.ipa"), [502, "upstream"]);
   assert.deepEqual(await code("https://dl.example/off.ipa", async () => { throw new Error("offline"); }), [502, "upstream"]);
-  assert.ok(kept.has(`https://ipainfo.cydian.internal/?${new URLSearchParams({ url: "https://dl.example/full.ipa" })}`), "a lasting error is cached");
-  assert.ok(!kept.has(`https://ipainfo.cydian.internal/?${new URLSearchParams({ url: "https://dl.example/down.ipa" })}`), "a network error isn't");
+  assert.ok(kept.has(`https://ipainfo.ifizbox.internal/?${new URLSearchParams({ url: "https://dl.example/full.ipa" })}`), "a lasting error is cached");
+  assert.ok(!kept.has(`https://ipainfo.ifizbox.internal/?${new URLSearchParams({ url: "https://dl.example/down.ipa" })}`), "a network error isn't");
   assert.equal((await at("ftp://dl.example/a.ipa")).status, 400);
   assert.equal((await at("https://user:pw@dl.example/a.ipa")).status, 400);
-  const routed = await w.fetch(new Request("https://cydian.example/api/ipainfo?url=nope"), { LOOKUP_CACHE: cache });
+  const routed = await w.fetch(new Request("https://ifizbox.example/api/ipainfo?url=nope"), { LOOKUP_CACHE: cache });
   assert.equal(routed.status, 400);
   console.log("worker ipainfo: ok");
 }
@@ -479,7 +479,7 @@ import { d1 } from "./src/d1-sqlite.js";
     if (token) headers["X-Review-Token"] = token;
     if (auth) headers.Authorization = auth;
     if (body !== undefined) headers["Content-Type"] = "application/json";
-    return reviewsRoute(new Request("https://cydian.example" + path, { method, headers, body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body) }), e, now ? { now } : {});
+    return reviewsRoute(new Request("https://ifizbox.example" + path, { method, headers, body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body) }), e, now ? { now } : {});
   };
   // caps and cleaning
   assert.equal(parseReview({ stars: 0 }).ok, false);
@@ -588,9 +588,9 @@ import { d1 } from "./src/d1-sqlite.js";
   j = await (await call("/reviews/com.example.velvet", { env: {} })).json();
   assert.equal(j.enabled, false);
   assert.equal((await call("/reviews/com.example.velvet", { method: "POST", token: tok("a"), body: { stars: 5 }, env: {} })).status, 503);
-  r = await w.fetch(new Request("https://cydian.example/reviews/com.example.velvet"), renv);
+  r = await w.fetch(new Request("https://ifizbox.example/reviews/com.example.velvet"), renv);
   assert.equal((await r.json()).count, 1);
-  r = await w.fetch(new Request("https://cydian.example/reviews/com.example.velvet", { method: "OPTIONS" }), renv);
+  r = await w.fetch(new Request("https://ifizbox.example/reviews/com.example.velvet", { method: "OPTIONS" }), renv);
   assert.match(r.headers.get("Access-Control-Allow-Headers"), /X-Review-Token/);
   console.log("worker reviews: ok");
 }
@@ -604,12 +604,12 @@ import { d1 } from "./src/d1-sqlite.js";
   const tok = "f1".repeat(24), app = new Uint8Array([0x50, 0x4b, 1, 2, 3, 4]);
   assert.deepEqual(await status(tok), { manifest: false, started: false, finished: false });
   // the early link: iOS asks for the manifest (from its query) before anything is reserved
-  let r = await at(`/sign/up/${tok}/manifest.plist?bundleid=com.you.cydian&version=1&title=iFizBox`);
+  let r = await at(`/sign/up/${tok}/manifest.plist?bundleid=com.you.ifizbox&version=1&title=iFizBox`);
   assert.equal(r.status, 200);
   assert.deepEqual(await status(tok), { manifest: true, started: false, finished: false });
-  await at(`/sign/up/${tok}/manifest.plist?bundleid=com.you.cydian&version=1&title=iFizBox`); // asked again: no write
-  await at(`/sign/upload?bundleid=com.you.cydian&version=1&title=iFizBox&token=${tok}`, { method: "POST" });
-  await at(`/sign/upload?bundleid=com.you.cydian&version=1&title=iFizBox&token=${tok}&size=${app.length}`, { method: "POST" });
+  await at(`/sign/up/${tok}/manifest.plist?bundleid=com.you.ifizbox&version=1&title=iFizBox`); // asked again: no write
+  await at(`/sign/upload?bundleid=com.you.ifizbox&version=1&title=iFizBox&token=${tok}`, { method: "POST" });
+  await at(`/sign/upload?bundleid=com.you.ifizbox&version=1&title=iFizBox&token=${tok}&size=${app.length}`, { method: "POST" });
   // the reservation and size writes leave iOS's mark alone; HEAD is no download
   assert.equal((await at(`/sign/up/${tok}/app.ipa`, { method: "HEAD" })).status, 200);
   assert.deepEqual(await status(tok), { manifest: true, started: false, finished: false });

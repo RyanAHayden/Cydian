@@ -4,7 +4,7 @@
 #   tools/ios-sdk.sh Xcode_27.1.xip [DEST]   extract the SDK to DEST and fix its .tbd stubs
 #   tools/ios-sdk.sh fix-tbd SDK             fix the .tbd stubs of an SDK that is already extracted
 #
-# DEST defaults to ${XDG_DATA_HOME:-~/.local/share}/cydian/iPhoneOS.sdk. The native build finds the SDK only through
+# DEST defaults to ${XDG_DATA_HOME:-~/.local/share}/ifizbox/iPhoneOS.sdk. The native build finds the SDK only through
 # $IOS_SDK; the script prints the line to set it. Get the .xip from https://developer.apple.com/download/all/
 # (an Apple ID is enough; take the Xcode whose Swift matches the swift.org toolchain, see docs/native.md).
 #
@@ -28,7 +28,7 @@ if [ "$1" = fix-tbd ]; then
   mode=fix src=$2 dest=$2
 else
   [ $# -le 2 ] && [ -f "$1" ] || { echo "ios-sdk.sh: no such .xip: $1" >&2; usage; }
-  mode=extract src=$1 dest=${2:-${XDG_DATA_HOME:-$HOME/.local/share}/cydian/iPhoneOS.sdk}
+  mode=extract src=$1 dest=${2:-${XDG_DATA_HOME:-$HOME/.local/share}/ifizbox/iPhoneOS.sdk}
 fi
 
 exec python3 -I -c '

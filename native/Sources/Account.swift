@@ -16,7 +16,7 @@ import Foundation
 import Security
 
 enum AccountKey {
-    static let service = "com.ryha.cydian.account"
+    static let service = "com.ryha.ifizbox.account"
     static let account = "key"
 
     static func register(_ b: Bridge) {
@@ -63,7 +63,7 @@ enum AccountKey {
 }
 
 enum ReviewToken {
-    static let service = "com.ryha.cydian.reviews"
+    static let service = "com.ryha.ifizbox.reviews"
     static let account = "token"
 
     static func register(_ b: Bridge) {

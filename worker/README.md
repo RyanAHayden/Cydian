@@ -35,12 +35,12 @@ memory.
 git clone https://github.com/RyanAHayden/iFizBox && cd iFizBox
 node worker/node.mjs                       # http://0.0.0.0:8787 (PORT, HOST, HOST_IDS, TTL as below)
 # or Docker:
-docker build -f worker/Dockerfile -t cydian . && docker run -d --restart unless-stopped -p 8787:8787 -v cydian-data:/data cydian
+docker build -f worker/Dockerfile -t ifizbox . && docker run -d --restart unless-stopped -p 8787:8787 -v ifizbox-data:/data ifizbox
 ```
 
 **Reviews** (`/reviews/*`) are kept in a SQLite file through Node's built-in `node:sqlite` (Node 22.5+, nothing to
 install): `reviews.db` in the folder you start it from, or `REVIEWS_DB=/path/to/reviews.db` (`REVIEWS_DB=off` keeps
-none). The Docker image keeps it at `/data/reviews.db`: the `-v cydian-data:/data` volume above keeps it across
+none). The Docker image keeps it at `/data/reviews.db`: the `-v ifizbox-data:/data` volume above keeps it across
 updates. `REVIEWS_ADMIN=<a long secret>` lets you delete a review (`DELETE /reviews/<package>/<id>` with
 `Authorization: Bearer <secret>`); `REVIEWS_SALT` salts the stored token and address hashes, `REVIEW_DAILY` caps
 writes per address a day (40) and `REPORT_HIDE` is the reports that hide a review (3), as on the Worker.
@@ -54,7 +54,7 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 
 ### Settings (`wrangler.toml`)
 
-- `HOST_IDS`: the bundle IDs it holds updates for. `*.cydian` (any ID ending in `.cydian`) covers iFizBox signed
+- `HOST_IDS`: the bundle IDs it holds updates for. `*.ifizbox` (any ID ending in `.ifizbox`) covers iFizBox signed
   with any team's profile. Use `*` to hold any app.
 - `TTL`: seconds a held update stays (600), and an app the website signed in the browser.
 - `MAX_UPLOAD_MB`: the largest IPA the website signs in the browser (512): it downloads through `/api/fetch?kind=ipa`
@@ -72,7 +72,7 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 | `GET /sign/manifest?bundleid=&version=&title=&port=&path=` | the manifest for `http://127.0.0.1:<port>/<path>` |
 | `POST /sign/host?bundleid=&version=&title=` (body: the IPA) | `{itms, manifest, expiresIn}` |
 | `GET /sign/host/<token>/manifest.plist`, `/app.ipa` | what that link fetches |
-| `GET /repo/<file>` | iFizBox's own APT repo (`Release`, `Packages`, `Packages.gz`, `*.deb`): the latest GitHub release's asset, fetched here so clients get no redirect (Zebra can't take GitHub's). `CYDIAN_REPO` (owner/name) for another repo's releases |
+| `GET /repo/<file>` | iFizBox's own APT repo (`Release`, `Packages`, `Packages.gz`, `*.deb`): the latest GitHub release's asset, fetched here so clients get no redirect (Zebra can't take GitHub's). `IFIZBOX_REPO` (owner/name) for another repo's releases |
 
 `node test.mjs` checks them against an in-memory KV. cydian.dev's own deploy: `npx wrangler deploy -c wrangler.ifizbox.toml`.
 

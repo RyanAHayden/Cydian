@@ -15,7 +15,7 @@ const plist = (values) => `<?xml version="1.0" encoding="UTF-8"?>\n<plist versio
   Object.entries(values).map(([k, v]) => `\t<key>${k}</key>\n\t<string>${v}</string>\n`).join("")}</dict>\n</plist>\n`;
 
 function containers(t) {
-  const dir = mkdtempSync(join(tmpdir(), "cydian-apps-"));
+  const dir = mkdtempSync(join(tmpdir(), "ifizbox-apps-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const app = (uuid, name, info, meta) => {
     mkdirSync(join(dir, uuid, name), { recursive: true });
@@ -32,20 +32,20 @@ function containers(t) {
 function setup(t, { mode = "jailbreak", helper, apps } = {}) {
   const fx = makeFixture();
   t.after(fx.cleanup);
-  const env = apps ? { CYDIAN_APPS_DIR: apps } : {};
+  const env = apps ? { IFIZBOX_APPS_DIR: apps } : {};
   const native = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: null, env, ...(helper ? { helper } : {}) });
   const backend = createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB(), mode, queue: createQueue() } });
   return { native, backend };
 }
 
 const records = [
-  { id: "com.ryha.cydian", name: "iFizBox", version: "0.2.8", self: true },
+  { id: "com.ryha.ifizbox", name: "iFizBox", version: "0.2.8", self: true },
   { id: "com.rileytestut.Delta", name: "Delta", version: "1.5", key: "altstore:x" }, // updated outside iFizBox
   { id: "com.utmapp.UTM", name: "UTM", version: "4.5.2" }, // as remembered
   { id: "com.example.gone", name: "Gone", version: "2.0" }, // deleted from the Home Screen
 ];
 
-test("appVersions: every app in the containers, through cydian-helper app-versions", async (t) => {
+test("appVersions: every app in the containers, through ifizbox-helper app-versions", async (t) => {
   const { backend, native } = setup(t, { apps: containers(t) });
   const list = await backend.appVersions();
   assert.deepEqual(native.calls.at(-1).params.words, ["app-versions"]);
@@ -80,7 +80,7 @@ test("no containers folder: nothing installed, every remembered app says so", as
 });
 
 test("no helper keeps the remembered versions; the sideload build has no app-versions at all", async (t) => {
-  const { backend } = setup(t, { helper: "/nonexistent/cydian-helper", apps: containers(t) });
+  const { backend } = setup(t, { helper: "/nonexistent/ifizbox-helper", apps: containers(t) });
   assert.equal(await backend.appVersions(), null);
   assert.deepEqual(await backend.installedApps(records), records);
   const side = setup(t, { mode: "sideload" }).backend;

@@ -111,10 +111,10 @@ test("signInBrowser hands the early link's token to the watcher after uploading 
     return json({ ok: true });
   };
   let watched = null;
-  const ok = await signInBrowser({ url: "https://github.com/RyanAHayden/iFizBox/releases/latest/download/Cydian.ipa", name: "iFizBox" }, {
+  const ok = await signInBrowser({ url: "https://github.com/RyanAHayden/iFizBox/releases/latest/download/iFizBox.ipa", name: "iFizBox" }, {
     hud: () => ({ set() {}, hide() {}, done() {} }), alert: async () => ({ index: 0 }), open: () => {}, go: () => {},
     now: () => id, identity: async () => id, fetcher, transfer: async () => null, origin: () => "https://x.example",
-    worker: async () => ({ ok: true, ipa: new Uint8Array([0x50, 0x4b, 1]), bundleId: "com.you.cydian", name: "iFizBox", version: "1" }),
+    worker: async () => ({ ok: true, ipa: new Uint8Array([0x50, 0x4b, 1]), bundleId: "com.you.ifizbox", name: "iFizBox", version: "1" }),
     watch: (token, h, o) => { watched = { token, o }; return { first: Promise.resolve(), end: Promise.resolve("installed") }; },
   });
   assert.equal(ok, true);

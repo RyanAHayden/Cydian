@@ -4,7 +4,7 @@
 #   tools/ui-7.sh lock ME           take the lock (fails, naming the holder, if someone else has it)
 #   tools/ui-7.sh ME tap X Y        tap at screenshot pixels (750x1334 portrait)
 #   tools/ui-7.sh ME swipe X1 Y1 X2 Y2 [secs]
-#   tools/ui-7.sh ME open URL       uiopen, e.g. cydian://sources
+#   tools/ui-7.sh ME open URL       uiopen, e.g. ifizbox://sources
 #   tools/ui-7.sh ME home           Home button
 #   tools/ui-7.sh ME lock-button    side button (locks or wakes the screen)
 #   tools/ui-7.sh ME shot NAME      screenshot -> ref/7/screens/NAME.png (nothing kept on the phone)
@@ -12,8 +12,8 @@
 # ME is your task ID. A lock unused for 30 minutes is stale and can be taken over.
 # Taps, swipes and buttons come from phonectl on the phone (tools/phonectl/, installed setuid in /var/jb/usr/local/bin).
 set -eu
-lock=${XDG_RUNTIME_DIR:-/tmp}/cydian-7-ui.lock  # outside the repo: shared by every worktree on this machine
-host=${CYDIAN_7_HOST:-7}
+lock=${XDG_RUNTIME_DIR:-/tmp}/ifizbox-7-ui.lock  # outside the repo: shared by every worktree on this machine
+host=${IFIZBOX_7_HOST:-7}
 stale=30
 pc=/var/jb/usr/local/bin/phonectl
 

@@ -29,9 +29,9 @@ class SelfRepo(unittest.TestCase):
         os.makedirs(os.path.join(root, "var/jb"))
         os.makedirs(debian)
         with open(os.path.join(debian, "control"), "w") as f:
-            f.write("Package: com.ryha.cydian\nVersion: 0.3.8-1\nArchitecture: iphoneos-arm64\n"
+            f.write("Package: com.ryha.ifizbox\nVersion: 0.3.8-1\nArchitecture: iphoneos-arm64\n"
                     "Maintainer: x\nDescription: test\n")
-        self.deb = os.path.join(self.tmp, "com.ryha.cydian_0.3.8-1_iphoneos-arm64.deb")
+        self.deb = os.path.join(self.tmp, "com.ryha.ifizbox_0.3.8-1_iphoneos-arm64.deb")
         mkdeb.build(root, debian, self.deb, mtime=0)
 
     def tearDown(self):
@@ -56,7 +56,7 @@ class SelfRepo(unittest.TestCase):
         with open(os.path.join(out, "Packages"), "rb") as fh:
             packages = fh.read()
         self.assertIn(" %s %d Packages\n" % (hashlib.sha256(packages).hexdigest(), len(packages)), text)
-        self.assertIn(b"Filename: com.ryha.cydian_0.3.8-1_iphoneos-arm64.deb\n", packages)
+        self.assertIn(b"Filename: com.ryha.ifizbox_0.3.8-1_iphoneos-arm64.deb\n", packages)
 
 
 if __name__ == "__main__":

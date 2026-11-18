@@ -8,13 +8,13 @@
 
 extern "C" {
 
-EMSCRIPTEN_KEEPALIVE int cydian_unzip(const char* zip, const char* dir)
+EMSCRIPTEN_KEEPALIVE int ifizbox_unzip(const char* zip, const char* dir)
 {
 	return Zip::Extract(zip, dir) ? 0 : 1;
 }
 
 // The plist at `path` as JSON text, or "" when it doesn't read. The buffer lives until the next call.
-EMSCRIPTEN_KEEPALIVE const char* cydian_plist_json(const char* path)
+EMSCRIPTEN_KEEPALIVE const char* ifizbox_plist_json(const char* path)
 {
 	static string out;
 	out.clear();

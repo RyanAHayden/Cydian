@@ -13,7 +13,7 @@ routes = [
 ]
 
 [vars]
-HOST_IDS = "*.cydian"   # bundle IDs /sign/host keeps: any ending in .cydian (each team's own iFizBox ID)
+HOST_IDS = "*.ifizbox"   # bundle IDs /sign/host keeps: any ending in .ifizbox (each team's own iFizBox ID)
 TTL = "600"              # seconds a hosted update (or a website-signed app) stays
 MAX_UPLOAD_MB = "512"    # largest IPA the website signs in the browser (/api/fetch?kind=ipa, /sign/upload); "0": none
 
@@ -36,12 +36,12 @@ namespace_id = "9802"
 simple = { limit = 12, period = 60 }
 
 # F182/F185: user reviews (src/reviews.js) in D1. No database_id: Wrangler makes the database on the first deploy
-# (or: `npx wrangler d1 create cydian-reviews`, and its database_id here); the Worker makes its tables itself.
+# (or: `npx wrangler d1 create ifizbox-reviews`, and its database_id here); the Worker makes its tables itself.
 # A person sets the secrets: `npx wrangler secret put REVIEWS_ADMIN -c wrangler.ifizbox.toml` (owner-only delete),
 # optionally REVIEWS_SALT (salts the stored token and address hashes).
 [[d1_databases]]
 binding = "REVIEWS"
-database_name = "cydian-reviews"
+database_name = "ifizbox-reviews"
 
 # F182: review writes (posts, reports) per address across isolates; keep limit at REVIEW_WRITES.
 [[ratelimits]]

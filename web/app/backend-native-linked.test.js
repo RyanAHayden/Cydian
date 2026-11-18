@@ -1,7 +1,7 @@
 // F131: a package whose Filename is a full URL (ios.jjolano.me's https://github.com/.../hookkit-rootless.deb). The
-// native backend downloads it through the shell (share.debFetch) and hands it to cydian-helper simulate-deb /
+// native backend downloads it through the shell (share.debFetch) and hands it to ifizbox-helper simulate-deb /
 // install-deb, beside apt's simulate / apply for the rest of the queue. The shell's share.* calls are stood in for
-// here over the fake helper (native/fake/cydian-helper), as ShareBridge.swift runs the real one.
+// here over the fake helper (native/fake/ifizbox-helper), as ShareBridge.swift runs the real one.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -16,7 +16,7 @@ import { fakeIndexedDB } from "../../native/fake/fake-indexeddb.mjs";
 const URL_DEB = "https://github.com/example/hookkit/releases/download/1.0/hookkit-rootless.deb";
 const DEB = "!<arch>\nPackage: com.example.linked\nVersion: 1.0\nArchitecture: iphoneos-arm64\nDepends: bash\nName: Linked\n";
 
-// `served`: URL -> the "deb" share.debFetch downloads (a fake .deb: a control stanza, native/fake/cydian-helper).
+// `served`: URL -> the "deb" share.debFetch downloads (a fake .deb: a control stanza, native/fake/ifizbox-helper).
 function setup(t, { served = { [URL_DEB]: DEB }, env = {} } = {}) {
   const fx = makeFixture();
   t.after(fx.cleanup);
@@ -24,7 +24,7 @@ function setup(t, { served = { [URL_DEB]: DEB }, env = {} } = {}) {
   for (const f of readdirSync(join(fx.remote, "lists"))) copyFileSync(join(fx.remote, "lists", f), join(lists, f));
   const debDir = join(fx.dir, "deb-cache");
   mkdirSync(debDir);
-  const fake = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: null, env: { CYDIAN_DEB_DIR: debDir, ...env } });
+  const fake = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: null, env: { IFIZBOX_DEB_DIR: debDir, ...env } });
   let n = 0;
   const share = {
     "share.debFetch"({ url, sha256, md5 }) {

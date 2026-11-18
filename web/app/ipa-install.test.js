@@ -129,7 +129,7 @@ test("the console run: no_adhoc ends in red with what to install", async (t) => 
   assert.ok(errors.some((l) => /AppSync Unified isn.t installed and there.s no ldid/.test(l)), errors.join("\n"));
   const warnings = v.lines.filter(([type]) => type === "warning").map(([, text]) => text);
   assert.deepEqual(warnings, NO_ADHOC_HELP);
-  assert.match(r.log, /E: (cydian-helper: )?AppSync Unified isn.t installed/);
+  assert.match(r.log, /E: (ifizbox-helper: )?AppSync Unified isn.t installed/);
 });
 
 test("the console run: other errors are one red line with the reason", async (t) => {
@@ -155,7 +155,7 @@ test("the console run: one line per status, and the helper's own error line isn'
   const v = fakeView();
   const native = { async call(m, p, on) {
     for (const pct of [10, 50, 90]) on({ fd: "status", line: `pmstatus:com.example.demo:${pct}:Installing` });
-    on({ fd: "err", line: "cydian-helper: installd refused the ad hoc signed app" });
+    on({ fd: "err", line: "ifizbox-helper: installd refused the ad hoc signed app" });
     throw new Error("no_adhoc: installd refused the ad hoc signed app");
   } };
   const r = await runIpaInstall({ url: URL_ }, v, { native });

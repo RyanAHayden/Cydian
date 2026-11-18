@@ -15,8 +15,8 @@ enum SignStore {
         return d
     }()
     static var profileURL: URL { dir.appendingPathComponent("profile.mobileprovision") }
-    static let certKey = "cydian.signing.certSHA256"
-    static let label = "Cydian signing identity"
+    static let certKey = "ifizbox.signing.certSHA256"
+    static let label = "\(Brand.name) signing identity"
 
     // ---- the user's identity
 
@@ -87,7 +87,7 @@ enum SignStore {
 
     // ---- F73: the .p12 as imported, for signing.export
 
-    static let p12Service = "com.ryha.cydian.signing.p12"
+    static let p12Service = "com.ryha.ifizbox.signing.p12"
     static let p12Account = "identity"
     static var p12Query: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: p12Service,
@@ -103,7 +103,7 @@ enum SignStore {
         var add = p12Query
         add[kSecValueData as String] = blob
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        add[kSecAttrLabel as String] = "Cydian signing .p12"
+        add[kSecAttrLabel as String] = "\(Brand.name) signing .p12"
         let st = SecItemAdd(add as CFDictionary, nil)
         guard st == errSecSuccess else { throw SignError("keychain", "The Keychain refused the .p12 (\(st)).") }
     }
@@ -137,16 +137,16 @@ enum SignStore {
     static func removeOldInstallCA() {
         let ca = dir.appendingPathComponent("localca.der"), leaf = dir.appendingPathComponent("localtls.der")
         guard FileManager.default.fileExists(atPath: ca.path) || FileManager.default.fileExists(atPath: leaf.path) else { return }
-        deleteKey(tag: "com.ryha.cydian.localca")
-        deleteKey(tag: "com.ryha.cydian.localtls")
-        SecItemDelete([kSecClass as String: kSecClassCertificate, kSecAttrLabel as String: "Cydian local install TLS"] as CFDictionary)
+        deleteKey(tag: "com.ryha.ifizbox.localca")
+        deleteKey(tag: "com.ryha.ifizbox.localtls")
+        SecItemDelete([kSecClass as String: kSecClassCertificate, kSecAttrLabel as String: "\(Brand.name) local install TLS"] as CFDictionary)
         try? FileManager.default.removeItem(at: ca)
         try? FileManager.default.removeItem(at: leaf)
     }
 }
 
 // The Keychain identity as the signer sees it: the key signs inside Security.framework, the certificates go into
-// the CMS with Apple's WWDR intermediate and root (bundled in Cydian.app/certs/, public certificates from
+// the CMS with Apple's WWDR intermediate and root (bundled in iFizBox.app/certs/, public certificates from
 // apple.com/certificateauthority) so iOS can build the chain.
 struct KeychainIdentity: SigningIdentity {
     let key: SecKey

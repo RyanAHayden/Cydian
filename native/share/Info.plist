@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- N9: the share extension's Info.plist (build.sh fills in the version, build and minimum iOS). It takes one web link
-     or some text (Safari's page, a link in Notes or Messages) and opens iFizBox with cydian://share?url=…. Files come
+     or some text (Safari's page, a link in Notes or Messages) and opens iFizBox with ifizbox://share?url=…. Files come
      through the app's own document types (Open in iFizBox), not here. -->
 <plist version="1.0">
 <dict>
-	<key>CFBundleExecutable</key><string>CydianShare</string>
-	<key>CFBundleIdentifier</key><string>com.ryha.cydian.share</string>
-	<key>CFBundleName</key><string>CydianShare</string>
+	<key>CFBundleExecutable</key><string>iFizBoxShare</string>
+	<key>CFBundleIdentifier</key><string>com.ryha.ifizbox.share</string>
+	<key>CFBundleName</key><string>iFizBoxShare</string>
 	<key>CFBundleDisplayName</key><string>$(BRAND_NAME)</string>
 	<key>CFBundlePackageType</key><string>XPC!</string>
 	<key>CFBundleShortVersionString</key><string>@VERSION@</string>
@@ -20,7 +20,7 @@
 	<key>UIDeviceFamily</key><array><integer>1</integer></array>
 	<key>NSExtension</key><dict>
 		<key>NSExtensionPointIdentifier</key><string>com.apple.share-services</string>
-		<key>NSExtensionPrincipalClass</key><string>CydianShare.ShareViewController</string>
+		<key>NSExtensionPrincipalClass</key><string>iFizBoxShare.ShareViewController</string>
 		<key>NSExtensionAttributes</key><dict>
 			<key>NSExtensionActivationRule</key><dict>
 				<key>NSExtensionActivationSupportsWebURLWithMaxCount</key><integer>1</integer>

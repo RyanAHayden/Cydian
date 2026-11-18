@@ -75,7 +75,7 @@ export function parseFeatured(input, base = null) {
 export function createFeaturedStore({ getText, storage = globalThis.localStorage, ttl = TTL, now = () => Date.now() } = {}) {
   const mem = new Map();
   const inflight = new Map();
-  const skey = (url) => "cydian.featured:" + url;
+  const skey = (url) => "ifizbox.featured:" + url;
 
   function cached(url) {
     let e = mem.get(url);

@@ -1,7 +1,7 @@
 // F93: the website's signing job (websign-job.js) with a fake zsign (the flow: unzip, Info.plist, bundle ID,
 // entitlements, iFizBox's bring files, zsign's errors), then the real zsign WebAssembly (vendor/zsign) on a tiny IPA
-// (core/fixtures/signing/tiny-cydian.ipa: Payload/Tiny.app, a 32 KB arm64 executable, binary Info.plist,
-// com.ryha.cydian) signed with the throwaway test certificate.
+// (core/fixtures/signing/tiny-ifizbox.ipa: Payload/Tiny.app, a 32 KB arm64 executable, binary Info.plist,
+// com.ryha.ifizbox) signed with the throwaway test certificate.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
@@ -27,12 +27,12 @@ function fakeZsign({ plist = { CFBundleIdentifier: "io.github.x.delta", CFBundle
       readdir: (p) => { if (p !== "/w/app/Payload" || unzip) throw new Error("ENOENT"); return [".", "..", appName]; },
     },
     ccall: (name, _r, _t, args) => {
-      if (name === "cydian_unzip") {
+      if (name === "ifizbox_unzip") {
         seen.unzipped = files.get(args[0]);
         if (!unzip) { dirs.add(`/w/app/Payload/${appName}`); dirs.add(`/w/app/Payload/${appName}/web`); }
         return unzip;
       }
-      if (name === "cydian_plist_json") return plist ? JSON.stringify(plist) : "";
+      if (name === "ifizbox_plist_json") return plist ? JSON.stringify(plist) : "";
       throw new Error("unknown " + name);
     },
     callMain: (args) => {
@@ -65,24 +65,24 @@ test("signs: unzips, reads the app, passes zsign the certificate, profile, narro
   assert.equal(r.name, "Delta");
   assert.equal(r.version, "1.2");
   assert.deepEqual([...r.ipa], [0x50, 0x4b, 9, 9]);
-  assert.equal(seen.files.has("/w/app/Payload/Delta.app/cydian-identity.plist"), false);
+  assert.equal(seen.files.has("/w/app/Payload/Delta.app/ifizbox-identity.plist"), false);
 });
 
 test("bring: only iFizBox's own IPA gets the certificate and the website's link, before zsign seals it", async () => {
-  const link = "cydian://import?d=abc";
+  const link = "ifizbox://import?d=abc";
   let { create, seen } = fakeZsign();
   await runSignJob(create, job({ bring: { identity: true, transfer: link } }));
-  assert.equal([...seen.files.keys()].some((k) => k.includes("cydian-identity") || k.includes("transfer.link")), false, "not another app");
-  ({ create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.ryha.cydian", CFBundleName: "iFizBox" }, appName: "Cydian.app" }));
+  assert.equal([...seen.files.keys()].some((k) => k.includes("ifizbox-identity") || k.includes("transfer.link")), false, "not another app");
+  ({ create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.ryha.ifizbox", CFBundleName: "iFizBox" }, appName: "iFizBox.app" }));
   await runSignJob(create, job({ bring: { identity: true, transfer: link } }));
-  const id = parsePlist(text(seen.files.get("/w/app/Payload/Cydian.app/cydian-identity.plist")));
+  const id = parsePlist(text(seen.files.get("/w/app/Payload/iFizBox.app/ifizbox-identity.plist")));
   assert.deepEqual([...id.p12], [...P12]);
   assert.deepEqual([...id.profile], [...PROFILE]);
   assert.equal(id.password, "hunter2");
-  assert.equal(seen.files.get("/w/app/Payload/Cydian.app/web/transfer.link"), link);
-  ({ create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.ryha.cydian" }, appName: "Cydian.app" }));
+  assert.equal(seen.files.get("/w/app/Payload/iFizBox.app/web/transfer.link"), link);
+  ({ create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.ryha.ifizbox" }, appName: "iFizBox.app" }));
   await runSignJob(create, job({ bring: { identity: false, transfer: "https://not-a-link" } }));
-  assert.equal([...seen.files.keys()].some((k) => k.includes("cydian-identity") || k.includes("transfer.link")), false, "switch off, bad link");
+  assert.equal([...seen.files.keys()].some((k) => k.includes("ifizbox-identity") || k.includes("transfer.link")), false, "switch off, bad link");
 });
 
 test("zsign's own reason when it can't sign; not an IPA; no app inside; no Info.plist", async () => {
@@ -102,14 +102,14 @@ const has = (b, s) => Buffer.from(b).includes(Buffer.from(s));
 
 test("zsign WebAssembly signs a tiny IPA, sealing iFizBox's bring files", { skip: !existsSync(WASM) && "no vendor/zsign" }, async () => {
   const { default: createZsign } = await import(WASM);
-  const r = await runSignJob(createZsign, { ipa: fx("tiny-cydian.ipa"), p12: P12, profile: PROFILE, password: "hunter2",
-    bring: { identity: true, transfer: "cydian://import?d=abc" } });
-  assert.equal(r.bundleId, "com.ryha.cydian");
-  assert.equal(r.name, "Tiny Cydian"); // from a binary Info.plist
+  const r = await runSignJob(createZsign, { ipa: fx("tiny-ifizbox.ipa"), p12: P12, profile: PROFILE, password: "hunter2",
+    bring: { identity: true, transfer: "ifizbox://import?d=abc" } });
+  assert.equal(r.bundleId, "com.ryha.ifizbox");
+  assert.equal(r.name, "Tiny iFizBox"); // from a binary Info.plist
   assert.equal(r.version, "9.9");
   assert.equal(r.ipa[0], 0x50);
   for (const n of ["Payload/Tiny.app/_CodeSignature/CodeResources", "Payload/Tiny.app/embedded.mobileprovision",
-    "Payload/Tiny.app/cydian-identity.plist", "Payload/Tiny.app/web/transfer.link"]) assert.ok(has(r.ipa, n), n);
+    "Payload/Tiny.app/ifizbox-identity.plist", "Payload/Tiny.app/web/transfer.link"]) assert.ok(has(r.ipa, n), n);
 });
 
 test("zsign WebAssembly signs the executable itself: the profile's entitlements and a CMS signature", { skip: !existsSync(WASM) && "no vendor/zsign" }, async () => {
@@ -123,8 +123,8 @@ test("zsign WebAssembly signs the executable itself: the profile's entitlements 
     zs.callMain = (args) => { try { return main(args); } finally { exe = zs.FS.readFile("/w/app/Payload/Tiny.app/Tiny"); } };
     return zs;
   };
-  await runSignJob(createZsign, { ipa: fx("tiny-cydian.ipa"), p12: P12, profile: PROFILE, password: "hunter2" });
-  assert.ok(has(exe, "<string>TESTTEAM42.com.ryha.cydian</string>"), "application-identifier in the signed executable");
+  await runSignJob(createZsign, { ipa: fx("tiny-ifizbox.ipa"), p12: P12, profile: PROFILE, password: "hunter2" });
+  assert.ok(has(exe, "<string>TESTTEAM42.com.ryha.ifizbox</string>"), "application-identifier in the signed executable");
   assert.ok(has(exe, "<key>get-task-allow</key><false/>"));
   assert.ok(!has(exe, "<key>get-task-allow</key><true/>") && !has(exe, "application-groups"));
   const b = Buffer.from(exe), cms = b.indexOf(Buffer.from([0xfa, 0xde, 0x0b, 0x01]));
@@ -136,7 +136,7 @@ test("zsign WebAssembly: a wrong password says so", { skip: !existsSync(WASM) &&
   // emscripten on node sets process.exitCode when main() fails (a browser's worker just throws): keep this run's
   const code = process.exitCode;
   t.after(() => { process.exitCode = code; });
-  await assert.rejects(runSignJob(createZsign, { ipa: fx("tiny-cydian.ipa"), p12: P12, profile: PROFILE, password: "nope" }),
+  await assert.rejects(runSignJob(createZsign, { ipa: fx("tiny-ifizbox.ipa"), p12: P12, profile: PROFILE, password: "nope" }),
     (e) => e.code === "sign_failed" && /password/.test(e.message));
 });
 

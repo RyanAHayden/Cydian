@@ -269,7 +269,7 @@ genPlist URL, and the pack-expiry check.
   profiles can't have them; see `docs/ipa.md`).
 - Info.plist for the sideload build: `UIBackgroundModes: [audio]` (install keep-alive, alongside I3's
   `fetch`/`processing` for BGAppRefreshTask), `CFBundleDocumentTypes` for `.ipa` (`com.apple.itunes.ipa`),
-  `.p12`, `.mobileprovision`, a URL scheme (`cydian://`), and `apple-magnifier` in `LSApplicationQueriesSchemes`.
+  `.p12`, `.mobileprovision`, a URL scheme (`ifizbox://`), and `apple-magnifier` in `LSApplicationQueriesSchemes`.
 - If iFizBox bundles a backloop pack at build time, that's an internet fetch in the build. Better: fetch it at
   first use and keep it in `Documents/`.
 - Self-update: as with Feather, the server route can't update the running app. Say so, and point to the user's

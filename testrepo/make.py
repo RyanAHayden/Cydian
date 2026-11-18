@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Cydian's temporary test sources (delete testrepo/ once update testing is done). Run: testrepo/make.py
+"""iFizBox's temporary test sources (delete testrepo/ once update testing is done). Run: testrepo/make.py
 
-- apt/: a flat APT repo of tiny test packages for the jailbreak side: an Essential one in two versions (Cydian's
+- apt/: a flat APT repo of tiny test packages for the jailbreak side: an Essential one in two versions (iFizBox's
   Essential Upgrade), a plain tweak in two versions (Changes, Upgrade, Downgrade), one depending on a package no
   source has (the plain-language dependency error) and one for rootful phones only (iphoneos-arm: incompatible on
   rootless). Built here without dpkg (ar + tar), Packages and Release written next to them.
@@ -49,8 +49,8 @@ def ar(members: list) -> bytes:
 
 
 def control(pid, ver, arch, extra, desc, name):
-    fields = {"Package": pid, "Name": name, "Version": ver, "Architecture": arch, "Maintainer": "Cydian Tests",
-              "Author": "Cydian Tests", "Section": "Tweaks", "Description": desc, **extra}
+    fields = {"Package": pid, "Name": name, "Version": ver, "Architecture": arch, "Maintainer": "iFizBox Tests",
+              "Author": "iFizBox Tests", "Section": "Tweaks", "Description": desc, **extra}
     return "".join(f"{k}: {v}\n" for k, v in fields.items())
 
 
@@ -62,7 +62,7 @@ def main():
     for pid, ver, arch, extra, desc in PKGS:
         name = "Test " + pid.rsplit(".", 1)[1].capitalize()
         ctl = control(pid, ver, arch, extra, desc, name)
-        data = tar_gz({f"./var/jb/usr/share/cydian-tests/{pid}": f"{pid} {ver}\n".encode()})
+        data = tar_gz({f"./var/jb/usr/share/ifizbox-tests/{pid}": f"{pid} {ver}\n".encode()})
         deb = ar([("debian-binary", b"2.0\n"), ("control.tar.gz", tar_gz({"./control": ctl.encode()})), ("data.tar.gz", data)])
         fn = f"{pid}_{ver}_{arch}.deb"
         (APT / fn).write_bytes(deb)
@@ -71,9 +71,9 @@ def main():
     packages = "\n".join(stanzas).encode()
     (APT / "Packages").write_bytes(packages)
     (APT / "Packages.gz").write_bytes(gzip.compress(packages, mtime=0))
-    lines = ["Origin: Cydian Tests", "Label: Cydian Tests", "Suite: stable", "Version: 1.0", "Codename: tests",
+    lines = ["Origin: iFizBox Tests", "Label: iFizBox Tests", "Suite: stable", "Version: 1.0", "Codename: tests",
              "Architectures: iphoneos-arm64 iphoneos-arm", "Components: main",
-             "Description: Temporary test packages for Cydian (will be deleted)", "MD5Sum:"]
+             "Description: Temporary test packages for iFizBox (will be deleted)", "MD5Sum:"]
     for f in ("Packages", "Packages.gz"):
         b = (APT / f).read_bytes()
         lines.append(f" {hashlib.md5(b).hexdigest()} {len(b)} {f}")

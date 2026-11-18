@@ -28,7 +28,7 @@ def _name(cn: str, team: str | None = None, uid: str | None = None) -> x509.Name
     attrs.append(x509.NameAttribute(NameOID.COMMON_NAME, cn))
     if team:
         attrs.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, team))
-    attrs += [x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Test Person" if team else "Cydian Test CA"),
+    attrs += [x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Test Person" if team else "iFizBox Test CA"),
               x509.NameAttribute(NameOID.COUNTRY_NAME, "US")]
     return x509.Name(attrs)
 
@@ -36,7 +36,7 @@ def _name(cn: str, team: str | None = None, uid: str | None = None) -> x509.Name
 def ca():
     """(key, cert): a throwaway CA standing in for Apple's WWDR intermediate (zsign wants the leaf's issuer)."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    name = _name("Cydian Test Worldwide Developer Relations CA")
+    name = _name("iFizBox Test Worldwide Developer Relations CA")
     start = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=2)
     cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
             .serial_number(x509.random_serial_number()).not_valid_before(start)
@@ -144,7 +144,7 @@ def macho(entry: bytes = b"\xc0\x03\x5f\xd6") -> bytes:
     return bytes(body)
 
 
-def ipa(bundle_id: str = "dev.cydian.fixture", name: str = "Fixture", version: str = "1.0") -> bytes:
+def ipa(bundle_id: str = "dev.ifizbox.fixture", name: str = "Fixture", version: str = "1.0") -> bytes:
     """A tiny IPA: Payload/Fixture.app with Info.plist, the Mach-O and a resource file."""
     info = {
         "CFBundleExecutable": name, "CFBundleIdentifier": bundle_id, "CFBundleName": name,
@@ -160,5 +160,5 @@ def ipa(bundle_id: str = "dev.cydian.fixture", name: str = "Fixture", version: s
         zi.external_attr = 0o100755 << 16
         zi.compress_type = zipfile.ZIP_DEFLATED
         z.writestr(zi, macho())
-        z.writestr(app + "hello.txt", "Hello from Cydian's signer test.\n")
+        z.writestr(app + "hello.txt", "Hello from iFizBox's signer test.\n")
     return buf.getvalue()

@@ -2,7 +2,7 @@
 //
 //   1. A package page's Install / Modify sheet, its Version History or an F18 "Remove X" row queues a package
 //      (getBackend().queue, backend-native.js); the Confirm sheet opens at once.
-//   2. Confirm: apt-get -s over the whole queue (cydian-helper simulate). Its Modifications (Install, Reinstall,
+//   2. Confirm: apt-get -s over the whole queue (ifizbox-helper simulate). Its Modifications (Install, Reinstall,
 //      Upgrade, Downgrade, Remove, one row each with the names), the queue itself (tap one to clear it), and
 //      Continue Queuing. When apt refuses, the sheet is "Cannot Comply": F18's plain-language explanation of each
 //      problem with its action (core/deps.js explainApt through the catalog) above apt's own output, which always
@@ -157,7 +157,7 @@ function openConfirm() {
     if (err) {
       m.setTitle("Cannot Comply");
       m.scroll.append(grouped([{ header: "Couldn't Ask apt", rows: [{ label: err.message || String(err) }],
-        footer: `Nothing was changed. ${NAME} runs apt through its helper (cydian-helper); reinstalling ${NAME} puts it back.` }]));
+        footer: `Nothing was changed. ${NAME} runs apt through its helper (ifizbox-helper); reinstalling ${NAME} puts it back.` }]));
     } else if (!r.ok || r.plan.essential.length) {
       m.setTitle("Cannot Comply");
       await drawIssues(m.scroll, r, names, () => close());
@@ -371,7 +371,7 @@ async function installApp(job) {
 // F84: a Custom Install job: signing.install with its own options (core/appqueue.js customParams: the look's token
 // while fresh, else the url, and the edits), then iOS's progress on the HUD as the sheet did (signing-sheet.js
 // followInstall). The token is spent by the try, so a failed run that keeps the job queued downloads it again next time.
-export async function installCustom(job, { sc, follow = null, now = Date.now(), native = globalThis.cydianNative } = {}) {
+export async function installCustom(job, { sc, follow = null, now = Date.now(), native = globalThis.ifizboxNative } = {}) {
   const params = customParams(job, now);
   if (params.token) job.options.token = null;
   const after = follow ?? (async (result, h) => (await import("../signing-sheet.js")).followInstall(native, result?.bundleId || job.options.signsAs || "", h));
@@ -382,7 +382,7 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
 // F91: a "resign" job: signing.resign {bundleId} signs the app again from the phone's record (Re-sign All's path,
 // one app) and opens iOS's install, the HUD following it; iFizBox's own is hosted on the Signing Server, as its
 // install is (iOS closes iFizBox). True once iOS was asked.
-export async function resignApp(job, { sc, native = globalThis.cydianNative, hud = null, alert = showAlert } = {}) {
+export async function resignApp(job, { sc, native = globalThis.ifizboxNative, hud = null, alert = showAlert } = {}) {
   sc ??= await import("../signing-client.js");
   const { resignLabel, deviceError } = await import("../core/signing.js");
   const h = hud ? hud("Re-signing") : progressHUD("Re-signing"); // F151: the progress page

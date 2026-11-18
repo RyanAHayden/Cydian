@@ -32,7 +32,7 @@ import { isAltKey } from "../core/altstore.js";
 import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 import { refreshInBackground } from "./sources.js";
-import { markCydianInstalled, browsingLocked, askToBrowse } from "../websign-gate.js";
+import { markiFizBoxInstalled, browsingLocked, askToBrowse } from "../websign-gate.js";
 import * as guides from "./guides.js";
 import { guideRows, JAILBREAK_INFO_URL } from "./guides.js";
 import { NAME } from "../brand.js";
@@ -80,7 +80,7 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
 // F177: on the way to Signing it remembers this install (signing.js rememberInstall), so Signing offers Install Now
 // once the certificate is in.
 export async function installApp({ ready = signingReady, install = signAndInstall, bring = getBring, go = (h) => { location.hash = h; },
-  installed = markCydianInstalled, remember = rememberInstall } = {}) {
+  installed = markiFizBoxInstalled, remember = rememberInstall } = {}) {
   const run = () => install({ url: APP_IPA_URL, name: APP_NAME, bring: bring(), onInstalled: () => installed() });
   if (!(await ready())) {
     remember({ name: APP_NAME, run });
@@ -93,7 +93,7 @@ export async function installApp({ ready = signingReady, install = signAndInstal
 
 // F96: Home's Install iFizBox App tile's action, also the first-visit prompt's Install iFizBox: Not Jailbroken, signed
 // in the browser (installApp); jailbroken, the .deb for the device's arch (installDeb).
-export function installCydian({ offer = homeOffer({ mode: settings.mode, deviceType: settings.deviceType() }) } = {}) {
+export function installiFizBox({ offer = homeOffer({ mode: settings.mode, deviceType: settings.deviceType() }) } = {}) {
   if (!offer) return null;
   return offer.action === "deb" ? installDeb(offer.arch) : installApp();
 }
@@ -185,7 +185,7 @@ export const DEVICE_HINT = "Showing apps for iPhones without a jailbreak. Jailbr
 export function deviceHint(type, mode = "site") {
   if (type !== "none") return null;
   // The sideload build is always Not Jailbroken: nothing to change there, so no hint. Nor on the website (user
-  // 2026-11-18: it's obviously the web; jailbroken visitors get "Jailbroken? Get Cydian.deb" in the iFizBox App card).
+  // 2026-11-18: it's obviously the web; jailbroken visitors get "Jailbroken? Get iFizBox.deb" in the iFizBox App card).
   if (mode === "sideload" || mode === "site") return null;
   return { text: DEVICE_HINT, href: format(settingsRoute(["device"])) };
 }
@@ -240,7 +240,7 @@ export function nav(route, ctx) {
 // About, laid out like Cydia's on the 4S (ref/4s/screens/cydia-about.png): centred lines in groups with a blank line
 // between them, and one wide Close button.
 async function showAbout(ctx) {
-  const version = (await globalThis.cydianNative?.call?.("app.info", {}).catch(() => null))?.version;
+  const version = (await globalThis.ifizboxNative?.call?.("app.info", {}).catch(() => null))?.version;
   await ctx.showAlert({
     title: `About ${NAME}`,
     message: `${version ? `Version ${version}` : `${NAME} Web`}\nFree and open source`
@@ -274,31 +274,31 @@ export async function withReloadSpinner(button, work) {
   return true;
 }
 
-// Resolves once no source is refreshing (screens/sources.js announce: globalThis.cydianRefreshing and the
-// cydian:refreshing event), or after `ms` at most, so a refresh that never says it ended can't keep the spinner.
+// Resolves once no source is refreshing (screens/sources.js announce: globalThis.ifizboxRefreshing and the
+// ifizbox:refreshing event), or after `ms` at most, so a refresh that never says it ended can't keep the spinner.
 export function untilRefreshed(ms = 120000) {
   return new Promise((resolve) => {
-    if (!(globalThis.cydianRefreshing > 0)) { resolve(); return; }
+    if (!(globalThis.ifizboxRefreshing > 0)) { resolve(); return; }
     let timer = null;
     const check = () => {
-      if (globalThis.cydianRefreshing > 0) return;
+      if (globalThis.ifizboxRefreshing > 0) return;
       clearTimeout(timer);
-      globalThis.removeEventListener?.("cydian:refreshing", check);
+      globalThis.removeEventListener?.("ifizbox:refreshing", check);
       resolve();
     };
-    timer = setTimeout(() => { globalThis.removeEventListener?.("cydian:refreshing", check); resolve(); }, ms);
-    globalThis.addEventListener?.("cydian:refreshing", check);
+    timer = setTimeout(() => { globalThis.removeEventListener?.("ifizbox:refreshing", check); resolve(); }, ms);
+    globalThis.addEventListener?.("ifizbox:refreshing", check);
   });
 }
 
 // What Reload does, each step injectable for the test: refresh the sources (Settings' Refresh on Launch's way: the
 // Sources tab's spinning badge, no HUD; when a refresh already runs, wait for that one), load the new package lists
 // (new versions: Changes' badge and list), re-read dpkg in the app, look for iFizBox's own update (app.js listens for
-// cydian:reloaded, as a launch does), then redraw Home in place.
+// ifizbox:reloaded, as a launch does), then redraw Home in place.
 const loadNew = async () => {
   await catalog.ensure();
   if (catalog.statusSource() === "native") await catalog.reloadInstalled();
-  globalThis.dispatchEvent?.(new Event("cydian:reloaded"));
+  globalThis.dispatchEvent?.(new Event("ifizbox:reloaded"));
 };
 // The website's Reload first re-downloads every file of the site (build.json lists them), which replaces whatever
 // copy the browser kept, then loads the page again: a phone holding stale files gets the new version (user
@@ -314,7 +314,7 @@ export async function refreshWebFiles({ fetcher = globalThis.fetch, info = build
 }
 
 export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ctx), settled = untilRefreshed, reload = loadNew, redraw = () => state.redraw?.(),
-  web = !globalThis.cydianNative } = {}) {
+  web = !globalThis.ifizboxNative } = {}) {
   if (web) return withReloadSpinner(button, async () => { if (!(await refreshWebFiles())) location.reload(); });
   return withReloadSpinner(button, async () => {
     if ((await refresh()) === "cancelled") return; // F150: the reload bar's Cancel stops the whole Reload
@@ -324,18 +324,18 @@ export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ct
   });
 }
 
-// F145: Home's root follows the website's lock (websign-gate.js setFirstVisit fires cydian:browse-lock): when it flips
+// F145: Home's root follows the website's lock (websign-gate.js setFirstVisit fires ifizbox:browse-lock): when it flips
 // from what the page was drawn with, `redraw` draws it again, so no locked rows or padlocks stay after Browse Anyway
 // (nor unlocked ones after Lock Home). Stops once `alive()` is false (the page is gone). -> a function that stops it.
 export function followBrowseLock({ wasLocked, locked, alive = () => true, redraw, target = globalThis }) {
-  const off = () => target.removeEventListener?.("cydian:browse-lock", on);
+  const off = () => target.removeEventListener?.("ifizbox:browse-lock", on);
   function on() {
     if (!alive()) { off(); return; }
     if (locked() === wasLocked) return;
     off(); // the redrawn page follows with its own
     redraw();
   }
-  target.addEventListener?.("cydian:browse-lock", on);
+  target.addEventListener?.("ifizbox:browse-lock", on);
   return off;
 }
 
@@ -346,7 +346,7 @@ const state = { tile: null, seq: 0, redraw: null };
 
 export function init() {
   // Sources tells when a refresh starts and each time one ends (screens/sources.js markLoading): repaint the tile.
-  globalThis.addEventListener?.("cydian:refreshing", () => refreshState());
+  globalThis.addEventListener?.("ifizbox:refreshing", () => refreshState());
   // F96: no question at launch (user 2026-11-18); Home's rows below the iFizBox App card are locked instead (renderRoot).
   // The root page stays in the stack while other tabs add or remove sources: look again whenever Home shows.
   globalThis.addEventListener?.("hashchange", () => {
@@ -369,7 +369,7 @@ async function refreshState() {
   }
   // only the sources this device type shows (Not Jailbroken hides APT ones, and their errors with them)
   const shown = sourcesFor(sources, settings.deviceType()).shown;
-  if (seq === state.seq) paintTile(stateTile({ sources: shown, upgrades, refreshing: globalThis.cydianRefreshing ?? 0 }));
+  if (seq === state.seq) paintTile(stateTile({ sources: shown, upgrades, refreshing: globalThis.ifizboxRefreshing ?? 0 }));
 }
 
 function paintTile(t) {
@@ -440,12 +440,12 @@ function renderRoot(body) {
   const icon = el("img", "home-icon");
   // The website shows its WEB icon (the home-screen one), so it's never taken for the app (user 2026-11-18).
   // The sideload app shows its LITE icon (its Home Screen icon), the jailbreak app the plain one.
-  const g = !globalThis.cydianNative ? "icon-web-glossy" : settings.mode === "sideload" ? "icon-lite-glossy" : "icon-glossy";
+  const g = !globalThis.ifizboxNative ? "icon-web-glossy" : settings.mode === "sideload" ? "icon-lite-glossy" : "icon-glossy";
   icon.src = `icons/${g}-76.png`;
   icon.srcset = `icons/${g}-76.png 1x, icons/${g}-152.png 2x, icons/${g}-228.png 3x`;
   icon.width = icon.height = 57;
   icon.alt = "";
-  const limits = versionLimits(!globalThis.cydianNative ? "web" : settings.mode);
+  const limits = versionLimits(!globalThis.ifizboxNative ? "web" : settings.mode);
   if (limits) {
     icon.classList.add("tappable");
     icon.alt = limits.title;
@@ -526,7 +526,7 @@ function renderRoot(body) {
     e.preventDefault();
     e.stopImmediatePropagation();
     if (!offer) return;
-    installCydian({ offer });
+    installiFizBox({ offer });
   }, true);
   const drawApp = () => {
     const type = settings.deviceType();
@@ -578,7 +578,7 @@ function renderRoot(body) {
     const locked = [browseRow, ...(ipasRow ? [ipasRow] : []), stateRow];
     for (const box of locked) box.classList.add("home-locked");
     lockHomeLinks(groups, links);
-    askOnLocked(home, () => askToBrowse({ install: installCydian })); // Browse Anyway redraws Home (followBrowseLock below)
+    askOnLocked(home, () => askToBrowse({ install: installiFizBox })); // Browse Anyway redraws Home (followBrowseLock below)
   }
   // F145: Browse Anyway (here, on a locked tab or in Settings) and Settings' Lock Home switch redraw Home at once.
   followBrowseLock({ wasLocked: lockedNow, locked: () => browsingLocked({ mode: settings.mode }), alive: () => home.isConnected,
@@ -682,7 +682,7 @@ function renderCredits(body) {
       footer: "Cydia's section icons and purpose badges, from its source at git.saurik.com/cydia.git.",
     },
   ])));
-  globalThis.cydianNative?.call?.("app.info", {}).then((i) => {
+  globalThis.ifizboxNative?.call?.("app.info", {}).then((i) => {
     if (i?.version) body.querySelector(".cell-detail").textContent = i.version;
   }, () => {});
 }
@@ -847,16 +847,16 @@ export function render(el, route, ctx) {
 }
 
 // I7: iFizBox's .deb for a jailbroken visitor's arch: the latest release's asset for it (GitHub's API, which answers
-// browsers), else the rootless Cydian.deb. Safari downloads it to Files, where Sileo or Filza installs it.
-// "Jailbroken? Get Cydian.deb": iFizBox's own APT repo (tools/release.sh: a flat repo beside each release's assets)
+// browsers), else the rootless iFizBox.deb. Safari downloads it to Files, where Sileo or Filza installs it.
+// "Jailbroken? Get iFizBox.deb": iFizBox's own APT repo (tools/release.sh: a flat repo beside each release's assets)
 // added in Sileo or Zebra, which then keep iFizBox updated; or the URL to paste elsewhere; or the .deb itself.
 // B17: cydian.dev/repo/ (the Worker serves the release assets itself): GitHub's latest/download redirect ends at a
 // signed URL too long for Zebra's cache file name.
-export const CYDIAN_APT_REPO = "https://cydian.dev/repo/";
+export const IFIZBOX_APT_REPO = "https://cydian.dev/repo/";
 export const JAILBROKEN_SHEET = { title: `Install ${NAME} with your jailbreak's package manager: it keeps ${NAME} updated.`,
   buttons: ["Add to Sileo", "Add to Zebra", "Copy Repo URL", "Download .deb"] };
-const CYDIAN_PACKAGE = "com.ryha.cydian";
-export const repoLinks = (repo = CYDIAN_APT_REPO, id = CYDIAN_PACKAGE) => ({
+const IFIZBOX_PACKAGE = "com.ryha.ifizbox";
+export const repoLinks = (repo = IFIZBOX_APT_REPO, id = IFIZBOX_PACKAGE) => ({
   sileo: `sileo://source/${repo}`, zebra: `zbra://sources/add/${repo}`,
   // their pages for a package, once the repo is there
   sileoPackage: `sileo://package/${id}`, zebraPackage: `zbra://packages/${id}` });
@@ -882,8 +882,8 @@ async function jailbrokenSheet() {
   if (i === 0) { offerPackageOnReturn("Sileo", links.sileoPackage); location.href = links.sileo; }
   else if (i === 1) { offerPackageOnReturn("Zebra", links.zebraPackage); location.href = links.zebra; }
   else if (i === 2) {
-    try { await navigator.clipboard.writeText(CYDIAN_APT_REPO); } catch { /* shown below anyway */ }
-    await showAlert({ title: "Repo URL Copied", message: CYDIAN_APT_REPO, buttons: ["OK"] });
+    try { await navigator.clipboard.writeText(IFIZBOX_APT_REPO); } catch { /* shown below anyway */ }
+    await showAlert({ title: "Repo URL Copied", message: IFIZBOX_APT_REPO, buttons: ["OK"] });
   } else if (i === 3) {
     const { showActionSheet: pick } = await import("../nav/actionsheet.js");
     const kinds = [["Rootless (Dopamine, palera1n)", "iphoneos-arm64"], ["Roothide", "iphoneos-arm64e"], ["Rootful (checkra1n, older)", "iphoneos-arm"]];
@@ -897,5 +897,5 @@ async function installDeb(arch) {
   try { release = await fetchRelease(); } catch { /* the plain rootless .deb below */ }
   const url = debUrl(arch, { release, debFor });
   const { index } = await showAlert(debAlert(arch, url));
-  if (url && index === 1) { markCydianInstalled(); location.href = url; } // F96: its download is as far as the website sees
+  if (url && index === 1) { markiFizBoxInstalled(); location.href = url; } // F96: its download is as far as the website sees
 }

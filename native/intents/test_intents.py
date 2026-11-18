@@ -1,14 +1,14 @@
 """N8: iFizBox's App Intents, widget and controls.
 
 - SwiftIntents: native/intents/tests/main.swift, built on Linux with Core.swift and native/sign/Updates.swift, runs
-  each intent against the fake helper (native/fake/cydian-helper) over native/fake/fixture/prefix. The sideload
-  restore's cydian://import link is decoded here as web/app/core/transfer.js decodeLink would.
+  each intent against the fake helper (native/fake/ifizbox-helper) over native/fake/fixture/prefix. The sideload
+  restore's ifizbox://import link is decoded here as web/app/core/transfer.js decodeLink would.
 - Metadata: metadata.py writes what Xcode 27's appintentsmetadataprocessor wrote for sweetpad's capture (fixtures/),
   covers iFizBox's own intent shapes, and refuses what it doesn't handle.
 - Built: when native/build.sh has built the .deb and the IPA (tools/check.sh does, where the toolchain is), the
   jailbreak app lists every intent and its widget the controls; the IPA only the both-modes intents, and a widget
   with no controls and no jailbreak entitlements.
-- Wiring: the text that ties it together (build.sh, the shell's cydian://add, the helper verb).
+- Wiring: the text that ties it together (build.sh, the shell's ifizbox://add, the helper verb).
 Without a Swift toolchain (SWIFT_TOOLCHAIN, or swiftc on PATH) the Swift part skips and says so."""
 import base64
 import gzip
@@ -46,7 +46,7 @@ def read(*p):
 class SwiftIntents(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.mkdtemp(prefix="cydian-intentstest-")
+        cls.tmp = tempfile.mkdtemp(prefix="ifizbox-intentstest-")
         binary = os.path.join(cls.tmp, "intentstest")
         env = dict(os.environ)
         shim = os.path.join(cls.tmp, "libshim")
@@ -63,7 +63,7 @@ class SwiftIntents(unittest.TestCase):
         if not cls.build_error:
             fake = os.path.join(NATIVE, "fake")
             run_env = dict(os.environ, TMPDIR=cls.tmp)
-            cls.out = subprocess.run([binary, os.path.join(fake, "cydian-helper"), os.path.join(fake, "fixture", "prefix"),
+            cls.out = subprocess.run([binary, os.path.join(fake, "ifizbox-helper"), os.path.join(fake, "fixture", "prefix"),
                                       os.path.join(fake, "fixture", "remote")],
                                      capture_output=True, text=True, timeout=300, env=run_env)
 
@@ -83,7 +83,7 @@ class SwiftIntents(unittest.TestCase):
         self.assertIsNone(self.build_error, self.build_error)
         line = next(l for l in self.out.stdout.splitlines() if l.startswith("LINK "))
         url = line[5:]
-        self.assertRegex(url, r"^cydian://import\?d=[A-Za-z0-9_-]+$")  # decodeLink's pattern
+        self.assertRegex(url, r"^ifizbox://import\?d=[A-Za-z0-9_-]+$")  # decodeLink's pattern
         d = url.split("d=", 1)[1]
         payload = json.loads(gzip.decompress(base64.urlsafe_b64decode(d + "=" * (-len(d) % 4))))
         self.assertEqual(payload, {"v": 1, "sources": ["deb https://apt.procurs.us/ 1800 main", "https://havoc.app/"],
@@ -109,7 +109,7 @@ class Metadata(unittest.TestCase):
         self.assertEqual(self.norm(got), self.norm(self.fixture("sweetpad-dataapp.actionsdata")))
 
     def intent(self, props, result=None, name="X"):
-        t = {"typeName": "Cydian." + name, "mangledTypeName": "6Cydian1XV", "conformances": ["AppIntents.AppIntent"],
+        t = {"typeName": "iFizBox." + name, "mangledTypeName": "7iFizBox1XV", "conformances": ["AppIntents.AppIntent"],
              "properties": props, "associatedTypeAliases": []}
         if result:
             t["associatedTypeAliases"].append(result)
@@ -126,7 +126,7 @@ class Metadata(unittest.TestCase):
         return {"label": label, "type": typ, "isStatic": "false", "isComputed": "true", "valueKind": "InitCall",
                 "value": {"type": "AppIntents.IntentParameter<%s>" % typ, "arguments": args}}
 
-    def test_cydian_shapes(self):
+    def test_ifizbox_shapes(self):
         result = {"typeAliasName": "PerformResult", "opaqueTypeProtocolRequirements": ["AppIntents.ProvidesDialog", "AppIntents.ReturnsValue"],
                   "opaqueTypeSameTypeRequirements": [{"typeAliasName": "AppIntents.IntentResult.Value",
                                                      "substitutedTypeName": "Swift.Array<Swift.String>"}]}
@@ -153,12 +153,12 @@ class Metadata(unittest.TestCase):
     def test_only_and_shortcuts(self):
         def shortcut(intent):
             return {"valueKind": "InitCall", "value": {"type": "AppIntents.AppShortcut", "arguments": [
-                {"label": "intent", "type": "Cydian." + intent, "valueKind": "InitCall", "value": {"type": "Cydian." + intent, "arguments": []}},
+                {"label": "intent", "type": "iFizBox." + intent, "valueKind": "InitCall", "value": {"type": "iFizBox." + intent, "arguments": []}},
                 {"label": "phrases", "valueKind": "Array", "value": [{"valueKind": "InterpolatedStringLiteral", "value": {"segments": [
                     {"valueKind": "RawLiteral", "value": "Go "}, {"valueKind": "Enum", "value": {"name": "applicationName"}}]}}]},
                 {"label": "shortTitle", "valueKind": "RawLiteral", "value": intent},
                 {"label": "systemImageName", "valueKind": "RawLiteral", "value": "power"}]}}
-        provider = {"typeName": "Cydian.S", "mangledTypeName": "6Cydian1SV", "conformances": ["AppIntents.AppShortcutsProvider"],
+        provider = {"typeName": "iFizBox.S", "mangledTypeName": "7iFizBox1SV", "conformances": ["AppIntents.AppShortcutsProvider"],
                     "properties": [{"label": "appShortcuts", "isStatic": "true", "valueKind": "Builder",
                                     "value": {"members": [{"element": shortcut("A")}, {"element": shortcut("B")}]}}]}
         types = [self.intent([self.lit("title", "A")], name="A"), self.intent([self.lit("title", "B")], name="B"), provider]
@@ -173,9 +173,9 @@ class Metadata(unittest.TestCase):
     def test_refuses_what_it_does_not_write(self):
         bad = [
             self.intent([]),  # no title
-            self.intent([self.lit("title", "x"), self.param("e", "Cydian.Thing")]),  # an entity/enum parameter
+            self.intent([self.lit("title", "x"), self.param("e", "iFizBox.Thing")]),  # an entity/enum parameter
             self.intent([self.lit("title", "x"), self.lit("supportedModes", "background")]),
-            {"typeName": "Cydian.E", "mangledTypeName": "x", "conformances": ["AppIntents.AppEntity"], "properties": []},
+            {"typeName": "iFizBox.E", "mangledTypeName": "x", "conformances": ["AppIntents.AppEntity"], "properties": []},
         ]
         for t in bad:
             with self.subTest(t=t["typeName"]), self.assertRaises(M.Unsupported):
@@ -195,8 +195,8 @@ class Metadata(unittest.TestCase):
 
 
 BUILD = os.path.join(NATIVE, "build")
-DEB_APP = os.path.join(BUILD, "root", "var", "jb", "Applications", "Cydian.app")
-IPA = os.path.join(BUILD, "Cydian.ipa")
+DEB_APP = os.path.join(BUILD, "root", "var", "jb", "Applications", "iFizBox.app")
+IPA = os.path.join(BUILD, "iFizBox.ipa")
 
 
 def built():
@@ -212,25 +212,25 @@ def built():
 class Built(unittest.TestCase):
     def test_jailbreak_app(self):
         self.assertEqual(M.check(os.path.join(DEB_APP, "Metadata.appintents"), sorted(JAILBREAK)), [])
-        appex = os.path.join(DEB_APP, "PlugIns", "CydianWidget.appex")
+        appex = os.path.join(DEB_APP, "PlugIns", "iFizBoxWidget.appex")
         with open(os.path.join(appex, "Info.plist"), "rb") as f:
             info = plistlib.load(f)
         self.assertEqual(info["NSExtension"]["NSExtensionPointIdentifier"], "com.apple.widgetkit-extension")
-        self.assertEqual((info["CFBundleIdentifier"], info["MinimumOSVersion"]), ("com.ryha.cydian.widget", "17.0"))
+        self.assertEqual((info["CFBundleIdentifier"], info["MinimumOSVersion"]), ("com.ryha.ifizbox.widget", "17.0"))
         self.assertEqual(M.check(os.path.join(appex, "Metadata.appintents"), ["RespringIntent", "UserspaceRebootIntent"]), [])
-        with open(os.path.join(appex, "CydianWidget"), "rb") as f:
+        with open(os.path.join(appex, "iFizBoxWidget"), "rb") as f:
             ents = macho_entitlements(f.read()) or {}
         self.assertIn("com.apple.private.persona-mgmt", ents)
-        self.assertEqual(ents.get("com.apple.security.application-groups"), ["group.com.ryha.cydian"])
+        self.assertEqual(ents.get("com.apple.security.application-groups"), ["group.com.ryha.ifizbox"])
 
     def test_ipa_carries_the_both_modes_intents(self):
         with zipfile.ZipFile(IPA) as z:
             names = set(z.namelist())
-            meta = json.loads(z.read("Payload/Cydian.app/Metadata.appintents/extract.actionsdata"))
-            exe = z.read("Payload/Cydian.app/PlugIns/CydianWidget.appex/CydianWidget")
+            meta = json.loads(z.read("Payload/iFizBox.app/Metadata.appintents/extract.actionsdata"))
+            exe = z.read("Payload/iFizBox.app/PlugIns/iFizBoxWidget.appex/iFizBoxWidget")
         self.assertEqual(set(meta["actions"]), SIDELOAD)
         self.assertEqual({s["actionIdentifier"] for s in meta["autoShortcuts"]}, {"CheckForUpdatesIntent"})
-        self.assertNotIn("Payload/Cydian.app/PlugIns/CydianWidget.appex/Metadata.appintents/extract.actionsdata", names)
+        self.assertNotIn("Payload/iFizBox.app/PlugIns/iFizBoxWidget.appex/Metadata.appintents/extract.actionsdata", names)
         ents = macho_entitlements(exe) or {}
         self.assertFalse([k for k in ents if k.startswith("com.apple.private") or k == "platform-application"], ents)
 
@@ -251,20 +251,20 @@ class Wiring(unittest.TestCase):
         self.assertNotIn("import UIKit", src)
         self.assertNotIn("import WidgetKit", src)
 
-    def test_shell_takes_cydian_add(self):
+    def test_shell_takes_ifizbox_add(self):
         self.assertIn('"add"', read("sign", "Handoff.swift"))
         self.assertIn("WidgetStore.save", read("Sources", "Notifications.swift"))
         with open(os.path.join(os.path.dirname(NATIVE), "web", "app", "incoming.js")) as f:
-            self.assertIn("cydian:\\/\\/add", f.read())
+            self.assertIn("ifizbox:\\/\\/add", f.read())
 
     def test_helper_verb(self):
         self.assertIn('"userspace-reboot"', read("helper", "policy.c"))
-        self.assertIn("userspace-reboot)", read("fake", "cydian-helper"))
+        self.assertIn("userspace-reboot)", read("fake", "ifizbox-helper"))
 
     def test_entitlements_have_the_group(self):
         for p in ("entitlements.plist", "entitlements-sideload.plist", "widget/entitlements.plist", "widget/entitlements-sideload.plist"):
             with open(os.path.join(NATIVE, p), "rb") as f:
-                self.assertEqual(plistlib.load(f)["com.apple.security.application-groups"], ["group.com.ryha.cydian"], p)
+                self.assertEqual(plistlib.load(f)["com.apple.security.application-groups"], ["group.com.ryha.ifizbox"], p)
         with open(os.path.join(NATIVE, "widget", "entitlements-sideload.plist"), "rb") as f:
             self.assertFalse([k for k in plistlib.load(f) if "private" in k or k == "platform-application"])
 

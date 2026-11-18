@@ -1,4 +1,4 @@
-# agent-runner (https://github.com/FIZL0/agent-runner): `tmux new -s cydian agent-runner run 3`
+# agent-runner (https://github.com/FIZL0/agent-runner): `tmux new -s ifizbox agent-runner run 3`
 [plan]
 dir = "plan"
 journal = "journal"

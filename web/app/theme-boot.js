@@ -3,7 +3,7 @@
 // the app runs.
 (function () {
   var a = null;
-  try { a = localStorage.getItem("cydian.appearance"); } catch (e) { /* private mode */ }
+  try { a = localStorage.getItem("ifizbox.appearance"); } catch (e) { /* private mode */ }
   // Light unless Dark is chosen, or Automatic on a dark iPhone (the default is Light: iOS 6 had no dark mode).
   var dark = a === "dark" || (a === "auto" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
   document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createSettings, detectMode, themeFor, SETTINGS, FEATURES, bridgeArch } from "./settings.js";
+import { createSettings, detectMode, themeFor, SETTINGS, FEATURES, bridgeArch, DAEMON_KEYS, DAEMON_LISTS } from "./settings.js";
+import { autoMarkShown } from "./automark.js";
 import { DEFAULT_ARCH } from "./apt.js";
 
 function memStorage(init = {}) {
@@ -170,10 +171,12 @@ test("rows each mode shows once every feature exists", () => {
     ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge", "resignReminder"]);
 });
 
-test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone and Ignored Upgrades", () => {
+test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone, Ignored Upgrades and Automatic Installs", () => {
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds", "upgradeNotifications"]);
-  assert.equal(s.isShown("autoInstall"), false);
+  assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds", "upgradeNotifications",
+    "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
+  assert.equal(s.isShown("autoInstall"), true);
+  assert.equal(s.isShown("checkUpdates"), false);
   assert.ok(FEATURES.has("appearance"));
   assert.deepEqual(createSettings({ storage: memStorage(), mode: "site", features: new Set(["appearance"]) })
     .sections().map((x) => x.id), ["appearance"]);
@@ -311,4 +314,68 @@ test("F38: Roothide is a device type on the site and a bridge type in the app (i
   assert.equal(bridgeArch({ jailbreak: "roothide" }), "iphoneos-arm64e");
   assert.equal(bridgeArch({ jailbreak: "none" }), null);
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", native: { jailbreak: "roothide" } }).deviceType(), "iphoneos-arm64e");
+});
+
+test("F70: the Automatic Installs rows show in the jailbreak app only, in their own section", () => {
+  const jb = createSettings({ storage: memStorage(), mode: "jailbreak" });
+  const auto = jb.sections().find((x) => x.id === "automatic");
+  assert.deepEqual(auto.settings.map((d) => d.key), ["autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
+  for (const mode of ["site", "sideload"]) {
+    assert.equal(createSettings({ storage: memStorage(), mode }).sections().some((x) => x.id === "automatic"), false);
+  }
+});
+
+test("F70: Update Automatically marks: sorted, unique, stored on the device, listeners told only on a change", () => {
+  const storage = memStorage();
+  const s = createSettings({ storage, mode: "jailbreak" });
+  const heard = [];
+  s.onChange((k, v) => heard.push([k, v]));
+  s.autoMarked.set("b.pkg", true);
+  s.autoMarked.set("a.pkg", true);
+  s.autoMarked.set("a.pkg", true); // no change
+  assert.deepEqual(s.autoMarked.list(), ["a.pkg", "b.pkg"]);
+  assert.equal(s.autoMarked.has("b.pkg"), true);
+  assert.equal(storage.map.get("cydian.autoMarked"), JSON.stringify(["a.pkg", "b.pkg"]));
+  s.autoMarked.set("b.pkg", false);
+  assert.deepEqual(heard, [["autoMarked", ["b.pkg"]], ["autoMarked", ["a.pkg", "b.pkg"]], ["autoMarked", ["a.pkg"]]]);
+  storage.map.set("cydian.autoMarked", "not json");
+  assert.deepEqual(s.autoMarked.list(), []);
+});
+
+test("F70: the mark's switch shows only for Only Packages I Mark, in the jailbreak app", () => {
+  const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
+  assert.equal(autoMarkShown(s), false); // Off by default
+  s.set("autoInstall", "marked");
+  assert.equal(autoMarkShown(s), true);
+  s.set("autoInstall", "all");
+  assert.equal(autoMarkShown(s), false);
+  const site = createSettings({ storage: memStorage({ "cydian.autoInstall": "marked" }), mode: "site" });
+  assert.equal(autoMarkShown(site), false);
+  assert.equal(autoMarkShown(null), false);
+});
+
+test("F70: daemonPrefs: the daemon's keys with their typed values, unpicked ones null, the lists as arrays", () => {
+  const storage = memStorage({ "cydian.keepVersions": "bogus" });
+  const s = createSettings({ storage, mode: "jailbreak" });
+  const keys = [...DAEMON_KEYS, ...DAEMON_LISTS].map((k) => "cydian." + k);
+  const first = s.daemonPrefs();
+  assert.deepEqual(Object.keys(first).sort(), keys.sort());
+  // Nothing picked: null everywhere (the daemon's defaults, Check for Updates staying Daily), empty lists.
+  for (const k of DAEMON_KEYS) assert.equal(first["cydian." + k], null, k);
+  assert.deepEqual(first["cydian.holds"], []);
+  assert.deepEqual(first["cydian.autoMarked"], []);
+  s.set("autoInstall", "marked");
+  s.set("autoInstallIdle", false);
+  s.set("keepVersions", 2);
+  s.set("cellular", true);
+  s.set("checkUpdates", "6h");
+  s.set("respring", "locked");
+  s.autoMarked.set("com.a", true);
+  s.holds.replace(["com.z", "com.h"]);
+  assert.deepEqual(s.daemonPrefs(), {
+    "cydian.checkUpdates": "6h", "cydian.cellular": true, "cydian.autoInstall": "marked", "cydian.autoInstallIdle": false,
+    "cydian.respring": "locked", "cydian.keepVersions": 2, "cydian.holds": ["com.h", "com.z"], "cydian.autoMarked": ["com.a"],
+  });
+  assert.deepEqual(s.daemonPrefs(["keepVersions"]), { "cydian.keepVersions": 2 });
+  assert.deepEqual(s.daemonPrefs(["holds", "appearance"]), { "cydian.holds": ["com.h", "com.z"] }); // not the daemon's: left out
 });

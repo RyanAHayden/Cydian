@@ -47,6 +47,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         Paid.register(self) // F57: vendors' calls, UDID, Keychain, sign-in sheet, paid installs (Paid.swift)
         SignBridge.register(self) // I6: sign and install IPAs on the phone, sideload build (SignBridge.swift)
         Notifications.register(self) // F65: app.badge, the icon badge (Notifications.swift)
+        Prefs.register(self) // F70: prefs.set, N7's settings for the daemon (below)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }
@@ -209,6 +210,44 @@ enum SelfUpdate {
                 UIApplication.shared.perform(#selector(NSXPCConnection.suspend))
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { exit(0) }
             }
+        }
+    }
+}
+
+// F70: N7's daemon (native/daemon/main.m e_settings) reads the automatic-install settings from Cydian's preferences,
+// com.ryha.cydian for user mobile through cfprefsd, not from the web view's localStorage. web/app/settings.js
+// createPrefsMirror sends them here at launch and on every change:
+//   prefs.set {values: {"cydian.<key>": string | bool | number | [string] | null}} -> nil   null removes the key
+// Only the daemon's keys (core/settings.js DAEMON_KEYS, DAEMON_LISTS) are taken; anything else is refused.
+enum Prefs {
+    static let domain = "com.ryha.cydian" as CFString
+    static let scalars: Set<String> = ["cydian.checkUpdates", "cydian.cellular", "cydian.autoInstall",
+                                       "cydian.autoInstallIdle", "cydian.respring", "cydian.keepVersions"]
+    static let lists: Set<String> = ["cydian.holds", "cydian.autoMarked"]
+
+    // The value to store, or nil to remove the key; .none when the value isn't one this key takes.
+    static func value(_ key: String, _ v: Any) -> CFPropertyList?? {
+        if v is NSNull { return .some(nil) }
+        if lists.contains(key) {
+            guard let a = v as? [Any], a.allSatisfy({ $0 is String }) else { return .none }
+            return .some((a as NSArray) as CFArray)
+        }
+        guard scalars.contains(key) else { return .none }
+        if let n = v as? NSNumber { return .some(n) } // JS booleans arrive as NSNumber (CFBoolean) and stay booleans
+        if let s = v as? String { return .some(s as CFString) }
+        return .none
+    }
+
+    static func register(_ b: Bridge) {
+        b.on("prefs.set") { c in
+            guard let values = c.params["values"] as? [String: Any] else { return c.reply(nil, "bad_params: no values") }
+            var bad: [String] = []
+            for (k, v) in values {
+                guard let stored = value(k, v) else { bad.append(k); continue }
+                CFPreferencesSetAppValue(k as CFString, stored, domain)
+            }
+            CFPreferencesAppSynchronize(domain)
+            c.reply(nil, bad.isEmpty ? nil : "bad_params: \(bad.sorted().joined(separator: ", "))")
         }
     }
 }

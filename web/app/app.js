@@ -32,6 +32,7 @@ import { initQueue } from "./screens/queue.js";
 import { initIpaLinks } from "./screens/ipa-install.js";
 import { startEssential } from "./essential-ui.js";
 import { createUpgradeNotices } from "./settings.js";
+import { createPrefsMirror } from "./settings.js";
 
 const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
 
@@ -303,6 +304,7 @@ if (isAddPath(location.pathname)) {
 }
 router.start();
 upgradeNotices.start();
+createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon
 document.getElementById("boot")?.remove(); // the first page is drawn: the loading screen goes
 if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 

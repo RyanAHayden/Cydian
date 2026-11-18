@@ -10,6 +10,8 @@
 //   s.holds.set("com.example.tweak", true);  // Ignore upgrades, kept on the device (jailbreak: also a dpkg hold)
 //   await s.holds.sync();                    // jailbreak: take dpkg's holds (apt-mark showhold) as the list
 //   s.hiddenSections.set("Themes", true);    // Section Visibility (F24): listeners hear ("hiddenSections", list)
+//   s.autoMarked.set("com.example.tweak", true); // Update Automatically, for Only Packages I Mark (F70)
+//   s.daemonPrefs();                         // { "cydian.autoInstall": "marked", … } for N7's daemon (F70)
 //
 // Every value is stored as a string under `cydian.<key>`, so backend.js getArch() keeps reading `cydian.arch`.
 // A stored value that is not one of the setting's options reads as the default (a hand-edited or older value
@@ -31,7 +33,9 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // "compat": Works on My Phone (F17). "device": Device type and Sideloader (F37).
 // "resign": Re-sign Reminder, which F68 turns on (signing.remind, F14).
 // "upgrade-notifications": Upgrade Notifications, N5's daemon's "n Upgrades" in the jailbreak app (F65).
-export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device", "resign", "upgrade-notifications"]);
+// "auto-install", "rollback": N7's Automatic Installs rows, which F70 hands to the daemon (daemonPrefs below).
+export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device", "resign", "upgrade-notifications",
+  "auto-install", "rollback"]);
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
@@ -189,6 +193,12 @@ export const SETTINGS = [
 const PREFIX = "cydian.";
 const HOLDS_KEY = PREFIX + "holds";
 const HIDDEN_SECTIONS_KEY = PREFIX + "hiddenSections";
+const AUTO_MARKED_KEY = PREFIX + "autoMarked";
+
+// F70: what N7's daemon (native/daemon/README.md "Automatic updates (N7)") reads from the app's preferences
+// (com.ryha.cydian), by the same `cydian.<key>` names: these settings, and the lists in DAEMON_LISTS.
+export const DAEMON_KEYS = ["checkUpdates", "cellular", "autoInstall", "autoInstallIdle", "respring", "keepVersions"];
+export const DAEMON_LISTS = ["holds", "autoMarked"];
 const byKey = new Map(SETTINGS.map((d) => [d.key, d]));
 
 // The architecture list in core/apt.js is the source of truth; the options above must cover it.
@@ -391,11 +401,54 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     replace: (names) => writeHidden((Array.isArray(names) ? names : []).filter((n) => typeof n === "string")),
   };
 
+  // F70: Only Packages I Mark's marks (the package page's Update Automatically), package ids kept on the device as
+  // a sorted JSON list like holds; listeners hear ("autoMarked", list) on a change.
+  function readMarked() {
+    try {
+      const list = JSON.parse(store.get(AUTO_MARKED_KEY) || "[]");
+      return Array.isArray(list) ? [...new Set(list.filter((p) => typeof p === "string"))].sort() : [];
+    } catch {
+      return [];
+    }
+  }
+  const autoMarked = {
+    list: readMarked,
+    has: (pkg) => readMarked().includes(pkg),
+    set(pkg, on) {
+      const list = new Set(readMarked());
+      if (on) list.add(pkg); else list.delete(pkg);
+      const sorted = [...list].sort();
+      if (JSON.stringify(sorted) === JSON.stringify(readMarked())) return;
+      store.set(AUTO_MARKED_KEY, JSON.stringify(sorted));
+      notify("autoMarked", sorted);
+    },
+  };
+
+  // F70: the daemon's preferences, { "cydian.<key>": value }: string, bool or number as get() gives them, the lists
+  // as arrays of package ids. A setting nobody has picked is null (the shell removes the key), so the daemon keeps
+  // its own default: F13's, except Check for Updates, which stays Daily (N5's check) until it is really chosen;
+  // its row isn't shown yet, and the app's "launch" default would otherwise switch the background check off.
+  // `keys`: only these (a setting's key or a list's name), for one change.
+  function daemonPrefs(keys = [...DAEMON_KEYS, ...DAEMON_LISTS]) {
+    const out = {};
+    for (const k of keys) {
+      if (k === "holds") out[HOLDS_KEY] = readHolds().sort();
+      else if (k === "autoMarked") out[AUTO_MARKED_KEY] = readMarked();
+      else if (DAEMON_KEYS.includes(k)) {
+        const raw = store.get(PREFIX + k);
+        out[PREFIX + k] = raw != null && def(k).options.some((o) => String(o.value) === raw) ? get(k) : null;
+      }
+    }
+    return out;
+  }
+
   return {
     mode,
     get,
     set,
     holds,
+    autoMarked,
+    daemonPrefs,
     hiddenSections,
     upgradeNotifications,
     deviceType,

@@ -14,7 +14,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Native jailbreak app (shape decided: docs/native.md)
 
-- [ ] **N6** Hand test on a modern jailbroken phone (the 4S never runs Cydian): add source, install, upgrade, remove, notification. — reopened: N5 landed — Unblocked 2026-11-18: test phone is an iPhone 7, iOS 15.8.8, palera1n rootless: `ssh 7` (mobile; sudo for root, password from the user). Has Sileo, apt, dpkg, uicache, unzip, ldid, ElleKit, curl. Not jailbroken after a reboot: ask the user to re-jailbreak.
+- [~] **N6** Hand test on a modern jailbroken phone (the 4S never runs Cydian): add source, install, upgrade, remove, notification. — reopened: N5 landed — Unblocked 2026-11-18: test phone is an iPhone 7, iOS 15.8.8, palera1n rootless: `ssh 7` (mobile; sudo for root, password from the user). Has Sileo, apt, dpkg, uicache, unzip, ldid, ElleKit, curl. Not jailbroken after a reboot: ask the user to re-jailbreak. BLOCKED: Root steps not run: sudo on ssh 7 needs the user's password and this run is unattended. Done without root: deb checked on the phone, helper SIGKILL bug found and fixed. Left for a person with the sudo password: dpkg -i, add source, install/upgrade/remove through the app (the helper's first root run via the persona spawn), the daemon notification, and uninstall. Steps in journal/2026-11-18-n6-hand-test/README.md. Unblock: give the sudo password to the run, or run those steps by hand.
 
 ### IPA: sideload management (same shell as the jailbreak app)
 

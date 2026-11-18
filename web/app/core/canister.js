@@ -3,6 +3,7 @@
 // app: the shell's fetch).
 //
 //   searchUrl(q, { limit, page })      -> https://api.canister.me/v2/jailbreak/package/search?… (null under 2 chars)
+//   askable(q)                         -> is q worth asking Canister about (2+ characters, counted as code points)
 //   lookupUrl(id)                      -> …/v2/jailbreak/package/<id>  (every repo's copy of one package)
 //   mapResults(json, { have, arch })   -> [{ id, name, description, author, version, section, price, paid, icon,
 //                                         depiction, arch, archOk, repo: { uri, name, slug, flat, dist,
@@ -17,15 +18,25 @@
 // Access-Control-Allow-Origin: *. Canister publishes no terms or rate limits (checked: the API's source has no
 // limiter, docs.canister.me states none); be gentle anyway: Search asks only after typing stops, only for 2+
 // characters, at most 50 results, and every answer is kept 10 minutes.
+//
+// One CJK character (F106, checked live 2026-11-18): local search takes it (core/catalog.js searchable(), Zebra's
+// rule), but Canister doesn't. Its 2-character check counts UTF-8 bytes, so "微" passes with 200, yet it finds
+// nothing: 微, 中, 汉, 化 and é all answered count 0 while 微信 found 5 packages and 中文 1. Asking would cost a
+// request per pause for an empty answer, so Canister keeps the 2-character rule, counted in characters (an emoji
+// or a CJK Extension B character is one character but two UTF-16 units).
 
 export const CANISTER = "https://api.canister.me/v2/jailbreak";
 export const SEARCH_LIMIT = 50;
 const TTL = 10 * 60 * 1000;
 const PKG = /^[a-z0-9][a-z0-9+.-]*$/i;
 
+export function askable(q) {
+  return [...String(q ?? "").trim()].length >= 2;
+}
+
 export function searchUrl(q, { limit = SEARCH_LIMIT, page = 1 } = {}) {
   const query = String(q ?? "").trim();
-  if (query.length < 2) return null;
+  if (!askable(query)) return null;
   const l = Math.min(250, Math.max(1, Math.floor(limit) || SEARCH_LIMIT));
   const p = Math.max(1, Math.floor(page) || 1);
   return `${CANISTER}/package/search?${new URLSearchParams({ q: query.slice(0, 100), limit: String(l), ...(p > 1 ? { page: String(p) } : {}) })}`;

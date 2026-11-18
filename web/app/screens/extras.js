@@ -27,7 +27,7 @@ import { mediaUrl } from "./depiction.js";
 import { settings } from "./settings.js";
 import { runPaidInstall } from "./queue.js";
 import { createFeaturedStore } from "../core/featured.js";
-import { createCanister, mapResults, priceFor, normalRepo } from "../core/canister.js";
+import { createCanister, mapResults, priceFor, normalRepo, askable } from "../core/canister.js";
 import {
   isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore,
 } from "../core/payment.js";
@@ -110,7 +110,8 @@ export function discoveryGroup(ctx) {
   async function search(q) {
     const turn = ++seq;
     box.replaceChildren();
-    if (String(q ?? "").trim().length < 2) return;
+    // 2+ characters, even CJK: Canister finds nothing for one character (F106, core/canister.js askable()).
+    if (!askable(q)) return;
     // Local results come every 120 ms of typing; Canister only once typing has stopped a moment.
     await new Promise((r) => setTimeout(r, 450));
     if (turn !== seq) return;

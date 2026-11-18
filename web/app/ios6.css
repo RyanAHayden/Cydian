@@ -323,6 +323,10 @@ html.no-zoom, html.no-zoom body { touch-action: pan-x pan-y; }
    ring, fully rounded; wider while held. The native indicator is hidden: it isn't iOS 6's. ---- */
 .page-body { scrollbar-width: none; }
 .page-body::-webkit-scrollbar { display: none; }
+/* B31: the other scrollers it follows (Search's results and Filter panel, an action sheet's list) too. On iOS 15 this
+   is what hides the native one: WebKit then turns off the indicators of the pane's own UIScrollView. */
+[data-scroller] { scrollbar-width: none; }
+[data-scroller]::-webkit-scrollbar { display: none; }
 .scroll-indicator {
   position: fixed; top: 0; right: 2px; z-index: 6; width: 5px; border-radius: 3px;
   background: rgba(0,0,0,.5); box-shadow: 0 0 0 1px rgba(255,255,255,.15);

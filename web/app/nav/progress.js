@@ -10,6 +10,10 @@
 //                                          UIAlertSheetBlackButton) and Close at the top right. action() runs on the
 //                                          button; a truthy return keeps the page up. Close only closes.
 //   p.reopen()                             "Running" again, for the next job of a run (progressHUD)
+//   p.stoppable(fn)                        F188: Cancel at the top right from now until finish (the IPA installs: iOS's
+//                                          own Install prompt can be cancelled, which would leave the page waiting for
+//                                          ever). Its tap runs fn() and closes the page; finish() puts Done in its
+//                                          place. stoppable(null) goes back to Close at the end.
 //   p.close() / p.closed / p.onClose(fn)
 //
 // Every line is selectable and copyable. The log follows the newest line and stops while the user scrolls up
@@ -22,6 +26,10 @@
 //                                          status }) ends it on another button, F155's "Open <app>" (signing-sheet.js
 //                                          followInstall) once iOS says the app is installed. With several
 //                                          on the page (a queue run), it completes when the last one ends (B27).
+//                                          F188: Cancel at the top right all through (page.stoppable): its tap ends
+//                                          the job, h.cancelled turns true, h.signal aborts and h.onCancel(fn)'s run
+//                                          (the job's own stops: the Web Worker, the download, the bridge call's
+//                                          answer); every later set/done/fail is ignored. Done replaces it at the end.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "./ui.js";
 import { createFollow, hudLine } from "../core/progress.js";
@@ -118,6 +126,13 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
 
   cancel.addEventListener("click", () => { if (!cancel.disabled && onCancel) onCancel(); });
 
+  // F188: the right button is Cancel while a stoppable page runs, Done once it has finished (else Close, at the end)
+  let stop = null;
+  const rightButton = () => {
+    close.textContent = stop ? (finished ? "Done" : "Cancel") : "Close";
+    close.hidden = !stop && !finished;
+  };
+
   const page = {
     sheet, scroll, out,
     get closed() { return closed; },
@@ -137,6 +152,8 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     setTitle,
     flush,
     cancellable(on, { disabled = false } = {}) { cancel.hidden = !on; cancel.disabled = Boolean(disabled); },
+    stoppable(fn) { stop = typeof fn === "function" ? fn : null; rightButton(); },
+    get stopping() { return Boolean(stop) && !finished; },
     finish({ label = `Return to ${NAME}`, action = null, status = null, title: t = "Complete" } = {}) {
       flush();
       finished = true;
@@ -157,7 +174,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
         finishButton.disabled = false;
         if (!keep) page.close();
       };
-      close.hidden = false;
+      rightButton();
       if (follow.shouldScroll()) toBottom();
     },
     reopen({ title: t = "Running", status = "Preparing" } = {}) {
@@ -168,7 +185,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       track.hidden = false;
       cursor.hidden = false;
       finishButton.hidden = true;
-      close.hidden = true;
+      rightButton();
     },
     onClose(fn) { closers.push(fn); },
     close() {
@@ -180,7 +197,10 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       return a.finished.then(() => sheet.remove(), () => sheet.remove());
     },
   };
-  close.addEventListener("click", () => page.close());
+  close.addEventListener("click", () => {
+    if (stop && !finished) { const f = stop; stop = null; try { f(); } catch { /* the page goes anyway */ } }
+    page.close();
+  });
   return page;
 }
 
@@ -206,6 +226,18 @@ export function progressHUD(label = "Preparing", { open = openProgress, done: do
   running.get(page).add(mine);
   let last = null;
   let ended = false;
+  let cancelled = false;
+  const ctl = typeof AbortController === "function" ? new AbortController() : null;
+  const stops = [];
+  const runStop = (f) => { try { f(); } catch { /* the rest still stop */ } };
+  const cancel = () => {
+    if (ended) return;
+    ended = true;
+    cancelled = true;
+    try { ctl?.abort(); } catch { /* no signal */ }
+    for (const f of stops.splice(0)) runStop(f);
+  };
+  page.stoppable?.(cancel);
   const set = (t) => {
     if (ended) return;
     const { text, percent } = hudLine(t);
@@ -231,6 +263,10 @@ export function progressHUD(label = "Preparing", { open = openProgress, done: do
     done: (t = "Done") => { if (!ended) { if (t !== last) page.step(t); last = t; } end(t); },
     fail: (message) => { if (!ended && message) page.error(message); end("Failed"); },
     finish: ({ label = doneLabel, action = null, status = last } = {}) => end(status, { label, action }),
+    get cancelled() { return cancelled; },
+    signal: ctl?.signal ?? null,
+    onCancel: (fn) => { if (typeof fn !== "function") return; if (cancelled) runStop(fn); else stops.push(fn); },
+    cancel,
     page,
   };
 }

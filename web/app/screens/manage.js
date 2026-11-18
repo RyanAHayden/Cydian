@@ -1,8 +1,11 @@
-// Sources > Manage (F45), a grouped page after Cydia's Manage tab: two rows, each its own page, and Recommended
-// right under them (user 2026-11-18: not a page of its own).
+// Sources > Manage (F45), a grouped page after Cydia's Manage tab: a row per page, Recommended among them (user
+// 2026-11-18: its own page after all, with Add All in the nav bar as the iOS 6 App Store's Update All).
 //
-//   #/sources/manage                     Sources, Import & Export; then Recommended (core/recommended.js): sources as
-//                                        Sources draws them, a round Add on each, icons and counts filled in lazily
+//   #/sources/manage                     Sources, Import & Export, Hidden; then Recommended, its badge the sources
+//                                        not added yet
+//   #/sources/manage/recommended         core/recommended.js's sources as Sources draws them, a round Add on each,
+//                                        icons and counts filled in lazily; jailbroken: the Jailbreak row, then
+//                                        Tweak Repos and App Sources; Not Jailbroken: app sources only. Add All.
 //   #/sources/manage/sources             the edit list: Add, the red minus and Delete, drag the grabber to reorder
 //   #/sources/manage/io                  Export (share text, save a file, QR code) and Import (file or the clipboard)
 //   #/sources/manage/io/review           what an import found: new ones (ticked), already listed, can't add; Add
@@ -17,6 +20,7 @@ import { cleanSourceUrl } from "../core/sources.js";
 import { grouped, plain, collapse, placeholder, el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showSheet } from "../nav/sheet.js";
+import { showActionSheet } from "../nav/actionsheet.js";
 import { format } from "../router.js";
 import { getBackend, getParser, getArch, siteJailbroken } from "../backend.js";
 import { detectMode } from "../core/settings.js";
@@ -56,6 +60,7 @@ function page(route) {
   if (!p.length) return "root";
   if (p[0] === "sources" && p.length === 1) return "sources";
   if (p[0] === "hidden" && p.length === 1) return "hidden";
+  if (p[0] === "recommended" && p.length === 1) return "recommended";
   if (p[0] === "recommended" && p.length === 2) return "preview";
   if (p[0] === "io") {
     if (p.length === 1) return "io";
@@ -70,6 +75,7 @@ export function nav(route, ctx) {
     case "sources": return { title: "Sources", style: "plain", right: { label: "Add", onClick: () => addSource(ctx) } };
     case "io": return { title: "Import & Export" };
     case "hidden": return { title: "Hidden" };
+    case "recommended": return { title: "Recommended", right: { label: "Add All", onClick: () => addAll(ctx) } };
     case "review": return { title: "Import", right: { label: "Add", onClick: () => addPicked(ctx) } };
     case "preview": return { title: RECOMMENDED_SOURCES.find((r) => recommendedSeed(r).key === route.path[2])?.name || "Source",
       right: { label: "Add", onClick: () => addFromPreview(route, ctx) } };
@@ -83,6 +89,7 @@ export function render(body, route, ctx) {
     case "sources": return renderSources(body);
     case "io": return renderIO(body, route, ctx);
     case "hidden": return renderHidden(body);
+    case "recommended": return renderRecommendedPage(body, ctx);
     case "review": return renderReview(body);
     case "preview": return renderPreview(body, route);
     default: body.append(el("p", "empty", "Nothing here."));
@@ -106,10 +113,16 @@ function renderRoot(body, ctx) {
     { label: "Import & Export", href: here("io") },
     hiddenRow(),
   ];
-  const rec = el("div", "manage-rec");
+  const jailbroken = settings.deviceType() !== "none";
   body.replaceChildren(grouped([{ rows, footer: "Add, delete and reorder your sources, or move them to another phone "
-    + "or package manager." }, { header: "Recommended" }]), rec);
-  renderRecommended(rec, ctx);
+    + "or package manager." }, { rows: [{ label: "Recommended", href: here("recommended"), cls: "rec-entry" }],
+    footer: jailbroken ? "Tweak repos that suit your jailbreak, and app sources." : "App sources to add in one tap." }]));
+  // The badge: how many aren't added yet.
+  recRows().then((rs) => {
+    const n = rs.filter((r) => !r.added).length;
+    const inner = body.querySelector(".rec-entry .cell-inner");
+    if (n && inner && !inner.querySelector(".cell-count")) inner.append(el("span", "cell-count", String(n)));
+  }).catch(() => {});
   getBackend().sources().then((list) => {
     const n = sourcesFor(list, settings.deviceType()).shown.length;
     const detail = body.querySelector(".cell .cell-inner");
@@ -636,6 +649,38 @@ function recIcon(li, row) {
 }
 
 const recHref = (row) => (row.added ? format({ tab: "sources", path: [row.key] }) : here("recommended", row.key));
+
+let recBox = null; // the Recommended page's list, for Add All to redraw
+function renderRecommendedPage(body, ctx) {
+  const box = recBox = el("div", "manage-rec");
+  body.replaceChildren(box);
+  renderRecommended(box, ctx);
+}
+
+// Add All (the nav bar's, as the App Store's Update All): an action sheet with the count, then each source not added
+// yet in turn under the Verifying URL HUD, as one Add does. Failures are named in one alert at the end.
+async function addAll(ctx) {
+  const todo = (await recRows()).filter((r) => !r.added);
+  if (!todo.length) {
+    await showAlert({ title: "Recommended", message: "Every recommended source is in your list.", buttons: ["OK"] });
+    return;
+  }
+  const what = todo.length === 1 ? "the 1 recommended source" : `the ${todo.length} recommended sources`;
+  const i = await showActionSheet({ title: `Add ${what} that aren't in your list yet?`, buttons: ["Add All"] });
+  if (i !== 0) return;
+  const failed = [];
+  const hide = ctx.showHUD("Verifying URL");
+  try {
+    for (const r of todo) {
+      try { await getBackend().addSource(r.input); } catch { failed.push(r.label); }
+    }
+  } finally {
+    hide();
+  }
+  changed();
+  if (failed.length) await showAlert({ title: "Verification Error", message: `Couldn't add ${failed.join(", ")}.`, buttons: ["OK"] });
+  if (recBox?.isConnected) renderRecommended(recBox, ctx);
+}
 
 async function renderRecommended(body, ctx) {
   const rows = await recRows();

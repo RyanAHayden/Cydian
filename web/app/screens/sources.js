@@ -291,7 +291,7 @@ function searchBar() {
 function recommendedRow() {
   if (settings.deviceType() === "none" || recommendedSeen()) return null;
   return { label: "Recommended Sources", subtitle: "sources that suit this jailbreak",
-    href: format({ tab: "sources", path: [manage.SEGMENT] }) }; // Manage: Recommended is on it
+    href: format({ tab: "sources", path: [manage.SEGMENT, "recommended"] }) };
 }
 
 function draw() {

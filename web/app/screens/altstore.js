@@ -16,7 +16,7 @@ import { displayName, githubAvatarUrl } from "../core/sources.js";
 import { compat } from "../core/compat.js";
 import { currentDevice, compatBadge } from "../device.js";
 import { detectMode } from "../core/settings.js";
-import { apps, recordInstall, removeInstall } from "../core/installed.js";
+import { apps, recordInstall, removeInstall, onAppsChange } from "../core/installed.js";
 import { signAndInstall, localSigning, signingReady } from "../signing-client.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { setSourceShare } from "./handoff.js";
@@ -90,11 +90,14 @@ function card(children, cls = "") {
 // sheet (signing-sheet.js customInstall) to change the bundle ID, name or icon, or leave extensions out. `custom`
 // overrides whether it shows, `customize` what it runs (tests; F84: the app page's appPageCustom, which queues).
 export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {},
-  queue = null, name = "", { custom = localSigning() && !ipaInstallAvailable(), customize = null } = {}) {
+  queue = null, name = "", { custom = localSigning() && !ipaInstallAvailable(), customize = null, jailbreak = ipaInstallAvailable(),
+    ipaInstall = openIpaInstall } = {}) {
   const o = installOptions(version, sourceUrl);
   const rows = [];
-  if (o.download && ipaInstallAvailable()) {
-    rows.push({ label: o.itms ? "Install IPA" : "Install", subtitle: "With the jailbreak", onClick: () => { onInstall(); openIpaInstall({ url: o.download, name }); } });
+  if (o.download && jailbreak) {
+    // F88: the helper says whether it installed, so the record waits for its success (openIpaInstall's onInstalled)
+    rows.push({ label: o.itms ? "Install IPA" : "Install", subtitle: "With the jailbreak",
+      onClick: () => ipaInstall({ url: o.download, name, onInstalled: () => onInstall() }) });
   } else if (o.itms) {
     rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
   } else if (o.download) {
@@ -224,6 +227,8 @@ function trackingSection(app, pkg, source) {
     if (i >= 0) mark(versions[i]);
   }
   draw();
+  // F88: an install's record lands when the helper's install ends: redraw, and stop once the page is gone.
+  const offApps = onAppsChange(() => { if (box.isConnected) draw(); else offApps(); });
   // F80: queuing or clearing this app relabels the nav button (Modify); the page gone, it stops listening.
   let shown = false;
   const off = appQueue.subscribe((e) => {
@@ -344,13 +349,15 @@ export function renderApp(body, route, pkg, source) {
   }
 
   // F30: without a jailbreak (the site, the sideload build) nothing can ask the phone what it has, so tapping an
-  // install row records the app on the device for the Installed tab. Jailbreak mode reads dpkg instead.
-  const record = detectMode() === "jailbreak" ? undefined : () => {
+  // install row records the app on the device for the Installed tab. F88: the jailbreak app records it too, once the
+  // helper's install succeeds (dpkg doesn't list IPAs); I4's real version (backend.installedApps) then corrects it.
+  const record = () => {
     apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: v.version, key: pkg.key,
       source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
   };
-  const { rows, options } = installRows(v, app.sourceUrl, undefined, record, record ? () => appPageAction(pkg, source) : null, app.name,
-    record ? { customize: (o) => appPageCustom(pkg, source, o) } : undefined);
+  const queued = detectMode() !== "jailbreak"; // the app queue (F80) and Custom Install (F84) aren't in the jailbreak build
+  const { rows, options } = installRows(v, app.sourceUrl, undefined, record, queued ? () => appPageAction(pkg, source) : null, app.name,
+    queued ? { customize: (o) => appPageCustom(pkg, source, o) } : undefined);
   body.append(grouped([{ header: "Install", rows,
     footer: options.download && ipaInstallAvailable() ? IPA_FOOTER
       : options.itms ? "Installs over the air with the source's signed link."
@@ -359,7 +366,8 @@ export function renderApp(body, route, pkg, source) {
 
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on
   // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.
-  if (record) body.append(trackingSection(app, pkg, source));
+  // F88: in the jailbreak app too (an IPA installed by another tool, or before Cydian recorded installs).
+  body.append(trackingSection(app, pkg, source));
 
   if (v.localizedDescription || v.date) {
     body.append(grouped([{ header: "What's New", rows: [{ label: `Version ${v.version}`, detail: formatDate(v.date) }] }]));

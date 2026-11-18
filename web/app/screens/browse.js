@@ -594,9 +594,9 @@ function downloadDeb(url, name) {
   a.remove();
 }
 
-// F30's record of an app installed without a jailbreak (as renderApp does for its Install rows).
+// F30's record of an installed app (as renderApp does for its Install rows). F88: in the jailbreak app too, where
+// installRows runs it on the helper's success.
 function recordApp(pkg, source, v) {
-  if (detectMode() === "jailbreak") return undefined;
   const app = pkg.stanza.ipa;
   return () => {
     apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: v.version, key: pkg.key,
@@ -737,8 +737,9 @@ async function renderVersions(body, route, key, id) {
           // F85: Install and Custom Install go through the queue (Confirm) like the app page's (F84): that version's job.
           // Where Custom Install is on offer (the sideload app) the sheet comes first so it can be picked; elsewhere a
           // tap queues the version, or (no queue: the jailbreak build, no certificate) does what it did before.
-          const queue = record ? () => appPageAction(pkg, source, { version: v.version }) : null;
-          const customize = record ? (o) => appPageCustom(pkg, source, o, { version: v.version }) : null;
+          const queued = detectMode() !== "jailbreak";
+          const queue = queued ? () => appPageAction(pkg, source, { version: v.version }) : null;
+          const customize = queued ? (o) => appPageCustom(pkg, source, o, { version: v.version }) : null;
           const customOffered = localSigning() && !ipaInstallAvailable();
           if (queue && !customOffered && await queue()) return;
           if (!customOffered && await signIfReady(pkg.stanza.ipa ?? { name: history.name, sourceUrl: history.sourceUrl }, v, record)) return;

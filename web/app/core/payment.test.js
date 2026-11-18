@@ -160,3 +160,9 @@ test("invalidate forgets the credentials", async () => {
   await client.finishSignIn("cydian://authentication_success?token=stale&payment_secret=wrong");
   assert.deepEqual(await client.purchase("com.paid.tweak"), { status: "failed" });
 });
+
+test("B13: isFreePrice reads FREE in any case, and nothing else", async () => {
+  const { isFreePrice } = await import("./payment.js");
+  for (const p of ["FREE", "free", "Free", " free "]) assert.equal(isFreePrice(p), true, p);
+  for (const p of ["$1.99", "", null, undefined, 0, "Freeware"]) assert.equal(isFreePrice(p), false, String(p));
+});

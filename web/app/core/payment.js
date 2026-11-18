@@ -9,6 +9,7 @@
 //   authenticateUrl(base, { udid, model }) -> the sign-in page (opened in an auth session, not fetched)
 //   parseCallback(url)                     -> { kind: "authentication_success", token, secret }
 //                                             | { kind: "payment_completed" } | null
+//   isFreePrice(price)                     -> true for "FREE" / "free" (B13)
 //   parseReply(status, json)               -> { ok, data, error, recoveryUrl, invalidate }
 //   createPaymentClient({ base, request, device, credentials })  the vendor's calls, signed in or not
 //   createCredentialStore({ storage, secure })                    token and payment secret per vendor
@@ -142,6 +143,12 @@ export function parseInfo(j) {
     banner: banner && typeof banner.message === "string"
       ? { message: banner.message, button: typeof banner.button === "string" && banner.button ? banner.button : "Sign In" } : null,
   };
+}
+
+// B13: a commercial package the vendor gives away answers price "FREE" (Chariz, betterAlarm), and purchased: true
+// even without a token, so the screen asks this rather than trusting `purchased` alone.
+export function isFreePrice(price) {
+  return typeof price === "string" && price.trim().toLowerCase() === "free";
 }
 
 export function parsePackageInfo(j) {

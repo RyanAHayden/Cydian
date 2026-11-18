@@ -18,10 +18,11 @@
 //   createAccountSync(deps)  the controller Settings > Account and the app's lifecycle use (below)
 //
 // The payload (v: 1): { sources: [core/sourcelist.js exportLine], settings: { TRAVELS key: value }, holds: [package],
+// wishlist: [package] (F102's Wish List, core/wishlist.js; an older payload without it reads as empty),
 // identity?: { p12, profile (base64url), password, p12Name, profileName } | null (null: no certificate; left out: this
 // build doesn't say), apps: [core/installed.js appRecord], stamps: { "settings.<key>": ms, identity: ms }, savedAt }.
 //
-// Merging: sources, holds and apps are sets, merged three ways against what this device last synced ("seen"): the
+// Merging: sources, holds, the wish list and apps are sets, merged three ways against what this device last synced ("seen"): the
 // account's list, plus what this device added since, minus what it removed since. So a removal travels too, and a
 // device that never synced only adds. Settings and the certificate are last-write-wins per field: a field this
 // device changed since the last sync wins (its stamp is now); otherwise the account's value stands. An app both have
@@ -166,7 +167,7 @@ const appVer = (r) => `${r.version ?? ""}@${r.date ?? 0}`;
 
 export function summarize(p) {
   return {
-    sources: [...new Set(p?.sources ?? [])].sort(), holds: [...new Set(p?.holds ?? [])].sort(),
+    sources: [...new Set(p?.sources ?? [])].sort(), holds: [...new Set(p?.holds ?? [])].sort(), wishlist: [...new Set(p?.wishlist ?? [])].sort(),
     settings: { ...(p?.settings ?? {}) }, identity: identityPrint(p?.identity),
     apps: Object.fromEntries((p?.apps ?? []).map((r) => [r.id, appVer(r)])),
   };
@@ -187,6 +188,7 @@ export function mergePayload(local, remote, seen = null, now = Date.now()) {
     for (const k of Object.keys(local.settings ?? {})) stamps[`settings.${k}`] = now;
     if (local.identity !== undefined) stamps.identity = now;
     return { v: ACCOUNT_VERSION, sources: [...new Set(local.sources ?? [])], settings: { ...local.settings }, holds: [...new Set(local.holds ?? [])],
+      wishlist: [...new Set(local.wishlist ?? [])],
       ...(local.identity !== undefined ? { identity: local.identity } : {}), apps: [...(local.apps ?? [])], stamps, savedAt: now };
   }
   const rs = remote.stamps ?? {};
@@ -214,7 +216,8 @@ export function mergePayload(local, remote, seen = null, now = Date.now()) {
     return changed ? l : r;
   });
   return { v: ACCOUNT_VERSION, sources: mergeSet(remote.sources, local.sources, seen?.sources), settings,
-    holds: mergeSet(remote.holds, local.holds, seen?.holds), ...(identity !== undefined ? { identity } : {}), apps, stamps, savedAt: now };
+    holds: mergeSet(remote.holds, local.holds, seen?.holds),
+    wishlist: mergeSet(remote.wishlist, local.wishlist, seen?.wishlist), ...(identity !== undefined ? { identity } : {}), apps, stamps, savedAt: now };
 }
 
 // Whether the account needs writing: what it would hold differs from what it holds (stamps and times aside).
@@ -225,6 +228,7 @@ export const changedSince = (local, seen) => !seen || !same(summarize(local), se
 export function changesFor(local, merged, { syncCert = true } = {}) {
   const has = (list) => new Set(list ?? []);
   const lS = has(local.sources), mS = has(merged.sources), lH = has(local.holds), mH = has(merged.holds);
+  const lW = has(local.wishlist), mW = has(merged.wishlist);
   const settings = {};
   for (const [k, v] of Object.entries(merged.settings ?? {})) if (!same(v, local.settings?.[k])) settings[k] = v;
   const la = new Map((local.apps ?? []).map((r) => [r.id, r]));
@@ -234,11 +238,12 @@ export function changesFor(local, merged, { syncCert = true } = {}) {
   const c = {
     addSources: [...mS].filter((x) => !lS.has(x)), removeSources: [...lS].filter((x) => !mS.has(x)), settings,
     addHolds: [...mH].filter((x) => !lH.has(x)), removeHolds: [...lH].filter((x) => !mH.has(x)), identity,
+    addWishes: [...mW].filter((x) => !lW.has(x)), removeWishes: [...lW].filter((x) => !mW.has(x)),
     putApps: (merged.apps ?? []).filter((r) => !la.has(r.id) || appVer(la.get(r.id)) !== appVer(r)),
     removeApps: [...la.keys()].filter((id) => !ma.has(id)),
   };
   c.empty = !c.addSources.length && !c.removeSources.length && !Object.keys(settings).length && !c.addHolds.length &&
-    !c.removeHolds.length && !identity && !c.putApps.length && !c.removeApps.length;
+    !c.removeHolds.length && !c.addWishes.length && !c.removeWishes.length && !identity && !c.putApps.length && !c.removeApps.length;
   return c;
 }
 

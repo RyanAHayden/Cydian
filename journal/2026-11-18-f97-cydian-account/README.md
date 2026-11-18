@@ -83,3 +83,22 @@ did the Cydian Account task as written there (user 2026-11-18, approved as draft
 - **Removing a source that lives in another apt list file** (jailbreak): `removeSource` throws there, so the
   source stays and the account keeps listing it on that device. The fake backend shows this is tolerated, but it
   wasn't run on a device.
+
+## Second pass: the Wish List (plan note: F102 added it, sync it beside holds)
+
+The account had already landed on main (5df4c6a). This pass adds only the note's part.
+
+- `core/account.js`: the payload has `wishlist: [package]`. It merges three ways like holds (mergeSet against
+  `seen.wishlist`), `summarize` keeps it, so adding a wish counts as a change to save, and `changesFor` gives
+  `addWishes` / `removeWishes`. An account or `seen` written before this has no `wishlist` and reads as empty, so
+  the first sync after the update only adds.
+- `screens/account.js`: `collectHere` / `applyHere` read and write the list through `core/wishlist.js`
+  (`createWishlist()`, the same `cydian.wishlist` localStorage key as browse.js's own instance). Nothing subscribes
+  to `onChange`, so a second instance misses nothing.
+- Tests: the merge rules and an old payload (core), two devices passing a wish both ways (core, over the Worker),
+  and collect/apply with an in-memory wish list (screens). `docs/account.md` names the list.
+- Decision: the Wish List page prunes installed packages (F102), and that removal travels like any other. So a
+  package installed on one device leaves the list on the others. It goes to whoever wanted it, so that's fine.
+
+**Not verified** (this pass): the round trip in a real browser or app. Only the node tests ran it, for the same
+reasons as above.

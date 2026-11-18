@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.1.5",
+          "date": "2026-11-17",
+          "localizedDescription": "Installs in the app work: the manifest request no longer trips the server proxy.\nInstall signs straight away; Signing walkthrough; built-in Cydian source and Essential Upgrade.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.5",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.5/Cydian.ipa",
+          "size": 2474477,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.1",
           "date": "2026-11-18T01:04:53Z",
           "localizedDescription": "Cydian 0.1.1. Release notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.1",

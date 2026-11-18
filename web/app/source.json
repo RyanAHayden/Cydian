@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.2.7",
+          "date": "2026-11-18T03:43:20Z",
+          "localizedDescription": "My IPAs under Installed: add your own IPAs from Files or a URL, sign them on the phone (offline), install, save or share them.\nHome: the Cydian App card (Install Cydian App, Send Settings to App); Featured slides in; the tile says Refreshing Sources while sources load.\nOpen in Cydian brings your certificate too and imports straight away.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.7",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.7/Cydian.ipa",
+          "size": 2670802,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.2.6",
           "date": "2026-11-18T03:36:05Z",
           "localizedDescription": "Open in Cydian App brings your certificate, sources and settings, and imports them straight away.\nInstalling Cydian from the website brings all of it along: ready on first launch, nothing to set up.\nHome: by Ryan Hayden (Fizlo).\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.6",

@@ -144,3 +144,10 @@
 .editing .source-row .source-lock { transform: none; }
 .name-lock { display: inline-block; margin-left: 5px; vertical-align: -1px; line-height: 0; }
 .name-lock svg, .source-lock svg { display: block; }
+/* Coloured alert buttons (nav/alert.js colors): iOS 6's green "go" and red destructive, the same gloss split at half
+   and dark edge as the greys. Greyed while counting down (disabled). */
+.alert-button.green { background: linear-gradient(#6fcf5a, #2f9d22 49%, #1f8c13 50%, #2a961c); background-origin: border-box; border-color: #134f0c; }
+.alert-button.red { background: linear-gradient(#e46a6a, #c51f1f 49%, #b30f0f 50%, #bd1a1a); background-origin: border-box; border-color: #5e0909; }
+.alert-button.green:active, .alert-button.green.is-pressed { background: linear-gradient(#4fae3c, #1e7a14 49%, #136a0a 50%, #1a7512); }
+.alert-button.red:active, .alert-button.red.is-pressed { background: linear-gradient(#bf4c4c, #9c1414 49%, #880909 50%, #941010); }
+.alert-button.red:disabled, .alert-button.green:disabled { opacity: .5; }

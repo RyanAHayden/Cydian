@@ -17,6 +17,16 @@ import { isZip, profileInfo, targetBundleId, appEntitlements, plistXml, identity
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
 
+// rm -r inside emscripten's FS; nothing there is fine.
+export function removeTree(FS, path) {
+  let st;
+  try { st = FS.stat(path); } catch { return; }
+  if (FS.isDir(st.mode)) {
+    for (const n of FS.readdir(path)) if (n !== "." && n !== "..") removeTree(FS, `${path}/${n}`);
+    FS.rmdir(path);
+  } else FS.unlink(path);
+}
+
 export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null }, { progress = () => {} } = {}) {
   const bytes = ipa instanceof Uint8Array ? ipa : new Uint8Array(ipa);
   if (!isZip(bytes)) throw fail("bad_ipa", "That file isn't an IPA (a zip archive).");
@@ -41,6 +51,10 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   if (!plist) throw fail("bad_ipa", "That IPA's app has no readable Info.plist.");
   const info = appInfo(plist);
   const bundleId = targetBundleId(prof.appId, info.bundleId);
+  // App extensions (PlugIns, a Watch app) come out: zsign gives every binary the app's own entitlements, which don't
+  // match an extension's bundle ID, and iOS then refuses the app ("its integrity could not be verified", user
+  // 2026-11-18, Cydian's Share and Widget). The app's own Sign Options do the same with Remove App Extensions.
+  for (const dir of ["PlugIns", "Extensions", "Watch"]) removeTree(FS, `${appDir}/${dir}`);
 
   FS.writeFile("/w/key.p12", new Uint8Array(p12));
   FS.writeFile("/w/app.mobileprovision", new Uint8Array(profile));

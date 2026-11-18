@@ -139,9 +139,11 @@ export const BROWSE_GATE = {
   title: "Install Cydian First",
   message: "Apps installed in the Cydian app are signed and installed on the iPhone itself: much faster than this "
     + "website, with no upload and no limits.\n\nYou can browse the website anyway, but installing here is slow and can fail on big apps.",
-  // stacked, as iOS 6 stacks three: Cancel closes it and Home stays locked (user 2026-11-18)
-  buttons: ["Install Cydian", "Ignore", "Cancel"],
+  // stacked, as iOS 6 stacks three: Cancel closes it and Home stays locked (user 2026-11-18). Install Cydian green,
+  // Browse Anyway red (the one we'd rather nobody pressed), and it counts down first.
+  buttons: ["Install Cydian", "Browse Anyway", "Cancel"],
   cancel: 2,
+  colors: { 0: "green", 1: "red" },
 };
 // -> "browse" (Ignore: unlocked from now on; Settings > Signing locks it again) | "install" | null (Cancel)
 export async function askToBrowse({ install, alert = showAlert, storage = store() } = {}) {

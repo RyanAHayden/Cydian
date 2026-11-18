@@ -92,6 +92,9 @@ export function httpUrl(raw) {
 }
 // GitHub release files never change once published: Cloudflare keeps them a day, so an install fetches GitHub once,
 // not every time. Everything else (sources, Packages) is fetched fresh.
+// A day at the edge for a release file that came, never an error: a 404 cached for a day kept "upstream answered
+// HTTP 404" after the missing file was uploaded (user 2026-11-18, iFizBox.ipa added to v0.9.3).
+const RELEASE_CACHE = { cacheEverything: true, cacheTtlByStatus: { "200-299": 86400, "300-599": 0 } };
 export const releaseFile = (url) => /^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/download\/[^/]+\/[^/]+$/.test(String(url));
 // GitHub limits requests per address, and Workers share theirs with other sites: a 429 (or a 5xx) is tried again
 // after a short wait, up to 3 times (user 2026-11-18: "upstream answered HTTP 429" installing iFizBox).
@@ -115,17 +118,20 @@ async function viaGitHubApi(url, token, { fetcher = fetch } = {}) {
   const hop = await fetcher(asset.url, { headers: { ...api, Accept: "application/octet-stream" }, redirect: "manual" });
   const where = hop.headers.get("location");
   if (!where) return hop.ok ? hop : null;
-  return fetcher(where, { headers: { "User-Agent": "cydian.dev" }, cf: { cacheEverything: true, cacheTtl: 86400 } });
+  return fetcher(where, { headers: { "User-Agent": "cydian.dev" }, cf: RELEASE_CACHE });
 }
 
 export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promise((r) => setTimeout(r, ms)), token = null } = {}) {
-  const cf = releaseFile(url) ? { cacheEverything: true, cacheTtl: 86400 } : { cacheTtl: 0 };
+  const cf = releaseFile(url) ? RELEASE_CACHE : { cacheTtl: 0 };
   let r;
   for (let attempt = 0; attempt < 3; attempt++) {
     // 30 s for the answer to start, not for the whole body: a 40 MB IPA streams for longer than that ("Load failed")
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 30000);
     try { r = await fetcher(url, { headers: CYDIA, redirect: "follow", cf, signal: ctl.signal }); } finally { clearTimeout(timer); }
+    // A 404 the edge kept (from before RELEASE_CACHE, or a redirect's hop, as releases/latest/download's to the
+    // tagged file): ask the server itself once.
+    if (r.status === 404) r = await fetcher(url, { headers: CYDIA, redirect: "follow", cache: "no-store" });
     if (r.status !== 429 && r.status < 500) return r;
     const after = Number(r.headers.get("retry-after"));
     await wait(Number.isFinite(after) && after > 0 && after <= 5 ? after * 1000 : 600 * (attempt + 1));

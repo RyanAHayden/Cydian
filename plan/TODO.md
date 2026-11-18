@@ -10,7 +10,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [~] **T2** Deploy: `deploy.sh` of our own design (TrueNAS: pull main and rebuild when it changes), the public URL behind Cloudflare Tunnel, `README.md` setup. The NAS side needs a human (ssh truenas). Write the steps and block on them. | files: deploy.sh, README.md | after: F5 — From the F3 review: set CYDIAN_PROXY_HOPS for the Cloudflare Tunnel hop(s), or every visitor shares one rate-limit bucket (request.remote_addr would be the tunnel). BLOCKED: needs the user to run the NAS steps in README (Deploy section): clone on TrueNAS, .env with CYDIAN_PROXY_HOPS=1, first ./deploy.sh, cron job, Cloudflared app + public hostname; and approve publishing
+- [~] **T2** Deploy: `deploy.sh` of our own design (TrueNAS: pull main and rebuild when it changes), the public URL behind Cloudflare Tunnel, `README.md` setup. The NAS side needs a human (ssh truenas). Write the steps and block on them. | files: deploy.sh, README.md | after: F5 — From the F3 review: set CYDIAN_PROXY_HOPS for the Cloudflare Tunnel hop(s), or every visitor shares one rate-limit bucket (request.remote_addr would be the tunnel). BLOCKED: needs the user to run the NAS steps in README (Deploy section): clone on TrueNAS, .env with CYDIAN_PROXY_HOPS=1, first ./deploy.sh, cron job, Cloudflared app + public hostname; and approve publishing — Obsolete 2026-11-18: the NAS deployment was removed; cydian.dev is one Cloudflare Worker deployed by Workers Builds (worker/, README).
 
 ### Research (any time, parallel)
 

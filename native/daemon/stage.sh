@@ -16,8 +16,8 @@ jobs=$root/var/jb/Library/LaunchDaemons
 mkdir -p "$(dirname "$exe")" "$jobs"
 clang -target arm64-apple-ios15.0 -isysroot "$sdk" -std=gnu11 -fobjc-arc -Wall -Wextra -Werror -O2 \
   -fuse-ld=lld --ld-path="$lld" -Wl,-dead_strip -Wl,-adhoc_codesign \
-  -framework Foundation -framework UserNotifications \
-  -o "$exe" "$here/main.m" "$here/upgrades.c" "$here/../Sources/availability.c"
+  -framework Foundation -framework UserNotifications -framework SystemConfiguration -framework IOKit \
+  -o "$exe" "$here/main.m" "$here/auto.c" "$here/upgrades.c" "$here/../Sources/availability.c"
 chmod 0755 "$exe"
 if [ -n "$ldid" ]; then
   "$ldid" -S"$here/entitlements.plist" "$exe"

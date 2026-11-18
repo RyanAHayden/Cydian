@@ -1176,5 +1176,117 @@ class InstallPaid(unittest.TestCase):
                 self.assertEqual(os.listdir(work), [])
 
 
+
+DEB_DIR = "/var/mobile/Library/Caches/com.ryha.cydian/deb"
+
+
+@unittest.skipUnless(CC, "no C compiler on this machine")
+class LocalDeb(unittest.TestCase):
+    """N9: simulate-deb | install-deb <path>: a .deb shared with Cydian (Open in Cydian, the share sheet). The plan,
+    and the chain on Linux: the app's file copied root-side as install-paid's, no control check, apt-get on the copy."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp()
+        cls.driver = os.path.join(cls.tmp, "test_driver")
+        build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"])
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp)
+
+    def run_driver(self, *args, driver=None):
+        r = subprocess.run([driver or self.driver, *args], capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout.splitlines()
+
+    def test_plan(self):
+        deb = DEB_DIR + "/0A1B.deb"
+        self.assertEqual(self.run_driver("plan", "/var/jb", "3", "simulate-deb", deb),
+                         ["/var/jb/usr/bin/apt-get", "apt-get", "-s", "--reinstall", "--allow-downgrades", "install", deb])
+        fixed = ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold",
+                 "--reinstall", "--allow-downgrades"]
+        self.assertEqual(self.run_driver("plan", "/var/jb", "3", "install-deb", deb),
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "-o", "APT::Keep-Fds::=3", "-o",
+                          "APT::Status-Fd=3", "install", deb])
+        self.assertEqual(self.run_driver("plan", "/var/jb", "-1", "install-deb", deb)[1:], ["apt-get", *fixed, "install", deb])
+        cases = {
+            ("simulate-deb",): "simulate-deb takes one .deb path",
+            ("install-deb", deb, deb): "install-deb takes one .deb path",
+            ("install-deb", "/var/jb/tmp/x.deb"): "bad .deb path",
+            ("install-deb", DEB_DIR + "/../paid/x.deb"): "bad .deb path",
+            ("simulate-deb", DEB_DIR + "/x.ipa"): "bad .deb path",
+            ("install-deb", PAID_DIR + "/x.deb"): "bad .deb path",  # not install-paid's folder
+        }
+        for words, msg in cases.items():
+            with self.subTest(words=words):
+                out = self.run_driver("plan", "/var/jb", "3", *words)
+                self.assertEqual(len(out), 1, out)
+                self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
+
+    def chain(self, apt_exit=0):
+        base = tempfile.mkdtemp(dir=self.tmp)
+        p, debs, work = (os.path.join(base, n) for n in ("prefix", "deb", "work"))
+        for d in ("Applications/Cydian.app", "usr/bin"):
+            os.makedirs(os.path.join(p, d))
+        os.makedirs(debs)
+        os.makedirs(work)
+        app = os.path.join(p, "Applications/Cydian.app/Cydian")
+        shutil.copy(self.driver, app)
+        apt = os.path.join(p, "usr/bin/apt-get")
+        with open(apt, "w") as f:
+            f.write('#!/bin/sh\necho "argv: $*"\nfor a; do last=$a; done\necho "copy: $(cat "$last")"\n'
+                    'echo "env: $(env | sort | tr \'\\n\' \' \')"\n'
+                    f'echo "pmstatus:com.example.shared:50:Installing" >&3\nexit {apt_exit}\n')
+        os.chmod(apt, 0o755)
+        helper = os.path.join(base, "cydian-helper")
+        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"', f"-DCYDIAN_ROOT_UID={os.getuid()}",
+                                                f'-DHELPER_DEB_DIR="{debs}"', f'-DHELPER_PAID_WORK="{work}"'])
+        return p, app, helper, debs, work
+
+    def deb(self, d, name="S1.deb", text="a shared deb"):
+        path = os.path.join(d, name)
+        with open(path, "w") as f:
+            f.write(text)
+        return path
+
+    def test_chain(self):
+        for verb, apt_exit in (("simulate-deb", 0), ("install-deb", 0), ("install-deb", 100)):
+            with self.subTest(verb=verb, apt_exit=apt_exit):
+                p, app, helper, debs, work = self.chain(apt_exit)
+                out = self.run_driver("spawn", helper, verb, self.deb(debs), driver=app)
+                self.assertEqual(out[-1], f"exit: {apt_exit}", out)
+                argv = next(l for l in out if l.startswith("1: argv: "))
+                self.assertIn(f" install {work}/cydian-deb.", argv)
+                self.assertTrue(argv.endswith("/deb.deb"), argv)  # the root-owned copy, not the app's file
+                self.assertEqual(argv.startswith("1: argv: -s "), verb == "simulate-deb", argv)
+                self.assertIn("1: copy: a shared deb", out)
+                env = next(l for l in out if l.startswith("1: env: "))
+                self.assertEqual("CYDIA=3 1" in env, verb == "install-deb", env)
+                self.assertFalse(any(l.startswith("2: cydian-helper: ") for l in out), out)
+                self.assertEqual(os.listdir(work), [])
+
+    def test_chain_refuses(self):
+        p, app, helper, debs, work = self.chain()
+        good = self.deb(debs)
+        link = os.path.join(debs, "link.deb")
+        os.symlink(good, link)
+        empty = self.deb(debs, name="empty.deb", text="")
+        cases = [
+            (app, link, "can't open the .deb", 64),
+            (app, empty, "isn't a plain file", 64),
+            (app, os.path.join(debs, "missing.deb"), "can't open the .deb", 64),
+            (app, os.path.join(p, "x.deb"), "bad .deb path", 64),
+            (self.driver, good, "isn't Cydian", 77),
+        ]
+        for parent, path, msg, code in cases:
+            with self.subTest(path=path, msg=msg):
+                out = self.run_driver("spawn", helper, "install-deb", path, driver=parent)
+                self.assertTrue(any(l.startswith("2: cydian-helper: ") and msg in l for l in out), out)
+                self.assertEqual(out[-1], f"exit: {code}")
+                self.assertFalse(any(l.startswith("1: ") for l in out), out)
+                self.assertEqual(os.listdir(work), [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -30,7 +30,8 @@ function el(tag, cls, text) {
 
 // The console sheet for one IPA. Resolves the run's result once it has ended (the sheet stays up until Close or
 // Return to Cydian). False when another IPA install's console is already up.
-export async function openIpaInstall({ url, name = "", onInstalled = () => {} }) {
+// N9: `native` stands in for the bridge (a shared file's share.ipaInstall, share.js).
+export async function openIpaInstall({ url, name = "", onInstalled = () => {}, native = undefined }) {
   if (running) return false;
   running = true;
   const title = name || ipaName(url);
@@ -68,7 +69,7 @@ export async function openIpaInstall({ url, name = "", onInstalled = () => {} })
     progress(pct) { fill.style.transform = `scaleX(${Math.max(0, Math.min(100, pct)) / 100})`; },
   };
 
-  const r = await runIpaInstall({ url, name: title }, view);
+  const r = await runIpaInstall({ url, name: title }, view, native ? { native } : undefined);
   flush();
   m.setTitle("Complete");
   runLogs.add({ title: `Install ${title}`, jobs: [{ op: "install", id: r.bundleId || url, version: null, mode: "ipa" }],

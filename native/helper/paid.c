@@ -6,6 +6,7 @@
  *      nothing the caller does afterwards changes what gets installed (as install-ipa does, ipa.c).
  *   2. dpkg-deb reads the copy's control: Package must be the id asked and Version the version (rollback's check).
  *   3. apt-get install <the copy>, as rollback does: apt installs the file and pulls in its dependencies.
+ * N9's simulate-deb and install-deb (helper_local_deb) take the same road from HELPER_DEB_DIR, without step 2.
  * SPDX-License-Identifier: GPL-3.0-or-later */
 #include "paid.h"
 
@@ -24,9 +25,10 @@ static void remove_work(const char *work, const char *copy) {
     rmdir(work);
 }
 
-static int copy_in(const char *src, const char *copy, const char **err) {
-    char real[PATH_MAX];
-    if (!realpath(HELPER_PAID_DIR, real) || (strcmp(real, HELPER_PAID_DIR) && strcmp(real, "/private" HELPER_PAID_DIR))) {
+static int copy_in(const char *from, const char *src, const char *copy, const char **err) {
+    char real[PATH_MAX], priv[PATH_MAX];
+    snprintf(priv, sizeof priv, "/private%s", from);
+    if (!realpath(from, real) || (strcmp(real, from) && strcmp(real, priv))) {
         *err = "the download directory is missing or a link";
         return HELPER_EX_IOERR;
     }
@@ -57,19 +59,22 @@ static int copy_in(const char *src, const char *copy, const char **err) {
     return 0;
 }
 
-int helper_install_paid(const char *prefix, struct helper_plan *plan, char *const env[], const char **err) {
+/* Copy plan->deb (in `from`) into a fresh root-owned <HELPER_PAID_WORK>/<tag>.XXXXXX/<tag>.deb, check it when `id` is
+ * set (install-paid), run plan's apt-get on the copy, remove the directory. */
+static int run_on_copy(const char *prefix, struct helper_plan *plan, char *const env[], const char *from, const char *tag,
+                       const char *id, const char *version, const char **err) {
     char work[PATH_MAX], copy[PATH_MAX], src[PATH_MAX];
     snprintf(src, sizeof src, "%s", plan->deb);
-    if ((size_t)snprintf(work, sizeof work, "%s/cydian-paid.XXXXXX", HELPER_PAID_WORK) >= sizeof work) {
+    if ((size_t)snprintf(work, sizeof work, "%s/cydian-%s.XXXXXX", HELPER_PAID_WORK, tag) >= sizeof work) {
         *err = "work path too long"; return HELPER_EX_IOERR;
     }
     if (!mkdtemp(work)) { *err = "can't make a work directory"; return HELPER_EX_IOERR; }
     chmod(work, 0755); /* apt's _apt user may read the copy; nobody else may write here */
-    if ((size_t)snprintf(copy, sizeof copy, "%s/paid.deb", work) >= sizeof copy) {
+    if ((size_t)snprintf(copy, sizeof copy, "%s/%s.deb", work, tag) >= sizeof copy) {
         rmdir(work); *err = "work path too long"; return HELPER_EX_IOERR;
     }
-    int rc = copy_in(src, copy, err);
-    if (!rc && helper_rollback_verify(prefix, copy, plan->name_buf[0], plan->item_buf[0], err)) {
+    int rc = copy_in(from, src, copy, err);
+    if (!rc && id && helper_rollback_verify(prefix, copy, id, version, err)) {
         *err = strstr(*err, "isn't that package") ? "the downloaded .deb isn't that package and version"
                                                    : "dpkg-deb couldn't read the downloaded .deb's control";
         rc = HELPER_EX_USAGE;
@@ -89,4 +94,12 @@ int helper_install_paid(const char *prefix, struct helper_plan *plan, char *cons
     remove_work(work, copy);
     *err = NULL;
     return WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
+}
+
+int helper_install_paid(const char *prefix, struct helper_plan *plan, char *const env[], const char **err) {
+    return run_on_copy(prefix, plan, env, HELPER_PAID_DIR, "paid", plan->name_buf[0], plan->item_buf[0], err);
+}
+
+int helper_local_deb(const char *prefix, struct helper_plan *plan, char *const env[], const char **err) {
+    return run_on_copy(prefix, plan, env, HELPER_DEB_DIR, "deb", NULL, NULL, err);
 }

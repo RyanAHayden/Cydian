@@ -6,6 +6,7 @@ import { collectHere, applyHere, keyStore, sourceLine, lastSyncedText } from "./
 import { changesFor, identityOf } from "../core/account.js";
 import { handleIncoming } from "../incoming.js";
 import { memoryAppStore } from "../core/installed.js";
+import { createWishlist } from "../core/wishlist.js";
 
 function fakes() {
   const srcs = [{ key: "a", uri: "https://a.example/" }, { key: "b", uri: "https://b.example" }];
@@ -21,7 +22,9 @@ function fakes() {
     holds: { list: () => [...holds], set: async (p, on) => { holds = on ? [...holds, p] : holds.filter((x) => x !== p); } },
   };
   const db = memoryAppStore([{ id: "com.ex.app", name: "App", version: "1.0", date: 5 }, { id: "com.ryha.cydian", self: true, version: "9" }]);
-  return { srcs, backend, store, vals, holds: () => holds, db, appStore: async () => db };
+  const wishes = createWishlist({ storage: null });
+  wishes.set("tweak.wish", true);
+  return { srcs, backend, store, vals, holds: () => holds, db, appStore: async () => db, wishes };
 }
 
 test("collect: sources as one line each, the settings that travel, holds, apps (not Cydian itself), the certificate", async () => {
@@ -32,6 +35,7 @@ test("collect: sources as one line each, the settings that travel, holds, apps (
   assert.equal(p.settings.appearance, "dark");
   assert.ok(!("iosVersion" in p.settings), "a setting this mode hides stays out");
   assert.deepEqual(p.holds, ["tweak.one"]);
+  assert.deepEqual((await collectHere({ backend: f.backend, store: f.store, appStore: f.appStore, mode: "jailbreak", wishes: f.wishes })).wishlist, ["tweak.wish"]);
   assert.deepEqual(p.apps.map((r) => r.id), ["com.ex.app"]);
   assert.deepEqual(p.identity, identityOf(cert));
   assert.equal((await collectHere({ syncCert: false, backend: f.backend, store: f.store, appStore: f.appStore, mode: "site", load: async () => cert })).identity, null);
@@ -48,7 +52,9 @@ test("apply: sources, settings, holds, apps and the certificate land; failures d
   const local = await collectHere({ backend: f.backend, store: f.store, appStore: f.appStore, mode: "jailbreak" });
   const merged = { ...local, sources: ["https://a.example/", "https://bad.example/", "https://c.example/"], holds: ["tweak.two"],
     settings: { ...local.settings, appearance: "light" }, apps: [{ id: "com.ex.app", name: "App", version: "2.0", date: 9 }, { id: "com.ex.new", name: "New", version: "1", date: 3 }] };
-  await applyHere(changesFor(local, merged), { backend: f.backend, store: f.store, appStore: f.appStore, mode: "jailbreak" });
+  const local2 = await collectHere({ backend: f.backend, store: f.store, appStore: f.appStore, mode: "jailbreak", wishes: f.wishes });
+  await applyHere(changesFor(local2, { ...merged, wishlist: ["tweak.other"] }), { backend: f.backend, store: f.store, appStore: f.appStore, mode: "jailbreak", wishes: f.wishes });
+  assert.deepEqual(f.wishes.list(), ["tweak.other"], "the Wish List lands beside the holds");
   assert.deepEqual(f.srcs.map((s) => s.uri), ["https://a.example/", "https://c.example/"]);
   assert.equal(f.vals.appearance, "light");
   assert.deepEqual(f.holds(), ["tweak.two"]);

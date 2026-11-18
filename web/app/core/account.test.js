@@ -131,7 +131,8 @@ function fakeServer() {
 
 function device(server, initial) {
   let key = null, saved = null;
-  const here = { sources: [...initial.sources], settings: { ...initial.settings }, holds: [...initial.holds], apps: [...(initial.apps ?? [])],
+  const here = { sources: [...initial.sources], settings: { ...initial.settings }, holds: [...initial.holds], wishlist: [...(initial.wishlist ?? [])],
+    apps: [...(initial.apps ?? [])],
     identity: initial.identity };
   const acct = createAccountSync({
     keys: { get: async () => key, set: async (k) => { key = k; }, remove: async () => { key = null; } },
@@ -140,6 +141,7 @@ function device(server, initial) {
     apply: async (c) => {
       here.sources = [...here.sources.filter((s) => !c.removeSources.includes(s)), ...c.addSources];
       here.holds = [...here.holds.filter((s) => !c.removeHolds.includes(s)), ...c.addHolds];
+      here.wishlist = [...here.wishlist.filter((s) => !c.removeWishes.includes(s)), ...c.addWishes];
       Object.assign(here.settings, c.settings);
       if (c.identity) here.identity = c.identity;
       here.apps = [...here.apps.filter((r) => !c.removeApps.includes(r.id) && !c.putApps.some((p) => p.id === r.id)), ...c.putApps];
@@ -185,6 +187,15 @@ test("two devices: create, sign in (a read), batched saves, a 409 merged, delete
   await a.acct.save();
   await b.acct.sync();
   assert.deepEqual(b.here.sources, ["https://b.example/"]);
+  // the Wish List (F102) travels beside the holds: an add, then a removal
+  a.here.wishlist.push("tweak.wish");
+  await a.acct.save();
+  await b.acct.sync();
+  assert.deepEqual(b.here.wishlist, ["tweak.wish"]);
+  b.here.wishlist = [];
+  await b.acct.save();
+  await a.acct.sync();
+  assert.deepEqual(a.here.wishlist, []);
   // a wrong key, a missing account
   const c = device(server, { sources: [], settings: {}, holds: [] });
   await assert.rejects(c.acct.signIn("nonsense"), { code: "bad_key" });
@@ -221,4 +232,18 @@ test("accountApi: errors say what happened", async () => {
   await assert.rejects(api.get(), { code: "network" });
   const busy = accountApi({ id: "ab".repeat(32), fetcher: async () => new Response(JSON.stringify({ error: "Too many requests." }), { status: 429 }) });
   await assert.rejects(busy.put(new Uint8Array(40), 1), { code: "rate_limited", message: "Too many requests." });
+});
+
+test("merge: the Wish List is a set like the holds; a payload from before it reads as empty", () => {
+  const seen = summarize({ ...base(), wishlist: ["w1", "w2"] });
+  const remote = { ...base(), wishlist: ["w1", "w2", "w3"], stamps: {} };
+  const local = { ...base(), wishlist: ["w2", "w4"] };
+  assert.deepEqual(mergePayload(local, remote, seen, 100).wishlist, ["w2", "w3", "w4"]); // w1 removed here, w3 there, w4 here
+  const old = { ...base(), stamps: {} }; // an account written before the Wish List synced
+  assert.deepEqual(mergePayload(local, old, summarize(old), 100).wishlist, ["w2", "w4"]);
+  assert.deepEqual(mergePayload(local, null, null, 100).wishlist, ["w2", "w4"]);
+  const c = changesFor(local, { ...local, wishlist: ["w4", "w5"] });
+  assert.deepEqual([c.addWishes, c.removeWishes, c.empty], [["w5"], ["w2"], false]);
+  assert.ok(changesFor(local, { ...local }).empty);
+  assert.ok(changedSince(local, summarize({ ...local, wishlist: ["w2"] })), "a wish added is a change to save");
 });

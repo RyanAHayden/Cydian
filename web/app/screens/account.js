@@ -1,5 +1,5 @@
 // F97: Settings > Account (iOS 6 grouped tables). Cydian Account keeps this device's sources, the settings that
-// travel, Ignored Upgrades, installed-app records and the signing certificate on cydian.dev, encrypted with an account
+// travel, Ignored Upgrades, the Wish List, installed-app records and the signing certificate on cydian.dev, encrypted with an account
 // key only the user's devices have (core/account.js has the rules; worker/src/account.js the storage).
 //
 //   accountSection()          the root Settings page's row: Cydian Account, Signed In / Off; pushes #/settings/account
@@ -24,6 +24,7 @@ import { createAccountSync, keyLink, parseKey, identityOf, identityFiles, ACCOUN
 import { detectMode, TRAVELS } from "../core/settings.js";
 import { exportLine } from "../core/sourcelist.js";
 import { toBase64 } from "../core/signing.js";
+import { createWishlist } from "../core/wishlist.js";
 import { apps, recordInstall, removeInstall } from "../core/installed.js";
 import { getBackend } from "../backend.js";
 import { loadIdentity, saveIdentity } from "../signing-client.js";
@@ -84,12 +85,12 @@ export const sourceLine = (line) => (/^https?:\/\/[^/\s]+$/i.test(line) ? line +
 const certBuild = (mode = detectMode()) => mode === "site" || mode === "sideload";
 
 export async function collectHere({ syncCert = true, backend = getBackend(), store = settings, native = globalThis.cydianNative,
-  mode = detectMode(), appStore = apps, load = loadIdentity } = {}) {
+  mode = detectMode(), appStore = apps, load = loadIdentity, wishes = createWishlist() } = {}) {
   const sources = (await backend.sources().catch(() => [])).filter((s) => s?.uri).map((s) => sourceLine(exportLine(s)));
   const values = {};
   for (const k of TRAVELS) if (store.isShown(k)) values[k] = store.get(k);
   const recs = await (await appStore()).all().catch(() => []);
-  const out = { sources: [...new Set(sources)], settings: values, holds: store.holds.list(),
+  const out = { sources: [...new Set(sources)], settings: values, holds: store.holds.list(), wishlist: wishes.list(),
     apps: recs.filter((r) => r?.id && !r.self).map(({ id, name, version, key, source, sourceName, icon, date }) =>
       ({ id, name, version, key: key ?? null, source: source ?? null, sourceName: sourceName ?? null, icon: icon ?? null, date: date ?? 0 })) };
   if (!certBuild(mode)) return out; // the jailbreak app signs nothing: it leaves the account's certificate as it is
@@ -109,7 +110,7 @@ export async function collectHere({ syncCert = true, backend = getBackend(), sto
 const b64toUrl = (b64) => String(b64).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 export async function applyHere(c, { backend = getBackend(), store = settings, native = globalThis.cydianNative, mode = detectMode(),
-  appStore = apps } = {}) {
+  appStore = apps, wishes = createWishlist() } = {}) {
   if (c.removeSources.length) {
     const have = await backend.sources().catch(() => []);
     for (const line of c.removeSources) {
@@ -121,6 +122,8 @@ export async function applyHere(c, { backend = getBackend(), store = settings, n
   for (const [k, v] of Object.entries(c.settings)) { try { if (store.isShown(k)) store.set(k, v); } catch { /* not in this build */ } }
   for (const p of c.addHolds) await Promise.resolve(store.holds.set(p, true)).catch(() => {});
   for (const p of c.removeHolds) await Promise.resolve(store.holds.set(p, false)).catch(() => {});
+  for (const p of c.addWishes ?? []) { try { wishes.set(p, true); } catch { /* storage full: the next sync tries again */ } }
+  for (const p of c.removeWishes ?? []) { try { wishes.set(p, false); } catch { /* as above */ } }
   if (c.identity) {
     try {
       if (mode === "site") await saveIdentity({ ...identityFiles(c.identity), passwordOk: null });

@@ -132,6 +132,18 @@ int auto_stash(const char *cache, const char *rollback, const char *id, const ch
 /* Delete <rollback>/<id>/'s .debs that auto_prune says go (the folder too once it's empty). Returns how many. */
 int auto_prune_dir(const char *rollback, const char *id, const char *installed, int keep);
 
+/* B16: 1 if a Packages "Filename:" value is a full URL ("<scheme>://...", ios.jjolano.me's GitHub links). apt joins
+ * it to the repo's URL and 404s; the app downloads it itself (F131), the daemon leaves such packages to the app. */
+int auto_url_filename(const char *filename);
+
+/* B16: which of the n id=version pairs some list in lists (apt's <prefix>/var/lib/apt/lists, its *_Packages files)
+ * offers with a full-URL Filename: hit[i] = 1 for those. Returns how many. lists NULL or unreadable: none. */
+int auto_linked(const char *lists, const char *const *ids, const char *const *vers, int n, unsigned char *hit);
+
+/* B16: the packages an `apt-get -s` plan installs ("Inst <id>[:arch] [<from>] (<to> ..."), new ones too, into
+ * ids/vers (each up to UPD_FIELD bytes, room for max). Returns how many. */
+int auto_plan_installs(const char *plan, char (*ids)[UPD_FIELD], char (*vers)[UPD_FIELD], int max);
+
 /* What the daemon is given: where things are, the facts of the moment and the work apt does. main.m fills it with
  * the phone's; auto_driver.c with a fake clock, phone and helper. Strings returned are malloc'd (or NULL). */
 enum { AUTO_NOTE_UPGRADES, AUTO_NOTE_UPDATED, AUTO_NOTE_FAILED, AUTO_NOTE_BADGE };
@@ -142,6 +154,7 @@ struct auto_env {
     const char *info_dir;     /* <prefix>/var/lib/dpkg/info (the <id>.list files) */
     const char *cache_dir;    /* <prefix>/var/cache/apt/archives */
     const char *rollback_dir; /* <prefix>/var/cache/cydian/rollback */
+    const char *lists_dir;    /* <prefix>/var/lib/apt/lists (B16: full-URL Filenames), NULL: not looked at */
     char *(*settings)(void *ctx);           /* the settings text (auto_settings_parse) */
     char *(*held)(void *ctx);               /* `apt-mark showhold` */
     long (*now)(void *ctx);

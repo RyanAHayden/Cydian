@@ -234,16 +234,26 @@ export async function removeFromDevice(native) {
 // (getServer, https only: the shell takes no other for the manifest) must be there. When one is missing, the Signing
 // page opens with that step open and this answers its id; null when Install can go on. A bridge that doesn't answer
 // counts as no certificate, as signingReady does.
-export async function firstInstallCheck({ native, server = getServer(), go = openRoute, wait = sleep } = {}) {
-  const { missingStep, openAt } = await import("./screens/signing.js");
+// B39: `from`, the page Install was tapped on (taken before any wait), is where Signing returns once it's ready.
+export async function firstInstallCheck({ native, server = getServer(), go = openRoute, wait = sleep, from = here() } = {}) {
+  const { missingStep, openAt, rememberReturn } = await import("./screens/signing.js");
   const step = missingStep(await readyStatus(native, wait), server);
   if (!step) return null;
   openAt(step);
+  rememberReturn(from);
   go(["signing"]);
   return step;
 }
 
-const openRoute = (path) => { location.hash = format(settingsRoute(path)).replace(/^#/, ""); };
+const here = () => globalThis.location?.hash ?? "";
+// B39: every trip to Settings > Signing from a page (a missing certificate or server) comes back to that page once
+// signing is ready (screens/signing.js offerInstall), not to Home's stack.
+const openRoute = (path) => {
+  const from = here();
+  import("./screens/signing.js").then((m) => m.rememberReturn(from)).catch(() => {});
+  location.hash = format(settingsRoute(path)).replace(/^#/, "");
+};
+export const openSigning = () => openRoute(["signing"]);
 
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an
 // error, which an alert explains (no_server and no_identity then open Settings > Signing).
@@ -329,7 +339,12 @@ const hostOf = (server) => { try { return new URL(server).host; } catch { return
 export async function installFromLibrary({ file, name = "", signed = false, onInstalled = () => {} },
   { native, hud = progressHUD, alert = showAlert, go = openRoute, check = firstInstallCheck, reachable = serverReachable,
     follow = null, later = setTimeout } = {}) {
-  if (await check({ native })) return null;
+  if (await check({ native })) {
+    // B39 (F177's Install Now): once Signing is ready it goes back to this IPA's page and offers this install there.
+    const deps = { native, hud, alert, go, check, reachable, follow, later };
+    (await import("./screens/signing.js")).rememberInstall({ name, run: () => installFromLibrary({ file, name, signed, onInstalled }, deps) });
+    return null;
+  }
   const server = getServer();
   // The first step the shell will report: a placeholder "Signing" put Signing, Reading, Signing on the log (user 2026-11-18).
   const h = hud(signed ? "Installing" : "Reading");

@@ -37,7 +37,7 @@ import { apps, recordInstall } from "../core/installed.js";
 import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optionsParams, siteEntries, addSiteUrl,
   STATE_LABELS, addSiteFile, removeSiteEntry, openIpaStore, memoryIpaStore } from "../core/myipas.js";
 import { readIpaFile } from "../core/ipainfo.js";
-import { localSigning, libraryCall, installFromLibrary, signAndInstall } from "../signing-client.js";
+import { localSigning, libraryCall, installFromLibrary, signAndInstall, openSigning } from "../signing-client.js";
 import { siteCertificateAlert } from "./altstore.js";
 import { NAME } from "../brand.js";
 
@@ -585,7 +585,7 @@ async function signNow(entry, body, route) {
     hide();
     const why = deviceError(e, entry.name);
     await showAlert({ title: why.open ? why.title : `Couldn't Sign ${entry.name || ""}`.trim(), message: why.message, buttons: ["OK"] });
-    if (why.open === "signing") location.hash = format(settingsRoute(["signing"])).replace(/^#/, "");
+    if (why.open === "signing") openSigning(); // B39: back to this IPA's page once it's set up
     return;
   }
   if (hide.done) hide.done("Signed"); else hide();

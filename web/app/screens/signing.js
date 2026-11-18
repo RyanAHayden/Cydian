@@ -19,7 +19,10 @@
 //   pendingInstall()                       that, or null; leaving Signing (a route without "signing") forgets it
 //   await offerInstall(ready, { alert })   the Signing page, each time it draws: when ready and one is pending, the
 //                                          iOS 6 alert Install <name>? (Later | Install Now) once; Install Now runs it.
-//                                          -> "install" | "later" | null (nothing asked)
+//                                          -> "install" | "later" | "back" | null (nothing asked)
+//   rememberReturn(hash) / pendingReturn()  B39: the page that opened Signing (signing-client.js firstInstallCheck,
+//                                          openSigning); once ready, offerInstall first goes back to it (the IPA's
+//                                          page with its file), then asks Install Now there. Never Home.
 //   siteReady(id)                          the website's saved certificate is ready (.p12, profile, password not wrong)
 import { statusReady } from "../signing-client.js";
 import { normalizeServer } from "../core/signing.js";
@@ -65,21 +68,43 @@ const onSigning = (hash) => /(^|\/)signing(\/|$)/.test(String(hash ?? "").replac
 export function rememberInstall({ name = "", run } = {}) {
   if (typeof run !== "function") return;
   pending = { name: name || NAME, run };
+  watchTrip();
+}
+
+export const pendingInstall = () => pending;
+export function forgetInstall() { pending = null; returnTo = null; }
+export const routeLeftSigning = (hash) => !onSigning(hash);
+
+// B39: the page that opened Signing for a missing certificate or server (an IPA's page in My IPAs, an app's page,
+// the incoming IPA's): once signing is ready, offerInstall goes back there, never Home. Kept for one trip like
+// `pending`; a Signing route itself (or none) is no page to return to.
+let returnTo = null;
+export function rememberReturn(hash) {
+  const h = String(hash ?? "").replace(/^#/, "");
+  if (!h || h === "/" || onSigning(h)) return;
+  returnTo = `#${h}`;
+  watchTrip();
+}
+export const pendingReturn = () => returnTo;
+
+function watchTrip() {
   if (watchingRoute || typeof addEventListener !== "function") return;
   watchingRoute = true;
   // A trip ends when the user leaves Signing (Back to Home, another tab): opening Signing again later is their own.
   addEventListener("hashchange", () => { if (!onSigning(globalThis.location?.hash)) forgetInstall(); });
 }
 
-export const pendingInstall = () => pending;
-export function forgetInstall() { pending = null; }
-export const routeLeftSigning = (hash) => !onSigning(hash);
+const goHash = (hash) => { if (globalThis.location) globalThis.location.hash = hash.replace(/^#/, ""); };
 
 // The website's certificate is ready to sign with: the .p12, the profile and a password not known to be wrong.
 export const siteReady = (id) => Boolean(id?.p12 && id?.profile && id.password != null && id.passwordOk !== false);
 
-export async function offerInstall(ready, { alert = null } = {}) {
-  if (!ready || !pending) return null;
+export async function offerInstall(ready, { alert = null, go = goHash } = {}) {
+  if (!ready) return null;
+  const from = returnTo;
+  returnTo = null;
+  if (from) go(from); // B39: back to the page that sent the user here, before (and under) the alert
+  if (!pending) return from ? "back" : null;
   const { name, run } = pending;
   pending = null; // once per trip, even when the page redraws while the alert is up
   const ask = alert ?? (await import("../nav/alert.js")).showAlert;

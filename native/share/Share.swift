@@ -206,10 +206,13 @@ enum ShareRouter {
                 if host.appInstaller == .none { return .refuse(title: noInstaller.title, message: noInstaller.message) }
                 return .helperIPA(item)
             case .sideload:
-                guard let signer = host.signer else {
+                guard host.signer != nil else {
                     return .refuse(title: "Can't Sign", message: "This \(Brand.name) can't sign apps on the phone.")
                 }
-                if let why = signer.problem() { return .refuse(title: "Import Your Certificate", message: why) }
+                // B39: always into My IPAs and its page, certificate or not. The page and its Install decide with
+                // signing.status, the rule Settings > Signing shows (web/app/signing-client.js statusReady); a check
+                // of its own here (signer.problem: the profile too, and its dates) refused an IPA, and dropped the
+                // file, while Signing showed the certificate as set up.
                 return .signIPA(item)
             }
         case .deb:

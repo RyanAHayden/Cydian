@@ -9,6 +9,8 @@
 //
 // Everything here reads bytes (Uint8Array or ArrayBuffer) and never leaves the phone.
 
+import { DOMAIN, SIGN_HOST } from "../brand.js";
+
 const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b));
 
 // ---- DER ------------------------------------------------------------------------------------------------------
@@ -312,9 +314,10 @@ export async function checkP12Password(buf, password, subtle = globalThis.crypto
 // ---- what the page shows --------------------------------------------------------------------------------------
 
 // The app signs on the phone and needs only manifests and iFizBox's update hand-off: the Cloudflare Worker (worker/).
-export const APP_SERVER = "https://sign.cydian.dev";
-// The website's own signer before F89 (gone with its server): a saved one means the default now.
-export const LEGACY_SERVER = "https://cydian.dev";
+// B22: from brand.js (the old sign.cydian.dev no longer resolves).
+export const APP_SERVER = `https://${SIGN_HOST}`;
+// The website itself (its own signer before F89, gone with its server): a saved one means the default now.
+export const LEGACY_SERVER = `https://${DOMAIN}`;
 
 // A typed server address as a base URL: "sign.example.org" -> "https://sign.example.org". Null when unusable.
 export function normalizeServer(s) {

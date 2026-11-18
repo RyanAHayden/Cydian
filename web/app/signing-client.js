@@ -1,5 +1,5 @@
 // Signing in the sideload build (F58, I6): the phone signs every app itself, through the shell's signing.* bridge
-// calls; the Signing Server (worker/, sign.cydian.dev unless the user runs their own) only hands iOS the install
+// calls; the Signing Server (worker/, brand.js SIGN_HOST unless the user runs their own) only hands iOS the install
 // manifest and holds iFizBox's own update. F93: the website signs in the browser again, zsign as WebAssembly in a Web
 // Worker (signInBrowser, at the end), and the Worker only hosts the signed IPA for iOS. docs/signing.md has the picture.
 //
@@ -12,7 +12,7 @@
 //                                jailbreak app
 //   getBring() / setBring(on)    the website's Bring My Certificate switch (on unless turned off): Install iFizBox
 //                                App puts the certificate inside iFizBox's IPA
-//   getServer() / setServer(s)   Settings > Signing's server, https://sign.cydian.dev unless the user set another
+//   getServer() / setServer(s)   Settings > Signing's server, https://${SIGN_HOST} unless the user set another
 //   await serverStatus()         what GET <server>/sign/status says
 //   await signAndInstall({ url, name, onInstalled, bring })   signs on the phone and installs (installOnDevice), or
 //                                on the website signs in the browser (signInBrowser)
@@ -106,7 +106,7 @@ export function setBring(on) {
   } catch { /* private mode: this session only */ }
 }
 
-// A saved cydian.dev (the website's old signer, an older default) means the default too.
+// A saved website address (LEGACY_SERVER, the website's old signer) means the default too.
 export function defaultServer() { return APP_SERVER; }
 export function getServer() {
   let saved = null;

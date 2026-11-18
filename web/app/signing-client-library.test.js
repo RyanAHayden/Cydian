@@ -44,7 +44,7 @@ test("offline: signed and kept, and the alert says installing needs the Signing 
   assert.ok(ui.labels.includes("Signing 50%"));
   assert.equal(ui.alerts[0].title, "No Connection");
   assert.match(ui.alerts[0].message, /Delta is signed and kept in My IPAs/);
-  assert.match(ui.alerts[0].message, /cydian\.dev/);
+  assert.match(ui.alerts[0].message, /sign\.ifizbox\.com/);
   assert.equal(ui.hidden, 1);
 });
 
@@ -56,7 +56,7 @@ test("online: signs, installs with the manifest server, records and follows iOS'
     { ...ui.deps, native, reachable: async () => true });
   assert.equal(r, "installed");
   assert.deepEqual(native.calls.map((c) => c.method), ["library.sign", "library.install"]);
-  assert.deepEqual(native.calls[1].params, { file: "Delta.ipa", manifestServer: "https://sign.cydian.dev" });
+  assert.deepEqual(native.calls[1].params, { file: "Delta.ipa", manifestServer: "https://sign.ifizbox.com" });
   assert.equal(got[0].bundleId, "com.me.delta");
   assert.deepEqual(ui.followed, ["com.me.delta"]);
   assert.deepEqual(ui.alerts, []);

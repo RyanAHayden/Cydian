@@ -2,7 +2,8 @@
 // reaches the daemon again at launch. Jailbreak app only.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createUpgradeNotices } from "./settings.js";
+import { createUpgradeNotices, createPrefsMirror } from "./settings.js";
+import { createSettings } from "./core/settings.js";
 
 function fakeNative(extra = {}) {
   const calls = [];
@@ -88,4 +89,58 @@ test("app.js wires it beside the tab badge and starts it after the router", asyn
   assert.match(src, /import \{ createUpgradeNotices \} from "\.\/settings\.js";/);
   assert.match(src, /setBadge: \(tab, n\) => \{ tabbar\.setBadge\(tab, n\); upgradeNotices\.badge\(tab, n\); \}/);
   assert.ok(src.indexOf("upgradeNotices.start()") > src.indexOf("router.start()"));
+});
+
+// F70: N7's settings reach the daemon through the shell's prefs.set (Bridge.swift Prefs).
+function memStorage() {
+  const m = new Map();
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)) };
+}
+
+test("the prefs mirror sends every daemon key at launch, then each change on its own", async () => {
+  const native = fakeNative();
+  const settings = createSettings({ storage: memStorage(), mode: "jailbreak" });
+  settings.set("autoInstall", "marked");
+  const mirror = createPrefsMirror({ settings, native });
+  assert.equal(mirror.start(), true);
+  assert.equal(mirror.start(), false); // once
+  await tick();
+  assert.equal(native.calls.length, 1);
+  const [method, { values }] = native.calls[0];
+  assert.equal(method, "prefs.set");
+  assert.equal(values["cydian.autoInstall"], "marked");
+  assert.equal(values["cydian.checkUpdates"], null);
+  assert.deepEqual(values["cydian.autoMarked"], []);
+  native.calls.length = 0;
+  settings.set("keepVersions", 0);
+  settings.set("autoInstallIdle", false);
+  settings.autoMarked.set("com.foo", true);
+  await settings.holds.set("com.bar", true);
+  settings.set("appearance", "dark"); // not the daemon's
+  await tick();
+  assert.deepEqual(native.calls, [
+    ["prefs.set", { values: { "cydian.keepVersions": 0 } }],
+    ["prefs.set", { values: { "cydian.autoInstallIdle": false } }],
+    ["prefs.set", { values: { "cydian.autoMarked": ["com.foo"] } }],
+    ["prefs.set", { values: { "cydian.holds": ["com.bar"] } }],
+  ]);
+});
+
+test("the prefs mirror does nothing on the site or in the sideload build, and survives a failing shell", async () => {
+  const settings = createSettings({ storage: memStorage(), mode: "jailbreak" });
+  assert.equal(createPrefsMirror({ settings, native: null }).start(), false);
+  const side = fakeNative({ mode: "sideload" });
+  assert.equal(createPrefsMirror({ settings, native: side }).start(), false);
+  assert.deepEqual(side.calls, []);
+  const failing = { call: () => { throw new Error("unknown method prefs.set"); } };
+  assert.equal(createPrefsMirror({ settings, native: failing }).start(), true);
+  settings.set("respring", "locked");
+  await tick(); // no unhandled rejection
+});
+
+test("app.js starts the prefs mirror at launch", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(new URL("./app.js", import.meta.url), "utf8");
+  assert.match(src, /import \{ createPrefsMirror \} from "\.\/settings\.js";/);
+  assert.match(src, /createPrefsMirror\(\{ settings: settingsScreen\.settings \}\)\.start\(\)/);
 });

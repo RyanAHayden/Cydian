@@ -41,7 +41,10 @@ clock, phone and apt in a folder); `main.m` only fills `struct auto_env` with th
   `cydian.autoInstallIdle`, `cydian.respring` (notify / locked), `cydian.keepVersions` (0-2), and the lists
   `cydian.autoMarked` (Only Packages I Mark) and `cydian.holds` (an array, or localStorage's JSON text). No
   preferences or a missing key: F13's defaults, except Check for Updates, which stays daily (N5) until the app
-  writes it. **The app doesn't mirror them yet** (a follow-up task): until then the daemon runs as N5 did.
+  writes it. The jailbreak app mirrors them (F70): `web/app/settings.js` createPrefsMirror sends them to
+  `Bridge.swift` `prefs.set` at launch and on every change, with get()'s string/bool/number values and the lists as
+  arrays; a setting nobody picked is removed, so the default above applies. `cydian.autoMarked` is the package
+  page's Update Automatically switch.
 - **When:** Off and On Launch: no background check (On Launch is the app's). Every 6 Hours: when the last check is
   5 h old; Daily: 23 h (launchd starts it hourly). On cellular with Use Cellular Data off, a due check waits for the
   next start (the last time stays). `--force` checks whatever the schedule says.

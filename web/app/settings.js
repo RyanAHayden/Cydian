@@ -10,7 +10,7 @@
 // in the background, before the sources have loaded, would otherwise wipe a badge that is right. A zero counted
 // while another tab is shown clears it when the user opens Changes.
 // Elsewhere (the site, the sideload build) both do nothing.
-import { detectMode } from "./core/settings.js";
+import { detectMode, DAEMON_KEYS, DAEMON_LISTS } from "./core/settings.js";
 import { parse } from "./router.js";
 
 export function createUpgradeNotices({ settings, native = globalThis.cydianNative, current, win = globalThis.window } = {}) {
@@ -41,6 +41,32 @@ export function createUpgradeNotices({ settings, native = globalThis.cydianNativ
       if (settings?.isShown?.("upgradeNotifications") && settings.get("upgradeNotifications") === false) {
         settings.upgradeNotifications.sync().catch(() => {});
       }
+      return true;
+    },
+  };
+}
+
+// F70: N7's daemon (native/daemon/) reads the automatic-install settings from the app's preferences
+// (NSUserDefaults com.ryha.cydian), not from the web view's localStorage. The page hands them over through the
+// shell's prefs.set {values: {"cydian.<key>": value | null}} (Bridge.swift Prefs; null removes the key): all of
+// them once at launch, then each one as it changes.
+//
+//   createPrefsMirror({ settings, native: globalThis.cydianNative }).start();
+//
+// Jailbreak app only; elsewhere start() does nothing and returns false. A failed call is dropped: the next change
+// or launch writes the values again.
+
+export function createPrefsMirror({ settings, native = globalThis.cydianNative } = {}) {
+  const on = Boolean(native && typeof native.call === "function") && detectMode({ cydianNative: native }) === "jailbreak";
+  const send = (values) => Promise.resolve().then(() => native.call("prefs.set", { values })).catch(() => {});
+  const watched = new Set([...DAEMON_KEYS, ...DAEMON_LISTS]);
+  let started = false;
+  return {
+    start() {
+      if (!on || !settings || started) return false;
+      started = true;
+      send(settings.daemonPrefs());
+      settings.onChange((key) => { if (watched.has(key)) send(settings.daemonPrefs([key])); });
       return true;
     },
   };

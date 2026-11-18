@@ -40,6 +40,7 @@ import { featuredStrip, paymentGroup } from "./extras.js";
 import { installQueue } from "../queue.js";
 import { queuedFor, MODE_LABEL } from "../core/queue.js";
 import { hasRollback, rollbackSlot } from "./rollback.js";
+import { autoMarkShown, AUTO_MARK_LABEL, AUTO_MARK_FOOTER } from "../core/automark.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -779,15 +780,22 @@ async function installedGroup(id) {
   if (!p) return null;
   // On the site a hold in the uploaded status file is dpkg's, set on the phone: shown, not switchable here.
   const dpkgHeld = p.held && catalog.statusSource() !== "native";
+  const mark = autoMarkShown(settings); // F70: Update Automatically, for Only Packages I Mark
   const frag = grouped([{
     header: "Installed Package",
-    rows: [{ label: "Version", detail: p.version }, { label: "Ignore Upgrades", detail: dpkgHeld ? "Held by dpkg" : null }],
-    footer: "Do not include this package when selecting Upgrade All.",
+    rows: [{ label: "Version", detail: p.version }, { label: "Ignore Upgrades", detail: dpkgHeld ? "Held by dpkg" : null },
+      ...(mark ? [{ label: AUTO_MARK_LABEL }] : [])],
+    footer: "Do not include this package when selecting Upgrade All." + (mark ? " " + AUTO_MARK_FOOTER : ""),
   }]);
   if (!dpkgHeld) {
     // grouped() draws plain rows; the switch goes into its cell afterwards, as on the Settings tab.
     const cell = frag.querySelectorAll(".cell-inner")[1];
     cell.append(createSwitch({ label: "Ignore Upgrades", checked: settings.holds.has(id), onToggle: (on) => { settings.holds.set(id, on); } }));
+    cell.classList.add("has-switch");
+  }
+  if (mark) {
+    const cell = frag.querySelectorAll(".cell-inner")[2];
+    cell.append(createSwitch({ label: AUTO_MARK_LABEL, checked: settings.autoMarked.has(id), onToggle: (on) => { settings.autoMarked.set(id, on); } }));
     cell.classList.add("has-switch");
   }
   return frag;

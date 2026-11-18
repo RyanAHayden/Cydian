@@ -27,7 +27,7 @@ import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
 import { renderAltSource, renderApp, installRows, formatDate, osRange, appPageAction, appPageCustom } from "./altstore.js";
 import { showActionSheet } from "../nav/actionsheet.js";
-import { signingReady, signingAvailable, signAndInstall, localSigning } from "../signing-client.js";
+import { signAndInstall, localSigning } from "../signing-client.js";
 import { installOptions } from "../core/altstore.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
@@ -621,15 +621,17 @@ async function packageActions(route, button) {
     const v = st.ipa.versions[0];
     // F80: Install / Upgrade / Reinstall queue the app and open Confirm; Modify while it's queued (altstore.js).
     if (await appPageAction(pkg, source)) return;
-    // I5: with the user's own certificate (Settings > Signing), Install signs this app and installs it.
+    // I5: in the sideload app Install signs this app on the phone and installs it.
     if (await signIfReady(st.ipa, v, recordApp(pkg, source, v))) return;
-    // Install at the top right installs: the first row (signed with the user's certificate, the source's signed
-    // link, or the jailbreak). Download IPA and older versions are on the page, not in a menu in between.
+    // Install at the top right installs: the first row (the source's signed link, or the jailbreak). Download IPA and
+    // older versions are on the page, not in a menu in between. F89: on the website the first rows are hand-offs
+    // (Open in Cydian, Get in AltStore...), so the button lists them all, as Cydia's sheet does.
     const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v), undefined, st.ipa.name);
-    if (rows[0] && rows[0].label !== "Download IPA") return rows[0].onClick();
+    if (rows[0] && !rows[0].handoff && rows[0].label !== "Download IPA") return rows[0].onClick();
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });
     if (many) actions.push({ label: "Version History", run: () => go(versionsHref(route, id)) });
-    return sheet(options.itms ? "" : "Install signs it with your own certificate: add one in Settings > Signing. Download IPA keeps the file.", actions);
+    return sheet(options.itms ? "" : rows[0]?.handoff ? "The website can't install apps itself: open it in Cydian or another sideloader, or keep the IPA."
+      : "Download IPA keeps the file.", actions);
   }
   const installed = installedOf(history);
   const queue = queueOf({ installed, name: pkg.row?.name });
@@ -658,13 +660,13 @@ async function packageActions(route, button) {
   return sheet(title, actions);
 }
 
-// I5: sign `v` with the saved certificate and install it, when one is saved and the version has an IPA. True when
-// signing took over (whatever its outcome: errors are shown in an alert).
+// I5: in the sideload app, sign `v` on the phone and install it when the version has an IPA. True when signing took
+// over (whatever its outcome: errors are shown in an alert). False elsewhere: nothing else signs (F89).
 async function signIfReady(app, v, record) {
   const url = installOptions(v, app.sourceUrl).download;
-  // F75: in the app, Install goes straight to signAndInstall, which opens the Signing walkthrough at the missing step
-  // when the certificate or the server isn't there yet (no sheet first, no alert)
-  if (!url || (!localSigning() && !(await signingReady()))) return false;
+  // F75: Install goes straight to signAndInstall, which opens the Signing walkthrough at the missing step when the
+  // certificate or the server isn't there yet (no sheet first, no alert)
+  if (!url || !localSigning()) return false;
   await signAndInstall({ url, name: app.name, onInstalled: () => record?.() });
   return true;
 }

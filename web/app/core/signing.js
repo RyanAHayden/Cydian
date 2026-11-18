@@ -1,12 +1,11 @@
-// Signing with your own certificate (I5): what Settings > Signing reads out of the files the user picks, and the
-// request the page sends a signing server. Pure JS, no DOM: the browser parts (IndexedDB, the HUD, opening the
-// itms-services link) are signing-client.js. docs/signing.md has the whole picture.
+// Signing with your own certificate (I5, F58): what Settings > Signing reads out of the files the user picks in the
+// sideload app, and what its signing.* calls answer. Pure JS, no DOM: the browser parts (the bridge, the HUD) are
+// signing-client.js. docs/signing.md has the whole picture.
 //
 //   const p = parseProfile(bytes);    // { name, teamId, teamName, appId, expires, devices, allDevices, certs: [cert…] }
 //   parseCert(der);                   // { name, team, org, notBefore, notAfter }
 //   await checkP12Password(bytes, pw) // true / false, or null when the file has no MAC to check against
 //   summary({ profile, now })         // the rows the page shows: certificate, team, expiry, devices, problems
-//   signBody({ url, p12, profile, password })  // the JSON for POST <server>/sign
 //
 // Everything here reads bytes (Uint8Array or ArrayBuffer) and never leaves the phone.
 
@@ -312,10 +311,10 @@ export async function checkP12Password(buf, password, subtle = globalThis.crypto
 
 // ---- what the page shows --------------------------------------------------------------------------------------
 
-export const DEFAULT_SERVER = "https://cydian.dev";
 // The app signs on the phone and needs only manifests and Cydian's update hand-off: the Cloudflare Worker (worker/).
-// The website signs on the server, which the NAS at DEFAULT_SERVER does (zsign).
 export const APP_SERVER = "https://sign.cydian.dev";
+// The website's own signer before F89 (gone with its server): a saved one means the default now.
+export const LEGACY_SERVER = "https://cydian.dev";
 
 // A typed server address as a base URL: "sign.example.org" -> "https://sign.example.org". Null when unusable.
 export function normalizeServer(s) {
@@ -357,7 +356,7 @@ export function summary({ profile, passwordOk = null, now = new Date(), locale, 
   return { rows, problems };
 }
 
-// ---- the request ----------------------------------------------------------------------------------------------
+// ---- bytes for the bridge ---------------------------------------------------------------------------------------
 
 export function toBase64(buf) {
   const b = bytesOf(buf);
@@ -365,19 +364,6 @@ export function toBase64(buf) {
   let s = "";
   for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
   return btoa(s);
-}
-
-// The JSON body of POST <server>/sign.
-export function signBody({ url, p12, profile, password }) {
-  return JSON.stringify({ url, p12: toBase64(p12), profile: toBase64(profile), password: password ?? "" });
-}
-
-// A server's error answer as one sentence for an alert.
-export function errorText(status, body) {
-  if (body && typeof body.error === "string" && body.error) return body.error;
-  if (status === 429) return "Too many signing requests: wait a few minutes.";
-  if (status === 404 || status === 405) return "This signing server doesn't sign apps (no /sign).";
-  return `The signing server answered HTTP ${status}.`;
 }
 
 // ---- on the phone (F58: the sideload build's Settings > Signing and Install, through I6's signing.* calls) -------

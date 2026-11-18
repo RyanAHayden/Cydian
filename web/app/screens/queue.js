@@ -339,7 +339,7 @@ export function openAppConfirm(queue = appQueue) {
 
 
 // One app: signed on the phone in the sideload app (installOnDevice; Cydian's own IPA through signAndInstall, which
-// hosts it on the Signing Server), on the Signing Server on the website (signAndInstall). True once iOS was asked.
+// hosts it on the Signing Server). The website queues nothing (F89). True once iOS was asked.
 async function installApp(job) {
   const sc = await import("../signing-client.js");
   if (job.options && sc.localSigning()) return installCustom(job, { sc });

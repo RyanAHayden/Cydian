@@ -7,7 +7,7 @@ import { createSettings } from "./core/settings.js";
 
 function fakeNative(extra = {}) {
   const calls = [];
-  return { calls, call: async (method, params) => { calls.push([method, params]); return null; }, ...extra };
+  return { calls, call: async (method, params) => { if (method !== "app.shortcuts") calls.push([method, params]); return null;}, ...extra };
 }
 function fakeWin(hash = "#/home") {
   const listeners = [];
@@ -49,7 +49,7 @@ test("a zero counted elsewhere clears when the user opens Changes", async () => 
 test("a failed clear is tried again next time", async () => {
   let fail = true;
   const calls = [];
-  const native = { call: async (m) => { calls.push(m); if (fail) throw new Error("no"); } };
+  const native = { call: async (m) => { if (m === "app.shortcuts") return; calls.push(m); if (fail) throw new Error("no"); } };
   const up = createUpgradeNotices({ native, current: () => ({ tab: "changes", path: [] }), win: fakeWin() });
   up.badge("changes", 0);
   await tick();

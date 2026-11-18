@@ -15,7 +15,8 @@
 //
 // In the sideload app the files live in Cydian's Documents (Files > On My iPhone > Cydian) and the shell signs them
 // (signing-client.js libraryCall, native/Sources/MyIPAs.swift). On the website there is no signer on the phone:
-// Add is From URL only, the list is links kept on this device, and Install signs through the Signing Server.
+// Add is From URL only, the list is links kept on this device, and Install hands the link on (F89: the website has
+// no server to sign with): Open in Cydian, Get in AltStore / SideStore / Feather (screens/handoff.js), Download IPA.
 // Rules and labels: core/myipas.js.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, placeholder } from "../nav/ui.js";
@@ -33,7 +34,8 @@ import { deviceError, phaseLabel, isCgBI, fromBase64 } from "../core/signing.js"
 import { apps, recordInstall } from "../core/installed.js";
 import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optionsParams, siteEntries, addSiteUrl, removeSiteUrl,
   STATE_LABELS } from "../core/myipas.js";
-import { localSigning, libraryCall, installFromLibrary, signAndInstall } from "../signing-client.js";
+import { localSigning, libraryCall, installFromLibrary } from "../signing-client.js";
+import { installLinks } from "./handoff.js";
 
 export { MYIPAS };
 
@@ -192,7 +194,7 @@ function draw(list) {
 
 export function libraryEmptyText(site) {
   return site
-    ? "No IPAs yet. Tap Add to keep a link to an IPA here: the Signing Server signs it with your certificate when you install it."
+    ? "No IPAs yet. Tap Add to keep a link to an IPA here: Install opens it in Cydian, AltStore, SideStore or Feather."
     : "No IPAs yet. Tap Add to choose one in Files or download one, or put IPAs in Files under On My iPhone > Cydian.";
 }
 
@@ -216,12 +218,12 @@ export function browseGroups(apps) {
   }
   if (!apps.length) {
     return [{ header: "Browse", rows: top,
-      footer: "Add an AltStore source in Sources to browse its apps here. Every app installs signed with your certificate." }];
+      footer: site() ? "Add an AltStore source in Sources to browse its apps here." : "Add an AltStore source in Sources to browse its apps here. Every app installs signed with your certificate." }];
   }
   return [
     { header: "Browse", rows: [...top, { label: "All Apps", detail: String(apps.length), href: browseHref("apps") }] },
     { rows: mergeCategories(apps, { jailbroken: false }).map((c) => ({ label: c.name, detail: String(c.count), href: browseHref(`category:${c.name}`) })),
-      footer: "Apps from your AltStore sources, signed with your certificate when you install one." },
+      footer: site() ? "Apps from your AltStore sources." : "Apps from your AltStore sources, signed with your certificate when you install one." },
   ];
 }
 
@@ -367,7 +369,7 @@ async function pickFiles() {
 async function addFromUrl() {
   const { index, value } = await showAlert({
     title: "Enter IPA URL",
-    message: site() ? "A link to an .ipa. The Signing Server downloads and signs it when you install." : "A link to an .ipa: Cydian downloads it into My IPAs.",
+    message: site() ? "A link to an .ipa, kept on this iPhone. Install opens it in a sideloader." : "A link to an .ipa: Cydian downloads it into My IPAs.",
     input: { placeholder: "https://", value: "https://", type: "url", paste: cleanSourceUrl },
     buttons: ["Cancel", "Add"],
     cancel: 0,
@@ -458,7 +460,7 @@ async function renderIpa(body, route, file) {
   if (site()) {
     body.append(grouped([
       { header: "Link", rows: [{ label: entry.url, chevron: false }],
-        footer: "Install sends this link with your certificate to the Signing Server (Settings > Signing), which signs the IPA and hands it to iOS." },
+        footer: "Install opens this link in Cydian, AltStore, SideStore or Feather, which sign it on the iPhone, or downloads the IPA." },
       { rows: [{ label: "Delete", onClick: () => confirmDelete(entry) }] },
     ]));
     markDelete(body);
@@ -563,10 +565,7 @@ async function install(file) {
   if (site()) {
     entry ??= siteEntries().find((e) => e.file === file);
     if (!entry) return;
-    await signAndInstall({ url: entry.url, name: entry.name, onInstalled: (b) => {
-      const id = b?.bundleId || b?.bundleID;
-      if (id) record(id, b?.name || entry.name, b?.version || "", null);
-    } });
+    await siteInstallSheet(entry);
     return;
   }
   const name = entry?.options?.name || entry?.name || file.replace(/\.ipa$/i, "");
@@ -579,6 +578,20 @@ async function install(file) {
     const route = { tab: "installed", path: ipaPath(file) };
     if (location.hash === format(route)) rerender(body, route);
   }
+}
+
+// F89: the website's Install for one of the user's links: the hand-offs, then Download IPA. -> [{ label, url }]
+export function siteInstallChoices(entry) {
+  const url = entry?.url;
+  if (!url) return [];
+  return [...installLinks(url, { name: entry.name || "" }).map((l) => ({ label: l.label, url: l.url })), { label: "Download IPA", url }];
+}
+
+async function siteInstallSheet(entry, { ask = showActionSheet, open = (u) => { location.href = u; } } = {}) {
+  const choices = siteInstallChoices(entry);
+  const i = await ask({ title: "The website can't install apps itself: open it in Cydian or another sideloader, or keep the IPA.",
+    buttons: choices.map((c) => c.label) });
+  if (i >= 0 && choices[i]) open(choices[i].url);
 }
 
 // ---- Sign Options -----------------------------------------------------------------------------------------------

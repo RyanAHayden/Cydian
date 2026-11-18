@@ -9,6 +9,7 @@
 // The delegate is also what lets a notification show while Cydian is open (the sideload build's re-sign reminder,
 // Sideload.swift, too); its taps carry no route and do nothing here.
 import UIKit
+import BackgroundTasks
 import UserNotifications
 import WebKit
 
@@ -63,6 +64,49 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
     }
 
     static func register(_ b: Bridge) {
+        // What iOS allows Cydian (Settings > Notifications > Cydian, Background App Refresh) and when the background
+        // check last ran: Settings shows it, so a badge that never comes has a reason on screen.
+        b.on("app.notifyStatus") { c in
+            UNUserNotificationCenter.current().getNotificationSettings { st in
+                DispatchQueue.main.async {
+                    let name: [UNAuthorizationStatus: String] = [.notDetermined: "notDetermined", .denied: "denied",
+                                                                 .authorized: "authorized", .provisional: "provisional"]
+                    let last = UserDefaults.standard.double(forKey: BackgroundCheck.lastRunKey)
+                    c.reply(["status": name[st.authorizationStatus] ?? "other", "badges": st.badgeSetting == .enabled,
+                             "alerts": st.alertSetting == .enabled,
+                             "backgroundRefresh": UIApplication.shared.backgroundRefreshStatus == .available,
+                             "backgroundOn": !UserDefaults.standard.bool(forKey: BackgroundCheck.offKey),
+                             "lastCheck": last > 0 ? ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: last)) as Any : NSNull()], nil)
+                }
+            }
+        }
+        // The Home Screen icon's long-press menu: "Upgrade All (N)" while N upgrades wait (none: no item).
+        b.on("app.shortcuts") { c in
+            let n = max(0, (c.params["upgrades"] as? NSNumber)?.intValue ?? 0)
+            DispatchQueue.main.async {
+                UIApplication.shared.shortcutItems = n > 0 ? [UIApplicationShortcutItem(type: Shortcut.upgrade,
+                    localizedTitle: "Upgrade All", localizedSubtitle: n == 1 ? "1 upgrade" : "\(n) upgrades",
+                    icon: UIApplicationShortcutIcon(systemImageName: "arrow.down.circle"), userInfo: nil)] : []
+                c.reply(nil, nil)
+            }
+        }
+        // Settings > Update Alerts > Check in the Background (on unless turned off): off cancels the scheduled check.
+        b.on("updates.background") { c in
+            let on = c.params["on"] as? Bool ?? true
+            UserDefaults.standard.set(!on, forKey: BackgroundCheck.offKey)
+            if on { BackgroundCheck.schedule() } else { BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: BackgroundCheck.taskID) }
+            c.reply(["on": on], nil)
+        }
+        // Cydian's page in iOS Settings (notifications, badges, Background App Refresh live there).
+        b.on("app.openSettings") { c in
+            DispatchQueue.main.async {
+                var s = UIApplication.openSettingsURLString
+                if #available(iOS 16.0, *) { s = UIApplication.openNotificationSettingsURLString }
+                let url = URL(string: s)!
+                UIApplication.shared.open(url)
+                c.reply(nil, nil)
+            }
+        }
         b.on("app.badge") { c in
             let n = max(0, (c.params["count"] as? NSNumber)?.intValue ?? 0)
             WidgetStore.save(count: n, names: []) // N8: the Home Screen widget shows the same count
@@ -87,5 +131,22 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
                 }
             }
         }
+    }
+}
+
+// The Home Screen icon's quick action (app.shortcuts sets it): the page queues every upgrade and opens Confirm
+// (app.js cydianShortcut). A tap that launched Cydian waits for the page as a notification tap does.
+enum Shortcut {
+    static let upgrade = "com.ryha.cydian.upgrade"
+    static func perform(_ type: String, tries: Int = 50) {
+        let web = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
+        guard let web, !web.isLoading, web.url != nil else {
+            if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { perform(type, tries: tries - 1) } }
+            return
+        }
+        // the page's own scripts may still be starting: it calls this once it can (app.js)
+        web.callAsyncJavaScript("globalThis.cydianShortcut ? globalThis.cydianShortcut(t) : (globalThis.cydianPendingShortcut = t)",
+                                arguments: ["t": type == upgrade ? "upgrade" : type], in: nil, in: .page, completionHandler: nil)
     }
 }

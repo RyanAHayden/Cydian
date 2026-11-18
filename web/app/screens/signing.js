@@ -1,7 +1,6 @@
 // F69, F75: Settings > Signing in the sideload build, as one walkthrough page (Home's Signing tile opens it too, and
 // so does the first Install with something missing): numbered steps, each collapsible, a green tick once done.
-//   1  Import your certificate: Select All Files (or the three rows' own Browse), or Import from Safari when it is
-//      already on the website (core/transfer.js): settings.js certificateBlock
+//   1  Import your certificate: Select All Files (or the three rows' own Browse): settings.js certificateBlock
 //   2  A Signing Server: cydian.dev unless the user runs their own; it hands iOS the manifest for the IPA Cydian
 //      serves at 127.0.0.1 (native/Sources/Sideload.swift). There is no install without one (F75: the old local
 //      HTTPS mode is gone; iOS's installer ignores a hand-trusted certificate).
@@ -104,10 +103,10 @@ const TEXT = {
 };
 
 // The page. opts: { status, failure (text when the signer didn't answer), certificate (element: Select All Files and
-// the rows), server (element: the server rows), serverUrl, actions: { importSafari() }, open (walkOpen), extra
-// (elements under the steps: the Keychain's details, Remove Certificate) }.
+// the rows), server (element: the server rows), serverUrl, open (walkOpen), extra (elements under the steps: the
+// Keychain's details, Remove Certificate) }.
 export function drawWalkthrough(el, { status = null, failure = "", certificate = null, server = null, serverUrl = null,
-  actions = {}, open = walkOpen, extra = [] } = {}) {
+  open = walkOpen, extra = [] } = {}) {
   style();
   const states = stepStates(status, { open, server: serverUrl });
   const page = h("div", "walkthrough");
@@ -132,12 +131,6 @@ export function drawWalkthrough(el, { status = null, failure = "", certificate =
     if (s.id === "certificate") {
       if (certificate) body.append(certificate);
       body.append(picture());
-      if (actions.importSafari) {
-        const b = h("button", "walk-action walk-secondary", "Import from Safari");
-        b.type = "button";
-        b.addEventListener("click", () => actions.importSafari());
-        body.append(b, h("p", "group-footer walk-note", "Added it on the website already? Import from Safari brings it over."));
-      }
     }
     if (s.id === "server" && server) body.append(server);
     head.addEventListener("click", () => {

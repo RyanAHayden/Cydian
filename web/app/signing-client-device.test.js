@@ -3,8 +3,8 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  localSigning, signingAvailable, signingReady, deviceStatus, importToDevice, removeFromDevice,
-  installOnDevice, loadIdentity, saveIdentity, clearIdentity, firstInstallCheck, importFromSafari, finishSafariImport, exportToApp,
+  localSigning, signingReady, deviceStatus, importToDevice, removeFromDevice,
+  installOnDevice, loadIdentity, saveIdentity, clearIdentity, firstInstallCheck, getServer, setServer,
 } from "./signing-client.js";
 import { walkOpen } from "./screens/signing.js";
 
@@ -38,12 +38,29 @@ let saved;
 beforeEach(() => { saved = globalThis.cydianNative; });
 afterEach(async () => { await clearIdentity().catch(() => {}); globalThis.cydianNative = saved; });
 
-test("the sideload build signs locally, not through the server", () => {
+test("only the sideload build signs (F89: the website has no signer)", async () => {
   globalThis.cydianNative = fakeNative();
   assert.equal(localSigning(), true);
-  assert.equal(signingAvailable(), false);
   delete globalThis.cydianNative;
   assert.equal(localSigning(), false);
+  assert.equal(await signingReady(), false);
+});
+
+test("the Signing Server: sign.cydian.dev by default, and the website's old cydian.dev means the default", () => {
+  const m = new Map();
+  const saved = globalThis.localStorage;
+  globalThis.localStorage = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
+  try {
+    assert.equal(getServer(), "https://sign.cydian.dev");
+    m.set("cydian.signingServer", "https://cydian.dev");
+    assert.equal(getServer(), "https://sign.cydian.dev");
+    assert.equal(setServer("my.example.org"), "https://my.example.org");
+    assert.equal(getServer(), "https://my.example.org");
+    setServer("https://cydian.dev");
+    assert.equal(m.has("cydian.signingServer"), false);
+    setServer("");
+    assert.equal(getServer(), "https://sign.cydian.dev");
+  } finally { globalThis.localStorage = saved; }
 });
 
 test("ready once the Keychain holds an identity", async () => {
@@ -111,49 +128,6 @@ test("first install: a signer that doesn't answer counts as no certificate", asy
   assert.equal(await firstInstallCheck({ native: n, server: "https://cydian.dev", go: (p) => went.push(p), wait: async () => {} }), "certificate");
 });
 
-// F75 (3): Import from Safari end to end: the app's key in the fragment, the website seals, the app opens and imports.
-function memStorage() {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
-}
-
-test("Import from Safari: key out in the fragment, ciphertext back, into the Keychain", async () => {
-  const storage = memStorage();
-  let opened = null;
-  const key = await importFromSafari({ server: "https://test.example.ts.net", open: (u) => { opened = u; }, storage });
-  assert.equal(opened, `https://test.example.ts.net/#/settings/signing-export.${key}`);
-  // the website's export page (its own storage: the staged picks here)
-  globalThis.cydianNative = fakeNative();
-  await saveIdentity({ p12: new Uint8Array([0x30, 1, 2]), profile: new Uint8Array([7, 8]), password: "pass word", p12Name: "me.p12" });
-  const link = await exportToApp(key);
-  assert.match(link, /^cydian:\/\/signing-import#[A-Za-z0-9_-]+$/);
-  assert.equal(link.includes("pass word"), false); // a space: never in base64url by chance
-  const n = fakeNative({ "signing.import": { identity: { name: "Me" } } });
-  const st = await finishSafariImport(link, { native: n, storage });
-  assert.deepEqual(st, { identity: { name: "Me" } });
-  assert.deepEqual(n.calls[0], { method: "signing.import", params: { p12: "MAEC", profile: "Bwg=", password: "pass word" } });
-  // one use: the same link again finds no key
-  await assert.rejects(finishSafariImport(link, { native: n, storage }), /Start again/);
-});
-
-test("Import from Safari: nothing on the website, a stale or foreign link", async () => {
-  globalThis.cydianNative = fakeNative();
-  assert.equal(await exportToApp("A".repeat(43)), null); // no certificate in this origin's storage
-  const storage = memStorage();
-  const n = fakeNative({ "signing.import": { identity: { name: "Me" } } });
-  await assert.rejects(finishSafariImport("cydian://import?d=x", { native: n, storage }), /no certificate/);
-  let t = 0;
-  const key = await importFromSafari({ open: () => {}, storage, now: () => t });
-  await saveIdentity({ p12: new Uint8Array([0x30]), profile: new Uint8Array([7]) });
-  const link = await exportToApp(key);
-  t = 31 * 60 * 1000;
-  await assert.rejects(finishSafariImport(link, { native: n, storage, now: () => t }), /Start again/);
-  t = 0;
-  await importFromSafari({ open: () => {}, storage, now: () => t }); // a new key: the old link doesn't open
-  await assert.rejects(finishSafariImport(link, { native: n, storage, now: () => t }), /couldn't be read/);
-  assert.equal(n.calls.length, 0);
-});
-
 test("Install: the HUD follows the phases, then Installing, and records the app", async () => {
   const done = { bundleId: "com.x", name: "X", version: "1.0", removed: [] };
   const n = fakeNative({
@@ -166,7 +140,7 @@ test("Install: the HUD follows the phases, then Installing, and records the app"
   const ui = fakeUI();
   let recorded = null;
   assert.equal(await installOnDevice({ url: "https://e.example/x.ipa", name: "X", onInstalled: (r) => { recorded = r; } }, { native: n, ...ui.deps }), true);
-  assert.deepEqual(n.calls[0], { method: "signing.install", params: { url: "https://e.example/x.ipa", manifestServer: "https://cydian.dev" } }); // the manifest from the signing server
+  assert.deepEqual(n.calls[0], { method: "signing.install", params: { url: "https://e.example/x.ipa", manifestServer: "https://sign.cydian.dev" } }); // the manifest from the signing server
   assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Reading", "Signing 25%", "Installing", "Installing"]);
   assert.equal(recorded, done);
   assert.equal(ui.alerts.length, 0);

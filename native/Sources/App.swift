@@ -9,6 +9,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         Notifications.shared.start() // F65: permission for N5's daemon, and notification taps (Notifications.swift)
+        // The new Cydian is open: the "Cydian Updated, tap to open" notices have done their job.
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["cydian.updating", "cydian.updated"])
         SignBridge.importBundled() // F75: the certificate the Signing Server put inside Cydian's own IPA
         BackgroundCheck.register() // I3: before launch ends, as BGTaskScheduler requires (sideload build)
         return true
@@ -37,16 +39,23 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         w.makeKeyAndVisible()
         window = w
         if let u = options.urlContexts.first?.url { Incoming.receive(u) } // F75: launched by a cydian:// link
+        if let item = options.shortcutItem { Shortcut.perform(item.type) } // launched from the icon's Upgrade All
         Replaced.watch()
     }
 
-    // F75: a cydian:// link while Cydian runs (Import from Safari, Open in Cydian App on the website).
+    // F75: a cydian:// link while Cydian runs (Open in Cydian App and Open in Cydian on the website).
+    func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem,
+                     completionHandler: @escaping (Bool) -> Void) {
+        Shortcut.perform(shortcutItem.type)
+        completionHandler(true)
+    }
+
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         for c in URLContexts { Incoming.receive(c.url) }
     }
 }
 
-// F75: cydian://import?d=… and cydian://signing-import#… for the page (web/app/incoming.js). The shell keeps the
+// F75: cydian://import?d=…, cydian://install?url=… (F89) and the rest of IncomingLink's hosts for the page (web/app/incoming.js). The shell keeps the
 // latest one and tells the page there is one ("cydian:url" on window); the page takes it with app.takeURL, also
 // once at start, so a link that launched Cydian before the page loaded isn't lost. Only IncomingLink's hosts pass.
 //   app.takeURL            -> {url} | null (and forgets it)

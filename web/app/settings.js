@@ -34,6 +34,8 @@ export function createUpgradeNotices({ settings, native = globalThis.cydianNativ
       const next = typeof n === "number" ? n : Number(n) || 0;
       // the app icon shows the count too (Settings > App Icon Badge), not only the daemon's background checks
       if (on && next > 0 && next !== count) Promise.resolve(native.call("app.badge", { count: next })).catch(() => {});
+      // the icon's long-press menu offers Upgrade All while there are upgrades (sideload: native Shortcut)
+      if (on && next !== count) Promise.resolve(native.call("app.shortcuts", { upgrades: next })).catch(() => {});
       count = next;
       if (count > 0) cleared = false;
       return clear();

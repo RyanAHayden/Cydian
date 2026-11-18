@@ -108,6 +108,7 @@ bundle() {
   # web/app/ goes in as it is, minus the tests.
   (cd ../web/app && find . -type f ! -name '*.test.js' ! -name '.*' -print0) |
     while IFS= read -r -d '' f; do mkdir -p "$app/web/$(dirname "$f")" && cp "../web/app/$f" "$app/web/$f"; done
+  ../tools/buildinfo.sh "$(cd "$app/web" && pwd)" >/dev/null # version and commit for Home's footer
   cp icon/AppIcon60x60@2x.png icon/AppIcon60x60@3x.png "$app/"
   # N10: the launch screen's images, loose PNGs that Info.plist's UILaunchScreen names (launch/make.py).
   cp launch/Launch*@2x.png launch/Launch*@3x.png "$app/"

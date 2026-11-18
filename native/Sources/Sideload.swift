@@ -461,7 +461,8 @@ enum Sideload {
             center.add(UNNotificationRequest(identifier: reminderID, content: content,
                                              trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
         }
-        if ask { center.requestAuthorization(options: [.alert, .sound]) { ok, _ in if ok { schedule() } } }
+        // Badges too: iOS asks once, so a first ask without them left the icon badge off for good (user 2026-11-18).
+        if ask { center.requestAuthorization(options: [.alert, .badge, .sound]) { ok, _ in if ok { schedule() } } }
         else { schedule() }
         return at
     }
@@ -568,8 +569,9 @@ enum CloseForUpdate {
             guard resigned else { return } // the prompt hasn't shown yet
             token.map(nc.removeObserver); token = nil; nc.removeObserver(off)
             let c = UNMutableNotificationContent()
-            c.title = "Cydian"
-            c.body = "Updating Cydian. Tap to open it when it's done."
+            // It arrives 8 s later, by when iOS has usually finished (user 2026-11-18: "tap when it's done" read wrong).
+            c.title = "Cydian Updated"
+            c.body = "Tap to open the new version."
             let req = UNNotificationRequest(identifier: "cydian.updating", content: c,
                                             trigger: UNTimeIntervalNotificationTrigger(timeInterval: 8, repeats: false))
             UNUserNotificationCenter.current().add(req) { _ in

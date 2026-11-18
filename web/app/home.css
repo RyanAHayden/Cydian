@@ -111,6 +111,8 @@ html[data-theme="dark"] .app-offer .table.grouped { background: #2f4a36; }
   animation: hud-spin .96s steps(12) infinite;
 }
 @media (prefers-reduced-motion: reduce) { .bar-button.is-reloading::after { animation-duration: 3s; } }
+.home-version.home-commit { margin-top: -10px; font-size: 13px; opacity: .8; }
+.home-commit:empty { display: none; }
 
 /* Credits' Special Thanks: big rows like a package page's header: a 58px picture, name, handle, then what for. */
 .thanks-row .cell-inner { padding-top: 10px; padding-bottom: 10px; gap: 12px; }

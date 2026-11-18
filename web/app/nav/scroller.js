@@ -79,14 +79,20 @@ export function initScroller(screens) {
 
   // A haptic tick when a scroll reaches the top or the bottom (user 2026-11-17), once per arrival. The app only:
   // Safari plays haptics from a touch, never from a scroll.
+  // Only when momentum carries it there (a flick, or the indicator thrown), not while a finger still drags the page
+  // (user 2026-11-17).
   const edges = new WeakMap(); // scroller -> "top" | "bottom" | "" (where it was last time)
+  let fingers = 0;
+  addEventListener("touchstart", (e) => { fingers = e.touches.length; }, { capture: true, passive: true });
+  for (const type of ["touchend", "touchcancel"]) addEventListener(type, (e) => { fingers = e.touches.length; }, { capture: true, passive: true });
   function edgeTick(t) {
     const max = t.scrollHeight - t.clientHeight;
     if (max <= 1) return;
     const at = t.scrollTop <= 0 ? "top" : t.scrollTop >= max - 1 ? "bottom" : "";
     const was = edges.get(t);
     edges.set(t, at);
-    if (at && was === "" && globalThis.cydianApp) haptic();
+    const flung = fingers === 0 || glide !== 0; // the page's own momentum, or our indicator's
+    if (at && was === "" && flung && globalThis.cydianApp) haptic();
   }
 
   // Momentum after letting go, like a native fling: the scrub's last ~80 ms give a velocity in scroll px/ms that

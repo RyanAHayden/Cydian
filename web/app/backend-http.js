@@ -14,6 +14,7 @@ import { freshUrl } from "./core/sources.js";
 import { sourceCalls, sortSources, DEFAULT_ALT_SOURCES } from "./core/sources.js";
 import { withAltSources } from "./core/altstore.js";
 import { validatorCache } from "./core/health.js";
+import { reviewsApi } from "./core/reviews.js";
 
 export class BackendError extends Error {
   constructor(code, message, status) {
@@ -83,6 +84,8 @@ export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(g
       };
     },
   };
+  // F182: user reviews, on the same server as the proxy (core/reviews.js; worker/src/reviews.js).
+  backend.reviews = reviewsApi({ base, fetcher: fetchFn });
   // AltStore sources (F9) sit beside the APT list, in their own store (core/altstore.js withAltSources).
   return Object.assign(backend, withAltSources(sourceCalls(backend, sourceOptions), backend, { altDefaults: DEFAULT_ALT_SOURCES, ...sourceOptions, sort: sortSources }));
 }

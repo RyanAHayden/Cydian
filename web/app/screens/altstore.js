@@ -32,7 +32,9 @@ import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { compareVersions } from "../core/apt.js";
 import { queueApp } from "./queue.js";
 import { descriptionGroup } from "./description.js";
-import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, updatedTile, reviewsPane, whatsNewGroup } from "./storepage.js";
+import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, updatedTile, whatsNewGroup } from "./storepage.js";
+import { reviewsTab } from "./reviews.js";
+import { reviewsApi, reviewsBase, mergeReviews } from "../core/reviews.js";
 import { needsCheck, savedInfo, withIpaInfo, checkIpa, ipaInfoUrl } from "../core/ipainfo.js";
 import { PUBLIC_SITE } from "../core/handoff.js";
 import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText } from "../core/applookup.js";
@@ -411,15 +413,16 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     line: headerLine({ version: `${v.version}${v.buildVersion ? ` (${v.buildVersion})` : ""}`, size, price: "Free" }) });
   page.append(header.head);
 
+  const reviewApi = getBackend().reviews ?? reviewsApi({ base: reviewsBase(detectMode()) }); // F182
+  const reviewId = appBundleId(app, pkg.row?.id);
+  const oursFirst = reviewApi.list(reviewId, 0).catch(() => null);
   let storeRating = null; // F161: the App Store's average and count (core/applookup.js), once looked up
   let ratingKnown;
   const ratingReady = new Promise((res) => { ratingKnown = res; });
   const tabs = storeTabs({
-    reviews: async (pane) => {
-      pane.replaceChildren(el("p", "empty", "Loading Ratings…"));
-      const r = await ratingReady;
-      reviewsPane(pane, { rating: r, footer: r ? "The App Store's rating for this app (found by its bundle ID)." : "Neither its source nor the App Store rates this app." });
-    },
+    // F182: reviews written here (screens/reviews.js), with the App Store's rating merged in.
+    reviews: (pane) => reviewsTab(pane, { id: reviewId, version: v.version ?? "", appStore: ratingReady, first: oursFirst, api: reviewApi,
+      onRating: (r) => { header.setRating(r); tiles.set("rating", ratingTile(r)); } }),
     related,
   });
   const details = tabs.panes.details;
@@ -440,6 +443,12 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     if (m.category) tiles.set("section", sectionTile(m.category, "App"));
     ratingKnown(storeRating);
   }, () => ratingKnown(null));
+  Promise.all([ratingReady, oursFirst]).then(([store, ours]) => { // F182: the stars count reviews written here too
+    if (!ours?.count) return;
+    const r = mergeReviews({ ours, appStore: store }).rating;
+    header.setRating(r);
+    tiles.set("rating", ratingTile(r));
+  });
 
   // F122: the source's screenshots, or (when it lists none) its GitHub repo's README and release pictures.
   // F161: when the source lists none, the App Store's screenshots come before the GitHub ones.

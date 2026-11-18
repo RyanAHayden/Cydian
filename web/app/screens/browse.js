@@ -30,7 +30,9 @@ import { renderAltSource, renderApp, installRows, appBundleId, formatDate, osRan
 import { linksGroup, previewSlot } from "./altstore.js";
 import { descriptionGroup } from "./description.js";
 import { packageLinks, packageGithub, aptShots, sileoShots, sileoRatings, sileoWhatsNew } from "../core/previews.js";
-import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, reviewsPane, whatsNewGroup } from "./storepage.js";
+import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, whatsNewGroup } from "./storepage.js";
+import { reviewsTab } from "./reviews.js";
+import { reviewsApi, reviewsBase, mergeReviews } from "../core/reviews.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { signAndInstall, localSigning } from "../signing-client.js";
 import { installOptions } from "../core/altstore.js";
@@ -586,16 +588,19 @@ async function renderPackage(body, route, key, id, ctx) {
   // One fetch of the Sileo JSON for the Details body, What's New, the stars and the Reviews tab (F181).
   const sileoJson = sileo ? getBackend().text(sileo).then((t) => JSON.parse(t)).catch(() => null) : Promise.resolve(null);
   const ratingOf = (json) => (json ? sileoRatings(json) : null);
-  sileoJson.then((json) => { if (body.isConnected) header.setRating(ratingOf(json)); });
+  // F182: the stars and the Rating tile count reviews written here too (core/reviews.js mergeReviews).
+  const reviewApi = getBackend().reviews ?? reviewsApi({ base: reviewsBase(detectMode()) });
+  const reviewId = st.package || id;
+  const oursFirst = reviewApi.list(reviewId, 0).catch(() => null);
+  let ratingTiles = null, lastRating; // the tiles are made further down, after some awaits
+  const showRating = (r) => { lastRating = r; if (!body.isConnected) return; header.setRating(r); ratingTiles?.set("rating", ratingTile(r)); };
+  Promise.all([sileoJson, oursFirst]).then(([json, ours]) => showRating(mergeReviews({ ours, depiction: ratingOf(json) }).rating));
   const descText = desc.long || desc.short;
 
   const tabs = storeTabs({
-    reviews: async (pane) => {
-      if (sileo) pane.replaceChildren(spinner("Loading Reviews"));
-      const r = ratingOf(await sileoJson);
-      reviewsPane(pane, { rating: r, reviews: r?.reviews ?? [], renderText: (rv) => reviewBody(rv, { open: openSileoSheet }),
-        footer: r ? "Ratings and reviews from the package's depiction, as its source wrote them." : "Its source gives no ratings or reviews for this package." });
-    },
+    // F182: reviews written here (screens/reviews.js) merged with the depiction's; Tap to Rate, Write a Review.
+    reviews: (pane) => reviewsTab(pane, { id: reviewId, version: st.version ?? "", depiction: sileoJson.then(ratingOf), first: oursFirst,
+      api: reviewApi, renderText: (rv) => reviewBody(rv, { open: openSileoSheet }), onRating: showRating }),
     related: (pane) => relatedPane(pane, route, pkg, id),
   });
   const details = tabs.panes.details;
@@ -645,7 +650,8 @@ async function renderPackage(body, route, key, id, ctx) {
   tiles.set("size", sizeTile(size));
   tiles.set("section", sectionTile(pkg.row.section === NO_SECTION ? null : pkg.row.section, { rootless: "Rootless", rootful: "Rootful", roothide: "Roothide" }[fit.need] ?? null));
   details.append(tiles.row);
-  sileoJson.then((json) => tiles.set("rating", ratingTile(ratingOf(json))));
+  ratingTiles = tiles; // the Rating tile: showRating above, once the depiction and reviews written here are both in
+  if (lastRating !== undefined) tiles.set("rating", ratingTile(lastRating));
 
   // Description, or the Sileo depiction as Details' body (its reviews go to the Reviews tab, its pictures to the
   // gallery).

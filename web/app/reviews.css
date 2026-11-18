@@ -1,0 +1,70 @@
+/* F182: reviews written here (screens/reviews.js): Tap to Rate, Write a Review, Report, and the Write a Review sheet,
+   per journal/F181/concept/TweakReviews.dc.html and WriteReview.dc.html. Colours from the concept (the App Store's
+   orange star #e08a1e, the empty star #a9b0bc; the white button #fdfdfd -> #e7e8ea, 1px #a3a7ae, label #385487). */
+
+/* five stars to tap: 44px targets, the star drawn as text so it stays sharp at 3x */
+.review-stars { display: inline-flex; }
+.review-star {
+  width: 44px; height: 44px; padding: 0; border: 0; background: none; cursor: pointer;
+  font: 30px/44px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #a9b0bc; text-shadow: 0 1px 0 rgba(255,255,255,.75);
+  -webkit-tap-highlight-color: transparent;
+}
+.review-star.on { color: #e08a1e; }
+.review-stars.small .review-star { width: 30px; height: 43px; font-size: 24px; line-height: 43px; color: #c4c4c4; text-shadow: none; }
+.review-stars.small .review-star.on { color: #e08a1e; }
+html[data-theme="dark"] .review-star { color: #5a606b; text-shadow: none; }
+html[data-theme="dark"] .review-star.on { color: #f0a03a; }
+
+/* Tap to Rate: the last row of the ratings card */
+.review-tap {
+  display: flex; align-items: center; gap: 8px; height: 43px; padding: 0 6px 0 12px;
+  border-top: 1px solid var(--divider); box-shadow: inset 0 1px 0 var(--divider-hi);
+}
+.review-tap-label { font-size: 15px; font-weight: bold; color: var(--text); }
+.review-tap-status { flex: 1; min-width: 0; font-size: 12px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Write a Review / More Reviews: the concept's white rounded button */
+.review-actions { display: flex; gap: 10px; margin: 12px 10px 0; }
+.review-button {
+  flex: 1; display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 9px;
+  font: bold 15px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #385487; text-shadow: 0 1px 0 #fff;
+  border: 1px solid #a3a7ae; background: linear-gradient(#fdfdfd, #e7e8ea); background-origin: border-box; cursor: pointer;
+}
+.review-button:active { background: linear-gradient(#e2e3e6, #c9cbcf); background-origin: border-box; }
+.review-button:disabled { color: #8a96ab; }
+.review-more { width: calc(100% - 20px); margin: 10px 10px 0; }
+html[data-theme="dark"] .review-button { color: #c9d6f0; text-shadow: none; border-color: #15171a; background: linear-gradient(#4a4f58, #3b3f46); background-origin: border-box; }
+.review-hidden-note { margin: 10px 19px 0; font-size: 14px; line-height: 18px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
+
+/* Report on a review written here: a small link, right-aligned under its text */
+.review-report, .review-reported { align-self: flex-end; padding: 2px 0; border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.review-report { color: #385487; cursor: pointer; }
+.review-reported { color: var(--subtitle); }
+html[data-theme="dark"] .review-report { color: #8fb0ea; }
+.store-review-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.store-reviews-footer { margin-bottom: 14px; }
+
+/* the Write a Review sheet: pinstripe, stars, a grouped form, a note */
+.review-sheet { background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light); }
+.sheet-left { justify-self: start; display: flex; }
+.review-sheet-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; padding-top: var(--nav-h); }
+.review-rate { display: flex; flex-direction: column; align-items: center; gap: 0; margin-top: 12px; color: var(--head); text-shadow: var(--emboss); }
+.review-rate-label { font-size: 14px; }
+.review-form {
+  margin: 16px 10px 0; overflow: hidden; background: #fff; border: 1px solid var(--table-edge); border-radius: 9.5px; font-size: 17px;
+}
+html[data-theme="dark"] .review-form { background: var(--table); }
+.review-field { display: flex; align-items: center; height: 44px; padding: 0 10px; }
+.review-field + .review-field { border-top: 1px solid var(--divider); }
+.review-field-label { flex: none; width: 70px; font-weight: bold; color: var(--text); }
+.review-input { flex: 1; min-width: 0; border: 0; outline: none; background: none; font: inherit; color: #4c566c; }
+html[data-theme="dark"] .review-input { color: var(--head); }
+.review-field-text { display: block; height: auto; padding: 0; }
+.review-field-text .review-input {
+  display: block; width: 100%; height: 170px; box-sizing: border-box; padding: 10px; resize: none;
+  font: 15px/20px "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--text);
+}
+.review-error { margin: 10px 19px 0; font-size: 14px; line-height: 18px; text-align: center; font-weight: bold; color: #c8231a; }
+.review-error[hidden] { display: none; }
+html[data-theme="dark"] .review-error { color: #ff7b6b; }
+.review-note { margin: 10px 19px 20px; font-size: 14px; line-height: 18px; text-align: center; color: var(--head); text-shadow: var(--emboss); }

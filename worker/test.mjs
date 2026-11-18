@@ -465,3 +465,132 @@ import { plistInfo } from "./src/ipainfo.js";
   assert.equal(routed.status, 400);
   console.log("worker ipainfo: ok");
 }
+
+// F182: user reviews in D1 (src/reviews.js), against Node's SQLite with D1's API (src/d1-sqlite.js).
+import { reviews as reviewsRoute, parseReview, clean, LIMITS } from "./src/reviews.js";
+import { d1 } from "./src/d1-sqlite.js";
+{
+  const db = d1();
+  const renv = { REVIEWS: db, REVIEWS_ADMIN: "owner-secret-123" };
+  const tok = (c) => c.repeat(40);
+  let ipN = 0;
+  const call = (path, { method = "GET", body, token, ip = `203.0.113.${++ipN % 250}`, auth, env: e = renv, now } = {}) => {
+    const headers = { "CF-Connecting-IP": ip };
+    if (token) headers["X-Review-Token"] = token;
+    if (auth) headers.Authorization = auth;
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    return reviewsRoute(new Request("https://cydian.example" + path, { method, headers, body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body) }), e, now ? { now } : {});
+  };
+  // caps and cleaning
+  assert.equal(parseReview({ stars: 0 }).ok, false);
+  assert.equal(parseReview({ stars: 6 }).ok, false);
+  assert.equal(parseReview({ stars: 2.5 }).ok, false);
+  assert.deepEqual(parseReview({ stars: "4" }).review, { stars: 4, title: "", name: "", text: "", version: "" });
+  assert.equal(parseReview({ stars: 5, title: "x".repeat(LIMITS.title + 1) }).ok, false);
+  assert.equal(parseReview({ stars: 5, title: "é".repeat(LIMITS.title) }).ok, true, "caps count characters, not bytes");
+  assert.equal(parseReview({ stars: 5, name: "x".repeat(31) }).ok, false);
+  assert.equal(parseReview({ stars: 5, text: "x".repeat(2001) }).ok, false);
+  assert.equal(parseReview({ stars: 5, text: { html: 1 } }).ok, false);
+  assert.equal(clean("a\u0000b\nc", 10), "a b c");
+  assert.equal(clean(" a\r\n\n\n\nb‮ ", 10, true), "a\n\nb");
+
+  // empty package: enabled, nothing yet
+  let r = await call("/reviews/com.example.velvet");
+  let j = await r.json();
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("Access-Control-Allow-Origin"), "*");
+  assert.deepEqual([j.enabled, j.count, j.average, j.reviews.length, j.mine], [true, 0, null, 0, null]);
+  assert.equal((await call("/reviews/..%2Fetc")).status, 404);
+  assert.equal((await call("/reviews/a%20b")).status, 404);
+
+  // post, then the same device again replaces it
+  r = await call("/reviews/com.example.velvet", { method: "POST", token: tok("a"), body: { stars: 5, title: "Great", name: "Ann", text: "<b>Loves</b> it", version: "2.1.3" }, now: 1000 });
+  j = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(j));
+  const first = j.review;
+  assert.match(first.id, /^[0-9a-f]{16}$/);
+  assert.equal(first.text, "<b>Loves</b> it", "kept as plain text; the clients draw it as text");
+  r = await call("/reviews/com.example.velvet", { method: "POST", token: tok("a"), body: { stars: 3, title: "Okay", name: "Ann", text: "Changed my mind", version: "2.1.4" }, now: 2000 });
+  j = await r.json();
+  assert.equal(j.review.id, first.id, "the same review, replaced");
+  assert.deepEqual([j.review.stars, j.review.title, j.review.date, j.review.updated], [3, "Okay", 1000, 2000]);
+  await call("/reviews/com.example.velvet", { method: "POST", token: tok("b"), body: { stars: 4, title: "Nice", name: "Bo", text: "Good", version: "2.1.4" }, now: 3000 });
+  await call("/reviews/com.example.velvet", { method: "POST", token: tok("c"), body: { stars: 5 }, now: 4000 }); // Tap to Rate
+  await call("/reviews/com.example.other", { method: "POST", token: tok("c"), body: { stars: 1, title: "Elsewhere" }, now: 4000 });
+  r = await call("/reviews/com.example.velvet", { token: tok("a") });
+  j = await r.json();
+  assert.equal(j.count, 3, "stars alone count as a rating");
+  assert.deepEqual(j.histogram, [1, 1, 1, 0, 0]);
+  assert.equal(j.average, 4);
+  assert.deepEqual(j.reviews.map((x) => x.title), ["Nice", "Okay"], "only reviews with words, newest first");
+  assert.equal(j.mine.id, first.id);
+  assert.equal(j.mine.hidden, false);
+  // paging
+  r = await call("/reviews/com.example.velvet?per=1&page=0");
+  j = await r.json();
+  assert.deepEqual([j.reviews.length, j.reviews[0].title, j.more], [1, "Nice", true]);
+  j = await (await call("/reviews/com.example.velvet?per=1&page=1")).json();
+  assert.deepEqual([j.reviews[0].title, j.more], ["Okay", false]);
+
+  // bad requests
+  assert.equal((await call("/reviews/com.example.velvet", { method: "POST", body: { stars: 5 } })).status, 400, "no token");
+  assert.equal((await call("/reviews/com.example.velvet", { method: "POST", token: "short", body: { stars: 5 } })).status, 400);
+  assert.equal((await call("/reviews/com.example.velvet", { method: "POST", token: tok("d"), body: { stars: 9 } })).status, 400);
+  assert.equal((await call("/reviews/com.example.velvet", { method: "POST", token: tok("d"), body: { stars: 5, text: "x".repeat(2001) } })).status, 400);
+  assert.equal((await call("/reviews/com.example.velvet", { method: "POST", token: tok("d"), body: "not json" })).status, 400);
+  assert.equal((await call("/reviews/com.example.velvet", { method: "POST", token: tok("d"), body: "x".repeat(20000) })).status, 413);
+
+  // report: one count per reporter, hidden at REPORT_HIDE (3), never by the author
+  const bo = (await (await call("/reviews/com.example.velvet")).json()).reviews[0];
+  assert.equal((await call(`/reviews/com.example.velvet/${bo.id}/report`, { method: "POST", token: tok("b") })).status, 400, "not your own");
+  j = await (await call(`/reviews/com.example.velvet/${bo.id}/report`, { method: "POST", token: tok("e") })).json();
+  assert.equal(j.hidden, false);
+  j = await (await call(`/reviews/com.example.velvet/${bo.id}/report`, { method: "POST", token: tok("e") })).json();
+  assert.equal(j.hidden, false, "the same reporter counts once");
+  await call(`/reviews/com.example.velvet/${bo.id}/report`, { method: "POST", token: tok("f") });
+  j = await (await call(`/reviews/com.example.velvet/${bo.id}/report`, { method: "POST", ip: "198.51.100.9" })).json(); // no token: by address
+  assert.equal(j.hidden, true);
+  j = await (await call("/reviews/com.example.velvet", { token: tok("b") })).json();
+  assert.deepEqual(j.reviews.map((x) => x.title), ["Okay"], "a hidden review is gone from the list");
+  assert.equal(j.count, 2, "and from the counts");
+  assert.equal(j.mine.hidden, true, "its author still sees it, marked hidden");
+  assert.equal((await call(`/reviews/com.example.velvet/${"0".repeat(16)}/report`, { method: "POST", token: tok("e") })).status, 404);
+
+  // owner delete
+  assert.equal((await call(`/reviews/com.example.velvet/${first.id}`, { method: "DELETE" })).status, 403);
+  assert.equal((await call(`/reviews/com.example.velvet/${first.id}`, { method: "DELETE", auth: "Bearer wrong" })).status, 403);
+  assert.equal((await call(`/reviews/com.example.velvet/${first.id}`, { method: "DELETE", auth: "Bearer owner-secret-123", env: { REVIEWS: db } })).status, 403, "no secret set: nobody");
+  assert.equal((await call(`/reviews/com.example.velvet/${first.id}`, { method: "DELETE", auth: "Bearer owner-secret-123" })).status, 200);
+  assert.equal((await call(`/reviews/com.example.velvet/${first.id}`, { method: "DELETE", auth: "Bearer owner-secret-123" })).status, 404);
+  j = await (await call("/reviews/com.example.velvet")).json();
+  assert.equal(j.count, 1);
+
+  // rate limits: per address a minute, per token a minute, per address a day
+  let codes = [];
+  for (let i = 0; i < 8; i++) codes.push((await call("/reviews/com.example.rl", { method: "POST", token: tok(String.fromCharCode(103 + i)), ip: "192.0.2.1", body: { stars: 4 } })).status);
+  assert.deepEqual(codes, [200, 200, 200, 200, 200, 200, 429, 429]);
+  codes = [];
+  for (let i = 0; i < 6; i++) codes.push((await call("/reviews/com.example.rl2", { method: "POST", token: tok("z"), body: { stars: 4 } })).status);
+  assert.deepEqual(codes, [200, 200, 200, 200, 429, 429]);
+  const daily = { REVIEWS: d1(), REVIEW_DAILY: "2" };
+  codes = [];
+  for (let i = 0; i < 3; i++) codes.push((await call("/reviews/com.example.day", { method: "POST", token: tok(String.fromCharCode(65 + i)), ip: "192.0.2.77", body: { stars: 2 }, env: daily, now: 5000 + i })).status);
+  assert.deepEqual(codes, [200, 200, 429]);
+  assert.equal((await call("/reviews/com.example.day", { method: "POST", token: tok("D"), ip: "192.0.2.77", body: { stars: 2 }, env: daily, now: 5000 + 86400001 })).status, 200, "a day later");
+  // the Rate Limiting binding when there is one
+  const said = [];
+  const bound = { REVIEWS: d1(), REVIEW_RATE_LIMIT: { limit: async ({ key }) => { said.push(key); return { success: said.length < 2 }; } } };
+  assert.equal((await call("/reviews/com.example.b", { method: "POST", token: tok("q"), body: { stars: 1 }, env: bound })).status, 200);
+  assert.equal((await call("/reviews/com.example.b", { method: "POST", token: tok("r"), body: { stars: 1 }, env: bound })).status, 429);
+  assert.match(said[0], /^ip:[0-9a-f]{64}$/, "addresses are hashed");
+
+  // no database: reading says off, writing 503; and the route through the Worker
+  j = await (await call("/reviews/com.example.velvet", { env: {} })).json();
+  assert.equal(j.enabled, false);
+  assert.equal((await call("/reviews/com.example.velvet", { method: "POST", token: tok("a"), body: { stars: 5 }, env: {} })).status, 503);
+  r = await w.fetch(new Request("https://cydian.example/reviews/com.example.velvet"), renv);
+  assert.equal((await r.json()).count, 1);
+  r = await w.fetch(new Request("https://cydian.example/reviews/com.example.velvet", { method: "OPTIONS" }), renv);
+  assert.match(r.headers.get("Access-Control-Allow-Headers"), /X-Review-Token/);
+  console.log("worker reviews: ok");
+}

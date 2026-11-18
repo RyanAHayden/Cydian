@@ -12,3 +12,6 @@ collide with the other slots' files. No product change made; blocked instead.
 **Not verified**: everything. There was no task to verify. If N11 was meant to be
 filed (for example a follow-up of N6 or N10), add it with `agent-runner plan add N …`
 and rerun.
+
+**Later the same day:** N11 was filed (finish N6's hand test with root) and done; see
+`journal/2026-11-18-n11-hand-test/`.

@@ -15,8 +15,9 @@
 //
 // In the sideload app the files live in Cydian's Documents (Files > On My iPhone > Cydian) and the shell signs them
 // (signing-client.js libraryCall, native/Sources/MyIPAs.swift). On the website there is no signer on the phone:
-// Add is From URL only, the list is links kept on this device, and Install hands the link on (F89: the website has
-// no server to sign with): Open in Cydian, Get in AltStore / SideStore / Feather (screens/handoff.js), Download IPA.
+// Add is From URL only, the list is links kept on this device, and Install is an app page's (F95, user 2026-11-18: no
+// Open in Cydian / Get in AltStore / SideStore / Feather): it signs in the browser (F93), and until that lands it says
+// the certificate is needed, with Download IPA (altstore.js siteCertificateAlert).
 // Rules and labels: core/myipas.js.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, placeholder } from "../nav/ui.js";
@@ -35,7 +36,7 @@ import { apps, recordInstall } from "../core/installed.js";
 import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optionsParams, siteEntries, addSiteUrl, removeSiteUrl,
   STATE_LABELS } from "../core/myipas.js";
 import { localSigning, libraryCall, installFromLibrary } from "../signing-client.js";
-import { installLinks } from "./handoff.js";
+import { siteCertificateAlert } from "./altstore.js";
 
 export { MYIPAS };
 
@@ -580,18 +581,12 @@ async function install(file) {
   }
 }
 
-// F89: the website's Install for one of the user's links: the hand-offs, then Download IPA. -> [{ label, url }]
-export function siteInstallChoices(entry) {
+// F95: the website's Install for one of the user's links, as an app page's (F92): the certificate alert, whose
+// Download IPA opens the link. -> whether it downloaded.
+export function siteInstallSheet(entry, { alert, open = (u) => { location.href = u; } } = {}) {
   const url = entry?.url;
-  if (!url) return [];
-  return [...installLinks(url, { name: entry.name || "" }).map((l) => ({ label: l.label, url: l.url })), { label: "Download IPA", url }];
-}
-
-async function siteInstallSheet(entry, { ask = showActionSheet, open = (u) => { location.href = u; } } = {}) {
-  const choices = siteInstallChoices(entry);
-  const i = await ask({ title: "The website can't install apps itself: open it in Cydian or another sideloader, or keep the IPA.",
-    buttons: choices.map((c) => c.label) });
-  if (i >= 0 && choices[i]) open(choices[i].url);
+  if (!url) return Promise.resolve(false);
+  return siteCertificateAlert({ download: () => open(url), ...(alert ? { alert } : {}) });
 }
 
 // ---- Sign Options -----------------------------------------------------------------------------------------------

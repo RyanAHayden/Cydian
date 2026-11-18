@@ -1,15 +1,13 @@
 // The website's Install (F92, user 2026-11-18: "the webpage install still shows open in and get in all these apps. we
 // shouldnt"): an app page offers only Install and Download IPA. Install signs in the browser (F93); until then it says
-// the certificate is needed, with Download IPA beside OK. Home's Install Cydian App does the same. My IPAs' links
-// still get the F89 hand-offs (myipas.js siteInstallChoices); Share keeps the sideloaders.
+// the certificate is needed, with Download IPA beside OK. Home's Install Cydian App and My IPAs' links (F95) do the
+// same. Share keeps the sideloaders.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { installRows, SITE_INSTALL_FOOTER, SITE_INSTALL_SUBTITLE, SITE_CERT_TITLE, siteCertificateAlert } from "./altstore.js";
-import { installLinks, HANDOFF_APPS } from "./handoff.js";
+import * as handoff from "./handoff.js";
 import { installAppSheet, APP_INSTALL_SUBTITLE, showsSigningTile } from "./home.js";
-import { siteInstallChoices } from "./myipas.js";
-import { installAsk } from "../incoming.js";
-import { parseOtherLink } from "../core/otherlinks.js";
+import { siteInstallSheet } from "./myipas.js";
 import { APP_IPA_URL } from "../core/appoffer.js";
 
 const V = { version: "1.2", downloadURL: "https://example.com/My-Delta.ipa" };
@@ -80,19 +78,9 @@ test("by default (no bridge: the website in node) the rows are the website's Ins
   } finally { if (saved) globalThis.cydianNative = saved; }
 });
 
-test("the hand-off links read back as what they say: Cydian's own and the sideloaders' (core/otherlinks.js)", () => {
-  const links = installLinks(V.downloadURL, { name: "Delta" });
-  assert.deepEqual(links.map((l) => l.app), ["Cydian", ...HANDOFF_APPS]);
-  assert.deepEqual(installAsk(links[0].url), { url: V.downloadURL, name: "Delta" });
-  for (const l of links.slice(1)) {
-    const o = parseOtherLink(l.url);
-    assert.equal(o?.action, "install", l.url);
-    assert.equal(o.app, l.app);
-    assert.equal(decodeURI(o.url), V.downloadURL);
-  }
-  // Feather takes https only; nothing for a link that isn't http(s).
-  assert.deepEqual(installLinks("http://plain.example/a.ipa").map((l) => l.app), ["Cydian", "AltStore", "SideStore"]);
-  assert.deepEqual(installLinks("ftp://x/a.ipa"), []);
+test("the install hand-offs are gone (F95): nothing builds Open in Cydian / Get in links", () => {
+  assert.equal(handoff.installLinks, undefined);
+  assert.equal(handoff.HANDOFF_APPS, undefined);
 });
 
 test("Home's Install Cydian App: the certificate alert with Download IPA, no sideloaders", async () => {
@@ -108,9 +96,18 @@ test("Home's Install Cydian App: the certificate alert with Download IPA, no sid
   assert.equal(showsSigningTile("sideload"), true);
 });
 
-test("My IPAs on the website: a link's Install offers the same hand-offs and Download IPA", () => {
-  const c = siteInstallChoices({ file: "a", url: "https://e.example/A.ipa", name: "A" });
-  assert.deepEqual(c.map((x) => x.label), ["Open in Cydian", "Get in AltStore", "Get in SideStore", "Get in Feather", "Download IPA"]);
-  assert.equal(c[4].url, "https://e.example/A.ipa");
-  assert.deepEqual(siteInstallChoices({ file: "a" }), []);
+test("My IPAs on the website: a link's Install is the certificate alert, whose Download IPA opens the link", async () => {
+  const opened = [];
+  let shown = null;
+  const entry = { file: "a", url: "https://e.example/A.ipa", name: "A" };
+  assert.equal(await siteInstallSheet(entry, { alert: async (o) => { shown = o; return { index: 0 }; }, open: (u) => opened.push(u) }), false);
+  assert.equal(shown.title, SITE_CERT_TITLE);
+  assert.deepEqual(shown.buttons, ["OK", "Download IPA"]);
+  assert.ok(!shown.buttons.some((b) => /Open in|Get in|AltStore|SideStore|Feather/.test(b)));
+  assert.deepEqual(opened, []);
+  assert.equal(await siteInstallSheet(entry, { alert: async () => ({ index: 1 }), open: (u) => opened.push(u) }), true);
+  assert.deepEqual(opened, ["https://e.example/A.ipa"]);
+  let asked = 0;
+  assert.equal(await siteInstallSheet({ file: "a" }, { alert: async () => { asked++; return { index: 1 }; }, open: (u) => opened.push(u) }), false);
+  assert.equal(asked, 0, "no link, no alert");
 });

@@ -19,7 +19,7 @@ import { appIcon, loadAppIcons } from "../app-icons.js";
 export function openInGroup(source, { pkg = null, jailbroken = settings.jailbroken() } = {}) {
   const apt = formatOf(source) === "apt";
   // An app's page has no Open In group: its Install group installs it (the user's certificate in the sideload app;
-  // F89: on the website, the hand-offs below, installLinks) or Download IPA keeps the file (user 2026-11-17).
+  // on the website, Install with the certificate alert until F93, F92) or Download IPA keeps the file (user 2026-11-17).
   const appPage = pkg && isIpaFormat(formatOf(source));
   const links = appPage || (apt && !jailbroken) ? [] : pkg ? packageLinks(pkg, source) : sourceLinks(source);
   const add = addLink(source, siteOrigin(globalThis.location));
@@ -147,33 +147,4 @@ function legacyCopy(text) {
   try { ok = document.execCommand("copy"); } catch { /* not allowed */ }
   t.remove();
   return ok;
-}
-
-// ---- install hand-offs (F89) --------------------------------------------------------------------------------------
-//
-//   installLinks(ipaUrl, { name })   -> [{ app, label, subtitle, url }]  Open in Cydian (cydian://install, incoming.js:
-//                                       the app signs it on the phone), then Get in AltStore / SideStore / Feather
-//                                       with their install links (core/otherlinks.js reads the same shapes back)
-// F92 (user 2026-11-18): an app page's Install and Home's Install Cydian App no longer offer these on the website
-// (altstore.js installRows, home.js installAppSheet); My IPAs' website Install still does (myipas.js).
-// Safari can't tell which apps are on the phone: a row whose app is missing gets Safari's own "address is invalid".
-export const HANDOFF_APPS = ["AltStore", "SideStore", "Feather"];
-const enc = encodeURIComponent;
-const isHttpUrl = (u) => /^https?:\/\/[^\s/?#]+/i.test(String(u ?? ""));
-
-const INSTALL_LINK = {
-  AltStore: (u) => `altstore://install?url=${enc(u)}`,
-  SideStore: (u) => `sidestore://install?url=${enc(u)}`,
-  Feather: (u) => (/^https:\/\//i.test(u) ? `feather://install/${u}` : null), // Feather takes https only, raw
-};
-
-export function installLinks(ipaUrl, { name = "" } = {}) {
-  if (!isHttpUrl(ipaUrl)) return [];
-  const cydian = `cydian://install?url=${enc(ipaUrl)}${name ? `&name=${enc(name)}` : ""}`;
-  const out = [{ app: "Cydian", label: "Open in Cydian", subtitle: "If you have the app: it signs it on the iPhone", url: cydian }];
-  for (const app of HANDOFF_APPS) {
-    const url = INSTALL_LINK[app](ipaUrl);
-    if (url) out.push({ app, label: `Get in ${app}`, subtitle: `If you use ${app}`, url });
-  }
-  return out;
 }

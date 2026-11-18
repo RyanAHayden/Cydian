@@ -624,14 +624,13 @@ async function packageActions(route, button) {
     // I5: in the sideload app Install signs this app on the phone and installs it.
     if (await signIfReady(st.ipa, v, recordApp(pkg, source, v))) return;
     // Install at the top right installs: the first row (the source's signed link, or the jailbreak). Download IPA and
-    // older versions are on the page, not in a menu in between. F89: on the website the first rows are hand-offs
-    // (Open in Cydian, Get in AltStore...), so the button lists them all, as Cydia's sheet does.
+    // older versions are on the page, not in a menu in between. On the website the first row is Install (F92: the
+    // certificate alert until F93's browser signing).
     const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v), undefined, st.ipa.name);
-    if (rows[0] && !rows[0].handoff && rows[0].label !== "Download IPA") return rows[0].onClick();
+    if (rows[0] && rows[0].label !== "Download IPA") return rows[0].onClick();
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });
     if (many) actions.push({ label: "Version History", run: () => go(versionsHref(route, id)) });
-    return sheet(options.itms ? "" : rows[0]?.handoff ? "The website can't install apps itself: open it in Cydian or another sideloader, or keep the IPA."
-      : "Download IPA keeps the file.", actions);
+    return sheet(options.itms ? "" : "Download IPA keeps the file.", actions);
   }
   const installed = installedOf(history);
   const queue = queueOf({ installed, name: pkg.row?.name });

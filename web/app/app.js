@@ -19,6 +19,7 @@ import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
 import { initMomentumTap, heldTap } from "./nav/momentum-tap.js";
+import { makeScrollToTop } from "./nav/statusbar.js";
 import * as home from "./screens/home.js";
 import * as sources from "./screens/sources.js";
 import * as changes from "./screens/changes.js";
@@ -435,6 +436,9 @@ if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.setting
 if (globalThis.cydianNative) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
 
 // The Home Screen icon's long-press Upgrade All (native Shortcut.perform): Changes, every upgrade queued, Confirm.
+// F167: the native shell calls this on a status bar tap (App.swift scrollViewShouldScrollToTop).
+globalThis.cydianScrollToTop = makeScrollToTop(document, () => stacks.top()?.page.body);
+
 globalThis.cydianShortcut = async (type) => {
   if (type !== "upgrade") return;
   location.hash = "#/changes";

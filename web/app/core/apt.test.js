@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   parseControl, description, parseRelations, stripClearsign, parseRelease, repoLayout, parseSourceLine,
-  resolveFilename, resolveIcon, isLocalUrl, parsePackages, parseVersion, compareVersions, satisfies,
+  resolveFilename, resolveIcon, parsePackages, parseVersion, compareVersions, satisfies,
   matchesArch, filterArch, DEFAULT_ARCH, ARCHES,
 } from "./apt.js";
 import { handle, reply } from "./worker.js";
@@ -140,8 +140,8 @@ test("Icon: remote kept, device paths normalised to file:///, relative against t
   for (const [icon, want] of cases) assert.equal(resolveIcon(root, icon), want, icon);
   assert.equal(resolveIcon(root, ""), null);
   assert.equal(resolveIcon(root, undefined), null);
-  assert.ok(isLocalUrl(resolveIcon(root, "/x.png")));
-  assert.ok(!isLocalUrl(resolveIcon(root, "x.png")));
+  assert.ok(resolveIcon(root, "/x.png").startsWith("file:"));
+  assert.ok(!resolveIcon(root, "x.png").startsWith("file:"));
 });
 
 test("parsePackages adds debUrl and iconUrl from the fixtures", () => {

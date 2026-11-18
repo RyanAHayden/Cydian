@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   parseAltSource, runsOn, appStanza, installOptions, newsToNotify, normalizeAltUrl, looksLikeAltUrl, tintOf,
-  withAltSources, altKey, isAltKey, appSection, compareOS, sideloaderLink,
+  withAltSources, altKey, isAltKey, appSection, compareOS,
   refreshAltSource, coreFoundationDist, GBOX_ENCRYPTED,
 } from "./altstore.js";
 import { parseIpaSource } from "./sources/ipa.js";
@@ -272,18 +272,6 @@ test("altstore: sources sit beside the APT list: add, list, refresh, remove", as
   assert.equal(await s.removeSource(apt[0].key), "apt");
   await s.removeSource(KEY);
   assert.deepEqual((await s.sources()).map((x) => x.key), [apt[0].key]);
-});
-
-test("F37: GET hands the source's own IPA URL to the chosen sideloader, or the IPA itself", () => {
-  const v = { downloadURL: "https://apps.example/My%20App.ipa?x=1&y=2" };
-  const enc = encodeURIComponent(v.downloadURL);
-  assert.deepEqual(sideloaderLink(v, "feather"), { name: "Feather", url: `feather://install/${v.downloadURL}` });
-  assert.deepEqual(sideloaderLink(v, "altstore"), { name: "AltStore", url: `altstore://install?url=${enc}` });
-  assert.deepEqual(sideloaderLink(v, "sidestore"), { name: "SideStore", url: `sidestore://install?url=${enc}` });
-  assert.deepEqual(sideloaderLink(v, "download"), { name: null, url: v.downloadURL });
-  assert.equal(sideloaderLink(v, "weird").name, "Feather");
-  assert.equal(sideloaderLink({ downloadURL: "itms-services://?action=x" }, "feather"), null);
-  assert.equal(sideloaderLink({}, "feather"), null);
 });
 
 test("F42: repeated entries of one app merge into its version history; variants under one bundle id stay apart", () => {

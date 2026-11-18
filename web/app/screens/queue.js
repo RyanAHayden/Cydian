@@ -386,16 +386,6 @@ async function installApp(job) {
   return sc.signAndInstall({ url: job.url, name: job.name || "" });
 }
 
-// F84: Custom Install's words on its Queue row: what it signs as, where that differs.
-export function customLabel(job) {
-  const o = job?.options;
-  if (!o) return null;
-  const e = o.edits ?? {};
-  const bits = [e.name && `as "${e.name}"`, e.bundleId, e.icon && "new icon",
-    e.removeExtensions?.length && `${e.removeExtensions.length} extension${e.removeExtensions.length === 1 ? "" : "s"} left out`].filter(Boolean);
-  return bits.length ? `Custom: ${bits.join(", ")}` : "Custom Install";
-}
-
 // F84: a Custom Install job: signing.install with its own options (core/appqueue.js customParams: the look's token
 // while fresh, else the url, and the edits), then iOS's progress on the HUD as the sheet did (signing-sheet.js
 // followInstall). The token is spent by the try, so a failed run that keeps the job queued downloads it again next time.

@@ -49,7 +49,6 @@ import { createWishlist, wishLabel, wishRows, WISH_EMPTY } from "../core/wishlis
 import { filterRows } from "../core/changes.js";
 
 export const ROW_HEIGHT = 58;
-export const SECTION_ROW_HEIGHT = 46;
 
 // Section Visibility (F24): the hidden sections live on the device (core/settings.js hiddenSections) and reach
 // the worker's catalog before its next answer, so every list, Search and Changes leave them out.

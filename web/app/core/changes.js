@@ -160,11 +160,6 @@ export function filterGroups(groups, opts) {
   return groups.map((g) => ({ ...g, rows: filterRows(g.rows, opts) })).filter((g) => g.rows.length);
 }
 
-// "New at Nov 17, 2026, 12:36:22 PM": Cydia's medium date and medium time, in the user's locale.
-export function groupTitle(seen, locale) {
-  return `New at ${new Date(seen).toLocaleString(locale, { dateStyle: "medium", timeStyle: "medium" })}`;
-}
-
 // Files a refresh: one `now` for every triple it saw. Returns how many records it added (or dated).
 export async function recordRefresh(store, current, now = Date.now()) {
   const known = new Map((await store.all()).map((r) => [r.k, r]));

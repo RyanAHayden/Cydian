@@ -24,7 +24,7 @@
 // that builds a feature adds its name here, and its row appears. Each def names its `feature`.
 
 import { ARCHES, DEFAULT_ARCH } from "./apt.js";
-import { IOS_VERSIONS } from "./compat.js";
+import { IOS_VERSIONS, JAILBREAK_ARCH } from "./compat.js";
 
 export const MODES = ["site", "jailbreak", "sideload"];
 
@@ -208,14 +208,13 @@ for (const a of ARCHES) if (!byKey.get("device").options.some((o) => o.value ===
 
 // F37: the device types. "none" is an iPhone without a jailbreak; the others are the APT architecture it installs.
 export const NOT_JAILBROKEN = "none";
-export const DEVICE_TYPES = byKey.get("device").options.map((o) => o.value);
 
 // The jailbreak app's type from its bridge: `cydianNative.arch` (one of ARCHES) or `cydianNative.jailbreak`
 // ("rootless" | "rootful" | "roothide", also what Bridge.swift app.info reports, F38), whichever the shell
 // detected; null when it says neither (or "none").
 export function bridgeArch(native) {
   if (ARCHES.includes(native?.arch)) return native.arch;
-  return { rootless: "iphoneos-arm64", rootful: "iphoneos-arm", roothide: "iphoneos-arm64e" }[native?.jailbreak] ?? null;
+  return JAILBREAK_ARCH[native?.jailbreak] ?? null;
 }
 
 // The mode: the app's bridge says which build is running (I2 sets `cydianNative.mode`); a bridge without one is

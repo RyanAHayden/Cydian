@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { appPageAction, appPageCustom } from "./altstore.js";
-import { queueApp, runAppQueue, installCustom, customLabel } from "./queue.js";
+import { queueApp, runAppQueue, installCustom } from "./queue.js";
 import { createAppQueue, customParams, TOKEN_LIFE } from "../core/appqueue.js";
 import { customInstall, inspectToQueue } from "../signing-sheet.js";
 
@@ -39,9 +39,6 @@ test("Custom Install: the sheet's Install queues the app with its options and op
   assert.equal(q.get("com.x.a").options.edits.bundleId, "com.me.a");
   assert.deepEqual(q.get("com.x.b").options.edits, { removeExtensions: ["PlugIns/W.appex"] });
   assert.equal(q.get("com.x.c").options, null);
-  assert.equal(customLabel(q.get("com.x.a")), 'Custom: as "Mine", com.me.a');
-  assert.equal(customLabel(q.get("com.x.b")), "Custom: 1 extension left out");
-  assert.equal(customLabel(q.get("com.x.c")), null);
 
   // Confirm's run: each in turn, each with its own options.
   const calls = [];

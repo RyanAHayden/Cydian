@@ -16,7 +16,6 @@ export const APP_DEB_URL = `${REPO_URL}/releases/latest/download/Cydian.deb`; //
 // Cydian's own AltStore source, kept current with native/VERSION by test_release.py.
 export const APP_SOURCE_URL = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json";
 export const APP_NAME = "Cydian";
-export const APP_LABEL = "Install App"; // half of Home's split button: Install App | Send Settings
 
 const NOT_JAILBROKEN = "none";
 

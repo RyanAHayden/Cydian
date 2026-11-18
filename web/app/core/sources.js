@@ -96,10 +96,6 @@ export function normalizeSourceUrl(input) {
   return u.href.replace(/\/*$/, "/");
 }
 
-// Where the source's Release and CydiaIcon.png live: the flat dir, or URI/dists/<dist>/.
-export const sourceBase = (source) => repoLayout(source).base;
-export const sourceIconUrl = (source) => sourceBase(source) + "CydiaIcon.png";
-
 // Where to look for CydiaIcon.png, in order. Cydia asks only <base> (MetaIndexURI(""), so dists/<dist>/ for a
 // dist repo), but dist repos such as Procursus serve it at the top level (the URI) instead, so a dist repo also
 // gets the root as a fallback. A flat repo has the one place.

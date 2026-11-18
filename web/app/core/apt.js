@@ -185,8 +185,6 @@ export function resolveIcon(root, icon) {
   return root ? new URL(safeRelative(s), root).href : null;
 }
 
-export const isLocalUrl = (u) => typeof u === "string" && u.startsWith("file:");
-
 // Parses a Packages file and adds the resolved `debUrl` and `iconUrl` to each stanza (camelCase, so they can
 // never collide with a lower-cased control field). Stanzas without a Package field are dropped.
 export function parsePackages(text, root) {

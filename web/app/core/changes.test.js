@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { openSeenStore, recordRefresh, changeGroups, newRecords, recordKey, groupTitle } from "./changes.js";
+import { openSeenStore, recordRefresh, changeGroups, newRecords, recordKey } from "./changes.js";
 
 // The slice of IndexedDB changes.js uses, in memory: open with upgradeneeded, one keyPath store, async requests,
 // several requests per transaction, completion after the last one.
@@ -69,7 +69,6 @@ test("changes: a refresh with a bumped version files it under today, and a repea
   assert.equal(groups.length, 1);
   assert.equal(groups[0].seen, today);
   assert.deepEqual(groups[0].rows.map((r) => [r.id, r.change]), [["a", "updated"], ["c", "new"]]);
-  assert.match(groupTitle(today, "en-US"), /^New at Nov 1[78], 2026/);
 
   // A repeat refresh (later the same day, nothing changed) records nothing and moves nothing.
   assert.equal(await recordRefresh(store, [["r1", "a", "1.1"], ["r1", "b", "2.0"], ["r1", "c", "0.1"]], today + 3600000), 0);

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  DEFAULT_SOURCES, DEFAULT_ALT_SOURCES, normalizeSourceUrl, sourceKey, sourceIconUrl, sourceIconUrls, displayName, sortSources, verifySource,
+  DEFAULT_SOURCES, DEFAULT_ALT_SOURCES, normalizeSourceUrl, sourceKey, sourceIconUrls, displayName, sortSources, verifySource,
   refreshSource, releaseDepiction, openSourceStore, sourceCalls, SourceError, sourcesFor, sourceFilter,
 } from "./sources.js";
 import { createHttpBackend, BackendError } from "../backend-http.js";
@@ -198,8 +198,8 @@ test("sorting: letters first, then without case or diacritics", () => {
 });
 
 test("icon URL: flat dir, or dists/<dist>/ for dist repos", () => {
-  assert.equal(sourceIconUrl(DEFAULT_SOURCES.find((s) => s.name === "Chariz")), "https://repo.chariz.com/CydiaIcon.png");
-  assert.equal(sourceIconUrl(DEFAULT_SOURCES.find((s) => s.name === "BigBoss")),
+  assert.equal(sourceIconUrls(DEFAULT_SOURCES.find((s) => s.name === "Chariz"))[0], "https://repo.chariz.com/CydiaIcon.png");
+  assert.equal(sourceIconUrls(DEFAULT_SOURCES.find((s) => s.name === "BigBoss"))[0],
     "http://apt.thebigboss.org/repofiles/cydia/dists/stable/CydiaIcon.png");
 });
 

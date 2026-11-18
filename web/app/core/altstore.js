@@ -316,23 +316,6 @@ export function installOptions(version, sourceUrl) {
   return { itms, download, open };
 }
 
-// F37: GET on a phone without a jailbreak: the IPA handed to the sideloader Settings > Sideloader picks, straight
-// from the source's own URL (never through a server of ours). Feather takes feather://install/<url> (FeatherApp.swift,
-// `validatedScheme(after: "/install/")`); AltStore and SideStore take <scheme>://install?url=<encoded url>.
-// "download" is the IPA itself. Returns { name, url } or null when the version has no http(s) IPA.
-export const SIDELOADER_INSTALL = {
-  feather: { name: "Feather", link: (u) => `feather://install/${u}` },
-  altstore: { name: "AltStore", link: (u) => `altstore://install?url=${encodeURIComponent(u)}` },
-  sidestore: { name: "SideStore", link: (u) => `sidestore://install?url=${encodeURIComponent(u)}` },
-  download: { name: null, link: (u) => u },
-};
-export function sideloaderLink(version, sideloader = "feather") {
-  const ipa = httpUrl(version?.downloadURL);
-  if (!ipa) return null;
-  const s = SIDELOADER_INSTALL[sideloader] ?? SIDELOADER_INSTALL.feather;
-  return { name: s.name, url: s.link(ipa) };
-}
-
 // News items flagged notify: true that haven't been pushed (sentIds: identifiers already sent), newest first.
 export function newsToNotify(source, sentIds = []) {
   const sent = new Set(sentIds);
@@ -359,18 +342,6 @@ export const looksLikeAltUrl = (input) => /^(altstore|sidestore|feather):\/\//i.
 export function altRecord(url, parsed) {
   return { key: altKey(url), kind: "altstore", uri: url, name: parsed.name || null, iconURL: parsed.iconURL,
     tintColor: parsed.tintColor, count: parsed.apps.length, updated: Date.now(), error: null };
-}
-
-// Fetches and parses a source; throws an Error with a `kind` (invalid_url, not_altstore) or the backend's code.
-export async function verifyAltSource(backend, input) {
-  const url = normalizeAltUrl(input);
-  if (!url) throw Object.assign(new Error("That is not a valid source URL. Please check it and try again."), { kind: "invalid_url", title: "Invalid URL" });
-  const text = await backend.text(url);
-  let parsed;
-  try { parsed = parseAltSource(text); } catch (e) {
-    throw Object.assign(new Error(e.message), { kind: "not_altstore", title: "Did not Find Source" });
-  }
-  return altRecord(url, parsed);
 }
 
 // F16a: an IPA source's JSON (text or parsed) by its record's `format` (none: AltStore, the records from before

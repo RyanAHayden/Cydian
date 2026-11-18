@@ -1,8 +1,8 @@
-// F75: Open in Cydian App, like Feather's feather:// links. On the website (Settings, and Home's Install Cydian App
-// area) a row that opens cydian://import?d=<base64url of gzipped JSON> with the visitor's sources, the settings that
-// travel (core/settings.js TRAVELS), Ignored Upgrades and the Signing Server; never the certificate (that travels
-// only inside Cydian's own IPA, or encrypted through Import from Safari). In the app, incoming.js hands the link to
-// reviewAndImport: an "Import from the Website?" alert listing only what's new, then Import adds it.
+// F75: Open in Cydian App (Home's Send Settings), like Feather's feather:// links. On the website (Settings, and
+// Home's Install Cydian App area) a row that opens cydian://import?d=<base64url of gzipped JSON> with the visitor's
+// sources, the settings that travel (core/settings.js TRAVELS) and Ignored Upgrades (F89: the website keeps no
+// certificate or Signing Server, so neither goes). In the app, incoming.js hands the link to reviewAndImport, which
+// adds only what's new.
 //
 //   openInAppSection()                   the website's group, Not Jailbroken (an empty box anywhere else)
 //   await openInApp()                    builds the link, shows the banner, opens it
@@ -16,9 +16,8 @@ import { showBanner } from "../nav/banner.js";
 import { showHUD } from "../nav/hud.js";
 import { detectMode, TRAVELS, SETTINGS } from "../core/settings.js";
 import { exportLine } from "../core/sourcelist.js";
-import { encodeLink, decodeLink, reviewLink, toB64url, fromB64url } from "../core/transfer.js";
+import { encodeLink, decodeLink, reviewLink } from "../core/transfer.js";
 import { toBase64 } from "../core/signing.js";
-import { getServer, setServer, loadIdentity, saveIdentity } from "../signing-client.js";
 import { getBackend } from "../backend.js";
 import { settings } from "./settings.js";
 
@@ -26,22 +25,15 @@ export function openInAppSection() {
   const box = document.createElement("div");
   if (detectMode() !== "site" || settings.deviceType() !== "none") return box; // the sideload app takes the link
   box.append(grouped([{ header: "Cydian App", rows: [{ label: "Open in Cydian App", onClick: () => openInApp() }],
-    footer: "Brings your sources and settings into the Cydian app on this iPhone. Your certificate stays here." }]));
+    footer: "Brings your sources and settings into the Cydian app on this iPhone." }]));
   return box;
 }
 
-export async function websitePayload({ backend = getBackend(), store = settings, server = getServer() } = {}) {
+export async function websitePayload({ backend = getBackend(), store = settings } = {}) {
   const sources = (await backend.sources().catch(() => [])).filter((s) => s?.uri).map(exportLine);
   const values = {};
   for (const k of TRAVELS) if (store.isShown(k)) values[k] = store.get(k);
-  // The certificate goes along when this browser has one (Settings > Signing), so the app needs no setup.
-  let identity = null;
-  try {
-    const id = await loadIdentity();
-    if (id?.p12 && id?.profile) identity = { p12: toB64url(id.p12), profile: toB64url(id.profile), password: id.password ?? "",
-      p12Name: id.p12Name ?? "", profileName: id.profileName ?? "" };
-  } catch { /* no certificate stored here */ }
-  return { sources, settings: values, holds: store.holds.list(), server, identity };
+  return { sources, settings: values, holds: store.holds.list() };
 }
 
 export async function openInApp() {
@@ -54,13 +46,12 @@ export async function openInApp() {
   }
   hide();
   // Safari's own "Open in Cydian?" can't be reworded: the banner says which button to press.
-  showBanner({ title: "Cydian", message: "Press Open to bring your certificate, sources and settings into Cydian." });
+  showBanner({ title: "Cydian", message: "Press Open to bring your sources and settings into Cydian." });
   location.href = link;
 }
 
 const labelOf = (key) => SETTINGS.find((d) => d.key === key)?.label ?? key;
 const optionOf = (key, v) => SETTINGS.find((d) => d.key === key)?.options?.find((o) => o.value === v)?.label ?? String(v);
-const host = (u) => { try { return new URL(u).host; } catch { return String(u); } };
 
 export function reviewText(r) {
   const lines = [];
@@ -71,7 +62,6 @@ export function reviewText(r) {
   }
   for (const s of r.settings) lines.push(`${labelOf(s.key)}: ${optionOf(s.key, s.to)}.`);
   if (r.holds.length) lines.push(`Ignored Upgrades: ${r.holds.length} more.`);
-  if (r.server) lines.push(`Signing Server: ${host(r.server.to)}.`);
   return lines.join("\n");
 }
 
@@ -88,20 +78,12 @@ export async function reviewAndImport(url, { native = globalThis.cydianNative, b
   const have = await backend.sources().catch(() => []);
   const r = reviewLink(payload, {
     have, get: (k) => (store.isShown(k) ? store.get(k) : undefined), shown: (k) => store.isShown(k),
-    holds: store.holds.list(), server: getServer(),
+    holds: store.holds.list(),
   });
   // Straight away, no question (user 2026-11-17): the user asked for it by opening the link.
   const hide = hud("Importing");
   const failed = [];
-  if (payload.identity && native?.call) {
-    try {
-      const b64 = (t) => toBase64(fromB64url(t));
-      await native.call("signing.import", { p12: b64(payload.identity.p12), profile: b64(payload.identity.profile),
-        password: payload.identity.password ?? "" });
-      await saveIdentity({ p12Name: payload.identity.p12Name, profileName: payload.identity.profileName }).catch(() => {});
-    } catch (err) { failed.push(`Certificate: ${err?.message ?? err}`); }
-  }
-  if (r.empty && !payload.identity) {
+  if (r.empty) {
     hide();
     await alert({ title: "Nothing New", message: "Cydian already has the website's sources and settings.", buttons: ["OK"] });
     return "nothing";
@@ -112,7 +94,6 @@ export async function reviewAndImport(url, { native = globalThis.cydianNative, b
   }
   for (const s of r.settings) { try { store.set(s.key, s.to); } catch { /* an option this build lacks */ } }
   for (const p of r.holds) { try { await store.holds.set(p, true); } catch { /* the helper refused */ } }
-  if (r.server) setServer(r.server.to);
   // One popup only: the HUD ends on its checkmark; anything that didn't go in is a banner, which goes by itself.
   if (hide.done) hide.done("Imported");
   else hide();

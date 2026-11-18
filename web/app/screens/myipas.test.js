@@ -84,7 +84,7 @@ test("Install IPAs' Browse section: All Apps and the categories of the AltStore 
   const none = browseGroups([]);
   assert.equal(none.length, 1);
   assert.match(none[0].footer, /AltStore source/);
-  assert.match(libraryEmptyText(true), /Signing Server/);
+  assert.match(libraryEmptyText(true), /AltStore, SideStore or Feather/);
   assert.match(libraryEmptyText(false), /On My iPhone > Cydian/);
 });
 

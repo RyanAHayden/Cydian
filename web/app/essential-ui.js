@@ -19,8 +19,7 @@ import { detectMode } from "./core/settings.js";
 import { parseStatus } from "./core/installed.js";
 import { showAlert } from "./nav/alert.js";
 import { settings } from "./screens/settings.js";
-import { getServer, pollJob, installOnDevice } from "./signing-client.js";
-import { signBody, errorText } from "./core/signing.js";
+import { installOnDevice } from "./signing-client.js";
 
 const native = () => globalThis.cydianNative;
 const storage = () => { try { return globalThis.localStorage; } catch { return null; } };
@@ -55,39 +54,14 @@ export async function upgradesWithSelf(upgrades) {
   return withSelfUpgrade(upgrades, selfUpgradeRow(info, await appVersion()));
 }
 
-// The certificate the Signing Server may use: the shell's signing.export, which the app doesn't have yet (the key
-// stays in the Keychain, I6): null, and installSelf sends the user to cydian.dev instead.
-async function exportIdentity() {
-  const r = await native()?.call?.("signing.export", {});
-  if (!r?.p12 || !r?.profile) return null;
-  const bytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  return { p12: bytes(r.p12), profile: bytes(r.profile), password: r.password ?? "" };
-}
-
-// POST <server>/sign as signing-client's signAndInstall does, with the given identity: the itms-services link.
-async function signOnServer({ url, identity, server }) {
-  const json = JSON.stringify({ ...JSON.parse(signBody({ url, ...identity })), async: true });
-  let status, body;
-  try {
-    const res = await fetch(`${server}/sign`, { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: json });
-    status = res.status;
-    body = await res.json().catch(() => null);
-    if (status === 202 && typeof body?.job === "string") ({ status, body } = await pollJob(server, body));
-  } catch {
-    throw new Error(`The signing server (${new URL(server).host}) can't be reached.`);
-  }
-  if (status !== 200 || !body?.itms) throw new Error(errorText(status, body));
-  return body.itms;
-}
-
 export async function installSelfNow(row) {
   // The sideload app signs its own update on the phone and hosts it on the Signing Server (signing.install host:
-  // true): straight to iOS's Install prompt, the key never leaves the phone. installSelf's paths stay for the rest.
+  // true): straight to iOS's Install prompt, the key never leaves the phone. Without the bridge: installSelf.
   if (detectMode() === "sideload" && row?.ipa && globalThis.cydianNative?.call) {
     const ok = await installOnDevice({ url: row.ipa, name: "Cydian", host: true });
     return ok ? "installing" : "failed";
   }
-  return installSelf(row, { exportIdentity, server: getServer(), signOnServer, alert: showAlert, open: openOutside, storage: storage() });
+  return installSelf(row, { alert: showAlert, open: openOutside });
 }
 
 // ---- jailbreak: the queue -----------------------------------------------------------------------------------

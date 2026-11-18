@@ -40,13 +40,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         Replaced.watch()
     }
 
-    // F75: a cydian:// link while Cydian runs (Import from Safari, Open in Cydian App on the website).
+    // F75: a cydian:// link while Cydian runs (Open in Cydian App and Open in Cydian on the website).
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         for c in URLContexts { Incoming.receive(c.url) }
     }
 }
 
-// F75: cydian://import?d=… and cydian://signing-import#… for the page (web/app/incoming.js). The shell keeps the
+// F75: cydian://import?d=…, cydian://install?url=… (F89) and the rest of IncomingLink's hosts for the page (web/app/incoming.js). The shell keeps the
 // latest one and tells the page there is one ("cydian:url" on window); the page takes it with app.takeURL, also
 // once at start, so a link that launched Cydian before the page loaded isn't lost. Only IncomingLink's hosts pass.
 //   app.takeURL            -> {url} | null (and forgets it)

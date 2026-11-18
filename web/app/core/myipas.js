@@ -6,9 +6,9 @@
 //     icon (base64 PNG) | null, error | null, options: {name, bundleId, icon, removeExtensions, fixArm64e},
 //     signed: { at, bundleId, name, version, size, expires? } | null }
 // On the website there is no signer on the phone: the library is a list of links kept on this device
-// (siteEntries/addSiteUrl/removeSiteUrl over localStorage), signed by the Signing Server as each one installs.
+// (siteEntries/addSiteUrl/removeSiteUrl over localStorage), handed to Cydian or another sideloader on Install (F89).
 //
-//   stateOf(entry, { identity, site })   { kind: "signed" | "unsigned" | "broken" | "server", label }
+//   stateOf(entry, { identity, site })   { kind: "signed" | "unsigned" | "broken" | "link", label }
 //   libraryRows(entries, opts)           A to Z, with the subtitle the list shows
 //   ipaSubtitle(entry, opts)             "1.2 · 14.3 MB · Signed, ready to install"
 //   formatBytes(n)                       "14.3 MB"
@@ -25,13 +25,13 @@ export const STATE_LABELS = {
   signed: "Signed, ready to install",
   unsigned: "Not signed yet",
   broken: "Can't be read",
-  server: "Signed by the Signing Server on Install",
+  link: "A link: Install opens it in a sideloader",
 };
 
 // `identity`: whether a certificate is in the app (without one nothing counts as signed: the shell already answers
 // signed null then). `site`: the website's library, which never holds a signed copy.
 export function stateOf(entry, { site = false } = {}) {
-  if (site) return { kind: "server", label: STATE_LABELS.server };
+  if (site) return { kind: "link", label: STATE_LABELS.link };
   if (entry?.error) return { kind: "broken", label: STATE_LABELS.broken };
   if (entry?.signed) return { kind: "signed", label: STATE_LABELS.signed };
   return { kind: "unsigned", label: STATE_LABELS.unsigned };

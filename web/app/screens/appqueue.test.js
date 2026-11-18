@@ -76,6 +76,7 @@ test("app page (F80): installed, Modify's sheet offers Upgrade (and Downgrade); 
 
   // Where the queue doesn't apply, the page does what it did before.
   assert.equal(await appPageAction(pkg, null, { ...base, mode: "jailbreak" }), false);
+  assert.equal(await appPageAction(pkg, null, { ...base, mode: "site" }), false); // F89: the website hands apps on
   assert.equal(await appPageAction(pkg, null, { ...base, ready: async () => false }), false);
   const itms = { ...pkg, stanza: { ...pkg.stanza, ipa: { ...pkg.stanza.ipa, versions: [{ version: "2", downloadURL: "itms-services://?x" }] } } };
   assert.equal(await appPageAction(itms, null, base), false);

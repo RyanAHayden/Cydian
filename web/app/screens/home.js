@@ -21,9 +21,10 @@ import { settings } from "./settings.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
 import { currentDevice } from "../device.js";
-import { signAndInstall, signingReady, getBring } from "../signing-client.js";
+import { showActionSheet } from "../nav/actionsheet.js";
+import { sourceHandoffs } from "./handoff.js";
 import { homeFeatured } from "./extras.js";
-import { homeOffer, debUrl, debAlert, APP_LABEL, APP_NAME, REPO_URL, APP_IPA_URL } from "../core/appoffer.js";
+import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_SOURCE_URL } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 import { refreshInBackground } from "./sources.js";
 import { GUIDES, guideRows, JAILBREAK_INFO_URL } from "./guides.js";
@@ -64,6 +65,24 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
 
 // F79: Home's Install IPAs tile, beside Browse: the Installed tab's Install IPAs page (screens/myipas.js). Not in the
 // jailbreak app, which has no such page (apt installs there).
+// F89: Install Cydian App on the website, Not Jailbroken: the website signs nothing, so the sheet adds Cydian's own
+// source to AltStore, SideStore or Feather (screens/handoff.js sourceHandoffs), or downloads the IPA.
+// -> [{ label, url }]
+export function appInstallChoices(sourceUrl = APP_SOURCE_URL, ipaUrl = APP_IPA_URL) {
+  return [...sourceHandoffs(sourceUrl).map((l) => ({ label: l.label, url: l.url })), { label: "Download IPA", url: ipaUrl }];
+}
+export const APP_SHEET_TITLE = "Cydian installs with your sideloader: add its source there, or keep the IPA.";
+
+async function installAppSheet({ ask = showActionSheet, open = (u) => { location.href = u; } } = {}) {
+  const choices = appInstallChoices();
+  const i = await ask({ title: APP_SHEET_TITLE, buttons: choices.map((c) => c.label) });
+  if (i >= 0 && choices[i]) open(choices[i].url);
+}
+
+// F89: Home's Signing tile (Settings > Signing) only where something signs: the sideload app. Elsewhere Featured
+// takes the row alone.
+export const showsSigningTile = (mode) => mode === "sideload";
+
 export function ipasTile(mode = "site") {
   if (mode === "jailbreak") return null;
   return { label: "Install IPAs", href: format({ tab: "installed", path: ["myipas"] }) };
@@ -315,8 +334,8 @@ function renderRoot(body) {
     a.href = h.href;
     hintBox.replaceChildren(a);
   };
-  // Themes beside Featured when jailbroken; while Not Jailbroken (F41) a Signing tile takes its place, the way to
-  // the user's own certificate (Settings > Signing), which is what installs apps without a jailbreak.
+  // Themes beside Featured when jailbroken; while Not Jailbroken (F41) a Signing tile takes its place in the
+  // sideload app, the way to the user's own certificate (Settings > Signing). F89: none on the website.
   const halves = tileRow("halves",
     tile({ label: "Featured", href: format({ tab: "home", path: ["browse", "popular"] }), glyph: "featured" }), // Popular, not every package
     tile({ label: "Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }), glyph: "themes" }),
@@ -324,7 +343,7 @@ function renderRoot(body) {
   const drawThemes = () => {
     const themes = showsThemes(settings.deviceType());
     halves.children[1].hidden = !themes;
-    halves.children[2].hidden = themes;
+    halves.children[2].hidden = themes || !showsSigningTile(settings.mode);
   };
   drawHint();
   drawThemes();
@@ -336,23 +355,23 @@ function renderRoot(body) {
     drawApp();
   });
 
-  // Install Cydian App, full width under Featured | Signing, on the website only (I7, core/appoffer.js homeOffer):
-  // Not Jailbroken, the sideload build (I2) signed with the user's own certificate through the signing server, or
-  // Settings > Signing first when there's none; jailbroken, the release's .deb for the device's arch.
-  // One green split button (user 2026-11-17): Install Cydian App | Send Settings (Open in Cydian App: the certificate,
-  // sources and settings into the app).
-  const sendTile = tile({ label: "Send Settings to App", subtitle: "Your certificate, sources and settings", href: format({ tab: "home" }), glyph: "send" });
-  const appRow = tileRow("green stack", tile({ label: "Install Cydian App", subtitle: "Signed with your certificate",
-    href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }), sendTile);
+  // Install Cydian App, full width under Featured, on the website only (I7, core/appoffer.js homeOffer): Not
+  // Jailbroken, F89's sheet (Cydian's source in AltStore / SideStore / Feather, or Download IPA); jailbroken, the
+  // release's .deb for the device's arch.
+  // One green split button (user 2026-11-17): Install Cydian App | Send Settings (Open in Cydian App: the sources
+  // and settings into the app).
+  const sendTile = tile({ label: "Send Settings to App", subtitle: "Your sources and settings", href: format({ tab: "home" }), glyph: "send" });
+  const appRow = tileRow("green stack", tile({ label: "Install Cydian App", subtitle: "AltStore, SideStore, Feather or the IPA",
+    href: format({ tab: "home" }), glyph: "install" }), sendTile);
   const appLink = appRow.querySelector("a");
+  const appSub = appLink.querySelector(".cell-subtitle");
   let offer = null;
   appLink.addEventListener("click", (e) => {
-    // decided synchronously from the last known state, so the link's default (Signing) and the install never both run
-    if (!offer || offer.action === "signing") return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    if (offer.action === "install") signAndInstall({ url: APP_IPA_URL, name: APP_NAME, bring: getBring() }); // F75
-    else installDeb(offer.arch);
+    if (!offer) return;
+    if (offer.action === "deb") installDeb(offer.arch);
+    else installAppSheet();
   }, true);
   // F75: Send Settings (Open in Cydian App), the split button's right half (the website, not jailbroken).
   const openRow = sendTile;
@@ -363,21 +382,12 @@ function renderRoot(body) {
   }, true);
   const drawApp = () => {
     const type = settings.deviceType();
-    offer = homeOffer({ mode: settings.mode, deviceType: type, certificate: false });
+    offer = homeOffer({ mode: settings.mode, deviceType: type });
     appRow.hidden = !offer;
     openRow.hidden = !(settings.mode === "site" && type === "none");
-    if (!offer || offer.action === "deb") return;
-    signingReady().then((ok) => {
-      offer = homeOffer({ mode: settings.mode, deviceType: settings.deviceType(), certificate: ok });
-    });
+    if (appSub) appSub.textContent = offer?.action === "deb" ? "The .deb for your jailbreak" : "AltStore, SideStore, Feather or the IPA";
   };
   drawApp();
-  // Back from Settings > Signing with a certificate set: the tile installs now.
-  const onShow = () => {
-    if (!appRow.isConnected) { removeEventListener("hashchange", onShow); return; }
-    if (/^#\/home\/?$/.test(location.hash)) drawApp();
-  };
-  addEventListener("hashchange", onShow);
 
   // F46: Browse, full width under Featured and Themes.
   // F79: Install IPAs beside it, where the build has the page.

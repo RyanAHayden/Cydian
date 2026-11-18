@@ -12,7 +12,7 @@ test("an IPA's state: signed, not signed yet, unreadable, or (website) signed by
   assert.deepEqual(stateOf(entry({ signed: { at: "2026-11-17T10:00:00Z" } })), { kind: "signed", label: "Signed, ready to install" });
   assert.equal(stateOf(entry({ error: "That isn't an IPA" })).kind, "broken");
   assert.equal(stateOf(entry({ error: "x", signed: { at: "" } })).kind, "broken");
-  assert.equal(stateOf({ file: "A.ipa", url: "https://x/A.ipa" }, { site: true }).label, STATE_LABELS.server);
+  assert.equal(stateOf({ file: "A.ipa", url: "https://x/A.ipa" }, { site: true }).label, STATE_LABELS.link);
   assert.equal(MYIPAS, "myipas");
 });
 

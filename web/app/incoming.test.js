@@ -1,11 +1,12 @@
 // F75: the native URL hand-off (incoming.js): app.takeURL at start and on "cydian:url", each link to its handler;
-// Import from Safari coming back lands in the Keychain and opens Settings > Signing; Open in Cydian App's review
-// (screens/importlink.js reviewAndImport) adds only what's new.
+// Open in Cydian App's review (screens/importlink.js reviewAndImport) adds only what's new; F89: the website's
+// Open in Cydian (cydian://install) asks, then installs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { handleIncoming, startIncoming } from "./incoming.js";
 import { reviewAndImport, reviewText, websitePayload } from "./screens/importlink.js";
-import { encodeLink, newKey, sealIdentity, importUrl } from "./core/transfer.js";
+import { installAsk } from "./incoming.js";
+import { encodeLink } from "./core/transfer.js";
 
 function ui() {
   const u = { alerts: [], huds: [], went: 0, answer: 1 };
@@ -24,27 +25,29 @@ test("not ours: nothing happens", async () => {
   assert.deepEqual([u.alerts.length, u.huds.length, u.went], [0, 0, 0]);
 });
 
-test("signing-import: imported, a checkmark, then the walkthrough", async () => {
+test("F89 install: the website's Open in Cydian asks, then installs the IPA with its name", async () => {
   const u = ui();
-  let got = null;
-  const r = await handleIncoming("cydian://signing-import#abc", { ...u.deps, finish: async (url) => { got = url; return { identity: { name: "Me" } }; } });
-  assert.equal(r, "signing-import");
-  assert.equal(got, "cydian://signing-import#abc");
-  assert.deepEqual(u.huds, ["Importing", "done Imported"]);
-  assert.equal(u.alerts.length, 0);
-  assert.equal(u.went, 1);
+  const ran = [];
+  const opened = [];
+  const link = "cydian://install?url=" + encodeURIComponent("https://e.example/My App.ipa") + "&name=My%20App";
+  assert.equal(await handleIncoming(link, { ...u.deps, install: async (o) => ran.push(o), open: (h) => opened.push(h) }), "install");
+  assert.deepEqual(opened, ["#/installed/myipas"]);
+  assert.equal(u.alerts[0].title, "Install IPA");
+  assert.match(u.alerts[0].message, /^My App\nhttps:\/\/e\.example\/My App\.ipa$/);
+  assert.deepEqual(ran, [{ url: "https://e.example/My App.ipa", name: "My App" }]);
+  u.answer = 0; // Cancel
+  await handleIncoming(link, { ...u.deps, install: async (o) => ran.push(o), open: () => {} });
+  assert.equal(ran.length, 1);
 });
 
-test("signing-import: a failure says why, still opens the walkthrough", async () => {
+test("F89 install: a link without an http(s) IPA does nothing", async () => {
   const u = ui();
-  await handleIncoming("cydian://signing-import#abc", { ...u.deps, finish: async () => { throw new Error("Start again with Import from Safari in Settings > Signing."); } });
-  assert.deepEqual(u.alerts.map((a) => [a.title, a.message]), [["Couldn't Import", "Start again with Import from Safari in Settings > Signing."]]);
-  const coded = Object.assign(new Error("x"), { code: "wrong_password" });
-  await handleIncoming("cydian://signing-import#abc", { ...u.deps, finish: async () => { throw coded; } });
-  assert.equal(u.alerts[1].title, "Couldn't Import");
-  await handleIncoming("cydian://signing-import#abc", { ...u.deps, finish: async () => ({ identity: null, identityProblem: "Keychain says no" }) });
-  assert.equal(u.alerts[2].message, "Keychain says no");
-  assert.equal(u.went, 3);
+  for (const bad of ["cydian://install", "cydian://install?url=javascript:alert(1)", "cydian://install?url=file:///x.ipa"]) {
+    assert.equal(installAsk(bad), null, bad);
+    assert.equal(await handleIncoming(bad, { ...u.deps, install: async () => assert.fail("installed"), open: () => {} }), "install");
+  }
+  assert.equal(u.alerts.length, 0);
+  assert.deepEqual(installAsk("cydian://install?url=https%3A%2F%2Fa.example%2Fb.ipa"), { url: "https://a.example/b.ipa", name: "" });
 });
 
 test("startIncoming takes the pending link at start and again on cydian:url", async () => {
@@ -83,15 +86,15 @@ function fakeBackend(list = []) {
   return { added, sources: async () => list, addSource: async (input) => { if (String(input?.uri ?? input).includes("fail")) throw new Error("no Release"); added.push(input); } };
 }
 
-test("the website's payload: every source as its export line, the travelling settings it shows, holds, server", async () => {
+test("the website's payload: every source as its export line, the travelling settings it shows, holds; no certificate or server", async () => {
   const backend = fakeBackend([{ key: "deb:https://a.example/:./", uri: "https://a.example/", dist: "./" },
     { key: "deb:https://apt.procurs.us/:1900", uri: "https://apt.procurs.us/", dist: "1900", components: ["main"] }, { key: "x" }]);
   const store = fakeStore({ appearance: "dark", device: "none", worksOnMyPhone: true }, ["com.x.tweak"]);
-  const p = await websitePayload({ backend, store, server: "https://cydian.dev" });
+  const p = await websitePayload({ backend, store });
   assert.deepEqual(p.sources, ["https://a.example/", "deb https://apt.procurs.us/ 1900 main"]);
   assert.deepEqual(p.settings, { appearance: "dark", device: "none", worksOnMyPhone: true });
   assert.deepEqual(p.holds, ["com.x.tweak"]);
-  assert.equal("p12" in p || "password" in p, false);
+  assert.equal("p12" in p || "password" in p || "identity" in p || "server" in p, false);
 });
 
 test("review in the app: Import adds only the new, keeps the user's own, no duplicates", async () => {
@@ -121,14 +124,18 @@ test("review in the app: nothing new says so; a broken link says so", async () =
 
 test("review text: five names at most", () => {
   const sources = Array.from({ length: 7 }, (_, i) => ({ uri: `https://r${i}.example/` }));
-  assert.equal(reviewText({ sources, settings: [], holds: [], server: { to: "https://mine.example" } }),
-    "7 new sources: r0.example, r1.example, r2.example, r3.example, r4.example and 2 more.\nSigning Server: mine.example.");
+  assert.equal(reviewText({ sources, settings: [], holds: [] }),
+    "7 new sources: r0.example, r1.example, r2.example, r3.example, r4.example and 2 more.");
 });
 
-test("the certificate never rides in cydian://import, only sealed in cydian://signing-import", async () => {
-  const key = newKey();
-  const sealed = importUrl(await sealIdentity({ p12: new Uint8Array([0x30, 1]), profile: new Uint8Array([2]), password: "hunter2" }, key));
-  assert.equal(sealed.includes("hunter2"), false);
+test("Send Settings' import never touches the Keychain (F89: no certificate travels)", async () => {
+  const backend = fakeBackend();
+  const store = fakeStore({ appearance: "light" });
   const u = ui();
+  const calls = [];
+  const native = { call: async (m) => { calls.push(m); return { text: "" }; } };
+  const url = await encodeLink({ sources: ["https://n.example/"] });
+  assert.equal(await reviewAndImport(url, { native, backend, store, ...u.deps }), "imported");
+  assert.equal(calls.includes("signing.import"), false);
   assert.equal(await handleIncoming("cydian://import?d=AAAA", { ...u.deps, review: async () => "bad" }), "import");
 });

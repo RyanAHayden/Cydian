@@ -24,7 +24,6 @@ import * as search from "./screens/search.js";
 import * as settingsScreen from "./screens/settings.js";
 import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
-import { startPush } from "./push-client.js";
 import { launchURL } from "./launch.js";
 import { isAddPath, parseAddLink } from "./core/handoff.js";
 import { addSource } from "./screens/manage.js";
@@ -336,20 +335,6 @@ if (standalone) {
   }, true);
 }
 router.start();
-// First launch of a Cydian installed from the website: its signed copy carries the website's sources, settings and
-// certificate as web/transfer.link (the Signing Server's bring + transfer); import them once, no question.
-// Only on the very first launch (user 2026-11-17: the website is rarely used after that).
-if (globalThis.cydianNative) {
-  let done = null;
-  try { done = localStorage.getItem("cydian.transferDone"); } catch { /* private */ }
-  if (!done) fetch("transfer.link", { cache: "no-store" }).then((r) => (r.ok ? r.text() : null)).then(async (link) => {
-    link = link?.trim();
-    if (!link || !link.startsWith("cydian://import?")) return;
-    try { localStorage.setItem("cydian.transferDone", "1"); } catch { /* imports again next launch */ }
-    const { handleIncoming } = await import("./incoming.js");
-    await handleIncoming(link.trim());
-  }).catch(() => {});
-}
 upgradeNotices.start();
 createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon
 document.getElementById("boot")?.remove(); // the first page is drawn: the loading screen goes
@@ -362,7 +347,7 @@ if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.setting
 // F72: in the app, once the launch has settled, the Essential Upgrade alert when Cydian (or, jailbroken, apt, dpkg or
 // another Essential: yes package) has an upgrade on Cydian's built-in source. It replaces F61's own popup: only when
 // that source couldn't be read does F61 look on GitHub (at most once a day).
-// F75: cydian:// links from the website (Import from Safari coming back, Open in Cydian App).
+// F75: cydian:// links from the website (Open in Cydian App, F89's Open in Cydian on an app page).
 if (globalThis.cydianNative) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
 
 if (globalThis.cydianNative) {
@@ -391,6 +376,9 @@ if (globalThis.cydianNative) {
   });
 }
 
-// Upgrade alerts (F10): register the service worker and, if opted in, re-subscribe (iOS drops subscriptions now
-// and then). After first paint, so it never competes with the launch.
-if (!globalThis.cydianNative) setTimeout(() => startPush({ holds: () => settingsScreen.settings.holds.list() }).catch(() => {}), 3000);
+// F89: Web Push went with the website's server. A browser that registered the old push service worker (sw.js,
+// F10) drops it, so iOS stops waking it for pushes that no longer come.
+if (!globalThis.cydianNative) {
+  setTimeout(() => navigator.serviceWorker?.getRegistrations?.()
+    .then((all) => Promise.all(all.map((r) => r.unregister()))).catch(() => {}), 3000);
+}

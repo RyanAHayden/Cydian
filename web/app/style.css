@@ -5,7 +5,10 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 /* Bars are fixed and every screen's scroller fills the window, padded clear of them, so content scrolls under the
    bars. html never scrolls: iOS 26 blurs the top and bottom edges of a scrolling page in the
    home-screen app (washing out the nav and tab bar) and has no switch for it; inner scrollers don't get it. */
-:root { --nav-h: calc(44px + env(safe-area-inset-top)); --tab-h: calc(49px + env(safe-area-inset-bottom)); }
+/* --safe-bottom: the bottom inset, plus --vgap from theme-boot.js when iOS 15 has left the Home Screen app's view
+   hanging off the bottom of the screen after a rotation. */
+:root { --safe-bottom: calc(env(safe-area-inset-bottom) + var(--vgap, 0px)); }
+:root { --nav-h: calc(44px + env(safe-area-inset-top)); --tab-h: calc(49px + var(--safe-bottom)); }
 body {
   overscroll-behavior: none;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -68,7 +71,7 @@ html.nav-moving #screens, html.nav-moving .navbar { pointer-events: none; } /* n
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; display: flex;
   height: var(--tab-h);
-  padding: 0 max(2px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(2px, env(safe-area-inset-left));
+  padding: 0 max(2px, env(safe-area-inset-right)) var(--safe-bottom) max(2px, env(safe-area-inset-left));
 }
 .tab { flex: 1; min-width: 0; position: relative; touch-action: manipulation; text-decoration: none; }
 

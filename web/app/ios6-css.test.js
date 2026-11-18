@@ -68,7 +68,7 @@ test("B40: the reload bar sits whole right above the tab bar, and the last row c
   const tab = new RegExp(String.raw`(^|\n)\.tabbar\s*\{([^}]*)\}`).exec(base)?.[2] ?? "";
   assert.match(tab, /bottom\s*:\s*0/);
   assert.match(tab, /height\s*:\s*var\(--tab-h\)/, "the tab bar is exactly --tab-h tall");
-  assert.match(base, /--tab-h\s*:\s*calc\(49px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(base, /--tab-h\s*:\s*calc\(49px \+ var\(--safe-bottom\)\)/);
   const z = zOf(css, ".reload-bar");
   assert.ok(z > zOf(base, "#screens"), "over the page, not behind it");
   assert.ok(z < zOf(base, ".tabbar"), "under the tab bar, so it slides out from behind it");
@@ -79,5 +79,5 @@ test("B40: the reload bar sits whole right above the tab bar, and the last row c
   assert.match(room.decl, /clear\s*:\s*both/, "below the rubber-band float, not beside it");
   const over = rules.find((x) => x.sel === "body:has(.sheet) .reload-bar");
   assert.ok(over, "over a sheet");
-  assert.match(over.decl, /translate\s*:\s*0 calc\(var\(--tab-h\) - env\(safe-area-inset-bottom\)\)/, "down by the tab bar's 49 pt only");
+  assert.match(over.decl, /translate\s*:\s*0 calc\(var\(--tab-h\) - var\(--safe-bottom\)\)/, "down by the tab bar's 49 pt only");
 });

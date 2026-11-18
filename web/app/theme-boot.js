@@ -27,3 +27,23 @@
   var metas = document.querySelectorAll('meta[name="theme-color"]:not([media])');
   for (var i = 0; i < metas.length; i++) metas[i].setAttribute("content", color);
 })();
+
+// Rotation fix for the Home Screen app (iOS 15, iPhone 7, opaque status bar): back in portrait after landscape, its view
+// comes back screen-tall (667pt) but still 20pt below the status bar, so its bottom hangs off the screen. clientHeight
+// says 667 while only innerHeight (647) shows: the tab bar was cut off and the whole page, nav bar too, scrolled natively.
+// A reload doesn't cure it and a see-through status bar is worse (a black band at launch). So: lift the bottom by the
+// gap (--vgap, in style.css --safe-bottom), keep html to the visible height and the document at the top.
+(function () {
+  if (!(window.navigator && navigator.standalone)) return;
+  var de = document.documentElement, gap = 0;
+  function fit() {
+    gap = innerWidth < innerHeight ? Math.max(0, de.clientHeight - innerHeight) : 0;
+    de.style.setProperty("--vgap", gap + "px");
+    de.style.height = gap ? innerHeight + "px" : "";
+    if (gap && scrollY) scrollTo(0, 0);
+  }
+  fit();
+  addEventListener("resize", fit);
+  addEventListener("orientationchange", function () { setTimeout(fit, 500); });
+  addEventListener("scroll", function () { if (gap && scrollY) scrollTo(0, 0); });
+})();

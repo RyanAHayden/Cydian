@@ -550,7 +550,7 @@ input.sign-field::placeholder { color: var(--field-hint); opacity: 1; }
 .share-scrim { position: fixed; inset: 0; z-index: 30; }
 .share-dim { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
 .share-sheet {
-  position: absolute; left: 0; right: 0; bottom: 0; padding: 36px 0 calc(21.5px + env(safe-area-inset-bottom));
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 36px 0 calc(21.5px + var(--safe-bottom));
   background:
     linear-gradient(rgba(29,32,35,.7), rgba(29,32,35,.7)) top / 100% 1px no-repeat,
     linear-gradient(rgba(255,255,255,.45), rgba(255,255,255,.45)) 0 1px / 100% 1px no-repeat,
@@ -704,7 +704,7 @@ html.has-reload :is(.page-body, .sheet-scroll, .search-results, .progress-scroll
 /* B26: a reload runs in the background (pull to refresh, the launch refresh), so a sheet can be open: sheets have no
    tab bar, so over one the strip comes over the sheet (z-index above the sheets' 25) and sits at its bottom, just
    above the home indicator. `translate` composes with the strip's slide animation (transform) and is composited. */
-body:has(.sheet) .reload-bar { z-index: 26; translate: 0 calc(var(--tab-h) - env(safe-area-inset-bottom)); }
+body:has(.sheet) .reload-bar { z-index: 26; translate: 0 calc(var(--tab-h) - var(--safe-bottom)); }
 @media (prefers-reduced-motion: reduce) { .reload-spinner { animation-duration: 3s; } }
 
 /* ---- F181: the package page's Details / Reviews / Related (screens/storepage.js segmented): UISegmentedControl's

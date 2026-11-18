@@ -50,7 +50,7 @@
 
 /* back to the newest line, while the user reads further up */
 .progress-jump {
-  position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: calc(98px + env(safe-area-inset-bottom));
+  position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: calc(98px + var(--safe-bottom));
   padding: 4px 11px; border: 0; border-radius: 12px; cursor: pointer; touch-action: manipulation;
   font: bold 12px/16px "Helvetica Neue", Helvetica, sans-serif; color: #000; background: rgba(229,229,229,.92);
 }
@@ -59,7 +59,7 @@
 /* ---- the bottom: status and bar while it runs, the finish button once it has ended ---- */
 .progress-foot {
   flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 12px max(21px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(21px, env(safe-area-inset-left));
+  padding: 12px max(21px, env(safe-area-inset-right)) calc(16px + var(--safe-bottom)) max(21px, env(safe-area-inset-left));
   background: #000;
 }
 .progress-status {

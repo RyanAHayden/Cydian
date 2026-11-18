@@ -33,7 +33,7 @@ html[data-theme="dark"] .confirm-problem .table { background: var(--dk-issue-tab
 .console .bar-button:active, .console .bar-button.is-pressed { background: linear-gradient(#2a2d32, #121316); background-origin: border-box; }
 .console-scroll {
   overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
-  padding: calc(var(--nav-h) + 20px) max(9px, env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) max(9px, env(safe-area-inset-left));
+  padding: calc(var(--nav-h) + 20px) max(9px, env(safe-area-inset-right)) calc(20px + var(--safe-bottom)) max(9px, env(safe-area-inset-left));
   display: flex; flex-direction: column; min-height: 100%;
 }
 .console-out { flex: 1; font-size: 12px; line-height: 16px; color: #a9a9a9; -webkit-user-select: text; user-select: text; }

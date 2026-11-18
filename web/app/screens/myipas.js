@@ -271,7 +271,7 @@ function searchBar(placeholder, onQuery) {
 
 // All Apps and a category: their list with a search bar that narrows this list only.
 export const matchApp = (r, q) => [r.name, r.short, r.author, r.id].some((v) => String(v ?? "").toLowerCase().includes(q.toLowerCase()));
-async function renderFiltered(body, route, fetchRows, placeholder) {
+async function renderFiltered(body, route, fetchRows, hint) { // hint: the search bar's (not "placeholder", the loading rows)
   const wait = placeholder("list");
   body.append(wait);
   let rows;
@@ -282,7 +282,7 @@ async function renderFiltered(body, route, fetchRows, placeholder) {
   const none = el("p", "empty", "No Results");
   none.hidden = true;
   const list = browse.packageList(body, route, rows, { letters: true });
-  body.append(searchBar(placeholder, (q) => {
+  body.append(searchBar(hint, (q) => {
     const shown = q ? rows.filter((r) => matchApp(r, q)) : rows;
     list.setItems(q ? shown : lettered(shown));
     none.hidden = shown.length > 0;

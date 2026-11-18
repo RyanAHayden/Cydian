@@ -133,10 +133,12 @@ class Release(unittest.TestCase):
         self.assertEqual(app["minimumVersion"], VERSION)
         self.assertEqual(app["versions"][0]["version"], VERSION)
         self.assertTrue(app["versions"][0]["localizedDescription"].startswith("A test release\n"))
-        # altsource.KEEP caps versions[]: once the source is full, the oldest entry drops off.
+        # altsource.KEEP caps versions[]: once the source is full, the oldest entry drops off. F180: entries whose IPA
+        # isn't <NAME>.ipa (the releases before it) drop off too.
         sys.path.insert(0, os.path.join(ROOT, "tools"))
         import altsource
-        old = [v["version"] for v in before["apps"][0]["versions"] if v["version"] != VERSION][:altsource.KEEP - 1]
+        old = [v["version"] for v in before["apps"][0]["versions"]
+               if v["version"] != VERSION and altsource.is_own_ipa(v)][:altsource.KEEP - 1]
         self.assertEqual([v["version"] for v in app["versions"][1:]], old)
         # A dry run never writes the repo's own source.json.
         with open(os.path.join(ROOT, "web", "app", "source.json")) as f:

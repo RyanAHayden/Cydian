@@ -55,7 +55,7 @@ export function parseRelease(json) {
   if (!v) return null;
   const assets = Array.isArray(json.assets) ? json.assets.filter((a) => a && typeof a.name === "string" && typeof a.browser_download_url === "string") : [];
   const url = (a) => a.browser_download_url;
-  const ipa = assets.find((a) => a.name === `${NAME}.ipa`) ?? assets.find((a) => /\.ipa$/i.test(a.name));
+  const ipa = assets.find((a) => a.name === `${NAME}.ipa`); // F180: that name only, no other .ipa
   return {
     version: v.join("."),
     tag: json.tag_name,

@@ -5,9 +5,9 @@
      through the app's own document types (Open in iFizBox), not here. -->
 <plist version="1.0">
 <dict>
-	<key>CFBundleExecutable</key><string>iFizBoxShare</string>
+	<key>CFBundleExecutable</key><string>$(BRAND_NAME)Share</string>
 	<key>CFBundleIdentifier</key><string>com.ryha.ifizbox.share</string>
-	<key>CFBundleName</key><string>iFizBoxShare</string>
+	<key>CFBundleName</key><string>$(BRAND_NAME)Share</string>
 	<key>CFBundleDisplayName</key><string>$(BRAND_NAME)</string>
 	<key>CFBundlePackageType</key><string>XPC!</string>
 	<key>CFBundleShortVersionString</key><string>@VERSION@</string>
@@ -20,7 +20,7 @@
 	<key>UIDeviceFamily</key><array><integer>1</integer></array>
 	<key>NSExtension</key><dict>
 		<key>NSExtensionPointIdentifier</key><string>com.apple.share-services</string>
-		<key>NSExtensionPrincipalClass</key><string>iFizBoxShare.ShareViewController</string>
+		<key>NSExtensionPrincipalClass</key><string>$(BRAND_NAME)Share.ShareViewController</string>
 		<key>NSExtensionAttributes</key><dict>
 			<key>NSExtensionActivationRule</key><dict>
 				<key>NSExtensionActivationSupportsWebURLWithMaxCount</key><integer>1</integer>

@@ -56,7 +56,8 @@ export const SECTIONS = [
   { id: "device", page: "general" },
   { id: "compat", page: "general" },
   { id: "sources", page: "general" },
-  { id: "appearance", page: "theme", title: "Appearance" },
+  { id: "appearance", page: "theme", title: "Mode" }, // F199: Theme's Mode, a segmented Automatic / Light / Dark
+  { id: "themes", page: "theme", title: "Themes" }, // F199: Light and Dark, each pushing its checklist of themes
   { id: "updates", page: "updates" },
   { id: "notifications", page: "updates" },
   { id: "automatic", page: "updates", title: "Automatic Installs" },
@@ -75,14 +76,32 @@ export const SIGNING_GROUPS = ["certificate", "files", "profile", "options", "se
 export const RETIRED = ["sideloader", "checkUpdates", "cellular", "notifications", "badge", "allowZoom"];
 export const RETIRED_DAEMON_KEYS = ["checkUpdates", "cellular"];
 
-// kind: "choice" (one row per option, the chosen one checked), "toggle" (a switch), "list" (pushes a page that
+// kind: "choice" (one row per option, the chosen one checked), "segmented" (an iOS 6 segmented control, F199), "toggle" (a switch), "list" (pushes a page that
 // picks one option; its footer shows there), "holds" (pushes the held packages). `default` is a value, or a function of the mode.
 export const SETTINGS = [
   {
-    key: "appearance", section: "appearance", kind: "choice", feature: "appearance", modes: ALL, default: "light",
-    label: "Appearance",
+    // F199: Theme's Mode, drawn as an iOS 6 segmented control. Kept under its old key (ifizbox.appearance) so a
+    // stored choice, the transfer to the app (TRAVELS) and the shell's app.theme read the same value.
+    key: "appearance", section: "appearance", kind: "segmented", feature: "appearance", modes: ALL, default: "light",
+    label: "Mode",
     options: [{ value: "auto", label: "Automatic" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }],
-    footer: "Automatic follows the iPhone's own Light or Dark setting.",
+    footer: "Automatic switches between your Light and Dark themes with the iPhone's own setting.",
+  },
+  {
+    // F199: the theme Light mode paints (one today: the kit's own). `swatch`: the theme list's little tile (bar
+    // colour over ground colour), from ios6.css's palette blocks. Stored at ifizbox.lightTheme.
+    key: "lightTheme", section: "themes", kind: "list", feature: "appearance", modes: ALL, default: "classic",
+    label: "Light", tone: "light",
+    options: [{ value: "classic", label: "Classic", swatch: ["#6f88a8", "#c5ccd4"] }],
+    footer: "The theme in Light mode, and in Automatic while the iPhone is light.",
+  },
+  {
+    // F198/F199: the dark palette, stored at ifizbox.darkTheme (DARK_THEME_KEY, which theme-boot.js reads raw).
+    key: "darkTheme", section: "themes", kind: "list", feature: "appearance", modes: ALL, default: "oled",
+    label: "Dark", tone: "dark",
+    options: [{ value: "oled", label: "OLED Black", swatch: ["#000", "#0e0e0f"] },
+      { value: "gunmetal", label: "Gunmetal", swatch: ["#5f656f", "#3b3f46"] }],
+    footer: "The theme in Dark mode, and in Automatic while the iPhone is dark.",
   },
   {
     // F37: what kind of iPhone this is. The site only: the jailbreak app takes it from the bridge (deviceType) and
@@ -217,7 +236,7 @@ export function addRecent(list, query, max = RECENT_MAX) {
 // F75: the settings that move with the user from the website to the app (Open in iFizBox App, core/transfer.js):
 // appearance, device, the compat options; Ignored Upgrades (holds) and the Signing Server travel beside them. The
 // app takes only those it shows itself (settings.isShown).
-export const TRAVELS = ["appearance", "device", "worksOnMyPhone", "compatMarks", "iosVersion"];
+export const TRAVELS = ["appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion"];
 export const DAEMON_KEYS = ["autoInstall", "autoInstallIdle", "respring", "keepVersions"];
 export const DAEMON_LISTS = ["holds", "autoMarked"];
 const byKey = new Map(SETTINGS.map((d) => [d.key, d]));
@@ -570,12 +589,24 @@ export function themeFor(appearance, systemDark) {
 }
 
 // F198: the palette inside a tone, for <html data-palette> beside data-theme. Light has one (classic, the kit's);
-// dark has OLED Black (the default, user 2026-11-18) and Gunmetal (F13's). The dark one is stored raw at
-// localStorage["ifizbox.darkTheme"]; F199's theme menu sets it (anything else reads as OLED Black). theme-boot.js
+// dark has OLED Black (the default, user 2026-11-18) and Gunmetal (F13's). The dark one is stored at
+// localStorage["ifizbox.darkTheme"]; Theme > Dark (F199) sets it (anything else reads as OLED Black). theme-boot.js
 // keeps the same rule.
-export const DARK_PALETTES = ["oled", "gunmetal"];
+// F199: the lists come from the lightTheme and darkTheme settings' options (the first is each one's default), and
+// lightTheme is stored at LIGHT_THEME_KEY the same way.
+export const DARK_PALETTES = byKey.get("darkTheme").options.map((o) => o.value);
+export const LIGHT_PALETTES = byKey.get("lightTheme").options.map((o) => o.value);
 export const DARK_THEME_KEY = "ifizbox.darkTheme";
-export function paletteFor(theme, darkTheme) {
-  if (theme !== "dark") return "classic";
+export const LIGHT_THEME_KEY = "ifizbox.lightTheme";
+export function paletteFor(theme, darkTheme, lightTheme) {
+  if (theme !== "dark") return LIGHT_PALETTES.includes(lightTheme) ? lightTheme : LIGHT_PALETTES[0];
   return DARK_PALETTES.includes(darkTheme) ? darkTheme : DARK_PALETTES[0];
+}
+
+// F199: everything Theme's page decides, in one call (theme-boot.js keeps the same rule before first paint): Mode
+// picks the tone (Automatic: the system's), and the tone's chosen theme is the palette. `preview` ("light" or
+// "dark") is the tone of the theme list on screen: the page shows that list's theme while it is open.
+export function themeState({ appearance, lightTheme, darkTheme, preview = null }, systemDark) {
+  const theme = preview === "light" || preview === "dark" ? preview : themeFor(appearance, systemDark);
+  return { theme, palette: paletteFor(theme, darkTheme, lightTheme) };
 }

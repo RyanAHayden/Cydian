@@ -34,8 +34,10 @@ test("SETTING_ICONS and PAGE_ICONS name real settings, pages and icons", () => {
     assert.notEqual(d.kind, "choice", `${key}: a choice's options stay bare`);
     assert.ok(ROW_ICONS[icon], icon);
   }
-  // every setting a row shows has a tile, except Appearance (its options are the rows)
-  for (const d of SETTINGS) if (d.modes.length && d.kind !== "choice") assert.ok(SETTING_ICONS[d.key], d.key);
+  // every setting a row shows has a tile, except choices (their options are the rows) and Theme's (F199): Mode is a
+  // segmented control with no row, and Themes' Light and Dark rows are its tones, bare as Appearance's options were
+  const bare = (d) => d.kind === "choice" || d.kind === "segmented" || d.tone;
+  for (const d of SETTINGS) if (d.modes.length && !bare(d)) assert.ok(SETTING_ICONS[d.key], d.key);
   for (const p of PAGES) assert.ok(ROW_ICONS[PAGE_ICONS[p.id]], p.id);
 });
 

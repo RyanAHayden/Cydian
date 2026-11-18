@@ -1,0 +1,17 @@
+{
+ "class": "FeaturedBannersView",
+ "itemSize": "{263, 148}",
+ "itemCornerRadius": 10,
+ "banners": [
+  {
+   "url": "https://media.havoc.app/620e8c24f7c30e05f71d526a",
+   "title": "Peek Dark",
+   "package": "com.theprestigext.peekdark"
+  },
+  {
+   "url": "https://media.havoc.app/64db89c89fb68ff811d165f6",
+   "title": "Dynamic Stage",
+   "package": "me.tomt000.stageduo"
+  }
+ ]
+}

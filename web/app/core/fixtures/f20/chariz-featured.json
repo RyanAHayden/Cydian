@@ -1,0 +1,19 @@
+{
+ "class": "FeaturedBannersView",
+ "itemSize": "{263, 148}",
+ "itemCornerRadius": 10,
+ "banners": [
+  {
+   "title": "Duo Free",
+   "package": "com.sreerag.duoFree",
+   "url": "https://cdn.chariz.cloud/asset/duofree/lRvhtgV0NS-Xzok1c8qIkNDKUkk-Hh-K/assets/fmgUOwkKjveA2itcyxynfpIS9WWok4rHiCLZxHgYcy0Gx7Us1fMpnZ9AkfsHXlNKmyNdZhQn3XSrROFx8WCbWg.jpg",
+   "displayText": false
+  },
+  {
+   "title": "Zinnia",
+   "package": "me.aspenuwu.zinnia",
+   "url": "https://cdn.chariz.cloud/sileo-banner/zinnia.jpg",
+   "displayText": false
+  }
+ ]
+}

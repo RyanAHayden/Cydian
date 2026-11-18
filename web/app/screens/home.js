@@ -433,6 +433,12 @@ function renderRoot(body) {
   state.tile = stateRow.querySelector("a");
   paintTile(stateTile());
   const featured = { box: homeFeatured() }; // F20: sources' sileo-featured.json banners, a couple from each
+  // Locked Home (the website before Cydian is installed): Signing full width where Featured | Signing was, and
+  // Featured down among the locked rows (user 2026-11-18). Ignore puts the usual row back.
+  const lockedNow = browsingLocked({ mode: settings.mode });
+  const lockedTop = lockedNow ? [tileRow("halves", tile({ label: "Signing", href: format({ tab: "settings", path: ["signing"] }), glyph: "signing" }))] : [];
+  const lockedFeatured = lockedNow ? [tileRow("halves", tile({ label: "Featured", href: format({ tab: "home", path: ["browse", "popular"] }), glyph: "featured" }))] : [];
+  if (lockedNow) halves.hidden = true;
 
   home.append(
     head,
@@ -443,7 +449,9 @@ function renderRoot(body) {
       // Cydia's pair was Facebook | Twitter: here GitHub | Discord (the community)
       tile({ label: "Discord", href: DISCORD_URL, glyph: "discord", external: true })),
     halves,
+    ...lockedTop,
     appRow,
+    ...lockedFeatured,
     browseRow,
     stateRow,
   );
@@ -464,14 +472,18 @@ function renderRoot(body) {
   home.append(list);
   // The website before Cydian is installed: everything below the Cydian App card is locked; a tap asks first.
   if (browsingLocked({ mode: settings.mode })) {
-    const locked = [browseRow, stateRow, ...groups];
+    const locked = [...lockedFeatured, browseRow, stateRow, ...groups];
     for (const box of locked) box.classList.add("home-locked");
     home.addEventListener("click", async (e) => {
       if (!e.target.closest?.(".home-locked")) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       const r = await askToBrowse({ install: installCydian });
-      if (r === "browse") for (const box of locked) box.classList.remove("home-locked");
+      if (r === "browse") {
+        for (const box of locked) box.classList.remove("home-locked");
+        for (const row of [...lockedTop, ...lockedFeatured]) row.remove();
+        halves.hidden = false;
+      }
     }, true);
   }
   // Cydia's line at the bottom of Home: the device, iOS, the installed version and the language

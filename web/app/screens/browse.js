@@ -42,6 +42,7 @@ import { installQueue } from "../queue.js";
 import { queuedFor, MODE_LABEL } from "../core/queue.js";
 import { hasRollback, rollbackSlot } from "./rollback.js";
 import { autoMarkShown, AUTO_MARK_LABEL, AUTO_MARK_FOOTER } from "../core/automark.js";
+import { createWishlist, wishLabel, wishRows, WISH_EMPTY } from "../core/wishlist.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -369,6 +370,34 @@ export async function renderList(body, route, fetchRows, letters) {
   body.append(list.el);
 }
 
+// ---- Wish List (F102) --------------------------------------------------------------------------------------
+
+// The device's Wish List (core/wishlist.js), made on first use.
+let wishes = null;
+export const wishlist = () => (wishes ??= createWishlist());
+
+// Home's Wish List page: the wished packages the sources carry, as a plain package list; installed ones drop off the
+// list for good (dpkg's status in the app, the uploaded one on the site; nothing drops where neither is known).
+export async function renderWishlist(body, route) {
+  body.append(placeholder("list"));
+  let rows;
+  try {
+    await catalog.ensure();
+    const installed = ((await catalog.installed().catch(() => null)) ?? []).map((r) => r.id);
+    wishlist().prune(installed);
+    const ids = wishlist().list();
+    const found = await Promise.all(ids.map((id) => catalog.package(id).then((p) => (p && !p.installedOnly ? p.row : null), () => null)));
+    rows = wishRows(ids, found, installed);
+  } catch (e) {
+    body.replaceChildren(el("p", "empty", e.message));
+    return;
+  }
+  body.replaceChildren();
+  if (!rows.length) { body.append(el("p", "empty", WISH_EMPTY)); return; }
+  const list = packageList(body, route, rows, { letters: false });
+  body.append(list.el);
+}
+
 // ---- the package page --------------------------------------------------------------------------------------
 
 export function formatSize(bytes) {
@@ -653,6 +682,9 @@ async function packageActions(route, button) {
   }
   if (many && !(installed && older.length)) actions.push({ label: "Other Versions", run: () => go(versionsHref(route, id)) });
   if (st.debUrl && getBackend().kind === "http" && !isPaid(st)) actions.push({ label: "Download .deb", run: () => downloadDeb(st.debUrl, st.package) });
+  // F102: Add to Wish List while it isn't installed; Remove from Wish List whenever it is on the list.
+  const wishId = st.package || id;
+  if (!installed || wishlist().has(wishId)) actions.push({ label: wishLabel(wishlist().has(wishId)), run: () => wishlist().set(wishId, !wishlist().has(wishId)) });
   const title = queue ? "" : getBackend().kind === "http"
     ? "Packages install on the iPhone, from Cydian's jailbreak app or another package manager."
     : "Installing from Cydian comes with its install queue, which this build doesn't have yet.";

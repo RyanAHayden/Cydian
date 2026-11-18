@@ -9,7 +9,7 @@
 // Every tile and row is a .cell-inner link, so it gets the table cells' held look (blue selection) from ios6.css
 // and app.js. Featured banners from sources' sileo-featured.json sit above the tiles (F20, screens/extras.js).
 //
-// Routes below the tab: help, featured, sources (More Package Sources), guides/<id>, credits, and browse (F46): Browse's list
+// Routes below the tab: help, featured, sources (More Package Sources), guides/<id>, credits, wishlist (F102), and browse (F46): Browse's list
 // (Popular, then the categories), browse/popular, browse/category:<name>, and below those browse.js's tokens
 // (package:<id>, author:<name>, versions:<id>), as in the Search tab.
 import { grouped } from "../nav/ui.js";
@@ -127,6 +127,7 @@ export function nav(route, ctx) {
     case "help": return { title: "Help" };
     case "featured": return { title: "Featured" };
     case "sources": return { title: "More Sources" };
+    case "wishlist": return route.path.length === 1 ? { title: "Wish List", style: "plain" } : browse.nav(route); // F102
   }
   return {
     title: "Cydian",
@@ -449,6 +450,7 @@ function renderRoot(body) {
       { label: "Find Extensions for Applications", href: format({ tab: "search" }), chevron: true },
       // Manage Sources (user 2026-11-18), opened on Home's own stack (router mountLink): Back comes home.
       { label: "More Package Sources", href: format({ tab: "sources", path: ["manage"] }) },
+      { label: "Wish List", href: format({ tab: "home", path: ["wishlist"] }) }, // F102: browse.js renderWishlist
     ],
   }, { header: "User Guides", rows: guideRows(format) },
   { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }]);
@@ -670,6 +672,7 @@ export function render(el, route, ctx) {
     case "featured": return renderFeatured(el);
     case "sources": return renderSources(el, ctx);
     case "browse": return renderBrowseRoute(el, route, ctx);
+    case "wishlist": return route.path.length === 1 ? browse.renderWishlist(el, route) : browse.render(el, route, ctx);
     default: return renderRoot(el);
   }
 }

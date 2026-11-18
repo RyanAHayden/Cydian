@@ -273,6 +273,21 @@ export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ct
   });
 }
 
+// F145: Home's root follows the website's lock (websign-gate.js setFirstVisit fires cydian:browse-lock): when it flips
+// from what the page was drawn with, `redraw` draws it again, so no locked rows or padlocks stay after Browse Anyway
+// (nor unlocked ones after Lock Home). Stops once `alive()` is false (the page is gone). -> a function that stops it.
+export function followBrowseLock({ wasLocked, locked, alive = () => true, redraw, target = globalThis }) {
+  const off = () => target.removeEventListener?.("cydian:browse-lock", on);
+  function on() {
+    if (!alive()) { off(); return; }
+    if (locked() === wasLocked) return;
+    off(); // the redrawn page follows with its own
+    redraw();
+  }
+  target.addEventListener?.("cydian:browse-lock", on);
+  return off;
+}
+
 // ---- state shared by the root page and the pages that change it ------------------------------------------
 
 // redraw: set by the root page, Reload's in-place update of its content (renderRoot).
@@ -518,14 +533,17 @@ function renderRoot(body) {
       if (!e.target.closest?.(".home-locked")) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      const r = await askToBrowse({ install: installCydian });
-      if (r === "browse") {
-        for (const box of locked) box.classList.remove("home-locked");
-        for (const row of [...lockedTop, ...lockedFeatured]) row.remove();
-        halves.hidden = false;
-      }
+      await askToBrowse({ install: installCydian }); // Browse Anyway redraws Home (followBrowseLock below)
     }, true);
   }
+  // F145: Browse Anyway (here, on a locked tab or in Settings) and Settings' Lock Home switch redraw Home at once.
+  followBrowseLock({ wasLocked: lockedNow, locked: () => browsingLocked({ mode: settings.mode }), alive: () => home.isConnected,
+    redraw: () => {
+      const top = body.scrollTop;
+      home.remove();
+      renderRoot(body);
+      body.scrollTop = top;
+    } });
   // Cydia's line at the bottom of Home: the device, iOS, the installed version and the language
   // ("iPhone4,1, iOS 6.1.3, Cydia 1.1.9 (en-us)").
   const foot = el("p", "home-version", footLine({ ios: currentDevice().ios, web: !globalThis.cydianNative }));

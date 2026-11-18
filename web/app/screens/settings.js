@@ -27,7 +27,7 @@ import { openInAppSection } from "./importlink.js";
 import { accountSection, drawAccount, startAccountSync } from "./account.js";
 import { signingExtras } from "./signed-apps.js";
 import { syncReminder } from "../core/signing.js";
-import { websiteInstallsOn, setWebsiteInstalls, acceptWebsiteInstalls, firstVisitState, setFirstVisit } from "../websign-gate.js";
+import { websiteSection } from "./website-settings.js";
 import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installPath, isNewer, compareVersions } from "../core/selfupdate.js";
 import { getArch } from "../backend.js";
 import { ipaSection } from "./ipa-install.js";
@@ -120,6 +120,7 @@ function rootPage() {
 function groupPage(id) {
   const frag = settingsGroups(settings.sections().filter((s) => s.page === id), id);
   if (id === "general") frag.append(sideloadingSection()); // F83, sideload build
+  if (id === "general") frag.append(websiteSection()); // F145: Lock Home, Install on the Website; website only
   if (id === "updates") frag.append(notifySection()); // Update Alerts, sideload build
   return frag;
 }
@@ -932,30 +933,7 @@ function siteAppSection(id) {
   return [frag, bring];
 }
 
-// F96: Install on the Website for apps other than Cydian, on once the user accepted the warning on an app page
-// (websign-gate.js). Off here puts the warning back; on here shows it first, and Cancel leaves the switch off.
-// F134: one line; the warning itself (websign-gate.js) says why the website is slower.
-const WEBSITE_INSTALLS_FOOTER = "Off, other apps' pages offer Install in Cydian. Cydian itself always installs from here.";
-function websiteInstallsSection({ on = websiteInstallsOn, set = setWebsiteInstalls, accept = acceptWebsiteInstalls } = {}) {
-  const frag = grouped([{ header: "Other Apps", rows: [{ label: "Install on the Website" }], footer: WEBSITE_INSTALLS_FOOTER }]);
-  const cell = frag.querySelector(".cell-inner");
-  const sw = createSwitch({ label: "Install on the Website", checked: on(), onToggle: async (want) => {
-    if (!want) { set(false); return; }
-    if (!(await accept())) sw.setAttribute("aria-checked", "false"); // Cancel: back off
-  } });
-  cell?.append(sw);
-  cell?.classList.add("has-switch");
-  // Home's lock (rows below the Cydian App card until Cydian is installed): on again after an Ignore.
-  const lockFrag = grouped([{ rows: [{ label: "Lock Home" }], // F134: the full name was cut off
-    footer: "Home and the other tabs ask to install Cydian first, until you tap Browse Anyway." }]);
-  const lockCell = lockFrag.querySelector(".cell-inner");
-  const lockSw = createSwitch({ label: "Lock Home Until Cydian Is Installed", checked: firstVisitState() !== "later",
-    onToggle: (want) => setFirstVisit(want ? "ask" : "later") });
-  lockCell?.append(lockSw);
-  lockCell?.classList.add("has-switch");
-  frag.append(lockFrag);
-  return frag;
-}
+// F96's Install on the Website and Home's lock moved to General > Website (F145: screens/website-settings.js).
 
 async function removeSiteCertificate() {
   const { index } = await showAlert({ title: "Remove Certificate?", message: "The .p12, its password and the profile are deleted from this browser.",
@@ -981,7 +959,6 @@ async function drawSiteSigning(el) {
     profile: () => grouped([{ header: "Provisioning Profile", rows: split.profile }]),
     options: () => settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"),
     app: () => { const f = document.createDocumentFragment(); f.append(...siteAppSection(id)); return f; },
-    other: () => websiteInstallsSection(),
     remove: () => grouped([{ rows: [{ label: "Remove Certificate", onClick: () => removeSiteCertificate() }] }]),
     help: () => helpGroup(),
   };

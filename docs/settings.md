@@ -13,7 +13,7 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 | Root row | Builds | Page |
 |---|---|---|
 | Cydian Account | all | sign in, create an account (screens/account.js) |
-| General | all | Device and iOS Version (website only); Works on My Phone; Refresh Sources on Launch; Sideloading > Open Other Apps' Links (sideload only) |
+| General | all | Device and iOS Version (website only); Works on My Phone; Refresh Sources on Launch; Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only, F145) |
 | Display | all | Appearance (Automatic / Light / Dark as checkmarks); Compatibility Marks |
 | Updates | all | Ignored Upgrades; Upgrade Notifications (jailbreak only); Automatic Installs (jailbreak only: Install Updates Automatically, When Charging and Locked, After a Respring Update, Keep Previous Versions); Update Alerts (sideload only) |
 | Signing | website, sideload | see "Settings > Signing" below |
@@ -44,7 +44,6 @@ iOS 6 settings page, with one-line footers. `SIGNING_GROUPS` (core/settings.js) 
 | Signing Server | sideload | the server, Check Server, Run Your Own |
 | Certificate Status, Signed Apps | sideload | Check Certificate; the signed apps (days left, or Expired), Re-sign All |
 | Install Cydian App, Bring My Certificate | website, certificate working | as before |
-| Other Apps | website | Install on the Website; **Lock Home** (renamed from Lock Home Until Cydian Is Installed, which was cut off) |
 | Remove Certificate | when there is a certificate or a picked file | |
 | How Signing Works | website, sideload | a link to `signing/help`: the two-step walkthrough (Select All Files, the Files picker's picture, the server), which used to fill the page |
 
@@ -78,6 +77,7 @@ of the apps it signs, so it shows no dates and the switch would do nothing there
 | Ignored Upgrades, Upgrade Notifications, Automatic Installs | Root | Updates |
 | Only When Charging and Locked | Root | Updates, renamed **When Charging and Locked** (the old label was cut off), now with a footer |
 | Update Alerts (sideload) | Root | Updates |
+| Lock Home Until Cydian Is Installed, Install on the Website (website) | Settings > Signing | General > Website (F145), with Lock Home's F134 short name; Install on the Website is padlocked while Home is locked |
 | Re-sign Reminder (sideload) | Root, Signing group | Settings > Signing, in the options group with Show Expiry Dates (F134) |
 | Certificate row (website, sideload) | Root, Signing group with a footer | Root row **Signing**, with the certificate's name as its detail |
 | About (app builds) | Root group with the version | Root row **About**, which opens the version, Check for Updates and Skip This Version |

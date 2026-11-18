@@ -7,7 +7,7 @@
 //   Other apps' pages: installRows (screens/altstore.js) gives "Install in Cydian" (cydian://package?id=…, which the
 //   app's incoming.js opens at that app's page), Download IPA, then "Install on the Website", greyed out until the
 //   user accepts the warning once (acceptWebsiteInstalls: its I Understand counts down 5 seconds first). Cydian's own
-//   IPA always installs from the website. Settings > Signing's switch turns website installs back off.
+//   IPA always installs from the website. Settings > General > Website's switch turns website installs back off.
 //
 // State is in localStorage, per browser; every function takes `storage` for tests.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -147,7 +147,7 @@ const BROWSE_GATE = {
   cancel: 2,
   colors: { 0: "green", 1: "red" },
 };
-// -> "browse" (Ignore: unlocked from now on; Settings > Signing locks it again) | "install" | null (Cancel)
+// -> "browse" (Ignore: unlocked from now on; Settings > General > Website locks it again) | "install" | null (Cancel)
 export async function askToBrowse({ install, alert = showAlert, storage = store() } = {}) {
   const { index } = await alert({ ...BROWSE_GATE, countdown: { button: 1, seconds: WARNING_SECONDS } });
   if (index === 1) { setFirstVisit("later", storage); return "browse"; }

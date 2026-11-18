@@ -79,9 +79,11 @@ export async function copyText(text) {
 
 // The app's clipboard straight from UIPasteboard (Bridge.swift clipboard.read: no WebKit Paste bubble), "" when
 // there's no text. null on the website, or a shell from before clipboard.read: those use navigator.clipboard.
-export async function nativePaste(native = globalThis.cydianNative) {
+// F146: `params.auto` (Sources' Add filling its field by itself) lets the sideload build skip the read when iOS says
+// no URL was copied or the user refused Allow Paste before; without it (a tap on Paste) it always reads.
+export async function nativePaste(native = globalThis.cydianNative, params = {}) {
   if (!native?.call) return null;
-  try { return String((await native.call("clipboard.read", {})) ?? ""); } catch { return null; }
+  try { return String((await native.call("clipboard.read", params)) ?? ""); } catch { return null; }
 }
 
 // A hold on `el` (or a descendant matching `selector`): 500 ms without moving more than 10px. `onHold(target, e)`

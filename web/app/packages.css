@@ -54,6 +54,7 @@
   animation: hud-spin .96s steps(12) infinite;
 }
 .depiction-slot .loading { margin: 20px; }
+.page-body > .loading { height: 72%; margin: 0 20px; } /* a page still loading: the spinner in the middle (user 2026-11-17) */
 
 /* ---- "grey search bar": 44px, #b5b9bd -> #d3dbdf (7%) -> #b3bdc5, a 1px #81919f line under it; the field is
    30px, 15px corners, white, a #7b8fa3 -> #a3afb9 edge and a soft inner shadow; the #93979d magnifier. ---- */

@@ -114,9 +114,13 @@ export function render(body, route, ctx) {
       hint.textContent = rows.length ? "" : "No Results";
     });
     page.append(bar, view.browse, view.body, results);
-    body.append(page);
-    loadBrowse();
-    load();
+    // Cydia's spinner in the middle until Browse and My IPAs are both in (user 2026-11-17: the page popped in in
+    // pieces); then the whole page shows at once.
+    const wait = el("div", "loading");
+    wait.append(el("span", "loading-spinner"), el("span", null, "Loading"));
+    page.hidden = true;
+    body.append(wait, page);
+    Promise.allSettled([loadBrowse(), load()]).then(() => { wait.remove(); page.hidden = false; });
     return;
   }
   if (p?.page === "search") return renderSearch(body, route);
@@ -255,11 +259,12 @@ function searchBar(placeholder, onQuery) {
 // All Apps and a category: their list with a search bar that narrows this list only.
 export const matchApp = (r, q) => [r.name, r.short, r.author, r.id].some((v) => String(v ?? "").toLowerCase().includes(q.toLowerCase()));
 async function renderFiltered(body, route, fetchRows, placeholder) {
-  const wait = el("p", "empty", "Loading");
+  const wait = el("div", "loading");
+  wait.append(el("span", "loading-spinner"), el("span", null, "Loading"));
   body.append(wait);
   let rows;
-  try { await catalog.ensure(); rows = await fetchRows(); } catch (e) { wait.textContent = e.message; return; }
-  if (!rows.length) { wait.textContent = "No apps."; return; }
+  try { await catalog.ensure(); rows = await fetchRows(); } catch (e) { wait.replaceWith(note(e.message)); return; }
+  if (!rows.length) { wait.replaceWith(note("No apps.")); return; }
   wait.remove();
   const lettered = (list) => withLetterHeaders(list, (r) => indexLetter(r.name));
   const none = el("p", "empty", "No Results");

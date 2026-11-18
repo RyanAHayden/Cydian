@@ -268,3 +268,41 @@ test("F195: Size keeps its unit in the value, the price under it; the row counts
   assert.match(css, /\.store-tiles\[data-count="5"\] \.store-tile[^{]*\{[^}]*width: 29%/s);
   assert.match(css, /\.store-tile-value \{[^}]*font-size: 15px/s);
 });
+
+test("B41: a Related row's icon: the picture over the letter tile, the letter alone when there is none or it fails", async () => {
+  const { grouped } = await import("../nav/ui.js");
+  const route = { tab: "search", path: ["package:com.a"] };
+  const rows = [
+    browseMod.relatedRow({ id: "com.b", name: "bravo", short: "B", icon: "https://repo.example/b.png" }, route),
+    browseMod.relatedRow({ id: "com.c", name: "Charlie", icon: "file:///Applications/C.app/icon.png" }, route),
+    browseMod.relatedRow({ id: "com.d", name: "" }, route),
+  ];
+  assert.equal(rows[0].icon.src, "https://repo.example/b.png");
+  assert.equal(rows[0].icon.text, "B", "the letter, upper case");
+  assert.equal(rows[0].icon.cls, "store-related-icon");
+  assert.equal(rows[1].icon.src, null, "a URL we can't load: the letter only");
+  assert.equal(rows[2].icon.text, "C", "no name: the id's first letter");
+  const icons = byClass(grouped([{ rows }]), "store-related-icon");
+  assert.equal(icons.length, 3);
+  const img = icons[0].children.find((c) => c.tagName === "IMG");
+  assert.ok(img, "the picture is in the tile");
+  assert.equal(icons[0].textContent, "B", "with the letter under it");
+  img.onerror();
+  assert.equal(icons[0].children.some((c) => c.tagName === "IMG"), false, "a failed load leaves the letter tile");
+  assert.equal(icons[0].textContent, "B");
+  assert.equal(icons[1].children.some((c) => c.tagName === "IMG"), false);
+  // The CSS sizes and clips the picture to the tile and hides it until it loads (the bug: it drew at its own size).
+  const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
+  assert.match(css, /\.store-related-icon \{[^}]*position: relative[^}]*overflow: hidden/s);
+  assert.match(css, /\.store-related-icon img \{[^}]*position: absolute[^}]*inset: 0[^}]*width: 100%[^}]*height: 100%[^}]*opacity: 0/s);
+  assert.match(css, /\.store-related-icon img\.loaded \{[^}]*opacity: 1/s);
+});
+
+test("B41: the header's sides are inset like the grouped rows' contents (10px margin + 1px border + 10px padding)", () => {
+  const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
+  const head = css.match(/\n\.store-head \{[^}]*\}/s)[0];
+  assert.match(head, /padding: 14px 21px 30px/);
+  const ios6 = readFileSync(new URL("../ios6.css", import.meta.url), "utf8");
+  assert.match(ios6, /\.group \{ margin: 10px 10px 0; \}/, "the group margin the 21px is built from");
+  assert.match(ios6, /\.cell-inner \{[^}]*padding: 0 10px/s);
+});

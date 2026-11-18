@@ -13,7 +13,7 @@ import { TABS, BAR_TABS, createRouter, format, parent, mounted } from "./router.
 import { createStacks, swipeCommits } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transition.js";
 import { attachEdgeSwipe } from "./nav/swipe.js";
-import { createTabbar, tapTab } from "./nav/tabbar.js";
+import { createTabbar, tapTab, scrollToTop } from "./nav/tabbar.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
@@ -279,10 +279,12 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
     import("./screens/home.js").then((h) => gate.askToBrowse({ install: () => h.installCydian() })).catch(() => {});
     return;
   }
-  // A second tap at the root runs the screen's reselect() (Search focuses its field), in this handler (F36).
+  // A second tap at the root scrolls the page to the top (F148), then runs the screen's reselect() (Search focuses
+  // its field), in this handler (F36).
   const tab = a.dataset.tab;
   // Back to the root of the tab you are on is our own pop, so it slides like Back (not a jump).
-  tapTab(tab, router.current(), { selectTab: (t) => { ownBack = true; router.selectTab(t); }, reselect: SCREENS[tab].reselect });
+  tapTab(tab, router.current(), { selectTab: (t) => { ownBack = true; router.selectTab(t); }, reselect: SCREENS[tab].reselect,
+    scrollTop: () => scrollToTop(stacks.top()?.page.body) });
 });
 
 // Pressed look while a finger is down, like Cydia's: .is-pressed on the bar button or row under it, off when the

@@ -157,14 +157,11 @@ const GLYPHS = {
   linux: ["#5d5d5d", "#1d1d1d", "<ellipse cx='29' cy='34' rx='13' ry='15'/><ellipse cx='29' cy='35' rx='8.5' ry='11' fill='#1d1d1d'/><circle cx='29' cy='19' r='9'/><g fill='#1d1d1d'><circle cx='25.5' cy='18' r='1.6'/><circle cx='32.5' cy='18' r='1.6'/></g><path d='M25 22h8l-4 4z' fill='#f6b73c'/><path d='M17 48h9l-2-4h-6zM32 48h9l-1-4h-6z' fill='#f6b73c'/>"],
   filza: ["#ffc66b", "#e07e14", "<path d='M11 16h12l4 4h20v24H11z'/><g fill='none' stroke='#e07e14' stroke-width='3' stroke-linecap='round'><path d='M19 27v11h8M19 32h8'/></g><rect x='29' y='25' width='10' height='5' rx='1' fill='#e07e14'/><rect x='29' y='35' width='10' height='5' rx='1' fill='#e07e14'/>"],
 };
+// Flat like Home's tiles (no gloss): the tile's colour, the white glyph.
 export const glyphSvg = (id) => {
-  const [top, bottom, body] = GLYPHS[id];
+  const [, colour, body] = GLYPHS[id];
   return "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 58 58'>"
-    + `<defs><linearGradient id='b-${id}' x2='0' y2='1'><stop offset='0' stop-color='${top}'/><stop offset='1' stop-color='${bottom}'/></linearGradient>`
-    + `<linearGradient id='g-${id}' x2='0' y2='1'><stop offset='0' stop-color='#fff' stop-opacity='.45'/><stop offset='1' stop-color='#fff' stop-opacity='.08'/></linearGradient></defs>`
-    + `<rect width='58' height='58' fill='url(#b-${id})'/>`
-    + `<g fill='#fff' transform='translate(0 1)' opacity='.35'><g fill='#000'>${body}</g></g><g fill='#fff'>${body}</g>`
-    + `<path d='M0 0h58v24C40 30 18 30 0 27z' fill='url(#g-${id})'/></svg>`;
+    + `<rect width='58' height='58' fill='${colour}'/><g fill='#fff'>${body}</g></svg>`;
 };
 // A row's icon: the glyph as a picture over its tile colour and letter (shown if the picture can't load).
 export const glyph = (id, text) => ({

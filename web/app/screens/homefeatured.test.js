@@ -28,9 +28,10 @@ async function withDom(fn) {
   try { return await fn(); } finally { globalThis.document = saved; }
 }
 
-test("F135: Settings is Home's first group, its row with our gear at the left", () => {
+test("F135: Settings is Home's first group, its row with our gear at the left, Theme its other half", () => {
   const [first, ...rest] = homeLinks();
-  assert.equal(first.rows.length, 1);
+  assert.equal(first.pair, true);
+  assert.deepEqual(first.rows.map((r) => r.label), ["Settings", "Theme"]);
   assert.equal(first.rows[0].label, "Settings");
   assert.equal(first.rows[0].icon.cls, SETTINGS_ICON);
   assert.ok(rest.every((g) => g.rows?.every((r) => r.label !== "Settings")), "Settings only once");

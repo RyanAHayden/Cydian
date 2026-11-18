@@ -321,10 +321,10 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
 }
 .cell-icon {
   flex: none; width: 29px; height: 29px; border-radius: 6px; display: grid; place-items: center;
-  font-size: 15px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.3);
-  background: #8c99b3; box-shadow: 0 1px 2px rgba(0,0,0,.35);
+  font-size: 15px; font-weight: bold; color: #fff;
+  background: #8c99b3; /* flat, like Home's tiles: no shadow or gloss */
 }
-/* F205: iOS 6 Settings' row tiles (icons/rowicons.js draws tile, gloss and edge as one SVG). Measured on the 4S: the
+/* F205: iOS 6 Settings' row tiles (icons/rowicons.js draws the flat tile and glyph as one SVG). Measured on the 4S: the
    tile 7pt in from the cell's edge and the label 11pt after it, so 3pt off .cell-inner's 10px padding and onto its gap. */
 .cell-icon.row-icon { background: none; box-shadow: none; border-radius: 0; margin: 0 3px 0 -3px; }
 .cell-icon.row-icon img { display: block; width: 29px; height: 29px; }

@@ -287,11 +287,50 @@ function listPage(key) {
     return grouped([{ footer: "This setting is not available here." }]);
   }
   const v = settings.get(key);
-  return grouped([{
-    rows: d.options.map((o) => ({ label: o.label, subtitle: o.subtitle, checked: o.value === v, onClick: () => settings.set(key, o.value),
+  const frag = grouped([{
+    rows: d.options.map((o) => ({ label: o.label, subtitle: o.subtitle, checked: o.value === v, onClick: () => pick(d, o.value),
       ...swatchIcon(o) })),
     footer: settings.footerOf(key),
   }]);
+  if (d.tone) frag.append(Object.assign(document.createElement("div"), { className: "theme-preview-space" }), themePreview());
+  return frag;
+}
+
+// A theme picked in Theme > Light / Dark also switches Mode to that tone, so it shows once back on Theme.
+export function pick(d, value, store = settings) {
+  store.set(d.key, value);
+  if (d.tone && store.get("appearance") !== d.tone) store.set("appearance", d.tone);
+}
+
+// Theme > Light / Dark: a sample of the app's controls in the theme showing, pinned over the page's bottom half
+// (settings.css .theme-preview). Inert: nothing in it does anything.
+function themePreview() {
+  const make = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls, textContent: text ?? "" });
+  const box = make("div", "theme-preview");
+  box.inert = true;
+  box.setAttribute("aria-hidden", "true");
+  const bar = make("div", "navbar theme-preview-bar");
+  bar.append(make("span", "bar-button back", "Back"), make("span", "nav-title", "Preview"), make("span", "bar-button", "Edit"));
+  const search = make("div", "search-bar");
+  const field = make("label", "search-field");
+  field.append(Object.assign(document.createElement("input"), { type: "search", placeholder: "Search" }));
+  search.append(field);
+  const seg = segmented(["Details", "Reviews", "Related"]).bar;
+  seg.classList.add("theme-preview-seg");
+  const buttons = make("div", "theme-preview-buttons");
+  buttons.append(make("span", "store-btn", "FREE"), make("span", "store-btn", "$0.99"), make("span", "badge", "3"));
+  const groups = grouped([{ header: "Sample", rows: [
+    { label: "Sources", detail: "12", chevron: true, icon: rowIcon(PAGE_ICONS.general) },
+    { label: "Upgrades", badge: "3", chevron: true, icon: rowIcon(PAGE_ICONS.updates) },
+    { label: "Switch" },
+    { label: "Checked", checked: true },
+    { label: "Package", subtitle: "A row with a subtitle", detail: "1.0" },
+  ], footer: "A group footer reads like this." }]);
+  const sw = groups.querySelectorAll(".cell-inner")[2];
+  sw.append(createSwitch({ label: "Switch", checked: true }));
+  sw.classList.add("has-switch");
+  box.append(bar, search, seg, buttons, groups);
+  return box;
 }
 
 function holdsPage() {

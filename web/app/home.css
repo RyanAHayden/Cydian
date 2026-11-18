@@ -150,4 +150,7 @@ html[data-theme="dark"] .home-locked .cell-label, html[data-theme="dark"] .home-
 /* F135/F159: Home's Settings row, a tile glyph (grey square, white gear) with the tiles' inset and gap, so its icon
    and label line up with the tiles above. */
 .home-settings-row > .cell-inner { padding: 0 10px 0 6px; gap: 8px; }
+/* Settings | Theme: one grouped table split in two halves (.home-pair's cells and divider, above). */
+.home-links > .table.home-pair { display: flex; }
+.glyph-theme { background-color: #4650b4; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' fill-rule='evenodd' d='M12 2.5a9.5 9.5 0 1 1 0 19a9.5 9.5 0 0 1 0-19zM12 4.8a7.2 7.2 0 0 0 0 14.4z'/%3E%3C/svg%3E"); }
 .glyph-settings { background-color: #8e8e93; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23fff' stroke-width='3.4' stroke-dasharray='3.534 3.534'/%3E%3Cpath fill='%23fff' fill-rule='evenodd' d='M12 4.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15zm0 4.2a3.3 3.3 0 1 0 0 6.6 3.3 3.3 0 0 0 0-6.6z'/%3E%3C/svg%3E"); }

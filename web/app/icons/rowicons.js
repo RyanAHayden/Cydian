@@ -1,5 +1,6 @@
-// F205: the 29pt row icons of iOS 6's Settings app, redrawn as SVG (no Apple artwork): a rounded square tile in
-// one colour per row, the curved gloss over its top half, a hairline dark edge, and a white glyph.
+// F205: the 29pt row icons of iOS 6's Settings app, redrawn as SVG (no Apple artwork): a flat rounded square tile in
+// one colour per row and a white glyph, the same simple style as Home's tiles (home.css .home-glyph; user
+// 2026-11-18: no gloss, keep the colours).
 //
 //   rowIcon("general")  -> { cls: "row-icon", src: "data:image/svg+xml,…" }   a grouped()/plain() row's `icon`
 //   tileSvg("general")  -> the SVG text
@@ -7,18 +8,14 @@
 //
 // Measured off the 4S (Preferences.app's Settings icons, 58x58 @2x, and a screenshot of Settings' root):
 //   tile      29 x 29pt, corners ~5pt (the first opaque pixel 9px in on the top row @2x)
-//   edge      0.5pt dark line all round, ~60% black of the tile's own colour
-//   body      darkest at the gloss line (~45% down), lighter to the bottom (#585d65 -> #8c9097 on the grey ones)
-//   gloss     white over the top 44%, strong at the top and fading down (top row 219 on the grey tile, 176 at its
-//             foot), ending in a shallow downward curve; a brighter half-point line just inside the top edge
 //   glyph     white, ~19pt, centred
 //   spacing   the tile 7pt in from the cell's left edge, the label 11pt after it (ios6.css .cell-icon.row-icon)
 // Tiles look the same in both themes, as iOS 6's did.
 
 const SIZE = 29;
-const R = 5;
+const R = 6; // home.css / ios6.css .cell-icon's corners
 
-// Tile colours: the body's bottom (lightest) colour; the gloss line is the same colour at 62%.
+// Tile colours.
 const C = {
   grey: "#8c9097", blue: "#3f80e0", sky: "#3ea2e8", green: "#40ae4c", red: "#e2382f", orange: "#f08b1d",
   purple: "#7650cc", indigo: "#4650b4", dark: "#55595f", teal: "#22a6b5", gold: "#e8ad1a", brown: "#a6763f",
@@ -135,9 +132,6 @@ export const SETTING_ICONS = {
 // Settings' pages (core/settings.js PAGES) -> their root row's icon.
 export const PAGE_ICONS = { general: "general", theme: "theme", updates: "updates", signing: "signing" };
 
-const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-const css = (rgb) => `rgb(${rgb.map((v) => Math.round(Math.max(0, Math.min(255, v)))).join(",")})`;
-const scale = (rgb, k) => rgb.map((v) => v * k);
 
 function glyphSvg(parts) {
   return parts.map(([kind, d, w]) => kind === "s"
@@ -149,24 +143,11 @@ export function tileSvg(name) {
   const icon = ROW_ICONS[name];
   if (!icon) throw new Error(`no row icon ${name}`);
   const [colour, glyph] = icon;
-  const base = hex(colour);
-  const mid = css(scale(base, 0.62));
-  const edge = css(scale(base, 0.4));
   const g = 19 / 24; // the glyph's 24 units drawn 19pt across
   const off = (SIZE - 24 * g) / 2;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">`
-    + `<defs><linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mid}"/>`
-    + `<stop offset=".44" stop-color="${mid}"/><stop offset="1" stop-color="${css(base)}"/></linearGradient>`
-    + `<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".74"/>`
-    + `<stop offset="1" stop-color="#fff" stop-opacity=".45"/></linearGradient>`
-    + `<clipPath id="c"><rect width="${SIZE}" height="${SIZE}" rx="${R}"/></clipPath></defs>`
-    + `<g clip-path="url(#c)"><rect width="${SIZE}" height="${SIZE}" fill="url(#b)"/>`
-    + `<path d="M0 0H${SIZE}V12.6Q${SIZE / 2} 14.4 0 12.6Z" fill="url(#g)"/>`
-    + `<rect y=".5" width="${SIZE}" height=".5" fill="#fff" fill-opacity=".3"/>`
-    + `<rect y="${SIZE - 1.5}" width="${SIZE}" height=".5" fill="#fff" fill-opacity=".14"/></g>`
-    + `<g transform="translate(${off} ${off}) scale(${g})">${glyphSvg(GLYPHS[glyph])}</g>`
-    + `<rect x=".25" y=".25" width="${SIZE - 0.5}" height="${SIZE - 0.5}" rx="${R - 0.25}" fill="none" stroke="${edge}" stroke-opacity=".75" stroke-width=".5"/>`
-    + "</svg>";
+    + `<rect width="${SIZE}" height="${SIZE}" rx="${R}" fill="${colour}"/>`
+    + `<g transform="translate(${off} ${off}) scale(${g})">${glyphSvg(GLYPHS[glyph])}</g></svg>`;
 }
 
 const cache = new Map();

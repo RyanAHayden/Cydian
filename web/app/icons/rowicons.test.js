@@ -6,15 +6,15 @@ import { readFileSync } from "node:fs";
 import { ROW_ICONS, GLYPHS, SETTING_ICONS, PAGE_ICONS, tileSvg, rowIcon } from "./rowicons.js";
 import { SETTINGS, PAGES } from "../core/settings.js";
 
-test("every row icon has a colour and a glyph, and draws a 29pt tile with 5pt corners", () => {
+test("every row icon has a colour and a glyph, and draws a 29pt tile with 6pt corners", () => {
   for (const [name, [colour, glyph]] of Object.entries(ROW_ICONS)) {
     assert.match(colour, /^#[0-9a-f]{6}$/, name);
     assert.ok(GLYPHS[glyph], `${name}: glyph ${glyph}`);
     const svg = tileSvg(name);
     assert.match(svg, /^<svg xmlns="http:\/\/www.w3.org\/2000\/svg" width="29" height="29" viewBox="0 0 29 29">/);
-    assert.match(svg, /<rect width="29" height="29" rx="5"\/>/);
-    assert.equal((svg.match(/<path /g) || []).length >= 2, true, name); // the gloss and at least one glyph part
-    assert.doesNotMatch(svg, /NaN|undefined/, name);
+    assert.match(svg, /<rect width="29" height="29" rx="6" fill="#[0-9a-f]{6}"\/>/);
+    assert.equal((svg.match(/<path /g) || []).length >= 1, true, name); 
+    assert.doesNotMatch(svg, /NaN|undefined|Gradient/, name); // flat: no gloss
   }
   assert.throws(() => tileSvg("nope"));
 });

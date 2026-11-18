@@ -17,3 +17,15 @@
 /* F199: a theme's swatch in Theme > Light / Dark: a small rounded tile, its bar colour over its ground (the gradient
    comes from core/settings.js `swatch`), with a hairline edge so OLED Black shows on a near-black row. */
 .cell-icon.theme-swatch { width: 24px; height: 24px; border-radius: 5px; box-shadow: inset 0 0 0 1px rgba(127,127,127,.45); }
+/* Theme > Light / Dark: the controls sample (screens/settings.js themePreview), pinned over the bottom half of the
+   screen, just above the tab bar; the theme list above it ends in a spacer as tall, so its last row scrolls clear.
+   The sample scrolls on its own. */
+.theme-preview { position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 1; height: 50vh; overflow-y: auto;
+  overscroll-behavior: contain; padding-bottom: 20px; box-sizing: border-box;
+  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
+  box-shadow: 0 -1px 0 rgba(0,0,0,.25), 0 -3px 6px rgba(0,0,0,.15); }
+.theme-preview-space { height: 50vh; }
+.theme-preview-bar { position: relative; display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 5px; }
+.theme-preview-bar .nav-title { flex: 1; }
+.theme-preview-seg { margin: 10px; }
+.theme-preview-buttons { display: flex; align-items: center; gap: 10px; padding: 0 10px; }

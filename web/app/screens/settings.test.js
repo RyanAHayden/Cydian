@@ -278,9 +278,11 @@ test("F205: Settings root, General and Theme rows carry iOS 6 tiles where iOS 6 
   for (const r of theme) assert.equal(r[1], null, r[0]);
   assert.deepEqual(rows(["display"]).map((r) => r[0]), ["Light", "Dark"]); // the old route
   // each theme list: a checked row per theme, each with its swatch
-  assert.deepEqual(rows(["theme", "darkTheme"]).map((r) => [r[0], r[1]]),
+  // (then the preview's sample rows, which start at Sources)
+  const list = (k) => { const r = rows(["theme", k]); return r.slice(0, r.findIndex((x) => x[0] === "Sources")).map((x) => [x[0], x[1]]); };
+  assert.deepEqual(list("darkTheme"),
     ["OLED Black", "Gunmetal", "Midnight", "Linen", "Nord", "Dracula"].map((t) => [t, "cell-icon theme-swatch"]));
-  assert.deepEqual(rows(["theme", "lightTheme"]).map((r) => [r[0], r[1]]),
+  assert.deepEqual(list("lightTheme"),
     ["Classic", "Sepia", "Solarized Light"].map((t) => [t, "cell-icon theme-swatch"]));
 });
 
@@ -322,4 +324,18 @@ test("F199: the theme lists preview their tone; other routes don't", async () =>
   assert.equal(previewOf(r("general", "darkTheme")), null);
   assert.equal(previewOf({ tab: "sources", path: ["darkTheme"] }), null);
   assert.equal(previewOf(null), null);
+});
+
+test("picking a theme in Theme > Light / Dark switches Mode to that tone", async () => {
+  const { pick } = await import("./settings.js");
+  const { SETTINGS } = await import("../core/settings.js");
+  const d = (k) => SETTINGS.find((s) => s.key === k);
+  settings.set("appearance", "auto");
+  pick(d("lightTheme"), "sepia");
+  assert.equal(settings.get("lightTheme"), "sepia");
+  assert.equal(settings.get("appearance"), "light");
+  pick(d("darkTheme"), "nord");
+  assert.equal(settings.get("appearance"), "dark");
+  pick(d("device"), "none"); // not a theme list: Mode stays
+  assert.equal(settings.get("appearance"), "dark");
 });

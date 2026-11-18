@@ -120,11 +120,15 @@ export async function signingSetUp(mode, { ready = signingReady, status = () => 
 // the tiles (user 2026-11-18: "move settings up on the main page and give it an icon"). F159: its gear is a tile glyph
 // (.home-glyph.glyph-settings, home.css) with the tiles' inset, so it lines up with Featured/Signing above.
 export const SETTINGS_ICON = "home-glyph glyph-settings";
+// Settings shares its row with Theme (Settings > Theme) as two halves, like the Featured | Signing tiles (user
+// 2026-11-18: "split the homescreen setting button to have setting and theme"); render() makes the group a pair.
+export const THEME_ICON = "home-glyph glyph-theme";
 // F157: the User Guides' lite set (no jailbreak guides) while Not Jailbroken: the sideload build, and the website
 // while Settings > Device says so (as F144).
 const guidesLite = () => guides.isLite(settings.deviceType());
 export function homeLinks() {
-  return [{ rows: [{ label: "Settings", href: format(settingsRoute()), icon: { cls: SETTINGS_ICON }, cls: "home-settings-row" }] }, {
+  return [{ pair: true, rows: [{ label: "Settings", href: format(settingsRoute()), icon: { cls: SETTINGS_ICON }, cls: "home-settings-row" },
+    { label: "Theme", href: format(settingsRoute(["theme"])), icon: { cls: THEME_ICON }, cls: "home-settings-row" }] }, {
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
       { label: "Find Extensions for Applications", href: format({ tab: "search" }), chevron: true },
@@ -584,6 +588,7 @@ function renderRoot(body) {
   const list = grouped(links);
   const groups = [...list.children]; // the fragment empties once appended
   for (const group of groups) group.classList.add("home-links");
+  links.forEach((l, i) => { if (l.pair) groups[i].querySelector(".table")?.classList.add("home-pair"); });
   home.append(list);
   // The website before iFizBox is installed: everything below the iFizBox App card is locked; a tap asks first. Not
   // Settings (F123: unlocked like Home, as its tab was), nor help, guides and credits (F156, lockHomeLinks).

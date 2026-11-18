@@ -318,6 +318,21 @@ static int respring_plan(int argc, const char *prefix, struct helper_plan *p, co
     return 0;
 }
 
+/* N8: userspace-reboot: the Userspace Reboot intent and Control Center control. launchctl reboot userspace (iOS 15+),
+ * from the prefix: the jailbreak ships launchctl there (the system has none). */
+static int userspace_reboot_plan(int argc, const char *prefix, struct helper_plan *p, const char **err) {
+    if (argc != 1) { *err = "this verb takes no arguments"; return -1; }
+    if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/launchctl", prefix) >= sizeof p->path) {
+        *err = "prefix too long"; return -1;
+    }
+    p->argv[0] = "launchctl";
+    p->argv[1] = "reboot";
+    p->argv[2] = "userspace";
+    p->argv[3] = NULL;
+    p->argc = 3;
+    return 0;
+}
+
 int helper_deb_path_ok(const char *s) {
     size_t n = strlen(s);
     if (n < 6 || n > HELPER_DEB_PATH_MAX || s[0] != '/' || strcmp(s + n - 4, ".deb")) return 0;
@@ -589,6 +604,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "apply")) { p->verb = HV_APPLY; return queue_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "apply-ask")) { p->verb = HV_APPLY_ASK; return queue_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "respring")) { p->verb = HV_RESPRING; return respring_plan(argc, prefix, p, err); }
+    else if (!strcmp(verb, "userspace-reboot")) { p->verb = HV_USERSPACE_REBOOT; return userspace_reboot_plan(argc, prefix, p, err); }
     else if (!strcmp(verb, "install-ipa")) { p->verb = HV_INSTALL_IPA; return ipa_plan(argc, argv, p, err); }
     else if (!strcmp(verb, "rollbacks")) { p->verb = HV_ROLLBACKS; return rollback_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "rollback")) { p->verb = HV_ROLLBACK; return rollback_plan(argc, argv, prefix, status_fd, p, err); }

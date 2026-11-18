@@ -66,7 +66,9 @@ ln -sfn "$tc/usr/lib/swift/clang" "$rd/clang"
   -target "$target" -sdk "$sdk" -resource-dir "$rd" -I "$rd/shims" -module-cache-path "$out/modules" \
   -Xcc -Wno-nullability-completeness -Xcc -Wno-nullability-inferred-on-nested-type \
   -import-objc-header Sources/Cydian-Bridging-Header.h \
-  -module-name Cydian -c Sources/*.swift sign/*.swift -o "$out/Cydian.o"
+  -emit-const-values-path "$out/Cydian.swiftconstvalues" \
+  -Xfrontend -const-gather-protocols-file -Xfrontend intents/protocols.json \
+  -module-name Cydian -c Sources/*.swift sign/*.swift intents/*.swift intents/App/*.swift -o "$out/Cydian.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/availability.c -o "$out/availability.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/mode.c -o "$out/mode.o"
 # The app's half of the root helper (cydian_helper_spawn), and the helper itself (N2's native/helper/).
@@ -74,11 +76,19 @@ hflags=(-target "$target" -isysroot "$sdk" -std=c11 -Wall -Wextra -Werror -O2)
 clang "${hflags[@]}" -c helper/spawn.c -o "$out/spawn.o"
 clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/Cydian.o" "$out/availability.o" \
   "$out/mode.o" "$out/spawn.o" -L "$sdk/usr/lib/swift" -lz -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
-  -o "$out/Cydian"
+  -Wl,-weak_framework,AppIntents -o "$out/Cydian"
+# N8: AppIntents is iOS 16+ and weak (above), so Cydian still launches on iOS 15. Nothing else may need it strongly.
+if command -v llvm-objdump >/dev/null || [ -x "$tc/usr/bin/llvm-objdump" ]; then
+  od=$(command -v llvm-objdump || echo "$tc/usr/bin/llvm-objdump")
+  strong=$("$od" --macho --dylibs-used "$out/Cydian" | grep -E '/(AppIntents|_AppIntents_[A-Za-z]+)\.framework/' | grep -v 'weak)' || true)
+  [ -z "$strong" ] || { echo "native build: AppIntents linked strongly (Cydian would not launch on iOS 15): $strong" >&2; exit 1; }
+fi
 
 rcodesign=${RCODESIGN:-$(command -v rcodesign || true)}
 ldid=${LDID:-$(command -v ldid || true)}
 if [ -z "$rcodesign$ldid" ] && [ -x "$HOME/.cargo/bin/rcodesign" ]; then rcodesign=$HOME/.cargo/bin/rcodesign; fi
+
+SIDELOAD_INTENTS=CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent # N8: the both-modes intents
 
 # bundle <Cydian.app dir> <entitlements> <Info.plist overlay or "">: the executable signed ad hoc with the
 # entitlements (the jailbreak trusts ad hoc code; a sideload signer re-signs it), web/app/, icons, Info.plist.
@@ -104,6 +114,14 @@ bundle() {
   # Apple's WWDR intermediates and roots, public certificates the on-device signer puts in each CMS (I6).
   mkdir -p "$app/certs" && cp sign/certs/*.cer "$app/certs/"
   sed -e "s/@VERSION@/$version/" -e "s/@BUILD@/$build/" -e "s/@MIN@/$min/" Info.plist > "$app/Info.plist"
+  # N8: App Intents (intents/metadata.py stands in for Xcode's metadata step) and the widget extension. The sideload
+  # IPA lists only the intents that work without a jailbreak, and its widget has no controls.
+  local variant=jailbreak only=()
+  [ -z "$overlay" ] || { variant=sideload; only=(--only "$SIDELOAD_INTENTS"); }
+  rm -rf "$app/Metadata.appintents"
+  python3 intents/metadata.py build "$out/Cydian.swiftconstvalues" "$app/Metadata.appintents" "${only[@]}" >/dev/null
+  SWIFTC=$swiftc SDK=$sdk RD=$rd LLD=$lld OUT=$out VERSION=$version BUILD=$build LDID=$ldid RCODESIGN=$rcodesign \
+    widget/build.sh "$variant" "$app"
   [ -z "$overlay" ] || python3 mkipa.py plist "$app/Info.plist" "$overlay" "$app/Info.plist"
   printf 'APPL????' > "$app/PkgInfo"
 }

@@ -14,6 +14,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper rollbacks <pkg> | rollback <pkg> <version>              (F71: Roll Back to a kept .deb)
     cydian-helper install-paid <path.deb> <pkg> <version>                 (F57: a paid package's .deb)
     cydian-helper notifications on|off                                     (F65: Upgrade Notifications)
+    cydian-helper userspace-reboot                                         (N8: the Userspace Reboot intent)
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
@@ -37,6 +38,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `rollback`  | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install /var/jb/var/cache/cydian/rollback/<pkg>/<pkg>_<ver>_<arch>.deb`, `CYDIA=3 1` as for `apply` (F71; below) |
 | `install-paid` | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install /var/tmp/cydian-paid.XXXXXX/paid.deb`, `CYDIA=3 1` as for `apply`, after copying and checking the app's download (F57; below) |
 | `respring`  | `sbreload`, or `killall -9 backboardd` when the jailbreak has no sbreload (N4: Restart SpringBoard) |
+| `userspace-reboot` | `launchctl reboot userspace` (N8: the Userspace Reboot intent and control)              |
 
 **The queue (N4):** `simulate` and `apply` take items: `name` installs the newest, `name=version` that exact
 version (Reinstall, Downgrade and the Version History pick one), `-name` removes. apt gets `name`, `name=version`

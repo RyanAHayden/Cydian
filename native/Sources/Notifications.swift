@@ -65,6 +65,7 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
     static func register(_ b: Bridge) {
         b.on("app.badge") { c in
             let n = max(0, (c.params["count"] as? NSNumber)?.intValue ?? 0)
+            WidgetStore.save(count: n, names: []) // N8: the Home Screen widget shows the same count
             DispatchQueue.main.async {
                 let center = UNUserNotificationCenter.current()
                 if n == 0 { center.removeDeliveredNotifications(withIdentifiers: [upgradesID]) }

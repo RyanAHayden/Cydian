@@ -31,7 +31,7 @@ test("defaults with nothing stored", () => {
 
 // F128: the settings audit. What's left, and the ones that went (docs/settings.md).
 test("F128: exactly these settings remain, and the retired ones are gone", () => {
-  assert.deepEqual(SETTINGS.map((d) => d.key), ["appearance", "device", "arch", "worksOnMyPhone", "compatMarks",
+  assert.deepEqual(SETTINGS.map((d) => d.key), ["appearance", "lightTheme", "darkTheme", "device", "arch", "worksOnMyPhone", "compatMarks",
     "iosVersion", "refreshOnLaunch", "returnHome", "holds", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
     "keepVersions", "showExpiry", "resignReminder"]);
   assert.deepEqual(RETIRED, ["sideloader", "checkUpdates", "cellular", "notifications", "badge", "allowZoom"]);
@@ -72,7 +72,7 @@ test("F128: the migration drops the retired settings' stored values and keeps ev
 test("F128: pages like iOS 6's Settings: General, Theme, Updates (Signing in the sideload build), by mode", () => {
   const layout = (mode) => createSettings({ storage: memStorage(), mode }).pages()
     .map((p) => [p.id, p.title, p.sections.map((x) => x.settings.map((d) => d.key))]);
-  const theme = ["theme", "Theme", [["appearance"]]];
+  const theme = ["theme", "Theme", [["appearance"], ["lightTheme", "darkTheme"]]]; // F199: Mode, then Themes
   const compat = ["worksOnMyPhone", "compatMarks"];
   assert.deepEqual(layout("site"), [
     ["general", "General", [["device", "iosVersion"], compat, ["refreshOnLaunch", "returnHome"]]],
@@ -245,28 +245,28 @@ test("holds: the helper is only used in jailbreak mode", async () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["appearance", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "returnHome", "holds"]);
+    ["appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "returnHome", "holds"]);
   assert.deepEqual(show("jailbreak"),
-    ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds",
+    ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds",
       "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
-    ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "showExpiry", "resignReminder"]);
+    ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "showExpiry", "resignReminder"]);
 });
 
 test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone, Ignored Upgrades and Automatic Installs", () => {
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.deepEqual(keysOf(s), ["appearance", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "upgradeNotifications",
+  assert.deepEqual(keysOf(s), ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "upgradeNotifications",
     "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.equal(s.isShown("autoInstall"), true);
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", features: new Set(["appearance"]) }).isShown("autoInstall"), false);
   assert.ok(FEATURES.has("appearance"));
   assert.deepEqual(createSettings({ storage: memStorage(), mode: "site", features: new Set(["appearance"]) })
-    .sections().map((x) => x.id), ["appearance"]);
+    .sections().map((x) => x.id), ["appearance", "themes"]);
 });
 
 test("sections come in page order, empty ones dropped", () => {
   const s = createSettings({ storage: memStorage(), mode: "sideload", features: everything });
-  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "sources", "appearance", "updates", "signing"]);
+  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "sources", "appearance", "themes", "updates", "signing"]);
   assert.equal(s.sections().find((x) => x.id === "appearance").settings[0].key, "appearance");
 });
 

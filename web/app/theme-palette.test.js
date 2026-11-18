@@ -4,11 +4,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { themeFor, paletteFor, DARK_PALETTES } from "./core/settings.js";
+import { themeFor, paletteFor, themeState, createSettings, DARK_PALETTES, LIGHT_PALETTES } from "./core/settings.js";
 import { applyTheme, settings, THEME_COLORS } from "./screens/settings.js";
 
 const here = new URL(".", import.meta.url);
 const read = (f) => readFileSync(new URL(f, here), "utf8");
+const mem = (init) => {
+  const m = new Map(Object.entries(init).filter(([, v]) => v != null));
+  return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
+};
 
 test("paletteFor: classic in light; OLED Black in dark unless Gunmetal is chosen", () => {
   assert.deepEqual(DARK_PALETTES, ["oled", "gunmetal"]);
@@ -20,11 +24,12 @@ test("paletteFor: classic in light; OLED Black in dark unless Gunmetal is chosen
 });
 
 // theme-boot.js in a sandbox: what it puts on <html> before first paint for a stored Appearance and dark theme.
-function boot({ appearance = null, darkTheme = null, systemDark = false } = {}) {
+function boot({ appearance = null, lightTheme = null, darkTheme = null, systemDark = false, hash = "" } = {}) {
   const attrs = {};
   const meta = { attrs: { content: "#4f698b" }, setAttribute(k, v) { this.attrs[k] = v; } };
-  const store = { "ifizbox.appearance": appearance, "ifizbox.darkTheme": darkTheme };
+  const store = { "ifizbox.appearance": appearance, "ifizbox.lightTheme": lightTheme, "ifizbox.darkTheme": darkTheme };
   const ctx = {
+    location: { hash },
     localStorage: { getItem: (k) => store[k] ?? null },
     matchMedia: () => ({ matches: systemDark }),
     document: {
@@ -56,16 +61,28 @@ test("applyTheme: data-palette and a black theme-color for OLED Black, Gunmetal 
   const doc = { documentElement: { dataset: {} }, querySelectorAll: () => metas };
   const meta = (media = "") => ({ media, content: "", cloneNode() { return meta(this.media); }, replaceWith(f) { metas[metas.indexOf(this)] = f; } });
   metas.push(meta(), meta("(prefers-color-scheme: light)"));
-  const win = (dark, chosen = null) => ({ matchMedia: () => ({ matches: dark }), localStorage: { getItem: () => chosen } });
-  const was = settings.get("appearance");
+  const win = (dark, hash = "") => ({ matchMedia: () => ({ matches: dark }), location: { hash } });
+  const was = [settings.get("appearance"), settings.get("darkTheme")];
   try {
     settings.set("appearance", "dark");
     applyTheme(doc, win(false));
     assert.equal(doc.documentElement.dataset.palette, "oled");
     assert.deepEqual(metas.map((m) => m.content), ["#000", "#000"]);
-    applyTheme(doc, win(false, "gunmetal"));
+    settings.set("darkTheme", "gunmetal"); // F199: Theme > Dark
+    applyTheme(doc, win(false));
     assert.equal(doc.documentElement.dataset.palette, "gunmetal");
     assert.deepEqual(metas.map((m) => m.content), ["#5f656f", "#5f656f"]);
+    settings.set("darkTheme", "oled");
+    // F199: Theme > Dark's list previews dark in Light mode; Theme > Light's previews light in Dark mode
+    settings.set("appearance", "light");
+    applyTheme(doc, win(false, "#/home/settings/theme/darkTheme"));
+    assert.deepEqual([doc.documentElement.dataset.theme, doc.documentElement.dataset.palette], ["dark", "oled"]);
+    assert.deepEqual(metas.map((m) => m.content), ["#000", "#000"]);
+    applyTheme(doc, win(false, "#/home/settings/theme"));
+    assert.deepEqual([doc.documentElement.dataset.theme, doc.documentElement.dataset.palette], ["light", "classic"]);
+    settings.set("appearance", "dark");
+    applyTheme(doc, win(false, "#/home/settings/theme/lightTheme"));
+    assert.deepEqual([doc.documentElement.dataset.theme, doc.documentElement.dataset.palette], ["light", "classic"]);
     settings.set("appearance", "auto"); // the bare meta takes what shows; one with a media query its own scheme's
     applyTheme(doc, win(true));
     assert.deepEqual([doc.documentElement.dataset.theme, doc.documentElement.dataset.palette], ["dark", "oled"]);
@@ -73,7 +90,27 @@ test("applyTheme: data-palette and a black theme-color for OLED Black, Gunmetal 
     settings.set("appearance", "light");
     applyTheme(doc, win(true));
     assert.equal(doc.documentElement.dataset.palette, "classic");
-  } finally { settings.set("appearance", was); }
+  } finally { settings.set("appearance", was[0]); settings.set("darkTheme", was[1]); }
+});
+
+// F199: every combination of Mode, light theme, dark theme, system and preview, through the one rule (themeState),
+// theme-boot.js before first paint, and the settings store's own stored values.
+test("F199: themeState, theme-boot.js and the store agree for every Mode, theme pair, system and preview", () => {
+  const lights = [null, "classic", "sepia"];
+  const darks = [null, "oled", "gunmetal", "neon"];
+  const previews = [[null, ""], ["light", "#/home/settings/theme/lightTheme"], ["dark", "#/home/settings/theme/darkTheme"]];
+  for (const appearance of [null, "auto", "light", "dark", "bogus"]) {
+    for (const lightTheme of lights) for (const darkTheme of darks) for (const systemDark of [false, true]) for (const [preview, hash] of previews) {
+      const store = createSettings({ storage: mem({ "ifizbox.appearance": appearance, "ifizbox.lightTheme": lightTheme, "ifizbox.darkTheme": darkTheme }) });
+      const got = themeState({ appearance: store.get("appearance"), lightTheme: store.get("lightTheme"), darkTheme: store.get("darkTheme"), preview }, systemDark);
+      const tone = preview ?? (appearance === "dark" || (appearance === "auto" && systemDark) ? "dark" : "light");
+      const want = { theme: tone, palette: tone === "dark" ? (darkTheme === "gunmetal" ? "gunmetal" : "oled") : "classic" };
+      const what = JSON.stringify({ appearance, lightTheme, darkTheme, systemDark, preview });
+      assert.deepEqual(got, want, what);
+      assert.deepEqual(boot({ appearance, lightTheme, darkTheme, systemDark, hash }), { ...want, color: THEME_COLORS[want.palette] }, what);
+    }
+  }
+  assert.deepEqual(LIGHT_PALETTES, ["classic"]);
 });
 
 // ---- the stylesheets ----

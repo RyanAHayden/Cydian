@@ -2,7 +2,8 @@
 // the root is one list of short rows (iFizBox Account; General, Theme, Updates; Signing; Console Logs), each
 // opening its own page. The settings' rows come from core/settings.js (which ones this mode shows, defaults,
 // storage, which page they're on); this file only draws them:
-//   choice  one row per option, the chosen one checked (Theme > Appearance: Automatic / Light / Dark)
+//   choice  one row per option, the chosen one checked
+//   segmented  an iOS 6 segmented control under the group's header (F199: Theme > Mode: Automatic / Light / Dark)
 //   toggle  the iOS 6 switch (ios6.css .switch)
 //   list    the current value as detail; pushes <page>/<key>, a page of checked options
 //   holds   the ignored packages' count; pushes <page>/holds
@@ -14,8 +15,9 @@
 // It also owns the theme: init() puts the Appearance setting on <html data-theme> and the theme-color metas, and
 // follows the system while Appearance is Automatic. theme-boot.js does the same before first paint.
 import { grouped } from "../nav/ui.js";
-import { format, settingsRoute } from "../router.js";
-import { createSettings, detectMode, themeFor, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
+import { format, parse, settingsRoute } from "../router.js";
+import { createSettings, detectMode, themeState, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
+import { segmented } from "./storepage.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind } from "../core/signing.js";
@@ -136,6 +138,7 @@ function groupPage(id) {
 // Groups of setting rows on page `page`; a list row pushes <page>/<key>.
 function settingsGroups(list, page) {
   const switches = [];
+  const segs = [];
   const sections = list.map((s) => {
     const rows = [];
     // F205: a setting's tile (SETTING_ICONS); a choice's option rows stay bare.
@@ -144,6 +147,8 @@ function settingsGroups(list, page) {
       if (d.kind === "choice") {
         const v = settings.get(d.key);
         for (const o of d.options) rows.push({ label: o.label, checked: o.value === v, onClick: () => settings.set(d.key, o.value) });
+      } else if (d.kind === "segmented") {
+        segs.push(d); // F199: Theme's Mode; drawn under the group's header below
       } else if (d.kind === "toggle") {
         switches.push([rows.length, d]);
         rows.push({ label: d.label, ...icon(d) });
@@ -154,12 +159,18 @@ function settingsGroups(list, page) {
         rows.push({ label: d.label, detail: n ? String(n) : "None", href: format(settingsRoute([page, "holds"])), ...icon(d) });
       }
     }
-    return { header: s.title, footer: s.footer, rows, id: s.id, switches: switches.splice(0) };
+    return { header: s.title, footer: s.footer, rows, id: s.id, switches: switches.splice(0), segs: segs.splice(0) };
   });
   const frag = grouped(sections);
-  // grouped() draws plain rows; the switches go into their cells afterwards.
+  // grouped() draws plain rows; the switches go into their cells afterwards, a segmented control under its header.
   const groups = frag.querySelectorAll(".group");
   sections.forEach((s, i) => {
+    if (s.segs.length) {
+      const g = groups[i];
+      const kids = [...g.children];
+      const head = kids.filter((c) => c.classList.contains("group-header"));
+      g.replaceChildren(...head, ...s.segs.map((d) => modeControl(d)), ...kids.filter((c) => !head.includes(c)));
+    }
     const cells = groups[i].querySelectorAll(".cell-inner");
     for (const [row, d] of s.switches) {
       cells[row].append(makeSwitch(d));
@@ -188,6 +199,30 @@ function makeSwitch(d) {
   });
   b.dataset.key = d.key;
   return b;
+}
+
+// F199: a "segmented" setting (Theme's Mode: Automatic / Light / Dark) as the iOS 6 segmented control, the same one
+// as the package page's (storepage.js segmented, ios6.css .store-segmented); settings.css fits it into the group.
+export function modeControl(d, store = settings) {
+  const values = d.options.map((o) => o.value);
+  const { bar } = segmented(d.options.map((o) => o.label), {
+    selected: Math.max(0, values.indexOf(store.get(d.key))),
+    onSelect: (i) => { if (store.get(d.key) !== values[i]) store.set(d.key, values[i]); },
+  });
+  bar.classList.add("settings-segmented");
+  bar.setAttribute("role", "radiogroup");
+  bar.setAttribute("aria-label", d.label);
+  // VoiceOver reads Mode as a set of radio buttons (the bar is redrawn on every change, so this stays right)
+  for (const b of bar.children) { b.setAttribute("role", "radio"); b.setAttribute("aria-checked", b.getAttribute("aria-selected")); }
+  bar.dataset.key = d.key;
+  return bar;
+}
+
+// F199: a theme's little tile in Theme > Light / Dark: its bar colour over its ground (core/settings.js `swatch`).
+export function swatchIcon(o) {
+  if (!o.swatch) return {};
+  const [bar, ground] = o.swatch;
+  return { icon: { cls: "theme-swatch", color: `linear-gradient(${bar} 0 45%, ${ground} 45%)` } };
 }
 
 // The iOS 6 switch (ios6.css .switch), for settings rows (makeSwitch) and anything else (F24's Section
@@ -251,7 +286,8 @@ function listPage(key) {
   }
   const v = settings.get(key);
   return grouped([{
-    rows: d.options.map((o) => ({ label: o.label, subtitle: o.subtitle, checked: o.value === v, onClick: () => settings.set(key, o.value) })),
+    rows: d.options.map((o) => ({ label: o.label, subtitle: o.subtitle, checked: o.value === v, onClick: () => settings.set(key, o.value),
+      ...swatchIcon(o) })),
     footer: settings.footerOf(key),
   }]);
 }
@@ -268,32 +304,48 @@ function holdsPage() {
 
 // ---- Theme ---------------------------------------------------------------------------------------------------
 
-// F198: the dark palette chosen (raw, as theme-boot.js reads it); F199's theme menu sets it. paletteFor() reads
-// anything but a known palette as OLED Black.
+// F198: the dark palette chosen (raw, as theme-boot.js reads it). F199: Theme > Dark sets it (settings' darkTheme,
+// stored at the same key); paletteFor() reads anything but a known palette as OLED Black.
 export function darkTheme(win = globalThis) {
   try { return win.localStorage?.getItem(DARK_THEME_KEY) ?? null; } catch { return null; }
+}
+
+// F199: Theme > Light and Theme > Dark are live previews: while one of their lists is the page on screen, the app
+// shows that tone in the theme picked there, whatever Mode says; back on Theme it shows Mode's again. Read off the
+// route (the URL hash), so it holds before the page is drawn and the moment back is tapped. theme-boot.js matches.
+const THEME_LISTS = { lightTheme: "light", darkTheme: "dark" };
+export function previewOf(route) {
+  if (route?.tab !== "home" || route.path[0] !== "settings") return null;
+  const [first, second] = pathOf({ path: route.path.slice(1) });
+  if (second && first !== "theme") return null;
+  return THEME_LISTS[second ?? first] ?? null;
+}
+function currentPreview(win) {
+  try { return previewOf(parse(win.location?.hash)); } catch { return null; }
 }
 
 export function applyTheme(doc = document, win = window) {
   const dark = win.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
   const appearance = settings.get("appearance");
-  const theme = themeFor(appearance, dark);
-  const chosen = darkTheme(win);
-  const palette = paletteFor(theme, chosen);
+  const lightTheme = settings.get("lightTheme");
+  const darkPalette = settings.get("darkTheme");
+  const preview = currentPreview(win);
+  const { theme, palette } = themeState({ appearance, lightTheme, darkTheme: darkPalette, preview }, dark);
   doc.documentElement.dataset.theme = theme;
-  doc.documentElement.dataset.palette = palette; // F198: OLED Black or Gunmetal in dark, classic in light
-  // A meta with a media query (light or dark) is painted for its own scheme while Appearance is Automatic; a fixed
-  // choice, or a meta with none (index.html has one), takes the palette showing now.
+  doc.documentElement.dataset.palette = palette; // F198/F199: Mode's tone in its chosen theme
+  // A meta with a media query (light or dark) is painted for its own scheme while Mode is Automatic; a fixed
+  // choice, a preview, or a meta with none (index.html has one), takes the palette showing now.
   // A fresh meta element, not a changed one: Safari doesn't always repaint its top bar when only `content` changes.
   for (const m of doc.querySelectorAll('meta[name="theme-color"]')) {
     const own = m.media?.includes("dark") ? "dark" : m.media?.includes("light") ? "light" : null;
-    const color = THEME_COLORS[appearance === "auto" && own ? paletteFor(own, chosen) : palette];
+    const color = THEME_COLORS[appearance === "auto" && own && !preview ? paletteFor(own, darkPalette, lightTheme) : palette];
     if (m.content === color) continue;
     const fresh = m.cloneNode();
     fresh.content = color;
     m.replaceWith(fresh);
   }
-  tellShell(appearance, theme, win, paletteFor("dark", chosen));
+  // A preview pins the shell to the tone on screen (its status bar and keyboard follow the page) until it ends.
+  tellShell(preview ? theme : appearance, theme, win, darkPalette);
 }
 
 // The jailbreak/sideload shell (F23): native parts the page can't style (keyboard, <select> pickers, alerts,
@@ -333,8 +385,9 @@ export function init() {
   applyZoom();
   for (const type of ["gesturestart", "gesturechange"]) document.addEventListener(type, stopPinch, { passive: false });
   window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => applyTheme());
+  window.addEventListener?.("hashchange", () => applyTheme()); // F199: a theme list's preview starts and ends
   settings.onChange((key) => {
-    if (key === "appearance") applyTheme();
+    if (key === "appearance" || key === "lightTheme" || key === "darkTheme") applyTheme();
     if (key === "resignReminder") remindNow();
   });
   startAccountSync(); // F97: read the account on launch, save it when iFizBox goes to the background

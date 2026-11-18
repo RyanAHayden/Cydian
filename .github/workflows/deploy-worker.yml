@@ -1,0 +1,23 @@
+# cydian.dev is one Cloudflare Worker (worker/): every push to main that touches the website or the Worker deploys
+# it, as the NAS's deploy.sh used to. Needs the repo secret CLOUDFLARE_API_TOKEN ("Edit Cloudflare Workers" template,
+# on the account that holds cydian.dev).
+name: Deploy cydian.dev
+on:
+  push:
+    branches: [main]
+    paths: ["web/app/**", "worker/**", ".github/workflows/deploy-worker.yml"]
+  workflow_dispatch:
+concurrency: { group: deploy-worker, cancel-in-progress: true }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node worker/test.mjs
+      - run: npx --yes wrangler@4 deploy -c wrangler.cydian.toml
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 3294c119d5a41f68889ebb549bb8b8bf

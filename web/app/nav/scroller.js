@@ -143,46 +143,71 @@ export function initScroller(screens) {
     glide = requestAnimationFrame(step);
   }
 
-  sb.addEventListener("pointerdown", (e) => {
-    if (!sb.classList.contains("on") || !body) return;
-    e.preventDefault();
+  // Grabbing takes a hold (user 2026-11-18: a swipe that starts on the bar scrolls the page, as on iOS): the bar
+  // itself never takes touches (pointer-events: none); a touch that starts on it (a finger-sized area around it)
+  // and stays still for HOLD ms grabs it: the haptic, the wider bar, and from then on the finger scrubs. Moving more
+  // than SLOP px first is an ordinary scroll, left to the browser.
+  const HOLD = 300, SLOP = 8;
+  let pending = null; // { id, x, y, timer } a touch that may become a grab
+  const onBar = (x, y) => {
+    if (!sb.classList.contains("on") || !body) return false;
+    const r = sb.getBoundingClientRect();
+    return x >= r.left - 26 && x <= r.right + 6 && y >= r.top - 12 && y <= r.bottom + 12;
+  };
+  const startGrab = (y) => {
     stopGlide();
-    grab = e.clientY - sb.getBoundingClientRect().top;
+    grab = y - sb.getBoundingClientRect().top;
     samples = [];
     // Stop the page's own momentum: a quick grab during a fling otherwise fights it (iOS keeps gliding the scroller
     // while we set scrollTop). overflow hidden ends a native fling at once; scrollTop still works while it's hidden.
     held = body;
     held.style.overflowY = "hidden";
-    sb.setPointerCapture?.(e.pointerId);
     sb.classList.add("grab");
     clearTimeout(hideTimer);
-    if (globalThis.cydianApp) haptic(); // the app's bridge can tick on touch-down; Safari only allows it on lift
-  });
-  sb.addEventListener("pointermove", (e) => {
+    if (globalThis.cydianApp) haptic(); // the app's bridge can tick any time; Safari only at the touch's end
+  };
+  document.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1 || grab !== null) return;
+    const t = e.touches[0];
+    if (!onBar(t.clientX, t.clientY)) return;
+    clearTimeout(hideTimer); // keep it showing while the finger decides
+    pending = { id: t.identifier, x: t.clientX, y: t.clientY, timer: setTimeout(() => {
+      if (pending) { const y = pending.y; pending = null; startGrab(y); }
+    }, HOLD) };
+  }, { capture: true, passive: true });
+  document.addEventListener("touchmove", (e) => {
+    const t = [...e.touches].find((x) => pending ? x.identifier === pending.id : true);
+    if (!t) return;
+    if (pending) {
+      if (Math.hypot(t.clientX - pending.x, t.clientY - pending.y) > SLOP) { clearTimeout(pending.timer); pending = null; }
+      return;
+    }
     if (grab === null || !body) return;
+    e.preventDefault(); // grabbed: the finger scrubs, the page doesn't pan
     const m = geom();
     if (m.h <= 1) return; // nothing to scrub on a page that fits
-    body.scrollTop = (e.clientY - grab - m.top) / (m.track - m.th) * m.h;
+    body.scrollTop = (t.clientY - grab - m.top) / (m.track - m.th) * m.h;
     const now = performance.now();
     samples.push([now, body.scrollTop]);
     while (samples.length > 2 && now - samples[0][0] > 80) samples.shift();
-  });
+  }, { capture: true, passive: false });
   const end = (e) => {
+    if (pending) { clearTimeout(pending.timer); pending = null; }
     if (grab === null) return;
     grab = null;
     sb.classList.remove("grab");
     if (held) { held.style.overflowY = ""; held = null; }
-    // Safari plays its switch haptic only inside a finished touch (pointerup counts, pointerdown doesn't).
-    if (e?.type === "pointerup" && !globalThis.cydianApp) haptic();
+    // Safari plays its switch haptic only inside a finished touch (touchend counts, a timer doesn't).
+    if (e?.type === "touchend" && !globalThis.cydianApp) haptic();
     const [a, z] = [samples[0], samples.at(-1)];
-    if (e?.type === "pointerup" && a && z && z[0] - a[0] > 10) {
+    if (e?.type === "touchend" && a && z && z[0] - a[0] > 10) {
       // ponytail: capped at 6 px/ms; a quick flick on the bar moves the content ~50x as far and flew off the end
       const v = Math.max(-6, Math.min(6, (z[1] - a[1]) / (z[0] - a[0])));
       if (Math.abs(v) > 0.3) fling(v);
     }
     draw();
   };
-  sb.addEventListener("pointerup", end);
-  sb.addEventListener("pointercancel", end);
+  document.addEventListener("touchend", end, { capture: true, passive: true });
+  document.addEventListener("touchcancel", end, { capture: true, passive: true });
   return sb;
 }

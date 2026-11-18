@@ -26,7 +26,7 @@ import * as browse from "./browse.js";
 import { catalog, ALL } from "../catalog.js";
 import { mergeCategories, indexLetter } from "../core/catalog.js";
 import { withLetterHeaders } from "../nav/vlist.js";
-import { format, settingsRoute } from "../router.js";
+import { format, mounted, parse, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { showHUD } from "../nav/hud.js";
@@ -644,11 +644,16 @@ async function install(file) {
     if (r?.bundleId) record(r.bundleId, r.name || name, r.version || entry?.version || "", entry?.options?.icon || entry?.icon);
   } });
   refresh();
-  const body = [...document.querySelectorAll(".page.is-top .page-body")].find((b) => b.isConnected);
-  if (body) {
-    const route = { tab: "installed", path: ipaPath(file) };
-    if (location.hash === format(route)) rerender(body, route);
-  }
+  const route = { tab: "installed", path: ipaPath(file) };
+  const body = shownBody(route);
+  if (body) rerender(body, route);
+}
+
+// The IPA's page body when it is on screen (its own tab, or mounted on Home's stack), else null. Only the active
+// tab's stack: every tab has an .is-top page, and Home's came first, so its root got the IPA's page (user 2026-11-18).
+export function shownBody(route) {
+  if (format(mounted(parse(location.hash))) !== format(route)) return null;
+  return document.querySelector(".tab-stack.is-active > .page.is-top .page-body");
 }
 
 // F95: the website's Install for one of the user's links, as an app page's (F92): the certificate alert, whose
@@ -779,9 +784,9 @@ async function saveOptions(file) {
   edits.delete(file);
   back();
   setTimeout(() => {
-    const body = [...document.querySelectorAll(".page.is-top .page-body")].at(-1);
     const route = { tab: "installed", path: ipaPath(file) };
-    if (body && location.hash === format(route)) rerender(body, route);
+    const body = shownBody(route);
+    if (body) rerender(body, route);
     refresh();
   }, 400);
 }

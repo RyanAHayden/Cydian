@@ -368,7 +368,7 @@ if (globalThis.cydianNative) {
   // that found nothing to say, GitHub's release, without the once-a-day wait (user 2026-11-17: only Settings' Check
   // for Updates showed it).
   const lookForUpdates = () => startEssential()
-    .then((r) => (["complete", "essential", "ignored"].includes(r) ? r : settingsScreen.checkUpdates({ always: true })))
+    .then((r) => (["complete", "essential", "ignored", "notified"].includes(r) ? r : settingsScreen.checkUpdates({ always: true })))
     .catch(() => {});
   setTimeout(lookForUpdates, 2000);
   globalThis.addEventListener("cydian:reloaded", lookForUpdates); // Home's Reload (screens/home.js reloadHome)

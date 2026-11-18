@@ -423,3 +423,16 @@ test("F61's sideload install takes installSelf when given (never the local serve
   deps.installSelf = async () => "cancelled";
   assert.equal(await runInstall({ version: "0.1.3", ipa: ROW.ipa }, "sideload", deps), "failed");
 });
+
+test("a Cydian update above the minimum: a banner (notify) instead of the alert; below it, the alert still blocks", async () => {
+  const { runEssential } = await import("./essential.js");
+  const row = { id: "com.ryha.cydian", version: "0.4.0" };
+  let notified = null, alerts = 0, queued = null;
+  const deps = (minimum) => ({ gather: async () => ({ current: "0.3.5", minimum, essential: [row], all: [row] }),
+    alert: async () => { alerts++; return { index: 1 }; }, complete: async () => {}, essentialOnly: async (r) => { queued = r; },
+    notify: (rows, upgrade) => { notified = rows; upgrade(); } });
+  assert.equal(await runEssential(deps("0.3.0")), "notified");
+  assert.deepEqual([notified, queued, alerts], [[row], [row], 0]); // Upgrade on the banner queues it
+  assert.equal(await runEssential(deps("0.4.0")), "essential");
+  assert.equal(alerts, 1);
+});

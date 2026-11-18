@@ -10,6 +10,7 @@
 // Either build, forced (below the minimum): Confirm's Cancel brings the alert back (core/essential.js queueEssential).
 // Nothing found to read (the built-in source never loaded, offline): resolves "unknown", and app.js falls back on
 // F61's GitHub check.
+import { showBanner } from "./nav/banner.js";
 import { runEssential, queueEssential, installSelf, selfFromAltSource, selfUpgradeRow, essentialIds, essentialUpgrades, minimumOf,
   isBuiltin, saveInfo, loadInfo, withSelfUpgrade, SELF_ALT_URL, SELF_ID } from "./core/essential.js";
 import { getBackend } from "./backend.js";
@@ -165,6 +166,16 @@ async function gather(mode) {
   return { current, minimum: minimumOf(self), essential: essentialUpgrades(upgrades.available, ids), all: upgrades.available };
 }
 
+// A Cydian update that isn't required: the iOS 6 banner, "Cydian X is out", with Upgrade (queues it, Confirm opens).
+// Once per version per session, so coming back to Cydian doesn't show it again.
+let bannered = null;
+function bannerOnce(rows, upgrade) {
+  const v = rows.find((r) => r.id === SELF_ID)?.version ?? rows[0]?.version ?? "";
+  if (!v || bannered === v) return;
+  bannered = v;
+  showBanner({ title: "Cydian", message: `Cydian ${v} is out.`, action: { label: "Upgrade", onClick: upgrade } });
+}
+
 let running = null;
 export function startEssential() {
   const mode = detectMode();
@@ -175,5 +186,6 @@ export function startEssential() {
     lock,
     complete: (all) => queueButton(mode, all, { everything: true }),
     essentialOnly: (rows) => queueButton(mode, rows),
+    ...(mode === "sideload" ? { notify: bannerOnce } : {}),
   }).finally(() => { running = null; }));
 }

@@ -8,7 +8,8 @@
 // "Open in Cydian?" for the website's Open in Cydian App, and "… would like to install …" for its installs.
 let current = null;
 
-export function showBanner({ title = "Cydian", message = "", icon = "icons/icon-glossy-76.png", duration = 0 } = {}) {
+// `action`: { label, onClick } puts a small blue button at the banner's right (Upgrade); a tap on it runs onClick.
+export function showBanner({ title = "Cydian", message = "", icon = "icons/icon-glossy-76.png", duration = 0, action = null } = {}) {
   current?.();
   const b = document.createElement("div");
   b.className = "banner";
@@ -20,6 +21,11 @@ export function showBanner({ title = "Cydian", message = "", icon = "icons/icon-
   text.append(Object.assign(document.createElement("strong"), { textContent: title }),
     Object.assign(document.createElement("span"), { textContent: message }));
   b.append(img, text);
+  if (action) {
+    const btn = Object.assign(document.createElement("button"), { type: "button", className: "bar-button done banner-action", textContent: action.label });
+    btn.addEventListener("click", (e) => { e.stopPropagation(); hide(); action.onClick?.(); });
+    b.append(btn);
+  }
   document.body.append(b);
   b.animate([{ transform: "translateY(-100%)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
   // The nav bar and the page slide down by the banner's height while it shows, so it covers no buttons.

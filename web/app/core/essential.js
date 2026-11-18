@@ -230,6 +230,9 @@ export async function runEssential(deps) {
   if (!essential.length) return "none";
   const forced = belowMinimum(info.current, info.minimum);
   const all = info.all?.length ? info.all : essential;
+  // Not below the minimum, where the build can tell the user quietly (deps.notify: the sideload app's banner with
+  // an Upgrade button): no blocking alert (user 2026-11-18).
+  if (!forced && deps.notify) { deps.notify(essential, () => deps.essentialOnly(essential)); return "notified"; }
   const ask = async () => {
     for (;;) {
       const { index } = await deps.alert(essentialAlert({ forced, minimum: info.minimum }));

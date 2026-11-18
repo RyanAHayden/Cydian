@@ -485,3 +485,4 @@ html.has-banner #navbar, html.has-banner #screens { transform: translateY(var(--
 html[data-theme="dark"] .ph-box, html[data-theme="dark"] .ph-bar { background: #3a3d42; }
 @keyframes ph-pulse { from { opacity: 1; } to { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .ph-box, .ph-bar { animation: none; } }
+.banner .banner-action { flex: none; margin-left: auto; margin-right: 4px; align-self: center; height: 30px; line-height: 28px; padding: 0 12px; font-size: 13px; }

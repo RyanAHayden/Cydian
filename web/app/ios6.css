@@ -450,3 +450,9 @@ input.sign-value { border: 0; padding: 0; margin: 0; background: none; font: inh
   content: ""; width: 25px; height: 20px; filter: drop-shadow(0 -1px 0 rgba(0,0,0,.45));
   background: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjExNDQgODQzIDUwIDQwIj48ZyBmaWxsPSIjZmZmIj48cGF0aCBkPSJNMTE5MiA4NTggMTE3NiA4NDVWODUzSDExNzNDMTE2Ny4xMyA4NTMgMTE1NiA4NTcuNzUgMTE1NiA4NzEgMTE1NiA4NzEuMTkgMTE2MS41OCA4NjMgMTE3MyA4NjNIMTE3NlY4NzFaIi8+PHBhdGggZD0iTTExODAgODczVjg3N0gxMTUwVjg1N0gxMTU4TDExNjAgODUzSDExNDZMMTE0NS45NyA4ODEuMDEgMTE4NCA4ODFWODcwWiIvPjwvZz48L3N2Zz4=") center / 25px 20px no-repeat;
 }
+
+/* Sources' Add while iOS's Paste bubble waits (screens/sources.js): a green "Paste", unlike any held or Done look. */
+.bar-button.paste-wait, .bar-button.paste-wait:active, .bar-button.paste-wait.is-pressed {
+  border-color: #2b6b1e; border-top-color: #30363e;
+  background: linear-gradient(#8fd36c, #4fa82e 49%, #3f9a20 51%, #44a024); background-origin: border-box;
+}

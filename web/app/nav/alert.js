@@ -71,9 +71,15 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
     const outside = (e) => { if (e.target === scrim && e.cancelable) e.preventDefault(); };
     scrim.addEventListener("touchstart", outside, { passive: false });
     scrim.addEventListener("mousedown", outside);
+    // iOS pans the whole page up to show a focused field, which shoved the bars and the list around behind the
+    // alert: undo the pan at once (scroll back to 0) and move only the box into the space above the keyboard.
     const vv = globalThis.visualViewport;
-    const fit = () => { box.style.translate = `0 ${Math.round(vv.offsetTop + vv.height / 2 - innerHeight / 2)}px`; };
+    const fit = () => {
+      if (scrollY || document.documentElement.scrollTop) scrollTo(0, 0);
+      box.style.translate = `0 ${Math.round(vv.offsetTop + vv.height / 2 - innerHeight / 2)}px`;
+    };
     if (vv) { fit(); vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit); }
+    if (field) field.addEventListener("focus", () => { requestAnimationFrame(fit); setTimeout(fit, 300); });
 
     const onKey = (e) => {
       if (e.key === "Escape") { e.preventDefault(); close(cancel); }

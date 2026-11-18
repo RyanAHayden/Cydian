@@ -171,7 +171,26 @@ export function openAppStore({ indexedDB: idb = globalThis.indexedDB, name = APP
 
 let shared = null;
 // Where IndexedDB is missing (Safari private mode can refuse it) the records last for this session only.
-export const apps = () => (shared ??= openAppStore().catch(() => memoryAppStore()));
+// The sideload app always lists itself, at the version it is (app.info), whatever was recorded: so Cydian's own
+// updates show in Installed and Changes like any app's. (The jailbreak app reads dpkg, which already has it.)
+export const apps = () => (shared ??= openAppStore().catch(() => memoryAppStore()).then(withSelf));
+
+export const SELF_ID = "com.ryha.cydian";
+let selfInfo = null;
+function selfRecord(native = globalThis.cydianNative) {
+  if (!native?.call) return Promise.resolve(null);
+  selfInfo ??= Promise.resolve().then(() => native.call("app.info", {})).then((i) => (i?.mode === "jailbreak" || !i?.version ? null
+    : { id: SELF_ID, name: "Cydian", version: String(i.version), key: null, source: null, sourceName: "Cydian",
+      icon: "icons/icon-glossy-76.png", date: 0, self: true }), () => null);
+  return selfInfo;
+}
+export function withSelf(store, native) {
+  return { ...store, all: async () => {
+    const recs = await store.all();
+    const me = await selfRecord(native);
+    return me ? [me, ...recs.filter((r) => r.id !== SELF_ID)] : recs;
+  } };
+}
 
 const appListeners = new Set();
 export function onAppsChange(f) {

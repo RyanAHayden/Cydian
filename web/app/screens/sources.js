@@ -36,12 +36,14 @@ const state = {
 const byKey = (key) => state.sources?.find((s) => s.key === key);
 
 async function addFromClipboard(ctx, button) {
+  // iOS's Paste bubble takes the touch, so the pointerup that would clear the held look never comes: clear it here.
+  button.classList.remove("is-pressed");
   button.textContent = "Paste";
-  button.classList.add("done", "paste-wait");
+  button.classList.add("paste-wait");
   let text = "";
   try { text = await navigator.clipboard.readText(); } catch { /* refused, or nothing to read */ }
   button.textContent = "Add";
-  button.classList.remove("done", "paste-wait");
+  button.classList.remove("paste-wait", "is-pressed");
   const url = cleanSourceUrl(text);
   manage.addSource(ctx, url ? { url } : null);
 }

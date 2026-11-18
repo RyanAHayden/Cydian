@@ -121,3 +121,11 @@ test("package page of an installed package no source carries comes from its stat
   assert.equal(c.package("org.herf.flux"), null);
   assert.deepEqual(c.has(["org.herf.flux"]), []);
 });
+
+test("the sideload app lists itself at its own version, ahead of any recorded copy", async () => {
+  const { withSelf, memoryAppStore, SELF_ID } = await import("./installed.js");
+  const native = { call: async (m) => (m === "app.info" ? { version: "0.2.0", mode: "sideload" } : null) };
+  const store = withSelf(memoryAppStore([{ id: SELF_ID, version: "0.1.0" }, { id: "a.b", version: "1" }]), native);
+  const all = await store.all();
+  assert.deepEqual(all.map((r) => [r.id, r.version]), [[SELF_ID, "0.2.0"], ["a.b", "1"]]);
+});

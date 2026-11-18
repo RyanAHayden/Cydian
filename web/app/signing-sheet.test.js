@@ -3,7 +3,7 @@
 // the re-sign reminder call. A fake cydianNative stands in for native/Sources/Sideload.swift.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { inspectAndInstall, followInstall } from "./signing-sheet.js";
+import { inspectAndInstall, followInstall, openLabel, openInstalled } from "./signing-sheet.js";
 import { installOnDevice } from "./signing-client.js";
 import {
   installParams, inspectGroups, isCgBI, fromBase64, certificateWarnings, revocationLabel, resignLabel, signedAppRows,
@@ -174,6 +174,38 @@ test("followInstall: no answer or no API just hides the HUD", async () => {
   assert.equal(ui.timers.length, 1);
   assert.equal(installedId({}, { bundleId: "b" }, INFO), "b");
   assert.equal(installedId(null, {}, INFO), "com.rileytestut.Delta");
+});
+
+test("followInstall (F155): on the progress page an installed app ends on Open <name>, which opens it by bundle ID", async () => {
+  const native = fakeNative({ "signing.progress": { installed: true }, "signing.openApp": { opened: true } });
+  const ui = fakeUI();
+  const ends = [];
+  const h = { ...ui.hud("Installing"), finish: (o) => ends.push(o) };
+  assert.equal(await followInstall(native, "com.me.delta", h, { later: ui.later, name: "Delta 2" }), true);
+  assert.equal(ui.labels.at(-1), "Installed");
+  assert.equal(ui.timers.length, 0); // the page stays, on its button
+  assert.equal(ends.length, 1);
+  assert.equal(ends[0].label, "Open Delta 2");
+  assert.equal(ends[0].status, "Installed");
+  assert.equal(await ends[0].action(), false); // the page closes once the app opens
+  assert.deepEqual(native.calls.at(-1), { method: "signing.openApp", params: { bundleId: "com.me.delta" } });
+
+  // not installed: Return to Cydian as before (hide), no Open
+  const no = { ...ui.hud("Installing"), finish: () => assert.fail() };
+  await followInstall(fakeNative({ "signing.progress": { installed: false } }), "com.a", no, { later: ui.later, name: "A" });
+  assert.equal(ui.hidden, 1);
+});
+
+test("openLabel and openInstalled: a long name cut, none says App; iOS refusing (or an older shell) is an alert", async () => {
+  assert.equal(openLabel("Delta"), "Open Delta");
+  assert.equal(openLabel(""), "Open App");
+  assert.equal(openLabel("A Very Long Application Name Indeed"), "Open A Very Long Application…");
+  const alerts = [];
+  const alert = async (a) => { alerts.push(a); };
+  assert.equal(await openInstalled(fakeNative({ "signing.openApp": { opened: false } }), "com.a", { alert }), false);
+  assert.equal(await openInstalled(fakeNative({ "signing.openApp": new Error("unknown method signing.openApp") }), "com.a", { alert }), false);
+  assert.equal(alerts.length, 2);
+  assert.equal(alerts[0].title, "Can't Open It");
 });
 
 test("certificateWarnings: revoked, and signatures ending within 7 days", () => {

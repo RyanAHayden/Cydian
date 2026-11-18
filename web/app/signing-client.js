@@ -318,7 +318,7 @@ export async function installFromLibrary({ file, name = "", onInstalled = () => 
   try { result = await libraryCall("install", { file, manifestServer: server }, onEvent, native); } catch (e) { return fail(e); }
   onInstalled(result);
   const followInstall = follow ?? (await import("./signing-sheet.js")).followInstall;
-  if (result?.bundleId) followInstall(bridge(native), result.bundleId, h, { later });
+  if (result?.bundleId) followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name });
   else later(() => (h.done ? h.done("Done") : h.hide()), 1200);
   return "installed";
 }

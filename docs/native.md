@@ -263,3 +263,80 @@ N2's text still says "a setuid binary (per R3)"; R3 put a note on N2.
   - a 2000-line stream;
   - error rejection.
 - **Not verified** until it runs on a phone (the desktop runs used `http://`).
+
+## Launch screen (N10, 2026-11-17)
+
+What opening the app shows before the page draws: Home as it loads, like the website's launch images
+(`tools/launch_images.py`, `web/app/icons/launch/`): the nav bar titled Cydian, the pinstripes with the Loading
+spinner in the middle, the tab bar with its six icons and Home selected. Before N10 the app showed black
+(`UILaunchScreen` was `{UIColorName: ""}`).
+
+**Constraints.** The app is built on Linux: no storyboard (no `ibtool`), no asset catalog (no `actool`, so no
+`Assets.car`). That leaves Info.plist's `UILaunchScreen` dictionary (iOS 14+). Keeping one at all matters: without
+`UILaunchScreen` or `UILaunchStoryboardName` iOS runs the app letterboxed at an old screen size.
+
+**What `UILaunchScreen` accepts** (Apple's Information Property List reference): `UIColorName` (background),
+`UIImageName` (an image shown at its natural size, centred), `UIImageRespectsSafeAreaInsets`, and `UINavigationBar`,
+`UITabBar`, `UIToolbar`, each a dict with an optional `UIImageName` for the bar's background. There is no title, no
+bar items and no per-screen image.
+
+- `UIColorName` names a colour set in an asset catalog. A colour has no loose-file form, so without `Assets.car`
+  there is no background colour: leave the key out (an empty one is the old black launch).
+- `UIImageName` is looked up by name in the bundle as `UIImage(named:in:)` does, and that finds loose
+  `Name@2x.png`/`Name@3x.png` files in the app's top folder as well as catalog images. Apple's docs only say "an
+  image in your asset catalog". **Whether SpringBoard's launch-screen renderer takes loose PNGs is not verified**
+  (no phone in this run): see "If it doesn't work" below.
+
+**What Cydian ships** (`native/Info.plist`, images in `native/launch/`, copied into both the .deb's and the IPA's
+`Cydian.app/` by `build.sh`):
+
+| key | image | what it is |
+|---|---|---|
+| `UIImageName` | `LaunchLoading@2x/@3x.png` | the pinstripes with Loading in the middle, as big as the largest screen of each scale (414x896 pt @2x, 440x956 pt @3x), so centred it fills any screen and the bars hide the edges |
+| `UIImageRespectsSafeAreaInsets` | `false` | centred on the whole screen, so the stripes go edge to edge |
+| `UINavigationBar` → `UIImageName` | `LaunchNavBar@2x/@3x.png` | the nav bar's 44 pt gradient (highlight on top, dark line below), 1 pt wide; UIKit stretches it across the bar |
+| `UITabBar` → `UIImageName` | `LaunchTabBar@2x/@3x.png` | the tab bar's 49 pt two-tone black, 1 pt wide |
+
+`native/launch/make.py` cuts them (stdlib only) from the website's `launch-828x1792.png` (@2x) and
+`launch-1179x2556.png` (@3x). Rerun it when those change; `test_native.py` fails until the two match.
+
+**What the system launch screen can't show:** the nav bar's "Cydian" and the tab bar's icons. A bar image is
+stretched to the bar's size, and the bar's height varies with the status bar (44 to 62 pt above the nav bar), so
+text or icons baked into it would be squashed on some phones. The bars are plain, and the title and icons come in
+a moment later with the app's own cover (below). The image is centred on the screen, while the page's spinner is
+centred between the bars, so the Loading block can sit up to about 10 pt off; the cover puts it in place.
+
+**No black flash after the launch screen** (`native/Sources/App.swift`):
+
+- The window's background is the pinstripes (an 8x1 pt pattern colour of `--pin-dark`/`--pin-light`), not black.
+- The WKWebView stays `isOpaque = false` with the pinstripes as its and its scroll view's background, and
+  `underPageBackgroundColor` (iOS 15+) is the light pinstripe colour.
+- **The app's cover:** until the page's first load ends (`didFinish`, or a failed load), a full-screen image view sits
+  over the web view showing this screen's exact website launch image (`web/icons/launch/launch-<W>x<H>.png` by
+  `UIScreen.nativeBounds`, already in the bundle). It then fades out over 0.2 s, onto `index.html`'s `#boot`, which
+  looks the same. So the title and icons appear as soon as the app's first frame is up, whatever the system launch
+  screen managed. On a screen with no website image (a new iPhone size) there is no cover, and the window's
+  pinstripes show until the page draws; add the size to `tools/launch_images.py`.
+- The cover and the launch images are the light theme. With Appearance set to Dark the page switches to dark when
+  the cover fades (the stored theme lives in the web view's localStorage, which the native side can't read before
+  the page loads).
+
+**Checked by the builds:** `mkdeb.py check` and `mkipa.py check` (through `native/launch_check.py`) refuse a bundle
+whose `UILaunchScreen` doesn't name the three images, lacks any of their @2x/@3x PNGs, has a `UIColorName`, or has
+no `web/icons/launch/launch-*.png`.
+
+**Testing on a phone.** iOS caches launch screens per app (SplashBoard snapshots) and may keep showing the old one
+after an update. If the launch still looks old, delete and reinstall the app, or reboot.
+
+**If it doesn't work** (the launch is white with white bars, or still black, after a reinstall): SpringBoard didn't
+take loose PNGs, and the images need a compiled `Assets.car`. Only Apple's `actool` writes one (CoreUI's
+undocumented BOM format; no Linux writer exists that I know of), so it takes one Mac run:
+
+1. Make `Launch.xcassets/` with `LaunchLoading.imageset`, `LaunchNavBar.imageset`, `LaunchTabBar.imageset` (each
+   a `Contents.json` listing the @2x and @3x PNGs from `native/launch/` with `"idiom": "universal"`) and
+   `LaunchBackground.colorset` (`--pin-light`, `#ced3dc`).
+2. `xcrun actool Launch.xcassets --compile out --platform iphoneos --minimum-deployment-target 15.0
+   --target-device iphone --output-partial-info-plist out/partial.plist`
+3. Commit `out/Assets.car` as `native/launch/Assets.car` (it holds only Cydian's own images), have `build.sh` copy
+   it into `Cydian.app/`, and add `UIColorName: LaunchBackground` to `UILaunchScreen` (and drop the `UIColorName`
+   refusal in `launch_check.py`). Rebuild it whenever the images change.

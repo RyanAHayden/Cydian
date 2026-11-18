@@ -14,6 +14,9 @@ import struct
 import sys
 import tarfile
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import launch_check  # noqa: E402
+
 PREFIX = "./var/jb/"
 APP = PREFIX + "Applications/Cydian.app/"
 HELPER = PREFIX + "usr/libexec/cydian/cydian-helper"
@@ -216,6 +219,8 @@ def check(path):
             png = files.get(APP + name + scale + ".png")
             if not png or not png[1].startswith(b"\x89PNG"):
                 problems.append("icon %s%s.png missing" % (name, scale))
+    # N10: the launch screen's keys and images (launch_check.py).
+    problems += launch_check.problems(info, {n: d for n, (_, d) in files.items()}, APP)
 
     summary = ""
     if exe not in files:

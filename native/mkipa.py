@@ -18,6 +18,7 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mkdeb import macho_info  # noqa: E402
+import launch_check  # noqa: E402
 
 APP = "Payload/Cydian.app/"
 # Entitlements only a jailbreak (or TrollStore) build may carry; a sideload signer would refuse or strip them.
@@ -134,6 +135,8 @@ def check(path):
             png = files.get(APP + name + scale + ".png")
             if not png or not png[1].startswith(b"\x89PNG"):
                 problems.append("icon %s%s.png missing" % (name, scale))
+    # N10: the launch screen's keys and images (launch_check.py).
+    problems += launch_check.problems(info, {n: d for n, (_, d) in files.items()}, APP)
 
     # The root helper and N5's upgrade daemon and its launchd job are the .deb's alone (T5).
     jailbreak_only = ("cydian-helper", "cydian-upgrades", "com.ryha.cydian.upgrades.plist")

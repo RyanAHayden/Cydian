@@ -1,7 +1,7 @@
 """N9: the share sheet and Open in Cydian.
 
-- SwiftShare: native/share/tests/main.swift, built on Linux with Share.swift, ../intents/Core.swift and
-  ../sign/Updates.swift, classifies shared links, text and files (repo, AltStore source, ipa, deb, unknown) and runs
+- SwiftShare: native/share/tests/main.swift, built on Linux with Share.swift, ../intents/Core.swift,
+  ../sign/Updates.swift and ../sign/Hash.swift (F133's SHA256), classifies shared links, text and files (repo, AltStore source, ipa, deb, unknown) and runs
   each mode's route against the fake helper (native/fake/cydian-helper, simulate-deb / install-deb / install-ipa)
   and a fake signer. Skips, and says so, without a Swift toolchain (SWIFT_TOOLCHAIN or swiftc on PATH).
 - Declared: the document types and UTTypes (.ipa, .deb) in both Info.plists, the cydian:// scheme in the jailbreak
@@ -72,7 +72,8 @@ class SwiftShare(unittest.TestCase):
             env["LD_LIBRARY_PATH"] = shim + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
         r = subprocess.run([SWIFTC, "-module-cache-path", os.path.join(cls.tmp, "modules"),
                             os.path.join(HERE, "Share.swift"), os.path.join(NATIVE, "intents", "Core.swift"),
-                            os.path.join(NATIVE, "sign", "Updates.swift"), os.path.join(HERE, "tests", "main.swift"),
+                            os.path.join(NATIVE, "sign", "Updates.swift"), os.path.join(NATIVE, "sign", "Hash.swift"),
+                            os.path.join(HERE, "tests", "main.swift"),
                             "-o", binary], capture_output=True, text=True, env=env, timeout=600)
         cls.build_error = None if r.returncode == 0 else (r.stdout + r.stderr)[-4000:]
         cls.out = None
@@ -97,7 +98,8 @@ class SwiftShare(unittest.TestCase):
                      "route: ipa in sideload mode is signed with the user's certificate (fake signer)",
                      "route: deb is the Confirm sheet in jailbreak mode, needs a jailbreak in sideload mode",
                      "jailbreak ipa: install-ipa through the helper, version for I3",
-                     "jailbreak deb: simulate-deb resolves dependencies, install-deb installs"):
+                     "jailbreak deb: simulate-deb resolves dependencies, install-deb installs",
+                     "F133: a downloaded .deb checked against its stanza's SHA256 or MD5sum"):
             self.assertIn("ok   " + name, self.out.stdout)
         self.assertIn("all passed", self.out.stdout)
 

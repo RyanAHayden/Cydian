@@ -54,7 +54,7 @@ test("APT: the installed version is marked, and listed even when no source offer
   assert.deepEqual(h.versions.filter((v) => v.installed).map((v) => v.version), ["1.0.16~rc2"]);
   c.setInstalled("Package: com.example.flip\nStatus: install ok installed\nVersion: 1.0.1\nName: Flip\n");
   const h2 = c.history("com.example.flip");
-  assert.deepEqual(h2.versions.at(-1), { version: "1.0.1", keys: [], size: null, debUrl: null, filename: null, candidate: false, installed: true });
+  assert.deepEqual(h2.versions.at(-1), { version: "1.0.1", keys: [], size: null, debUrl: null, filename: null, sha256: null, md5sum: null, candidate: false, installed: true });
   assert.equal(c.history("com.example.nothing"), null);
 });
 
@@ -63,7 +63,7 @@ test("APT: a package with one version, and an installed-only package", () => {
   assert.deepEqual(c.history("com.example.single").versions.map((v) => [v.version, v.candidate]), [["2", true]]);
   c.setInstalled("Package: com.example.gone\nStatus: install ok installed\nVersion: 0.9\nName: Gone\n");
   assert.deepEqual(c.history("com.example.gone"), { kind: "apt", id: "com.example.gone", name: "Gone",
-    versions: [{ version: "0.9", keys: [], size: null, debUrl: null, filename: null, candidate: false, installed: true }] });
+    versions: [{ version: "0.9", keys: [], size: null, debUrl: null, filename: null, sha256: null, md5sum: null, candidate: false, installed: true }] });
 });
 
 test("aptVersionList: dedupes, sorts by Debian version order, skips stanzas with no version", () => {

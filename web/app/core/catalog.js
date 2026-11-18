@@ -301,7 +301,8 @@ export function wordStart(s, q) {
 // ---- Version History (F29) ---------------------------------------------------------------------------------
 
 // APT: `offers` [{ key, stanza }] (every version every source lists) -> one entry per version, newest first:
-// { version, keys: [source keys carrying it], size, debUrl, filename, candidate, installed }. `candidate` is the
+// { version, keys: [source keys carrying it], size, debUrl, filename, sha256, md5sum, candidate, installed }. F133:
+// sha256 / md5sum are the hashes of the stanza that gave debUrl (null when it lists none). `candidate` is the
 // version the page shows; `installed` dpkg's. An installed version no source still offers is listed too (keys []),
 // so Downgrade (N4) sees where the phone stands.
 export function aptVersionList(offers, { candidate = null, installed = null } = {}) {
@@ -312,16 +313,27 @@ export function aptVersionList(offers, { candidate = null, installed = null } = 
     let o = byVersion.get(v);
     if (!o) {
       o = { version: v, keys: [], size: Number(stanza.size) > 0 ? Number(stanza.size) : null, debUrl: stanza.debUrl ?? null,
-        filename: stanza.filename ?? null, candidate: v === candidate, installed: v === installed };
+        filename: stanza.filename ?? null, ...stanzaHashes(stanza), candidate: v === candidate, installed: v === installed };
       byVersion.set(v, o);
     }
     if (!o.keys.includes(key)) o.keys.push(key);
-    if (!o.debUrl && stanza.debUrl) o.debUrl = stanza.debUrl;
+    if (!o.debUrl && stanza.debUrl) Object.assign(o, { debUrl: stanza.debUrl, ...stanzaHashes(stanza) });
   }
   if (installed && !byVersion.has(installed)) {
-    byVersion.set(installed, { version: installed, keys: [], size: null, debUrl: null, filename: null, candidate: installed === candidate, installed: true });
+    byVersion.set(installed, { version: installed, keys: [], size: null, debUrl: null, filename: null, sha256: null, md5sum: null,
+      candidate: installed === candidate, installed: true });
   }
   return [...byVersion.values()].sort((a, b) => compareVersions(b.version, a.version));
+}
+
+// F133: a Packages stanza's SHA256 and MD5sum (lowercase hex, else null), for the shell to check a download apt
+// doesn't make (F131's full-URL Filenames).
+function stanzaHashes(stanza) {
+  const hex = (v, n) => {
+    const t = String(v ?? "").trim().toLowerCase();
+    return t.length === n && /^[0-9a-f]+$/.test(t) ? t : null;
+  };
+  return { sha256: hex(stanza?.sha256, 64), md5sum: hex(stanza?.md5sum, 32) };
 }
 
 // AltStore: every versions[] entry of a parsed app (core/altstore.js parseApp), in the source's order (newest

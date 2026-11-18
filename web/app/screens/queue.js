@@ -28,7 +28,7 @@ import { getBackend } from "../backend.js";
 import { catalog } from "../catalog.js";
 import { installQueue, runLogs } from "../queue.js";
 import { MODES, MODE_LABEL, changeCount, parseStatusLine, consoleText, finishOf, FINISH_LABEL, runTitle, createRepeatFilter, CONFFILE_TITLE,
-  CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf } from "../core/queue.js";
+  CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf, debLinkOf } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 
@@ -199,13 +199,14 @@ export function openConfirm() {
 }
 
 // F131: each install job whose version's Filename is a full URL gets that link as `debUrl` (core/queue.js debUrlOf);
-// the native backend downloads those itself, since apt would join the link to the repo's URL and 404.
+// the native backend downloads those itself, since apt would join the link to the repo's URL and 404. F133: with the
+// stanza's hashes (debSha256, debMd5), which the shell checks the download against.
 async function withDebUrls(jobs) {
   return Promise.all(jobs.map(async (j) => {
     if (j.op !== "install") return j;
     try {
-      const url = debUrlOf(await catalog.history(j.id), j.version);
-      return url ? { ...j, debUrl: url } : j;
+      const link = debLinkOf(await catalog.history(j.id), j.version);
+      return link ? { ...j, ...link } : j;
     } catch {
       return j;
     }

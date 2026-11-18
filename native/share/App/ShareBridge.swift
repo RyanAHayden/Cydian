@@ -9,7 +9,9 @@
 //                               cydian://shared?route=… with the link. False for anything else.
 //   share.ipaInstall {file, stream}  jailbreak: cydian-helper install-ipa <staged>; -> {code: 0, stdout, stderr, bundleId,
 //                               name, version} (the version for I3), errors as ipa.install's (bad_ipa, no_adhoc, ...)
-//   share.debFetch {url}        jailbreak: a .deb link downloaded into the helper's directory -> {file, name}
+//   share.debFetch {url, sha256?, md5?}  jailbreak: a .deb link downloaded into the helper's directory -> {file, name,
+//                               checked: "SHA256" | "MD5" | null}; F133: with a hash (the Packages stanza's) a file
+//                               that doesn't match is removed and the call fails "bad_hash: …" (../Share.swift DebChecksum)
 //   share.debSimulate {file}    jailbreak: cydian-helper simulate-deb -> {ok, code, output, stdout, package, version}
 //   share.debInstall {file, stream}  jailbreak: cydian-helper install-deb, streamed as helper.run -> {code, stdout,
 //                               stderr}; the staged file is removed afterwards
@@ -152,7 +154,17 @@ enum ShareBridge {
                     try? FileManager.default.removeItem(at: dest)
                     return Apt.reply(c, nil, "not_deb: \(url.absoluteString) didn't give a Debian package")
                 }
-                Apt.reply(c, ["file": name, "name": url.lastPathComponent], nil)
+                // F133: hashing a large .deb takes a while; off the download's callback queue.
+                let sha = c.params["sha256"] as? String, md5 = c.params["md5"] as? String
+                SharedInbox.queue.async {
+                    if let bad = DebChecksum.check(dest, sha256: sha, md5: md5) {
+                        try? FileManager.default.removeItem(at: dest)
+                        return Apt.reply(c, nil, bad)
+                    }
+                    let kind: String? = DebChecksum.clean(sha) != nil ? "SHA256" : DebChecksum.clean(md5) != nil ? "MD5" : nil
+                    let checked: Any = kind ?? NSNull()
+                    Apt.reply(c, ["file": name, "name": url.lastPathComponent, "checked": checked], nil)
+                }
             }
         }
         b.on("share.debSimulate") { c in

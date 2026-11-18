@@ -130,3 +130,69 @@ import { PART, uploadCap } from "./src/index.js";
   assert.equal(none.status, 429); // no token: as before
   console.log("worker github token: ok");
 }
+
+// F97: Cydian Account: the size cap, the version check (409), delete, and KV never keyed by the id itself.
+import { account, MAX_ACCOUNT, rateLimiter, kvKey } from "./src/account.js";
+{
+  const kv = new Map();
+  const aenv = { HOSTED: {
+    put: async (k, v, o) => kv.set(k, { v, m: o?.metadata ?? null }),
+    getWithMetadata: async (k) => ({ value: kv.get(k)?.v ?? null, metadata: kv.get(k)?.m ?? null }),
+    delete: async (k) => { kv.delete(k); } } };
+  const id = "ab".repeat(32);
+  const send = (method, { body, headers = {}, limit = rateLimiter({ rate: 1000, writes: 1000 }), path = `/api/account/${id}` } = {}) =>
+    account(new Request("https://cydian.example" + path, { method, body, headers }), aenv, { limit });
+  const blob = (n, fill = 7) => new Uint8Array(n).fill(fill);
+
+  assert.equal((await send("GET")).status, 404);
+  assert.equal((await send("GET", { path: "/api/account/xyz" })).status, 404);
+  assert.equal((await send("POST")).status, 405);
+  // make it: If-None-Match: *
+  let r = await send("PUT", { body: blob(100), headers: { "If-None-Match": "*" } });
+  assert.equal(r.status, 201);
+  assert.equal(r.headers.get("ETag"), '"1"');
+  assert.deepEqual([...kv.keys()], [await kvKey(id)]);
+  assert.ok(![...kv.keys()][0].includes(id), "KV's key isn't the id");
+  r = await send("GET");
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("ETag"), '"1"');
+  assert.deepEqual(new Uint8Array(await r.arrayBuffer()), blob(100));
+  // a second device that made it too, or wrote without the version: 409 with the current ETag
+  r = await send("PUT", { body: blob(100, 1), headers: { "If-None-Match": "*" } });
+  assert.equal(r.status, 409);
+  assert.equal(r.headers.get("ETag"), '"1"');
+  assert.equal((await send("PUT", { body: blob(100, 1) })).status, 409);
+  // the right version replaces it; the old one then conflicts
+  r = await send("PUT", { body: blob(120, 2), headers: { "If-Match": '"1"' } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { version: 2 });
+  r = await send("PUT", { body: blob(120, 3), headers: { "If-Match": '"1"' } });
+  assert.equal(r.status, 409);
+  assert.equal(r.headers.get("ETag"), '"2"');
+  assert.deepEqual(new Uint8Array(await (await send("GET")).arrayBuffer()), blob(120, 2));
+  // the size cap: by the header, and by what really came
+  assert.equal((await send("PUT", { body: blob(MAX_ACCOUNT + 1), headers: { "If-Match": '"2"' } })).status, 413);
+  const big = new ReadableStream({ start(c) { c.enqueue(blob(MAX_ACCOUNT)); c.enqueue(blob(10)); c.close(); } });
+  r = await account(new Request(`https://cydian.example/api/account/${id}`, { method: "PUT", body: big, duplex: "half",
+    headers: { "If-Match": '"2"' } }), aenv, { limit: rateLimiter({ rate: 9, writes: 9 }) });
+  assert.equal(r.status, 413);
+  assert.equal((await send("PUT", { body: blob(MAX_ACCOUNT), headers: { "If-Match": '"2"' } })).status, 200);
+  assert.equal((await send("PUT", { body: blob(5), headers: { "If-Match": '"3"' } })).status, 400); // too short to be ciphertext
+  // delete, then it's gone
+  assert.equal((await send("DELETE")).status, 200);
+  assert.equal((await send("GET")).status, 404);
+  assert.equal(kv.size, 0);
+  // per address: writes run out before reads
+  const lim = rateLimiter({ rate: 2, writes: 1 });
+  assert.equal((await send("PUT", { body: blob(40), headers: { "If-None-Match": "*" }, limit: lim })).status, 201);
+  assert.equal((await send("PUT", { body: blob(40), headers: { "If-Match": '"1"' }, limit: lim })).status, 429);
+  assert.equal((await send("GET", { limit: lim })).status, 200);
+  assert.equal((await send("GET", { limit: lim })).status, 429);
+  assert.ok(lim.allow("?", true, Date.now() + 61000), "a new minute");
+  // through the Worker: the route, and CORS for the app's cydian://app page
+  const pre = await w.fetch(new Request(`https://cydian.example/api/account/${id}`, { method: "OPTIONS" }), aenv);
+  assert.match(pre.headers.get("Access-Control-Allow-Methods"), /PUT/);
+  assert.match(pre.headers.get("Access-Control-Allow-Headers"), /If-Match/);
+  assert.equal((await w.fetch(new Request(`https://cydian.example/api/account/${id}`), aenv)).headers.get("Access-Control-Expose-Headers"), "ETag");
+  console.log("worker account: ok");
+}

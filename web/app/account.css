@@ -1,0 +1,6 @@
+/* F97: Settings > Account (screens/account.js). The rows are grouped()'s; only the key and Delete Account are drawn here. */
+.account-code .cell-label { font-size: 18px; letter-spacing: 0; white-space: normal; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+.account-qr img { max-width: 240px; }
+/* Delete Account: the action sheet's red button (packages.css .action-button.destructive), full width like iOS 6's Delete Account */
+.account-delete-wrap { display: flex; padding: 10px 10px 30px; }
+.account-delete { flex: 1; }

@@ -10,13 +10,14 @@
 //                                      N9: also an APT repo or AltStore source shared with Cydian
 //   cydian://shared?route=…            N9: an .ipa or .deb shared with Cydian, or why not (share.js)
 //   cydian://package?id=<id>           F96: the website's Install in Cydian: that app's page (Search's package:<id>)
+//   cydian://account?k=<key>           F97: a Cydian Account's link or QR code: Sign In With Key, filled in
 //   altstore://source?url=…, feather://install/<ipa>, …   F83: other sideloaders' links (core/otherlinks.js), when
 //                                      Settings > Sideloading > Open Other Apps' Links is on: a source goes to Sources >
 //                                      Manage's Add, filled in; an IPA to Install IPAs, then Install (signAndInstall).
 //                                      Off, or a link Cydian has no use for: handed back (handBack below)
 //
 //   startIncoming({ native })          once, in the app
-//   await handleIncoming(url, deps)    -> "import" | "install" | "myipas" | "add" | "shared" | "package" | "other-source" |
+//   await handleIncoming(url, deps)    -> "import" | "install" | "myipas" | "add" | "shared" | "package" | "account" | "other-source" |
 //                                         "other-install" | "other-app" | null (not one of ours)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showAlert } from "./nav/alert.js";
@@ -46,7 +47,7 @@ export function startIncoming({ native = globalThis.cydianNative } = {}) {
 }
 
 export async function handleIncoming(url, { native = globalThis.cydianNative, alert = showAlert, hud = showHUD,
-  review = null, add = null, shared = null, install = null, on = otherLinksOn, open = goHash, now = Date.now } = {}) {
+  review = null, add = null, shared = null, install = null, signIn = null, on = otherLinksOn, open = goHash, now = Date.now } = {}) {
   const u = String(url ?? "");
   if (/^cydian:\/\/install\b/i.test(u)) {
     const ask = installAsk(u);
@@ -75,6 +76,11 @@ export async function handleIncoming(url, { native = globalThis.cydianNative, al
     const id = packageIdOf(u);
     if (id) open(format({ tab: "search", path: [`package:${id}`] }));
     return "package";
+  }
+  if (/^cydian:\/\/account\b/i.test(u)) {
+    const run = signIn ?? (await import("./screens/account.js")).signInFromLink;
+    await run(u, { open });
+    return "account";
   }
   if (/^cydian:\/\/import\b/i.test(u)) {
     const run = review ?? (await import("./screens/importlink.js")).reviewAndImport;

@@ -452,10 +452,6 @@ input.sign-value { border: 0; padding: 0; margin: 0; background: none; font: inh
 }
 
 /* Sources' Add while iOS's Paste bubble waits (screens/sources.js): a green "Paste", unlike any held or Done look. */
-.bar-button.paste-wait, .bar-button.paste-wait:active, .bar-button.paste-wait.is-pressed {
-  border-color: #2b6b1e; border-top-color: #30363e;
-  background: linear-gradient(#8fd36c, #4fa82e 49%, #3f9a20 51%, #44a024); background-origin: border-box;
-}
 
 /* Cydia's Sources badge while sources refresh: the red badge holding a white spinner (4S screenshots). */
 .badge.spinning { position: absolute; width: 20px; padding: 0; }

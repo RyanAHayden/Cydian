@@ -46,18 +46,22 @@ function reset(button) {
   parent.insertBefore(button, next);
 }
 
+// Add: asks iOS for the clipboard. While iOS's Paste bubble is up the button turns blue and reads Type: tapping it
+// (or anywhere but another button) dismisses the bubble and opens the Enter APT URL alert to type one in.
 async function addFromClipboard(ctx, button) {
   reset(button);
-  button.textContent = "Paste";
-  button.classList.add("paste-wait");
-  let text = "", refused = false;
-  try { text = await navigator.clipboard.readText(); } catch { refused = true; }
+  button.textContent = "Type";
+  button.classList.add("done"); // the blue Done look (sources.css)
+  let elsewhere = false; // a touch on another button while the bubble was up: that button's tap wins
+  const watch = (e) => { const b = e.target.closest?.(".bar-button, .tab"); if (b && b !== button) elsewhere = true; };
+  document.addEventListener("pointerdown", watch, true);
+  let text = "";
+  try { text = await navigator.clipboard.readText(); } catch { /* dismissed: type it in */ }
+  document.removeEventListener("pointerdown", watch, true);
   button.textContent = "Add";
-  button.classList.remove("paste-wait");
+  button.classList.remove("done");
   reset(button);
-  // The bubble dismissed (a tap elsewhere, Manage included) or the page left Sources: that tap wins, no popup.
-  if (refused && navigator.clipboard?.readText) return;
-  if (!button.isConnected || !/^#\/sources\/?$/.test(location.hash)) return;
+  if (elsewhere || !button.isConnected || !/^#\/sources\/?$/.test(location.hash)) return;
   const url = cleanSourceUrl(text);
   manage.addSource(ctx, url ? { url } : null);
 }

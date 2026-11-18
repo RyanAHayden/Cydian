@@ -168,9 +168,15 @@ const router = createRouter({
       }
       tabbar.select(r.tab);
     }
+    // A link into another tab's page (Home's Install IPAs): the tab comes forward and the page slides in over that
+    // tab's own page, as a push, instead of appearing at once.
+    const under = r.kind === "tab" && r.from && r.added.length && !r.removed.length && all.length > 1 ? all[all.length - 2] : null;
     if (r.kind === "push" && r.from) {
       setTop(r.to, true);
       slide(r.to, r.from, 0, 1, () => setTop(r.from, false));
+    } else if (under) {
+      for (const e of all) setTop(e, e === r.to || e === under);
+      slide(r.to, under, 0, 1, () => setTop(under, false));
     } else if (r.kind === "pop" && !swipedBack && !(webBack && !ownBack)) {
       const [old, ...deeper] = r.removed;
       drop(deeper);
@@ -349,6 +355,14 @@ if (globalThis.cydianNative) import("./incoming.js").then((m) => m.startIncoming
 
 if (globalThis.cydianNative) {
   setTimeout(() => startEssential().then((r) => (r === "unknown" ? settingsScreen.checkUpdates() : r)).catch(() => {}), 2000);
+  // Back in the foreground after a while: look again (an essential update can come out while Cydian sits in the
+  // background, and iOS rarely cold-launches it). ponytail: at most every 10 minutes.
+  let lastEssential = Date.now();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || Date.now() - lastEssential < 10 * 60 * 1000) return;
+    lastEssential = Date.now();
+    startEssential().catch(() => {});
+  });
 }
 
 // Upgrade alerts (F10): register the service worker and, if opted in, re-subscribe (iOS drops subscriptions now

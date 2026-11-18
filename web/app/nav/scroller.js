@@ -101,8 +101,9 @@ export function initScroller(screens) {
   function bounce(el, v) {
     const d = Math.min(80, Math.abs(v) * 22) * (v < 0 ? 1 : -1);
     if (Math.abs(d) < 4) return;
-    el.animate([{ transform: "none" }, { transform: `translateY(${d}px)`, offset: 0.28, easing: "cubic-bezier(.25,.1,.25,1)" },
-      { transform: "none" }], { duration: 520, easing: "cubic-bezier(.33,0,.2,1)" });
+    // Out quickly (the speed it hit with), then UIKit's slow settle back (user 2026-11-17: 520 ms snapped too fast).
+    el.animate([{ transform: "none", easing: "cubic-bezier(.15,.6,.35,1)" }, { transform: `translateY(${d}px)`, offset: 0.2,
+      easing: "cubic-bezier(.3,0,.15,1)" }, { transform: "none" }], { duration: 950 });
   }
 
   function fling(v) {

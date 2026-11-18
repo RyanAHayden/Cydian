@@ -443,6 +443,10 @@ if (globalThis.cydianNative) {
     if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
     if (!hiddenAt || Date.now() - hiddenAt < 2 * 60 * 1000) return;
     hiddenAt = 0;
+    // Home's root at its top, not where it was scrolled (user 2026-11-18). go's hashchange is async: scroll after it.
+    const toTop = () => { const b = stacks.top()?.page.body; if (b) b.scrollTop = 0; };
+    if (location.hash === format({ tab: "home", path: [] })) toTop();
+    else addEventListener("hashchange", toTop, { once: true });
     router.go({ tab: "home", path: [] });
     if (refreshOnLaunch()) SCREENS.sources.refreshInBackground?.(ctx);
   });

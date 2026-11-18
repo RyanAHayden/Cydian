@@ -114,6 +114,8 @@ final class IPASigner {
         cut = cut.filter { c in !cut.contains { $0 != c && c.hasPrefix($0) } }
         for c in cut { removed.append(String(c.dropFirst(appDir.count).dropLast())); }
         bundles = bundles.filter { k, _ in !cut.contains { k.hasPrefix($0) } }
+        log("App \(appDir.dropFirst(8).dropLast()): \(oldID)" + (newID == oldID ? "" : " -> \(newID)") + ", \(zip.entries.count) files")
+        for r in removed { log("Left out \(r)" + (profile.isWildcard ? "" : " (the profile covers one app ID)")) }
         func gone(_ name: String) -> Bool { dropped(name) || cut.contains { name.hasPrefix($0) } }
 
         // New bundle IDs: the app's, and the extensions' that start with the app's old one.
@@ -163,6 +165,7 @@ final class IPASigner {
             doneBytes += e.size
             progress?("reading", Double(doneBytes) / Double(totalBytes))
         }
+        log("Read \(kept.count) files (\(ByteCountFormatter.string(fromByteCount: Int64(totalBytes), countStyle: .file))), \(machos.count) Mach-O, \(bundles.count) bundles to sign")
         for (path, d) in changed { files[path] = .data(d, mode: 0o100644) }
         // The user's name in the app's own localisations, and the user's icon (F14).
         if options.name != nil {
@@ -212,9 +215,12 @@ final class IPASigner {
                                             infoPlist: infoData, codeResources: resources)
                 files[exe] = .data(try MachO.sign(data, params, identity, time: time), mode: mode(exe, files))
             }
+            let rel = dir == appDir ? String(appDir.dropFirst(8).dropLast()) : String(dir.dropFirst(appDir.count).dropLast())
+            log("Signed \(rel) (\(id))" + (isApp ? ", with the profile's entitlements" : ""))
             progress?("signing", Double(n + 1) / Double(dirs.count))
         }
 
+        for f in fixedArm64e { log("Fixed the old arm64e slice of \(f)") }
         // Write: kept entries in their order (copied raw when untouched), then the new files.
         let out = try ZipWriter(url: output)
         var written = Set<String>()

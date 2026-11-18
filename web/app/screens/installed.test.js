@@ -26,7 +26,10 @@ test("installed tab: an app row says the upgrade, the source and the date", () =
 test("installed tab: My IPAs pages without a jailbreak (F77)", async () => {
   assert.equal(pageKind(r("myipas"), "sideload"), "myipas");
   assert.equal(pageKind(r("myipas", "ipa:A.ipa"), "site"), "myipas");
-  assert.equal(pageKind(r("myipas"), "jailbreak"), "browse");
+  assert.equal(pageKind(r("myipas"), "jailbreak"), "myipas"); // F209: not Not Found in the jailbreak app
+  assert.equal(pageKind(r("myipas", "ipa:A.ipa"), "jailbreak"), "myipas");
+  assert.equal(pageKind(r("myipas", "apps"), "jailbreak"), "myipas");
+  assert.equal(pageKind(r(APPS), "jailbreak"), "apps"); // the jailbreak app's Apps page is unchanged
   const { myIpasRow } = await import("./installed.js");
   assert.equal(myIpasRow(r(), false).href, "#/installed/myipas");
   assert.equal(myIpasRow(r(), false).label, "Install IPAs"); // F79: the page is Install IPAs now

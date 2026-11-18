@@ -14,6 +14,7 @@
 // app's one queue (queue.js), which opens the Confirm sheet (screens/queue.js); simulate(jobs) is `apt-get -s` over
 // it, apply(jobs, onEvent) runs it with the console streaming, respring() restarts SpringBoard. All through
 // cydian-helper's simulate | apply | respring verbs (native/helper/README.md).
+// F64: cancelApply() stops a running apply before dpkg starts (helper.cancel).
 //
 // Roll Back (F71, jailbreak build): rollbacks(id) lists the .debs N7's daemon kept when automatic updates replaced
 // a version (cydian-helper rollbacks), [{ version, file }] newest first; rollback(id, version, onEvent) installs one
@@ -159,6 +160,9 @@ function queueCalls(backend, q, call) {
     apply: (jobs, onEvent) => run([onEvent ? "apply-ask" : "apply", ...queueWords(jobs)], onEvent),
     // F63: the Configuration Upgrade answer for the running apply: "keep" (Keep My Old Copy) or "new".
     answerConffile: async (answer) => { await call("helper.answer", { answer }); },
+    // F64: Cancel the running apply while apt is still downloading. Rejects BackendError("helper") once dpkg has
+    // started (the console hides its Cancel there anyway) or when nothing runs. The run then resolves with code 130.
+    cancelApply: async () => { await call("helper.cancel", {}); },
     // F71: [] when nothing is stored, or the helper can't list (not installed, or an older one without the verb).
     async rollbacks(id) {
       let r;

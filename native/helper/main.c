@@ -6,7 +6,8 @@
  *   cydian-helper simulate <item>... | apply <item>... | respring      (N4: the install queue; item: name,
  *                                                                        name=version or -name)
  *   cydian-helper apply-ask <item>...        (F63: apply, but dpkg asks about changed conffiles; answers "Y"/"N"
- *                                             lines on stdin, relayed to apt-get by ask_relay below)
+ *                                             lines on stdin, relayed to apt-get by ask_relay below; F64: a "C"
+ *                                             line is Cancel, SIGINT to apt-get)
  *   cydian-helper install-ipa <path>            (F59: an IPA the app downloaded, installed through installd as
  *                                                AppSync's appinst does; ipa.c. Exit 69: can't install ad hoc)
  *   cydian-helper selfupdate <path.deb>                                 (F61: dpkg -i of Cydian's own update)
@@ -111,7 +112,13 @@ static int ask_relay(const struct helper_plan *plan, char *const env[], int answ
                 else skipping = 1; /* too long to be an answer */
                 continue;
             }
-            if (!skipping && helper_answer_ok(line, used)) {
+            if (!skipping && helper_cancel_ok(line, used)) {
+                /* F64: Cancel. SIGINT, as Ctrl-C would: while apt downloads it stops there (nothing is unpacked; the
+                 * partial files stay for next time); once dpkg runs, apt lets the current dpkg call finish and stops
+                 * after it. The app only sends it before apt's first pmstatus line. */
+                fprintf(stderr, "cydian-helper: cancelled: stopping apt-get\n");
+                kill(pid, SIGINT);
+            } else if (!skipping && helper_answer_ok(line, used)) {
                 char out[2] = {line[0], '\n'};
                 if (write(in[1], out, 2) != 2) { /* dpkg stopped reading: nothing to tell it */ }
             } else {

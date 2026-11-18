@@ -12,7 +12,9 @@
 //      a changed package hooks SpringBoard (or a script asked, $CYDIA), else Return to Cydian. The run's output is
 //      kept (queue.js runLogs) for Settings > Console Logs (logsPage below). A conffile changed by both the user and
 //      the package opens Cydia's Configuration Upgrade alert (F63): Keep My Old Copy or Accept The New Copy, sent
-//      back to dpkg through backend.answerConffile while the run waits.
+//      back to dpkg through backend.answerConffile while the run waits. While apt is still downloading (no dpkg
+//      status line yet) the bar has Cydia's Cancel (F64, backend.cancelApply): the run stops, nothing is installed
+//      and the queue stays.
 //
 // While the queue holds packages: they are marked in every list (browse.js), the Installed tab's badge reads Q'd
 // and its nav bar has a Queue button that reopens Confirm. Styles: queue.css.
@@ -313,7 +315,11 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
   updateChrome();
   const close = barButton("Close");
   close.hidden = true;
-  const m = modal({ title: "Running", right: close, cls: "console" });
+  // F64: Cancel while apt only downloads (a queue run, apply-ask: the helper reads its stdin); gone once dpkg starts.
+  const canCancel = asks && typeof getBackend().cancelApply === "function";
+  const cancel = barButton("Cancel");
+  cancel.hidden = !canCancel;
+  const m = modal({ title: "Running", left: cancel, right: close, cls: "console" });
   m.scroll.className = "sheet-scroll console-scroll";
   const out = el("div", "console-out");
   out.setAttribute("role", "log");
@@ -356,6 +362,22 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
   } catch { /* the scripts' own finish lines still count */ }
 
   let result = null, error = null, ended = false;
+  let cancelled = false, dpkg = false;
+  const dpkgStarted = () => { dpkg = true; cancel.hidden = true; };
+  cancel.addEventListener("click", async () => {
+    if (cancel.disabled || dpkg || ended) return;
+    cancel.disabled = true;
+    statusText.textContent = "Cancelling";
+    try {
+      await getBackend().cancelApply();
+      cancelled = true;
+      cancel.hidden = true;
+    } catch (e) {
+      if (ended) return;
+      line("error", `Couldn't cancel: ${e.message || String(e)}`);
+      if (dpkg) cancel.hidden = true; else cancel.disabled = false;
+    }
+  });
   // F63: dpkg waits on one question at a time; alerts are shown one after another all the same.
   let asking = Promise.resolve();
   const ask = (file) => {
@@ -375,6 +397,7 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
   try {
     result = await run(({ fd, line: raw }) => {
       if (fd === "status") {
+        if (!dpkg && /^pm(status|conffile|error):/.test(raw)) dpkgStarted();
         const s = parseStatusLine(raw);
         if (s.type === "finish") { finish = finishOf(finish, s.finish); return; }
         if (s.type === "conffile") {
@@ -399,10 +422,14 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
     error = e;
   }
   ended = true;
+  cancel.hidden = true;
   flush();
 
   const ok = result?.code === 0 && !error;
+  // F64: the helper stopped apt before dpkg ran (SIGINT: exit 130). A run that went through anyway counts as done.
+  const stopped = cancelled && !ok && !dpkg;
   if (error) line("error", error.message || String(error));
+  else if (stopped) line("status", "Cancelled. Nothing was installed or removed; the queue is kept.");
   else if (!ok) {
     line("error", `apt-get stopped with exit code ${result.code}. Nothing after the error above was done.`);
     try {
@@ -413,7 +440,7 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
   flush();
   setProgress(100);
   m.setTitle("Complete");
-  statusText.textContent = ok ? "Done" : "Failed";
+  statusText.textContent = ok ? "Done" : stopped ? "Cancelled" : "Failed";
 
   runLogs.add({ title: title ? title(names) : runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] }))), jobs: jobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode })),
     code: error ? -1 : result.code, text: log.join("\n") });

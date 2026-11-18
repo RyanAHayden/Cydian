@@ -492,6 +492,18 @@ class Helper(unittest.TestCase):
         out = ask("close", "Y", "apply", "com.repo.tweak")
         self.assertIn("1: stdin: eof", out)
 
+    def test_chain_apply_ask_cancel(self):
+        """F64: a "C" line on apply-ask's stdin is Cancel: never passed to apt, which gets SIGINT instead (the fake
+        apt-get is waiting on its stdin, so it dies of it: exit 128 + 2)."""
+        p, app, helper = self.chain_prefix()
+        r = subprocess.run([app, "spawn-ask", "keep", helper, "apply-ask", "com.repo.tweak"], capture_output=True,
+                           text=True, timeout=30, env={**os.environ, "TEST_ANSWERS": "C"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = r.stdout.splitlines()
+        self.assertIn("2: cydian-helper: cancelled: stopping apt-get", out)
+        self.assertFalse([l for l in out if l.startswith("1: stdin:")], out)
+        self.assertEqual(out[-1], "exit: 130")
+
     def test_chain_holds(self):
         p, app, helper = self.chain_prefix()
         out = self.run_driver("spawn", helper, "hold", "installed.one", driver=app)

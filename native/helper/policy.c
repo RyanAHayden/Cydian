@@ -292,6 +292,11 @@ int helper_answer_ok(const char *line, size_t len) {
     return len == 1 && (line[0] == 'Y' || line[0] == 'N');
 }
 
+int helper_cancel_ok(const char *line, size_t len) {
+    if (len && line[len - 1] == '\r') len--;
+    return len == 1 && line[0] == 'C';
+}
+
 /* N4: respring: Restart SpringBoard at the end of a run. sbreload when the jailbreak has it, else killall
  * backboardd (which takes SpringBoard with it), both from the prefix. */
 static int respring_plan(int argc, const char *prefix, struct helper_plan *p, const char **err) {

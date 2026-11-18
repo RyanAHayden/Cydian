@@ -5,8 +5,8 @@
 //                               a certificate that was imported doesn't show
 //   signing.import {p12, password, profile}   (both files base64) -> status; the .p12 goes into the Keychain
 //   signing.remove              forgets the identity, the kept .p12 and the profile -> status
-//   signing.export              F73: {p12, profile, password} (files base64) as imported, for the Signing Server when
-//                               Cydian updates itself (essential-ui.js installSelf, which asks the user first) | null
+//   signing.export              F73: {p12, profile, password} (files base64) as imported, for Cydian Account's
+//                               certificate sync (screens/account.js) | null
 //                               when there is no certificate or it was imported before F73
 //   signing.install {url, manifestServer} (stream: {phase: "downloading"|"reading"|"signing"|"installing", progress})
 //                               downloads, signs and opens the itms-services link -> {bundleId, originalBundleId,

@@ -9,7 +9,7 @@ also posts a local notification: "3 Upgrades" / "3 upgrades: A, B and C.".
   `test_driver.c`). Upgrades are the `Inst <id> [<from>] (<to> …)` lines of `apt-get -s dist-upgrade` whose versions
   differ, so new dependencies don't count, and apt already leaves held packages (Ignored Upgrades) out. Names come
   from dpkg's status (`Name:`) and fall back to the id. A notification goes up only when some `id=version` isn't in
-  the state file (push.py `decide`), so the same "3 upgrades" doesn't show again every day. A check is due when the
+  the state file, so the same "3 upgrades" doesn't show again every day. A check is due when the
   last one is 23 hours old or more.
 - `main.m`: the daemon (N7: the facts and apt calls behind `auto_step`). Flags: `--force` (check now), `--no-update`, `--dry-run` (print the count and words, post
   nothing). It runs apt from `/var/jb/usr/bin` with a clean environment and time limits (update 10 min, plan

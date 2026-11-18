@@ -14,7 +14,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         let notices = ["cydian.updating", "cydian.updated"]
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: notices)
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: notices)
-        SignBridge.importBundled() // F75: the certificate the Signing Server put inside Cydian's own IPA
+        SignBridge.importBundled() // F75: the certificate the website put inside Cydian's own IPA (bring, F93)
         BackgroundCheck.register() // I3: before launch ends, as BGTaskScheduler requires (sideload build)
         return true
     }

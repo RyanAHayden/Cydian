@@ -14,7 +14,7 @@
 // The Essential Upgrade alert, Cydia's (docs/cydia.md ESSENTIAL_UPGRADE) in Cydian's words: on launch, when Cydian
 // itself (or, in the jailbreak build, apt, dpkg or anything installed with Essential: yes) has an upgrade:
 //   Complete Upgrade      every upgrade in Changes
-//   Essential Only        just the essential ones (sideload: Cydian itself, signed on the Signing Server)
+//   Essential Only        just the essential ones (sideload: Cydian itself, signed on the phone)
 //   Ignore (Temporary)    asks again on the next launch
 // Cydian's own source may name a minimum version (AltStore "minimumVersion", APT X-Cydian-Minimum-Version): a
 // running Cydian older than that gets the alert without Ignore, and nothing else is usable until it upgrades.

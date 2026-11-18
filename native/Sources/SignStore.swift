@@ -1,7 +1,7 @@
 // The sideload build's signing identity (I6): the user's .p12 goes into the iOS Keychain (this device only, never
 // synced or backed up) and is used there. F73: the imported .p12 file and its password are also kept, as one Keychain
-// generic-password item (this device only), so signing.export can hand them to the Signing Server when Cydian updates
-// itself (essential-ui.js installSelf); signing.remove deletes it with the identity. The profile is a plain file in
+// generic-password item (this device only), so signing.export can hand them to Cydian Account's certificate sync
+// (screens/account.js); signing.remove deletes it with the identity. The profile is a plain file in
 // Application Support (it holds no secret). docs/signing.md, "On the phone (I6)".
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation

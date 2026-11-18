@@ -1,4 +1,4 @@
-// Site backend: fetches go through the server's SSRF-safe proxy, /api/fetch (web/fetch.py), because most repos
+// Site backend: fetches go through the Worker's SSRF-safe proxy, /api/fetch (worker/src/index.js), because most repos
 // send no CORS headers. The app build swaps this for backend-native.js, which fetches directly.
 //
 //   const backend = createHttpBackend();

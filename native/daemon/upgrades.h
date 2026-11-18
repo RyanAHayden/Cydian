@@ -9,7 +9,7 @@
 
 #define UPD_MAX 2048          /* upgrades kept; more are counted (n) but not listed */
 #define UPD_FIELD 256         /* package names and versions are at most 255 bytes (the helper's limit) */
-#define UPD_SHOWN 3           /* names in the body before "and n more" (SHOWN_NAMES in push.py) */
+#define UPD_SHOWN 3           /* names in the body before "and n more" */
 #define UPD_TEXT 1024         /* room for a title or body */
 #define UPD_INTERVAL (23 * 3600) /* "daily": launchd starts us every hour; we check when the last good check
                                     is at least this old: at most 24 hours apart, and a phone that
@@ -37,7 +37,7 @@ int upd_parse_simulation(const char *text, struct upd_list *out);
 void upd_names_from_status(const char *status, struct upd_list *list);
 
 /* 1 if some upgrade (id=to) is not in state: the last check already told the user about the rest, and the same
- * "3 upgrades" isn't shown again every day (push.py decide). state: upd_state's lines, NULL or "" for none. */
+ * "3 upgrades" isn't shown again every day. state: upd_state's lines, NULL or "" for none. */
 int upd_fresh(const struct upd_list *list, const char *state);
 
 /* The state to keep after a check: "last <unix time>\n", then one "<id>=<to>\n" per upgrade. Returns the length
@@ -51,11 +51,11 @@ long upd_state_last(const char *state);
  * clock went back). */
 int upd_due(long now, long last);
 
-/* "1 Upgrade" / "<n> Upgrades" (the title push.py and device-check.js use). */
+/* "1 Upgrade" / "<n> Upgrades". */
 void upd_title(int n, char *buf, size_t size);
 
 /* "<name> <to> is available." for one, else "<n> upgrades: A, B and C." / "<n> upgrades: A, B, C and <k> more."
- * (push.py notification_text). */
+ */
 void upd_body(const struct upd_list *list, char *buf, size_t size);
 
 #endif

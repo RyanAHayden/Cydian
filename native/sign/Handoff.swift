@@ -2,7 +2,7 @@
 // SignBridge.swift do the UIKit and Keychain half). docs/signing.md, "From the website to the app (F75)".
 //
 //   BundledIdentity    Payload/Cydian.app/cydian-identity.plist: the user's .p12, password and profile, which the
-//                      Signing Server adds to Cydian's own IPA when Install Cydian App asks (bring: true). Imported
+//                      website adds to Cydian's own IPA as it signs it (F93, Install Cydian App's bring). Imported
 //                      into the Keychain on the first launch that finds it, unless the Keychain already holds one;
 //                      the bundle is read-only, so its digest is remembered and the same file is never looked at again.
 //   IncomingLink       which cydian:// links the shell hands to the page: cydian://import?d=… (sources and settings),

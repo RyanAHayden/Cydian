@@ -48,6 +48,8 @@ export function init(ctx) {
   state.ctx = ctx;
   catalog.onChange(() => { if (state.body) load(); else badge(); });
   onAppsChange(() => { if (state.body) load(); else badge(); }); // I3: a recorded install can end an upgrade
+  // Cydian's own source read (essential-ui.js readSelfInfo): its upgrade row and the badge count again.
+  globalThis.addEventListener?.("cydian:self-info", () => { if (state.body) load(); else badge(); });
   settings.onChange((key) => { if (key === "holds" || key === "resignReminder") { if (state.body) load(); else badge(); } });
   // At launch, only with a status file: without one there are no upgrades, and no reason to load every source.
   // Without one (the site, the sideload app) the remembered apps count, and Cydian itself in the app: badge at

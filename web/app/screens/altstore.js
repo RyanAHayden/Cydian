@@ -16,7 +16,8 @@ import { displayName, githubAvatarUrl } from "../core/sources.js";
 import { compat } from "../core/compat.js";
 import { currentDevice, compatBadge } from "../device.js";
 import { detectMode } from "../core/settings.js";
-import { apps, recordInstall } from "../core/installed.js";
+import { apps, recordInstall, removeInstall } from "../core/installed.js";
+import { showActionSheet } from "../nav/actionsheet.js";
 import { openInGroup } from "./handoff.js";
 
 function el(tag, cls, text) {
@@ -167,6 +168,31 @@ export async function renderAltSource(body, route, key) {
 
 // ---- the app page ----------------------------------------------------------------------------------------------
 
+function trackingSection(app, pkg, source) {
+  const box = el("div");
+  const mark = (version) => apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version, key: pkg.key,
+    source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).then(draw, () => {});
+  async function draw() {
+    let rec = null;
+    try { rec = (await (await apps()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
+    const versions = app.versions.map((x) => x.version).filter(Boolean);
+    const rows = rec
+      ? [{ label: "Installed Version", detail: rec.version || "Unknown" },
+        ...(versions.length > 1 ? [{ label: "Change Installed Version", onClick: () => pick() }] : []),
+        { label: "Mark as Not Installed", onClick: () => apps().then((store) => removeInstall(store, app.bundleIdentifier)).then(draw, () => {}) }]
+      : [{ label: "Mark as Installed", onClick: () => (versions.length > 1 ? pick() : mark(versions[0] ?? "")) }];
+    box.replaceChildren(grouped([{ header: "Installed", rows,
+      footer: rec ? "Cydian follows this app for updates: they show in Changes." : "Installed it another way? Mark it, and Cydian follows it for updates." }]));
+  }
+  async function pick() {
+    const versions = app.versions.map((x) => x.version).filter(Boolean);
+    const i = await showActionSheet({ title: "Which version is installed?", buttons: versions });
+    if (i >= 0) mark(versions[i]);
+  }
+  draw();
+  return box;
+}
+
 export function renderApp(body, route, pkg, source) {
   const st = pkg.stanza;
   const app = st.ipa;
@@ -215,6 +241,10 @@ export function renderApp(body, route, pkg, source) {
   body.append(grouped([{ header: "Install", rows,
     footer: options.itms ? "Installs over the air with the source's signed link."
       : "This app isn't signed for your iPhone: a sideloader signs it on the phone with your Apple ID. Adding the source there lists this app." }]));
+
+  // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on
+  // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.
+  if (record) body.append(trackingSection(app, pkg, source));
 
   if (v.localizedDescription || v.date) {
     body.append(grouped([{ header: "What's New", rows: [{ label: `Version ${v.version}`, detail: formatDate(v.date) }] }]));

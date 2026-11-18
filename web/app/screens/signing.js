@@ -13,8 +13,17 @@
 //
 //   picture()                              the certificate step's picture: the user's Files picker screenshot for
 //                                          the current theme (F78), shotFor(theme) its address
+//
+// F177: Install sent the user here first (no certificate yet): once signing is ready, ask to go on with that install.
+//   rememberInstall({ name, run })         Install's redirect to Signing: the app and the install it wanted (one trip)
+//   pendingInstall()                       that, or null; leaving Signing (a route without "signing") forgets it
+//   await offerInstall(ready, { alert })   the Signing page, each time it draws: when ready and one is pending, the
+//                                          iOS 6 alert Install <name>? (Later | Install Now) once; Install Now runs it.
+//                                          -> "install" | "later" | null (nothing asked)
+//   siteReady(id)                          the website's saved certificate is ready (.p12, profile, password not wrong)
 import { statusReady } from "../signing-client.js";
 import { normalizeServer } from "../core/signing.js";
+import { NAME } from "../brand.js";
 
 export const STEPS = [
   { id: "certificate", title: "Import Your Certificate" },
@@ -45,6 +54,41 @@ export const walkOpen = {};
 export function openAt(id) {
   for (const k of Object.keys(walkOpen)) delete walkOpen[k];
   for (const s of STEPS) walkOpen[s.id] = s.id === id;
+}
+
+// ---- F177: the install that sent the user here --------------------------------------------------------------
+
+let pending = null;
+let watchingRoute = false;
+const onSigning = (hash) => /(^|\/)signing(\/|$)/.test(String(hash ?? "").replace(/^#/, ""));
+
+export function rememberInstall({ name = "", run } = {}) {
+  if (typeof run !== "function") return;
+  pending = { name: name || NAME, run };
+  if (watchingRoute || typeof addEventListener !== "function") return;
+  watchingRoute = true;
+  // A trip ends when the user leaves Signing (Back to Home, another tab): opening Signing again later is their own.
+  addEventListener("hashchange", () => { if (!onSigning(globalThis.location?.hash)) forgetInstall(); });
+}
+
+export const pendingInstall = () => pending;
+export function forgetInstall() { pending = null; }
+export const routeLeftSigning = (hash) => !onSigning(hash);
+
+// The website's certificate is ready to sign with: the .p12, the profile and a password not known to be wrong.
+export const siteReady = (id) => Boolean(id?.p12 && id?.profile && id.password != null && id.passwordOk !== false);
+
+export async function offerInstall(ready, { alert = null } = {}) {
+  if (!ready || !pending) return null;
+  const { name, run } = pending;
+  pending = null; // once per trip, even when the page redraws while the alert is up
+  const ask = alert ?? (await import("../nav/alert.js")).showAlert;
+  const { index } = await ask({ title: `Install ${name}?`,
+    message: `Signing is set up. ${name} can be signed and installed now.`,
+    buttons: ["Later", "Install Now"], cancel: 0, colors: { 1: "green" } });
+  if (index !== 1) return "later";
+  run();
+  return "install";
 }
 
 // ---- drawing --------------------------------------------------------------------------------------------------

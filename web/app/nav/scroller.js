@@ -80,20 +80,16 @@ export function initScroller(screens) {
 
   // A haptic tick when a scroll reaches the top or the bottom (user 2026-11-17), once per arrival. The app only:
   // Safari plays haptics from a touch, never from a scroll.
-  // Only when momentum carries it there (a flick, or the indicator thrown), not while a finger still drags the page
-  // (user 2026-11-17).
+  // Only from the indicator: scrubbed while held, or thrown (fling() ticks for that). A normal swipe's momentum never
+  // ticks (user 2026-11-18).
   const edges = new WeakMap(); // scroller -> "top" | "bottom" | "" (where it was last time)
-  let fingers = 0;
-  addEventListener("touchstart", (e) => { fingers = e.touches.length; }, { capture: true, passive: true });
-  for (const type of ["touchend", "touchcancel"]) addEventListener(type, (e) => { fingers = e.touches.length; }, { capture: true, passive: true });
   function edgeTick(t) {
     const max = t.scrollHeight - t.clientHeight;
     if (max <= 1) return;
     const at = t.scrollTop <= 0 ? "top" : t.scrollTop >= max - 1 ? "bottom" : "";
     const was = edges.get(t);
     edges.set(t, at);
-    const flung = fingers === 0 || glide !== 0 || grab !== null; // momentum, or the indicator held (its scrub ticks too)
-    if (at && was === "" && flung && globalThis.ifizboxApp) haptic();
+    if (at && was === "" && grab !== null && globalThis.ifizboxApp) haptic();
   }
 
   // Momentum after letting go, like a native fling: the scrub's last ~80 ms give a velocity in scroll px/ms that
@@ -134,9 +130,14 @@ export function initScroller(screens) {
       const dt = Math.min(32, now - last); last = now;
       v *= Math.pow(0.95, dt / 16.67);
       const max = body.scrollHeight - body.clientHeight;
-      const next = Math.max(0, Math.min(max, body.scrollTop + v * dt));
+      const prev = body.scrollTop, next = Math.max(0, Math.min(max, prev + v * dt));
       body.scrollTop = next;
-      if ((next <= 0 && v < 0) || (next >= max && v > 0)) { glide = 0; bounce(body, v); return; }
+      if ((next <= 0 && v < 0) || (next >= max && v > 0)) {
+        glide = 0;
+        if (next !== prev && globalThis.ifizboxApp) haptic(); // the thrown indicator reached the end
+        bounce(body, v);
+        return;
+      }
       if (Math.abs(v) < 0.02) { glide = 0; return; }
       glide = requestAnimationFrame(step);
     };

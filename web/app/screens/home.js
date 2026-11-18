@@ -266,7 +266,7 @@ export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ct
   web = !globalThis.cydianNative } = {}) {
   if (web) return withReloadSpinner(button, async () => { if (!(await refreshWebFiles())) location.reload(); });
   return withReloadSpinner(button, async () => {
-    await refresh();
+    if ((await refresh()) === "cancelled") return; // F150: the reload bar's Cancel stops the whole Reload
     await settled();
     await reload();
     await redraw();

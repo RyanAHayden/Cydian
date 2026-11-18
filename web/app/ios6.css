@@ -499,3 +499,31 @@ html[data-theme="dark"] .ph-box, html[data-theme="dark"] .ph-bar { background: #
   content: ""; position: absolute; top: 5px; left: calc(50% + 9px); width: 10px; height: 12px; pointer-events: none;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 15'%3E%3Cpath fill='%23c8ccd2' d='M3 6V4.2a3 3 0 0 1 6 0V6h.6c.8 0 1.4.6 1.4 1.4v5.2c0 .8-.6 1.4-1.4 1.4H2.4C1.6 14 1 13.4 1 12.6V7.4C1 6.6 1.6 6 2.4 6H3zm1.5 0h3V4.2a1.5 1.5 0 0 0-3 0V6z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
+
+/* F150: the reload bar (nav/reloadbar.js), Cydia's: the kit's "Semi-transparent black bar" (#4c4c4c to black at 52%,
+   a white-at-20% highlight on top, black-at-70% at the bottom) at .8, dropping down like the banner, a 20 pt white
+   spinner, a bold white status line and a blue Cancel. No scrim: only the strip takes touches. */
+.reload-bar {
+  position: fixed; z-index: 49; top: 0; left: 0; right: 0; height: calc(44px + env(safe-area-inset-top));
+  display: flex; align-items: center; gap: 10px;
+  padding: env(safe-area-inset-top) max(6px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+  background:
+    linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) bottom / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(rgba(76,76,76,.8), rgba(0,0,0,.8) 52%);
+  will-change: transform;
+}
+.reload-spinner { flex: none; width: 20px; height: 20px; animation: hud-spin .96s steps(12) infinite; }
+.reload-text {
+  flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 14px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
+}
+.reload-bar .reload-cancel { flex: none; margin-left: auto; }
+/* The nav bar and the screens move down by the bar's 44 pt while it shows (as for the banner), and the screens end
+   that much higher so a page's bottom stays clear of the tab bar. Under a banner, the bar sits below it. */
+html.has-reload #navbar, html.has-reload #screens { transform: translateY(44px); }
+html.has-reload #screens { bottom: 44px; }
+html.has-reload.has-banner #navbar, html.has-reload.has-banner #screens { transform: translateY(calc(var(--banner-h, 44px) + 44px)); }
+html.has-reload.has-banner #screens { bottom: calc(var(--banner-h, 44px) + 44px); }
+html.has-banner .reload-bar { top: var(--banner-h, 44px); }
+@media (prefers-reduced-motion: reduce) { .reload-spinner { animation-duration: 3s; } }

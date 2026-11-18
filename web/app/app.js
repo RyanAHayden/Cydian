@@ -33,6 +33,8 @@ import { initQueue } from "./screens/queue.js";
 import { initIpaLinks } from "./screens/ipa-install.js";
 import { startEssential, appVersion } from "./essential-ui.js";
 import { showBanner } from "./nav/banner.js";
+import { showReloadBar } from "./nav/reloadbar.js";
+import { catalog } from "./catalog.js";
 import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
 
@@ -61,6 +63,13 @@ const ctx = {
   setBadge: (tab, n) => { tabbar.setBadge(tab, n); upgradeNotices.badge(tab, n); },
   showHUD,
   showAlert,
+  // F150: Sources' refreshes drop the reload bar; its last two steps load the new package lists into the catalog
+  // ("Loading Data") and build All Sources, the merged index Search reads, by asking for its sections ("Building
+  // Searcher Cache"). A failure there shows where it is used (the source's Sections page, Search), not as the
+  // refresh's error.
+  reloadBar: showReloadBar,
+  loadData: () => catalog.ensure().catch(() => {}),
+  buildCache: () => catalog.sections().catch(() => {}),
 };
 
 const stacks = createStacks({ tabs: BAR_TABS, create: makePage });

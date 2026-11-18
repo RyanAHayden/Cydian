@@ -348,3 +348,13 @@ test("freshUrl: raw.githubusercontent.com gets a per-minute query, other hosts a
   assert.equal(freshUrl("https://repo.example/"), "https://repo.example/");
   assert.equal(freshUrl("https://raw.githubusercontent.com/o/r/main/x.json?a=1"), "https://raw.githubusercontent.com/o/r/main/x.json?a=1");
 });
+
+test("F150: refreshSources starts no source once its signal is aborted (the reload bar's Cancel)", async () => {
+  const b = fakeBackend({});
+  const calls = sourceCalls(b, { indexedDB: fakeIndexedDB() });
+  const seen = [];
+  const out = await calls.refreshSources((s) => seen.push(s), { signal: { aborted: true } });
+  assert.deepEqual(seen, []);
+  assert.deepEqual(b.calls, [], "nothing fetched");
+  assert.ok(out.every((x) => x === null));
+});

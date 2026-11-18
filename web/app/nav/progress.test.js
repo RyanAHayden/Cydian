@@ -62,3 +62,18 @@ test("progressHUD: the next job of a run continues on the page while it is up; a
   assert.equal(pages.length, 2);
   pages[1].close();
 });
+
+test("progressHUD: finish ends on the caller's button (F155's Open <app>), its action handed to the page", () => {
+  const page = fakePage();
+  let action = null;
+  page.finish = (o) => { action = o.action; page.calls.push(["finish", o.label, o.status]); };
+  const h = progressHUD("Installing", { open: () => page });
+  h.set("Installed");
+  const go = () => false;
+  h.finish({ label: "Open Delta", action: go, status: "Installed" });
+  assert.deepEqual(page.calls.at(-1), ["finish", "Open Delta", "Installed"]);
+  assert.equal(action, go);
+  h.done("Done"); // already ended: nothing more
+  assert.equal(page.calls.filter(([k]) => k === "finish").length, 1);
+  page.close();
+});

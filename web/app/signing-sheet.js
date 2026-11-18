@@ -70,7 +70,7 @@ export async function inspectAndInstall({ url, name = "", onInstalled = () => {}
         close();
         const shown = params.name || info.app?.name || name;
         resolve(await install({ url, name: shown, onInstalled, params,
-          after: (result, hh) => followInstall(native, installedId(result, params, info), hh, { later }) }));
+          after: (result, hh) => followInstall(native, installedId(result, params, info), hh, { later, name: shown }) }));
       },
       onClose: () => { if (!started) resolve(false); },
     });
@@ -146,7 +146,9 @@ export function signSheetButtons({ right, box, onInstall, onCancel, doc = docume
 }
 
 // signing.progress {bundleId}: iOS's own progress on the HUD until it says installed (or gives up), then it goes.
-export async function followInstall(native, bundleId, h, { later = setTimeout } = {}) {
+// F155: on the progress page (a HUD with finish, nav/progress.js progressHUD) an installed app ends it on
+// "Open <name>" instead (signing.openApp; Close at the top right still just closes).
+export async function followInstall(native, bundleId, h, { later = setTimeout, name = "" } = {}) {
   if (!bundleId) { later(h.hide, 2500); return null; }
   let r = null;
   try {
@@ -155,8 +157,27 @@ export async function followInstall(native, bundleId, h, { later = setTimeout } 
       h.set(pct > 0 && pct < 100 ? `Installing ${pct}%` : "Installing");
     });
   } catch { /* an older shell, or the private API gone: the HUD just goes */ }
-  if (r?.installed === true) { h.set("Installed"); later(h.hide, 1200); } else h.hide();
+  if (r?.installed === true && typeof h.finish === "function") {
+    h.set("Installed");
+    h.finish({ label: openLabel(name), status: "Installed", action: () => openInstalled(native, bundleId) });
+  } else if (r?.installed === true) { h.set("Installed"); later(h.hide, 1200); } else h.hide();
   return r?.installed ?? null;
+}
+
+// F155: the progress page's button for an installed app: "Open Delta" (a long name cut, "Open App" with none).
+export function openLabel(name) {
+  const n = String(name ?? "").trim();
+  if (!n) return "Open App";
+  return `Open ${n.length > 24 ? `${n.slice(0, 23).trimEnd()}…` : n}`;
+}
+
+// signing.openApp {bundleId}, then the page closes; when iOS won't open it (or the shell is older) an alert says so first.
+export async function openInstalled(native, bundleId, { alert = showAlert } = {}) {
+  let r = null;
+  try { r = await native.call("signing.openApp", { bundleId }); } catch { /* an older shell: no such call */ }
+  if (r?.opened === true) return false;
+  await alert({ title: "Can't Open It", message: "iOS didn't open the app. Open it from the Home Screen.", buttons: ["OK"] });
+  return false;
 }
 
 // The sheet itself. `onSign(edits)` with { name, bundleId, icon (base64 PNG | null), removeExtensions: [path] }.

@@ -18,7 +18,9 @@
 //   progressHUD(label)                     the HUD interface ({ set, hide, done, fail }, nav/hud.js liveHUD's) on this
 //                                          page: the sideload IPA's and the website's installs (signing-client.js),
 //                                          each label a step, its percent on the bar; a job started while the page
-//                                          is still up continues on it.
+//                                          is still up continues on it. Beyond liveHUD's: finish({ label, action,
+//                                          status }) ends it on another button, F155's "Open <app>" (signing-sheet.js
+//                                          followInstall) once iOS says the app is installed.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "./ui.js";
 import { createFollow, hudLine } from "../core/progress.js";
@@ -205,10 +207,10 @@ export function progressHUD(label = "Preparing", { open = openProgress, done: do
     if (percent != null) page.progress(percent);
   };
   set(label);
-  const end = (status) => {
+  const end = (status, { label = doneLabel, action = null } = {}) => {
     if (ended) return;
     ended = true;
-    page.finish({ label: doneLabel, status });
+    page.finish({ label, action, status });
   };
   return {
     set,
@@ -216,6 +218,7 @@ export function progressHUD(label = "Preparing", { open = openProgress, done: do
     hide: () => end(null),
     done: (t = "Done") => { if (!ended) { if (t !== last) page.step(t); last = t; } end(t); },
     fail: (message) => { if (!ended && message) page.error(message); end("Failed"); },
+    finish: ({ label = doneLabel, action = null, status = last } = {}) => end(status, { label, action }),
     page,
   };
 }

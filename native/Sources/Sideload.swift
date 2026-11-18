@@ -11,6 +11,7 @@
 //        -> I6's reply + {fixedArm64e, expires}
 //   signing.progress {bundleId} (stream: {phase: "installing", progress}) -> {installed: true | false | null}
 //   signing.installed            -> {apps: [record], next: {expires, apps} | null}
+//   signing.openApp {bundleId}   -> {opened: true | false}: F155, launches an installed app (the progress page's Open)
 //   signing.forget {bundleId}    -> {apps}
 //   signing.resignAll (stream: {index, count, name, phase, progress}) -> {done: [bundleId], failed: [{bundleId, name, error}]}
 //   signing.resign {bundleId} (stream and reply as resignAll, one app) -> F91's queue job "resign"; not_signed: when
@@ -36,6 +37,7 @@ enum Sideload {
         b.on("signing.inspect") { c in inspect(c) }
         b.on("signing.progress") { c in progress(c) }
         b.on("signing.installed") { c in SignBridge.run(c) { installedJSON() } }
+        b.on("signing.openApp") { c in openApp(c) }
         b.on("signing.forget") { c in
             SignBridge.run(c) {
                 let id = c.params["bundleId"] as? String ?? ""
@@ -300,6 +302,12 @@ enum Sideload {
         }
     }
 
+    // F155: the progress page's "Open <app>" once iOS says it installed it. False when iOS refuses (or lacks the call).
+    static func openApp(_ c: Bridge.Call) {
+        guard let bid = c.params["bundleId"] as? String, !bid.isEmpty else { return Apt.reply(c, nil, "bad_request: bundleId") }
+        DispatchQueue.main.async { Apt.reply(c, ["opened": Workspace.open(bid)], nil) }
+    }
+
     // nil: the private API isn't there, so it can't be told.
     static func watch(_ bid: String, onProgress: @escaping (Double) -> Void, done: @escaping (Bool?) -> Void) {
         guard Workspace.available else { return done(nil) }
@@ -539,7 +547,7 @@ final class KeepAlive {
 }
 
 // Private LSApplicationWorkspace calls that work from a sideloaded app (docs/sideload.md, Feather's
-// UIApplication+open_private): install progress and whether an app is installed. Looked up at run time; when iOS
+// UIApplication+open_private): install progress, whether an app is installed, and opening it (F155). Looked up at run time; when iOS
 // lacks one, `available` is false and the callers say they can't tell.
 enum Workspace {
     static var shared: NSObject? {
@@ -564,6 +572,14 @@ enum Workspace {
     static func isInstalled(_ id: String) -> Bool? {
         let sel = NSSelectorFromString("applicationIsInstalled:")
         guard let ws = shared, let m = class_getInstanceMethod(type(of: ws), sel) else { return nil }
+        typealias F = @convention(c) (NSObject, Selector, NSString) -> Bool
+        let f = unsafeBitCast(method_getImplementation(m), to: F.self)
+        return f(ws, sel, id as NSString)
+    }
+
+    static func open(_ id: String) -> Bool {
+        let sel = NSSelectorFromString("openApplicationWithBundleID:")
+        guard let ws = shared, let m = class_getInstanceMethod(type(of: ws), sel) else { return false }
         typealias F = @convention(c) (NSObject, Selector, NSString) -> Bool
         let f = unsafeBitCast(method_getImplementation(m), to: F.self)
         return f(ws, sel, id as NSString)

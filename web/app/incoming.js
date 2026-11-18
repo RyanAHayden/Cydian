@@ -123,13 +123,30 @@ async function handleOtherLink(u, other, { native, alert, hud, add, install, on,
 }
 
 // Install IPAs opens under the alert; Install signs and installs (the sideload build's signAndInstall).
+// B50: the jailbreak build has no signer (signAndInstall only says "Can't Install Here" there): Install downloads the
+// IPA and installs it through the helper (ipa.install, screens/ipa-install.js's progress page), as Settings > Install
+// IPA and a tapped .ipa link do, and remembers it for Installed's Apps.
 async function confirmInstall(url, name, message, { alert, install, open }) {
   open(format({ tab: "installed", path: ["myipas"] }));
   const { index } = await alert({ title: "Install IPA", message, buttons: ["Cancel", "Install"], cancel: 0 });
   if (index !== 1) return false;
-  const run = install ?? (await import("./signing-client.js")).signAndInstall;
+  const run = install ?? (await defaultInstall());
   await run({ url, name });
   return true;
+}
+
+// What Install runs: the helper's ipa.install in the jailbreak build (`jailbreak`), else signAndInstall.
+// `ipaInstall` and `remember` stand in for screens/ipa-install.js's openIpaInstall and rememberIpa (tests).
+export async function defaultInstall({ jailbreak = null, ipaInstall = null, remember = null } = {}) {
+  const { ipaInstallAvailable } = await import("./ipa-install.js");
+  if (jailbreak ?? ipaInstallAvailable()) {
+    const screen = ipaInstall && remember ? null : await import("./screens/ipa-install.js");
+    const { ipaName } = await import("./core/ipainstall.js");
+    const openIt = ipaInstall ?? screen.openIpaInstall;
+    const keep = remember ?? screen.rememberIpa;
+    return ({ url, name }) => openIt({ url, name, onInstalled: (r) => keep(r, name || ipaName(url)) });
+  }
+  return (await import("./signing-client.js")).signAndInstall;
 }
 
 // F89: ifizbox://install?url=<https IPA>[&name=…] -> { url, name }, or null (no http(s) URL in it).

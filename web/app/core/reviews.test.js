@@ -72,6 +72,20 @@ test("the API: list, post, report with the token; anything that isn't the server
   assert.match(reviewsBase("jailbreak"), /^https:\/\//);
 });
 
+test("F207: remove() deletes this token's own review, by package or by review id", async () => {
+  const calls = [];
+  let next = () => new Response(JSON.stringify({ ok: true, id: "0123456789abcdef" }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const api = reviewsApi({ base: "https://ifizbox.example", fetcher: async (url, init = {}) => { calls.push({ url, init }); return next(); }, token: async () => "t".repeat(40) });
+  assert.deepEqual(await api.remove("com.example.a"), { ok: true, id: "0123456789abcdef" });
+  assert.deepEqual([calls[0].url, calls[0].init.method, calls[0].init.headers["X-Review-Token"]], ["https://ifizbox.example/reviews/com.example.a", "DELETE", "t".repeat(40)]);
+  await api.remove("com.example.a", "0123456789abcdef");
+  assert.equal(calls[1].url, "https://ifizbox.example/reviews/com.example.a/0123456789abcdef");
+  next = () => new Response(JSON.stringify({ code: "forbidden", error: "Only the review's writer deletes it." }), { status: 403, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(api.remove("com.example.a", "0123456789abcdef"), { code: "forbidden" });
+  next = () => { throw new TypeError("offline"); };
+  await assert.rejects(api.remove("com.example.a"), { code: "network" });
+});
+
 test("merging: ours alone keep the bar chart; with others, a count-weighted average and where each comes from", () => {
   const now = Date.UTC(2026, 10, 18);
   const ours = { enabled: true, average: 4, count: 2, histogram: [1, 1, 0, 0, 0], more: false,

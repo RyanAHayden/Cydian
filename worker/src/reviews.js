@@ -12,7 +12,10 @@
 //   POST   /reviews/<package id>/<review id>/report   one count per reporter (token, else address); REPORT_HIDE
 //                                                reports (3) hide it -> {ok, hidden}
 //   DELETE /reviews/<package id>/<review id>     Authorization: Bearer <REVIEWS_ADMIN> (a Worker secret: `npx wrangler
-//                                                secret put REVIEWS_ADMIN`); without the secret set, nobody can
+//                                                secret put REVIEWS_ADMIN`); without the secret set, nobody can.
+//                                                F207: or X-Review-Token of the device that wrote it (else 403)
+//   DELETE /reviews/<package id>                 X-Review-Token: this device's own review there -> {ok, id}; 404
+//                                                when it has none. Token deletes count as writes (rate limits)
 //
 // review: { id, stars, title, name, text, version, date (ms), updated (ms) }. Everything is plain text: control
 // characters go, the length caps hold, and the clients draw it as text (textContent), never as HTML.
@@ -162,12 +165,26 @@ export async function reviews(req, env = {}, { now = Date.now() } = {}) {
       mine: own ? { ...view(own), hidden: Boolean(own.hidden) } : null });
   }
 
-  if (req.method === "DELETE" && rid !== null && !report) {
+  if (req.method === "DELETE" && !report) {
     const auth = /^Bearer (.+)$/.exec(req.headers.get("Authorization") ?? "")?.[1] ?? "";
-    if (!env.REVIEWS_ADMIN || !sameSecret(auth, env.REVIEWS_ADMIN)) return fail("forbidden", "Only the owner deletes reviews.", 403);
-    const r = await db.prepare("DELETE FROM reviews WHERE id = ? AND pkg = ?").bind(rid, pkg).run();
-    await db.prepare("DELETE FROM review_reports WHERE review = ?").bind(rid).run();
-    return (r.meta?.changes ?? 0) ? json({ ok: true }) : fail("not_found", "No such review.", 404);
+    const admin = Boolean(env.REVIEWS_ADMIN) && auth !== "" && sameSecret(auth, env.REVIEWS_ADMIN);
+    if (admin && rid !== null) {
+      const r = await db.prepare("DELETE FROM reviews WHERE id = ? AND pkg = ?").bind(rid, pkg).run();
+      await db.prepare("DELETE FROM review_reports WHERE review = ?").bind(rid).run();
+      return (r.meta?.changes ?? 0) ? json({ ok: true }) : fail("not_found", "No such review.", 404);
+    }
+    // F207: a device deletes its own review, by id or (no id) the one it wrote on this package.
+    if (!device) return fail("forbidden", "Only the review's writer deletes it.", 403);
+    if (!(await allowWrite(env, ip, device))) return fail("rate_limited", "Too many changes from here. Try again in a minute.", 429);
+    if (!(await allowToday(db, ip, now, Number(env.REVIEW_DAILY) || REVIEW_DAILY))) return fail("rate_limited", "That's enough changes from here for today.", 429);
+    const row = rid !== null
+      ? await db.prepare("SELECT id, device FROM reviews WHERE id = ? AND pkg = ?").bind(rid, pkg).first()
+      : await db.prepare("SELECT id, device FROM reviews WHERE pkg = ? AND device = ?").bind(pkg, device).first();
+    if (!row) return fail("not_found", "No such review.", 404);
+    if (row.device !== device) return fail("forbidden", "Only the review's writer deletes it.", 403);
+    await db.prepare("DELETE FROM reviews WHERE id = ? AND device = ?").bind(row.id, device).run();
+    await db.prepare("DELETE FROM review_reports WHERE review = ?").bind(row.id).run();
+    return json({ ok: true, id: row.id });
   }
 
   if (req.method !== "POST" || (rid !== null && !report)) return fail("bad_request", "Not a reviews route.", 405);

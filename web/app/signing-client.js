@@ -216,7 +216,6 @@ export async function firstInstallCheck({ native, server = getServer(), go = ope
   return step;
 }
 
-// The HUD whose label follows the install's phases: { set(text), hide() }.
 const openRoute = (path) => { location.hash = format(settingsRoute(path)).replace(/^#/, ""); };
 
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an

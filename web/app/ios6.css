@@ -472,6 +472,8 @@ input.sign-value { border: 0; padding: 0; margin: 0; background: none; font: inh
 /* While a banner shows (nav/banner.js), the nav bar and the screens move down by its height, so it covers nothing. */
 #navbar, #screens { transition: transform .3s cubic-bezier(.25,.1,.25,1); }
 html.has-banner #navbar, html.has-banner #screens { transform: translateY(var(--banner-h, 44px)); }
+/* The screens also end that much higher, so moving down doesn't push the bottom of a page under the tab bar. */
+html.has-banner #screens { bottom: var(--banner-h, 44px); }
 
 /* A bar button iOS left stuck in :active (Sources' Add after the Paste bubble): drawn as normal until touched again. */
 

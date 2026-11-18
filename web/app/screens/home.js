@@ -378,7 +378,7 @@ function renderRoot(body) {
   // Settings > Signing first when there's none; jailbroken, the release's .deb for the device's arch.
   // One green split button (user 2026-11-17): Install Cydian App | Send Settings (Open in Cydian App: the
   // certificate, sources and settings into the app).
-  const sendTile = tile({ label: "Send Settings to App", subtitle: "Your certificate, sources and settings", href: format({ tab: "home" }), glyph: "send" });
+  const sendTile = tile({ label: "Send Settings to Cydian", subtitle: "Your certificate, sources and settings", href: format({ tab: "home" }), glyph: "send" });
   const appRow = tileRow("green stack", tile({ label: "Install Cydian App", subtitle: "Signed with your certificate",
     href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }), sendTile);
   const appLink = appRow.querySelector("a");

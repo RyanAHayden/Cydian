@@ -213,7 +213,7 @@ export function render(body, route, ctx) {
     const q = input.value.trim();
     state.query = input.value;
     const seq = ++state.seq;
-    // F101: one Latin character searches nothing, here or on Canister (one CJK character does: Zebra's rule).
+    // One character searches here; Canister needs two (core/canister.js askable()).
     others.search(searchable(q) && settings.deviceType() !== "none" ? q : ""); // jailbreak packages only
     recs.search(searchable(q) ? q : "");
     drawRecent();

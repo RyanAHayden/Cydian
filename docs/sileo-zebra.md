@@ -62,8 +62,8 @@ ranked list of follow-ups is at the end.
 - Rank tiers: exact name or id, then prefix, then the query starting a word in the name or id ("board" in "Snow
   Board", not "Keyboard"), then substring in name or id, then author or maintainer. Within a tier: name length
   closest to the query, then how many sources list the package, then by name (F101, proposal 2).
-- One Latin character searches nothing; one CJK character searches locally (`core/catalog.js searchable()`, F101,
-  proposal 4).
+- Any non-blank query searches locally, one character too (`core/catalog.js searchable()`; the user dropped
+  Zebra's one-Latin-character rule). Canister still needs two characters.
 - 120 ms debounce. A scope bar (All, Tweaks, Themes, Apps) plus a Filter panel (section, source, installed,
   free/paid, Show Incompatible).
 - Canister "Other Sources" under the local results (`screens/extras.js discoveryGroup`, 2+ characters even for CJK,

@@ -13,7 +13,7 @@
 //                                             Maintainer is one of these drop out like hidden sections' (author()
 //                                             still lists them, so the author page can show them again)
 //   c.list(key | "*", section | "*")       -> [row], sorted by name ("*": All Sources / All Packages)
-//   c.search(query)                        -> [row], best matches first (nothing for one Latin character)
+//   c.search(query)                        -> [row], best matches first (any non-blank query)
 //   c.author(name)                         -> [row]: every package whose Author or Maintainer is `name`
 //   c.package(id, key | "*")               -> { stanza, key, others: [{ key, version }] } or null; a package
 //                                             no source carries but dpkg has installed comes from its status
@@ -408,13 +408,10 @@ export function spinPick(pool, rand = Math.random) {
   return { type, row: t.rows[Math.min(t.rows.length - 1, Math.floor(rand() * t.rows.length))] };
 }
 
-// Search (F101, docs/sileo-zebra.md 'Search'). Zebra's short-query rule: one Latin character (code point below
-// U+0100) is too broad to search, locally or on Canister; one CJK (or other non-Latin) character is a word.
+// Search (F101, docs/sileo-zebra.md 'Search'). Any non-blank query searches, one Latin character too (the user
+// dropped Zebra's short-query rule); Canister still needs two (core/canister.js askable()).
 export function searchable(query) {
-  const q = String(query ?? "").trim();
-  if (!q) return false;
-  const chars = [...q];
-  return chars.length > 1 || chars[0].codePointAt(0) >= 0x100;
+  return String(query ?? "").trim() !== "";
 }
 
 // Does `s` hold `q` at the start of a word (after a character that is not a letter or digit)? "board" starts a
@@ -686,8 +683,8 @@ export function createCatalog() {
   // Every word must appear somewhere (name, id, description, author or maintainer). Ranked: exact name or id,
   // then name or id starting with the query, then the query starting a word in the name or id (F101), then the
   // query inside the name or id, then author or maintainer, then the rest. Within a tier (Sileo): the name
-  // closest in length to the query, then the most sources listing it, then by name. One Latin character finds
-  // nothing (searchable(), Zebra's rule).
+  // closest in length to the query, then the most sources listing it, then by name. Any non-blank query
+  // searches (searchable()).
   // Search's filters (F35, all optional): `section` a section name or a SECTION_GROUPS group ("group:Tweaks"),
   // `source` a source key, `installed` "installed" | "not", `price` "free" | "paid". With the Works on My Phone
   // filter on, what can't work drops out, except an exact name or id match: that one stays, marked `exact`, with

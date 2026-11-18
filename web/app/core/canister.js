@@ -19,8 +19,8 @@
 // limiter, docs.canister.me states none); be gentle anyway: Search asks only after typing stops, only for 2+
 // characters, at most 50 results, and every answer is kept 10 minutes.
 //
-// One CJK character (F106, checked live 2026-11-18): local search takes it (core/catalog.js searchable(), Zebra's
-// rule), but Canister doesn't. Its 2-character check counts UTF-8 bytes, so "微" passes with 200, yet it finds
+// One character (F106, checked live 2026-11-18): local search takes it (core/catalog.js searchable()), but
+// Canister doesn't. Its 2-character check counts UTF-8 bytes, so "微" passes with 200, yet it finds
 // nothing: 微, 中, 汉, 化 and é all answered count 0 while 微信 found 5 packages and 中文 1. Asking would cost a
 // request per pause for an empty answer, so Canister keeps the 2-character rule, counted in characters (an emoji
 // or a CJK Extension B character is one character but two UTF-16 units).

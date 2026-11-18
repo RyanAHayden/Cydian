@@ -130,17 +130,13 @@ test("search covers name, id, description and author, ranked", () => {
   assert.equal(c.search("ja", { limit: 2 }).length, 2);
 });
 
-test("search: one Latin character finds nothing, one CJK character does (F101, Zebra)", () => {
-  assert.equal(searchable("a"), false);
-  assert.equal(searchable(" g "), false);
-  assert.equal(searchable("é"), false);
+test("search: any non-blank query searches, one character too", () => {
   assert.equal(searchable(""), false);
-  assert.equal(searchable("ab"), true);
+  assert.equal(searchable("   "), false);
+  assert.equal(searchable("x"), true);
   assert.equal(searchable("雪"), true);
-  assert.equal(searchable("😀"), true, "one code point, not two UTF-16 units");
   const c = loaded();
-  assert.deepEqual(c.search("g"), []);
-  assert.deepEqual(c.search("a", { limit: 2 }), []);
+  assert.ok(c.search("g").length > 0);
   c.load("C", packages({ Package: "com.c.snow", Name: "雪板", Version: "1", Architecture: "iphoneos-arm64", Section: "Themes" }));
   assert.deepEqual(ids(c.search("雪")), ["com.c.snow"]);
 });

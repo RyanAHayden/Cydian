@@ -23,7 +23,7 @@
   p { margin: 0 0 26px; font-size: 29px; line-height: 36px; }
   .bar-button { display: inline-block; height: 44px; padding: 0 18px; font-size: 21px; line-height: 42px; border-radius: 8px; text-decoration: none; }
   /* The phone: the kit's bitmap at --s of its point size (379.5 x 743.5 pt), the page in its 320 x 480 pt screen. */
-  .phone { --s: .78; position: relative; flex: none; width: calc(379.5px * var(--s)); height: calc(743.5px * var(--s)); margin: 30px 110px 0 0; }
+  .phone { --s: .74; position: relative; flex: none; width: calc(379.5px * var(--s)); height: calc(743.5px * var(--s)); margin: -6px 110px 0 0; } /* centred: equal room above and below (the shadow hangs under it) */
   .phone > img { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 14px 22px rgba(0,0,0,.35)); }
   .screen { position: absolute; left: calc(32px * var(--s)); top: calc(132.25px * var(--s)); width: 320px; height: 480px; overflow: hidden; transform: scale(var(--s)); transform-origin: 0 0; background: #000; }
   .screen iframe { display: block; width: 320px; height: 460px; border: 0; }

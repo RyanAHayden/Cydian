@@ -28,6 +28,7 @@ import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
 import { renderAltSource, renderApp, installRows, appBundleId, formatDate, osRange, appPageAction, appPageCustom } from "./altstore.js";
 import { linksGroup, previewSlot } from "./altstore.js";
+import { descriptionGroup } from "./description.js";
 import { packageLinks, packageGithub, aptShots, sileoShots } from "../core/previews.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { signAndInstall, localSigning } from "../signing-client.js";
@@ -653,13 +654,7 @@ async function renderPackage(body, route, key, id, ctx) {
   if (groups.length) later.push(...groups);
   body.append(grouped(later));
   body.append(depictionSlot);
-  if (!sileo && descText) {
-    const g = el("div", "group");
-    const t = el("div", "table grouped pkg-description");
-    t.textContent = descText;
-    g.append(t);
-    body.append(g);
-  }
+  if (!sileo && descText) body.append(descriptionGroup(descText)); // F165: own group, long ones fold behind More
   // F122: the gallery (Screenshots:/Header:, a Sileo depiction's screenshots, else the HTML depiction's pictures or
   // the GitHub repo's) and the Links group (the source, Homepage:, GitHub, a Sileo depiction's buttons).
   const previews = el("div", "package-previews");
@@ -1139,13 +1134,7 @@ async function loadSileo(slot, url, { fallback }) {
   } catch {
     // A dead or broken JSON depiction: show the description instead, as if there were none.
     slot.replaceChildren();
-    if (fallback) {
-      const g = el("div", "group");
-      const t = el("div", "table grouped pkg-description");
-      t.textContent = fallback;
-      g.append(t);
-      slot.append(g);
-    }
+    if (fallback) slot.append(descriptionGroup(fallback)); // F165
     return null;
   }
 }

@@ -20,7 +20,7 @@ import { showAlert } from "./nav/alert.js";
 import { liveHUD } from "./nav/hud.js";
 import { grouped, el } from "./nav/ui.js";
 import { format, settingsRoute } from "./router.js";
-import { installOnDevice } from "./signing-client.js";
+import { installOnDevice, openSigning } from "./signing-client.js";
 import { createSwitch } from "./screens/settings.js";
 import { phaseLabel, deviceError, inspectGroups, installParams, installedId, isCgBI, fromBase64 } from "./core/signing.js";
 import { NAME } from "./brand.js";
@@ -51,7 +51,7 @@ export async function inspectAndInstall({ url, name = "", onInstalled = () => {}
     if (unknownMethod(e)) return install({ url, name, onInstalled });
     const why = deviceError(e, name);
     await alert({ title: why.title, message: why.message, buttons: ["OK"] });
-    if (why.open === "signing") location.hash = format(settingsRoute(["signing"])).replace(/^#/, "");
+    if (why.open === "signing") openSigning(); // B39: back to this page once it's set up
     return false;
   }
   h.hide();
@@ -100,7 +100,7 @@ export async function inspectToQueue({ url, name = "", queue },
     if (unknownMethod(e)) { queue(null); return true; }
     const why = deviceError(e, name);
     await alert({ title: why.title, message: why.message, buttons: ["OK"] });
-    if (why.open === "signing") location.hash = format(settingsRoute(["signing"])).replace(/^#/, "");
+    if (why.open === "signing") openSigning(); // B39: back to this page once it's set up
     return false;
   }
   h.hide();

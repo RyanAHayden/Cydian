@@ -203,12 +203,12 @@ test("route: ipa in sideload mode is signed with the user's certificate (fake si
     let item = classifyFile("Demo.ipa")
     let ready = try FakeHost(.sideload)
     check(ShareRouter.route(item, ready) == .signIPA(item), "ready")
+    // B39: no certificate (or one the signer finds a problem with) still goes to My IPAs: the IPA's page and its
+    // Install check signing.status, as Settings > Signing does, and open Signing from there when it's missing.
     let none = try FakeHost(.sideload, signer: FakeSigner(why: "Import your certificate (.p12) and its profile (.mobileprovision) in Settings > Signing first."))
-    guard case .refuse(let t, let m) = ShareRouter.route(item, none) else { return check(false, "no certificate: refused") }
-    check(t == "Import Your Certificate" && m.contains(".p12"), "\(t): \(m)")
+    check(ShareRouter.route(item, none) == .signIPA(item), "no certificate: My IPAs")
     let expired = try FakeHost(.sideload, signer: FakeSigner(why: "Your certificate expired on 2026-11-01."))
-    guard case .refuse(_, let m2) = ShareRouter.route(item, expired) else { return check(false, "expired: refused") }
-    check(m2.contains("expired"), m2)
+    check(ShareRouter.route(item, expired) == .signIPA(item), "expired: My IPAs")
     let noSigner = try FakeHost(.sideload, signer: nil)
     guard case .refuse = ShareRouter.route(item, noSigner) else { return check(false, "no signer: refused") }
     // AppSync on disk means nothing in sideload mode

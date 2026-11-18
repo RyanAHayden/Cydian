@@ -60,9 +60,9 @@ enum SharedInbox {
         guard url.isFileURL else { return false }
         let host = PhoneShareHost()
         let ext = url.pathExtension.lowercased()
-        // Sideload IPAs that can't be signed yet, and ones already in Documents (tapped in Files): My IPAs as before (F77).
+        // Sideload IPAs already in Documents (tapped in Files): My IPAs as before (F77). B39: no certificate check here
+        // (the page's Install asks signing.status, as Settings > Signing does).
         if host.mode == .sideload, ext == "ipa" || ext == "tipa" {
-            if host.signer?.problem() != nil { return false }
             let docs = MyIPAs.library.root.standardizedFileURL.resolvingSymlinksInPath().path
             if url.standardizedFileURL.resolvingSymlinksInPath().deletingLastPathComponent().path == docs { return false }
         }

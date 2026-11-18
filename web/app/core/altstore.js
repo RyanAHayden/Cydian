@@ -447,6 +447,17 @@ function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "cydian-al
   });
 }
 
+// F144: what Add says to an APT repo where APT sources aren't kept (withAltSources aptAllowed false): one short
+// alert (screens show `title` and `message`), the source not added.
+export const JAILBREAK_SOURCE_TITLE = "Jailbreak Source";
+export const JAILBREAK_SOURCE_MESSAGE = "This source lists tweaks for jailbroken iPhones. Cydian adds app sources here.";
+export function jailbreakSourceError() {
+  const e = new Error(JAILBREAK_SOURCE_MESSAGE);
+  e.title = JAILBREAK_SOURCE_TITLE;
+  e.code = "jailbreak_source";
+  return e;
+}
+
 // Wraps a backend's source calls (core/sources.js sourceCalls, or backend-native's) so AltStore sources live
 // beside the APT ones: listed together (`sort`: the list's order), added from the same Add Source alert, removed
 // and refreshed by key. F16a: Add Source asks core/sources/add.js detectSource what the URL is: an IPA source of
@@ -456,12 +467,28 @@ function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "cydian-al
 // (F48) goes straight to the wrapped calls.
 // opts: { indexedDB, altName, sort, altDefaults: URLs seeded once (F28), arch: () => string, count,
 //         dists: [suite] or () => [suite] (add.js DEFAULT_DISTS when none; give it coreFoundationDist's suite),
-//         coreFoundation: () => number, the phone's kCFCoreFoundationVersionNumber (adds its Telesphoreo suite) }.
+//         coreFoundation: () => number, the phone's kCFCoreFoundationVersionNumber (adds its Telesphoreo suite),
+//         aptAllowed: bool or () => bool (F144, default true), dropApt: bool (F144) }.
+// F144: with aptAllowed false (the sideload build; the website while Settings > Device says Not Jailbroken) APT
+// sources don't exist here: Add refuses one with jailbreakSourceError, and sources() and refreshSources() leave the
+// wrapped calls' list out. dropApt (the sideload build, whose store no jailbreak build reads) also deletes the APT
+// records an older build stored, once, quietly; the website keeps them for when Device says jailbroken again.
 export function withAltSources(calls, backend, opts = {}) {
   let opened = null;
   const store = () => (opened ??= openAltStore({ indexedDB: opts.indexedDB, name: opts.altName, defaults: opts.altDefaults }));
   const sort = opts.sort ?? ((l) => l);
   const value = (v) => (typeof v === "function" ? v() : v);
+  const aptOk = () => opts.aptAllowed == null || Boolean(value(opts.aptAllowed));
+  let dropped = null; // F144: the one sweep of stored APT records (dropApt)
+  const dropOld = () => (dropped ??= calls.sources().then(async (list) => {
+    // `forget` (backend-native): the device store's record only, no apt files read; else removeSource.
+    for (const s of list ?? []) if (!s?.builtin) await (calls.forget ?? calls.removeSource)(s.key).catch(() => {});
+  }).catch(() => {}));
+  const aptList = async () => {
+    if (aptOk()) return calls.sources();
+    if (opts.dropApt) dropOld();
+    return [];
+  };
   async function saveAlt(rec) {
     const db = await store();
     const cur = await db.get(rec.key);
@@ -480,14 +507,18 @@ export function withAltSources(calls, backend, opts = {}) {
   }
   return {
     async sources() {
-      const [apt, alt] = await Promise.all([calls.sources(), store().then((db) => db.list()).catch(() => [])]);
+      const [apt, alt] = await Promise.all([aptList(), store().then((db) => db.list()).catch(() => [])]);
       return sort([...apt, ...alt]);
     },
     async addSource(input) {
-      if (input && typeof input === "object") return calls.addSource(input);
+      if (input && typeof input === "object") {
+        if (!aptOk()) throw jailbreakSourceError(); // a dist repo ({ uri, dist, components }) is always APT
+        return calls.addSource(input);
+      }
       const { detectSource } = await import("./sources/add.js");
       const found = await detectSource(backend, input, await detectOpts());
       if (found.kind === "ipa") return saveAlt(found.source);
+      if (!aptOk()) throw jailbreakSourceError();
       const s = found.source;
       // The wrapped calls check it again on their own terms (and the app writes it into apt's sources).
       return calls.addSource(!s.dist || s.dist.endsWith("/") ? s.uri : { uri: s.uri, dist: s.dist, components: s.components });
@@ -502,7 +533,7 @@ export function withAltSources(calls, backend, opts = {}) {
       const keep = filter ?? (() => true);
       const db = await store().catch(() => null);
       const alt = (db ? await db.list().catch(() => []) : []).filter(keep);
-      const aptWanted = !filter || (await calls.sources().catch(() => [])).some(keep);
+      const aptWanted = aptOk() && (!filter || (await calls.sources().catch(() => [])).some(keep));
       const [apt, alts] = await Promise.all([
         aptWanted ? calls.refreshSources(onEach, filter ? { filter } : undefined) : [],
         // F19: in waves, each with a time limit, and the health fields (core/health.js) saved with the result.

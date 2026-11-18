@@ -8,7 +8,7 @@
 //   ShareRouter.route(item, host)              -> ShareRoute: what this build does with it
 //                jailbreak  repo or AltStore source: Add Source's alert | .ipa: the N2 helper (AppSync Unified or ldid)
 //                           | .deb: the N4 Confirm sheet (apt-get -s install ./file.deb), then the console
-//                sideload   repo or source: Add Source's alert | .ipa: My IPAs, signed on the phone with the user's
+//                sideload   repo or source: Add Source's alert (F144: an APT manager's link is refused: jailbreak source) | .ipa: My IPAs, signed on the phone with the user's
 //                           certificate and installed through the in-app server (Sideload.swift) | .deb: needs a jailbreak
 //   ShareRoute.link(…)                         the cydian:// link the shell hands the page (web/app/share.js)
 //   ShareInbox.stage(file, kind, dirs)         a copy where the helper takes it from (HELPER_IPA_DIR, HELPER_DEB_DIR)
@@ -27,6 +27,7 @@ struct SharedItem: Equatable {
     var isFile = false
     var name = ""            // what to call it: the file's name, the link's last part
     var why: String? = nil   // unknown: why Cydian can't take it
+    var aptLink = false      // F144: unwrapped from an APT manager's link (cydia://, sileo://, zbra://, installer://)
 
     static func unknown(_ why: String, name: String = "") -> SharedItem { SharedItem(kind: .unknown, url: nil, name: name, why: why) }
 }
@@ -52,7 +53,7 @@ enum ShareClassifier {
                             name: link.absoluteString)
         }
         let name = url.lastPathComponent.removingPercentEncoding ?? url.lastPathComponent
-        if let forced { return SharedItem(kind: forced, url: url, name: host) }
+        if let forced { return SharedItem(kind: forced, url: url, name: host, aptLink: forced == .aptRepo) }
         switch url.pathExtension.lowercased() {
         case "ipa", "tipa": return SharedItem(kind: .ipa, url: url, name: name)
         case "deb": return SharedItem(kind: .deb, url: url, name: name)
@@ -184,8 +185,16 @@ enum ShareRouter {
     static let noInstaller = (title: "Can't Install IPAs",
                               message: "Installing an IPA on this jailbreak needs AppSync Unified (or ldid, to sign it ad hoc). Install AppSync Unified from its repo, then share the IPA with Cydian again.")
 
+    // F144: the sideload build keeps no APT sources. A link only an APT manager opens is refused here, with the words
+    // the page's Add uses (web/app/core/altstore.js JAILBREAK_SOURCE_TITLE/MESSAGE); a bare https link may still be an
+    // app source, so it goes to Add, which checks it and refuses an APT repo the same way.
+    static let jailbreakSource = (title: "Jailbreak Source",
+                                  message: "This source lists tweaks for jailbroken iPhones. Cydian adds app sources here.")
+
     static func route(_ item: SharedItem, _ host: ShareHost) -> ShareRoute {
         switch item.kind {
+        case .aptRepo where item.aptLink && host.mode == .sideload:
+            return .refuse(title: jailbreakSource.title, message: jailbreakSource.message)
         case .aptRepo, .altSource:
             guard let u = item.url, let link = try? IntentsCore.addSourceLink(u) else {
                 return .refuse(title: "Can't Add Source", message: "That link can't be added as a source.")

@@ -18,6 +18,17 @@ export function getArch() {
   }
 }
 
+// F144: the website keeps APT sources only while Settings > Device (`cydian.device`, Not Jailbroken unless set)
+// says jailbroken; Not Jailbroken refuses adding one and leaves stored ones out (core/altstore.js aptAllowed).
+export function siteJailbroken(store = globalThis.localStorage) {
+  try {
+    const d = store?.getItem("cydian.device");
+    return Boolean(d) && d !== "none";
+  } catch {
+    return false;
+  }
+}
+
 let backend = null;
 let parser = null;
 
@@ -31,5 +42,6 @@ export function getBackend() {
   // F72: Cydian's own source is always in the list and can't be removed (core/essential.js builtinSources).
   return (backend ??= applyBuiltins(globalThis.cydianNative?.call
     ? createNativeBackend({ sourceOptions })
-    : createHttpBackend({ sourceOptions }), () => builtinSources(detectMode())));
+    : createHttpBackend({ sourceOptions: { ...sourceOptions, aptAllowed: () => siteJailbroken() } }),
+  () => builtinSources(detectMode())));
 }

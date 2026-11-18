@@ -166,6 +166,22 @@ test("route: sources open Add Source in both modes") {
     }
 }
 
+test("F144: an APT manager's link is refused in sideload mode, Add Source in jailbreak mode") {
+    for s in ["cydia://url/https://repo.chariz.com/", "sileo://source/https://havoc.app/", "zbra://sources/add/https://repo.chariz.com/",
+              "installer://add/https://repo.example/"] {
+        let item = ShareClassifier.classify(link: URL(string: s)!)
+        check(item.aptLink, "\(s): aptLink")
+        let r = ShareRouter.route(item, try FakeHost(.sideload))
+        guard case .refuse(let t, let m) = r else { check(false, "sideload \(s): \(r)"); continue }
+        check(t == "Jailbreak Source" && !m.lowercased().contains("hidden") && !m.contains("Settings"), "\(t): \(m)")
+        guard case .addSource = ShareRouter.route(item, try FakeHost(.jailbreak)) else { check(false, "jailbreak \(s)"); continue }
+    }
+    // a bare https link may be an app source without .json: Add checks it
+    guard case .addSource = ShareRouter.route(ShareClassifier.classify(link: URL(string: "https://repo.chariz.com/")!), try FakeHost(.sideload)) else {
+        return check(false, "bare https link, sideload")
+    }
+}
+
 test("route: ipa in jailbreak mode needs AppSync Unified or ldid") {
     let host = try FakeHost(.jailbreak)
     let item = classifyFile("Demo.ipa")

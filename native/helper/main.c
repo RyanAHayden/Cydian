@@ -10,7 +10,6 @@
  *                                             line is Cancel, SIGINT to apt-get)
  *   cydian-helper install-ipa <path>            (F59: an IPA the app downloaded, installed through installd as
  *                                                AppSync's appinst does; ipa.c. Exit 69: can't install ad hoc)
- *   cydian-helper selfupdate <path.deb>                                 (F61: dpkg -i of iFizBox's own update)
  *   cydian-helper simulate-deb | install-deb <path.deb>   (N9: a .deb shared with iFizBox; apt-get -s / install on a
  *                                                           root-owned copy, dependencies from the sources; paid.c)
  *   cydian-helper install-paid <path.deb> <pkg> <version>  (F57: a paid package's .deb the app downloaded from the

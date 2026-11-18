@@ -384,45 +384,6 @@ static int uicache_plan(int argc, const char *prefix, struct helper_plan *p, con
     return 0;
 }
 
-int helper_deb_path_ok(const char *s) {
-    size_t n = strlen(s);
-    if (n < 6 || n > HELPER_DEB_PATH_MAX || s[0] != '/' || strcmp(s + n - 4, ".deb")) return 0;
-    for (size_t i = 0; i < n; i++)
-        if (!(alnum(s[i]) || strchr("._/-", s[i]))) return 0;
-    return !dot_segment(s + 1, n - 1);
-}
-
-/* F61: selfupdate <path>: iFizBox's own update, a .deb from its GitHub release that the app downloaded
- * (Bridge.swift selfupdate.download). dpkg -i with the same conffile options as apt's runs. It installs whatever
- * .deb it is given: the caller check is the boundary, and iFizBox can already install any package through
- * addsource + install. */
-static int selfupdate_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
-                           const char **err) {
-    static char status_dpkg[16];
-    if (argc != 2) { *err = "selfupdate takes one .deb path"; return -1; }
-    if (!helper_deb_path_ok(argv[1])) { *err = "bad .deb path (absolute, [A-Za-z0-9._/-], no . segments, ending .deb)"; return -1; }
-    struct stat st;
-    if (lstat(argv[1], &st) || !S_ISREG(st.st_mode)) { *err = "the .deb is not a regular file"; return -1; }
-    if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/dpkg", prefix) >= sizeof p->path) {
-        *err = "prefix too long"; return -1;
-    }
-    int k = 0;
-    const char **a = p->argv;
-    a[k++] = "dpkg";
-    a[k++] = "--force-confdef";
-    a[k++] = "--force-confold";
-    if (status_fd >= 0) {
-        snprintf(status_dpkg, sizeof status_dpkg, "%d", status_fd);
-        a[k++] = "--status-fd";
-        a[k++] = status_dpkg;
-    }
-    a[k++] = "-i";
-    a[k++] = argv[1];
-    a[k] = NULL;
-    p->argc = k;
-    return 0;
-}
-
 /* --- F71: Roll Back to a .deb N7's daemon kept */
 
 #ifndef CYDIAN_ROOT_UID
@@ -675,7 +636,6 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "simulate-deb")) { p->verb = HV_SIMULATE_DEB; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "install-deb")) { p->verb = HV_INSTALL_DEB; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "app-versions")) { p->verb = HV_APP_VERSIONS; return app_versions_plan(argc, p, err); }
-    else if (!strcmp(verb, "selfupdate")) { p->verb = HV_SELFUPDATE; return selfupdate_plan(argc, argv, prefix, status_fd, p, err); }
     else { *err = "unknown verb (" HELPER_VERBS ")"; return -1; }
 
     int n = argc - 1;

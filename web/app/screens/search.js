@@ -17,6 +17,7 @@ import { displayName, sourcesFor, loadNeverLoaded } from "../core/sources.js";
 import { orderSources, loadOrder } from "../core/sourcelist.js";
 import { getBackend } from "../backend.js";
 import { grouped } from "../nav/ui.js";
+import { discoveryGroup } from "./extras.js";
 
 export const title = "Search";
 
@@ -150,6 +151,9 @@ export function render(body, route, ctx) {
 
   const list = browse.packageList(body, route, [], { letters: false });
   body.append(list.el);
+  // F20: packages from sources the user hasn't added (Canister), under the local results.
+  const others = discoveryGroup(ctx);
+  body.append(others.el);
 
   // Show Incompatible, the iOS version or the Architecture changed (here, in the sheet or in Settings): search
   // again. A page left behind unsubscribes.
@@ -165,6 +169,7 @@ export function render(body, route, ctx) {
     const q = input.value.trim();
     state.query = input.value;
     const seq = ++state.seq;
+    others.search(q.length >= 2 && settings.deviceType() !== "none" ? q : ""); // jailbreak packages only
     if (!q) {
       list.setItems([]);
       note.textContent = "Package names, descriptions and authors.";

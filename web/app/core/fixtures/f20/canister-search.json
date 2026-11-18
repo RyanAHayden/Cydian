@@ -1,0 +1,95 @@
+{
+ "status": "200 OK",
+ "date": "2026-11-17T23:51:44.884349591+00:00",
+ "refs": {
+  "nextPage": null,
+  "previousPage": null
+ },
+ "count": 3,
+ "data": [
+  {
+   "package_id": "me.aspenuwu.zinnia.trial",
+   "latest_version": true,
+   "visible": true,
+   "repository_id": "chariz",
+   "price": "Free",
+   "version": "1.1.4",
+   "architecture": "iphoneos-arm",
+   "name": "Zinnia (Trial)",
+   "description": "A wonderful neon overhaul for your lock screen! (FREE TRIAL VERSION)",
+   "author": "Aspen <support@aspenuwu.me>",
+   "maintainer": "Aspen <support@aspenuwu.me>",
+   "depiction": "https://chariz.com/buy/zinnia-trial",
+   "native_depiction": null,
+   "sileo_depiction": "https://repo.chariz.com/api/sileo/package/me.aspenuwu.zinnia.trial/depiction.json",
+   "icon_url": "https://img.chariz.cloud/icon/zinnia-trial/icon@3x.png",
+   "section": "Tweaks",
+   "repository": {
+    "id": "chariz",
+    "uri": "https://repo.chariz.com",
+    "name": "Chariz",
+    "slug": "chariz",
+    "suite": "./",
+    "component": null,
+    "tier": 1,
+    "visible": true
+   }
+  },
+  {
+   "package_id": "me.aspenuwu.zinnia",
+   "latest_version": true,
+   "visible": true,
+   "repository_id": "chariz",
+   "price": "Free",
+   "version": "1.1.5",
+   "architecture": "iphoneos-arm",
+   "name": "Zinnia",
+   "description": "A wonderful neon overhaul for your lock screen!",
+   "author": "Aspen <support@aspenuwu.me>",
+   "maintainer": "Aspen <support@aspenuwu.me>",
+   "depiction": "https://chariz.com/get/zinnia",
+   "native_depiction": null,
+   "sileo_depiction": "https://repo.chariz.com/api/sileo/package/me.aspenuwu.zinnia/depiction.json",
+   "icon_url": "https://img.chariz.cloud/icon/zinnia/icon@3x.png",
+   "section": "Tweaks",
+   "repository": {
+    "id": "chariz",
+    "uri": "https://repo.chariz.com",
+    "name": "Chariz",
+    "slug": "chariz",
+    "suite": "./",
+    "component": null,
+    "tier": 1,
+    "visible": true
+   }
+  },
+  {
+   "package_id": "com.sss136.filzacodingpro",
+   "latest_version": true,
+   "visible": true,
+   "repository_id": "bigboss",
+   "price": "Free",
+   "version": "0.0.1-1",
+   "architecture": "iphoneos-arm",
+   "name": "Filza Coding Pro",
+   "description": "Features for easy coding in Filza app",
+   "author": "SsS136 <shibuya0118@icloud.com>",
+   "maintainer": "BigBoss <bigboss@thebigboss.org>",
+   "depiction": "http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=filzacodingproDp",
+   "native_depiction": null,
+   "sileo_depiction": null,
+   "icon_url": "file:///Library/PreferenceBundles/FilzaCodingPro.bundle/icon@2x.png",
+   "section": "Tweaks",
+   "repository": {
+    "id": "bigboss",
+    "uri": "http://apt.thebigboss.org/repofiles/cydia",
+    "name": "BigBoss",
+    "slug": "bigboss",
+    "suite": "stable",
+    "component": "main",
+    "tier": 2,
+    "visible": true
+   }
+  }
+ ]
+}

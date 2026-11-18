@@ -33,6 +33,7 @@ import { apps, recordInstall } from "../core/installed.js";
 import { openInGroup } from "./handoff.js";
 import { healthOf } from "../core/health.js";
 import { addSource } from "./manage.js";
+import { featuredStrip, paymentGroup } from "./extras.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -178,6 +179,7 @@ async function drawSections(page) {
   if (!editing && key !== ALL) {
     const source = await getBackend().sources().then((l) => l.find((x) => x.key === key)).catch(() => null);
     if (source && turn === page.draw && body.isConnected) {
+      body.prepend(featuredStrip(source)); // F20: the source's sileo-featured.json banners, above its sections
       body.append(openInGroup(source));
       body.append(grouped([{ footer: healthOf(source).label }])); // F19: last reached, last Release, Not Responding
     }
@@ -469,6 +471,7 @@ async function renderPackage(body, route, key, id, ctx) {
   }
 
   body.replaceChildren(headGroup);
+  if (!pkg.installedOnly) body.append(paymentGroup(st, source, ctx)); // F20: price; in the app Sign In, Buy, Install
   const later = [];
   if (groups.length) later.push(...groups);
   body.append(grouped(later));

@@ -7,7 +7,7 @@
 //   - a grouped list like Cydia's help links: Upgrading & Jailbreaking Help (our page), Find Extensions for
 //     Applications (Search), More Package Sources (a curated list, one tap adds a source), About
 // Every tile and row is a .cell-inner link, so it gets the table cells' held look (blue selection) from ios6.css
-// and app.js. Featured banners from sources' sileo-featured.json go above the tiles once F20 lands.
+// and app.js. Featured banners from sources' sileo-featured.json sit above the tiles (F20, screens/extras.js).
 //
 // Routes below the tab: help, featured, sources (More Package Sources), about, and browse (F46): Browse's list
 // (Popular, then the categories), browse/popular, browse/category:<name>, and below those browse.js's tokens
@@ -20,6 +20,7 @@ import { sourceKey } from "../core/sources.js";
 import { settings } from "./settings.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
+import { homeFeatured } from "./extras.js";
 
 export const title = "Home";
 
@@ -251,6 +252,7 @@ function renderRoot(body) {
   home.append(
     head,
     hintBox,
+    homeFeatured(), // F20: sources' sileo-featured.json banners, a couple from each
     tileRow("pair",
       tile({ label: "GitHub", href: REPO_URL, glyph: "github", external: true }),
       tile({ label: "Sources", href: format({ tab: "sources" }), glyph: "sources" })),
@@ -301,6 +303,7 @@ function renderHelp(body) {
 }
 
 function renderFeatured(body) {
+  body.append(homeFeatured()); // F20
   body.append(grouped([{
     rows: [...(showsThemes(settings.deviceType()) ? [{ label: "Browse Themes", href: format({ tab: "sources", path: ["*", "section:Themes"] }) }] : []),
       { label: "All Packages", href: format({ tab: "sources", path: ["*", "section:*"] }) }],

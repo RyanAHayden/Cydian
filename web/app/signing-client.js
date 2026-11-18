@@ -235,7 +235,7 @@ export async function installOnDevice(opts, deps) {
 }
 
 async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false },
-  { native, hud = progressHUD, alert = showAlert, go = openRoute, later = setTimeout } = {}) {
+  { native, hud = progressHUD, alert = showAlert, go = openRoute, later = setTimeout, follow = null } = {}) {
   const h = hud("Downloading");
   let result;
   try {
@@ -258,6 +258,14 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   // (native CloseForUpdate): say so first (user 2026-11-18).
   if (host) showBanner({ title: "Cydian", message: "Press Install. Cydian closes to finish updating; open it again once the new icon appears." });
   if (after) { after(result, h); return true; }
+  // F169: a plain Install follows iOS's install too (signing-sheet.js followInstall), so it ends on F155's
+  // Open <app>, as Custom Install and My IPAs do. Not for Cydian itself (host, or its own IPA or ID): iOS closes
+  // Cydian while it installs over it, and there's nothing to open.
+  if (result?.bundleId && !host && !isSelfIpa(url) && result.bundleId !== CYDIAN_ID) {
+    const followInstall = follow ?? (await import("./signing-sheet.js")).followInstall;
+    followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name });
+    return true;
+  }
   // iOS asks "Install …?" over the app: the progress page ends on Done (signed and handed to iOS), Return under it.
   later(() => (h.done ? h.done("Done") : h.hide()), 1200);
   return true;

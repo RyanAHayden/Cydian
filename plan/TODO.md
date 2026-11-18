@@ -10,7 +10,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **F82** Home's Reload like Cydia's (user 2026-11-17: "can the IPA and possibly web page reload match real cydia for the reload. it changes the top right button to the spinner and reloads without having a huge flicker of reloading"). Pressing Reload turns the nav button into Cydia's small white spinner (the button's own spot, sampled from Cydia on the 4S) while Home's content and the sources reload, then back to Reload; the page keeps showing its content and swaps it in place when ready: no Loading screen, no flash. App and website. t: node test that Reload keeps the content and restores the button; the user tries it on the iPhone. | files: web/app/screens/queue.js, web/app/screens/altstore.js, web/app/screens/changes.js, web/app/signing-sheet.js, web/app/screens/home.js
 - [~] **T2** Deploy: `deploy.sh` of our own design (TrueNAS: pull main and rebuild when it changes), the public URL behind Cloudflare Tunnel, `README.md` setup. The NAS side needs a human (ssh truenas). Write the steps and block on them. | files: deploy.sh, README.md | after: F5 — From the F3 review: set CYDIAN_PROXY_HOPS for the Cloudflare Tunnel hop(s), or every visitor shares one rate-limit bucket (request.remote_addr would be the tunnel). BLOCKED: needs the user to run the NAS steps in README (Deploy section): clone on TrueNAS, .env with CYDIAN_PROXY_HOPS=1, first ./deploy.sh, cron job, Cloudflared app + public hostname; and approve publishing
 
 ### Research (any time, parallel)

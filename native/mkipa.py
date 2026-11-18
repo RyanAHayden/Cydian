@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write and check Cydian's sideload IPA (task I2) with the stdlib only.
+"""Write and check iFizBox's sideload IPA (task I2) with the stdlib only.
 
     mkipa.py plist <Info.plist> <overlay.plist> <out>   Info.plist with the overlay's keys added (Info-sideload.plist)
     mkipa.py build <Cydian.app> <out.ipa>               zip the app as Payload/Cydian.app, reproducibly

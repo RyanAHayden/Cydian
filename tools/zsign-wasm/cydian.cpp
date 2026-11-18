@@ -1,5 +1,5 @@
 // Two calls the website's signing worker (web/app/signing-worker.js) makes into zsign's own code before main():
-// unzip the IPA (zsign then signs the folder, after the worker has read the app's Info.plist and, for Cydian's own
+// unzip the IPA (zsign then signs the folder, after the worker has read the app's Info.plist and, for iFizBox's own
 // IPA, added the files it carries) and read a plist (binary or XML) as JSON. Built by tools/build-zsign-wasm.sh.
 #include <emscripten.h>
 #include "common.h"

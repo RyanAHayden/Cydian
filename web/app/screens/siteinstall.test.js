@@ -1,6 +1,6 @@
 // The website's Install (F92, user 2026-11-18: "the webpage install still shows open in and get in all these apps. we
 // shouldnt"): an app page offers only Install and Download IPA. F93: Install signs in the browser
-// (signing-client.js signInBrowser), and Home's Install Cydian App signs Cydian (home.js installApp). My IPAs' links
+// (signing-client.js signInBrowser), and Home's Install iFizBox App signs iFizBox (home.js installApp). My IPAs' links
 // (F95) still say the certificate is needed, with Download IPA beside OK. Share keeps the sideloaders.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -17,12 +17,12 @@ const SITE = { site: true, jailbreak: false, custom: false };
 
 const CYDIAN = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.7/Cydian.ipa" };
 
-test("the website's Install rows: Cydian installs in the browser; other apps go to Cydian first (F96), no hand-offs", () => {
-  const own = installRows(CYDIAN, "https://example.com/apps.json", () => {}, () => {}, null, "Cydian", SITE).rows;
+test("the website's Install rows: iFizBox installs in the browser; other apps go to iFizBox first (F96), no hand-offs", () => {
+  const own = installRows(CYDIAN, "https://example.com/apps.json", () => {}, () => {}, null, "iFizBox", SITE).rows;
   assert.deepEqual(labels(own), ["Install", "Download IPA"]);
   assert.equal(own[0].subtitle, SITE_INSTALL_SUBTITLE);
   const { rows } = installRows(V, "https://example.com/apps.json", () => {}, () => {}, null, "Delta", SITE);
-  assert.deepEqual(labels(rows), ["Install in Cydian", "Download IPA", "Install on the Website"]);
+  assert.deepEqual(labels(rows), ["Install in iFizBox", "Download IPA", "Install on the Website"]);
   assert.ok(!rows.some((r) => r.handoff), "no hand-off rows");
   assert.ok(!rows.some((r) => /Open in|Get in|AltStore|SideStore|Feather/.test(`${r.label} ${r.subtitle}`)), labels(rows).join());
   assert.doesNotMatch(SITE_INSTALL_FOOTER, /AltStore|SideStore|Feather|Open in/);
@@ -65,22 +65,22 @@ test("the sideload app still signs: Install, no hand-offs", () => {
   assert.equal(rows[0].needsCertificate, undefined);
 });
 
-test("by default (no bridge: the website in node) Cydian installs in the browser and other apps get the F96 rows", () => {
+test("by default (no bridge: the website in node) iFizBox installs in the browser and other apps get the F96 rows", () => {
   const saved = globalThis.cydianNative;
   try {
     delete globalThis.cydianNative;
     assert.deepEqual(labels(installRows(CYDIAN, null).rows), ["Install", "Download IPA"]);
-    assert.deepEqual(labels(installRows(V, null).rows), ["Install in Cydian", "Download IPA", "Install on the Website"]);
+    assert.deepEqual(labels(installRows(V, null).rows), ["Install in iFizBox", "Download IPA", "Install on the Website"]);
   } finally { if (saved) globalThis.cydianNative = saved; }
   assert.match(SITE_INSTALL_FOOTER, /signs the app here in the browser/);
 });
 
-test("the install hand-offs are gone (F95): nothing builds Open in Cydian / Get in links", () => {
+test("the install hand-offs are gone (F95): nothing builds Open in iFizBox / Get in links", () => {
   assert.equal(handoff.installLinks, undefined);
   assert.equal(handoff.HANDOFF_APPS, undefined);
 });
 
-test("Home's Install Cydian App (F93): signs Cydian with the certificate, or opens Settings > Signing; no sideloaders", async () => {
+test("Home's Install iFizBox App (F93): signs iFizBox with the certificate, or opens Settings > Signing; no sideloaders", async () => {
   const calls = [];
   let marked = 0;
   const deps = (ready, bring) => ({ ready: async () => ready, bring: () => bring, go: (h) => calls.push(["go", h]), installed: () => marked++,

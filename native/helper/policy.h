@@ -11,7 +11,7 @@
 
 /* Exit codes of the helper itself (sysexits.h values); anything else is apt's or dpkg's own. */
 #define HELPER_EX_USAGE 64  /* refused: verb, package name or unknown package */
-#define HELPER_EX_NOPERM 77 /* refused: caller isn't Cydian running as root */
+#define HELPER_EX_NOPERM 77 /* refused: caller isn't iFizBox running as root */
 #define HELPER_EX_EXEC 126  /* apt-get or dpkg couldn't be run */
 #define HELPER_EX_IOERR 74  /* F33: cydian.sources couldn't be read or written */
 
@@ -75,7 +75,7 @@ struct helper_plan {
     char deb[PATH_MAX]; /* F71 rollback: the stored .deb apt-get installs (also in argv) */
 };
 
-/* F61: selfupdate <path>: dpkg -i of the one .deb the app downloaded (Cydian's own update). The path is absolute,
+/* F61: selfupdate <path>: dpkg -i of the one .deb the app downloaded (iFizBox's own update). The path is absolute,
  * of [A-Za-z0-9._/-], with no "." or ".." segment, ends in ".deb", at most HELPER_DEB_PATH_MAX bytes, and is a
  * regular file (not a symlink) when the plan is made. */
 #define HELPER_DEB_PATH_MAX 1024
@@ -123,7 +123,7 @@ int helper_rollback_verify(const char *prefix, const char *deb, const char *id, 
  * bytes, no "..". */
 int helper_paid_path_ok(const char *dir, const char *path);
 
-/* N9: simulate-deb <path> | install-deb <path>: a .deb another app handed Cydian (Open in Cydian, the share sheet),
+/* N9: simulate-deb <path> | install-deb <path>: a .deb another app handed iFizBox (Open in iFizBox, the share sheet),
  * which the app copied into <HELPER_DEB_DIR>/<name>.deb (name as helper_paid_path_ok). paid.c copies it into a
  * root-owned work directory as install-paid does, then runs apt-get on the copy, so apt resolves its dependencies
  * from the sources (`apt install ./file.deb`):
@@ -137,7 +137,7 @@ int helper_paid_path_ok(const char *dir, const char *path);
 #endif
 
 /* I4: app-versions (no arguments) runs nothing: ipa.c helper_app_versions lists the version of every app installd
- * put in HELPER_APPS_DIR, for the jailbreak app's Installed apps (the real version, not the one Cydian remembers).
+ * put in HELPER_APPS_DIR, for the jailbreak app's Installed apps (the real version, not the one iFizBox remembers).
  * path is the folder, argv the verb. Tests build with their own -DHELPER_APPS_DIR. */
 #ifndef HELPER_APPS_DIR
 #define HELPER_APPS_DIR "/var/containers/Bundle/Application"

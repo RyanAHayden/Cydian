@@ -392,9 +392,9 @@ int helper_deb_path_ok(const char *s) {
     return !dot_segment(s + 1, n - 1);
 }
 
-/* F61: selfupdate <path>: Cydian's own update, a .deb from its GitHub release that the app downloaded
+/* F61: selfupdate <path>: iFizBox's own update, a .deb from its GitHub release that the app downloaded
  * (Bridge.swift selfupdate.download). dpkg -i with the same conffile options as apt's runs. It installs whatever
- * .deb it is given: the caller check is the boundary, and Cydian can already install any package through
+ * .deb it is given: the caller check is the boundary, and iFizBox can already install any package through
  * addsource + install. */
 static int selfupdate_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
                            const char **err) {
@@ -719,7 +719,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
             a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confold";
             a[k++] = "--allow-unauthenticated";
         } else {
-            /* N6: most jailbreak repos (BigBoss, Cydian's own, repo.palera.in with its key missing) are unsigned, and
+            /* N6: most jailbreak repos (BigBoss, iFizBox's own, repo.palera.in with its key missing) are unsigned, and
              * apt-get update exits 100 on one. Read them, as Sileo and Zebra do. A repo that was signed still can't
              * go unsigned unnoticed: Acquire::AllowDowngradeToInsecureRepositories stays false. */
             a[k++] = "-o"; a[k++] = "Acquire::AllowInsecureRepositories=true";
@@ -800,7 +800,7 @@ int helper_first_unknown(const char *prefix, const struct helper_plan *p) {
 int helper_caller_ok(uid_t uid, uid_t euid, uid_t root_uid, const char *parent_exe, const char *expected_exe,
                      const char **err) {
     if (uid != root_uid || euid != root_uid) {
-        *err = "not root: Cydian must spawn the helper with the root persona";
+        *err = "not root: the app must spawn the helper with the root persona";
         return -1;
     }
     struct stat a, b;
@@ -809,7 +809,7 @@ int helper_caller_ok(uid_t uid, uid_t euid, uid_t root_uid, const char *parent_e
         return -1;
     }
     if (a.st_dev != b.st_dev || a.st_ino != b.st_ino) {
-        *err = "the calling process isn't Cydian";
+        *err = "the calling process isn't the installed app";
         return -1;
     }
     return 0;

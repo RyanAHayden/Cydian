@@ -6,7 +6,7 @@
 	<key>CFBundleExecutable</key><string>CydianWidget</string>
 	<key>CFBundleIdentifier</key><string>com.ryha.cydian.widget</string>
 	<key>CFBundleName</key><string>CydianWidget</string>
-	<key>CFBundleDisplayName</key><string>Cydian</string>
+	<key>CFBundleDisplayName</key><string>$(BRAND_NAME)</string>
 	<key>CFBundlePackageType</key><string>XPC!</string>
 	<key>CFBundleShortVersionString</key><string>@VERSION@</string>
 	<key>CFBundleVersion</key><string>@BUILD@</string>

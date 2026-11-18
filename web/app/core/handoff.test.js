@@ -1,4 +1,4 @@
-// F8: every "Open in" link and Cydian's /add link, exactly as each app's source code reads it.
+// F8: every "Open in" link and iFizBox's /add link, exactly as each app's source code reads it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { sourceLinks, packageLinks, formatOf, addLink, parseAddLink, siteOrigin, isAddPath, PUBLIC_SITE } from "./handoff.js";

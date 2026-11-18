@@ -1,6 +1,6 @@
 // F129: installRows hands the app's own bundle ID (AltStore's bundleIdentifier, else the .ipa row's id) to
 // signAndInstall, so a wildcard profile's website install opens iOS's prompt from the Install tap (F121's
-// expectedBundleId). The website's gated Install on the Website, Cydian's own Install, and the sideload app's Install.
+// expectedBundleId). The website's gated Install on the Website, iFizBox's own Install, and the sideload app's Install.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { installRows, appBundleId } from "./altstore.js";
@@ -26,7 +26,7 @@ test("the website's Install on the Website signs with the app's bundle ID", asyn
   assert.equal(calls[0].url, V.downloadURL);
 });
 
-test("Cydian's own website Install and the sideload app's Install pass it too", async () => {
+test("iFizBox's own website Install and the sideload app's Install pass it too", async () => {
   const own = rowsWith(CYDIAN, { site: true, bundleId: "com.ryha.cydian" });
   await own.rows[0].onClick();
   assert.equal(own.calls[0].bundleId, "com.ryha.cydian");

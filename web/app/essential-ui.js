@@ -3,9 +3,9 @@
 //
 //   jailbreak   catalog.upgrades (apt's lists) + dpkg's status (Essential: yes) + the built-in repo's minimum.
 //               Complete Upgrade and Essential Only queue the upgrades (N4), and the Confirm sheet opens.
-//   sideload    Cydian's own AltStore source, read once per launch: Cydian's newest version and its minimum.
+//   sideload    iFizBox's own AltStore source, read once per launch: iFizBox's newest version and its minimum.
 //               F86: Complete Upgrade queues every upgrade Changes lists (Upgrade (N)'s queueUpgrades), Essential
-//               Only just Cydian, in the app queue, and F80's Confirm opens (Cydian last: installing it closes the
+//               Only just iFizBox, in the app queue, and F80's Confirm opens (iFizBox last: installing it closes the
 //               app). Nothing could be queued (no Cydian.ipa in the source): installSelfNow says why.
 // Either build, forced (below the minimum): Confirm's Cancel brings the alert back (core/essential.js queueEssential).
 // Nothing found to read (the built-in source never loaded, offline): resolves "unknown", and app.js falls back on
@@ -20,6 +20,7 @@ import { parseStatus } from "./core/installed.js";
 import { showAlert } from "./nav/alert.js";
 import { settings } from "./screens/settings.js";
 import { installOnDevice } from "./signing-client.js";
+import { NAME } from "./brand.js";
 
 const native = () => globalThis.cydianNative;
 const storage = () => { try { return globalThis.localStorage; } catch { return null; } };
@@ -37,21 +38,21 @@ async function openOutside(url) {
   location.href = url;
 }
 
-// ---- sideload: Cydian's own AltStore source -----------------------------------------------------------------
+// ---- sideload: iFizBox's own AltStore source -----------------------------------------------------------------
 
 export async function readSelfInfo() {
   // A fresh copy: raw.githubusercontent.com caches for 5 minutes, and a query of its own skips that cache.
   const info = selfFromAltSource(await getBackend().text(`${SELF_ALT_URL}?t=${Date.now()}`));
   if (info) {
     saveInfo(storage(), info);
-    // Changes counts Cydian's own upgrade from this (upgradesWithSelf): it may have counted before it was read at
+    // Changes counts iFizBox's own upgrade from this (upgradesWithSelf): it may have counted before it was read at
     // launch (user 2026-11-18: the 0.3.8 banner came, Changes had no row and no badge).
     globalThis.dispatchEvent?.(new Event("cydian:self-info"));
   }
   return info;
 }
 
-// Changes (sideload): the upgrades with Cydian's own row on top, from what the last launch read.
+// Changes (sideload): the upgrades with iFizBox's own row on top, from what the last launch read.
 export async function upgradesWithSelf(upgrades) {
   if (detectMode() !== "sideload") return upgrades;
   const info = loadInfo(storage());
@@ -63,7 +64,7 @@ export async function installSelfNow(row) {
   // The sideload app signs its own update on the phone and hosts it on the Signing Server (signing.install host:
   // true): straight to iOS's Install prompt, the key never leaves the phone. Without the bridge: installSelf.
   if (detectMode() === "sideload" && row?.ipa && globalThis.cydianNative?.call) {
-    const ok = await installOnDevice({ url: row.ipa, name: "Cydian", host: true });
+    const ok = await installOnDevice({ url: row.ipa, name: NAME, host: true });
     return ok ? "installing" : "failed";
   }
   return installSelf(row, { alert: showAlert, open: openOutside });
@@ -84,7 +85,7 @@ function queueAll(rows) {
 // ---- sideload: the app queue (F80) ----------------------------------------------------------------------------
 
 // Complete Upgrade: what Changes' Upgrade (N) would queue, read when the button is tapped (the alert doesn't wait
-// for the catalog): every app upgrade, with Cydian's own row on top. Unreadable: just the rows the alert had.
+// for the catalog): every app upgrade, with iFizBox's own row on top. Unreadable: just the rows the alert had.
 async function sideloadAll(rows) {
   try {
     const { withAppUpgrades } = await import("./app-updates.js");
@@ -120,7 +121,7 @@ function lock(prompt) {
   block = document.createElement("div");
   block.className = "essential-block";
   Object.assign(block.style, { position: "fixed", inset: "0", zIndex: "10", background: "transparent" });
-  block.setAttribute("aria-label", "Cydian needs to upgrade itself first");
+  block.setAttribute("aria-label", `${NAME} needs to upgrade itself first`);
   block.addEventListener("click", () => prompt().catch(() => {}));
   document.body.append(block);
 }
@@ -145,14 +146,14 @@ async function gather(mode) {
   return { current, minimum: minimumOf(self), essential: essentialUpgrades(upgrades.available, ids), all: upgrades.available };
 }
 
-// A Cydian update that isn't required: the iOS 6 banner, "Cydian X is out", with Upgrade (queues it, Confirm opens).
-// Once per version per session, so coming back to Cydian doesn't show it again.
+// A iFizBox update that isn't required: the iOS 6 banner, "iFizBox X is out", with Upgrade (queues it, Confirm opens).
+// Once per version per session, so coming back to iFizBox doesn't show it again.
 let bannered = null;
 function bannerOnce(rows, upgrade) {
   const v = rows.find((r) => r.id === SELF_ID)?.version ?? rows[0]?.version ?? "";
   if (!v || bannered === v) return;
   bannered = v;
-  showBanner({ title: "Cydian", message: `Cydian ${v} is out.`, action: { label: "Upgrade", onClick: upgrade } });
+  showBanner({ title: NAME, message: `${NAME} ${v} is out.`, action: { label: "Upgrade", onClick: upgrade } });
 }
 
 let running = null;

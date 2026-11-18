@@ -1,4 +1,4 @@
-// I7: when the website offers the Cydian app (core/appoffer.js): Home's tile, in the app or not, Not Jailbroken or
+// I7: when the website offers the iFizBox app (core/appoffer.js): Home's tile, in the app or not, Not Jailbroken or
 // not. F89: no certificate on the website, so Not Jailbroken always gets the sideloaders.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -6,7 +6,7 @@ import { homeOffer, debUrl, debAlert, APP_IPA_URL, APP_DEB_URL, APP_SOURCE_URL }
 import { parseRelease, debFor } from "./selfupdate.js";
 import { DEFAULT_ALT_SOURCES } from "./sources.js";
 
-test("Home: Not Jailbroken on the site, the tile hands Cydian to a sideloader (F89)", () => {
+test("Home: Not Jailbroken on the site, the tile hands iFizBox to a sideloader (F89)", () => {
   assert.deepEqual(homeOffer({ mode: "site", deviceType: "none" }), { action: "sideloaders" });
   assert.deepEqual(homeOffer(), { action: "sideloaders" });
 });
@@ -38,7 +38,7 @@ test("the .deb: the release's asset for the arch, else rootless Cydian.deb, else
   assert.match(debAlert("iphoneos-arm", null).message, /rootful/);
 });
 
-test("the IPA and the source: the release's latest Cydian.ipa, Cydian's source first among the defaults", () => {
+test("the IPA and the source: the release's latest Cydian.ipa, iFizBox's source first among the defaults", () => {
   assert.match(APP_IPA_URL, /\/releases\/latest\/download\/Cydian\.ipa$/);
   assert.equal(DEFAULT_ALT_SOURCES[0], APP_SOURCE_URL);
 });

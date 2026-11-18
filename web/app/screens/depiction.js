@@ -239,7 +239,7 @@ const VIEWS = {
     box.append(f);
     return box;
   },
-  // Sileo shows `view` only when Sileo is at least `minVersion`; Cydian draws every view it knows, so it always shows.
+  // Sileo shows `view` only when Sileo is at least `minVersion`; iFizBox draws every view it knows, so it always shows.
   DepictionMinVersionForceView(v, opts) {
     return view(v.view, opts);
   },

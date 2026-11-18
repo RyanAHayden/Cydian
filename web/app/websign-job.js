@@ -7,7 +7,7 @@
 //
 // `createZsign` is the module factory (vendor/zsign/zsign.js; a fake in the tests): it takes { print, printErr }
 // and resolves a module with FS, ccall and callMain. A fresh module per job: zsign's main() keeps globals.
-// bring (Cydian's own IPA only, com.ryha.cydian): { identity: true } puts the .p12, password and profile inside the
+// bring (iFizBox's own IPA only, com.ryha.cydian): { identity: true } puts the .p12, password and profile inside the
 // app as cydian-identity.plist (the app imports it on first launch, native BundledIdentity) and { transfer: link }
 // writes the website's cydian://import link as web/transfer.link (app.js imports it once); both before zsign seals
 // the bundle, as the old server signer did.
@@ -53,7 +53,7 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   const bundleId = targetBundleId(prof.appId, info.bundleId);
   // App extensions (PlugIns, a Watch app) come out: zsign gives every binary the app's own entitlements, which don't
   // match an extension's bundle ID, and iOS then refuses the app ("its integrity could not be verified", user
-  // 2026-11-18, Cydian's Share and Widget). The app's own Sign Options do the same with Remove App Extensions.
+  // 2026-11-18, iFizBox's Share and Widget). The app's own Sign Options do the same with Remove App Extensions.
   for (const dir of ["PlugIns", "Extensions", "Watch"]) removeTree(FS, `${appDir}/${dir}`);
 
   FS.writeFile("/w/key.p12", new Uint8Array(p12));

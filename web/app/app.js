@@ -40,6 +40,7 @@ import { showReloadBar } from "./nav/reloadbar.js";
 import { catalog } from "./catalog.js";
 import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
+import { NAME } from "./brand.js";
 
 const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
 
@@ -224,7 +225,7 @@ const router = createRouter({
     swipedBack = false;
     ownBack = false;
     updateEdge();
-    document.title = r.to.page.title === "Cydian" ? "Cydian" : `${r.to.page.title} · Cydian`;
+    document.title = r.to.page.title === NAME ? NAME : `${r.to.page.title} · ${NAME}`;
   },
 });
 
@@ -295,8 +296,8 @@ attachEdgeSwipe(edgeEl, {
 
 // Tab taps go through selectTab so each tab keeps its place; the href is there for no-JS fallbacks and a11y.
 for (const tab of BAR_TABS) tabbar.items[tab].href = format({ tab });
-// The website before Cydian is installed (websign-gate.js browsingLocked): only Home in the tab bar (Settings is on
-// Home's stack since F123, so it stays reachable); the others are dimmed with a lock, and a tap asks Install Cydian
+// The website before iFizBox is installed (websign-gate.js browsingLocked): only Home in the tab bar (Settings is on
+// Home's stack since F123, so it stays reachable); the others are dimmed with a lock, and a tap asks Install iFizBox
 // First (user 2026-11-18). Ignore unlocks them all.
 const OPEN_TABS = new Set(["home"]);
 let gate = null;
@@ -405,7 +406,7 @@ if (standalone) {
   }, true);
 }
 router.start();
-// F93 (as before F89): first launch of a Cydian installed from the website: its signed copy carries the website's
+// F93 (as before F89): first launch of a iFizBox installed from the website: its signed copy carries the website's
 // sources and settings as web/transfer.link (signed in the browser, websign-job.js); import them once, no question.
 // Only on the very first launch (user 2026-11-17: the website is rarely used after that).
 if (globalThis.cydianNative) {
@@ -428,10 +429,10 @@ if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 // Refresh on Launch: in the background, with the Sources tab's spinning red badge (screens/sources.js).
 if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch")) SCREENS.sources.refreshInBackground?.(ctx);
 
-// F72: in the app, once the launch has settled, the Essential Upgrade alert when Cydian (or, jailbroken, apt, dpkg or
-// another Essential: yes package) has an upgrade on Cydian's built-in source. It replaces F61's own popup: only when
+// F72: in the app, once the launch has settled, the Essential Upgrade alert when iFizBox (or, jailbroken, apt, dpkg or
+// another Essential: yes package) has an upgrade on iFizBox's built-in source. It replaces F61's own popup: only when
 // that source couldn't be read does F61 look on GitHub (at most once a day).
-// F75: cydian:// links from the website (Send Settings, Home's Open in Cydian App) and elsewhere (incoming.js).
+// F75: cydian:// links from the website (Send Settings, Home's Open in iFizBox App) and elsewhere (incoming.js).
 // cydian://install (F89) is no longer sent by the website since F92/F95: only for links already out there.
 if (globalThis.cydianNative) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
 
@@ -447,7 +448,7 @@ globalThis.cydianShortcut = async (type) => {
 if (globalThis.cydianPendingShortcut) { globalThis.cydianShortcut(globalThis.cydianPendingShortcut); globalThis.cydianPendingShortcut = null; }
 
 if (globalThis.cydianNative) {
-  // Every launch (Home's Reload is one) and every return: Cydian's source first (the Essential Upgrade alert); when
+  // Every launch (Home's Reload is one) and every return: iFizBox's source first (the Essential Upgrade alert); when
   // that found nothing to say, GitHub's release, without the once-a-day wait (user 2026-11-17: only Settings' Check
   // for Updates showed it).
   const lookForUpdates = () => startEssential()
@@ -455,18 +456,18 @@ if (globalThis.cydianNative) {
     .catch(() => {});
   setTimeout(lookForUpdates, 2000);
   globalThis.addEventListener("cydian:reloaded", lookForUpdates); // Home's Reload (screens/home.js reloadHome)
-  // The first launch after Cydian updated itself (iOS closed the old one as it installed this one): say so.
+  // The first launch after iFizBox updated itself (iOS closed the old one as it installed this one): say so.
   appVersion().then((v) => {
     if (!v) return;
     let last = null;
     try { last = localStorage.getItem("cydian.lastVersion"); localStorage.setItem("cydian.lastVersion", v); } catch { return; }
     if (last && last !== v) {
-      showBanner({ title: "Cydian", message: `Updated to ${v}.`, duration: 4000 });
+      showBanner({ title: NAME, message: `Updated to ${v}.`, duration: 4000 });
       // The icon badge counted this very update: clear it; Changes sets it again with what's still waiting (user 2026-11-18).
       Promise.resolve(globalThis.cydianNative.call("app.badge", { count: 0 })).catch(() => {});
     }
   }).catch(() => {});
-  // Back in the foreground after a while: look again (an essential update can come out while Cydian sits in the
+  // Back in the foreground after a while: look again (an essential update can come out while iFizBox sits in the
   // background, and iOS rarely cold-launches it).
   let lastEssential = Date.now();
   document.addEventListener("visibilitychange", () => {

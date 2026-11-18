@@ -84,7 +84,7 @@ final class InstallServer {
         idle = w
         queue.asyncAfter(deadline: .now() + ttl, execute: w)
         DispatchQueue.main.async {
-            // iOS's install sheet can send Cydian to the background mid-download; ask for the time to finish.
+            // iOS's install sheet can send iFizBox to the background mid-download; ask for the time to finish.
             if self.task == .invalid {
                 self.task = UIApplication.shared.beginBackgroundTask(withName: "cydian.install") { self.endBackground() }
             }

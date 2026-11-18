@@ -14,13 +14,13 @@ here=$(cd "$(dirname "$0")" && pwd)
 native=$(dirname "$here")
 [ $# -eq 2 ] || { sed -n '2,12p' "$0" >&2; exit 2; }
 variant=$1 app=$2
-: "${SWIFTC:?}" "${SDK:?}" "${RD:?}" "${LLD:?}" "${OUT:?}" "${VERSION:?}" "${BUILD:?}"
+: "${SWIFTC:?}" "${SDK:?}" "${RD:?}" "${LLD:?}" "${OUT:?}" "${VERSION:?}" "${BUILD:?}" "${BRAND_NAME:?}"
 min=17.0 target=arm64-apple-ios17.0
 obj=$OUT/widget-$variant
 appex=$app/PlugIns/CydianWidget.appex
 mkdir -p "$obj" "$appex"
 
-sources=("$here/Widget.swift" "$native/intents/Core.swift" "$native/sign/Updates.swift")
+sources=("$here/Widget.swift" "$native/intents/Core.swift" "$native/sign/Updates.swift" "$native/sign/Brand.swift")
 flags=()
 cobjs=("$obj/availability.o")
 if [ "$variant" = jailbreak ]; then
@@ -43,7 +43,7 @@ clang -target "$target" -isysroot "$SDK" -fuse-ld=lld --ld-path="$LLD" -fapplica
   "${cobjs[@]}" -L "$SDK/usr/lib/swift" -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
   -o "$appex/CydianWidget"
 
-sed -e "s/@VERSION@/$VERSION/" -e "s/@BUILD@/$BUILD/" -e "s/@MIN@/$min/" "$here/Info.plist" > "$appex/Info.plist"
+sed -e "s/@VERSION@/$VERSION/" -e "s/@BUILD@/$BUILD/" -e "s/@MIN@/$min/" -e "s/\$(BRAND_NAME)/$BRAND_NAME/g" "$here/Info.plist" > "$appex/Info.plist"
 rm -rf "$appex/Metadata.appintents"
 if [ "$variant" = jailbreak ]; then
   python3 "$native/intents/metadata.py" build "$obj/CydianWidget.swiftconstvalues" "$appex/Metadata.appintents" >/dev/null

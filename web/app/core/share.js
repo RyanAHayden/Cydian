@@ -1,4 +1,4 @@
-// N9: the share sheet and Open in Cydian, the pure part (share.js draws it). The shell (native/share/) has already
+// N9: the share sheet and Open in iFizBox, the pure part (share.js draws it). The shell (native/share/) has already
 // classified what was shared and picked its route (native/share/Share.swift ShareRouter); it hands the page
 // cydian://shared?route=…, or N8's cydian://add?url=… for an APT repo or AltStore source (incoming.js).
 //

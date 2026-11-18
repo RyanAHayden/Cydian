@@ -1,13 +1,13 @@
 # native/intents/: App Intents (N8)
 
-Cydian's actions for Shortcuts, Siri, Spotlight and the Action button, with nothing built by hand. How to use them:
+iFizBox's actions for Shortcuts, Siri, Spotlight and the Action button, with nothing built by hand. How to use them:
 `docs/shortcuts.md`. The widget and the Control Center controls are in `../widget/`.
 
 | intent | modes | does | returns |
 |---|---|---|---|
 | Check for Updates | both | jailbreak: `cydian-helper update`, then installed (dpkg status) vs the newest in apt's lists, holds left out; sideload: the apps Install remembered (I3's list) against their sources | one line per update (`Name 1.0 → 1.1`), dialog "3 Updates: …" |
-| Add Source (URL) | both | opens Cydian (`openAppWhenRun`) and hands the page `cydian://add?url=…`: the Add Source alert, filled in | – |
-| Restore My Packages (file) | both | opens Cydian; jailbreak: adds the file's sources (`addsource`), `update`, installs what isn't installed and some source has (`apply`, newest versions), holds; sideload: its sources as a `cydian://import` link (Import's review alert) | dialog with what happened |
+| Add Source (URL) | both | opens iFizBox (`openAppWhenRun`) and hands the page `cydian://add?url=…`: the Add Source alert, filled in | – |
+| Restore My Packages (file) | both | opens iFizBox; jailbreak: adds the file's sources (`addsource`), `update`, installs what isn't installed and some source has (`apply`, newest versions), holds; sideload: its sources as a `cydian://import` link (Import's review alert) | dialog with what happened |
 | Install All Updates | jailbreak | the check, then `apply` of every upgrade (pulls new dependencies in, unlike `upgrade`) | the installed `Name version` lines; dialog says "Respring to finish" on `finish:` |
 | Respring | jailbreak | `cydian-helper respring` | – |
 | Userspace Reboot | jailbreak | `cydian-helper userspace-reboot` (`launchctl reboot userspace`, N8's helper verb) | – |
@@ -20,7 +20,7 @@ Cydian's actions for Shortcuts, Siri, Spotlight and the Action button, with noth
   `PhoneHost` (spawns the real helper through `../helper/spawn.c`; the widget builds it too); `App/WidgetStore.swift`:
   writes the count for the widget (also from the page's `app.badge`). Intents.swift imports neither UIKit nor
   WidgetKit: with AppIntents in one file they pull in a strongly linked cross-import overlay.
-- AppIntents is weak-linked (`-weak_framework AppIntents`) so Cydian still launches on iOS 15; `build.sh` fails if
+- AppIntents is weak-linked (`-weak_framework AppIntents`) so iFizBox still launches on iOS 15; `build.sh` fails if
   objdump shows it, or an `_AppIntents_*` overlay, linked strongly.
 
 ## Metadata without Xcode

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cydian's icon background: a soft starburst, made the way the old iOS icons made theirs.
+"""iFizBox's icon background: a soft starburst, made the way the old iOS icons made theirs.
 
 Not hand-drawn rays (those come out sharp): random noise along the angle, blurred into soft streaks, wrapped around
 the centre (Photoshop's noise + motion blur + Polar Coordinates), then coloured with a top-to-bottom gradient that has
@@ -18,10 +18,8 @@ SIZE = 1024
 CX, CY = 512, 540           # rays fan out from just below the middle, behind the ring
 SEED = 20261117
 
-# (position 0-1 down the icon, colour): pale shine at the top, dark band at ~0.46, warm brown at the bottom
-STOPS = [(0.0, "e9c6bb"), (.08, "d1aea2"), (.14, "c1a196"), (.2, "a8867a"), (.27, "967569"), (.33, "7b5a4f"),
-         (.39, "6a483c"), (.42, "57372b"), (.45, "411f11"), (.48, "38170c"), (.55, "422113"), (.61, "512b1c"),
-         (.67, "593324"), (.73, "663c2c"), (.8, "6d4030"), (.86, "7f4d3d"), (.92, "8e5b4a"), (1.0, "946252")]
+# (position 0-1 down the icon, colour): pale shine at the top, dark band at ~0.46, deeper blue at the bottom (iFizBox concept: the brown profile mapped onto a ramp centred on #14a1ff)
+STOPS = [(0.0, "c5e9ff"), (.08, "99d8ff"), (.14, "81ceff"), (.2, "50baff"), (.27, "31adff"), (.33, "1292eb"), (.39, "0e7ac9"), (.42, "0b63a9"), (.45, "06437c"), (.48, "05396d"), (.55, "074580"), (.61, "095494"), (.67, "0a5fa3"), (.73, "0c6cb5"), (.8, "0d72be"), (.86, "1085d8"), (.92, "1398f3"), (1.0, "15a1ff")]
 
 
 def gradient():

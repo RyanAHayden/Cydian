@@ -1,20 +1,21 @@
-// F96: the website pushes Cydian first (user 2026-11-18: "we push users toward installing cydian FIRST when the
+// F96: the website pushes iFizBox first (user 2026-11-18: "we push users toward installing cydian FIRST when the
 // webpage is launched. all others should be disabled until they accept a delayed warning that the experience on web
 // will not be good"). Website only: the app never asks.
 //
-//   First visit (until Cydian is installed from the website, or Not Now): "Install Cydian First" at launch
-//   (promptFirstVisit, from screens/home.js init), Install Cydian running Home's Install Cydian App flow.
-//   Other apps' pages: installRows (screens/altstore.js) gives "Install in Cydian" (cydian://package?id=…, which the
+//   First visit (until iFizBox is installed from the website, or Not Now): "Install iFizBox First" at launch
+//   (promptFirstVisit, from screens/home.js init), Install iFizBox running Home's Install iFizBox App flow.
+//   Other apps' pages: installRows (screens/altstore.js) gives "Install in iFizBox" (cydian://package?id=…, which the
 //   app's incoming.js opens at that app's page), Download IPA, then "Install on the Website", greyed out until the
-//   user accepts the warning once (acceptWebsiteInstalls: its I Understand counts down 5 seconds first). Cydian's own
+//   user accepts the warning once (acceptWebsiteInstalls: its I Understand counts down 5 seconds first). iFizBox's own
 //   IPA always installs from the website. Settings > General > Website's switch turns website installs back off.
 //
 // State is in localStorage, per browser; every function takes `storage` for tests.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showAlert } from "./nav/alert.js";
+import { NAME } from "./brand.js";
 
 export const ACCEPT_KEY = "cydian.websiteInstalls"; // "on" once the warning was accepted
-export const FIRST_KEY = "cydian.firstVisit"; // "later" (Not Now) | "installed" (Cydian installed from here)
+export const FIRST_KEY = "cydian.firstVisit"; // "later" (Not Now) | "installed" (iFizBox installed from here)
 
 const store = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 const read = (storage, key) => { try { return storage?.getItem(key) ?? null; } catch { return null; } };
@@ -32,7 +33,7 @@ export const WARNING = {
   title: "Install on the Website?",
   message: "Installing here is slow: Safari downloads the app, signs it with your certificate, uploads it to this "
     + "site, and then iOS downloads it again. Big apps or a weak connection can make it fail, and the signed apps use "
-    + "this site's limited storage.\n\nInstall in Cydian signs and installs on the iPhone itself: much faster, with no "
+    + `this site's limited storage.\n\nInstall in ${NAME} signs and installs on the iPhone itself: much faster, with no `
     + "upload and no limits.",
   buttons: ["Cancel", "I Understand"],
   cancel: 0,
@@ -47,7 +48,7 @@ export async function acceptWebsiteInstalls({ alert = showAlert, storage = store
   return true;
 }
 
-// ---- Install in Cydian -----------------------------------------------------------------------------------------
+// ---- Install in iFizBox -----------------------------------------------------------------------------------------
 
 export const packageLink = (id) => `cydian://package?id=${encodeURIComponent(String(id))}`;
 
@@ -72,14 +73,14 @@ export function idFromHash(hash = globalThis.location?.hash ?? "") {
 const IN_CYDIAN_SUBTITLE = "Signed and installed on the iPhone: fast, no limits";
 export const WEBSITE_ON_SUBTITLE = "Signed in the browser with your certificate";
 export const WEBSITE_OFF_SUBTITLE = "Slow, and can fail on big apps: tap to read why";
-export const SITE_GATE_FOOTER = "Install in Cydian opens this app in the Cydian app, which signs and installs it on the "
+export const SITE_GATE_FOOTER = `Install in ${NAME} opens this app in the ${NAME} app, which signs and installs it on the `
   + "iPhone. Download IPA keeps the file. Installing on the website is slower and can fail on big apps.";
 
-// The website's rows for an app that isn't Cydian, in order: Install in Cydian, Download IPA (`download`, the row
+// The website's rows for an app that isn't iFizBox, in order: Install in iFizBox, Download IPA (`download`, the row
 // installRows makes), Install on the Website (greyed out until accepted; once accepted it runs `install`).
 export function siteGateRows({ id, install, download = null, open = (u) => { location.href = u; }, alert = showAlert, storage = store() }) {
   const on = websiteInstallsOn(storage);
-  const rows = [{ label: "Install in Cydian", subtitle: IN_CYDIAN_SUBTITLE, onClick: () => open(packageLink(id ?? idFromHash() ?? "")) }];
+  const rows = [{ label: `Install in ${NAME}`, subtitle: IN_CYDIAN_SUBTITLE, onClick: () => open(packageLink(id ?? idFromHash() ?? "")) }];
   if (download) rows.push(download);
   rows.push({ label: "Install on the Website", subtitle: on ? WEBSITE_ON_SUBTITLE : WEBSITE_OFF_SUBTITLE, cls: on ? null : "websign-off",
     onClick: async (e) => {
@@ -112,15 +113,15 @@ export const markCydianInstalled = (storage = store()) => setFirstVisit("install
 export const shouldAskFirst = ({ mode = "site", storage = store() } = {}) => mode === "site" && firstVisitState(storage) === "ask";
 
 export const FIRST_VISIT = {
-  title: "Install Cydian First",
-  message: "Apps installed in the Cydian app are signed and installed on the iPhone itself: much faster than this "
-    + "website, with no upload and no limits.\n\nInstall Cydian now, then install everything else from it.",
-  buttons: ["Not Now", "Install Cydian"],
+  title: `Install ${NAME} First`,
+  message: `Apps installed in the ${NAME} app are signed and installed on the iPhone itself: much faster than this `
+    + `website, with no upload and no limits.\n\nInstall ${NAME} now, then install everything else from it.`,
+  buttons: ["Not Now", `Install ${NAME}`],
   cancel: 0,
 };
 
-// Asks once per launch while the state is "ask". Install Cydian runs `install` (Home's Install Cydian App flow);
-// Not Now is remembered, and Home's green Install Cydian App tile stays as the reminder. -> "install" | "later" | null
+// Asks once per launch while the state is "ask". Install iFizBox runs `install` (Home's Install iFizBox App flow);
+// Not Now is remembered, and Home's green Install iFizBox App tile stays as the reminder. -> "install" | "later" | null
 let asked = false;
 export async function promptFirstVisit({ mode, install, alert = showAlert, storage = store(), once = true } = {}) {
   if (!shouldAskFirst({ mode, storage }) || (once && asked)) return null;
@@ -131,19 +132,19 @@ export async function promptFirstVisit({ mode, install, alert = showAlert, stora
   return "install";
 }
 
-// Home on the website while Cydian isn't installed (user 2026-11-18): nothing pops up at launch; everything below the
-// Cydian App card is locked (greyed, a lock in place of the chevron). A tap on a locked row asks: Install Cydian, or
+// Home on the website while iFizBox isn't installed (user 2026-11-18): nothing pops up at launch; everything below the
+// iFizBox App card is locked (greyed, a lock in place of the chevron). A tap on a locked row asks: Install iFizBox, or
 // Ignore, which counts down from 5 before it can be tapped and then unlocks browsing for good in this browser.
-// Only Browse Anyway unlocks it ("later"): installing Cydian from here doesn't (user 2026-11-18: someone who installs
+// Only Browse Anyway unlocks it ("later"): installing iFizBox from here doesn't (user 2026-11-18: someone who installs
 // through the website likely never comes back, so the website keeps pointing at the app).
 export const browsingLocked = ({ mode = "site", storage = store() } = {}) => mode === "site" && firstVisitState(storage) !== "later";
 const BROWSE_GATE = {
-  title: "Install Cydian First",
-  message: "Apps installed in the Cydian app are signed and installed on the iPhone itself: much faster than this "
+  title: `Install ${NAME} First`,
+  message: `Apps installed in the ${NAME} app are signed and installed on the iPhone itself: much faster than this `
     + "website, with no upload and no limits.\n\nYou can browse the website anyway, but installing here is slow and can fail on big apps.",
-  // stacked, as iOS 6 stacks three: Cancel closes it and Home stays locked (user 2026-11-18). Install Cydian green,
+  // stacked, as iOS 6 stacks three: Cancel closes it and Home stays locked (user 2026-11-18). Install iFizBox green,
   // Browse Anyway red (the one we'd rather nobody pressed), and it counts down first.
-  buttons: ["Install Cydian", "Browse Anyway", "Cancel"],
+  buttons: [`Install ${NAME}`, "Browse Anyway", "Cancel"],
   cancel: 2,
   colors: { 0: "green", 1: "red" },
 };

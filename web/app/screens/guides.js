@@ -14,6 +14,7 @@
 // Cydia's Storage Information and Developers Only are left out: there's no storage page to show.
 import { el, grouped, row } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
+import { NAME } from "../brand.js";
 
 export const JAILBREAK_INFO_URL = "https://jailbreakme.dev/";
 
@@ -43,7 +44,7 @@ export const linkRow = (id) => ({ label: LINKS[id].label, href: LINKS[id].href()
 export const FAQ_GROUPS = ["Getting Started", "Problems", "Sources"];
 export const FAQ = [
   {
-    id: "what", group: "Getting Started", q: "What is Cydian?",
+    id: "what", group: "Getting Started", q: `What is ${NAME}?`,
     a: "A package manager with the iOS 6 look, for modern iPhones. Jailbroken, it lists tweaks, themes and tools "
       + "from APT sources and installs them with apt. Not jailbroken, it lists apps from AltStore-style sources, "
       + "signed and installed on the phone.",
@@ -54,13 +55,13 @@ export const FAQ = [
   {
     id: "need", group: "Getting Started", only: "full", q: "Do I need a jailbreak?",
     a: "Only for tweaks and themes. Apps from AltStore-style sources work on any iPhone. Upgrading & Jailbreaking "
-      + "Help says which jailbreak kinds Cydian supports.",
+      + `Help says which jailbreak kinds ${NAME} supports.`,
     next: ["help", "device"],
   },
   {
     id: "kind", group: "Getting Started", only: "full", q: "Rootful or rootless?",
     a: "Dopamine and palera1n's default are rootless: packages live under /var/jb and are built for iphoneos-arm64. "
-      + "checkra1n and older jailbreaks are rootful (iphoneos-arm). Settings > Device picks which packages Cydian "
+      + `checkra1n and older jailbreaks are rootful (iphoneos-arm). Settings > Device picks which packages ${NAME} `
       + "lists, so it must match your jailbreak.",
     next: ["device", "help"],
   },

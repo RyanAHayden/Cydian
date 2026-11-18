@@ -11,7 +11,7 @@
 // Logic lives in core/featured.js, core/payment.js and core/canister.js; this file is DOM and transport only.
 //
 // The app's vendor calls need the shell (vendors send no CORS headers, and the spec wants the payment secret in the
-// Keychain). It asks the shell for these methods and says "needs a newer Cydian" when a shell doesn't have them:
+// Keychain). It asks the shell for these methods and says "needs a newer iFizBox" when a shell doesn't have them:
 //   net.request { method, url, headers, body }  -> { status, headers, body }  body base64, like net.fetch
 //   device.info                                 -> { udid, model }
 //   keychain.get { key } / keychain.set { key, value } / keychain.remove { key }  (passcode / Face ID protected)
@@ -33,6 +33,7 @@ import { createCanister, mapResults, priceFor, normalRepo, askable } from "../co
 import {
   isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore, isFreePrice,
 } from "../core/payment.js";
+import { NAME } from "../brand.js";
 
 const pkgHref = (key, id) => format({ tab: "sources", path: [key, `package:${id}`] });
 
@@ -249,7 +250,7 @@ const native = () => globalThis.cydianNative?.call ? globalThis.cydianNative : n
 
 class NeedsShell extends Error {
   constructor(method) {
-    super(`This needs a newer Cydian app (the shell has no ${method} yet).`);
+    super(`This needs a newer ${NAME} app (the shell has no ${method} yet).`);
     this.name = "NeedsShell";
   }
 }
@@ -428,7 +429,7 @@ export function busyAction(label, job, { hud, fail, refresh }) {
 export async function vendorSignIn(client, call = shell) {
   const cb = await call("auth.session", { url: await client.authenticateUrl(), callbackScheme: "sileo" });
   if (cb == null) return CANCELLED;
-  if (!(await client.finishSignIn(cb))) throw new Error("The vendor sent nothing back that Cydian could read.");
+  if (!(await client.finishSignIn(cb))) throw new Error(`The vendor sent nothing back that ${NAME} could read.`);
 }
 
 // B13: the Price row's detail. "Free" for a package the vendor gives away (Chariz answers purchased: true for those

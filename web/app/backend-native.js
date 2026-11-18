@@ -27,7 +27,7 @@
 //
 // I4 (jailbreak build): appVersions() is every installed app's real version, read by the helper from installd's
 // containers (cydian-helper app-versions: Info.plist, App Store apps' iTunesMetadata), [{ id, version, build, store }],
-// or null when it can't be read (no helper, an older one). installedApps(records) is the apps Cydian remembers
+// or null when it can't be read (no helper, an older one). installedApps(records) is the apps iFizBox remembers
 // (core/installed.js) with that version in place of the remembered one, and a note where the two disagree
 // (withRealVersions). The sideload build has neither: no helper, so the remembered version stays.
 //
@@ -36,7 +36,7 @@
 //
 // Sources: the list is apt's (core/aptsources.js), so what the app shows is what apt installs from. Refresh runs
 // `apt-get update` through the helper first, then reads each source's Release and Packages from apt's lists
-// directory, falling back to the network for anything apt has no list for. A source added in Cydian is checked
+// directory, falling back to the network for anything apt has no list for. A source added in iFizBox is checked
 // like on the site, then written into apt's own sources through the helper (F33: `cydian-helper addsource`, which
 // edits only sources.list.d/cydian.sources), so apt-get update and installs use it too. Only where the helper
 // can't be run (not installed) is it kept on the device alone (IndexedDB, `added: true`); refreshSources moves such
@@ -52,8 +52,9 @@ import { withAltSources } from "./core/altstore.js";
 import { detectMode } from "./core/settings.js";
 import { queueWords, parseSimulation, mergePlans } from "./core/queue.js";
 import { installQueue } from "./queue.js";
+import { NAME } from "./brand.js";
 
-// The one apt source file Cydian writes (cydian-helper addsource/removesource, F33).
+// The one apt source file iFizBox writes (cydian-helper addsource/removesource, F33).
 const CYDIAN_SOURCES = /(^|\/)sources\.list\.d\/cydian\.sources$/;
 
 const CODES = new Set(["bad_url", "refused", "too_large", "timeout", "upstream", "not_found", "network", "helper"]);
@@ -310,14 +311,14 @@ function linkedDebs(q, call) {
       } catch (e) {
         discard(j.id);
         const issue = badHash(e)
-          ? `${label(j)} from ${j.debUrl} isn't the file its source lists (${clean(e)}), so Cydian won't install it.`
+          ? `${label(j)} from ${j.debUrl} isn't the file its source lists (${clean(e)}), so ${NAME} won't install it.`
           : `Couldn't download ${label(j)} from ${j.debUrl}, where its source says it is: ${clean(e)}`;
         return { ok: false, code: -1, plan: empty(), output: `E: ${label(j)}: ${clean(e)} (${j.debUrl})`, issue };
       }
       if (r.package && r.package !== j.id) {
         discard(j.id);
         return { ok: false, code: -1, plan: empty(), output: r.output ?? "",
-          issue: `The link ${j.debUrl} gave ${r.package}, not ${label(j)}, so Cydian won't install it.` };
+          issue: `The link ${j.debUrl} gave ${r.package}, not ${label(j)}, so ${NAME} won't install it.` };
       }
       return { ok: Boolean(r.ok), code: r.code ?? (r.ok ? 0 : -1), plan: parseSimulation(r.stdout), output: r.output ?? "" };
     },
@@ -371,13 +372,13 @@ export function parseAppVersions(text) {
 
 // I4: the remembered apps (core/installed.js records: { id, name, version, ... }) against what is really installed
 // (parseAppVersions' list, or null when it couldn't be read: the records come back as they are). Each record gets
-//   remembered  the version Cydian recorded at Install
-//   actual      the installed app's version, or null when no installed app has that id (removed outside Cydian)
+//   remembered  the version iFizBox recorded at Install
+//   actual      the installed app's version, or null when no installed app has that id (removed outside iFizBox)
 //   disagrees   true when both are known and the remembered one is none of the app's spellings (short version,
 //               build number, store version), compared as written
-//   note        what to say then: "Installed: 1.6 (Cydian remembered 1.5)", or "Not installed (Cydian remembered 1.5)"
+//   note        what to say then: "Installed: 1.6 (iFizBox remembered 1.5)", or "Not installed (iFizBox remembered 1.5)"
 // and `version` becomes the actual one where there is one, so upgrades are worked out from what's on the phone.
-// Cydian's own record (`self`) is dpkg's in jailbreak mode and is left as it is.
+// iFizBox's own record (`self`) is dpkg's in jailbreak mode and is left as it is.
 export function withRealVersions(records, actual) {
   if (!Array.isArray(actual)) return records ?? [];
   const byId = new Map(actual.map((a) => [a.id, a]));
@@ -386,12 +387,12 @@ export function withRealVersions(records, actual) {
     const remembered = rec.version ?? null;
     const app = byId.get(rec.id) ?? null;
     if (!app) {
-      return { ...rec, remembered, actual: null, disagrees: false, note: remembered ? `Not installed (Cydian remembered ${remembered})` : "Not installed" };
+      return { ...rec, remembered, actual: null, disagrees: false, note: remembered ? `Not installed (${NAME} remembered ${remembered})` : "Not installed" };
     }
     const spellings = [app.version, app.build, app.store].filter(Boolean).map(String);
     const disagrees = Boolean(remembered) && !spellings.includes(String(remembered).trim());
     return { ...rec, version: app.version, remembered, actual: app.version, disagrees,
-      note: disagrees ? `Installed: ${app.version} (Cydian remembered ${remembered})` : null };
+      note: disagrees ? `Installed: ${app.version} (${NAME} remembered ${remembered})` : null };
   });
 }
 
@@ -480,9 +481,9 @@ function nativeSourceCalls(backend, call, opts) {
     async removeSource(key) {
       const apt = (await aptSources()).find((s) => s.key === key);
       if (apt && CYDIAN_SOURCES.test(apt.file)) {
-        if (!(await writeSource("removesource", apt))) throw new BackendError("helper", "cydian-helper is not installed, so Cydian can't change apt's sources.");
+        if (!(await writeSource("removesource", apt))) throw new BackendError("helper", `cydian-helper is not installed, so ${NAME} can't change apt's sources.`);
       } else if (apt) {
-        throw new Error(`This source is listed in ${apt.file}, which Cydian doesn't change. Remove it there (Filza or a terminal), then Refresh.`);
+        throw new Error(`This source is listed in ${apt.file}, which ${NAME} doesn't change. Remove it there (Filza or a terminal), then Refresh.`);
       }
       return (await store()).remove(key);
     },

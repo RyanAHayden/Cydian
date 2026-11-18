@@ -134,7 +134,7 @@
 }
 .alert-paste:active { background: linear-gradient(#8a90a3, #3f4863 49%, #39446a 51%, #2f3a5c); background-origin: border-box; }
 
-/* F72: Cydian's own source is built in: a lock where Delete's minus would be (Manage's edit list), and a small one
+/* F72: iFizBox's own source is built in: a lock where Delete's minus would be (Manage's edit list), and a small one
    after its name (nav/lock.js). It never shows Delete. */
 .source-lock {
   position: absolute; left: 7px; top: 50%; width: 29px; height: 29px; margin-top: -14.5px; display: flex;

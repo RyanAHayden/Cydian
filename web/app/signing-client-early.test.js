@@ -40,7 +40,7 @@ function deps(id, over = {}) {
     go: () => {},
     now: () => id,
     identity: async () => { log.order.push("identity"); return id; },
-    worker: async () => ({ ok: true, ipa: new Uint8Array([0x50, 0x4b, 1, 2, 3]), bundleId: "com.you.cydian", name: "Cydian", version: "0.4" }),
+    worker: async () => ({ ok: true, ipa: new Uint8Array([0x50, 0x4b, 1, 2, 3]), bundleId: "com.you.cydian", name: "iFizBox", version: "0.4" }),
     transfer: async () => null,
     origin: () => "https://cydian.example",
     ...over,
@@ -59,11 +59,11 @@ test("expectedBundleId: explicit profiles, wildcards with a known app ID, else n
 });
 
 test("earlyLink: a fresh 48-hex token and the itms link to its manifest", () => {
-  const app = { bundleId: "com.you.cydian", name: "Cydian & Co", version: "0.4" };
+  const app = { bundleId: "com.you.cydian", name: "iFizBox & Co", version: "0.4" };
   const a = earlyLink("https://cydian.dev", app), b = earlyLink("https://cydian.dev", app);
   assert.match(a.token, /^[0-9a-f]{48}$/);
   assert.notEqual(a.token, b.token);
-  assert.equal(a.manifest, `https://cydian.dev/sign/up/${a.token}/manifest.plist?bundleid=com.you.cydian&version=0.4&title=Cydian+%26+Co`);
+  assert.equal(a.manifest, `https://cydian.dev/sign/up/${a.token}/manifest.plist?bundleid=com.you.cydian&version=0.4&title=iFizBox+%26+Co`);
   assert.equal(a.itms, "itms-services://?action=download-manifest&url=" + encodeURIComponent(a.manifest));
 });
 
@@ -71,7 +71,7 @@ test("Install with the bundle ID known: iOS's prompt opens first, reserved, then
   const srv = fakeServer();
   const { d, log } = deps(idFor("com.you.*"), { fetcher: srv.fetcher });
   let recorded = null;
-  assert.equal(await signInBrowser({ url: SELF, name: "Cydian", onInstalled: (r) => { recorded = r; } }, d), true);
+  assert.equal(await signInBrowser({ url: SELF, name: "iFizBox", onInstalled: (r) => { recorded = r; } }, d), true);
   assert.deepEqual(log.order.slice(0, 2), ["open", "identity"]); // the link opened before anything waited
   const token = /%2Fsign%2Fup%2F([0-9a-f]{48})%2Fmanifest\.plist%3Fbundleid%3Dcom\.you\.cydian%26/.exec(log.opened[0])?.[1];
   assert.ok(token, log.opened[0]);
@@ -89,7 +89,7 @@ test("the early link falls back to Ready to Install: another bundle ID came out,
   let srv = fakeServer();
   let { d, log } = deps(idFor("com.you.*"), { fetcher: srv.fetcher,
     worker: async () => ({ ok: true, ipa: new Uint8Array([0x50, 0x4b, 1]), bundleId: "com.you.other", name: "Other", version: "1" }) });
-  assert.equal(await signInBrowser({ url: SELF, name: "Cydian" }, d), true);
+  assert.equal(await signInBrowser({ url: SELF, name: "iFizBox" }, d), true);
   assert.deepEqual(log.alerts, ["Ready to Install"]);
   assert.equal(log.opened.length, 2);
   assert.equal(log.opened[1], "itms-services://?action=download-manifest&url=t0k");
@@ -97,7 +97,7 @@ test("the early link falls back to Ready to Install: another bundle ID came out,
 
   srv = fakeServer({ reserveStatus: 500 });
   ({ d, log } = deps(idFor("com.you.*"), { fetcher: srv.fetcher }));
-  assert.equal(await signInBrowser({ url: SELF, name: "Cydian" }, d), true);
+  assert.equal(await signInBrowser({ url: SELF, name: "iFizBox" }, d), true);
   assert.deepEqual(log.alerts, ["Ready to Install"]);
   assert.equal(log.opened[1], "itms-services://?action=download-manifest&url=t0k");
 
@@ -105,7 +105,7 @@ test("the early link falls back to Ready to Install: another bundle ID came out,
   let t = 0;
   srv = fakeServer();
   ({ d, log } = deps(idFor("com.you.*"), { fetcher: srv.fetcher, clock: () => (t += EARLY_WINDOW) }));
-  assert.equal(await signInBrowser({ url: SELF, name: "Cydian" }, d), true);
+  assert.equal(await signInBrowser({ url: SELF, name: "iFizBox" }, d), true);
   assert.deepEqual(log.alerts, ["Ready to Install"]);
   const token = /%2Fsign%2Fup%2F([0-9a-f]{48})%2F/.exec(log.opened[0])[1];
   assert.equal(log.opened[1], `itms-services://?action=download-manifest&url=${token}`);
@@ -126,9 +126,9 @@ test("no profile in memory, or its bundle ID unknown before signing: today's flo
 test("an error after the early open still says why in an alert", async () => {
   const srv = fakeServer();
   const { d, log } = deps(idFor("com.you.*"), { fetcher: srv.fetcher, worker: async () => { throw Object.assign(new Error("zsign: bad p12"), { code: "sign_failed" }); } });
-  assert.equal(await signInBrowser({ url: SELF, name: "Cydian" }, d), false);
+  assert.equal(await signInBrowser({ url: SELF, name: "iFizBox" }, d), false);
   assert.equal(log.opened.length, 1);
-  assert.deepEqual(log.alerts, ["Couldn't Install Cydian"]);
+  assert.deepEqual(log.alerts, ["Couldn't Install iFizBox"]);
 });
 
 test("reserveUpload and uploadSigned with a token", async () => {
@@ -149,7 +149,7 @@ test("F132: a slow sign/upload still lands in the early link for minutes (iOS re
     let calls = 0;
     const srv = fakeServer();
     const { d, log } = deps(idFor("com.you.*"), { fetcher: srv.fetcher, clock: () => (calls++ ? late : 0) });
-    assert.equal(await signInBrowser({ url: SELF, name: "Cydian" }, d), true);
+    assert.equal(await signInBrowser({ url: SELF, name: "iFizBox" }, d), true);
     assert.deepEqual(log.alerts, [], `alert after ${late} ms`);
     assert.equal(log.opened.length, 1);
     assert.equal(log.hud.at(-1), "done Installing");
@@ -158,7 +158,7 @@ test("F132: a slow sign/upload still lands in the early link for minutes (iOS re
   let calls = 0;
   const srv = fakeServer();
   const { d, log } = deps(idFor("com.you.*"), { fetcher: srv.fetcher, clock: () => (calls++ ? EARLY_WINDOW : 0) });
-  assert.equal(await signInBrowser({ url: SELF, name: "Cydian" }, d), true);
+  assert.equal(await signInBrowser({ url: SELF, name: "iFizBox" }, d), true);
   assert.deepEqual(log.alerts, ["Ready to Install"]);
   assert.equal(log.opened.length, 2);
 });

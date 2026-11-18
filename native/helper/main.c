@@ -1,4 +1,4 @@
-/* cydian-helper: the one place Cydian's root work goes through (docs/native.md, "3. Root").
+/* cydian-helper: the one place iFizBox's root work goes through (docs/native.md, "3. Root").
  *
  *   cydian-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
  *   cydian-helper hold <pkg>... | unhold <pkg>... | showhold
@@ -10,8 +10,8 @@
  *                                             line is Cancel, SIGINT to apt-get)
  *   cydian-helper install-ipa <path>            (F59: an IPA the app downloaded, installed through installd as
  *                                                AppSync's appinst does; ipa.c. Exit 69: can't install ad hoc)
- *   cydian-helper selfupdate <path.deb>                                 (F61: dpkg -i of Cydian's own update)
- *   cydian-helper simulate-deb | install-deb <path.deb>   (N9: a .deb shared with Cydian; apt-get -s / install on a
+ *   cydian-helper selfupdate <path.deb>                                 (F61: dpkg -i of iFizBox's own update)
+ *   cydian-helper simulate-deb | install-deb <path.deb>   (N9: a .deb shared with iFizBox; apt-get -s / install on a
  *                                                           root-owned copy, dependencies from the sources; paid.c)
  *   cydian-helper install-paid <path.deb> <pkg> <version>  (F57: a paid package's .deb the app downloaded from the
  *                                                           vendor; copied, its control checked, apt-get install; paid.c)
@@ -22,8 +22,8 @@
  *   cydian-helper notifications on|off   (F65: Settings' Upgrade Notifications; off creates
  *                                         <prefix>/var/lib/cydian/upgrades.off, which N5's daemon reads; runs nothing)
  *
- * No setuid bit: Cydian spawns it as root with the persona spawn attributes (spawn.c), which the kernel allows
- * only because Cydian is signed with com.apple.private.persona-mgmt. Run by anything else it is plain mobile and
+ * No setuid bit: iFizBox spawns it as root with the persona spawn attributes (spawn.c), which the kernel allows
+ * only because iFizBox is signed with com.apple.private.persona-mgmt. Run by anything else it is plain mobile and
  * refuses. It runs exactly one of apt-get update|install|remove|upgrade, apt-mark hold|unhold|showhold or
  * dpkg --configure -a from the rootless
  * prefix, with fixed options; the caller only picks the verb and package names ([a-z0-9][a-z0-9.+-]+, known to

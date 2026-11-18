@@ -190,7 +190,7 @@ test("followInstall (F155): on the progress page an installed app ends on Open <
   assert.equal(await ends[0].action(), false); // the page closes once the app opens
   assert.deepEqual(native.calls.at(-1), { method: "signing.openApp", params: { bundleId: "com.me.delta" } });
 
-  // not installed: Return to Cydian as before (hide), no Open
+  // not installed: Return to iFizBox as before (hide), no Open
   const no = { ...ui.hud("Installing"), finish: () => assert.fail() };
   await followInstall(fakeNative({ "signing.progress": { installed: false } }), "com.a", no, { later: ui.later, name: "A" });
   assert.equal(ui.hidden, 1);

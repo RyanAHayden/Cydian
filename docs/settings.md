@@ -12,12 +12,12 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 
 | Root row | Builds | Page |
 |---|---|---|
-| Cydian Account | all | sign in, create an account (screens/account.js) |
+| iFizBox Account | all | sign in, create an account (screens/account.js) |
 | General | all | Device and iOS Version (website only); Works on My Phone; Refresh Sources on Launch; Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only, F145) |
 | Display | all | Appearance (Automatic / Light / Dark as checkmarks); Compatibility Marks |
 | Updates | all | Ignored Upgrades; Upgrade Notifications (jailbreak only); Automatic Installs (jailbreak only: Install Updates Automatically, When Charging and Locked, After a Respring Update, Keep Previous Versions); Update Alerts (sideload only) |
 | Signing | website, sideload | see "Settings > Signing" below |
-| Open in Cydian App | website, not jailbroken | an action, not a setting (screens/importlink.js) |
+| Open in iFizBox App | website, not jailbroken | an action, not a setting (screens/importlink.js) |
 | Install from URL | where Install IPA works | an action (screens/ipa-install.js) |
 | Console Logs | jailbreak, or wherever there are logs | screens/queue.js |
 | About | jailbreak, sideload | Version, Check for Updates, Skip This Version |
@@ -43,7 +43,7 @@ iOS 6 settings page, with one-line footers. `SIGNING_GROUPS` (core/settings.js) 
 | (options) | sideload | **Show Expiry Dates** (switch, on), Re-sign Reminder (list) |
 | Signing Server | sideload | the server, Check Server, Run Your Own |
 | Certificate Status, Signed Apps | sideload | Check Certificate; the signed apps (days left, or Expired), Re-sign All |
-| Install Cydian App, Bring My Certificate | website, certificate working | as before |
+| Install iFizBox App, Bring My Certificate | website, certificate working | as before |
 | Remove Certificate | when there is a certificate or a picked file | |
 | How Signing Works | website, sideload | a link to `signing/help`: the two-step walkthrough (Select All Files, the Files picker's picture, the server), which used to fill the page |
 
@@ -54,7 +54,7 @@ of the apps it signs, so it shows no dates and the switch would do nothing there
 
 | Setting | Was | Why it went | Now |
 |---|---|---|---|
-| `sideloader` (Sideloader) | Hidden since 2026-11-17 (`modes: []`) | Nothing read it after app pages stopped handing apps to other sideloaders | Cydian always signs and installs itself |
+| `sideloader` (Sideloader) | Hidden since 2026-11-17 (`modes: []`) | Nothing read it after app pages stopped handing apps to other sideloaders | iFizBox always signs and installs itself |
 | `checkUpdates` (Check for Updates: Off / On Launch / Every 6 Hours / Daily) | Never shown (its feature, `update-check`, never shipped) | The app has its own check (About > Check for Updates, once a day), and N5's daemon checks daily | The daemon's default (Daily). A full `daemonPrefs()` sends `cydian.checkUpdates: null` so the shell removes any old value |
 | `cellular` (Use Cellular Data) | Never shown (feature `cellular` never shipped) | No row, and nobody could set it | The daemon's default (cellular data on). Sent as null like `checkUpdates` |
 | `notifications` (Off / Summary / One per Package) | Never shown (feature `notifications` never shipped) | Nothing read it. Upgrade Notifications (jailbreak) and Update Alerts (sideload) are the real controls | none |
@@ -77,7 +77,7 @@ of the apps it signs, so it shows no dates and the switch would do nothing there
 | Ignored Upgrades, Upgrade Notifications, Automatic Installs | Root | Updates |
 | Only When Charging and Locked | Root | Updates, renamed **When Charging and Locked** (the old label was cut off), now with a footer |
 | Update Alerts (sideload) | Root | Updates |
-| Lock Home Until Cydian Is Installed, Install on the Website (website) | Settings > Signing | General > Website (F145), with Lock Home's F134 short name; Install on the Website is padlocked while Home is locked |
+| Lock Home Until iFizBox Is Installed, Install on the Website (website) | Settings > Signing | General > Website (F145), with Lock Home's F134 short name; Install on the Website is padlocked while Home is locked |
 | Re-sign Reminder (sideload) | Root, Signing group | Settings > Signing, in the options group with Show Expiry Dates (F134) |
 | Certificate row (website, sideload) | Root, Signing group with a footer | Root row **Signing**, with the certificate's name as its detail |
 | About (app builds) | Root group with the version | Root row **About**, which opens the version, Check for Updates and Skip This Version |

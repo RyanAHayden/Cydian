@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs><image id="bg" width="1024" height="1024" href="bg-1.jpg"/><filter id="blue" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".2126 .7152 .0722 0 0  .2126 .7152 .0722 0 0  .2126 .7152 .0722 0 0  0 0 0 1 0"/><feComponentTransfer><feFuncR type="table" tableValues="0.008 0.013 0.018 0.025 0.035 0.045 0.055 0.065 0.075 0.133 0.224 0.315 0.405 0.496 0.587 0.678 0.769 0.826 0.884 0.942 1.000"/><feFuncG type="table" tableValues="0.102 0.154 0.207 0.268 0.335 0.402 0.470 0.537 0.604 0.654 0.691 0.728 0.765 0.802 0.839 0.877 0.914 0.935 0.957 0.978 1.000"/><feFuncB type="table" tableValues="0.212 0.307 0.401 0.495 0.589 0.682 0.776 0.869 0.963 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000 1.000"/></feComponentTransfer></filter></defs><use href="#bg" filter="url(#blue)"/><defs>
+<radialGradient id="sph" cx="40%" cy="32%" r="78%"><stop offset="0" stop-color="#f7f8fa"/><stop offset=".6" stop-color="#e3e7ec"/><stop offset="1" stop-color="#bcc4ce"/></radialGradient>
+<linearGradient id="rim" x1="0" y1="0" x2=".35" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d3d9e0"/></linearGradient>
+<linearGradient id="ink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a6473"/><stop offset="1" stop-color="#434c59"/></linearGradient>
+<filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="14"/></filter>
+<clipPath id="gclip"><circle cx="512" cy="512" r="230"/></clipPath></defs>
+<circle cx="512" cy="528" r="286.925" fill="#00203f" opacity=".45" filter="url(#sh)"/>
+<circle cx="512" cy="512" r="289.925" fill="#0b2a4a" opacity=".35"/>
+<circle cx="512" cy="512" r="286.925" fill="url(#rim)"/>
+<circle cx="512" cy="512" r="230" fill="url(#sph)"/>
+<g clip-path="url(#gclip)"><g transform="rotate(-24 512 512)" fill="none" stroke="url(#ink)" stroke-width="21.9" stroke-linecap="round"><ellipse cx="512" cy="512" rx="126.5" ry="234.6"/><path d="M305.7 385.0 Q512 451.3 718.3 385.0"/><path d="M270.7 513.8 Q512 580.1 753.3 513.8"/><path d="M311.9 633.4 Q512 699.7 712.1 633.4"/></g></g>
+<circle cx="512" cy="512" r="230" fill="none" stroke="url(#ink)" stroke-width="21.9"/></svg>

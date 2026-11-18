@@ -1,4 +1,4 @@
-"""tools/selfrepo.py: the Release file of Cydian's own APT repo carries what apt, Cydian and Sileo each need (N11)."""
+"""tools/selfrepo.py: the Release file of iFizBox's own APT repo carries what apt, iFizBox and Sileo each need (N11)."""
 import os
 import sys
 import tempfile

@@ -1,4 +1,4 @@
-// Swift tests for N9's share sheet and Open in Cydian (native/share/Share.swift), run on Linux by
+// Swift tests for N9's share sheet and Open in iFizBox (native/share/Share.swift), run on Linux by
 // native/share/test_share.py against the fake helper (native/fake/cydian-helper) over a copy of
 // native/fake/fixture/prefix, and a fake signer:
 //   sharetest <fake helper> <fixture prefix> <fake remote> <files dir>

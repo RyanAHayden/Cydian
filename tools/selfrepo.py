@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cydian's own APT repo (F72), the jailbreak app's built-in source, like Cydia's apt.saurik.com.
+"""iFizBox's own APT repo (F72), the jailbreak app's built-in source, like Cydia's apt.saurik.com.
 
   tools/selfrepo.py OUT DEB [DEB...] [--minimum X.Y.Z] [--date RFC2822]
 
@@ -12,8 +12,8 @@ as assets of the release, next to the .debs. GitHub serves them at
 where the Worker (worker/src/index.js `repo`) fetches the same asset and answers with it, no redirect: Zebra names
 its cache file after the final URL, and GitHub's signed one is too long for it (B17).
 
---minimum sets X-Cydian-Minimum-Version, Cydian's own field (in the Release and in Cydian's Packages stanza): a
-running Cydian older than that must upgrade before anything else (web/app/core/essential.js). apt ignores X- fields.
+--minimum sets X-Cydian-Minimum-Version, iFizBox's own field (in the Release and in iFizBox's Packages stanza): a
+running iFizBox older than that must upgrade before anything else (web/app/core/essential.js). apt ignores X- fields.
 """
 import gzip
 import hashlib
@@ -27,6 +27,7 @@ from email.utils import formatdate
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "native"))
 import mkdeb  # noqa: E402
+from brand import NAME  # noqa: E402  (F170: native/brand.env)
 
 SELF_ID = "com.ryha.cydian"
 MIN_FIELD = "X-Cydian-Minimum-Version"
@@ -91,8 +92,8 @@ def build(out, debs, minimum=None, date=None):
         f.write(gz)
     files = [("Packages", packages), ("Packages.gz", gz)]
     rel = [
-        "Origin: Cydian",
-        "Label: Cydian",
+        "Origin: " + NAME,
+        "Label: " + NAME,
         "Suite: stable",
         "Codename: cydian",
         "Architectures: " + " ".join(arches),
@@ -100,7 +101,7 @@ def build(out, debs, minimum=None, date=None):
         # `guard ["components"].allSatisfy(releaseDict.keys.contains)`), flat or not; apt ignores it on a flat repo.
         # Chariz (flat) says main too.
         "Components: main",
-        "Description: Cydian's own source: Cydian for jailbroken iPhones",
+        "Description: %s's own source: %s for jailbroken iPhones" % (NAME, NAME),
         "Date: " + (date or formatdate(usegmt=True)),
     ]
     if minimum:

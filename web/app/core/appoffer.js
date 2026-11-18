@@ -1,26 +1,27 @@
-// I7: the website offers the Cydian app itself. Pure: no DOM, no network; screens/home.js draws what these answer,
+// I7: the website offers the iFizBox app itself. Pure: no DOM, no network; screens/home.js draws what these answer,
 // and core/appoffer.test.js covers every case.
 //
 // Where the offer shows (the website only: nothing inside the app, which is already installed):
-//   Home, the Install Cydian App tile
-//     Not Jailbroken                      F93: Cydian's IPA signed in the browser with the user's certificate and
+//   Home, the Install iFizBox App tile
+//     Not Jailbroken                      F93: iFizBox's IPA signed in the browser with the user's certificate and
 //                                         installed (screens/home.js installApp), or Settings > Signing first
 //     jailbroken (rootless, ...)          downloads the release's .deb for that architecture, to open in Sileo or
 //                                         Filza; an architecture with no .deb yet is told so
-//   Cydian's own package page: its AltStore source (web/app/source.json, first in DEFAULT_ALT_SOURCES).
+//   iFizBox's own package page: its AltStore source (web/app/source.json, first in DEFAULT_ALT_SOURCES).
+import { NAME } from "../brand.js";
 
 export const REPO_URL = "https://github.com/RyanAHayden/Cydian";
 // The release assets native/build.sh makes (tools/release.sh uploads them): latest/download always names the newest.
 export const APP_IPA_URL = `${REPO_URL}/releases/latest/download/Cydian.ipa`;
 export const APP_DEB_URL = `${REPO_URL}/releases/latest/download/Cydian.deb`; // rootless, iphoneos-arm64
-// Cydian's own AltStore source, kept current with native/VERSION by test_release.py.
+// iFizBox's own AltStore source, kept current with native/VERSION by test_release.py.
 export const APP_SOURCE_URL = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json";
-export const APP_NAME = "Cydian";
+export const APP_NAME = NAME;
 
 const NOT_JAILBROKEN = "none";
 
 // Home's tile: null (no tile), or { action }:
-//   "sideloaders"  Not Jailbroken: sign Cydian in the browser and install it (F93; the name is F89's)
+//   "sideloaders"  Not Jailbroken: sign iFizBox in the browser and install it (F93; the name is F89's)
 //   "deb"          download the .deb for `deviceType` (an APT arch): { action: "deb", arch }
 // mode: core/settings.js detectMode(); deviceType: settings.deviceType() ("none" or an arch).
 export function homeOffer({ mode = "site", deviceType = NOT_JAILBROKEN } = {}) {
@@ -45,11 +46,11 @@ const ARCH_NAMES = { "iphoneos-arm64": "rootless", "iphoneos-arm": "rootful", "i
 export function debAlert(arch, url) {
   const kind = ARCH_NAMES[arch] ?? arch;
   if (!url) {
-    return { title: "No Build Yet", message: `Cydian is built for rootless jailbreaks so far, not ${kind}. Set Settings > Device if your phone is rootless.`, buttons: ["OK"], cancel: 0 };
+    return { title: "No Build Yet", message: `${NAME} is built for rootless jailbreaks so far, not ${kind}. Set Settings > Device if your phone is rootless.`, buttons: ["OK"], cancel: 0 };
   }
   return {
-    title: "Install Cydian",
-    message: `Cydian's ${kind} .deb downloads to Files. Open it there in Sileo or Filza to install it.`,
+    title: `Install ${NAME}`,
+    message: `${NAME}'s ${kind} .deb downloads to Files. Open it there in Sileo or Filza to install it.`,
     buttons: ["Cancel", "Download"],
     cancel: 0,
   };

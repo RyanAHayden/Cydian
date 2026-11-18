@@ -1,5 +1,5 @@
 // Source Warning (F19): Cydia asked saurik's server (api/repotag, docs/cydia.md "Adding a source") whether a repo
-// was a known piracy source and showed "Source Warning" with Cancel / Add Anyway. Cydian keeps its own list, here,
+// was a known piracy source and showed "Source Warning" with Cancel / Add Anyway. iFizBox keeps its own list, here,
 // with a reason and a link for every entry, and asks nobody: the check runs before Add Source fetches anything.
 //
 //   sourceWarning(input)  -> the matching entry { host, reason, link }, or null. `input` is what Add Source gets: a

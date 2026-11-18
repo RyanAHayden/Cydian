@@ -1,4 +1,4 @@
-// F156: on the locked website (before Cydian is installed), Home's help, User Guides and Credits / Thank You rows
+// F156: on the locked website (before iFizBox is installed), Home's help, User Guides and Credits / Thank You rows
 // stay open like Settings; Find Extensions for Applications and More Package Sources stay locked and ask first.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -74,7 +74,7 @@ test("F156: help, User Guides and Credits stay open on the locked Home; Find Ext
       assert.equal(li.closest(".home-locked"), null, `${label}: no .home-locked`);
       assert.equal(await tap(home, li.querySelector(".cell-label")), false, `${label}: opens`);
     }
-    assert.equal(asked, 0, "no Install Cydian First for the open rows");
+    assert.equal(asked, 0, "no Install iFizBox First for the open rows");
     for (const label of LOCKED) {
       const li = rows.get(label);
       assert.ok(li.closest(".home-locked"), `${label}: still locked`);
@@ -93,7 +93,7 @@ test("F156: the open routes are Settings, help, guides/* and credits, deep links
     "#/home/sources", "#/home", "https://example.com/", undefined]) assert.equal(openWhileLocked(h), false, String(h));
 });
 
-test("F156: no route gate asks Install Cydian First, so deep links to help, guides and credits open", async () => {
+test("F156: no route gate asks Install iFizBox First, so deep links to help, guides and credits open", async () => {
   // The only askers are Home's locked rows (askOnLocked), locked tabs (app.js) and Settings' padlocked row: nothing
   // in the router or Home's render() looks at the lock, so #/home/help etc. load straight in.
   const { readFile } = await import("node:fs/promises");

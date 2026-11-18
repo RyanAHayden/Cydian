@@ -49,7 +49,7 @@ Each step is its own `R13 …` commit, so any one can be reverted alone.
 docs/native.md (Flask and web/app.py → the Worker), worker/README.md (the website signs in the browser and uses
 `/sign/upload`), README.md (same, plus `/sign/upload`), AGENTS.md (no web/requirements.txt), docs/ipa.md (a note
 on what is out of date), the daemon's comments (push.py, device-check.js), backend-http.js (web/fetch.py), the
-signer's comments (web/signer/, the Signing Server putting the certificate in Cydian's IPA, signing.export's
+signer's comments (web/signer/, the Signing Server putting the certificate in iFizBox's IPA, signing.export's
 user), and CSS/JS comments that credited sidedrop for looks.
 
 ## Left on purpose

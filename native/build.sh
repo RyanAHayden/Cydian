@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Cydian on Linux (no Mac, no Theos): the Swift shell around web/app/, arm64, iOS 15+, as two artifacts from
+# Build iFizBox on Linux (no Mac, no Theos): the Swift shell around web/app/, arm64, iOS 15+, as two artifacts from
 # one executable (task I2; the app picks its mode at launch, native/Sources/mode.c):
 #   native/build/Cydian.deb  jailbreak: rootless, iphoneos-arm64, jailbreak entitlements; checked by mkdeb.py
 #   native/build/Cydian.ipa  sideload: no helper, get-task-allow only, ad hoc signed; checked by mkipa.py.
@@ -11,13 +11,17 @@
 # Needs (docs/native.md, "Building on Linux"):
 #   SWIFT_TOOLCHAIN  a swift.org Linux toolchain, 6.4.x to match the SDK's compiler: the dir holding usr/bin/swiftc
 #                    (default: the one swiftc on PATH belongs to)
-#   IOS_SDK          iPhoneOS.sdk extracted from an Xcode .xip (required; Cydian's own extraction script is task T3)
+#   IOS_SDK          iPhoneOS.sdk extracted from an Xcode .xip (required; iFizBox's own extraction script is task T3)
 #   LD64_LLD         an ld64.lld (default: rustup's gcc-ld/ld64.lld, else ld64.lld on PATH)
 #   RCODESIGN/LDID   a signer for the entitlements (default: rcodesign or ldid on PATH, then ~/.cargo/bin/rcodesign).
 #                    Without one the executable keeps lld's ad hoc signature, which has no entitlements.
 # arm64 only: lld can't link arm64e, and apps run as arm64 on arm64e phones (R3).
 set -euo pipefail
 cd "$(dirname "$0")"
+# F170: the product name (and later the IDs) for the templates: $(BRAND_NAME) in Info.plist, deb/control and the
+# extensions' plists. The Swift code has it as Brand.name (sign/Brand.swift, from `python3 brand.py sync`).
+set -a; . ./brand.env; set +a
+brand_sed=(-e "s/\$(BRAND_NAME)/$BRAND_NAME/g")
 
 missing=()
 if [ -n "${SWIFT_TOOLCHAIN:-}" ]; then
@@ -50,6 +54,10 @@ build=$(git rev-list --count HEAD 2>/dev/null || echo 1)
 export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct 2>/dev/null || echo 0)}
 out=build
 mkdir -p "$out"
+# Clang's module cache records its absolute path: one built before the checkout moved (F170: ~/runs/Cydian became
+# ~/runs/iFizBox) fails with "precompiled file ... was compiled with module cache path". Start it again then.
+if [ -d "$out/modules" ] && [ "$(cat "$out/modules/.path" 2>/dev/null)" != "$PWD/$out/modules" ]; then rm -rf "$out/modules"; fi
+mkdir -p "$out/modules" && printf '%s' "$PWD/$out/modules" > "$out/modules/.path"
 # The ubuntu24.04 toolchain wants libncurses.so.6; Arch ships only the wide one. ldd's whole output is read first:
 # `ldd | grep -q` under pipefail fails when grep quits early and ldd dies of SIGPIPE (it did under a loaded gate, I7).
 if [[ "$(ldd "$swiftc" 2>/dev/null || true)" == *'libncurses.so.6 => not found'* ]]; then
@@ -78,11 +86,11 @@ clang "${hflags[@]}" -c helper/spawn.c -o "$out/spawn.o"
 clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/Cydian.o" "$out/availability.o" \
   "$out/mode.o" "$out/spawn.o" -L "$sdk/usr/lib/swift" -lz -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
   -Wl,-weak_framework,AppIntents -o "$out/Cydian"
-# N8: AppIntents is iOS 16+ and weak (above), so Cydian still launches on iOS 15. Nothing else may need it strongly.
+# N8: AppIntents is iOS 16+ and weak (above), so iFizBox still launches on iOS 15. Nothing else may need it strongly.
 if command -v llvm-objdump >/dev/null || [ -x "$tc/usr/bin/llvm-objdump" ]; then
   od=$(command -v llvm-objdump || echo "$tc/usr/bin/llvm-objdump")
   strong=$("$od" --macho --dylibs-used "$out/Cydian" | grep -E '/(AppIntents|_AppIntents_[A-Za-z]+)\.framework/' | grep -v 'weak)' || true)
-  [ -z "$strong" ] || { echo "native build: AppIntents linked strongly (Cydian would not launch on iOS 15): $strong" >&2; exit 1; }
+  [ -z "$strong" ] || { echo "native build: AppIntents linked strongly ($BRAND_NAME would not launch on iOS 15): $strong" >&2; exit 1; }
 fi
 
 rcodesign=${RCODESIGN:-$(command -v rcodesign || true)}
@@ -117,7 +125,7 @@ bundle() {
   cp bridge.js "$app/bridge.js"
   # Apple's WWDR intermediates and roots, public certificates the on-device signer puts in each CMS (I6).
   mkdir -p "$app/certs" && cp sign/certs/*.cer "$app/certs/"
-  sed -e "s/@VERSION@/$version/" -e "s/@BUILD@/$build/" -e "s/@MIN@/$min/" Info.plist > "$app/Info.plist"
+  sed -e "s/@VERSION@/$version/" -e "s/@BUILD@/$build/" -e "s/@MIN@/$min/" "${brand_sed[@]}" Info.plist > "$app/Info.plist"
   # N8: App Intents (intents/metadata.py stands in for Xcode's metadata step) and the widget extension. The sideload
   # IPA lists only the intents that work without a jailbreak, and its widget has no controls.
   local variant=jailbreak only=()
@@ -154,7 +162,7 @@ if [ "$what" != ipa ]; then
   fi
   # N5: the background upgrade check (daemon/README.md), a launchd daemon; jailbreak only.
   daemon/stage.sh "$root" "$sdk" "$lld" "$ldid" "$rcodesign"
-  sed -e "s/@VERSION@/$version-$build/" deb/control > "$out/debian/control"
+  sed -e "s/@VERSION@/$version-$build/" "${brand_sed[@]}" deb/control > "$out/debian/control"
   cp deb/postinst deb/prerm "$out/debian/"
   python3 mkdeb.py build "$root" "$out/debian" "$out/Cydian.deb"
   python3 mkdeb.py check "$out/Cydian.deb"

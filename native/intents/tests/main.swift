@@ -223,7 +223,7 @@ test("export my packages: sources, manual packages, holds") {
                         BackupSource(uri: "https://havoc.app/", suite: "./", components: []),
                         BackupSource(uri: "https://apt.procurs.us/", suite: "1800", components: ["main"])], "\(b.sources)")
     check(String(decoding: data, as: UTF8.self).contains("\"format\" : \"cydian-backup\""), "format")
-    check(IntentsCore.backupFileName(Date(timeIntervalSince1970: 1_800_000_000)) == "Cydian Packages 2027-01-15.json", "name")
+    check(IntentsCore.backupFileName(Date(timeIntervalSince1970: 1_800_000_000)) == "\(Brand.name) Packages 2027-01-15.json", "name")
     check(throwsFailure { _ = try IntentsCore.exportBackup(FakeHost(jailbroken: false)) } == .needsJailbreak, "sideload")
 }
 
@@ -256,7 +256,7 @@ test("restore my packages: refused files") {
     check(throwsFailure { _ = try IntentsCore.restore(Data("{}".utf8), h, gzip: storedGzip) }?.message == "That isn't a file from Export My Packages.", "empty")
     var b = Backup(created: "x", sources: [], packages: [], holds: [])
     b.version = 2
-    check(throwsFailure { _ = try IntentsCore.restore(try JSONEncoder().encode(b), h, gzip: storedGzip) }?.message.contains("newer Cydian") == true, "v2")
+    check(throwsFailure { _ = try IntentsCore.restore(try JSONEncoder().encode(b), h, gzip: storedGzip) }?.message.contains("newer \(Brand.name)") == true, "v2")
     check(throwsFailure { _ = try IntentsCore.restore(Data(count: IntentsCore.maxBackup + 1), h, gzip: storedGzip) }?.message.contains("too big") == true, "big")
     check(h.log.isEmpty, "\(h.log)")
 }
@@ -269,7 +269,7 @@ test("restore my packages: sideload restores sources only, as an import link") {
     let r = try IntentsCore.restore(try JSONEncoder().encode(b), h, gzip: storedGzip)
     check(h.log.isEmpty, "\(h.log)")
     check(r.importLink?.hasPrefix("cydian://import?d=") == true, "\(String(describing: r.importLink))")
-    check(r.dialog == "Opening Cydian to add the sources.", r.dialog)
+    check(r.dialog == "Opening \(Brand.name) to add the sources.", r.dialog)
     print("LINK \(r.importLink ?? "")")
     let empty = Backup(created: "x", sources: [], packages: [], holds: [])
     check(throwsFailure { _ = try IntentsCore.restore(try JSONEncoder().encode(empty), h, gzip: storedGzip) } != nil, "no sources")
@@ -283,7 +283,7 @@ test("widget share: app snapshot, daemon state, the newer wins") {
     check(d == WidgetShare.Snapshot(count: 2, names: ["apt", "com.example.tweak"], checked: Date(timeIntervalSince1970: 200)), "\(String(describing: d))")
     check(WidgetShare.daemonState("apt=1\n") == nil, "no last")
     check(WidgetShare.pick(s, d) == d && WidgetShare.pick(s, nil) == s && WidgetShare.pick(nil, nil) == nil, "pick")
-    check(WidgetShare.label(nil) == "Open Cydian" && WidgetShare.label(d) == "2 Updates", "label")
+    check(WidgetShare.label(nil) == "Open \(Brand.name)" && WidgetShare.label(d) == "2 Updates", "label")
     check(WidgetShare.label(WidgetShare.Snapshot(count: 0, names: [], checked: Date())) == "Up to Date", "zero")
 }
 

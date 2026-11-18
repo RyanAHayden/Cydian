@@ -2,7 +2,7 @@
 // (WidgetShare, ../Core.swift) and the widget is told to reload. Called by Check for Updates and Install All Updates
 // (Intents.swift) and by the page's app.badge (Sources/Notifications.swift), which sends Changes' count whenever it
 // changes. Without the App Group (a signer whose profile has none) there is nowhere to write: the widget then shows
-// "Open Cydian". Kept apart from Intents.swift: WidgetKit and AppIntents in one file pull in a strongly linked
+// "Open iFizBox". Kept apart from Intents.swift: WidgetKit and AppIntents in one file pull in a strongly linked
 // cross-import overlay (see there).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation

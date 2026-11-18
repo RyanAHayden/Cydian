@@ -23,6 +23,7 @@ import { format, settingsRoute } from "./router.js";
 import { installOnDevice } from "./signing-client.js";
 import { createSwitch } from "./screens/settings.js";
 import { phaseLabel, deviceError, inspectGroups, installParams, installedId, isCgBI, fromBase64 } from "./core/signing.js";
+import { NAME } from "./brand.js";
 
 const ICON_SIZE = 180; // the 60pt @3x icon; the signer writes the same PNG as @2x and @3x
 
@@ -259,7 +260,7 @@ function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } =
       drawIcon();
       setIconState();
     } catch {
-      await showAlert({ title: "Can't Use This Image", message: "Cydian couldn't read it. Choose a PNG or JPEG.", buttons: ["OK"] });
+      await showAlert({ title: "Can't Use This Image", message: `${NAME} couldn't read it. Choose a PNG or JPEG.`, buttons: ["OK"] });
     }
   });
   iconLi.append(iconRow, file, choose);

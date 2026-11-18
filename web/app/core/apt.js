@@ -116,7 +116,7 @@ export function parseRelease(text) {
 
 // ---- repo layout and URLs ---------------------------------------------------------------------------------
 
-// Cydian targets rootless jailbreaks; "iphoneos-arm" (rootful, palera1n rootful) and "iphoneos-arm64e" (roothide,
+// iFizBox targets rootless jailbreaks; "iphoneos-arm" (rootful, palera1n rootful) and "iphoneos-arm64e" (roothide,
 // F38) stay available as a setting.
 export const DEFAULT_ARCH = "iphoneos-arm64";
 export const ARCHES = ["iphoneos-arm64", "iphoneos-arm", "iphoneos-arm64e"];

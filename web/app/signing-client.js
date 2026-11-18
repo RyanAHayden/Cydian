@@ -1,6 +1,6 @@
 // Signing in the sideload build (F58, I6): the phone signs every app itself, through the shell's signing.* bridge
 // calls; the Signing Server (worker/, sign.cydian.dev unless the user runs their own) only hands iOS the install
-// manifest and holds Cydian's own update. F93: the website signs in the browser again, zsign as WebAssembly in a Web
+// manifest and holds iFizBox's own update. F93: the website signs in the browser again, zsign as WebAssembly in a Web
 // Worker (signInBrowser, at the end), and the Worker only hosts the signed IPA for iOS. docs/signing.md has the picture.
 //
 //   await loadIdentity()         the picks on Settings > Signing ({ p12, p12Name, password, profile, profileName }),
@@ -10,8 +10,8 @@
 //   await signingReady()         true when the Keychain holds an identity (statusReady(signing.status), as Settings
 //                                shows it), or on the website when a .p12 and a profile are saved; false in the
 //                                jailbreak app
-//   getBring() / setBring(on)    the website's Bring My Certificate switch (on unless turned off): Install Cydian
-//                                App puts the certificate inside Cydian's IPA
+//   getBring() / setBring(on)    the website's Bring My Certificate switch (on unless turned off): Install iFizBox
+//                                App puts the certificate inside iFizBox's IPA
 //   getServer() / setServer(s)   Settings > Signing's server, https://sign.cydian.dev unless the user set another
 //   await serverStatus()         what GET <server>/sign/status says
 //   await signAndInstall({ url, name, onInstalled, bring })   signs on the phone and installs (installOnDevice), or
@@ -23,6 +23,7 @@ import { IPA_MAX, CYDIAN_ID, profileInfo, targetBundleId } from "./core/websign.
 import { detectMode } from "./core/settings.js";
 import { progressHUD } from "./nav/progress.js";
 import { showAlert } from "./nav/alert.js";
+import { NAME } from "./brand.js";
 
 // F151: a job's error on the progress page (the HUD interface's fail, nav/progress.js) before its alert; a HUD
 // without one (liveHUD, the tests') just goes.
@@ -32,7 +33,7 @@ const SERVER_KEY = "cydian.signingServer";
 
 // The picks wait in memory only, until signing.import puts them into the Keychain; then only their names stay (the
 // .p12 itself never goes to the web view's storage). F93: the website keeps them in IndexedDB (this browser only:
-// they never leave it but inside Cydian's own IPA with Bring My Certificate), as it did before F89.
+// they never leave it but inside iFizBox's own IPA with Bring My Certificate), as it did before F89.
 let staged = null;
 // F121: the website's identity as last read from or written to IndexedDB, for Install's tap to use without waiting
 // (identityNow); warmed when this module loads on the website.
@@ -86,7 +87,7 @@ export async function clearIdentity() {
 
 export async function signingReady({ native, wait = sleep } = {}) {
   if (browserSigning()) {
-    // F121: from memory when it's there, so Install Cydian App's tap reaches iOS's prompt without a wait in between
+    // F121: from memory when it's there, so Install iFizBox App's tap reaches iOS's prompt without a wait in between
     const id = known ?? (await loadIdentity());
     return Boolean(id?.p12 && id?.profile && id.passwordOk !== false);
   }
@@ -129,24 +130,24 @@ export async function serverStatus(server = getServer()) {
   return r.json();
 }
 
-// F72: an IPA of Cydian itself (its GitHub releases, where Cydian's own source points).
-// Only Cydian's own IPA files count: a release's Cydian.ipa, or the test source's cydian-<version>.ipa. Other files
+// F72: an IPA of iFizBox itself (its GitHub releases, where iFizBox's own source points).
+// Only iFizBox's own IPA files count: a release's Cydian.ipa, or the test source's cydian-<version>.ipa. Other files
 // under the same releases (the test-fixtures pre-release's Test Alpha, Test Beta...) are ordinary apps.
 export const isSelfIpa = (url) => /^https:\/\/github\.com\/RyanAHayden\/Cydian\/releases\/(?:latest\/)?download\/(?:[^/]+\/)?(?:Cydian|cydian-[\d.]+)\.ipa$/i
   .test(String(url ?? ""));
 
 // Signs `url` (an IPA) on the phone and installs it. Resolves true once iOS was asked to install; false after an
 // error, which it shows in an alert; false in the jailbreak app (its pages use the helper, so this is only a guard).
-// F93: on the website, signs it in the browser (signInBrowser); `bring` (Install Cydian App) carries the certificate.
+// F93: on the website, signs it in the browser (signInBrowser); `bring` (Install iFizBox App) carries the certificate.
 export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "" }) {
   if (browserSigning()) return signInBrowser({ url, name, onInstalled, bring, bundleId, version });
   if (!localSigning()) {
-    await showAlert({ title: "Can't Install Here", message: "Apps are signed in the Cydian app. Open this one in Cydian, AltStore, SideStore or Feather.", buttons: ["OK"] });
+    await showAlert({ title: "Can't Install Here", message: `Apps are signed in the ${NAME} app. Open this one in ${NAME}, AltStore, SideStore or Feather.`, buttons: ["OK"] });
     return false;
   }
-  // Cydian's own IPA: signed here on the phone like any app, then hosted on the Signing Server (host: true) since
-  // iOS closes Cydian, and its install server, while it installs over it. Straight to iOS's Install prompt.
-  if (isSelfIpa(url)) return installOnDevice({ url, name: name || "Cydian", onInstalled, host: true });
+  // iFizBox's own IPA: signed here on the phone like any app, then hosted on the Signing Server (host: true) since
+  // iOS closes iFizBox, and its install server, while it installs over it. Straight to iOS's Install prompt.
+  if (isSelfIpa(url)) return installOnDevice({ url, name: name || NAME, onInstalled, host: true });
   // F75: the first Install with something missing opens the Signing walkthrough at that step, not an alert.
   if (await firstInstallCheck()) return false;
   // F81: one tap: Install signs and installs straight away. The look-first sheet (F68, signing-sheet.js) is the app
@@ -239,7 +240,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   const h = hud("Downloading");
   let result;
   try {
-    // manifestServer: the signing server hands iOS the manifest while Cydian serves the IPA over plain HTTP at
+    // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
     // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
     result = await bridge(native).call("signing.install", { ...(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}) }, (ev) => {
       const t = phaseLabel(ev);
@@ -254,13 +255,13 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   }
   h.set("Installing");
   onInstalled(result);
-  // Cydian itself (host): iOS's Install prompt is up, and Cydian closes once it's answered so the install finishes
+  // iFizBox itself (host): iOS's Install prompt is up, and iFizBox closes once it's answered so the install finishes
   // (native CloseForUpdate): say so first (user 2026-11-18).
-  if (host) showBanner({ title: "Cydian", message: "Press Install. Cydian closes to finish updating; open it again once the new icon appears." });
+  if (host) showBanner({ title: NAME, message: `Press Install. ${NAME} closes to finish updating; open it again once the new icon appears.` });
   if (after) { after(result, h); return true; }
   // F169: a plain Install follows iOS's install too (signing-sheet.js followInstall), so it ends on F155's
-  // Open <app>, as Custom Install and My IPAs do. Not for Cydian itself (host, or its own IPA or ID): iOS closes
-  // Cydian while it installs over it, and there's nothing to open.
+  // Open <app>, as Custom Install and My IPAs do. Not for iFizBox itself (host, or its own IPA or ID): iOS closes
+  // iFizBox while it installs over it, and there's nothing to open.
   if (result?.bundleId && !host && !isSelfIpa(url) && result.bundleId !== CYDIAN_ID) {
     const followInstall = follow ?? (await import("./signing-sheet.js")).followInstall;
     followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name });
@@ -341,10 +342,10 @@ export async function installFromLibrary({ file, name = "", onInstalled = () => 
 //       Install tap opens iOS's install prompt (itms-services, from the tap). F121: when the bundle ID is known at the
 //       tap (expectedBundleId; `bundleId` is the app's own ID where the caller knows it), iOS's prompt opens at once
 //       instead, for a link the upload fills later, and there's no alert. true once iOS was asked; false after an error, shown in an alert (zsign's own reason when
-//       it can't sign the app). bring: Cydian's own IPA carries the certificate (cydian-identity.plist), and always
+//       it can't sign the app). bring: iFizBox's own IPA carries the certificate (cydian-identity.plist), and always
 //       the website's sources and settings (web/transfer.link): the app imports both on its first launch.
 //
-// The .p12, password and profile go only into the Web Worker (this browser), and with bring into Cydian's signed
+// The .p12, password and profile go only into the Web Worker (this browser), and with bring into iFizBox's signed
 // IPA, which waits on the Worker for those 10 minutes as the old server signer's copy did.
 
 export const browserSigning = () => detectMode() === "site";
@@ -438,7 +439,7 @@ export async function uploadSigned(bytes, { bundleId, name, version }, { base = 
 // the upload is there (app.ipa, up to 2 minutes; the manifest answers from its URL's query, the reservation just
 // binds the token to the app). That needs the
 // bundle ID the app will be signed as before it's downloaded: an explicit profile's, or a wildcard profile's for an
-// app whose own ID is known (Cydian's, or the caller's bundleId). Otherwise, and whenever the early link can't be
+// app whose own ID is known (iFizBox's, or the caller's bundleId). Otherwise, and whenever the early link can't be
 // used (another bundle ID came out, the reservation failed, it took too long), the Ready to Install alert as before.
 
 // F132: iOS's installer retries a held app.ipa for at least 5 minutes (R14, docs/signing.md: HEAD 30 s, HEAD 30 s,
@@ -536,7 +537,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   }
 }
 
-// What Cydian's own IPA carries for its first launch: the website's sources and settings (Send Settings' link).
+// What iFizBox's own IPA carries for its first launch: the website's sources and settings (Send Settings' link).
 async function websiteTransfer() {
   const [{ websitePayload }, { encodeLink }] = await Promise.all([import("./screens/importlink.js"), import("./core/transfer.js")]);
   return encodeLink(await websitePayload({ identity: false })); // the certificate goes as cydian-identity.plist (bring)

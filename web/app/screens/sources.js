@@ -1,5 +1,5 @@
 // Sources tab, after Cydia's (docs/cydia.md "Sources tab"): one row per source, sorted by name, with its
-// CydiaIcon.png, name, URL and (Cydian's own addition) how many packages it has for this device's architecture.
+// CydiaIcon.png, name, URL and (iFizBox's own addition) how many packages it has for this device's architecture.
 // Nav bar: Refresh (F150 reload bar, refetch every source) and Manage (F45, screens/manage.js: the edit list with Add, delete
 // and reorder, Import & Export, Recommended). A left swipe on a row shows Delete. Rows keep the order set there. The list lives on the
 // device and comes through the backend (core/sources.js sourceCalls), so the app runs this file unchanged.
@@ -114,7 +114,7 @@ export function nav(route, ctx) {
     right: [
       // Add: the clipboard (the app: UIPasteboard; the website: iOS's Paste bubble, the button blue and reading Type
       // while it waits). Then the Enter APT URL alert, filled with a copied source URL.
-      // F146: the app has no Type switch at all (no onPress): Add opens Enter APT URL and Cydian reads the clipboard.
+      // F146: the app has no Type switch at all (no onPress): Add opens Enter APT URL and iFizBox reads the clipboard.
       { label: "Add", ...(globalThis.cydianNative ? {} : { onPress: (e) => showType(e.currentTarget) }),
         onClick: (e) => addFromClipboard(ctx, e.currentTarget) },
       { label: "Manage", onClick: () => ctx.go({ tab: "sources", path: [manage.SEGMENT] }) },
@@ -325,7 +325,7 @@ function draw() {
   const backend = getBackend();
   // F37: Not Jailbroken shows AltStore sources only. F144: and says nothing of APT ones (no count, no hint).
   // F45: in the order set in Manage > Sources (none set: by name).
-  // F72: Cydian's own source (built in) stays first whatever the order.
+  // F72: iFizBox's own source (built in) stays first whatever the order.
   const { shown } = sourcesFor(builtinFirst(orderSources(state.sources, loadOrder())), settings.deviceType());
   const searching = Boolean(state.query.trim());
   const list = filterSources(shown, state.query, displayName);
@@ -392,7 +392,7 @@ function decorate(li, source, backend) {
   img.src = urls.shift();
   li.querySelector(".cell-icon").append(img);
   li.dataset.url = source.uri; // Copy URL (hold the row)
-  // F72: Cydian's own source is built in: a lock after its name, and no Delete (a swipe arms nothing).
+  // F72: iFizBox's own source is built in: a lock after its name, and no Delete (a swipe arms nothing).
   if (isBuiltin(source)) {
     li.dataset.builtin = "1";
     li.querySelector(".cell-label")?.append(lockMark("name-lock"));

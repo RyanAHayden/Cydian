@@ -1,4 +1,4 @@
-// F75: Send Settings (Open in Cydian App) on the website: its sources, settings and Ignored Upgrades into the
+// F75: Send Settings (Open in iFizBox App) on the website: its sources, settings and Ignored Upgrades into the
 // sideload app, as one cydian://import link. Pure JS (CompressionStream is a global in Safari and in node), so node
 // tests cover both ends. F93: the website keeps a certificate again (Settings > Signing, signing in the browser), so
 // it travels too, as before F89; the Signing Server doesn't (the app keeps its own).
@@ -35,7 +35,7 @@ function identityOf(id) {
   return { p12: id.p12, profile: id.profile, password: str(id.password), p12Name: str(id.p12Name), profileName: str(id.profileName) };
 }
 
-// ---- Open in Cydian App ----------------------------------------------------------------------------------------
+// ---- Open in iFizBox App ----------------------------------------------------------------------------------------
 
 async function pipe(data, stream) {
   const out = new Response(new Blob([data]).stream().pipeThrough(stream));

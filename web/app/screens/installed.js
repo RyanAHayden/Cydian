@@ -10,11 +10,11 @@
 //
 // F77: a My IPAs row under the apps opens the user's own IPAs (screens/myipas.js, #installed/myipas/...).
 //
-// F87: in the jailbreak app, apps Cydian remembers (core/installed.js) are on an Apps page one row down
+// F87: in the jailbreak app, apps iFizBox remembers (core/installed.js) are on an Apps page one row down
 // (#installed/apps, the row above dpkg's packages, there only when it has any), listed at the version on the phone
-// (app-updates.js rememberedApps, I4) with the note where it differs from what Cydian remembered.
+// (app-updates.js rememberedApps, I4) with the note where it differs from what iFizBox remembered.
 //
-// F91: in the sideload app every app Cydian signed (signing.installed) shows its signature's days left on the right,
+// F91: in the sideload app every app iFizBox signed (signing.installed) shows its signature's days left on the right,
 // a small pill (core/signing.js signatureState; packages.css .sig-pill): green outside the re-sign window (Settings >
 // Signing > Re-sign Reminder), amber inside it, red once expired. Signed apps the list doesn't remember (My IPAs,
 // Custom Install as another ID) are listed under them, without Delete (Signed Apps in Settings forgets those).
@@ -59,6 +59,7 @@ import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { settings } from "./settings.js";
 import { wishRows, wishCount, WISH_EMPTY } from "../core/wishlist.js";
 import { compareNames, indexLetter } from "../core/catalog.js";
+import { NAME } from "../brand.js";
 
 export const title = "Installed";
 
@@ -94,7 +95,7 @@ export function appSections(rows, { mode = "user", query = "", locale } = {}) {
   const out = [];
   if (mode === "recent") {
     for (const r of appRows(shown)) {
-      const label = r.date > 0 ? dayLabel(r.date / 1000, locale) : "Cydian";
+      const label = r.date > 0 ? dayLabel(r.date / 1000, locale) : NAME;
       if (out.at(-1)?.header !== label) out.push({ header: label, rows: [] });
       out.at(-1).rows.push(r);
     }
@@ -334,7 +335,7 @@ function drawList() {
   body.append(state.list.el);
 }
 
-// F87: how many apps (not Cydian itself) the jailbreak app remembers; 0 when the store can't be read.
+// F87: how many apps (not iFizBox itself) the jailbreak app remembers; 0 when the store can't be read.
 async function jailbreakAppCount() {
   try { return (await (await apps()).all()).filter((r) => r?.id && !r.self).length; } catch { return 0; }
 }
@@ -409,7 +410,7 @@ async function candidates(rows) {
 
 export function appSubtitle(r, locale) {
   const date = r.date ? new Date(r.date).toLocaleDateString(locale, { dateStyle: "medium" }) : null;
-  // F87: I4's note, where the phone's version isn't the one Cydian remembered, comes first.
+  // F87: I4's note, where the phone's version isn't the one iFizBox remembered, comes first.
   return [r.note || null, r.upgrade ? `Upgrade to ${r.upgrade}` : null, r.sourceName || r.source, date].filter(Boolean).join(" · ");
 }
 
@@ -463,7 +464,7 @@ async function loadApps() {
   const installedIds = catalog.installed().then((x) => (x ?? []).map((r) => r.id), () => []);
   const [hasStatus, signed] = await Promise.all([site ? catalog.hasStatus() : false, signedApps()]);
   if (seq !== appView.seq) return;
-  if (!recordsApps()) rows = rows.filter((r) => !r?.self); // Cydian's own row is dpkg's there
+  if (!recordsApps()) rows = rows.filter((r) => !r?.self); // iFizBox's own row is dpkg's there
   appView.signed = signed; // F91
   drawApps(appListRows(rows, () => null), new Map(), site, hasStatus);
   const ids = await installedIds;
@@ -518,7 +519,7 @@ function drawAppList() {
     href: cands.has(r.id) ? format({ tab: route.tab, path: [...route.path, `package:${r.id}`] }) : null,
   });
   const sections = appSecs.map((sec) => ({ header: sec.header, rows: sec.rows.map(appRow) }));
-  sections.push({ rows: extra.map((r) => ({ label: r.name, subtitle: [r.version ? `Version ${r.version}` : null, "Signed by Cydian"].filter(Boolean).join(" · "),
+  sections.push({ rows: extra.map((r) => ({ label: r.name, subtitle: [r.version ? `Version ${r.version}` : null, `Signed by ${NAME}`].filter(Boolean).join(" · "),
     detail: r.sig?.text, icon: { text: r.name.charAt(0).toUpperCase() } })) });
   if (site) {
     sections.push({ header: "Jailbroken iPhone", rows: [hasStatus

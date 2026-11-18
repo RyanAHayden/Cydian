@@ -177,9 +177,9 @@ test("re-sign reminder") {
     check(Reminder.date(expiry: expiry, daysBefore: 0, now: now, calendar: utc) == nil, "off")
     check(Reminder.date(expiry: expiry, daysBefore: 7, now: now, calendar: utc) == nil, "already past")
     check(Reminder.text(apps: ["Delta"], expiry: expiry, now: now, calendar: utc).body
-          == "Delta stops opening in 7 days. Open Cydian and tap Re-sign All.", "one app")
+          == "Delta stops opening in 7 days. Open \(Brand.name) and tap Re-sign All.", "one app")
     check(Reminder.text(apps: ["A", "B", "C"], expiry: day("2026-11-18T08:00:00Z"), now: now, calendar: utc).body
-          == "A and 2 other apps stop opening tomorrow. Open Cydian and tap Re-sign All.", "three apps")
+          == "A and 2 other apps stop opening tomorrow. Open \(Brand.name) and tap Re-sign All.", "three apps")
     check(Reminder.text(apps: [], expiry: now, now: now, calendar: utc).body.hasPrefix("Your signing certificate stops opening today"), "none")
 }
 
@@ -213,7 +213,7 @@ test("signed records") {
     check(SignedRecords.only(list, bundleID: "nope").isEmpty && SignedRecords.only(list, bundleID: "").isEmpty, "none")
 }
 
-// F75: Cydian's own IPA with the user's certificate inside (BundledIdentity), the cydian:// links the shell takes,
+// F75: iFizBox's own IPA with the user's certificate inside (BundledIdentity), the cydian:// links the shell takes,
 // and gunzip for cydian://import on an iOS without DecompressionStream.
 test("bundled identity: first launch imports, once") {
     let plist = try PropertyListSerialization.data(fromPropertyList: ["p12": Data([0x30, 1, 2]), "password": "pw",

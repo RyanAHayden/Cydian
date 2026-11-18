@@ -40,7 +40,7 @@ test("statusReady: an identity object, with or without a name, with or without a
   assert.equal(statusReady(KEPT), true);
   assert.equal(statusReady({ ...KEPT, identity: { ...KEPT.identity, name: "" } }), true);
   assert.equal(statusReady({ ...KEPT, identity: { name: "X", team: "" } }), true); // no profile file
-  assert.equal(statusReady({ ...KEPT, trust: { ca: true, trusted: true, name: "Cydian Local Install CA (iPhone 1A2B)" } }), true);
+  assert.equal(statusReady({ ...KEPT, trust: { ca: true, trusted: true, name: "iFizBox Local Install CA (iPhone 1A2B)" } }), true);
   assert.equal(statusReady(JSON.stringify(KEPT)), true); // the same as JSON text
 });
 

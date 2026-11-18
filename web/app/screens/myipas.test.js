@@ -85,7 +85,7 @@ test("Install IPAs' Browse section: All Apps and the categories of the AltStore 
   assert.equal(none.length, 1);
   assert.match(none[0].footer, /AltStore source/);
   assert.match(libraryEmptyText(true), /AltStore, SideStore or Feather/);
-  assert.match(libraryEmptyText(false), /On My iPhone > Cydian/);
+  assert.match(libraryEmptyText(false), /On My iPhone > iFizBox/);
 });
 
 test("Install IPAs: a list's search bar matches name, description, developer or ID", async () => {

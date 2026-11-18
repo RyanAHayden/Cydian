@@ -1,16 +1,16 @@
-// N8: Cydian's App Intents, so Shortcuts, Siri, Spotlight and the Action button get them with nothing built by hand.
+// N8: iFizBox's App Intents, so Shortcuts, Siri, Spotlight and the Action button get them with nothing built by hand.
 // Each is a thin wrapper around IntentsCore (../Core.swift, tested on Linux); the build turns these declarations into
 // Cydian.app/Metadata.appintents (../metadata.py), which is how iOS finds them without Xcode.
 //
 //   both modes       Check for Updates (returns one line per update; dialog "3 Updates: …"), Add Source (URL; opens
-//                    Cydian's Add Source alert filled in), Restore My Packages (file; in the sideload app: its sources)
+//                    iFizBox's Add Source alert filled in), Restore My Packages (file; in the sideload app: its sources)
 //   jailbreak only   Install All Updates, Respring, Userspace Reboot, Export My Packages (returns the file)
 // The sideload IPA's metadata lists only the first three (metadata.py --mode sideload), so the jailbreak-only ones
 // never show there; run anyway they say they need the jailbreak build. Respring and Userspace Reboot are also
 // Control Center controls, from the widget extension (native/widget/).
 // AppIntents is iOS 16+ and weak-linked (build.sh): on iOS 15 none of this is registered or run.
 // Nothing here imports UIKit or WidgetKit: AppIntents with either in one file pulls in a cross-import overlay
-// (_AppIntents_UIKit, _AppIntents_SwiftUI) that would be strongly linked and keep Cydian from launching on iOS 15.
+// (_AppIntents_UIKit, _AppIntents_SwiftUI) that would be strongly linked and keep iFizBox from launching on iOS 15.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import AppIntents
 import Foundation
@@ -29,10 +29,11 @@ extension IntentFailure: CustomLocalizedStringResourceConvertible {
     var localizedStringResource: LocalizedStringResource { LocalizedStringResource(stringLiteral: message) }
 }
 
+// F170: App Intents strings are read at build time (const values), so they name no product: no Brand.name here.
 @available(iOS 16.0, *)
 struct CheckForUpdatesIntent: AppIntent {
     static let title: LocalizedStringResource = "Check for Updates"
-    static let description = IntentDescription("Refreshes Cydian's sources and returns the updates, one line each (name, installed version, new version). Use Count for the number.")
+    static let description = IntentDescription("Refreshes your sources and returns the updates, one line each (name, installed version, new version). Use Count for the number.")
 
     func perform() async throws -> some IntentResult & ReturnsValue<[String]> & ProvidesDialog {
         let r = try await run { try IntentsCore.checkForUpdates(PhoneHost.shared) }
@@ -44,7 +45,7 @@ struct CheckForUpdatesIntent: AppIntent {
 @available(iOS 16.0, *)
 struct AddSourceIntent: AppIntent {
     static let title: LocalizedStringResource = "Add Source"
-    static let description = IntentDescription("Opens Cydian's Add Source alert with this URL filled in: an APT repo or an app source (.json).")
+    static let description = IntentDescription("Opens the Add Source alert with this URL filled in: an APT repo or an app source (.json).")
     static let openAppWhenRun = true
 
     @Parameter(title: "URL", description: "The repo's or the app source's address.")
@@ -61,7 +62,7 @@ struct AddSourceIntent: AppIntent {
 @available(iOS 16.0, *)
 struct InstallAllUpdatesIntent: AppIntent {
     static let title: LocalizedStringResource = "Install All Updates"
-    static let description = IntentDescription("Refreshes Cydian's sources and installs every update, Ignored Upgrades left out. Jailbreak only.")
+    static let description = IntentDescription("Refreshes your sources and installs every update, Ignored Upgrades left out. Jailbreak only.")
 
     func perform() async throws -> some IntentResult & ReturnsValue<[String]> & ProvidesDialog {
         let r = try await run { try IntentsCore.installAllUpdates(PhoneHost.shared) }
@@ -107,7 +108,7 @@ struct ExportPackagesIntent: AppIntent {
 struct RestorePackagesIntent: AppIntent {
     static let title: LocalizedStringResource = "Restore My Packages"
     static let description = IntentDescription("Adds the sources from an Export My Packages file and installs its packages again (after a re-jailbreak, or on a new iPhone). In the sideload app, adds the sources only.")
-    // In the app's process with Cydian open: a whole restore runs apt for minutes, longer than a background intent
+    // In the app's process with iFizBox open: a whole restore runs apt for minutes, longer than a background intent
     // may, and the sideload app hands the sources to the page.
     static let openAppWhenRun = true
 

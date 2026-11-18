@@ -1,14 +1,14 @@
-# What Sileo and Zebra do, and what Cydian should take (R11)
+# What Sileo and Zebra do, and what iFizBox should take (R11)
 
 Read on 2026-11-18 from shallow clones: Sileo `c9f7015` (2024-10-08, github.com/Sileo/Sileo) and Zebra `e2f3c27`
 (2026-11-15, github.com/zbrateam/Zebra). File paths below are relative to those repos.
 
 **Licences.** Sileo is BSD-4-Clause (its `LICENSE` clause 3, the advertising clause, can't be combined with the GPL):
-take **ideas only**, never its code. Zebra is GPL-3.0, like Cydian: code may be reused, with credit in the file
-header and on the Credits page. Cydian is web code and Zebra is Objective-C, so in practice nothing below copies code
+take **ideas only**, never its code. Zebra is GPL-3.0, like iFizBox: code may be reused, with credit in the file
+header and on the Credits page. iFizBox is web code and Zebra is Objective-C, so in practice nothing below copies code
 from either app. Each proposal describes behaviour, and each follow-up writes its own JS.
 
-**Short version.** Cydian already has most of what these two apps are known for: Canister search for sources you
+**Short version.** iFizBox already has most of what these two apps are known for: Canister search for sources you
 haven't added (F20), `sileo-featured.json` banners (F20), native Sileo depictions (`screens/depiction.js`), the
 Payment Provider API (F20/F57), plain-language dependency errors (F18), refresh skipping by Release fingerprint, and
 ETag/Last-Modified caching. The gaps worth filling are smaller: search history and ranking polish, a one-tap install
@@ -37,7 +37,7 @@ ranked list of follow-ups is at the end.
   `queueCache()` puts it in the install queue on its own, so the user gets **one tap from search to queued**. A
   Settings switch (`ShowProvisional`) turns it off.
 - **Telemetry:** `ingest(packages:)` POSTs every installed package's id, version, author and repo to Canister's
-  `/download/ingest`, along with device headers. Cydian should **not** do this. Zebra puts Canister behind a privacy
+  `/download/ingest`, along with device headers. iFizBox should **not** do this. Zebra puts Canister behind a privacy
   screen (`Tabs/Home/Canister Privacy Controller`).
 - **Piracy check:** `CanisterResolver.piracy(urls)` asks Canister's `/repository/safety` before adding a source.
 
@@ -45,7 +45,7 @@ ranked list of follow-ups is at the end.
 - **Where it looks:** `Database/ZBDatabaseManager.m` runs SQLite queries. A scope bar under the field picks one
   field: **Name | Description | Author**. Name search is
   `WHERE NAME LIKE %q% ORDER BY arch weight, (exact = 1, prefix = 2, else 3), NAME COLLATE NOCASE`, which is the same
-  tiers Cydian uses.
+  tiers iFizBox uses.
 - **Live vs. full search:** with Live Search on (a Settings switch), each keystroke fetches only 7 columns with
   `LIMIT 30` (`ZBProxyPackage`). Pressing Search fetches every result in full.
 - **Short queries:** a one-character query is ignored when the character is Latin (`< 0xFF`) and allowed for CJK
@@ -56,7 +56,7 @@ ranked list of follow-ups is at the end.
 - **Filters:** `Tabs/Home/Settings/Filters` hides whole sections and **authors** (and blocks packages by author)
   everywhere: lists, search and Changes.
 
-### Cydian today
+### iFizBox today
 `screens/search.js` with `core/catalog.js search()`, run in the worker:
 - Every word must appear somewhere in name, id, description, author or maintainer.
 - Rank tiers: exact name or id, then prefix, then the query starting a word in the name or id ("board" in "Snow
@@ -90,7 +90,7 @@ ranked list of follow-ups is at the end.
 ## Canister: from search result to installed
 
 Sileo goes from a Canister result to the install queue in one tap: add the repo, refresh, then queue the package.
-Cydian's alert (`screens/extras.js offer`) offers **Add Source** and then says "Refresh Sources to list it". The user
+iFizBox's alert (`screens/extras.js offer`) offers **Add Source** and then says "Refresh Sources to list it". The user
 has to refresh, search again and tap Install.
 
 **Proposal:** in the jailbreak app, the alert's buttons become **Cancel / Add Source & Install** (and Depiction).
@@ -102,7 +102,7 @@ Tapping Add Source & Install:
 If the refreshed source turns out not to list the package (stale Canister data), say so in an alert. On the site and
 in the sideload build, keep the current Add Source.
 
-Cydian already has its own static piracy list (`core/warnings.js`, taken from Canister's MIT list). Asking Canister
+iFizBox already has its own static piracy list (`core/warnings.js`, taken from Canister's MIT list). Asking Canister
 live would send every added source URL to a third party, so keep the static list.
 
 ## Native depictions (Sileo JSON)
@@ -128,7 +128,7 @@ and skips classes it doesn't know.
 F20 checked their featured files live. This task didn't sample depiction JSON across repos: see **Not verified** in
 the journal.
 
-**Cydian today.** `screens/depiction.js` renders every class in the list above except Rating, Review, WebView,
+**iFizBox today.** `screens/depiction.js` renders every class in the list above except Rating, Review, WebView,
 MinVersionForce and forms. Markdown is parsed locally and raw HTML goes through an allowlist. Unknown classes are
 skipped, as in Sileo.
 
@@ -137,7 +137,7 @@ skipped, as in Sileo.
 - **ReviewView:** a grouped-table cell with the title in bold, then the author and stars, then the markdown.
 - **WebView:** a sandboxed `<iframe>` (no scripts touching us, no top-level navigation), like HTML depictions. Use
   the `width`/`height` aspect ratio, http through the proxy as `mediaUrl` does.
-- **MinVersionForceView:** compares against Sileo's version numbers, which mean nothing for Cydian. Render the inner
+- **MinVersionForceView:** compares against Sileo's version numbers, which mean nothing for iFizBox. Render the inner
   `view` (that's what a current Sileo shows).
 
 Forms stay out (they post user input to the repo). Their button can open the URL outside the app like any link.
@@ -150,7 +150,7 @@ title, package, hideShadow}]`) sits at the top of that repo's page. Sileo's own 
 `FeaturedButtonView`, …) and only Sileo's own server serves it. Zebra shows featured repos on Home
 (`ZBFeaturedCollectionViewCell`).
 
-**Cydian.** `core/featured.js` already parses `FeaturedBannersView`, shows banners on the source page, and shows a
+**iFizBox.** `core/featured.js` already parses `FeaturedBannersView`, shows banners on the source page, and shows a
 few from each source on Home. Nothing to add. Sileo's store-wide featured file is Sileo's own curation, not a repo
 format, so leave it out.
 
@@ -179,7 +179,7 @@ format, so leave it out.
   `payment_secret` (`null` when there is none). Its `authorize_download` adds `version`, **`architecture`** and
   `repo`.
 
-**Cydian today** (`core/payment.js buildRequest`, `native/Sources/Paid.swift`): the same flow and the same `sileo`
+**iFizBox today** (`core/payment.js buildRequest`, `native/Sources/Paid.swift`): the same flow and the same `sileo`
 callback. Keychain items use `.userPresence`/`WhenPasscodeSetThisDeviceOnly` and fall back to plain items when the
 phone has no passcode. Two differences from both apps:
 - `purchase` sends only `{token, payment_secret}`, with no `udid`/`device`.
@@ -209,7 +209,7 @@ or send the wrong build. Both are one-line fixes in `buildRequest` (follow-up 1)
 lists installs, upgrades, removals and the packages they pull in, plus apt's broken packages as errors. Confirm
 stays off while there are errors.
 
-**Cydian today.** It already does better than Zebra's own resolver. Confirm runs real `apt-get -s` over the whole
+**iFizBox today.** It already does better than Zebra's own resolver. Confirm runs real `apt-get -s` over the whole
 queue (N4) and shows Modifications. "Cannot Comply" carries F18's one-sentence explanations with actions (Add
 Chariz, Remove Y), with apt's output underneath.
 
@@ -226,7 +226,7 @@ low priority.
   hash it doesn't download Packages again. On a normal launch it refreshes only repos older than **3 hours**
   (`repoRequiresUpdate`). Pull to refresh forces all of them.
 - **Zebra** (`Downloads/ZBDownloadManager.m`): `If-Modified-Since` from the saved file's date, parsed into SQLite.
-- **Cydian today:**
+- **iFizBox today:**
   - Release fingerprint (`core/health.js fingerprint`): an unchanged Release skips Packages, the same idea as
     Sileo's hash cache.
   - ETag/Last-Modified kept in IndexedDB (`core/cache.js`).
@@ -238,7 +238,7 @@ low priority.
 
 ## Other things worth having
 
-| Feature | Sileo / Zebra | Cydian today | Proposal |
+| Feature | Sileo / Zebra | iFizBox today | Proposal |
 |---|---|---|---|
 | **Wish List** | Both (`Wish List Manager`, `ZBWishListTableViewController`): add a package from its page, then list them all on one page | none | A "Wish List" row on the package page's More sheet ("Add to Wish List"), a Wish List page from Home/Manage as a plain package list. Rows that are installed drop off. Stored like holds |
 | Hide by author | Zebra Filters | sections can be hidden, authors can't | Low: a "Hide Packages by <author>" row on the author page, listed in Manage > Hidden with sections |
@@ -282,4 +282,4 @@ Each one is filed with `agent-runner plan add`, with its files and test.
 Every keystroke is far below the ~16 ms threshold, so **the narrowing cache (proposal 3) was not filed**. The
 scan over `_hay` is ~1 ms per 10k rows. One-letter queries cost the most because they sort thousands of hits, and
 F101's single-Latin-character skip (proposal 4) removes those. The 4S is a reference device only and never runs
-Cydian, so search was not timed on it. It wasn't timed on a modern iPhone either: no task allows driving one.
+iFizBox, so search was not timed on it. It wasn't timed on a modern iPhone either: no task allows driving one.

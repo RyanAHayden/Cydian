@@ -1,5 +1,5 @@
-// F72: Cydian's built-in source (always there, first, not removable, not exported), the essential detection, the
-// minimum version, the alert and each of its buttons, and Cydian's own sideload install path.
+// F72: iFizBox's built-in source (always there, first, not removable, not exported), the essential detection, the
+// minimum version, the alert and each of its buttons, and iFizBox's own sideload install path.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -42,7 +42,7 @@ function fakeCalls(initial = []) {
     sources: async () => [...list.values()],
     async addSource(input) {
       log.push(["add", input]);
-      const s = input === SELF_ALT_URL ? { key: altKey(input), uri: input, kind: "altstore", name: "Cydian", updated: 1 }
+      const s = input === SELF_ALT_URL ? { key: altKey(input), uri: input, kind: "altstore", name: "iFizBox", updated: 1 }
         : { key: sourceKey({ uri: input, dist: "./" }), uri: input, dist: "./", updated: 1 };
       list.set(s.key, s);
       return s;
@@ -64,12 +64,12 @@ test("withBuiltins: always listed, first, marked builtin, even before it was eve
   assert.equal(list.length, 2);
   assert.equal(list[0].key, altKey(SELF_ALT_URL));
   assert.equal(list[0].builtin, true);
-  assert.equal(list[0].name, "Cydian");
+  assert.equal(list[0].name, "iFizBox");
   assert.equal(isBuiltin(list[1]), false);
 });
 
 test("withBuiltins: a stored built-in keeps its fields and moves first", async () => {
-  const stored = { key: altKey(SELF_ALT_URL), uri: SELF_ALT_URL, name: "Cydian", count: 1, updated: 5 };
+  const stored = { key: altKey(SELF_ALT_URL), uri: SELF_ALT_URL, name: "iFizBox", count: 1, updated: 5 };
   const z = { key: "alt:https://0.example/a.json", uri: "https://0.example/a.json", name: "0" };
   const list = await withBuiltins(fakeCalls([z, stored]), builtinSources("site")).sources();
   assert.deepEqual(list.map((s) => s.key), [stored.key, z.key]);
@@ -139,8 +139,8 @@ test("belowMinimum: the version compare", () => {
   assert.equal(belowMinimum("", "0.1.3"), false); // unknown (the site): never forced
 });
 
-test("refreshSource keeps the Release's minimum on the record (Cydian's own repo)", async () => {
-  const release = "Origin: Cydian\nLabel: Cydian\nArchitectures: iphoneos-arm64\nX-Cydian-Minimum-Version: 0.1.3\n";
+test("refreshSource keeps the Release's minimum on the record (iFizBox's own repo)", async () => {
+  const release = "Origin: iFizBox\nLabel: iFizBox\nArchitectures: iphoneos-arm64\nX-Cydian-Minimum-Version: 0.1.3\n";
   const backend = {
     text: async (url) => { if (url.endsWith("Release")) return release; throw Object.assign(new Error("404"), { code: "not_found" }); },
     packages: async () => ({ text: "Package: com.ryha.cydian\nVersion: 0.1.4\nArchitecture: iphoneos-arm64\n" }),
@@ -151,7 +151,7 @@ test("refreshSource keeps the Release's minimum on the record (Cydian's own repo
 });
 
 const SOURCE = {
-  name: "Cydian",
+  name: "iFizBox",
   apps: [
     { bundleIdentifier: "com.example.other", versions: [{ version: "9.0", downloadURL: "https://x.example/o.ipa" }] },
     { bundleIdentifier: SELF_ID, minimumVersion: "0.1.2", versions: [
@@ -161,17 +161,17 @@ const SOURCE = {
   ],
 };
 
-test("selfFromAltSource: the newest Cydian (by version), its IPA, notes and minimum; only com.ryha.cydian", () => {
+test("selfFromAltSource: the newest iFizBox (by version), its IPA, notes and minimum; only com.ryha.cydian", () => {
   const info = selfFromAltSource(JSON.stringify(SOURCE));
   assert.equal(info.version, "0.1.3");
   assert.match(info.ipa, /v0\.1\.3\/Cydian\.ipa$/);
   assert.deepEqual(info.notes, ["Essential Upgrade"]);
   assert.equal(info.minimum, "0.1.2");
-  assert.equal(selfFromAltSource({ apps: [SOURCE.apps[0]] }), null); // no other app is ever Cydian
+  assert.equal(selfFromAltSource({ apps: [SOURCE.apps[0]] }), null); // no other app is ever iFizBox
   assert.equal(selfFromAltSource("not json"), null);
 });
 
-test("selfUpgradeRow / withSelfUpgrade: Cydian's row on top of Changes when newer, once", () => {
+test("selfUpgradeRow / withSelfUpgrade: iFizBox's row on top of Changes when newer, once", () => {
   const info = selfFromAltSource(SOURCE);
   const row = selfUpgradeRow(info, "0.1.1");
   assert.equal(row.id, SELF_ID);
@@ -195,7 +195,7 @@ test("saveInfo / loadInfo keep what the last launch read", () => {
 
 // ---- essential detection -------------------------------------------------------------------------------------
 
-test("essentialIds / essentialUpgrades: Cydian, apt, dpkg and installed Essential: yes packages; nothing else", () => {
+test("essentialIds / essentialUpgrades: iFizBox, apt, dpkg and installed Essential: yes packages; nothing else", () => {
   const ids = essentialIds([{ id: "base", essential: true }, { id: "tweak", essential: false }]);
   for (const id of [SELF_ID, "apt", "dpkg", "base"]) assert.ok(ids.has(id), id);
   assert.ok(!ids.has("tweak"));
@@ -211,7 +211,7 @@ test("essentialAlert: Cydia's buttons; below the minimum there is no Ignore", ()
   assert.equal(a.title, TITLE);
   assert.equal(a.title, "Essential Upgrade");
   assert.equal(a.message, MESSAGE);
-  assert.equal(a.message, "Cydian needs to upgrade itself before it can do anything else.");
+  assert.equal(a.message, "iFizBox needs to upgrade itself before it can do anything else.");
   assert.deepEqual(a.buttons, ["Complete Upgrade", "Essential Only", "Ignore (Temporary)"]);
   assert.equal(a.buttons[a.cancel], IGNORE);
   const f = essentialAlert({ forced: true, minimum: "0.1.3" });
@@ -331,7 +331,7 @@ test("F86: Continue Queuing keeps the queue and doesn't ask again; nothing queua
   assert.equal(await queueEssential([], { queue: async () => { throw new Error("x"); }, confirmed: async () => "confirm" }), "failed");
 });
 
-// ---- Cydian's own IPA in the sideload app ---------------------------------------------------------------------
+// ---- iFizBox's own IPA in the sideload app ---------------------------------------------------------------------
 
 function selfDeps({ answers = [] } = {}) {
   const log = [];
@@ -346,7 +346,7 @@ function selfDeps({ answers = [] } = {}) {
 }
 const ROW = { version: "0.1.3", ipa: "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.3/Cydian.ipa" };
 
-test("installSelf (no bridge to sign with): it offers cydian.dev in Safari, which hands Cydian to a sideloader (F89)", async () => {
+test("installSelf (no bridge to sign with): it offers cydian.dev in Safari, which hands iFizBox to a sideloader (F89)", async () => {
   const s = selfDeps({ answers: [1] });
   assert.equal(await installSelf(ROW, s.deps), "site");
   assert.match(s.log[0][2], /cydian\.dev/);
@@ -362,7 +362,7 @@ test("installSelf: no IPA in the source says so", async () => {
   assert.equal(await installSelf({ version: "0.1.3" }, s.deps), "no-asset");
 });
 
-test("the committed web/app/source.json reads as Cydian's own source", async () => {
+test("the committed web/app/source.json reads as iFizBox's own source", async () => {
   const { readFile } = await import("node:fs/promises");
   const text = await readFile(new URL("../source.json", import.meta.url), "utf8");
   const info = selfFromAltSource(text);
@@ -370,7 +370,7 @@ test("the committed web/app/source.json reads as Cydian's own source", async () 
   assert.match(info.ipa, /^https:\/\/github\.com\/RyanAHayden\/Cydian\/releases\/download\/v[\d.]+\/Cydian\.ipa$/);
 });
 
-test("F61's sideload install takes installSelf when given (never the local server for Cydian itself)", async () => {
+test("F61's sideload install takes installSelf when given (never the local server for iFizBox itself)", async () => {
   const { runInstall } = await import("./selfupdate.js");
   const log = [];
   const deps = {
@@ -385,7 +385,7 @@ test("F61's sideload install takes installSelf when given (never the local serve
   assert.equal(await runInstall({ version: "0.1.3", ipa: ROW.ipa }, "sideload", deps), "failed");
 });
 
-test("a Cydian update above the minimum: a banner (notify) instead of the alert; below it, the alert still blocks", async () => {
+test("a iFizBox update above the minimum: a banner (notify) instead of the alert; below it, the alert still blocks", async () => {
   const { runEssential } = await import("./essential.js");
   const row = { id: "com.ryha.cydian", version: "0.4.0" };
   let notified = null, alerts = 0, queued = null;

@@ -4,7 +4,7 @@
 // Re-sign All (signing.resignAll, the HUD following each app) and a left swipe on an app to forget it
 // (signing.forget). settings.js drawDeviceSigning puts what signingExtras() returns into the page.
 // F91: Re-sign All queues every app as a "resign" job (core/appqueue.js resignJob) and opens Confirm (screens/queue.js
-// queueApp), which signs each through signing.resign, Cydian last, instead of running at once.
+// queueApp), which signs each through signing.resign, iFizBox last, instead of running at once.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, collapse } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";

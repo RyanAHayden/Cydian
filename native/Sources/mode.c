@@ -1,4 +1,4 @@
-// Which of Cydian's two builds is running (task I2): jailbreak when the N2 root helper is installed at its
+// Which of iFizBox's two builds is running (task I2): jailbreak when the N2 root helper is installed at its
 // rootless path, sideload otherwise. Plain C so the same file is tested on Linux (native/test_mode.py).
 // A sideloaded app is sandboxed, so stat() on /var/jb fails there even on a jailbroken phone: that is sideload
 // too, and rightly, since a sandboxed app can't spawn the helper. SPDX-License-Identifier: GPL-3.0-or-later

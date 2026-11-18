@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- N8: the sideload IPA's widget extension: the App Group the app writes the count into. The user's signer swaps in
-     its own profile's entitlements; one without App Groups leaves the widget at "Open Cydian". -->
+     its own profile's entitlements; one without App Groups leaves the widget at "Open iFizBox". -->
 <plist version="1.0">
 <dict>
 	<key>get-task-allow</key><true/>

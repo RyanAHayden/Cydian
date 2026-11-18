@@ -732,7 +732,7 @@ int auto_step(const struct auto_env *env, int force, int update, int dry, struct
             for (int i = 0; i < before->kept; i++) {
                 if (!chosen[i]) continue;
                 if (linked[j++]) {
-                    say(env, "%s %s downloads from a link apt can't fetch: left for Cydian's queue", before->items[i].id,
+                    say(env, "%s %s downloads from a link apt can't fetch: left for the app's queue", before->items[i].id,
                         before->items[i].to);
                     chosen[i] = 0;
                 } else ids[m++] = before->items[i].id;

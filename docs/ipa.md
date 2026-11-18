@@ -1,4 +1,4 @@
-# IPA: does Cydian need one?
+# IPA: does iFizBox need one?
 
 > **Overruled by the user, 2026-11-17: build it.** Not as a separate app: the `native/` shell also builds as a
 > sideload IPA (plan I2-I4). It remembers the version you downloaded, checks sources in the background and posts
@@ -21,8 +21,8 @@ See "Not verified" at the end.
 
 On a phone without a jailbreak there's no dpkg, so APT upgrades mean nothing there. Jailbroken phones get the
 native app, which checks for upgrades with its own launchd daemon (N5). That leaves **the IPAs from AltStore
-sources (F9)** as the only things a non-jailbroken Cydian could tell you to update. The "installed" list for
-those is whatever Cydian saw you install (taps on GET/UPDATE, the way sidedrop's `installed.json` works), kept on
+sources (F9)** as the only things a non-jailbroken iFizBox could tell you to update. The "installed" list for
+those is whatever iFizBox saw you install (taps on GET/UPDATE, the way sidedrop's `installed.json` works), kept on
 the device. **An IPA can't get a better list than the PWA can.** iOS has no public API to list installed apps or
 read their versions. `canOpenURL` only says whether a URL scheme you declared ahead of time has a handler, and
 `LSApplicationWorkspace` is private and blocked for third-party apps.
@@ -37,7 +37,7 @@ for the least upkeep?
 | Who can use it | Anyone on iOS 16.4+ who adds it to the Home Screen | Anyone who builds the shortcut by hand (or imports the iCloud link) | Only phones that can install the IPA: sidedrop-enrolled UDIDs (ad hoc), or AltStore/SideStore users with a free Apple ID |
 | What triggers the check | The server's daily job. Delivery is up to APNs, but it doesn't depend on how often the app gets opened | Time-of-day Personal Automation, runs without a prompt ("Run Immediately", iOS 17) | `BGAppRefreshTask`: iOS picks the time, if it runs at all (see below) |
 | Where the diff runs | On the server, from sources + installed list the user sends on opt-in (or in the service worker, see the note to F10) | On the server via `/api/upgrades`, called by the shortcut. Nothing is stored | On the phone (the same `core/` in a WKWebView or JSContext) |
-| Notification | Yes, Web Push. Must be visible (no silent pushes) | Yes, "Show Notification" (it comes from Shortcuts, not Cydian) | Yes, local `UNUserNotificationCenter` |
+| Notification | Yes, Web Push. Must be visible (no silent pushes) | Yes, "Show Notification" (it comes from Shortcuts, not iFizBox) | Yes, local `UNUserNotificationCenter` |
 | Icon badge | Yes, Badging API (`navigator.setAppBadge`, iOS 16.4+ Home Screen apps) | No | Yes |
 | Home Screen widget | No | No (only the shortcut's own tile) | Yes, WidgetKit, with limits (see below) |
 | Install an IPA | Opens the `itms-services://` link; iOS does the install | Opens the `itms-services://` link | Opens the same `itms-services://` link. **No more than that** |
@@ -74,7 +74,7 @@ How sidedrop signs (`~/repos/sidedrop/README.md`, `app.py`): one **ad hoc** prof
 
 - **No push entitlement.** Wildcard App IDs can't have Push Notifications, so `aps-environment` is never in
   sidedrop's profile. (Ad hoc itself allows push, on production APNs, but only for an explicit App ID with the
-  capability, which would mean a second profile and a sidedrop change just for Cydian.) Even with that done,
+  capability, which would mean a second profile and a sidedrop change just for iFizBox.) Even with that done,
   APNs push from an IPA wouldn't beat Web Push, so it isn't worth doing.
 - **No App Groups** (same wildcard reason), so the app and a widget extension can't share storage.
 - **Only enrolled phones.** Ad hoc runs only on UDIDs in the profile: 100 per device family per membership year,

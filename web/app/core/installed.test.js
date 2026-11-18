@@ -46,7 +46,7 @@ test("upgrades: fixture status + fixture repos give the expected upgrade list", 
   // WinterBoard is held in dpkg (hold ok installed): an ignored upgrade, not an available one.
   assert.deepEqual(ignored.map((r) => [r.id, r.installed, r.version]), [["winterboard", "0.9.3915", "0.9.3919"]]);
 
-  // Cydian's Ignored Upgrades list moves a package out of the available ones too.
+  // iFizBox's Ignored Upgrades list moves a package out of the available ones too.
   const held = c.upgrades(["cydia"]);
   assert.deepEqual(held.available.map((r) => r.id), ["apt7", "bash"]);
   assert.deepEqual(held.ignored.map((r) => r.id), ["cydia", "winterboard"]);

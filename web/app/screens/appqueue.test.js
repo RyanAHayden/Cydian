@@ -18,7 +18,7 @@ test("queueApp: queues the app and opens Confirm over the queue", () => {
   assert.equal(opened[0], q);
 });
 
-test("Confirm's run: each app in turn, Cydian last, each cleared and recorded; a failure stops it and keeps the rest", async () => {
+test("Confirm's run: each app in turn, iFizBox last, each cleared and recorded; a failure stops it and keeps the rest", async () => {
   const q = createAppQueue();
   for (const j of [job(SELF_ID), job("a"), job("b")]) q.add(j);
   const seen = [], recorded = [];
@@ -26,7 +26,7 @@ test("Confirm's run: each app in turn, Cydian last, each cleared and recorded; a
     record: async (j) => recorded.push(j.id) });
   assert.equal(n, 3);
   assert.deepEqual(seen, ["a", "b", SELF_ID]);
-  assert.deepEqual(recorded, ["a", "b", SELF_ID]); // recordApp itself leaves Cydian to its own record
+  assert.deepEqual(recorded, ["a", "b", SELF_ID]); // recordApp itself leaves iFizBox to its own record
   assert.equal(q.size, 0);
 
   for (const j of [job("a"), job("b")]) q.add(j);

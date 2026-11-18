@@ -85,13 +85,13 @@ html[data-theme="dark"] .home-links .cell + .cell { border-top-color: var(--divi
 /* Cydia's footer line under Home's links: small, centred, embossed grey. */
 .home-version { margin: 14px 10px 6px; font-size: 13px; line-height: 16px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
 
-/* I7: Settings > Signing's Install Cydian App row, once the certificate works: Home's green tile (the account tile's
+/* I7: Settings > Signing's Install iFizBox App row, once the certificate works: Home's green tile (the account tile's
    #eefff0, its green glyph) as a grouped row. */
 .app-offer .table.grouped { background: #eefff0; }
 html[data-theme="dark"] .app-offer .table.grouped { background: #2f4a36; }
 .app-offer .home-glyph { background-color: #37a94a; }
 
-/* Home's Cydian App card (screens/home.js tileRow "green stack"): one green table, two full-width rows with a line
+/* Home's iFizBox App card (screens/home.js tileRow "green stack"): one green table, two full-width rows with a line
    of explanation each. */
 .home-row.stack > .table { flex: 1; }
 .home-stack > .cell + .cell { border-top: 1px solid var(--tile-edge, rgba(0,0,0,.12)); }
@@ -125,7 +125,7 @@ html[data-theme="dark"] .app-offer .table.grouped { background: #2f4a36; }
 .thanks-row .cell-icon img.loaded { opacity: 1; }
 .thanks-row .cell-subtitle { white-space: pre-line; overflow-wrap: anywhere; line-height: 18px; margin-top: 2px; }
 
-/* Website, before Cydian is installed: rows below the Cydian App card are disabled, iOS 6 style: dimmed text and
+/* Website, before iFizBox is installed: rows below the iFizBox App card are disabled, iOS 6 style: dimmed text and
    icons, and a small grey padlock where the chevron was (screens/home.js, websign-gate.js askToBrowse). */
 .home-locked .cell-label, .home-locked .cell-detail, .home-locked .cell-subtitle { color: #a3a8af !important; text-shadow: none; }
 .home-locked .home-glyph, .home-locked .cell-icon { filter: grayscale(1); opacity: .45; }
@@ -136,7 +136,7 @@ html[data-theme="dark"] .app-offer .table.grouped { background: #2f4a36; }
 .home-locked .cell-inner:active, .home-locked .cell-inner.is-pressed { background: none !important; }
 html[data-theme="dark"] .home-locked .cell-label, html[data-theme="dark"] .home-locked .cell-detail { color: #6c7178 !important; }
 
-/* "Install Full Cydian" (the website, for a jailbroken phone): its own purple tile, an open padlock for the glyph
+/* "Install Full iFizBox" (the website, for a jailbroken phone): its own purple tile, an open padlock for the glyph
    (drawn here: an unlocked lock, jailbreak's usual sign; not anyone's artwork). */
 .home-row.purple > .table { background: linear-gradient(#7d4fc4, #5b2fa3); border-color: #3f1d78; }
 .home-row.purple .cell-label, .home-row.purple .cell-subtitle { color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); }

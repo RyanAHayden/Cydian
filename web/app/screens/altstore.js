@@ -35,6 +35,7 @@ import { descriptionGroup } from "./description.js";
 import { needsCheck, savedInfo, withIpaInfo, checkIpa, ipaInfoUrl } from "../core/ipainfo.js";
 import { PUBLIC_SITE } from "../core/handoff.js";
 import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText } from "../core/applookup.js";
+import { NAME } from "../brand.js";
 
 function img(url, cls) {
   const src = mediaUrl(url);
@@ -72,13 +73,13 @@ function card(children, cls = "") {
   return g;
 }
 
-// The install rows for a version (user 2026-11-17: Cydian's own signing is the way in the app):
+// The install rows for a version (user 2026-11-17: iFizBox's own signing is the way in the app):
 //   - jailbreak build: Install through the helper (F67, screens/ipa-install.js), the console titled with `name`
 //   - a source's own signed link (itms-services): Install, signed by the source
 //   - the sideload app: Install, signed with the user's certificate on the phone (signing-client signAndInstall;
 //     without one it opens the Signing walkthrough)
 //   - the website: F93's Install, signed in the browser with the user's certificate (signing-client signAndInstall).
-//     F92 (user 2026-11-18): no hand-offs to Cydian / AltStore / SideStore / Feather here; Share keeps those.
+//     F92 (user 2026-11-18): no hand-offs to iFizBox / AltStore / SideStore / Feather here; Share keeps those.
 //   - always: Download IPA, to keep the file
 // `opener` opens a URL outside the app (window.open on the site). `onInstall` runs first on any of them (F30: the
 // Installed tab's record). F80: `queue`, when given, is what "Signed with your certificate" does instead (the app page
@@ -86,7 +87,7 @@ function card(children, cls = "") {
 // F81: where the phone signs (the sideload app), any version with an IPA also gets "Custom Install": the look-first
 // sheet (signing-sheet.js customInstall) to change the bundle ID, name or icon, or leave extensions out. `custom`
 // overrides whether it shows, `customize` what it runs (tests; F84: the app page's appPageCustom, which queues).
-// F96: on the website any app but Cydian gets websign-gate.js's rows instead (Install in Cydian, Download IPA, then
+// F96: on the website any app but iFizBox gets websign-gate.js's rows instead (Install in iFizBox, Download IPA, then
 // Install on the Website behind its warning); `appId` is the app's package id for the cydian:// link (else the page's
 // hash), `gate` makes the rows (tests).
 // F129: `bundleId` is the app's own bundle ID (appBundleId), handed to signAndInstall so a wildcard profile's website
@@ -106,12 +107,12 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   } else if (o.itms) {
     rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
   } else if (o.download && site && !isSelfIpa(o.download)) {
-    // F96: other apps go to Cydian first; Install on the Website (F93's browser signing) waits for the warning.
+    // F96: other apps go to iFizBox first; Install on the Website (F93's browser signing) waits for the warning.
     const install = () => sign({ url: o.download, name, ...own, onInstalled: () => onInstall() });
     return { rows: gate({ id: appId, install, download: downloadRow(o.download, opener) }), options: o, gated: true };
   } else if (o.download && site) {
     // F93: Install signs in the browser with the certificate in Settings > Signing (signing-client.js
-    // signInBrowser). F92: no hand-offs follow it. F96: Cydian itself always installs from the website.
+    // signInBrowser). F92: no hand-offs follow it. F96: iFizBox itself always installs from the website.
     rows.push({ label: "Install", subtitle: SITE_INSTALL_SUBTITLE,
       onClick: () => sign({ url: o.download, name, ...own, onInstalled: () => { markCydianInstalled(); onInstall(); } }) });
   } else if (o.download) {
@@ -213,8 +214,8 @@ export async function renderAltSource(body, route, key) {
 
 // ---- the app page ----------------------------------------------------------------------------------------------
 
-// F91: Cydian's signing.installed record of this app (by installed or original bundle ID), in the sideload app; null
-// anywhere else, for an app Cydian didn't sign, or when the call fails.
+// F91: iFizBox's signing.installed record of this app (by installed or original bundle ID), in the sideload app; null
+// anywhere else, for an app iFizBox didn't sign, or when the call fails.
 export async function signedRecordOf(id, { mode = detectMode(), native = globalThis.cydianNative } = {}) {
   if (mode !== "sideload" || !id || typeof native?.call !== "function") return null;
   try { return signedIndex(await native.call("signing.installed", {})).get(id) ?? null; } catch { return null; }
@@ -255,7 +256,7 @@ function trackingSection(app, pkg, source) {
     if (!relabel()) setTimeout(relabel, 0);
     if (sigRow) rows.splice(1, 0, sigRow);
     box.replaceChildren(grouped([{ header: "Installed", rows,
-      footer: rec ? "Cydian follows this app for updates: they show in Changes." : "Installed it another way? Mark it, and Cydian follows it for updates." }]));
+      footer: rec ? `${NAME} follows this app for updates: they show in Changes.` : `Installed it another way? Mark it, and ${NAME} follows it for updates.` }]));
   }
   async function pick() {
     const versions = app.versions.map((x) => x.version).filter(Boolean);
@@ -346,7 +347,7 @@ async function siteInstallVersion(pkg, v, source) {
     source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
   const { rows, gated } = installRows(v, app.sourceUrl, undefined, record, null, app.name, { appId: pkg.row?.id ?? pkg.stanza.package,
     bundleId: appBundleId(app, pkg.row?.id) });
-  // F96: once website installs are accepted the downgrade signs here; until then it's Install in Cydian.
+  // F96: once website installs are accepted the downgrade signs here; until then it's Install in iFizBox.
   const first = gated && websiteInstallsOn() ? rows.find((r) => r.label === "Install on the Website") : rows[0];
   if (first && first.label !== "Download IPA") return first.onClick();
 }
@@ -497,7 +498,7 @@ export function renderApp(body, route, pkg, source) {
 
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on
   // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.
-  // F88: in the jailbreak app too (an IPA installed by another tool, or before Cydian recorded installs).
+  // F88: in the jailbreak app too (an IPA installed by another tool, or before iFizBox recorded installs).
   body.append(trackingSection(app, pkg, source));
 
   if (v.localizedDescription || v.date) {
@@ -583,7 +584,7 @@ export function renderApp(body, route, pkg, source) {
   body.append(grouped([{ rows: [{ label: "Version History", href: deeper(route, `versions:${pkg.row.id}`) }] }]));
 
   // Links (F161, after F122): this app's own page (its GitHub or website, else the App Store), then the source's page
-  // in Cydian, then the source's website when it is another page. Never two rows to one page (core/applookup.js).
+  // in iFizBox, then the source's website when it is another page. Never two rows to one page (core/applookup.js).
   const sourceName = app.sourceName || (source ? displayName(source) : "") || app.sourceUrl;
   const sourceRow = { label: sourceName, subtitle: app.sourceUrl,
     href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) };

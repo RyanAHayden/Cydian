@@ -21,7 +21,7 @@
 // can't call them itself: the app sends them through the shell (net.request), the site doesn't call them at all.
 //
 // Sign-in: the vendor finishes at sileo://authentication_success?token=…&payment_secret=…, a scheme its server
-// writes, not one Cydian picks. The shell's auth session catches that URL (ASWebAuthenticationSession's
+// writes, not one iFizBox picks. The shell's auth session catches that URL (ASWebAuthenticationSession's
 // callbackURLScheme "sileo" needs no registered scheme) and hands it back; a cydian:// link with the same path
 // (cydian://authentication_success?… or cydian://payment/authentication_success?…) is read the same way, for a
 // vendor that lets the client name its own callback.

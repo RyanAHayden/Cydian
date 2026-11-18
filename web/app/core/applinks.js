@@ -2,7 +2,7 @@
 // no way to, and x-safari- (app.js) lands in Safari. For sites whose app has its own URL scheme, open that instead;
 // app.js falls back to Safari when the app doesn't come up. X, YouTube, Discord, GitHub. The native shell needs none of this (LinkOut.open asks iOS
 // for the universal link first).
-// ponytail: only schemes known to take these paths; add a site here when Cydian links to it.
+// ponytail: only schemes known to take these paths; add a site here when iFizBox links to it.
 
 export function appSchemeFor(href) {
   let u;

@@ -108,11 +108,11 @@ enum Reminder {
         default: what = "\(apps[0]) and \(apps.count - 1) other apps"
         }
         let verb = apps.count == 1 || apps.isEmpty ? "stops" : "stop"
-        return ("Re-sign Soon", "\(what) \(verb) opening \(when). Open Cydian and tap Re-sign All.")
+        return ("Re-sign Soon", "\(what) \(verb) opening \(when). Open \(Brand.name) and tap Re-sign All.")
     }
 }
 
-// Apps Cydian signed and installed (F14), so Re-sign All can do them again and the reminder can name them. No IPA
+// Apps iFizBox signed and installed (F14), so Re-sign All can do them again and the reminder can name them. No IPA
 // is kept (no IPA library): Re-sign All downloads each from its URL again.
 struct SignedRecord: Codable, Equatable {
     var bundleID: String          // as installed

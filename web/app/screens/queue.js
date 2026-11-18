@@ -11,7 +11,7 @@
 //      bridge as they come, the status fd's steps in bold white, dpkg's own output in monospace, errors in red, a
 //      progress bar, then the finish button (core/progress.js chooseFinish): Restart SpringBoard when a changed
 //      package is a tweak, Reload Data (uicache) for an app, or what a script asked ($CYDIA's finish: words, up to
-//      Reboot Device), else Return to Cydian. The run's output is
+//      Reboot Device), else Return to iFizBox. The run's output is
 //      kept (queue.js runLogs) for Settings > Console Logs (logsPage below). A conffile changed by both the user and
 //      the package opens Cydia's Configuration Upgrade alert (F63): Keep My Old Copy or Accept The New Copy, sent
 //      back to dpkg through backend.answerConffile while the run waits. While apt is still downloading (no dpkg
@@ -35,6 +35,7 @@ import { MODES, MODE_LABEL, changeCount, runTitle, createRepeatFilter, CONFFILE_
   CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf, debLinkOf } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
+import { NAME } from "../brand.js";
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 
@@ -166,7 +167,7 @@ function openConfirm() {
     if (err) {
       m.setTitle("Cannot Comply");
       m.scroll.append(grouped([{ header: "Couldn't Ask apt", rows: [{ label: err.message || String(err) }],
-        footer: "Nothing was changed. Cydian runs apt through its helper (cydian-helper); reinstalling Cydian puts it back." }]));
+        footer: `Nothing was changed. ${NAME} runs apt through its helper (cydian-helper); reinstalling ${NAME} puts it back.` }]));
     } else if (!r.ok || r.plan.essential.length) {
       m.setTitle("Cannot Comply");
       await drawIssues(m.scroll, r, names, () => close());
@@ -274,7 +275,7 @@ async function drawIssues(box, r, names, close) {
   }
   const sentences = [
     ...(r.issues ?? []).map((sentence) => ({ sentence })), // F131: a link that couldn't be downloaded
-    ...r.plan.essential.map((id) => ({ sentence: `Removing ${names[id] || id} would take away part of the jailbreak itself (an essential package), so Cydian won't do it.` })),
+    ...r.plan.essential.map((id) => ({ sentence: `Removing ${names[id] || id} would take away part of the jailbreak itself (an essential package), so ${NAME} won't do it.` })),
     ...problems,
   ];
   if (!sentences.length) sentences.push({ sentence: `apt refused this queue${r.code ? ` (exit ${r.code})` : ""}. Its own words are below.` });
@@ -324,7 +325,7 @@ function rawOutput(text) {
 // Upgrade (N) queue apps (app-queue.js) and open this Confirm sheet: Statistics (the download), Modifications
 // (Install, Upgrade... with the names, and a tweak's dependencies once tweaks have them: core/appqueue.js appPlan),
 // the Queue (tap one to clear it) and Continue Queuing; Cancel at the top left clears the queue, Confirm at the top
-// right installs it in turn (runAppQueue), each signed on the phone, Cydian itself last.
+// right installs it in turn (runAppQueue), each signed on the phone, iFizBox itself last.
 
 let appConfirm = null;  // the open Confirm sheet for apps: { refresh(), close() }
 let appRunning = false; // Confirm's installs are going: queuing adds without opening a second sheet
@@ -367,7 +368,7 @@ export function openAppConfirm(queue = appQueue) {
 }
 
 
-// One app: signed on the phone in the sideload app (installOnDevice; Cydian's own IPA through signAndInstall, which
+// One app: signed on the phone in the sideload app (installOnDevice; iFizBox's own IPA through signAndInstall, which
 // hosts it on the Signing Server). The website queues nothing (F89). True once iOS was asked.
 async function installApp(job) {
   const sc = await import("../signing-client.js");
@@ -389,8 +390,8 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
 }
 
 // F91: a "resign" job: signing.resign {bundleId} signs the app again from the phone's record (Re-sign All's path,
-// one app) and opens iOS's install, the HUD following it; Cydian's own is hosted on the Signing Server, as its
-// install is (iOS closes Cydian). True once iOS was asked.
+// one app) and opens iOS's install, the HUD following it; iFizBox's own is hosted on the Signing Server, as its
+// install is (iOS closes iFizBox). True once iOS was asked.
 export async function resignApp(job, { sc, native = globalThis.cydianNative, hud = null, alert = showAlert } = {}) {
   sc ??= await import("../signing-client.js");
   const { resignLabel, deviceError } = await import("../core/signing.js");
@@ -398,7 +399,7 @@ export async function resignApp(job, { sc, native = globalThis.cydianNative, hud
   const fail = (message) => (typeof h.fail === "function" ? h.fail(message) : h.hide());
   let r;
   try {
-    if (!native?.call) throw new Error("Re-signing needs the Cydian app.");
+    if (!native?.call) throw new Error(`Re-signing needs the ${NAME} app.`);
     r = await native.call("signing.resign", { bundleId: job.id, manifestServer: sc.getServer(), ...(job.id === SELF_ID ? { host: true } : {}) },
       (ev) => { const t = resignLabel(ev); if (t) h.set(t.replace(/ \(1 of 1\)$/, "")); });
   } catch (e) {
@@ -418,7 +419,7 @@ export async function resignApp(job, { sc, native = globalThis.cydianNative, hud
   return true;
 }
 
-// F30/I3: the version Install put on the phone, so Installed and Changes follow it (Cydian records itself).
+// F30/I3: the version Install put on the phone, so Installed and Changes follow it (iFizBox records itself).
 async function recordApp(job) {
   if (job.id === SELF_ID || job.mode === "resign") return; // F91: a re-sign changes no version
   const { apps, recordInstall } = await import("../core/installed.js");
@@ -432,7 +433,7 @@ async function readyToInstall() {
   return !(sc.localSigning() && await sc.firstInstallCheck());
 }
 
-// Confirm's run: each app in turn (runOrder: Cydian last), each one out of the queue once iOS has it; the first
+// Confirm's run: each app in turn (runOrder: iFizBox last), each one out of the queue once iOS has it; the first
 // failure (its alert already shown) stops the run and leaves the rest queued. -> how many were installed.
 export async function runAppQueue(jobs, { queue = appQueue, install = installApp, record = recordApp, ready = readyToInstall } = {}) {
   if (appRunning) return 0;

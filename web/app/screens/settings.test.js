@@ -59,7 +59,7 @@ test("F128: page titles for the iOS 6-style routes and the old ones", async () =
   assert.equal(t("device"), "Device"); // Home's hint
   assert.equal(t("iosVersion"), "iOS Version"); // a package page's link
   assert.equal(t("holds"), "Ignored Upgrades");
-  assert.equal(t("account"), "Cydian Account");
+  assert.equal(t("account"), "iFizBox Account");
 });
 
 // F134: Settings > Signing like an iOS 6 settings page: the certificate first, then its profile, the options, and How
@@ -76,7 +76,7 @@ test("F134: the Signing page's groups, in order, for each build and state", asyn
   assert.deepEqual(signingLayout({ mode: "sideload", options: true }), ["certificate", "options", "server", "status", "help"]);
   // a file picked, one still missing: the Files group under the certificate
   assert.deepEqual(signingLayout({ mode: "sideload", staged: true, options: true }), ["certificate", "files", "options", "server", "status", "remove", "help"]);
-  // the website: no options, server or Signed Apps; Install Cydian App once the certificate works
+  // the website: no options, server or Signed Apps; Install iFizBox App once the certificate works
   assert.deepEqual(signingLayout({ mode: "site", certificate: true, profile: true, ready: true }), ["certificate", "profile", "app", "other", "remove", "help"]);
   assert.deepEqual(signingLayout({ mode: "site" }), ["certificate", "other", "help"]);
   // each layout is in SIGNING_GROUPS order with no group twice

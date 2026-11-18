@@ -41,7 +41,7 @@ test("B12: a callback finishSignIn can't read still shows the Purchase alert", a
   await assert.rejects(vendorSignIn(client, call), /sent nothing back/);
   const { run, log } = harness(() => vendorSignIn(client, call));
   await run();
-  assert.deepEqual(log, ["show Signing In", "hide", "alert The vendor sent nothing back that Cydian could read."]);
+  assert.deepEqual(log, ["show Signing In", "hide", "alert The vendor sent nothing back that iFizBox could read."]);
 });
 
 test("B12: a good sign-in draws the page again", async () => {

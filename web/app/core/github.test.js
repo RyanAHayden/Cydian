@@ -65,7 +65,7 @@ test("icon: the GitHub avatar when the source gives none of its own", () => {
 
 test("the F28 defaults: every GitHub-hosted one gets a user title and a short subtitle", () => {
   const gh = DEFAULT_ALT_SOURCES.filter((u) => githubRepo(u));
-  assert.equal(gh.length, 6); // main dropped the three FIZL0 release-URL defaults (c8f4846); I7 added Cydian's own
+  assert.equal(gh.length, 6); // main dropped the three FIZL0 release-URL defaults (c8f4846); I7 added iFizBox's own
   for (const u of gh) {
     const s = seedRecord(u);
     assert.equal(s.key, altKey(u));

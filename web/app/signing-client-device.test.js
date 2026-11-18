@@ -183,7 +183,7 @@ test("Install: no bundleId from the signer ends on Done as before", async () => 
 });
 
 // (host: true too, but its banner needs a DOM, so it isn't run here.)
-test("Install: Cydian itself (its own IPA, or its ID) isn't followed", async () => {
+test("Install: iFizBox itself (its own IPA, or its ID) isn't followed", async () => {
   const self = "https://github.com/RyanAHayden/Cydian/releases/latest/download/Cydian.ipa";
   for (const [opts, answer] of [
     [{ url: self }, { bundleId: "com.x" }],
@@ -191,7 +191,7 @@ test("Install: Cydian itself (its own IPA, or its ID) isn't followed", async () 
   ]) {
     const n = fakeNative({ "signing.install": answer });
     const ui = fakeUI();
-    assert.equal(await installOnDevice({ name: "Cydian", ...opts }, { native: n, ...ui.deps }), true);
+    assert.equal(await installOnDevice({ name: "iFizBox", ...opts }, { native: n, ...ui.deps }), true);
     assert.deepEqual(ui.followed, [], JSON.stringify(opts));
     assert.equal(ui.later[0][1], 1200);
   }

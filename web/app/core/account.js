@@ -1,4 +1,4 @@
-// F97: Cydian Account. Settings, sources, Ignored Upgrades, installed-app records and the signing certificate kept on
+// F97: iFizBox Account. Settings, sources, Ignored Upgrades, installed-app records and the signing certificate kept on
 // cydian.dev, so a new phone, a reinstall or the website gets them back. No email, no password: the account is a
 // random 128-bit account key made on the device. Everything is encrypted here (AES-GCM, its key from the account key
 // with HKDF) before it leaves, so the server (worker/src/account.js) only ever holds ciphertext; the URL's id is a
@@ -29,6 +29,7 @@
 // goes to the changed side, or the newer record. Applying never removes a certificate from a device.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { toB64url, fromB64url } from "./transfer.js";
+import { NAME } from "../brand.js";
 
 const ACCOUNT_VERSION = 1;
 export const ACCOUNT_BASE = "https://cydian.dev"; // the app's server; the website uses its own origin
@@ -102,7 +103,7 @@ export async function unseal(key, bytes) {
     text = new TextDecoder().decode(await subtle().decrypt({ name: "AES-GCM", iv: b.subarray(0, 12) }, key, b.subarray(12)));
   } catch { throw new AccountError("bad_key", "Your account can't be opened with this key."); }
   const p = JSON.parse(text);
-  if (!p || typeof p !== "object" || p.v !== ACCOUNT_VERSION) throw new AccountError("too_new", "Your account was saved by a newer Cydian. Update Cydian.");
+  if (!p || typeof p !== "object" || p.v !== ACCOUNT_VERSION) throw new AccountError("too_new", `Your account was saved by a newer ${NAME}. Update ${NAME}.`);
   return p;
 }
 
@@ -276,7 +277,7 @@ export function createAccountSync({ keys, state, collect, apply, api = null, bas
   const open = async () => {
     const code = await keys.get();
     const bytes = code && parseKey(code);
-    if (!bytes) throw new AccountError("signed_out", "Sign in to your Cydian Account first.");
+    if (!bytes) throw new AccountError("signed_out", `Sign in to your ${NAME} Account first.`);
     const { id, key } = await deriveAccount(bytes);
     return { key, api: api ? api(id) : accountApi({ base, id, fetcher }) };
   };

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Launch images for the home-screen web app (apple-touch-startup-image), one per current iPhone screen.
 
-Home as it first appears while it loads: the nav bar titled Cydian (under the status bar too), the pinstripe
+Home as it first appears while it loads: the nav bar titled with the app's name (native/brand.env; under the status bar too), the pinstripe
 background with the app's own Loading spinner in the middle, and the tab bar with Home selected, so the launch screen
 turns into the page without a jump. Drawn by headless Chromium from the app's real stylesheets (the ones index.html
 links), with each phone's safe-area insets put in where env() would give them.
@@ -17,6 +17,8 @@ import sys
 import tempfile
 
 APP = pathlib.Path(__file__).resolve().parent.parent / "web" / "app"
+sys.path.insert(0, str(APP.parent.parent / "native"))
+from brand import NAME  # noqa: E402  (F170)
 
 # (width pt, height pt, scale, top inset, bottom inset): the screens index.html has media queries for.
 SCREENS = [
@@ -40,7 +42,7 @@ def page(top: int, bottom: int) -> str:
             "html,body{margin:0;overflow:hidden} .page-body{visibility:visible;display:flex;align-items:center;"
             "justify-content:center} .page-body::before{display:none} .loading-spinner{animation:none}</style></head><body>"
             "<header class='navbar'><div class='nav-stack is-active'><div class='nav-item is-top'><div></div>"
-            "<h1 class='nav-title'>Cydian</h1><div></div></div></div></header>"
+            f"<h1 class='nav-title'>{NAME}</h1><div></div></div></div></header>"
             "<div class='page-body grouped'><div class='loading'><span class='loading-spinner'></span><span>Loading</span></div></div>"
             f"<nav class='tabbar'>{tabs}</nav></body></html>")
 

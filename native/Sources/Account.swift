@@ -1,4 +1,4 @@
-// F97: Cydian Account's key in the Keychain (web/app/screens/account.js keyStore). The key is the whole account, so
+// F97: iFizBox Account's key in the Keychain (web/app/screens/account.js keyStore). The key is the whole account, so
 // it lives where the certificate does: this device only, never in a backup, readable after the first unlock (the
 // page reads it at every launch, so no Face ID). Everything else about the account is the page's (core/account.js).
 //

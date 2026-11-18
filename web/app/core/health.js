@@ -4,7 +4,7 @@
 //
 //   healthOf(source, now)       -> { state, reachedAt, releaseDate, failures, label }
 //                                  state: "unknown" (never refreshed) | "ok" | "quiet" (no new Release for a year)
-//                                       | "down" (the last refresh failed: Cydian's "Not Responding")
+//                                       | "down" (the last refresh failed: iFizBox's "Not Responding")
 //   healthFields(prev, result)  -> the record fields after a refresh (reachedAt, failures), from the last record
 //   releaseTime(release)        -> the Release's Date: as ms since 1970, or null
 //   fingerprint(text)           -> a short hash of a Release text: the same Release means the same Packages

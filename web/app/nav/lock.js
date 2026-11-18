@@ -1,4 +1,4 @@
-// F72: the padlock a built-in source (core/essential.js, Cydian's own) shows instead of Delete: `lockIcon(size)` an
+// F72: the padlock a built-in source (core/essential.js, iFizBox's own) shows instead of Delete: `lockIcon(size)` an
 // SVG, grey like iOS 6's secondary text; sources.css .source-lock (Manage's edit list, where the red minus goes) and
 // .name-lock (after the name, in the Sources tab) place it.
 const NS = "http://www.w3.org/2000/svg";

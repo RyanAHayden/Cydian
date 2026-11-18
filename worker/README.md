@@ -1,16 +1,16 @@
-# Cydian's install server (Cloudflare Worker)
+# iFizBox's install server (Cloudflare Worker)
 
 The sideload app signs every app **on the iPhone**; your certificate and key never leave it. iOS still needs a
 server for two things, and this Worker is that server:
 
 - **The install manifest.** iOS installs only from an `itms-services` link whose manifest comes over real HTTPS.
-  Cydian serves the signed app itself at `127.0.0.1`; the Worker hands iOS a manifest pointing there.
-- **Cydian's own updates.** iOS closes Cydian while it installs the new one, and Cydian's local server closes with
+  iFizBox serves the signed app itself at `127.0.0.1`; the Worker hands iOS a manifest pointing there.
+- **iFizBox's own updates.** iOS closes iFizBox while it installs the new one, and iFizBox's local server closes with
   it, so the signed update waits here for 10 minutes (Cloudflare KV) and installs from here.
 - **Apps the website signed in the browser** (F93): the website signs with zsign as WebAssembly in your browser and
   leaves the signed app here for the same 10 minutes, for iOS's install prompt.
 
-It stores nothing else and logs nothing. Cydian uses `https://sign.cydian.dev` unless you set your own.
+It stores nothing else and logs nothing. iFizBox uses `https://sign.cydian.dev` unless you set your own.
 
 ## Host your own (free, about a minute)
 
@@ -19,12 +19,12 @@ It stores nothing else and logs nothing. Cydian uses `https://sign.cydian.dev` u
 Or by hand, with Node installed:
 
 ```sh
-git clone https://github.com/RyanAHayden/Cydian && cd Cydian/worker
+git clone https://github.com/RyanAHayden/Cydian && cd iFizBox/worker
 npx wrangler login
 npx wrangler deploy        # makes the KV storage on the first deploy and prints your https://….workers.dev address
 ```
 
-Then in Cydian: **Settings > Signing > Signing Server**, paste that address, and **Check Server**.
+Then in iFizBox: **Settings > Signing > Signing Server**, paste that address, and **Check Server**.
 
 ### On your own PC or in Docker
 
@@ -32,7 +32,7 @@ The same code runs on Node 22 (`worker/node.mjs`): the website, `/api/fetch` and
 memory.
 
 ```sh
-git clone https://github.com/RyanAHayden/Cydian && cd Cydian
+git clone https://github.com/RyanAHayden/Cydian && cd iFizBox
 node worker/node.mjs                       # http://0.0.0.0:8787 (PORT, HOST, HOST_IDS, TTL as below)
 # or Docker:
 docker build -f worker/Dockerfile -t cydian . && docker run -d --restart unless-stopped -p 8787:8787 cydian
@@ -47,7 +47,7 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 
 ### Settings (`wrangler.toml`)
 
-- `HOST_IDS`: the bundle IDs it holds updates for. `*.cydian` (any ID ending in `.cydian`) covers Cydian signed
+- `HOST_IDS`: the bundle IDs it holds updates for. `*.cydian` (any ID ending in `.cydian`) covers iFizBox signed
   with any team's profile. Use `*` to hold any app.
 - `TTL`: seconds a held update stays (600), and an app the website signed in the browser.
 - `MAX_UPLOAD_MB`: the largest IPA the website signs in the browser (512): it downloads through `/api/fetch?kind=ipa`
@@ -65,7 +65,7 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 | `GET /sign/manifest?bundleid=&version=&title=&port=&path=` | the manifest for `http://127.0.0.1:<port>/<path>` |
 | `POST /sign/host?bundleid=&version=&title=` (body: the IPA) | `{itms, manifest, expiresIn}` |
 | `GET /sign/host/<token>/manifest.plist`, `/app.ipa` | what that link fetches |
-| `GET /repo/<file>` | Cydian's own APT repo (`Release`, `Packages`, `Packages.gz`, `*.deb`): the latest GitHub release's asset, fetched here so clients get no redirect (Zebra can't take GitHub's). `CYDIAN_REPO` (owner/name) for another repo's releases |
+| `GET /repo/<file>` | iFizBox's own APT repo (`Release`, `Packages`, `Packages.gz`, `*.deb`): the latest GitHub release's asset, fetched here so clients get no redirect (Zebra can't take GitHub's). `CYDIAN_REPO` (owner/name) for another repo's releases |
 
 `node test.mjs` checks them against an in-memory KV. cydian.dev's own deploy: `npx wrangler deploy -c wrangler.ifizbox.toml`.
 

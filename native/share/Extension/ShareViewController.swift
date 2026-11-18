@@ -1,11 +1,11 @@
 // N9: the share extension (PlugIns/CydianShare.appex). Safari's Share button, a link in Notes or Messages: it takes
-// the one web link (or the text, which the shell searches for a link) and opens Cydian with cydian://share?url=…
-// (or ?text=…). Cydian decides what it is (../Share.swift: an APT repo or AltStore source opens Add Source, an .ipa
-// or .deb link its install route) and says so there; this sheet only shows "Opening Cydian" for a moment.
+// the one web link (or the text, which the shell searches for a link) and opens iFizBox with cydian://share?url=…
+// (or ?text=…). iFizBox decides what it is (../Share.swift: an APT repo or AltStore source opens Add Source, an .ipa
+// or .deb link its install route) and says so there; this sheet only shows "Opening iFizBox" for a moment.
 //
 // An extension can't call UIApplication.shared.open. As other share extensions do, it walks the responder chain to
 // the UIApplication object and sends it open(_:options:completionHandler:) through the runtime (iOS 18 dropped the
-// old openURL:). When that finds nothing, the sheet says to open Cydian and paste the link instead.
+// old openURL:). When that finds nothing, the sheet says to open iFizBox and paste the link instead.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 import UIKit
@@ -18,7 +18,7 @@ final class ShareViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        label.text = "Opening Cydian"
+        label.text = "Opening \(Brand.name)"
         label.font = .boldSystemFont(ofSize: 17)
         label.textAlignment = .center
         label.numberOfLines = 0
@@ -88,7 +88,7 @@ final class ShareViewController: UIViewController {
     }
 
     private func fail(_ nothing: Bool) {
-        label.text = nothing ? "There's no link here for Cydian." : "Couldn't open Cydian. Copy the link, open Cydian and add it there."
+        label.text = nothing ? "There's no link here for \(Brand.name)." : "Couldn't open \(Brand.name). Copy the link, open \(Brand.name) and add it there."
         label.font = .systemFont(ofSize: 15)
         let b = UIButton(type: .system)
         b.setTitle("Done", for: .normal)

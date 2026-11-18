@@ -1,12 +1,12 @@
 // F65: the app side of N5's upgrade daemon (native/daemon/). The daemon posts "3 Upgrades" and sets the icon badge
-// under Cydian's bundle id, and iOS drops both until Cydian itself has notification permission: so the jailbreak
+// under iFizBox's bundle id, and iOS drops both until iFizBox itself has notification permission: so the jailbreak
 // build asks once (alert, badge and sound) at its first launch. A tap on a notification whose userInfo has a
 // "url" route ("#/changes", main.m's post) opens that route in the web view, and the page clears the badge
 // through app.badge once the Changes tab shows no upgrades (web/app/settings.js).
 //
 //   app.badge {count}   the icon badge to count (0 clears it and takes N5's delivered notification away)
 //
-// The delegate is also what lets a notification show while Cydian is open (the sideload build's re-sign reminder,
+// The delegate is also what lets a notification show while iFizBox is open (the sideload build's re-sign reminder,
 // Sideload.swift, too); its taps carry no route and do nothing here.
 import UIKit
 import BackgroundTasks
@@ -64,7 +64,7 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
     }
 
     static func register(_ b: Bridge) {
-        // What iOS allows Cydian (Settings > Notifications > Cydian, Background App Refresh) and when the background
+        // What iOS allows iFizBox (Settings > Notifications > iFizBox, Background App Refresh) and when the background
         // check last ran: Settings shows it, so a badge that never comes has a reason on screen.
         b.on("app.notifyStatus") { c in
             UNUserNotificationCenter.current().getNotificationSettings { st in
@@ -97,7 +97,7 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
             if on { BackgroundCheck.schedule() } else { BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: BackgroundCheck.taskID) }
             c.reply(["on": on], nil)
         }
-        // Cydian's page in iOS Settings (notifications, badges, Background App Refresh live there).
+        // iFizBox's page in iOS Settings (notifications, badges, Background App Refresh live there).
         b.on("app.openSettings") { c in
             DispatchQueue.main.async {
                 var s = UIApplication.openSettingsURLString
@@ -135,7 +135,7 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
 }
 
 // The Home Screen icon's quick action (app.shortcuts sets it): the page queues every upgrade and opens Confirm
-// (app.js cydianShortcut). A tap that launched Cydian waits for the page as a notification tap does.
+// (app.js cydianShortcut). A tap that launched iFizBox waits for the page as a notification tap does.
 enum Shortcut {
     static let upgrade = "com.ryha.cydian.upgrade"
     static func perform(_ type: String, tries: Int = 50) {

@@ -25,7 +25,7 @@ test("F82: Reload spins in the button's spot, keeps the page's content, and give
   const done = reloadHome(button, {}, { web: false,
     refresh: () => new Promise((r) => { finishRefresh = r; seen.push("refresh"); }),
     settled: async () => { seen.push("settled"); },
-    reload: async () => { seen.push("reload"); }, // the new package lists, dpkg, Cydian's own update
+    reload: async () => { seen.push("reload"); }, // the new package lists, dpkg, iFizBox's own update
     redraw: async () => {
       seen.push("redraw");
       assert.ok(spinning(button), "still the spinner while Home redraws");
@@ -108,5 +108,5 @@ test("the website's Reload re-downloads every listed file past the browser's cac
   assert.deepEqual(got, [["build.json", "no-store"], ["app.js", "reload"], ["nav/ui.js", "reload"]]);
   assert.ok(reloaded);
   assert.equal(await refreshWebFiles({ fetcher: async () => ({ ok: false }), reloadPage: () => assert.fail() }), false); // no build.json
-  assert.equal(footLine({ ios: "26.1", version: "0.3.5", web: true }, "en-US"), "iPhone, iOS 26.1, Cydian Web 0.3.5 (en-us)");
+  assert.equal(footLine({ ios: "26.1", version: "0.3.5", web: true }, "en-US"), "iPhone, iOS 26.1, iFizBox Web 0.3.5 (en-us)");
 });

@@ -360,7 +360,7 @@ class Helper(unittest.TestCase):
         p = tempfile.mkdtemp(dir=self.tmp)
         self.assertEqual(self.run_driver("plan", p, "3", "uicache"), [f"{p}/usr/bin/uicache", "uicache", "-a"])
 
-    # --- F61: selfupdate <path.deb>, dpkg -i of Cydian's own update
+    # --- F61: selfupdate <path.deb>, dpkg -i of iFizBox's own update
 
     def test_selfupdate_plan(self):
         d = tempfile.mkdtemp(dir=self.tmp)
@@ -416,12 +416,12 @@ class Helper(unittest.TestCase):
         c = lambda *a: self.run_driver("caller", *a)[0]
         self.assertEqual(c("0", "0", "0", app, app), "ok")
         self.assertEqual(c("0", "0", "0", link, app), "ok")  # same file by device + inode
-        self.assertIn("isn't Cydian", c("0", "0", "0", other, app))
+        self.assertIn("isn't the installed app", c("0", "0", "0", other, app))
         self.assertIn("can't identify", c("0", "0", "0", os.path.join(self.tmp, "gone"), app))
         self.assertIn("not root", c("501", "0", "0", app, app))
         self.assertIn("not root", c("0", "501", "0", app, app))
 
-    # --- the chain on Linux: a stand-in Cydian spawns the helper, which runs a stand-in apt-get
+    # --- the chain on Linux: a stand-in iFizBox spawns the helper, which runs a stand-in apt-get
 
     @staticmethod
     def stand_in_fds(out):
@@ -548,7 +548,7 @@ class Helper(unittest.TestCase):
             (app, ["remove", "com.repo.tweak"], "unknown package: com.repo.tweak", 64),
             (app, ["shell"], "unknown verb", 64),
             (app, ["hold", "com.repo.tweak"], "unknown package: com.repo.tweak", 64),  # in a list, not installed
-            (self.driver, ["update"], "isn't Cydian", 77),  # same program, but not the file at the app's path
+            (self.driver, ["update"], "isn't the installed app", 77),  # same program, but not the file at the app's path
         ]
         for parent, words, msg, code in cases:
             with self.subTest(words=words):
@@ -586,14 +586,14 @@ class Helper(unittest.TestCase):
             os.chmod(os.path.dirname(f), 0o755)
 
     def test_not_root(self):
-        """The helper as shipped (root uid 0) refuses a normal user even when Cydian is the parent."""
+        """The helper as shipped (root uid 0) refuses a normal user even when the app is the parent."""
         if os.getuid() == 0:
             self.skipTest("running as root")
         p, app, _ = self.chain_prefix()
         helper = os.path.join(p, "cydian-helper-uid0")
         build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"'])
         out = self.run_driver("spawn", helper, "update", driver=app)
-        self.assertIn("2: cydian-helper: not root: Cydian must spawn the helper with the root persona", out)
+        self.assertIn("2: cydian-helper: not root: the app must spawn the helper with the root persona", out)
         self.assertEqual(out[-1], "exit: 77")
 
     def test_ios_build(self):
@@ -800,7 +800,7 @@ class InstallIpa(unittest.TestCase):
             (app, self.ipa(ipa_dir, name="B.ipa", bundle_id="bad id"), "no usable CFBundleIdentifier", 64),
             (app, os.path.join(p, "x.ipa"), "bad IPA path", 64),
             (app, ipa_dir + "/../ipa/" + os.path.basename(good), "bad IPA path", 64),
-            (self.driver, good, "isn't Cydian", 77),
+            (self.driver, good, "isn't the installed app", 77),
         ]
         for parent, path, msg, code in cases:
             with self.subTest(path=os.path.basename(path), msg=msg):
@@ -1031,8 +1031,8 @@ class Rollback(unittest.TestCase):
             (app, ["rollback", "com.example.tweak", "3.0"], "no stored .deb", 64),
             (app, ["rollback", "com.example.tweak", "--force-all"], "bad version", 64),
             (app, ["rollbacks", "../etc"], "bad package name", 64),
-            (self.driver, ["rollback", "com.example.tweak", "1:1.0~b1"], "isn't Cydian", 77),
-            (self.driver, ["rollbacks", "com.example.tweak"], "isn't Cydian", 77),
+            (self.driver, ["rollback", "com.example.tweak", "1:1.0~b1"], "isn't the installed app", 77),
+            (self.driver, ["rollbacks", "com.example.tweak"], "isn't the installed app", 77),
         ]
         for parent, words, msg, code in cases:
             with self.subTest(words=words):
@@ -1175,7 +1175,7 @@ class InstallPaid(unittest.TestCase):
             (app, [hard, "com.example.paid", "1:1.0"], "isn't a plain file", 64),
             (app, [empty, "com.example.paid", "1:1.0"], "isn't a plain file", 64),
             (app, [os.path.join(p, "x.deb"), "com.example.paid", "1:1.0"], "bad .deb path", 64),
-            (self.driver, [good, "com.example.paid", "1:1.0"], "isn't Cydian", 77),
+            (self.driver, [good, "com.example.paid", "1:1.0"], "isn't the installed app", 77),
         ]
         for parent, words, msg, code in cases:
             with self.subTest(words=words[0], msg=msg):
@@ -1192,7 +1192,7 @@ DEB_DIR = "/var/mobile/Library/Caches/com.ryha.cydian/deb"
 
 @unittest.skipUnless(CC, "no C compiler on this machine")
 class LocalDeb(unittest.TestCase):
-    """N9: simulate-deb | install-deb <path>: a .deb shared with Cydian (Open in Cydian, the share sheet). The plan,
+    """N9: simulate-deb | install-deb <path>: a .deb shared with the app (Open in iFizBox, the share sheet). The plan,
     and the chain on Linux: the app's file copied root-side as install-paid's, no control check, apt-get on the copy."""
 
     @classmethod
@@ -1287,7 +1287,7 @@ class LocalDeb(unittest.TestCase):
             (app, empty, "isn't a plain file", 64),
             (app, os.path.join(debs, "missing.deb"), "can't open the .deb", 64),
             (app, os.path.join(p, "x.deb"), "bad .deb path", 64),
-            (self.driver, good, "isn't Cydian", 77),
+            (self.driver, good, "isn't the installed app", 77),
         ]
         for parent, path, msg, code in cases:
             with self.subTest(path=path, msg=msg):

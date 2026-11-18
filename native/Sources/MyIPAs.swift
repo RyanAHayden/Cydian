@@ -12,7 +12,7 @@
 //   library.export {file}           the share sheet (Save to Files, AirDrop...) for the signed copy -> {shared: bool}
 //   library.delete {file}           the IPA, its signed copy and options -> {ipas}
 //
-// Other apps' .ipa (Open in Cydian, AirDrop, Files: the document type in Info-sideload.plist) land in the library
+// Other apps' .ipa (Open in iFizBox, AirDrop, Files: the document type in Info-sideload.plist) land in the library
 // too: MyIPAs.receive copies the file in and hands the page cydian://myipas?file=<name> (web/app/incoming.js).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation

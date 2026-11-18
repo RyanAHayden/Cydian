@@ -13,6 +13,7 @@
 // Apps with no bundle id (ESign often, GBox always) get a stable made-up one: `<format>.<name slug>`, so a refresh
 // keeps the same row and Changes sees a version bump, not a new app.
 import { parseAltSource, appStanza, str, httpUrl } from "../altstore.js";
+import { NAME } from "../../brand.js";
 
 const isObj = (v) => Boolean(v && typeof v === "object" && !Array.isArray(v));
 
@@ -179,7 +180,7 @@ export function toAltSource(format, json) {
     case "gbox":
       if (!Array.isArray(json.appRepositories)) throw new Error("This GBox source is encrypted, so only GBox can read it.");
       return gboxToAlt(json);
-    default: throw new Error(`Cydian can't read ${format} sources as apps.`);
+    default: throw new Error(`${NAME} can't read ${format} sources as apps.`);
   }
 }
 

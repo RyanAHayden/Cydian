@@ -39,7 +39,7 @@ export function getParser() {
 // In the app the shell has put `cydianNative` in place before any module ran (native/bridge.js).
 export function getBackend() {
   const sourceOptions = { arch: getArch, count: (t, a) => getParser().count(t, a) };
-  // F72: Cydian's own source is always in the list and can't be removed (core/essential.js builtinSources).
+  // F72: iFizBox's own source is always in the list and can't be removed (core/essential.js builtinSources).
   return (backend ??= applyBuiltins(globalThis.cydianNative?.call
     ? createNativeBackend({ sourceOptions })
     : createHttpBackend({ sourceOptions: { ...sourceOptions, aptAllowed: () => siteJailbroken() } }),

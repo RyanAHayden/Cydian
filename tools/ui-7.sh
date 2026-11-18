@@ -1,5 +1,5 @@
 #!/bin/sh
-# Drive the iPhone 7's screen (iOS 15.8.8, palera1n rootless; Cydian's .deb test phone). One agent at a time:
+# Drive the iPhone 7's screen (iOS 15.8.8, palera1n rootless; iFizBox's .deb test phone). One agent at a time:
 # every action needs the UI lock (ssh, dpkg and reading files don't).
 #   tools/ui-7.sh lock ME           take the lock (fails, naming the holder, if someone else has it)
 #   tools/ui-7.sh ME tap X Y        tap at screenshot pixels (750x1334 portrait)

@@ -80,12 +80,12 @@ test("Ready to Install's Cancel: nothing opens; false", async () => {
   assert.deepEqual(log.opened, []);
 });
 
-test("Install Cydian App: Cydian's IPA carries the certificate (bring) and the website's link", async () => {
+test("Install iFizBox App: iFizBox's IPA carries the certificate (bring) and the website's link", async () => {
   const srv = fakeServer();
   const { d, log } = deps({ fetcher: srv.fetcher });
-  await signInBrowser({ url: "https://github.com/RyanAHayden/Cydian/releases/latest/download/Cydian.ipa", name: "Cydian", bring: true }, d);
+  await signInBrowser({ url: "https://github.com/RyanAHayden/Cydian/releases/latest/download/Cydian.ipa", name: "iFizBox", bring: true }, d);
   assert.deepEqual(log.jobs[0].bring, { identity: true, transfer: "cydian://import?d=xyz" });
-  await signInBrowser({ url: "https://github.com/RyanAHayden/Cydian/releases/latest/download/Cydian.ipa", name: "Cydian", bring: false }, d);
+  await signInBrowser({ url: "https://github.com/RyanAHayden/Cydian/releases/latest/download/Cydian.ipa", name: "iFizBox", bring: false }, d);
   assert.deepEqual(log.jobs[1].bring, { identity: false, transfer: "cydian://import?d=xyz" }, "Bring My Certificate off: sources and settings only");
 });
 

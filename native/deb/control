@@ -1,10 +1,10 @@
 Package: com.ryha.cydian
-Name: Cydian
+Name: $(BRAND_NAME)
 Version: @VERSION@
 Architecture: iphoneos-arm64
 Description: Package manager with the iOS 6 look, for modern iPhones
-Maintainer: Cydian
-Author: Cydian
+Maintainer: $(BRAND_NAME)
+Author: $(BRAND_NAME)
 Section: Packaging
 Depends: firmware (>= 15.0), uikittools, unzip
 Recommends: ldid

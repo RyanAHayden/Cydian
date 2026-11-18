@@ -59,7 +59,7 @@ test("Changes: Upgrade (N) queues the re-signs, then the upgrades", async () => 
   assert.deepEqual(queueResigns([], { add }), []);
 });
 
-test("Installed: the signature pill for each app Cydian signed, and signed apps the list doesn't hold", () => {
+test("Installed: the signature pill for each app iFizBox signed, and signed apps the list doesn't hold", () => {
   const rows = [{ id: "a", name: "Alpha", version: "1.0" }, { id: "z", name: "Zed", version: "9" }, { id: "c.orig", name: "Charlie", version: "3.0" }];
   const signed = { apps: [...installed.apps.slice(0, 2), { ...installed.apps[2], originalBundleId: "c.orig" }] };
   const r = withSignatures(rows, signed, { now, window: 2 });
@@ -92,13 +92,13 @@ test("app page: the Signature row, and Modify's Re-sign queues a resign job", as
   assert.equal(await appPageAction(pkg, null, { ...unrecorded, ask: async (o) => { sheet = o; return 1; } }), true);
   assert.deepEqual(sheet.buttons, ["Install", "Re-sign"]);
   assert.equal(q.get("b").mode, "resign");
-  // not signed by Cydian: no Re-sign
+  // not signed by iFizBox: no Re-sign
   q.clearAll();
   await appPageAction(pkg, null, { ...base, signedOf: async () => null, ask: async (o) => { sheet = o; return -1; } });
   assert.deepEqual(sheet.buttons, ["Reinstall", "Mark as Not Installed"]);
 });
 
-test("Confirm's run: a resign job goes through signing.resign {bundleId}, Cydian's hosted and last; a failure stops the run", async () => {
+test("Confirm's run: a resign job goes through signing.resign {bundleId}, iFizBox's hosted and last; a failure stops the run", async () => {
   const calls = [];
   const sc = { getServer: () => "https://sign.example" };
   const hud = () => ({ set() {}, hide() {} });
@@ -106,7 +106,7 @@ test("Confirm's run: a resign job goes through signing.resign {bundleId}, Cydian
   const alert = async (o) => { alerts.push(o.title); return { index: 0 }; };
   const ok = native((m, p) => ({ done: [p.bundleId], failed: [] }), calls);
   assert.equal(await resignApp({ id: "b", name: "Bravo", mode: "resign" }, { sc, native: ok, hud, alert }), true);
-  assert.equal(await resignApp({ id: SELF_ID, name: "Cydian", mode: "resign" }, { sc, native: ok, hud, alert }), true);
+  assert.equal(await resignApp({ id: SELF_ID, name: "iFizBox", mode: "resign" }, { sc, native: ok, hud, alert }), true);
   assert.deepEqual(calls, [["signing.resign", { bundleId: "b", manifestServer: "https://sign.example" }],
     ["signing.resign", { bundleId: SELF_ID, manifestServer: "https://sign.example", host: true }]]);
   const bad = native((m, p) => ({ done: [], failed: [{ bundleId: p.bundleId, name: "Bravo", error: "cancelled: iOS didn't fetch it" }] }));
@@ -116,7 +116,7 @@ test("Confirm's run: a resign job goes through signing.resign {bundleId}, Cydian
   assert.deepEqual(alerts, ["Couldn't Re-sign Bravo", "Couldn't Re-sign Bravo"]);
 
   const q = createAppQueue();
-  q.add({ id: SELF_ID, name: "Cydian", version: "0.3.6", mode: "resign" });
+  q.add({ id: SELF_ID, name: "iFizBox", version: "0.3.6", mode: "resign" });
   q.add({ id: "b", name: "Bravo", version: "2.0", mode: "resign" });
   const order = [];
   const recorded = [];

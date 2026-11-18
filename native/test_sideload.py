@@ -248,7 +248,7 @@ if __name__ == "__main__":
 
 class HandoffSourceTest(unittest.TestCase):
     """F75: the phone half can't run here, so read the sources: cydian:// links reach the page (scene URL contexts,
-    app.takeURL), the certificate inside Cydian's own IPA is imported at launch, and nothing of the old local HTTPS
+    app.takeURL), the certificate inside iFizBox's own IPA is imported at launch, and nothing of the old local HTTPS
     install mode (its CA, TLS server, trust calls) is left."""
 
     @classmethod

@@ -12,7 +12,7 @@ import { repoLayout, parseRelease, parseControl, matchesArch, DEFAULT_ARCH } fro
 import { isAltKey, neverLoaded } from "./altstore.js";
 import { releaseTime, fingerprint, healthFields, withTimeout, pool, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 
-// F72: Cydian's own repo names the oldest Cydian that may run without upgrading first (core/essential.js).
+// F72: iFizBox's own repo names the oldest iFizBox that may run without upgrading first (core/essential.js).
 const MIN_FIELD = "x-cydian-minimum-version";
 
 // A source: { key, uri, dist, components, name?, origin?, depiction?, count?, updated?, error? }. `name` is ours
@@ -31,7 +31,7 @@ export const DEFAULT_SOURCES = [
 // one. Several redirect (github.com/.../raw/..., releases/latest/download/...): the proxy follows each hop, so the
 // URL kept is the one given. Deduped on the parsed URL.
 export const DEFAULT_ALT_SOURCES = dedupeUrls([
-  // I7: Cydian's own source first, the app's own package page (web/app/source.json, tools/altsource.py).
+  // I7: iFizBox's own source first, the app's own package page (web/app/source.json, tools/altsource.py).
   "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json",
   "https://provenance-emu.com/apps.json",
   "https://fizl0.github.io/apps/source.json",
@@ -263,7 +263,7 @@ export async function verifySource(backend, input, { arch = DEFAULT_ARCH, count 
   if (!found) throw new SourceError("not_repository");
   if (release?.origin) source.origin = release.origin;
   if (release) source.depiction = release.fields.depiction || null;
-  if (release?.fields[MIN_FIELD]) source.minimumVersion = release.fields[MIN_FIELD]; // F72: Cydian's own repo
+  if (release?.fields[MIN_FIELD]) source.minimumVersion = release.fields[MIN_FIELD]; // F72: iFizBox's own repo
   source.count = text == null ? null : await count(text, arch);
   source.updated = source.reachedAt = Date.now(); // F19: health
   source.failures = 0;
@@ -343,7 +343,7 @@ export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, coun
     if (release?.origin) out.origin = release.origin;
     if (release) {
       out.depiction = release.fields.depiction || null;
-      out.minimumVersion = release.fields[MIN_FIELD] || null; // F72: X-Cydian-Minimum-Version (Cydian's own repo)
+      out.minimumVersion = release.fields[MIN_FIELD] || null; // F72: X-Cydian-Minimum-Version (iFizBox's own repo)
       out.releaseDate = releaseTime(release);
       out.releaseHash = fingerprint(release.raw);
     }
@@ -528,8 +528,8 @@ export function cleanSourceUrl(text) {
 }
 
 // raw.githubusercontent.com keeps a file 5 minutes after it changes, but treats a query as another file: sources
-// there (Cydian's own among them) are asked for with one that changes each minute, so a release shows within a
-// minute (user 2026-11-18: Changes said Cydian 0.3.5 with 0.3.6 out). Other hosts' URLs stay as they are.
+// there (iFizBox's own among them) are asked for with one that changes each minute, so a release shows within a
+// minute (user 2026-11-18: Changes said iFizBox 0.3.5 with 0.3.6 out). Other hosts' URLs stay as they are.
 export function freshUrl(url, now = Date.now()) {
   const s = String(url ?? "");
   if (!/^https:\/\/raw\.githubusercontent\.com\//i.test(s) || s.includes("?")) return s;

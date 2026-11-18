@@ -242,7 +242,7 @@ test("garbage is refused with a clear message", () => {
       && e.title === "Did not Find Source" && re.test(e.message));
   refused(text("page-repo-landing.html"), "web_page", /junk\.example sent a web page, not a source/);
   refused(text("garbage.txt"), "unknown_text", /not a source: no APT Release or Packages, and no app source JSON/);
-  refused(text("garbage.json"), "unknown_json", /no source format Cydian knows/);
+  refused(text("garbage.json"), "unknown_json", /no source format iFizBox knows/);
   refused("{ \"apps\": [ ", "bad_json", /broken JSON/);
   refused("   \n", "empty", /empty page/);
   refused(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]), "unknown_text", /not a source/);

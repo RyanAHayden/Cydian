@@ -1,4 +1,4 @@
-// N9: core/share.js, the page's half of the share sheet and Open in Cydian.
+// N9: core/share.js, the page's half of the share sheet and Open in iFizBox.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseShared, sharedRecord } from "./share.js";

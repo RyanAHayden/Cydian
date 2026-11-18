@@ -1,4 +1,4 @@
-// Cydian's jailbreak shell: one window, one WKWebView showing web/app/ from the bundle (docs/native.md, R3 (a)).
+// iFizBox's jailbreak shell: one window, one WKWebView showing web/app/ from the bundle (docs/native.md, R3 (a)).
 // Navigation, push/pop and the edge swipe back are web/app/'s own JS stack; the shell adds nothing on top.
 import UIKit
 import WebKit
@@ -9,12 +9,12 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         Notifications.shared.start() // F65: permission for N5's daemon, and notification taps (Notifications.swift)
-        // The new Cydian is open: the "Cydian Updated, tap to open" notices have done their job.
-        // and one still waiting to arrive (it's sent 8 s after the old Cydian closed) never comes once this one is open
+        // The new iFizBox is open: the "iFizBox Updated, tap to open" notices have done their job.
+        // and one still waiting to arrive (it's sent 8 s after the old iFizBox closed) never comes once this one is open
         let notices = ["cydian.updating", "cydian.updated"]
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: notices)
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: notices)
-        SignBridge.importBundled() // F75: the certificate the website put inside Cydian's own IPA (bring, F93)
+        SignBridge.importBundled() // F75: the certificate the website put inside iFizBox's own IPA (bring, F93)
         BackgroundCheck.register() // I3: before launch ends, as BGTaskScheduler requires (sideload build)
         return true
     }
@@ -46,7 +46,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         Replaced.watch()
     }
 
-    // F75: a cydian:// link while Cydian runs (Open in Cydian App and Open in Cydian on the website).
+    // F75: a cydian:// link while iFizBox runs (Open in iFizBox App and Open in iFizBox on the website).
     func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem,
                      completionHandler: @escaping (Bool) -> Void) {
         Shortcut.perform(shortcutItem.type)
@@ -60,7 +60,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 // F75: cydian://import?d=…, cydian://install?url=… (F89) and the rest of IncomingLink's hosts for the page (web/app/incoming.js). The shell keeps the
 // latest one and tells the page there is one ("cydian:url" on window); the page takes it with app.takeURL, also
-// once at start, so a link that launched Cydian before the page loaded isn't lost. Only IncomingLink's hosts pass.
+// once at start, so a link that launched iFizBox before the page loaded isn't lost. Only IncomingLink's hosts pass.
 //   app.takeURL            -> {url} | null (and forgets it)
 //   app.gunzip {data}      base64 gzip -> {text}: cydian://import's payload where WebKit has no DecompressionStream
 enum Incoming {
@@ -107,7 +107,7 @@ enum Incoming {
 
 // F83: other sideloaders' schemes, claimed by the sideload build (native/Info-sideload.plist; the jailbreak build
 // claims none, so it never gets them). The page decides what each becomes, and whether Settings > Sideloading > Open
-// Other Apps' Links lets Cydian take it (web/app/core/otherlinks.js OTHER_SCHEMES holds the same list; a test checks).
+// Other Apps' Links lets iFizBox take it (web/app/core/otherlinks.js OTHER_SCHEMES holds the same list; a test checks).
 enum OtherLink {
     static let schemes: Set<String> = ["altstore", "altstore-classic", "sidestore", "feather", "ksign", "esign", "scarlet",
                                        "gbox", "trollapps", "stikstore"]
@@ -145,10 +145,10 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
         dropCover()
     }
 
-    // B8 (docs/native.md, "Links out of the app"): Cydian's own pages (cydian:, about:, blob:, data:) load in the
+    // B8 (docs/native.md, "Links out of the app"): iFizBox's own pages (cydian:, about:, blob:, data:) load in the
     // web view, and so does anything inside a subframe. Any other main-frame navigation (location.href to https,
     // itms-services, feather://, altstore://, cydia://, sileo://, a target=_blank link) goes to iOS and is cancelled,
-    // so Cydian's UI stays where it was. Going straight to iOS also means an itms-services install link shows only
+    // so iFizBox's UI stays where it was. Going straight to iOS also means an itms-services install link shows only
     // iOS's "Install …?" prompt, not WebKit's "Open in iTunes?" first.
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -257,7 +257,7 @@ enum Launch {
     }()
 
     // The website's launch image for this screen (web/icons/launch/launch-<W>x<H>.png, in device pixels, made by
-    // tools/launch_images.py): nav bar titled Cydian, the pinstripes with Loading, the tab bar with Home selected.
+    // tools/launch_images.py): nav bar titled iFizBox, the pinstripes with Loading, the tab bar with Home selected.
     // nil on a screen it has no image for; the window's pinstripes show there instead.
     static func cover(frame: CGRect) -> UIView? {
         let px = UIScreen.main.nativeBounds.size // portrait pixels
@@ -272,9 +272,9 @@ enum Launch {
     }
 }
 
-// Cydian updated over itself (its own IPA from Changes, or a .deb on a jailbroken phone) keeps running the old copy
+// iFizBox updated over itself (its own IPA from Changes, or a .deb on a jailbroken phone) keeps running the old copy
 // until it's closed (user 2026-11-17). Every few seconds it reads its Info.plist on disk: once that is gone or names
-// another version, it leaves a "tap to open" notification and closes, so the next open is the new Cydian.
+// another version, it leaves a "tap to open" notification and closes, so the next open is the new iFizBox.
 enum Replaced {
     static let running = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
                           Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "")
@@ -298,7 +298,7 @@ enum Replaced {
 
     static func close(newVersion: String?) {
         let c = UNMutableNotificationContent()
-        c.title = "Cydian"
+        c.title = Brand.name
         c.body = newVersion.map { "Updated to \($0). Tap to open it." } ?? "Updated. Tap to open it."
         let req = UNNotificationRequest(identifier: "cydian.updated", content: c,
                                         trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))

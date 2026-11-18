@@ -1,5 +1,5 @@
 // F14: the sideload build's install flow around I6's signer. Look before signing (entitlements, permissions,
-// extensions), sign with the user's edits (name, bundle ID, icon, extensions left out, arm64e fix-up), keep Cydian
+// extensions), sign with the user's edits (name, bundle ID, icon, extensions left out, arm64e fix-up), keep iFizBox
 // alive with silent audio while iOS downloads the IPA from it, watch iOS install it (private LSApplicationWorkspace,
 // as Feather does), remember what was signed so Re-sign All can do it again, check the certificate with Apple's
 // OCSP responder, and remind before signatures expire. docs/signing.md, "On the phone (I6)" and "F14".
@@ -15,7 +15,7 @@
 //   signing.forget {bundleId}    -> {apps}
 //   signing.resignAll (stream: {index, count, name, phase, progress}) -> {done: [bundleId], failed: [{bundleId, name, error}]}
 //   signing.resign {bundleId} (stream and reply as resignAll, one app) -> F91's queue job "resign"; not_signed: when
-//        Cydian has no record of that app (by installed or original bundle ID)
+//        iFizBox has no record of that app (by installed or original bundle ID)
 //   signing.checkCertificate     -> {status: "good" | "revoked" | "unknown", checked, revokedAt?}
 //   signing.remind {days}        -> {at | null}: the re-sign reminder, 0 = off
 // F77: My IPAs' library.* calls are MyIPAs.swift; they install through serveAndOpen, and Re-sign All signs an app
@@ -102,13 +102,13 @@ enum Sideload {
 
     // ---- install
 
-    // The signing server whose GET /sign/manifest hands iOS the manifest for an IPA Cydian serves over plain HTTP
+    // The signing server whose GET /sign/manifest hands iOS the manifest for an IPA iFizBox serves over plain HTTP
     // at 127.0.0.1 (Feather's "Semi Local", on our own server): no certificate to trust on the phone, the key never
     // leaves it, the server sees only the app's ID, version and name. Set by each signing.install (and resignAll)
     // call's `manifestServer`; F75: there is no install without one (iOS's installer ignores a hand-trusted CA, so
     // the old fully local HTTPS mode never worked), and without one the call answers no_server.
     static var manifestServer: String?
-    // Set (to the Signing Server) when the IPA is Cydian itself: iOS closes Cydian, and its install server with it, as
+    // Set (to the Signing Server) when the IPA is iFizBox itself: iOS closes iFizBox, and its install server with it, as
     // it installs over it, so the signed IPA goes up to the server's POST /sign/host and installs from there. Signing
     // still happens here; the key never leaves the phone. Set by each signing.install call's `host`.
     static var hostServer: String?
@@ -175,8 +175,8 @@ enum Sideload {
     // manifest from `manifestServer`). `opened`
     // gets the result once iOS has been handed the link; `served` once iOS has fetched the whole IPA (or it expired
     // unfetched: false). Runs on SignBridge.queue.
-    // Cydian's own update: upload the IPA signed here to the server, which holds it for its 10 minutes and answers the
-    // itms-services link; then iOS installs from the server, unaffected by Cydian closing.
+    // iFizBox's own update: upload the IPA signed here to the server, which holds it for its 10 minutes and answers the
+    // itms-services link; then iOS installs from the server, unaffected by iFizBox closing.
     static func hostAndOpen(_ output: URL, server: String, app: SignedApp, record: SignedRecord,
                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void, served: ((Bool) -> Void)?) {
         // The Worker (worker/src/index.js) doesn't open the IPA: the app says what it is.
@@ -338,7 +338,7 @@ enum Sideload {
     static func resignOne(_ c: Bridge.Call) {
         let bid = c.params["bundleId"] as? String ?? ""
         guard !SignedRecords.only(records(), bundleID: bid).isEmpty else {
-            return Apt.reply(c, nil, "not_signed: Cydian has no record of signing \(bid.isEmpty ? "that app" : bid)")
+            return Apt.reply(c, nil, "not_signed: \(Brand.name) has no record of signing \(bid.isEmpty ? "that app" : bid)")
         }
         resign(c) { SignedRecords.only($0, bundleID: bid) }
     }
@@ -346,7 +346,7 @@ enum Sideload {
     static func resign(_ c: Bridge.Call, pick: @escaping ([SignedRecord]) -> [SignedRecord]) {
         guard let (id, profile) = ready(c) else { return }
         guard takeServer(c) != nil else { return Apt.reply(c, nil, noServer) }
-        hostServer = (c.params["host"] as? Bool ?? false) ? manifestServer : nil // F91: Cydian's own re-sign is hosted
+        hostServer = (c.params["host"] as? Bool ?? false) ? manifestServer : nil // F91: iFizBox's own re-sign is hosted
         SignBridge.queue.async {
             let list = pick(records())
             var done = [String](), failed = [[String: Any]]()
@@ -422,7 +422,7 @@ enum Sideload {
         SignBridge.queue.async {
             do {
                 let ident = try KeychainIdentity(sid)
-                guard let issuer = ident.chain.first else { throw SignError("ocsp", "The certificate's issuer isn't one Cydian knows.") }
+                guard let issuer = ident.chain.first else { throw SignError("ocsp", "The certificate's issuer isn't one \(Brand.name) knows.") }
                 let cert = ident.certificate
                 guard let responder = OCSP.responder(cert) else { throw SignError("ocsp", "The certificate names no OCSP responder.") }
                 var req = URLRequest(url: responder, timeoutInterval: 20)
@@ -498,8 +498,8 @@ final class Once {
     func first() -> Bool { lock.lock(); defer { lock.unlock() }; if done { return false }; done = true; return true }
 }
 
-// Silent audio while iOS downloads an IPA from Cydian (Feather's BackgroundAudioManager, docs/sideload.md): the
-// install sheet sends Cydian to the background, and beginBackgroundTask alone gives about 30 s, too little for a big
+// Silent audio while iOS downloads an IPA from iFizBox (Feather's BackgroundAudioManager, docs/sideload.md): the
+// install sheet sends iFizBox to the background, and beginBackgroundTask alone gives about 30 s, too little for a big
 // IPA. UIBackgroundModes has `audio` in the sideload build (Info-sideload.plist). Mixed with others, so the user's
 // music keeps playing; held while any install needs it.
 final class KeepAlive {
@@ -586,9 +586,9 @@ enum Workspace {
     }
 }
 
-// iOS doesn't finish installing a new Cydian over the one that's running (user 2026-11-18: the update waited until
-// Cydian was closed by hand). Once iOS's "would like to install Cydian" prompt has been answered (Cydian becomes
-// active again), Cydian leaves a notification and closes, so the install finishes; the notification opens the new one.
+// iOS doesn't finish installing a new iFizBox over the one that's running (user 2026-11-18: the update waited until
+// iFizBox was closed by hand). Once iOS's "would like to install iFizBox" prompt has been answered (iFizBox becomes
+// active again), iFizBox leaves a notification and closes, so the install finishes; the notification opens the new one.
 enum CloseForUpdate {
     static var token: NSObjectProtocol?
     static func afterPrompt() {
@@ -601,7 +601,7 @@ enum CloseForUpdate {
             token.map(nc.removeObserver); token = nil; nc.removeObserver(off)
             let c = UNMutableNotificationContent()
             // It arrives 8 s later, by when iOS has usually finished (user 2026-11-18: "tap when it's done" read wrong).
-            c.title = "Cydian Updated"
+            c.title = "\(Brand.name) Updated"
             c.body = "Tap to open the new version."
             let req = UNNotificationRequest(identifier: "cydian.updating", content: c,
                                             trigger: UNTimeIntervalNotificationTrigger(timeInterval: 8, repeats: false))

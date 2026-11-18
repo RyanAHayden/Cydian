@@ -18,6 +18,9 @@
 #   rollbacks/rollback (F71) work on $CYDIAN_PREFIX/var/cache/cydian/rollback/<id>/ like the real ones: a "stored
 #                  .deb" here is a plain text control stanza (Package, Version, ...), which rollback writes into dpkg's
 #                  status in place of the installed one. Ownership isn't checked (the tests run as one user)
+#   install-paid (F57) takes a "downloaded .deb" from $CYDIAN_PAID_DIR (the real one's HELPER_PAID_DIR): a plain text
+#                  control stanza as rollback's, checked to be the package and version asked, then written into
+#                  dpkg's status like rollback does. FAKE_FAIL=install-paid fails like apt (exit 100)
 # Status lines go to fd 3 when it is open, like apt's APT::Status-Fd. SPDX-License-Identifier: GPL-3.0-or-later
 set -u
 prefix=${CYDIAN_PREFIX:?}
@@ -26,7 +29,7 @@ status=$prefix/var/lib/dpkg/status
 st() { { printf '%s\n' "$1" >&3; } 2>/dev/null || true; }
 refuse() { echo "cydian-helper: $1" >&2; exit 64; }
 verb=${1:-}
-VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback"
+VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid"
 [ -n "$verb" ] || refuse "no verb ($VERBS)"
 shift
 sources=$prefix/etc/apt/sources.list.d/cydian.sources
@@ -209,6 +212,35 @@ print(v)' "$1")
     echo "Setting up $1 ($2) ..."
     st "pmstatus:$1:100:Installed $1"
     [ -n "${FAKE_FINISH:-}" ] && st "finish:$FAKE_FINISH"
+    exit 0 ;;
+  install-paid)
+    # F57: policy.c's paid_plan (helper_paid_path_ok, name, version), then paid.c's control check and apt-get install.
+    [ $# -eq 3 ] || refuse "install-paid takes a .deb path, a package name and a version"
+    dir=${CYDIAN_PAID_DIR:?}
+    case $1 in "$dir"/*) name=${1#"$dir"/} ;; *) name= ;; esac
+    { one_line "$1" && [ ${#name} -le 255 ] && printf '%s' "$name" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]*\.deb' &&
+      case $name in *..*) false ;; esac; } || refuse "bad .deb path (only $dir/<name>.deb)"
+    { one_line "$2" && printf '%s' "$2" | grep -Eqx '[a-z0-9][a-z0-9.+-]{1,254}'; } || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"
+    { one_line "$3" && printf '%s' "$3" | grep -Eqx '[0-9][A-Za-z0-9.+~:-]{0,254}'; } || refuse "bad version (a digit, then [A-Za-z0-9.+~:-])"
+    { [ -f "$1" ] && [ ! -L "$1" ] && [ -s "$1" ]; } || refuse "can't open the .deb (missing, or a link)"
+    deb=$(sed '1{/^!<arch>$/d}' "$1")
+    { printf '%s\n' "$deb" | grep -qxF "Package: $2" && printf '%s\n' "$deb" | grep -qxF "Version: $3" &&
+      [ "$(printf '%s\n' "$deb" | grep -c '^Package:')" = 1 ] && [ "$(printf '%s\n' "$deb" | grep -c '^Version:')" = 1 ]; } ||
+      refuse "the downloaded .deb isn't that package and version"
+    echo "Reading package lists..."
+    st "pmstatus:$2:50:Preparing $2"
+    echo "Unpacking $2 ($3) ..."
+    if [ "${FAKE_FAIL:-}" = install-paid ]; then
+      echo "E: Sub-process /usr/bin/dpkg returned an error code (1)" >&2
+      exit 100
+    fi
+    { awk -v p="$2" 'BEGIN { RS = ""; ORS = "\n\n" } { n = split($0, l, "\n"); name = ""
+        for (i = 1; i <= n; i++) if (l[i] ~ /^Package:/) { name = l[i]; sub(/^Package:[ \t]*/, "", name) }
+        if (name != p) print }' "$status"
+      printf '%s\n' "$deb" | awk 'NR == 1 { print; print "Status: install ok installed"; next } { print }'
+      echo; } > "$status.new" && mv "$status.new" "$status"
+    echo "Setting up $2 ($3) ..."
+    st "pmstatus:$2:100:Installed $2"
     exit 0 ;;
   *) refuse "unknown verb ($VERBS)" ;;
 esac

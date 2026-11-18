@@ -6,6 +6,7 @@
  *                                              "unchanged" or "error: ..."
  *   test_driver uri|suite|component <s>...     print "ok" or "bad" per string <uid> <euid> <root_uid> <parent_exe> <expected>   print "ok" or "error: ..."
  *   test_driver ipapath <dir> <path>...        F59: print "ok" or "bad" per path (helper_ipa_path_ok)
+ *   test_driver paidpath <dir> <path>...       F57: print "ok" or "bad" per path (helper_paid_path_ok)
  *   test_driver plistid <file>                 F59: the Info.plist's CFBundleIdentifier, or "bad"
  *   test_driver appsync <prefix>               F59: "yes" or "no"
  *   test_driver debname <id> <file>...         F71: the version in each stored .deb name, or "bad"
@@ -112,6 +113,8 @@ int main(int argc, char **argv) {
         else printf("ok\n");
     } else if (!strcmp(cmd, "ipapath") && argc >= 3) {
         for (int i = 3; i < argc; i++) printf("%s\n", helper_ipa_path_ok(argv[2], argv[i]) ? "ok" : "bad");
+    } else if (!strcmp(cmd, "paidpath") && argc >= 3) {
+        for (int i = 3; i < argc; i++) printf("%s\n", helper_paid_path_ok(argv[2], argv[i]) ? "ok" : "bad");
     } else if (!strcmp(cmd, "plistid") && argc == 3) {
         static char buf[1 << 20];
         char id[HELPER_NAME_MAX + 1];

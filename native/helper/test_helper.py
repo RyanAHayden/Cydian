@@ -16,6 +16,9 @@ def build(out, sources, defs=()):
     # F59: main.c calls ipa.c's install-ipa, test_driver.c its checks.
     if ("main.c" in sources or "test_driver.c" in sources) and "ipa.c" not in sources:
         sources = [*sources, "ipa.c"]
+    # F57: main.c calls paid.c's install-paid.
+    if "main.c" in sources and "paid.c" not in sources:
+        sources = [*sources, "paid.c"]
     subprocess.run([CC, *FLAGS, *defs, "-o", out, *(os.path.join(HERE, s) for s in sources)], check=True,
                    capture_output=True)
 
@@ -999,6 +1002,150 @@ class Rollback(unittest.TestCase):
                 self.assertTrue(any(l.startswith("2: cydian-helper: ") and msg in l for l in out), out)
                 self.assertEqual(out[-1], f"exit: {code}")
                 self.assertFalse(any(l.startswith("1: ") for l in out), out)
+
+PAID_DIR = "/var/mobile/Library/Caches/com.ryha.cydian/paid"
+
+
+@unittest.skipUnless(CC, "no C compiler on this machine")
+class InstallPaid(unittest.TestCase):
+    """F57: install-paid <path> <id> <version>: the path allowlist, the plan, and the chain on Linux (stand-in
+    dpkg-deb that prints the fake .deb's text as its control, and a stand-in apt-get)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp()
+        cls.driver = os.path.join(cls.tmp, "test_driver")
+        build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"])
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp)
+
+    def run_driver(self, *args, driver=None):
+        r = subprocess.run([driver or self.driver, *args], capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout.splitlines()
+
+    def test_paths(self):
+        d = PAID_DIR
+        good = [d + "/a.deb", d + "/3F2A-11.deb", d + "/com.foo_1.0_iphoneos-arm64.deb", d + "/" + "a" * 251 + ".deb"]
+        bad = ["", d, d + "/", d + "/.deb", d + "/.x.deb", d + "/a.DEB", d + "/a.ipa", d + "/sub/a.deb",
+               d + "/../a.deb", d + "/a..deb", "/tmp/a.deb", d + "x/a.deb", d + "/a b.deb", d + "/a\n.deb",
+               d + "/-a.deb", d + "/" + "a" * 252 + ".deb", "a.deb", d.replace("/paid", "/ipa") + "/a.deb"]
+        self.assertEqual(self.run_driver("paidpath", d, *good), ["ok"] * len(good))
+        self.assertEqual(self.run_driver("paidpath", d, *bad), ["bad"] * len(bad))
+
+    def test_plan(self):
+        deb = PAID_DIR + "/0A1B.deb"
+        fixed = ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
+        self.assertEqual(self.run_driver("plan", "/var/jb", "3", "install-paid", deb, "com.example.paid", "1:1.0"),
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "-o", "APT::Keep-Fds::=3", "-o",
+                          "APT::Status-Fd=3", "install", deb])
+        self.assertEqual(self.run_driver("plan", "/var/jb", "-1", "install-paid", deb, "com.example.paid", "1.0")[1:],
+                         ["apt-get", *fixed, "install", deb])
+        cases = {
+            ("install-paid",): "a .deb path, a package name and a version",
+            ("install-paid", deb, "com.example.paid"): "a .deb path, a package name and a version",
+            ("install-paid", deb, "com.example.paid", "1.0", "x"): "a .deb path, a package name and a version",
+            ("install-paid", "/var/jb/tmp/x.deb", "com.example.paid", "1.0"): "bad .deb path",
+            ("install-paid", PAID_DIR + "/../ipa/x.deb", "com.example.paid", "1.0"): "bad .deb path",
+            ("install-paid", deb, "-o", "1.0"): "bad package name",
+            ("install-paid", deb, "com.example.paid", "--force-all"): "bad version",
+        }
+        for words, msg in cases.items():
+            with self.subTest(words=words):
+                out = self.run_driver("plan", "/var/jb", "3", *words)
+                self.assertEqual(len(out), 1, out)
+                self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
+        self.assertEqual(self.run_driver("known", "/nonexistent", "install-paid", deb, "com.example.paid", "1.0"),
+                         ["all known"])
+
+    # --- the chain
+
+    def chain(self, apt_exit=0):
+        base = tempfile.mkdtemp(dir=self.tmp)
+        p, paid, work = (os.path.join(base, n) for n in ("prefix", "paid", "work"))
+        for d in ("Applications/Cydian.app", "usr/bin"):
+            os.makedirs(os.path.join(p, d))
+        os.makedirs(paid)
+        os.makedirs(work)
+        app = os.path.join(p, "Applications/Cydian.app/Cydian")
+        shutil.copy(self.driver, app)
+        dpkg_deb = os.path.join(p, "usr/bin/dpkg-deb")  # dpkg-deb -f <deb> Package Version
+        with open(dpkg_deb, "w") as f:
+            f.write('#!/bin/sh\n[ "$1" = -f ] && [ "$3" = Package ] && [ "$4" = Version ] && [ $# -eq 4 ] || exit 2\n'
+                    'case $(head -c 4 "$2") in junk) exit 2 ;; esac\ncat "$2"\n')
+        apt = os.path.join(p, "usr/bin/apt-get")  # says what it got, and what the copy holds
+        with open(apt, "w") as f:
+            f.write('#!/bin/sh\necho "argv: $*"\nfor a; do last=$a; done\necho "copy: $(cat "$last")"\n'
+                    'echo "env: $(env | sort | tr \'\\n\' \' \')"\n'
+                    f'echo "pmstatus:com.example.paid:50:Installing" >&3\nexit {apt_exit}\n')
+        os.chmod(dpkg_deb, 0o755)
+        os.chmod(apt, 0o755)
+        helper = os.path.join(base, "cydian-helper")
+        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"', f"-DCYDIAN_ROOT_UID={os.getuid()}",
+                                                f'-DHELPER_PAID_DIR="{paid}"', f'-DHELPER_PAID_WORK="{work}"'])
+        return p, app, helper, paid, work
+
+    def deb(self, paid, name="A1.deb", pkg="com.example.paid", ver="1:1.0"):
+        path = os.path.join(paid, name)
+        with open(path, "w") as f:
+            f.write(f"Package: {pkg}\nVersion: {ver}\n")
+        return path
+
+    def spawn(self, app, helper, *words):
+        return self.run_driver("spawn", helper, *words, driver=app)
+
+    def test_chain(self):
+        p, app, helper, paid, work = self.chain()
+        out = self.spawn(app, helper, "install-paid", self.deb(paid), "com.example.paid", "1:1.0")
+        self.assertEqual(out[-1], "exit: 0", out)
+        argv = next(l for l in out if l.startswith("1: argv: "))
+        self.assertTrue(argv.startswith("1: argv: -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "
+                                        f"-o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install {work}/cydian-paid."), argv)
+        self.assertTrue(argv.endswith("/paid.deb"), argv)  # the root-owned copy, not the app's file
+        self.assertIn("1: copy: Package: com.example.paid", out)
+        self.assertIn("CYDIA=3 1", next(l for l in out if l.startswith("1: env: ")))
+        self.assertIn("3: pmstatus:com.example.paid:50:Installing", out)
+        self.assertEqual(os.listdir(work), [])  # the work directory goes
+        out = self.chain(apt_exit=100)
+        p, app, helper, paid, work = out
+        out = self.spawn(app, helper, "install-paid", self.deb(paid), "com.example.paid", "1:1.0")
+        self.assertEqual(out[-1], "exit: 100", out)  # apt's own status
+        self.assertFalse(any(l.startswith("2: cydian-helper: ") for l in out), out)
+        self.assertEqual(os.listdir(work), [])
+
+    def test_chain_refuses(self):
+        p, app, helper, paid, work = self.chain()
+        good = self.deb(paid)
+        link = os.path.join(paid, "link.deb")
+        os.symlink(good, link)
+        hard = os.path.join(paid, "hard.deb")
+        os.link(self.deb(paid, name="H.deb"), hard)
+        junk = os.path.join(paid, "junk.deb")
+        with open(junk, "w") as f:
+            f.write("junk")
+        empty = os.path.join(paid, "empty.deb")
+        open(empty, "w").close()
+        cases = [
+            (app, [good, "com.example.paid", "2.0"], "isn't that package and version", 64),
+            (app, [self.deb(paid, name="E.deb", pkg="com.example.evil"), "com.example.paid", "1:1.0"],
+             "isn't that package and version", 64),
+            (app, [junk, "com.example.paid", "1:1.0"], "couldn't read the downloaded", 64),
+            (app, [os.path.join(paid, "missing.deb"), "com.example.paid", "1:1.0"], "can't open the .deb", 64),
+            (app, [link, "com.example.paid", "1:1.0"], "can't open the .deb", 64),
+            (app, [hard, "com.example.paid", "1:1.0"], "isn't a plain file", 64),
+            (app, [empty, "com.example.paid", "1:1.0"], "isn't a plain file", 64),
+            (app, [os.path.join(p, "x.deb"), "com.example.paid", "1:1.0"], "bad .deb path", 64),
+            (self.driver, [good, "com.example.paid", "1:1.0"], "isn't Cydian", 77),
+        ]
+        for parent, words, msg, code in cases:
+            with self.subTest(words=words[0], msg=msg):
+                out = self.spawn(parent, helper, "install-paid", *words)
+                self.assertTrue(any(l.startswith("2: cydian-helper: ") and msg in l for l in out), out)
+                self.assertEqual(out[-1], f"exit: {code}")
+                self.assertFalse(any(l.startswith("1: ") for l in out), out)
+                self.assertEqual(os.listdir(work), [])
 
 
 if __name__ == "__main__":

@@ -17,9 +17,9 @@
 
 enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, HV_HOLD, HV_UNHOLD, HV_SHOWHOLD,
                    HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA, HV_SELFUPDATE,
-                   HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK };
+                   HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK, HV_INSTALL_PAID };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
-                     "simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback"
+                     "simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid"
 
 /* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
  * Downgrade and Reinstall pick theirs), "-name" removes. apt gets "name", "name=version" and "name-" in one
@@ -103,6 +103,19 @@ int helper_control_matches(const char *text, const char *id, const char *version
 /* Run <prefix>/usr/bin/dpkg-deb -f <deb> Package Version (stdin /dev/null, stderr dropped, an environment of our
  * own) and check it with helper_control_matches. 0, or -1 + *err. */
 int helper_rollback_verify(const char *prefix, const char *deb, const char *id, const char *version, const char **err);
+
+/* F57: install-paid <path> <id> <version>: a paid package's .deb, downloaded by the app from the vendor's one-time
+ * authorize_download URL (Paid.swift paid.install). Only from <HELPER_PAID_DIR>/<name>.deb, name
+ * [A-Za-z0-9][A-Za-z0-9._-]* (mobile's own Caches: the app is no-container). paid.c copies it into a root-owned work
+ * directory, checks its control through dpkg-deb (Package must be id, Version the version asked, as rollback does),
+ * then runs apt-get -y (conffile options) [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <the copy>, so apt
+ * pulls in its dependencies. Tests build with their own -DHELPER_PAID_DIR. */
+#ifndef HELPER_PAID_DIR
+#define HELPER_PAID_DIR "/var/mobile/Library/Caches/com.ryha.cydian/paid"
+#endif
+/* 1 if path is <dir>/<name> with name [A-Za-z0-9][A-Za-z0-9._-]* ending in ".deb", at most HELPER_IPA_NAME_MAX
+ * bytes, no "..". */
+int helper_paid_path_ok(const char *dir, const char *path);
 
 /* 1 if s is a package name the helper passes on: [a-z0-9][a-z0-9.+-]+, at most HELPER_NAME_MAX bytes. */
 int helper_name_ok(const char *s);

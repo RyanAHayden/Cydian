@@ -22,6 +22,8 @@
 			<key>CFBundleIconName</key><string>AppIcon</string>
 		</dict>
 	</dict>
+	<!-- F57: reading a vendor's payment secret from the Keychain asks for Face ID (Paid.swift) -->
+	<key>NSFaceIDUsageDescription</key><string>Face ID unlocks your payment details when you buy a package.</string>
 	<key>UIApplicationSceneManifest</key><dict>
 		<key>UIApplicationSupportsMultipleScenes</key><false/>
 		<key>UISceneConfigurations</key><dict>

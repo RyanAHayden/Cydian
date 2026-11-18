@@ -272,8 +272,53 @@ test("F205: Settings root, General and Theme rows carry iOS 6 tiles where iOS 6 
   const at = (label) => general.findIndex((r) => r[0] === label);
   assert.equal(at("Compatibility Marks"), at("Works on My Phone") + 1);
   for (const r of general) assert.equal(r[1], "cell-icon row-icon", r[0]);
+  // F199: Theme is Mode (a segmented control, no rows) and Themes' two push rows, bare like iOS 6's.
   const theme = rows(["theme"]);
-  assert.deepEqual(theme.map((r) => r[0]), ["Automatic", "Light", "Dark"]);
+  assert.deepEqual(theme.map((r) => r[0]), ["Light", "Dark"]);
   for (const r of theme) assert.equal(r[1], null, r[0]);
-  assert.deepEqual(rows(["display"]).map((r) => r[0]), ["Automatic", "Light", "Dark"]); // the old route
+  assert.deepEqual(rows(["display"]).map((r) => r[0]), ["Light", "Dark"]); // the old route
+  // each theme list: a checked row per theme, each with its swatch
+  assert.deepEqual(rows(["theme", "darkTheme"]).map((r) => [r[0], r[1]]),
+    [["OLED Black", "cell-icon theme-swatch"], ["Gunmetal", "cell-icon theme-swatch"]]);
+  assert.deepEqual(rows(["theme", "lightTheme"]).map((r) => [r[0], r[1]]), [["Classic", "cell-icon theme-swatch"]]);
+});
+
+// F199: Settings > Theme: Mode (segmented Automatic / Light / Dark) under its header, then Themes with Light and Dark
+// rows whose detail is the theme chosen; the segments set Mode.
+test("F199: Theme page: Mode's segmented control, then Light > Classic and Dark > OLED Black", async () => {
+  const { render, settings } = await import("./settings.js");
+  const find = (n, pred, out = []) => { for (const c of n.children ?? []) { if (pred(c)) out.push(c); find(c, pred, out); } return out; };
+  const was = [settings.get("appearance"), settings.get("darkTheme")];
+  try {
+    settings.set("appearance", "dark");
+    settings.set("darkTheme", "oled");
+    const root = fakeElement("div");
+    render(root, { tab: "home", path: ["theme"] });
+    const [mode, themes] = root.children;
+    assert.deepEqual(mode.children.map((c) => String(c.className).split(" ")[0]), ["group-header", "store-segmented", "group-footer"]);
+    assert.equal(mode.children[0].textContent, "Mode");
+    const bar = mode.children[1];
+    assert.equal(bar.attrs.role, "radiogroup");
+    // (the fake classList can't toggle "selected": aria-selected is set beside it)
+    assert.deepEqual(bar.children.map((b) => [b.textContent, b.attrs.role, b.attrs["aria-selected"]]),
+      [["Automatic", "radio", "false"], ["Light", "radio", "false"], ["Dark", "radio", "true"]]);
+    assert.equal(themes.children[0].textContent, "Themes");
+    const details = find(themes, (c) => c.className === "cell-detail").map((c) => c.textContent);
+    assert.deepEqual(details, ["Classic", "OLED Black"]);
+    settings.set("darkTheme", "gunmetal");
+    assert.equal(settings.get("darkTheme"), "gunmetal");
+  } finally { settings.set("appearance", was[0]); settings.set("darkTheme", was[1]); }
+});
+
+test("F199: the theme lists preview their tone; other routes don't", async () => {
+  const { previewOf } = await import("./settings.js");
+  const r = (...path) => ({ tab: "home", path: ["settings", ...path] });
+  assert.equal(previewOf(r("theme", "darkTheme")), "dark");
+  assert.equal(previewOf(r("theme", "lightTheme")), "light");
+  assert.equal(previewOf(r("display", "darkTheme")), "dark"); // Theme's old id
+  assert.equal(previewOf(r("darkTheme")), "dark"); // the one-segment form
+  assert.equal(previewOf(r("theme")), null);
+  assert.equal(previewOf(r("general", "darkTheme")), null);
+  assert.equal(previewOf({ tab: "sources", path: ["darkTheme"] }), null);
+  assert.equal(previewOf(null), null);
 });

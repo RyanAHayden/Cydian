@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.3.5",
+          "date": "2026-11-18T06:03:43Z",
+          "localizedDescription": "Updates are checked every time you come back to Cydian, from a fresh copy of the source.\nAfter you tap Install on an update of Cydian, it closes so iOS can finish, with a notification to open the new version.\nThe website no longer needs a server of its own: Install hands apps to Cydian or another sideloader.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.5",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.5/Cydian.ipa",
+          "size": 3376754,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.3.4",
           "date": "2026-11-18T05:55:21Z",
           "localizedDescription": "Alerts stack two long buttons (the Essential Upgrade popup).\nHome: Reload like Cydia's (spinner in the button); the lower list like Cydia's (User Guides and more).\nJailbreak app: installed apps show their real versions and are recorded when installed.\ncydian.dev is now one Cloudflare Worker: the website, its source proxy and the install server; anyone can run their own (worker/README.md).\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.4",
@@ -168,17 +176,9 @@
           "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.6/Cydian.ipa",
           "size": 2495422,
           "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.1.5",
-          "date": "2026-11-17",
-          "localizedDescription": "Installs in the app work: the manifest request no longer trips the server proxy.\nInstall signs straight away; Signing walkthrough; built-in Cydian source and Essential Upgrade.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.5",
-          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.5/Cydian.ipa",
-          "size": 2474477,
-          "minOSVersion": "15.0"
         }
       ],
-      "minimumVersion": "0.3.4"
+      "minimumVersion": "0.3.5"
     }
   ],
   "news": []

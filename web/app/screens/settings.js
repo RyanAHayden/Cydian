@@ -18,7 +18,7 @@ import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus,
   localSigning, deviceStatus, importToDevice, removeFromDevice, installOnDevice, signAndInstall, statusReady,
-  importFromSafari, getBring, setBring, exportToApp } from "../signing-client.js";
+  importFromSafari, getBring, setBring, exportToApp, defaultServer } from "../signing-client.js";
 import { drawWalkthrough, walkOpen } from "./signing.js";
 import { exportKey, EXPORT_SEGMENT } from "../core/transfer.js";
 import { openInAppSection } from "./importlink.js";
@@ -447,9 +447,9 @@ async function recheckPassword(el, redraw = true) {
 
 async function askServer(el) {
   const { index, value } = await showAlert({ title: "Signing Server", message: `Where apps are signed. Empty for ${new URL(DEFAULT_SERVER).host}.`,
-    input: { type: "url", placeholder: DEFAULT_SERVER, value: getServer() === DEFAULT_SERVER ? "" : getServer() }, buttons: ["Cancel", "Save"], cancel: 0 });
+    input: { type: "url", placeholder: defaultServer(), value: getServer() === defaultServer() ? "" : getServer() }, buttons: ["Cancel", "Save"], cancel: 0 });
   if (index !== 1) return;
-  setServer(value.trim() || DEFAULT_SERVER);
+  setServer(value.trim() || defaultServer());
   redrawAll();
 }
 
@@ -458,9 +458,12 @@ async function checkServer() {
   try {
     const st = await serverStatus();
     hide();
-    await alertOK(st.zsign ? "Server Signs Apps" : "Server Can't Sign",
-      st.zsign ? `${new URL(getServer()).host} signs IPAs up to ${Math.round(st.maxBytes / 1048576)} MB and keeps each signed app for ${Math.round(st.ttl / 60)} minutes.`
-        : `${new URL(getServer()).host} answers but has no signer (zsign) installed.`);
+    const host = new URL(getServer()).host;
+    // The app needs only manifests and the update hand-off (a Worker answers worker: true); the website needs zsign.
+    if (st.worker || (localSigning() && st.ok)) await alertOK("Server Works", `${host} hands iOS the install manifests and holds Cydian's own updates. Signing happens on this iPhone.`);
+    else await alertOK(st.zsign ? "Server Signs Apps" : "Server Can't Sign",
+      st.zsign ? `${host} signs IPAs up to ${Math.round(st.maxBytes / 1048576)} MB and keeps each signed app for ${Math.round(st.ttl / 60)} minutes.`
+        : `${host} answers but has no signer (zsign) installed.`);
   } catch (e) {
     hide();
     await alertOK("Server Not Reachable", `${new URL(getServer()).host}: ${e.message || "no answer"}.`);

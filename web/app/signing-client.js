@@ -18,7 +18,7 @@
 //
 // The certificate, key and password leave the phone only inside the POST to the signing server, over HTTPS, for
 // that one request. Nothing goes to localStorage but the server's address.
-import { DEFAULT_SERVER, normalizeServer, signBody, errorText, toBase64, phaseLabel, deviceError } from "./core/signing.js";
+import { DEFAULT_SERVER, APP_SERVER, normalizeServer, signBody, errorText, toBase64, phaseLabel, deviceError } from "./core/signing.js";
 import { newKey, exportUrl, sealIdentity, openIdentity, importUrl, sealedFrom } from "./core/transfer.js";
 import { format } from "./router.js";
 import { detectMode } from "./core/settings.js";
@@ -87,8 +87,14 @@ export async function signingReady({ native, wait = sleep } = {}) {
   return Boolean(id?.p12 && id?.profile);
 }
 
+// The default differs by build: the app (signs itself) uses the Worker, the website the NAS that signs. A saved
+// cydian.dev in the app (an older default, or the website's import) means the default too.
+export function defaultServer() { return localSigning() ? APP_SERVER : DEFAULT_SERVER; }
 export function getServer() {
-  try { return normalizeServer(localStorage.getItem(SERVER_KEY)) ?? DEFAULT_SERVER; } catch { return DEFAULT_SERVER; }
+  let saved = null;
+  try { saved = normalizeServer(localStorage.getItem(SERVER_KEY)); } catch { /* private */ }
+  if (!saved || (localSigning() && saved === DEFAULT_SERVER)) return defaultServer();
+  return saved;
 }
 
 export function setServer(s) {

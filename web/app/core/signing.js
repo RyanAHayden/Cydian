@@ -313,6 +313,9 @@ export async function checkP12Password(buf, password, subtle = globalThis.crypto
 // ---- what the page shows --------------------------------------------------------------------------------------
 
 export const DEFAULT_SERVER = "https://cydian.dev";
+// The app signs on the phone and needs only manifests and Cydian's update hand-off: the Cloudflare Worker (worker/).
+// The website signs on the server, which the NAS at DEFAULT_SERVER does (zsign).
+export const APP_SERVER = "https://sign.cydian.dev";
 
 // A typed server address as a base URL: "sign.example.org" -> "https://sign.example.org". Null when unusable.
 export function normalizeServer(s) {

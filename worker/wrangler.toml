@@ -1,0 +1,12 @@
+# Cydian's install server (src/index.js). Deploy your own: worker/README.md.
+name = "cydian-sign"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+HOST_IDS = "*.cydian"   # bundle IDs /sign/host keeps: any ending in .cydian (each team's own Cydian ID)
+TTL = "600"              # seconds a hosted update stays
+
+# Wrangler makes this storage on the first deploy (or: `npx wrangler kv namespace create HOSTED`, and its id here).
+[[kv_namespaces]]
+binding = "HOSTED"

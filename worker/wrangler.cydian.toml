@@ -1,0 +1,14 @@
+# cydian.dev's own deploy: npx wrangler deploy -c wrangler.cydian.toml (yours: wrangler.toml, README.md).
+name = "cydian-sign"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+routes = [{ pattern = "sign.cydian.dev", custom_domain = true }]
+
+[vars]
+HOST_IDS = "*.cydian"   # bundle IDs /sign/host keeps: any ending in .cydian (each team's own Cydian ID)
+TTL = "600"              # seconds a hosted update stays
+
+# Wrangler makes this storage on the first deploy (or: `npx wrangler kv namespace create HOSTED`, and its id here).
+[[kv_namespaces]]
+binding = "HOSTED"
+id = "34714fc96ca44db29c935c4a68594bcf"

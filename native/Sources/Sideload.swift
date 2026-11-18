@@ -174,7 +174,11 @@ enum Sideload {
     // itms-services link; then iOS installs from the server, unaffected by Cydian closing.
     static func hostAndOpen(_ output: URL, server: String, app: SignedApp, record: SignedRecord,
                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void, served: ((Bool) -> Void)?) {
-        var req = URLRequest(url: URL(string: server + "/sign/host")!)
+        // The Worker (worker/src/index.js) doesn't open the IPA: the app says what it is.
+        var q = URLComponents(string: server + "/sign/host")!
+        q.queryItems = [URLQueryItem(name: "bundleid", value: app.bundleID), URLQueryItem(name: "version", value: app.version),
+                        URLQueryItem(name: "title", value: app.name)]
+        var req = URLRequest(url: q.url!)
         req.httpMethod = "POST"
         req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
         req.timeoutInterval = 300

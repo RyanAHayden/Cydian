@@ -2,6 +2,7 @@
 // Navigation, push/pop and the edge swipe back are web/app/'s own JS stack; the shell adds nothing on top.
 import UIKit
 import WebKit
+import UserNotifications
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -36,6 +37,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         w.makeKeyAndVisible()
         window = w
         if let u = options.urlContexts.first?.url { Incoming.receive(u) } // F75: launched by a cydian:// link
+        Replaced.watch()
     }
 
     // F75: a cydian:// link while Cydian runs (Import from Safari, Open in Cydian App on the website).
@@ -244,5 +246,41 @@ enum Launch {
         v.contentMode = .scaleToFill
         v.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         return v
+    }
+}
+
+// Cydian updated over itself (its own IPA from Changes, or a .deb on a jailbroken phone) keeps running the old copy
+// until it's closed (user 2026-11-17). Every few seconds it reads its Info.plist on disk: once that is gone or names
+// another version, it leaves a "tap to open" notification and closes, so the next open is the new Cydian.
+enum Replaced {
+    static let running = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
+                          Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "")
+    static var timer: Timer?
+
+    static func onDisk() -> (String, String)? {
+        let url = Bundle.main.bundleURL.appendingPathComponent("Info.plist")
+        guard let d = NSDictionary(contentsOf: url) else { return nil }
+        return (d["CFBundleShortVersionString"] as? String ?? "", d["CFBundleVersion"] as? String ?? "")
+    }
+
+    static func watch() {
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+            let now = onDisk()
+            if let now, now == running { return }
+            timer?.invalidate()
+            close(newVersion: now?.0)
+        }
+    }
+
+    static func close(newVersion: String?) {
+        let c = UNMutableNotificationContent()
+        c.title = "Cydian"
+        c.body = newVersion.map { "Updated to \($0). Tap to open it." } ?? "Updated. Tap to open it."
+        let req = UNNotificationRequest(identifier: "cydian.updated", content: c,
+                                        trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
+        UNUserNotificationCenter.current().add(req) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { exit(0) } // ponytail: a plain exit; iOS allows it here
+        }
     }
 }

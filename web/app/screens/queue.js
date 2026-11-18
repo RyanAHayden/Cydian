@@ -27,7 +27,7 @@ import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
 import { catalog } from "../catalog.js";
 import { installQueue, runLogs } from "../queue.js";
-import { MODES, MODE_LABEL, changeCount, parseStatusLine, consoleText, finishOf, FINISH_LABEL, runTitle, CONFFILE_TITLE,
+import { MODES, MODE_LABEL, changeCount, parseStatusLine, consoleText, finishOf, FINISH_LABEL, runTitle, createRepeatFilter, CONFFILE_TITLE,
   CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
@@ -500,7 +500,9 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
     while (out.childElementCount > MAX_LINES) out.firstElementChild.remove();
     m.scroll.scrollTop = m.scroll.scrollHeight;
   };
+  const fresh = createRepeatFilter(); // C6: apt's "Retrieving file 1 of N" shows once, not once per percent
   const line = (type, text) => {
+    if (!fresh(type, text)) return;
     log.push(type === "info" ? text : type === "error" ? `E: ${text}`.replace(/^E: E: /, "E: ") : `» ${text}`);
     pending.push([type, text]);
     if (!frame) frame = requestAnimationFrame(flush);

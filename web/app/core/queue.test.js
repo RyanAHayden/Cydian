@@ -175,3 +175,17 @@ test("F63 the Configuration Upgrade alert: Cydia's words, and only Accept instal
   assert.equal(conffileLine("/e", "new"), "Configuration file /e: installing the package's new copy");
   assert.equal(conffileLine("/e", "keep"), "Configuration file /e: keeping your copy");
 });
+
+test("createRepeatFilter: a status line the same as the one before shows once (C6)", async () => {
+  const { createRepeatFilter } = await import("./queue.js");
+  const keep = createRepeatFilter();
+  const lines = [
+    ["status", "Retrieving file 1 of 3"], ["status", "Retrieving file 1 of 3"], ["status", "Retrieving file 1 of 3"],
+    ["status", "Retrieving file 2 of 3"], ["info", "Get:1 repo foo"], ["status", "Retrieving file 2 of 3"],
+    ["info", "same"], ["info", "same"], ["error", "boom"], ["error", "boom"],
+  ];
+  assert.deepEqual(lines.filter(([t, x]) => keep(t, x)).map(([t, x]) => `${t}:${x}`), [
+    "status:Retrieving file 1 of 3", "status:Retrieving file 2 of 3", "info:Get:1 repo foo", "status:Retrieving file 2 of 3",
+    "info:same", "info:same", "error:boom", "error:boom",
+  ]);
+});

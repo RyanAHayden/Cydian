@@ -15,6 +15,7 @@
 //   CONFFILE_TITLE, CONFFILE_BUTTONS, conffileMessage(file), conffileAnswer(index), conffileLine(file, answer)
 //                             F63: the Configuration Upgrade alert and the word it answers (keep | new)
 //   createRunLog(storage)     -> the console logs Settings shows
+//   createRepeatFilter()      -> (type, text) -> false for a status line the same as the one before (C6)
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { compareVersions, parseRelations } from "./apt.js";
@@ -158,6 +159,19 @@ export const conffileLine = (file, answer) =>
 
 // Only the text after the last carriage return shows, so progress-bar lines collapse into one (Cydia's console).
 export const consoleText = (line) => String(line ?? "").split("\r").filter((p) => p !== "").pop() ?? "";
+
+// C6: apt's download status repeats itself ("Retrieving file 1 of 3" once per percent step), so a status line the
+// same as the one just before it is shown once. Only status lines: plain output can repeat on purpose.
+//   const keep = createRepeatFilter();  keep(type, text) -> false when it repeats the last status line
+export function createRepeatFilter() {
+  let last = null;
+  return (type, text) => {
+    const key = type === "status" ? String(text ?? "") : null;
+    const repeat = key !== null && key === last;
+    last = key;
+    return !repeat;
+  };
+}
 
 // Cydia's finish levels, lowest first; the button shows the highest reached.
 export const FINISH = ["return", "reopen", "restart", "reload", "reboot"];

@@ -156,7 +156,7 @@ enum Sideload {
         }
     }
 
-    struct Failed: Error { let text: String }
+    struct Failed: LocalizedError { let text: String; var errorDescription: String? { text } } // the text, not "Sideload.Failed error 1"
 
     static func download(_ url: URL, emit: @escaping (String, Double) -> Void, done: @escaping (Result<URL, Error>) -> Void) {
         let file = SignBridge.work.appendingPathComponent("\(SignBridge.token())-in.ipa")

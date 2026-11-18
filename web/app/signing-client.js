@@ -340,7 +340,14 @@ const openRoute = (path) => { location.hash = format({ tab: "settings", path }).
 // F68: `params` replaces { url } with the look-first sheet's { token, name?, bundleId?, icon?, removeExtensions? }
 // (core/signing.js installParams); `after(result, h)` runs with the HUD still up once iOS has the link (the sheet
 // follows iOS's own progress there) and hides it itself.
-export async function installOnDevice({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false },
+let installing = false; // one install at a time: a second tap (or a doubled handler) while one runs is dropped
+export async function installOnDevice(opts, deps) {
+  if (installing) return false;
+  installing = true;
+  try { return await installOnDeviceOnce(opts, deps); } finally { installing = false; }
+}
+
+async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false },
   { native, hud = liveHUD, alert = showAlert, go = openRoute, later = setTimeout } = {}) {
   const h = hud("Downloading");
   let result;

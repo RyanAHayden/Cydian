@@ -73,3 +73,16 @@ test("Changes (F62): Upgrade (N) queues every available upgrade, never the ignor
   assert.equal(canUpgrade("sideload", withQueue), false);
   assert.equal(nav({ tab: "changes", path: [] }).right, undefined); // node: the site
 });
+
+test("sideload Upgrade (N): each app's newest IPA in turn, Cydian last, stops at a failure", async () => {
+  const { upgradeApps } = await import("./changes.js");
+  const pkg = (id) => ({ stanza: { ipa: { name: id, versions: [{ downloadURL: `https://x/${id}.ipa` }] } } });
+  const seen = [];
+  const n = await upgradeApps([{ id: "com.ryha.cydian" }, { id: "a" }, { id: "b" }],
+    { pkgOf: async (id) => pkg(id), install: async ({ url }) => { seen.push(url); return true; } });
+  assert.equal(n, 3);
+  assert.deepEqual(seen, ["https://x/a.ipa", "https://x/b.ipa", "https://x/com.ryha.cydian.ipa"]);
+  seen.length = 0;
+  assert.equal(await upgradeApps([{ id: "a" }, { id: "b" }], { pkgOf: async (id) => pkg(id), install: async ({ url }) => { seen.push(url); return false; } }), 0);
+  assert.equal(seen.length, 1);
+});

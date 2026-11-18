@@ -8,6 +8,7 @@
 // Screens (screens/*.js) export `title`, `render(body, route, ctx)` and optionally `nav(route, ctx)` returning
 // { title, back (the back button's label above it; else the title), style: "grouped" | "plain", left: { label, onClick }, right: { label, onClick } | [several] } and `init(ctx)`,
 // run once at start (e.g. to set the tab's badge). ctx: { go, back, setBadge, showHUD }.
+import { detectMode } from "./core/settings.js";
 import { TABS, createRouter, format, parent, mounted } from "./router.js";
 import { createStacks, swipeCommits } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transition.js";
@@ -255,10 +256,25 @@ attachEdgeSwipe(edgeEl, {
 
 // Tab taps go through selectTab so each tab keeps its place; the href is there for no-JS fallbacks and a11y.
 for (const tab of TABS) tabbar.items[tab].href = format({ tab });
+// The website before Cydian is installed (websign-gate.js browsingLocked): only Home and Settings in the tab bar; the
+// others are dimmed with a lock, and a tap asks Install Cydian First (user 2026-11-18). Ignore unlocks them all.
+const OPEN_TABS = new Set(["home", "settings"]);
+let gate = null;
+const lockTabs = async () => {
+  gate ??= await import("./websign-gate.js");
+  const locked = gate.browsingLocked({ mode: detectMode() });
+  for (const t of TABS) tabbar.items[t].classList.toggle("tab-locked", locked && !OPEN_TABS.has(t));
+};
+if (!(globalThis.cydianApp || globalThis.cydianNative)) { lockTabs(); addEventListener("cydian:browse-lock", lockTabs); }
+
 document.getElementById("tabbar").addEventListener("click", (e) => {
   const a = e.target.closest("a.tab");
   if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
   e.preventDefault();
+  if (a.classList.contains("tab-locked")) {
+    import("./screens/home.js").then((h) => gate.askToBrowse({ install: () => h.installCydian() })).catch(() => {});
+    return;
+  }
   // A second tap at the root runs the screen's reselect() (Search focuses its field), in this handler (F36).
   const tab = a.dataset.tab;
   // Back to the root of the tab you are on is our own pop, so it slides like Back (not a jump).

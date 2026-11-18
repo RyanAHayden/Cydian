@@ -102,7 +102,11 @@ export function firstVisitState(storage = store()) {
   const v = read(storage, FIRST_KEY);
   return v === "later" || v === "installed" ? v : "ask";
 }
-export function setFirstVisit(state, storage = store()) { write(storage, FIRST_KEY, state === "ask" ? null : state); }
+export function setFirstVisit(state, storage = store()) {
+  write(storage, FIRST_KEY, state === "ask" ? null : state);
+  // the tab bar and Home follow (app.js, screens/home.js)
+  globalThis.dispatchEvent?.(new Event("cydian:browse-lock"));
+}
 export const markCydianInstalled = (storage = store()) => setFirstVisit("installed", storage);
 
 export const shouldAskFirst = ({ mode = "site", storage = store() } = {}) => mode === "site" && firstVisitState(storage) === "ask";

@@ -681,6 +681,11 @@ async function packageActions(route, button) {
     actions.push({ label: "Downgrade", run: () => go(versionsHref(route, id)) });
   }
   if (many && !(installed && older.length)) actions.push({ label: "Other Versions", run: () => go(versionsHref(route, id)) });
+  // The website: a jailbroken phone's Cydian installs it with apt (cydian://package, websign-gate.js), so nobody has to
+  // download a .deb (user 2026-11-18); Download .deb stays below for other package managers.
+  if (getBackend().kind === "http" && (st.package || id)) {
+    actions.push({ label: "Install in Cydian", run: () => import("../websign-gate.js").then((g) => { location.href = g.packageLink(st.package || id); }) });
+  }
   if (st.debUrl && getBackend().kind === "http" && !isPaid(st)) actions.push({ label: "Download .deb", run: () => downloadDeb(st.debUrl, st.package) });
   // F102: Add to Wish List while it isn't installed; Remove from Wish List whenever it is on the list.
   const wishId = st.package || id;

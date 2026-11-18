@@ -430,3 +430,9 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
 .page-body[data-section-index] > .installed-search, .page-body[data-section-index] > .installed-scope { padding-right: 24px; }
 .page-body[data-section-index] > .installed-top { margin-right: 24px; }
 .page-body[data-section-index] > .list-search { padding-right: 24px; } /* F124: Browse's list search ends before the A–Z index */
+
+/* F147: Installed's Wish List bar button (screens/installed.js): beside the segmented title the name may end in "…",
+   the count stays whole. */
+.bar-button.wish-button { display: inline-flex; padding: 0 7px; }
+.wish-button .wish-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wish-button .wish-count { flex: none; margin-left: .25em; }

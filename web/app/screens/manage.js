@@ -31,7 +31,7 @@ import {
   RECOMMENDED_SOURCES, JAILBREAKS, jailbreakName, detectJailbreak, jailbreakFromMarkers, recommendedFor, savedJailbreak, saveJailbreak,
   markRecommendedSeen,
 } from "../core/recommended.js";
-import { copyText } from "../nav/menu.js";
+import { copyText, nativePaste } from "../nav/menu.js";
 import { builtinFirst, isBuiltin, exportable } from "../core/essential.js";
 import { lockMark } from "../nav/lock.js";
 import { settings } from "./settings.js";
@@ -386,14 +386,13 @@ async function showQR() {
   showSheet({ title: "QR Code", body: box });
 }
 
-// Import > From Clipboard: iOS's Paste bubble, as Sources' Add (sources.js addFromClipboard): readText blocks WebKit's
-// main thread while the bubble is up, so the row is let go and a frame painted first (the tap's gesture outlives a
-// timer under 1 s). Dismissed or empty: nothing found.
+// Import > From Clipboard, as Sources' Add (sources.js addFromClipboard): the app reads UIPasteboard (nav/menu.js
+// nativePaste); the website iOS's Paste bubble, read straight from the tap (Safari allows no timer between).
+// Dismissed or empty: nothing found.
 async function importClipboard(row, route, ctx) {
   row?.classList.remove("is-pressed");
-  await new Promise((r) => setTimeout(r, 50));
-  let text = "";
-  try { text = await navigator.clipboard.readText(); } catch { /* dismissed */ }
+  let text = globalThis.cydianNative ? await nativePaste() : null; // no await on the website: it could lose the tap
+  if (text == null) { try { text = await navigator.clipboard.readText(); } catch { text = ""; } }
   if (!/^#\/sources\/manage\/io\/?$/.test(location.hash)) return; // left the page while the bubble was up
   await startReview(text, route, ctx);
 }

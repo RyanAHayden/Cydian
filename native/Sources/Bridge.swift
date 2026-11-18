@@ -42,6 +42,15 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
                 c.reply(nil, nil)
             }
         }
+        // The clipboard for Sources' Add and Import > From Clipboard (nav/menu.js pasteText), so the app shows no WebKit
+        // Paste bubble. hasStrings/hasURLs never ask; reading another app's copy may show iOS's own Allow Paste alert,
+        // which Settings > Cydian > Paste from Other Apps: Allow turns off.
+        on("clipboard.read") { c in
+            DispatchQueue.main.async {
+                let pb = UIPasteboard.general
+                c.reply(pb.hasStrings || pb.hasURLs ? (pb.string ?? pb.url?.absoluteString ?? "") : "", nil)
+            }
+        }
         SelfUpdate.register(self) // F61: selfupdate.download, app.quit (below)
         Apt.register(self) // N3: apt's files, the network, cydian-helper, haptic.tap (Apt.swift)
         Paid.register(self) // F57: vendors' calls, UDID, Keychain, sign-in sheet, paid installs (Paid.swift)

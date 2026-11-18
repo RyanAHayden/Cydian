@@ -77,6 +77,13 @@ export async function copyText(text) {
   }
 }
 
+// The app's clipboard straight from UIPasteboard (Bridge.swift clipboard.read: no WebKit Paste bubble), "" when
+// there's no text. null on the website, or a shell from before clipboard.read: those use navigator.clipboard.
+export async function nativePaste(native = globalThis.cydianNative) {
+  if (!native?.call) return null;
+  try { return String((await native.call("clipboard.read", {})) ?? ""); } catch { return null; }
+}
+
 // A hold on `el` (or a descendant matching `selector`): 500 ms without moving more than 10px. `onHold(target, e)`
 // runs at the hold; the click that ends it is swallowed so the item doesn't open.
 export function longPress(el, selector, onHold) {

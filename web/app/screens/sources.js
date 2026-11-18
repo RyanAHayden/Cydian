@@ -9,7 +9,7 @@ import { cleanSourceUrl } from "../core/sources.js";
 import { plain, collapse } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
-import { showMenu, longPress, copyText } from "../nav/menu.js";
+import { showMenu, longPress, copyText, nativePaste } from "../nav/menu.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor, sourceFilter, loadNeverLoaded } from "../core/sources.js";
@@ -48,18 +48,34 @@ function reset(button) {
 
 // Add: asks iOS for the clipboard. While iOS's Paste bubble is up the button turns blue and reads Type: tapping it
 // (or anywhere but another button) dismisses the bubble and opens the Enter APT URL alert to type one in.
+// Touch-down on the website: Safari reads the clipboard only straight from the tap (no timer between), and nothing
+// paints while the bubble is up, so Type goes on now, painted before the release opens the bubble.
+function showType(button) {
+  if (globalThis.cydianNative) return; // the app reads UIPasteboard: no bubble
+  button.textContent = "Type";
+  button.classList.add("done");
+  setTimeout(() => button.classList.remove("is-pressed")); // app.js presses it after this listener
+  button.addEventListener("pointercancel", () => { button.textContent = "Add"; button.classList.remove("done"); }, { once: true });
+}
+
 async function addFromClipboard(ctx, button) {
+  // The app: UIPasteboard, no Paste bubble, so no Type either. Only awaited there: on the website any await before
+  // readText could lose the tap.
+  const pasted = globalThis.cydianNative ? await nativePaste() : null;
+  if (pasted != null) {
+    if (!button.isConnected || !/^#\/sources\/?$/.test(location.hash)) return;
+    const url = cleanSourceUrl(pasted);
+    manage.addSource(ctx, url ? { url } : null);
+    return;
+  }
   reset(button);
   button.textContent = "Type";
   button.classList.add("done"); // the blue Done look (sources.css)
   let elsewhere = false; // a touch on another button while the bubble was up: that button's tap wins
   const watch = (e) => { const b = e.target.closest?.(".bar-button, .tab"); if (b && b !== button) elsewhere = true; };
   document.addEventListener("pointerdown", watch, true);
-  // readText blocks WebKit's main thread while the Paste bubble is up (it waits on the UI process), so nothing set
-  // above would paint: the button stayed pressed and showed Type only a frame after the next touch. Let a frame
-  // paint first; WebKit carries the tap's user gesture into timers under 1 s, so the bubble still comes.
-  // ponytail: 50 ms is a few frames at 60-120 Hz; raise it if Type ever fails to show before the bubble.
-  await new Promise((r) => setTimeout(r, 50));
+  // readText blocks WebKit's main thread while the Paste bubble is up, so nothing set here paints: Safari reads only
+  // straight from the tap (no timer between), so showType put Type on at touch-down instead.
   let text = "";
   try { text = await navigator.clipboard.readText(); } catch { /* dismissed: type it in */ }
   document.removeEventListener("pointerdown", watch, true);
@@ -80,9 +96,9 @@ export function nav(route, ctx) {
     title: "Sources", style: "plain",
     left: { label: "Refresh", onClick: () => refresh(ctx) },
     right: [
-      // Add: asks iOS for the clipboard (its Paste bubble); while that waits the button turns blue and reads Paste,
-      // so it's clear the bubble wants a tap. Then the Enter APT URL alert, filled with a copied source URL.
-      { label: "Add", onClick: (e) => addFromClipboard(ctx, e.currentTarget) },
+      // Add: the clipboard (the app: UIPasteboard; the website: iOS's Paste bubble, the button blue and reading Type
+      // while it waits). Then the Enter APT URL alert, filled with a copied source URL.
+      { label: "Add", onPress: (e) => showType(e.currentTarget), onClick: (e) => addFromClipboard(ctx, e.currentTarget) },
       { label: "Manage", onClick: () => ctx.go({ tab: "sources", path: [manage.SEGMENT] }) },
     ],
   };

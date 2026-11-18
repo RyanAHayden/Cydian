@@ -328,9 +328,14 @@ export function renderApp(body, route, pkg, source) {
       toggle.replaceWith(...extra, toggleRow("Show Fewer", (e) => close(e.currentTarget.closest("li")), true));
       for (const li of extra) li.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250 });
     }
+    // The page scrolls so the row stays where it was under the finger (user 2026-11-17: no jump on Show Fewer).
     function close(toggle) {
+      const scroller = toggle.closest(".page-body");
+      const before = toggle.getBoundingClientRect().top;
       for (const li of extra) li.remove();
-      toggle.replaceWith(toggleRow(`${more} More Permissions`, (e) => open(e.currentTarget.closest("li")), false));
+      const row = toggleRow(`${more} More Permissions`, (e) => open(e.currentTarget.closest("li")), false);
+      toggle.replaceWith(row);
+      if (scroller) scroller.scrollTop += row.getBoundingClientRect().top - before;
     }
     if (more > 1) ul.append(toggleRow(`${more} More Permissions`, (e) => open(e.currentTarget.closest("li")), false));
     body.append(group);

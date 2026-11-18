@@ -338,3 +338,21 @@ html[data-theme="dark"] .section-index.held { background: rgba(255,255,255,.15);
   position: fixed; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
   background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
 }
+
+/* The clear button iOS 6 puts in a search field with text in it (Cydia's search on the 4S: docs/cydia-4s/search-85.png):
+   a grey circle with a white x at the field's right end. Drawn here since WebKit on iOS shows none; app.js clears
+   the field on a tap there. */
+.search-field input::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
+.search-field::after {
+  content: ""; display: none; flex: none; width: 19px; height: 19px; margin: 0 -5px 0 6px; border-radius: 50%;
+  background: #b4b4b4 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2 2l6 6M8 2l-6 6' stroke='%23fff' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center / 9px 9px no-repeat;
+}
+.search-field:has(input:not(:placeholder-shown))::after { display: block; }
+html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
+
+/* Search's root page: the bar and scope row fixed at the top, the results their own scroller below. */
+.page-body.search-root { overflow: hidden; display: flex; flex-direction: column; }
+.search-root > .search-bar, .search-root > .search-scope { flex: none; }
+.search-results { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; position: relative; }
+.page-body.search-root::before { display: none; } /* the always-bounce spacer (ios6.css) belongs to the results now */
+.search-results::before { content: ""; float: left; width: 1px; margin-right: -1px; height: calc(100% + 1px); }

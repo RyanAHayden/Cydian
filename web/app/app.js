@@ -287,6 +287,18 @@ for (const type of ["pointerup", "pointercancel", "pointerleave"]) document.addE
 document.addEventListener("pointermove", (e) => {
   if (pressed && !pressed.contains(document.elementFromPoint(e.clientX, e.clientY))) unpress();
 }, { passive: true });
+// The search fields' clear button (packages.css .search-field::after): a tap at the field's right end, while it has
+// text, empties it and searches again (the field's own input listener), keeping the keyboard up.
+document.addEventListener("click", (e) => {
+  const f = e.target;
+  if (!(f instanceof Element) || !f.classList.contains("search-field")) return;
+  const input = f.querySelector("input");
+  if (!input?.value || e.clientX < f.getBoundingClientRect().right - 32) return;
+  e.preventDefault();
+  input.value = "";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.focus();
+}, true);
 // iOS only applies :active to elements when a touch listener exists somewhere on the page.
 document.addEventListener("touchstart", () => {}, { passive: true });
 

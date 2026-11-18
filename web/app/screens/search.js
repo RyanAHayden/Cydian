@@ -147,13 +147,19 @@ export function render(body, route, ctx) {
 
   const note = document.createElement("p");
   note.className = "empty search-note";
-  body.append(bar, scope, note);
+  // The bar and its scope row stay put, as Cydia's search bar does on the 4S (docs/cydia-4s/search-85.png); only the
+  // results scroll, and bounce, under them (packages.css .search-root).
+  const results = el("div", "search-results");
+  results.setAttribute("data-scroller", "");
+  body.classList.add("search-root");
+  body.append(bar, scope, results);
+  results.append(note);
 
-  const list = browse.packageList(body, route, [], { letters: false });
-  body.append(list.el);
+  const list = browse.packageList(results, route, [], { letters: false });
+  results.append(list.el);
   // F20: packages from sources the user hasn't added (Canister), under the local results.
   const others = discoveryGroup(ctx);
-  body.append(others.el);
+  results.append(others.el);
 
   // Show Incompatible, the iOS version or the Architecture changed (here, in the sheet or in Settings): search
   // again. A page left behind unsubscribes.
@@ -184,7 +190,7 @@ export function render(body, route, ctx) {
       return;
     }
     if (seq !== state.seq) return; // a newer keystroke won
-    body.scrollTop = 0;
+    results.scrollTop = 0;
     browse.rememberNames(rows);
     list.setItems(rows);
     note.textContent = rows.length ? "" : "No Results";

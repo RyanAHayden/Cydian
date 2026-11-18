@@ -80,3 +80,60 @@ test("F100: Recent Searches: last 5, newest first, no duplicates, cleared, store
   assert.deepEqual(picked, ["snowboard"], "a tap runs that query again");
   assert.deepEqual(recentRows(null, () => {}), []);
 });
+
+test("F99: Other Sources' Add Source & Install: add, refresh that source, open the page, queue; or say it isn't there", async () => {
+  const { offerButtons, addSourceAndInstall } = await import("./extras.js");
+  const row = { id: "com.ex.tweak", name: "Tweak", version: "1.0", depiction: "https://ex.test/d",
+    repo: { uri: "https://repo.ex.test/", name: "Example Repo", flat: true, dist: "./" } };
+  assert.deepEqual(offerButtons(row, { canQueue: true }), ["Cancel", "Add Source & Install", "Depiction"], "the jailbreak app");
+  assert.deepEqual(offerButtons(row, { canQueue: false }), ["Cancel", "Add Source", "Depiction"], "site and sideload keep Add Source");
+  assert.deepEqual(offerButtons({ ...row, depiction: null, repo: { ...row.repo, flat: false, dist: "stable" } }, { canQueue: true }),
+    ["Cancel"], "a suite repo is still added from Sources > Edit");
+
+  const KEY = "deb:https://repo.ex.test/:./";
+  function setup({ listed = true, addError = null, key = KEY } = {}) {
+    const log = [];
+    const backend = {
+      addSource: async (uri) => { log.push(["add", uri]); if (addError) throw addError; return key ? { key, uri } : undefined; },
+      sources: async () => [{ key: "apt:other", uri: "https://other.test/" }, { key: KEY, uri: "https://REPO.ex.test" }],
+      refreshSources: async (onEach, { filter }) => {
+        log.push(["refresh", ["apt:other", KEY].filter((k) => filter({ key: k }))]);
+      },
+      queue: (job) => log.push(["queue", job]),
+    };
+    const catalog = {
+      ensure: async () => { log.push(["ensure"]); },
+      package: async (id, k) => (listed && id === row.id && k === KEY ? { key: KEY, stanza: { version: "1.1" }, row: { name: "Tweak!" } } : null),
+    };
+    const deps = {
+      backend, catalog, go: (href) => log.push(["go", href]),
+      showHUD: (label) => { log.push(["hud", label]); return () => log.push(["hide", label]); },
+      showAlert: async (a) => { log.push(["alert", a.title, a.message]); return { index: 0 }; },
+    };
+    return { log, deps };
+  }
+
+  let { log, deps } = setup();
+  assert.equal(await addSourceAndInstall(row, deps), "queued");
+  assert.deepEqual(log.map((l) => l[0]), ["hud", "add", "hide", "hud", "refresh", "ensure", "hide", "go", "queue"]);
+  assert.deepEqual(log[1], ["add", "https://repo.ex.test/"]);
+  assert.deepEqual(log[4], ["refresh", [KEY]], "only the new source is refreshed");
+  const { format } = await import("../router.js");
+  assert.equal(log[7][1], format({ tab: "sources", path: [KEY, "package:com.ex.tweak"] }), "the package page opens");
+  assert.deepEqual(log[8][1], { op: "install", id: "com.ex.tweak", version: "1.1", name: "Tweak!" }, "queued at the source's version");
+
+  ({ log, deps } = setup({ key: null }));
+  assert.equal(await addSourceAndInstall(row, deps), "queued", "no key from addSource: found among the sources by URI");
+  assert.deepEqual(log.find((l) => l[0] === "refresh"), ["refresh", [KEY]]);
+
+  ({ log, deps } = setup({ listed: false }));
+  assert.equal(await addSourceAndInstall(row, deps), "missing");
+  const said = log.find((l) => l[0] === "alert");
+  assert.equal(said[1], "Not Found");
+  assert.match(said[2], /Example Repo was added, but it doesn't list Tweak/);
+  assert.ok(!log.some((l) => l[0] === "queue" || l[0] === "go"), "nothing opened or queued");
+
+  ({ log, deps } = setup({ addError: Object.assign(new Error("Not a repository"), { title: "Verification Error" }) }));
+  assert.equal(await addSourceAndInstall(row, deps), "error");
+  assert.deepEqual(log.map((l) => l[0]), ["hud", "add", "hide", "alert"], "a refused source stops there, HUD gone");
+});

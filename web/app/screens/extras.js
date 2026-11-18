@@ -3,7 +3,8 @@
 //   featuredStrip(source)       the source page's banners (sileo-featured.json), filled in when they land
 //   homeFeatured()              Home's banners: a couple from each source
 //   paymentGroup(st, source)    a paid package's Price row; in the app Sign In / Buy / Download & Install
-//   discoveryGroup()            Search's "Other Sources" list (Canister), with Add Source; .search(q)
+//   discoveryGroup()            Search's "Other Sources" list (Canister), with Add Source; .search(q). In the
+//                               jailbreak app Add Source & Install (F99): add, refresh it, open the page, queue
 //
 // Logic lives in core/featured.js, core/payment.js and core/canister.js; this file is DOM and transport only.
 //
@@ -26,7 +27,7 @@ import { mediaUrl } from "./depiction.js";
 import { settings } from "./settings.js";
 import { runPaidInstall } from "./queue.js";
 import { createFeaturedStore } from "../core/featured.js";
-import { createCanister, mapResults, priceFor } from "../core/canister.js";
+import { createCanister, mapResults, priceFor, normalRepo } from "../core/canister.js";
 import {
   isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore,
 } from "../core/payment.js";
@@ -138,22 +139,86 @@ export function discoveryGroup(ctx) {
   return { el: box, search };
 }
 
-async function offer(r, ctx) {
+// The alert's buttons for a Canister row. F99: where the backend can queue (the jailbreak app), a flat source's
+// row offers Add Source & Install (Sileo's provisional Get) instead of Add Source; the site and the sideload build
+// keep Add Source.
+export function offerButtons(r, { canQueue = false } = {}) {
   const buttons = ["Cancel"];
-  if (r.repo.flat) buttons.push("Add Source");
+  if (r.repo.flat) buttons.push(canQueue ? "Add Source & Install" : "Add Source");
   if (r.depiction) buttons.push("Depiction");
+  return buttons;
+}
+
+const canQueue = (b) => typeof b?.queue === "function";
+
+async function offer(r, ctx) {
+  const backend = getBackend();
+  const buttons = offerButtons(r, { canQueue: canQueue(backend) });
   const lines = [`${r.version}${r.author ? ` · ${r.author}` : ""}`, r.repo.uri];
   if (!r.repo.flat) lines.push(`This source uses suite "${r.repo.dist}": add it from Sources > Edit.`);
   if (!r.archOk) lines.push(`Built for ${r.arch}, not this device.`);
   const { index } = await showAlert({ title: r.name, message: lines.join("\n"), buttons, cancel: 0 });
   const pick = buttons[index];
   if (pick === "Depiction") window.open(r.depiction, "_blank", "noopener");
+  if (pick === "Add Source & Install") {
+    const { catalog } = await import("../catalog.js"); // late: catalog.js pulls in the parse worker
+    await addSourceAndInstall(r, {
+      backend, catalog, showHUD: ctx?.showHUD ?? showHUD, showAlert,
+      go: (href) => { location.hash = href.replace(/^#/, ""); },
+    });
+    return;
+  }
   if (pick !== "Add Source") return;
   const hide = (ctx?.showHUD ?? showHUD)("Verifying URL");
   let error = null;
-  try { await getBackend().addSource(r.repo.uri); } catch (e) { error = e; } finally { hide(); }
+  try { await backend.addSource(r.repo.uri); } catch (e) { error = e; } finally { hide(); }
   if (error) await showAlert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
   else await showAlert({ title: "Source Added", message: `${r.repo.name} is in your sources. Refresh Sources to list ${r.name}.`, buttons: ["OK"] });
+}
+
+// F99: Add Source & Install. Verify and add the source (the "Verifying URL" HUD), refresh that one source and load
+// it into the catalog ("Reloading Data"), then open the package page and queue the package, which brings up
+// Confirm as usual. When the refreshed source doesn't list it (Canister's data is stale, or the package isn't
+// built for this device), an alert says so and the source stays added. Every outside call comes in `deps`
+// ({ backend, catalog, showHUD, showAlert, go }), so the steps can be tested without a page.
+// Resolves to what happened: "error" | "missing" | "queued".
+export async function addSourceAndInstall(r, { backend, catalog, showHUD: hud, showAlert: alert, go }) {
+  let hide = hud("Verifying URL");
+  let added;
+  try {
+    added = await backend.addSource(r.repo.uri);
+  } catch (e) {
+    hide();
+    await alert({ title: e.title || "Verification Error", message: e.message, buttons: ["OK"] });
+    return "error";
+  }
+  hide();
+  hide = hud("Reloading Data");
+  let key = added?.key ?? null, pkg = null;
+  try {
+    if (!key) {
+      const want = normalRepo(r.repo.uri);
+      key = (await backend.sources()).find((s) => normalRepo(s.uri) === want)?.key ?? null;
+    }
+    const only = (s) => s.key === key;
+    await backend.refreshSources(() => {}, { filter: only });
+    await catalog.ensure();
+    pkg = key ? await catalog.package(r.id, key) : null;
+  } catch (e) {
+    hide();
+    await alert({ title: "Error", message: `${r.repo.name} was added, but refreshing it failed: ${e.message}`, buttons: ["OK"] });
+    return "error";
+  }
+  hide();
+  if (!pkg || pkg.installedOnly || (pkg.key && pkg.key !== key)) {
+    await alert({ title: "Not Found",
+      message: `${r.repo.name} was added, but it doesn't list ${r.name} for this device. Canister's copy may be out of date.`,
+      buttons: ["OK"] });
+    return "missing";
+  }
+  go(pkgHref(key, r.id));
+  backend.queue({ op: "install", id: r.id, version: pkg.stanza?.version ?? r.version, name: pkg.row?.name || pkg.stanza?.name || r.name });
+  return "queued";
 }
 
 // ---- paid packages ---------------------------------------------------------------------------------------

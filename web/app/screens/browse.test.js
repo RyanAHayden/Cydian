@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseToken, token, pageOf, nav, formatSize, withBase, escapeHtml } from "./browse.js";
+import { parseToken, token, pageOf, nav, formatSize, withBase, escapeHtml, installedAppSection } from "./browse.js";
 import { withLetterHeaders } from "../nav/vlist.js";
 import { parse, format } from "../router.js";
 
@@ -43,4 +43,13 @@ test("sizes, letter headers and proxied depiction HTML", () => {
     '<html><head><base href="http://x/a?b=1&amp;c=&quot;2&quot;" target="_blank"><title>t</title></head></html>');
   assert.equal(withBase("<p>hi</p>", "http://x/"), '<base href="http://x/" target="_blank"><p>hi</p>');
   assert.equal(escapeHtml(`<a href="x">'&'</a>`), "&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;");
+});
+
+test("F87: the jailbreak app page's Installed App group: the phone's version, and I4's note where it differs", () => {
+  assert.deepEqual(installedAppSection({ id: "d", version: "1.6", actual: "1.6", note: "Installed: 1.6 (Cydian remembered 1.5)" }),
+    { header: "Installed App", rows: [{ label: "Version", detail: "1.6" }], footer: "Installed: 1.6 (Cydian remembered 1.5)" });
+  assert.deepEqual(installedAppSection({ id: "g", version: "2.0", actual: null, note: "Not installed (Cydian remembered 2.0)" }).rows,
+    [{ label: "Version", detail: "Not Installed" }]);
+  assert.equal(installedAppSection({ id: "u", version: "4.5.2", actual: "4.5.2", note: null }).footer, null);
+  assert.equal(installedAppSection({ id: "o", version: "1.0" }).rows[0].detail, "1.0"); // real versions unreadable: the remembered one
 });

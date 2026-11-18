@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pageKind, recordsApps, appSubtitle, DPKG } from "./installed.js";
+import { pageKind, recordsApps, appSubtitle, appListRows, DPKG, APPS } from "./installed.js";
 
 const r = (...path) => ({ tab: "installed", path });
 
@@ -30,4 +30,18 @@ test("installed tab: My IPAs pages without a jailbreak (F77)", async () => {
   const { myIpasRow } = await import("./installed.js");
   assert.equal(myIpasRow(r(), false).href, "#/installed/myipas");
   assert.equal(myIpasRow(r(), false).label, "Install IPAs"); // F79: the page is Install IPAs now
+});
+
+test("F87: the jailbreak app's Apps page: the phone's versions, I4's notes, no upgrade for an app that's gone", () => {
+  assert.equal(pageKind(r(APPS), "jailbreak"), "apps");
+  assert.equal(pageKind(r(APPS, "package:x"), "jailbreak"), "browse");
+  assert.equal(pageKind(r(APPS), "sideload"), "browse"); // the list is the root there
+  assert.equal(appSubtitle({ note: "Installed: 1.6 (Cydian remembered 1.5)", sourceName: "AltStore", date: 0, upgrade: "1.7" }),
+    "Installed: 1.6 (Cydian remembered 1.5) · Upgrade to 1.7 · AltStore");
+  const rows = appListRows([
+    { id: "delta", name: "Delta", version: "1.6", actual: "1.6", remembered: "1.5", date: 2 },
+    { id: "gone", name: "Gone", version: "2.0", actual: null, remembered: "2.0", date: 1 },
+    { id: "plain", name: "Plain", version: "1.0", date: 3 }, // site/sideload record, no I4 fields
+  ], () => ({ version: "9" }));
+  assert.deepEqual(rows.map((x) => [x.id, x.upgrade]), [["plain", "9"], ["delta", "9"], ["gone", null]]);
 });

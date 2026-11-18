@@ -33,6 +33,7 @@ import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
+import { rememberedApps } from "../app-updates.js";
 import { openInGroup, setSourceShare } from "./handoff.js";
 import { healthOf } from "../core/health.js";
 import { addSource } from "./manage.js";
@@ -399,6 +400,7 @@ async function renderPackage(body, route, key, id, ctx) {
     setTitle(body, st.name);
     const altSrc = sources.find((s) => s.key === pkg.key);
     renderApp(body, route, pkg, altSrc);
+    if (detectMode() === "jailbreak") installedAppGroup(st.ipa.bundleIdentifier).then((g) => { if (g && body.isConnected) body.append(g); });
     rememberPackage(body, route, { id, pkg, source: altSrc, history: await catalog.history(id, key).catch(() => null) });
     return;
   }
@@ -786,6 +788,20 @@ function setRightLabel(body, label) {
   const item = document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i];
   const b = item?.querySelector(".nav-right .bar-button:not(.share-button)"); // F76: not the Share icon
   if (b && b.textContent !== label) b.textContent = label;
+}
+
+// F87: in the jailbreak app, an app Cydian remembers (core/installed.js) at the version on the phone, with I4's note
+// where that isn't the one it remembered ("Installed: 1.6 (Cydian remembered 1.5)", "Not installed (...)").
+// Null when Cydian doesn't remember the app.
+export async function installedAppGroup(id, { records = () => rememberedApps({ mode: "jailbreak" }) } = {}) {
+  let rec;
+  try { rec = (await records()).find((r) => r?.id === id && !r.self); } catch { return null; }
+  return rec ? grouped([installedAppSection(rec)]) : null;
+}
+
+export function installedAppSection(rec) {
+  const version = rec.actual === null ? "Not Installed" : rec.version || "Unknown";
+  return { header: "Installed App", rows: [{ label: "Version", detail: version }], footer: rec.note || null };
 }
 
 // Installed Package (F7, Cydia's Installed Details): the version on the device and the Ignore Upgrades switch

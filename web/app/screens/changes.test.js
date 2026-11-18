@@ -89,3 +89,8 @@ test("sideload Upgrade (N) (F80): every app upgrade with an IPA queued for Confi
   assert.equal(jobs[1].name, "A");
   assert.deepEqual(await queueUpgrades(undefined, { add: () => assert.fail("nothing to queue") }), []);
 });
+
+test("F87: Upgrade in the jailbreak app queues dpkg's rows, not the remembered apps' (apt has no such package)", () => {
+  assert.deepEqual(upgradeJobs([{ id: "tweak", version: "2", installed: "1", name: "Tweak" },
+    { id: "com.rileytestut.Delta", version: "1.7", installed: "1.6", name: "Delta", remembered: true }]).map((j) => j.id), ["tweak"]);
+});

@@ -497,6 +497,16 @@ if (globalThis.ifizboxNative) {
 // F89: Web Push went with the website's server. A browser that registered the old push service worker (sw.js,
 // F10) drops it, so iOS stops waking it for pushes that no longer come.
 if (!globalThis.ifizboxNative) {
+  // A new build on the site: get every file again and reload (screens/home.js refreshIfNewBuild), on open and on
+  // each return to the foreground (a Home Screen web app rarely cold-launches), once a minute at most.
+  let lastBuildCheck = 0;
+  const checkBuild = () => {
+    if (document.visibilityState === "hidden" || Date.now() - lastBuildCheck < 60 * 1000) return;
+    lastBuildCheck = Date.now();
+    home.refreshIfNewBuild().catch(() => {});
+  };
+  checkBuild();
+  document.addEventListener("visibilitychange", checkBuild);
   setTimeout(() => navigator.serviceWorker?.getRegistrations?.()
     .then((all) => Promise.all(all.map((r) => r.unregister()))).catch(() => {}), 3000);
 }

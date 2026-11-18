@@ -313,6 +313,18 @@ export async function refreshWebFiles({ fetcher = globalThis.fetch, info = build
   return true;
 }
 
+// The website, on every open, reload and return to the foreground: build.json (never cached) names a commit other
+// than the one this browser last loaded -> refreshWebFiles (every file again, then one page load), so a phone never
+// sits on an old build (user 2026-11-18). A first visit only notes the commit. True when it reloaded the page.
+export async function refreshIfNewBuild({ info = buildInfo, store = globalThis.localStorage, refresh = refreshWebFiles } = {}) {
+  const b = await info();
+  if (!b?.commit) return false;
+  let last;
+  try { last = store.getItem("ifizbox.webBuild"); store.setItem("ifizbox.webBuild", b.commit); } catch { return false; }
+  if (!last || last === b.commit) return false;
+  return refresh({ info: async () => b });
+}
+
 export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ctx), settled = untilRefreshed, reload = loadNew, redraw = () => state.redraw?.(),
   web = !globalThis.ifizboxNative } = {}) {
   if (web) return withReloadSpinner(button, async () => { if (!(await refreshWebFiles())) location.reload(); });

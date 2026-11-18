@@ -2,7 +2,7 @@
 // reload, the page keeps its content (no Loading screen, no flash), and the button comes back as Reload.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { nav, reloadHome, withReloadSpinner, untilRefreshed } from "./home.js";
+import { nav, reloadHome, withReloadSpinner, untilRefreshed, refreshIfNewBuild } from "./home.js";
 
 // A bar button and a page body, small fakes of the DOM nodes app.js makes (makePage, button()).
 function fakeButton(label = "Reload") {
@@ -109,4 +109,18 @@ test("the website's Reload re-downloads every listed file past the browser's cac
   assert.ok(reloaded);
   assert.equal(await refreshWebFiles({ fetcher: async () => ({ ok: false }), reloadPage: () => assert.fail() }), false); // no build.json
   assert.equal(footLine({ ios: "26.1", version: "0.3.5", web: true }, "en-US"), "iPhone, iOS 26.1, iFizBox Web 0.3.5 (en-us)");
+});
+
+test("the website refreshes its files and reloads once when build.json names a new commit", async () => {
+  const mem = new Map();
+  const store = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  const refreshed = [];
+  const run = (commit) => refreshIfNewBuild({ store, info: async () => ({ commit, files: ["app.js"] }),
+    refresh: async ({ info }) => { refreshed.push((await info()).commit); return true; } });
+  assert.equal(await run("aaa"), false, "a first visit only notes the commit");
+  assert.equal(await run("aaa"), false, "the same build: no reload");
+  assert.equal(await run("bbb"), true, "a new build: every file again and a reload");
+  assert.equal(await run("bbb"), false, "the reloaded page doesn't loop");
+  assert.deepEqual(refreshed, ["bbb"]);
+  assert.equal(await refreshIfNewBuild({ store, info: async () => null }), false, "no build.json (a local checkout): nothing");
 });

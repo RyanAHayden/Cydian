@@ -3,7 +3,7 @@
 // {key, value, etag, lastModified, savedAt}. The IDBFactory is passed in so node tests can hand it a fake.
 const STORE = "indexes";
 
-export function openIndexCache({ indexedDB: idb = globalThis.indexedDB, name = "cydian-index" } = {}) {
+export function openIndexCache({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-index" } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
   return new Promise((resolve, reject) => {
     const req = idb.open(name, 1);

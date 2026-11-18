@@ -72,7 +72,7 @@ const state = { body: null, route: null, list: null, seq: 0, dates: null, auto: 
 // ---- F127: modes, kinds and search -----------------------------------------------------------------------------
 
 // Whether install dates can be read (the jailbreak app: apt.installDates), so Recent can be offered.
-export function canReadDates(native = globalThis.cydianNative) {
+export function canReadDates(native = globalThis.ifizboxNative) {
   return typeof native?.call === "function" && typeof native?.dpkgStatus === "function";
 }
 
@@ -110,7 +110,7 @@ export function appSections(rows, { mode = "user", query = "", locale } = {}) {
 }
 
 // { package: seconds } from apt.installDates (the jailbreak app), or null where it can't be read.
-export async function installDates(native = globalThis.cydianNative) {
+export async function installDates(native = globalThis.ifizboxNative) {
   if (!canReadDates(native)) return null;
   try {
     const d = await native.call("apt.installDates", {});
@@ -120,7 +120,7 @@ export async function installDates(native = globalThis.cydianNative) {
 
 // F130: a Set of the packages apt marked Auto-Installed (apt.autoInstalled, the jailbreak app), or null where the
 // marks can't be read: no dpkg (the site, the sideload build), an older shell, or no extended_states file.
-export async function autoInstalled(native = globalThis.cydianNative) {
+export async function autoInstalled(native = globalThis.ifizboxNative) {
   if (!canReadDates(native)) return null;
   try {
     const list = await native.call("apt.autoInstalled", {});
@@ -444,7 +444,7 @@ export function withSignatures(rows, installed, { now = new Date(), window, show
 }
 
 // signing.installed in the sideload app; null anywhere else or when the call fails.
-async function signedApps(native = globalThis.cydianNative) {
+async function signedApps(native = globalThis.ifizboxNative) {
   if (detectMode() !== "sideload" || typeof native?.call !== "function") return null;
   try { return await native.call("signing.installed", {}); } catch { return null; }
 }

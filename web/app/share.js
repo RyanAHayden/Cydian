@@ -1,5 +1,5 @@
-// N9: what the page does with cydian://shared?route=… (incoming.js hands it here; core/share.js reads it). The shell
-// already picked the route for this build (native/share/Share.swift); sources came as cydian://add?url=… instead.
+// N9: what the page does with ifizbox://shared?route=… (incoming.js hands it here; core/share.js reads it). The shell
+// already picked the route for this build (native/share/Share.swift); sources came as ifizbox://add?url=… instead.
 //   helper-ipa  jailbreak: "Install <name>?", then the Install IPA console (screens/ipa-install.js) over
 //               share.ipaInstall (a staged file) or ipa.install (a link); the app is remembered for I3's updates
 //   sign-ipa    sideload: the IPA in My IPAs (a link is added there first, library.add), its page, then "Install
@@ -18,7 +18,7 @@ import { apps, recordInstall } from "./core/installed.js";
 import { deviceError } from "./core/signing.js";
 import { NAME } from "./brand.js";
 
-export async function handleShared(url, { native = globalThis.cydianNative, alert = showAlert, hud = showHUD } = {}) {
+export async function handleShared(url, { native = globalThis.ifizboxNative, alert = showAlert, hud = showHUD } = {}) {
   const s = parseShared(url);
   if (!s) return null;
   if (s.route === "refuse") {

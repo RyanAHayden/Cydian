@@ -2,7 +2,7 @@
 // vibe, price) that spin and come to rest on a real free package from the user's sources, then a card with Wish
 // List (core/wishlist.js) and View (the package's page). No daily limit (user 2026-11-18: "don't limit the
 // spins"): Spin always works. A day streak counts the days in a row with at least one spin, kept on the device
-// beside the settings (localStorage["cydian.roulette"]). The apps builds spin app categories (core/catalog.js
+// beside the settings (localStorage["ifizbox.roulette"]). The apps builds spin app categories (core/catalog.js
 // ROULETTE_TYPES). A haptic tick as rows pass the band, where the native bridge has haptics. The wheels also turn
 // by hand, like UIPickerView's (user 2026-11-18): drag one, it glides on and snaps to a row, and once they rest a
 // package of the type and price they show comes up (core/catalog.js choosePick).
@@ -16,7 +16,7 @@ import { haptic } from "../nav/haptic.js";
 import { ROULETTE_TYPES, ROULETTE_VIBES, ROULETTE_PRICES, spinPick, choosePick, dayKey, dayBefore } from "../core/catalog.js";
 import { wishlist, iconBox, rememberNames, token } from "./browse.js";
 
-export const ROULETTE_KEY = "cydian.roulette";
+export const ROULETTE_KEY = "ifizbox.roulette";
 const ROW = 40;        // a wheel row's height (px)
 const CENTER = 80;     // the band's top inside a wheel: the third of five rows
 const COPIES = 14;     // each wheel's list repeated, so a spin of several turns never runs off the end
@@ -82,7 +82,7 @@ const mod = (a, n) => ((a % n) + n) % n;
 export const nav = () => ({ title: "Roulette" });
 
 // Haptics only where the app's bridge plays them (nav/haptic.js "haptic.tap"); Safari's fallbacks need a gesture.
-const hasHaptics = () => Boolean(globalThis.cydianApp && globalThis.webkit?.messageHandlers?.cydian);
+const hasHaptics = () => Boolean(globalThis.ifizboxApp && globalThis.webkit?.messageHandlers?.ifizbox);
 
 export function render(body, route, { jailbroken = true, storage = globalThis.localStorage } = {}) {
   body.classList.add("roulette-page");

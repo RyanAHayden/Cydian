@@ -52,7 +52,7 @@ function reset(button) {
 // Touch-down on the website: Safari reads the clipboard only straight from the tap (no timer between), and nothing
 // paints while the bubble is up, so Type goes on now, painted before the release opens the bubble.
 function showType(button) {
-  if (globalThis.cydianNative) return; // the app reads UIPasteboard: no bubble
+  if (globalThis.ifizboxNative) return; // the app reads UIPasteboard: no bubble
   button.textContent = "Type";
   button.classList.add("done");
   setTimeout(() => button.classList.remove("is-pressed")); // app.js presses it after this listener
@@ -60,7 +60,7 @@ function showType(button) {
 }
 
 // `native` and `open` are for tests (screens/addsource.test.js): the bridge, and manage.addSource.
-export async function addFromClipboard(ctx, button, { native = globalThis.cydianNative, open = manage.addSource } = {}) {
+export async function addFromClipboard(ctx, button, { native = globalThis.ifizboxNative, open = manage.addSource } = {}) {
   if (native) return addFromPasteboard(ctx, button, native, open);
   reset(button);
   button.textContent = "Type";
@@ -115,7 +115,7 @@ export function nav(route, ctx) {
       // Add: the clipboard (the app: UIPasteboard; the website: iOS's Paste bubble, the button blue and reading Type
       // while it waits). Then the Enter APT URL alert, filled with a copied source URL.
       // F146: the app has no Type switch at all (no onPress): Add opens Enter APT URL and iFizBox reads the clipboard.
-      { label: "Add", ...(globalThis.cydianNative ? {} : { onPress: (e) => showType(e.currentTarget) }),
+      { label: "Add", ...(globalThis.ifizboxNative ? {} : { onPress: (e) => showType(e.currentTarget) }),
         onClick: (e) => addFromClipboard(ctx, e.currentTarget) },
       { label: "Manage", onClick: () => ctx.go({ tab: "sources", path: [manage.SEGMENT] }) },
     ],
@@ -180,10 +180,10 @@ async function firstLoad(ctx) {
 
 // Loading marks: the rows of `keys` spin and the Sources tab's badge spins until each answers (onEach), as
 // Cydia does. Returns onEach for refreshSources.
-// globalThis.cydianRefreshing: how many sources are refreshing now, for Home's tile (with the cydian:refreshing event).
+// globalThis.ifizboxRefreshing: how many sources are refreshing now, for Home's tile (with the ifizbox:refreshing event).
 function announce() {
-  globalThis.cydianRefreshing = state.loading.size;
-  globalThis.dispatchEvent?.(new Event("cydian:refreshing"));
+  globalThis.ifizboxRefreshing = state.loading.size;
+  globalThis.dispatchEvent?.(new Event("ifizbox:refreshing"));
 }
 function markLoading(ctx, keys) {
   for (const k of keys) state.loading.add(k);
@@ -268,7 +268,7 @@ export function startRun(ctx, keys) {
     stop();
   };
   const steps = reloadSteps(keys.map((k) => byKey.get(k) ?? { key: k }), {
-    apt: Boolean(globalThis.cydianNative) && settings.deviceType() !== "none",
+    apt: Boolean(globalThis.ifizboxNative) && settings.deviceType() !== "none",
     name: (s) => (s?.uri || s?.name ? displayName(s) : ""),
     onText: (t) => bar?.set(t),
   });

@@ -8,7 +8,7 @@
 //   q.list() -> [job]   q.get(id)   q.clear(id)   q.clearAll()   q.subscribe(fn) -> unsubscribe
 //   job: { op, id, version, mode, name }   mode: install | reinstall | upgrade | downgrade | remove
 //
-//   queueWords(jobs)          -> ["com.a", "com.b=1.0", "-com.c"]   cydian-helper simulate|apply <words>
+//   queueWords(jobs)          -> ["com.a", "com.b=1.0", "-com.c"]   ifizbox-helper simulate|apply <words>
 //   parseSimulation(text)     -> { installs, reinstalls, upgrades, downgrades, removes, essential, download }
 //   parseStatusLine(line)     -> { type: "status" | "error" | "conffile" | "finish", ... } (apt's Status-Fd, $CYDIA)
 //   finishOf(levels...)       -> the highest of return | uicache | reopen | restart | reload | reboot
@@ -64,7 +64,7 @@ export function createQueue() {
   };
 }
 
-// The helper's items (cydian-helper simulate|apply): "id" installs the newest, "id=version" that version (Reinstall,
+// The helper's items (ifizbox-helper simulate|apply): "id" installs the newest, "id=version" that version (Reinstall,
 // Downgrade and the Version History pick one), "-id" removes.
 export function queueWords(jobs) {
   return jobs.map((j) => (j.op === "remove" ? `-${j.id}` : j.version ? `${j.id}=${j.version}` : j.id));
@@ -207,7 +207,7 @@ export function needsRestart(stanzas) {
 
 // ---- console logs (Settings > Console Logs) ------------------------------------------------------------------
 
-export const LOG_KEY = "cydian.consoleLogs";
+export const LOG_KEY = "ifizbox.consoleLogs";
 const LOG_MAX = 20;           // runs kept, newest first
 const LOG_CHARS = 60_000;     // per run: the head and the tail of a longer one, with a note where it was cut
 
@@ -263,7 +263,7 @@ export function runTitle(jobs) {
 // Some repos list `Filename: https://github.com/.../x.deb` (ios.jjolano.me). apt joins it to the repo's URL and 404s
 // ("Failed to fetch https://ios.jjolano.me/https://github.com/..."); Sileo fetches the link itself. iFizBox does too:
 // the Confirm sheet gives such a job its `debUrl` (debUrlOf over catalog.history), and the native backend downloads
-// it (share.debFetch) and hands the file to cydian-helper simulate-deb / install-deb, beside apt's run for the rest.
+// it (share.debFetch) and hands the file to ifizbox-helper simulate-deb / install-deb, beside apt's run for the rest.
 
 // A Filename apt can't fetch: an absolute URL rather than a path under the repo.
 const isAbsoluteFilename = (filename) => /^[a-z][a-z0-9+.-]*:\/\//i.test(String(filename ?? ""));

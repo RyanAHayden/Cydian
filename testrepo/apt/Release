@@ -1,11 +1,11 @@
-Origin: Cydian Tests
-Label: Cydian Tests
+Origin: iFizBox Tests
+Label: iFizBox Tests
 Suite: stable
 Version: 1.0
 Codename: tests
 Architectures: iphoneos-arm64 iphoneos-arm
 Components: main
-Description: Temporary test packages for Cydian (will be deleted)
+Description: Temporary test packages for iFizBox (will be deleted)
 MD5Sum:
  53b7f6222c4913e23f6c9ac548649596 2463 Packages
  30b5ea12d39e74bf8b61b4c158aee1ac 848 Packages.gz

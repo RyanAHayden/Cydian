@@ -15,10 +15,10 @@ const labels = (rows) => rows.map((r) => r.label);
 
 const SITE = { site: true, jailbreak: false, custom: false };
 
-const CYDIAN = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.7/Cydian.ipa" };
+const IFIZBOX = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.7/iFizBox.ipa" };
 
 test("the website's Install rows: iFizBox installs in the browser; other apps go to iFizBox first (F96), no hand-offs", () => {
-  const own = installRows(CYDIAN, "https://example.com/apps.json", () => {}, () => {}, null, "iFizBox", SITE).rows;
+  const own = installRows(IFIZBOX, "https://example.com/apps.json", () => {}, () => {}, null, "iFizBox", SITE).rows;
   assert.deepEqual(labels(own), ["Install", "Download IPA"]);
   assert.equal(own[0].subtitle, SITE_INSTALL_SUBTITLE);
   const { rows } = installRows(V, "https://example.com/apps.json", () => {}, () => {}, null, "Delta", SITE);
@@ -66,12 +66,12 @@ test("the sideload app still signs: Install, no hand-offs", () => {
 });
 
 test("by default (no bridge: the website in node) iFizBox installs in the browser and other apps get the F96 rows", () => {
-  const saved = globalThis.cydianNative;
+  const saved = globalThis.ifizboxNative;
   try {
-    delete globalThis.cydianNative;
-    assert.deepEqual(labels(installRows(CYDIAN, null).rows), ["Install", "Download IPA"]);
+    delete globalThis.ifizboxNative;
+    assert.deepEqual(labels(installRows(IFIZBOX, null).rows), ["Install", "Download IPA"]);
     assert.deepEqual(labels(installRows(V, null).rows), ["Install in iFizBox", "Download IPA", "Install on the Website"]);
-  } finally { if (saved) globalThis.cydianNative = saved; }
+  } finally { if (saved) globalThis.ifizboxNative = saved; }
   assert.match(SITE_INSTALL_FOOTER, /signs the app here in the browser/);
 });
 

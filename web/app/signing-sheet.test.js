@@ -1,6 +1,6 @@
 // F68: the sideload build's look-first install (signing-sheet.js) and the page's side of F14's calls in
 // core/signing.js: the sheet's params, what it shows, the certificate warnings, Signed Apps, Re-sign All's HUD and
-// the re-sign reminder call. A fake cydianNative stands in for native/Sources/Sideload.swift.
+// the re-sign reminder call. A fake ifizboxNative stands in for native/Sources/Sideload.swift.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { inspectAndInstall, followInstall, openLabel, openInstalled } from "./signing-sheet.js";
@@ -53,8 +53,8 @@ const INFO = {
 };
 
 let saved;
-beforeEach(() => { saved = globalThis.cydianNative; });
-afterEach(() => { globalThis.cydianNative = saved; });
+beforeEach(() => { saved = globalThis.ifizboxNative; });
+afterEach(() => { globalThis.ifizboxNative = saved; });
 
 test("installParams: the token, and only the edits that change something", () => {
   assert.deepEqual(installParams(INFO, { name: "Delta", bundleId: "com.rileytestut.Delta", icon: null, removeExtensions: [] }), { token: "tok1" });
@@ -103,7 +103,7 @@ test("Install: inspect, the sheet's edits, signing.install {token, ...edits}, th
     "signing.install": (p, on) => { on({ phase: "signing", progress: 0.3 }); return { bundleId: "com.me.delta", name: "Delta 2" }; },
     "signing.progress": (p, on) => { on({ phase: "installing", progress: 0.4 }); on({ phase: "installing", progress: 1 }); return { installed: true }; },
   });
-  globalThis.cydianNative = native;
+  globalThis.ifizboxNative = native;
   const ui = fakeUI();
   let shown = null;
   const sheet = (info, { onSign }) => {

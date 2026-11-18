@@ -97,13 +97,13 @@ test("F146: the app's Add reads with auto, a URL fills the field, none leaves ht
 
 test("F146: Sources' Add has the Type switch (onPress) only on the website", () => {
   const add = (n) => n.right.find((b) => b.label === "Add");
-  const saved = globalThis.cydianNative;
+  const saved = globalThis.ifizboxNative;
   try {
-    delete globalThis.cydianNative;
+    delete globalThis.ifizboxNative;
     assert.equal(typeof add(nav({ path: [] }, {})).onPress, "function", "website: Type at touch-down");
-    globalThis.cydianNative = { call: async () => "" };
+    globalThis.ifizboxNative = { call: async () => "" };
     const app = add(nav({ path: [] }, {}));
     assert.equal(app.onPress, undefined, "app: no Type switch");
     assert.equal(typeof app.onClick, "function");
-  } finally { if (saved === undefined) delete globalThis.cydianNative; else globalThis.cydianNative = saved; }
+  } finally { if (saved === undefined) delete globalThis.ifizboxNative; else globalThis.ifizboxNative = saved; }
 });

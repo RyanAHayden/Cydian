@@ -2,7 +2,7 @@
 """Write and check iFizBox's sideload IPA (task I2) with the stdlib only.
 
     mkipa.py plist <Info.plist> <overlay.plist> <out>   Info.plist with the overlay's keys added (Info-sideload.plist)
-    mkipa.py build <Cydian.app> <out.ipa>               zip the app as Payload/Cydian.app, reproducibly
+    mkipa.py build <iFizBox.app> <out.ipa>               zip the app as Payload/iFizBox.app, reproducibly
     mkipa.py check <file.ipa>                           exit 1 and list every problem if the IPA is not right
 
 The IPA is the same Swift shell as the .deb, without the root helper and with sideload entitlements. It is ad hoc
@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mkdeb import macho_info  # noqa: E402
 import launch_check  # noqa: E402
 
-APP = "Payload/Cydian.app/"
+APP = "Payload/iFizBox.app/"
 # Entitlements only a jailbreak (or TrollStore) build may carry; a sideload signer would refuse or strip them.
 PRIVATE = ("platform-application", "com.apple.private.")
 
@@ -37,7 +37,7 @@ def merge_plist(base, overlay, out):
 
 
 def build(app, out, mtime=None):
-    """Zip app (a Cydian.app directory) as Payload/Cydian.app/, sorted and with one timestamp: same input, same bytes."""
+    """Zip app (a iFizBox.app directory) as Payload/iFizBox.app/, sorted and with one timestamp: same input, same bytes."""
     if mtime is None:
         mtime = int(os.environ.get("SOURCE_DATE_EPOCH", "0"))
     stamp = time.gmtime(max(mtime, 315532800))[:6]  # zip can't go before 1980
@@ -106,14 +106,14 @@ def check(path):
         if not i.filename.startswith("Payload/") or ".." in i.filename.split("/"):
             problems.append("not under Payload/: %s" % i.filename)
     apps = {n.split("/")[1] for n in files if n.startswith("Payload/") and n.count("/") >= 2}
-    if apps != {"Cydian.app"}:
-        problems.append("Payload holds %s, want just Cydian.app" % sorted(apps))
+    if apps != {"iFizBox.app"}:
+        problems.append("Payload holds %s, want just iFizBox.app" % sorted(apps))
 
     plist = files.get(APP + "Info.plist")
     if not plist:
-        return problems + ["no Cydian.app/Info.plist"], ""
+        return problems + ["no iFizBox.app/Info.plist"], ""
     info = plistlib.loads(plist[1])
-    want = {"CFBundleExecutable": "Cydian", "MinimumOSVersion": "15.0", "CADisableMinimumFrameDurationOnPhone": True}
+    want = {"CFBundleExecutable": "iFizBox", "MinimumOSVersion": "15.0", "CADisableMinimumFrameDurationOnPhone": True}
     for k, v in want.items():
         if info.get(k) != v:
             problems.append("Info.plist %s is %r, want %r" % (k, info.get(k), v))
@@ -125,8 +125,8 @@ def check(path):
     if "audio" not in info.get("UIBackgroundModes", []):
         problems.append("Info.plist UIBackgroundModes has no audio")
     schemes = [s for t in info.get("CFBundleURLTypes", []) for s in t.get("CFBundleURLSchemes", [])]
-    if "cydian" not in schemes:
-        problems.append("Info.plist has no cydian:// URL scheme")
+    if "ifizbox" not in schemes:
+        problems.append("Info.plist has no ifizbox:// URL scheme")
     types = [u for d in info.get("CFBundleDocumentTypes", []) for u in d.get("LSItemContentTypes", [])]
     if "com.apple.itunes.ipa" not in types:
         problems.append("Info.plist does not open .ipa files")
@@ -139,7 +139,7 @@ def check(path):
     problems += launch_check.problems(info, {n: d for n, (_, d) in files.items()}, APP)
 
     # The root helper and N5's upgrade daemon and its launchd job are the .deb's alone (T5).
-    jailbreak_only = ("cydian-helper", "cydian-upgrades", "com.ryha.cydian.upgrades.plist")
+    jailbreak_only = ("ifizbox-helper", "ifizbox-upgrades", "com.ryha.ifizbox.upgrades.plist")
     helpers = sorted(n for n in files if n.rsplit("/", 1)[-1] in jailbreak_only or "/var/jb/" in n
                      or "/LaunchDaemons/" in n)
     if helpers:
@@ -175,7 +175,7 @@ def check(path):
     problems += intents_problems(files)
 
     if APP + "bridge.js" not in files:
-        problems.append("bridge.js missing (cydianNative and the mode come from it)")
+        problems.append("bridge.js missing (ifizboxNative and the mode come from it)")
     web = {n[len(APP + "web/"):] for n in files if n.startswith(APP + "web/")}
     for need in ("index.html", "app.js", "style.css", "router.js"):
         if need not in web:
@@ -191,7 +191,7 @@ def check(path):
 # N8: the IPA carries the intents that work without a jailbreak (native/build.sh SIDELOAD_INTENTS), and a widget
 # extension without controls (no intents of its own) and without jailbreak entitlements.
 SIDELOAD_INTENTS = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent"}
-WIDGET = APP + "PlugIns/CydianWidget.appex/"
+WIDGET = APP + "PlugIns/iFizBoxWidget.appex/"
 
 
 def intents_problems(files):
@@ -208,9 +208,9 @@ def intents_problems(files):
         problems.append("App Intents %s, want the both-modes %s" % (sorted(actions), sorted(SIDELOAD_INTENTS)))
     if WIDGET + "Metadata.appintents/extract.actionsdata" in files:
         problems.append("the widget extension carries intents (the controls are the .deb's)")
-    exe = files.get(WIDGET + "CydianWidget")
+    exe = files.get(WIDGET + "iFizBoxWidget")
     if not exe or WIDGET + "Info.plist" not in files:
-        problems.append("no widget extension (PlugIns/CydianWidget.appex)")
+        problems.append("no widget extension (PlugIns/iFizBoxWidget.appex)")
     else:
         ents = macho_entitlements(exe[1]) or {}
         bad = sorted(k for k in ents if k.startswith(PRIVATE))

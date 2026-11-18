@@ -1,6 +1,6 @@
 // F65: the jailbreak app's side of N5's upgrade daemon (native/daemon/), wired up by app.js.
 //
-//   const up = createUpgradeNotices({ settings, native: globalThis.cydianNative, current: () => router.current() });
+//   const up = createUpgradeNotices({ settings, native: globalThis.ifizboxNative, current: () => router.current() });
 //   up.badge("changes", n);   // beside the tab badge: 0 while the Changes tab is on screen clears the icon badge
 //   up.start();               // once at launch: Upgrade Notifications off reaches the daemon again
 //
@@ -13,9 +13,9 @@
 import { detectMode, DAEMON_KEYS, DAEMON_LISTS } from "./core/settings.js";
 import { parse } from "./router.js";
 
-export function createUpgradeNotices({ settings, native = globalThis.cydianNative, current, win = globalThis.window } = {}) {
+export function createUpgradeNotices({ settings, native = globalThis.ifizboxNative, current, win = globalThis.window } = {}) {
   // Both app builds: the jailbreak app's daemon counts in the background too, the sideload app counts here.
-  const on = Boolean(native && typeof native.call === "function") && ["jailbreak", "sideload"].includes(detectMode({ cydianNative: native }));
+  const on = Boolean(native && typeof native.call === "function") && ["jailbreak", "sideload"].includes(detectMode({ ifizboxNative: native }));
   let count = null; // the Changes tab's last count
   let cleared = false; // the icon badge is 0 as far as we know (until the next count above 0)
   const onChanges = () => (current?.() ?? (win ? parse(win.location.hash) : null))?.tab === "changes";
@@ -53,17 +53,17 @@ export function createUpgradeNotices({ settings, native = globalThis.cydianNativ
 }
 
 // F70: N7's daemon (native/daemon/) reads the automatic-install settings from the app's preferences
-// (NSUserDefaults com.ryha.cydian), not from the web view's localStorage. The page hands them over through the
-// shell's prefs.set {values: {"cydian.<key>": value | null}} (Bridge.swift Prefs; null removes the key): all of
+// (NSUserDefaults com.ryha.ifizbox), not from the web view's localStorage. The page hands them over through the
+// shell's prefs.set {values: {"ifizbox.<key>": value | null}} (Bridge.swift Prefs; null removes the key): all of
 // them once at launch, then each one as it changes.
 //
-//   createPrefsMirror({ settings, native: globalThis.cydianNative }).start();
+//   createPrefsMirror({ settings, native: globalThis.ifizboxNative }).start();
 //
 // Jailbreak app only; elsewhere start() does nothing and returns false. A failed call is dropped: the next change
 // or launch writes the values again.
 
-export function createPrefsMirror({ settings, native = globalThis.cydianNative } = {}) {
-  const on = Boolean(native && typeof native.call === "function") && detectMode({ cydianNative: native }) === "jailbreak";
+export function createPrefsMirror({ settings, native = globalThis.ifizboxNative } = {}) {
+  const on = Boolean(native && typeof native.call === "function") && detectMode({ ifizboxNative: native }) === "jailbreak";
   const send = (values) => Promise.resolve().then(() => native.call("prefs.set", { values })).catch(() => {});
   const watched = new Set([...DAEMON_KEYS, ...DAEMON_LISTS]);
   let started = false;

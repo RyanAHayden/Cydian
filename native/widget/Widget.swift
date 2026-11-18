@@ -1,6 +1,6 @@
-// N8: iFizBox's widget extension (Cydian.app/PlugIns/CydianWidget.appex, iOS 17+): a Home Screen and Lock Screen widget
+// N8: iFizBox's widget extension (iFizBox.app/PlugIns/iFizBoxWidget.appex, iOS 17+): a Home Screen and Lock Screen widget
 // with the update count, and in the jailbreak build Respring and Userspace Reboot as Control Center controls (iOS 18,
-// Controls.swift, built with -D CYDIAN_JAILBREAK; also what the Action button can run).
+// Controls.swift, built with -D IFIZBOX_JAILBREAK; also what the Action button can run).
 // The count comes from the App Group's defaults, which the app writes (native/intents/App/WidgetStore.swift: Check for
 // Updates, Install All Updates and every count the page shows in Changes); in the jailbreak build also from N5's
 // daemon's state file (its daily apt check), whichever is newer. Without the App Group and before any check it says
@@ -30,8 +30,8 @@ struct UpdatesProvider: TimelineProvider {
 
     func current() -> WidgetShare.Snapshot? {
         let shared = WidgetShare.decode(UserDefaults(suiteName: WidgetShare.group)?.object(forKey: WidgetShare.key))
-        #if CYDIAN_JAILBREAK
-        let daemon = PhoneHost.shared.read("/var/lib/cydian/upgrades.state").flatMap(WidgetShare.daemonState)
+        #if IFIZBOX_JAILBREAK
+        let daemon = PhoneHost.shared.read("/var/lib/ifizbox/upgrades.state").flatMap(WidgetShare.daemonState)
         return WidgetShare.pick(shared, daemon)
         #else
         return shared
@@ -85,10 +85,10 @@ struct UpdatesWidget: Widget {
 }
 
 @main
-struct CydianWidgets: WidgetBundle {
+struct iFizBoxWidgets: WidgetBundle {
     var body: some Widget {
         UpdatesWidget()
-        #if CYDIAN_JAILBREAK
+        #if IFIZBOX_JAILBREAK
         controls
         #endif
     }

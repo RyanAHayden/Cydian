@@ -19,7 +19,7 @@
 import { showBanner } from "./nav/banner.js";
 import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError } from "./core/signing.js";
 import { format, settingsRoute } from "./router.js";
-import { IPA_MAX, CYDIAN_ID, profileInfo, targetBundleId } from "./core/websign.js";
+import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId } from "./core/websign.js";
 import { detectMode } from "./core/settings.js";
 import { progressHUD } from "./nav/progress.js";
 import { showAlert } from "./nav/alert.js";
@@ -29,7 +29,7 @@ import { NAME } from "./brand.js";
 // without one (liveHUD, the tests') just goes.
 const failed = (h, message) => (typeof h.fail === "function" ? h.fail(message) : h.hide());
 
-const SERVER_KEY = "cydian.signingServer";
+const SERVER_KEY = "ifizbox.signingServer";
 
 // The picks wait in memory only, until signing.import puts them into the Keychain; then only their names stay (the
 // .p12 itself never goes to the web view's storage). F93: the website keeps them in IndexedDB (this browser only:
@@ -39,7 +39,7 @@ let staged = null;
 // (identityNow); warmed when this module loads on the website.
 let known = null;
 const identityNow = () => known;
-const DB = "cydian-signing", STORE = "identity", KEY = "current", BRING_KEY = "cydian.bringCertificate";
+const DB = "ifizbox-signing", STORE = "identity", KEY = "current", BRING_KEY = "ifizbox.bringCertificate";
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -131,9 +131,10 @@ export async function serverStatus(server = getServer()) {
 }
 
 // F72: an IPA of iFizBox itself (its GitHub releases, where iFizBox's own source points).
-// Only iFizBox's own IPA files count: a release's Cydian.ipa, or the test source's cydian-<version>.ipa. Other files
-// under the same releases (the test-fixtures pre-release's Test Alpha, Test Beta...) are ordinary apps.
-export const isSelfIpa = (url) => /^https:\/\/github\.com\/RyanAHayden\/Cydian\/releases\/(?:latest\/)?download\/(?:[^/]+\/)?(?:Cydian|cydian-[\d.]+)\.ipa$/i
+// Only iFizBox's own IPA files count: any IPA of a versioned release (v<X.Y.Z>: only iFizBox builds; F171 renamed the
+// asset, and releases before it still carry the old name), a release's iFizBox.ipa, or the test source's
+// ifizbox-<version>.ipa. Other files under the test-fixtures pre-release (Test Alpha, Test Beta...) are ordinary apps.
+export const isSelfIpa = (url) => /^https:\/\/github\.com\/RyanAHayden\/Cydian\/releases\/(?:download\/v[\d.]+\/[\w.-]+|(?:latest\/)?download\/(?:[^/]+\/)?(?:iFizBox|ifizbox-[\d.]+))\.ipa$/i
   .test(String(url ?? ""));
 
 // Signs `url` (an IPA) on the phone and installs it. Resolves true once iOS was asked to install; false after an
@@ -167,11 +168,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 //   await firstInstallCheck()          F75: the walkthrough's missing step ("certificate" | "server"), opened, or null
 //   await installOnDevice({ url, name, onInstalled })  signing.install with the progress page following its phases (F151)
 //
-// Each takes `native` (the bridge, globalThis.cydianNative by default) so tests can pass a fake.
+// Each takes `native` (the bridge, globalThis.ifizboxNative by default) so tests can pass a fake.
 
 export const localSigning = () => detectMode() === "sideload";
 const bridge = (native) => {
-  const n = native ?? globalThis.cydianNative;
+  const n = native ?? globalThis.ifizboxNative;
   if (!n?.call) throw Object.assign(new Error("This build has no signer."), { code: "internal" });
   return n;
 };
@@ -262,7 +263,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   // F169: a plain Install follows iOS's install too (signing-sheet.js followInstall), so it ends on F155's
   // Open <app>, as Custom Install and My IPAs do. Not for iFizBox itself (host, or its own IPA or ID): iOS closes
   // iFizBox while it installs over it, and there's nothing to open.
-  if (result?.bundleId && !host && !isSelfIpa(url) && result.bundleId !== CYDIAN_ID) {
+  if (result?.bundleId && !host && !isSelfIpa(url) && result.bundleId !== IFIZBOX_ID) {
     const followInstall = follow ?? (await import("./signing-sheet.js")).followInstall;
     followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name });
     return true;
@@ -342,7 +343,7 @@ export async function installFromLibrary({ file, name = "", onInstalled = () => 
 //       Install tap opens iOS's install prompt (itms-services, from the tap). F121: when the bundle ID is known at the
 //       tap (expectedBundleId; `bundleId` is the app's own ID where the caller knows it), iOS's prompt opens at once
 //       instead, for a link the upload fills later, and there's no alert. true once iOS was asked; false after an error, shown in an alert (zsign's own reason when
-//       it can't sign the app). bring: iFizBox's own IPA carries the certificate (cydian-identity.plist), and always
+//       it can't sign the app). bring: iFizBox's own IPA carries the certificate (ifizbox-identity.plist), and always
 //       the website's sources and settings (web/transfer.link): the app imports both on its first launch.
 //
 // The .p12, password and profile go only into the Web Worker (this browser), and with bring into iFizBox's signed
@@ -454,7 +455,7 @@ export function expectedBundleId(id, { url = "", bundleId = null } = {}) {
     const { appId } = profileInfo(id.profile instanceof Uint8Array ? id.profile : new Uint8Array(id.profile));
     if (!appId) return null;
     if (!appId.includes("*")) return appId;
-    const own = bundleId || (isSelfIpa(url) ? CYDIAN_ID : null);
+    const own = bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null);
     return own ? targetBundleId(appId, own) : null;
   } catch { return null; }
 }
@@ -540,7 +541,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
 // What iFizBox's own IPA carries for its first launch: the website's sources and settings (Send Settings' link).
 async function websiteTransfer() {
   const [{ websitePayload }, { encodeLink }] = await Promise.all([import("./screens/importlink.js"), import("./core/transfer.js")]);
-  return encodeLink(await websitePayload({ identity: false })); // the certificate goes as cydian-identity.plist (bring)
+  return encodeLink(await websitePayload({ identity: false })); // the certificate goes as ifizbox-identity.plist (bring)
 }
 
 // F121: Install's tap needs the profile at once (identityNow), so the website reads it as soon as this module loads.

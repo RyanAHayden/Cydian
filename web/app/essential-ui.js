@@ -6,7 +6,7 @@
 //   sideload    iFizBox's own AltStore source, read once per launch: iFizBox's newest version and its minimum.
 //               F86: Complete Upgrade queues every upgrade Changes lists (Upgrade (N)'s queueUpgrades), Essential
 //               Only just iFizBox, in the app queue, and F80's Confirm opens (iFizBox last: installing it closes the
-//               app). Nothing could be queued (no Cydian.ipa in the source): installSelfNow says why.
+//               app). Nothing could be queued (no iFizBox.ipa in the source): installSelfNow says why.
 // Either build, forced (below the minimum): Confirm's Cancel brings the alert back (core/essential.js queueEssential).
 // Nothing found to read (the built-in source never loaded, offline): resolves "unknown", and app.js falls back on
 // F61's GitHub check.
@@ -22,7 +22,7 @@ import { settings } from "./screens/settings.js";
 import { installOnDevice } from "./signing-client.js";
 import { NAME } from "./brand.js";
 
-const native = () => globalThis.cydianNative;
+const native = () => globalThis.ifizboxNative;
 const storage = () => { try { return globalThis.localStorage; } catch { return null; } };
 
 export const appVersion = () => native()?.call
@@ -47,7 +47,7 @@ export async function readSelfInfo() {
     saveInfo(storage(), info);
     // Changes counts iFizBox's own upgrade from this (upgradesWithSelf): it may have counted before it was read at
     // launch (user 2026-11-18: the 0.3.8 banner came, Changes had no row and no badge).
-    globalThis.dispatchEvent?.(new Event("cydian:self-info"));
+    globalThis.dispatchEvent?.(new Event("ifizbox:self-info"));
   }
   return info;
 }
@@ -63,7 +63,7 @@ export async function upgradesWithSelf(upgrades) {
 export async function installSelfNow(row) {
   // The sideload app signs its own update on the phone and hosts it on the Signing Server (signing.install host:
   // true): straight to iOS's Install prompt, the key never leaves the phone. Without the bridge: installSelf.
-  if (detectMode() === "sideload" && row?.ipa && globalThis.cydianNative?.call) {
+  if (detectMode() === "sideload" && row?.ipa && globalThis.ifizboxNative?.call) {
     const ok = await installOnDevice({ url: row.ipa, name: NAME, host: true });
     return ok ? "installing" : "failed";
   }

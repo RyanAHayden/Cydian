@@ -1,11 +1,11 @@
 /* F57: install-paid's work (paid.c), apart from main() so it builds and is tested on Linux (test_helper.py).
  * SPDX-License-Identifier: GPL-3.0-or-later */
-#ifndef CYDIAN_HELPER_PAID_H
-#define CYDIAN_HELPER_PAID_H
+#ifndef IFIZBOX_HELPER_PAID_H
+#define IFIZBOX_HELPER_PAID_H
 
 #include "policy.h"
 
-/* Where install-paid makes its root-owned work directory (cydian-paid.XXXXXX, removed at the end). Tests build with
+/* Where install-paid makes its root-owned work directory (ifizbox-paid.XXXXXX, removed at the end). Tests build with
  * their own -DHELPER_PAID_WORK. */
 #ifndef HELPER_PAID_WORK
 #define HELPER_PAID_WORK "/var/tmp"

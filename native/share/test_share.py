@@ -2,11 +2,11 @@
 
 - SwiftShare: native/share/tests/main.swift, built on Linux with Share.swift, ../intents/Core.swift,
   ../sign/Updates.swift and ../sign/Hash.swift (F133's SHA256), classifies shared links, text and files (repo, AltStore source, ipa, deb, unknown) and runs
-  each mode's route against the fake helper (native/fake/cydian-helper, simulate-deb / install-deb / install-ipa)
+  each mode's route against the fake helper (native/fake/ifizbox-helper, simulate-deb / install-deb / install-ipa)
   and a fake signer. Skips, and says so, without a Swift toolchain (SWIFT_TOOLCHAIN or swiftc on PATH).
-- Declared: the document types and UTTypes (.ipa, .deb) in both Info.plists, the cydian:// scheme in the jailbreak
+- Declared: the document types and UTTypes (.ipa, .deb) in both Info.plists, the ifizbox:// scheme in the jailbreak
   build too, the share extension's Info.plist and its activation rule.
-- Built: when native/build.sh has built the .deb and the IPA, both carry PlugIns/CydianShare.appex.
+- Built: when native/build.sh has built the .deb and the IPA, both carry PlugIns/iFizBoxShare.appex.
 - Wiring: the text that ties it together (the shell's Incoming, the bridge, the page)."""
 import os
 import plistlib
@@ -26,7 +26,7 @@ from test_sign import toolchain  # noqa: E402
 
 SWIFTC = toolchain()
 INFO_PLIST = b"""<?xml version="1.0" encoding="UTF-8"?>
-<plist version="1.0"><dict><key>CFBundleIdentifier</key><string>dev.cydian.demo</string>
+<plist version="1.0"><dict><key>CFBundleIdentifier</key><string>dev.ifizbox.demo</string>
 <key>CFBundleShortVersionString</key><string>2.1</string><key>CFBundleName</key><string>Demo</string></dict></plist>"""
 
 
@@ -45,7 +45,7 @@ def make_files(d):
     with zipfile.ZipFile(os.path.join(d, "Archive.zip"), "w") as z:
         z.writestr("readme.txt", "hi")
     files = {
-        # the fake helper's .deb: an ar magic line, then the control stanza (fake/cydian-helper drops the first line)
+        # the fake helper's .deb: an ar magic line, then the control stanza (fake/ifizbox-helper drops the first line)
         "Tweak.deb": "!<arch>\nPackage: com.example.shared\nVersion: 1.2\nName: Shared\nDepends: bash, apt\n",
         "Bad.deb": "!<arch>\nPackage: com.example.broken\nVersion: 1.0\nDepends: com.example.nowhere\n",
         "apps.json": '{"name": "A Source", "apps": []}',
@@ -62,7 +62,7 @@ def make_files(d):
 class SwiftShare(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.mkdtemp(prefix="cydian-sharetest-")
+        cls.tmp = tempfile.mkdtemp(prefix="ifizbox-sharetest-")
         binary = os.path.join(cls.tmp, "sharetest")
         env = dict(os.environ)
         shim = os.path.join(cls.tmp, "libshim")
@@ -83,7 +83,7 @@ class SwiftShare(unittest.TestCase):
             os.makedirs(files)
             make_files(files)
             fake = os.path.join(NATIVE, "fake")
-            cls.out = subprocess.run([binary, os.path.join(fake, "cydian-helper"), os.path.join(fake, "fixture", "prefix"),
+            cls.out = subprocess.run([binary, os.path.join(fake, "ifizbox-helper"), os.path.join(fake, "fixture", "prefix"),
                                       os.path.join(fake, "fixture", "remote"), files],
                                      capture_output=True, text=True, timeout=300, env=dict(os.environ, TMPDIR=cls.tmp))
 
@@ -126,21 +126,21 @@ class Declared(unittest.TestCase):
                 self.assertIn("deb", deb["UTTypeTagSpecification"]["public.filename-extension"])
                 self.assertIn("public.data", deb["UTTypeConformsTo"])
                 schemes = [s for t in info.get("CFBundleURLTypes", []) for s in t.get("CFBundleURLSchemes", [])]
-                self.assertIn("cydian", schemes)  # the share extension opens cydian://share?url=…
+                self.assertIn("ifizbox", schemes)  # the share extension opens ifizbox://share?url=…
                 self.assertIn("LSSupportsOpeningDocumentsInPlace", info)
         # sideload keeps F77's types
         self.assertLessEqual({"com.rsa.pkcs-12", "com.apple.mobileprovision"}, self.types(side))
 
     def test_extension_plist(self):
         info = self.plist("share", "Info.plist")
-        self.assertEqual(info["CFBundleIdentifier"], "com.ryha.cydian.share")
+        self.assertEqual(info["CFBundleIdentifier"], "com.ryha.ifizbox.share")
         self.assertEqual(info["CFBundlePackageType"], "XPC!")
         ext = info["NSExtension"]
         self.assertEqual(ext["NSExtensionPointIdentifier"], "com.apple.share-services")
         rule = ext["NSExtensionAttributes"]["NSExtensionActivationRule"]
         self.assertEqual(rule.get("NSExtensionActivationSupportsWebURLWithMaxCount"), 1)
         self.assertEqual(rule.get("NSExtensionActivationSupportsText"), True)
-        self.assertEqual(ext["NSExtensionPrincipalClass"], "CydianShare.ShareViewController")
+        self.assertEqual(ext["NSExtensionPrincipalClass"], "iFizBoxShare.ShareViewController")
 
 
 BUILD = os.path.join(NATIVE, "build")
@@ -148,20 +148,20 @@ BUILD = os.path.join(NATIVE, "build")
 
 class Built(unittest.TestCase):
     def test_deb_app(self):
-        app = os.path.join(BUILD, "root", "var", "jb", "Applications", "Cydian.app")
-        exe = os.path.join(app, "PlugIns", "CydianShare.appex", "CydianShare")
-        if not os.path.exists(os.path.join(app, "Cydian")) or os.path.getmtime(os.path.join(app, "Cydian")) < os.path.getmtime(os.path.join(HERE, "Share.swift")):
+        app = os.path.join(BUILD, "root", "var", "jb", "Applications", "iFizBox.app")
+        exe = os.path.join(app, "PlugIns", "iFizBoxShare.appex", "iFizBoxShare")
+        if not os.path.exists(os.path.join(app, "iFizBox")) or os.path.getmtime(os.path.join(app, "iFizBox")) < os.path.getmtime(os.path.join(HERE, "Share.swift")):
             self.skipTest("no fresh native build (tools/check.sh builds it after the tests, where the toolchain is)")
-        self.assertTrue(os.path.exists(exe), "PlugIns/CydianShare.appex missing from the .deb's app")
+        self.assertTrue(os.path.exists(exe), "PlugIns/iFizBoxShare.appex missing from the .deb's app")
         with open(os.path.join(app, "Info.plist"), "rb") as f:
             self.assertIn("CFBundleDocumentTypes", plistlib.load(f))
 
     def test_ipa(self):
-        ipa = os.path.join(BUILD, "Cydian.ipa")
+        ipa = os.path.join(BUILD, "iFizBox.ipa")
         if not os.path.exists(ipa) or os.path.getmtime(ipa) < os.path.getmtime(os.path.join(HERE, "Share.swift")):
             self.skipTest("no fresh native build (tools/check.sh builds it after the tests, where the toolchain is)")
         with zipfile.ZipFile(ipa) as z:
-            self.assertIn("Payload/Cydian.app/PlugIns/CydianShare.appex/CydianShare", z.namelist())
+            self.assertIn("Payload/iFizBox.app/PlugIns/iFizBoxShare.appex/iFizBoxShare", z.namelist())
 
 
 class Wiring(unittest.TestCase):
@@ -178,7 +178,7 @@ class Wiring(unittest.TestCase):
 
     def test_page(self):
         with open(os.path.join(REPO, "web", "app", "incoming.js")) as f:
-            self.assertIn("cydian://shared", f.read())
+            self.assertIn("ifizbox://shared", f.read())
 
 
 if __name__ == "__main__":

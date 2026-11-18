@@ -14,7 +14,7 @@ const P12_LEGACY = fx("test-legacy.p12");
 
 test("the profile: name, team, app ID, expiry, device count", () => {
   const p = parseProfile(PROFILE);
-  assert.equal(p.name, "Cydian Test Profile");
+  assert.equal(p.name, "FizBox Test Profile");
   assert.equal(p.teamId, "TESTTEAM42");
   assert.equal(p.teamName, "Test Person");
   assert.equal(p.appId, "*");
@@ -90,7 +90,7 @@ test("signing server addresses", () => {
   assert.equal(normalizeServer("sign.example.org"), "https://sign.example.org");
   assert.equal(normalizeServer(" https://box.tail1234.ts.net:8443/ "), "https://box.tail1234.ts.net:8443");
   assert.equal(normalizeServer("http://192.168.1.5:8080"), "http://192.168.1.5:8080");
-  assert.equal(normalizeServer("https://example.org/cydian/"), "https://example.org/cydian");
+  assert.equal(normalizeServer("https://example.org/ifizbox/"), "https://example.org/ifizbox");
   assert.equal(normalizeServer(""), null);
   assert.equal(normalizeServer("ftp://x"), null);
   assert.equal(normalizeServer("https://u:p@x.org"), null);

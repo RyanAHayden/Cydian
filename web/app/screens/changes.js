@@ -50,7 +50,7 @@ export function init(ctx) {
   catalog.onChange(() => { if (state.body) load(); else badge(); });
   onAppsChange(() => { if (state.body) load(); else badge(); }); // I3: a recorded install can end an upgrade
   // iFizBox's own source read (essential-ui.js readSelfInfo): its upgrade row and the badge count again.
-  globalThis.addEventListener?.("cydian:self-info", () => { if (state.body) load(); else badge(); });
+  globalThis.addEventListener?.("ifizbox:self-info", () => { if (state.body) load(); else badge(); });
   settings.onChange((key) => { if (key === "holds" || key === "resignReminder") { if (state.body) load(); else badge(); } });
   // At launch, only with a status file: without one there are no upgrades, and no reason to load every source.
   // Without one (the site, the sideload app) the remembered apps count, and iFizBox itself in the app: badge at
@@ -100,7 +100,7 @@ export const badgeCount = (upgrades, resign = []) => (upgrades?.available?.lengt
 
 // The apps iFizBox signed that are inside the re-sign window, from signing.installed (sideload app only; [] anywhere
 // else or when the call fails). `upgrades`: those with an upgrade are left to it.
-export async function resignNow(upgrades, { mode = detectMode(), native = globalThis.cydianNative, get = (k) => settings.get(k), now = new Date() } = {}) {
+export async function resignNow(upgrades, { mode = detectMode(), native = globalThis.ifizboxNative, get = (k) => settings.get(k), now = new Date() } = {}) {
   if (mode !== "sideload" || typeof native?.call !== "function") return [];
   let installed;
   try { installed = await native.call("signing.installed", {}); } catch { return []; }

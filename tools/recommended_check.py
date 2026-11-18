@@ -21,7 +21,7 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-UA = "Cydian-recommended-check/1"
+UA = "iFizBox-recommended-check/1"
 
 
 def get(url, limit=64 << 20):

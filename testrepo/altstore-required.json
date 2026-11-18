@@ -1,16 +1,16 @@
 {
- "name": "Cydian Tests (Required)",
- "identifier": "com.ryha.cydian.tests.required",
- "subtitle": "Temporary test apps for Cydian",
+ "name": "iFizBox Tests (Required)",
+ "identifier": "com.ryha.ifizbox.tests.required",
+ "subtitle": "Temporary test apps for iFizBox",
  "website": "https://github.com/RyanAHayden/Cydian",
  "iconURL": "https://github.com/RyanAHayden/Cydian/releases/download/test-fixtures/tests.png",
  "apps": [
   {
-   "name": "Cydian",
-   "bundleIdentifier": "com.ryha.cydian",
+   "name": "iFizBox",
+   "bundleIdentifier": "com.ryha.ifizbox",
    "developerName": "Ryan Hayden",
    "subtitle": "Test: a required update (minimumVersion)",
-   "localizedDescription": "Test build of Cydian marked 0.1.1.1 (the v0.1.1 app with a higher version number). Installing it is a real update over Cydian.",
+   "localizedDescription": "Test build of iFizBox marked 0.1.1.1 (the v0.1.1 app with a higher version number). Installing it is a real update over iFizBox.",
    "iconURL": "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/icons/icon-180.png",
    "category": "utilities",
    "versions": [

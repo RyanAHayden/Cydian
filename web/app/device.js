@@ -95,7 +95,7 @@ export function initDevice() {
   wired = true;
   send();
   settings.onChange((key) => { if (DEVICE_KEYS.includes(key)) send(); });
-  const n = globalThis.cydianNative;
+  const n = globalThis.ifizboxNative;
   if (n?.call) {
     n.call("app.info", {}).then((info) => {
       applyNativeJailbreak(info); // a changed arch tells the catalog through settings.onChange

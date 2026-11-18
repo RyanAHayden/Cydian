@@ -19,7 +19,7 @@ import { currentDevice, compatBadge } from "../device.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall, onAppsChange } from "../core/installed.js";
 import { signAndInstall, localSigning, isSelfIpa } from "../signing-client.js";
-import { siteGateRows, markCydianInstalled, websiteInstallsOn, SITE_GATE_FOOTER } from "../websign-gate.js";
+import { siteGateRows, markiFizBoxInstalled, websiteInstallsOn, SITE_GATE_FOOTER } from "../websign-gate.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { setSourceShare } from "./handoff.js";
@@ -88,7 +88,7 @@ function card(children, cls = "") {
 // sheet (signing-sheet.js customInstall) to change the bundle ID, name or icon, or leave extensions out. `custom`
 // overrides whether it shows, `customize` what it runs (tests; F84: the app page's appPageCustom, which queues).
 // F96: on the website any app but iFizBox gets websign-gate.js's rows instead (Install in iFizBox, Download IPA, then
-// Install on the Website behind its warning); `appId` is the app's package id for the cydian:// link (else the page's
+// Install on the Website behind its warning); `appId` is the app's package id for the ifizbox:// link (else the page's
 // hash), `gate` makes the rows (tests).
 // F129: `bundleId` is the app's own bundle ID (appBundleId), handed to signAndInstall so a wildcard profile's website
 // install opens iOS's prompt from the Install tap (signing-client.js expectedBundleId); null where it isn't known.
@@ -114,7 +114,7 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
     // F93: Install signs in the browser with the certificate in Settings > Signing (signing-client.js
     // signInBrowser). F92: no hand-offs follow it. F96: iFizBox itself always installs from the website.
     rows.push({ label: "Install", subtitle: SITE_INSTALL_SUBTITLE,
-      onClick: () => sign({ url: o.download, name, ...own, onInstalled: () => { markCydianInstalled(); onInstall(); } }) });
+      onClick: () => sign({ url: o.download, name, ...own, onInstalled: () => { markiFizBoxInstalled(); onInstall(); } }) });
   } else if (o.download) {
     const direct = () => sign({ url: o.download, name, ...own, onInstalled: () => onInstall() });
     rows.push({ label: "Install", subtitle: "Signed with your certificate",
@@ -216,7 +216,7 @@ export async function renderAltSource(body, route, key) {
 
 // F91: iFizBox's signing.installed record of this app (by installed or original bundle ID), in the sideload app; null
 // anywhere else, for an app iFizBox didn't sign, or when the call fails.
-export async function signedRecordOf(id, { mode = detectMode(), native = globalThis.cydianNative } = {}) {
+export async function signedRecordOf(id, { mode = detectMode(), native = globalThis.ifizboxNative } = {}) {
   if (mode !== "sideload" || !id || typeof native?.call !== "function") return null;
   try { return signedIndex(await native.call("signing.installed", {})).get(id) ?? null; } catch { return null; }
 }

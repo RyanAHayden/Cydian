@@ -1,4 +1,4 @@
-// F58: signing-client.js in the sideload build, against a fake cydianNative: status and import calls, the picks
+// F58: signing-client.js in the sideload build, against a fake ifizboxNative: status and import calls, the picks
 // kept in memory, Install's HUD following signing.install's phases, and its errors by code.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -7,7 +7,7 @@ import {
   installOnDevice, loadIdentity, saveIdentity, clearIdentity, firstInstallCheck, getServer, setServer,
 } from "./signing-client.js";
 import { walkOpen } from "./screens/signing.js";
-import { CYDIAN_ID } from "./core/websign.js";
+import { IFIZBOX_ID } from "./core/websign.js";
 
 // A fake bridge: `answers[method]` is a value, an Error (rejects) or fn(params, onEvent).
 function fakeNative(answers = {}) {
@@ -37,13 +37,13 @@ function fakeUI() {
 }
 
 let saved;
-beforeEach(() => { saved = globalThis.cydianNative; });
-afterEach(async () => { await clearIdentity().catch(() => {}); globalThis.cydianNative = saved; });
+beforeEach(() => { saved = globalThis.ifizboxNative; });
+afterEach(async () => { await clearIdentity().catch(() => {}); globalThis.ifizboxNative = saved; });
 
 test("only the sideload build signs (F89: the website has no signer)", async () => {
-  globalThis.cydianNative = fakeNative();
+  globalThis.ifizboxNative = fakeNative();
   assert.equal(localSigning(), true);
-  delete globalThis.cydianNative;
+  delete globalThis.ifizboxNative;
   assert.equal(localSigning(), false);
   assert.equal(await signingReady(), false);
 });
@@ -54,28 +54,28 @@ test("the Signing Server: sign.cydian.dev by default, and the website's old cydi
   globalThis.localStorage = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
   try {
     assert.equal(getServer(), "https://sign.cydian.dev");
-    m.set("cydian.signingServer", "https://cydian.dev");
+    m.set("ifizbox.signingServer", "https://cydian.dev");
     assert.equal(getServer(), "https://sign.cydian.dev");
     assert.equal(setServer("my.example.org"), "https://my.example.org");
     assert.equal(getServer(), "https://my.example.org");
     setServer("https://cydian.dev");
-    assert.equal(m.has("cydian.signingServer"), false);
+    assert.equal(m.has("ifizbox.signingServer"), false);
     setServer("");
     assert.equal(getServer(), "https://sign.cydian.dev");
   } finally { globalThis.localStorage = saved; }
 });
 
 test("ready once the Keychain holds an identity", async () => {
-  globalThis.cydianNative = fakeNative({ "signing.status": { identity: null } });
+  globalThis.ifizboxNative = fakeNative({ "signing.status": { identity: null } });
   assert.equal(await signingReady(), false);
-  globalThis.cydianNative = fakeNative({ "signing.status": { identity: { name: "X" } } });
+  globalThis.ifizboxNative = fakeNative({ "signing.status": { identity: { name: "X" } } });
   assert.equal(await signingReady(), true);
-  globalThis.cydianNative = fakeNative({ "signing.status": coded("internal", "boom") });
+  globalThis.ifizboxNative = fakeNative({ "signing.status": coded("internal", "boom") });
   assert.equal(await signingReady(), false);
 });
 
 test("the picks stay in memory in the sideload build", async () => {
-  globalThis.cydianNative = fakeNative();
+  globalThis.ifizboxNative = fakeNative();
   await saveIdentity({ p12: new Uint8Array([0x30, 1]), p12Name: "me.p12" });
   await saveIdentity({ password: "pw" });
   const id = await loadIdentity();
@@ -184,10 +184,10 @@ test("Install: no bundleId from the signer ends on Done as before", async () => 
 
 // (host: true too, but its banner needs a DOM, so it isn't run here.)
 test("Install: iFizBox itself (its own IPA, or its ID) isn't followed", async () => {
-  const self = "https://github.com/RyanAHayden/Cydian/releases/latest/download/Cydian.ipa";
+  const self = "https://github.com/RyanAHayden/Cydian/releases/latest/download/iFizBox.ipa";
   for (const [opts, answer] of [
     [{ url: self }, { bundleId: "com.x" }],
-    [{ url: "https://e.example/c.ipa" }, { bundleId: CYDIAN_ID }],
+    [{ url: "https://e.example/c.ipa" }, { bundleId: IFIZBOX_ID }],
   ]) {
     const n = fakeNative({ "signing.install": answer });
     const ui = fakeUI();
@@ -220,7 +220,7 @@ test("Install: other errors show the signer's message and stay put", async () =>
 });
 
 test("Install without a bridge fails with an alert, not a throw", async () => {
-  delete globalThis.cydianNative;
+  delete globalThis.ifizboxNative;
   const ui = fakeUI();
   assert.equal(await installOnDevice({ url: "https://e.example/x.ipa" }, ui.deps), false);
   assert.equal(ui.alerts.length, 1);

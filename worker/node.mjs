@@ -51,7 +51,7 @@ const LOOKUP_CACHE = {
 };
 setInterval(() => { const now = Date.now(); for (const [k, e] of looked) if (e.until < now) looked.delete(k); }, 3_600_000).unref();
 
-const env = { HOSTED, ASSETS, LOOKUP_CACHE, HOST_IDS: process.env.HOST_IDS ?? "*.cydian", TTL: process.env.TTL ?? "600", MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB };
+const env = { HOSTED, ASSETS, LOOKUP_CACHE, HOST_IDS: process.env.HOST_IDS ?? "*.ifizbox", TTL: process.env.TTL ?? "600", MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB };
 const server = http.createServer(async (inc, out) => {
   try {
     const proto = inc.headers["x-forwarded-proto"] ?? "http";
@@ -67,4 +67,4 @@ const server = http.createServer(async (inc, out) => {
   }
 });
 const port = Number(process.env.PORT ?? 8787);
-server.listen(port, process.env.HOST ?? "0.0.0.0", () => console.log(`cydian: http://${process.env.HOST ?? "0.0.0.0"}:${port} (web: ${WEB})`));
+server.listen(port, process.env.HOST ?? "0.0.0.0", () => console.log(`ifizbox: http://${process.env.HOST ?? "0.0.0.0"}:${port} (web: ${WEB})`));

@@ -1,4 +1,4 @@
-/* cydian-upgrades' rules (N5): see upgrades.h. SPDX-License-Identifier: GPL-3.0-or-later */
+/* ifizbox-upgrades' rules (N5): see upgrades.h. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "upgrades.h"
 
 #include <stdio.h>

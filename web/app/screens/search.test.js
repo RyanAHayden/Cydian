@@ -62,7 +62,7 @@ test("F100: Recent Searches: last 5, newest first, no duplicates, cleared, store
   assert.deepEqual(s.recentSearches.list(), []);
   for (const q of ["filza", "snowboard", "filza"]) s.recentSearches.add(q);
   assert.deepEqual(s.recentSearches.list(), ["filza", "snowboard"]);
-  assert.equal(mem.get("cydian.recentSearches"), JSON.stringify(["filza", "snowboard"]), "kept under cydian.recentSearches");
+  assert.equal(mem.get("ifizbox.recentSearches"), JSON.stringify(["filza", "snowboard"]), "kept under ifizbox.recentSearches");
   assert.deepEqual(createSettings({ storage, mode: "site" }).recentSearches.list(), ["filza", "snowboard"], "survives a reload");
   heard.length = 0;
   s.recentSearches.add("filza");
@@ -70,7 +70,7 @@ test("F100: Recent Searches: last 5, newest first, no duplicates, cleared, store
   s.recentSearches.clear();
   assert.deepEqual(s.recentSearches.list(), []);
   assert.deepEqual(heard, [["recentSearches", []]]);
-  mem.set("cydian.recentSearches", "{not json");
+  mem.set("ifizbox.recentSearches", "{not json");
   assert.deepEqual(s.recentSearches.list(), []);
 
   const picked = [];

@@ -48,11 +48,11 @@ test("requests are built as the spec writes them", () => {
   assert.equal(authenticateUrl(base, { udid: "4e12", model: "iPhone7,2" }), base + "authenticate?udid=4e12&model=iPhone7%2C2");
 });
 
-test("callbacks: sileo:// as vendors send it, cydian:// the same way", () => {
+test("callbacks: sileo:// as vendors send it, ifizbox:// the same way", () => {
   const ok = { kind: "authentication_success", token: "tok", secret: "sec" };
   assert.deepEqual(parseCallback("sileo://authentication_success?token=tok&payment_secret=sec"), ok);
-  assert.deepEqual(parseCallback("cydian://authentication_success?token=tok&payment_secret=sec"), ok);
-  assert.deepEqual(parseCallback("cydian://payment/authentication_success?token=tok&payment_secret=sec"), ok);
+  assert.deepEqual(parseCallback("ifizbox://authentication_success?token=tok&payment_secret=sec"), ok);
+  assert.deepEqual(parseCallback("ifizbox://payment/authentication_success?token=tok&payment_secret=sec"), ok);
   assert.deepEqual(parseCallback("sileo://payment_completed"), { kind: "payment_completed" });
   assert.equal(parseCallback("sileo://authentication_success?token=tok"), null);
   assert.equal(parseCallback("https://evil.example/authentication_success?token=a&payment_secret=b"), null);
@@ -153,11 +153,11 @@ test("invalidate forgets the credentials", async () => {
   const storage = memStorage();
   const credentials = createCredentialStore({ storage });
   const client = createPaymentClient({ base, request, credentials });
-  await client.finishSignIn("cydian://authentication_success?token=stale&payment_secret=s");
+  await client.finishSignIn("ifizbox://authentication_success?token=stale&payment_secret=s");
   assert.equal(await client.signedIn(), true);
   await assert.rejects(client.userInfo(), (e) => e.invalidate === true && /Signed out/.test(e.message));
   assert.equal(await client.signedIn(), false);
-  await client.finishSignIn("cydian://authentication_success?token=stale&payment_secret=wrong");
+  await client.finishSignIn("ifizbox://authentication_success?token=stale&payment_secret=wrong");
   assert.deepEqual(await client.purchase("com.paid.tweak"), { status: "failed" });
 });
 

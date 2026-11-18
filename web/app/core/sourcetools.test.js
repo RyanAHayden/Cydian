@@ -389,7 +389,7 @@ test("F19: the jailbreak pick and the first-run row's flag are kept", () => {
   assert.equal(savedJailbreak(st), null);
   saveJailbreak("nathanlr", st);
   assert.equal(savedJailbreak(st), "nathanlr");
-  st.setItem("cydian.jailbreakName", "bogus");
+  st.setItem("ifizbox.jailbreakName", "bogus");
   assert.equal(savedJailbreak(st), null);
   assert.equal(recommendedSeen(st), false);
   markRecommendedSeen(st);

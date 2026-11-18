@@ -1,5 +1,5 @@
 // Swift tests for N9's share sheet and Open in iFizBox (native/share/Share.swift), run on Linux by
-// native/share/test_share.py against the fake helper (native/fake/cydian-helper) over a copy of
+// native/share/test_share.py against the fake helper (native/fake/ifizbox-helper) over a copy of
 // native/fake/fixture/prefix, and a fake signer:
 //   sharetest <fake helper> <fixture prefix> <fake remote> <files dir>
 // <files dir> holds what test_share.py made: Demo.ipa (a zip with Payload/Demo.app/Info.plist), Tweak.deb (a fake
@@ -65,11 +65,11 @@ final class FakeHost: ShareHost {
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
         p.arguments = ["-c", "exec \"$0\" \"$@\" 3>\"$STATUS_FILE\"", helperPath] + words
         var e = ProcessInfo.processInfo.environment
-        e["CYDIAN_PREFIX"] = prefix
+        e["IFIZBOX_PREFIX"] = prefix
         e["FAKE_REMOTE"] = remote
         e["STATUS_FILE"] = status
-        e["CYDIAN_IPA_DIR"] = dirs.ipa
-        e["CYDIAN_DEB_DIR"] = dirs.deb
+        e["IFIZBOX_IPA_DIR"] = dirs.ipa
+        e["IFIZBOX_DEB_DIR"] = dirs.deb
         for (k, v) in env { e[k] = v }
         p.environment = e
         let out = Pipe(), err = Pipe()
@@ -158,8 +158,8 @@ test("route: sources open Add Source in both modes") {
         for s in ["https://repo.chariz.com/", "https://example.com/apps.json", "altstore://source?url=https://e.x/a.json"] {
             let r = ShareRouter.route(ShareClassifier.classify(link: URL(string: s)!), host)
             guard case .addSource(let u) = r else { check(false, "\(mode) \(s): \(r)"); continue }
-            check(u.scheme == "cydian" && u.host == "add", "\(u)")
-            check(ShareRouter.link(r) == u, "the link is N8's cydian://add")
+            check(u.scheme == "ifizbox" && u.host == "add", "\(u)")
+            check(ShareRouter.link(r) == u, "the link is N8's ifizbox://add")
         }
         let r = ShareRouter.route(ShareClassifier.classify(link: URL(string: "https://e.x/a+b/")!), host)
         check(query(ShareRouter.link(r))["url"] == "https://e.x/a+b/", "a + survives: \(String(describing: ShareRouter.link(r)))")
@@ -254,13 +254,13 @@ test("stage: a fresh copy with a name the helper takes") {
 test("jailbreak ipa: install-ipa through the helper, version for I3") {
     let host = try FakeHost(.jailbreak)
     host.env["FAKE_APPSYNC"] = "1"
-    host.inspected = InstalledApp(bundleID: "dev.cydian.demo", name: "Demo", version: "2.1")
+    host.inspected = InstalledApp(bundleID: "dev.ifizbox.demo", name: "Demo", version: "2.1")
     let path = try ShareInbox.stage(file("Demo.ipa"), kind: .ipa, dirs: host.dirs)
     var statuses = [String]()
     let app = try ShareRun.installIPA(path, host) { fd, l in if fd == "status" { statuses.append(l) } }
-    check(app == InstalledApp(bundleID: "dev.cydian.demo", name: "Demo", version: "2.1"), "\(app)")
+    check(app == InstalledApp(bundleID: "dev.ifizbox.demo", name: "Demo", version: "2.1"), "\(app)")
     check(host.log == [["install-ipa", path]], "\(host.log)")
-    check(statuses.contains { $0.hasPrefix("pmstatus:dev.cydian.demo:") }, "\(statuses)")
+    check(statuses.contains { $0.hasPrefix("pmstatus:dev.ifizbox.demo:") }, "\(statuses)")
     // neither AppSync nor ldid: the helper's own exit 69
     let bare = try FakeHost(.jailbreak)
     let p2 = try ShareInbox.stage(file("Demo.ipa"), kind: .ipa, dirs: bare.dirs)
@@ -301,7 +301,7 @@ test("jailbreak deb: simulate-deb resolves dependencies, install-deb installs") 
 }
 
 test("apt's plan names the shared package") {
-    let out = "Note, selecting 'com.foo' instead of '/var/tmp/cydian-deb.X/deb.deb'\nInst dep (1 r [a])\nInst com.foo [0.9] (1.0 [iphoneos-arm64])\n"
+    let out = "Note, selecting 'com.foo' instead of '/var/tmp/ifizbox-deb.X/deb.deb'\nInst dep (1 r [a])\nInst com.foo [0.9] (1.0 [iphoneos-arm64])\n"
     check(ShareRun.ownPackage(out)! == ("com.foo", "1.0"), "old apt, no origin")
     check(ShareRun.ownPackage("Inst a (1 local-deb [x])\n")! == ("a", "1"), "local-deb")
     check(ShareRun.ownPackage("Inst a (1 r [x])\n") == nil, "nothing to go on")

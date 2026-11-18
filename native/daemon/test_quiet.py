@@ -53,7 +53,7 @@ class Quiet(unittest.TestCase):
         self.assertEqual(rows[(1, n["AUTO_NOTE_UPGRADES"])], n["AUTO_NOTE_BADGE"])  # off: the count, no banner
         for k in ("AUTO_NOTE_UPDATED", "AUTO_NOTE_FAILED", "AUTO_NOTE_BADGE"):
             self.assertEqual(rows[(1, n[k])], n[k], k)
-        self.assertEqual(out[-1], "file /var/lib/cydian/upgrades.off")
+        self.assertEqual(out[-1], "file /var/lib/ifizbox/upgrades.off")
 
     def test_same_file_as_helper(self):
         self.assertEqual(defined(os.path.join(HERE, "quiet.h"), "QUIET_FILE"),
@@ -64,7 +64,7 @@ class Quiet(unittest.TestCase):
         self.assertIn('#include "quiet.h"', m)
         body = m[m.index("static void e_notify("):]
         body = body[:body.index("\n}\n")]
-        self.assertIn("quiet_kind(kind, access(CYDIAN_PREFIX QUIET_FILE, F_OK) == 0)", body)
+        self.assertIn("quiet_kind(kind, access(IFIZBOX_PREFIX QUIET_FILE, F_OK) == 0)", body)
         self.assertLess(body.index("quiet_kind"), body.index("AUTO_NOTE_BADGE"))
 
 

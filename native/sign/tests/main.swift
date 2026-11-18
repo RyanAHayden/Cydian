@@ -180,15 +180,15 @@ test("zip round trip") {
 test("profile rules") {
     let p = try Profile(try fixture("profile.mobileprovision"))
     check(p.team == team && p.appID == "*" && p.isWildcard && p.devices == 3, "fields \(p.team) \(p.appID) \(p.devices)")
-    check(try p.bundleID(for: "dev.cydian.fixture") == "dev.cydian.fixture", "wildcard keeps the ID")
+    check(try p.bundleID(for: "dev.ifizbox.fixture") == "dev.ifizbox.fixture", "wildcard keeps the ID")
     check(p.problem(with: identity.certificate) == nil, "certificate is in the profile")
     check(p.problem(with: try fixture("other.der"))?.code == "cert_not_in_profile", "other certificate refused")
-    let e = p.entitlements(for: "dev.cydian.fixture")
-    check(e["application-identifier"] as? String == "\(team).dev.cydian.fixture", "application-identifier")
-    check(e["keychain-access-groups"] as? [String] == ["\(team).dev.cydian.fixture"], "keychain group narrowed")
+    let e = p.entitlements(for: "dev.ifizbox.fixture")
+    check(e["application-identifier"] as? String == "\(team).dev.ifizbox.fixture", "application-identifier")
+    check(e["keychain-access-groups"] as? [String] == ["\(team).dev.ifizbox.fixture"], "keychain group narrowed")
     check(e["get-task-allow"].flatMap(plistBool) == false, "never debuggable")
     let x = try Profile(try fixture("profile-explicit.mobileprovision"))
-    let xid = try x.bundleID(for: "dev.cydian.fixture")
+    let xid = try x.bundleID(for: "dev.ifizbox.fixture")
     check(!x.isWildcard && xid == "com.me.fixture", "explicit renames")
     let pre = try Profile(try fixture("profile-prefix.mobileprovision"))
     check(try pre.bundleID(for: "com.me.tool") == "com.me.tool", "prefix keeps a fitting ID")
@@ -204,7 +204,7 @@ test("sign a fixture IPA, wildcard profile") {
     let out = work.appendingPathComponent("signed.ipa")
     var phases = Set<String>()
     let app = try signer.sign(fixtures.appendingPathComponent("rich.ipa"), to: out) { phase, _ in phases.insert(phase) }
-    check(app.bundleID == "dev.cydian.fixture" && app.name == "Fixture" && app.version == "1.0", "\(app)")
+    check(app.bundleID == "dev.ifizbox.fixture" && app.name == "Fixture" && app.version == "1.0", "\(app)")
     check(app.removed.isEmpty, "nothing removed: \(app.removed)")
     check(phases == ["reading", "signing"], "progress phases \(phases)")
     let f = try entries(out)
@@ -215,17 +215,17 @@ test("sign a fixture IPA, wildcard profile") {
     check(f[a + "_CodeSignature/CodeResources"] != nil && f[a + "OldStuff/_CodeSignature/CodeResources"] == nil, "old seal gone")
     check(f[a + "hello.txt"] == (try entries(fixtures.appendingPathComponent("rich.ipa")))[a + "hello.txt"], "resources untouched")
     // inner bundles first: the framework, the extension, then the app
-    try verifySigned(f[a + "Frameworks/Kit.framework/Kit"]!, name: "Kit", expectIdent: "dev.cydian.kit", team: team,
+    try verifySigned(f[a + "Frameworks/Kit.framework/Kit"]!, name: "Kit", expectIdent: "dev.ifizbox.kit", team: team,
                      info: f[a + "Frameworks/Kit.framework/Info.plist"], resources: f[a + "Frameworks/Kit.framework/_CodeSignature/CodeResources"], ents: false)
     try verifySigned(f[a + "Frameworks/libloose.dylib"]!, name: "libloose", expectIdent: "libloose", team: team, info: nil, resources: nil, ents: false)
-    try verifySigned(f[a + "PlugIns/Share.appex/Share"]!, name: "Share", expectIdent: "dev.cydian.fixture.share", team: team,
+    try verifySigned(f[a + "PlugIns/Share.appex/Share"]!, name: "Share", expectIdent: "dev.ifizbox.fixture.share", team: team,
                      info: f[a + "PlugIns/Share.appex/Info.plist"], resources: f[a + "PlugIns/Share.appex/_CodeSignature/CodeResources"], ents: true)
-    try verifySigned(f[a + "Fixture"]!, name: "Fixture", expectIdent: "dev.cydian.fixture", team: team,
+    try verifySigned(f[a + "Fixture"]!, name: "Fixture", expectIdent: "dev.ifizbox.fixture", team: team,
                      info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
     let main = readSignature(f[a + "Fixture"]!)!
     check(main.execFlags & 1 == 1, "main binary flag")
     let ents = try PropertyListSerialization.propertyList(from: main.ents.subdata(in: 8..<main.ents.count), format: nil) as? [String: Any]
-    check(ents?["application-identifier"] as? String == "\(team).dev.cydian.fixture", "app entitlements")
+    check(ents?["application-identifier"] as? String == "\(team).dev.ifizbox.fixture", "app entitlements")
     // CodeResources seals every file with its final hash, nested bundles' signed files included
     let cr = try PropertyListSerialization.propertyList(from: f[a + "_CodeSignature/CodeResources"]!, format: nil) as! [String: Any]
     let files2 = cr["files2"] as! [String: Any]
@@ -247,7 +247,7 @@ test("re-sign a signed IPA (the old LC_CODE_SIGNATURE is replaced)") {
     let a = "Payload/Fixture.app/"
     let before = try entries(work.appendingPathComponent("signed.ipa"))[a + "Fixture"]!
     check(f[a + "Fixture"]!.count == before.count, "same size: the signature is replaced, not added")
-    try verifySigned(f[a + "Fixture"]!, name: "Fixture-resigned", expectIdent: "dev.cydian.fixture", team: team,
+    try verifySigned(f[a + "Fixture"]!, name: "Fixture-resigned", expectIdent: "dev.ifizbox.fixture", team: team,
                      info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
 }
 
@@ -255,7 +255,7 @@ test("sign with an explicit profile: renamed, extensions removed") {
     let profile = try Profile(try fixture("profile-explicit.mobileprovision"))
     let out = work.appendingPathComponent("signed-explicit.ipa")
     let app = try IPASigner(profile: profile, identity: identity).sign(fixtures.appendingPathComponent("rich.ipa"), to: out)
-    check(app.bundleID == "com.me.fixture" && app.originalBundleID == "dev.cydian.fixture", "\(app.bundleID)")
+    check(app.bundleID == "com.me.fixture" && app.originalBundleID == "dev.ifizbox.fixture", "\(app.bundleID)")
     check(app.removed == ["PlugIns/Share.appex"], "removed \(app.removed)")
     let f = try entries(out)
     let a = "Payload/Fixture.app/"
@@ -277,15 +277,15 @@ test("an unsigned binary gets LC_CODE_SIGNATURE") {
     try verifySigned(sf.subdata(in: off..<off + size), name: "fat", expectIdent: "fat", team: team, info: nil, resources: nil, ents: false)
 }
 
-if let real = ProcessInfo.processInfo.environment["CYDIAN_REAL_IPA"], FileManager.default.fileExists(atPath: real) {
-    test("sign a real IPA (native/build/Cydian.ipa)") {
+if let real = ProcessInfo.processInfo.environment["IFIZBOX_REAL_IPA"], FileManager.default.fileExists(atPath: real) {
+    test("sign a real IPA (native/build/iFizBox.ipa)") {
         let profile = try Profile(try fixture("profile.mobileprovision"))
         let out = work.appendingPathComponent("real-signed.ipa")
         let app = try IPASigner(profile: profile, identity: identity).sign(URL(fileURLWithPath: real), to: out)
-        check(app.bundleID == "com.ryha.cydian", "bundle id \(app.bundleID)")
+        check(app.bundleID == "com.ryha.ifizbox", "bundle id \(app.bundleID)")
         let f = try entries(out)
-        let a = "Payload/Cydian.app/"
-        try verifySigned(f[a + "Cydian"]!, name: "Cydian", expectIdent: "com.ryha.cydian", team: team,
+        let a = "Payload/iFizBox.app/"
+        try verifySigned(f[a + "iFizBox"]!, name: "iFizBox", expectIdent: "com.ryha.ifizbox", team: team,
                          info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
     }
 }
@@ -318,11 +318,11 @@ test("HTTP requests and ranges") {
 }
 
 test("manifest and itms link") {
-    let m = try InstallManifest.manifest(ipaURL: "http://127.0.0.1:4242/t/app.ipa", bundleID: "dev.cydian.fixture", version: "1.0", title: "Fixture")
+    let m = try InstallManifest.manifest(ipaURL: "http://127.0.0.1:4242/t/app.ipa", bundleID: "dev.ifizbox.fixture", version: "1.0", title: "Fixture")
     let pl = try PropertyListSerialization.propertyList(from: m, format: nil) as? [String: Any]
     let item = (pl?["items"] as? [[String: Any]])?.first
     check(((item?["assets"] as? [[String: Any]])?.first?["url"] as? String) == "http://127.0.0.1:4242/t/app.ipa", "asset url")
-    check((item?["metadata"] as? [String: Any])?["bundle-identifier"] as? String == "dev.cydian.fixture", "bundle id")
+    check((item?["metadata"] as? [String: Any])?["bundle-identifier"] as? String == "dev.ifizbox.fixture", "bundle id")
     check(InstallManifest.itmsURL(manifest: "https://cydian.dev/sign/manifest?bundleid=a.b&port=4242")
           == "itms-services://?action=download-manifest&url=https%3A%2F%2Fcydian.dev%2Fsign%2Fmanifest%3Fbundleid%3Da.b%26port%3D4242", "itms link")
 }
@@ -339,7 +339,7 @@ test("F77: My IPAs signs a local IPA file") {
     check(a == "Rich.ipa" && b == "Rich 2.ipa", "unique names \(a) \(b)")
     check(lib.files() == ["Rich.ipa", "Rich 2.ipa"], "files \(lib.files())")
     let d = try lib.details(a)
-    check(d.name == "Fixture" && d.bundleID == "dev.cydian.fixture" && d.error == nil, "details \(d.name) \(d.bundleID) \(d.error ?? "")")
+    check(d.name == "Fixture" && d.bundleID == "dev.ifizbox.fixture" && d.error == nil, "details \(d.name) \(d.bundleID) \(d.error ?? "")")
     check(!d.extensions.isEmpty, "extensions read")
     check(try lib.details(b).error != nil, "a zip that isn't an IPA is listed with an error")
     let cert = identity.certificate
@@ -347,12 +347,12 @@ test("F77: My IPAs signs a local IPA file") {
     check(lib.json(a, certificate: cert)["signed"] is NSNull, "json: not signed")
     let profile = try Profile(try fixture("profile.mobileprovision"))
     let s = try lib.sign(a, signer: IPASigner(profile: profile, identity: identity), certificate: cert, expires: nil, work: work)
-    check(s.bundleID == "dev.cydian.fixture", "signed as \(s.bundleID)")
+    check(s.bundleID == "dev.ifizbox.fixture", "signed as \(s.bundleID)")
     check(lib.signed(a, certificate: cert) != nil, "signed, ready to install")
     check(lib.signed(a, certificate: try fixture("other.der")) == nil, "another certificate: not signed")
     check(lib.signed(a, certificate: nil) == nil, "no certificate: not signed")
     let f = try entries(lib.signedURL(a))
-    try verifySigned(f[A + "Fixture"]!, name: "Fixture", expectIdent: "dev.cydian.fixture", team: team,
+    try verifySigned(f[A + "Fixture"]!, name: "Fixture", expectIdent: "dev.ifizbox.fixture", team: team,
                      info: f[A + "Info.plist"], resources: f[A + "_CodeSignature/CodeResources"], ents: true)
     check(try entries(lib.root.appendingPathComponent(a))[A + "_CodeSignature/CodeResources"] == Data("old seal".utf8), "the IPA itself stays as added")
     // New Sign Options: the signed copy no longer fits and goes.

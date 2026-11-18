@@ -37,8 +37,8 @@ struct SignOptions {
 
     static func isPNG(_ d: Data) -> Bool { d.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) }
 
-    // The icon's file stem in the app: CydianIcon60x60@2x.png and @3x.png (the same bytes; iOS scales).
-    static let iconStem = "CydianIcon60x60"
+    // The icon's file stem in the app: iFizBoxIcon60x60@2x.png and @3x.png (the same bytes; iOS scales).
+    static let iconStem = "iFizBoxIcon60x60"
     var iconFiles: [String] { icon == nil ? [] : ["\(SignOptions.iconStem)@2x.png", "\(SignOptions.iconStem)@3x.png"] }
 
     // The main app's Info.plist with the name and icon changed. CFBundleIconName goes, so iOS takes the loose PNGs

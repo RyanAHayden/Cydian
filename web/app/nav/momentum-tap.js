@@ -2,7 +2,7 @@
 // spends a touch that lands during momentum on stopping it, and the row gets no click. Two ways in:
 // - The app: UIKit swallows that touch whole (WebKit sees no touchstart, no pointerdown: checked on the iPhone 7),
 //   so native/Sources/MomentumTap.swift spots the tap on the decelerating scroll view and calls
-//   cydianMomentumTap(x, y) here.
+//   ifizboxMomentumTap(x, y) here.
 // - Touch events that do reach the page (a browser that sends them, or our own JS fling in nav/scroller.js): a
 //   touch that starts while a scroller is coasting (a scroll event with no finger down in the last MOMENTUM ms) and
 //   ends as a quick tap (at most TAP_MS long, at most SLOP px off where it began) gets its click from us.
@@ -67,7 +67,7 @@ export function initMomentumTap(doc = document, win = window) {
     target.dispatchEvent(new win.MouseEvent("click", { bubbles: true, cancelable: true, view: win, detail: 1, clientX: x, clientY: y, screenX, screenY }));
     return true;
   };
-  globalThis.cydianMomentumTap = (x, y) => clickAt(x, y);
+  globalThis.ifizboxMomentumTap = (x, y) => clickAt(x, y);
 
   doc.addEventListener("click", (e) => {
     if (!e.isTrusted) return;

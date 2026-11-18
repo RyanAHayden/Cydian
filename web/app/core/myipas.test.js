@@ -80,6 +80,6 @@ test("the website's library: links kept on this device, one entry per link, uniq
   assert.equal(siteEntries(s).length, 3);
   removeSiteUrl(s, "Delta.ipa");
   assert.deepEqual(siteEntries(s).map((e) => e.file), ["Delta 2.ipa", "App.ipa"]);
-  s.setItem("cydian.myIpas", "{broken");
+  s.setItem("ifizbox.myIpas", "{broken");
   assert.deepEqual(siteEntries(s), []);
 });

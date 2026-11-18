@@ -1,7 +1,7 @@
-/* cydian-helper's checks, kept apart from main() so they build and are tested on Linux (test_helper.py).
+/* ifizbox-helper's checks, kept apart from main() so they build and are tested on Linux (test_helper.py).
  * SPDX-License-Identifier: GPL-3.0-or-later */
-#ifndef CYDIAN_HELPER_POLICY_H
-#define CYDIAN_HELPER_POLICY_H
+#ifndef IFIZBOX_HELPER_POLICY_H
+#define IFIZBOX_HELPER_POLICY_H
 
 #include <limits.h>
 #include <sys/types.h>
@@ -13,7 +13,7 @@
 #define HELPER_EX_USAGE 64  /* refused: verb, package name or unknown package */
 #define HELPER_EX_NOPERM 77 /* refused: caller isn't iFizBox running as root */
 #define HELPER_EX_EXEC 126  /* apt-get or dpkg couldn't be run */
-#define HELPER_EX_IOERR 74  /* F33: cydian.sources couldn't be read or written */
+#define HELPER_EX_IOERR 74  /* F33: ifizbox.sources couldn't be read or written */
 
 enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, HV_HOLD, HV_UNHOLD, HV_SHOWHOLD,
                    HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA, HV_SELFUPDATE,
@@ -43,7 +43,7 @@ int helper_cancel_ok(const char *line, size_t len);
  * ipa.install): <HELPER_IPA_DIR>/<name>.ipa, name [A-Za-z0-9][A-Za-z0-9._-]*. The app is no-container, so this is
  * mobile's own Caches. Tests build with their own -DHELPER_IPA_DIR; the shipped build keeps this one. */
 #ifndef HELPER_IPA_DIR
-#define HELPER_IPA_DIR "/var/mobile/Library/Caches/com.ryha.cydian/ipa"
+#define HELPER_IPA_DIR "/var/mobile/Library/Caches/com.ryha.ifizbox/ipa"
 #endif
 #define HELPER_IPA_NAME_MAX 255
 /* F59: install-ipa's own refusal: no AppSync Unified and no ldid to sign ad hoc, or installd refused the ad hoc
@@ -51,7 +51,7 @@ int helper_cancel_ok(const char *line, size_t len);
 #define HELPER_EX_ADHOC 69
 
 /* F33: the one file addsource/removesource edit, under the prefix. Nothing else in apt's sources is touched. */
-#define HELPER_SOURCES_FILE "/etc/apt/sources.list.d/cydian.sources"
+#define HELPER_SOURCES_FILE "/etc/apt/sources.list.d/ifizbox.sources"
 #define HELPER_URI_MAX 1024
 #define HELPER_SUITE_MAX 255
 #define HELPER_COMPONENT_MAX 64
@@ -91,7 +91,7 @@ int helper_deb_path_ok(const char *s);
  * a regular root-owned file, not group/other writable, with one link; then (main.c, before the exec)
  * helper_rollback_verify reads its control through dpkg-deb: Package must be id and Version the version asked. */
 #ifndef HELPER_ROLLBACK_DIR
-#define HELPER_ROLLBACK_DIR "/var/cache/cydian/rollback"
+#define HELPER_ROLLBACK_DIR "/var/cache/ifizbox/rollback"
 #endif
 #define HELPER_ROLLBACK_MAX 64 /* stored .debs listed per package, at most */
 /* The version in a stored .deb's name for id ("%3a" back to ':'), into ver; 1, or 0 when the name isn't
@@ -117,7 +117,7 @@ int helper_rollback_verify(const char *prefix, const char *deb, const char *id, 
  * then runs apt-get -y (conffile options) [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <the copy>, so apt
  * pulls in its dependencies. Tests build with their own -DHELPER_PAID_DIR. */
 #ifndef HELPER_PAID_DIR
-#define HELPER_PAID_DIR "/var/mobile/Library/Caches/com.ryha.cydian/paid"
+#define HELPER_PAID_DIR "/var/mobile/Library/Caches/com.ryha.ifizbox/paid"
 #endif
 /* 1 if path is <dir>/<name> with name [A-Za-z0-9][A-Za-z0-9._-]* ending in ".deb", at most HELPER_IPA_NAME_MAX
  * bytes, no "..". */
@@ -133,7 +133,7 @@ int helper_paid_path_ok(const char *dir, const char *path);
  * No control check: any .deb is accepted, as selfupdate does; the caller check is the boundary. Tests build with
  * their own -DHELPER_DEB_DIR. */
 #ifndef HELPER_DEB_DIR
-#define HELPER_DEB_DIR "/var/mobile/Library/Caches/com.ryha.cydian/deb"
+#define HELPER_DEB_DIR "/var/mobile/Library/Caches/com.ryha.ifizbox/deb"
 #endif
 
 /* I4: app-versions (no arguments) runs nothing: ipa.c helper_app_versions lists the version of every app installd
@@ -179,7 +179,7 @@ int helper_sources_apply(const struct helper_plan *plan, int *changed, const cha
  * the file). off creates <prefix>HELPER_NOTIFY_OFF (an empty file, 0644; its folder made 0755 if missing), on
  * deletes it. Nothing is executed: path is the file, argv the verb and on/off. A symlink or anything but a regular
  * file at the path is refused, never followed. 0, or -1 + *err (main.c exits HELPER_EX_IOERR). */
-#define HELPER_NOTIFY_OFF "/var/lib/cydian/upgrades.off"
+#define HELPER_NOTIFY_OFF "/var/lib/ifizbox/upgrades.off"
 int helper_notify_apply(const struct helper_plan *plan, const char **err);
 
 /* Every package of an install (and every install item of simulate/apply) must be named "Package: <name>" in dpkg's status or one of apt's *_Packages lists;

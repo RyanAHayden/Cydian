@@ -16,23 +16,23 @@
 //   Complete Upgrade      every upgrade in Changes
 //   Essential Only        just the essential ones (sideload: iFizBox itself, signed on the phone)
 //   Ignore (Temporary)    asks again on the next launch
-// iFizBox's own source may name a minimum version (AltStore "minimumVersion", APT X-Cydian-Minimum-Version): a
+// iFizBox's own source may name a minimum version (AltStore "minimumVersion", APT X-iFizBox-Minimum-Version): a
 // running iFizBox older than that gets the alert without Ignore, and nothing else is usable until it upgrades.
-// For IPAs only iFizBox itself (com.ryha.cydian from its own source) is ever essential.
+// For IPAs only iFizBox itself (com.ryha.ifizbox from its own source) is ever essential.
 import { compareVersions, isNewer, parseVersion } from "./selfupdate.js";
 import { altKey, seedRecord } from "./altstore.js";
 import { NAME } from "../brand.js";
 
-export const SELF_ID = "com.ryha.cydian";
+export const SELF_ID = "com.ryha.ifizbox";
 const SELF_NAME = NAME;
 export const SELF_APT_URI = "https://cydian.dev/repo/";
 export const SELF_ALT_URL = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json";
 export const SELF_SITE = "https://cydian.dev/";
 // The .debs that are essential whatever their control says (iFizBox's helper is in iFizBox's own package).
 const ESSENTIAL_IDS = [SELF_ID, "apt", "dpkg"];
-export const MIN_FIELD = "x-cydian-minimum-version"; // the Release field, lower-cased as core/apt.js keeps them
+export const MIN_FIELD = "x-ifizbox-minimum-version"; // the Release field, lower-cased as core/apt.js keeps them
 const LOCKED_TEXT = `${NAME}'s own source is built in and can't be removed.`;
-export const STORE_KEY = "cydian.essential";
+export const STORE_KEY = "ifizbox.essential";
 
 // core/sources.js sourceKey, repeated here so this file doesn't import sources.js (which imports altstore.js).
 const aptKey = (uri, dist = "./") => `deb:${uri}:${dist}`;
@@ -118,7 +118,7 @@ const cleanVersion = (v) => {
   return p && /^\s*v?\d/.test(String(v)) ? p.join(".") : null;
 };
 
-// The minimum a source names: AltStore's app "minimumVersion" (or the source's), APT's X-Cydian-Minimum-Version
+// The minimum a source names: AltStore's app "minimumVersion" (or the source's), APT's X-iFizBox-Minimum-Version
 // (a Release's fields, or the record core/sources.js saved as `minimumVersion`). Null when none or unreadable.
 export function minimumOf(x) {
   if (!x || typeof x !== "object") return null;
@@ -259,7 +259,7 @@ export async function installSelf(row, deps) {
   const { alert, open } = deps;
   const v = row?.version ? `${NAME} ${row.version}` : NAME;
   if (!row?.ipa) {
-    await alert({ title: "Can't Install", message: `${v} has no Cydian.ipa in ${NAME}'s source.`, buttons: ["OK"] });
+    await alert({ title: "Can't Install", message: `${v} has no ${NAME}.ipa in ${NAME}'s source.`, buttons: ["OK"] });
     return "no-asset";
   }
   const { index } = await alert({ title: `Install ${v}`,

@@ -78,7 +78,7 @@ test("sign in, buy and install: the secret only in the Keychain, the .deb instal
   assert.equal(await signIn(s), true);
   assert.equal(await client.signedIn(), true);
   // the token beside the page, the payment secret only in the shell's Keychain
-  const key = "cydian.payment:" + vendor.base;
+  const key = "ifizbox.payment:" + vendor.base;
   assert.equal(native.keychain.size, 1);
   assert.ok(native.keychain.get(key));
   assert.ok(!storage.getItem(key).includes(native.keychain.get(key)));

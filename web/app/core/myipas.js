@@ -98,7 +98,7 @@ export function optionsParams(info, edits = {}) {
 
 // ---- the website's library: links, on this device -----------------------------------------------------------
 
-const SITE_KEY = "cydian.myIpas";
+const SITE_KEY = "ifizbox.myIpas";
 
 export function siteEntries(storage = globalThis.localStorage) {
   let list = [];

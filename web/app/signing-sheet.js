@@ -13,7 +13,7 @@
 //
 // The sheet's buttons (F81, user 2026-11-17): Install at the top right of its nav bar, a red Cancel at the bottom.
 //
-// The bridge is globalThis.cydianNative; an older shell without signing.inspect installs straight away as before.
+// The bridge is globalThis.ifizboxNative; an older shell without signing.inspect installs straight away as before.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showSheet } from "./nav/sheet.js";
 import { showAlert } from "./nav/alert.js";
@@ -41,7 +41,7 @@ function style() {
 const unknownMethod = (e) => /unknown method/i.test(String(e?.message ?? e ?? ""));
 
 export async function inspectAndInstall({ url, name = "", onInstalled = () => {} },
-  { native = globalThis.cydianNative, hud = liveHUD, alert = showAlert, install = installOnDevice, sheet = openSignSheet, later = setTimeout } = {}) {
+  { native = globalThis.ifizboxNative, hud = liveHUD, alert = showAlert, install = installOnDevice, sheet = openSignSheet, later = setTimeout } = {}) {
   const h = hud("Downloading");
   let info;
   try {
@@ -90,7 +90,7 @@ export async function customInstall(opts, { check = null, inspect = inspectAndIn
 // was looked at, the edits, the name to show, the ID iOS will know it by) and closes. True once queued, false on
 // Cancel or an error (shown). An older shell without signing.inspect queues it plain (queue(null)), as Install would.
 export async function inspectToQueue({ url, name = "", queue },
-  { native = globalThis.cydianNative, hud = liveHUD, alert = showAlert, sheet = openSignSheet, now = Date.now } = {}) {
+  { native = globalThis.ifizboxNative, hud = liveHUD, alert = showAlert, sheet = openSignSheet, now = Date.now } = {}) {
   const h = hud("Downloading");
   let info;
   try {

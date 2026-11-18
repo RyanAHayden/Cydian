@@ -1,7 +1,7 @@
 // F102: the Wish List (Sileo's Wish List Manager, Zebra's ZBWishListTableViewController; docs/sileo-zebra.md). Add to /
 // Remove from Wish List on the package page's sheet (screens/browse.js packageActions). F125: its page is in Installed
 // (screens/installed.js, #installed/wishlist: a Wish List row with the count, Edit or a swipe removes one), not Home. Kept on the device like the holds: a JSON list of package ids at
-// localStorage["cydian.wishlist"]. Installed packages drop off it (prune, when the page draws). Pure JS, no DOM.
+// localStorage["ifizbox.wishlist"]. Installed packages drop off it (prune, when the page draws). Pure JS, no DOM.
 //
 //   const w = createWishlist();           // storage defaults to localStorage; memory only where that throws
 //   w.has(id)  w.list()  w.set(id, on)    // list(): in the order they were added
@@ -10,7 +10,7 @@
 //   wishRows(ids, rows, installed)        // the page's rows: the catalog's, by name, installed and unknown left out
 //   wishCount(ids, installed)             // F125: Installed's Wish List row count: the wished ids not installed
 
-export const WISHLIST_KEY = "cydian.wishlist";
+export const WISHLIST_KEY = "ifizbox.wishlist";
 export const WISH_ADD = "Add to Wish List";
 export const WISH_REMOVE = "Remove from Wish List";
 export const WISH_EMPTY = "Packages you add from their page (Add to Wish List) show here until they are installed.";

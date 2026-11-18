@@ -3,8 +3,8 @@
 // browsers: navigator.vibrate. Must be called from a user gesture (pointerdown/touchstart), or iOS stays silent.
 
 export function haptic() {
-  const bridge = globalThis.webkit?.messageHandlers?.cydian;
-  if (bridge && globalThis.cydianApp) {
+  const bridge = globalThis.webkit?.messageHandlers?.ifizbox;
+  if (bridge && globalThis.ifizboxApp) {
     try { bridge.postMessage({ method: "haptic.tap" })?.catch?.(() => {}); return; } catch { /* fall through */ }
   }
   if (typeof navigator !== "undefined" && navigator.vibrate) { navigator.vibrate(10); return; }

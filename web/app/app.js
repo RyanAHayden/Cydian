@@ -236,7 +236,7 @@ const router = createRouter({
 // then ours finishing and calling history.back() again), landing somewhere else. So on the web our edge strip stays
 // off and a pop we didn't start isn't animated; we just show the page history lands on. The native app's WKWebView
 // has no such gesture (N1 turns it off), so it keeps ours.
-const webBack = !(globalThis.cydianApp || globalThis.cydianNative);
+const webBack = !(globalThis.ifizboxApp || globalThis.ifizboxNative);
 let ownBack = false; // the pop under way came from our back button or our swipe
 
 function goBack() {
@@ -306,14 +306,14 @@ const lockTabs = async () => {
   const locked = gate.browsingLocked({ mode: detectMode() });
   for (const t of BAR_TABS) tabbar.items[t].classList.toggle("tab-locked", locked && !OPEN_TABS.has(t));
 };
-if (!(globalThis.cydianApp || globalThis.cydianNative)) { lockTabs(); addEventListener("cydian:browse-lock", lockTabs); }
+if (!(globalThis.ifizboxApp || globalThis.ifizboxNative)) { lockTabs(); addEventListener("ifizbox:browse-lock", lockTabs); }
 
 document.getElementById("tabbar").addEventListener("click", (e) => {
   const a = e.target.closest("a.tab");
   if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
   e.preventDefault();
   if (a.classList.contains("tab-locked")) {
-    import("./screens/home.js").then((h) => gate.askToBrowse({ install: () => h.installCydian() })).catch(() => {});
+    import("./screens/home.js").then((h) => gate.askToBrowse({ install: () => h.installiFizBox() })).catch(() => {});
     return;
   }
   // A second tap at the root scrolls the page to the top (F148), then runs the screen's reselect() (Search focuses
@@ -387,7 +387,7 @@ if (isAddPath(location.pathname)) {
 // The Home Screen web app opens outside links in a sheet over itself, address bar on top. x-safari-https://… makes
 // iOS hand them to Safari instead, and from there to their own apps (Discord, GitHub). The app's shell sends them
 // out natively already (LinkOut); a Safari tab opens them as usual.
-const standalone = !globalThis.cydianNative && (navigator.standalone || matchMedia?.("(display-mode: standalone)").matches);
+const standalone = !globalThis.ifizboxNative && (navigator.standalone || matchMedia?.("(display-mode: standalone)").matches);
 if (standalone) {
   const outside = (u) => { try { const x = new URL(u, location.href); return /^https?:$/.test(x.protocol) && x.origin !== location.origin ? x.href : null; } catch { return null; } };
   // A site with its own app's scheme (core/applinks.js: X, YouTube) opens that app; Safari only if it didn't come up.
@@ -409,13 +409,13 @@ router.start();
 // F93 (as before F89): first launch of a iFizBox installed from the website: its signed copy carries the website's
 // sources and settings as web/transfer.link (signed in the browser, websign-job.js); import them once, no question.
 // Only on the very first launch (user 2026-11-17: the website is rarely used after that).
-if (globalThis.cydianNative) {
+if (globalThis.ifizboxNative) {
   let done = null;
-  try { done = localStorage.getItem("cydian.transferDone"); } catch { /* private */ }
+  try { done = localStorage.getItem("ifizbox.transferDone"); } catch { /* private */ }
   if (!done) fetch("transfer.link", { cache: "no-store" }).then((r) => (r.ok ? r.text() : null)).then(async (link) => {
     link = link?.trim();
-    if (!link || !link.startsWith("cydian://import?")) return;
-    try { localStorage.setItem("cydian.transferDone", "1"); } catch { /* imports again next launch */ }
+    if (!link || !link.startsWith("ifizbox://import?")) return;
+    try { localStorage.setItem("ifizbox.transferDone", "1"); } catch { /* imports again next launch */ }
     const { handleIncoming } = await import("./incoming.js");
     await handleIncoming(link);
   }).catch(() => {});
@@ -432,22 +432,22 @@ if (settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.setting
 // F72: in the app, once the launch has settled, the Essential Upgrade alert when iFizBox (or, jailbroken, apt, dpkg or
 // another Essential: yes package) has an upgrade on iFizBox's built-in source. It replaces F61's own popup: only when
 // that source couldn't be read does F61 look on GitHub (at most once a day).
-// F75: cydian:// links from the website (Send Settings, Home's Open in iFizBox App) and elsewhere (incoming.js).
-// cydian://install (F89) is no longer sent by the website since F92/F95: only for links already out there.
-if (globalThis.cydianNative) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
+// F75: ifizbox:// links from the website (Send Settings, Home's Open in iFizBox App) and elsewhere (incoming.js).
+// ifizbox://install (F89) is no longer sent by the website since F92/F95: only for links already out there.
+if (globalThis.ifizboxNative) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
 
 // The Home Screen icon's long-press Upgrade All (native Shortcut.perform): Changes, every upgrade queued, Confirm.
 // F167: the native shell calls this on a status bar tap (App.swift scrollViewShouldScrollToTop).
-globalThis.cydianScrollToTop = makeScrollToTop(document, () => stacks.top()?.page.body);
+globalThis.ifizboxScrollToTop = makeScrollToTop(document, () => stacks.top()?.page.body);
 
-globalThis.cydianShortcut = async (type) => {
+globalThis.ifizboxShortcut = async (type) => {
   if (type !== "upgrade") return;
   location.hash = "#/changes";
   (await import("./screens/changes.js")).upgradeEverything().catch(() => {});
 };
-if (globalThis.cydianPendingShortcut) { globalThis.cydianShortcut(globalThis.cydianPendingShortcut); globalThis.cydianPendingShortcut = null; }
+if (globalThis.ifizboxPendingShortcut) { globalThis.ifizboxShortcut(globalThis.ifizboxPendingShortcut); globalThis.ifizboxPendingShortcut = null; }
 
-if (globalThis.cydianNative) {
+if (globalThis.ifizboxNative) {
   // Every launch (Home's Reload is one) and every return: iFizBox's source first (the Essential Upgrade alert); when
   // that found nothing to say, GitHub's release, without the once-a-day wait (user 2026-11-17: only Settings' Check
   // for Updates showed it).
@@ -455,16 +455,16 @@ if (globalThis.cydianNative) {
     .then((r) => (["complete", "essential", "ignored", "notified"].includes(r) ? r : settingsScreen.checkUpdates({ always: true })))
     .catch(() => {});
   setTimeout(lookForUpdates, 2000);
-  globalThis.addEventListener("cydian:reloaded", lookForUpdates); // Home's Reload (screens/home.js reloadHome)
+  globalThis.addEventListener("ifizbox:reloaded", lookForUpdates); // Home's Reload (screens/home.js reloadHome)
   // The first launch after iFizBox updated itself (iOS closed the old one as it installed this one): say so.
   appVersion().then((v) => {
     if (!v) return;
     let last = null;
-    try { last = localStorage.getItem("cydian.lastVersion"); localStorage.setItem("cydian.lastVersion", v); } catch { return; }
+    try { last = localStorage.getItem("ifizbox.lastVersion"); localStorage.setItem("ifizbox.lastVersion", v); } catch { return; }
     if (last && last !== v) {
       showBanner({ title: NAME, message: `Updated to ${v}.`, duration: 4000 });
       // The icon badge counted this very update: clear it; Changes sets it again with what's still waiting (user 2026-11-18).
-      Promise.resolve(globalThis.cydianNative.call("app.badge", { count: 0 })).catch(() => {});
+      Promise.resolve(globalThis.ifizboxNative.call("app.badge", { count: 0 })).catch(() => {});
     }
   }).catch(() => {});
   // Back in the foreground after a while: look again (an essential update can come out while iFizBox sits in the
@@ -479,7 +479,7 @@ if (globalThis.cydianNative) {
 
 // F89: Web Push went with the website's server. A browser that registered the old push service worker (sw.js,
 // F10) drops it, so iOS stops waking it for pushes that no longer come.
-if (!globalThis.cydianNative) {
+if (!globalThis.ifizboxNative) {
   setTimeout(() => navigator.serviceWorker?.getRegistrations?.()
     .then((all) => Promise.all(all.map((r) => r.unregister()))).catch(() => {}), 3000);
 }

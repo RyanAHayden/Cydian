@@ -1,6 +1,6 @@
 // N8: iFizBox's App Intents, so Shortcuts, Siri, Spotlight and the Action button get them with nothing built by hand.
 // Each is a thin wrapper around IntentsCore (../Core.swift, tested on Linux); the build turns these declarations into
-// Cydian.app/Metadata.appintents (../metadata.py), which is how iOS finds them without Xcode.
+// iFizBox.app/Metadata.appintents (../metadata.py), which is how iOS finds them without Xcode.
 //
 //   both modes       Check for Updates (returns one line per update; dialog "3 Updates: …"), Add Source (URL; opens
 //                    iFizBox's Add Source alert filled in), Restore My Packages (file; in the sideload app: its sources)
@@ -54,7 +54,7 @@ struct AddSourceIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         let link = try IntentsCore.addSourceLink(url)
-        Incoming.receive(link) // the page's incoming.js opens Add Source (cydian://add, Sources/App.swift)
+        Incoming.receive(link) // the page's incoming.js opens Add Source (ifizbox://add, Sources/App.swift)
         return .result()
     }
 }
@@ -126,7 +126,7 @@ struct RestorePackagesIntent: AppIntent {
 
 // Siri phrases and Spotlight's App Shortcuts. The sideload IPA's metadata keeps only the both-modes ones.
 @available(iOS 16.0, *)
-struct CydianShortcuts: AppShortcutsProvider {
+struct iFizBoxShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: CheckForUpdatesIntent(),
                     phrases: ["Check for updates in \(.applicationName)", "Check \(.applicationName) for updates"],
@@ -143,7 +143,7 @@ struct CydianShortcuts: AppShortcutsProvider {
     }
 }
 
-// A gzip member (RFC 1952) over Zip.swift's raw deflate, for the sideload restore's cydian://import link.
+// A gzip member (RFC 1952) over Zip.swift's raw deflate, for the sideload restore's ifizbox://import link.
 func gzipMember(_ d: Data) throws -> Data {
     var out = Data([0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255])
     out.append(try deflateData(d))

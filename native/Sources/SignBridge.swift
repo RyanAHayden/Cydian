@@ -26,12 +26,12 @@ import UIKit
 enum SignBridge {
     static let maxIPA: Int64 = 4 << 30
     static let work: URL = {
-        let d = FileManager.default.temporaryDirectory.appendingPathComponent("cydian-sign", isDirectory: true)
+        let d = FileManager.default.temporaryDirectory.appendingPathComponent("ifizbox-sign", isDirectory: true)
         try? FileManager.default.removeItem(at: d) // leftovers of an earlier run
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d
     }()
-    static let queue = DispatchQueue(label: "cydian.sign", qos: .userInitiated)
+    static let queue = DispatchQueue(label: "ifizbox.sign", qos: .userInitiated)
 
     static func register(_ b: Bridge) {
         b.on("signing.status") { c in run(c) { status() } }
@@ -86,7 +86,7 @@ enum SignBridge {
 
     // ---- F75: the certificate that came inside iFizBox's own IPA (BundledIdentity, native/sign/Handoff.swift)
 
-    // At launch, sideload build only: imports Payload/Cydian.app/cydian-identity.plist into the Keychain unless the
+    // At launch, sideload build only: imports Payload/iFizBox.app/ifizbox-identity.plist into the Keychain unless the
     // Keychain already holds an identity or this same file was looked at before (its digest in UserDefaults; the
     // bundle is read-only, so the file stays until the next update replaces it). Also clears the old Local Install's
     // leftovers. Never throws; a file that doesn't import is remembered too, so it isn't tried on every launch.
@@ -94,7 +94,7 @@ enum SignBridge {
         guard AppMode.current == .sideload else { return }
         queue.async {
             SignStore.removeOldInstallCA()
-            guard let url = Bundle.main.url(forResource: "cydian-identity", withExtension: "plist"),
+            guard let url = Bundle.main.url(forResource: "ifizbox-identity", withExtension: "plist"),
                   let data = try? Data(contentsOf: url) else { return }
             let digest = BundledIdentity.digest(data)
             let seen = UserDefaults.standard.string(forKey: BundledIdentity.seenKey)

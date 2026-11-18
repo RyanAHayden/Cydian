@@ -28,10 +28,10 @@ function fakeDom() {
 
 async function tapPaste({ native, clipboard }) {
   const dom = fakeDom();
-  const saved = { document: globalThis.document, native: globalThis.cydianNative,
+  const saved = { document: globalThis.document, native: globalThis.ifizboxNative,
     navigator: Object.getOwnPropertyDescriptor(globalThis, "navigator") };
   globalThis.document = dom.document;
-  if (native) globalThis.cydianNative = native; else delete globalThis.cydianNative;
+  if (native) globalThis.ifizboxNative = native; else delete globalThis.ifizboxNative;
   let readText = 0;
   Object.defineProperty(globalThis, "navigator", { configurable: true,
     value: { clipboard: { readText: async () => { readText++; return clipboard; } } } });
@@ -43,7 +43,7 @@ async function tapPaste({ native, clipboard }) {
     return { value: field.value, readText };
   } finally {
     globalThis.document = saved.document;
-    if (saved.native === undefined) delete globalThis.cydianNative; else globalThis.cydianNative = saved.native;
+    if (saved.native === undefined) delete globalThis.ifizboxNative; else globalThis.ifizboxNative = saved.native;
     if (saved.navigator) Object.defineProperty(globalThis, "navigator", saved.navigator); else delete globalThis.navigator;
   }
 }

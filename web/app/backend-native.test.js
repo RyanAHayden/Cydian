@@ -1,5 +1,5 @@
 // N3: the app's backend against the Swift side's stand-in (native/fake/fake-native.mjs: a fixture prefix with apt's
-// sources, lists and dpkg status, and native/fake/cydian-helper), fed into the same core as the site.
+// sources, lists and dpkg status, and native/fake/ifizbox-helper), fed into the same core as the site.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -169,10 +169,10 @@ const NEW_NET = {
   "https://new.test/Release": "Origin: New Repo\nArchitectures: iphoneos-arm64\n",
 };
 const NEW = "deb:https://new.test/:./";
-const cydianSources = (fx) => join(fx.prefix, "etc/apt/sources.list.d/cydian.sources");
+const ifizboxSources = (fx) => join(fx.prefix, "etc/apt/sources.list.d/ifizbox.sources");
 const readOrNull = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null);
 
-test("addSource checks the repo and writes it into apt's sources (cydian.sources) through the helper", async (t) => {
+test("addSource checks the repo and writes it into apt's sources (ifizbox.sources) through the helper", async (t) => {
   const { backend, native, fx } = setup(t, { net: NEW_NET });
   const added = await backend.addSource("new.test");
   assert.equal(added.key, NEW);
@@ -181,13 +181,13 @@ test("addSource checks the repo and writes it into apt's sources (cydian.sources
   assert.equal(added.added, undefined); // in apt's files now, not the device's alone
   assert.deepEqual(native.calls.filter((c) => c.method === "helper.run").map((c) => c.params.words),
     [["addsource", "https://new.test/", "./"]]);
-  assert.equal(readOrNull(cydianSources(fx)), "Types: deb\nURIs: https://new.test/\nSuites: ./\n");
+  assert.equal(readOrNull(ifizboxSources(fx)), "Types: deb\nURIs: https://new.test/\nSuites: ./\n");
   const listed = (await backend.sources()).find((s) => s.key === NEW);
-  assert.match(listed.file, /sources\.list\.d\/cydian\.sources$/);
+  assert.match(listed.file, /sources\.list\.d\/ifizbox\.sources$/);
   assert.equal(listed.origin, "New Repo"); // the device's metadata stays with apt's entry
   assert.equal(listed.added, undefined);
   await backend.addSource("new.test"); // again: no second stanza
-  assert.equal(readOrNull(cydianSources(fx)), "Types: deb\nURIs: https://new.test/\nSuites: ./\n");
+  assert.equal(readOrNull(ifizboxSources(fx)), "Types: deb\nURIs: https://new.test/\nSuites: ./\n");
 });
 
 test("F48: addSource takes a dist repo { uri, dist, components }: Release under dists/<suite>/, suite and components to apt", async (t) => {
@@ -202,19 +202,19 @@ test("F48: addSource takes a dist repo { uri, dist, components }: Release under 
   assert.equal(added.count, 1);
   assert.deepEqual(native.calls.filter((c) => c.method === "helper.run").map((c) => c.params.words),
     [["addsource", "https://dist.test/", "stable", "main"]]);
-  assert.match(readOrNull(cydianSources(fx)), /URIs: https:\/\/dist\.test\/\nSuites: stable\nComponents: main\n/);
+  assert.match(readOrNull(ifizboxSources(fx)), /URIs: https:\/\/dist\.test\/\nSuites: stable\nComponents: main\n/);
   // no Release there: APT's "Did not Find Repository", not an AltStore attempt with the object
   await assert.rejects(backend.addSource({ uri: "https://dist.test/", dist: "nope", components: ["main"] }), { kind: "not_repository" });
 });
 
-test("removeSource takes a source out of cydian.sources; apt's other files are left alone", async (t) => {
+test("removeSource takes a source out of ifizbox.sources; apt's other files are left alone", async (t) => {
   const { backend, native, fx } = setup(t, { net: NEW_NET });
   await backend.addSource("new.test");
   await assert.rejects(backend.removeSource(PROCURSUS), /procursus\.sources/);
   assert.ok(!native.calls.some((c) => c.method === "helper.run" && c.params.words[0] === "removesource"));
   await backend.removeSource(NEW);
   assert.deepEqual(native.calls.filter((c) => c.method === "helper.run").pop().params.words, ["removesource", "https://new.test/", "./"]);
-  assert.equal(readOrNull(cydianSources(fx)), null); // the last one gone: the file too
+  assert.equal(readOrNull(ifizboxSources(fx)), null); // the last one gone: the file too
   assert.ok(!(await backend.sources()).some((s) => s.key === NEW));
   assert.equal(readOrNull(join(fx.prefix, "etc/apt/sources.list.d/procursus.sources")).includes("apt.procurs.us"), true);
 });
@@ -222,7 +222,7 @@ test("removeSource takes a source out of cydian.sources; apt's other files are l
 test("a failed write is an error with the helper's message, and nothing is kept", async (t) => {
   const { backend, fx } = setup(t, { net: NEW_NET, env: { FAKE_FAIL: "addsource" } });
   await assert.rejects(backend.addSource("new.test"), (e) => e.code === "helper" && /addsource failed \(74\).*temp file/.test(e.message));
-  assert.equal(readOrNull(cydianSources(fx)), null);
+  assert.equal(readOrNull(ifizboxSources(fx)), null);
   assert.ok(!(await backend.sources()).some((s) => s.key === NEW));
 });
 
@@ -240,14 +240,14 @@ test("without a helper (sideload build) an added source is kept on the device, a
   assert.ok((await bare.sources()).some((s) => s.key === NEW && s.added && !s.file));
   await assert.rejects(bare.removeSource(PROCURSUS), /procursus\.sources/);
 
-  // The same device store, now with the helper: Refresh writes the record into cydian.sources first.
+  // The same device store, now with the helper: Refresh writes the record into ifizbox.sources first.
   const app = make();
   const seen = [];
   await app.refreshSources((s) => seen.push(s.key));
-  assert.equal(readOrNull(cydianSources(fx)), "Types: deb\nURIs: https://new.test/\nSuites: ./\n");
+  assert.equal(readOrNull(ifizboxSources(fx)), "Types: deb\nURIs: https://new.test/\nSuites: ./\n");
   assert.ok(seen.includes(NEW));
   const listed = (await app.sources()).find((s) => s.key === NEW);
-  assert.match(listed.file, /cydian\.sources$/);
+  assert.match(listed.file, /ifizbox\.sources$/);
   assert.equal(listed.added, undefined);
   assert.equal(listed.origin, "New Repo");
 });
@@ -264,11 +264,11 @@ test("refreshSources keeps a device-only source that can't be written yet, and s
   const app = make({ env: { FAKE_FAIL: "addsource" } });
   const out = await app.refreshSources();
   assert.ok(out.some((s) => s.key === PROCURSUS && s.count === 2));
-  assert.equal(readOrNull(cydianSources(fx)), null);
+  assert.equal(readOrNull(ifizboxSources(fx)), null);
   assert.ok((await app.sources()).some((s) => s.key === NEW && s.added)); // tried again next time
 });
 
-test("native/bridge.js: postMessage ids, stream events, error codes, cydianApp", async () => {
+test("native/bridge.js: postMessage ids, stream events, error codes, ifizboxApp", async () => {
   const src = readFileSync(join(import.meta.dirname, "../../native/bridge.js"), "utf8");
   const posted = [];
   let ctx;
@@ -277,16 +277,16 @@ test("native/bridge.js: postMessage ids, stream events, error codes, cydianApp",
       posted.push(msg);
       if (msg.method === "fail") return Promise.reject(new Error("timeout: the repo took too long"));
       if (msg.method === "helper.run") {
-        ctx.cydianNative.emit(msg.id, [{ fd: "out", line: "hello" }]);
+        ctx.ifizboxNative.emit(msg.id, [{ fd: "out", line: "hello" }]);
         return Promise.resolve({ code: 0, stdout: "hello\n", stderr: "" });
       }
       return Promise.resolve(undefined);
     },
   };
-  ctx = vm.createContext({ webkit: { messageHandlers: { cydian: handler } }, console });
+  ctx = vm.createContext({ webkit: { messageHandlers: { ifizbox: handler } }, console });
   vm.runInContext(src.replace("})(globalThis);", "})(this);"), ctx);
-  assert.equal(ctx.cydianApp, true);
-  const n = ctx.cydianNative;
+  assert.equal(ctx.ifizboxApp, true);
+  const n = ctx.ifizboxNative;
   const lines = [];
   const r = await n.helper(["hold", "com.a"], (e) => lines.push(e.line));
   assert.equal(r.code, 0);
@@ -294,10 +294,10 @@ test("native/bridge.js: postMessage ids, stream events, error codes, cydianApp",
   assert.deepEqual(JSON.parse(JSON.stringify(posted[0])), { id: 1, method: "helper.run", params: { words: ["hold", "com.a"], stream: true }, stream: true });
   assert.equal(await n.dpkgStatus(), null);
   await assert.rejects(n.call("fail"), (e) => e.code === "timeout" && e.message === "the repo took too long");
-  // Without the shell it does nothing: the site never gets a cydianNative.
+  // Without the shell it does nothing: the site never gets a ifizboxNative.
   const bare = vm.createContext({});
   vm.runInContext(src.replace("})(globalThis);", "})(this);"), bare);
-  assert.equal(bare.cydianNative, undefined);
+  assert.equal(bare.ifizboxNative, undefined);
 });
 
 test("F49: Add Source tries Telesphoreo's dists/ios/<cf>/ from app.info's CoreFoundation number", async (t) => {

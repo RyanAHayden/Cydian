@@ -36,7 +36,9 @@ Shortcuts recipes live in `docs/shortcuts.md`.
 - The name (and domain, IDs, repo) come from one place: `web/app/brand.js` (`NAME`, imported by the frontend and
   `worker/`) and `native/brand.env` (build.sh's `$(BRAND_NAME)` in plists, `Brand.name` in Swift, `brand.py` for
   Python). Never spell the name in code or a user-visible string; `native/test_brand.py` checks it.
-- Bundle ID and package name: `com.ryha.cydian` (extensions and spikes add a suffix: `com.ryha.cydian.share`).
+- Bundle ID and package name: `com.ryha.ifizbox` (extensions and spikes add a suffix: `com.ryha.ifizbox.share`),
+  from brand.env's `BRAND_BUNDLE_ID`. Internal IDs, storage keys, paths and env variables use the lowercase name
+  (`ifizbox.*`, `ifizbox-helper`, `IFIZBOX_*`); F171 made a clean break from the old name (no migration).
 - Drawing iOS 6 controls: take colours and shapes from the 4S's UIKit art (`ref/4s/artwork/Shared@2x/`, sample the
   pixels), pressed states from its `*Pressed` images. Never add highlights, glows or bottom lines the phone doesn't
   draw. A gradient on an element with a border needs `background-origin: border-box` (repeat it after any

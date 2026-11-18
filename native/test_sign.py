@@ -84,20 +84,20 @@ def rich_ipa(main_binary=None):
             z.writestr(zi, data)
         put("Payload/", b"", 0o40755)
         put(A, b"", 0o40755)
-        put(A + "Info.plist", info("dev.cydian.fixture", "Fixture", CFBundleDisplayName="Fixture",
+        put(A + "Info.plist", info("dev.ifizbox.fixture", "Fixture", CFBundleDisplayName="Fixture",
                                    UISupportedDevices=["iPhone14,2"]))
         put(A + "Fixture", main_binary or macho(), 0o100755)
-        put(A + "hello.txt", b"Hello from Cydian's on-device signer test.\n")
+        put(A + "hello.txt", b"Hello from iFizBox's on-device signer test.\n")
         put(A + "link.txt", b"hello.txt", 0o120777)
         put(A + "en.lproj/Localizable.strings", b'"hi" = "hi";\n')
         put(A + "Base.lproj/Main.storyboardc", b"storyboard")
         put(A + "OldStuff/_CodeSignature/CodeResources", b"old seal")
         put(A + "_CodeSignature/CodeResources", b"old seal")
         put(A + "embedded.mobileprovision", b"old profile")
-        put(A + "Frameworks/Kit.framework/Info.plist", info("dev.cydian.kit", "Kit", "Kit", CFBundlePackageType="FMWK"))
+        put(A + "Frameworks/Kit.framework/Info.plist", info("dev.ifizbox.kit", "Kit", "Kit", CFBundlePackageType="FMWK"))
         put(A + "Frameworks/Kit.framework/Kit", macho(6), 0o100755)
         put(A + "Frameworks/libloose.dylib", macho(6), 0o100755)
-        put(A + "PlugIns/Share.appex/Info.plist", info("dev.cydian.fixture.share", "Share", "Share",
+        put(A + "PlugIns/Share.appex/Info.plist", info("dev.ifizbox.fixture.share", "Share", "Share",
                                                        CFBundlePackageType="XPC!"))
         put(A + "PlugIns/Share.appex/Share", macho(), 0o100755)
         put("iTunesMetadata.plist", plistlib.dumps({"itemName": "Fixture"}))
@@ -179,7 +179,7 @@ def slots(binary):
 class OnDeviceSigner(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.mkdtemp(prefix="cydian-signtest-")
+        cls.tmp = tempfile.mkdtemp(prefix="ifizbox-signtest-")
         cls.fx = os.path.join(cls.tmp, "fixtures")
         cls.work = os.path.join(cls.tmp, "work")
         os.makedirs(cls.fx)
@@ -231,9 +231,9 @@ class OnDeviceSigner(unittest.TestCase):
     def test_swift(self):
         self.assertIsNone(self.build_error, self.build_error)
         env = dict(os.environ)
-        real = os.path.join(HERE, "build", "Cydian.ipa")  # the sideload build, where tools/check.sh made one
+        real = os.path.join(HERE, "build", "iFizBox.ipa")  # the sideload build, where tools/check.sh made one
         if os.path.exists(real):
-            env["CYDIAN_REAL_IPA"] = real
+            env["IFIZBOX_REAL_IPA"] = real
         r = subprocess.run([self.binary, self.fx, self.work], capture_output=True, text=True, timeout=600, env=env)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("all passed", r.stdout)

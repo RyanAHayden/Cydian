@@ -1,6 +1,6 @@
 // N9: what the share sheet and Open in iFizBox do with what they're handed, Foundation only, so it builds and is tested
 // on Linux (native/share/test_share.py, against the fake helper and a fake signer). The phone's parts are in App/
-// (the shell's side) and Extension/ (the share extension, which only turns a shared link into cydian://share?url=…).
+// (the shell's side) and Extension/ (the share extension, which only turns a shared link into ifizbox://share?url=…).
 //
 //   ShareClassifier.classify(link:)            an http(s) link, or a repo manager's link wrapping one -> SharedItem
 //   ShareClassifier.classify(file:head:)       a file (its first bytes decide, then its extension) -> SharedItem
@@ -10,7 +10,7 @@
 //                           | .deb: the N4 Confirm sheet (apt-get -s install ./file.deb), then the console
 //                sideload   repo or source: Add Source's alert (F144: an APT manager's link is refused: jailbreak source) | .ipa: My IPAs, signed on the phone with the user's
 //                           certificate and installed through the in-app server (Sideload.swift) | .deb: needs a jailbreak
-//   ShareRoute.link(…)                         the cydian:// link the shell hands the page (web/app/share.js)
+//   ShareRoute.link(…)                         the ifizbox:// link the shell hands the page (web/app/share.js)
 //   ShareInbox.stage(file, kind, dirs)         a copy where the helper takes it from (HELPER_IPA_DIR, HELPER_DEB_DIR)
 //   ShareRun.installIPA / simulateDeb / installDeb   the helper's install-ipa, simulate-deb and install-deb, read
 //
@@ -163,7 +163,7 @@ extension ShareHost {
 
 enum ShareRoute: Equatable {
     case addSource(URL)                         // both modes: Add Source's alert, filled in
-    case helperIPA(SharedItem)                  // jailbreak: cydian-helper install-ipa
+    case helperIPA(SharedItem)                  // jailbreak: ifizbox-helper install-ipa
     case signIPA(SharedItem)                    // sideload: My IPAs, signed on the phone, installed through Sideload
     case confirmDeb(SharedItem)                 // jailbreak: Confirm sheet (simulate-deb), console (install-deb)
     case refuse(title: String, message: String)
@@ -220,8 +220,8 @@ enum ShareRouter {
         }
     }
 
-    // The link the shell hands the page (web/app/share.js): cydian://add?url=… for sources (N8's, the Add Source
-    // alert), else cydian://shared?route=<name>&… with `file` (a staged file's name: the helper's directory, or My
+    // The link the shell hands the page (web/app/share.js): ifizbox://add?url=… for sources (N8's, the Add Source
+    // alert), else ifizbox://shared?route=<name>&… with `file` (a staged file's name: the helper's directory, or My
     // IPAs), `url` (a link the page downloads through the shell), `name`, and for refuse `title` and `message`.
     static func link(_ route: ShareRoute, file: String? = nil) -> URL? {
         var q = [URLQueryItem(name: "route", value: route.name)]
@@ -238,7 +238,7 @@ enum ShareRouter {
             q.append(URLQueryItem(name: "message", value: String(m.prefix(1000))))
         }
         var c = URLComponents()
-        c.scheme = "cydian"
+        c.scheme = "ifizbox"
         c.host = "shared"
         c.queryItems = q
         // URLComponents leaves + alone; the page's URLSearchParams would read it as a space.
@@ -253,8 +253,8 @@ enum ShareRouter {
 // helper takes ([A-Za-z0-9][A-Za-z0-9._-]*.ipa|.deb). The jailbreak app is no-container, so these are mobile's own
 // Caches (native/helper/policy.h HELPER_IPA_DIR, HELPER_DEB_DIR); the tests use their own.
 struct ShareDirs {
-    var ipa = "/var/mobile/Library/Caches/com.ryha.cydian/ipa"
-    var deb = "/var/mobile/Library/Caches/com.ryha.cydian/deb"
+    var ipa = "/var/mobile/Library/Caches/com.ryha.ifizbox/ipa"
+    var deb = "/var/mobile/Library/Caches/com.ryha.ifizbox/deb"
 }
 
 enum ShareInbox {
@@ -312,7 +312,7 @@ struct DebPlan: Equatable {
 }
 
 enum ShareRun {
-    // jailbreak: cydian-helper install-ipa <staged>. The result is what to record for I3 (the IPA's own Info.plist,
+    // jailbreak: ifizbox-helper install-ipa <staged>. The result is what to record for I3 (the IPA's own Info.plist,
     // the bundle ID the helper installed).
     static func installIPA(_ path: String, _ host: ShareHost, emit: ((String, String) -> Void)? = nil) throws -> InstalledApp {
         guard host.mode == .jailbreak else { throw IntentFailure.needsJailbreak }
@@ -326,8 +326,8 @@ enum ShareRun {
 
     // ipa.install's error kinds (Apt.swift IPAInstall), so the page explains them the same way.
     static func ipaError(_ r: HelperResult) -> String {
-        let why = r.err.split(separator: "\n").last { $0.hasPrefix("cydian-helper: ") }.map { String($0.dropFirst(15)) }
-            ?? "cydian-helper exited with \(r.code)"
+        let why = r.err.split(separator: "\n").last { $0.hasPrefix("ifizbox-helper: ") }.map { String($0.dropFirst(16)) }
+            ?? "ifizbox-helper exited with \(r.code)"
         let kind = r.code == 64 ? "bad_ipa" : r.code == 69 ? "no_adhoc" : r.code == 77 ? "helper" : "install"
         return "\(kind): \(why)"
     }

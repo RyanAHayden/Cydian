@@ -36,7 +36,7 @@ import { modeOf } from "./queue.js";
 import { compareVersions } from "./apt.js";
 import { installOptions } from "./altstore.js";
 
-export const SELF_ID = "com.ryha.cydian";
+export const SELF_ID = "com.ryha.ifizbox";
 
 // A download or installed size in Cydia's words ("109 kB", "4.7 MB"), for the Queue and the package and app pages.
 export function sizeText(bytes) {

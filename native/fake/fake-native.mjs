@@ -1,10 +1,10 @@
 // The Swift side of the bridge (native/Sources/Apt.swift) in node, over a fixture tree instead of a phone, for tests
 // without a device (N3; N4's queue and console reuse it). It answers the same methods with the same shapes and
-// error strings, and runs native/fake/cydian-helper where the app runs the real helper as root.
+// error strings, and runs native/fake/ifizbox-helper where the app runs the real helper as root.
 //
 //   const fx = makeFixture();                       // a scratch copy of native/fake/fixture/
 //   const native = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: { "https://r/x": "body" } });
-//   globalThis.cydianNative = native;                // what native/bridge.js would have set up
+//   globalThis.ifizboxNative = native;                // what native/bridge.js would have set up
 //   ...                                              fx.cleanup()
 //
 // `net`: URL -> string | { status, body, headers } for net.fetch / net.packages (a missing URL answers 404;
@@ -26,11 +26,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-export const FAKE_HELPER = join(HERE, "cydian-helper");
+export const FAKE_HELPER = join(HERE, "ifizbox-helper");
 export const FIXTURE = join(HERE, "fixture");
 
 export function makeFixture() {
-  const dir = mkdtempSync(join(tmpdir(), "cydian-fake-"));
+  const dir = mkdtempSync(join(tmpdir(), "ifizbox-fake-"));
   cpSync(FIXTURE, dir, { recursive: true });
   return { dir, prefix: join(dir, "prefix"), remote: join(dir, "remote"), cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
@@ -119,11 +119,11 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
     },
     "helper.run"({ words, stream }, onEvent) {
       // Like Helper.run in Apt.swift: no helper at its path, or one that can't start, is a "helper:" error.
-      if (!existsSync(helper)) return fail(`helper: cydian-helper is not installed at ${helper}`);
+      if (!existsSync(helper)) return fail(`helper: ifizbox-helper is not installed at ${helper}`);
       return new Promise((resolve, reject) => {
         const child = spawn(helper, words, {
-          env: { PATH: process.env.PATH, CYDIAN_PREFIX: prefix, FAKE_REMOTE: remote, CYDIAN_IPA_DIR: ipaDir,
-            CYDIAN_PAID_DIR: paidDir, ...env },
+          env: { PATH: process.env.PATH, IFIZBOX_PREFIX: prefix, FAKE_REMOTE: remote, IFIZBOX_IPA_DIR: ipaDir,
+            IFIZBOX_PAID_DIR: paidDir, ...env },
           // F63: apply-ask gets a stdin pipe for helper.answer, as Helper.run in Apt.swift gives it.
           stdio: [words[0] === "apply-ask" ? "pipe" : "ignore", "pipe", "pipe", "pipe"],
           detached: true, // F64: its own process group, so Cancel's signal reaches a sleep in the fake too
@@ -148,7 +148,7 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
         child.stdout.on("data", feed("out"));
         child.stderr.on("data", feed("err"));
         child.stdio[3].on("data", feed("status"));
-        child.on("error", (e) => reject(new Error(`helper: can't start cydian-helper: ${e.message}`)));
+        child.on("error", (e) => reject(new Error(`helper: can't start ifizbox-helper: ${e.message}`)));
         child.on("close", (code, signal) => {
           if (child.stdin) { if (answerTo === child.stdin) answerTo = null; child.stdin.destroy(); }
           if (running === run) running = null;
@@ -178,7 +178,7 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       process.kill(-running.child.pid, "SIGTERM");
       return true;
     },
-    // F59: like IPAInstall.run in Apt.swift: download as <UUID>.ipa into ipaDir, cydian-helper install-ipa, remove
+    // F59: like IPAInstall.run in Apt.swift: download as <UUID>.ipa into ipaDir, ifizbox-helper install-ipa, remove
     // the download; the helper's exit code picks the error code.
     async "ipa.install"({ url, stream }, onEvent) {
       if (mode !== "jailbreak") return fail("sideload: the sideload build installs IPAs through signing.install");
@@ -200,9 +200,9 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
         const id = res.stdout.split("\n").filter((l) => l.startsWith("Installed ")).pop();
         return { code: 0, stdout: res.stdout, stderr: res.stderr, bundleId: id ? id.slice(10) : "" };
       }
-      const why = res.stderr.split("\n").filter((l) => l.startsWith("cydian-helper: ")).pop();
+      const why = res.stderr.split("\n").filter((l) => l.startsWith("ifizbox-helper: ")).pop();
       const kind = { 64: "bad_ipa", 69: "no_adhoc", 77: "helper" }[res.code] ?? "install";
-      return fail(`${kind}: ${why ? why.slice(15) : `cydian-helper exited with ${res.code}`}`);
+      return fail(`${kind}: ${why ? why.slice(16) : `ifizbox-helper exited with ${res.code}`}`);
     },
     // F57: like Paid.swift. net.request: https only, GET or POST, body a string; the answer's body is base64.
     "net.request"({ method = "GET", url, headers, body }) {
@@ -237,7 +237,7 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
     // closing the sheet (ASWebAuthenticationSessionError.canceledLogin).
     "auth.session"({ url, callbackScheme = "sileo" }) {
       if (!/^https:\/\//i.test(url ?? "")) return fail("bad_url: not an https URL");
-      if (!/^[a-z][a-z0-9+.-]*$/.test(callbackScheme) || ["http", "https", "file", "cydian"].includes(callbackScheme)) {
+      if (!/^[a-z][a-z0-9+.-]*$/.test(callbackScheme) || ["http", "https", "file", "ifizbox"].includes(callbackScheme)) {
         return fail("bad_url: bad callback scheme");
       }
       for (const v of vendors) {

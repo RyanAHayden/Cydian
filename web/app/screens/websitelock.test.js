@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-// The page's window hears cydian:browse-lock (websign-gate.js setFirstVisit); Node's globalThis has no events of its own.
+// The page's window hears ifizbox:browse-lock (websign-gate.js setFirstVisit); Node's globalThis has no events of its own.
 if (!globalThis.addEventListener) {
   const bus = new EventTarget();
   globalThis.addEventListener = bus.addEventListener.bind(bus);
@@ -122,9 +122,9 @@ test("F145: a Home page that's gone stops listening", async () => {
   followBrowseLock({ wasLocked: true, locked: () => state, alive: () => alive, redraw: () => redraws++, target });
   alive = false;
   state = false;
-  target.dispatchEvent(new Event("cydian:browse-lock"));
+  target.dispatchEvent(new Event("ifizbox:browse-lock"));
   alive = true;
-  target.dispatchEvent(new Event("cydian:browse-lock"));
+  target.dispatchEvent(new Event("ifizbox:browse-lock"));
   assert.equal(redraws, 0);
 });
 
@@ -168,8 +168,8 @@ test("F145: while the site is locked, Install on the Website is padlocked and as
     let answer = 2;
     const alert = async (a) => { asked.push(a); return { index: answer }; };
     // setFirstVisit fires the event on globalThis; send it to this section's target too.
-    const relay = () => target.dispatchEvent(new Event("cydian:browse-lock"));
-    globalThis.addEventListener("cydian:browse-lock", relay);
+    const relay = () => target.dispatchEvent(new Event("ifizbox:browse-lock"));
+    globalThis.addEventListener("ifizbox:browse-lock", relay);
     try {
       const box = websiteSection({ mode: "site", storage, alert, install: async () => { installs++; }, target });
       doc.body.append(box);
@@ -217,7 +217,7 @@ test("F145: while the site is locked, Install on the Website is padlocked and as
       setFirstVisit("later", storage);
       assert.equal(box.dataset.locked, "false");
     } finally {
-      globalThis.removeEventListener("cydian:browse-lock", relay);
+      globalThis.removeEventListener("ifizbox:browse-lock", relay);
     }
   });
 });

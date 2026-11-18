@@ -1,8 +1,8 @@
 #!/bin/sh
-# A stand-in for cydian-helper (native/helper/) for tests without a device (N3, and N4's queue and console).
+# A stand-in for ifizbox-helper (native/helper/) for tests without a device (N3, and N4's queue and console).
 # Same words, same allowlist and exit codes; instead of apt it works on a fixture tree (addsource/removesource
-# edit $CYDIAN_PREFIX/etc/apt/sources.list.d/cydian.sources like the real one, F33):
-#   CYDIAN_PREFIX  the fake rootless prefix (etc/apt, var/lib/apt/lists, var/lib/dpkg/status)
+# edit $IFIZBOX_PREFIX/etc/apt/sources.list.d/ifizbox.sources like the real one, F33):
+#   IFIZBOX_PREFIX  the fake rootless prefix (etc/apt, var/lib/apt/lists, var/lib/dpkg/status)
 #   FAKE_REMOTE    what "the repos" hold: FAKE_REMOTE/lists/* is what apt-get update writes into the lists dir
 #   FAKE_FAIL      a verb that fails like apt does (exit 100, "E: ..." on stderr); simulate fails with an unmet
 #                  dependency of the first item on FAKE_MISSING (default com.example.missing), as apt-get -s does
@@ -12,35 +12,35 @@
 #   FAKE_DLWAIT    seconds apply waits after its download pass, before the first pmstatus: line (F64: Cancel's window;
 #                  like apt, apply fetches every install item first, dlstatus: lines, then hands them to dpkg)
 #   FAKE_FINISH    apply writes "finish:$FAKE_FINISH" to fd 3, as a maintainer script does through $CYDIA (N4)
-#   CYDIAN_IPA_DIR install-ipa's one directory (F59; the real one's HELPER_IPA_DIR). install-ipa reads the IPA's
-#                  bundle id like ipa.c and "installs" it into $CYDIAN_PREFIX/var/fake-installed-ipas:
+#   IFIZBOX_IPA_DIR install-ipa's one directory (F59; the real one's HELPER_IPA_DIR). install-ipa reads the IPA's
+#                  bundle id like ipa.c and "installs" it into $IFIZBOX_PREFIX/var/fake-installed-ipas:
 #   FAKE_APPSYNC=1 AppSync Unified is there (the IPA goes to installd as it is); else FAKE_LDID=1 means ldid signs it
 #                  ad hoc first, and neither is exit 69 (can't install ad hoc). A bundle id ending in .refused makes
 #                  the fake installd refuse an ad hoc app (exit 69) or an AppSync one (exit 1)
-#   rollbacks/rollback (F71) work on $CYDIAN_PREFIX/var/cache/cydian/rollback/<id>/ like the real ones: a "stored
+#   rollbacks/rollback (F71) work on $IFIZBOX_PREFIX/var/cache/ifizbox/rollback/<id>/ like the real ones: a "stored
 #                  .deb" here is a plain text control stanza (Package, Version, ...), which rollback writes into dpkg's
 #                  status in place of the installed one. Ownership isn't checked (the tests run as one user)
-#   install-paid (F57) takes a "downloaded .deb" from $CYDIAN_PAID_DIR (the real one's HELPER_PAID_DIR): a plain text
+#   install-paid (F57) takes a "downloaded .deb" from $IFIZBOX_PAID_DIR (the real one's HELPER_PAID_DIR): a plain text
 #                  control stanza as rollback's, checked to be the package and version asked, then written into
 #                  dpkg's status like rollback does. FAKE_FAIL=install-paid fails like apt (exit 100)
-#   simulate-deb/install-deb (N9) take a shared ".deb" from $CYDIAN_DEB_DIR (the real one's HELPER_DEB_DIR): a plain
+#   simulate-deb/install-deb (N9) take a shared ".deb" from $IFIZBOX_DEB_DIR (the real one's HELPER_DEB_DIR): a plain
 #                  text control stanza as install-paid's, no check of what it is. Its Depends: (names, comma separated)
 #                  are resolved as apt would: installed ones skipped, ones in apt's lists installed too, any other an
 #                  unmet dependency (exit 100). FAKE_FAIL=install-deb fails like apt (exit 100)
-#   app-versions (I4) lists the apps of a fake app-container tree, $CYDIAN_APPS_DIR (default
-#                  $CYDIAN_PREFIX/var/containers/Bundle/Application), as the real one lists installd's
+#   app-versions (I4) lists the apps of a fake app-container tree, $IFIZBOX_APPS_DIR (default
+#                  $IFIZBOX_PREFIX/var/containers/Bundle/Application), as the real one lists installd's
 # Status lines go to fd 3 when it is open, like apt's APT::Status-Fd. SPDX-License-Identifier: GPL-3.0-or-later
 set -u
-prefix=${CYDIAN_PREFIX:?}
+prefix=${IFIZBOX_PREFIX:?}
 lists=$prefix/var/lib/apt/lists
 status=$prefix/var/lib/dpkg/status
 st() { { printf '%s\n' "$1" >&3; } 2>/dev/null || true; }
-refuse() { echo "cydian-helper: $1" >&2; exit 64; }
+refuse() { echo "ifizbox-helper: $1" >&2; exit 64; }
 verb=${1:-}
 VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid, userspace-reboot, simulate-deb, install-deb, app-versions"
 [ -n "$verb" ] || refuse "no verb ($VERBS)"
 shift
-sources=$prefix/etc/apt/sources.list.d/cydian.sources
+sources=$prefix/etc/apt/sources.list.d/ifizbox.sources
 # F33: the same checks as policy.c's helper_uri_ok, helper_suite_ok and helper_component_ok. grep -x matches a
 # line, so a value with a newline in it ("https://r/\nTrusted: yes") is refused first.
 one_line() { case $1 in *"
@@ -76,7 +76,7 @@ case $verb in
       for c in "$@"; do component_ok "$c" || refuse "bad component"; done
     fi
     if [ "${FAKE_FAIL:-}" = "$verb" ]; then
-      echo "cydian-helper: can't create a temp file in sources.list.d: Permission denied (fake)" >&2
+      echo "ifizbox-helper: can't create a temp file in sources.list.d: Permission denied (fake)" >&2
       exit 74
     fi
     mine=
@@ -88,7 +88,7 @@ Suites: $suite"
 Components: $*"
     fi
     mkdir -p "${sources%/*}"
-    tmp="${sources%/*}/.cydian.sources.$$"
+    tmp="${sources%/*}/.ifizbox.sources.$$"
     # One stanza per paragraph; the first naming exactly this URI and suite becomes ours, the rest go.
     { cat "$sources" 2>/dev/null || true; } | awk -v uri="$uri" -v suite="$suite" -v mine="$mine" '
       BEGIN { RS = ""; placed = (mine == "") }
@@ -109,10 +109,10 @@ Components: $*"
       what="nothing to change"
     elif [ -s "$tmp" ]; then
       chmod 644 "$tmp" && mv "$tmp" "$sources"
-      what="cydian.sources updated"
+      what="ifizbox.sources updated"
     else
       rm -f "$tmp" "$sources"
-      what="cydian.sources updated"
+      what="ifizbox.sources updated"
     fi
     echo "$([ "$verb" = addsource ] && echo Added || echo Removed) $uri $suite: $what"
     exit 0 ;;
@@ -122,10 +122,10 @@ Components: $*"
   respring) [ $# -eq 0 ] || refuse "this verb takes no arguments"; echo "sbreload (fake)"; exit 0 ;;
   userspace-reboot) [ $# -eq 0 ] || refuse "this verb takes no arguments"; echo "launchctl reboot userspace (fake)"; exit 0 ;;
   app-versions)
-    # I4: ipa.c's helper_app_versions over $CYDIAN_APPS_DIR (default <prefix>/var/containers/Bundle/Application):
+    # I4: ipa.c's helper_app_versions over $IFIZBOX_APPS_DIR (default <prefix>/var/containers/Bundle/Application):
     # "<id>\t<short>\t<build>\t<store>" per <UUID>/<one>.app with an XML Info.plist; links aren't followed.
     [ $# -eq 0 ] || refuse "app-versions takes no arguments"
-    apps=${CYDIAN_APPS_DIR:-$prefix/var/containers/Bundle/Application}
+    apps=${IFIZBOX_APPS_DIR:-$prefix/var/containers/Bundle/Application}
     pval() { [ -f "$1" ] && [ ! -L "$1" ] || return 0
       tr -d '\n' < "$1" | sed -n "s|.*<key>$2</key>[[:space:]]*<string>\([^<]*\)</string>.*|\1|p" | grep -Ex '[^[:cntrl:]]{1,255}' || true; }
     for box in "$apps"/*; do
@@ -141,7 +141,7 @@ Components: $*"
   install-ipa)
     # F59: policy.c's helper_ipa_path_ok, then ipa.c's steps without installd.
     [ $# -eq 1 ] || refuse "install-ipa takes one path"
-    dir=${CYDIAN_IPA_DIR:?}
+    dir=${IFIZBOX_IPA_DIR:?}
     case $1 in "$dir"/*) name=${1#"$dir"/} ;; *) name= ;; esac
     { one_line "$1" && [ ${#name} -le 255 ] && printf '%s' "$name" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]*\.ipa' &&
       case $name in *..*) false ;; esac; } || refuse "bad IPA path (only $dir/<name>.ipa)"
@@ -175,18 +175,18 @@ print(v)' "$1")
     if [ "${FAKE_APPSYNC:-}" = 1 ]; then
       st "pmstatus:$id:50:Installing (AppSync Unified)"
       echo "install ipa $id"
-      case $id in *.refused) echo "cydian-helper: installd: fake installd refused it" >&2
-        echo "cydian-helper: installd refused the app" >&2; exit 1 ;; esac
+      case $id in *.refused) echo "ifizbox-helper: installd: fake installd refused it" >&2
+        echo "ifizbox-helper: installd refused the app" >&2; exit 1 ;; esac
     elif [ "${FAKE_LDID:-}" = 1 ]; then
       st "pmstatus:$id:40:Signing ad hoc (ldid)"
       echo "ldid -s Payload/$id.app (fake)"
       st "pmstatus:$id:60:Installing (ad hoc signed)"
       echo "install app $id (PackageType Developer)"
-      case $id in *.refused) echo "cydian-helper: installd: fake installd refused it" >&2
-        echo "cydian-helper: installd refused the ad hoc signed app: this jailbreak can't install ad hoc apps without AppSync Unified. Install AppSync Unified, or sign the IPA for this iPhone first" >&2
+      case $id in *.refused) echo "ifizbox-helper: installd: fake installd refused it" >&2
+        echo "ifizbox-helper: installd refused the ad hoc signed app: this jailbreak can't install ad hoc apps without AppSync Unified. Install AppSync Unified, or sign the IPA for this iPhone first" >&2
         exit 69 ;; esac
     else
-      echo "cydian-helper: AppSync Unified isn't installed and there's no ldid to sign the app ad hoc: install AppSync Unified or ldid, or sign the IPA for this iPhone first" >&2
+      echo "ifizbox-helper: AppSync Unified isn't installed and there's no ldid to sign the app ad hoc: install AppSync Unified or ldid, or sign the IPA for this iPhone first" >&2
       exit 69
     fi
     echo "$id" >> "$prefix/var/fake-installed-ipas"
@@ -201,7 +201,7 @@ print(v)' "$1")
     if [ "$verb" = rollback ]; then
       { one_line "$2" && printf '%s' "$2" | grep -Eqx '[0-9][A-Za-z0-9.+~:-]{0,254}'; } || refuse "bad version (a digit, then [A-Za-z0-9.+~:-])"
     fi
-    store=$prefix/var/cache/cydian/rollback/$1
+    store=$prefix/var/cache/ifizbox/rollback/$1
     found=
     for f in "$store/$1"_*_*.deb; do
       [ -f "$f" ] && [ ! -L "$f" ] || continue
@@ -242,7 +242,7 @@ print(v)' "$1")
   install-paid)
     # F57: policy.c's paid_plan (helper_paid_path_ok, name, version), then paid.c's control check and apt-get install.
     [ $# -eq 3 ] || refuse "install-paid takes a .deb path, a package name and a version"
-    dir=${CYDIAN_PAID_DIR:?}
+    dir=${IFIZBOX_PAID_DIR:?}
     case $1 in "$dir"/*) name=${1#"$dir"/} ;; *) name= ;; esac
     { one_line "$1" && [ ${#name} -le 255 ] && printf '%s' "$name" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]*\.deb' &&
       case $name in *..*) false ;; esac; } || refuse "bad .deb path (only $dir/<name>.deb)"
@@ -271,7 +271,7 @@ print(v)' "$1")
   simulate-deb|install-deb)
     # N9: policy.c's local_deb_plan (helper_paid_path_ok over HELPER_DEB_DIR), then paid.c's copy and apt-get.
     [ $# -eq 1 ] || refuse "$verb takes one .deb path"
-    dir=${CYDIAN_DEB_DIR:?}
+    dir=${IFIZBOX_DEB_DIR:?}
     case $1 in "$dir"/*) name=${1#"$dir"/} ;; *) name= ;; esac
     { one_line "$1" && [ ${#name} -le 255 ] && printf '%s' "$name" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]*\.deb' &&
       case $name in *..*) false ;; esac; } || refuse "bad .deb path (only $dir/<name>.deb)"
@@ -356,7 +356,7 @@ drop_pkg() { awk -v p="$1" "$FIELDS"' BEGIN { RS = ""; ORS = "\n\n" } field("Pac
 # F63: dpkg's conffile question for $FAKE_CONFFILE, once per run (after the first install item's unpack). apply
 # keeps the old copy silently (--force-confold); apply-ask asks on fd 3 as apt's pmconffile: line and reads the
 # answer as the real helper relays it: only "Y" or "N" lines count (others: the helper's warning), end of file is
-# dpkg's error. The outcome goes into $CYDIAN_PREFIX/var/fake-conffiles as "keep <file>" or "new <file>".
+# dpkg's error. The outcome goes into $IFIZBOX_PREFIX/var/fake-conffiles as "keep <file>" or "new <file>".
 asked=
 conffile() {
   [ -n "${FAKE_CONFFILE:-}" ] && [ -z "$asked" ] || return 0
@@ -380,7 +380,7 @@ conffile() {
     case $ans in
       Y) echo "Installing new version of config file $f ..."; echo "new $f" >> "$prefix/var/fake-conffiles"; return 0 ;;
       N) echo "keep $f" >> "$prefix/var/fake-conffiles"; return 0 ;;
-      *) echo "cydian-helper: ignored an answer that isn't Y or N" >&2 ;;
+      *) echo "ifizbox-helper: ignored an answer that isn't Y or N" >&2 ;;
     esac
   done
 }

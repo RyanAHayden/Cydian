@@ -1,4 +1,4 @@
-"""I4: cydian-helper app-versions, the real version of each installed app, read from a fake app-container tree
+"""I4: ifizbox-helper app-versions, the real version of each installed app, read from a fake app-container tree
 (/var/containers/Bundle/Application/<UUID>/<Name>.app/Info.plist and <UUID>/iTunesMetadata.plist). XML plists only
 here: the iOS build reads any plist through CoreFoundation, which can't run on Linux (see the I4 journal)."""
 import os
@@ -106,28 +106,28 @@ class AppVersions(unittest.TestCase):
     def test_chain(self):
         """The whole chain: stand-in app spawns the helper, which prints the tree's apps and exits 0."""
         p = tempfile.mkdtemp(dir=self.tmp)
-        os.makedirs(os.path.join(p, "Applications/Cydian.app"))
-        cydian = os.path.join(p, "Applications/Cydian.app/Cydian")
-        shutil.copy(self.driver, cydian)
+        os.makedirs(os.path.join(p, "Applications/iFizBox.app"))
+        ifizbox = os.path.join(p, "Applications/iFizBox.app/iFizBox")
+        shutil.copy(self.driver, ifizbox)
         apps = self.tree()
-        helper = os.path.join(p, "cydian-helper")
-        build(helper, ["main.c", "policy.c"], [f'-DCYDIAN_PREFIX="{p}"', f"-DCYDIAN_ROOT_UID={os.getuid()}",
+        helper = os.path.join(p, "ifizbox-helper")
+        build(helper, ["main.c", "policy.c"], [f'-DIFIZBOX_PREFIX="{p}"', f"-DIFIZBOX_ROOT_UID={os.getuid()}",
                                                f'-DHELPER_APPS_DIR="{apps}"'])
-        out = self.run_driver("spawn", helper, "app-versions", driver=cydian)
+        out = self.run_driver("spawn", helper, "app-versions", driver=ifizbox)
         self.assertEqual(out[-1], "exit: 0", out)
         self.assertIn("1: com.rileytestut.Delta\t1.6\t45\t", out)
         self.assertIn("1: com.apple.Pages\t14.0\t7032\t14.0", out)
-        out = self.run_driver("spawn", helper, "app-versions", "--all", driver=cydian)
+        out = self.run_driver("spawn", helper, "app-versions", "--all", driver=ifizbox)
         self.assertEqual(out[-1], "exit: 64", out)
         # Unreadable folder: exit 74 with the reason.
         if os.getuid() != 0:
             os.chmod(apps, 0)
             try:
-                out = self.run_driver("spawn", helper, "app-versions", driver=cydian)
+                out = self.run_driver("spawn", helper, "app-versions", driver=ifizbox)
             finally:
                 os.chmod(apps, 0o755)
             self.assertEqual(out[-1], "exit: 74", out)
-            self.assertTrue(any(l.startswith("2: cydian-helper: can't read the app containers folder") for l in out), out)
+            self.assertTrue(any(l.startswith("2: ifizbox-helper: can't read the app containers folder") for l in out), out)
 
 
 if __name__ == "__main__":

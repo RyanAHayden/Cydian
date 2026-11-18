@@ -9,7 +9,7 @@ function win({ standalone = "media", type = "navigate", url = "https://cydian.de
     matchMedia: (q) => ({ matches: standalone === "media" && q === "(display-mode: standalone)" }),
     navigator: { standalone: standalone === "apple" },
     performance: { getEntriesByType: (k) => (k === "navigation" && type ? [{ type }] : []) },
-    ...(native ? { cydianApp: {} } : {}),
+    ...(native ? { ifizboxApp: {} } : {}),
   };
 }
 
@@ -39,5 +39,5 @@ test("navigationType falls back to performance.navigation", () => {
   assert.equal(navigationType({ performance: { navigation: { type: 1 } } }), "reload");
   assert.equal(navigationType({ performance: { navigation: { type: 0 } } }), "navigate");
   assert.equal(navigationType({}), null);
-  assert.equal(isStandaloneWeb({ navigator: { standalone: true }, cydianNative: {} }), false);
+  assert.equal(isStandaloneWeb({ navigator: { standalone: true }, ifizboxNative: {} }), false);
 });

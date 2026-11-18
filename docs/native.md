@@ -118,7 +118,7 @@ Desktop traces (`native/spike/trace/`: `trace.mjs` for Chromium, `trace_webkit.p
 - Spike B's push, pop and swipe are UIKit's own and can't be traced on a desktop. On a phone they run at 120 Hz in
   the render server: that part of (b) was never in doubt.
 
-**Measuring on a phone.** `native/spike/build.sh` → `native/spike/build/CydianSpike.ipa` (unsigned, about 80 KB,
+**Measuring on a phone.** `native/spike/build.sh` → `native/spike/build/iFizBoxSpike.ipa` (unsigned, about 80 KB,
 arm64, iOS 15+). It needs no jailbreak: sideload it with any signer (Feather, AltStore, SideStore) and install it on the
 iPhone 15 Pro. Its menu has Spike A, Spike B, a probe page and Results. There are two switches: the WebKit 60 fps
 preference, and the native CADisplayLink meter (which itself holds the display at 120 Hz).
@@ -164,9 +164,9 @@ folder in the Files app. Paste the table here when it exists.
   are arm64. Only tweaks injected into arm64e system processes need arm64e. If iFizBox ever needs it, Theos' Linux
   toolchain (`bin/install-theos`, which ships Apple's ld64 via cctools-port) can link it.
 - **Rootless .deb (N1, not built here):**
-  - Package architecture `iphoneos-arm64`. The app goes in `/var/jb/Applications/Cydian.app`; the helper and daemon
-    under `/var/jb/usr/libexec/cydian/` and `/var/jb/Library/LaunchDaemons/`. The postinst runs
-    `uicache -p /var/jb/Applications/Cydian.app`.
+  - Package architecture `iphoneos-arm64`. The app goes in `/var/jb/Applications/iFizBox.app`; the helper and daemon
+    under `/var/jb/usr/libexec/ifizbox/` and `/var/jb/Library/LaunchDaemons/`. The postinst runs
+    `uicache -p /var/jb/Applications/iFizBox.app`.
   - `dpkg-deb` isn't on this Arch machine. A .deb is an `ar` of `debian-binary`, `control.tar.xz` and
     `data.tar.xz`, which Python's stdlib (`tarfile`, plus a 60-byte ar header writer) can produce without new
     dependencies.
@@ -200,7 +200,7 @@ folder in the Files app. Paste the table here when it exists.
 
 **iFizBox (iOS 15+):**
 
-- The app gets those four entitlements. It runs one small helper, `/var/jb/usr/libexec/cydian/cydian-helper`, as
+- The app gets those four entitlements. It runs one small helper, `/var/jb/usr/libexec/ifizbox/ifizbox-helper`, as
   root through the persona attributes. The helper has no setuid bit.
 - The helper keeps N2's allowlist: only `apt-get update|install|remove|upgrade` and `dpkg --configure -a`, package
   names matching `[a-z0-9.+-]+`, no options from the caller (N4 added the queue's `simulate`/`apply`, one
@@ -210,7 +210,7 @@ folder in the Files app. Paste the table here when it exists.
   process running it gets plain `mobile`, and apt fails on the lock files. So the check that matters is the
   entitlement, which the kernel enforces. As defence in depth, the helper still refuses unless `getuid() == 0` and
   its parent's executable (`proc_pidpath(getppid())`) is the same file (device + inode) as
-  `<prefix>/Applications/Cydian.app/Cydian`.
+  `<prefix>/Applications/iFizBox.app/iFizBox`.
 - **Does it work on Dopamine and palera1n?** Sileo is the default package manager on both, and it works this way
   there. That's the evidence; iFizBox itself hasn't been run on either (N6).
 - **For the iOS 27 jailbreak:** it isn't out, so this can't be checked. If it doesn't honour private entitlements
@@ -227,9 +227,9 @@ N2's text still says "a setuid binary (per R3)"; R3 put a note on N2.
 
 **Requests:**
 
-- JS calls `window.webkit.messageHandlers.cydian.postMessage({id, method, params})`, which returns a promise.
+- JS calls `window.webkit.messageHandlers.ifizbox.postMessage({id, method, params})`, which returns a promise.
 - Swift registers a `WKScriptMessageHandlerWithReply` (iOS 14+) with
-  `addScriptMessageHandler(_:contentWorld: .page, name: "cydian")`. It answers through `replyHandler(result, nil)`,
+  `addScriptMessageHandler(_:contentWorld: .page, name: "ifizbox")`. It answers through `replyHandler(result, nil)`,
   or `replyHandler(nil, "message")`, which rejects the promise with `Error(message)`.
 - Values are plain JSON types (dictionaries, arrays, strings, numbers, booleans, null). `id` is the caller's counter
   and is only needed for streams. Method names are dotted: `sources.list`, `apt.update`, `apt.install`,
@@ -238,7 +238,7 @@ N2's text still says "a setuid binary (per R3)"; R3 put a note on N2.
 **Streams (apt's console, progress):**
 
 - JS sends the request with `stream: true` and registers `id` in a map.
-- Swift pushes batches of events with `callAsyncJavaScript("cydianNative.emit(id, events)", arguments:)`. Arguments
+- Swift pushes batches of events with `callAsyncJavaScript("ifizboxNative.emit(id, events)", arguments:)`. Arguments
   are serialised by WebKit, so there's no string-built JS.
 - Event shapes: `{type: "output", fd: 1|2, text}`, `{type: "status", pkg, percent, text}` (from status-fd), and
   `{type: "exit", code}` last. The reply then settles the promise and JS drops the map entry.
@@ -251,13 +251,13 @@ N2's text still says "a setuid binary (per R3)"; R3 put a note on N2.
 
 **Offline bundle:**
 
-- `web/app/` is copied into `Cydian.app/web/` at build time.
-- It's served through a `WKURLSchemeHandler` as `cydian://app/...`, with the right MIME types, `no-cache`, and
+- `web/app/` is copied into `iFizBox.app/web/` at build time.
+- It's served through a `WKURLSchemeHandler` as `ifizbox://app/...`, with the right MIME types, `no-cache`, and
   paths kept inside the bundle (`AppScheme` in `Bridge.swift`). Nothing loads from the network. Repos are fetched by
   Swift (or by apt) and handed over through the bridge.
 - `loadFileURL` is not used. `file://` pages get an opaque origin, which WebKit treats badly for ES modules, module
   workers and IndexedDB. A custom scheme is a real origin, so `web/app/` behaves exactly as on the site.
-- The probe page (`probe.html`) checks on a phone, against `cydian://app`:
+- The probe page (`probe.html`) checks on a phone, against `ifizbox://app`:
   - module scripts, a module worker and IndexedDB;
   - a bundled `fetch`;
   - bridge round-trip time (200 pings);
@@ -289,7 +289,7 @@ bar items and no per-screen image.
   (no phone in this run): see "If it doesn't work" below.
 
 **What iFizBox ships** (`native/Info.plist`, images in `native/launch/`, copied into both the .deb's and the IPA's
-`Cydian.app/` by `build.sh`):
+`iFizBox.app/` by `build.sh`):
 
 | key | image | what it is |
 |---|---|---|
@@ -339,7 +339,7 @@ undocumented BOM format; no Linux writer exists that I know of), so it takes one
 2. `xcrun actool Launch.xcassets --compile out --platform iphoneos --minimum-deployment-target 15.0
    --target-device iphone --output-partial-info-plist out/partial.plist`
 3. Commit `out/Assets.car` as `native/launch/Assets.car` (it holds only iFizBox's own images), have `build.sh` copy
-   it into `Cydian.app/`, and add `UIColorName: LaunchBackground` to `UILaunchScreen` (and drop the `UIColorName`
+   it into `iFizBox.app/`, and add `UIColorName: LaunchBackground` to `UILaunchScreen` (and drop the `UIColorName`
    refusal in `launch_check.py`). Rebuild it whenever the images change.
 
 ## Links out of the app (R8, 2026-11-17)
@@ -358,7 +358,7 @@ WebKit's source (main, `Source/WebKit/UIProcess/Cocoa/`), not from a tap on a ph
 
 So every link out of the app is dead except F72's. The fix is filed as a B: give the shell a `WKUIDelegate` whose
 `createWebViewWith` hands the URL to `UIApplication.shared.open` and returns nil, and a `decidePolicyFor` that
-lets `cydian:` (`AppScheme.scheme`, the bundle) and `about:`/`blob:` load. Any other main-frame scheme goes to
+lets `ifizbox:` (`AppScheme.scheme`, the bundle) and `about:`/`blob:` load. Any other main-frame scheme goes to
 `UIApplication.shared.open` and is cancelled. That fixes all the call sites with no JS change. Also widen
 `app.openURL` to the schemes the page builds (or leave it alone and let the delegate do the work).
 
@@ -369,13 +369,13 @@ install prompt. More Information opens Safari, and iFizBox stays where it was.
 **Fixed in B8 (2026-11-17), not yet tried on a phone.** `WebController` (`native/Sources/App.swift`) is now also
 the web view's `WKUIDelegate`, and `LinkOut` decides:
 
-- `decidePolicyFor`: `cydian:`, `about:`, `blob:` and `data:` load in the web view, and so does any subframe
+- `decidePolicyFor`: `ifizbox:`, `about:`, `blob:` and `data:` load in the web view, and so does any subframe
   navigation. Any other main-frame navigation (including a new-window one, `targetFrame == nil`) is cancelled and
   handed to `UIApplication.shared.open`. So `location.href = "https://…"` opens Safari (or the app claiming the
   link) and iFizBox's UI stays put; itms-services and `feather://`, `altstore://`, `cydia://`, `sileo://`… go to iOS.
 - `createWebViewWith` (`window.open`): hands the URL to `UIApplication.shared.open` and returns nil, so
   `window.open` still returns `null` but the link opens.
-- `app.openURL` takes any scheme except `cydian`, `about`, `blob`, `data`, `javascript` and `file`
+- `app.openURL` takes any scheme except `ifizbox`, `about`, `blob`, `data`, `javascript` and `file`
   (`LinkOut.canOpen`); it replies `{opened: false}` when no app claims the scheme.
 
 No JS changed: every call site in the table above works through the delegates.

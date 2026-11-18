@@ -28,28 +28,28 @@ class Release(unittest.TestCase):
         os.makedirs(self.dist)
 
     def fake_build(self, deb_version, ipa_version):
-        """A Cydian.deb and Cydian.ipa just real enough to name: they fail mkdeb/mkipa's checks, which a dry run
+        """A iFizBox.deb and iFizBox.ipa just real enough to name: they fail mkdeb/mkipa's checks, which a dry run
         only reports."""
         root, debian = os.path.join(self.tmp, "root"), os.path.join(self.tmp, "debian")
-        os.makedirs(os.path.join(root, "var/jb/Applications/Cydian.app"))
+        os.makedirs(os.path.join(root, "var/jb/Applications/iFizBox.app"))
         os.makedirs(debian)
-        with open(os.path.join(root, "var/jb/Applications/Cydian.app/x"), "wb") as f:
+        with open(os.path.join(root, "var/jb/Applications/iFizBox.app/x"), "wb") as f:
             f.write(b"x")
         with open(os.path.join(debian, "control"), "w") as f:
-            f.write("Package: com.ryha.cydian\nVersion: %s\nArchitecture: iphoneos-arm64\n"
+            f.write("Package: com.ryha.ifizbox\nVersion: %s\nArchitecture: iphoneos-arm64\n"
                     "Installed-Size: @SIZE@\n" % deb_version)
-        mkdeb.build(root, debian, os.path.join(self.dist, "Cydian.deb"), mtime=0)
-        app = os.path.join(self.tmp, "Cydian.app")
+        mkdeb.build(root, debian, os.path.join(self.dist, "iFizBox.deb"), mtime=0)
+        app = os.path.join(self.tmp, "iFizBox.app")
         os.makedirs(app)
         with open(os.path.join(app, "Info.plist"), "wb") as f:
-            plistlib.dump({"CFBundleShortVersionString": ipa_version, "CFBundleIdentifier": "com.ryha.cydian"}, f)
-        mkipa.build(app, os.path.join(self.dist, "Cydian.ipa"), mtime=0)
+            plistlib.dump({"CFBundleShortVersionString": ipa_version, "CFBundleIdentifier": "com.ryha.ifizbox"}, f)
+        mkipa.build(app, os.path.join(self.dist, "iFizBox.ipa"), mtime=0)
 
     def dry_run(self, *extra):
         notes = os.path.join(self.tmp, "notes.md")
         with open(notes, "w") as f:
             f.write("- A test release\n")
-        env = {k: v for k, v in os.environ.items() if k != "CYDIAN_RELEASE_REPO"}
+        env = {k: v for k, v in os.environ.items() if k != "IFIZBOX_RELEASE_REPO"}
         return subprocess.run([SCRIPT, "--dry-run", "--dist", self.dist, "--notes", notes, *extra], cwd=ROOT,
                               env=env, capture_output=True, text=True, timeout=60)
 
@@ -62,7 +62,7 @@ class Release(unittest.TestCase):
         r = self.dry_run()
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.assets(r.stdout),
-                         ["Cydian.ipa", "Cydian.deb", "com.ryha.cydian_%s-7_iphoneos-arm64.deb" % VERSION,
+                         ["iFizBox.ipa", "iFizBox.deb", "com.ryha.ifizbox_%s-7_iphoneos-arm64.deb" % VERSION,
                           "Packages", "Packages.gz", "Release"])
         self.assertIn("RyanAHayden/Cydian v%s " % VERSION, r.stdout)
         self.assertIn("nothing published", r.stdout)
@@ -85,8 +85,8 @@ class Release(unittest.TestCase):
         got = json.loads(out.stdout)
         base = "https://example.invalid/"
         self.assertEqual(got["v"], VERSION)
-        self.assertEqual(got["ipa"], base + "Cydian.ipa")
-        self.assertEqual(got["arm64"], base + "com.ryha.cydian_%s-7_iphoneos-arm64.deb" % VERSION)
+        self.assertEqual(got["ipa"], base + "iFizBox.ipa")
+        self.assertEqual(got["arm64"], base + "com.ryha.ifizbox_%s-7_iphoneos-arm64.deb" % VERSION)
         self.assertIsNone(got["none"])  # the rootless build is never offered to a roothide (arm64e) phone
 
     def test_version_mismatch_reported(self):
@@ -106,13 +106,13 @@ class Release(unittest.TestCase):
         out = os.path.join(self.tmp, "out")
         r = self.dry_run("--minimum", VERSION, "--out", out)
         self.assertEqual(r.returncode, 0, r.stderr)
-        debname = "com.ryha.cydian_%s-7_iphoneos-arm64.deb" % VERSION
+        debname = "com.ryha.ifizbox_%s-7_iphoneos-arm64.deb" % VERSION
         with open(os.path.join(out, "Packages")) as f:
             packages = f.read()
-        self.assertIn("Package: com.ryha.cydian\n", packages)
+        self.assertIn("Package: com.ryha.ifizbox\n", packages)
         self.assertIn("Filename: %s\n" % debname, packages)
-        self.assertIn("X-Cydian-Minimum-Version: %s\n" % VERSION, packages)
-        with open(os.path.join(self.dist, "Cydian.deb"), "rb") as f:
+        self.assertIn("X-iFizBox-Minimum-Version: %s\n" % VERSION, packages)
+        with open(os.path.join(self.dist, "iFizBox.deb"), "rb") as f:
             deb = f.read()
         self.assertIn("SHA256: %s\n" % hashlib.sha256(deb).hexdigest(), packages)
         with open(os.path.join(out, "Packages.gz"), "rb") as f:
@@ -121,7 +121,7 @@ class Release(unittest.TestCase):
             release = f.read()
         self.assertIn("Origin: iFizBox\n", release)
         self.assertIn("Architectures: iphoneos-arm64\n", release)
-        self.assertIn("X-Cydian-Minimum-Version: %s\n" % VERSION, release)
+        self.assertIn("X-iFizBox-Minimum-Version: %s\n" % VERSION, release)
         self.assertIn(" %s %d Packages\n" % (hashlib.sha256(packages.encode()).hexdigest(), len(packages)), release)
         self.assertIn("releases/latest/download/", r.stdout)
         self.assertIn("apt repo: https://cydian.dev/repo/", r.stdout)  # B17
@@ -146,8 +146,8 @@ class Release(unittest.TestCase):
 
     def test_other_arch_rides_along(self):
         self.fake_build("%s-7" % VERSION, VERSION)
-        other = "com.ryha.cydian_%s-7_iphoneos-arm64e.deb" % VERSION
-        shutil.copy(os.path.join(self.dist, "Cydian.deb"), os.path.join(self.dist, other))
+        other = "com.ryha.ifizbox_%s-7_iphoneos-arm64e.deb" % VERSION
+        shutil.copy(os.path.join(self.dist, "iFizBox.deb"), os.path.join(self.dist, other))
         out = os.path.join(self.tmp, "out")
         r = self.dry_run("--out", out)
         self.assertEqual(r.returncode, 0, r.stderr)

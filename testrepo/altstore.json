@@ -1,16 +1,16 @@
 {
- "name": "Cydian Tests",
- "identifier": "com.ryha.cydian.tests",
- "subtitle": "Temporary test apps for Cydian",
+ "name": "iFizBox Tests",
+ "identifier": "com.ryha.ifizbox.tests",
+ "subtitle": "Temporary test apps for iFizBox",
  "website": "https://github.com/RyanAHayden/Cydian",
  "iconURL": "https://github.com/RyanAHayden/Cydian/releases/download/test-fixtures/tests.png",
  "apps": [
   {
-   "name": "Cydian",
-   "bundleIdentifier": "com.ryha.cydian",
+   "name": "iFizBox",
+   "bundleIdentifier": "com.ryha.ifizbox",
    "developerName": "Ryan Hayden",
-   "subtitle": "Test: an update to Cydian (0.2.8.1)",
-   "localizedDescription": "Test build of Cydian marked 0.1.1.1 (the v0.1.1 app with a higher version number). Installing it is a real update over Cydian.",
+   "subtitle": "Test: an update to iFizBox (0.2.8.1)",
+   "localizedDescription": "Test build of iFizBox marked 0.1.1.1 (the v0.1.1 app with a higher version number). Installing it is a real update over iFizBox.",
    "iconURL": "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/icons/icon-180.png",
    "category": "utilities",
    "versions": [
@@ -46,7 +46,7 @@
   {
    "name": "Test Alpha",
    "bundleIdentifier": "com.ryha.test.alpha",
-   "developerName": "Cydian Tests",
+   "developerName": "iFizBox Tests",
    "subtitle": "Updates and version history",
    "localizedDescription": "Three versions to test installing an older one, the update showing in Changes, background update checks and downgrades.",
    "iconURL": "https://github.com/RyanAHayden/Cydian/releases/download/test-fixtures/alpha.png",
@@ -93,7 +93,7 @@
   {
    "name": "Test Beta",
    "bundleIdentifier": "com.ryha.test.beta",
-   "developerName": "Cydian Tests",
+   "developerName": "iFizBox Tests",
    "subtitle": "Screenshots, permissions, a long description",
    "localizedDescription": "Tests the app page: a screenshot strip, the permissions list, and a description long enough to wrap over several lines so the layout can be checked on a small screen and a big one.",
    "iconURL": "https://github.com/RyanAHayden/Cydian/releases/download/test-fixtures/beta.png",
@@ -122,7 +122,7 @@
   {
    "name": "Test Gamma",
    "bundleIdentifier": "com.ryha.test.gamma",
-   "developerName": "Cydian Tests",
+   "developerName": "iFizBox Tests",
    "subtitle": "Incompatible: needs iOS 99",
    "localizedDescription": "Says it needs iOS 99, to test the incompatible mark and Show Incompatible.",
    "iconURL": "https://github.com/RyanAHayden/Cydian/releases/download/test-fixtures/gamma.png",

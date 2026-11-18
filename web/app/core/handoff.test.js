@@ -110,14 +110,14 @@ test("parseAddLink refuses what isn't an http(s) URL", () => {
 test("siteOrigin: the page's own http(s) origin, else the public site", () => {
   assert.equal(siteOrigin({ origin: "http://127.0.0.1:8080" }), "http://127.0.0.1:8080");
   assert.equal(siteOrigin({ origin: "null" }), PUBLIC_SITE);
-  assert.equal(siteOrigin({ origin: "cydian-app://bundle" }), PUBLIC_SITE);
+  assert.equal(siteOrigin({ origin: "ifizbox-app://bundle" }), PUBLIC_SITE);
   assert.equal(siteOrigin(undefined), PUBLIC_SITE);
 });
 
 test("isAddPath", () => {
   assert.ok(isAddPath("/add"));
   assert.ok(isAddPath("/add/"));
-  assert.ok(isAddPath("/cydian/add"));
+  assert.ok(isAddPath("/ifizbox/add"));
   assert.ok(!isAddPath("/"));
   assert.ok(!isAddPath("/address"));
   assert.ok(!isAddPath("/index.html"));

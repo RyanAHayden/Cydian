@@ -1,4 +1,4 @@
-// N4: the install queue's backend calls against the fake helper (native/fake/cydian-helper simulate | apply |
+// N4: the install queue's backend calls against the fake helper (native/fake/ifizbox-helper simulate | apply |
 // respring): what apt would change, apt's refusal explained in F18's words, the console's streamed lines, dpkg's
 // status after the run, and a downgrade by version.
 import { test } from "node:test";

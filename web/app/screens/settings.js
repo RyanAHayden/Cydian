@@ -49,7 +49,7 @@ function style() {
 
 // The one store the app uses (both modes and the site read it through here). In the jailbreak app the bridge's
 // helper makes Ignored Upgrades real dpkg holds (F22); the bridge itself is N3's.
-export const settings = createSettings({ mode: detectMode(), helper: globalThis.cydianNative?.helper, native: globalThis.cydianNative });
+export const settings = createSettings({ mode: detectMode(), helper: globalThis.ifizboxNative?.helper, native: globalThis.ifizboxNative });
 
 // Light: the top of the blue status bar under the nav bar; dark: "Status Bar (Black)".
 const THEME_COLORS = { light: "#4f698b", dark: "#5f656f" }; // dark: the gunmetal bar's top
@@ -161,7 +161,7 @@ function settingsGroups(list, page) {
 }
 
 // A settings row's switch: createSwitch bound to the toggle setting `d`.
-// F65: a toggle whose value changed under its switch (Upgrade Notifications when cydian-helper fails) shows it.
+// F65: a toggle whose value changed under its switch (Upgrade Notifications when ifizbox-helper fails) shows it.
 function syncSwitches(key) {
   const on = settings.get(key) === true;
   for (const p of pages) {
@@ -287,7 +287,7 @@ export function themeMessage(appearance, theme) {
 }
 let lastSent = "";
 function tellShell(appearance, theme, win) {
-  const h = win.webkit?.messageHandlers?.cydian;
+  const h = win.webkit?.messageHandlers?.ifizbox;
   if (!h) return;
   const msg = themeMessage(appearance, theme);
   const key = JSON.stringify(msg.params);
@@ -324,7 +324,7 @@ export function init() {
 // F68: Re-sign Reminder to the shell (signing.remind {days}, F14), sideload build only.
 function remindNow() {
   if (!localSigning() || !settings.isShown("resignReminder")) return;
-  const n = globalThis.cydianNative;
+  const n = globalThis.ifizboxNative;
   syncReminder((k) => settings.get(k), n?.call ? (m, p) => n.call(m, p) : null);
 }
 
@@ -801,8 +801,8 @@ function showSigningPage(el, layout, parts) {
 // once a newer release is known, Skip This Version. core/selfupdate.js does the work; this binds it to the bridge,
 // the signer, the alerts and the HUD. app.js runs the automatic check at launch (checkUpdates()).
 
-const appVersion = () => globalThis.cydianNative?.call
-  ? globalThis.cydianNative.call("app.info", {}).then((i) => String(i?.version ?? ""))
+const appVersion = () => globalThis.ifizboxNative?.call
+  ? globalThis.ifizboxNative.call("app.info", {}).then((i) => String(i?.version ?? ""))
   : Promise.resolve("");
 
 let checking = null;
@@ -811,7 +811,7 @@ export function checkUpdates({ manual = false, always = false } = {}) {
   if (checking) return checking;
   const mode = detectMode();
   if (!installPath(mode)) return Promise.resolve("site");
-  const native = globalThis.cydianNative;
+  const native = globalThis.ifizboxNative;
   const go = (path) => { location.hash = format(settingsRoute(path)).replace(/^#/, ""); };
   const hide = manual ? showHUD("Checking") : () => {};
   const alert = (spec) => { hide(); return showAlert(spec); };
@@ -854,7 +854,7 @@ export function notifyRows(st, now = Date.now()) {
 }
 function notifySection() {
   const box = document.createElement("div");
-  const n = globalThis.cydianNative;
+  const n = globalThis.ifizboxNative;
   if (detectMode() !== "sideload" || !n?.call) return box;
   Promise.resolve(n.call("app.notifyStatus", {})).then((st) => {
     const g = notifyRows(st);

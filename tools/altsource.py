@@ -3,7 +3,7 @@
 app itself (core/sources.js DEFAULT_ALT_SOURCES, core/appoffer.js APP_SOURCE_URL).
 
   tools/altsource.py update VERSION IPA [DATE] [--notes FILE] [--minimum X.Y.Z]
-        point the source at release vVERSION's Cydian.ipa (its size from IPA), newest first in versions[], the
+        point the source at release vVERSION's iFizBox.ipa (its size from IPA), newest first in versions[], the
         versions already listed kept below it (at most KEEP), with the notes' first lines as its description
   tools/altsource.py check                       the source is well formed and names a release tag of its own version
 
@@ -20,18 +20,18 @@ from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "native"))
-from brand import NAME  # noqa: E402  (F170: native/brand.env)
+from brand import BRAND, NAME  # noqa: E402  (F170: native/brand.env)
 SOURCE = os.path.join(ROOT, "web", "app", "source.json")
 REPO = "https://github.com/RyanAHayden/Cydian"
 RAW = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main"
-BUNDLE_ID = "com.ryha.cydian"
+BUNDLE_ID = BRAND["BRAND_BUNDLE_ID"]
 MIN_OS = "15.0"  # native/mkipa.py's MinimumOSVersion
 KEEP = 20  # versions[] entries kept (newest first)
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 
 def ipa_url(version):
-    return f"{REPO}/releases/download/v{version}/Cydian.ipa"
+    return f"{REPO}/releases/download/v{version}/{NAME}.ipa"
 
 
 def note_text(version, notes=None):
@@ -123,8 +123,9 @@ def check(data):
     if not versions:
         return problems + ["no versions"]
     v = versions[0]
-    if v.get("downloadURL") != ipa_url(v.get("version")):
-        problems.append(f"downloadURL is not release v{v.get('version')}'s Cydian.ipa")
+    # Any IPA of that release: the releases before F171 (v0.5.0 and older) carry it under the old name.
+    if not re.fullmatch(re.escape(f"{REPO}/releases/download/v{v.get('version')}/") + r"[\w.-]+\.ipa", str(v.get("downloadURL"))):
+        problems.append(f"downloadURL is not release v{v.get('version')}'s {NAME}.ipa")
     if not isinstance(v.get("size"), int) or v["size"] <= 0:
         problems.append("size is not a positive number of bytes")
     if v.get("minOSVersion") != MIN_OS:

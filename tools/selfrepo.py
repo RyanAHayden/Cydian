@@ -12,7 +12,7 @@ as assets of the release, next to the .debs. GitHub serves them at
 where the Worker (worker/src/index.js `repo`) fetches the same asset and answers with it, no redirect: Zebra names
 its cache file after the final URL, and GitHub's signed one is too long for it (B17).
 
---minimum sets X-Cydian-Minimum-Version, iFizBox's own field (in the Release and in iFizBox's Packages stanza): a
+--minimum sets X-iFizBox-Minimum-Version, iFizBox's own field (in the Release and in iFizBox's Packages stanza): a
 running iFizBox older than that must upgrade before anything else (web/app/core/essential.js). apt ignores X- fields.
 """
 import gzip
@@ -29,8 +29,8 @@ sys.path.insert(0, os.path.join(ROOT, "native"))
 import mkdeb  # noqa: E402
 from brand import NAME  # noqa: E402  (F170: native/brand.env)
 
-SELF_ID = "com.ryha.cydian"
-MIN_FIELD = "X-Cydian-Minimum-Version"
+SELF_ID = "com.ryha.ifizbox"
+MIN_FIELD = "X-iFizBox-Minimum-Version"
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 # The control fields a Packages stanza carries, in apt's usual order (the rest follow as they come).
 ORDER = ["Package", "Version", "Architecture", "Maintainer", "Installed-Size", "Pre-Depends", "Depends", "Conflicts",
@@ -95,7 +95,7 @@ def build(out, debs, minimum=None, date=None):
         "Origin: " + NAME,
         "Label: " + NAME,
         "Suite: stable",
-        "Codename: cydian",
+        "Codename: ifizbox",
         "Architectures: " + " ".join(arches),
         # N11: Sileo drops a repo whose Release has no Components ("Could not parse release file", RepoManager.swift:
         # `guard ["components"].allSatisfy(releaseDict.keys.contains)`), flat or not; apt ignores it on a flat repo.

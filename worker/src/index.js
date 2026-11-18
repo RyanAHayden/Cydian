@@ -30,7 +30,7 @@
 //   GET  /repo/<file>                       B17: iFizBox's own flat APT repo (Release, Packages, Packages.gz, *.deb),
 //                                           the latest release's asset fetched here, redirects followed here
 //
-// Settings (wrangler.toml [vars]): HOST_IDS, the bundle IDs /sign/host takes ("*.cydian" = any ending in .cydian);
+// Settings (wrangler.toml [vars]): HOST_IDS, the bundle IDs /sign/host takes ("*.ifizbox" = any ending in .ifizbox);
 // TTL (seconds, 600); MAX_UPLOAD_MB (512), the largest IPA /sign/upload and kind=ipa take ("0": no uploads). KV
 // namespace binding: HOSTED.
 
@@ -63,7 +63,7 @@ export function appOf(q) {
   return { bundleId, version, title };
 }
 
-export function allowed(bundleId, list = "*.cydian") {
+export function allowed(bundleId, list = "*.ifizbox") {
   return list.split(",").map((s) => s.trim()).filter(Boolean)
     .some((p) => (p.startsWith("*.") ? bundleId.endsWith(p.slice(1)) : p === "*" || p === bundleId));
 }
@@ -138,7 +138,7 @@ export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promis
 // a URL Zebra 1.1.36 names its cache file after: too long, "the file name is invalid", the source shows red. Here
 // the Worker follows the redirect and answers with the file itself, so https://cydian.dev/repo/ has no redirect.
 // Only the repo's own names are fetched (anything else, InRelease, Packages.xz, icons: 404 without asking GitHub).
-// CYDIAN_REPO (owner/name) picks another GitHub repo's releases (default RyanAHayden/Cydian).
+// IFIZBOX_REPO (owner/name) picks another GitHub repo's releases (default RyanAHayden/Cydian).
 const SELF_REPO = "RyanAHayden/Cydian";
 const REPO_TYPES = { "Release": "text/plain; charset=utf-8", "Packages": "text/plain; charset=utf-8", "Packages.gz": "application/gzip" };
 export function repoFile(pathname) {
@@ -156,7 +156,7 @@ export async function repo(req, u, env = {}, { fetcher = fetch, wait } = {}) {
   }
   const f = repoFile(u.pathname);
   if (!f || !["GET", "HEAD"].includes(req.method)) return new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
-  const name = /^[\w.-]+\/[\w.-]+$/.test(env.CYDIAN_REPO ?? "") ? env.CYDIAN_REPO : SELF_REPO;
+  const name = /^[\w.-]+\/[\w.-]+$/.test(env.IFIZBOX_REPO ?? "") ? env.IFIZBOX_REPO : SELF_REPO;
   const src = `https://github.com/${name}/releases/latest/download/${encodeURIComponent(f.name)}`;
   let r;
   try { r = await upstream(src, { fetcher, token: env.GITHUB_TOKEN ?? null, ...(wait ? { wait } : {}) }); } catch {
@@ -168,7 +168,7 @@ export async function repo(req, u, env = {}, { fetcher = fetch, wait } = {}) {
     return new Response(status === 404 ? "Not found\n" : `GitHub answered HTTP ${r.status}\n`, { status, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
   }
   // Release and Packages change with every release: clients ask again after 5 minutes; a .deb is named by version
-  // (Cydian.deb, the one fixed name, is never in Packages' Filename: apt fetches the versioned name).
+  // (iFizBox.deb, the one fixed name, is never in Packages' Filename: apt fetches the versioned name).
   const headers = { "Content-Type": f.type, "Cache-Control": `public, max-age=${f.name.endsWith(".deb") ? 3600 : 300}`, "X-Content-Type-Options": "nosniff", ...CORS };
   for (const h of ["content-length", "last-modified", "etag"]) { const v = r.headers.get(h); if (v) headers[h] = v; }
   if (req.method === "HEAD") { r.body?.cancel?.(); return new Response(null, { headers }); }
@@ -369,7 +369,7 @@ export async function appLookup(u, env = {}, { fetcher = fetch, cache = env.LOOK
   const country = (u.searchParams.get("country") || "us").toLowerCase();
   if (!/^[A-Za-z0-9.-]{1,155}$/.test(bundleId) || !/^[a-z]{2}$/.test(country)) return fail("bad_request", "Send bundleId and a two-letter country.");
   const apple = `https://itunes.apple.com/lookup?${new URLSearchParams({ bundleId, country })}`;
-  const key = new Request(`https://applookup.cydian.internal/${country}/${encodeURIComponent(bundleId)}`);
+  const key = new Request(`https://applookup.ifizbox.internal/${country}/${encodeURIComponent(bundleId)}`);
   const hit = cache ? await cache.match(key).catch(() => null) : null;
   if (hit) return hit;
   let r;
@@ -429,7 +429,7 @@ export function rangeReader(url, { fetcher = fetch, timeout = 20000, maxRequests
 export async function ipaInfo(u, env = {}, { fetcher = fetch, cache = env.LOOKUP_CACHE ?? globalThis.caches?.default ?? null, timeout } = {}) {
   const target = httpUrl(u.searchParams.get("url") ?? "");
   if (!target) return fail("bad_url", "Send the IPA's http(s) URL as url.");
-  const key = new Request(`https://ipainfo.cydian.internal/?${new URLSearchParams({ url: target.href })}`);
+  const key = new Request(`https://ipainfo.ifizbox.internal/?${new URLSearchParams({ url: target.href })}`);
   const hit = cache ? await cache.match(key).catch(() => null) : null;
   if (hit) return hit;
   const answer = (body, status, ttl) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json",

@@ -1,12 +1,12 @@
 // F96: the website pushes iFizBox first. The first-visit prompt's state, the install rows per app (iFizBox vs others,
 // website installs accepted or not), the warning whose I Understand counts down 5 seconds (nav/alert.js countdown),
-// and the cydian://package link the app opens at that app's page (incoming.js).
+// and the ifizbox://package link the app opens at that app's page (incoming.js).
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import {
   ACCEPT_KEY, FIRST_KEY, websiteInstallsOn, setWebsiteInstalls, acceptWebsiteInstalls, WARNING, WARNING_SECONDS,
   packageLink, packageIdOf, idFromHash, siteGateRows, WEBSITE_ON_SUBTITLE, WEBSITE_OFF_SUBTITLE,
-  firstVisitState, setFirstVisit, markCydianInstalled, shouldAskFirst, promptFirstVisit, FIRST_VISIT,
+  firstVisitState, setFirstVisit, markiFizBoxInstalled, shouldAskFirst, promptFirstVisit, FIRST_VISIT,
 } from "./websign-gate.js";
 import { installRows } from "./screens/altstore.js";
 import { handleIncoming } from "./incoming.js";
@@ -19,7 +19,7 @@ function memory(init = {}) {
 }
 const labels = (rows) => rows.map((r) => r.label);
 const OTHER = { version: "1.2", downloadURL: "https://example.com/Delta.ipa" };
-const CYDIAN = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.7/Cydian.ipa" };
+const IFIZBOX = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.7/iFizBox.ipa" };
 const SITE = { site: true, jailbreak: false, custom: false };
 
 // ---- first visit -----------------------------------------------------------------------------------------------
@@ -35,7 +35,7 @@ test("first visit: asks on the website until Not Now or iFizBox is installed; ne
   assert.equal(shouldAskFirst({ mode: "site", storage: s }), false);
   setFirstVisit("ask", s);
   assert.equal(s.getItem(FIRST_KEY), null);
-  markCydianInstalled(s);
+  markiFizBoxInstalled(s);
   assert.equal(firstVisitState(s), "installed");
   assert.equal(shouldAskFirst({ mode: "site", storage: s }), false);
   assert.equal(firstVisitState(memory({ [FIRST_KEY]: "junk" })), "ask");
@@ -76,7 +76,7 @@ const newLog = () => ({ opened: [], alerts: [], installs: 0, downloads: [] });
 
 test("iFizBox always installs from the website: Install and Download IPA, no gate", () => {
   const log = newLog();
-  const r = rowsFor(CYDIAN, memory(), log);
+  const r = rowsFor(IFIZBOX, memory(), log);
   assert.deepEqual(labels(r.rows), ["Install", "Download IPA"]);
   assert.equal(r.gated, undefined);
 });
@@ -90,7 +90,7 @@ test("other apps, not accepted: Install in iFizBox, Download IPA, then Install o
   assert.equal(rows[2].cls, "websign-off");
   assert.equal(rows[2].subtitle, WEBSITE_OFF_SUBTITLE);
   rows[0].onClick();
-  assert.deepEqual(log.opened, ["cydian://package?id=com.example.delta"]);
+  assert.deepEqual(log.opened, ["ifizbox://package?id=com.example.delta"]);
   rows[1].onClick();
   assert.deepEqual(log.downloads, [OTHER.downloadURL]);
   await rows[2].onClick(); // the warning, Cancel
@@ -132,19 +132,19 @@ test("Install in iFizBox without an id from the caller takes it from the page's 
 
 // ---- the link ------------------------------------------------------------------------------------------------
 
-test("cydian://package?id=: built and read back; bad ids are refused", () => {
-  assert.equal(packageLink("com.a b"), "cydian://package?id=com.a%20b");
+test("ifizbox://package?id=: built and read back; bad ids are refused", () => {
+  assert.equal(packageLink("com.a b"), "ifizbox://package?id=com.a%20b");
   assert.equal(packageIdOf(packageLink("com.example.delta")), "com.example.delta");
-  assert.equal(packageIdOf("cydian://package?id="), null);
-  assert.equal(packageIdOf("cydian://package?id=a/b"), null);
+  assert.equal(packageIdOf("ifizbox://package?id="), null);
+  assert.equal(packageIdOf("ifizbox://package?id=a/b"), null);
   assert.equal(packageIdOf("not a url"), null);
 });
 
-test("the app opens cydian://package at that app's page (Search's package:<id>)", async () => {
+test("the app opens ifizbox://package at that app's page (Search's package:<id>)", async () => {
   const hashes = [];
-  assert.equal(await handleIncoming("cydian://package?id=com.example.delta", { open: (h) => hashes.push(h) }), "package");
+  assert.equal(await handleIncoming("ifizbox://package?id=com.example.delta", { open: (h) => hashes.push(h) }), "package");
   assert.deepEqual(hashes, [format({ tab: "search", path: ["package:com.example.delta"] })]);
-  assert.equal(await handleIncoming("cydian://package?id=", { open: (h) => hashes.push(h) }), "package");
+  assert.equal(await handleIncoming("ifizbox://package?id=", { open: (h) => hashes.push(h) }), "package");
   assert.equal(hashes.length, 1, "no id: nothing opens");
 });
 
@@ -219,7 +219,7 @@ test("the website stays locked after iFizBox is installed from it; only Browse A
   const { browsingLocked } = await import("./websign-gate.js");
   const s = memory();
   assert.equal(browsingLocked({ storage: s }), true);
-  markCydianInstalled(s);
+  markiFizBoxInstalled(s);
   assert.equal(browsingLocked({ storage: s }), true); // installed: still locked
   setFirstVisit("later", s);
   assert.equal(browsingLocked({ storage: s }), false); // Browse Anyway

@@ -1,9 +1,9 @@
-/* cydian-upgrades' rules (N5), kept apart from the daemon's main so they build and are tested on Linux
+/* ifizbox-upgrades' rules (N5), kept apart from the daemon's main so they build and are tested on Linux
  * (test_daemon.py): which lines of apt's plan are upgrades, the notification's words, when to notify and when a
  * check is due.
  * SPDX-License-Identifier: GPL-3.0-or-later */
-#ifndef CYDIAN_UPGRADES_H
-#define CYDIAN_UPGRADES_H
+#ifndef IFIZBOX_UPGRADES_H
+#define IFIZBOX_UPGRADES_H
 
 #include <stddef.h>
 

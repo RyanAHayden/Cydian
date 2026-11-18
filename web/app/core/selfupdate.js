@@ -5,13 +5,13 @@
 // Check for Updates and Skip This Version (screens/settings.js aboutSection).
 //
 // Install, by build:
-//   sideload   the release's Cydian.ipa, signed on the phone with the user's certificate and installed over the
-//              running app (F58's installOnDevice: same bundle ID com.ryha.cydian, so its data stays). No certificate
+//   sideload   the release's iFizBox.ipa, signed on the phone with the user's certificate and installed over the
+//              running app (F58's installOnDevice: same bundle ID com.ryha.ifizbox, so its data stays). No certificate
 //              in the Keychain: an alert says so and Settings > Signing opens.
 //              F72: given `installSelf` (core/essential.js), that takes over: iOS closes iFizBox, and the local install
 //              server with it, as soon as the install starts, so iFizBox's own IPA is signed on the Signing Server.
 //   jailbreak  the release's .deb for this device's architecture, downloaded by the shell (selfupdate.download) and
-//              installed with `cydian-helper selfupdate <path>` (dpkg -i, N2), then an offer to close iFizBox so the
+//              installed with `ifizbox-helper selfupdate <path>` (dpkg -i, N2), then an offer to close iFizBox so the
 //              next launch runs the new build (Cydia's own "Close Cydia" after finish:reopen).
 //
 // Pure: everything that touches the network, the bridge, storage or the screen comes in through `deps`, so node
@@ -20,7 +20,7 @@ import { NAME } from "../brand.js";
 
 export const RELEASES_URL = "https://api.github.com/repos/RyanAHayden/Cydian/releases/latest";
 export const DAY = 24 * 60 * 60 * 1000;
-export const STORE_KEY = "cydian.selfupdate";
+export const STORE_KEY = "ifizbox.selfupdate";
 const NOTE_LINES = 4;
 
 // "v1.2.3", "1.2", "1.2.3-beta" -> [1, 2, 3] (missing parts are 0; anything after the numbers is ignored).
@@ -63,7 +63,7 @@ export function parseRelease(json) {
   if (!v) return null;
   const assets = Array.isArray(json.assets) ? json.assets.filter((a) => a && typeof a.name === "string" && typeof a.browser_download_url === "string") : [];
   const url = (a) => a.browser_download_url;
-  const ipa = assets.find((a) => a.name === "Cydian.ipa") ?? assets.find((a) => /\.ipa$/i.test(a.name));
+  const ipa = assets.find((a) => a.name === `${NAME}.ipa`) ?? assets.find((a) => /\.ipa$/i.test(a.name));
   return {
     version: v.join("."),
     tag: json.tag_name,
@@ -76,14 +76,14 @@ export function parseRelease(json) {
 
 // The .deb for this architecture (core/settings.js bridgeArch: iphoneos-arm64 rootless, iphoneos-arm64e roothide,
 // iphoneos-arm rootful): the asset naming exactly that arch (Debian's name_version_arch.deb), else a plain
-// Cydian.deb, which is the rootless build (native/build.sh), so only for iphoneos-arm64. Null when none fits.
+// iFizBox.deb, which is the rootless build (native/build.sh), so only for iphoneos-arm64. Null when none fits.
 export function debFor(release, arch) {
   const debs = release?.debs ?? [];
   if (arch) {
     const exact = debs.find((d) => new RegExp(`[_-]${arch.replace(/[^a-z0-9-]/g, "")}\\.deb$`, "i").test(d.name));
     if (exact) return exact.url;
   }
-  if (!arch || arch === "iphoneos-arm64") return debs.find((d) => d.name === "Cydian.deb")?.url ?? null;
+  if (!arch || arch === "iphoneos-arm64") return debs.find((d) => d.name === `${NAME}.deb`)?.url ?? null;
   return null;
 }
 
@@ -223,7 +223,7 @@ export async function runInstall(release, mode, deps) {
 
 async function installSideload(release, { status, installOnDevice, installSelf, alert, go }) {
   if (!release.ipa) {
-    await alert({ title: "Can't Install", message: `${NAME} ${release.version} has no Cydian.ipa on GitHub.`, buttons: ["OK"] });
+    await alert({ title: "Can't Install", message: `${NAME} ${release.version} has no ${NAME}.ipa on GitHub.`, buttons: ["OK"] });
     return "no-asset";
   }
   // F72: iFizBox's own IPA can't come through the local install server (iOS closes iFizBox, and the server, as it

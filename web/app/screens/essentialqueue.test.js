@@ -52,7 +52,7 @@ test("F86: Confirm answers \"confirm\"; a queue emptied under the sheet answers 
   openAppConfirm(q);
   const ok = buttons(body).find((b) => b.textContent === "Confirm");
   assert.ok(ok, "Confirm has Confirm");
-  globalThis.cydianNative = undefined;
+  globalThis.ifizboxNative = undefined;
   q.clear("a"); // the run itself isn't under test: an empty queue closes the sheet, which counts as Cancel
   assert.equal(await ended, "cancel");
   const q2 = createAppQueue();

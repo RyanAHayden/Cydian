@@ -96,7 +96,7 @@ export function findUpgrades(installed, candidateOf, holds = [], { dpkgHolds = t
 //   openAppStore({ indexedDB, name })   -> Promise of { all, put, remove }; memoryAppStore() is the same in memory
 //   apps()                              -> the device's store, opened once; onAppsChange(f) after record/remove
 
-const APP_DB = "cydian-installed";
+const APP_DB = "ifizbox-installed";
 const APP_STORE = "apps";
 
 const text = (v) => (v == null ? "" : String(v).trim());
@@ -177,9 +177,9 @@ let shared = null;
 // updates show in Installed and Changes like any app's. (The jailbreak app reads dpkg, which already has it.)
 export const apps = () => (shared ??= openAppStore().catch(() => memoryAppStore()).then(withSelf));
 
-export const SELF_ID = "com.ryha.cydian";
+export const SELF_ID = "com.ryha.ifizbox";
 let selfInfo = null;
-function selfRecord(native = globalThis.cydianNative) {
+function selfRecord(native = globalThis.ifizboxNative) {
   if (!native?.call) return Promise.resolve(null);
   selfInfo ??= Promise.resolve().then(() => native.call("app.info", {})).then((i) => (i?.mode === "jailbreak" || !i?.version ? null
     : { id: SELF_ID, name: NAME, version: String(i.version), key: null, source: null, sourceName: NAME,

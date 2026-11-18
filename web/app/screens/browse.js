@@ -851,7 +851,7 @@ async function packageActions(route, button) {
     actions.push({ label: "Downgrade", run: () => go(versionsHref(route, id)) });
   }
   if (many && !(installed && older.length)) actions.push({ label: "Other Versions", run: () => go(versionsHref(route, id)) });
-  // The website: a jailbroken phone's iFizBox installs it with apt (cydian://package, websign-gate.js), so nobody has to
+  // The website: a jailbroken phone's iFizBox installs it with apt (ifizbox://package, websign-gate.js), so nobody has to
   // download a .deb (user 2026-11-18); Download .deb stays below for other package managers.
   if (getBackend().kind === "http" && (st.package || id)) {
     actions.push({ label: `Install in ${NAME}`, run: () => import("../websign-gate.js").then((g) => { location.href = g.packageLink(st.package || id); }) });

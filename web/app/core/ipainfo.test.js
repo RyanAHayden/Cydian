@@ -78,10 +78,10 @@ test("iPad-only (UIDeviceFamily without 1) is not for iPhone", () => {
 
 test("kept on the device by downloadURL; expired entries are gone", () => {
   const store = memoryStore();
-  store.setItem("cydian.ipainfo." + IPA, JSON.stringify({ minOSVersion: "15", deviceFamily: [1], from: "ipa", at: 5 }));
-  store.setItem("cydian.ipainfo.https://x/old.ipa", JSON.stringify({ minOSVersion: null, from: null, at: 1, until: 10 }));
-  store.setItem("cydian.ipainfo.https://x/bad.ipa", "{nope");
-  store.setItem("cydian.other", "1");
+  store.setItem("ifizbox.ipainfo." + IPA, JSON.stringify({ minOSVersion: "15", deviceFamily: [1], from: "ipa", at: 5 }));
+  store.setItem("ifizbox.ipainfo.https://x/old.ipa", JSON.stringify({ minOSVersion: null, from: null, at: 1, until: 10 }));
+  store.setItem("ifizbox.ipainfo.https://x/bad.ipa", "{nope");
+  store.setItem("ifizbox.other", "1");
   assert.deepEqual(savedInfo(store, IPA, 100), { minOSVersion: "15.0", deviceFamily: [1], from: "ipa", at: 5 });
   assert.equal(savedInfo(store, "https://x/old.ipa", 100), null);
   assert.deepEqual(Object.keys(allSaved(store, 100)), [IPA]);

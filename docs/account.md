@@ -7,11 +7,11 @@ phone, a reinstall or the website gets them back.
 ## The key
 
 - 128 random bits made on the device, shown as 26 Crockford base32 characters in groups of four
-  (`XXXX-XXXX-…-XX`), and as `cydian://account?k=<code>` (link and QR code). Typing is forgiving: case, spaces,
+  (`XXXX-XXXX-…-XX`), and as `ifizbox://account?k=<code>` (link and QR code). Typing is forgiving: case, spaces,
   dashes, O/0 and I/L/1.
 - Kept in the Keychain in the app (`account.key.get/set/remove`, `native/Sources/Account.swift`: this device only,
-  after first unlock, no Face ID) and in IndexedDB (`cydian-account`) on the website or in an older shell.
-- HKDF-SHA256 (salt `cydian-account-v1`) gives two things: `info "id"` → the 64-hex id in the URL;
+  after first unlock, no Face ID) and in IndexedDB (`ifizbox-account`) on the website or in an older shell.
+- HKDF-SHA256 (salt `ifizbox-account-v1`) gives two things: `info "id"` → the 64-hex id in the URL;
   `info "encrypt"` → the AES-GCM-256 key. The server keys KV by `acct:` + SHA-256(id), so neither the key nor the
   URL's id is stored. Losing the key loses the data; nobody can recover it.
 
@@ -30,7 +30,7 @@ same routes, with accounts kept in memory.
   / `pagehide`), but only if something changed since the last sync, or a read found this device ahead of the
   account. Sync Now does both. Signing in is a read only.
 - **Merge**: sources, holds, the Wish List (`wishlist`, F102) and apps are sets merged three ways against `seen` (what the account held after this
-  device's last sync, kept in localStorage `cydian.account` with the certificate only as a fingerprint): the
+  device's last sync, kept in localStorage `ifizbox.account` with the certificate only as a fingerprint): the
   account's list, plus this device's additions, minus this device's removals. So a removal travels to the other
   devices too, and a device that has never synced only adds. Settings and the certificate are last-write-wins per
   field: what this device changed since `seen` wins (stamp = now); otherwise the account's value stands. Syncing

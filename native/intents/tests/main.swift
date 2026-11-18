@@ -1,5 +1,5 @@
 // Swift tests for N8's intents (native/intents/Core.swift), run on Linux by native/intents/test_intents.py against
-// the fake helper (native/fake/cydian-helper) over a copy of native/fake/fixture/prefix:
+// the fake helper (native/fake/ifizbox-helper) over a copy of native/fake/fixture/prefix:
 //   intentstest <fake helper> <fixture prefix> <fake remote>
 // Each intent gets a fresh copy of the prefix. Prints "ok   <name>" per test, "all passed" at the end, and the
 // sideload restore's link as "LINK <url>" for the Python side to decode.
@@ -48,7 +48,7 @@ final class FakeHost: IntentHost {
         // fd 3 is the status fd, as the real spawn gives it.
         p.arguments = ["-c", "exec \"$0\" \"$@\" 3>\"$STATUS_FILE\"", helperPath] + words
         var e = ProcessInfo.processInfo.environment
-        e["CYDIAN_PREFIX"] = prefix
+        e["IFIZBOX_PREFIX"] = prefix
         e["FAKE_REMOTE"] = remote
         e["STATUS_FILE"] = status
         for (k, v) in env { e[k] = v }
@@ -198,13 +198,13 @@ test("respring and userspace reboot: the helper's verbs, jailbreak only") {
     check(s.log.isEmpty, "\(s.log)")
 }
 
-test("add source: a cydian://add link for the page's alert") {
+test("add source: a ifizbox://add link for the page's alert") {
     let u = try IntentsCore.addSourceLink(URL(string: "https://repo.example.com/")!)
-    check(u.absoluteString == "cydian://add?url=https://repo.example.com/", u.absoluteString)
+    check(u.absoluteString == "ifizbox://add?url=https://repo.example.com/", u.absoluteString)
     let d = try IntentsCore.addSourceLink(URL(string: "https://apt.procurs.us/")!, suite: "1800", components: ["main"])
-    check(d.absoluteString == "cydian://add?url=https://apt.procurs.us/&suite=1800&component=main", d.absoluteString)
+    check(d.absoluteString == "ifizbox://add?url=https://apt.procurs.us/&suite=1800&component=main", d.absoluteString)
     let q = try IntentsCore.addSourceLink(URL(string: "https://r.example/a?b=c&d=e+f")!)
-    check(q.absoluteString == "cydian://add?url=https://r.example/a?b%3Dc%26d%3De%2Bf", q.absoluteString)
+    check(q.absoluteString == "ifizbox://add?url=https://r.example/a?b%3Dc%26d%3De%2Bf", q.absoluteString)
     check(throwsFailure { _ = try IntentsCore.addSourceLink(URL(string: "ftp://x.example/")!) } != nil, "ftp")
     check(throwsFailure { _ = try IntentsCore.addSourceLink(URL(string: "file:///etc/passwd")!) } != nil, "file")
 }
@@ -222,7 +222,7 @@ test("export my packages: sources, manual packages, holds") {
     check(b.sources == [BackupSource(uri: "https://one.example/", suite: "stable", components: ["main", "extra"]),
                         BackupSource(uri: "https://havoc.app/", suite: "./", components: []),
                         BackupSource(uri: "https://apt.procurs.us/", suite: "1800", components: ["main"])], "\(b.sources)")
-    check(String(decoding: data, as: UTF8.self).contains("\"format\" : \"cydian-backup\""), "format")
+    check(String(decoding: data, as: UTF8.self).contains("\"format\" : \"ifizbox-backup\""), "format")
     check(IntentsCore.backupFileName(Date(timeIntervalSince1970: 1_800_000_000)) == "\(Brand.name) Packages 2027-01-15.json", "name")
     check(throwsFailure { _ = try IntentsCore.exportBackup(FakeHost(jailbroken: false)) } == .needsJailbreak, "sideload")
 }
@@ -240,13 +240,13 @@ test("restore my packages: new sources, apt update, installs, holds") {
                    holds: ["bash", "com.example.nowhere"])
     let r = try IntentsCore.restore(try JSONEncoder().encode(b), h, gzip: storedGzip)
     check(r.addedSources == [b.sources[1]], "\(r.addedSources)")
-    check(r.failedSources.count == 1 && r.failedSources[0].hasPrefix("https://bad example/ ./: cydian-helper: bad URI"), "\(r.failedSources)")
+    check(r.failedSources.count == 1 && r.failedSources[0].hasPrefix("https://bad example/ ./: ifizbox-helper: bad URI"), "\(r.failedSources)")
     check(h.log.contains(["addsource", "https://new.example/", "./"]), "\(h.log)")
     check(h.log.contains(["apply", "bash", "com.example.rootful"]), "\(h.log)")
     check(r.installed == ["bash", "com.example.rootful"] && r.alreadyInstalled == 1, "\(r)")
     check(r.missing == ["com.example.nowhere"], "\(r.missing)")
     check(r.held == ["bash"] && h.log.last == ["hold", "bash"], "\(r.held) \(h.log)")
-    check(h.read("/etc/apt/sources.list.d/cydian.sources")?.contains("URIs: https://new.example/") == true, "cydian.sources")
+    check(h.read("/etc/apt/sources.list.d/ifizbox.sources")?.contains("URIs: https://new.example/") == true, "ifizbox.sources")
     check(r.dialog.hasPrefix("Added 1 source, installed 2 packages, 1 already installed. Not in any source: com.example.nowhere."), r.dialog)
     check(try IntentsCore.pending(h).map(\.id) == ["apt", "com.example.tweak"], "after restore")
 }
@@ -268,7 +268,7 @@ test("restore my packages: sideload restores sources only, as an import link") {
                    packages: [BackupPackage(id: "bash", version: "5", name: nil)], holds: ["bash"])
     let r = try IntentsCore.restore(try JSONEncoder().encode(b), h, gzip: storedGzip)
     check(h.log.isEmpty, "\(h.log)")
-    check(r.importLink?.hasPrefix("cydian://import?d=") == true, "\(String(describing: r.importLink))")
+    check(r.importLink?.hasPrefix("ifizbox://import?d=") == true, "\(String(describing: r.importLink))")
     check(r.dialog == "Opening \(Brand.name) to add the sources.", r.dialog)
     print("LINK \(r.importLink ?? "")")
     let empty = Backup(created: "x", sources: [], packages: [], holds: [])

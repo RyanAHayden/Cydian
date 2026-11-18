@@ -12,6 +12,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper install-ipa <path>                                      (F59: an IPA, through installd)
     cydian-helper selfupdate <path.deb>                                    (F61: Cydian updates itself)
     cydian-helper rollbacks <pkg> | rollback <pkg> <version>              (F71: Roll Back to a kept .deb)
+    cydian-helper install-paid <path.deb> <pkg> <version>                 (F57: a paid package's .deb)
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
@@ -32,6 +33,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `selfupdate` | `dpkg --force-confdef --force-confold [--status-fd 3] -i <path>`: Cydian's own update (F61). The path is absolute, `[A-Za-z0-9._/-]`, no `.`/`..` segment, ends in `.deb`, at most 1024 bytes, and a regular file (not a symlink). Any .deb is accepted: the caller check is the boundary, and Cydian can already install anything through `addsource` + `install` |
 | `rollbacks` | runs nothing: `<version> <file>` per line for each .deb of the package N7's daemon kept in `/var/jb/var/cache/cydian/rollback/<pkg>/` that `rollback` would take (F71; below) |
 | `rollback`  | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install /var/jb/var/cache/cydian/rollback/<pkg>/<pkg>_<ver>_<arch>.deb`, `CYDIA=3 1` as for `apply` (F71; below) |
+| `install-paid` | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install /var/tmp/cydian-paid.XXXXXX/paid.deb`, `CYDIA=3 1` as for `apply`, after copying and checking the app's download (F57; below) |
 | `respring`  | `sbreload`, or `killall -9 backboardd` when the jailbreak has no sbreload (N4: Restart SpringBoard) |
 
 **The queue (N4):** `simulate` and `apply` take items: `name` installs the newest, `name=version` that exact
@@ -97,6 +99,16 @@ that tree is mobile's, the same trust as mobile running appinst. No ldid, or ins
 as `pmstatus:<id>:<percent>:<text>`, `Installed <id>` on stdout. The helper is signed with `entitlements.plist` here
 (appinst's: `allowedSPI` Install and InstallForLaunchServices, installd's mach-lookup, `platform-application`).
 
+**Paid packages (F57):** `install-paid <path> <pkg> <version>` takes one file,
+`/var/mobile/Library/Caches/com.ryha.cydian/paid/<name>.deb` (`HELPER_PAID_DIR`, where Paid.swift's `paid.install`
+downloads the vendor's one-time `authorize_download` URL; name `[A-Za-z0-9][A-Za-z0-9._-]*.deb`, at most 255 bytes),
+a package name and a version by the usual rules. `paid.c` opens it as `ipa.c` does (`O_NOFOLLOW` through the real
+directory; a plain file, one link, the directory owner's and not root's, at most 1 GiB), copies it into a root-owned
+`/var/tmp/cydian-paid.XXXXXX/paid.deb` (`HELPER_PAID_WORK`), and `dpkg-deb -f` reads the copy's control: `Package`
+must be the name and `Version` the version asked (rollback's check), so a vendor's or a swapped file can't install
+something else. Then apt-get installs the copy (dependencies from the sources), and the directory goes. Exit 64 for
+a refused path, file or control, 74 couldn't copy, else apt's.
+
 - **Arguments:** only the verb and package names. A name matches `[a-z0-9][a-z0-9.+-]+` (so never an option), is
   at most 255 bytes, at most 256 of them, and must be known: for `install` a `Package:` line in dpkg's status or an
   apt `*_Packages` list, for `remove`, `hold` and `unhold` in dpkg's status. The last rule stops apt from reading
@@ -119,6 +131,7 @@ Files:
   `cydian.sources` edit. Pure enough to test on Linux.
 - `ipa.c/.h`: install-ipa (F59). Off iOS its installd step only prints what it would install, so the rest is tested
   on Linux (`test_helper.py` InstallIpa).
+- `paid.c/.h`: install-paid (F57), tested on Linux (`test_helper.py` InstallPaid).
 - `entitlements.plist`: the helper's (F59, appinst's); `../build.sh` signs with it.
 - `main.c`: the helper. `CYDIAN_PREFIX` (default `/var/jb`) and `CYDIAN_ROOT_UID` (default 0) are compile-time
   only; the tests change them, the shipped build must not.

@@ -44,6 +44,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         }
         SelfUpdate.register(self) // F61: selfupdate.download, app.quit (below)
         Apt.register(self) // N3: apt's files, the network, cydian-helper, haptic.tap (Apt.swift)
+        Paid.register(self) // F57: vendors' calls, UDID, Keychain, sign-in sheet, paid installs (Paid.swift)
         SignBridge.register(self) // I6: sign and install IPAs on the phone, sideload build (SignBridge.swift)
     }
 

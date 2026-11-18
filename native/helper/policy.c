@@ -115,6 +115,51 @@ static int ipa_plan(int argc, char *const argv[], struct helper_plan *p, const c
     return 0;
 }
 
+int helper_paid_path_ok(const char *dir, const char *path) {
+    size_t d = strlen(dir);
+    if (!d || strncmp(path, dir, d) || path[d] != '/') return 0;
+    const char *name = path + d + 1;
+    size_t n = strlen(name);
+    if (n < 5 || n > HELPER_IPA_NAME_MAX || !alnum(name[0]) || strcmp(name + n - 4, ".deb")) return 0;
+    for (size_t i = 0; i < n; i++)
+        if (!(alnum(name[i]) || strchr("._-", name[i]))) return 0;
+    return !strstr(name, "..");
+}
+
+/* F57: install-paid <path> <id> <version>. The plan is apt-get install of p->deb; paid.c (helper_install_paid)
+ * copies the caller's file into a root-owned directory, points p->deb at the copy and checks its control first. */
+static int paid_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
+                     const char **err) {
+    static char status_apt[64], keep_fd[64];
+    if (argc != 4) { *err = "install-paid takes a .deb path, a package name and a version"; return -1; }
+    if (!helper_paid_path_ok(HELPER_PAID_DIR, argv[1])) { *err = "bad .deb path (only " HELPER_PAID_DIR "/<name>.deb)"; return -1; }
+    if (!helper_name_ok(argv[2])) { *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return -1; }
+    if (!helper_version_ok(argv[3])) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-])"; return -1; }
+    snprintf(p->name_buf[0], sizeof p->name_buf[0], "%s", argv[2]);
+    snprintf(p->item_buf[0], sizeof p->item_buf[0], "%s", argv[3]);
+    if ((size_t)snprintf(p->deb, sizeof p->deb, "%s", argv[1]) >= sizeof p->deb) { *err = "path too long"; return -1; }
+    if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/apt-get", prefix) >= sizeof p->path) {
+        *err = "prefix too long"; return -1;
+    }
+    int k = 0;
+    const char **a = p->argv;
+    a[k++] = "apt-get";
+    a[k++] = "-y";
+    a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confdef";
+    a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confold";
+    if (status_fd >= 0) {
+        snprintf(keep_fd, sizeof keep_fd, "APT::Keep-Fds::=%d", status_fd);
+        snprintf(status_apt, sizeof status_apt, "APT::Status-Fd=%d", status_fd);
+        a[k++] = "-o"; a[k++] = keep_fd;
+        a[k++] = "-o"; a[k++] = status_apt;
+    }
+    a[k++] = "install";
+    a[k++] = p->deb; /* absolute: apt-get reads an argument with a "/" as a file */
+    a[k] = NULL;
+    p->argc = k;
+    return 0;
+}
+
 /* addsource <uri> <suite> [component...] | removesource <uri> <suite>: checked here, done by helper_sources_apply. */
 static int source_plan(int argc, char *const argv[], const char *prefix, struct helper_plan *p, const char **err) {
     int add = p->verb == HV_ADDSOURCE;
@@ -505,6 +550,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "install-ipa")) { p->verb = HV_INSTALL_IPA; return ipa_plan(argc, argv, p, err); }
     else if (!strcmp(verb, "rollbacks")) { p->verb = HV_ROLLBACKS; return rollback_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "rollback")) { p->verb = HV_ROLLBACK; return rollback_plan(argc, argv, prefix, status_fd, p, err); }
+    else if (!strcmp(verb, "install-paid")) { p->verb = HV_INSTALL_PAID; return paid_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "selfupdate")) { p->verb = HV_SELFUPDATE; return selfupdate_plan(argc, argv, prefix, status_fd, p, err); }
     else { *err = "unknown verb (" HELPER_VERBS ")"; return -1; }
 

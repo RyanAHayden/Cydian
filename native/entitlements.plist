@@ -7,5 +7,8 @@
 	<key>com.apple.private.security.no-container</key><true/>
 	<key>com.apple.private.security.no-sandbox</key><true/>
 	<key>com.apple.private.persona-mgmt</key><true/>
+	<!-- F57 (Paid.swift): Keychain items for vendors' payment secrets, and the UDID vendors ask for (as Sileo has) -->
+	<key>keychain-access-groups</key><array><string>com.ryha.cydian</string></array>
+	<key>com.apple.private.MobileGestalt.AllowedProtectedKeys</key><array><string>UniqueDeviceID</string></array>
 </dict>
 </plist>

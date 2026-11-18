@@ -248,6 +248,15 @@ class Plists(unittest.TestCase):
         self.assertTrue(e["com.apple.private.security.no-container"])
         self.assertTrue(e["com.apple.private.persona-mgmt"])  # N3: spawning cydian-helper as root
 
+    def test_paid_entitlements(self):
+        """F57 (Paid.swift): the Keychain group for payment secrets, the UDID key, and Face ID's usage string."""
+        with open(os.path.join(HERE, "entitlements.plist"), "rb") as f:
+            e = plistlib.load(f)
+        self.assertEqual(e["keychain-access-groups"], ["com.ryha.cydian"])
+        self.assertEqual(e["com.apple.private.MobileGestalt.AllowedProtectedKeys"], ["UniqueDeviceID"])
+        with open(os.path.join(HERE, "Info.plist"), "rb") as f:
+            self.assertIn("Face ID", plistlib.load(f)["NSFaceIDUsageDescription"])
+
     def test_daemon_entitlements(self):
         with open(os.path.join(HERE, "daemon/entitlements.plist"), "rb") as f:
             e = plistlib.load(f)

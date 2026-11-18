@@ -11,6 +11,10 @@
 // net: null means offline, every request fails with "network: ..."). `env` goes to the helper (FAKE_FAIL=update).
 // F63: helper.run of apply-ask gives the helper a stdin pipe, which helper.answer { answer: keep | new } writes to.
 // F59: ipa.install downloads into `ipaDir` (default: beside the prefix, ipa-cache/) and runs install-ipa there.
+// F57: paid packages (native/Sources/Paid.swift): `vendors` (native/fake/fake-vendor.mjs) answer net.request,
+// auth.session and paid.install's download; `device` is device.info's answer (null: the UDID can't be read);
+// keychain.* keep secrets in `keychain` (a Map the test can look at); paid.install downloads into `paidDir`
+// (default: beside the prefix, paid-cache/) and runs install-paid there.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -32,8 +36,11 @@ export function makeFixture() {
 const read = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null);
 
 export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = FAKE_HELPER, mode = "jailbreak",
-  ipaDir = join(dirname(prefix ?? "."), "ipa-cache") } = {}) {
+  ipaDir = join(dirname(prefix ?? "."), "ipa-cache"), vendors = [],
+  device = { udid: "00008110-000A1B2C3D4E5F60", model: "iPhone14,2" },
+  paidDir = join(dirname(prefix ?? "."), "paid-cache") } = {}) {
   const calls = [];
+  const keychain = new Map(); // F57
   let answerTo = null; // F63: the running apply-ask's stdin
   const fail = (msg) => Promise.reject(new Error(msg));
 
@@ -82,7 +89,8 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       if (!existsSync(helper)) return fail(`helper: cydian-helper is not installed at ${helper}`);
       return new Promise((resolve, reject) => {
         const child = spawn(helper, words, {
-          env: { PATH: process.env.PATH, CYDIAN_PREFIX: prefix, FAKE_REMOTE: remote, CYDIAN_IPA_DIR: ipaDir, ...env },
+          env: { PATH: process.env.PATH, CYDIAN_PREFIX: prefix, FAKE_REMOTE: remote, CYDIAN_IPA_DIR: ipaDir,
+            CYDIAN_PAID_DIR: paidDir, ...env },
           // F63: apply-ask gets a stdin pipe for helper.answer, as Helper.run in Apt.swift gives it.
           stdio: [words[0] === "apply-ask" ? "pipe" : "ignore", "pipe", "pipe", "pipe"],
         });
@@ -145,6 +153,68 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       const kind = { 64: "bad_ipa", 69: "no_adhoc", 77: "helper" }[res.code] ?? "install";
       return fail(`${kind}: ${why ? why.slice(15) : `cydian-helper exited with ${res.code}`}`);
     },
+    // F57: like Paid.swift. net.request: https only, GET or POST, body a string; the answer's body is base64.
+    "net.request"({ method = "GET", url, headers, body }) {
+      if (!/^https:\/\//i.test(url ?? "")) return fail("bad_url: not an https URL");
+      const m = String(method).toUpperCase();
+      if (m !== "GET" && m !== "POST") return fail(`bad_url: method ${m}`);
+      if (net === null) return fail("network: The Internet connection appears to be offline.");
+      let r;
+      for (const v of vendors) if ((r = v.handle({ method: m, url, headers: headers ?? {}, body: m === "POST" ? body ?? null : null }))) break;
+      r ??= m === "GET" ? netGet(url) : { status: 404, body: "" };
+      return { status: r.status, headers: r.headers ?? {}, body: Buffer.from(r.body ?? "").toString("base64") };
+    },
+    "device.info"() {
+      if (!device?.udid) return fail("device: can't read this iPhone's UDID (MobileGestalt refused UniqueDeviceID)");
+      return { udid: device.udid, model: device.model };
+    },
+    "keychain.get"({ key }) {
+      if (!key) return fail("keychain: no key");
+      return keychain.get(key) ?? null;
+    },
+    "keychain.set"({ key, value }) {
+      if (!key) return fail("keychain: no key");
+      if (typeof value === "string") keychain.set(key, value); else keychain.delete(key);
+      return true;
+    },
+    "keychain.remove"({ key }) {
+      if (!key) return fail("keychain: no key");
+      keychain.delete(key);
+      return true;
+    },
+    // The sheet "loads" the URL: a vendor's sign-in page or payment page ends at its callback; null is the user
+    // closing the sheet (ASWebAuthenticationSessionError.canceledLogin).
+    "auth.session"({ url, callbackScheme = "sileo" }) {
+      if (!/^https:\/\//i.test(url ?? "")) return fail("bad_url: not an https URL");
+      if (!/^[a-z][a-z0-9+.-]*$/.test(callbackScheme) || ["http", "https", "file", "cydian"].includes(callbackScheme)) {
+        return fail("bad_url: bad callback scheme");
+      }
+      for (const v of vendors) {
+        const cb = v.authenticate(url) ?? v.completePayment?.(url);
+        if (cb) return cb.startsWith(callbackScheme + ":") ? cb : null;
+      }
+      return null;
+    },
+    async "paid.install"({ url, package: pkg, version, stream }, onEvent) {
+      if (mode !== "jailbreak") return fail("sideload: paid packages install with the jailbreak build");
+      if (!/^https:\/\//i.test(url ?? "")) return fail("bad_url: not an https URL");
+      if (!pkg || !version) return fail("helper: no package or version");
+      if (net === null) return fail("network: The Internet connection appears to be offline.");
+      mkdirSync(paidDir, { recursive: true, mode: 0o700 });
+      if (stream && onEvent) onEvent({ fd: "status", line: `dlstatus:${pkg}:0:Downloading` });
+      let r;
+      for (const v of vendors) if ((r = v.download(url))) break;
+      r ??= netGet(url);
+      if (r.status >= 400) return fail(`not_found: HTTP ${r.status} for the download`);
+      if (!String(r.body).startsWith("!<arch>\n")) return fail("not_found: the vendor's download is not a .deb");
+      const path = join(paidDir, `${randomUUID().toUpperCase()}.deb`);
+      writeFileSync(path, Buffer.from(r.body));
+      try {
+        return await call("helper.run", { words: ["install-paid", path, pkg, version], stream }, onEvent);
+      } finally {
+        rmSync(path, { force: true });
+      }
+    },
   };
 
   async function call(method, params = {}, onEvent) {
@@ -157,6 +227,7 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
 
   return {
     calls,
+    keychain,
     call,
     emit() {},
     helper: (words, onEvent) => call("helper.run", { words, stream: Boolean(onEvent) }, onEvent),

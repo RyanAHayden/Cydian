@@ -10,6 +10,11 @@ A Swift shell around one WKWebView that shows `web/app/` from the app bundle (do
   (apt's and dpkg's files under the jailbreak prefix), `net.fetch`/`net.packages` (repos fetched by the shell; .xz and
   .gz decompressed), `helper.run` (cydian-helper through `helper/spawn.c`, output streamed), `haptic.tap`. Errors
   are `"<code>: <message>"`. `Sources/Cydian-Bridging-Header.h` brings in `spawn.h`.
+- `Sources/Paid.swift` (F57): paid packages' shell calls for `web/app/screens/extras.js`: `net.request` (vendors'
+  POSTs, no CORS), `device.info` (MobileGestalt UDID, hw.machine), `keychain.get/set/remove` (payment secrets behind
+  the passcode / Face ID), `auth.session` (ASWebAuthenticationSession, callback scheme `sileo`), `paid.install`
+  (download the one-time .deb into `HELPER_PAID_DIR`, `cydian-helper install-paid`). The fake vendor for tests is
+  `fake/fake-vendor.mjs` (`web/app/backend-native-paid.test.js`).
 - `bridge.js`: injected at document start (a WKUserScript), it sets up `cydianNative` (`call`, `emit`, `helper`,
   `dpkgStatus`) and `cydianApp` before any module of `web/app/` runs.
 - `fake/`: the Swift side in node for tests without a device: `fake-native.mjs` (same methods over a fixture

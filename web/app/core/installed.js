@@ -9,8 +9,8 @@
 // Cydia's rule (docs/cydia.md "Changes and metadata.cb0"): a package is upgradable when it is installed and its
 // candidate (the newest version on any source) is newer than the installed one. Held packages (dpkg's `hold`
 // selection, or Cydian's Ignored Upgrades list) go under Ignored Upgrades, not Available Upgrades.
-import { parseControl, description, compareVersions } from "./apt.js";
-import { sectionName, parseAuthor, compareNames } from "./catalog.js";
+import { parseControl, description, compareVersions, parseRelations } from "./apt.js";
+import { sectionName, parseAuthor, compareNames, sectionGroup } from "./catalog.js";
 
 // Where dpkg keeps it: rootful, then rootless (Dopamine, palera1n rootless).
 export const STATUS_PATHS = ["/var/lib/dpkg/status", "/var/jb/var/lib/dpkg/status"];
@@ -27,13 +27,13 @@ export function parseStatusField(value) {
 
 // One installed package, shaped like a catalog row (core/catalog.js) so the same lists draw it, plus `held`
 // (dpkg's hold selection) and `state` (anything but "installed" means a broken install).
-function installedRow(st) {
+function installedRow(st, deps = new Set()) {
   const { want, state } = parseStatusField(st.status);
   const name = st.name || st.package;
   return {
     id: st.package, name, short: description(st).short, version: st.version ?? "", section: sectionName(st.section),
     icon: null, key: null, author: parseAuthor(st.author)?.name || parseAuthor(st.maintainer)?.name || "",
-    held: want === "hold", state, essential: /^yes$/i.test(st.essential ?? ""),
+    held: want === "hold", state, essential: /^yes$/i.test(st.essential ?? ""), tier: packageTier(st, deps), // F127
   };
 }
 
@@ -53,7 +53,8 @@ export function installedStanzas(text) {
 // The packages dpkg has on disk, sorted by name. A file that isn't a status file (no Status fields) gives [].
 // `stanzas` (installedStanzas' result) saves parsing the text again.
 export function parseStatus(text, stanzas = installedStanzas(text)) {
-  return stanzas.map(installedRow).sort(compareNames);
+  const deps = dependedOn(stanzas);
+  return stanzas.map((st) => installedRow(st, deps)).sort(compareNames);
 }
 
 // Whether text looks like a dpkg status file: at least one stanza with Package and Status. For the upload, so a
@@ -205,4 +206,110 @@ export function installedIds(dpkgRows, appRecords) {
   for (const r of dpkgRows ?? []) if (r?.id) ids.add(r.id);
   for (const r of appRecords ?? []) if (r?.id) ids.add(r.id);
   return ids;
+}
+
+// ---- F127: Installed's modes, type filters and search (Cydia's InstalledController) ----------------------------
+// Cydia 1.1's Installed tab has a segmented control in the nav bar: User, Expert, Recent (MobileCydia.mm
+// InstalledController, checked on the 4S: ref/4s/screens/cydia-installed-*.png). Cydia ranks each package by its
+// `Tag: role::…` (Package role_: none 0, enduser 1, hacker 2, developer 3, any other role 4, cydia 7): User lists
+// role <= 1, Expert role <= 3, Recent role < 7 by the birth time of dpkg's info/<pkg>.list, newest first, in day
+// sections (long date style), leaving out packages with no date. Few packages carry role tags now, so User also
+// leaves out what the user didn't choose (the brief, user 2026-11-18): Essential packages (`Essential: yes`, the
+// `cydia::essential` tag, `Priority: required`) and dependencies (anything another installed package Depends or
+// Pre-Depends on, by name or through Provides). A row's `tier` holds that rank: 1 User, 3 Expert, 6 Recent only, 7
+// never listed.
+//
+//   dependedOn(stanzas)                     -> Set of the installed ids another installed package needs
+//   packageTier(stanza, deps)               -> 1 | 3 | 6 | 7
+//   modeRows(rows, mode, dates)             -> the rows a mode lists, in its order (dates: { id: seconds })
+//   typeRows(rows, type)                    -> rows of one TYPES kind (Search's scope bar: core/catalog.js sectionGroup)
+//   queryRows(rows, query)                  -> rows whose name, id, description or author hold every word of query
+//   dayHeaders(rows, dates, locale)         -> Recent's list items: { header: "November 16, 2026" } before each day
+
+export const MODES = ["user", "expert", "recent"];
+export const MODE_LABEL = { user: "User", expert: "Expert", recent: "Recent" };
+export const TYPES = ["All", "Tweaks", "Themes", "Apps"]; // Search's segments (screens/search.js SCOPES), same order
+
+const tagsOf = (st) => String(st?.tag ?? "").split(",").map((t) => t.trim()).filter(Boolean);
+
+// Cydia's role_: the first role:: tag decides.
+export function roleRank(st) {
+  const tag = tagsOf(st).find((t) => t.startsWith("role::"));
+  if (!tag) return 0;
+  return { enduser: 1, hacker: 2, developer: 3, cydia: 7 }[tag.slice(6)] ?? 4;
+}
+
+export function dependedOn(stanzas) {
+  const ids = new Set(stanzas.map((st) => st.package));
+  const providers = new Map(); // virtual name -> installed ids that provide it
+  for (const st of stanzas) {
+    for (const [p] of parseRelations(st.provides)) {
+      if (!providers.has(p.name)) providers.set(p.name, []);
+      providers.get(p.name).push(st.package);
+    }
+  }
+  const out = new Set();
+  for (const st of stanzas) {
+    for (const group of [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)]) {
+      for (const alt of group) {
+        for (const id of [...(ids.has(alt.name) ? [alt.name] : []), ...(providers.get(alt.name) ?? [])]) {
+          if (id !== st.package) out.add(id);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+export function packageTier(st, deps = new Set()) {
+  const role = roleRank(st);
+  if (role === 7) return 7;
+  if (role >= 4) return 6;
+  if (role >= 2) return 3;
+  const essential = /^yes$/i.test(st.essential ?? "") || tagsOf(st).includes("cydia::essential") ||
+    /^required$/i.test(String(st.priority ?? "").trim());
+  return essential || deps.has(st.package) ? 3 : 1;
+}
+
+// Rows without a tier (an older worker's) count as User, so nothing disappears.
+const tierOf = (r) => (Number.isFinite(r?.tier) ? r.tier : 1);
+const dateOf = (dates, r) => Number(dates?.[r.id]) || 0;
+
+export function modeRows(rows, mode, dates = null) {
+  if (mode === "recent") {
+    return rows.filter((r) => tierOf(r) < 7 && dateOf(dates, r) > 0)
+      .sort((a, b) => dateOf(dates, b) - dateOf(dates, a) || compareNames(a, b));
+  }
+  const max = mode === "expert" ? 3 : 1;
+  return rows.filter((r) => tierOf(r) <= max);
+}
+
+export function typeRows(rows, type) {
+  if (!type || type === "All" || !TYPES.includes(type)) return rows;
+  return rows.filter((r) => sectionGroup(r.section) === type);
+}
+
+export function queryRows(rows, query) {
+  const words = String(query ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return rows;
+  return rows.filter((r) => {
+    const hay = [r.name, r.id, r.short, r.author].filter(Boolean).join("\n").toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
+}
+
+export function dayLabel(seconds, locale) {
+  return new Date(seconds * 1000).toLocaleDateString(locale, { dateStyle: "long" });
+}
+
+export function dayHeaders(rows, dates, locale) {
+  const out = [];
+  let cur = null;
+  for (const r of rows) {
+    const t = dateOf(dates, r);
+    const label = t > 0 ? dayLabel(t, locale) : null;
+    if (label && label !== cur) { out.push({ header: label }); cur = label; }
+    out.push(r);
+  }
+  return out;
 }

@@ -23,6 +23,13 @@
 // first, by the mtime of dpkg's info/<pkg>.list, which the jailbreak app reads: apt.installDates in Apt.swift;
 // the site's uploaded status file has no dates, so no Recent there) and Size (Installed-Size, largest first).
 //
+// F127: Installed as Cydia's (user 2026-11-18). Cydia 1.1's segmented control in the nav bar, User | Expert | Recent
+// (core/installed.js modeRows: User leaves out Essential packages and dependencies, Expert lists everything, Recent
+// newest install first in day sections), replaces F104's Name/Recent/Size bar; Recent needs the jailbreak app's
+// install dates, so the site's dpkg page has User | Expert. Under the Apps and Wish List rows, a search bar narrows
+// the list as it is typed and Search's scope segments filter by kind (All, Tweaks, Themes, Apps). Without a jailbreak
+// the apps list gets User (A–Z) | Recent (newest first, by day) and the search bar, no kinds (it is all apps).
+//
 // F125: the Wish List lives here (it was a row on Home): a Wish List row with its count (a grey count badge) on the
 // root, under the installed lists (beside Apps above dpkg's packages in the jailbreak app, so it isn't hundreds of rows
 // down; a Packages section under the apps elsewhere), opens #installed/wishlist: the wished packages as a package
@@ -34,12 +41,14 @@ import { format } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
 import { showAlert } from "../nav/alert.js";
 import { detectMode } from "../core/settings.js";
-import { apps, appRows, appUpgrades, removeInstall, onAppsChange } from "../core/installed.js";
+import { apps, appRows, appUpgrades, removeInstall, onAppsChange, MODES, MODE_LABEL, TYPES, modeRows, typeRows, queryRows,
+  dayHeaders, dayLabel } from "../core/installed.js";
 import { mediaUrl } from "./depiction.js";
 import { rememberedApps } from "../app-updates.js";
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { settings } from "./settings.js";
 import { wishRows, wishCount, WISH_EMPTY } from "../core/wishlist.js";
+import { compareNames, indexLetter } from "../core/catalog.js";
 
 export const title = "Installed";
 
@@ -47,62 +56,106 @@ export const DPKG = "dpkg"; // the site's path segment for the status file's pac
 export const APPS = "apps"; // F87: the jailbreak app's path segment for the remembered apps
 export const WISH = "wishlist"; // F125: the Wish List page's path segment
 
-const state = { body: null, route: null, list: null, seq: 0, dates: null };
+const state = { body: null, route: null, list: null, seq: 0, dates: null, mode: "user", type: "All", query: "", tail: [] };
 
-// ---- F104: sorting the dpkg list --------------------------------------------------------------------------------
+// ---- F127: modes, kinds and search -----------------------------------------------------------------------------
 
-export const SORTS = ["name", "recent", "size"];
-const SORT_LABEL = { name: "Name", recent: "Recent", size: "Size" };
-const SORT_KEY = "cydian.installedSort";
-
-// The scope bar's segments: Recent only where install dates can be read.
-export const sortScopes = (hasDates) => SORTS.filter((s) => s !== "recent" || hasDates);
-
-// rows (sorted by name, as catalog.installed gives them) in `by`'s order. `dates`: { id: seconds } (Recent);
-// packages without a date or size go last, by name.
-export function sortInstalled(rows, by, dates = null) {
-  if (by !== "recent" && by !== "size") return rows;
-  const val = by === "recent" ? (r) => Number(dates?.[r.id]) || 0 : (r) => Number(r.size) || 0;
-  return rows.map((r, i) => [val(r), i, r]).sort((a, b) => b[0] - a[0] || a[1] - b[1]).map((x) => x[2]);
+// Whether install dates can be read (the jailbreak app: apt.installDates), so Recent can be offered.
+export function canReadDates(native = globalThis.cydianNative) {
+  return typeof native?.call === "function" && typeof native?.dpkgStatus === "function";
 }
 
-// What a row shows beside its version under Recent or Size.
-export function sortDetail(r, by, dates = null, locale) {
-  if (by === "size") return browse.formatSize(r.size);
-  const t = by === "recent" ? Number(dates?.[r.id]) : 0;
-  return t > 0 ? new Date(t * 1000).toLocaleDateString(locale, { dateStyle: "medium" }) : null;
+// The modes the dpkg list offers.
+export const dpkgModes = (hasDates) => MODES.filter((m) => m !== "recent" || hasDates);
+// The apps list's: User (A–Z) and Recent; there are no dependencies or Essential apps to leave out.
+export const APP_MODES = ["user", "recent"];
+
+// What the dpkg list shows: the mode's rows of the kind, narrowed by the search; Recent with its day headers.
+export function dpkgItems(rows, { mode = "user", type = "All", query = "", dates = null, locale } = {}) {
+  const shown = queryRows(typeRows(modeRows(rows, mode, dates), type), query);
+  return mode === "recent" ? dayHeaders(shown, dates, locale) : shown;
 }
 
-function readSort() {
-  try { const v = globalThis.localStorage?.getItem(SORT_KEY); return SORTS.includes(v) ? v : "name"; } catch { return "name"; }
+// The apps list's sections (nav/ui.js plain): User by name under A–Z headers, Recent newest first under day headers
+// (r.date is in milliseconds), both narrowed by the search.
+export function appSections(rows, { mode = "user", query = "", locale } = {}) {
+  const shown = queryRows(rows, query);
+  const out = [];
+  if (mode === "recent") {
+    for (const r of appRows(shown)) {
+      const label = r.date > 0 ? dayLabel(r.date / 1000, locale) : "Cydian";
+      if (out.at(-1)?.header !== label) out.push({ header: label, rows: [] });
+      out.at(-1).rows.push(r);
+    }
+  } else {
+    for (const r of [...shown].sort(compareNames)) {
+      const label = indexLetter(r.name);
+      if (out.at(-1)?.header !== label) out.push({ header: label, rows: [] });
+      out.at(-1).rows.push(r);
+    }
+  }
+  return out;
 }
-function saveSort(v) {
-  try { globalThis.localStorage?.setItem(SORT_KEY, v); } catch { /* private mode: this session only */ }
-}
-let sortBy = readSort();
 
 // { package: seconds } from apt.installDates (the jailbreak app), or null where it can't be read.
 export async function installDates(native = globalThis.cydianNative) {
-  if (typeof native?.call !== "function" || typeof native?.dpkgStatus !== "function") return null;
+  if (!canReadDates(native)) return null;
   try {
     const d = await native.call("apt.installDates", {});
     return d && typeof d === "object" && Object.keys(d).length ? d : null;
   } catch { return null; }
 }
 
-function scopeBar(scopes, current, onPick) {
-  const bar = Object.assign(document.createElement("div"), { className: "search-scope installed-scope" });
+// Search's segmented control (packages.css .scope-segments), labels -> onPick(value) when another is tapped.
+function segments(values, labels, current, onPick) {
   const seg = Object.assign(document.createElement("div"), { className: "scope-segments" });
-  for (const s of scopes) {
-    const b = Object.assign(document.createElement("button"), { type: "button", className: "scope-segment", textContent: SORT_LABEL[s] });
-    b.classList.toggle("selected", s === current);
-    b.addEventListener("click", () => { if (s !== current) onPick(s); });
-    seg.append(b);
-  }
-  bar.append(seg);
-  return bar;
+  seg.setAttribute("role", "tablist");
+  const buttons = values.map((v) => {
+    const b = Object.assign(document.createElement("button"), { type: "button", className: "scope-segment", textContent: labels[v] ?? v });
+    b.setAttribute("role", "tab");
+    b.addEventListener("click", () => {
+      if (b.classList.contains("selected")) return;
+      for (const o of buttons) { o.classList.toggle("selected", o === b); o.setAttribute("aria-selected", String(o === b)); }
+      onPick(v);
+    });
+    b.classList.toggle("selected", v === current);
+    b.setAttribute("aria-selected", String(v === current));
+    return b;
+  });
+  seg.append(...buttons);
+  return seg;
 }
-const appView = { body: null, route: null, seq: 0, editing: false, right: null };
+
+// Cydia's User | Expert | Recent, in the nav bar in place of the title (app.js titleView).
+function modeControl(modes, current, onPick) {
+  const wrap = Object.assign(document.createElement("div"), { className: "nav-segments" });
+  wrap.append(segments(modes, MODE_LABEL, current, onPick));
+  return wrap;
+}
+
+// The search bar (Search's look) that narrows `view`'s list as it is typed; with `types`, Search's kinds under it.
+function filterControls(view, { types = false, onChange }) {
+  const bar = Object.assign(document.createElement("form"), { className: "search-bar installed-search" + (types ? " has-scope" : "") });
+  bar.setAttribute("role", "search");
+  const field = Object.assign(document.createElement("label"), { className: "search-field" });
+  const input = Object.assign(document.createElement("input"), { type: "search", placeholder: "Search", autocomplete: "off", spellcheck: false });
+  input.autocapitalize = "off";
+  input.setAttribute("autocorrect", "off");
+  input.setAttribute("aria-label", "Search installed packages");
+  input.enterKeyHint = "search";
+  input.value = view.query ?? "";
+  const changed = () => { if (input.value !== view.query) { view.query = input.value; onChange(); } };
+  input.addEventListener("input", changed);
+  input.addEventListener("search", changed); // the field's clear button
+  bar.addEventListener("submit", (e) => { e.preventDefault(); input.blur(); });
+  field.append(input);
+  bar.append(field);
+  if (!types) return [bar];
+  const scope = Object.assign(document.createElement("div"), { className: "search-scope installed-scope" });
+  scope.append(segments(TYPES, {}, view.type, (t) => { view.type = t; onChange(); }));
+  return [bar, scope];
+}
+const appView = { body: null, route: null, seq: 0, editing: false, right: null, mode: "user", query: "", tail: [], last: null };
 
 // Records apps (F30) rather than reading dpkg: everywhere but the jailbreak app.
 export const recordsApps = (mode = detectMode()) => mode !== "jailbreak";
@@ -140,9 +193,15 @@ export function nav(route) {
   }
   if (kind === "apps") {
     return { title: recordsApps() ? "Installed" : "Apps", style: "plain", // F87: "Apps" one row down in the jailbreak app
+      // F127: User | Recent on the apps list's root (the jailbreak app's Apps page stays newest first).
+      titleView: recordsApps() ? modeControl(APP_MODES, appView.mode, (m) => { appView.mode = m; redrawApps(); }) : undefined,
       right: { label: appView.editing ? "Done" : "Edit", onClick: (e) => setEditing(!appView.editing, e.currentTarget) } };
   }
   const info = { title: recordsApps() ? "dpkg Status" : "Installed", style: "plain" };
+  // F127: Cydia's User | Expert | Recent in place of the title.
+  const modes = dpkgModes(canReadDates());
+  if (!modes.includes(state.mode)) state.mode = "user";
+  info.titleView = modeControl(modes, state.mode, (m) => { state.mode = m; if (state.body) drawList(); });
   // The site: pick a newer status file whenever the phone's packages changed.
   if (catalog.statusSource() === "upload") info.right = { label: "Load", onClick: () => chooseStatus() };
   return info;
@@ -168,6 +227,7 @@ export function render(body, route, ctx) {
   if (kind === "apps") {
     appView.body = body;
     appView.route = route;
+    appView.last = null;
     body.append(placeholder("list", 6));
     loadApps();
     return;
@@ -231,19 +291,34 @@ function draw() {
     return;
   }
   body.replaceChildren();
-  if (top.length) body.append(grouped([{ rows: top }]));
-  // F104: the scope bar goes in before the list measures where it starts.
-  const scopes = sortScopes(Boolean(state.dates));
-  const by = scopes.includes(sortBy) ? sortBy : "name";
-  body.append(scopeBar(scopes, by, (s) => { sortBy = s; saveSort(s); draw(); }));
-  const dates = state.dates;
-  state.list = browse.packageList(body, state.route, sortInstalled(rows, by, dates), by === "name" ? undefined : {
-    letters: false,
-    decorate: (row, item) => {
-      const extra = sortDetail(item, by, dates);
-      row._.version.textContent = [item.version, extra].filter(Boolean).join(" · ");
-    },
-  });
+  if (top.length) {
+    const g = grouped([{ rows: top }]);
+    g.firstElementChild?.classList.add("installed-top"); // F127: stops short of the A–Z index (packages.css)
+    body.append(g);
+  }
+  // F127: the search bar and kinds go in before the list measures where it starts.
+  body.append(...filterControls(state, { types: true, onChange: drawList }));
+  state.tail = [];
+  drawList();
+}
+
+// The list under the controls, again whenever the mode, the kind or the search changes (the field keeps its focus).
+function drawList() {
+  const { rows, body } = state;
+  if (!rows?.length || !body) return;
+  browse.dropList(body, state.list);
+  state.list = null;
+  for (const n of state.tail) n.remove();
+  const { mode, dates } = state;
+  const items = dpkgItems(rows, { mode, type: state.type, query: state.query, dates });
+  if (!items.length) {
+    state.tail = [note(state.query.trim() ? "No matches." : mode === "recent" ? "No install dates." : "No packages.")];
+    body.append(...state.tail);
+    return;
+  }
+  // Cydia: A–Z headers and the index for User and Expert, day headers for Recent.
+  state.list = browse.packageList(body, state.route, items, { letters: mode !== "recent" });
+  state.tail = [state.list.el];
   body.append(state.list.el);
 }
 
@@ -364,19 +439,43 @@ async function loadApps() {
 function drawApps(listRows, cands, site, hasStatus) {
   const body = appView.body;
   const route = appView.route;
+  appView.last = { listRows, cands, site, hasStatus };
+  body.classList.replace("grouped", "plain");
+  // F87: no Install IPAs tile on the jailbreak app's Apps page (My IPAs is a sideload page). F127: the search bar under
+  // it, on the root, once there are apps to search.
+  const head = recordsApps() ? [myIpasTile(route, site)] : [];
+  if (recordsApps() && listRows.length) head.push(...filterControls(appView, { onChange: drawAppList }));
+  body.replaceChildren(...head);
+  appView.tail = [];
+  drawAppList();
+}
+
+// F127: the mode or the search changed: the list again, under the tile and the field (which keeps its focus).
+function redrawApps() {
+  if (appView.body && appView.last) drawAppList();
+}
+
+function drawAppList() {
+  const body = appView.body;
+  const route = appView.route;
+  const { listRows, cands, site, hasStatus } = appView.last;
+  for (const n of appView.tail ?? []) n.remove();
   // F91: the signature pill in place of the version (the version stays in the subtitle).
   const signed = appView.signed ? withSignatures(listRows, appView.signed, { window: resignWindow((k) => settings.get(k)) }) : { rows: listRows, extra: [] };
-  const rows = signed.rows;
-  const sections = [{
-    rows: [...rows.map((r) => ({
-      label: r.name, subtitle: r.sig && !r.upgrade && r.version ? [`Version ${r.version}`, appSubtitle(r)].filter(Boolean).join(" · ") : appSubtitle(r),
-      detail: r.sig && !r.upgrade ? r.sig.text : r.upgrade || r.actual === null ? undefined : r.version,
-      badge: r.upgrade ? "Upgrade" : undefined, icon: { text: r.name.charAt(0).toUpperCase() },
-      // The app page, while a source still has the app.
-      href: cands.has(r.id) ? format({ tab: route.tab, path: [...route.path, `package:${r.id}`] }) : null,
-    })), ...signed.extra.map((r) => ({ label: r.name, subtitle: [r.version ? `Version ${r.version}` : null, "Signed by Cydian"].filter(Boolean).join(" · "),
-      detail: r.sig?.text, icon: { text: r.name.charAt(0).toUpperCase() } }))],
-  }];
+  // F127: User (A–Z) or Recent (by day) on the root, narrowed by the search; the jailbreak app's Apps page as before.
+  const appSecs = recordsApps() ? appSections(signed.rows, { mode: appView.mode, query: appView.query }) : [{ rows: signed.rows }];
+  const extra = recordsApps() ? queryRows(signed.extra, appView.query) : signed.extra;
+  const rows = appSecs.flatMap((sec) => sec.rows);
+  const appRow = (r) => ({
+    label: r.name, subtitle: r.sig && !r.upgrade && r.version ? [`Version ${r.version}`, appSubtitle(r)].filter(Boolean).join(" · ") : appSubtitle(r),
+    detail: r.sig && !r.upgrade ? r.sig.text : r.upgrade || r.actual === null ? undefined : r.version,
+    badge: r.upgrade ? "Upgrade" : undefined, icon: { text: r.name.charAt(0).toUpperCase() },
+    // The app page, while a source still has the app.
+    href: cands.has(r.id) ? format({ tab: route.tab, path: [...route.path, `package:${r.id}`] }) : null,
+  });
+  const sections = appSecs.map((sec) => ({ header: sec.header, rows: sec.rows.map(appRow) }));
+  sections.push({ rows: extra.map((r) => ({ label: r.name, subtitle: [r.version ? `Version ${r.version}` : null, "Signed by Cydian"].filter(Boolean).join(" · "),
+    detail: r.sig?.text, icon: { text: r.name.charAt(0).toUpperCase() } })) });
   if (site) {
     sections.push({ header: "Jailbroken iPhone", rows: [hasStatus
       ? { label: "dpkg Status File", subtitle: "Packages installed with apt", href: format({ tab: route.tab, path: [DPKG] }) }
@@ -387,14 +486,15 @@ function drawApps(listRows, cands, site, hasStatus) {
   ul.classList.toggle("editing", appView.editing);
   const cells = ul.querySelectorAll(":scope > .cell");
   rows.forEach((r, i) => decorateApp(cells[i], r));
-  [...rows, ...signed.extra].forEach((r, i) => { if (r.sig && !r.upgrade) sigPill(cells[i], r.sig); });
+  [...rows, ...extra].forEach((r, i) => { if (r.sig && !r.upgrade) sigPill(cells[i], r.sig); });
   attachRowGestures(ul);
-  body.classList.replace("grouped", "plain");
-  // F87: no Install IPAs tile on the jailbreak app's Apps page (My IPAs is a sideload page).
-  body.replaceChildren(...(recordsApps() ? [myIpasTile(route, site)] : []), ul);
-  if (!rows.length) {
-    ul.before(note("No apps yet. Apps you install from an app's page are listed here, on this device.")); // under My IPAs
+  appView.tail = [ul];
+  if (!listRows.length) {
+    appView.tail.unshift(note("No apps yet. Apps you install from an app's page are listed here, on this device.")); // under My IPAs
+  } else if (!rows.length && !extra.length) {
+    appView.tail.unshift(note("No matches."));
   }
+  body.append(...appView.tail);
 }
 
 // F91: the row's detail drawn as the signature pill.

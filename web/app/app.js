@@ -104,6 +104,7 @@ function makePage(tab, path) {
   const h1 = document.createElement("h1");
   h1.className = "nav-title";
   h1.textContent = title;
+  if (info.titleView) { h1.classList.add("nav-title-view"); h1.replaceChildren(info.titleView); } // a control in the title's place (F127)
   const right = document.createElement("div");
   right.className = "nav-right";
   // `right` may be one button or several side by side (Sources: Add and Manage).

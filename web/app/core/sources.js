@@ -528,3 +528,12 @@ export function cleanSourceUrl(text) {
   if (!/^https?:\/\//i.test(u)) u = "https://" + u.replace(/^\/+/, "");
   try { return new URL(u).href; } catch { return ""; }
 }
+
+// raw.githubusercontent.com keeps a file 5 minutes after it changes, but treats a query as another file: sources
+// there (Cydian's own among them) are asked for with one that changes each minute, so a release shows within a
+// minute (user 2026-11-18: Changes said Cydian 0.3.5 with 0.3.6 out). Other hosts' URLs stay as they are.
+export function freshUrl(url, now = Date.now()) {
+  const s = String(url ?? "");
+  if (!/^https:\/\/raw\.githubusercontent\.com\//i.test(s) || s.includes("?")) return s;
+  return `${s}?t=${Math.floor(now / 60000)}`;
+}

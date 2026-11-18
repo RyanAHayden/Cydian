@@ -10,6 +10,7 @@
 // Failures throw BackendError with the proxy's `code` (bad_url, refused, too_large, timeout, upstream,
 // not_found, network, rate_limited) and, for code "upstream", the repo's HTTP `status`.
 
+import { freshUrl } from "./core/sources.js";
 import { sourceCalls, sortSources, DEFAULT_ALT_SOURCES } from "./core/sources.js";
 import { withAltSources } from "./core/altstore.js";
 import { validatorCache } from "./core/health.js";
@@ -26,7 +27,7 @@ export class BackendError extends Error {
 // `sourceOptions` go to core/sources.js sourceCalls (indexedDB, arch, count): the source list lives in this
 // browser's IndexedDB, the same code the app runs.
 export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(globalThis), sourceOptions = {} } = {}) {
-  const endpoint = (params) => `${base}/api/fetch?${new URLSearchParams(params)}`;
+  const endpoint = (params) => `${base}/api/fetch?${new URLSearchParams(params.url ? { ...params, url: freshUrl(params.url) } : params)}`;
 
   // F19: the proxy answers with an ETag (and the repo's Last-Modified); text() sends them back, and a 304 reuses
   // the text kept here, so a Release that hasn't changed costs no transfer.

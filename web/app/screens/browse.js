@@ -640,7 +640,7 @@ async function renderPackage(body, route, key, id, ctx) {
   body.append(grouped([{ header: "Details", rows: details }]));
   // F29: Version History, every version the sources offer (Downgrade's list); and Modify once it's installed.
   const history = await catalog.history(id, key).catch(() => null);
-  rememberPackage(body, route, { id, pkg, source, history });
+  rememberPackage(body, route, { id, key, pkg, source, history });
   if (history?.versions.length) body.append(versionHistoryRow(route, id, history));
   body.append(grouped([{ header: "Works on My Phone", rows: [{ label: compatBadge(fitCode) }],
     footer: fit.detail }]));
@@ -696,6 +696,23 @@ function rememberPackage(body, route, page) {
   const installed = page.pkg.stanza.kind !== "ipa" && page.history?.versions.some((v) => v.installed);
   setRightLabel(body, installed ? "Modify" : "Install");
 }
+
+// N11: a run (install, upgrade, remove) re-reads dpkg (catalog.reloadInstalled), which fires catalog.onChange. A
+// package page left open under the console kept saying Install after its package went in (and Modify after it was
+// removed) until it was opened again (iPhone 7). Each APT page on screen asks for its Version History again, so the
+// nav bar button and Modify's sheet follow what is installed now. AltStore pages keep their own state (altstore.js).
+export async function refreshPackagePages(pages = packagePages, { history = (id, key) => catalog.history(id, key ?? ALL),
+  label = setRightLabel } = {}) {
+  for (const [k, p] of [...pages]) {
+    if (!p.body.isConnected) { pages.delete(k); continue; }
+    if (p.pkg.stanza.kind === "ipa") continue;
+    const h = await history(p.id, p.key).catch(() => null);
+    if (!h || !p.body.isConnected) continue;
+    p.history = h;
+    label(p.body, h.versions.some((v) => v.installed) ? "Modify" : "Install");
+  }
+}
+catalog.onChange(() => { refreshPackagePages().catch(() => {}); });
 
 const installedOf = (history) => history?.versions.find((v) => v.installed)?.version ?? null;
 // N4: `extra` ({ installed, name }) goes with every job, so the queue knows the mode (Reinstall, Downgrade...) at once.

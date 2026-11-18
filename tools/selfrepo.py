@@ -93,6 +93,10 @@ def build(out, debs, minimum=None, date=None):
         "Suite: stable",
         "Codename: cydian",
         "Architectures: " + " ".join(arches),
+        # N11: Sileo drops a repo whose Release has no Components ("Could not parse release file", RepoManager.swift:
+        # `guard ["components"].allSatisfy(releaseDict.keys.contains)`), flat or not; apt ignores it on a flat repo.
+        # Chariz (flat) says main too.
+        "Components: main",
         "Description: Cydian's own source: Cydian for jailbroken iPhones",
         "Date: " + (date or formatdate(usegmt=True)),
     ]

@@ -104,3 +104,14 @@ palera1n is semi-tethered: after a reboot the phone boots stock, without `/var/j
 The T490 has `apple_mfi_fastcharge` blacklisted (`/etc/modprobe.d/no-mfi-fastcharge.conf`): that driver grabs the
 phone in DFU and breaks checkm8 on Linux. If palera1n says "Resource busy", another palera1n/checkra1n process is
 still holding the phone: kill it and retry.
+
+## Serving a test repo to the phone (N11)
+
+The desktop's firewall blocks the phone from reaching it over the LAN. To serve a repo you built, use a reverse
+tunnel instead: `python3 -m http.server 8711 --bind 127.0.0.1` in the repo folder, then
+`ssh -N -R 8711:127.0.0.1:8711 7`. On the phone it is `http://127.0.0.1:8711/`, in Cydian, Sileo
+(`sileo://source/http://127.0.0.1:8711/`) and Zebra alike. Keep the pids, stop both when you're done, and take the
+stanzas back out of `sileo.sources` and Zebra.
+
+Sileo 2.5 drops a repo whose Release has no `Components:` field. Zebra 1.1.36 can't read files that redirect to very
+long URLs (GitHub release assets; B17).

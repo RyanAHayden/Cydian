@@ -79,7 +79,7 @@ ssh 7 'launchctl list | grep com.ryha.ifizbox'       # the app and the upgrades 
 `sudo` needs no password (passwordless rule since 2026-11-18); scripts use `sudo -n` so they fail instead of
 hanging at a prompt if the rule is ever gone. Remove with `sudo apt-get remove -y com.ryha.ifizbox`.
 
-iFizBox is installed on the phone: `com.ryha.ifizbox` 0.9.2-1152, built from F171 (checked 2026-11-18 with
+iFizBox is installed on the phone: `com.ryha.ifizbox` 0.9.3-1189, built from main at 634040e (checked 2026-11-18 with
 `ssh 7 dpkg-query -W com.ryha.ifizbox`). Leave it installed: later tasks test iFizBox here. A build from before
 F171 has the old package ID, so it installs beside iFizBox instead of over it: don't install one on this phone; if
 one is there, remove it and its files as below. Check the version before assuming

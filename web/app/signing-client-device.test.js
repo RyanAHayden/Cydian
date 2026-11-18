@@ -48,20 +48,20 @@ test("only the sideload build signs (F89: the website has no signer)", async () 
   assert.equal(await signingReady(), false);
 });
 
-test("the Signing Server: sign.cydian.dev by default, and the website's old cydian.dev means the default", () => {
+test("the Signing Server: brand.js SIGN_HOST (sign.ifizbox.com) by default, and the website's own address means the default", () => {
   const m = new Map();
   const saved = globalThis.localStorage;
   globalThis.localStorage = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
   try {
-    assert.equal(getServer(), "https://sign.cydian.dev");
-    m.set("cydian.signingServer", "https://cydian.dev");
-    assert.equal(getServer(), "https://sign.cydian.dev");
+    assert.equal(getServer(), "https://sign.ifizbox.com");
+    m.set("cydian.signingServer", "https://ifizbox.com");
+    assert.equal(getServer(), "https://sign.ifizbox.com");
     assert.equal(setServer("my.example.org"), "https://my.example.org");
     assert.equal(getServer(), "https://my.example.org");
-    setServer("https://cydian.dev");
+    setServer("https://ifizbox.com");
     assert.equal(m.has("cydian.signingServer"), false);
     setServer("");
-    assert.equal(getServer(), "https://sign.cydian.dev");
+    assert.equal(getServer(), "https://sign.ifizbox.com");
   } finally { globalThis.localStorage = saved; }
 });
 
@@ -142,7 +142,7 @@ test("Install: the HUD follows the phases, then Installing, and records the app"
   const ui = fakeUI();
   let recorded = null;
   assert.equal(await installOnDevice({ url: "https://e.example/x.ipa", name: "X", onInstalled: (r) => { recorded = r; } }, { native: n, ...ui.deps }), true);
-  assert.deepEqual(n.calls[0], { method: "signing.install", params: { url: "https://e.example/x.ipa", manifestServer: "https://sign.cydian.dev" } }); // the manifest from the signing server
+  assert.deepEqual(n.calls[0], { method: "signing.install", params: { url: "https://e.example/x.ipa", manifestServer: "https://sign.ifizbox.com" } }); // the manifest from the signing server
   assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Reading", "Signing 25%", "Installing", "Installing"]);
   assert.equal(recorded, done);
   assert.equal(ui.alerts.length, 0);

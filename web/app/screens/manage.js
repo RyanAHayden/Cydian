@@ -1,11 +1,11 @@
-// Sources > Manage (F45), a grouped page after Cydia's Manage tab: three rows, each its own page.
+// Sources > Manage (F45), a grouped page after Cydia's Manage tab: two rows, each its own page, and Recommended
+// right under them (user 2026-11-18: not a page of its own).
 //
-//   #/sources/manage                     Sources, Import & Export, Recommended
+//   #/sources/manage                     Sources, Import & Export; then Recommended (core/recommended.js): sources as
+//                                        Sources draws them, a round Add on each, icons and counts filled in lazily
 //   #/sources/manage/sources             the edit list: Add, the red minus and Delete, drag the grabber to reorder
-//   #/sources/manage/io                  Export (share text, save a file, QR code) and Import (file or pasted text)
-//   #/sources/manage/io/paste            a text box for a pasted list; Next checks it
-//   #/sources/manage/io[/paste]/review   what an import found: new ones (ticked), already listed, can't add; Add
-//   #/sources/manage/recommended         core/recommended.js: sources as Sources draws them, a round Add on each
+//   #/sources/manage/io                  Export (share text, save a file, QR code) and Import (file or the clipboard)
+//   #/sources/manage/io/review           what an import found: new ones (ticked), already listed, can't add; Add
 //   #/sources/manage/recommended/<key>   one not added yet, read from its URL: its apps (F52) or packages (F54), and Add
 //
 // Source keys always hold a ':' (deb:..., alt:...), so "manage" can't be one. The parsing, export text and order
@@ -51,12 +51,10 @@ function page(route) {
   const p = route.path.slice(1);
   if (!p.length) return "root";
   if (p[0] === "sources" && p.length === 1) return "sources";
-  if (p[0] === "recommended" && p.length === 1) return "recommended";
   if (p[0] === "recommended" && p.length === 2) return "preview";
   if (p[0] === "io") {
     if (p.length === 1) return "io";
-    if (p.at(-1) === "review") return "review";
-    if (p[1] === "paste" && p.length === 2) return "paste";
+    if (p[1] === "review" && p.length === 2) return "review";
   }
   return "missing";
 }
@@ -66,9 +64,7 @@ export function nav(route, ctx) {
     case "root": return { title: "Manage", right: { label: "Add", onClick: () => addSource(ctx) } }; // F52
     case "sources": return { title: "Sources", style: "plain", right: { label: "Add", onClick: () => addSource(ctx) } };
     case "io": return { title: "Import & Export" };
-    case "paste": return { title: "Paste List", right: { label: "Next", onClick: () => pasteNext(route, ctx) } };
     case "review": return { title: "Import", right: { label: "Add", onClick: () => addPicked(ctx) } };
-    case "recommended": return { title: "Recommended", style: "plain" };
     case "preview": return { title: RECOMMENDED_SOURCES.find((r) => recommendedSeed(r).key === route.path[2])?.name || "Source",
       right: { label: "Add", onClick: () => addFromPreview(route, ctx) } };
     default: return { title: "Not Found" };
@@ -77,12 +73,10 @@ export function nav(route, ctx) {
 
 export function render(body, route, ctx) {
   switch (page(route)) {
-    case "root": return renderRoot(body);
+    case "root": return renderRoot(body, ctx);
     case "sources": return renderSources(body);
     case "io": return renderIO(body, route, ctx);
-    case "paste": return renderPaste(body);
     case "review": return renderReview(body);
-    case "recommended": return renderRecommended(body, ctx);
     case "preview": return renderPreview(body, route);
     default: body.append(el("p", "empty", "Nothing here."));
   }
@@ -106,14 +100,15 @@ const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 
 // ---- Manage --------------------------------------------------------------------------------------------------
 
-function renderRoot(body) {
+function renderRoot(body, ctx) {
   const rows = [
     { label: "Sources", href: here("sources") },
     { label: "Import & Export", href: here("io") },
-    { label: "Recommended", href: here("recommended") },
   ];
-  body.replaceChildren(grouped([{ rows, footer: "Add, delete and reorder your sources; move them to another phone or "
-    + "package manager; or pick from a short list of sources worth having." }]));
+  const rec = el("div", "manage-rec");
+  body.replaceChildren(grouped([{ rows, footer: "Add, delete and reorder your sources, or move them to another phone "
+    + "or package manager." }, { header: "Recommended" }]), rec);
+  renderRecommended(rec, ctx);
   getBackend().sources().then((list) => {
     const n = sourcesFor(list, settings.deviceType()).shown.length;
     const detail = body.querySelector(".cell .cell-inner");
@@ -326,7 +321,7 @@ function renderIO(body, route, ctx) {
       + "package managers, one URL at a time." },
     { header: "Import", rows: [
       { label: "From File", onClick: () => file.click() },
-      { label: "From Pasted Text", href: here("io", "paste") },
+      { label: "From Clipboard", onClick: (e) => importClipboard(e.currentTarget, route, ctx) },
     ], footer: "Reads Cydian's export, a list of URLs, AltStore, SideStore and Feather source lists (JSON), "
       + "Sileo's .sources and Cydia's .list. You see which are new before anything is added." },
   ]), file);
@@ -387,40 +382,36 @@ async function showQR() {
   img.alt = `QR code of ${plural(count, "source")}`;
   img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   box.append(img, el("p", "group-footer", `${plural(count, "source")}. Scan it with the other phone's Camera, `
-    + "copy the text it shows, then Import > From Pasted Text."));
+    + "copy the text it shows, then Import > From Clipboard."));
   showSheet({ title: "QR Code", body: box });
 }
 
-function renderPaste(body) {
-  const area = Object.assign(document.createElement("textarea"), { className: "manage-paste",
-    placeholder: "Paste URLs, a sources list or a JSON file here", spellcheck: false });
-  area.setAttribute("autocapitalize", "off");
-  area.setAttribute("autocorrect", "off");
-  area.setAttribute("aria-label", "Source list");
-  const g = el("div", "group");
-  g.append(area, el("p", "group-footer", "Tap Next to see which sources are new."));
-  body.replaceChildren(g);
-}
-
-async function pasteNext(route, ctx) {
-  const text = document.querySelector(".page.is-top textarea.manage-paste")?.value ?? "";
+// Import > From Clipboard: iOS's Paste bubble, as Sources' Add (sources.js addFromClipboard): readText blocks WebKit's
+// main thread while the bubble is up, so the row is let go and a frame painted first (the tap's gesture outlives a
+// timer under 1 s). Dismissed or empty: nothing found.
+async function importClipboard(row, route, ctx) {
+  row?.classList.remove("is-pressed");
+  await new Promise((r) => setTimeout(r, 50));
+  let text = "";
+  try { text = await navigator.clipboard.readText(); } catch { /* dismissed */ }
+  if (!/^#\/sources\/manage\/io\/?$/.test(location.hash)) return; // left the page while the bubble was up
   await startReview(text, route, ctx);
 }
 
 async function startReview(text, route, ctx) {
   const { entries } = parseImport(text);
   if (!entries.length) {
-    await showAlert({ title: "No Sources Found", message: "There are no source URLs in that text.", buttons: ["OK"] });
+    await showAlert({ title: "No Sources Found", message: "There are no source URLs in that text. Copy a list of URLs or a sources file first.", buttons: ["OK"] });
     return;
   }
   const have = await getBackend().sources().catch(() => []);
   pending = reviewImport(entries, have).map((e) => ({ ...e, pick: e.status === "new" && !e.warning }));
-  ctx.go({ tab: "sources", path: [...route.path, "review"] });
+  ctx.go({ tab: "sources", path: [SEGMENT, "io", "review"] });
 }
 
 function renderReview(body) {
   if (!pending) {
-    body.replaceChildren(el("p", "empty", "Nothing to import. Go back and pick a file or paste a list."));
+    body.replaceChildren(el("p", "empty", "Nothing to import. Go back and pick a file or copy a list."));
     return;
   }
   const row = (e) => ({ label: e.uri.replace(/^https?:\/\//, ""), subtitle: e.dist && e.dist !== "./" ? `${e.dist} ${e.components.join(" ")}` : undefined });

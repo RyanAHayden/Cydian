@@ -281,7 +281,9 @@ document.addEventListener("pointerdown", (e) => {
   if (!e.isPrimary) return; // one finger's button at a time, as UIKit does
   // A new press clears any other still showing (a quick tap's lingering 140 ms included): one held look at a time.
   for (const other of document.querySelectorAll(".is-pressed")) if (other !== el) other.classList.remove("is-pressed");
-  if (el && !el.disabled) { pressed = el; pressedAt = performance.now(); el.classList.add("is-pressed"); }
+  // While a row shows its Delete (a swipe), a tap on a row only puts the Delete away: no blue, as Cydia.
+  const delShown = el?.closest("ul")?.querySelector(":scope > .armed") && !el.matches(".del-confirm");
+  if (el && !el.disabled && !delShown) { pressed = el; pressedAt = performance.now(); el.classList.add("is-pressed"); }
 }, { passive: true });
 for (const type of ["pointerup", "pointercancel", "pointerleave"]) document.addEventListener(type, unpress, { passive: true });
 document.addEventListener("pointermove", (e) => {

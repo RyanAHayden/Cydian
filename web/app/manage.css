@@ -30,14 +30,6 @@
 .manage-why .cell-inner { padding-top: 6px; padding-bottom: 6px; }
 .manage-review .cell-label { font-size: 15px; }
 
-/* The paste box: a grouped-table outline around a text area. */
-.manage-paste {
-  display: block; box-sizing: border-box; width: 100%; min-height: 220px; margin-top: 10px; padding: 9px 10px;
-  border: 1px solid var(--table-edge); border-radius: 9.5px; background: var(--table); color: var(--text);
-  font: 15px/20px "Helvetica Neue", Helvetica, sans-serif; resize: vertical;
-  box-shadow: inset 0 .5px .5px var(--table-inset);
-}
-
 .manage-qr { text-align: center; }
 .manage-qr img { display: block; width: 100%; max-width: 320px; margin: 20px auto 10px; image-rendering: pixelated; background: #fff; }
 /* F8: the add link under the QR code of a source's Open In > Add on Another Device (screens/handoff.js). */

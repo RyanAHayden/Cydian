@@ -58,6 +58,15 @@ Cydian App.
 
 ## Cutting one
 
+One command does all of it: `tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.Y.Z] [--dry-run]`. It checks main is
+clean and current and the version is new, commits and pushes `native/VERSION`, builds that exact commit in a clean
+temporary worktree, publishes it with `tools/release.sh` as the repo owner's GitHub account (whichever gh account
+is active), commits and pushes the updated `web/app/source.json`, and checks that `releases/latest/download/Cydian.ipa`
+is the new version. Run it from an interactive shell (it needs `SWIFT_TOOLCHAIN` and `IOS_SDK`). `--dry-run` builds
+and prints what would be published and changes nothing. There is no release on tag push in CI: the build needs the
+iOS SDK, which can't go on a hosted runner. The steps below are what it runs.
+
+
 1. Bump `native/VERSION` (it is X.Y.Z: the script refuses a tag that already exists), commit it and push to main.
 2. Write the notes in a file. The first lines are the ones the alert shows.
 3. Look at the plan first: `tools/release.sh --dry-run --notes notes.md`. That builds `native/` (it needs the

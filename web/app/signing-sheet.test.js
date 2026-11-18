@@ -182,7 +182,7 @@ test("followInstall: once iOS has the link the page says Done and ends on Return
   assert.equal(await followInstall(native, "com.a", progressHUD("Installing", { open: () => page }), { later: () => assert.fail("no timer") }), null);
   assert.equal(page.title, "Complete");
   assert.equal(page.finished.status, "Done");
-  assert.equal(page.finished.label, "Return to iFizBox");
+  assert.equal(page.finished.label, "Close iFizBox");
   const ui = fakeUI();
   assert.equal(await followInstall(native, "com.a", ui.hud("Installing"), { later: ui.later }), null);
   assert.equal(ui.timers.length, 1); // a plain HUD goes a moment after Done

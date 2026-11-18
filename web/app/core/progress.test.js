@@ -96,8 +96,8 @@ test("packageKind: tweaks by their hooking library or section, apps by section o
 });
 
 test("chooseFinish: Return by default; Restart SpringBoard for a tweak; Reload Data for an app; the highest wins", () => {
-  assert.deepEqual(chooseFinish({}), { level: "return", label: "Return to iFizBox", uicache: false });
-  assert.deepEqual(chooseFinish({ kinds: ["package"] }), { level: "return", label: "Return to iFizBox", uicache: false });
+  assert.deepEqual(chooseFinish({}), { level: "return", label: "Close iFizBox", uicache: false });
+  assert.deepEqual(chooseFinish({ kinds: ["package"] }), { level: "return", label: "Close iFizBox", uicache: false });
   assert.deepEqual(chooseFinish({ kinds: ["tweak"] }), { level: "restart", label: "Restart SpringBoard", uicache: false });
   assert.deepEqual(chooseFinish({ kinds: ["app"] }), { level: "uicache", label: "Reload Data", uicache: false });
   // an app and a tweak in one run: Restart SpringBoard, the icon cache rebuilt first

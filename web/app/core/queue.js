@@ -186,9 +186,11 @@ export function createRepeatFilter() {
 
 // Cydia's finish levels, lowest first; the button shows the highest reached. F151: uicache (Reload Data: the home
 // screen's icon cache rebuilt, for an app) between return and reopen.
+// B35: return and reopen both read "Close iFizBox": return only closes the sheet, reopen quits the app (for it to
+// be opened again). One page has one finish button at one level, so the two never show together.
 const FINISH = ["return", "uicache", "reopen", "restart", "reload", "reboot"];
 export const FINISH_LABEL = {
-  return: `Return to ${NAME}`, uicache: "Reload Data", reopen: `Close ${NAME}`, restart: "Restart SpringBoard", reload: "Reload SpringBoard",
+  return: `Close ${NAME}`, uicache: "Reload Data", reopen: `Close ${NAME}`, restart: "Restart SpringBoard", reload: "Reload SpringBoard",
   reboot: "Reboot Device",
 };
 export function finishOf(...levels) {

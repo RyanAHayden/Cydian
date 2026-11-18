@@ -130,8 +130,8 @@ def check(data):
     if not versions:
         return problems + ["no versions"]
     v = versions[0]
-    # Any IPA of that release: the releases before F171 (v0.5.0 and older) carry it under the old name.
-    if not re.fullmatch(re.escape(f"{REPO}/releases/download/v{v.get('version')}/") + r"[\w.-]+\.ipa", str(v.get("downloadURL"))):
+    # F180a: exactly that release's {NAME}.ipa (every release from v0.9.4 carries it under that name).
+    if str(v.get("downloadURL")) != ipa_url(v.get("version")):
         problems.append(f"downloadURL is not release v{v.get('version')}'s {NAME}.ipa")
     if not isinstance(v.get("size"), int) or v["size"] <= 0:
         problems.append("size is not a positive number of bytes")

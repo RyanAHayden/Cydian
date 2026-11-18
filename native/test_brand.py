@@ -3,9 +3,8 @@
 string a person reads in web/app, worker/ or the Swift code says the old name or spells the name itself.
 
 F171: no file outside plan/, journal/ and docs/concepts says the old name in any case (IDs, storage keys, paths,
-env variables, file names), except what F172 moves: the old domain, the GitHub repo slug, and URLs of assets
-already published on GitHub under the old name (NoOldIds.F172). The old name is spelled in pieces here so this file
-passes its own grep."""
+env variables, file names). F172 moved the domain and repo slug; F180a dropped the last exception (URLs of assets
+published under the old name). The old name is spelled in pieces here so this file passes its own grep."""
 import json
 import os
 import re
@@ -192,11 +191,8 @@ class NoOldName(unittest.TestCase):
 class NoOldIds(unittest.TestCase):
     """F171: the old name is gone from every tracked text file but plan/, journal/ and docs/concepts (the record)."""
     SKIP = ("plan/", "journal/", "docs/concepts/")
-    # F172 moved the domain and the worker's name to the brand. Only assets already published under the old name keep
-    # their URLs: the test-fixtures pre-release's files, and source.json's release IPAs (release.sh adds the next
-    # release's iFizBox.ipa).
-    F172 = re.compile(r"releases/download/test-fixtures/[\w.-]+|releases/download/v[\d.]+/" + OLD_WORD + r"\.(?:ipa|deb)\b",
-                      re.I | re.M)
+    # F180a: no exception for assets published under the old name any more: source.json lists only the brand's
+    # release IPAs and the test-fixtures pre-release holds only renamed files.
 
     def test_no_old_domain(self):
         """F172: the old domain is gone from every tracked file but the record (no fallback to it, user 2026-11-18)."""
@@ -221,7 +217,7 @@ class NoOldIds(unittest.TestCase):
                 data = f.read()
             if b"\0" in data[:8192]:
                 continue  # binary: zsign.wasm is rebuilt from source, the fixtures were rewritten (journal F171)
-            text = self.F172.sub("", data.decode("utf-8", "replace"))
+            text = data.decode("utf-8", "replace")
             for n, line in enumerate(text.splitlines(), 1):
                 if OLD_ANY.search(line):
                     bad.append(f"{rel}:{n}: {line.strip()[:100]}")

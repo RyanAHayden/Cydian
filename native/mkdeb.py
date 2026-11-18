@@ -110,6 +110,22 @@ def control_fields(text):
     return fields
 
 
+# What the helper runs on the phone (F66): uikittools' uicache in postinst, unzip for every install-ipa (F59),
+# ldid to sign ad hoc when AppSync Unified is missing (so recommended, not required).
+WANT_RELATIONS = {"Depends": ("firmware", "uikittools", "unzip"), "Recommends": ("ldid",)}
+
+
+def relation_names(value):
+    """Package names in a Depends-style field: "a (>= 1), b | c" gives [a, b, c]."""
+    names = []
+    for group in value.split(","):
+        for alt in group.split("|"):
+            name = re.split(r"[\s(:\[]", alt.strip(), maxsplit=1)[0]
+            if name:
+                names.append(name)
+    return names
+
+
 def macho_info(data):
     """(cputype, cpusubtype, filetype, platform, minos 'x.y', has code signature) of a thin 64-bit Mach-O."""
     magic, cpu, sub, ftype, ncmds, _ = struct.unpack_from("<IiiIII", data, 0)
@@ -153,6 +169,10 @@ def check(path):
         problems.append("bad Package name %r" % fields.get("Package"))
     if not re.fullmatch(r"\d+\.\d+\.\d+-\d+", fields.get("Version", "")):
         problems.append("Version %r is not <VERSION>-<build>" % fields.get("Version"))
+    for k, want in WANT_RELATIONS.items():
+        missing = sorted(set(want) - set(relation_names(fields.get(k, ""))))
+        if missing:
+            problems.append("control %s lacks %s" % (k, ", ".join(missing)))
     if "@" in ctl["control"][1].decode():
         problems.append("control has an unfilled @PLACEHOLDER@")
     post = ctl.get("postinst")

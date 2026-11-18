@@ -34,6 +34,7 @@
   transition: opacity .2s;
 }
 .featured-banner img.loaded { opacity: 1; }
+.featured-banner:active img { opacity: .75; }
 .featured-title {
   position: absolute;
   left: 0;

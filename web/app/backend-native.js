@@ -138,7 +138,10 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
   // F49: the phone's kCFCoreFoundationVersionNumber (Bridge.swift app.info `cf`) adds Telesphoreo's ios/<cf> suite
   // to the dists Add Source tries, unless sourceOptions brings its own coreFoundation.
   const cf = sourceOptions.coreFoundation ? null : coreFoundationOf(call);
-  const opts = { ...sourceOptions, sort: sortSources, ...(cf ? { coreFoundation: cf.get } : {}) };
+  // F144: the sideload build keeps no APT sources: Add refuses them, and ones an older build stored are deleted.
+  const sideload = (sourceOptions.mode ?? detectMode()) === "sideload";
+  const opts = { ...sourceOptions, sort: sortSources, ...(cf ? { coreFoundation: cf.get } : {}),
+    ...(sideload ? { aptAllowed: false, dropApt: true } : {}) };
   const sources = withAltSources(nativeSourceCalls(backend, call, sourceOptions), backend, opts);
   if (cf) {
     const add = sources.addSource;
@@ -472,6 +475,8 @@ function nativeSourceCalls(backend, call, opts) {
       }
       return (await store()).remove(key);
     },
+    // F144: drops a record from the device store only (core/altstore.js withAltSources dropApt, the sideload build).
+    forget: async (key) => (await store()).remove(key),
     // Device-only sources into cydian.sources, apt-get update, then every source's count and Release from apt's
     // lists (all at once), saved as each lands. `filter` (F41, C5): only the sources it keeps are read back and
     // saved (F99's Add Source & Install refreshes one); apt-get update itself still updates all of apt's sources.

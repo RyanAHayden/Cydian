@@ -162,9 +162,8 @@ function renderHidden(body) {
 
 async function renderSources(body) {
   let list;
-  let hidden = 0;
   try {
-    ({ shown: list, hidden } = await shownSources());
+    ({ shown: list } = await shownSources());
   } catch (e) {
     body.replaceChildren(el("p", "empty", e.message));
     return;
@@ -185,8 +184,7 @@ async function renderSources(body) {
     sort.addEventListener("click", () => { saveOrder(null); changed(); renderSources(body); });
     foot.append(sort);
   }
-  foot.append(el("p", "group-footer", (hidden ? `${plural(hidden, "APT source")} hidden (Not Jailbroken). ` : "")
-    + "Drag ≡ to reorder; the Sources tab keeps this order."));
+  foot.append(el("p", "group-footer", "Drag ≡ to reorder; the Sources tab keeps this order."));
   body.append(foot);
 }
 
@@ -640,9 +638,6 @@ async function renderRecommended(body, ctx) {
   });
   body.replaceChildren(ul);
   if (settings.deviceType() !== "none") body.prepend(jailbreakRow(await currentJailbreak(), body, ctx));
-  if (settings.deviceType() === "none") {
-    body.append(el("p", "group-footer", "Tweak repos show here once Settings > Device says this iPhone is jailbroken."));
-  }
   // Fill in icons and app counts as each AltStore source answers: those not added, and added ones nothing has been
   // read from yet (a default the Sources tab hasn't loaded). Tweak repos wait for Refresh (their Packages is big).
   rows.forEach((r, i) => {

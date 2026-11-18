@@ -297,6 +297,15 @@ export function runRollback({ id, version, installed = null, name = "" }) {
   return true;
 }
 
+// F74: a paid package's Download & Install (screens/extras.js) in the same console: `run(onEvent)` is the shell's
+// paid.install with stream on (its dlstatus/pmstatus lines like ipa.install). Outside the queue. Null when a console
+// is already up; else a promise for the run's end ({ ok, reloaded }: reloaded settles once dpkg status is read again).
+export function runPaidInstall({ id, version, name = "", run }) {
+  if (running) return null;
+  const jobs = [{ op: "install", id, version, installed: null, name, mode: "install" }];
+  return runConsole({ jobs, ids: [id], keepQueue: true, asks: false, title: (names) => `Install ${name || names[id] || id} ${version}`, run });
+}
+
 // asks: the run is apply-ask (F63), so a conffile line opens the Configuration Upgrade alert and its answer goes back
 // through backend.answerConffile; otherwise dpkg keeps the old copy (--force-confold) and the console says so.
 async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = null, run = (onEvent) => getBackend().apply(jobs, onEvent) }) {
@@ -410,7 +419,7 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
     code: error ? -1 : result.code, text: log.join("\n") });
   // A run that went through empties the queue; one apt stopped keeps it, so Confirm can show what's left to fix.
   if (ok && !keepQueue) installQueue.clearAll();
-  catalog.reloadInstalled?.().catch(() => {});
+  const reloaded = catalog.reloadInstalled?.().catch(() => {});
 
   const done = () => { running = false; updateChrome(); return m.close(); };
   const level = ok ? finish : "return";
@@ -420,6 +429,7 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
   bar.replaceWith(button);
   close.hidden = false;
   close.addEventListener("click", () => done());
+  return { ok, reloaded };
 }
 
 async function finishAction(level, done) {

@@ -13,15 +13,18 @@
 //   device.info                                 -> { udid, model }
 //   keychain.get { key } / keychain.set { key, value } / keychain.remove { key }  (passcode / Face ID protected)
 //   auth.session { url, callbackScheme }        -> the callback URL (ASWebAuthenticationSession; "sileo" here)
-//   paid.install { url, package, version }      -> { code, stdout, stderr }  download the one-time URL, dpkg it
+//   paid.install { url, package, version, stream } -> { code, stdout, stderr }  download the one-time URL, dpkg it;
+//                                                 streamed into the install queue's console (F74), dpkg status read
+//                                                 again after, and the package page drawn again so it shows Installed
 // The site never calls a vendor: it shows Canister's price and links to the vendor's page.
 import { getBackend, getArch } from "../backend.js";
-import { format } from "../router.js";
+import { format, parse } from "../router.js";
 import { grouped } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { mediaUrl } from "./depiction.js";
 import { settings } from "./settings.js";
+import { runPaidInstall } from "./queue.js";
 import { createFeaturedStore } from "../core/featured.js";
 import { createCanister, mapResults, priceFor } from "../core/canister.js";
 import {
@@ -163,11 +166,11 @@ class NeedsShell extends Error {
   }
 }
 
-async function shell(method, params) {
+async function shell(method, params, onEvent) {
   const n = native();
   if (!n) throw new NeedsShell(method);
   try {
-    return await n.call(method, params);
+    return await (onEvent ? n.call(method, params, onEvent) : n.call(method, params));
   } catch (e) {
     if (/unknown method/.test(e?.message ?? "")) throw new NeedsShell(method);
     throw e;
@@ -238,7 +241,7 @@ export function paymentGroup(st, source, ctx) {
     const base = await vendorOf(source);
     if (!base || !box.isConnected && box.parentNode == null) return;
     if (getBackend().kind !== "native") return drawSite(st, source, base, draw);
-    return drawApp(st, source, base, draw, ctx);
+    return drawApp(st, source, base, draw, ctx, box);
   })().catch((e) => draw([{ header: "Purchase", footer: e.message }]));
   return box;
 }
@@ -262,10 +265,10 @@ function markExternal() {
   }
 }
 
-async function drawApp(st, source, base, draw, ctx) {
+async function drawApp(st, source, base, draw, ctx, box) {
   const client = clientFor(base);
   const id = st.package;
-  const refresh = () => drawApp(st, source, base, draw, ctx);
+  const refresh = () => drawApp(st, source, base, draw, ctx, box);
   const fail = async (e) => {
     const buttons = e.recoveryUrl ? ["OK", "More Info"] : ["OK"];
     const { index } = await showAlert({ title: "Purchase", message: e.message, buttons });
@@ -301,12 +304,41 @@ async function drawApp(st, source, base, draw, ctx) {
       else if (r.status !== "done") throw new Error("The purchase did not go through.");
     }) });
   } else {
-    rows.push({ label: "Download & Install", onClick: busy("Installing", async () => {
-      const url = await client.authorizeDownload(id, { version: st.version, repo: source.uri });
-      const r = await shell("paid.install", { url, package: id, version: st.version });
-      if (r?.code) throw new Error(`Install failed (${r.code}): ${String(r.stderr ?? "").trim().split("\n").pop() || "no output"}`);
-    }) });
+    rows.push({ label: "Download & Install", onClick: () => downloadAndInstall(st, source, client, box, ctx, fail) });
   }
   if (signedIn) rows.push({ label: `Sign Out of ${name}`, onClick: busy("Signing Out", () => client.signOut()) });
   draw([{ header: "Purchase", rows, footer: vendor?.banner && !signedIn ? vendor.banner.message : `Sold by ${name}.` }]);
+}
+
+// F74: authorize (under a HUD: the vendor can refuse), then paid.install in the install queue's console, streamed
+// (Paid.swift's dlstatus/pmstatus lines). The one-time URL expires in a minute or two, so the console opens at once.
+// After the run dpkg status is read again and the package page drawn again: Installed, and Modify > Remove works.
+async function downloadAndInstall(st, source, client, box, ctx, fail) {
+  const id = st.package;
+  // The page the row is on, and its route (the top page's: the console is modal, so it stays on top).
+  const body = box.closest(".page-body");
+  const route = parse(location.hash);
+  const hide = (ctx?.showHUD ?? showHUD)("Authorizing");
+  let url;
+  try { url = await client.authorizeDownload(id, { version: st.version, repo: source.uri }); } catch (e) { hide(); await fail(e); return; }
+  hide();
+  const run = runPaidInstall({ id, version: st.version, name: st.name || "",
+    run: (onEvent) => shell("paid.install", { url, package: id, version: st.version, stream: true }, onEvent) });
+  if (!run) {
+    await showAlert({ title: "Download & Install", message: "Another install is running. Try again when it has finished.", buttons: ["OK"] });
+    return;
+  }
+  const { reloaded } = await run;
+  await reloaded;
+  if (body?.isConnected) await redrawPage(body, route, ctx);
+}
+
+// The package page drawn again in place (browse.js render), at the same scroll position. Imported late: browse.js
+// imports this file.
+async function redrawPage(body, route, ctx) {
+  const top = body.scrollTop;
+  const { render, pageOf } = await import("./browse.js");
+  if (pageOf(route).page !== "package") return;
+  await render(body, route, ctx);
+  body.scrollTop = top;
 }

@@ -66,4 +66,7 @@ html.nav-moving #screens, html.nav-moving .navbar { pointer-events: none; } /* n
 html.native .navbar, html.native .tabbar { display: none; }
 
 .empty { margin: 40px 20px; text-align: center; }
+/* F152: a page whose only content is its empty-state note shows it in the middle of the page, as a loading page's
+   spinner (packages.css .page-body > .loading), not stuck near the top of the empty space. */
+.page-body > .empty:only-child { display: flex; align-items: center; justify-content: center; height: 72%; margin: 0 20px; }
 [hidden] { display: none !important; }

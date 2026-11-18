@@ -3,7 +3,8 @@
 //
 //   await loadIdentity()         { p12, p12Name, password, profile, profileName } or null (IndexedDB, this phone only)
 //   await saveIdentity(patch)    merges into the saved one;  await clearIdentity()
-//   await signingReady()         true when a .p12 and a profile are saved (the site only)
+//   await signingReady()         true when a .p12 and a profile are saved (the site), or the Keychain holds an
+//                                identity (the sideload build: statusReady(signing.status), as Settings shows it)
 //   getServer() / setServer(s)   Settings > Signing's server, https://cydian.dev unless the user set another
 //   await serverStatus()         what GET <server>/sign/status says
 //   await signAndInstall({ url, name, onInstalled })   HUD "Signing", POST /sign, HUD "Installing", itms-services
@@ -73,10 +74,8 @@ export async function clearIdentity() {
 
 export const signingAvailable = () => detectMode() === "site";
 
-export async function signingReady() {
-  if (localSigning()) {
-    try { return Boolean((await deviceStatus())?.identity); } catch { return false; }
-  }
+export async function signingReady({ native, wait = sleep } = {}) {
+  if (localSigning()) return statusReady(await readyStatus(native, wait));
   if (!signingAvailable()) return false;
   const id = await loadIdentity();
   return Boolean(id?.p12 && id?.profile);
@@ -178,10 +177,11 @@ export async function pollJob(server, first, { wait = sleep } = {}) {
 // ---- on the phone (F58): the sideload build signs and installs itself, through I6's signing.* bridge calls ------
 //
 //   localSigning()                     true in the sideload build (signingAvailable() stays the site's server signer)
-//   await deviceStatus()               signing.status: { identity | null, trust: { ca, trusted, name } }
+//   await deviceStatus()               signing.status: { identity | null, trust: { ca, trusted, name }, identityProblem? }
+//   statusReady(status)                F69: true when that status holds an identity (Install and Settings both ask)
 //   await importToDevice({ p12, password, profile })   signing.import (files base64) -> status
 //   await removeFromDevice()           signing.remove -> status
-//   await setUpTrust()                 signing.trust: makes the local CA, opens its profile in Safari -> { url }
+//   await setUpTrust()                 signing.trust: makes the local CA, opens its profile in Safari -> { url, signed }
 //   await installOnDevice({ url, name, onInstalled })  signing.install with a HUD following its phases
 //
 // Each takes `native` (the bridge, globalThis.cydianNative by default) so tests can pass a fake.
@@ -195,6 +195,26 @@ const bridge = (native) => {
 
 export async function deviceStatus(native) {
   return bridge(native).call("signing.status", {});
+}
+
+// F69: whether a signing.status answer holds a usable identity, the one rule Install (signingReady) and Settings >
+// Signing (which shows the certificate) both go by, so the two can't disagree. The status as the bridge hands it
+// over: an object, or the same as JSON text; identity an object with the certificate's name (it may be empty) or
+// null (none, or one the Keychain doesn't return: then `identityProblem` says why).
+export function statusReady(status) {
+  let st = status;
+  if (typeof st === "string") { try { st = JSON.parse(st); } catch { return false; } }
+  const id = st?.identity;
+  return Boolean(id && typeof id === "object" && !Array.isArray(id));
+}
+
+// signing.status for signingReady: one more try a moment later when the bridge call fails (the signer's queue busy
+// right after an import, the web view coming back from Safari). null when both fail.
+async function readyStatus(native, wait) {
+  for (let i = 0; i < 2; i++) {
+    try { return await deviceStatus(native); } catch { if (i === 0) await wait(400); }
+  }
+  return null;
 }
 
 export async function importToDevice({ p12, password, profile }, native) {

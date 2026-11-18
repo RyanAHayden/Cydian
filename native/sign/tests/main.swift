@@ -368,5 +368,27 @@ test("manifest and itms link") {
           == "itms-services://?action=download-manifest&url=https%3A%2F%2F127.0.0.1%3A4242%2Ft%2Fmanifest.plist", "itms link")
 }
 
+// F69: the install profile signed with the user's certificate: openssl verifies the CMS against the certificate's
+// CA (the phone has Apple's WWDR and root there) and gets the plist back byte for byte; no identity, no signature.
+test("install profile signed with the user's certificate") {
+    let caKey = try OpenSSLECKey(fixtures.path + "/ec-ca.pem")
+    let plist = try LocalCA.mobileconfig(ca: try LocalCA.makeCA(key: caKey, label: "Test iPhone"), label: "Test iPhone")
+    let (signed, isSigned) = ProfileSign.profile(plist, id: identity)
+    check(isSigned && signed != plist, "signed")
+    let d = work.appendingPathComponent("profile-sign", isDirectory: true)
+    try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+    try signed.write(to: d.appendingPathComponent("signed.mobileconfig"))
+    let (rc, out, err) = try run(["openssl", "cms", "-verify", "-binary", "-inform", "DER", "-in", d.path + "/signed.mobileconfig",
+                                  "-CAfile", fixtures.path + "/ca.pem", "-purpose", "any"])
+    check(rc == 0, "openssl cms -verify against the CA: \(err)")
+    check(out == plist, "the verified content is the profile (\(out.count) of \(plist.count) bytes)")
+    let (rc2, certs, _) = try run(["openssl", "cms", "-verify", "-noverify", "-binary", "-inform", "DER", "-in", d.path + "/signed.mobileconfig",
+                                   "-certsout", "/dev/stdout", "-out", "/dev/null"])
+    let pem = String(decoding: certs, as: UTF8.self)
+    check(rc2 == 0 && pem.components(separatedBy: "BEGIN CERTIFICATE").count == 3, "leaf and its CA in the CMS")
+    let (plain, unsigned) = ProfileSign.profile(plist, id: nil)
+    check(!unsigned && plain == plist, "unsigned without a certificate")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failure(s)")
 exit(failures == 0 ? 0 : 1)

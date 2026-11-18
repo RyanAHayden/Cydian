@@ -1,10 +1,12 @@
 // The bridge calls for signing and installing IPAs on the phone (I6), sideload build only. In jailbreak mode they
 // answer code "jailbreak": there the N2 helper installs IPAs itself and none of this is needed.
 //
-//   signing.status              {mode, identity: {name, team, expires, profile: {...}} | null, trust: {ca, trusted, name}}
+//   signing.status              {mode, identity: {name, team, expires, profile: {...}} | null, trust: {ca, trusted, name},
+//                               identityProblem?}: F69, why a certificate that was imported doesn't show
 //   signing.import {p12, password, profile}   (both files base64) -> status; the .p12 goes into the Keychain
 //   signing.remove              forgets the identity and the profile -> status
-//   signing.trust               makes the local CA if needed and opens its profile in Safari -> {url}
+//   signing.trust               makes the local CA if needed and opens its profile in Safari -> {url, signed}; F69:
+//                               the profile is CMS-signed with the user's certificate when one is imported
 //   signing.resetTrust          throws the local CA away (the user removes the old profile in Settings) -> status
 //   signing.testServer {open?}  a test page on the install server; open: in Safari, Cydian in the background -> {url}
 //   signing.install {url} (stream: {phase: "downloading"|"reading"|"signing"|"installing", progress})
@@ -37,7 +39,9 @@ enum SignBridge {
                       let prof = (c.params["profile"] as? String).flatMap({ Data(base64Encoded: $0) }) else {
                     throw SignError("bad_p12", "A .p12 and a .mobileprovision are needed.")
                 }
-                _ = try SignStore.importIdentity(p12: p12, password: c.params["password"] as? String ?? "", profile: prof)
+                let password = c.params["password"] as? String ?? ""
+                _ = try SignStore.importIdentity(p12: p12, password: password, profile: prof)
+                try confirmImport(p12: p12, password: password) // F69: status must see what was imported
                 return status()
             }
         }
@@ -49,7 +53,10 @@ enum SignBridge {
                 do {
                     let ca = try LocalTrust.ensureCA()
                     _ = try LocalTrust.tlsIdentity()
-                    let profile = try LocalCA.mobileconfig(ca: ca, label: LocalTrust.label() ?? "iPhone")
+                    let plist = try LocalCA.mobileconfig(ca: ca, label: LocalTrust.label() ?? "iPhone")
+                    // F69: signed with the user's certificate when there is one, so iOS shows it Verified
+                    let signer = SignStore.identity().flatMap { try? KeychainIdentity($0) }
+                    let (profile, signed) = ProfileSign.profile(plist, id: signer)
                     let path = "/\(token())/Cydian-Local-Install.mobileconfig"
                     InstallServer.plain.serve(path, .init(type: "application/x-apple-aspen-config", body: .data(profile), onServed: nil),
                                               ttl: 5 * 60)
@@ -60,7 +67,7 @@ enum SignBridge {
                             let url = InstallServer.plain.base + path
                             DispatchQueue.main.async {
                                 UIApplication.shared.open(URL(string: url)!)
-                                c.reply(["url": url], nil)
+                                c.reply(["url": url, "signed": signed], nil)
                             }
                         }
                     }
@@ -113,10 +120,49 @@ enum SignBridge {
             out["identity"] = ident
         } else {
             out["identity"] = NSNull()
+            // F69: a certificate was imported but the Keychain doesn't hand back the pair (or it can't be read):
+            // say so, rather than the page looking set up while Install finds nothing
+            if UserDefaults.standard.string(forKey: SignStore.certKey) != nil {
+                out["identityProblem"] = SignStore.identity() == nil
+                    ? "The Keychain doesn't return the imported certificate with its key. Remove the certificate and import it again."
+                    : "The certificate in the Keychain can't be read. Remove it and import it again."
+            }
         }
         out["trust"] = ["ca": LocalTrust.ca() != nil, "trusted": LocalTrust.ca() != nil && LocalTrust.trusted(),
                         "name": LocalTrust.label() ?? ""] as [String: Any]
         return out
+    }
+
+    // ---- F69: an import that status() can see
+
+    // After SignStore.importIdentity: the identity must come back from the Keychain the way status() and Install
+    // look for it. It didn't when a certificate or key of an earlier import was still there (SecItemAdd then answers
+    // errSecDuplicateItem for half of the pair and importIdentity keeps "that one", which may not pair up). Then
+    // whatever matches the certificate's public key is deleted and the identity added once more; if it still isn't
+    // found, the import fails with a keychain error instead of the page looking set up while Install finds nothing.
+    static func confirmImport(p12: Data, password: String) throws {
+        if let id = SignStore.identity(), let der = SignStore.certificateDER(id), (try? Certificate(der: der)) != nil { return }
+        var items: CFArray?
+        guard SecPKCS12Import(p12 as CFData, [kSecImportExportPassphrase as String: password] as CFDictionary, &items) == errSecSuccess,
+              let first = (items as? [[String: Any]])?.first, let ref = first[kSecImportItemIdentity as String] else {
+            throw SignError("keychain", "The certificate was imported but can't be read back.")
+        }
+        let identity = ref as! SecIdentity // swiftlint:disable:this force_cast
+        var cert: SecCertificate?
+        guard SecIdentityCopyCertificate(identity, &cert) == errSecSuccess, let c = cert else {
+            throw SignError("keychain", "The certificate was imported but can't be read back.")
+        }
+        if let pub = SecCertificateCopyKey(c), let ext = SecKeyCopyExternalRepresentation(pub, nil) as Data? {
+            let hash = sha1(ext) // iOS's kSecAttrPublicKeyHash (certificates) and kSecAttrApplicationLabel (keys)
+            SecItemDelete([kSecClass as String: kSecClassCertificate, kSecAttrPublicKeyHash as String: hash] as CFDictionary)
+            SecItemDelete([kSecClass as String: kSecClassKey, kSecAttrApplicationLabel as String: hash] as CFDictionary)
+        }
+        SecItemDelete([kSecClass as String: kSecClassCertificate, kSecAttrLabel as String: SignStore.label] as CFDictionary)
+        let st = SecItemAdd([kSecValueRef as String: identity, kSecAttrLabel as String: SignStore.label,
+                             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly] as CFDictionary, nil)
+        guard st == errSecSuccess || st == errSecDuplicateItem, SignStore.identity() != nil else {
+            throw SignError("keychain", "The Keychain took the certificate but doesn't pair it with its key (\(st)). Remove the certificate and import it again.")
+        }
     }
 
     // ---- helpers

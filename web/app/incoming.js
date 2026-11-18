@@ -3,9 +3,10 @@
 // app before the page was there).
 //   cydian://signing-import#<sealed>   Import from Safari coming back: into the Keychain, then Settings > Signing
 //   cydian://import?d=<gzipped JSON>   Open in Cydian App on the website: the review alert (screens/importlink.js)
+//   cydian://myipas?file=<name>        F77: an .ipa another app sent, already in My IPAs (MyIPAs.swift): its page
 //
 //   startIncoming({ native })          once, in the app
-//   await handleIncoming(url, deps)    -> "signing-import" | "import" | null (not one of ours)
+//   await handleIncoming(url, deps)    -> "signing-import" | "import" | "myipas" | null (not one of ours)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showAlert } from "./nav/alert.js";
 import { showHUD } from "./nav/hud.js";
@@ -56,10 +57,23 @@ export async function handleIncoming(url, { native = globalThis.cydianNative, al
     go(); // the walkthrough, ticked
     return "signing-import";
   }
+  if (/^cydian:\/\/myipas\b/i.test(u)) {
+    const path = myIpasPath(u);
+    const hash = format({ tab: "installed", path }).replace(/^#/, "");
+    if (typeof location !== "undefined") location.hash = hash;
+    return "myipas";
+  }
   if (/^cydian:\/\/import\b/i.test(u)) {
     const run = review ?? (await import("./screens/importlink.js")).reviewAndImport;
     await run(u, { native });
     return "import";
   }
   return null;
+}
+
+// F77: the Installed path for cydian://myipas?file=<name>: the IPA's page, or the library when the name is missing.
+export function myIpasPath(url) {
+  let file = null;
+  try { file = new URL(String(url)).searchParams.get("file"); } catch { /* none */ }
+  return file && /\.ipa$/i.test(file) && !file.includes("/") ? ["myipas", `ipa:${file}`] : ["myipas"];
 }

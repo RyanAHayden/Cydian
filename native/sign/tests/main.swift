@@ -327,5 +327,54 @@ test("manifest and itms link") {
           == "itms-services://?action=download-manifest&url=https%3A%2F%2Fcydian.dev%2Fsign%2Fmanifest%3Fbundleid%3Da.b%26port%3D4242", "itms link")
 }
 
+test("F77: My IPAs signs a local IPA file") {
+    let A = "Payload/Fixture.app/"
+    let lib = IPALibrary(root: work.appendingPathComponent("lib/Documents"), store: work.appendingPathComponent("lib/Store"))
+    check(IPALibrary.safeName("https://x.test/dl/My%20App.IPA") == "My App.ipa", "safe name \(IPALibrary.safeName("https://x.test/dl/My%20App.IPA"))")
+    check(IPALibrary.safeName("../../.hidden") == "hidden.ipa", "no folders, no dots: \(IPALibrary.safeName("../../.hidden"))")
+    check(IPALibrary.safeName("") == "App.ipa", "empty")
+    check(!IPALibrary.validName("../x.ipa") && !IPALibrary.validName(".x.ipa") && !IPALibrary.validName("x.zip") && IPALibrary.validName("A b.ipa"), "valid names")
+    let a = try lib.add(fixtures.appendingPathComponent("rich.ipa"), name: "Rich.ipa", move: false)
+    let b = try lib.add(fixtures.appendingPathComponent("notanipa.ipa"), name: "Rich.ipa", move: false)
+    check(a == "Rich.ipa" && b == "Rich 2.ipa", "unique names \(a) \(b)")
+    check(lib.files() == ["Rich.ipa", "Rich 2.ipa"], "files \(lib.files())")
+    let d = try lib.details(a)
+    check(d.name == "Fixture" && d.bundleID == "dev.cydian.fixture" && d.error == nil, "details \(d.name) \(d.bundleID) \(d.error ?? "")")
+    check(!d.extensions.isEmpty, "extensions read")
+    check(try lib.details(b).error != nil, "a zip that isn't an IPA is listed with an error")
+    let cert = identity.certificate
+    check(lib.signed(a, certificate: cert) == nil, "not signed yet")
+    check(lib.json(a, certificate: cert)["signed"] is NSNull, "json: not signed")
+    let profile = try Profile(try fixture("profile.mobileprovision"))
+    let s = try lib.sign(a, signer: IPASigner(profile: profile, identity: identity), certificate: cert, expires: nil, work: work)
+    check(s.bundleID == "dev.cydian.fixture", "signed as \(s.bundleID)")
+    check(lib.signed(a, certificate: cert) != nil, "signed, ready to install")
+    check(lib.signed(a, certificate: try fixture("other.der")) == nil, "another certificate: not signed")
+    check(lib.signed(a, certificate: nil) == nil, "no certificate: not signed")
+    let f = try entries(lib.signedURL(a))
+    try verifySigned(f[A + "Fixture"]!, name: "Fixture", expectIdent: "dev.cydian.fixture", team: team,
+                     info: f[A + "Info.plist"], resources: f[A + "_CodeSignature/CodeResources"], ents: true)
+    check(try entries(lib.root.appendingPathComponent(a))[A + "_CodeSignature/CodeResources"] == Data("old seal".utf8), "the IPA itself stays as added")
+    // New Sign Options: the signed copy no longer fits and goes.
+    var o = SignOptions()
+    o.name = "Renamed"
+    try lib.setOptions(a, o)
+    check(lib.signed(a, certificate: cert) == nil && !FileManager.default.fileExists(atPath: lib.signedURL(a).path), "options changed: re-sign")
+    let s2 = try lib.sign(a, signer: IPASigner(profile: profile, identity: identity), certificate: cert,
+                          expires: Date(timeIntervalSinceNow: 3600), work: work)
+    check(s2.name == "Renamed" && lib.options(a).name == "Renamed", "signed with the options")
+    check(lib.signed(a, certificate: cert, now: Date(timeIntervalSinceNow: 7200)) == nil, "expired: not signed")
+    // The IPA replaced in Files: the copy doesn't fit.
+    try FileManager.default.removeItem(at: lib.root.appendingPathComponent(a))
+    try FileManager.default.copyItem(at: fixtures.appendingPathComponent("rich.ipa"), to: lib.root.appendingPathComponent(a))
+    try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: 60)], ofItemAtPath: lib.root.appendingPathComponent(a).path)
+    check(lib.signed(a, certificate: cert) == nil, "replaced IPA: not signed")
+    try lib.delete(a)
+    check(lib.files() == ["Rich 2.ipa"] && !FileManager.default.fileExists(atPath: lib.signedURL(a).path), "deleted with its copy")
+    try FileManager.default.removeItem(at: lib.root.appendingPathComponent(b))
+    lib.sweep()
+    check(((try? FileManager.default.contentsOfDirectory(atPath: lib.store.path)) ?? ["x"]).isEmpty, "sweep clears leftovers")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failure(s)")
 exit(failures == 0 ? 0 : 1)

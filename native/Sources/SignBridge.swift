@@ -51,6 +51,7 @@ enum SignBridge {
         b.on("signing.remove") { c in run(c) { SignStore.removeIdentity(); return status() } }
         b.on("signing.install") { c in Sideload.install(c) } // F14: with the user's edits, keep-alive and a record
         Sideload.register(b) // F14: inspect, progress, installed, forget, resignAll, checkCertificate, remind
+        MyIPAs.register(b) // F77: library.*, My IPAs under Installed (MyIPAs.swift)
     }
 
     static func status() -> [String: Any] {

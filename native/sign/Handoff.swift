@@ -34,7 +34,7 @@ enum BundledIdentity {
 }
 
 enum IncomingLink {
-    static let hosts: Set<String> = ["import", "signing-import"]
+    static let hosts: Set<String> = ["import", "signing-import", "myipas"] // myipas: F77, an .ipa opened in Cydian
     static let maxLength = 512 * 1024
 
     static func accepts(_ url: URL) -> Bool {

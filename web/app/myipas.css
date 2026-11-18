@@ -1,0 +1,11 @@
+/* F77: My IPAs (screens/myipas.js). The list reuses the plain table, the page the package page's header and grouped
+   tables; only what's new is here. */
+.myipa-row .cell-icon { position: relative; overflow: hidden; }
+.myipa-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; }
+.myipa-row .cell-icon img:not(.loaded) { opacity: 0; }
+.myipa-row.is-broken .cell-subtitle { color: #b5322c; }
+.myipa-bundle { font-size: 13px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* Delete: centred red text in its own group, as Settings' Delete Account rows are on iOS 6. */
+.cell-inner.myipa-delete { justify-content: center; }
+.cell-inner.myipa-delete .cell-text { flex: none; }
+.cell-inner.myipa-delete .cell-label { color: #b5322c; text-align: center; }

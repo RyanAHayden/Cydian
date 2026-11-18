@@ -230,6 +230,7 @@ test("incoming cydian:// links") {
     check(IncomingLink.accepts(URL(string: "cydian://import?d=H4sI")!), "import")
     check(IncomingLink.accepts(URL(string: "cydian://signing-import#abc")!), "signing-import")
     check(!IncomingLink.accepts(URL(string: "cydian://other")!), "other host")
+    check(IncomingLink.accepts(URL(string: "cydian://myipas?file=A.ipa")!), "myipas (F77)")
     check(!IncomingLink.accepts(URL(string: "https://import/x")!), "other scheme")
     check(!IncomingLink.accepts(URL(string: "cydian://import?d=" + String(repeating: "A", count: 600_000))!), "too long")
 }

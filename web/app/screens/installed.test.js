@@ -22,3 +22,12 @@ test("installed tab: an app row says the upgrade, the source and the date", () =
   assert.equal(appSubtitle({ sourceName: "AltStore", date, upgrade: "1.6" }, "en-US"), "Upgrade to 1.6 · AltStore · Nov 17, 2026");
   assert.equal(appSubtitle({ source: "https://a.example/apps.json", date: 0, upgrade: null }, "en-US"), "https://a.example/apps.json");
 });
+
+test("installed tab: My IPAs pages without a jailbreak (F77)", async () => {
+  assert.equal(pageKind(r("myipas"), "sideload"), "myipas");
+  assert.equal(pageKind(r("myipas", "ipa:A.ipa"), "site"), "myipas");
+  assert.equal(pageKind(r("myipas"), "jailbreak"), "browse");
+  const { myIpasRow } = await import("./installed.js");
+  assert.equal(myIpasRow(r(), false).href, "#/installed/myipas");
+  assert.equal(myIpasRow(r(), false).label, "My IPAs");
+});

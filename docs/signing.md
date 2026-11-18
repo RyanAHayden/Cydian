@@ -398,6 +398,28 @@ it).
 - **Re-sign Reminder** shows (FEATURES has `resign`); its value goes to `signing.remind {days}` on every change and
   at launch (`screens/settings.js remindNow`, `core/signing.js syncReminder`).
 
+### My IPAs (F77)
+
+Installed > My IPAs is the user's own IPAs. In the sideload app they are plain files in Cydian's Documents, which
+Files shows under On My iPhone > Cydian (`UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace`), so an IPA
+dropped there from Files is listed too. Add offers Browse (the iOS Files picker, several at once) and From URL (the
+Add alert with Paste); an .ipa another app opens in Cydian (AirDrop, Files, Mail: the document type in
+`Info-sideload.plist`) is copied in and its page opens (`cydian://myipas?file=<name>`, `web/app/incoming.js`).
+
+- `native/sign/Library.swift` (`IPALibrary`, Foundation only, tested on Linux in `native/sign/tests/main.swift`):
+  the list, the details cache (by size and date) with the icon, each IPA's Sign Options, and the signed copy in
+  Application Support/MyIPAs. A signed copy counts only while it fits: same file, the certificate in use, the
+  Sign Options set now, signature not expired. Anything else is "Not signed yet".
+- `native/Sources/MyIPAs.swift`: the `library.*` bridge calls (list, add, pick, options, sign, install, export,
+  delete). Sign Now signs offline. Install signs if needed and then installs through `Sideload.serveAndOpen`, the
+  second half of `signAndOpen`, with the Signing Server's manifest. The server gets a copy, so the signed copy stays.
+  The record's url is `library:<file>`, so Re-sign All signs from the library's file instead of downloading.
+- `web/app/signing-client.js` `installFromLibrary`: signs first, then checks that `<server>/sign/status` answers.
+  Offline it says installing needs the Signing Server for iOS's manifest and keeps the signed copy.
+- `web/app/core/myipas.js` holds the states and rows, and `web/app/screens/myipas.js` draws the pages. On the
+  website the library is a list of links kept in localStorage: Add is From URL only, and Install sends the link to
+  the Signing Server (`signAndInstall`). There are no Sign Options there.
+
 ### Tests
 
 `native/test_sign.py` builds `native/sign/` with `native/sign/tests/main.swift` for Linux (the Swift toolchain the

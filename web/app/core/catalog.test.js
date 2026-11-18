@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   createCatalog, sectionName, simpleSection, parseAuthor, isVisible, indexLetter, NO_SECTION, ALL, runCatalog,
+  searchable, wordStart,
 } from "./catalog.js";
 import { reply } from "./worker.js";
 import { createParser } from "./parser.js";
@@ -122,11 +123,54 @@ test("search covers name, id, description and author, ranked", () => {
   assert.deepEqual(ids(c.search("alpha tweak")), ["com.a.tweak"]);
   const jane = ids(c.search("jane"));
   assert.deepEqual(jane.sort(), ["com.a.theme", "com.a.tweak", "com.b.springy"].sort());
-  const t = ids(c.search("g"));
+  const t = ids(c.search("ga"));
   assert.equal(t[0], "com.a.theme", "name or id prefix outranks a match inside");
   assert.deepEqual(c.search("   "), []);
   assert.deepEqual(c.search("zzz-nothing"), []);
-  assert.equal(c.search("a", { limit: 2 }).length, 2);
+  assert.equal(c.search("ja", { limit: 2 }).length, 2);
+});
+
+test("search: one Latin character finds nothing, one CJK character does (F101, Zebra)", () => {
+  assert.equal(searchable("a"), false);
+  assert.equal(searchable(" g "), false);
+  assert.equal(searchable("é"), false);
+  assert.equal(searchable(""), false);
+  assert.equal(searchable("ab"), true);
+  assert.equal(searchable("雪"), true);
+  assert.equal(searchable("😀"), true, "one code point, not two UTF-16 units");
+  const c = loaded();
+  assert.deepEqual(c.search("g"), []);
+  assert.deepEqual(c.search("a", { limit: 2 }), []);
+  c.load("C", packages({ Package: "com.c.snow", Name: "雪板", Version: "1", Architecture: "iphoneos-arm64", Section: "Themes" }));
+  assert.deepEqual(ids(c.search("雪")), ["com.c.snow"]);
+});
+
+test("search: word-start tier, then closest length, most sources, name (F101, Sileo)", () => {
+  assert.equal(wordStart("snow board", "board"), true);
+  assert.equal(wordStart("com.x.board", "board"), true);
+  assert.equal(wordStart("keyboard plus", "board"), false);
+  assert.equal(wordStart("board", "board"), false, "the start is the prefix tier's");
+  assert.equal(wordStart("keyboard board", "board"), true, "a later match can start a word");
+  const pkg = (id, name) => ({ Package: id, Name: name, Version: "1", Architecture: "iphoneos-arm64", Section: "Tweaks" });
+  const c = createCatalog();
+  c.load("A", packages(
+    pkg("com.k.keyboardplus", "Keyboard Plus"),
+    pkg("com.s.snowboardclassic", "Snowboard Classic Theme"),
+    pkg("com.s.snowboard", "Snowboard"),
+    pkg("com.w.snowb", "Snow Board"),
+    pkg("com.b.boarder", "Boarder"),
+    pkg("com.z.board2", "Zed Boards"),
+    pkg("com.y.board3", "Yak Boards"),
+  ));
+  // the Yak is in a second source too: same length as Zed, so it goes first
+  c.load("B", packages(pkg("com.y.board3", "Yak Boards")));
+  assert.deepEqual(ids(c.search("board")), [
+    "com.b.boarder",                                      // prefix
+    "com.y.board3", "com.w.snowb", "com.z.board2",        // word start, all 10 long: 2 sources first, then by name
+    "com.s.snowboard", "com.k.keyboardplus", "com.s.snowboardclassic", // inside: shortest first
+  ]);
+  // Sileo's example: the closer length wins inside the prefix tier
+  assert.deepEqual(ids(c.search("snowb")), ["com.s.snowboard", "com.s.snowboardclassic", "com.w.snowb"]);
 });
 
 test("author lists every package by Author or Maintainer name, any case", () => {
@@ -218,7 +262,9 @@ test("Works on my phone (F17): rows carry their code; the filter drops what can'
   assert.equal(c.setDevice({ ios: "16.5", jailbreak: "rootless" }), 2);
   assert.deepEqual(ids(c.list()), ["fits", "says-nothing"]);
   assert.deepEqual(c.list().map((r) => r.compat), ["works", "unknown"]);
-  assert.deepEqual(ids(c.search("o")), ["says-nothing"]); // "Old Only" and "Too New" match but can't work
+  assert.deepEqual(ids(c.search("in")), ["says-nothing"]);
+  assert.deepEqual(ids(c.search("ol")), []); // "Old Only" and "Too New" match but can't work
+  assert.deepEqual(ids(c.search("ne")), []);
   // a section with nothing that fits drops out, and counts follow the filter
   assert.deepEqual(c.sections(), { total: 2, sections: [{ name: "Themes", count: 1 }, { name: "Tweaks", count: 1 }] });
   // the package page still finds what the filter hides
@@ -248,8 +294,8 @@ test("Search filters (F35): section and group, source, installed, paid", async (
   c.load("P", packages(
     { Package: "com.p.paid", Name: "Paid Alpha", Version: "1", Architecture: "iphoneos-arm64", Section: "Tweaks", Tag: "cydia::commercial" },
   ), null);
-  assert.deepEqual(ids(c.search("a", { section: "group:Themes" })), ["com.a.theme"]);
-  assert.deepEqual(ids(c.search("a", { section: "Utilities" })), ["com.a.util"]);
+  assert.deepEqual(ids(c.search("am", { section: "group:Themes" })), ["com.a.theme"]);
+  assert.deepEqual(ids(c.search("ut", { section: "Utilities" })), ["com.a.util"]);
   assert.deepEqual(ids(c.search("alpha", { section: "group:Tweaks" })), ["com.a.tweak", "com.p.paid"]);
   assert.deepEqual(ids(c.search("alpha", { price: "paid" })), ["com.p.paid"]);
   assert.deepEqual(ids(c.search("alpha", { price: "free" })), ["com.a.tweak"]);
@@ -285,9 +331,9 @@ test("Search (F35): incompatible packages are hidden by default, except an exact
   // an exact id works the same way
   assert.deepEqual(ids(c.search("com.old.flexer")), ["com.old.flexer"]);
   assert.equal(c.search("com.old.flexer")[0].why, "Needs iOS older than 15.0");
-  // Show Incompatible (the filter off): everything, the exact match still flagged
+  // Show Incompatible (the filter off): everything, the exact match still flagged; Flexer is closer in length
   c.setDevice({ ios: "16.5", jailbreak: "rootless" }, { filter: false });
-  assert.deepEqual(ids(c.search("flex")), ["com.old.flex", "com.new.flexall", "com.old.flexer"]);
+  assert.deepEqual(ids(c.search("flex")), ["com.old.flex", "com.old.flexer", "com.new.flexall"]);
   assert.equal(c.search("flex")[0].exact, true);
   // a package that works is never flagged, exact or not
   c.setDevice({ ios: "14.2", jailbreak: "rootless" });

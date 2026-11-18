@@ -15,7 +15,7 @@ import * as browse from "./browse.js";
 import { catalog, ALL } from "../catalog.js";
 import { compatFilterOn } from "../device.js";
 import { settings, createSwitch } from "./settings.js";
-import { SECTION_GROUPS } from "../core/catalog.js";
+import { SECTION_GROUPS, searchable } from "../core/catalog.js";
 import { displayName, sourcesFor, loadNeverLoaded } from "../core/sources.js";
 import { orderSources, loadOrder } from "../core/sourcelist.js";
 import { getBackend } from "../backend.js";
@@ -210,9 +210,10 @@ export function render(body, route, ctx) {
     const q = input.value.trim();
     state.query = input.value;
     const seq = ++state.seq;
-    others.search(q.length >= 2 && settings.deviceType() !== "none" ? q : ""); // jailbreak packages only
+    // F101: one Latin character searches nothing, here or on Canister (one CJK character does: Zebra's rule).
+    others.search(searchable(q) && settings.deviceType() !== "none" ? q : ""); // jailbreak packages only
     drawRecent();
-    if (!q) {
+    if (!searchable(q)) {
       list.setItems([]);
       note.textContent = "Package names, descriptions and authors.";
       return;

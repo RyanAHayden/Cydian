@@ -145,6 +145,7 @@ html[data-theme="dark"] .home-locked .cell-label, html[data-theme="dark"] .home-
 .home-row.purple .home-tile { min-height: 58px; }
 .glyph-jailbreak { background-color: #2b1158; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' d='M8 10.5V7.5a4 4 0 0 1 7.6-1.7'/%3E%3Crect x='5' y='10.5' width='14' height='10' rx='2' fill='%23fff'/%3E%3Ccircle cx='12' cy='15' r='1.6' fill='%232b1158'/%3E%3Cpath d='M12 15.5v2.3' stroke='%232b1158' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E"); }
 
-/* F135: Home's Settings row, its grey gear (icons/settings.svg) at the left as iOS 6's Settings rows draw theirs. */
-.home-settings-row .cell-icon { position: relative; overflow: hidden; background: none; box-shadow: none; }
-.home-settings-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* F135/F159: Home's Settings row, a tile glyph (grey square, white gear) with the tiles' inset and gap, so its icon
+   and label line up with the tiles above. */
+.home-settings-row > .cell-inner { padding: 0 10px 0 6px; gap: 8px; }
+.glyph-settings { background-color: #8e8e93; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23fff' stroke-width='3.4' stroke-dasharray='3.534 3.534'/%3E%3Cpath fill='%23fff' fill-rule='evenodd' d='M12 4.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15zm0 4.2a3.3 3.3 0 1 0 0 6.6 3.3 3.3 0 0 0 0-6.6z'/%3E%3C/svg%3E"); }

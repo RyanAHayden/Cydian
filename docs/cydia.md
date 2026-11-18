@@ -177,6 +177,8 @@ compares without case or diacritics (`LaxCompareOptions_`).
   Cydian can show http(s) icons (F2 resolves them), but should keep the fallback chain behind them.
 - Purpose badges: the tag `purpose::<x>` puts `Purposes/<x>.png` on the cell. The 4S has commercial, console,
   daemon, extension, library, uikit and x.
+- Cydian (F126): `web/app/core/sectionicons.js` and Cydia's own icons in `web/app/icons/sections/` (GPLv3, from
+  Cydia's repo: 39 section icons; the 4S's other 29 came from third-party repos).
 - Hidden from every list:
   - packages tagged `cydia::obsolete`;
   - packages whose `role::` tag isn't `enduser`, `hacker` or `developer` (for example `role::cydia`).

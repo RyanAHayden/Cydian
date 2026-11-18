@@ -46,7 +46,7 @@
 //                                             sources only: APT sources' packages drop out of everything, filter or
 //                                             not (lists, Search, package pages, installed rows and upgrades)
 //
-// A row is the slim record lists draw: { id, name, short, version, section, icon, key, author, compat }.
+// A row is the slim record lists draw: { id, name, short, version, section, icon, key, author, compat, purpose }.
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
 import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
 import { compat, compatCode, isIncompatible, normalizeDevice, needText } from "./compat.js";
@@ -130,14 +130,17 @@ function makeRow(st, key) {
   return {
     id: st.package, name, short: desc.short, version: st.version ?? "", section: sectionName(st.section),
     icon: st.iconUrl ?? null, key, author: author || maint, paid: tagsOf(st).includes("cydia::commercial"),
-    kind: st.kind === "ipa" ? "ipa" : undefined,
+    kind: st.kind === "ipa" ? "ipa" : undefined, purpose: purposeOf(st),
     // search fields, lower-cased once at load; dropped before rows leave the worker
     _hay: [name, st.package, desc.short, desc.long, author, maint].join("\n").toLowerCase(),
     _n: name.toLowerCase(), _id: st.package.toLowerCase(), _a: author.toLowerCase(), _m: maint.toLowerCase(),
   };
 }
 
-const slim = ({ id, name, short, version, section, icon, key, author, compat, paid, kind }) => ({ id, name, short, version, section, icon, key, author, compat, paid, kind });
+// F126: Cydia's primaryPurpose (the first purpose:: tag), for the corner badge (core/sectionicons.js).
+const purposeOf = (st) => tagsOf(st).find((t) => t.startsWith("purpose::"))?.slice(9) || null;
+
+const slim = ({ id, name, short, version, section, icon, key, author, compat, paid, kind, purpose }) => ({ id, name, short, version, section, icon, key, author, compat, paid, kind, purpose });
 
 // Search's segmented control (F35): a few broad kinds over Cydia's sections. A section belongs to a group by its
 // simple name (simpleSection): "Themes (SpringBoard)" is a Theme, "Tweaks" a Tweak.
@@ -664,6 +667,7 @@ export function createCatalog() {
       const e = all.get(p.id);
       return { id: p.id, name: p.name, short: p.short, version: p.version, section: p.section,
         icon: e?.row.icon ?? null, key: e?.row.key ?? null, author: p.author, installed: p.version, held: p.held,
+        purpose: e?.row.purpose ?? (statusById.has(p.id) ? purposeOf(statusById.get(p.id)) : null),
         size: installedBytes(statusById.get(p.id)),
         compat: e ? e.row.compat : (device && statusById.has(p.id) ? compatCode(statusById.get(p.id), device) : null) };
     });

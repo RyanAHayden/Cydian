@@ -11,7 +11,9 @@ A package manager with the iOS 6 Cydia look, for modern iPhones.
 Work is planned in `plan/TODO.md` and run with [agent-runner](https://github.com/FIZL0/agent-runner):
 `tmux new -s cydian agent-runner run 3`.
 
-Not affiliated with Cydia or SaurikIT. No Apple or Cydia artwork is included; the look is redrawn in CSS.
+Not affiliated with Cydia or SaurikIT. No Apple artwork is included, and the look is redrawn in CSS. The one exception
+is Cydia's section icons and purpose badges (`web/app/icons/sections/`), by Jay Freeman (saurik), copied from
+Cydia's GPLv3 source (credit and details in that folder's README).
 
 ## Run it
 

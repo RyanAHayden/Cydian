@@ -402,3 +402,14 @@ html[data-theme="dark"] .search-field::after { background-color: #6b6f75; }
    (.source-row's red minus and Delete); the chevron and the version make room as they do on a source row. */
 .wish-row > .cell-inner::after, .wish-row .pkg-version { transition: opacity .2s ease; }
 .editing .wish-row > .cell-inner::after, .wish-row.armed > .cell-inner::after, .wish-row.armed .pkg-version { opacity: 0; }
+
+/* ---- F126: Cydia's package icons (PackageCell): the section icon (or unknown.png) behind the package's own, and a
+   badge half the icon's size centred 11/32 of the way in from its corner (Cydia: 32 pt icon at (25,25), 16 pt badge
+   at (36,36)). The artwork is Cydia's own (icons/sections/, GPLv3) and draws its own rounded corners. */
+.pkg-art { position: relative; flex: none; display: block; width: 32px; height: 32px; }
+.pkg-art.large { width: 64px; height: 64px; }
+.pkg-icon.cy { width: 100%; height: 100%; box-shadow: none; background: transparent center / cover no-repeat; }
+.pkg-badge { position: absolute; left: 19px; top: 19px; width: 16px; height: 16px; pointer-events: none; }
+.pkg-art.large .pkg-badge { left: 38px; top: 38px; width: 32px; height: 32px; }
+.pkg-badge[hidden], .pkg-badge.section { display: none; }
+.pkg-art.own .pkg-badge.section:not([hidden]) { display: block; }

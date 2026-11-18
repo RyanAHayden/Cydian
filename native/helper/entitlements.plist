@@ -2,10 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- cydian-helper's entitlements (F59): AppSync Unified's appinst_entitlements.plist (GPL-3.0), so install-ipa may
      ask installd through LSApplicationWorkspace installApplication:withOptions:error:. build.sh signs the helper
-     with these (ldid -S or rcodesign). -->
+     with these (ldid -S or rcodesign). N6: no-container and no-sandbox as the daemon has; without one of them a
+     rootless jailbreak (palera1n, iOS 15) SIGKILLs the helper the moment it starts, as it does any binary. -->
 <plist version="1.0">
 <dict>
 	<key>platform-application</key><true/>
+	<key>com.apple.private.security.no-container</key><true/>
+	<key>com.apple.private.security.no-sandbox</key><true/>
 	<key>com.apple.private.mobileinstall.allowedSPI</key>
 	<array>
 		<string>Install</string>

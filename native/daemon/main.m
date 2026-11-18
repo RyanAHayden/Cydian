@@ -369,7 +369,9 @@ int main(int argc, char *argv[]) {
         /* One run at a time (RunAtLoad and the interval can meet, or a hand-run --force). */
         int lock = open([dir stringByAppendingPathComponent:@"upgrades.lock"].fileSystemRepresentation,
                         O_RDWR | O_CREAT | O_CLOEXEC, 0644);
-        if (lock < 0 || flock(lock, LOCK_EX | LOCK_NB)) { say("another check is running"); return 0; }
+        /* N6: a run without root (by hand as mobile) can't create the lock; say so rather than "another check". */
+        if (lock < 0) { say("can't open %s/upgrades.lock: %s", dir.UTF8String, strerror(errno)); return 1; }
+        if (flock(lock, LOCK_EX | LOCK_NB)) { say("another check is running"); return 0; }
 
         struct phone phone = {.dry = dry};
         if (!dry) {

@@ -254,7 +254,9 @@ def check(path):
             cpu, sub, ftype, platform, minos, signed = macho_info(data)
             if (cpu, sub, ftype, platform) != (0x0100000C, 0, 2, 2) or not signed:
                 problems.append("helper is not a signed arm64 iOS executable")
-        except (ValueError, struct.error) as e:
+            elif not _unsandboxed(data):
+                problems.append("helper has neither %s (a rootless jailbreak kills it at launch)" % " nor ".join(UNSANDBOXED))
+        except (ValueError, struct.error, plistlib.InvalidFileException) as e:
             problems.append("helper: %s" % e)
     problems += _check_daemon(files)
     if APP + "bridge.js" not in files:
@@ -270,6 +272,17 @@ def check(path):
     summary = "%s %s (%s): %d web files, %s" % (fields.get("Package"), fields.get("Version"),
                                                fields.get("Architecture"), len(web), summary)
     return problems, summary
+
+
+# N6 (iPhone 7, iOS 15.8.8, palera1n rootless): a binary started outside an app container is SIGKILLed at launch
+# unless it carries one of these, as Procursus's own tools do. The app's entitlements.plist has no-container.
+UNSANDBOXED = ("com.apple.private.security.no-container", "com.apple.private.security.no-sandbox")
+
+
+def _unsandboxed(data):
+    from mkipa import macho_entitlements  # mkipa imports this module; import it here, not at the top
+    ents = macho_entitlements(data) or {}
+    return any(ents.get(k) is True for k in UNSANDBOXED)
 
 
 def _check_daemon(files):
@@ -291,6 +304,9 @@ def _check_daemon(files):
                 if not isinstance(ids, list) or "com.ryha.cydian" not in ids:
                     problems.append("daemon has no %s entitlement for com.ryha.cydian (it can't post notifications)"
                                     % NOTIFY_ENTITLEMENT)
+                if not _unsandboxed(data):
+                    problems.append("daemon has neither %s (a rootless jailbreak kills it at launch)"
+                                    % " nor ".join(UNSANDBOXED))
         except (ValueError, struct.error, plistlib.InvalidFileException) as e:
             problems.append("daemon: %s" % e)
     if DAEMON_JOB not in files:

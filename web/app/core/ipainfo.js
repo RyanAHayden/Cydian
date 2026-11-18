@@ -157,3 +157,151 @@ export function checkIpa(url, { get, store = null, fallback = null, text = "", n
   inflight.set(u, p);
   return p;
 }
+
+// ---- F197: an IPA picked on the website, read in the browser ------------------------------------------------------
+//
+//   readIpaFile(src)    -> Promise<{ bundleId, name, version, minimumOS, icon }> from a File/Blob, Uint8Array or
+//                          ArrayBuffer: the app's Info.plist (XML or binary) and its largest plain-PNG icon (base64; null
+//                          when the app has only CgBI PNGs or an asset catalog, which a browser can't draw). Only the
+//                          zip's directory and those entries are read (Blob.slice), never the whole IPA. Throws
+//                          { code: "bad_ipa" } for a file that isn't an IPA.
+//   parseBplist(bytes)  -> the JS value of a binary plist (bplist00): dict, array, string, number, bool, Date, Uint8Array
+// ponytail: no zip64 (a picked IPA is capped well under 4 GB, core/myipas.js SITE_FILE_MAX), no encrypted entries.
+
+const badIpa = (message) => Object.assign(new Error(message), { code: "bad_ipa" });
+
+function sourceOf(src) {
+  if (src && typeof src.slice === "function" && typeof src.size === "number" && !(src instanceof Uint8Array) && !(src instanceof ArrayBuffer)) {
+    return { size: src.size, read: async (a, b) => new Uint8Array(await src.slice(a, b).arrayBuffer()) };
+  }
+  const b = src instanceof Uint8Array ? src : src instanceof ArrayBuffer ? new Uint8Array(src) : null;
+  if (!b) throw badIpa("That isn't a file.");
+  return { size: b.length, read: async (a, c) => b.subarray(a, c) };
+}
+
+async function zipDirectory({ size, read }) {
+  const tailLen = Math.min(size, 65557);
+  const tail = await read(size - tailLen, size);
+  const tv = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
+  let eocd = -1;
+  for (let i = tail.length - 22; i >= 0; i--) if (tv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw badIpa("That file isn't an IPA (not a zip archive).");
+  const dirSize = tv.getUint32(eocd + 12, true), dirAt = tv.getUint32(eocd + 16, true);
+  if (dirAt === 0xffffffff || dirAt + dirSize > size) throw badIpa("That IPA's zip directory can't be read.");
+  const d = await read(dirAt, dirAt + dirSize);
+  const v = new DataView(d.buffer, d.byteOffset, d.byteLength);
+  const out = [];
+  for (let p = 0; p + 46 <= d.length && v.getUint32(p, true) === 0x02014b50;) {
+    const nameLen = v.getUint16(p + 28, true), extraLen = v.getUint16(p + 30, true), commentLen = v.getUint16(p + 32, true);
+    out.push({ name: new TextDecoder().decode(d.subarray(p + 46, p + 46 + nameLen)), flags: v.getUint16(p + 8, true),
+      method: v.getUint16(p + 10, true), csize: v.getUint32(p + 20, true), size: v.getUint32(p + 24, true), local: v.getUint32(p + 42, true) });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
+}
+
+async function zipEntry({ read }, e, max = 8 * 1024 * 1024) {
+  if (e.size > max || e.flags & 1) return null;
+  const head = await read(e.local, e.local + 30);
+  const hv = new DataView(head.buffer, head.byteOffset, head.byteLength);
+  if (head.length < 30 || hv.getUint32(0, true) !== 0x04034b50) return null;
+  const start = e.local + 30 + hv.getUint16(26, true) + hv.getUint16(28, true);
+  const raw = await read(start, start + e.csize);
+  if (e.method === 0) return raw.slice();
+  if (e.method !== 8) return null;
+  const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+export function parseBplist(bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (b.length < 40 || new TextDecoder().decode(b.subarray(0, 6)) !== "bplist") throw new Error("bplist: no header");
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  const t = b.length - 32;
+  const offSize = b[t + 6], refSize = b[t + 7];
+  const num = Number(v.getBigUint64(t + 8)), top = Number(v.getBigUint64(t + 16)), table = Number(v.getBigUint64(t + 24));
+  const uint = (at, n) => { let x = 0; for (let i = 0; i < n; i++) x = x * 256 + b[at + i]; return x; };
+  const offset = (i) => uint(table + i * offSize, offSize);
+  const depth = new Set();
+  const obj = (i) => {
+    if (i >= num || depth.has(i)) throw new Error("bplist: bad reference");
+    depth.add(i);
+    try { return value(offset(i)); } finally { depth.delete(i); }
+  };
+  const length = (at, low) => {
+    if (low !== 0xf) return { n: low, at: at + 1 };
+    const m = b[at + 1] & 0xf, w = 1 << m;
+    return { n: uint(at + 2, w), at: at + 2 + w };
+  };
+  function value(at) {
+    const marker = b[at], hi = marker >> 4, low = marker & 0xf;
+    switch (hi) {
+      case 0x0: return low === 0x8 ? false : low === 0x9 ? true : null;
+      case 0x1: { const w = 1 << low; return w === 8 ? Number(v.getBigInt64(at + 1)) : uint(at + 1, w); }
+      case 0x2: return low === 2 ? v.getFloat32(at + 1) : v.getFloat64(at + 1);
+      case 0x3: return new Date(Date.UTC(2001, 0, 1) + v.getFloat64(at + 1) * 1000);
+      case 0x4: { const l = length(at, low); return b.slice(l.at, l.at + l.n); }
+      case 0x5: { const l = length(at, low); return new TextDecoder("latin1").decode(b.subarray(l.at, l.at + l.n)); }
+      case 0x6: {
+        const l = length(at, low);
+        let s = "";
+        for (let i = 0; i < l.n; i++) s += String.fromCharCode(v.getUint16(l.at + i * 2));
+        return s;
+      }
+      case 0x7: { const l = length(at, low); return new TextDecoder().decode(b.subarray(l.at, l.at + l.n)); }
+      case 0x8: return { UID: uint(at + 1, low + 1) };
+      case 0xa: { const l = length(at, low); return Array.from({ length: l.n }, (_, k) => obj(uint(l.at + k * refSize, refSize))); }
+      case 0xd: {
+        const l = length(at, low), o = {};
+        for (let k = 0; k < l.n; k++) o[String(obj(uint(l.at + k * refSize, refSize)))] = obj(uint(l.at + (l.n + k) * refSize, refSize));
+        return o;
+      }
+      default: throw new Error(`bplist: unknown object 0x${marker.toString(16)}`);
+    }
+  }
+  return obj(top);
+}
+
+const pngBase64 = (bytes) => {
+  if (typeof Buffer !== "undefined") return Buffer.from(bytes).toString("base64");
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+};
+const isPng = (b) => b?.length > 16 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
+const isCgBIPng = (b) => isPng(b) && b[12] === 0x43 && b[13] === 0x67 && b[14] === 0x42 && b[15] === 0x49;
+
+function iconNames(p) {
+  const names = [];
+  for (const k of ["CFBundleIcons", "CFBundleIcons~ipad"]) names.push(...(p?.[k]?.CFBundlePrimaryIcon?.CFBundleIconFiles ?? []));
+  names.push(...(p?.CFBundleIconFiles ?? []));
+  if (p?.CFBundleIconFile) names.push(p.CFBundleIconFile);
+  return [...new Set(names.filter((n) => typeof n === "string" && n).map((n) => n.replace(/\.png$/i, "")))];
+}
+
+export async function readIpaFile(src) {
+  const s = sourceOf(src);
+  const dir = await zipDirectory(s);
+  const info = dir.find((e) => /^Payload\/[^/]+\.app\/Info\.plist$/.test(e.name));
+  if (!info) throw badIpa("That file isn't an IPA: it has no Payload/<app>.app/Info.plist.");
+  const raw = await zipEntry(s, info);
+  if (!raw) throw badIpa("That IPA's Info.plist can't be read.");
+  let p;
+  try {
+    p = new TextDecoder().decode(raw.subarray(0, 6)) === "bplist" ? parseBplist(raw)
+      : (await import("./signing.js")).parsePlist(new TextDecoder().decode(raw));
+  } catch { throw badIpa("That IPA's Info.plist can't be read."); }
+  const bundleId = str(p?.CFBundleIdentifier);
+  if (!bundleId) throw badIpa("That IPA's app has no bundle ID (CFBundleIdentifier).");
+  const app = info.name.slice(0, -"Info.plist".length);
+  const names = iconNames(p);
+  const icons = dir.filter((e) => e.name.startsWith(app) && !e.name.slice(app.length).includes("/") && /\.png$/i.test(e.name) &&
+    names.some((n) => e.name.slice(app.length).startsWith(n))).sort((a, c) => c.size - a.size);
+  let icon = null;
+  for (const e of icons.slice(0, 4)) {
+    const png = await zipEntry(s, e, 2 * 1024 * 1024).catch(() => null);
+    if (isPng(png) && !isCgBIPng(png)) { icon = pngBase64(png); break; }
+  }
+  return { bundleId, name: str(p.CFBundleDisplayName) || str(p.CFBundleName) || bundleId,
+    version: str(p.CFBundleShortVersionString) || str(p.CFBundleVersion) || "", minimumOS: osVersion(p.MinimumOSVersion), icon };
+}

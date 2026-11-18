@@ -15,7 +15,8 @@
 //
 // In the sideload app the files live in iFizBox's Documents (Files > On My iPhone > iFizBox) and the shell signs them
 // (signing-client.js libraryCall, native/Sources/MyIPAs.swift). On the website there is no signer on the phone:
-// Add is From URL only, the list is links kept on this device, and Install is an app page's (F95, user 2026-11-18: no
+// Add is Choose File (F197: the IPA is kept in this browser's IndexedDB and Install signs it here, signInBrowser with
+// its bytes) or From URL; links are kept on this device, and a link's Install is an app page's (F95, user 2026-11-18: no
 // Open in iFizBox / Get in AltStore / SideStore / Feather): it signs in the browser (F93), and until that lands it says
 // the certificate is needed, with Download IPA (altstore.js siteCertificateAlert).
 // Rules and labels: core/myipas.js.
@@ -33,9 +34,10 @@ import { cleanSourceUrl } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
 import { deviceError, phaseLabel, isCgBI, fromBase64 } from "../core/signing.js";
 import { apps, recordInstall } from "../core/installed.js";
-import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optionsParams, siteEntries, addSiteUrl, removeSiteUrl,
-  STATE_LABELS } from "../core/myipas.js";
-import { localSigning, libraryCall, installFromLibrary } from "../signing-client.js";
+import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optionsParams, siteEntries, addSiteUrl,
+  STATE_LABELS, addSiteFile, removeSiteEntry, openIpaStore, memoryIpaStore } from "../core/myipas.js";
+import { readIpaFile } from "../core/ipainfo.js";
+import { localSigning, libraryCall, installFromLibrary, signAndInstall } from "../signing-client.js";
 import { siteCertificateAlert } from "./altstore.js";
 import { NAME } from "../brand.js";
 
@@ -189,7 +191,7 @@ function draw(list) {
 
 export function libraryEmptyText(site) {
   return site
-    ? `No IPAs yet. Tap Add to keep a link to an IPA here: Install opens it in ${NAME}, AltStore, SideStore or Feather.`
+    ? `No IPAs yet. Tap Add to choose an IPA in Files (kept in this browser, signed here when you install it) or to keep a link to one: Install opens it in ${NAME}, AltStore, SideStore or Feather.`
     : `No IPAs yet. Tap Add to choose one in Files or download one, or put IPAs in Files under On My iPhone > ${NAME}.`;
 }
 
@@ -343,7 +345,13 @@ const refresh = () => { if (view.body?.isConnected) load(); };
 catalog.onChange?.(() => { if (view.browse?.isConnected) loadBrowse(); });
 
 async function addMenu() {
-  if (site()) return addFromUrl();
+  if (site()) {
+    // F197: the picker opens from the sheet's tap (Safari opens a file input only inside the user's tap).
+    const i = await showActionSheet({ buttons: ["Choose File", "From URL"] });
+    if (i === 0) return chooseSiteFile();
+    if (i === 1) return addFromUrl();
+    return;
+  }
   const i = await showActionSheet({ buttons: ["Files", "From URL"] }); // F79: Browse is the page's own section now
   if (i === 0) return pickFiles();
   if (i === 1) return addFromUrl();
@@ -358,6 +366,52 @@ async function pickFiles() {
   remember(r?.ipas);
   if (view.body?.isConnected) draw(r?.ipas ?? []);
   if (r?.files?.length === 1) go(ipaPath(r.files[0]));
+}
+
+// ---- F197: the website's Choose File: an IPA from Files, kept in this browser -----------------------------------
+
+let ipaStore = null;
+const siteStore = () => (ipaStore ??= openIpaStore().catch(() => memoryIpaStore()));
+// What this site may still keep (Safari's quota less what it uses), or null when the browser doesn't say.
+const siteRoom = async () => {
+  const est = await globalThis.navigator?.storage?.estimate?.();
+  return est && Number.isFinite(est.quota) && Number.isFinite(est.usage) ? est.quota - est.usage : null;
+};
+
+function chooseSiteFile() {
+  const input = Object.assign(el("input", "visually-hidden"), { type: "file", accept: ".ipa,application/octet-stream" });
+  document.body.append(input);
+  input.addEventListener("change", async () => {
+    const f = input.files?.[0];
+    input.remove();
+    if (f) await addPickedFile(f);
+  }, { once: true });
+  input.addEventListener("cancel", () => input.remove(), { once: true });
+  input.click();
+}
+
+// A picked File into My IPAs (the HUD while its Info.plist is read and its bytes stored), then its page.
+export async function addPickedFile(file, { store, read = readIpaFile, room = siteRoom, alert = showAlert, hud = showHUD, open = go } = {}) {
+  const hide = hud("Adding");
+  let entry;
+  try { entry = await addSiteFile(file, { store: store ?? (await siteStore()), read, room }); } catch (e) {
+    hide();
+    await alert({ title: "Couldn't Add", message: String(e?.message ?? e), buttons: ["OK"] });
+    return null;
+  }
+  if (hide.done) hide.done("Added"); else hide();
+  known.set(entry.file, entry);
+  refresh();
+  open(ipaPath(entry.file));
+  return entry;
+}
+
+// Install for a kept IPA: signed in this browser from its bytes (no download), with the same early itms link,
+// progress page, Cancel and upload as an app page's Install. Called inside Install's tap, nothing awaited before
+// signInBrowser opens iOS's prompt; the bytes are read after.
+export function siteFileInstall(entry, { store = siteStore, sign = signAndInstall, onInstalled = () => {} } = {}) {
+  return sign({ name: entry.name || entry.file.replace(/\.ipa$/i, ""), bundleId: entry.bundleId || null, version: entry.version || "",
+    bytes: async () => (await (typeof store === "function" ? store() : store)).get(entry.file), onInstalled });
 }
 
 // The Add alert as Sources has it: a URL field with Paste, cleaned up by cleanSourceUrl.
@@ -452,6 +506,21 @@ async function renderIpa(body, route, file) {
   }
   setTitle(body, entry.name || file);
   body.replaceChildren(header(entry));
+  if (site() && entry.stored) {
+    const details = [
+      { label: "Version", detail: entry.version || "—", chevron: false },
+      { label: "Bundle ID", detail: entry.bundleId || "—", chevron: false },
+      { label: "Size", detail: formatBytes(entry.size) || "—", chevron: false },
+    ];
+    if (entry.minimumOS) details.push({ label: "Requires", detail: `iOS ${entry.minimumOS}`, chevron: false });
+    body.append(grouped([
+      { header: "Details", rows: details,
+        footer: "Kept in this browser. Install signs it here with your certificate (Settings > Signing) and iOS installs it." },
+      { rows: [{ label: "Delete", onClick: () => confirmDelete(entry) }] },
+    ]));
+    markDelete(body);
+    return;
+  }
   if (site()) {
     body.append(grouped([
       { header: "Link", rows: [{ label: entry.url, chevron: false }],
@@ -538,10 +607,11 @@ async function saveSigned(entry, body, route) {
 }
 
 async function confirmDelete(entry) {
-  const i = await showActionSheet({ title: site() ? "" : "The IPA and its signed copy are deleted from this iPhone.", buttons: ["Delete IPA"], destructive: 0 });
+  const i = await showActionSheet({ title: site() ? (entry.stored ? "The IPA is deleted from this browser." : "") : "The IPA and its signed copy are deleted from this iPhone.",
+    buttons: ["Delete IPA"], destructive: 0 });
   if (i !== 0) return;
   try {
-    if (site()) removeSiteUrl(globalThis.localStorage, entry.file);
+    if (site()) await removeSiteEntry(entry, { store: entry.stored ? await siteStore() : null });
     else await libraryCall("delete", { file: entry.file });
   } catch (e) {
     await showAlert({ title: "Couldn't Delete", message: deviceError(e).message, buttons: ["OK"] });
@@ -560,6 +630,12 @@ async function install(file) {
   if (site()) {
     entry ??= siteEntries().find((e) => e.file === file);
     if (!entry) return;
+    if (entry.stored) {
+      await siteFileInstall(entry, { onInstalled: (r) => {
+        if (r?.bundleId) record(r.bundleId, r.name || entry.name, r.version || entry.version || "", entry.icon);
+      } });
+      return;
+    }
     await siteInstallSheet(entry);
     return;
   }

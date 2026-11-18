@@ -158,8 +158,8 @@ export const isSelfIpa = (url) => SELF_IPA.test(String(url ?? ""));
 // Signs `url` (an IPA) on the phone and installs it. Resolves true once iOS was asked to install; false after an
 // error, which it shows in an alert; false in the jailbreak app (its pages use the helper, so this is only a guard).
 // F93: on the website, signs it in the browser (signInBrowser); `bring` (Install iFizBox App) carries the certificate.
-export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "" }) {
-  if (browserSigning()) return signInBrowser({ url, name, onInstalled, bring, bundleId, version });
+export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null }) {
+  if (browserSigning()) return signInBrowser({ url, name, onInstalled, bring, bundleId, version, bytes });
   if (!localSigning()) {
     await showAlert({ title: "Can't Install Here", message: `Apps are signed in the ${NAME} app. Open this one in ${NAME}, AltStore, SideStore or Feather.`, buttons: ["OK"] });
     return false;
@@ -170,7 +170,7 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {}, b
   // F75: the first Install with something missing opens the Signing walkthrough at that step, not an alert.
   if (await firstInstallCheck()) {
     // F177: Signing offers Install Now for this app once it's set up.
-    (await import("./screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version }) });
+    (await import("./screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version, bytes }) });
     return false;
   }
   // F81: one tap: Install signs and installs straight away. The look-first sheet (F68, signing-sheet.js) is the app
@@ -366,7 +366,8 @@ export async function installFromLibrary({ file, name = "", onInstalled = () => 
 // ---- the website (F93): signed in the browser ----------------------------------------------------------------
 //
 //   browserSigning()                   true on the website
-//   await signInBrowser({ url, name, onInstalled, bring }, deps)
+//   await signInBrowser({ url, name, onInstalled, bring, bytes }, deps)
+//       F197: `bytes` (an IPA kept in this browser, or a function answering it) is signed instead of downloading `url`.
 //       the progress page (F151; was a HUD): "Downloading" (the IPA through the Worker's /api/fetch?kind=ipa: most hosts send no CORS headers),
 //       "Signing" (signing-worker.js: zsign as WebAssembly, with the certificate from IndexedDB), "Uploading" (the
 //       signed IPA to the Worker's /sign/upload, in parts, kept 10 minutes), then a Ready to Install alert whose
@@ -518,9 +519,19 @@ export async function reserveUpload(token, { bundleId, name, version }, { base =
   } catch { return false; }
 }
 
+// F197: the bytes of an IPA kept in this browser (My IPAs' Choose File): a Uint8Array, ArrayBuffer or Blob, or a
+// function answering one (read only after Install's tap has opened iOS's prompt).
+async function keptBytes(src) {
+  const v = await (typeof src === "function" ? src() : src);
+  if (v instanceof Uint8Array) return v;
+  if (v instanceof ArrayBuffer) return new Uint8Array(v);
+  if (v && typeof v.arrayBuffer === "function") return new Uint8Array(await v.arrayBuffer());
+  throw signFail("missing", "The IPA isn't kept in this browser any more: Safari may have cleared it. Add it again.");
+}
+
 const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof ArrayBuffer ? b.slice(0) : new Uint8Array(b ?? []).buffer);
 
-export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "" },
+export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null },
   { hud = progressHUD, alert = showAlert, open = (u) => { location.href = u; }, go = openRoute,
     identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "",
     now = identityNow, origin = () => new URL(base || "/", globalThis.location?.href).origin, clock = Date.now,
@@ -539,15 +550,16 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   const id = await identity();
   if (!id?.p12 || !id?.profile) {
     await alert({ title: "No Certificate", message: "Add your certificate, its password and provisioning profile in Settings > Signing.", buttons: ["OK"] });
-    (await import("./screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version }) }); // F177
+    (await import("./screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version, bytes }) }); // F177
     go(["signing"]);
     return false;
   }
-  const h = hud("Downloading");
+  const h = hud(bytes ? "Reading" : "Downloading");
   const pct = (label) => (p) => h.set(`${label} ${p}%`);
   const signal = h.signal ?? null; // F188: the page's Cancel stops the download, the signer and the upload
   try {
-    const ipa = await untilCancel(h, downloadIpa(url, { base, fetcher, onProgress: pct("Downloading"), ...(signal ? { signal } : {}) }));
+    const ipa = bytes ? await untilCancel(h, keptBytes(bytes))
+      : await untilCancel(h, downloadIpa(url, { base, fetcher, onProgress: pct("Downloading"), ...(signal ? { signal } : {}) }));
     h.set("Signing");
     const self = isSelfIpa(url) || bring;
     const carry = self ? { identity: Boolean(bring), transfer: await transfer().catch(() => null) } : null;

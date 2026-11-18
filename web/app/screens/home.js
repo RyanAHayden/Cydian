@@ -107,6 +107,7 @@ export function nav(route, ctx) {
   }
   return {
     title: "Cydian",
+    back: "Home", // the back button above it reads Home, as Cydia's
     left: { label: "About", onClick: () => showAbout(ctx) },
     // F82 Reload, as Cydia's: the button turns into the small white spinner in its own spot while the sources and
     // Home's content reload, then back to Reload. The page keeps its content and swaps the new in place: no Loading

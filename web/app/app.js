@@ -6,7 +6,7 @@
 // top page of the active tab is visible; the one below shows during a slide or swipe.
 //
 // Screens (screens/*.js) export `title`, `render(body, route, ctx)` and optionally `nav(route, ctx)` returning
-// { title, style: "grouped" | "plain", left: { label, onClick }, right: { label, onClick } | [several] } and `init(ctx)`,
+// { title, back (the back button's label above it; else the title), style: "grouped" | "plain", left: { label, onClick }, right: { label, onClick } | [several] } and `init(ctx)`,
 // run once at start (e.g. to set the tab's badge). ctx: { go, back, setBadge, showHUD }.
 import { TABS, createRouter, format, parent, mounted } from "./router.js";
 import { createStacks, swipeCommits } from "./nav/stack.js";
@@ -96,8 +96,8 @@ function makePage(tab, path) {
   const left = document.createElement("div");
   left.className = "nav-left";
   if (below) {
-    const back = button({ label: below.page.title, onClick: () => goBack() }, "bar-button back");
-    back.setAttribute("aria-label", "Back to " + below.page.title);
+    const back = button({ label: below.page.back, onClick: () => goBack() }, "bar-button back");
+    back.setAttribute("aria-label", "Back to " + below.page.back);
     left.append(back);
   } else if (info.left) left.append(button(info.left, "bar-button"));
   const h1 = document.createElement("h1");
@@ -111,7 +111,7 @@ function makePage(tab, path) {
   navStacks[tab].append(item);
 
   screen.render(body, route, ctx);
-  return { el: page, body, shade, item, title };
+  return { el: page, body, shade, item, title, back: info.back ?? title }; // back: the label pages above it show
 }
 
 const pairOf = (top, below) => ({

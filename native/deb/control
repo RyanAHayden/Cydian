@@ -6,5 +6,6 @@ Description: Package manager with the iOS 6 look, for modern iPhones
 Maintainer: Cydian
 Author: Cydian
 Section: Packaging
-Depends: firmware (>= 15.0), uikittools
+Depends: firmware (>= 15.0), uikittools, unzip
+Recommends: ldid
 Installed-Size: @SIZE@

@@ -98,6 +98,19 @@ class Deb(unittest.TestCase):
         _, summary = mkdeb.check(self.deb)
         self.assertIn("0.1.0-7 (iphoneos-arm64)", summary)
 
+    def test_relations_flagged(self):
+        """F66: install-ipa needs unzip (Depends) and wants ldid (Recommends)."""
+        self.assertEqual(mkdeb.relation_names("firmware (>= 15.0), uikittools, a | b:any"),
+                         ["firmware", "uikittools", "a", "b"])
+        path = os.path.join(self.debian, "control")
+        text = open(path).read()
+        self.assertIn("unzip", text)
+        self.write(self.debian, "control",
+                   text.replace(", unzip\n", "\n").replace("Recommends: ldid\n", "").encode())
+        p = " | ".join(self.problems())
+        self.assertIn("control Depends lacks unzip", p)
+        self.assertIn("control Recommends lacks ldid", p)
+
     def test_build_is_reproducible(self):
         mkdeb.build(self.root, self.debian, self.deb, mtime=0)
         first = open(self.deb, "rb").read()

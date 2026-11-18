@@ -102,7 +102,7 @@ test("the page closed by the user stops the polling", async () => {
 test("signInBrowser hands the early link's token to the watcher after uploading into it", async () => {
   const profile = new TextEncoder().encode(`<?xml version="1.0"?><plist version="1.0"><dict><key>TeamIdentifier</key><array><string>T</string></array>
 <key>Entitlements</key><dict><key>application-identifier</key><string>T.com.you.*</string></dict></dict></plist>`);
-  const id = { p12: new Uint8Array([0x30, 1]), profile, password: "" };
+  const id = { p12: new Uint8Array([0x30, 1]), profile, password: "", passwordOk: true };
   const fetcher = async (url) => {
     const u = new URL(url, "https://x.example");
     if (u.pathname === "/api/fetch") return new Response(new Uint8Array([0x50, 0x4b, 3, 4]));

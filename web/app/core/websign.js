@@ -106,7 +106,11 @@ export function zsignError(lines) {
   const clean = lines.map((l) => String(l).replace(ANSI, "").trim()).filter(Boolean);
   const said = clean.filter((l) => l.startsWith(">>>")).map((l) => l.replace(/^>+\s*/, ""));
   const why = [...said].reverse().find((l) => /fail|invalid|can't|cannot|error|not /i.test(l)) ?? said.at(-1) ?? clean.at(-1) ?? "";
-  if (/Can't load p12/i.test(why)) return "The certificate's password doesn't open it, or the .p12 is damaged.";
+  if (/Can't load p12/i.test(why)) {
+    // OpenSSL's queue says which: a MAC that doesn't verify is the wrong password (the file itself read fine).
+    return clean.some((l) => /mac verify failure/i.test(l)) ? "The certificate's password is wrong: it doesn't open this .p12."
+      : "The certificate's password doesn't open it, or the .p12 is damaged.";
+  }
   return why ? `zsign: ${why.replace(/[.!]+$/, "")}.` : "zsign stopped without saying why.";
 }
 

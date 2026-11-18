@@ -492,7 +492,10 @@ export const EARLY_WINDOW = 8 * 60 * 1000;
 
 // The bundle ID `id`'s profile signs this app as, when it's known before signing; else null.
 export function expectedBundleId(id, { url = "", bundleId = null } = {}) {
-  if (!id?.p12 || !id?.profile) return null;
+  // Only a password known to open the .p12: a sign that fails after iOS was sent to the link leaves iOS waiting, and
+  // it gives up with "the certificate for <domain> is not valid" (user 2026-11-18). Unchecked (null, e.g. synced from
+  // the account) goes the slow way: Ready to Install, or the signing error, with nothing opened.
+  if (!id?.p12 || !id?.profile || id.passwordOk !== true) return null;
   try {
     const { appId } = profileInfo(id.profile instanceof Uint8Array ? id.profile : new Uint8Array(id.profile));
     if (!appId) return null;

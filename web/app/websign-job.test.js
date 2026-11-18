@@ -89,7 +89,7 @@ test("zsign's own reason when it can't sign; not an IPA; no app inside; no Info.
   const { create } = fakeZsign({ fail: ["\x1b[31m>>> Can't find the signature of Frameworks/X.framework!\x1b[0m"] });
   await assert.rejects(runSignJob(create, job()), (e) => e.code === "sign_failed" && /zsign: Can't find the signature of Frameworks\/X\.framework\./.test(e.message));
   const pw = fakeZsign({ fail: ["01000000:error:...mac verify failure", "\x1b[31m>>> Can't load p12 or private key file. Please input the correct file and password!\x1b[0m"] });
-  await assert.rejects(runSignJob(pw.create, job()), /password doesn't open it/);
+  await assert.rejects(runSignJob(pw.create, job()), /password is wrong/);
   await assert.rejects(runSignJob(fakeZsign().create, job({ ipa: new Uint8Array([1, 2, 3, 4]) })), (e) => e.code === "bad_ipa");
   await assert.rejects(runSignJob(fakeZsign({ unzip: 1 }).create, job()), /couldn't be unpacked/);
   await assert.rejects(runSignJob(fakeZsign({ plist: null }).create, job()), /no readable Info\.plist/);

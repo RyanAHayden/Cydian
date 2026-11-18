@@ -56,6 +56,7 @@ test("expectedBundleId: explicit profiles, wildcards with a known app ID, else n
   assert.equal(expectedBundleId(idFor("com.you.*"), { url: "https://x/a.ipa" }), null); // its own ID comes with the download
   assert.equal(expectedBundleId(null, { url: SELF }), null);
   assert.equal(expectedBundleId({ p12: new Uint8Array(1), profile: new Uint8Array([1, 2]) }, { url: SELF }), null); // not a profile
+  assert.equal(expectedBundleId({ ...idFor("com.you.app"), passwordOk: null }, { url: SELF }), null); // password never checked: no early link
 });
 
 test("earlyLink: a fresh 48-hex token and the itms link to its manifest", () => {

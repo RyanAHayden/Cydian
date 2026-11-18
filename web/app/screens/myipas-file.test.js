@@ -137,7 +137,7 @@ test("Install hands the kept bytes to the signer: no downloadIpa, same early lin
   };
   const profile = new TextEncoder().encode(`<?xml version="1.0"?><plist version="1.0"><dict><key>TeamIdentifier</key><array><string>T</string></array>
 <key>Entitlements</key><dict><key>application-identifier</key><string>T.*</string></dict></dict></plist>`);
-  const id = { p12: new Uint8Array([0x30, 1]), profile, password: "" };
+  const id = { p12: new Uint8Array([0x30, 1]), profile, password: "", passwordOk: true };
   const order = [];
   let signedInput = null;
   const ok = await signInBrowser({ name: "Delta", bundleId: "io.dev.delta", version: "1.5", bytes: asked.bytes }, {

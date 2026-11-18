@@ -53,3 +53,8 @@ test("an app's name, version and ID from its Info.plist; zip check", () => {
   assert.equal(isZip(new Uint8Array([0x50, 0x4b, 3, 4])), true);
   assert.equal(isZip(new Uint8Array([0x50])), false);
 });
+
+test("zsignError: OpenSSL's mac verify failure says the password is wrong", () => {
+  assert.match(zsignError(["01000000:error:11800071:PKCS12 routines:PKCS12_parse:mac verify failure:crypto/pkcs12/p12_kiss.c:71:",
+    "\x1b[31m>>> Can't load p12 or private key file. Please input the correct file and password!"]), /password is wrong/);
+});

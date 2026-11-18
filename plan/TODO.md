@@ -30,7 +30,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **C8** (follow-up, low) Remove what F183 left unreachable: screens/queue.js whenConfirmEnds (and screens/essentialqueue.test.js, which only served the Essential Upgrade alert's wait), the shell's selfupdate.download (native/Sources/Bridge.swift) and cydian-helper's selfupdate command, which only selfupdate.js runInstall called | files: web/app/screens/queue.js, web/app/screens/essentialqueue.test.js, native/Sources/Bridge.swift, native/helper/** | after: F183
 ### Parked
 - [ ] **F21** (later) Ideas from feature research, journal/2026-11-17-feature-research, not scheduled: iPad layout and keyboard shortcuts (⌘F search, ⌘R refresh; Zebra #1892); block authors/packages from lists and upgrades (Zebra #1037, #998); 'worked for me' compatibility votes per package and iOS version (Sileo #249; needs moderation); malware check of installed packages against the F19 list; Bootstrap Install mode for broken bootstraps (Irisin); uicache from the app; localisation; self-update for the IPA build. See `journal/2026-11-17-feature-research/reports/Sideloader and package manager features.md`.
 - [ ] **F15** (follow-up, later) idevice install route (R5, docs/sideload.md): IDeviceKit + idevice (MIT, xcframework built from source) behind an Advanced switch: import a pairing file, LocalDevVPN loopback, AFC upload + installation_proxy with progress. The one route with no internet and no TLS, and it can update Cydian itself. | files: native/sideload/idevice/**

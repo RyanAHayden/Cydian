@@ -65,6 +65,16 @@ import { longPress } from "../nav/menu.js";
 import { libraryCall } from "../signing-client.js";
 import { resignJob } from "../core/appqueue.js";
 import { deviceError } from "../core/signing.js";
+import { getBackend } from "../backend.js";
+import { liveHUD } from "../nav/hud.js";
+
+// B46: Delete means what it says (user 2026-11-18: "I swiped and deleted an app in Installed and it just got rid of the
+// icon, I had to remove it again"). In the jailbreak app, an app the helper sees in installd's containers (`actual`, I4)
+// is uninstalled (ifizbox-helper uninstall-app, backend-native.js uninstallApp) behind a HUD, then its record goes.
+// Where iFizBox can't uninstall (the sideload app, the site, a record of an app that is gone) the button is Remove from
+// List, and the sheet says in one line that deleting the app itself is done from the Home Screen. In the sideload app
+// a row the shell reports installed (signing.isInstalled) isn't hidden: iOS's word wins over the record. Every one is
+// confirmed by an iOS 6 action sheet first (deleteAction, confirmDelete).
 
 // B36: every row on the apps list opens a page (the source's package page, else an installed-app page for the record,
 // #installed/app:<id>), a hold opens an action sheet (Open, Re-sign, Save Signed IPA, Remove: what applies) and a left
@@ -472,6 +482,7 @@ async function loadApps() {
   let rows;
   try {
     rows = await rememberedApps(); // F87: the phone's versions and I4's notes in the jailbreak app
+    rows = await withInstalled(rows); // B46: in the sideload app, whether iOS still has each one
   } catch (e) {
     if (seq === appView.seq) appView.body.replaceChildren(note(e.message));
     return;
@@ -617,8 +628,9 @@ function decorateApp(li, r) {
   const toggle = Object.assign(document.createElement("button"), { type: "button", className: "del-toggle" });
   toggle.setAttribute("aria-label", "Delete " + r.name);
   toggle.addEventListener("click", () => arm(li, !li.classList.contains("armed")));
-  const confirm = Object.assign(document.createElement("button"), { type: "button", className: "del-confirm", textContent: "Delete" });
-  confirm.addEventListener("click", () => removeApp(li, r));
+  const confirm = Object.assign(document.createElement("button"), { type: "button", className: "del-confirm",
+    textContent: deleteAction(r)?.label ?? DELETE }); // B46: Delete only where it uninstalls
+  confirm.addEventListener("click", () => confirmDelete(r, { li }));
   li.append(toggle, confirm);
 }
 
@@ -716,7 +728,90 @@ export const withSigned = (r, index) => ({ ...r, signed: index?.get?.(r.id) ?? n
 // iFizBox's own row is never removed (it is the app showing the list).
 export const canDelete = (r) => !r?.self;
 
-export const OPEN = "Open", RESIGN = "Re-sign", SAVE_IPA = "Save Signed IPA", REMOVE = "Remove";
+export const OPEN = "Open", RESIGN = "Re-sign", SAVE_IPA = "Save Signed IPA", REMOVE = "Remove from List", DELETE = "Delete";
+
+// ---- B46: Delete uninstalls where it can, Remove from List where it can't ------------------------------------------
+
+export const HOME_SCREEN = "Deleting the app itself is done from the Home Screen.";
+
+// What a row's Delete is in this mode, or null (iFizBox's own row):
+//   { kind: "uninstall" | "forget" | "installed", label (the swipe's and the hold sheet's button), button (the confirm
+//     sheet's red button), note (the confirm sheet's one line, or null) }
+// "uninstall": the jailbreak app and the helper sees the app installed (`actual`, I4). "installed": the sideload app's
+// shell says iOS still has it (`installed` true, signing.isInstalled), so Remove from List only explains. "forget":
+// everything else drops iFizBox's record, saying the app itself is deleted from the Home Screen (or that it's gone).
+export function deleteAction(r, { mode = detectMode() } = {}) {
+  if (!canDelete(r)) return null;
+  if (mode === "jailbreak" && typeof r.actual === "string" && r.actual && !r.signedOnly) {
+    return { kind: "uninstall", label: DELETE, button: `Delete ${r.name}`, note: null };
+  }
+  if (mode === "jailbreak" && r.actual === null) {
+    return { kind: "forget", label: REMOVE, button: REMOVE, note: `${r.name} is no longer on your iPhone.` };
+  }
+  if (mode === "sideload" && r.installed === true && !r.signedOnly) {
+    return { kind: "installed", label: REMOVE, button: null, note: `${r.name} is still on your iPhone. ${HOME_SCREEN}` };
+  }
+  return { kind: "forget", label: REMOVE, button: REMOVE, note: r.signedOnly ? `Forgets the signature record. ${HOME_SCREEN}` : HOME_SCREEN };
+}
+
+// The sideload app's rows with `installed` from the shell (signing.isInstalled): true, false or left out where it
+// can't say. Anywhere else, or when the call fails, the rows as they were.
+export async function withInstalled(rows, { mode = detectMode(), native = globalThis.ifizboxNative } = {}) {
+  if (mode !== "sideload" || typeof native?.call !== "function" || !rows?.length) return rows;
+  const ids = rows.filter((r) => r?.id && !r.self).map((r) => r.id);
+  if (!ids.length) return rows;
+  let res;
+  try { res = await native.call("signing.isInstalled", { bundleIds: ids }); } catch { return rows; }
+  const map = res?.installed && typeof res.installed === "object" ? res.installed : {};
+  return rows.map((r) => (typeof map[r?.id] === "boolean" ? { ...r, installed: map[r.id] } : r));
+}
+
+// "pmstatus:<id>:<percent>:<text>" (the helper's progress) -> its text, or null for any other line.
+export function statusText(line) {
+  const m = /^pmstatus:[^:]*:[\d.]+:(.+)$/.exec(String(line ?? "").trim());
+  return m ? m[1] : null;
+}
+
+// The swipe's or the sheet's Delete: the iOS 6 action sheet ('Delete <App>' red, Cancel; Remove from List with its
+// one line), then the action. "installed" only explains (an alert). -> true when it went ahead.
+export async function confirmDelete(r, { mode = detectMode(), sheet = showActionSheet, alert = showAlert, run = runDelete, li = null, after = null } = {}) {
+  const a = deleteAction(r, { mode });
+  if (!a) return false;
+  if (a.kind === "installed") {
+    li?.classList.remove("armed");
+    await alert({ title: "Still Installed", message: a.note, buttons: ["OK"] });
+    return false;
+  }
+  const i = await sheet({ title: a.note ?? "", buttons: [a.button], destructive: 0 });
+  if (i !== 0) { li?.classList.remove("armed"); return false; }
+  await run(a, r, { li, after });
+  return true;
+}
+
+// Uninstalls through the helper behind a HUD (its pmstatus text as the label), then drops the record; or forgets.
+async function runDelete(a, r, { li = null, after = null } = {}) {
+  if (a.kind !== "uninstall") {
+    if (li) { removeApp(li, r); return; }
+    try { await forgetApp(r); after?.(); } catch (e) { await showAlert({ title: "Error", message: deviceError(e).message, buttons: ["OK"] }); }
+    return;
+  }
+  const hud = liveHUD(`Deleting ${r.name}`);
+  try {
+    const backend = getBackend();
+    if (typeof backend?.uninstallApp !== "function") throw new Error("This build can't delete apps.");
+    await backend.uninstallApp(r.id, (ev) => { const t = statusText(ev?.line); if (t) hud.set(t); });
+  } catch (e) {
+    hud.hide();
+    li?.classList.remove("armed");
+    await showAlert({ title: `Couldn't Delete ${r.name}`, message: e?.message || String(e), buttons: ["OK"] });
+    return;
+  }
+  hud.done("Deleted");
+  li?.classList.add("removing");
+  try { await removeInstall(await apps(), r.id); } catch { /* the app is gone; the record goes next time */ }
+  if (appView.body) loadApps();
+  after?.();
+}
 
 // The hold sheet's buttons for a row, in order. Open and Re-sign need the sideload app (signing.openApp,
 // signing.resign); Re-sign only for an app iFizBox signed; Save Signed IPA when My IPAs keeps a signed copy (`ipa`).
@@ -725,9 +820,12 @@ export function appActions(r, { mode = detectMode(), ipa = null } = {}) {
   if (mode === "sideload" && !r.self && r.actual !== null) out.push(OPEN);
   if (mode === "sideload" && r.signed) out.push(RESIGN);
   if (ipa) out.push(SAVE_IPA);
-  if (canDelete(r)) out.push(REMOVE);
+  const del = deleteAction(r, { mode }); // B46: Delete where it uninstalls, else Remove from List
+  if (del) out.push(del.label);
   return out;
 }
+
+const isDelete = (label) => label === REMOVE || label === DELETE;
 
 // My IPAs' entry with a signed copy of this app (by bundle ID, as signed or as in the IPA), or null.
 export function keptIpaOf(r, entries) {
@@ -763,10 +861,8 @@ async function runAppAction(label, r, { ipa = null, li = null, after = null } = 
       if (job) (await import("./queue.js")).queueApp(job);
     } else if (label === SAVE_IPA) {
       await libraryCall("export", { file: ipa.file });
-    } else if (label === REMOVE) {
-      if (li) { removeApp(li, r); return; }
-      await forgetApp(r);
-      after?.();
+    } else if (isDelete(label)) {
+      await confirmDelete(r, { li, after }); // B46: confirmed by its own sheet, then uninstalled or forgotten
     }
   } catch (e) {
     await showAlert({ title: "Error", message: deviceError(e).message, buttons: ["OK"] });
@@ -778,7 +874,7 @@ export async function appSheet(r, { mode = detectMode(), sheet = showActionSheet
   const ipa = mode === "sideload" ? await findIpa(r) : null;
   const buttons = appActions(r, { mode, ipa });
   if (!buttons.length) return null;
-  const i = await sheet({ title: r.name, buttons, destructive: buttons.indexOf(REMOVE) });
+  const i = await sheet({ title: r.name, buttons, destructive: buttons.findIndex(isDelete) });
   if (!(i >= 0)) return null;
   await act(buttons[i], r, { ipa, li, after });
   return buttons[i];
@@ -805,6 +901,7 @@ async function renderAppPage(body, route, ctx) {
     const [records, installed] = await Promise.all([rememberedApps().catch(() => []), signedApps()]);
     signed = signedIndex(installed).get(id) ?? null;
     rec = (records ?? []).find((x) => x?.id === id) ?? null;
+    if (rec) [rec] = await withInstalled([rec]); // B46
   } catch { /* drawn from what there is */ }
   const r = rec ? { ...rec, signed } : signed ? { id, name: signed.name || id, version: signed.version || "", signedOnly: true, signed } : null;
   if (!r) { body.replaceChildren(note("This app isn't installed.")); return; }
@@ -827,11 +924,13 @@ export function appPageSections(r, { ipa = null, mode = detectMode(), now = new 
   }
   const out = [{ header: sec.header, rows, footer: sec.footer || (r.signedOnly ? `Signed by ${NAME}. No source lists it.` : null) }];
   const acts = appActions(r, { mode, ipa });
-  const main = acts.filter((a) => a !== REMOVE);
+  const main = acts.filter((a) => !isDelete(a));
   if (main.length) out.push({ rows: main.map((label) => ({ label, onClick: () => onAction(label) })) });
-  if (acts.includes(REMOVE)) {
-    out.push({ rows: [{ label: REMOVE, onClick: () => onAction(REMOVE) }],
-      footer: r.signedOnly ? "Forgets the app here; it stays on your iPhone." : "Takes the app off this list. Delete it from the Home Screen yourself." });
+  const del = acts.find(isDelete);
+  if (del) {
+    const a = deleteAction(r, { mode });
+    out.push({ rows: [{ label: del, onClick: () => onAction(del) }],
+      footer: a.kind === "uninstall" ? `Deletes ${r.name} and its data from your iPhone.` : a.note });
   }
   return out;
 }

@@ -657,7 +657,8 @@ class InstallIpa(unittest.TestCase):
         with open(os.path.join(HERE, "entitlements.plist"), "rb") as f:
             e = plistlib.load(f)
         self.assertTrue(e["platform-application"])
-        self.assertEqual(e["com.apple.private.mobileinstall.allowedSPI"], ["Install", "InstallForLaunchServices"])
+        self.assertEqual(e["com.apple.private.mobileinstall.allowedSPI"],  # B46: uninstall-app needs the Uninstall SPI
+                         ["Install", "InstallForLaunchServices", "Uninstall", "UninstallForLaunchServices"])
         self.assertEqual(e["com.apple.security.exception.mach-lookup.global-name"], ["com.apple.mobile.installd"])
         with open(os.path.join(HERE, "..", "build.sh")) as f:
             build_sh = f.read()

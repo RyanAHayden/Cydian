@@ -19,10 +19,10 @@ enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, H
                    HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA,
                    HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK, HV_INSTALL_PAID, HV_NOTIFICATIONS,
                    HV_USERSPACE_REBOOT, HV_SIMULATE_DEB, HV_INSTALL_DEB,
-                   HV_APP_VERSIONS, HV_UICACHE };
+                   HV_APP_VERSIONS, HV_UICACHE, HV_UNINSTALL_APP };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
                      "simulate, apply, apply-ask, respring, install-ipa, rollbacks, rollback, install-paid, " \
-                     "notifications, userspace-reboot, simulate-deb, install-deb, app-versions, uicache"
+                     "notifications, userspace-reboot, simulate-deb, install-deb, app-versions, uicache, uninstall-app"
 
 /* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
  * Downgrade and Reinstall pick theirs), "-name" removes. apt gets "name", "name=version" and "name-" in one
@@ -136,6 +136,11 @@ int helper_paid_path_ok(const char *dir, const char *path);
 #ifndef HELPER_APPS_DIR
 #define HELPER_APPS_DIR "/var/containers/Bundle/Application"
 #endif
+
+/* B46: uninstall-app <bundle id> runs nothing: ipa.c helper_uninstall_app finds the app among installd's containers
+ * (HELPER_APPS_DIR, so only apps the user installed: never a system app, nor iFizBox or anything else in the
+ * jailbreak's /Applications) and asks installd to uninstall it (LSApplicationWorkspace uninstallApplication:
+ * withOptions:). path is the folder, argv the verb and the id (helper_ipa_bundle_id_ok). */
 
 /* 1 if s is a package name the helper passes on: [a-z0-9][a-z0-9.+-]+, at most HELPER_NAME_MAX bytes. */
 int helper_name_ok(const char *s);

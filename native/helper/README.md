@@ -17,6 +17,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     ifizbox-helper app-versions                                             (I4: installed apps' real versions)
     ifizbox-helper userspace-reboot                                         (N8: the Userspace Reboot intent)
     ifizbox-helper uicache                                                  (F151: the console's Reload Data)
+    ifizbox-helper uninstall-app <bundle id>                                (B46: Installed's Delete)
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
@@ -42,6 +43,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `respring`  | `sbreload`, or `killall -9 backboardd` when the jailbreak has no sbreload (N4: Restart SpringBoard) |
 | `userspace-reboot` | `launchctl reboot userspace` (N8: the Userspace Reboot intent and control)              |
 | `uicache`   | `uicache -a`: rebuilds the home screen's icon cache (F151: the console's Reload Data after an app was installed) |
+| `uninstall-app` | runs nothing: takes a bundle id (`[A-Za-z0-9.-]`), finds the app among installd's containers as `app-versions` reads them (`HELPER_APPS_DIR`; real directories only), and has installd uninstall it (`LSApplicationWorkspace uninstallApplication:withOptions:`, the entitlements' `Uninstall` SPI). A system app or anything in the jailbreak's `/Applications` (iFizBox itself) isn't in the containers, so it is refused (exit 64). `pmstatus:<id>:<percent>:<text>` on fd 3, `Uninstalled <id>` on stdout; installd refusing is exit 1 (B46; `ipa.c`) |
 
 **The queue (N4):** `simulate` and `apply` take items: `name` installs the newest, `name=version` that exact
 version (Reinstall, Downgrade and the Version History pick one), `-name` removes. apt gets `name`, `name=version`

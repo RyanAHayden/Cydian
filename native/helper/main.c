@@ -18,6 +18,8 @@
  *                                                              of one, after dpkg-deb shows its control matches)
  *   ifizbox-helper app-versions   (I4: every installed app's id and real versions, from installd's containers;
  *                                 runs nothing; ipa.c)
+ *   ifizbox-helper uninstall-app <bundle id>   (B46: Installed's Delete; an app in installd's containers only,
+ *                                              uninstalled through installd; ipa.c)
  *   ifizbox-helper notifications on|off   (F65: Settings' Upgrade Notifications; off creates
  *                                         <prefix>/var/lib/ifizbox/upgrades.off, which N5's daemon reads; runs nothing)
  *
@@ -205,6 +207,12 @@ int main(int argc, char *argv[]) {
             return HELPER_EX_IOERR;
         }
         return fflush(stdout) ? HELPER_EX_IOERR : 0;
+    }
+
+    if (plan.verb == HV_UNINSTALL_APP) { /* B46 */
+        int rc = helper_uninstall_app(plan.path, plan.argv[1], status_fd, &err);
+        if (rc) fprintf(stderr, "ifizbox-helper: %s\n", err);
+        return fflush(stdout) && !rc ? HELPER_EX_IOERR : rc;
     }
 
     if (plan.verb == HV_ROLLBACKS) {

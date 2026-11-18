@@ -447,3 +447,81 @@ int helper_app_versions(const char *dir, FILE *out, const char **err) {
     closedir(d);
     return count;
 }
+
+/* ---- B46: uninstall-app (ipa.h). Installed: Delete in the jailbreak app takes the app off the phone. */
+
+int helper_app_find(const char *dir, const char *id, char *box, size_t size, const char **err) {
+    DIR *d = opendir(dir);
+    if (!d) {
+        if (errno == ENOENT) return 1;
+        *err = "can't read the app containers folder";
+        return -1;
+    }
+    int seen = 0, rc = 1;
+    struct dirent *de;
+    while (rc && (de = readdir(d)) && seen < HELPER_APPS_MAX) {
+        if (de->d_name[0] == '.') continue;
+        char b[PATH_MAX], app[PATH_MAX], p[PATH_MAX];
+        struct stat st;
+        if ((size_t)snprintf(b, sizeof b, "%s/%s", dir, de->d_name) >= sizeof b) continue;
+        if (lstat(b, &st) || !S_ISDIR(st.st_mode)) continue;
+        if (find_app(b, app, sizeof app)) continue;
+        seen++;
+        if ((size_t)snprintf(p, sizeof p, "%s/Info.plist", app) >= sizeof p) continue;
+        char *info = NULL;
+        size_t ilen = 0;
+        if (read_small(p, &info, &ilen)) continue;
+        char got[HELPER_NAME_MAX + 1];
+        if (!helper_plist_string(info, ilen, "CFBundleIdentifier", got, sizeof got) && !strcmp(got, id) &&
+            (size_t)snprintf(box, size, "%s", b) < size)
+            rc = 0;
+        free(info);
+    }
+    closedir(d);
+    return rc;
+}
+
+/* installd's uninstall. 0, or -1 with the reason in why. */
+static int uninstall(const char *bundle, char *why, size_t size) {
+#ifdef __APPLE__
+    void *pool = objc_autoreleasePoolPush();
+    int rc = -1;
+    dlopen("/System/Library/Frameworks/MobileCoreServices.framework/MobileCoreServices", RTLD_NOW);
+    Class ws = objc_getClass("LSApplicationWorkspace");
+    if (!ws) {
+        snprintf(why, size, "LSApplicationWorkspace isn't there");
+    } else {
+        id w = ((id(*)(Class, SEL))objc_msgSend)(ws, sel_registerName("defaultWorkspace"));
+        CFStringRef cid = CFStringCreateWithCString(NULL, bundle, kCFStringEncodingUTF8);
+        BOOL ok = ((BOOL(*)(id, SEL, id, id))objc_msgSend)(w, sel_registerName("uninstallApplication:withOptions:"),
+                                                           (id)cid, nil);
+        if (ok) rc = 0;
+        else snprintf(why, size, "installd didn't uninstall %s", bundle);
+        CFRelease(cid);
+    }
+    objc_autoreleasePoolPop(pool);
+    return rc;
+#else
+    /* The tests' stand-in for installd, as install()'s. */
+    printf("uninstall %s\n", bundle);
+    size_t n = strlen(bundle);
+    if (n >= 8 && !strcmp(bundle + n - 8, ".refused")) { snprintf(why, size, "test installd refused it"); return -1; }
+    return 0;
+#endif
+}
+
+int helper_uninstall_app(const char *dir, const char *id, int fd3, const char **err) {
+    static char why[512];
+    status_fd = fd3;
+    if (!helper_ipa_bundle_id_ok(id)) { *err = "bad bundle id"; return HELPER_EX_USAGE; }
+    char box[PATH_MAX];
+    int found = helper_app_find(dir, id, box, sizeof box, err);
+    if (found < 0) return HELPER_EX_IOERR;
+    if (found) { *err = "not an app installed in the app containers (system and jailbreak apps aren't removed here)"; return HELPER_EX_USAGE; }
+    progress(id, 10, "Removing");
+    fflush(stdout);
+    if (uninstall(id, why, sizeof why)) { *err = why; return 1; }
+    progress(id, 100, "Removed");
+    printf("Uninstalled %s\n", id);
+    return 0;
+}

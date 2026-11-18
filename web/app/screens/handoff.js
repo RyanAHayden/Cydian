@@ -149,14 +149,13 @@ function legacyCopy(text) {
   return ok;
 }
 
-// ---- the website's Install (F89) ---------------------------------------------------------------------------------
+// ---- install hand-offs (F89) --------------------------------------------------------------------------------------
 //
-// cydian.dev has no server of its own (one Cloudflare Worker), so the website signs nothing. An app's Install there
-// hands the IPA on instead, and Home's Install Cydian App hands on Cydian's own source:
 //   installLinks(ipaUrl, { name })   -> [{ app, label, subtitle, url }]  Open in Cydian (cydian://install, incoming.js:
 //                                       the app signs it on the phone), then Get in AltStore / SideStore / Feather
 //                                       with their install links (core/otherlinks.js reads the same shapes back)
-//   sourceHandoffs(sourceUrl)        -> [{ app, label, url }]  their add-source links (core/handoff.js ALT_MANAGERS)
+// F92 (user 2026-11-18): an app page's Install and Home's Install Cydian App no longer offer these on the website
+// (altstore.js installRows, home.js installAppSheet); My IPAs' website Install still does (myipas.js).
 // Safari can't tell which apps are on the phone: a row whose app is missing gets Safari's own "address is invalid".
 export const HANDOFF_APPS = ["AltStore", "SideStore", "Feather"];
 const enc = encodeURIComponent;
@@ -177,10 +176,4 @@ export function installLinks(ipaUrl, { name = "" } = {}) {
     if (url) out.push({ app, label: `Get in ${app}`, subtitle: `If you use ${app}`, url });
   }
   return out;
-}
-
-export function sourceHandoffs(sourceUrl) {
-  return sourceLinks({ kind: "altstore", key: `alt:${sourceUrl}`, uri: sourceUrl })
-    .filter((l) => HANDOFF_APPS.includes(l.app))
-    .map((l) => ({ app: l.app, label: `Add to ${l.app}`, url: l.url }));
 }

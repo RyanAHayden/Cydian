@@ -110,8 +110,8 @@ class Deb(unittest.TestCase):
         self.assertIn("0.1.0-7 (iphoneos-arm64)", summary)
 
     def test_launch_image_missing_flagged(self):
-        os.remove(os.path.join(self.app, "LaunchTabBar@3x.png"))
-        self.assertIn("launch image LaunchTabBar@3x.png missing", self.problems())
+        os.remove(os.path.join(self.app, "LaunchLoading@3x.png"))
+        self.assertIn("launch image LaunchLoading@3x.png missing", self.problems())
 
     def test_relations_flagged(self):
         """F66: install-ipa needs unzip (Depends) and wants ldid (Recommends)."""
@@ -231,8 +231,9 @@ class Plists(unittest.TestCase):
             if name.endswith(".png"):
                 with open(os.path.join(tmp, name), "rb") as a, open(os.path.join(HERE, "launch", name), "rb") as b:
                     self.assertEqual(a.read(), b.read(), name)
-        w, h, rows = make.read_png(os.path.join(HERE, "launch", "LaunchLoading@3x.png"))
-        self.assertEqual((w, h), (1320, 2868))
+        with open(os.path.join(HERE, "launch", "LaunchLoading@3x.png"), "rb") as f:
+            w, h = struct.unpack(">II", f.read(24)[16:24])
+        self.assertGreaterEqual((w, h), (1800, 3600))  # bigger than any iPhone, so centred it fills the screen
 
     def test_info_plist(self):
         p = plistlib.loads(plist())

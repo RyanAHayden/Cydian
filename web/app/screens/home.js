@@ -250,7 +250,7 @@ function renderRoot(body) {
   // Install Cydian App, full width under Featured | Signing, on the website only (I7, core/appoffer.js homeOffer):
   // Not Jailbroken, the sideload build (I2) signed with the user's own certificate through the signing server, or
   // Settings > Signing first when there's none; jailbroken, the release's .deb for the device's arch.
-  const appRow = tileRow("halves", tile({ label: APP_LABEL, href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }));
+  const appRow = tileRow("green", tile({ label: APP_LABEL, href: format({ tab: "settings", path: ["signing"] }), glyph: "install" }));
   const appLink = appRow.querySelector("a");
   let offer = null;
   appLink.addEventListener("click", (e) => {

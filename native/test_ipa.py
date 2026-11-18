@@ -77,8 +77,8 @@ class Ipa(unittest.TestCase):
 
     def test_launch_screen_checked(self):
         """N10: the IPA has the launch screen's images too."""
-        os.remove(os.path.join(self.app, "LaunchNavBar@2x.png"))
-        self.assertIn("launch image LaunchNavBar@2x.png missing", self.problems())
+        os.remove(os.path.join(self.app, "LaunchLoading@2x.png"))
+        self.assertIn("launch image LaunchLoading@2x.png missing", self.problems())
 
     def test_helper_flagged(self):
         self.write("cydian-helper", b"x", 0o755)

@@ -101,7 +101,7 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
         web.uiDelegate = self // B8: window.open goes out of the app (LinkOut)
         // N10: the launch screen's Home-as-it-loads, exact for this screen, over the web view until the page has
         // drawn its own (index.html's #boot looks the same), so the hand-over from the launch screen shows no jump.
-        if let c = Launch.cover(frame: UIScreen.main.bounds) {
+        if false, let c = Launch.cover(frame: UIScreen.main.bounds) { // off: per-screen images only fit known sizes
             web.addSubview(c)
             cover = c
         }

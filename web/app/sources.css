@@ -11,6 +11,7 @@
 .alert {
   /* iOS 6's 284pt, widened to fit longer text and button labels on today's wider screens */
   position: relative; width: min(340px, 100%); padding: 16px 12px 11px; border-radius: 10px;
+  transition: translate .3s cubic-bezier(.25,.1,.25,1); /* glides above the keyboard (nav/alert.js) instead of jumping */
   color: #fff; text-align: center; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
   background: rgba(11,27,67,.8); border: 2px solid #b1b7c1; border-bottom-color: #e1e3e3;
   box-shadow: 0 8px 19px rgba(0,0,0,.9);

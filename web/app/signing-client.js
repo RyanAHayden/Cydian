@@ -172,7 +172,7 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {}, b
   else hide = showHUD("Installing");
   onInstalled(body);
   // On the website Safari asks first ("… would like to install …"): say which button to press.
-  if (!globalThis.cydianNative) showBanner({ title: "Cydian", message: `Press Install to put ${name || "the app"} on your iPhone.` });
+  if (!globalThis.cydianNative) showBanner({ title: "Cydian", message: `Press Install to put ${name || "the app"} on your iPhone.`, duration: 5000 });
   location.href = body.itms;
   setTimeout(() => (hide.done ? hide.done("Done") : hide()), 1200); // iOS asks "Install …?": end on a checkmark, then fade
   return true;

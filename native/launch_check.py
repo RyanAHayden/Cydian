@@ -6,7 +6,9 @@ Assets.car, so it must not be there (an empty one is what the app had before N10
 cover until the page draws (App.swift, LaunchCover) reads the website's per-screen launch images from web/icons/launch/.
 """
 
-WANT = {"UIImageName": "LaunchLoading", "UINavigationBar": "LaunchNavBar", "UITabBar": "LaunchTabBar"}
+# One image: a plain fill in the pinstripes' colour, bigger than any iPhone, so drawn centred at its own size (as iOS
+# draws launch images) it fills every screen; no bars or title, which only fit screens whose size is known.
+WANT = {"UIImageName": "LaunchLoading"}
 
 
 def problems(info, files, app):
@@ -15,7 +17,9 @@ def problems(info, files, app):
     ls = info.get("UILaunchScreen")
     if not isinstance(ls, dict):
         return ["Info.plist has no UILaunchScreen dict (without one iOS letterboxes the app)"]
-    names = [ls.get("UIImageName")] + [(ls.get(k) or {}).get("UIImageName") for k in ("UINavigationBar", "UITabBar")]
+    names = [ls.get("UIImageName")]
+    if "UINavigationBar" in ls or "UITabBar" in ls:
+        out.append("Info.plist UILaunchScreen has bar images: they only fit screens whose size is known")
     for key, name in zip(WANT, names):
         if name != WANT[key]:
             out.append("Info.plist UILaunchScreen %s image is %r, want %r" % (key, name, WANT[key]))
@@ -28,6 +32,4 @@ def problems(info, files, app):
         out.append("Info.plist UILaunchScreen has UIColorName, but the app has no asset catalog to name a colour in")
     if ls.get("UIImageRespectsSafeAreaInsets") is not False:
         out.append("Info.plist UILaunchScreen UIImageRespectsSafeAreaInsets must be false (the pinstripes fill the screen)")
-    if not any(n.startswith(app + "web/icons/launch/launch-") and n.endswith(".png") for n in files):
-        out.append("web/icons/launch/ has no launch-<W>x<H>.png (the app's cover until the page draws)")
     return out

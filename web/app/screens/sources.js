@@ -45,6 +45,9 @@ async function addFromClipboard(ctx, button) {
   try { text = await navigator.clipboard.readText(); } catch { /* refused, or nothing to read */ }
   button.textContent = "Add";
   button.classList.remove("paste-wait", "is-pressed");
+  // iOS can leave the button in :active after its Paste bubble took the touch: draw it unpressed until it's touched
+  button.classList.add("unpressed");
+  button.addEventListener("pointerdown", () => button.classList.remove("unpressed"), { once: true });
   const url = cleanSourceUrl(text);
   manage.addSource(ctx, url ? { url } : null);
 }

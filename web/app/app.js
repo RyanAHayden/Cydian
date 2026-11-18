@@ -302,6 +302,21 @@ const addFrom = isAddPath(location.pathname) ? parseAddLink(location.search) : n
 if (isAddPath(location.pathname)) {
   history.replaceState(null, "", location.pathname.replace(/add\/?$/, "") + format({ tab: "sources", path: ["manage", "sources"] }));
 }
+// The Home Screen web app opens outside links in a sheet over itself, address bar on top. x-safari-https://… makes
+// iOS hand them to Safari instead, and from there to their own apps (Discord, GitHub). The app's shell sends them
+// out natively already (LinkOut); a Safari tab opens them as usual.
+const standalone = !globalThis.cydianNative && (navigator.standalone || matchMedia?.("(display-mode: standalone)").matches);
+if (standalone) {
+  const outside = (u) => { try { const x = new URL(u, location.href); return /^https?:$/.test(x.protocol) && x.origin !== location.origin ? x.href : null; } catch { return null; } };
+  const viaSafari = (href) => { location.href = "x-safari-" + href; };
+  const open = window.open.bind(window);
+  window.open = (u, ...rest) => { const href = outside(u); if (href) { viaSafari(href); return null; } return open(u, ...rest); };
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest?.("a[href]");
+    const href = a && outside(a.getAttribute("href"));
+    if (href && (a.target === "_blank" || a.rel.includes("noopener"))) { e.preventDefault(); viaSafari(href); }
+  }, true);
+}
 router.start();
 upgradeNotices.start();
 createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon

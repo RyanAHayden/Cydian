@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.2.3",
+          "date": "2026-11-18T03:02:42Z",
+          "localizedDescription": "Cydian updates itself in one step: it signs the update on the phone, the signing server holds it for a few minutes, and iOS asks Install right away.\nInstall at the top right installs straight away (Download IPA is on the page).\nThe test apps (Test Alpha, Test Beta...) are no longer mistaken for Cydian.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.3",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.3/Cydian.ipa",
+          "size": 2621218,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.2.2",
           "date": "2026-11-18T02:57:28Z",
           "localizedDescription": "The Installed tab is back in the app: your apps, and Cydian itself at its real version.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.2",

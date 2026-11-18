@@ -9,8 +9,11 @@
 //                              second device merges instead of overwriting -> {version}
 //   DELETE /api/account/<id>   gone -> {ok}
 //
-// <id> is 64 hex characters. Each address gets ACCOUNT_RATE requests a minute (ACCOUNT_WRITES of them writes):
-// counted in this isolate's memory, not in KV, which has only 1,000 free writes a day. Bodies are never logged.
+// <id> is 64 hex characters. Each address gets ACCOUNT_RATE requests a minute (ACCOUNT_WRITES of them writes),
+// never counted in KV, which has only 1,000 free writes a day. F98: with Cloudflare's Rate Limiting bindings
+// (ACCOUNT_RATE_LIMIT, ACCOUNT_WRITE_LIMIT in wrangler.toml's [[ratelimits]]) the count holds across isolates
+// (per Cloudflare location); without them, or if one throws, it is counted in this isolate's memory.
+// Bodies are never logged.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 export const MAX_ACCOUNT = 256 * 1024;
@@ -50,6 +53,26 @@ export function rateLimiter({ rate = ACCOUNT_RATE, writes = ACCOUNT_WRITES } = {
 }
 const limiter = rateLimiter();
 
+// F98: Cloudflare's Rate Limiting bindings, { allow(ip, write) -> Promise<bool> }. Every request takes one from
+// `all`; a write also from `writes` (or from `all` again under a "w:" key when only one is bound). A binding that
+// throws hands that request to the memory limiter, so an outage there never locks accounts out or lets floods in.
+export function bindingLimiter(all, writes, fallback = limiter) {
+  return {
+    async allow(ip, write, now = Date.now()) {
+      try {
+        if (!(await all.limit({ key: ip })).success) return false;
+        if (write && !(await (writes ?? all).limit({ key: writes ? ip : "w:" + ip })).success) return false;
+        return true;
+      } catch {
+        return fallback.allow(ip, write, now);
+      }
+    },
+  };
+}
+const limiterFor = (env) => env?.ACCOUNT_RATE_LIMIT?.limit
+  ? bindingLimiter(env.ACCOUNT_RATE_LIMIT, env.ACCOUNT_WRITE_LIMIT?.limit ? env.ACCOUNT_WRITE_LIMIT : null)
+  : limiter;
+
 const tag = (v) => `"${v}"`;
 const untag = (h) => String(h ?? "").trim().replace(/^W\//, "").replace(/^"(.*)"$/, "$1");
 
@@ -59,7 +82,7 @@ async function current(env, key) {
 }
 
 // A Response for /api/account..., or null for anything else.
-export async function account(req, env, { limit = limiter, now = Date.now() } = {}) {
+export async function account(req, env, { limit = limiterFor(env), now = Date.now() } = {}) {
   const u = new URL(req.url);
   if (!isAccountPath(u.pathname)) return null;
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
@@ -68,7 +91,7 @@ export async function account(req, env, { limit = limiter, now = Date.now() } = 
   const write = req.method === "PUT" || req.method === "DELETE";
   if (!write && req.method !== "GET") return fail("bad_request", "GET, PUT or DELETE.", 405);
   const ip = req.headers.get("CF-Connecting-IP") ?? req.headers.get("X-Forwarded-For")?.split(",")[0].trim() ?? "?";
-  if (!limit.allow(ip, write, now)) return fail("rate_limited", "Too many requests. Try again in a minute.", 429, { "Retry-After": "60" });
+  if (!(await limit.allow(ip, write, now))) return fail("rate_limited", "Too many requests. Try again in a minute.", 429, { "Retry-After": "60" });
   const key = await kvKey(m[1]);
 
   if (req.method === "GET") {

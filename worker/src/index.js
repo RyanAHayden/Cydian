@@ -28,6 +28,7 @@
 //   GET  /api/fetch?url=&kind=ipa           F93: an IPA for the website's signer, streamed, up to MAX_UPLOAD_MB
 //   GET  /api/applookup?bundleId=&country=  F161: Apple's iTunes Search API lookup of one app by bundle ID (the
 //                                           app page's App Store details), its first result only; cached a day
+//   GET  /api/appreviews?id=&country=       B37: Apple's customer-reviews RSS (JSON) for one App Store id, cached a day
 //   GET  /api/ipainfo?url=<IPA URL>          F160: MinimumOSVersion, UIDeviceFamily, bundle ID and version from the IPA's
 //                                           own Info.plist, read with Range requests (src/ipainfo.js); cached 30 days
 //   GET/POST/DELETE /reviews/<package id>[/<review id>[/report]]   F182: user reviews in D1 (src/reviews.js)
@@ -432,6 +433,37 @@ export async function appLookup(u, env = {}, { fetcher = fetch, cache = env.LOOK
   return res;
 }
 
+// ---- /api/appreviews: one app's recent App Store reviews (B37) --------------------------------------------------
+// Apple's customer-reviews RSS (JSON) for one App Store id, cached at the edge for a day like /api/applookup. Only a
+// numeric id and a two-letter country reach Apple; the answer is Apple's JSON as it came (core/applookup.js
+// parseStoreReviews reads it), capped at 512 KiB.
+export const REVIEWS_TTL_S = 86400;
+export async function appReviews(u, env = {}, { fetcher = fetch, cache = env.LOOKUP_CACHE ?? globalThis.caches?.default ?? null } = {}) {
+  const id = u.searchParams.get("id") ?? "";
+  const country = (u.searchParams.get("country") || "us").toLowerCase();
+  if (!/^\d{1,15}$/.test(id) || !/^[a-z]{2}$/.test(country)) return fail("bad_request", "Send a numeric App Store id and a two-letter country.");
+  const apple = `https://itunes.apple.com/${country}/rss/customerreviews/id=${id}/sortby=mostrecent/json`;
+  const key = new Request(`https://appreviews.ifizbox.internal/${country}/${id}`);
+  const hit = cache ? await cache.match(key).catch(() => null) : null;
+  if (hit) return hit;
+  let r;
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 10000);
+    try { r = await fetcher(apple, { headers: { Accept: "application/json" }, cf: { cacheEverything: true, cacheTtl: REVIEWS_TTL_S }, signal: ctl.signal }); }
+    finally { clearTimeout(timer); }
+  } catch { return fail("upstream", "The App Store didn't answer.", 502); }
+  if (!r.ok) return fail("upstream", `The App Store answered HTTP ${r.status}.`, 502);
+  let text;
+  try { text = await r.text(); } catch { return fail("upstream", "The App Store stopped sending.", 502); }
+  if (text.length > 512 * 1024) return fail("upstream", "The App Store's answer was too large.", 502);
+  try { JSON.parse(text); } catch { return fail("upstream", "The App Store's answer wasn't JSON.", 502); }
+  const res = new Response(text, { headers: {
+    "Content-Type": "application/json", "Cache-Control": `public, max-age=${REVIEWS_TTL_S}`, "X-Content-Type-Options": "nosniff", ...CORS } });
+  if (cache) await cache.put(key, res.clone()).catch(() => {});
+  return res;
+}
+
 // ---- /api/ipainfo: what an IPA's own Info.plist says (F160) ------------------------------------------------------
 // For apps whose source gives no iOS range (AppTesters gives none for 10,000 apps): the app page asks here once, and
 // the answer is cached at the edge for 30 days keyed by the IPA's URL (node.mjs: env.LOOKUP_CACHE), so each IPA is
@@ -503,6 +535,7 @@ export default {
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null);
     if (u.pathname === "/api/applookup" && req.method === "GET") return appLookup(u, env);
+    if (u.pathname === "/api/appreviews" && req.method === "GET") return appReviews(u, env); // B37
     if (u.pathname === "/api/ipainfo" && req.method === "GET") return ipaInfo(u, env); // F160
     if (u.pathname === "/repo" || u.pathname.startsWith("/repo/")) return repo(req, u, env);
     if (u.pathname === "/healthz") return new Response("ok\n", { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });

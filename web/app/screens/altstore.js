@@ -37,7 +37,8 @@ import { reviewsTab } from "./reviews.js";
 import { reviewsApi, reviewsBase, mergeReviews } from "../core/reviews.js";
 import { needsCheck, savedInfo, withIpaInfo, checkIpa, ipaInfoUrl } from "../core/ipainfo.js";
 import { PUBLIC_SITE } from "../core/handoff.js";
-import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText } from "../core/applookup.js";
+import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText,
+  storeTrackId, storeReviews, reviewsFeedUrl, workerReviewsUrl } from "../core/applookup.js";
 import { NAME } from "../brand.js";
 
 function img(url, cls) {
@@ -423,7 +424,8 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   const ratingReady = new Promise((res) => { ratingKnown = res; });
   const tabs = storeTabs({
     // F182: reviews written here (screens/reviews.js), with the App Store's rating merged in.
-    reviews: (pane) => reviewsTab(pane, { id: reviewId, version: v.version ?? "", appStore: ratingReady, first: oursFirst, api: reviewApi,
+    // B37: and the App Store's written reviews, asked for only when the tab opens.
+    reviews: (pane) => reviewsTab(pane, { id: reviewId, version: v.version ?? "", appStore: withStoreReviews(ratingReady, looked), first: oursFirst, api: reviewApi,
       onRating: (r) => { header.setRating(r); tiles.set("rating", ratingTile(r)); } }),
     related,
   });
@@ -435,7 +437,8 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   // source already gives screenshots, developer and the app's own page.
   const ownLinks = ownPageLinks(app, appLinks(app));
   const need = lookupNeed(app, ownLinks);
-  const looked = need === "none" ? Promise.resolve(null) : storeLookup(appBundleId(app, pkg.row?.id));
+  // B37: asked whatever `need` is, for the App Store's rating and reviews (need only gates the other details).
+  const looked = storeLookup(appBundleId(app, pkg.row?.id));
   const merged = looked.then((store) => mergeDetails(app, store, need));
   merged.then((m) => {
     if (m.developer && !app.developerName) header.setAuthor(m.developer); // F161: the App Store's, when the source names none
@@ -624,6 +627,24 @@ export function storeLookup(bundleId, { backend = getBackend(), fetchFn = global
     ? (id, c) => fetchFn(workerLookupUrl(id, c)).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
     : (id, c) => backend.text(lookupUrl(id, c));
   return lookupApp(bundleId, { country: regionOf(locale), get, store }).catch(() => null);
+}
+
+// B37: the App Store's recent written reviews for a looked-up app: the website asks the Worker (/api/appreviews,
+// cached at the edge a day), the app asks Apple itself (core/applookup.js storeReviews). [] when it fails.
+export function appStoreReviews(store, { backend = getBackend(), fetchFn = globalThis.fetch, locale = globalThis.navigator?.language } = {}) {
+  const id = storeTrackId(store);
+  if (!id) return Promise.resolve([]);
+  const get = backend.kind === "http"
+    ? (t, c) => fetchFn(workerReviewsUrl(t, c)).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
+    : (t, c) => backend.text(reviewsFeedUrl(t, c));
+  return storeReviews(id, { country: regionOf(locale), get }).catch(() => []);
+}
+
+// B37: the Reviews tab's appStore: the App Store's rating (ratingReady) with its written reviews, or null.
+export function withStoreReviews(ratingReady, looked, opts = {}) {
+  const list = Promise.resolve(looked).then((s) => (s ? appStoreReviews(s, opts) : []), () => []);
+  return Promise.all([Promise.resolve(ratingReady).catch(() => null), list])
+    .then(([r, reviews]) => (r || reviews.length ? { ...(r ?? {}), reviews } : null));
 }
 
 // F160: localStorage, or null where it's blocked.

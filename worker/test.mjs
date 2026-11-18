@@ -377,6 +377,37 @@ import { appLookup } from "./src/index.js";
   console.log("worker applookup: ok");
 }
 
+// B37: /api/appreviews asks Apple's customer-reviews RSS once per id and country a day, Apple's JSON as it came.
+import { appReviews } from "./src/index.js";
+{
+  const FEED = { feed: { entry: [{ "im:rating": { label: "5" }, title: { label: "Great" }, content: { label: "Works." } }] } };
+  const asked = [];
+  const fetcher = async (url) => { asked.push(url); return new Response(JSON.stringify(FEED)); };
+  const kept = new Map();
+  const cache = { match: async (k) => kept.get(k.url)?.clone(), put: async (k, r) => { kept.set(k.url, r); } };
+  const at = (q, f = fetcher) => appReviews(new URL("https://ifizbox.example/api/appreviews?" + q), {}, { fetcher: f, cache });
+  let r = await at("id=1048524688&country=GB");
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get("Cache-Control"), /max-age=86400/);
+  assert.equal(r.headers.get("Access-Control-Allow-Origin"), "*");
+  assert.deepEqual(await r.json(), FEED);
+  assert.deepEqual(asked, ["https://itunes.apple.com/gb/rss/customerreviews/id=1048524688/sortby=mostrecent/json"]);
+  r = await at("id=1048524688&country=gb");
+  assert.deepEqual(await r.json(), FEED);
+  assert.equal(asked.length, 1); // cached
+  assert.equal((await at("id=12a")).status, 400);
+  assert.equal((await at("id=../x")).status, 400);
+  assert.equal((await at("id=1&country=usa")).status, 400);
+  assert.equal(asked.length, 1); // bad input never reaches Apple
+  assert.equal((await at("id=2", async () => new Response("x", { status: 503 }))).status, 502);
+  assert.equal((await at("id=3", async () => new Response("<html>"))).status, 502);
+  assert.equal((await at("id=4", async () => { throw new Error("offline"); })).status, 502);
+  assert.equal((await at("id=2")).status, 200); // a failure isn't cached
+  const routed = await w.fetch(new Request("https://ifizbox.example/api/appreviews?id=x"), { LOOKUP_CACHE: cache });
+  assert.equal(routed.status, 400);
+  console.log("worker appreviews: ok");
+}
+
 // F160: /api/ipainfo reads Payload/*.app/Info.plist out of an IPA with Range requests only: a plain zip (deflated XML
 // plist), a zip64 one (binary plist, sizes and offset in the zip64 extra field), a server without Range, a zip with
 // no Info.plist; answers cached (30 days; lasting errors a day, network ones not at all).

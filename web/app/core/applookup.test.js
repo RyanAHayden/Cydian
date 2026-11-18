@@ -71,8 +71,13 @@ test("mergeDetails: the source's fields win; the App Store fills only the gaps",
 
   const link = mergeDetails(own, store, "link");
   assert.equal(link.trackViewUrl, store.trackViewUrl);
-  assert.equal(link.rating, null);
+  assert.equal(link.rating, 4.58, "B37: the App Store's rating whatever need is (Delta on apps.altstore.io)");
+  assert.equal(link.ratingCount, 812);
   assert.equal(link.developer, null);
+  assert.equal(link.category, null);
+  assert.deepEqual(link.screenshots, []);
+  assert.equal(link.description, null);
+  assert.equal(mergeDetails(own, { ...store, rating: null, ratingCount: null }, "link").rating, null);
   const none = mergeDetails(appTesters, null);
   assert.equal(none.developer, null);
   assert.deepEqual(none.screenshots, []);
@@ -190,4 +195,58 @@ test("ownPageLinks: a GitHub repo found only through the IPA's download is the a
   const s = shortText(long);
   assert.ok(s.length < long.length && s.length <= 320 * 1.3 && long.startsWith(s));
   assert.match(shortText("x".repeat(50) + " " + "y ".repeat(400)), /…$/);
+});
+
+// B37: the App Store's written reviews (Apple's customer-reviews RSS as JSON; shape from Delta's feed, 2026-11-18).
+test("B37: App Store reviews: track id, feed URLs, parsing to plain text, newest first, cached in memory", async () => {
+  const { storeTrackId, reviewsFeedUrl, workerReviewsUrl, parseStoreReviews, storeReviews, clearStoreReviewsMemory } = await import("./applookup.js");
+  assert.equal(storeTrackId(parseLookup({ results: [{ trackId: 1048524688, trackViewUrl: "https://apps.apple.com/us/app/delta/id1048524688" }] })), "1048524688");
+  assert.equal(storeTrackId({ trackViewUrl: "https://apps.apple.com/gb/app/flighttracker/id123?uo=4" }), "123", "an older cached lookup without trackId");
+  assert.equal(storeTrackId(null), null);
+  assert.equal(reviewsFeedUrl("1048524688", "GB"), "https://itunes.apple.com/gb/rss/customerreviews/id=1048524688/sortby=mostrecent/json");
+  assert.equal(reviewsFeedUrl("../x"), null);
+  assert.equal(workerReviewsUrl("123", "de"), "/api/appreviews?id=123&country=de");
+  assert.equal(workerReviewsUrl("abc"), null);
+
+  const entry = (id, rating, updated, title, text) => ({ author: { name: { label: `user${id}` }, uri: { label: "https://x" } },
+    updated: { label: updated }, "im:rating": { label: String(rating) }, "im:version": { label: "2.0.1" }, id: { label: String(id) },
+    title: { label: title }, content: { label: text, attributes: { type: "text" } } });
+  const FEED = { feed: { entry: [
+    { "im:name": { label: "Delta" }, id: { label: "app" } }, // an older feed's first entry: the app itself
+    entry(1, 4, "2026-11-14T07:53:57-07:00", "Older", "fine"),
+    entry(2, 5, "2026-11-17T05:34:34-07:00", "Cool update", "<b>not markup</b>"),
+    entry(3, 9, "2026-11-17T05:00:00-07:00", "Bad rating", "x")] } };
+  const list = parseStoreReviews(JSON.stringify(FEED));
+  assert.deepEqual(list.map((r) => r.title), ["Cool update", "Older"]);
+  assert.deepEqual(list[0], { appStore: true, title: "Cool update", author: "user2", rating: 5, version: "2.0.1",
+    at: Date.parse("2026-11-17T05:34:34-07:00"), text: "<b>not markup</b>" });
+  assert.equal(parseStoreReviews({ feed: { entry: entry(9, 3, "2026-01-01T00:00:00Z", "One", "only") } }).length, 1, "one entry comes as an object");
+  assert.deepEqual(parseStoreReviews("<html>"), []);
+  assert.deepEqual(parseStoreReviews({ feed: {} }), []);
+
+  clearStoreReviewsMemory();
+  const asked = [];
+  const get = async (id, c) => { asked.push(`${c}/${id}`); return JSON.stringify(FEED); };
+  assert.equal((await storeReviews("1048524688", { country: "GB", get })).length, 2);
+  assert.equal((await storeReviews("1048524688", { country: "gb", get })).length, 2);
+  assert.deepEqual(asked, ["gb/1048524688"], "asked once");
+  assert.deepEqual(await storeReviews("7", { get: async () => { throw new Error("offline"); } }), []);
+  assert.deepEqual(await storeReviews("bad", { get }), []);
+});
+
+test("B37: the app page's Reviews tab gets the App Store's rating with its reviews (withStoreReviews)", async () => {
+  const { withStoreReviews } = await import("../screens/altstore.js");
+  const { clearStoreReviewsMemory } = await import("./applookup.js");
+  clearStoreReviewsMemory();
+  const feed = JSON.stringify({ feed: { entry: [{ "im:rating": { label: "5" }, title: { label: "Great" }, content: { label: "Works." },
+    updated: { label: "2026-11-17T05:34:34-07:00" } }] } });
+  const asked = [];
+  const backend = { kind: "http" };
+  const fetchFn = async (u) => { asked.push(u); return { ok: true, text: async () => feed }; };
+  const looked = Promise.resolve(parseLookup({ results: [{ trackId: 1048524688, trackViewUrl: "https://apps.apple.com/us/app/delta/id1048524688" }] }));
+  const r = await withStoreReviews(Promise.resolve({ average: 4.76, count: 28385, noun: "Ratings" }), looked, { backend, fetchFn, locale: "en-US" });
+  assert.equal(r.average, 4.76);
+  assert.deepEqual(r.reviews.map((x) => x.title), ["Great"]);
+  assert.deepEqual(asked, ["/api/appreviews?id=1048524688&country=us"]);
+  assert.equal(await withStoreReviews(Promise.resolve(null), Promise.resolve(null), { backend, fetchFn }), null, "no App Store app: nothing");
 });

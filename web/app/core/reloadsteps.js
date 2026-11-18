@@ -2,13 +2,16 @@
 // Pure: the Sources screen feeds it what happens and shows what text() says.
 //
 //   const steps = reloadSteps(sources, { apt: true, onText: (t) => bar.set(t) });
-//   steps.each(record)   // a source answered: the next one still loading is named
+//   steps.each(record)   // a source answered: from the first answer on, "Downloading Packages"
 //   steps.load()         // the package lists go into the catalog
 //   steps.cache()        // the catalog's lists (Changes, search) are worked out
 //
-// Order: "Updating Sources" while apt-get update runs (the jailbreak app; nowhere else is there such a step), then
-// "Downloading <source>" for the first source still loading ("Downloading Packages" when it has no name), then
+// Order: "Updating Sources" while the sources' Release/Packages and AltStore JSON are first fetched (apt-get update
+// in the jailbreak app), "Downloading Packages" once the first source has answered and the rest come in, then
 // "Loading Data", then "Building Searcher Cache".
+// F179: only these four fixed words, never a source's name, URL or a count: the per-source text flickered past
+// unreadably (the bar also holds each step on screen for a minimum time, nav/reloadbar.js). `apt` and `name` are
+// still taken, and ignored, so callers need no change.
 
 export const STEP_TEXT = Object.freeze({
   update: "Updating Sources",
@@ -17,16 +20,10 @@ export const STEP_TEXT = Object.freeze({
   cache: "Building Searcher Cache",
 });
 
-const fallbackName = (s) => s?.name || s?.origin || s?.uri || "";
-
-export function reloadSteps(list, { apt = false, name = fallbackName, onText = () => {} } = {}) {
+export function reloadSteps(list, { onText = () => {} } = {}) {
   const pending = (Array.isArray(list) ? list : []).filter(Boolean);
-  let phase = apt && pending.length ? "update" : "download";
-  const text = () => {
-    if (phase !== "download") return STEP_TEXT[phase];
-    const who = pending.length ? String(name(pending[0]) ?? "").trim() : "";
-    return who ? `Downloading ${who}` : STEP_TEXT.download;
-  };
+  let phase = pending.length ? "update" : "download";
+  const text = () => STEP_TEXT[phase];
   let last = null;
   const emit = () => {
     const t = text();
@@ -36,9 +33,7 @@ export function reloadSteps(list, { apt = false, name = fallbackName, onText = (
   return {
     text,
     get phase() { return phase; },
-    each(done) {
-      const i = pending.findIndex((s) => s.key === done?.key);
-      if (i >= 0) pending.splice(i, 1);
+    each() {
       if (phase === "update") phase = "download";
       if (phase === "download") emit();
     },

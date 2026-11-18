@@ -1,10 +1,10 @@
-// F150: Cydia's drop-down reload bar: the words it shows as a refresh goes on (core/reloadsteps.js), its Cancel
+// F150/F179: Cydia's drop-down reload bar: the few fixed words it shows as a refresh goes on (core/reloadsteps.js), its Cancel
 // (nav/reloadbar.js, screens/sources.js startRun) and that nothing it adds blocks the screens underneath.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { reloadSteps, STEP_TEXT } from "../core/reloadsteps.js";
-import { showReloadBar } from "./reloadbar.js";
+import { showReloadBar, phaseOf, PHASES, MIN_STEP_MS } from "./reloadbar.js";
 import { startRun } from "../screens/sources.js";
 
 // ---- a small DOM: what reloadbar.js and sources.js touch ----
@@ -40,37 +40,60 @@ function fakeDoc() {
   return doc;
 }
 const tick = () => new Promise((r) => setTimeout(r, 0));
+// F179: a clock the tests move by hand, so the minimum time per step is checked exactly and fast.
+function fakeClock() {
+  let t = 1000, seq = 0;
+  const timers = new Map();
+  const clock = {
+    now: () => t,
+    setTimeout: (f, ms) => { const id = ++seq; timers.set(id, { at: t + ms, f }); return id; },
+    clearTimeout: (id) => timers.delete(id),
+    advance(ms) {
+      const end = t + ms;
+      for (;;) {
+        const next = [...timers].filter(([, x]) => x.at <= end).sort((a, b) => a[1].at - b[1].at)[0];
+        if (!next) break;
+        timers.delete(next[0]);
+        t = next[1].at;
+        next[1].f();
+      }
+      t = end;
+    },
+  };
+  return clock;
+}
 const cancelButton = (bar) => bar.children.find((k) => k.classList.contains("reload-cancel"));
 
 // ---- the words ----
 
-test("F150: the text goes Updating Sources, Downloading <each source>, Loading Data, Building Searcher Cache", () => {
+test("F179: the steps go Updating Sources, Downloading Packages, Loading Data, Building Searcher Cache, never a name", () => {
   const seen = [];
   const s = reloadSteps([{ key: "a", name: "BigBoss" }, { key: "b", name: "Chariz" }, { key: "c" }], { apt: true, onText: (t) => seen.push(t) });
   assert.equal(s.text(), "Updating Sources");
-  s.each({ key: "a" });          // apt-get update is over and BigBoss answered: the next one is named
-  s.each({ key: "c" });          // out of order: Chariz is still the first one waiting
-  s.each({ key: "b" });          // none left: the headline
+  s.each({ key: "a" });
+  s.each({ key: "c" });
+  s.each({ key: "b" });
   s.load();
   s.cache();
-  assert.deepEqual(seen, ["Updating Sources", "Downloading Chariz", "Downloading Packages", "Loading Data", "Building Searcher Cache"]);
+  assert.deepEqual(seen, ["Updating Sources", "Downloading Packages", "Loading Data", "Building Searcher Cache"]);
   assert.deepEqual(Object.values(STEP_TEXT), ["Updating Sources", "Downloading Packages", "Loading Data", "Building Searcher Cache"]);
 });
 
-test("F150: without apt (the website, the sideload app) it starts on the first source", () => {
-  const s = reloadSteps([{ key: "a", name: "Repo A" }, { key: "b", name: "Repo B" }]);
-  assert.equal(s.text(), "Downloading Repo A");
+test("F179: the website and the sideload app say the same words as the jailbreak app", () => {
+  const seen = [];
+  const s = reloadSteps([{ key: "a", name: "Repo A", uri: "https://a.example/" }, { key: "b", name: "Repo B" }], { onText: (t) => seen.push(t) });
   s.each({ key: "a" });
-  assert.equal(s.text(), "Downloading Repo B");
-  assert.equal(reloadSteps([]).text(), "Downloading Packages");
-  assert.equal(reloadSteps([], { apt: true }).text(), "Downloading Packages", "nothing to update: no apt step");
+  s.each({ key: "b" });
+  assert.deepEqual(seen, ["Updating Sources", "Downloading Packages"]);
+  assert.equal(reloadSteps([]).text(), "Downloading Packages", "nothing to update: no update step");
 });
 
 // ---- the bar ----
 
 test("F150: the bar drops down with the text, changes it, and slides back up; only transform animates", async () => {
   const doc = fakeDoc();
-  const bar = showReloadBar("Updating Sources", { doc });
+  const clock = fakeClock();
+  const bar = showReloadBar("Updating Sources", { doc, clock });
   const el = bar.el;
   assert.equal(doc.body.children.length, 1, "one element: the strip, and no scrim");
   assert.ok(el.classList.contains("reload-bar"));
@@ -80,9 +103,11 @@ test("F150: the bar drops down with the text, changes it, and slides back up; on
   assert.equal(cancelButton(el).textContent, "Cancel");
   assert.ok(cancelButton(el).classList.contains("done"), "the blue bar button");
   assert.ok(doc.documentElement.classList.contains("has-reload"), "the nav bar and screens move down");
+  clock.advance(MIN_STEP_MS);
   bar.set("Loading Data");
   assert.equal(el.querySelector(".reload-text").textContent, "Loading Data");
   bar.hide();
+  clock.advance(MIN_STEP_MS);
   assert.ok(!doc.documentElement.classList.contains("has-reload"));
   await tick();
   assert.equal(doc.body.children.length, 0);
@@ -122,6 +147,80 @@ test("F150: nothing blocks input: no full-screen layer, no pointer-events trick,
   assert.doesNotMatch(readFileSync(new URL("./reloadbar.js", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""), /scrim|inset/);
 });
 
+// ---- F179: fixed steps only, each up for the minimum time ----
+
+test("F179: only the four fixed steps reach the strip; names, URLs, counts and per-file text are dropped", () => {
+  assert.equal(MIN_STEP_MS >= 500 && MIN_STEP_MS <= 800, true, "about 0.6 s");
+  for (const p of PHASES) assert.equal(phaseOf(p), p);
+  assert.equal(phaseOf("Downloading BigBoss"), "Downloading Packages");
+  assert.equal(phaseOf("Downloading https://repo.chariz.com/Packages.bz2"), "Downloading Packages");
+  for (const t of ["BigBoss", "Fetching 3 of 12", "https://apt.example/Release", "Parsing Packages.xz", "", null]) assert.equal(phaseOf(t), null, String(t));
+
+  const doc = fakeDoc();
+  const clock = fakeClock();
+  const bar = showReloadBar("Downloading Chariz", { doc, clock });
+  const label = bar.el.querySelector(".reload-text");
+  const seen = [label.textContent];
+  const feed = ["Downloading BigBoss", "https://x.example/", "Loading 5 of 9", "Loading Data", "Building Searcher Cache", "Havoc"];
+  for (const t of feed) { bar.set(t); clock.advance(100); if (label.textContent !== seen.at(-1)) seen.push(label.textContent); }
+  for (let i = 0; i < 20; i++) { clock.advance(100); if (label.textContent !== seen.at(-1)) seen.push(label.textContent); }
+  assert.deepEqual(seen, ["Downloading Packages", "Loading Data", "Building Searcher Cache"]);
+  for (const t of seen) assert.ok(PHASES.includes(t), t);
+  bar.hide();
+});
+
+test("F179: each step stays up at least the minimum even when the work is faster, then the bar slides away", () => {
+  const doc = fakeDoc();
+  const clock = fakeClock();
+  const bar = showReloadBar("Updating Sources", { doc, clock });
+  const label = bar.el.querySelector(".reload-text");
+  const changes = [{ text: label.textContent, at: clock.now() }];
+  const look = () => { if (label.textContent !== changes.at(-1).text) changes.push({ text: label.textContent, at: clock.now() }); };
+  // the whole refresh is over in 50 ms
+  bar.set("Downloading Packages"); clock.advance(10); look();
+  bar.set("Loading Data"); clock.advance(10); look();
+  bar.set("Building Searcher Cache"); clock.advance(10); look();
+  bar.hide();
+  assert.equal(bar.hidden, true, "the run is over at once");
+  assert.ok(doc.body.children.includes(bar.el), "but the strip stays until its steps have had their time");
+  let goneAt = null;
+  for (let i = 0; i < 400 && goneAt == null; i++) {
+    clock.advance(10); look();
+    if (!doc.documentElement.classList.contains("has-reload")) goneAt = clock.now();
+  }
+  assert.deepEqual(changes.map((c) => c.text), PHASES);
+  for (let i = 1; i < changes.length; i++) assert.ok(changes[i].at - changes[i - 1].at >= MIN_STEP_MS, `${changes[i - 1].text} up ${changes[i].at - changes[i - 1].at} ms`);
+  assert.ok(goneAt - changes.at(-1).at >= MIN_STEP_MS, "the last step too, before the slide");
+  assert.ok(goneAt - changes.at(-1).at < MIN_STEP_MS + 50, "and no longer than needed");
+  bar.set("Loading Data");
+  assert.equal(label.textContent, "Building Searcher Cache", "nothing changes after hide()");
+});
+
+test("F179: a slow step changes at once when the next comes; Cancel and a new bar take it away without waiting", () => {
+  const doc = fakeDoc();
+  const clock = fakeClock();
+  let cancelled = 0;
+  const bar = showReloadBar("Updating Sources", { doc, clock, onCancel: () => cancelled++ });
+  const label = bar.el.querySelector(".reload-text");
+  clock.advance(2000);
+  bar.set("Downloading Packages");
+  assert.equal(label.textContent, "Downloading Packages", "already up long enough: no wait");
+  bar.set("Loading Data");
+  cancelButton(bar.el).click();
+  assert.equal(cancelled, 1);
+  assert.ok(!doc.documentElement.classList.contains("has-reload"), "Cancel does not wait for the minimum");
+  assert.equal(label.textContent, "Downloading Packages", "and the queued step never shows");
+
+  const one = showReloadBar("Updating Sources", { doc, clock });
+  one.hide();                                   // still lingering for its minimum
+  const two = showReloadBar("Updating Sources", { doc, clock });
+  assert.ok(!doc.body.children.includes(one.el) || one.el.animations.length === 2, "the first slides away now");
+  assert.ok(doc.documentElement.classList.contains("has-reload"), "the new bar holds the page down");
+  clock.advance(MIN_STEP_MS * 2);
+  assert.ok(doc.documentElement.classList.contains("has-reload"), "the old bar's timer does not take the new one's room");
+  two.dismiss();
+});
+
 // ---- Sources' run under the bar ----
 
 function withPage(fn) {
@@ -133,7 +232,7 @@ function withPage(fn) {
 function fakeCtx(doc, log) {
   return {
     setBadge: (tab, v) => log.badges.push(v),
-    reloadBar: (text, opts) => { const b = showReloadBar(text, { ...opts, doc }); log.bars.push(b); return b; },
+    reloadBar: (text, opts) => { const b = showReloadBar(text, { ...opts, doc, minMs: 0 }); log.bars.push(b); return b; },
     loadData: async () => log.steps.push("load"),
     buildCache: async () => log.steps.push("cache"),
   };
@@ -147,7 +246,7 @@ test("F150: a run drops the bar and its text follows the refresh to the end; the
   const bar = log.bars[0];
   const set = bar.set;
   bar.set = (t) => { texts.push(t); set(t); };
-  assert.equal(bar.el.querySelector(".reload-text").textContent, "Downloading Packages", "unknown sources: no names to give");
+  assert.equal(bar.el.querySelector(".reload-text").textContent, "Updating Sources");
   assert.deepEqual(log.badges, ["spinner"], "the Sources badge spins, as before");
   run.onEach({ key: "a" });
   run.onEach({ key: "b" });

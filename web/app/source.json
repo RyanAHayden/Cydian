@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.2.6",
+          "date": "2026-11-18T03:36:05Z",
+          "localizedDescription": "Open in Cydian App brings your certificate, sources and settings, and imports them straight away.\nInstalling Cydian from the website brings all of it along: ready on first launch, nothing to set up.\nHome: by Ryan Hayden (Fizlo).\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.6",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.2.6/Cydian.ipa",
+          "size": 2602470,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.2.5",
           "date": "2026-11-18T03:27:34Z",
           "localizedDescription": "The app opens on a plain fill that fits every iPhone, then its loading screen (no more cut-off launch screen).\nImport your certificate from Safari, or get it built into the app from the website; Open in Cydian App moves your sources and settings (F75).\nBadges: Changes and the app icon show the upgrade count at launch; sources refresh in the background with the red spinning badge.\nUpgrade/Reinstall on app pages, Discord next to GitHub, the banner moves the bars down, outside links open in Safari.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.2.5",

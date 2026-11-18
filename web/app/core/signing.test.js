@@ -85,8 +85,8 @@ test("summary rows and problems", () => {
 });
 
 test("signing server addresses", () => {
-  assert.equal(APP_SERVER, "https://sign.cydian.dev");
-  assert.equal(LEGACY_SERVER, "https://cydian.dev");
+  assert.equal(APP_SERVER, "https://sign.ifizbox.com"); // B22: brand.js SIGN_HOST, not the dead sign.cydian.dev
+  assert.equal(LEGACY_SERVER, "https://ifizbox.com");
   assert.equal(normalizeServer("sign.example.org"), "https://sign.example.org");
   assert.equal(normalizeServer(" https://box.tail1234.ts.net:8443/ "), "https://box.tail1234.ts.net:8443");
   assert.equal(normalizeServer("http://192.168.1.5:8080"), "http://192.168.1.5:8080");

@@ -1,6 +1,8 @@
 // The sideload build's signing identity (I6): the user's .p12 goes into the iOS Keychain (this device only, never
-// synced or backed up) and is used there; the password isn't kept at all once the identity is imported. The profile
-// is a plain file in Application Support (it holds no secret). Also the keys of the phone's local install CA
+// synced or backed up) and is used there. F73: the imported .p12 file and its password are also kept, as one Keychain
+// generic-password item (this device only), so signing.export can hand them to the Signing Server when Cydian updates
+// itself (essential-ui.js installSelf); signing.remove deletes it with the identity. The profile is a plain file in
+// Application Support (it holds no secret). Also the keys of the phone's local install CA
 // (native/sign/LocalCA.swift), made in the Keychain and never exported. docs/signing.md, "On the phone (I6)".
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
@@ -43,6 +45,7 @@ enum SignStore {
             st = errSecSuccess
         }
         guard st == errSecSuccess else { throw SignError("keychain", "The Keychain refused the identity (\(st)).") }
+        try keepP12(p12, password: password, certSHA256: sha256(der).base64EncodedString()) // F73
         try profileData.write(to: profileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         UserDefaults.standard.set(sha256(der).base64EncodedString(), forKey: certKey)
         return profile
@@ -78,8 +81,50 @@ enum SignStore {
                 SecItemDelete([kSecClass as String: kSecClassKey, kSecValueRef as String: k] as CFDictionary)
             }
         }
+        deleteP12() // F73
         UserDefaults.standard.removeObject(forKey: certKey)
         try? FileManager.default.removeItem(at: profileURL)
+    }
+
+    // ---- F73: the .p12 as imported, for signing.export
+
+    static let p12Service = "com.ryha.cydian.signing.p12"
+    static let p12Account = "identity"
+    static var p12Query: [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: p12Service,
+         kSecAttrAccount as String: p12Account]
+    }
+
+    // One generic-password item: a binary plist {p12, password, cert} (cert: the certificate's SHA-256, base64, so a
+    // stale item never goes out with another identity). This device only: never synced to iCloud or in a backup.
+    static func keepP12(_ p12: Data, password: String, certSHA256: String) throws {
+        deleteP12()
+        let blob = try PropertyListSerialization.data(fromPropertyList: ["p12": p12, "password": password, "cert": certSHA256],
+                                                      format: .binary, options: 0)
+        var add = p12Query
+        add[kSecValueData as String] = blob
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        add[kSecAttrLabel as String] = "Cydian signing .p12"
+        let st = SecItemAdd(add as CFDictionary, nil)
+        guard st == errSecSuccess else { throw SignError("keychain", "The Keychain refused the .p12 (\(st)).") }
+    }
+
+    // The kept .p12 and password, when they belong to the identity in use; nil when there is none (no certificate,
+    // or one imported before F73: the user imports it again for Cydian to update itself through the Signing Server).
+    static func exportP12() -> (p12: Data, password: String)? {
+        guard let want = UserDefaults.standard.string(forKey: certKey) else { return nil }
+        var q = p12Query
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let blob = out as? Data,
+              let d = try? PropertyListSerialization.propertyList(from: blob, format: nil) as? [String: Any],
+              let p12 = d["p12"] as? Data, let pw = d["password"] as? String, d["cert"] as? String == want else { return nil }
+        return (p12, pw)
+    }
+
+    static func deleteP12() {
+        SecItemDelete(p12Query as CFDictionary)
     }
 
     // ---- keys made on the phone (the local install CA and its TLS key)

@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.3.1",
+          "date": "2026-11-18T04:49:14Z",
+          "localizedDescription": "Confirm and queue like Cydia: Install, Upgrade, Reinstall and Upgrade (N) queue apps and open Confirm.\nLinks into other tabs slide in over the page you are on; Back comes back (Install IPAs from Home).\nInstall IPAs: a search bar (all apps, or the list you are in).\nApp pages: the first permissions, then N More Permissions.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.1",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.1/Cydian.ipa",
+          "size": 2811065,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.3.0",
           "date": "2026-11-18T04:31:18Z",
           "localizedDescription": "Install IPAs: browse apps from your sources by category, search them, and keep your own IPAs; linked from Home.\nLinks into another tab slide in.\nSources Add: while iOS shows Paste, the button reads Type (blue): tap it to type a source in.\nCydian checks for essential updates again when you come back to it.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.0",

@@ -1,8 +1,9 @@
-// F150: Cydia's reload bar. While sources refresh, a dark translucent strip drops down from the top like the
-// notification banner (nav/banner.js), with a small white spinner at its left, a line saying what is happening
-// (core/reloadsteps.js) and a blue Cancel at its right. It blocks nothing: there is no scrim, only the strip itself
-// takes touches, and the nav bar and the screens move down by its height (ios6.css html.has-reload) so it covers
-// no buttons. It slides back up when hidden. Only transform animates.
+// F150: Cydia's reload bar. While sources refresh, a dark translucent strip shows, with a small white spinner at its
+// left, a line saying what is happening (core/reloadsteps.js) and a blue Cancel at its right. It blocks nothing:
+// there is no scrim, only the strip itself takes touches. F204: it sits on top of the tab bar and slides up from
+// behind it (over a sheet, at the sheet's bottom); nothing on the page moves. html.has-reload only gives every
+// scroller 44 pt more room at its end (ios6.css) so the last row still scrolls clear of the strip. It slides back
+// down behind the tab bar when hidden. Only transform animates.
 //
 //   const bar = showReloadBar("Updating Sources", { onCancel: () => stop() });
 //   bar.set("Loading Data");  bar.hide();   // hide() waits until the last step has had its time
@@ -64,7 +65,7 @@ export function showReloadBar(text = "", { onCancel = null, doc = globalThis.doc
     if (timer != null) { clock.clearTimeout(timer); timer = null; }
     if (current === handle) current = null;
     root?.classList?.remove("has-reload");
-    const a = bar.animate?.([{ transform: "none" }, { transform: "translateY(-100%)" }], { duration: 250, easing: "ease-in", fill: "forwards" });
+    const a = bar.animate?.([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 250, easing: "ease-in", fill: "forwards" });
     if (a?.finished) a.finished.then(() => bar.remove(), () => bar.remove());
     else bar.remove();
   };
@@ -103,7 +104,7 @@ export function showReloadBar(text = "", { onCancel = null, doc = globalThis.doc
   });
   handle.set(text);
   doc.body.append(bar);
-  bar.animate?.([{ transform: "translateY(-100%)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
+  bar.animate?.([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
   root?.classList?.add("has-reload");
   current = handle;
   return handle;

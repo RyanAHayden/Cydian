@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs";
 
 const css = readFileSync(new URL("./ios6.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, decl]) => ({ sel: sel.trim(), decl }));
+const base = readFileSync(new URL("./style.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const zOf = (src, sel) => Number(new RegExp(`(^|\\n)${sel.replace(/\./g, "\\.")}\\s*\\{[^}]*z-index:\\s*(\\d+)`).exec(src)?.[2]);
 
 test("no rule sizes a page's children to the scroller's height", () => {
   for (const { sel, decl } of rules) {
@@ -22,32 +24,30 @@ test("the rubber-band spacer is a zero-width float 1px taller than the page", ()
   assert.match(r.decl, /height\s*:\s*calc\(100% \+ 1px\)/);
 });
 
-// B25: the banner covered the top of sheets (the install progress page's nav bar). The has-banner rule must move
-// every .sheet down by --banner-h (by `translate`, which composes with the sheets' slide animations) and end it that
-// much higher, and the banner must stay above the sheets.
-test("while a banner shows, sheets move below it and end higher", () => {
-  const r = rules.find((x) => /(^|,)\s*html\.has-banner \.sheet\s*(,|$)/.test(x.sel));
-  assert.ok(r, "no html.has-banner .sheet rule");
-  assert.match(r.decl, /translate\s*:\s*0 var\(--banner-h/);
-  assert.match(r.decl, /bottom\s*:\s*var\(--banner-h/);
-  const pk = readFileSync(new URL("./packages.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-  const z = (src, sel) => Number(new RegExp(`(^|\\n)${sel.replace(".", "\\.")}\\s*\\{[^}]*z-index:\\s*(\\d+)`).exec(src)?.[2]);
-  assert.ok(z(css, ".banner") > z(pk, ".sheet"), "the banner must sit above sheets");
+// F204 (replaces B25/B26's push): top notices stop moving the page. Nothing moves the nav bar, the screens or the
+// sheets for a banner or the reload bar any more.
+test("no banner or reload-bar rule moves the nav bar, the screens or the sheets", () => {
+  assert.doesNotMatch(css, /has-banner|--banner-h/, "html.has-banner is gone");
+  for (const { sel, decl } of rules) {
+    if (/#navbar|#screens|\.sheet\b(?!-)/.test(sel) && /has-reload|has-banner/.test(sel)) assert.fail(`${sel} still moves`);
+    if (/^\.sheet$/.test(sel)) assert.doesNotMatch(decl, /translate/, ".sheet keeps no translate transition");
+  }
 });
 
-// B26: the reload bar (z-index 49) covered a sheet's nav bar the same way. Sheets move down by its 44 pt under
-// has-reload, and by banner + 44 pt under has-reload.has-banner, and the bar stays above the sheets.
-test("while the reload bar shows, sheets move below it and end higher", () => {
-  const find = (s) => rules.find((x) => x.sel.split(",").some((p) => p.trim() === s));
-  const r = find("html.has-reload .sheet");
-  assert.ok(r, "no html.has-reload .sheet rule");
-  assert.match(r.decl, /translate\s*:\s*0 44px/);
-  assert.match(r.decl, /bottom\s*:\s*44px/);
-  const rb = find("html.has-reload.has-banner .sheet");
-  assert.ok(rb, "no html.has-reload.has-banner .sheet rule");
-  assert.match(rb.decl, /translate\s*:\s*0 calc\(var\(--banner-h, 44px\) \+ 44px\)/);
-  assert.match(rb.decl, /bottom\s*:\s*calc\(var\(--banner-h, 44px\) \+ 44px\)/);
-  const pk = readFileSync(new URL("./packages.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-  const z = (src, sel) => Number(new RegExp(`(^|\\n)${sel.replace(".", "\\.")}\\s*\\{[^}]*z-index:\\s*(\\d+)`).exec(src)?.[2]);
-  assert.ok(z(css, ".reload-bar") > z(pk, ".sheet"), "the reload bar must sit above sheets");
+// The banner sits right under the nav bar (top = --nav-h), below it in z-order and above the screens, so it slides
+// out from behind the nav bar; it has no safe-area top padding of its own. Inside a sheet (banner.js) the same
+// z-index puts it under the sheet's nav bar (a .navbar, z-index 3) and over its body.
+test("the banner sits under the nav bar, below it in z-order, without the safe-area padding", () => {
+  const b = rules.find((x) => x.sel === ".banner");
+  assert.ok(b, ".banner missing");
+  assert.match(b.decl, /top\s*:\s*var\(--nav-h\)/);
+  assert.doesNotMatch(b.decl, /safe-area-inset-top/);
+  const z = zOf(css, ".banner");
+  assert.ok(z < zOf(base, ".navbar"), "below the nav bar");
+  assert.ok(z > zOf(base, "#screens"), "over the page");
+  const t = rules.find((x) => x.sel === ".banner-timer");
+  assert.ok(t, "the timer line");
+  assert.match(t.decl, /height\s*:\s*2px/);
+  assert.match(t.decl, /bottom\s*:\s*0/);
+  assert.match(t.decl, /transform-origin\s*:\s*left/);
 });

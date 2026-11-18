@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { itemsOf, nav, scopeOf, emptyText } from "./changes.js";
+import { itemsOf, nav, scopeOf, emptyText, canUpgrade, upgradeLabel, upgradeJobs, upgradeAll } from "./changes.js";
+import { createQueue } from "../core/queue.js";
 import { pageOf, token } from "./browse.js";
 
 test("Changes: a header per day, newest first, then its rows; package pages open below the tab", () => {
@@ -46,4 +47,29 @@ test("Changes (F51): default scope is Installed with installs, All without; a pi
   assert.equal(scopeOf(null, new Set()), "all");
   assert.equal(scopeOf("all", new Set(["a"])), "all");
   assert.equal(scopeOf("installed", new Set()), "installed");
+});
+
+test("Changes (F62): Upgrade (N) queues every available upgrade, never the ignored ones; jailbreak build only", () => {
+  const upgrades = { available: [{ id: "bash", name: "Bash", version: "5.2", installed: "5.1" }, { id: "zsh", name: "Zsh", version: "5.9", installed: "5.8" }],
+    ignored: [{ id: "wb", name: "WB", version: "3", installed: "2" }] };
+  const q = createQueue();
+  const events = [];
+  q.subscribe((e) => events.push(e.type));
+  const jobs = upgradeAll((job) => q.add(job), upgrades.available);
+  assert.deepEqual(jobs, [
+    { op: "install", id: "bash", version: "5.2", installed: "5.1", name: "Bash" },
+    { op: "install", id: "zsh", version: "5.9", installed: "5.8", name: "Zsh" }]);
+  assert.deepEqual(q.list().map((j) => `${j.id}=${j.version}:${j.mode}`), ["bash=5.2:upgrade", "zsh=5.9:upgrade"]);
+  assert.equal(q.get("wb"), null);
+  assert.deepEqual(events, ["add", "add"]); // the first add opens Confirm (screens/queue.js initQueue)
+  assert.deepEqual(upgradeAll(null, upgrades.available), []);
+  assert.deepEqual(upgradeJobs([{ id: "x" }, null]), []);
+  assert.equal(upgradeLabel(2), "Upgrade (2)");
+
+  const withQueue = () => ({ queue() {} });
+  assert.equal(canUpgrade("jailbreak", withQueue), true);
+  assert.equal(canUpgrade("jailbreak", () => ({})), false);
+  assert.equal(canUpgrade("site", withQueue), false);
+  assert.equal(canUpgrade("sideload", withQueue), false);
+  assert.equal(nav({ tab: "changes", path: [] }).right, undefined); // node: the site
 });

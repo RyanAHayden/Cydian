@@ -59,7 +59,7 @@ image from a pinned commit of tag v1.1.3, its tarball checked by SHA-256; licenc
    pages); a server from before F47 ignores `"async"` and answers 200 with the link, which the page takes as well
    (`web/app/signing-client.js`, `pollJob`). The page gives up after five failed polls in a row or 15 minutes.
 4. The phone opens `itms-services://?action=download-manifest&url=<server>/sign/<token>/manifest.plist`; iOS reads
-   the manifest and downloads `<server>/sign/<token>/app.ipa`. That first download deletes the file and the token.
+   the manifest and downloads `<server>/sign/<token>/app.ipa` (a HEAD, ranges, the whole file: the installer asks more than once, so the link answers every request until it expires).
 
 `GET <server>/sign/status` answers `{ok, zsign, maxBytes, ttl, jobs}` (`jobs`: it takes `"async"`, F47); Settings >
 Signing's Check Server row asks it.
@@ -73,7 +73,7 @@ Signing's Check Server row asks it.
 | Certificate, key, password, profile on the server | That request's memory only (with `"async"`, its job thread's, until the job ends). zsign gets an unencrypted copy of the key and the profile through anonymous in-memory files (`memfd_create`, opened as `/dev/fd/N`): no file on disk, no password on a command line | The request |
 | The downloaded IPA and zsign's unpacked copy | The server's job folder in `CYDIAN_SIGN_DIR` | Deleted when the job ends, signed or not |
 | A job's status and, once done, its install link | The server process's memory, under the job id | 10 minutes after the job ends; a restart forgets it |
-| The signed IPA | `CYDIAN_SIGN_DIR`, named by the token's SHA-256 (a directory listing gives no token away) | 10 minutes or its first download, whichever is first; after a restart none can be fetched, and the first signing request deletes them |
+| The signed IPA | `CYDIAN_SIGN_DIR`, named by the token's SHA-256 (a directory listing gives no token away) | 10 minutes; after a restart none can be fetched, and the first signing request deletes them |
 
 Nothing about a signing request is logged by Cydian: no URL parameters carry secrets (it's a JSON body), errors
 never repeat the password, and gunicorn's access log is off in the image. The page states this under Signing
@@ -148,7 +148,7 @@ Running the signer outside Docker: `zsign` on `PATH` (build it from
 
 - `web/test_signer.py`: a throwaway CA, certificate, `.p12` and profile and a tiny hand-built IPA
   (`web/signer/testkit.py`). The checks (wrong password, expired certificate and profile, a certificate the profile
-  doesn't list, app ID fit), the token store (expiry, first download only, a restart's cleanup), asynchronous jobs
+  doesn't list, app ID fit), the token store (expiry, a restart's cleanup), asynchronous jobs
   (202 at once, the phases, done with the link, a download error and a crash in the poll, a bad pair still in the
   POST, the job slot held until the job ends, expiry; zsign replaced by a copy so they run everywhere), POST /sign's guards
   (SSRF: loopback, private, IPv6 loopback, `file:`, `ftp:`, credentials, a redirect to loopback; the size cap with

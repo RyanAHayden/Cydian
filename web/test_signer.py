@@ -204,15 +204,6 @@ class StoreTest(unittest.TestCase):
         self.assertIsNone(self.store.get(token))
         self.assertEqual(os.listdir(self.dir), [])
 
-    def test_first_download_only(self):
-        token = self.held()
-        h, f = self.store.take(token)
-        self.assertEqual(os.listdir(self.dir), [])  # unlinked as the download starts
-        self.assertEqual(f.read(), b"signed")
-        f.close()
-        self.assertEqual(self.store.take(token), (None, None))
-        self.assertIsNone(self.store.get(token))
-
     def test_restart_clears_leftovers(self):
         self.held()
         os.mkdir(os.path.join(self.dir, "job-x"))
@@ -337,7 +328,7 @@ class AsyncJobTest(Base):
         self.assertEqual(r.data, IPA)
         r.close()
         self.assertEqual(self.c.get(f"/sign/job/{job}").json["status"], "done")  # a late poll still reads it
-        self.assertEqual(os.listdir(self.dir), [])
+        self.assertEqual([n[-4:] for n in os.listdir(self.dir)], [".ipa"])  # only the signed IPA, until it expires
 
     def test_bad_pair_fails_in_the_post(self):
         r = self.post(password="wrong", **{"async": True})
@@ -453,14 +444,20 @@ class SignTest(Base):
         item = m["items"][0]
         self.assertEqual(item["metadata"]["bundle-identifier"], j["bundleId"])
         self.assertTrue(item["assets"][0]["url"].endswith(f"/sign/{token}/app.ipa"))
+        # iOS's installer asks more than once: a HEAD, a range, then the whole file. None of them uses the link up.
+        head = self.c.head(f"/sign/{token}/app.ipa")
+        self.assertEqual(head.status_code, 200)
+        size = int(head.headers["Content-Length"])
+        part = self.c.get(f"/sign/{token}/app.ipa", headers={"Range": "bytes=0-3"})
+        self.assertEqual((part.status_code, part.data), (206, b"PK\x03\x04"))
+        part.close()
         r = self.c.get(f"/sign/{token}/app.ipa")
         self.assertEqual(r.status_code, 200)
         signed = r.data
         r.close()
-        # first download only: the IPA, and the manifest pointing at it, are gone
-        self.assertEqual(self.c.get(f"/sign/{token}/app.ipa").status_code, 404)
-        self.assertEqual(self.c.get(f"/sign/{token}/manifest.plist").status_code, 404)
-        self.assertEqual(os.listdir(self.dir), [])  # no job folder, no key, no IPA left behind
+        self.assertEqual(len(signed), size)
+        self.assertEqual(self.c.get(f"/sign/{token}/app.ipa").status_code, 200)
+        self.assertEqual(self.c.get(f"/sign/{token}/manifest.plist").status_code, 200)
         return j, signed
 
     def test_sign_install_once(self):

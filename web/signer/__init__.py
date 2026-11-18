@@ -7,13 +7,13 @@ itms-services:// link the phone installs from. docs/signing.md is the long versi
   GET  /sign/job/<job>            {status: downloading | signing | done (+ the fields above) | error (+ error, code,
                                   httpStatus)}: the phone polls it, so no one request outlasts a proxy's timeout
   GET  /sign/<token>/manifest.plist   the install manifest iOS reads (until the token expires)
-  GET  /sign/<token>/app.ipa          the signed IPA, once: deleted when that download ends
+  GET  /sign/<token>/app.ipa          the signed IPA (HEAD and Range too), until the token expires
   GET  /sign/status                   {ok, zsign, maxBytes, ttl, jobs}: Settings > Signing asks if this server signs
 
 The certificate, its key, the password and the profile live in this request's memory and go to zsign through
 memfd (signer/zsign.py): never a file, never a log line. The downloaded and the signed IPA are on disk in
 CYDIAN_SIGN_DIR (a private temp folder by default): the download only while the job runs, the signed one under a
-random 256-bit token for TTL seconds or until its first download, whichever comes first. CORS is open on /sign so
+random 256-bit token for TTL seconds. CORS is open on /sign so
 any copy of the page can use any signing server (the user's own, docs/signing.md).
 
 The store is this process's memory: run one gunicorn worker (threads are fine), as the Dockerfile does.
@@ -33,7 +33,7 @@ import time
 from dataclasses import dataclass
 from urllib.parse import quote
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, jsonify, request, send_file
 
 import fetch
 
@@ -62,7 +62,6 @@ class Held:
     name: str
     version: str
     size: int
-    taken: bool = False
 
 
 @dataclass
@@ -153,7 +152,7 @@ class Store:
         self.sweep()
         with self._lock:
             h = self._held.get(token)
-            return h if h and not h.taken else None
+            return h
 
     def take(self, token: str):
         """The open file of a token's IPA, once: the file is unlinked at once (the open handle still reads it) and the
@@ -339,20 +338,20 @@ def create_blueprint(fetcher: fetch.Fetcher, store: Store | None = None, limiter
 
     @bp.get("/sign/<token>/app.ipa")
     def download(token):
-        h, f = db().take(token)
+        # Every request until the token expires: iOS's installer asks more than once (a HEAD, then the download,
+        # sometimes in ranges), and a link that answered only the first request made every install fail with
+        # "Unable to Install". send_file answers HEAD and Range itself.
+        h = db().get(token)
         if not h:
-            return answer({"error": "This install link has expired or was used: sign the app again.", "code": "gone"}, 404)
-
-        def stream():
-            try:
-                while chunk := f.read(1 << 16):
-                    yield chunk
-            finally:
-                f.close()
-
-        return Response(stream(), 200, {"Content-Type": "application/octet-stream", "Content-Length": str(h.size),
-                                        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
-                                        "Content-Disposition": 'attachment; filename="app.ipa"'})
+            return answer({"error": "This install link has expired: sign the app again.", "code": "gone"}, 404)
+        try:
+            r = send_file(h.path, mimetype="application/octet-stream", conditional=True, max_age=0,
+                          as_attachment=True, download_name="app.ipa")
+        except FileNotFoundError:  # swept just now
+            return answer({"error": "This install link has expired: sign the app again.", "code": "gone"}, 404)
+        r.headers["Cache-Control"] = "no-store"
+        r.headers["X-Content-Type-Options"] = "nosniff"
+        return r
 
     return bp
 

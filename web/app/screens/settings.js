@@ -404,7 +404,7 @@ async function drawSigning(el) {
     rows: [{ label: new URL(server).host, subtitle: server === DEFAULT_SERVER ? "Default" : server, onClick: () => askServer(el), chevron: true },
       { label: "Check Server", onClick: () => checkServer() }],
     footer: "Install sends the app's link, the certificate, its password and the profile to this server over HTTPS. "
-      + "The server uses them in memory for that one request and never writes them to disk or logs; the signed app is deleted after 10 minutes or its first download. "
+      + "The server uses them in memory for that one request and never writes them to disk or logs; the signed app is deleted after 10 minutes. "
       + "Run your own with docker compose up (docs/signing.md) and put its address here.",
   });
   if (id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeCertificate(el) }] });

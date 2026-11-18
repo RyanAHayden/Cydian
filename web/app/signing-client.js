@@ -21,8 +21,12 @@ import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, devic
 import { format, settingsRoute } from "./router.js";
 import { IPA_MAX, CYDIAN_ID, profileInfo, targetBundleId } from "./core/websign.js";
 import { detectMode } from "./core/settings.js";
-import { liveHUD } from "./nav/hud.js";
+import { progressHUD } from "./nav/progress.js";
 import { showAlert } from "./nav/alert.js";
+
+// F151: a job's error on the progress page (the HUD interface's fail, nav/progress.js) before its alert; a HUD
+// without one (liveHUD, the tests') just goes.
+const failed = (h, message) => (typeof h.fail === "function" ? h.fail(message) : h.hide());
 
 const SERVER_KEY = "cydian.signingServer";
 
@@ -160,7 +164,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 //   await importToDevice({ p12, password, profile })   signing.import (files base64) -> status
 //   await removeFromDevice()           signing.remove -> status
 //   await firstInstallCheck()          F75: the walkthrough's missing step ("certificate" | "server"), opened, or null
-//   await installOnDevice({ url, name, onInstalled })  signing.install with a HUD following its phases
+//   await installOnDevice({ url, name, onInstalled })  signing.install with the progress page following its phases (F151)
 //
 // Each takes `native` (the bridge, globalThis.cydianNative by default) so tests can pass a fake.
 
@@ -231,7 +235,7 @@ export async function installOnDevice(opts, deps) {
 }
 
 async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false },
-  { native, hud = liveHUD, alert = showAlert, go = openRoute, later = setTimeout } = {}) {
+  { native, hud = progressHUD, alert = showAlert, go = openRoute, later = setTimeout } = {}) {
   const h = hud("Downloading");
   let result;
   try {
@@ -242,8 +246,8 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
       if (t) h.set(t);
     });
   } catch (e) {
-    h.hide();
     const why = deviceError(e, name);
+    failed(h, why.message);
     await alert({ title: why.title, message: why.message, buttons: ["OK"] });
     if (why.open === "signing") go(["signing"]);
     return false;
@@ -254,7 +258,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   // (native CloseForUpdate): say so first (user 2026-11-18).
   if (host) showBanner({ title: "Cydian", message: "Press Install. Cydian closes to finish updating; open it again once the new icon appears." });
   if (after) { after(result, h); return true; }
-  // iOS asks "Install …?" over the app: the HUD ends on a checkmark (signed and handed to iOS) and fades.
+  // iOS asks "Install …?" over the app: the progress page ends on Done (signed and handed to iOS), Return under it.
   later(() => (h.done ? h.done("Done") : h.hide()), 1200);
   return true;
 }
@@ -289,15 +293,15 @@ export const offlineText = (name, server) => `${name || "The app"} is signed and
 const hostOf = (server) => { try { return new URL(server).host; } catch { return String(server ?? ""); } };
 
 export async function installFromLibrary({ file, name = "", onInstalled = () => {} },
-  { native, hud = liveHUD, alert = showAlert, go = openRoute, check = firstInstallCheck, reachable = serverReachable,
+  { native, hud = progressHUD, alert = showAlert, go = openRoute, check = firstInstallCheck, reachable = serverReachable,
     follow = null, later = setTimeout } = {}) {
   if (await check({ native })) return null;
   const server = getServer();
   const h = hud("Signing");
   const onEvent = (ev) => { const t = phaseLabel(ev); if (t) h.set(t); };
   const fail = async (e) => {
-    h.hide();
     const why = deviceError(e, name);
+    failed(h, why.message);
     await alert({ title: why.title, message: why.message, buttons: ["OK"] });
     if (why.open === "signing") go(["signing"]);
     return false;
@@ -323,7 +327,7 @@ export async function installFromLibrary({ file, name = "", onInstalled = () => 
 //
 //   browserSigning()                   true on the website
 //   await signInBrowser({ url, name, onInstalled, bring }, deps)
-//       HUD "Downloading" (the IPA through the Worker's /api/fetch?kind=ipa: most hosts send no CORS headers),
+//       the progress page (F151; was a HUD): "Downloading" (the IPA through the Worker's /api/fetch?kind=ipa: most hosts send no CORS headers),
 //       "Signing" (signing-worker.js: zsign as WebAssembly, with the certificate from IndexedDB), "Uploading" (the
 //       signed IPA to the Worker's /sign/upload, in parts, kept 10 minutes), then a Ready to Install alert whose
 //       Install tap opens iOS's install prompt (itms-services, from the tap). F121: when the bundle ID is known at the
@@ -469,7 +473,7 @@ export async function reserveUpload(token, { bundleId, name, version }, { base =
 const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof ArrayBuffer ? b.slice(0) : new Uint8Array(b ?? []).buffer);
 
 export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "" },
-  { hud = liveHUD, alert = showAlert, open = (u) => { location.href = u; }, go = openRoute,
+  { hud = progressHUD, alert = showAlert, open = (u) => { location.href = u; }, go = openRoute,
     identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "",
     now = identityNow, origin = () => new URL(base || "/", globalThis.location?.href).origin, clock = Date.now } = {}) {
   // F121: before anything waits, while Safari still counts this as the user's tap: iOS's install prompt, for a link
@@ -518,7 +522,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
       buttons: ["Cancel", "Install"], cancel: 0, onTap: (i) => { if (i === 1) open(body.itms); } });
     return index === 1;
   } catch (e) {
-    h.hide();
+    failed(h, String(e?.message ?? e));
     await alert({ title: name ? `Couldn't Install ${name}` : "Couldn't Install", message: String(e?.message ?? e), buttons: ["OK"] });
     return false;
   }

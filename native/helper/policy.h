@@ -19,10 +19,10 @@ enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, H
                    HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA, HV_SELFUPDATE,
                    HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK, HV_INSTALL_PAID, HV_NOTIFICATIONS,
                    HV_USERSPACE_REBOOT, HV_SIMULATE_DEB, HV_INSTALL_DEB,
-                   HV_APP_VERSIONS };
+                   HV_APP_VERSIONS, HV_UICACHE };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
                      "simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid, " \
-                     "notifications, userspace-reboot, simulate-deb, install-deb, app-versions"
+                     "notifications, userspace-reboot, simulate-deb, install-deb, app-versions, uicache"
 
 /* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
  * Downgrade and Reinstall pick theirs), "-name" removes. apt gets "name", "name=version" and "name-" in one

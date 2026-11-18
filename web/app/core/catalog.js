@@ -28,7 +28,7 @@
 //   c.popular({ limit })                   -> [row] ranked by how many sources list it, then newest (rankPopular),
 //                                             each with `sources` (that count)
 //   c.aptProblems(aptOutput)              -> N4: explainApt over the same index as deps (the Confirm sheet)
-//   c.queueInfo([id])                      -> N4: { id: { name, restart } } for the queue's packages
+//   c.queueInfo([id])                      -> N4: { id: { name, restart, kind } } for the queue's packages (F151: kind)
 //   c.deps(id, key | "*")                  -> F18 (core/deps.js explain): { ok, problems, targets } for an APT
 //                                             package, against every source and the installed list; null if unknown
 //   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
@@ -53,6 +53,7 @@ import { compat, compatCode, isIncompatible, normalizeDevice, needText } from ".
 import { parseSource, appStanza, isAltKey, runsOn, installOptions } from "./altstore.js";
 import { depIndex, explain, explainApt } from "./deps.js";
 import { needsRestart } from "./queue.js";
+import { packageKind } from "./progress.js";
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -706,7 +707,8 @@ export function createCatalog() {
         const o = byId.get(id);
         if (o && o !== e) stanzas.push(o.stanza, ...(o.older ?? []));
       }
-      out[id] = { name: e?.row.name ?? (st ? installedPkgs?.find((r) => r.id === id)?.name : null) ?? null, restart: needsRestart(stanzas) };
+      const kind = packageKind(stanzas); // F151: what the console's finish button does for it
+      out[id] = { name: e?.row.name ?? (st ? installedPkgs?.find((r) => r.id === id)?.name : null) ?? null, restart: needsRestart(stanzas), kind };
     }
     return out;
   }

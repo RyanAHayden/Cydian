@@ -7,9 +7,11 @@
 //      Continue Queuing. When apt refuses, the sheet is "Cannot Comply": F18's plain-language explanation of each
 //      problem with its action (core/deps.js explainApt through the catalog) above apt's own output, which always
 //      shows; never a silent failure (Zebra #2052). Cancel clears the queue; Confirm runs it.
-//   3. The console ("Running", then "Complete"): apt's and dpkg's lines streamed over the bridge as they come, the
-//      status fd's lines in white, errors in red, a progress bar, then the finish button: Restart SpringBoard when
-//      a changed package hooks SpringBoard (or a script asked, $CYDIA), else Return to Cydian. The run's output is
+//   3. The console ("Running", then "Complete"; F151: nav/progress.js): apt's and dpkg's lines streamed over the
+//      bridge as they come, the status fd's steps in bold white, dpkg's own output in monospace, errors in red, a
+//      progress bar, then the finish button (core/progress.js chooseFinish): Restart SpringBoard when a changed
+//      package is a tweak, Reload Data (uicache) for an app, or what a script asked ($CYDIA's finish: words, up to
+//      Reboot Device), else Return to Cydian. The run's output is
 //      kept (queue.js runLogs) for Settings > Console Logs (logsPage below). A conffile changed by both the user and
 //      the package opens Cydia's Configuration Upgrade alert (F63): Keep My Old Copy or Accept The New Copy, sent
 //      back to dpkg through backend.answerConffile while the run waits. While apt is still downloading (no dpkg
@@ -22,12 +24,14 @@
 import { grouped, el, barButton } from "../nav/ui.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { showAlert } from "../nav/alert.js";
-import { showHUD, liveHUD } from "../nav/hud.js";
+import { showHUD } from "../nav/hud.js";
+import { openProgress, progressHUD } from "../nav/progress.js";
+import { classify, chooseFinish } from "../core/progress.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
 import { catalog } from "../catalog.js";
 import { installQueue, runLogs } from "../queue.js";
-import { MODES, MODE_LABEL, changeCount, parseStatusLine, consoleText, finishOf, FINISH_LABEL, runTitle, createRepeatFilter, CONFFILE_TITLE,
+import { MODES, MODE_LABEL, changeCount, runTitle, createRepeatFilter, CONFFILE_TITLE,
   CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf, debLinkOf } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
@@ -390,24 +394,27 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
 export async function resignApp(job, { sc, native = globalThis.cydianNative, hud = null, alert = showAlert } = {}) {
   sc ??= await import("../signing-client.js");
   const { resignLabel, deviceError } = await import("../core/signing.js");
-  const h = hud ? hud("Re-signing") : liveHUD("Re-signing");
+  const h = hud ? hud("Re-signing") : progressHUD("Re-signing"); // F151: the progress page
+  const fail = (message) => (typeof h.fail === "function" ? h.fail(message) : h.hide());
   let r;
   try {
     if (!native?.call) throw new Error("Re-signing needs the Cydian app.");
     r = await native.call("signing.resign", { bundleId: job.id, manifestServer: sc.getServer(), ...(job.id === SELF_ID ? { host: true } : {}) },
       (ev) => { const t = resignLabel(ev); if (t) h.set(t.replace(/ \(1 of 1\)$/, "")); });
   } catch (e) {
-    h.hide();
     const why = deviceError(e, job.name || job.id);
+    fail(why.message);
     await alert({ title: `Couldn't Re-sign ${job.name || job.id}`, message: why.message, buttons: ["OK"] });
     return false;
   }
-  h.hide();
   const failed = Array.isArray(r?.failed) ? r.failed : [];
   if (failed.length || !(r?.done ?? []).length) {
-    await alert({ title: `Couldn't Re-sign ${job.name || job.id}`, message: failed.map((f) => f.error || "failed").join("\n") || "Nothing was signed.", buttons: ["OK"] });
+    const message = failed.map((f) => f.error || "failed").join("\n") || "Nothing was signed.";
+    fail(message);
+    await alert({ title: `Couldn't Re-sign ${job.name || job.id}`, message, buttons: ["OK"] });
     return false;
   }
+  if (typeof h.done === "function") h.done("Done"); else h.hide();
   return true;
 }
 
@@ -450,8 +457,6 @@ export async function runAppQueue(jobs, { queue = appQueue, install = installApp
 
 // ---- the console -----------------------------------------------------------------------------------------------
 
-const MAX_LINES = 1500; // lines kept on screen; the log keeps everything (trimmed only past core/queue.js's cap)
-
 // F71: Roll Back runs in the same console: one stored .deb through backend.rollback, outside the queue (whatever is
 // queued stays queued). False when a console is already up.
 export function runRollback({ id, version, installed = null, name = "" }) {
@@ -473,76 +478,55 @@ export function runPaidInstall({ id, version, name = "", run }) {
 
 // asks: the run is apply-ask (F63), so a conffile line opens the Configuration Upgrade alert and its answer goes back
 // through backend.answerConffile; otherwise dpkg keeps the old copy (--force-confold) and the console says so.
+// F151: the page is nav/progress.js (steps bold, dpkg's output monospace, errors red with the x badge, auto-scroll),
+// and its button follows what was done (core/progress.js chooseFinish): the scripts' finish: lines and the kinds of
+// package changed (a tweak: Restart SpringBoard; an app: Reload Data).
 async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = null, run = (onEvent) => getBackend().apply(jobs, onEvent) }) {
   running = true;
   updateChrome();
-  const close = barButton("Close");
-  close.hidden = true;
   // F64: Cancel while apt only downloads (a queue run, apply-ask: the helper reads its stdin); gone once dpkg starts.
   const canCancel = asks && typeof getBackend().cancelApply === "function";
-  const cancel = barButton("Cancel");
-  cancel.hidden = !canCancel;
-  const m = modal({ title: "Running", left: cancel, right: close, cls: "console" });
-  m.scroll.className = "sheet-scroll console-scroll";
-  const out = el("div", "console-out");
-  out.setAttribute("role", "log");
-  out.setAttribute("aria-live", "polite");
-  const foot = el("div", "console-foot");
-  const statusText = el("div", "console-status", "Preparing");
-  const bar = el("div", "console-progress");
-  const fill = el("div", "console-fill");
-  bar.append(fill);
-  foot.append(statusText, bar);
-  m.scroll.append(out, foot);
+  let onCancel = () => {};
+  const page = openProgress({ onCancel: () => onCancel() });
+  page.cancellable(canCancel);
 
   const log = [];
-  let pending = [];
-  let frame = 0;
-  const flush = () => {
-    frame = 0;
-    if (!pending.length) return;
-    const frag = document.createDocumentFragment();
-    for (const [type, text] of pending) frag.append(el("div", `console-line ${type}`, text));
-    pending = [];
-    out.append(frag);
-    while (out.childElementCount > MAX_LINES) out.firstElementChild.remove();
-    m.scroll.scrollTop = m.scroll.scrollHeight;
-  };
   const fresh = createRepeatFilter(); // C6: apt's "Retrieving file 1 of N" shows once, not once per percent
   const line = (type, text) => {
     if (!fresh(type, text)) return;
-    log.push(type === "info" ? text : type === "error" ? `E: ${text}`.replace(/^E: E: /, "E: ") : `» ${text}`);
-    pending.push([type, text]);
-    if (!frame) frame = requestAnimationFrame(flush);
+    log.push(type === "info" ? text : type === "error" ? `E: ${text}`.replace(/^E: E: /, "E: ") : type === "warning" ? text : `» ${text}`);
+    page.line(type === "status" ? "step" : type === "info" ? "raw" : type, text);
   };
-  const setProgress = (pct) => { fill.style.transform = `scaleX(${Math.max(0, Math.min(100, pct)) / 100})`; };
-  setProgress(0);
+  page.progress(0);
 
   const names = await namesFor(ids);
   const label = (pkg) => names[pkg] || pkg;
-  let finish = "return";
+  const levels = [];
+  let kinds = [];
   try {
     const info = await catalog.queueInfo(ids);
-    if (Object.values(info ?? {}).some((v) => v?.restart)) finish = "restart";
+    kinds = Object.values(info ?? {}).map((v) => v?.kind ?? (v?.restart ? "tweak" : "package"));
   } catch { /* the scripts' own finish lines still count */ }
 
   let result = null, error = null, ended = false;
   let cancelled = false, dpkg = false;
-  const dpkgStarted = () => { dpkg = true; cancel.hidden = true; };
-  cancel.addEventListener("click", async () => {
-    if (cancel.disabled || dpkg || ended) return;
-    cancel.disabled = true;
-    statusText.textContent = "Cancelling";
+  let cancelling = false;
+  const dpkgStarted = () => { dpkg = true; page.cancellable(false); };
+  onCancel = async () => {
+    if (cancelling || dpkg || ended) return;
+    cancelling = true;
+    page.cancellable(true, { disabled: true });
+    page.status("Cancelling");
     try {
       await getBackend().cancelApply();
       cancelled = true;
-      cancel.hidden = true;
+      page.cancellable(false);
     } catch (e) {
       if (ended) return;
       line("error", `Couldn't cancel: ${e.message || String(e)}`);
-      if (dpkg) cancel.hidden = true; else cancel.disabled = false;
+      if (dpkg) page.cancellable(false); else { page.cancellable(true); cancelling = false; }
     }
-  });
+  };
   // F63: dpkg waits on one question at a time; alerts are shown one after another all the same.
   let asking = Promise.resolve();
   const ask = (file) => {
@@ -561,34 +545,34 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
   const canAsk = asks && typeof getBackend().answerConffile === "function";
   try {
     result = await run(({ fd, line: raw }) => {
-      if (fd === "status") {
-        if (!dpkg && /^pm(status|conffile|error):/.test(raw)) dpkgStarted();
-        const s = parseStatusLine(raw);
-        if (s.type === "finish") { finish = finishOf(finish, s.finish); return; }
-        if (s.type === "conffile") {
-          if (s.percent != null) setProgress(s.percent);
-          statusText.textContent = `Configuration file ${s.file}`;
-          if (canAsk) ask(s.file);
-          else line("status", conffileLine(s.file, "keep"));
-        } else if (s.type === "status") {
-          const text = s.pkg && s.text ? s.text.replaceAll(s.pkg, label(s.pkg)) : s.text;
-          if (s.percent != null && !s.download) setProgress(s.percent);
-          statusText.textContent = text;
+      if (fd === "status" && !dpkg && /^pm(status|conffile|error):/.test(String(raw ?? ""))) dpkgStarted();
+      const c = classify({ fd, line: raw });
+      if (!c) return;
+      switch (c.kind) {
+        case "finish": levels.push(c.finish); return;
+        case "conffile":
+          if (c.percent != null) page.progress(c.percent);
+          page.status(`Configuration file ${c.file}`);
+          if (canAsk) ask(c.file);
+          else line("status", conffileLine(c.file, "keep"));
+          return;
+        case "step": {
+          const text = c.pkg ? c.text.replaceAll(c.pkg, label(c.pkg)) : c.text;
+          if (c.percent != null && !c.download) page.progress(c.percent);
+          page.status(text);
           line("status", text);
-        } else if (s.type === "error") line("error", `${label(s.pkg)}: ${s.text}`);
-        else line("info", s.text);
-        return;
+          return;
+        }
+        case "error": line("error", c.pkg ? `${label(c.pkg)}: ${c.text}` : c.text); return;
+        case "warning": line("warning", c.text); return;
+        default: line("info", c.text);
       }
-      const text = consoleText(raw);
-      if (!text) return;
-      line(fd === "err" && /^(E:|dpkg: error)/.test(text) ? "error" : fd === "err" && /^W:/.test(text) ? "warning" : "info", text);
     });
   } catch (e) {
     error = e;
   }
   ended = true;
-  cancel.hidden = true;
-  flush();
+  page.cancellable(false);
 
   const ok = result?.code === 0 && !error;
   // F64: the helper stopped apt before dpkg ran (SIGINT: exit 130). A run that went through anyway counts as done.
@@ -602,45 +586,62 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
       for (const p of problems) line("error", p.sentence);
     } catch { /* the raw lines above say it */ }
   }
-  flush();
-  setProgress(100);
-  m.setTitle("Complete");
-  statusText.textContent = ok ? "Done" : stopped ? "Cancelled" : "Failed";
 
+  const choice = chooseFinish({ ok, levels, kinds });
   runLogs.add({ title: title ? title(names) : runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] }))), jobs: jobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode })),
-    code: error ? -1 : result.code, text: log.join("\n") });
+    code: error ? -1 : result.code, finish: choice.level, text: log.join("\n") });
   // A run that went through empties the queue; one apt stopped keeps it, so Confirm can show what's left to fix.
   if (ok && !keepQueue) installQueue.clearAll();
   const reloaded = catalog.reloadInstalled?.().catch(() => {});
 
-  const done = () => { running = false; updateChrome(); return m.close(); };
-  const level = ok ? finish : "return";
-  const button = el("button", "console-finish", FINISH_LABEL[level]);
-  button.type = "button";
-  button.addEventListener("click", () => finishAction(level, done));
-  bar.replaceWith(button);
-  close.hidden = false;
-  close.addEventListener("click", () => done());
+  page.onClose(() => { running = false; updateChrome(); });
+  page.finish({ label: choice.label, status: ok ? "Done" : stopped ? "Cancelled" : "Failed", action: () => finishAction(choice) });
   return { ok, reloaded };
 }
 
-async function finishAction(level, done) {
+// The finish button's action. -> true to keep the page up (the action failed and said so).
+async function finishAction({ level, uicache }) {
+  const b = getBackend();
+  if (uicache || level === "uicache") {
+    const hide = showHUD("Reloading Data");
+    try {
+      if (typeof b.uicache === "function") await b.uicache();
+      await catalog.reloadInstalled?.();
+    } catch (e) {
+      hide();
+      await showAlert({ title: "Reload Data", message: e.message || String(e), buttons: ["OK"] });
+      return true;
+    }
+    hide();
+  }
   if (level === "restart" || level === "reload") {
     const hide = showHUD("Loading");
     try {
-      await getBackend().respring();
+      await b.respring();
     } catch (e) {
       hide();
       await showAlert({ title: "Restart SpringBoard", message: e.message || String(e), buttons: ["OK"] });
-      return;
+      return true;
     }
     hide();
-    return;
+    return false;
   }
   if (level === "reboot") {
+    if (typeof b.userspaceReboot === "function") {
+      const { index } = await showAlert({ title: "Reboot Device", message: "A package asked for a reboot to finish. A userspace reboot restarts iOS and keeps the jailbreak.",
+        buttons: ["Later", "Reboot"], cancel: 0 });
+      if (index !== 1) return false;
+      try {
+        await b.userspaceReboot();
+      } catch (e) {
+        await showAlert({ title: "Reboot Device", message: e.message || String(e), buttons: ["OK"] });
+        return true;
+      }
+      return false;
+    }
     await showAlert({ title: "Reboot Device", message: "A package asked for a reboot to finish. Restart the iPhone, then jailbreak it again with your jailbreak app if it needs that.", buttons: ["OK"] });
   }
-  done();
+  return false;
 }
 
 // ---- Settings > Console Logs -----------------------------------------------------------------------------------

@@ -6,79 +6,56 @@
 //     (initIpaLinks, app.js)
 // F88: a successful install is remembered (core/installed.js) for the Installed tab's Apps page and Changes: the
 // AltStore row's with its source (installRows' onInstall), a URL's or link's by bundle id (rememberIpa).
-// All open the same console as the install queue's (screens/queue.js modal, queue.css's .console): the shell's and
-// helper's lines as they come, installd's pmstatus progress on the bar, then Return to Cydian. A jailbreak that
+// All open the same progress page as the install queue's (F151: nav/progress.js): the shell's and helper's lines as
+// they come, installd's pmstatus progress on the bar, then Reload Data (uicache) or Return to Cydian. A jailbreak that
 // can't install ad hoc apps (no_adhoc) ends with the console's red line and an alert saying what to install
 // (AppSync Unified or ldid) or to sign the IPA. Each run is kept in Settings > Console Logs.
 // The sideload build has none of this: it keeps signing.install (signing-client.js).
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { grouped, el } from "../nav/ui.js";
+import { grouped } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
-import { modal } from "./queue.js";
+import { openProgress } from "../nav/progress.js";
+import { chooseFinish } from "../core/progress.js";
+import { getBackend } from "../backend.js";
 import { runLogs } from "../queue.js";
 import { ipaInstallAvailable, runIpaInstall } from "../ipa-install.js";
 import { ipaUrl, ipaName, looksLikeIpa, IPA_FOOTER } from "../core/ipainstall.js";
 import { apps, recordInstall } from "../core/installed.js";
 
-const MAX_LINES = 1500;
 let running = false;
 
-// The console sheet for one IPA. Resolves the run's result once it has ended (the sheet stays up until Close or
-// Return to Cydian). False when another IPA install's console is already up.
-// N9: `native` stands in for the bridge (a shared file's share.ipaInstall, share.js).
+// The console page for one IPA (F151: nav/progress.js, as the queue's). Resolves the run's result once it has ended
+// (the page stays up until Close or the finish button). False when another IPA install's console is already up.
+// N9: `native` stands in for the bridge (a shared file's share.ipaInstall, share.js). An app went in, so the button
+// is Reload Data (uicache, as Cydia runs after a run) when the backend can, else Return to Cydian.
 export async function openIpaInstall({ url, name = "", onInstalled = () => {}, native = undefined }) {
   if (running) return false;
   running = true;
   const title = name || ipaName(url);
-  const close = el("button", "bar-button", "Close");
-  close.type = "button";
-  close.hidden = true;
-  const m = modal({ title: "Running", right: close, cls: "console" });
-  m.scroll.className = "sheet-scroll console-scroll";
-  const out = el("div", "console-out");
-  out.setAttribute("role", "log");
-  out.setAttribute("aria-live", "polite");
-  const foot = el("div", "console-foot");
-  const statusText = el("div", "console-status", "Preparing");
-  const bar = el("div", "console-progress");
-  const fill = el("div", "console-fill");
-  bar.append(fill);
-  foot.append(statusText, bar);
-  m.scroll.append(out, foot);
-
-  let pending = [];
-  let frame = 0;
-  const flush = () => {
-    frame = 0;
-    if (!pending.length) return;
-    const frag = document.createDocumentFragment();
-    for (const [type, text] of pending) frag.append(el("div", `console-line ${type}`, text));
-    pending = [];
-    out.append(frag);
-    while (out.childElementCount > MAX_LINES) out.firstElementChild.remove();
-    m.scroll.scrollTop = m.scroll.scrollHeight;
-  };
+  const page = openProgress();
+  page.onClose(() => { running = false; });
   const view = {
-    line(type, text) { pending.push([type, text]); if (!frame) frame = requestAnimationFrame(flush); },
-    status(text) { statusText.textContent = text; },
-    progress(pct) { fill.style.transform = `scaleX(${Math.max(0, Math.min(100, pct)) / 100})`; },
+    line(type, text) { page.line(type === "status" ? "step" : type === "info" ? "raw" : type, text); },
+    status(text) { page.status(text); },
+    progress(pct) { page.progress(pct); },
   };
 
   const r = await runIpaInstall({ url, name: title }, view, native ? { native } : undefined);
-  flush();
-  m.setTitle("Complete");
   runLogs.add({ title: `Install ${title}`, jobs: [{ op: "install", id: r.bundleId || url, version: null, mode: "ipa" }],
     code: r.ok ? 0 : -1, text: r.log });
   if (r.ok) { try { onInstalled(r); } catch { /* the record is a nicety */ } }
 
-  const done = () => { running = false; return m.close(); };
-  const button = el("button", "console-finish", "Return to Cydian");
-  button.type = "button";
-  button.addEventListener("click", () => done());
-  bar.replaceWith(button);
-  close.hidden = false;
-  close.addEventListener("click", () => done());
+  const backend = getBackend();
+  const reload = r.ok && typeof backend?.uicache === "function";
+  const choice = chooseFinish({ ok: reload, kinds: ["app"] });
+  page.finish({ label: choice.label, status: r.ok ? "Done" : "Failed", action: reload ? async () => {
+    try { await backend.uicache(); } catch (e) {
+      await showAlert({ title: "Reload Data", message: e.message || String(e), buttons: ["OK"] });
+      return true;
+    }
+    return false;
+  } : null });
   if (r.error) await showAlert({ title: r.error.title, message: r.error.message, buttons: ["OK"] });
   return r;
 }

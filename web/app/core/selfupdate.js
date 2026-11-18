@@ -8,6 +8,8 @@
 //   sideload   the release's Cydian.ipa, signed on the phone with the user's certificate and installed over the
 //              running app (F58's installOnDevice: same bundle ID com.ryha.cydian, so its data stays). No certificate
 //              in the Keychain: an alert says so and Settings > Signing opens.
+//              F72: given `installSelf` (core/essential.js), that takes over: iOS closes Cydian, and the local install
+//              server with it, as soon as the install starts, so Cydian's own IPA is signed on the Signing Server.
 //   jailbreak  the release's .deb for this device's architecture, downloaded by the shell (selfupdate.download) and
 //              installed with `cydian-helper selfupdate <path>` (dpkg -i, N2), then an offer to close Cydian so the
 //              next launch runs the new build (Cydia's own "Close Cydia" after finish:reopen).
@@ -215,10 +217,16 @@ export async function runInstall(release, mode, deps) {
   return "site";
 }
 
-async function installSideload(release, { status, installOnDevice, alert, go }) {
+async function installSideload(release, { status, installOnDevice, installSelf, alert, go }) {
   if (!release.ipa) {
     await alert({ title: "Can't Install", message: `Cydian ${release.version} has no Cydian.ipa on GitHub.`, buttons: ["OK"] });
     return "no-asset";
+  }
+  // F72: Cydian's own IPA can't come through the local install server (iOS closes Cydian, and the server, as it
+  // starts installing): installSelf (core/essential.js) signs it on the Signing Server or opens cydian.dev.
+  if (installSelf) {
+    const r = await installSelf({ version: release.version, ipa: release.ipa });
+    return r === "installing" || r === "site" ? "installed" : r === "no-asset" ? "no-asset" : "failed";
   }
   let st = null;
   try { st = await status(); } catch { /* the signer didn't answer: as if no certificate, Settings > Signing says why */ }

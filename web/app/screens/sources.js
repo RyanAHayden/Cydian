@@ -18,6 +18,8 @@ import * as manage from "./manage.js";
 import { orderSources, loadOrder, filterSources } from "../core/sourcelist.js";
 import { healthOf } from "../core/health.js";
 import { recommendedSeen, jailbreakName } from "../core/recommended.js";
+import { builtinFirst, isBuiltin } from "../core/essential.js";
+import { lockMark } from "../nav/lock.js";
 
 export const title = "Sources";
 
@@ -163,7 +165,8 @@ function draw() {
   const backend = getBackend();
   // F37: Not Jailbroken shows AltStore sources only; the APT ones stay in the list, out of sight.
   // F45: in the order set in Manage > Sources (none set: by name).
-  const { shown, hidden } = sourcesFor(orderSources(state.sources, loadOrder()), settings.deviceType());
+  // F72: Cydian's own source (built in) stays first whatever the order.
+  const { shown, hidden } = sourcesFor(builtinFirst(orderSources(state.sources, loadOrder())), settings.deviceType());
   const searching = Boolean(state.query.trim());
   const list = filterSources(shown, state.query, displayName);
   const rec = searching ? null : recommendedRow();
@@ -230,6 +233,13 @@ function decorate(li, source, backend) {
   img.onerror = () => (urls.length ? (img.src = urls.shift()) : img.remove());
   img.src = urls.shift();
   li.querySelector(".cell-icon").append(img);
+  li.dataset.url = source.uri; // Copy URL (hold the row)
+  // F72: Cydian's own source is built in: a lock after its name, and no Delete (a swipe arms nothing).
+  if (isBuiltin(source)) {
+    li.dataset.builtin = "1";
+    li.querySelector(".cell-label")?.append(lockMark("name-lock"));
+    return;
+  }
 
   const toggle = document.createElement("button");
   toggle.type = "button";
@@ -246,6 +256,7 @@ function decorate(li, source, backend) {
 }
 
 function arm(li, on) {
+  if (li.dataset.builtin) return; // F72: built in, nothing to delete
   for (const other of li.parentNode.querySelectorAll(".source-row.armed")) if (other !== li) other.classList.remove("armed");
   li.classList.toggle("armed", on);
 }

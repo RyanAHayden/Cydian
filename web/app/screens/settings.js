@@ -700,6 +700,7 @@ export function checkUpdates({ manual = false } = {}) {
     alert,
     install: (release) => runInstall(release, mode, {
       status: () => deviceStatus(), installOnDevice: (o) => installOnDevice(o), alert, go,
+      installSelf: (row) => import("../essential-ui.js").then((m) => m.installSelfNow(row)), // F72
       native, arch: getArch(), hud: updateHUD,
     }),
   }, { manual }).catch(() => "error").finally(() => { hide(); checking = null; redrawAll(); });

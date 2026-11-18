@@ -2,13 +2,19 @@
 """Cydian's own AltStore source (I7): web/app/source.json, the package page Cydian's default sources show for the
 app itself (core/sources.js DEFAULT_ALT_SOURCES, core/appoffer.js APP_SOURCE_URL).
 
-  tools/altsource.py update VERSION IPA [DATE]   point the source at release vVERSION's Cydian.ipa (its size from IPA)
+  tools/altsource.py update VERSION IPA [DATE] [--notes FILE] [--minimum X.Y.Z]
+        point the source at release vVERSION's Cydian.ipa (its size from IPA), newest first in versions[], the
+        versions already listed kept below it (at most KEEP), with the notes' first lines as its description
   tools/altsource.py check                       the source is well formed and names a release tag of its own version
 
-tools/release.sh runs `update` when it publishes a release, so the source keeps naming the newest IPA.
+tools/release.sh runs `update` when it publishes a release, so the source keeps naming the newest IPA. F72: this is
+the sideload app's and the site's built-in source (web/app/core/essential.js). --minimum sets the app's
+"minimumVersion", Cydian's own field (other AltStore clients ignore it): a running Cydian older than that must
+upgrade before anything else.
 """
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -18,13 +24,48 @@ REPO = "https://github.com/RyanAHayden/Cydian"
 RAW = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main"
 BUNDLE_ID = "com.ryha.cydian"
 MIN_OS = "15.0"  # native/mkipa.py's MinimumOSVersion
+KEEP = 20  # versions[] entries kept (newest first)
+VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 
 def ipa_url(version):
     return f"{REPO}/releases/download/v{version}/Cydian.ipa"
 
 
-def build(version, size, date):
+def note_text(version, notes=None):
+    """The version's description: the notes' first lines (Markdown bullets and headings off), then the link."""
+    link = f"Release notes: {REPO}/releases/tag/v{version}"
+    lines = []
+    for raw in (notes or "").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("<!--"):
+            continue
+        lines.append(re.sub(r"^[-*+]\s+", "", line))
+        if len(lines) >= 4:
+            break
+    return "\n".join(lines + [link]) if lines else f"Cydian {version}. {link}"
+
+
+def build(version, size, date, notes=None, minimum=None, previous=()):
+    """The whole source for release vVERSION; `previous`: the versions[] entries already published (kept below)."""
+    if minimum is not None and not VERSION_RE.match(minimum):
+        raise ValueError(f"minimum must be X.Y.Z, not {minimum!r}")
+    newest = {
+        "version": version,
+        "date": date,
+        "localizedDescription": note_text(version, notes),
+        "downloadURL": ipa_url(version),
+        "size": size,
+        "minOSVersion": MIN_OS,
+    }
+    older = [v for v in previous if isinstance(v, dict) and v.get("version") != version][:KEEP - 1]
+    app = app_entry([newest] + older)
+    if minimum:
+        app["minimumVersion"] = minimum
+    return source_entry(app)
+
+
+def source_entry(app):
     return {
         "name": "Cydian",
         "identifier": BUNDLE_ID,
@@ -33,28 +74,25 @@ def build(version, size, date):
         "iconURL": f"{RAW}/web/app/icons/icon-180.png",
         "website": REPO,
         "tintColor": "#37a94a",
-        "apps": [{
-            "name": "Cydian",
-            "bundleIdentifier": BUNDLE_ID,
-            "developerName": "Ryan Hayden",
-            "subtitle": "Packages and apps with the iOS 6 look",
-            "localizedDescription": (
-                "Cydian lists apps from AltStore-style sources and, on a jailbroken iPhone, tweaks and themes from "
-                "APT repos, with the iOS 6 look. The app signs apps on your iPhone with your own certificate (no "
-                "server) and scrolls at 120Hz. Free and open source (GPL-3.0-or-later)."),
-            "iconURL": f"{RAW}/web/app/icons/icon-180.png",
-            "tintColor": "#37a94a",
-            "category": "utilities",
-            "versions": [{
-                "version": version,
-                "date": date,
-                "localizedDescription": f"Cydian {version}. Release notes: {REPO}/releases/tag/v{version}",
-                "downloadURL": ipa_url(version),
-                "size": size,
-                "minOSVersion": MIN_OS,
-            }],
-        }],
+        "apps": [app],
         "news": [],
+    }
+
+
+def app_entry(versions):
+    return {
+        "name": "Cydian",
+        "bundleIdentifier": BUNDLE_ID,
+        "developerName": "Ryan Hayden",
+        "subtitle": "Packages and apps with the iOS 6 look",
+        "localizedDescription": (
+            "Cydian lists apps from AltStore-style sources and, on a jailbroken iPhone, tweaks and themes from "
+            "APT repos, with the iOS 6 look. The app signs apps on your iPhone with your own certificate (no "
+            "server) and scrolls at 120Hz. Free and open source (GPL-3.0-or-later)."),
+        "iconURL": f"{RAW}/web/app/icons/icon-180.png",
+        "tintColor": "#37a94a",
+        "category": "utilities",
+        "versions": versions,
     }
 
 
@@ -77,6 +115,8 @@ def check(data):
         problems.append("size is not a positive number of bytes")
     if v.get("minOSVersion") != MIN_OS:
         problems.append(f"minOSVersion is not {MIN_OS}")
+    if "minimumVersion" in app and not VERSION_RE.match(str(app["minimumVersion"])):
+        problems.append("minimumVersion is not X.Y.Z")
     return problems
 
 
@@ -88,10 +128,33 @@ def write(data, path=SOURCE):
 
 def main(argv):
     if len(argv) >= 3 and argv[0] == "update":
-        version, ipa = argv[1], argv[2]
-        date = argv[3] if len(argv) > 3 else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        write(build(version, os.path.getsize(ipa), date))
-        print(f"{SOURCE}: v{version}")
+        opts, rest = {}, []
+        it = iter(argv[1:])
+        for a in it:
+            if a in ("--notes", "--minimum", "--source"):
+                opts[a] = next(it, None)
+            else:
+                rest.append(a)
+        version, ipa = rest[0], rest[1]
+        date = rest[2] if len(rest) > 2 else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        path = opts.get("--source") or SOURCE
+        notes = None
+        if opts.get("--notes"):
+            with open(opts["--notes"]) as f:
+                notes = f.read()
+        try:
+            with open(path) as f:
+                previous = json.load(f)["apps"][0].get("versions") or []
+        except (OSError, ValueError, KeyError, IndexError, TypeError):
+            previous = []
+        try:
+            data = build(version, os.path.getsize(ipa), date, notes=notes, minimum=opts.get("--minimum"),
+                         previous=previous)
+        except ValueError as e:
+            print(f"altsource: {e}", file=sys.stderr)
+            return 1
+        write(data, path)
+        print(f"{path}: v{version}")
         return 0
     if argv == ["check"]:
         with open(SOURCE) as f:

@@ -32,6 +32,8 @@ import {
   markRecommendedSeen,
 } from "../core/recommended.js";
 import { copyText } from "../nav/menu.js";
+import { builtinFirst, isBuiltin, exportable } from "../core/essential.js";
+import { lockMark } from "../nav/lock.js";
 import { settings } from "./settings.js";
 
 export const SEGMENT = "manage";
@@ -95,7 +97,8 @@ function el(tag, cls, text) {
 
 // The list in the user's order, as the Sources tab shows it (Not Jailbroken: AltStore sources only).
 async function shownSources() {
-  const all = orderSources(await getBackend().sources(), loadOrder());
+  // F72: Cydian's own source (built in) stays first whatever the order.
+  const all = builtinFirst(orderSources(await getBackend().sources(), loadOrder()));
   return { all, ...sourcesFor(all, settings.deviceType()) };
 }
 
@@ -162,6 +165,12 @@ function editRow(li, source, backend, body) {
   img.onerror = () => (urls.length ? (img.src = urls.shift()) : img.remove());
   if (urls.length) img.src = urls.shift();
   li.querySelector(".cell-icon").append(img);
+  // F72: Cydian's own source is built in: a lock where the minus goes, no Delete, and it doesn't move.
+  if (isBuiltin(source)) {
+    li.dataset.builtin = "1";
+    li.append(lockMark("source-lock", `${displayName(source)} is built in: it can't be removed`));
+    return;
+  }
 
   const toggle = el("button", "del-toggle");
   toggle.type = "button";
@@ -205,7 +214,8 @@ function attachReorder(ul, body) {
     e.preventDefault();
     const li = grab.closest(".source-row");
     const rows = [...ul.querySelectorAll(":scope > .source-row")];
-    drag = { li, rows, from: rows.indexOf(li), to: rows.indexOf(li), y: e.clientY, h: li.offsetHeight, id: e.pointerId };
+    const min = rows.filter((r) => r.dataset.builtin).length; // F72: nothing goes above the built-in source
+    drag = { li, rows, min, from: rows.indexOf(li), to: rows.indexOf(li), y: e.clientY, h: li.offsetHeight, id: e.pointerId };
     grab.setPointerCapture?.(e.pointerId);
     li.classList.add("dragging");
     ul.classList.add("is-reordering");
@@ -213,10 +223,10 @@ function attachReorder(ul, body) {
   ul.addEventListener("pointermove", (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     const dy = e.clientY - drag.y;
-    const { rows, from, h } = drag;
-    const to = Math.max(0, Math.min(rows.length - 1, from + Math.round(dy / h)));
+    const { rows, from, h, min } = drag;
+    const to = Math.max(min, Math.min(rows.length - 1, from + Math.round(dy / h)));
     drag.to = to;
-    drag.li.style.transform = `translateY(${Math.max(-from * h, Math.min((rows.length - 1 - from) * h, dy))}px)`;
+    drag.li.style.transform = `translateY(${Math.max(-(from - min) * h, Math.min((rows.length - 1 - from) * h, dy))}px)`;
     rows.forEach((r, i) => {
       if (r === drag.li) return;
       const shift = from < to && i > from && i <= to ? -h : from > to && i < from && i >= to ? h : 0;
@@ -322,14 +332,15 @@ function renderIO(body, route, ctx) {
   ]), file);
 }
 
+// F72: Cydian's own source (built in) is left out: every Cydian has it.
 async function exportNow() {
-  const { all } = await shownSources();
+  const all = exportable((await shownSources()).all);
   return { text: exportText(all), count: all.length };
 }
 
 // F52: the URLs alone, one per line (no header comment), for pasting anywhere.
 async function copyList() {
-  const { all } = await shownSources();
+  const all = exportable((await shownSources()).all); // F72: not the built-in source
   await copyText(clipboardText(all));
   await showAlert({ title: "Copied", message: `${plural(all.length, "source")} on the clipboard, one URL per line.`, buttons: ["OK"] });
 }

@@ -12,6 +12,9 @@ import { repoLayout, parseRelease, parseControl, matchesArch, DEFAULT_ARCH } fro
 import { isAltKey, neverLoaded } from "./altstore.js";
 import { releaseTime, fingerprint, healthFields, withTimeout, pool, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 
+// F72: Cydian's own repo names the oldest Cydian that may run without upgrading first (core/essential.js).
+const MIN_FIELD = "x-cydian-minimum-version";
+
 // A source: { key, uri, dist, components, name?, origin?, depiction?, count?, updated?, error? }. `name` is ours
 // (the defaults), `origin` comes from the repo's Release; the row shows the first there is, else the host.
 // `depiction` is the Release's Depiction: template (see releaseDepiction), null when the Release has none.
@@ -264,6 +267,7 @@ export async function verifySource(backend, input, { arch = DEFAULT_ARCH, count 
   if (!found) throw new SourceError("not_repository");
   if (release?.origin) source.origin = release.origin;
   if (release) source.depiction = release.fields.depiction || null;
+  if (release?.fields[MIN_FIELD]) source.minimumVersion = release.fields[MIN_FIELD]; // F72: Cydian's own repo
   source.count = text == null ? null : await count(text, arch);
   source.updated = source.reachedAt = Date.now(); // F19: health
   source.failures = 0;
@@ -343,6 +347,7 @@ export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, coun
     if (release?.origin) out.origin = release.origin;
     if (release) {
       out.depiction = release.fields.depiction || null;
+      out.minimumVersion = release.fields[MIN_FIELD] || null; // F72: X-Cydian-Minimum-Version (Cydian's own repo)
       out.releaseDate = releaseTime(release);
       out.releaseHash = fingerprint(release.raw);
     }

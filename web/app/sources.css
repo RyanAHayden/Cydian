@@ -128,3 +128,14 @@
   background: linear-gradient(#b4b9c8, #5f6882 49%, #596484 51%, #4d597a); background-origin: border-box;
 }
 .alert-paste:active { background: linear-gradient(#8a90a3, #3f4863 49%, #39446a 51%, #2f3a5c); background-origin: border-box; }
+
+/* F72: Cydian's own source is built in: a lock where Delete's minus would be (Manage's edit list), and a small one
+   after its name (nav/lock.js). It never shows Delete. */
+.source-lock {
+  position: absolute; left: 7px; top: 50%; width: 29px; height: 29px; margin-top: -14.5px; display: flex;
+  align-items: center; justify-content: center; pointer-events: none; transform: translateX(-40px);
+  transition: transform .3s ease-in-out;
+}
+.editing .source-row .source-lock { transform: none; }
+.name-lock { display: inline-block; margin-left: 5px; vertical-align: -1px; line-height: 0; }
+.name-lock svg, .source-lock svg { display: block; }

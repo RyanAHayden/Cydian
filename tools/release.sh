@@ -5,29 +5,39 @@
 #   Cydian.deb                       the rootless jailbreak build (debFor's fallback, iphoneos-arm64 only)
 #   <pkg>_<ver>_<arch>.deb           the same .deb under Debian's name (debFor's exact-arch match), e.g.
 #                                    com.ryha.cydian_0.2.0-412_iphoneos-arm64.deb
-# Then it points Cydian's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new Cydian.ipa:
-# commit web/app/source.json afterwards.
+#   <pkg>_<ver>_<arch>.deb           any other arch build found in --dist under that name (roothide, rootful)
+#   Packages, Packages.gz, Release   Cydian's own flat APT repo over those .debs (F72, tools/selfrepo.py): the
+#                                    jailbreak app's built-in source, releases/latest/download/ on GitHub
+# Then it points Cydian's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new Cydian.ipa, the
+# sideload app's and the site's built-in source (F72), versions[] newest first: commit web/app/source.json afterwards.
 # Run it only when a person asks for a release. How to cut one: docs/release.md.
 #
-#   tools/release.sh [--dry-run] [--notes FILE] [--dist DIR] [--draft]
+#   tools/release.sh [--dry-run] [--notes FILE] [--dist DIR] [--draft] [--minimum X.Y.Z] [--out DIR]
 #     --dry-run   build (or read --dist), check and print what would be published; publish nothing, no network
 #     --notes F   the release notes (Markdown; the first 4 lines show in the app's update alert). Default: the
 #                 commit subjects since the last v* tag, then the standard footer about the two files
 #     --dist DIR  publish DIR/Cydian.deb and DIR/Cydian.ipa as they are instead of running `make -C native package`
 #     --draft     create the release as a draft (the app ignores drafts until it is published on GitHub)
+#     --minimum V the oldest Cydian that may keep running without upgrading first (F72): X-Cydian-Minimum-Version in
+#                 the Release and Cydian's stanza, "minimumVersion" in the AltStore source. Older ones get the
+#                 Essential Upgrade alert without Ignore. Default: none (the alert can always be ignored)
+#     --out DIR   also leave the repo files, the notes and the updated AltStore source (source.json) in DIR; a dry
+#                 run writes the source there only, never into web/app/source.json
 #   CYDIAN_RELEASE_REPO  owner/name to publish on (default RyanAHayden/Cydian)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 repo=${CYDIAN_RELEASE_REPO:-RyanAHayden/Cydian}
-dry=0 notes= dist= draft=()
+dry=0 notes= dist= draft=() minimum= out=
 while [ $# -gt 0 ]; do
   case $1 in
     --dry-run) dry=1 ;;
     --notes) notes=${2:?--notes needs a file}; shift ;;
     --dist) dist=${2:?--dist needs a directory}; shift ;;
     --draft) draft=(--draft) ;;
-    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --minimum) minimum=${2:?--minimum needs a version}; shift ;;
+    --out) out=${2:?--out needs a directory}; shift ;;
+    -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "release: unknown argument $1 (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -37,6 +47,14 @@ die() { echo "release: $*" >&2; exit 1; }
 version=$(tr -d '[:space:]' < native/VERSION)
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "native/VERSION is '$version', not X.Y.Z"
 tag=v$version
+if [ -n "$minimum" ]; then
+  [[ $minimum =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--minimum is '$minimum', not X.Y.Z"
+  python3 - "$minimum" "$version" <<'PY' || die "--minimum $minimum is newer than this release ($version): nobody could satisfy it"
+import sys
+a, b = (tuple(int(x) for x in v.split(".")) for v in sys.argv[1:])
+sys.exit(0 if a <= b else 1)
+PY
+fi
 sha=$(git rev-parse HEAD)
 
 # A real release comes from a clean, pushed commit, under a tag that doesn't exist yet.
@@ -104,6 +122,22 @@ trap 'rm -rf "$stage"' EXIT
 cp "$ipa" "$stage/Cydian.ipa"
 cp "$deb" "$stage/Cydian.deb"
 cp "$deb" "$stage/$debname"
+# Other arch builds named like Debian's files (com.ryha.cydian_<ver>_iphoneos-arm64e.deb) ride along.
+extra=()
+pkg=${debname%%_*}
+for f in "$dist/${pkg}"_*_*.deb; do
+  [ -f "$f" ] || continue
+  b=$(basename "$f")
+  [ "$b" = "$debname" ] && continue
+  cp "$f" "$stage/$b"
+  extra+=("$b")
+done
+# F72: Cydian's own APT repo over the Debian-named .debs (Filename: is the asset's name beside the Release).
+repodebs=("$stage/$debname")
+for b in "${extra[@]}"; do repodebs+=("$stage/$b"); done
+python3 tools/selfrepo.py "$stage" "${repodebs[@]}" ${minimum:+--minimum "$minimum"} >/dev/null ||
+  die "couldn't write the APT repo files"
+repofiles=(Packages Packages.gz Release)
 
 if [ -n "$notes" ]; then
   [ -f "$notes" ] || die "no notes file $notes"
@@ -119,18 +153,34 @@ else
 fi
 
 echo "release: $repo $tag at $sha"
-echo "release: assets: Cydian.ipa Cydian.deb $debname"
+echo "release: assets: Cydian.ipa Cydian.deb $debname ${extra[*]:+${extra[*]} }${repofiles[*]}"
+echo "release: apt repo: https://github.com/$repo/releases/latest/download/${minimum:+ (minimum $minimum)}"
 echo "release: notes:"
 sed 's/^/  /' "$stage/notes.md"
+altargs=(--notes "$stage/notes.md" ${minimum:+--minimum "$minimum"})
+if [ -n "$out" ]; then
+  mkdir -p "$out"
+  cp "$stage/notes.md" "$out/notes.md"
+  for f in "${repofiles[@]}"; do cp "$stage/$f" "$out/$f"; done
+fi
 if [ $dry = 1 ]; then
+  if [ -n "$out" ]; then
+    cp web/app/source.json "$out/source.json"
+    python3 tools/altsource.py update "$version" "$ipa" "${altargs[@]}" --source "$out/source.json" >/dev/null
+    echo "release: dry run: the AltStore source it would write is $out/source.json"
+  fi
   echo "release: dry run, nothing published"
   exit 0
 fi
 
+assets=("$stage/Cydian.ipa" "$stage/Cydian.deb" "$stage/$debname")
+for b in "${extra[@]}"; do assets+=("$stage/$b"); done
+for f in "${repofiles[@]}"; do assets+=("$stage/$f"); done
 gh release create "$tag" --repo "$repo" --target "$sha" --title "Cydian $version" --notes-file "$stage/notes.md" \
-  "${draft[@]}" "$stage/Cydian.ipa" "$stage/Cydian.deb" "$stage/$debname"
+  "${draft[@]}" "${assets[@]}"
 git fetch -q origin "refs/tags/$tag:refs/tags/$tag" || true
 echo "release: published https://github.com/$repo/releases/tag/$tag"
-python3 tools/altsource.py update "$version" "$ipa"
+python3 tools/altsource.py update "$version" "$ipa" "${altargs[@]}"
 python3 tools/altsource.py check
+[ -z "$out" ] || cp web/app/source.json "$out/source.json"
 echo "release: web/app/source.json now names $tag's Cydian.ipa: commit it"

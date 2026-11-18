@@ -74,11 +74,11 @@
 .progress-finish {
   width: 100%; max-width: 360px; height: 44px; margin: 2px 0 0; padding: 0 12px; border: 0; border-radius: 10px;
   cursor: pointer; touch-action: manipulation;
-  font: bold 20px/44px "Helvetica Neue", Helvetica, sans-serif; color: #000; text-shadow: 0 1px 0 rgba(255,255,255,.45);
+  font: bold 20px/44px "Helvetica Neue", Helvetica, sans-serif; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.5);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   box-shadow: 0 0 0 2.5px #000, 0 3.5px 0 0 rgba(211,211,211,.19);
-  background: linear-gradient(#f1f1f1, #f1f1f1 .5px, #e3e3e3 .5px, #dfdfdf 8%, #d7d7d7 18%, #cbcbcb 31%, #c0c0c0 44%,
-    #bdbdbd 50%, #a5a5a5 50%, #a5a5a5 calc(100% - .5px), #d3d3d3 calc(100% - .5px));
+  /* black, as the user asked (2026-11-18): UIAlertSheetBlackCancelButton's gradient (packages.css) */
+  background: linear-gradient(#878787, #686868 7%, #545454 23%, #383838 38%, #1a1a1a 54%, #020202 69%, #000 77%, #131313);
 }
 .progress-finish:active, .progress-finish.is-pressed {
   color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4);

@@ -159,16 +159,16 @@ test("Install: follows iOS's install with the signed app's ID and name", async (
   assert.deepEqual(ui.followed, [{ id: "com.me.delta", name: "Delta" }]);
 });
 
-test("Install: the follow goes through the real followInstall to Open <app>", async () => {
-  const n = fakeNative({ "signing.install": { bundleId: "com.x", name: "X" }, "signing.progress": { installed: true } });
+test("Install: the real followInstall ends on Done once iOS has the link, without following iOS (user 2026-11-18)", async () => {
+  const n = fakeNative({ "signing.install": { bundleId: "com.x", name: "X" } });
   const ui = fakeUI();
   delete ui.deps.follow;
   const finished = [];
   const hud = (t) => ({ set: (x) => ui.labels.push(x), hide: () => { ui.hidden++; }, finish: (f) => finished.push(f) });
   assert.equal(await installOnDevice({ url: "https://e.example/x.ipa", name: "X" }, { native: n, ...ui.deps, hud }), true);
   for (let i = 0; i < 20 && !finished.length; i++) await new Promise((r) => setTimeout(r, 0));
-  assert.deepEqual(n.calls.map((c) => c.method), ["signing.install", "signing.progress"]);
-  assert.equal(finished[0]?.label, "Open X");
+  assert.deepEqual(n.calls.map((c) => c.method), ["signing.install"]);
+  assert.equal(finished[0]?.status, "Done");
   assert.equal(ui.hidden, 0);
 });
 

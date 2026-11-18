@@ -146,52 +146,14 @@ export function signSheetButtons({ right, box, onInstall, onCancel, doc = docume
   return { install, cancel };
 }
 
-// signing.progress {bundleId}: iOS's own progress on the HUD until it says installed (or gives up), then it goes.
-// F155: on the progress page (a HUD with finish, nav/progress.js progressHUD) an installed app ends it on
-// "Open <name>" instead (signing.openApp; Close at the top right still just closes).
-const FOLLOW_AGAIN = 3; // B27: signing.progress calls again after one ended mid-install
-
-export async function followInstall(native, bundleId, h, { later = setTimeout, name = "" } = {}) {
-  if (!bundleId) { later(h.hide, 2500); return null; }
-  let r = null;
-  // B27: the shell's watch answers {installed: false} as soon as one look finds no install progress, which iOS
-  // gives between its stages (user 2026-11-18: the page said Complete over "Installing 72%"). An answer that came
-  // while the percent was still under 100 isn't the end: follow it again (a few times; a round that sees no more
-  // progress ends it as before).
-  for (let round = 0; ; round++) {
-    let mid = false;
-    try {
-      r = await native.call("signing.progress", { bundleId }, (ev) => {
-        // B29: the install server's lines (what iOS fetched) for the console; not progress.
-        if (ev?.log) { h.page?.raw?.(ev.log); return; }
-        const pct = Math.round(Number(ev?.progress) * 100);
-        mid = pct > 0 && pct < 100;
-        h.set(mid ? `Installing ${pct}%` : "Installing");
-      });
-    } catch { r = null; /* an older shell, or the private API gone: the HUD just goes */ }
-    if (!mid || r?.installed === true || round >= FOLLOW_AGAIN) break;
-  }
-  if (r?.installed === true && typeof h.finish === "function") {
-    h.set("Installed");
-    h.finish({ label: openLabel(name), status: "Installed", action: () => openInstalled(native, bundleId) });
-  } else if (r?.installed === true) { h.set("Installed"); later(h.hide, 1200); } else h.hide();
-  return r?.installed ?? null;
-}
-
-// F155: the progress page's button for an installed app: "Open Delta" (a long name cut, "Open App" with none).
-export function openLabel(name) {
-  const n = String(name ?? "").trim();
-  if (!n) return "Open App";
-  return `Open ${n.length > 24 ? `${n.slice(0, 23).trimEnd()}…` : n}`;
-}
-
-// signing.openApp {bundleId}, then the page closes; when iOS won't open it (or the shell is older) an alert says so first.
-export async function openInstalled(native, bundleId, { alert = showAlert } = {}) {
-  let r = null;
-  try { r = await native.call("signing.openApp", { bundleId }); } catch { /* an older shell: no such call */ }
-  if (r?.opened === true) return false;
-  await alert({ title: "Can't Open It", message: "iOS didn't open the app. Open it from the Home Screen.", buttons: ["OK"] });
-  return false;
+// Once iOS has the install link, the page says Done and ends on Return: iOS's own install is the user's from there
+// (user 2026-11-18: "after we give the install just say its done"). B27-B29 followed iOS's progress over
+// signing.progress, which could sit on "iOS has the whole IPA" long after the app was in.
+export async function followInstall(_native, _bundleId, h, { later = setTimeout } = {}) {
+  h.set("Done");
+  if (typeof h.finish === "function") h.finish({ status: "Done" });
+  else later(h.hide, 1200);
+  return null;
 }
 
 // The sheet itself. `onSign(edits)` with { name, bundleId, icon (base64 PNG | null), removeExtensions: [path] }.

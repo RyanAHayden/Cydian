@@ -286,9 +286,8 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   // (native CloseForUpdate): say so first (user 2026-11-18).
   if (host) showBanner({ title: NAME, message: `Press Install. ${NAME} closes to finish updating; open it again once the new icon appears.` });
   if (after) { after(result, h); return true; }
-  // F169: a plain Install follows iOS's install too (signing-sheet.js followInstall), so it ends on F155's
-  // Open <app>, as Custom Install and My IPAs do. Not for iFizBox itself (host, or its own IPA or ID): iOS closes
-  // iFizBox while it installs over it, and there's nothing to open.
+  // F169: a plain Install ends through followInstall (signing-sheet.js): Done once iOS has the link (user 2026-11-18).
+  // Not for iFizBox itself (host, or its own IPA or ID): iOS closes iFizBox while it installs over it.
   if (result?.bundleId && !host && !isSelfIpa(url) && result.bundleId !== CYDIAN_ID) {
     const followInstall = follow ?? (await import("./signing-sheet.js")).followInstall;
     followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name });

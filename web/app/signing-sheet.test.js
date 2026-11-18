@@ -3,7 +3,7 @@
 // the re-sign reminder call. A fake cydianNative stands in for native/Sources/Sideload.swift.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { inspectAndInstall, followInstall, openLabel, openInstalled } from "./signing-sheet.js";
+import { inspectAndInstall, followInstall } from "./signing-sheet.js";
 import { installOnDevice } from "./signing-client.js";
 import { progressHUD } from "./nav/progress.js";
 import {
@@ -98,11 +98,10 @@ test("isCgBI: Apple's CgBI PNG is told apart from a plain one", () => {
   assert.equal(isCgBI(new Uint8Array(4)), false);
 });
 
-test("Install: inspect, the sheet's edits, signing.install {token, ...edits}, then signing.progress for iOS's install", async () => {
+test("Install: inspect, the sheet's edits, signing.install {token, ...edits}, then Done once iOS has the link", async () => {
   const native = fakeNative({
     "signing.inspect": (p, on) => { on({ phase: "downloading", progress: 0.5 }); return INFO; },
     "signing.install": (p, on) => { on({ phase: "signing", progress: 0.3 }); return { bundleId: "com.me.delta", name: "Delta 2" }; },
-    "signing.progress": (p, on) => { on({ phase: "installing", progress: 0.4 }); on({ phase: "installing", progress: 1 }); return { installed: true }; },
   });
   globalThis.cydianNative = native;
   const ui = fakeUI();
@@ -118,17 +117,16 @@ test("Install: inspect, the sheet's edits, signing.install {token, ...edits}, th
     { native, hud: ui.hud, alert: ui.alert, install, sheet, later: ui.later });
   assert.equal(ok, true);
   assert.equal(shown, INFO);
-  assert.deepEqual(native.calls.map((c) => c.method), ["signing.inspect", "signing.install", "signing.progress"]);
+  assert.deepEqual(native.calls.map((c) => c.method), ["signing.inspect", "signing.install"]);
   assert.deepEqual(native.calls[0].params, { url: "https://example.com/Delta.ipa" });
   const { manifestServer, ...sent } = native.calls[1].params;
   assert.deepEqual(sent, { token: "tok1", name: "Delta 2", bundleId: "com.me.delta", removeExtensions: ["PlugIns/DeltaWidget.appex"] });
   assert.match(manifestServer, /^https:\/\//);
-  assert.deepEqual(native.calls[2].params, { bundleId: "com.me.delta" });
   assert.deepEqual(installed, [{ bundleId: "com.me.delta", name: "Delta 2" }]);
   // let the progress call finish (after() runs it without awaiting)
   for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
-  assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Signing 30%", "Installing", "Installing 40%", "Installing", "Installed"]);
-  assert.equal(ui.timers.length, 1); // the HUD goes a moment after Installed
+  assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Signing 30%", "Installing", "Done"]);
+  assert.equal(ui.timers.length, 1); // the HUD goes a moment after Done
 });
 
 test("Install: Cancel on the sheet signs nothing; a bad ID is said before signing", async () => {
@@ -164,49 +162,30 @@ test("Install: inspect's errors are alerts; an older shell without signing.inspe
   assert.equal(straight[0].params, undefined);
 });
 
-test("followInstall: no answer or no API just hides the HUD", async () => {
+// A progress page as nav/progress.js openProgress draws it, keeping what the tests look at.
+function fakePage() {
+  const p = {
+    title: "Running", statusText: "", finished: null, closed: false, closers: [],
+    line() {}, step() {}, error() {}, raw() {}, progress() {},
+    status(t) { p.statusText = t; },
+    finish(o) { p.title = "Complete"; p.finished = o; },
+    reopen() { p.title = "Running"; p.finished = null; },
+    onClose(f) { p.closers.push(f); },
+    close() { p.closed = true; p.closers.forEach((f) => f()); },
+  };
+  return p;
+}
+
+test("followInstall: once iOS has the link the page says Done and ends on Return; no signing.progress (user 2026-11-18)", async () => {
+  const page = fakePage();
+  const native = { async call() { assert.fail("iOS's install isn't followed"); } };
+  assert.equal(await followInstall(native, "com.a", progressHUD("Installing", { open: () => page }), { later: () => assert.fail("no timer") }), null);
+  assert.equal(page.title, "Complete");
+  assert.equal(page.finished.status, "Done");
+  assert.equal(page.finished.label, "Return to iFizBox");
   const ui = fakeUI();
-  const h = ui.hud("Installing");
-  assert.equal(await followInstall(fakeNative({ "signing.progress": { installed: false } }), "com.a", h, { later: ui.later }), false);
-  assert.equal(ui.hidden, 1);
-  assert.equal(await followInstall(fakeNative({ "signing.progress": new Error("unknown method") }), "com.a", h, { later: ui.later }), null);
-  assert.equal(ui.hidden, 2);
-  assert.equal(await followInstall(fakeNative(), "", h, { later: ui.later }), null);
-  assert.equal(ui.timers.length, 1);
-  assert.equal(installedId({}, { bundleId: "b" }, INFO), "b");
-  assert.equal(installedId(null, {}, INFO), "com.rileytestut.Delta");
-});
-
-test("followInstall (F155): on the progress page an installed app ends on Open <name>, which opens it by bundle ID", async () => {
-  const native = fakeNative({ "signing.progress": { installed: true }, "signing.openApp": { opened: true } });
-  const ui = fakeUI();
-  const ends = [];
-  const h = { ...ui.hud("Installing"), finish: (o) => ends.push(o) };
-  assert.equal(await followInstall(native, "com.me.delta", h, { later: ui.later, name: "Delta 2" }), true);
-  assert.equal(ui.labels.at(-1), "Installed");
-  assert.equal(ui.timers.length, 0); // the page stays, on its button
-  assert.equal(ends.length, 1);
-  assert.equal(ends[0].label, "Open Delta 2");
-  assert.equal(ends[0].status, "Installed");
-  assert.equal(await ends[0].action(), false); // the page closes once the app opens
-  assert.deepEqual(native.calls.at(-1), { method: "signing.openApp", params: { bundleId: "com.me.delta" } });
-
-  // not installed: Return to iFizBox as before (hide), no Open
-  const no = { ...ui.hud("Installing"), finish: () => assert.fail() };
-  await followInstall(fakeNative({ "signing.progress": { installed: false } }), "com.a", no, { later: ui.later, name: "A" });
-  assert.equal(ui.hidden, 1);
-});
-
-test("openLabel and openInstalled: a long name cut, none says App; iOS refusing (or an older shell) is an alert", async () => {
-  assert.equal(openLabel("Delta"), "Open Delta");
-  assert.equal(openLabel(""), "Open App");
-  assert.equal(openLabel("A Very Long Application Name Indeed"), "Open A Very Long Application…");
-  const alerts = [];
-  const alert = async (a) => { alerts.push(a); };
-  assert.equal(await openInstalled(fakeNative({ "signing.openApp": { opened: false } }), "com.a", { alert }), false);
-  assert.equal(await openInstalled(fakeNative({ "signing.openApp": new Error("unknown method signing.openApp") }), "com.a", { alert }), false);
-  assert.equal(alerts.length, 2);
-  assert.equal(alerts[0].title, "Can't Open It");
+  assert.equal(await followInstall(native, "com.a", ui.hud("Installing"), { later: ui.later }), null);
+  assert.equal(ui.timers.length, 1); // a plain HUD goes a moment after Done
 });
 
 test("certificateWarnings: revoked, and signatures ending within 7 days", () => {
@@ -257,87 +236,4 @@ test("Re-sign Reminder: shown in the sideload build, and its value goes to signi
   assert.deepEqual(native.calls.map((c) => c.params), [{ days: 2 }, { days: 7 }, { days: 0 }]);
   assert.equal(await syncReminder(s.get, null), null);
   assert.equal(await syncReminder(s.get, async () => { throw new Error("unknown method"); }), null);
-});
-
-// B27: a progress page as nav/progress.js openProgress draws it, keeping what the tests look at.
-function fakePage() {
-  const p = {
-    title: "Running", statusText: "", finished: null, closed: false, closers: [],
-    line() {}, step() {}, error() {}, raw() {}, progress() {},
-    status(t) { p.statusText = t; },
-    finish(o) { p.title = "Complete"; p.finished = o; },
-    reopen() { p.title = "Running"; p.finished = null; },
-    onClose(f) { p.closers.push(f); },
-    close() { p.closed = true; p.closers.forEach((f) => f()); },
-  };
-  return p;
-}
-
-// signing.progress whose stream the test drives: emit(fraction), then end(answer).
-function streamingProgress() {
-  const s = { rounds: 0 };
-  s.native = { async call(method, params, onEvent) {
-    assert.equal(method, "signing.progress");
-    s.rounds++;
-    return new Promise((resolve) => { s.emit = (f) => onEvent({ phase: "installing", progress: f }); s.end = resolve; });
-  } };
-  return s;
-}
-const tick = () => new Promise((r) => setTimeout(r, 0));
-
-test("B27: a queue run's next job ending doesn't complete the page while the last app's signing.progress still streams", async () => {
-  const page = fakePage();
-  const open = () => page;
-  const s = streamingProgress();
-  const h1 = progressHUD("Downloading", { open });
-  const following = followInstall(s.native, "com.a", h1, { later: () => assert.fail("no timer"), name: "A" });
-  await tick();
-  s.emit(0.3);
-  const h2 = progressHUD("Downloading", { open }); // the queue's next app, on the same page
-  assert.equal(page.title, "Running");
-  h2.done("Done"); // it was handed to iOS (or it failed): the first app is still installing
-  s.emit(0.72);
-  assert.equal(page.title, "Running");
-  assert.equal(page.finished, null);
-  assert.equal(page.statusText, "Installing 72%");
-  s.end({ installed: true });
-  assert.equal(await following, true);
-  assert.equal(page.title, "Complete");
-  assert.equal(page.finished.label, "Open A");
-  assert.equal(page.finished.status, "Installed");
-  page.close();
-});
-
-test("B27: signing.progress answering not-installed mid-install (iOS between stages) is followed again, not ended", async () => {
-  const page = fakePage();
-  const s = streamingProgress();
-  const h = progressHUD("Installing", { open: () => page });
-  const following = followInstall(s.native, "com.a", h, { later: () => assert.fail("no timer"), name: "A" });
-  await tick();
-  s.emit(0.72);
-  s.end({ installed: false }); // the shell's watch saw no Progress for a moment
-  await tick();
-  assert.equal(s.rounds, 2);
-  assert.equal(page.title, "Running");
-  assert.equal(page.statusText, "Installing 72%");
-  s.emit(0.9);
-  s.end({ installed: true });
-  assert.equal(await following, true);
-  assert.equal(page.finished.label, "Open A");
-  page.close();
-
-  // a round with no progress at all ends it as before; so does an install that never streamed
-  const p2 = fakePage();
-  const s2 = streamingProgress();
-  const f2 = followInstall(s2.native, "com.a", progressHUD("Installing", { open: () => p2 }), { later: () => {} });
-  await tick();
-  s2.emit(0.5);
-  s2.end({ installed: false });
-  await tick();
-  s2.end({ installed: false });
-  assert.equal(await f2, false);
-  assert.equal(s2.rounds, 2);
-  assert.equal(p2.title, "Complete");
-  assert.equal(p2.finished.label, "Return to iFizBox");
-  p2.close();
 });

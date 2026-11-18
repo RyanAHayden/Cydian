@@ -18,6 +18,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.3.7",
+          "date": "2026-11-18T07:32:34Z",
+          "localizedDescription": "The website signs and installs apps again, entirely in Safari (zsign as WebAssembly): Settings > Signing, Home's Signing tile and Install Cydian App are back. Website Install offers Install and Download IPA.\nInstalled shows each signed app's days left (green, amber, red); Changes lists Needs Re-sign; re-signs go through Confirm.\nModify offers Mark as Not Installed.\nSettings > Update Alerts uses Cydian's switches: Check in the Background, badge, notifications, Background App Refresh.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.7",
+          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.7/Cydian.ipa",
+          "size": 3390046,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.3.6",
           "date": "2026-11-18T06:46:38Z",
           "localizedDescription": "Icon badge fixed (badge permission is asked for); the background check keeps the badge current and Settings > Update Alerts shows what iOS allows, when it last checked, and a switch to turn background checks off.\nLong-press the Cydian icon: Upgrade All (N) queues every upgrade and opens Confirm.\nA new Cydian (not required) shows a banner with Upgrade instead of an alert; installed apps show Modify (Upgrade or Reinstall, Downgrade).\nUpdating Cydian: a banner says it will close, and it closes itself so iOS finishes.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.3.6",
@@ -167,14 +175,6 @@
           "localizedDescription": "Mark as Installed on app pages: apps installed another way are followed for updates (Change Installed Version, Mark as Not Installed).\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.8",
           "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.8/Cydian.ipa",
           "size": 2510101,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.1.7",
-          "date": "2026-11-18T02:08:32Z",
-          "localizedDescription": "Signing and installing end on a Done checkmark that fades, so it is clear the app was handed to iOS.\nThe Signing walkthrough moves to the next step by itself when you come back from Settings.\nRelease notes: https://github.com/RyanAHayden/Cydian/releases/tag/v0.1.7",
-          "downloadURL": "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.7/Cydian.ipa",
-          "size": 2496201,
           "minOSVersion": "15.0"
         }
       ]

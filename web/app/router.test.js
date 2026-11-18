@@ -46,8 +46,11 @@ test("F123: the tab bar is Cydia's five, Settings' pages are on Home's stack", a
   assert.equal(mountLink({ tab: "home", path: [] }, settingsRoute(["signing"])), null);
   assert.deepEqual(mountLink({ tab: "sources", path: ["pkg"] }, settingsRoute(["iosVersion"])),
     { tab: "sources", path: ["pkg", "~settings", "iosVersion"] });
+  assert.deepEqual(mountLink({ tab: "sources", path: ["pkg", "~settings", "logs"] }, settingsRoute(["logs", "7"])),
+    { tab: "sources", path: ["pkg", "~settings", "logs", "7"] });
+  // F143: a link to another branch of Settings is a push on top, so Back returns to the page it came from
   assert.deepEqual(mountLink({ tab: "sources", path: ["pkg", "~settings", "iosVersion"] }, settingsRoute(["device"])),
-    { tab: "sources", path: ["pkg", "~settings", "device"] });
+    { tab: "sources", path: ["pkg", "~settings", "iosVersion", "~settings", "device"] });
   assert.equal(mountLink({ tab: "sources", path: ["pkg"] }, settingsRoute()), null);
 });
 
@@ -270,4 +273,69 @@ test("another tab's pages inside this one: mounted, prefixes and parent skip the
     { tab: "changes", path: ["x", "~installed", "myipas"] });
   assert.equal(mountLink(r, { tab: "home", path: ["about"] }), null); // same tab
   assert.equal(mountLink(r, { tab: "sources", path: [] }), null); // a tab's root: a switch
+});
+
+// app.js goBack: history.back() when the top was pushed (the entry behind is the page below), else replace with it.
+function pressBack(h) {
+  const top = h.stacks.top();
+  const below = h.stacks.below();
+  const up = below ? { tab: below.tab, path: below.path } : parent({ tab: top.tab, path: top.path });
+  if (top.pushed) h.win.back(format(up));
+  else h.router.replace(up);
+}
+
+test("F143: Home > Manage > a source (More Sources) > Back is Manage, Back again is Home", async () => {
+  const { mounted } = await import("./router.js");
+  const h = stackHarness("#/home");
+  h.win.location.hash = format({ tab: "sources", path: ["manage"] }); // Home's More Package Sources row
+  assert.equal(h.win.location.hash, "#/home/~sources/manage");
+  h.win.location.hash = format({ tab: "sources", path: ["bigboss"] }); // a source in Manage's More Sources
+  assert.equal(h.win.location.hash, "#/home/~sources/manage/~sources/bigboss");
+  assert.deepEqual(mounted(h.router.current()), { tab: "sources", path: ["bigboss"] });
+  assert.deepEqual(h.paths("home"), ["", "~sources/manage", "~sources/manage/~sources/bigboss"]);
+  // inside the source, its own links stay in the inner mount
+  h.win.location.hash = format({ tab: "sources", path: ["bigboss", "pkg"] });
+  assert.equal(h.win.location.hash, "#/home/~sources/manage/~sources/bigboss/pkg");
+  pressBack(h);
+  assert.equal(h.win.location.hash, "#/home/~sources/manage/~sources/bigboss");
+  pressBack(h);
+  assert.equal(h.last().kind, "pop");
+  assert.equal(h.win.location.hash, "#/home/~sources/manage");
+  assert.deepEqual(h.paths("home"), ["", "~sources/manage"]);
+  pressBack(h);
+  assert.equal(h.win.location.hash, "#/home");
+  assert.deepEqual(h.paths("home"), [""]);
+});
+
+test("F143: Sources > Manage > a source > Back is Manage, Back again is Sources; also from a deep link (no history)", async () => {
+  const { mounted } = await import("./router.js");
+  const h = stackHarness("#/sources");
+  h.router.go({ tab: "sources", path: ["manage"] }); // the Manage button
+  h.win.location.hash = format({ tab: "sources", path: ["bigboss"] });
+  assert.equal(h.win.location.hash, "#/sources/manage/~sources/bigboss");
+  assert.deepEqual(mounted(h.router.current()), { tab: "sources", path: ["bigboss"] });
+  assert.deepEqual(h.paths("sources"), ["", "manage", "manage/~sources/bigboss"]);
+  pressBack(h);
+  assert.equal(h.win.location.hash, "#/sources/manage");
+  pressBack(h);
+  assert.equal(h.win.location.hash, "#/sources");
+
+  // reloaded on the source (nothing behind in history): Back replaces, still to Manage, then Home
+  const d = stackHarness("#/home/~sources/manage/~sources/bigboss");
+  assert.deepEqual(d.paths("home"), ["", "~sources/manage", "~sources/manage/~sources/bigboss"]);
+  pressBack(d);
+  assert.equal(d.win.location.hash, "#/home/~sources/manage");
+  pressBack(d);
+  assert.equal(d.win.location.hash, "#/home");
+});
+
+test("F143: links within a branch of the tab stay plain pushes, pops and siblings", async () => {
+  const { mountLink } = await import("./router.js");
+  assert.equal(mountLink({ tab: "sources", path: [] }, { tab: "sources", path: ["bigboss"] }), null);
+  assert.equal(mountLink({ tab: "sources", path: ["bigboss"] }, { tab: "sources", path: ["bigboss", "pkg"] }), null);
+  assert.equal(mountLink({ tab: "sources", path: ["x", "y"] }, { tab: "sources", path: ["x", "z"] }), null);
+  assert.equal(mountLink({ tab: "sources", path: ["manage", "io"] }, { tab: "sources", path: ["manage"] }), null);
+  // Back's replace to the page below a nested mount is a pop, not another mount
+  assert.equal(mountLink({ tab: "sources", path: ["manage", "~sources", "bigboss"] }, { tab: "sources", path: ["manage"] }), null);
+  assert.equal(mountLink({ tab: "home", path: ["~sources", "manage", "~sources", "b"] }, { tab: "home", path: ["~sources", "manage"] }), null);
 });

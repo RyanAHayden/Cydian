@@ -54,7 +54,7 @@ enum Incoming {
 
     static func receive(_ url: URL) {
         if MyIPAs.receive(url) { return } // F77: an .ipa file goes into My IPAs, which then sends cydian://myipas
-        guard IncomingLink.accepts(url) else { return }
+        guard IncomingLink.accepts(url) || OtherLink.accepts(url) else { return } // F83: other sideloaders' links too
         pending = url.absoluteString
         notify(tries: 50)
     }
@@ -87,6 +87,20 @@ enum Incoming {
                 c.reply(nil, "bad_data: \(error)")
             }
         }
+    }
+}
+
+// F83: other sideloaders' schemes, claimed by the sideload build (native/Info-sideload.plist; the jailbreak build
+// claims none, so it never gets them). The page decides what each becomes, and whether Settings > Sideloading > Open
+// Other Apps' Links lets Cydian take it (web/app/core/otherlinks.js OTHER_SCHEMES holds the same list; a test checks).
+enum OtherLink {
+    static let schemes: Set<String> = ["altstore", "altstore-classic", "sidestore", "feather", "ksign", "esign", "scarlet",
+                                       "gbox", "trollapps", "stikstore"]
+    static let maxLength = 8192
+
+    static func accepts(_ url: URL) -> Bool {
+        guard let s = url.scheme?.lowercased(), schemes.contains(s) else { return false }
+        return url.absoluteString.utf8.count <= maxLength
     }
 }
 

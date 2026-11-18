@@ -34,6 +34,12 @@
 			<key>CFBundleURLName</key><string>com.ryha.cydian</string>
 			<key>CFBundleURLSchemes</key><array><string>cydian</string></array>
 		</dict>
+		<!-- F83: other sideloaders' links, turned into Cydian's own (web/app/core/otherlinks.js; App.swift OtherLink holds
+		     the same list). iOS gives a scheme to one app when several claim it. -->
+		<dict>
+			<key>CFBundleURLName</key><string>com.ryha.cydian.other</string>
+			<key>CFBundleURLSchemes</key><array><string>altstore</string><string>altstore-classic</string><string>sidestore</string><string>feather</string><string>ksign</string><string>esign</string><string>scarlet</string><string>gbox</string><string>trollapps</string><string>stikstore</string></array>
+		</dict>
 	</array>
 	<!-- No system type for .mobileprovision: declare it, so the document type above has something to match. -->
 	<key>UTImportedTypeDeclarations</key><array>

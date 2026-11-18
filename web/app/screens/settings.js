@@ -28,6 +28,7 @@ import { signingRowShows, offerAfterImport, IMPORT_ALERT, APP_IPA_URL, APP_NAME,
 import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installPath, isNewer, compareVersions } from "../core/selfupdate.js";
 import { getArch } from "../backend.js";
 import { ipaSection } from "./ipa-install.js";
+import { otherLinksOn, setOtherLinks } from "../core/otherlinks.js";
 
 export const title = "Settings";
 
@@ -80,7 +81,7 @@ function draw({ el, route }) {
   else if (String(key ?? "").startsWith(EXPORT_SEGMENT + ".")) drawExport(el, exportKey(key)); // F75: Import from Safari
   else if (key === LOGS) el.replaceChildren(logsPage(route.path[1], () => draw({ el, route })));
   else if (key) el.replaceChildren(listPage(key));
-  else el.replaceChildren(rootPage(), signingSection(), openInAppSection(), ipaSection(), pushSection(), logsSection(detectMode()), aboutSection());
+  else el.replaceChildren(rootPage(), signingSection(), sideloadingSection(), openInAppSection(), ipaSection(), pushSection(), logsSection(detectMode()), aboutSection());
   el.scrollTop = top;
 }
 
@@ -376,6 +377,23 @@ function appOfferSection(id) {
   frag.firstChild.classList.add("app-offer");
   frag.querySelector(".cell-icon")?.classList.add("home-glyph", "glyph-install");
   return [frag, bringSection()];
+}
+
+// F83: Sideloading > Open Other Apps' Links (sideload build only, which claims the schemes; on by default). The
+// footer says the limit: iOS fixed the schemes at install, so off can't hand a link back to the app it was for.
+export const OTHER_LINKS_FOOTER = "Links for AltStore, SideStore, Feather, ESign, Scarlet and other sideloaders open in Cydian: "
+  + "a source goes to Sources, an app to Install IPAs. iOS gives each kind of link to one app and Cydian can't change "
+  + "which, so off doesn't give them back: Cydian opens the link again, which reaches the other app only where iOS "
+  + "picked that app, and otherwise says the link was for another app.";
+export function sideloadingSection(mode = detectMode()) {
+  const box = document.createElement("div");
+  if (mode !== "sideload") return box;
+  const frag = grouped([{ header: "Sideloading", rows: [{ label: "Open Other Apps' Links" }], footer: OTHER_LINKS_FOOTER }]);
+  const cell = frag.querySelector(".cell-inner");
+  cell?.append(createSwitch({ label: "Open Other Apps' Links", checked: otherLinksOn(), onToggle: (on) => setOtherLinks(on) }));
+  cell?.classList.add("has-switch");
+  box.append(frag);
+  return box;
 }
 
 // F75: the website's "Bring my certificate into the app" switch, on by default.

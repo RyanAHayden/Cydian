@@ -28,8 +28,10 @@ export async function installIpa(url, onEvent = null, { native = globalThis.cydi
 //   view.line(type, text)   type "info" | "status" | "error" | "warning": one console line
 //   view.status(text)       the white line over the bar
 //   view.progress(percent)  0..100
-// Resolves { ok, bundleId, error: core/ipainstall.js ipaError's answer or null, log: the console's text }.
-export async function runIpaInstall({ url, name = "" }, view, { native = globalThis.cydianNative } = {}) {
+// Resolves { ok, bundleId, error: core/ipainstall.js ipaError's answer or null, log: the console's text, cancelled }.
+// F188: `signal` (the page's Cancel) ends the run at once: it resolves { ok: false, cancelled: true } without waiting
+// for ipa.install (the shell has no call to stop it, so it runs out on its own) and nothing more is drawn.
+export async function runIpaInstall({ url, name = "" }, view, { native = globalThis.cydianNative, signal = null } = {}) {
   const log = [];
   const line = (type, text) => {
     log.push(type === "error" ? `E: ${text}` : type === "status" ? `» ${text}` : text);
@@ -42,8 +44,16 @@ export async function runIpaInstall({ url, name = "" }, view, { native = globalT
   let error = null;
   let lastStatus = "";
   const said = new Set(); // the helper's own "cydian-helper: " lines, not repeated at the end
+  const stopped = () => Boolean(signal?.aborted);
+  const cancelled = () => {
+    log.push("» Cancelled");
+    return { ok: false, bundleId: "", error: null, log: log.join("\n"), cancelled: true };
+  };
+  if (stopped()) return cancelled();
+  const aborted = new Promise((resolve) => signal?.addEventListener?.("abort", () => resolve(true), { once: true }));
   try {
-    result = await installIpa(url, ({ fd, line: raw }) => {
+    const job = installIpa(url, ({ fd, line: raw }) => {
+      if (stopped()) return;
       const text = String(raw ?? "").replace(/\s+$/, "");
       if (!text) return;
       if (fd === "status") {
@@ -59,9 +69,12 @@ export async function runIpaInstall({ url, name = "" }, view, { native = globalT
       if (fd === "err" && /^cydian-helper: /.test(text)) said.add(text.slice(15));
       line(fd === "err" && /^cydian-helper: /.test(text) ? "error" : fd === "err" && /^(W:|warning)/i.test(text) ? "warning" : "info", text);
     }, { native });
+    job.catch(() => {}); // after Cancel no one waits for it
+    result = await (signal ? Promise.race([job, aborted.then(() => null)]) : job);
   } catch (e) {
-    error = ipaError(e, name);
+    if (!stopped()) error = ipaError(e, name);
   }
+  if (stopped()) return cancelled();
   if (error) {
     const first = error.code === "no_adhoc" ? error.detail || error.title : error.message;
     if (!(error.code === "no_adhoc" && said.has(error.detail))) line("error", first);
@@ -73,5 +86,5 @@ export async function runIpaInstall({ url, name = "" }, view, { native = globalT
     view.status("Done");
   }
   view.progress(100);
-  return { ok: !error, bundleId: result?.bundleId || "", error, log: log.join("\n") };
+  return { ok: !error, bundleId: result?.bundleId || "", error, log: log.join("\n"), cancelled: false };
 }

@@ -29,6 +29,24 @@ import { NAME, GITHUB_REPO } from "./brand.js";
 // without one (liveHUD, the tests') just goes.
 const failed = (h, message) => (typeof h.fail === "function" ? h.fail(message) : h.hide());
 
+// F188: the progress page's Cancel (top right all through, nav/progress.js progressHUD) ends the job at once: `p`, or a
+// rejection with code "cancelled" the moment it is tapped, so nothing waits on a bridge call, a download or the
+// signer that no one wants any more (and installOnDevice's one-at-a-time lock comes free). A HUD without Cancel
+// (liveHUD, the tests') just waits for `p`.
+export function untilCancel(h, p) {
+  if (typeof h?.onCancel !== "function") return p;
+  return new Promise((resolve, reject) => {
+    h.onCancel(() => reject(Object.assign(new Error("Cancelled"), { code: "cancelled" })));
+    Promise.resolve(p).then(resolve, reject);
+  });
+}
+
+// F188: asks the shell to stop its signing job (download, signing, the local server's keep-alive). Shells without
+// signing.cancel refuse it, and the job then runs out on its own; its answer is ignored either way.
+function stopNative(native) {
+  try { Promise.resolve(bridge(native).call("signing.cancel", {})).catch(() => {}); } catch { /* no bridge */ }
+}
+
 const SERVER_KEY = "cydian.signingServer";
 
 // The picks wait in memory only, until signing.import puts them into the Keychain; then only their names stay (the
@@ -243,21 +261,24 @@ export async function installOnDevice(opts, deps) {
 async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false },
   { native, hud = progressHUD, alert = showAlert, go = openRoute, later = setTimeout, follow = null } = {}) {
   const h = hud("Downloading");
+  h.onCancel?.(() => stopNative(native));
   let result;
   try {
     // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
     // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
-    result = await bridge(native).call("signing.install", { ...(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}) }, (ev) => {
+    result = await untilCancel(h, bridge(native).call("signing.install", { ...(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}) }, (ev) => {
       const t = phaseLabel(ev);
       if (t) h.set(t);
-    });
+    }));
   } catch (e) {
+    if (h.cancelled) return false;
     const why = deviceError(e, name);
     failed(h, why.message);
     await alert({ title: why.title, message: why.message, buttons: ["OK"] });
     if (why.open === "signing") go(["signing"]);
     return false;
   }
+  if (h.cancelled) return false;
   h.set("Installing");
   onInstalled(result);
   // iFizBox itself (host): iOS's Install prompt is up, and iFizBox closes once it's answered so the install finishes
@@ -312,8 +333,10 @@ export async function installFromLibrary({ file, name = "", onInstalled = () => 
   if (await check({ native })) return null;
   const server = getServer();
   const h = hud("Signing");
+  h.onCancel?.(() => stopNative(native));
   const onEvent = (ev) => { const t = phaseLabel(ev); if (t) h.set(t); };
   const fail = async (e) => {
+    if (h.cancelled) return false;
     const why = deviceError(e, name);
     failed(h, why.message);
     await alert({ title: why.title, message: why.message, buttons: ["OK"] });
@@ -321,15 +344,17 @@ export async function installFromLibrary({ file, name = "", onInstalled = () => 
     return false;
   };
   // Sign first: nothing here needs the network, so an offline phone still ends with a signed copy.
-  try { await libraryCall("sign", { file }, onEvent, native); } catch (e) { return fail(e); }
-  if (!(await reachable(server))) {
+  try { await untilCancel(h, libraryCall("sign", { file }, onEvent, native)); } catch (e) { return fail(e); }
+  if (!(await untilCancel(h, reachable(server)).catch(() => false)) && !h.cancelled) {
     h.hide();
     await alert({ title: "No Connection", message: offlineText(name, server), buttons: ["OK"] });
     return "offline";
   }
+  if (h.cancelled) return false;
   h.set("Installing");
   let result;
-  try { result = await libraryCall("install", { file, manifestServer: server }, onEvent, native); } catch (e) { return fail(e); }
+  try { result = await untilCancel(h, libraryCall("install", { file, manifestServer: server }, onEvent, native)); } catch (e) { return fail(e); }
+  if (h.cancelled) return false;
   onInstalled(result);
   const followInstall = follow ?? (await import("./signing-sheet.js")).followInstall;
   if (result?.bundleId) followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name });
@@ -358,10 +383,13 @@ export const browserSigning = () => detectMode() === "site";
 const signFail = (code, message) => Object.assign(new Error(message), { code });
 
 // The Web Worker, as one call: resolves the worker's answer ({ ipa, bundleId, name, version }), or throws its error.
-export function runInWorker(job, { make = () => new Worker(new URL("./signing-worker.js", import.meta.url), { type: "module" }), onProgress = () => {} } = {}) {
+// F188: `signal` (the progress page's Cancel) ends the worker, and zsign with it, mid-signing.
+export function runInWorker(job, { make = () => new Worker(new URL("./signing-worker.js", import.meta.url), { type: "module" }), onProgress = () => {}, signal = null } = {}) {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(signFail("cancelled", "Cancelled")); return; }
     let w;
     try { w = make(); } catch (e) { reject(signFail("unsupported", `This browser can't sign apps (${e?.message ?? e}).`)); return; }
+    signal?.addEventListener?.("abort", () => { w.terminate?.(); reject(signFail("cancelled", "Cancelled")); }, { once: true });
     w.onmessage = (e) => {
       const m = e.data ?? {};
       if (m.progress) { onProgress(m.progress); return; }
@@ -383,19 +411,21 @@ async function answerError(res) {
 // A request that failed for want of a connection (Safari: "Load failed") is tried again, up to `tries` times with a
 // pause, as phones drop a request now and then mid-upload (user 2026-11-18: an upload stopped after its second part).
 // An answer from the server, even an error, is final.
-async function retrying(send, { tries = 3, wait = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+async function retrying(send, { tries = 3, wait = (ms) => new Promise((r) => setTimeout(r, ms)), signal = null } = {}) {
   for (let i = 1; ; i++) {
     try { return await send(); } catch (e) {
-      if (i >= tries) throw e;
+      if (i >= tries || signal?.aborted) throw e; // F188: Cancel isn't a dropped request
       await wait(800 * i);
     }
   }
 }
 
 // The IPA's bytes through /api/fetch, the label following the download ("Downloading 40%").
-export async function downloadIpa(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, max = IPA_MAX, wait = undefined } = {}) {
+// F188: `signal` (the progress page's Cancel) aborts the download.
+export async function downloadIpa(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, max = IPA_MAX, wait = undefined, signal = null } = {}) {
   let res;
-  try { res = await retrying(() => fetcher(`${base}/api/fetch?${new URLSearchParams({ url, kind: "ipa" })}`, { cache: "no-store" }), { wait }); } catch {
+  try { res = await retrying(() => fetcher(`${base}/api/fetch?${new URLSearchParams({ url, kind: "ipa" })}`, { cache: "no-store", ...(signal ? { signal } : {}) }), { wait, signal }); } catch {
+    if (signal?.aborted) throw signFail("cancelled", "Cancelled");
     throw signFail("network", "The app couldn't be downloaded: no connection to the server.");
   }
   if (!res.ok) throw await answerError(res);
@@ -405,6 +435,7 @@ export async function downloadIpa(url, { base = "", fetcher = globalThis.fetch, 
   const reader = res.body.getReader();
   let buf = new Uint8Array(total || 1 << 20), n = 0;
   for (;;) {
+    if (signal?.aborted) { reader.cancel?.(); throw signFail("cancelled", "Cancelled"); }
     const { done, value } = await reader.read();
     if (done) break;
     if (n + value.length > max) { reader.cancel?.(); throw signFail("too_large", `Apps up to ${Math.round(max / 1048576)} MB can be signed on the website.`); }
@@ -418,12 +449,14 @@ export async function downloadIpa(url, { base = "", fetcher = globalThis.fetch, 
 
 // The signed IPA to the Worker (POST /sign/upload, each part, done): the install link's answer { itms, ... }.
 // F121: `token` uploads into the reserved early link instead of a new one.
-export async function uploadSigned(bytes, { bundleId, name, version }, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, wait = undefined, token = null } = {}) {
+export async function uploadSigned(bytes, { bundleId, name, version }, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, wait = undefined, token = null, signal = null } = {}) {
   const q = new URLSearchParams({ bundleid: bundleId, version: String(version || "1.0").slice(0, 64), title: String(name || bundleId).slice(0, 200), size: String(bytes.length),
     ...(token ? { token } : {}) });
   const call = async (path, init) => {
     let res;
-    try { res = await retrying(() => fetcher(`${base}${path}`, { cache: "no-store", ...init }), { wait }); } catch {
+    if (signal?.aborted) throw signFail("cancelled", "Cancelled"); // F188: no part goes up after Cancel
+    try { res = await retrying(() => fetcher(`${base}${path}`, { cache: "no-store", ...init, ...(signal ? { signal } : {}) }), { wait, signal }); } catch {
+      if (signal?.aborted) throw signFail("cancelled", "Cancelled");
       throw signFail("network", "The signed app couldn't be uploaded: no connection to the server.");
     }
     if (!res.ok) throw await answerError(res);
@@ -510,18 +543,21 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   }
   const h = hud("Downloading");
   const pct = (label) => (p) => h.set(`${label} ${p}%`);
+  const signal = h.signal ?? null; // F188: the page's Cancel stops the download, the signer and the upload
   try {
-    const ipa = await downloadIpa(url, { base, fetcher, onProgress: pct("Downloading") });
+    const ipa = await untilCancel(h, downloadIpa(url, { base, fetcher, onProgress: pct("Downloading"), ...(signal ? { signal } : {}) }));
     h.set("Signing");
     const self = isSelfIpa(url) || bring;
     const carry = self ? { identity: Boolean(bring), transfer: await transfer().catch(() => null) } : null;
-    const signed = await worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(id.profile), password: id.password ?? "", bring: carry },
-      { onProgress: (t) => h.set(t) });
+    const signed = await untilCancel(h, worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(id.profile), password: id.password ?? "", bring: carry },
+      { onProgress: (t) => h.set(t), ...(signal ? { signal } : {}) }));
     h.set("Uploading");
     const ipaBytes = signed.ipa instanceof Uint8Array ? signed.ipa : new Uint8Array(signed.ipa);
     // the early link takes this app only if it came out with the reserved bundle ID (iOS already has its manifest)
     const intoEarly = early && signed.bundleId === early.bundleId && (await reserved);
-    const body = await uploadSigned(ipaBytes, signed, { base, fetcher, onProgress: pct("Uploading"), token: intoEarly ? early.token : null });
+    const body = await untilCancel(h, uploadSigned(ipaBytes, signed, { base, fetcher, onProgress: pct("Uploading"), token: intoEarly ? early.token : null,
+      ...(signal ? { signal } : {}) }));
+    if (h.cancelled) return false;
     onInstalled({ ...body, bundleId: signed.bundleId, name: signed.name, version: signed.version });
     const app = name || signed.name || "The app";
     if (intoEarly && clock() - early.at < EARLY_WINDOW) {
@@ -537,6 +573,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
       buttons: ["Cancel", "Install"], cancel: 0, onTap: (i) => { if (i === 1) open(body.itms); } });
     return index === 1;
   } catch (e) {
+    if (h.cancelled) return false; // F188: Cancel closed the page; no alert after it
     failed(h, String(e?.message ?? e));
     await alert({ title: name ? `Couldn't Install ${name}` : "Couldn't Install", message: String(e?.message ?? e), buttons: ["OK"] });
     return false;

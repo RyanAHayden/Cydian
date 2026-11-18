@@ -1,9 +1,13 @@
-// Settings tab (F13), iOS 6 Settings style: grouped tables, Appearance first. The rows come from core/settings.js
-// (which ones this mode shows, defaults, storage); this file only draws them:
-//   choice  one row per option, the chosen one checked (Appearance: Automatic / Light / Dark)
+// Settings (F13; at the bottom of Home since F123), laid out like iOS 6's Settings app (F128, docs/settings.md):
+// the root is one list of short rows (Cydian Account; General, Display, Updates; Signing; Console Logs; About), each
+// opening its own page. The settings' rows come from core/settings.js (which ones this mode shows, defaults,
+// storage, which page they're on); this file only draws them:
+//   choice  one row per option, the chosen one checked (Display > Appearance: Automatic / Light / Dark)
 //   toggle  the iOS 6 switch (ios6.css .switch)
-//   list    the current value as detail; pushes #/settings/<key>, a page of checked options
-//   holds   the ignored packages' count; pushes #/settings/holds
+//   list    the current value as detail; pushes <page>/<key>, a page of checked options
+//   holds   the ignored packages' count; pushes <page>/holds
+// Routes below Settings: <page> (general, display, updates), <page>/<key>, signing[/<key>], account, about,
+// logs[/<id>], and the older <key> and holds, which links from elsewhere use.
 // It also owns the theme: init() puts the Appearance setting on <html data-theme> and the theme-color metas, and
 // follows the system while Appearance is Automatic. theme-boot.js does the same before first paint.
 import { grouped } from "../nav/ui.js";
@@ -41,12 +45,13 @@ export const THEME_COLORS = { light: "#4f698b", dark: "#5f656f" }; // dark: the 
 const defOf = (key) => SETTINGS.find((d) => d.key === key);
 const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? String(v);
 
+const TITLES = { holds: "Ignored Upgrades", signing: "Signing", account: "Cydian Account", about: "About" };
 export function nav(route) {
-  const key = route.path[0];
-  if (key === "holds") return { title: "Ignored Upgrades" };
-  if (key === "signing") return { title: "Signing" };
-  if (key === "account") return { title: "Cydian Account" }; // F97
-  if (key === LOGS) return { title: logsTitle(route.path[1]) }; // N4: Console Logs
+  const [first, second] = route.path;
+  if (first === LOGS) return { title: logsTitle(second) }; // N4: Console Logs
+  const key = second ?? first;
+  if (key && TITLES[key]) return { title: TITLES[key] };
+  if (key && settings.pageOf(key)) return { title: settings.pageOf(key).title };
   if (key && defOf(key)) return { title: defOf(key).label };
   return { title: "Settings" };
 }
@@ -73,20 +78,42 @@ export function render(el, route) {
 }
 
 function draw({ el, route }) {
-  const key = route.path[0];
+  const [first, second] = route.path;
   const top = el.scrollTop;
-  if (key === "holds") el.replaceChildren(holdsPage());
-  else if (key === "signing") drawSigning(el);
-  else if (key === "account") drawAccount(el); // F97
-  else if (key === LOGS) el.replaceChildren(logsPage(route.path[1], () => draw({ el, route })));
-  else if (key) el.replaceChildren(listPage(key));
-  else el.replaceChildren(rootPage(), accountSection(), signingSection(), sideloadingSection(), openInAppSection(), ipaSection(), notifySection(), logsSection(detectMode()), aboutSection());
+  if (first === LOGS) el.replaceChildren(logsPage(second, () => draw({ el, route })));
+  else if (first === "account") drawAccount(el); // F97
+  else if (first === "about") el.replaceChildren(aboutPage());
+  else if ((second ?? first) === "holds") el.replaceChildren(holdsPage());
+  else if (second) el.replaceChildren(listPage(second));
+  else if (first === "signing") drawSigning(el);
+  else if (first && settings.pageOf(first)) el.replaceChildren(groupPage(first));
+  else if (first) el.replaceChildren(listPage(first));
+  else el.replaceChildren(rootPage());
   el.scrollTop = top;
 }
 
+// The root, like iOS 6's: short rows, each opening a page; no footers.
 function rootPage() {
+  const frag = document.createDocumentFragment();
+  const pageRows = settings.pages().filter((p) => p.id !== "signing")
+    .map((p) => ({ label: p.title, href: format(settingsRoute([p.id])) }));
+  frag.append(accountSection(), grouped([{ rows: pageRows }]), signingSection(), openInAppSection(), ipaSection(),
+    logsSection(detectMode()), aboutRow());
+  return frag;
+}
+
+// A page under the root (General, Display, Updates): its groups, then what other parts of the app add there.
+function groupPage(id) {
+  const frag = settingsGroups(settings.sections().filter((s) => s.page === id), id);
+  if (id === "general") frag.append(sideloadingSection()); // F83, sideload build
+  if (id === "updates") frag.append(notifySection()); // Update Alerts, sideload build
+  return frag;
+}
+
+// Groups of setting rows on page `page`; a list row pushes <page>/<key>.
+function settingsGroups(list, page) {
   const switches = [];
-  const sections = settings.sections().map((s) => {
+  const sections = list.map((s) => {
     const rows = [];
     for (const d of s.settings) {
       if (d.kind === "choice") {
@@ -96,10 +123,10 @@ function rootPage() {
         switches.push([rows.length, d]);
         rows.push({ label: d.label });
       } else if (d.kind === "list") {
-        rows.push({ label: d.label, detail: optionLabel(d, settings.get(d.key)), href: format(settingsRoute([d.key])) });
+        rows.push({ label: d.label, detail: optionLabel(d, settings.get(d.key)), href: format(settingsRoute([page, d.key])) });
       } else if (d.kind === "holds") {
         const n = settings.holds.list().length;
-        rows.push({ label: d.label, detail: n ? String(n) : "None", href: format(settingsRoute(["holds"])) });
+        rows.push({ label: d.label, detail: n ? String(n) : "None", href: format(settingsRoute([page, "holds"])) });
       }
     }
     return { header: s.title, footer: s.footer, rows, id: s.id, switches: switches.splice(0) };
@@ -335,10 +362,8 @@ async function chooseFiles(el, files, slot) {
 
 // F83: Sideloading > Open Other Apps' Links (sideload build only, which claims the schemes; on by default). The
 // footer says the limit: iOS fixed the schemes at install, so off can't hand a link back to the app it was for.
-export const OTHER_LINKS_FOOTER = "Links for AltStore, SideStore, Feather, ESign, Scarlet and other sideloaders open in Cydian: "
-  + "a source goes to Sources, an app to Install IPAs. iOS gives each kind of link to one app and Cydian can't change "
-  + "which, so off doesn't give them back: Cydian opens the link again, which reaches the other app only where iOS "
-  + "picked that app, and otherwise says the link was for another app.";
+export const OTHER_LINKS_FOOTER = "AltStore, SideStore, Feather and other sideloaders' links open in Cydian. "
+  + "iOS picks the app for each kind of link, so Off can't always hand them back.";
 export function sideloadingSection(mode = detectMode()) {
   const box = document.createElement("div");
   if (mode !== "sideload") return box;
@@ -513,12 +538,10 @@ function browseButton(accept, multiple, onFiles) {
 // Signing Server, which hands iOS the manifest for the IPA Cydian serves at 127.0.0.1 (the certificate never leaves
 // the phone; the server sees the app's ID, version and name).
 
+// F128: the root's Signing row, the certificate as its detail (the page explains the rest).
+const signingRow = (box, detail) => box.replaceChildren(grouped([{ rows: [{ label: "Signing", detail, href: format(settingsRoute(["signing"])) }] }]));
 function deviceSigningSection(box) {
-  // F68: Re-sign Reminder's group just above already says Signing
-  const header = settings.isShown("resignReminder") ? undefined : "Signing";
-  const fill = (detail) => box.replaceChildren(grouped([{ header,
-    rows: [{ label: "Certificate", detail, href: format(settingsRoute(["signing"])) }],
-    footer: "Your own certificate: Install signs AltStore apps with it on this iPhone." }]));
+  const fill = (detail) => signingRow(box, detail);
   fill("");
   Promise.all([deviceStatus().catch(() => null), loadIdentity()]).then(([st, id]) => {
     // F69: statusReady, the rule Install goes by: the row names a certificate only when Install will use it
@@ -626,7 +649,9 @@ async function drawDeviceSigning(el) {
     certificate: certificateBlock(el, id, status ?? { identity: null }),
     server: serverRows, serverUrl: server,
     open: walkOpen,
-    extra: [...(sections.length ? [grouped(sections)] : []), signingExtras({ identity: kept, redraw: redrawAll })],
+    // F128: Re-sign Reminder (the "signing" page's settings) under the steps
+    extra: [settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"),
+      ...(sections.length ? [grouped(sections)] : []), signingExtras({ identity: kept, redraw: redrawAll })],
   });
 }
 
@@ -727,9 +752,17 @@ function notifySection() {
   return box;
 }
 
-function aboutSection() {
+// The root's About row (the app builds), and its page: the version, Check for Updates, Skip This Version.
+function aboutRow() {
+  if (!installPath(detectMode())) return document.createDocumentFragment();
+  return grouped([{ rows: [{ label: "About", href: format(settingsRoute(["about"])) }] }]);
+}
+function aboutPage() {
   const box = document.createElement("div");
-  if (!installPath(detectMode())) return box;
+  if (!installPath(detectMode())) {
+    box.append(grouped([{ footer: "This page is in the Cydian app." }]));
+    return box;
+  }
   const fill = (version) => {
     const st = loadState(globalThis.localStorage);
     const latest = st.latest?.version;
@@ -743,7 +776,7 @@ function aboutSection() {
       footer = skipped ? `Cydian won't ask about ${latest} again. Check for Updates still offers it.`
         : `Cydian ${latest} is available. Check for Updates installs it.`;
     }
-    box.replaceChildren(grouped([{ header: "About", rows, footer }]));
+    box.replaceChildren(grouped([{ rows, footer }]));
   };
   fill(loadState(globalThis.localStorage).current ?? "");
   appVersion().then(fill, () => {});
@@ -756,9 +789,7 @@ function aboutSection() {
 // Worker only hosts the signed IPA for iOS's install prompt.
 
 function siteSigningSection(box) {
-  const fill = (detail) => box.replaceChildren(grouped([{ header: "Signing",
-    rows: [{ label: "Certificate", detail, href: format(settingsRoute(["signing"])) }],
-    footer: "Your own certificate: Install signs apps with it, here in the browser." }]));
+  const fill = (detail) => signingRow(box, detail);
   fill("");
   loadIdentity().then((id) => {
     let name = "None";

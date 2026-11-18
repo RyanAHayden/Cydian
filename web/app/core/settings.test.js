@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createSettings, detectMode, themeFor, SETTINGS, FEATURES, bridgeArch, DAEMON_KEYS, DAEMON_LISTS } from "./settings.js";
+import { createSettings, detectMode, themeFor, SETTINGS, FEATURES, bridgeArch, DAEMON_KEYS, DAEMON_LISTS, RETIRED,
+  RETIRED_DAEMON_KEYS, dropRetired, PAGES, SECTIONS } from "./settings.js";
 import { autoMarkShown } from "./automark.js";
 import { DEFAULT_ARCH } from "./apt.js";
 
 function memStorage(init = {}) {
   const m = new Map(Object.entries(init));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), map: m };
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), map: m };
 }
 const everything = new Set(SETTINGS.map((d) => d.feature));
 const keysOf = (s) => s.visible().map((d) => d.key);
@@ -15,13 +16,90 @@ test("defaults with nothing stored", () => {
   const s = createSettings({ storage: memStorage(), mode: "site" });
   assert.equal(s.get("appearance"), "light"); // Light unless chosen, dark iPhones too
   assert.equal(s.get("arch"), DEFAULT_ARCH);
-  assert.equal(s.get("checkUpdates"), "launch");
-  assert.equal(s.get("notifications"), "summary");
-  assert.equal(s.get("badge"), true);
+  assert.equal(s.get("allowZoom"), false);
+  assert.equal(s.get("device"), "none");
+  assert.equal(s.get("worksOnMyPhone"), true);
+  assert.equal(s.get("compatMarks"), true);
+  assert.equal(s.get("iosVersion"), "auto");
+  assert.equal(s.get("upgradeNotifications"), true);
   assert.equal(s.get("autoInstall"), "off");
+  assert.equal(s.get("autoInstallIdle"), true);
   assert.equal(s.get("respring"), "notify");
   assert.equal(s.get("keepVersions"), 1);
+  assert.equal(s.get("resignReminder"), 2);
   assert.deepEqual(s.holds.list(), []);
+});
+
+// F128: the settings audit. What's left, and the ones that went (docs/settings.md).
+test("F128: exactly these settings remain, and the retired ones are gone", () => {
+  assert.deepEqual(SETTINGS.map((d) => d.key), ["appearance", "allowZoom", "device", "arch", "worksOnMyPhone", "compatMarks",
+    "iosVersion", "refreshOnLaunch", "holds", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
+    "keepVersions", "resignReminder"]);
+  assert.deepEqual(RETIRED, ["sideloader", "checkUpdates", "cellular", "notifications", "badge"]);
+  const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
+  for (const k of RETIRED) {
+    assert.throws(() => s.get(k), new RegExp(k));
+    assert.equal(s.isShown(k), false);
+  }
+  for (const k of RETIRED_DAEMON_KEYS) assert.ok(RETIRED.includes(k) && !DAEMON_KEYS.includes(k), k);
+  // every section is on a page, every setting in a section
+  for (const sec of SECTIONS) assert.ok(PAGES.some((p) => p.id === sec.page), sec.id);
+  for (const d of SETTINGS) if (d.modes.length) assert.ok(SECTIONS.some((x) => x.id === d.section), d.key);
+});
+
+test("F128: the migration drops the retired settings' stored values and keeps everything else", () => {
+  const old = { "cydian.sideloader": "altstore", "cydian.checkUpdates": "6h", "cydian.cellular": "false",
+    "cydian.notifications": "each", "cydian.badge": "false", "cydian.appearance": "dark", "cydian.allowZoom": "true",
+    "cydian.holds": '["com.a"]', "cydian.keepVersions": "2", "other.key": "x" };
+  const storage = memStorage(old);
+  const s = createSettings({ storage, mode: "jailbreak" });
+  for (const k of RETIRED) assert.equal(storage.map.has("cydian." + k), false, k);
+  assert.deepEqual([...storage.map.keys()].sort(),
+    ["cydian.allowZoom", "cydian.appearance", "cydian.holds", "cydian.keepVersions", "other.key"]);
+  assert.equal(s.get("appearance"), "dark");
+  assert.equal(s.get("allowZoom"), true);
+  assert.equal(s.get("keepVersions"), 2);
+  assert.deepEqual(s.holds.list(), ["com.a"]);
+  // run again: nothing left to drop; storage without removeItem or that throws doesn't break it
+  assert.deepEqual(dropRetired(storage), []);
+  assert.deepEqual(dropRetired(memStorage({ "cydian.badge": "true" })), ["badge"]);
+  const plain = { getItem: (k) => (k === "cydian.badge" ? "true" : null), setItem() {} };
+  assert.doesNotThrow(() => createSettings({ storage: plain }));
+  const broken = { getItem() { throw new Error("denied"); }, setItem() { throw new Error("quota"); }, removeItem() { throw new Error("no"); } };
+  assert.doesNotThrow(() => createSettings({ storage: broken }));
+});
+
+test("F128: pages like iOS 6's Settings: General, Display, Updates (Signing in the sideload build), by mode", () => {
+  const layout = (mode) => createSettings({ storage: memStorage(), mode }).pages()
+    .map((p) => [p.id, p.title, p.sections.map((x) => x.settings.map((d) => d.key))]);
+  const display = ["display", "Display", [["appearance"], ["compatMarks"], ["allowZoom"]]];
+  assert.deepEqual(layout("site"), [
+    ["general", "General", [["device", "iosVersion"], ["worksOnMyPhone"], ["refreshOnLaunch"]]],
+    display,
+    ["updates", "Updates", [["holds"]]],
+  ]);
+  assert.deepEqual(layout("jailbreak"), [
+    ["general", "General", [["worksOnMyPhone"], ["refreshOnLaunch"]]],
+    display,
+    ["updates", "Updates", [["holds"], ["upgradeNotifications"], ["autoInstall", "autoInstallIdle", "respring", "keepVersions"]]],
+  ]);
+  assert.deepEqual(layout("sideload"), [
+    ["general", "General", [["worksOnMyPhone"], ["refreshOnLaunch"]]],
+    display,
+    ["updates", "Updates", [["holds"]]],
+    ["signing", "Signing", [["resignReminder"]]],
+  ]);
+  const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
+  assert.equal(s.pageOf("display").title, "Display");
+  assert.equal(s.pageOf("appearance"), null); // a section, not a page
+  // every group's footer is one or two short sentences
+  for (const mode of ["site", "jailbreak", "sideload"]) {
+    for (const sec of createSettings({ storage: memStorage(), mode }).sections()) {
+      if (sec.footer) assert.ok(sec.footer.length <= 120, `${mode} ${sec.id}: ${sec.footer}`);
+    }
+  }
+  // no page key collides with a setting's key or the Settings routes (screens/settings.js draw)
+  for (const p of PAGES) assert.equal(SETTINGS.some((d) => d.key === p.id && p.id !== "signing"), false, p.id);
 });
 
 test("refresh on launch is off on the site and on in the app", () => {
@@ -163,12 +241,12 @@ test("holds: the helper is only used in jailbreak mode", async () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["appearance", "allowZoom", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "checkUpdates", "holds", "notifications", "badge"]);
+    ["appearance", "allowZoom", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "holds"]);
   assert.deepEqual(show("jailbreak"),
-    ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications",
-      "upgradeNotifications", "badge", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
+    ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds",
+      "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
-    ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "checkUpdates", "cellular", "holds", "notifications", "badge", "resignReminder"]);
+    ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds", "resignReminder"]);
 });
 
 test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone, Ignored Upgrades and Automatic Installs", () => {
@@ -176,22 +254,24 @@ test("rows wait for their feature: today Appearance, the sources settings, Works
   assert.deepEqual(keysOf(s), ["appearance", "allowZoom", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "holds", "upgradeNotifications",
     "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.equal(s.isShown("autoInstall"), true);
-  assert.equal(s.isShown("checkUpdates"), false);
+  assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", features: new Set(["appearance"]) }).isShown("autoInstall"), false);
   assert.ok(FEATURES.has("appearance"));
   assert.deepEqual(createSettings({ storage: memStorage(), mode: "site", features: new Set(["appearance"]) })
-    .sections().map((x) => x.id), ["appearance"]);
+    .sections().map((x) => x.id), ["appearance", "zoom"]);
 });
 
-test("sections come in order, Appearance first, empty ones dropped", () => {
+test("sections come in page order, empty ones dropped", () => {
   const s = createSettings({ storage: memStorage(), mode: "sideload", features: everything });
-  assert.deepEqual(s.sections().map((x) => x.id), ["appearance", "sources", "compat", "updates", "notifications", "signing"]);
-  assert.equal(s.sections()[0].settings[0].key, "appearance");
+  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "sources", "appearance", "display", "zoom", "updates", "signing"]);
+  assert.equal(s.sections().find((x) => x.id === "appearance").settings[0].key, "appearance");
 });
 
 test("mode-dependent footers", () => {
-  const f = (mode) => createSettings({ storage: memStorage(), mode, features: everything }).footerOf("checkUpdates");
-  assert.match(f("sideload"), /apps/);
-  assert.match(f("jailbreak"), /packages/);
+  const f = (mode, key) => createSettings({ storage: memStorage(), mode, features: everything }).footerOf(key);
+  assert.match(f("site", "worksOnMyPhone"), /set above/);
+  assert.doesNotMatch(f("jailbreak", "worksOnMyPhone"), /set above/);
+  assert.match(f("jailbreak", "holds"), /dpkg/);
+  assert.doesNotMatch(f("sideload", "holds"), /dpkg/);
 });
 
 test("detectMode: the bridge says, otherwise the site", () => {
@@ -268,7 +348,8 @@ test("the Device row shows on the site only; the app hides the choice", () => {
   assert.equal(shown("sideload"), false);
   assert.equal(createSettings({ storage: memStorage(), mode: "site" }).isShown("arch"), false);
   const site = createSettings({ storage: memStorage(), mode: "site" });
-  assert.deepEqual(site.sections().map((x) => x.id).slice(0, 2), ["appearance", "device"]);
+  assert.deepEqual(site.sections().map((x) => x.id)[0], "device"); // General's first group
+  assert.deepEqual(site.sections()[0].settings.map((d) => d.key), ["device", "iosVersion"]);
   assert.deepEqual(SETTINGS.find((d) => d.key === "device").options.map((o) => o.label),
     ["Not Jailbroken", "Jailbroken (Rootless)", "Jailbroken (Rootful)", "Jailbroken (Roothide)"]);
 });
@@ -294,15 +375,6 @@ test("a site visitor who had picked an Architecture keeps it as their device typ
   assert.equal(createSettings({ storage: memStorage({ "cydian.arch": "iphoneos-arm" }), mode: "site" }).deviceType(), "iphoneos-arm");
   assert.equal(createSettings({ storage: memStorage({ "cydian.arch": "iphoneos-arm", "cydian.device": "none" }), mode: "site" }).deviceType(), "none");
   assert.equal(createSettings({ storage: memStorage({ "cydian.arch": "x86" }), mode: "site" }).deviceType(), "none");
-});
-
-test("Sideloader: Feather by default, on the site only", () => {
-  const s = createSettings({ storage: memStorage(), mode: "site" });
-  assert.equal(s.get("sideloader"), "feather");
-  s.set("sideloader", "sidestore");
-  assert.equal(s.get("sideloader"), "sidestore");
-  assert.equal(createSettings({ storage: memStorage(), mode: "sideload" }).isShown("sideloader"), false);
-  assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak" }).isShown("sideloader"), false);
 });
 
 test("F38: Roothide is a device type on the site and a bridge type in the app (iphoneos-arm64e)", () => {
@@ -357,24 +429,23 @@ test("F70: the mark's switch shows only for Only Packages I Mark, in the jailbre
 test("F70: daemonPrefs: the daemon's keys with their typed values, unpicked ones null, the lists as arrays", () => {
   const storage = memStorage({ "cydian.keepVersions": "bogus" });
   const s = createSettings({ storage, mode: "jailbreak" });
-  const keys = [...DAEMON_KEYS, ...DAEMON_LISTS].map((k) => "cydian." + k);
+  const keys = [...DAEMON_KEYS, ...DAEMON_LISTS, ...RETIRED_DAEMON_KEYS].map((k) => "cydian." + k);
   const first = s.daemonPrefs();
   assert.deepEqual(Object.keys(first).sort(), keys.sort());
-  // Nothing picked: null everywhere (the daemon's defaults, Check for Updates staying Daily), empty lists.
-  for (const k of DAEMON_KEYS) assert.equal(first["cydian." + k], null, k);
+  // Nothing picked: null everywhere (the daemon's defaults), empty lists; the retired ones always null (F128).
+  for (const k of [...DAEMON_KEYS, ...RETIRED_DAEMON_KEYS]) assert.equal(first["cydian." + k], null, k);
   assert.deepEqual(first["cydian.holds"], []);
   assert.deepEqual(first["cydian.autoMarked"], []);
   s.set("autoInstall", "marked");
   s.set("autoInstallIdle", false);
   s.set("keepVersions", 2);
-  s.set("cellular", true);
-  s.set("checkUpdates", "6h");
   s.set("respring", "locked");
   s.autoMarked.set("com.a", true);
   s.holds.replace(["com.z", "com.h"]);
   assert.deepEqual(s.daemonPrefs(), {
-    "cydian.checkUpdates": "6h", "cydian.cellular": true, "cydian.autoInstall": "marked", "cydian.autoInstallIdle": false,
+    "cydian.autoInstall": "marked", "cydian.autoInstallIdle": false,
     "cydian.respring": "locked", "cydian.keepVersions": 2, "cydian.holds": ["com.h", "com.z"], "cydian.autoMarked": ["com.a"],
+    "cydian.checkUpdates": null, "cydian.cellular": null,
   });
   assert.deepEqual(s.daemonPrefs(["keepVersions"]), { "cydian.keepVersions": 2 });
   assert.deepEqual(s.daemonPrefs(["holds", "appearance"]), { "cydian.holds": ["com.h", "com.z"] }); // not the daemon's: left out

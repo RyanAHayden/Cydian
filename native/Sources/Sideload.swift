@@ -569,8 +569,9 @@ enum CloseForUpdate {
             guard resigned else { return } // the prompt hasn't shown yet
             token.map(nc.removeObserver); token = nil; nc.removeObserver(off)
             let c = UNMutableNotificationContent()
-            c.title = "Cydian"
-            c.body = "Updating Cydian. Tap to open it when it's done."
+            // It arrives 8 s later, by when iOS has usually finished (user 2026-11-18: "tap when it's done" read wrong).
+            c.title = "Cydian Updated"
+            c.body = "Tap to open the new version."
             let req = UNNotificationRequest(identifier: "cydian.updating", content: c,
                                             trigger: UNTimeIntervalNotificationTrigger(timeInterval: 8, repeats: false))
             UNUserNotificationCenter.current().add(req) { _ in

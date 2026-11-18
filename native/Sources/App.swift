@@ -9,6 +9,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         Notifications.shared.start() // F65: permission for N5's daemon, and notification taps (Notifications.swift)
+        // The new Cydian is open: the "Cydian Updated, tap to open" notices have done their job.
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["cydian.updating", "cydian.updated"])
         SignBridge.importBundled() // F75: the certificate the Signing Server put inside Cydian's own IPA
         BackgroundCheck.register() // I3: before launch ends, as BGTaskScheduler requires (sideload build)
         return true

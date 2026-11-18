@@ -172,9 +172,9 @@ export function sortSources(list) {
 
 // The repo answered, but not with this file: try the next name. Anything else (refused, timeout, network, too
 // large, rate limited) ends the check: asking again won't help.
-const missing = (e) => e?.code === "upstream" || e?.code === "not_found";
+export const missing = (e) => e?.code === "upstream" || e?.code === "not_found";
 
-function verificationError(e) {
+export function verificationError(e) {
   return new SourceError("verification", e?.message || String(e), e?.code);
 }
 

@@ -15,16 +15,13 @@
 // any of Cydia's paths). When it is a web page or missing (an APT repo's root often is one or the other), the URL
 // is checked as a flat APT repo (core/sources.js verifySource), then as dist repos under dists/<d>/ for each `dists`
 // candidate. opts: { arch, count, dists: ["stable", …] }.
-import { verifySource, refreshSource, sourceKey, normalizeSourceUrl, SourceError } from "../sources.js";
+import { verifySource, refreshSource, sourceKey, normalizeSourceUrl, SourceError, missing, verificationError } from "../sources.js";
 import { altKey } from "../altstore.js";
 import { DEFAULT_ARCH, repoLayout, parseRelease } from "../apt.js";
 import { detect, unwrapLink, SourceFormatError, FORMATS } from "./detect.js";
 import { parseIpaSource } from "./ipa.js";
 
 export const DEFAULT_DISTS = ["stable"];
-
-const missing = (e) => e?.code === "upstream" || e?.code === "not_found";
-const verificationError = (e) => new SourceError("verification", e?.message || String(e), e?.code);
 
 async function bodyOf(backend, url) {
   const res = await backend.fetch(url);

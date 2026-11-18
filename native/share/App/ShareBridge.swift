@@ -1,4 +1,4 @@
-// N9: the shell's side of the share sheet and Open in Cydian. What to do with each item is ../Share.swift (tested on
+// N9: the shell's side of the share sheet and Open in iFizBox. What to do with each item is ../Share.swift (tested on
 // Linux); this file is the phone's half: files iOS hands over (the document types in Info.plist and
 // Info-sideload.plist: .ipa, .deb), cydian://share?url=… from the share extension (../Extension/), and the bridge
 // calls web/app/share.js runs.
@@ -45,7 +45,7 @@ final class PhoneShareHost: ShareHost {
 struct PhoneSigner: ShareSigner {
     func problem() -> String? {
         guard let id = SignStore.identity(), let cert = SignStore.certificateDER(id), let profile = SignStore.profile() else {
-            return "Cydian signs the app on this iPhone with your own certificate. Import it (.p12 and its password) and its provisioning profile (.mobileprovision) in Settings > Signing, then share the IPA again. It is in My IPAs meanwhile."
+            return "\(Brand.name) signs the app on this iPhone with your own certificate. Import it (.p12 and its password) and its provisioning profile (.mobileprovision) in Settings > Signing, then share the IPA again. It is in My IPAs meanwhile."
         }
         return profile.problem(with: cert).map { "\($0.message) Fix it in Settings > Signing." }
     }
@@ -89,7 +89,7 @@ enum SharedInbox {
             default: break
             }
         } catch {
-            return hand(ShareRouter.link(.refuse(title: "Couldn't Open", message: "Cydian couldn't keep a copy of \(item.name): \(error.localizedDescription)")))
+            return hand(ShareRouter.link(.refuse(title: "Couldn't Open", message: "\(Brand.name) couldn't keep a copy of \(item.name): \(error.localizedDescription)")))
         }
         hand(ShareRouter.link(route, file: staged))
     }

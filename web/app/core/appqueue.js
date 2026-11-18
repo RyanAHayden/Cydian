@@ -16,7 +16,7 @@
 //                                                   (no IPA to sign, or a source-signed itms-services link)
 //   appPlan(jobs)     -> core/queue.js parseSimulation's shape: { installs, reinstalls, upgrades, downgrades, removes,
 //                        essential, download }, so Confirm draws apps with the jailbreak queue's own groups
-//   runOrder(jobs)    -> the order Confirm installs in: as queued, Cydian itself last (installing it closes the app)
+//   runOrder(jobs)    -> the order Confirm installs in: as queued, iFizBox itself last (installing it closes the app)
 //   appNavLabel({ queued, installed, newest }) -> the app page's nav button: Modify while the app is queued (Cydia),
 //                        else Install, Upgrade or Reinstall
 //   modifyActions({ queued, installed, newest }) -> the Modify sheet's buttons: Clear first (Cydia's), then the rest
@@ -25,7 +25,7 @@
 //       signs the app again from the phone's record (native Sideload.swift), no IPA url of its own
 //   resignJob({ bundleId, name, version }) -> such a job, from a signing.installed record or a Needs Re-sign row
 //   APP_MODES, APP_MODE_LABEL -> Confirm's Modifications for apps: core/queue.js's modes, Remove out, Re-sign in
-//   modifyActions({ ..., signed }) -> "Re-sign" last for an app Cydian signed
+//   modifyActions({ ..., signed }) -> "Re-sign" last for an app iFizBox signed
 // F94: Modify's last button for an installed app, per build (user 2026-11-18):
 //   modifyActions({ ..., build }) -> build "sideload" or "site": "Mark as Not Installed" (the phone can't remove apps:
 //       it forgets core/installed.js's record, as the Installed section's row does); "jailbreak": "Remove" (apt's
@@ -133,7 +133,7 @@ export function appNavLabel({ queued = false, installed = null, newest = null } 
 // Mark as Not Installed where the phone can't remove apps (the sideload app, the website), Remove in the jailbreak build.
 export const MARK_NOT_INSTALLED = "Mark as Not Installed";
 export function modifyActions({ queued = false, installed = null, newest = null, older = false, signed = false, build = null } = {}) {
-  const resign = signed ? ["Re-sign"] : []; // F91: an app Cydian signed can be signed again, as it is
+  const resign = signed ? ["Re-sign"] : []; // F91: an app iFizBox signed can be signed again, as it is
   const last = installed == null ? [] : build === "jailbreak" ? ["Remove"] : build === "sideload" || build === "site" ? [MARK_NOT_INSTALLED] : [];
   if (queued) return ["Clear", verb({ installed, newest }), ...resign, ...last];
   if (installed == null) return [verb({ installed, newest }), ...resign];

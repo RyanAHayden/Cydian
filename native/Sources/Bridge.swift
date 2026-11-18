@@ -44,7 +44,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         }
         // The clipboard for Sources' Add and Import > From Clipboard (nav/menu.js pasteText), so the app shows no WebKit
         // Paste bubble. hasStrings/hasURLs never ask; reading another app's copy may show iOS's own Allow Paste alert,
-        // which Settings > Cydian > Paste from Other Apps: Allow turns off.
+        // which Settings > iFizBox > Paste from Other Apps: Allow turns off.
         // F146: {auto: true} is Sources' Add filling its field by itself (ClipboardRead below).
         on("clipboard.read") { c in
             DispatchQueue.main.async { ClipboardRead.read(auto: c.params["auto"] as? Bool ?? false) { c.reply($0, nil) } }
@@ -57,8 +57,8 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         Prefs.register(self) // F70: prefs.set, N7's settings for the daemon (below)
         Incoming.register(self) // F75: cydian:// links for the page, app.takeURL and app.gunzip (App.swift)
         BackgroundCheck.register(self) // I3: updates.watch, the sideload build's background update check
-        ShareBridge.register(self) // N9: share.*, what the share sheet and Open in Cydian handed over (share/App/)
-        AccountKey.register(self) // F97: account.key.*, the Cydian Account key in the Keychain (Account.swift)
+        ShareBridge.register(self) // N9: share.*, what the share sheet and Open in iFizBox handed over (share/App/)
+        AccountKey.register(self) // F97: account.key.*, the iFizBox Account key in the Keychain (Account.swift)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }
@@ -176,7 +176,7 @@ enum Theme {
     }
 }
 
-// F61: Cydian updates itself (web/app/core/selfupdate.js). The jailbreak build downloads its release's .deb here and
+// F61: iFizBox updates itself (web/app/core/selfupdate.js). The jailbreak build downloads its release's .deb here and
 // installs it with `cydian-helper selfupdate <path>` (dpkg -i, native/helper/README.md); the sideload build signs
 // its Cydian.ipa through signing.install and needs nothing from here.
 //   selfupdate.download {url} -> {path, bytes}   the .deb (an ar archive) in this app's temp folder
@@ -205,7 +205,7 @@ enum SelfUpdate {
                 }
             }
         }
-        // F72: open a link outside the web view (Cydian's own update: the Signing Server's itms-services link, or
+        // F72: open a link outside the web view (iFizBox's own update: the Signing Server's itms-services link, or
         // cydian.dev in Safari). B8: any scheme iOS can hand to an app (feather://, altstore://, sileo://…), not
         // the bundle's own, javascript:, file: or data: (LinkOut.canOpen).
         b.on("app.openURL") { c in
@@ -225,7 +225,7 @@ enum SelfUpdate {
     }
 }
 
-// F70: N7's daemon (native/daemon/main.m e_settings) reads the automatic-install settings from Cydian's preferences,
+// F70: N7's daemon (native/daemon/main.m e_settings) reads the automatic-install settings from iFizBox's preferences,
 // com.ryha.cydian for user mobile through cfprefsd, not from the web view's localStorage. web/app/settings.js
 // createPrefsMirror sends them here at launch and on every change:
 //   prefs.set {values: {"cydian.<key>": string | bool | number | [string] | null}} -> nil   null removes the key

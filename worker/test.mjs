@@ -22,7 +22,7 @@ assert.equal(appOf(new URLSearchParams("bundleid=a/b")), null);
 const ipa = new Uint8Array([0x50, 0x4b, 3, 4, 1, 2, 3, 4, 5, 6]);
 r = await go("/sign/host?bundleid=com.evil.app&version=1", { method: "POST", body: ipa, headers: { "Content-Length": "10" } });
 assert.equal(r.status, 403);
-r = await go("/sign/host?bundleid=com.ryha.cydian&version=0.3.2&title=Cydian", { method: "POST", body: ipa, headers: { "Content-Length": "10" } });
+r = await go("/sign/host?bundleid=com.ryha.cydian&version=0.3.2&title=iFizBox", { method: "POST", body: ipa, headers: { "Content-Length": "10" } });
 const j = await r.json();
 assert.match(j.itms, /^itms-services:\/\/\?action=download-manifest&url=https%3A%2F%2Fsign\.example%2Fsign%2Fhost%2F[0-9a-f]{48}%2Fmanifest\.plist$/);
 t = await (await go(new URL(j.manifest).pathname)).text();
@@ -131,7 +131,7 @@ import { PART, uploadCap } from "./src/index.js";
   console.log("worker github token: ok");
 }
 
-// F97: Cydian Account: the size cap, the version check (409), delete, and KV never keyed by the id itself.
+// F97: iFizBox Account: the size cap, the version check (409), delete, and KV never keyed by the id itself.
 import { account, MAX_ACCOUNT, rateLimiter, kvKey, bindingLimiter } from "./src/account.js";
 {
   const kv = new Map();
@@ -232,7 +232,7 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   // iOS asks for the manifest before the reservation lands: it waits, then answers with the reserved app
   const early = at(`/sign/up/${tok}/manifest.plist`);
   await new Promise((r) => setTimeout(r, 5));
-  let r = await at(`/sign/upload?bundleid=com.ryha.cydian&version=0.4&title=Cydian&token=${tok}`, { method: "POST" });
+  let r = await at(`/sign/upload?bundleid=com.ryha.cydian&version=0.4&title=iFizBox&token=${tok}`, { method: "POST" });
   assert.deepEqual(await r.json(), { token: tok, reserved: true, expiresIn: 600 });
   r = await early;
   assert.equal(r.status, 200);
@@ -242,7 +242,7 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   assert.equal((await at(`/sign/upload/${tok}/0`, { method: "PUT", body: app })).status, 409);
   // app.ipa holds while the website signs; its headers come once the upload starts, its body once it's done
   const held = at(`/sign/up/${tok}/app.ipa`);
-  r = await at(`/sign/upload?bundleid=com.ryha.cydian&version=0.4&title=Cydian&token=${tok}&size=${app.length}`, { method: "POST" });
+  r = await at(`/sign/upload?bundleid=com.ryha.cydian&version=0.4&title=iFizBox&token=${tok}&size=${app.length}`, { method: "POST" });
   assert.equal((await r.json()).parts, 1);
   r = await held;
   assert.equal(r.status, 200);
@@ -285,7 +285,7 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   console.log("worker reserved link: ok");
 }
 {
-  // B17: /repo/ serves Cydian's APT repo itself (the release asset fetched here, GitHub's redirect followed here):
+  // B17: /repo/ serves iFizBox's APT repo itself (the release asset fetched here, GitHub's redirect followed here):
   // Zebra names its cache file after the final URL, and GitHub's signed one is too long for it.
   const { repo, repoFile } = await import("./src/index.js");
   assert.deepEqual(repoFile("/repo/Release"), { name: "Release", type: "text/plain; charset=utf-8" });
@@ -296,14 +296,14 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   const fetcher = async (url, o = {}) => {
     seen.push(url);
     assert.equal(o.redirect, "follow");
-    if (url.endsWith("/Release")) return new Response("Origin: Cydian\n", { headers: { "content-length": "15", "last-modified": "Wed, 18 Nov 2026 10:00:00 GMT" } });
+    if (url.endsWith("/Release")) return new Response("Origin: iFizBox\n", { headers: { "content-length": "15", "last-modified": "Wed, 18 Nov 2026 10:00:00 GMT" } });
     if (url.endsWith("/Packages.gz")) return new Response(new Uint8Array([0x1f, 0x8b, 8]));
     return new Response("no", { status: 404 });
   };
   const at = (path, init) => { const req = new Request("https://cydian.example" + path, init); return repo(req, new URL(req.url), {}, { fetcher, wait: async () => {} }); };
   let r = await at("/repo/Release");
   assert.equal(r.status, 200);
-  assert.equal(await r.text(), "Origin: Cydian\n");
+  assert.equal(await r.text(), "Origin: iFizBox\n");
   assert.equal(r.headers.get("content-type"), "text/plain; charset=utf-8");
   assert.equal(r.headers.get("last-modified"), "Wed, 18 Nov 2026 10:00:00 GMT");
   assert.equal(seen.pop(), "https://github.com/RyanAHayden/Cydian/releases/latest/download/Release");

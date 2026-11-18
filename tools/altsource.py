@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cydian's own AltStore source (I7): web/app/source.json, the package page Cydian's default sources show for the
+"""iFizBox's own AltStore source (I7): web/app/source.json, the package page iFizBox's default sources show for the
 app itself (core/sources.js DEFAULT_ALT_SOURCES, core/appoffer.js APP_SOURCE_URL).
 
   tools/altsource.py update VERSION IPA [DATE] [--notes FILE] [--minimum X.Y.Z]
@@ -9,7 +9,7 @@ app itself (core/sources.js DEFAULT_ALT_SOURCES, core/appoffer.js APP_SOURCE_URL
 
 tools/release.sh runs `update` when it publishes a release, so the source keeps naming the newest IPA. F72: this is
 the sideload app's and the site's built-in source (web/app/core/essential.js). --minimum sets the app's
-"minimumVersion", Cydian's own field (other AltStore clients ignore it): a running Cydian older than that must
+"minimumVersion", iFizBox's own field (other AltStore clients ignore it): a running iFizBox older than that must
 upgrade before anything else.
 """
 import json
@@ -19,6 +19,8 @@ import sys
 from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "native"))
+from brand import NAME  # noqa: E402  (F170: native/brand.env)
 SOURCE = os.path.join(ROOT, "web", "app", "source.json")
 REPO = "https://github.com/RyanAHayden/Cydian"
 RAW = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main"
@@ -43,7 +45,7 @@ def note_text(version, notes=None):
         lines.append(re.sub(r"^[-*+]\s+", "", line))
         if len(lines) >= 4:
             break
-    return "\n".join(lines + [link]) if lines else f"Cydian {version}. {link}"
+    return "\n".join(lines + [link]) if lines else f"{NAME} {version}. {link}"
 
 
 def build(version, size, date, notes=None, minimum=None, previous=()):
@@ -67,10 +69,10 @@ def build(version, size, date, notes=None, minimum=None, previous=()):
 
 def source_entry(app):
     return {
-        "name": "Cydian",
+        "name": NAME,
         "identifier": BUNDLE_ID,
         "subtitle": "A package manager with the iOS 6 look",
-        "description": "Cydian's own source: the Cydian app for iPhones without a jailbreak.",
+        "description": f"{NAME}'s own source: the {NAME} app for iPhones without a jailbreak.",
         "iconURL": f"{RAW}/web/app/icons/icon-180.png",
         "website": REPO,
         "tintColor": "#37a94a",
@@ -81,12 +83,12 @@ def source_entry(app):
 
 def app_entry(versions):
     return {
-        "name": "Cydian",
+        "name": NAME,
         "bundleIdentifier": BUNDLE_ID,
         "developerName": "Ryan Hayden",
         "subtitle": "Packages and apps with the iOS 6 look",
         "localizedDescription": (
-            "Cydian lists apps from AltStore-style sources and, on a jailbroken iPhone, tweaks and themes from "
+            f"{NAME} lists apps from AltStore-style sources and, on a jailbroken iPhone, tweaks and themes from "
             "APT repos, with the iOS 6 look. The app signs apps on your iPhone with your own certificate (no "
             "server) and scrolls at 120Hz. Free and open source (GPL-3.0-or-later)."),
         "iconURL": f"{RAW}/web/app/icons/icon-180.png",
@@ -94,6 +96,18 @@ def app_entry(versions):
         "category": "utilities",
         "versions": versions,
     }
+
+
+def rebrand(data):
+    """The published source with today's name and descriptions (F170, native/brand.py sync); versions[] and
+    minimumVersion as they are: old release notes keep the name they shipped under."""
+    app = (data.get("apps") or [{}])[0]
+    fresh = app_entry(app.get("versions") or [])
+    if "minimumVersion" in app:
+        fresh["minimumVersion"] = app["minimumVersion"]
+    out = source_entry(fresh)
+    out["news"] = data.get("news", [])
+    return out
 
 
 def check(data):

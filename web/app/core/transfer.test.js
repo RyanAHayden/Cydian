@@ -1,4 +1,4 @@
-// F75: Send Settings' link (Open in Cydian App): encode/decode and what importing would change. F89: no certificate
+// F75: Send Settings' link (Open in iFizBox App): encode/decode and what importing would change. F89: no certificate
 // and no Signing Server in it any more.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -14,7 +14,7 @@ test("base64url both ways, any bytes", () => {
 
 const SOURCES = ["https://repo.chariz.com/", "deb https://apt.procurs.us/ 1900 main", "https://alt.example/apps.json"];
 
-test("Open in Cydian App: encode/decode round trip, gzip keeps hundreds of sources inside a URL", async () => {
+test("Open in iFizBox App: encode/decode round trip, gzip keeps hundreds of sources inside a URL", async () => {
   const url = await encodeLink({ sources: [...SOURCES, SOURCES[0]], settings: { appearance: "dark" }, holds: ["a"], server: "sign.example.org" });
   assert.match(url, /^cydian:\/\/import\?d=[A-Za-z0-9_-]+$/);
   const p = await decodeLink(url);
@@ -29,7 +29,7 @@ test("Open in Cydian App: encode/decode round trip, gzip keeps hundreds of sourc
   assert.equal((await decodeLink(big)).sources.length, 400);
 });
 
-test("Open in Cydian App: the shell's gunzip where WebKit has no DecompressionStream", async () => {
+test("Open in iFizBox App: the shell's gunzip where WebKit has no DecompressionStream", async () => {
   const url = await encodeLink({ sources: SOURCES });
   const saved = globalThis.DecompressionStream;
   try {
@@ -41,7 +41,7 @@ test("Open in Cydian App: the shell's gunzip where WebKit has no DecompressionSt
   } finally { globalThis.DecompressionStream = saved; }
 });
 
-test("Open in Cydian App: anything else decodes to null, and the certificate never rides along", async () => {
+test("Open in iFizBox App: anything else decodes to null, and the certificate never rides along", async () => {
   for (const bad of ["cydian://import", "cydian://import?d=!!", "cydian://other?d=H4sI", "https://x/?d=H4sI", "cydian://import?d=AAAA"]) {
     assert.equal(await decodeLink(bad), null, bad);
   }

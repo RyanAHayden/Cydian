@@ -2,19 +2,20 @@
 // title and a line of text. It stays, so it can be read in full, until it's tapped or the page comes back after the
 // user has been away (they answered iOS's question); `duration` (ms) makes it go by itself. Styles: ios6.css (.banner).
 //
-//   showBanner({ title: "Cydian", message: "Press Open to import your settings." })
+//   showBanner({ title: "iFizBox", message: "Press Open to import your settings." })
 //
-// Used where iOS asks the user something Cydian can't word itself, so they know which button to press: Safari's
-// "Open in Cydian?" for the website's Open in Cydian App, and "… would like to install …" for its installs.
+// Used where iOS asks the user something iFizBox can't word itself, so they know which button to press: Safari's
+// "Open in iFizBox?" for the website's Open in iFizBox App, and "… would like to install …" for its installs.
 let current = null;
 
 // `action`: { label, onClick } puts a small blue button at the banner's right (Upgrade); a tap on it runs onClick.
-// Cydian's own icon for where it runs: WEB on the website, LITE in the sideload app, plain in the jailbreak app.
+// iFizBox's own icon for where it runs: WEB on the website, LITE in the sideload app, plain in the jailbreak app.
 import { detectMode } from "../core/settings.js";
+import { NAME } from "../brand.js";
 const ownIcon = () => (!globalThis.cydianNative ? "icons/icon-web-glossy-76.png"
   : detectMode() === "sideload" ? "icons/icon-lite-glossy-76.png" : "icons/icon-glossy-76.png");
 
-export function showBanner({ title = "Cydian", message = "", icon = ownIcon(), duration = 0, action = null } = {}) {
+export function showBanner({ title = NAME, message = "", icon = ownIcon(), duration = 0, action = null } = {}) {
   current?.();
   const b = document.createElement("div");
   b.className = "banner";

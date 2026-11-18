@@ -25,6 +25,7 @@
 
 import { ARCHES, DEFAULT_ARCH } from "./apt.js";
 import { IOS_VERSIONS, JAILBREAK_ARCH } from "./compat.js";
+import { NAME } from "../brand.js";
 
 export const MODES = ["site", "jailbreak", "sideload"];
 
@@ -132,20 +133,20 @@ export const SETTINGS = [
     key: "refreshOnLaunch", section: "sources", kind: "toggle", feature: "sources", modes: ALL,
     default: (mode) => mode !== "site", // the site fetches through our proxy: opt in there
     label: "Refresh Sources on Launch", options: onOff,
-    footer: "Looks for new packages in every source each time Cydian opens.",
+    footer: `Looks for new packages in every source each time ${NAME} opens.`,
   },
   {
     key: "holds", section: "updates", kind: "holds", feature: "holds", modes: ALL, label: "Ignored Upgrades",
     footer: (mode) => mode === "jailbreak"
       ? "Held with dpkg, so other package managers leave them alone too."
-      : "Kept on this device, and synced by a Cydian Account.",
+      : `Kept on this device, and synced by a ${NAME} Account.`,
   },
   {
     // F65: N5's background check (native/daemon/) posts "3 Upgrades". Off: `cydian-helper notifications off` writes
     // /var/jb/var/lib/cydian/upgrades.off and the daemon only updates the icon's count (daemon/quiet.h).
     key: "upgradeNotifications", section: "notifications", kind: "toggle", feature: "upgrade-notifications",
     modes: ["jailbreak"], default: true, label: "Upgrade Notifications", options: onOff,
-    footer: "Off, Cydian's icon still shows how many upgrades there are.",
+    footer: `Off, ${NAME}'s icon still shows how many upgrades there are.`,
   },
   {
     key: "autoInstall", section: "automatic", kind: "list", feature: "auto-install", modes: ["jailbreak"], default: "off",
@@ -204,7 +205,7 @@ export function addRecent(list, query, max = RECENT_MAX) {
 
 // F70: what N7's daemon (native/daemon/README.md "Automatic updates (N7)") reads from the app's preferences
 // (com.ryha.cydian), by the same `cydian.<key>` names: these settings, and the lists in DAEMON_LISTS.
-// F75: the settings that move with the user from the website to the app (Open in Cydian App, core/transfer.js):
+// F75: the settings that move with the user from the website to the app (Open in iFizBox App, core/transfer.js):
 // appearance, device, the compat options; Ignored Upgrades (holds) and the Signing Server travel beside them. The
 // app takes only those it shows itself (settings.isShown).
 export const TRAVELS = ["appearance", "device", "worksOnMyPhone", "compatMarks", "iosVersion"];

@@ -8,7 +8,7 @@ to 3 items and strings to 160 characters. Nothing else is taken from those proje
 
 | file | URL | shape |
 |---|---|---|
-| `cydian.json` | https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json | Cydian's own source (I7), a copy of `web/app/source.json`: 2.0, one app |
+| `cydian.json` | https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json | iFizBox's own source (I7), a copy of `web/app/source.json`: 2.0, one app |
 | `provenance-emu.json` | https://provenance-emu.com/apps.json | AltStore 2.0: versions[], news, appPermissions; no source icon |
 | `fizl0-apps.json` | https://fizl0.github.io/apps/source.json | 1.x fields (version, downloadURL) beside versions[] |
 | `feather.json` | https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json | 1.x beside versions[], news |

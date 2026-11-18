@@ -1,7 +1,7 @@
 // Changes tab, after Cydia's ChangesController (docs/cydia.md "Changes and metadata.cb0"). Every catalog reload
 // files what it saw in IndexedDB on the device (core/changes.js, via catalog.js); this tab lists the last 7 days
 // of it, a section per day ("Today", "Yesterday", then the date; F51), newest first, leaving out what the first
-// load saw. AltStore versions file under their own dates. Rows say New or Updated (Cydian's addition). Nav bar:
+// load saw. AltStore versions file under their own dates. Rows say New or Updated (iFizBox's addition). Nav bar:
 // Refresh, as on the Sources tab. Below the root, the routes are screens/browse.js tokens (package:<id>, author:<name>).
 // F51 filters, as on Search: a search field and a scope bar, All / Installed. Installed (dpkg's packages and the
 // apps recorded on the device) is the default whenever anything is installed, else All; a tap on a segment holds
@@ -14,7 +14,7 @@
 // the installed version so the queue reads it as an upgrade), which opens the Confirm sheet: Cydia's dist-upgrade.
 // Hidden while there are none, as Cydia's is.
 // F80: the sideload app's Upgrade (N) queues every available app upgrade too, in the app queue (app-queue.js), and
-// opens the same Confirm (screens/queue.js openAppConfirm), which installs them in turn, Cydian last.
+// opens the same Confirm (screens/queue.js openAppConfirm), which installs them in turn, iFizBox last.
 // F91: the sideload app's apps whose signature is inside the re-sign window (Settings > Signing > Re-sign Reminder,
 // default 2 days) or over get their own group above the upgrades, "Needs Re-sign" (core/signing.js needsResign, from
 // signing.installed), count in the tab badge (and so the icon badge) and in Upgrade (N), which queues them as
@@ -49,11 +49,11 @@ export function init(ctx) {
   state.ctx = ctx;
   catalog.onChange(() => { if (state.body) load(); else badge(); });
   onAppsChange(() => { if (state.body) load(); else badge(); }); // I3: a recorded install can end an upgrade
-  // Cydian's own source read (essential-ui.js readSelfInfo): its upgrade row and the badge count again.
+  // iFizBox's own source read (essential-ui.js readSelfInfo): its upgrade row and the badge count again.
   globalThis.addEventListener?.("cydian:self-info", () => { if (state.body) load(); else badge(); });
   settings.onChange((key) => { if (key === "holds" || key === "resignReminder") { if (state.body) load(); else badge(); } });
   // At launch, only with a status file: without one there are no upgrades, and no reason to load every source.
-  // Without one (the site, the sideload app) the remembered apps count, and Cydian itself in the app: badge at
+  // Without one (the site, the sideload app) the remembered apps count, and iFizBox itself in the app: badge at
   // launch whenever there is anything installed to follow.
   catalog.hasStatus().then((has) => {
     if (has || detectMode() === "sideload") return badge(); // F91: signed apps can need a re-sign with nothing recorded
@@ -98,7 +98,7 @@ export const upgradeLabel = (n) => `Upgrade (${n})`;
 // with an upgrade).
 export const badgeCount = (upgrades, resign = []) => (upgrades?.available?.length ?? 0) + (resign?.length ?? 0);
 
-// The apps Cydian signed that are inside the re-sign window, from signing.installed (sideload app only; [] anywhere
+// The apps iFizBox signed that are inside the re-sign window, from signing.installed (sideload app only; [] anywhere
 // else or when the call fails). `upgrades`: those with an upgrade are left to it.
 export async function resignNow(upgrades, { mode = detectMode(), native = globalThis.cydianNative, get = (k) => settings.get(k), now = new Date() } = {}) {
   if (mode !== "sideload" || typeof native?.call !== "function") return [];
@@ -138,7 +138,7 @@ export function upgradeAll(queue, available, skip = null) {
 }
 
 // Sideload Upgrade (N) (F80): every available upgrade with an IPA as an app queue job (core/appqueue.js appJob, the
-// version Changes shows; Cydian's own row carries its IPA), queued through `add` (screens/queue.js queueApp: the first
+// version Changes shows; iFizBox's own row carries its IPA), queued through `add` (screens/queue.js queueApp: the first
 // opens Confirm, the rest redraw it). -> jobs queued.
 // The Home Screen icon's Upgrade All (native Shortcut): every available upgrade, ignored ones left out, queued,
 // and Confirm opens. -> the jobs queued.
@@ -309,7 +309,7 @@ async function load() {
   try {
     await catalog.ensure();
     [groups, upgrades, installed] = await Promise.all([catalog.changes(), catalog.upgrades(settings.holds.list()), installedNow()]);
-    upgrades = await upgradesWithSelf(upgrades); // F72: the sideload build lists Cydian's own upgrade here
+    upgrades = await upgradesWithSelf(upgrades); // F72: the sideload build lists iFizBox's own upgrade here
     upgrades = await withAppUpgrades(upgrades, settings.holds.list()); // I3: the apps Install remembered (app-updates.js)
     resign = await resignNow(upgrades); // F91
     vendorSold = await vendorSoldNow(upgrades); // B19

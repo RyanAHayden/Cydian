@@ -21,7 +21,7 @@ const ALL = [...DEFAULT_SOURCES, ...ALT];
 test("export writes one line per source: a URL, or a deb line for a dist repo", () => {
   const text = exportText(ALL, { date: new Date("2026-11-17T12:00:00Z") });
   const lines = text.trim().split("\n");
-  assert.equal(lines[0], `# Cydian sources (${ALL.length}), 2026-11-17`);
+  assert.equal(lines[0], `# iFizBox sources (${ALL.length}), 2026-11-17`);
   assert.ok(lines.includes("deb http://apt.saurik.com/ ios/1800.00 main"));
   assert.ok(lines.includes("deb https://apt.procurs.us/ 1800 main"));
   assert.ok(lines.includes("https://repo.chariz.com/"));

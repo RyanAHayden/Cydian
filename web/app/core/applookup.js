@@ -14,7 +14,7 @@
 //   pageLinks({ ownLinks, store, source, sourceWebsite, appUrls })
 //                                         -> [{ kind, label, detail, url? }] never two rows to one page:
 //                                              1) the app's own page (its GitHub/website, else the App Store page)
-//                                              2) the source (kind "source": opens its page in Cydian)
+//                                              2) the source (kind "source": opens its page in iFizBox)
 //                                              3) the source's website, only when it isn't a page already listed
 //   ownPageLinks(app, links)              -> appLinks(app) without a GitHub repo found only through the IPA's download
 //                                              URL and not named for the app (a source's many-app repo: AppTesters_Repo)
@@ -141,7 +141,7 @@ export function pageLinks({ ownLinks = [], store = null, source = null, sourceWe
     if (add({ kind: l.kind, label: l.label, detail: l.detail || l.url, url: l.url }, l.url)) own++;
   }
   if (!own && store?.trackViewUrl) add({ kind: "appstore", label: "App Store", detail: store.developer || "apps.apple.com", url: store.trackViewUrl }, store.trackViewUrl);
-  // 2) the source, as a page in Cydian (its other apps)
+  // 2) the source, as a page in iFizBox (its other apps)
   if (source) out.push({ kind: "source", label: source.label, detail: source.subtitle || null, href: source.href ?? null });
   // 3) its website, only when it is a page not listed yet
   const site = httpsUrl(sourceWebsite);

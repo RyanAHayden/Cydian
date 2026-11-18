@@ -7,7 +7,7 @@ import { deviceSummary, phaseLabel, deviceError } from "./signing.js";
 const fmt = { locale: "en-US", timeZone: "UTC", now: new Date("2026-11-17T00:00:00Z") };
 const identity = {
   name: "Apple Development: Jo Doe (ABCDE12345)", team: "TEAM123456", expires: "2027-03-01T00:00:00Z",
-  profile: { name: "Cydian Dev", team: "TEAM123456", appId: "TEAM123456.*", devices: 3, wildcard: true, expires: "2027-01-05T00:00:00Z" },
+  profile: { name: "iFizBox Dev", team: "TEAM123456", appId: "TEAM123456.*", devices: 3, wildcard: true, expires: "2027-01-05T00:00:00Z" },
 };
 
 test("no identity: no rows", () => {
@@ -20,7 +20,7 @@ test("the identity and its profile as rows", () => {
     { label: "Certificate", detail: "Apple Development: Jo Doe (ABCDE12345)" },
     { label: "Team", detail: "TEAM123456" },
     { label: "Certificate Expires", detail: "Mar 1, 2027" },
-    { label: "Profile", detail: "Cydian Dev" },
+    { label: "Profile", detail: "iFizBox Dev" },
     { label: "Profile Expires", detail: "Jan 5, 2027" },
     { label: "Devices", detail: "3" },
     { label: "App ID", detail: "TEAM123456.*" },

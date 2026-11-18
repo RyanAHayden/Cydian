@@ -51,6 +51,7 @@ import { filterRows } from "../core/changes.js";
 import { sizeText as formatSize } from "../core/appqueue.js";
 import { dailyPick, browseKind, collectionsFor, dayKey } from "../core/catalog.js";
 import { readSpins, currentStreak, rouletteRow } from "./roulette.js";
+import { NAME } from "../brand.js";
 
 const ROW_HEIGHT = 58;
 
@@ -850,18 +851,18 @@ async function packageActions(route, button) {
     actions.push({ label: "Downgrade", run: () => go(versionsHref(route, id)) });
   }
   if (many && !(installed && older.length)) actions.push({ label: "Other Versions", run: () => go(versionsHref(route, id)) });
-  // The website: a jailbroken phone's Cydian installs it with apt (cydian://package, websign-gate.js), so nobody has to
+  // The website: a jailbroken phone's iFizBox installs it with apt (cydian://package, websign-gate.js), so nobody has to
   // download a .deb (user 2026-11-18); Download .deb stays below for other package managers.
   if (getBackend().kind === "http" && (st.package || id)) {
-    actions.push({ label: "Install in Cydian", run: () => import("../websign-gate.js").then((g) => { location.href = g.packageLink(st.package || id); }) });
+    actions.push({ label: `Install in ${NAME}`, run: () => import("../websign-gate.js").then((g) => { location.href = g.packageLink(st.package || id); }) });
   }
   if (st.debUrl && getBackend().kind === "http" && !isPaid(st)) actions.push({ label: "Download .deb", run: () => downloadDeb(st.debUrl, st.package) });
   // F102: Add to Wish List while it isn't installed; Remove from Wish List whenever it is on the list.
   const wishId = st.package || id;
   if (!installed || wishlist().has(wishId)) actions.push({ label: wishLabel(wishlist().has(wishId)), run: () => wishlist().set(wishId, !wishlist().has(wishId)) });
   const title = queue ? "" : getBackend().kind === "http"
-    ? "Packages install on the iPhone, from Cydian's jailbreak app or another package manager."
-    : "Installing from Cydian comes with its install queue, which this build doesn't have yet.";
+    ? `Packages install on the iPhone, from ${NAME}'s jailbreak app or another package manager.`
+    : `Installing from ${NAME} comes with its install queue, which this build doesn't have yet.`;
   return sheet(title, actions);
 }
 
@@ -1018,9 +1019,9 @@ function setRightLabel(body, label) {
   if (b && b.textContent !== label) b.textContent = label;
 }
 
-// F87: in the jailbreak app, an app Cydian remembers (core/installed.js) at the version on the phone, with I4's note
-// where that isn't the one it remembered ("Installed: 1.6 (Cydian remembered 1.5)", "Not installed (...)").
-// Null when Cydian doesn't remember the app.
+// F87: in the jailbreak app, an app iFizBox remembers (core/installed.js) at the version on the phone, with I4's note
+// where that isn't the one it remembered ("Installed: 1.6 (iFizBox remembered 1.5)", "Not installed (...)").
+// Null when iFizBox doesn't remember the app.
 async function installedAppGroup(id, { records = () => rememberedApps({ mode: "jailbreak" }) } = {}) {
   let rec;
   try { rec = (await records()).find((r) => r?.id === id && !r.self); } catch { return null; }

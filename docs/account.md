@@ -1,4 +1,4 @@
-# Cydian Account (F97)
+# iFizBox Account (F97)
 
 A free, minimal account that keeps a device's sources, the settings that travel (`core/settings.js` TRAVELS),
 Ignored Upgrades, installed-app records (`core/installed.js`) and the signing certificate on cydian.dev, so a new

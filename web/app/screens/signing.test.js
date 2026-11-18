@@ -1,5 +1,5 @@
 // F69, F75: the Signing walkthrough's step states (screens/signing.js stepStates) from signing.status answers and the
-// Signing Server: just the certificate and a server, nothing about trusting a certificate of Cydian's own.
+// Signing Server: just the certificate and a server, nothing about trusting a certificate of iFizBox's own.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { stepStates, allDone, STEPS, missingStep, serverReady, openAt, walkOpen } from "./signing.js";
@@ -63,7 +63,7 @@ test("openAt: Install's redirect opens just the missing step", () => {
   assert.deepEqual(opened(stepStates(st(ident), { server: null, open: walkOpen })), ["server"]);
 });
 
-test("nothing on the page or in the code still talks about trusting Cydian's certificate", async () => {
+test("nothing on the page or in the code still talks about trusting iFizBox's certificate", async () => {
   const { readFile } = await import("node:fs/promises");
   for (const f of ["./signing.js", "./settings.js", "../signing-client.js", "../core/signing.js", "../signing.css"]) {
     const text = await readFile(new URL(f, import.meta.url), "utf8");

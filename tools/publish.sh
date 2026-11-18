@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# One command for a Cydian release, every step in order (docs/release.md):
+# One command for a iFizBox release, every step in order (docs/release.md):
 #
 #   tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.Y.Z] [--dry-run]
 #
 #   1. checks: on main, no uncommitted changes, up to date with origin, X.Y.Z newer than the last v* tag
 #   2. writes native/VERSION, commits "Version X.Y.Z" and pushes it
 #   3. builds that commit in a clean temporary worktree and publishes it with tools/release.sh: tag vX.Y.Z,
-#      Cydian.ipa, the .debs and Cydian's own APT repo, as the repo owner's GitHub account
+#      Cydian.ipa, the .debs and iFizBox's own APT repo, as the repo owner's GitHub account
 #   4. commits the updated AltStore source (web/app/source.json, the built-in source) and pushes it
 #   5. checks that releases/latest/download/Cydian.ipa is X.Y.Z
 #
@@ -14,6 +14,7 @@
 # repo owner's account. --dry-run builds and prints what would be published, and changes nothing.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
+. native/brand.env # F170: BRAND_NAME
 die() { echo "publish: $*" >&2; exit 1; }
 
 version="${1:-}"; shift || true
@@ -68,7 +69,7 @@ git pull -q --ff-only origin main
 cp "$tmp/out/source.json" web/app/source.json
 python3 tools/altsource.py check >/dev/null
 if ! git diff --quiet web/app/source.json; then
-  git commit -q -m "Cydian's AltStore source: $version" web/app/source.json
+  git commit -q -m "$BRAND_NAME's AltStore source: $version" web/app/source.json
   git push -q origin main
 fi
 
@@ -78,4 +79,4 @@ import io, plistlib, sys, zipfile
 z = zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read()))
 print(plistlib.loads(z.read(next(n for n in z.namelist() if n.endswith(".app/Info.plist"))))["CFBundleShortVersionString"])')
 [ "$got" = "$version" ] || die "latest/download/Cydian.ipa is $got, not $version"
-echo "publish: Cydian $version is out: https://github.com/$repo/releases/tag/v$version"
+echo "publish: $BRAND_NAME $version is out: https://github.com/$repo/releases/tag/v$version"

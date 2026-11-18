@@ -1,5 +1,5 @@
 // Settings (F13; at the bottom of Home since F123), laid out like iOS 6's Settings app (F128, docs/settings.md):
-// the root is one list of short rows (Cydian Account; General, Display, Updates; Signing; Console Logs; About), each
+// the root is one list of short rows (iFizBox Account; General, Display, Updates; Signing; Console Logs; About), each
 // opening its own page. The settings' rows come from core/settings.js (which ones this mode shows, defaults,
 // storage, which page they're on); this file only draws them:
 //   choice  one row per option, the chosen one checked (Display > Appearance: Automatic / Light / Dark)
@@ -32,6 +32,7 @@ import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installP
 import { getArch } from "../backend.js";
 import { ipaSection } from "./ipa-install.js";
 import { otherLinksOn, setOtherLinks } from "../core/otherlinks.js";
+import { NAME } from "../brand.js";
 
 export const title = "Settings";
 
@@ -56,7 +57,7 @@ const THEME_COLORS = { light: "#4f698b", dark: "#5f656f" }; // dark: the gunmeta
 const defOf = (key) => SETTINGS.find((d) => d.key === key);
 const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? String(v);
 
-const TITLES = { holds: "Ignored Upgrades", signing: "Signing", account: "Cydian Account", about: "About" };
+const TITLES = { holds: "Ignored Upgrades", signing: "Signing", account: `${NAME} Account`, about: "About" };
 export function nav(route) {
   const [first, second] = route.path;
   if (first === LOGS) return { title: logsTitle(second) }; // N4: Console Logs
@@ -316,7 +317,7 @@ export function init() {
     if (key === "appearance") applyTheme();
     if (key === "resignReminder") remindNow();
   });
-  startAccountSync(); // F97: read the account on launch, save it when Cydian goes to the background
+  startAccountSync(); // F97: read the account on launch, save it when iFizBox goes to the background
   remindNow(); // F68: on launch too, so the notification follows the setting (and any change the shell missed)
 }
 
@@ -376,7 +377,7 @@ async function chooseFiles(el, files, slot) {
 
 // F83: Sideloading > Open Other Apps' Links (sideload build only, which claims the schemes; on by default). The
 // footer says the limit: iOS fixed the schemes at install, so off can't hand a link back to the app it was for.
-const OTHER_LINKS_FOOTER = "AltStore, SideStore, Feather and other sideloaders' links open in Cydian. "
+const OTHER_LINKS_FOOTER = `AltStore, SideStore, Feather and other sideloaders' links open in ${NAME}. `
   + "iOS picks the app for each kind of link, so Off can't always hand them back.";
 function sideloadingSection(mode = detectMode()) {
   const box = document.createElement("div");
@@ -444,7 +445,7 @@ async function checkServer() {
     hide();
     const host = new URL(getServer()).host;
     // The app needs only manifests and the update hand-off (worker/ answers worker: true).
-    if (st?.worker || st?.ok) await alertOK("Server Works", `${host} hands iOS the install manifests and holds Cydian's own updates. Signing happens on this iPhone.`);
+    if (st?.worker || st?.ok) await alertOK("Server Works", `${host} hands iOS the install manifests and holds ${NAME}'s own updates. Signing happens on this iPhone.`);
     else await alertOK("Server Not Ready", `${host} answers but isn't a Signing Server.`);
   } catch (e) {
     hide();
@@ -455,7 +456,7 @@ async function checkServer() {
 async function drawSigning(el) {
   if (localSigning()) return drawDeviceSigning(el);
   if (browserSigning()) return drawSiteSigning(el);
-  el.replaceChildren(grouped([{ footer: "Apps are signed in the Cydian app, on the iPhone itself, with your own certificate." }]));
+  el.replaceChildren(grouped([{ footer: `Apps are signed in the ${NAME} app, on the iPhone itself, with your own certificate.` }]));
 }
 
 // The certificate, its profile and its password: one group of rows, each with its name on the left, its value in the
@@ -513,8 +514,8 @@ function certificateBlock(el, id, status = null, { files = false } = {}) {
   ul.append(fileRow(".p12", p12Shown, "p12"),
     fileRow(".mobileprovision", profShown, "profile"), focusOnRowTap(signRow("Password", input, pwBrowse), input));
   const state = id?.p12 && id?.password != null ? (id.passwordOk === false ? " The password doesn't open this certificate." : id.passwordOk ? " The password opens it." : "") : "";
-  const kind = browserSigning() ? "They're kept in this browser only, and apps are signed here in the browser: they go to no server, except inside Cydian's own app with Bring My Certificate."
-    : "Once all three are here, they go into this iPhone's Keychain, where only Cydian can use them; the password isn't kept. To change one, choose the .p12 and the profile again.";
+  const kind = browserSigning() ? `They're kept in this browser only, and apps are signed here in the browser: they go to no server, except inside ${NAME}'s own app with Bring My Certificate.`
+    : `Once all three are here, they go into this iPhone's Keychain, where only ${NAME} can use them; the password isn't kept. To change one, choose the .p12 and the profile again.`;
   const foot = Object.assign(document.createElement("p"), { className: "group-footer",
     textContent: (files ? "Browse for what's missing, or type the password." : "Your .p12 (the certificate and its key), its .mobileprovision and the password. Each row's Browse picks one. " + kind) + state });
   if (files) {
@@ -572,7 +573,7 @@ function browseButton(accept, multiple, onFiles) {
 // The sideload build: the same Certificate rows, but the picks wait in memory (signing-client.js) until the .p12, the
 // profile and a password are there, then go to the Keychain through signing.import (I6, docs/signing.md "On the
 // phone"). What the page shows comes from signing.status: the identity, its profile and their problem. F75: and the
-// Signing Server, which hands iOS the manifest for the IPA Cydian serves at 127.0.0.1 (the certificate never leaves
+// Signing Server, which hands iOS the manifest for the IPA iFizBox serves at 127.0.0.1 (the certificate never leaves
 // the phone; the server sees the app's ID, version and name).
 
 // F128: the root's Signing row, the certificate as its detail (the page explains the rest).
@@ -614,7 +615,7 @@ async function importIfComplete(el, typing) {
   // instead of leaving the names on the rows as if it worked.
   if (after && !statusReady(after)) {
     await clearIdentity();
-    await alertOK("Couldn't Import", after.identityProblem || "The certificate went into the Keychain but Cydian can't find it there. Remove it and import it again.");
+    await alertOK("Couldn't Import", after.identityProblem || `The certificate went into the Keychain but ${NAME} can't find it there. Remove it and import it again.`);
     redrawAll();
     return false;
   }
@@ -634,7 +635,7 @@ async function removeDeviceCertificate() {
   redrawAll();
 }
 
-// Back in Cydian (from Safari or the Files app): redraw, and while the Signing page is open look at signing.status
+// Back in iFizBox (from Safari or the Files app): redraw, and while the Signing page is open look at signing.status
 // every 2 s, so the walkthrough ticks the moment a certificate lands (the launch import of one that came inside the
 // app, an import finished elsewhere). The app's web view doesn't always send visibilitychange, so focus and
 // pageshow count too.
@@ -688,7 +689,7 @@ async function drawDeviceSigning(el) {
   const split = splitSummary(info.rows);
   const parts = {
     certificate: () => certificateGroup(el, { rows: split.certificate, has: Boolean(kept), staged, notes,
-      footer: "Kept in this iPhone's Keychain, where only Cydian can use it." }),
+      footer: `Kept in this iPhone's Keychain, where only ${NAME} can use it.` }),
     files: () => certificateBlock(el, id, status ?? { identity: null }, { files: true }),
     profile: () => grouped([{ header: "Provisioning Profile", rows: split.profile }]),
     options: () => settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"),
@@ -828,7 +829,7 @@ export function checkUpdates({ manual = false, always = false } = {}) {
   return checking;
 }
 
-// The sideload app: what iOS lets Cydian do for update alerts (badges, notifications, Background App Refresh) and
+// The sideload app: what iOS lets iFizBox do for update alerts (badges, notifications, Background App Refresh) and
 // when the background check last ran. A "no" given once can only be changed in iOS Settings: the row opens it.
 export function notifyRows(st, now = Date.now()) {
   if (!st) return null;
@@ -848,7 +849,7 @@ export function notifyRows(st, now = Date.now()) {
     { label: "Background App Refresh", detail: onOff(st.backgroundRefresh), on: Boolean(st.backgroundRefresh), toggle: "ios" },
     { label: "Last Background Check", detail: ago(st.lastCheck) },
     ...(off ? [{ label: "Turn On in Settings", chevron: true, open: true }] : [])],
-    footer: off ? "iOS asks only once: anything left off is turned on in Settings > Notifications > Cydian, and Settings > General > Background App Refresh."
+    footer: off ? `iOS asks only once: anything left off is turned on in Settings > Notifications > ${NAME}, and Settings > General > Background App Refresh.`
       : "iOS decides when the background check runs, usually every few hours. It badges every update and notifies only about new ones." };
 }
 function notifySection() {
@@ -893,7 +894,7 @@ function aboutRow() {
 function aboutPage() {
   const box = document.createElement("div");
   if (!installPath(detectMode())) {
-    box.append(grouped([{ footer: "This page is in the Cydian app." }]));
+    box.append(grouped([{ footer: `This page is in the ${NAME} app.` }]));
     return box;
   }
   const fill = (version) => {
@@ -901,13 +902,13 @@ function aboutPage() {
     const latest = st.latest?.version;
     const rows = [{ label: "Version", detail: version || "Unknown" },
       { label: "Check for Updates", onClick: () => checkUpdates({ manual: true }) }];
-    let footer = latest && version && !isNewer(latest, version) ? "Cydian is up to date." : "Cydian looks for a new version on GitHub once a day.";
+    let footer = latest && version && !isNewer(latest, version) ? `${NAME} is up to date.` : `${NAME} looks for a new version on GitHub once a day.`;
     if (latest && isNewer(latest, version)) {
       const skipped = st.skip && compareVersions(st.skip, latest) === 0;
-      rows.push({ label: "Skip This Version", subtitle: `Cydian ${latest}`, checked: skipped,
+      rows.push({ label: "Skip This Version", subtitle: `${NAME} ${latest}`, checked: skipped,
         onClick: () => { setSkip(globalThis.localStorage, skipped ? null : latest); redrawAll(); } });
-      footer = skipped ? `Cydian won't ask about ${latest} again. Check for Updates still offers it.`
-        : `Cydian ${latest} is available. Check for Updates installs it.`;
+      footer = skipped ? `${NAME} won't ask about ${latest} again. Check for Updates still offers it.`
+        : `${NAME} ${latest} is available. Check for Updates installs it.`;
     }
     box.replaceChildren(grouped([{ rows, footer }]));
   };
@@ -918,7 +919,7 @@ function aboutPage() {
 
 // ---- Signing on the website (F93, as before F89) --------------------------------------------------------------
 // The .p12, its password and the .mobileprovision in this browser's IndexedDB (signing-client.js); Install on an app
-// page and Home's Install Cydian App sign in the browser with them (zsign as WebAssembly, signing-worker.js) and the
+// page and Home's Install iFizBox App sign in the browser with them (zsign as WebAssembly, signing-worker.js) and the
 // Worker only hosts the signed IPA for iOS's install prompt.
 
 function siteSigningSection(box) {
@@ -934,16 +935,16 @@ function siteSigningSection(box) {
   return box;
 }
 
-// Install Cydian App, green, once the certificate works, with Bring My Certificate under it.
+// Install iFizBox App, green, once the certificate works, with Bring My Certificate under it.
 const installApp = () => signAndInstall({ url: APP_IPA_URL, name: APP_NAME, bring: getBring() });
 function siteAppSection(id) {
   if (!(id?.p12 && id?.profile && id.passwordOk !== false)) return [];
-  const frag = grouped([{ rows: [{ label: "Install Cydian App", onClick: installApp, icon: { text: "" } }],
-    footer: "Cydian as an app, signed here with this certificate. It signs apps on the iPhone itself." }]);
+  const frag = grouped([{ rows: [{ label: `Install ${NAME} App`, onClick: installApp, icon: { text: "" } }],
+    footer: `${NAME} as an app, signed here with this certificate. It signs apps on the iPhone itself.` }]);
   frag.firstChild.classList.add("app-offer");
   frag.querySelector(".cell-icon")?.classList.add("home-glyph", "glyph-install");
   const bring = grouped([{ rows: [{ label: "Bring My Certificate" }],
-    footer: "Puts a copy of your certificate inside the app, so Cydian has it on first launch." }]);
+    footer: `Puts a copy of your certificate inside the app, so ${NAME} has it on first launch.` }]);
   const cell = bring.querySelector(".cell-inner");
   cell?.append(createSwitch({ label: "Bring my certificate into the app", checked: getBring(), onToggle: (on) => setBring(on) }));
   cell?.classList.add("has-switch");

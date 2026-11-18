@@ -6,7 +6,7 @@
 //               <name>?": signed on the phone with your certificate and installed through the in-app server
 //               (screens/myipas.js installLibraryFile, which also remembers it)
 //   deb         jailbreak: the Confirm sheet and console for that file (screens/sharedeb.js); a link is fetched first
-//   refuse      an alert saying why (a .deb in the sideload app, no AppSync Unified, something Cydian can't open)
+//   refuse      an alert saying why (a .deb in the sideload app, no AppSync Unified, something iFizBox can't open)
 //
 //   await handleShared(url, deps) -> the route, or null when it isn't one
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -16,6 +16,7 @@ import { format } from "./router.js";
 import { parseShared, sharedRecord } from "./core/share.js";
 import { apps, recordInstall } from "./core/installed.js";
 import { deviceError } from "./core/signing.js";
+import { NAME } from "./brand.js";
 
 export async function handleShared(url, { native = globalThis.cydianNative, alert = showAlert, hud = showHUD } = {}) {
   const s = parseShared(url);
@@ -26,7 +27,7 @@ export async function handleShared(url, { native = globalThis.cydianNative, aler
   }
   const name = s.name || "this app";
   if (s.route === "helper-ipa") {
-    const { index } = await alert({ title: `Install ${name}?`, message: "Cydian installs it with the jailbreak's app installer (AppSync Unified).",
+    const { index } = await alert({ title: `Install ${name}?`, message: `${NAME} installs it with the jailbreak's app installer (AppSync Unified).`,
       buttons: ["Cancel", "Install"], cancel: 0 });
     if (index !== 1) {
       if (s.file) native.call("share.discard", { file: s.file, kind: "ipa" }).catch(() => {});
@@ -55,7 +56,7 @@ export async function handleShared(url, { native = globalThis.cydianNative, aler
       if (!file) return s.route;
     }
     location.hash = format({ tab: "installed", path: ["myipas", `ipa:${file}`] }).replace(/^#/, "");
-    const { index } = await alert({ title: `Install ${name}?`, message: "Cydian signs it on this iPhone with your certificate and installs it. It stays in My IPAs.",
+    const { index } = await alert({ title: `Install ${name}?`, message: `${NAME} signs it on this iPhone with your certificate and installs it. It stays in My IPAs.`,
       buttons: ["Not Now", "Install"], cancel: 0 });
     if (index === 1) {
       const { installLibraryFile } = await import("./screens/myipas.js");

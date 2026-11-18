@@ -1,5 +1,5 @@
 // F93: the website's signing job (websign-job.js) with a fake zsign (the flow: unzip, Info.plist, bundle ID,
-// entitlements, Cydian's bring files, zsign's errors), then the real zsign WebAssembly (vendor/zsign) on a tiny IPA
+// entitlements, iFizBox's bring files, zsign's errors), then the real zsign WebAssembly (vendor/zsign) on a tiny IPA
 // (core/fixtures/signing/tiny-cydian.ipa: Payload/Tiny.app, a 32 KB arm64 executable, binary Info.plist,
 // com.ryha.cydian) signed with the throwaway test certificate.
 import { test } from "node:test";
@@ -68,12 +68,12 @@ test("signs: unzips, reads the app, passes zsign the certificate, profile, narro
   assert.equal(seen.files.has("/w/app/Payload/Delta.app/cydian-identity.plist"), false);
 });
 
-test("bring: only Cydian's own IPA gets the certificate and the website's link, before zsign seals it", async () => {
+test("bring: only iFizBox's own IPA gets the certificate and the website's link, before zsign seals it", async () => {
   const link = "cydian://import?d=abc";
   let { create, seen } = fakeZsign();
   await runSignJob(create, job({ bring: { identity: true, transfer: link } }));
   assert.equal([...seen.files.keys()].some((k) => k.includes("cydian-identity") || k.includes("transfer.link")), false, "not another app");
-  ({ create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.ryha.cydian", CFBundleName: "Cydian" }, appName: "Cydian.app" }));
+  ({ create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.ryha.cydian", CFBundleName: "iFizBox" }, appName: "Cydian.app" }));
   await runSignJob(create, job({ bring: { identity: true, transfer: link } }));
   const id = parsePlist(text(seen.files.get("/w/app/Payload/Cydian.app/cydian-identity.plist")));
   assert.deepEqual([...id.p12], [...P12]);
@@ -100,7 +100,7 @@ test("zsign's own reason when it can't sign; not an IPA; no app inside; no Info.
 const WASM = new URL("./vendor/zsign/zsign.js", import.meta.url);
 const has = (b, s) => Buffer.from(b).includes(Buffer.from(s));
 
-test("zsign WebAssembly signs a tiny IPA, sealing Cydian's bring files", { skip: !existsSync(WASM) && "no vendor/zsign" }, async () => {
+test("zsign WebAssembly signs a tiny IPA, sealing iFizBox's bring files", { skip: !existsSync(WASM) && "no vendor/zsign" }, async () => {
   const { default: createZsign } = await import(WASM);
   const r = await runSignJob(createZsign, { ipa: fx("tiny-cydian.ipa"), p12: P12, profile: PROFILE, password: "hunter2",
     bring: { identity: true, transfer: "cydian://import?d=abc" } });

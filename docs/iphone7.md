@@ -1,7 +1,7 @@
 # The iPhone 7 test phone
 
-The phone that runs Cydian's jailbreak build (.deb). Set up 2026-11-18. The iPhone 4S (`ssh 4s`, iOS 6) stays the
-Cydia look reference only and never runs Cydian.
+The phone that runs iFizBox's jailbreak build (.deb). Set up 2026-11-18. The iPhone 4S (`ssh 4s`, iOS 6) stays the
+Cydia look reference only and never runs iFizBox.
 
 | | |
 |---|---|
@@ -18,7 +18,7 @@ Cydia look reference only and never runs Cydian.
 - Drive its screen only through `tools/ui-7.sh`, under its lock (below). `ssh`, `dpkg -s`, reading files and pulling
   logs need no lock.
 - No `apt upgrade` of system packages, no removing palera1n, Sileo, ElleKit or openssh. Installing and removing
-  Cydian and test packages is fine when the task is about that.
+  iFizBox and test packages is fine when the task is about that.
 - If `ssh 7` fails or `/var/jb` is missing, the phone rebooted and lost its jailbreak. Stop and ask the user to
   re-jailbreak it (below); don't try to do it yourself.
 
@@ -34,7 +34,7 @@ tools/ui-7.sh N6 home
 tools/ui-7.sh unlock N6               # always, also after a failure
 ```
 
-- `open` takes any URL. `cydian://<tab>` (home, sources, changes, installed, search, settings) opens Cydian on
+- `open` takes any URL. `cydian://<tab>` (home, sources, changes, installed, search, settings) opens iFizBox on
   that tab, launched or already running (B14); the other `cydian://` links are listed in `web/app/incoming.js`.
 - Coordinates are screenshot pixels (750x1334; points x2), so read a spot off a screenshot and tap it.
 - From the top edge, `swipe 375 2 375 900 0.4` opens Notification Centre (checked 2026-11-18); `home` closes it.
@@ -67,7 +67,7 @@ phonectl size | sender | tap X Y | swipe X1 Y1 X2 Y2 [secs] | home | lock | shot
 - Rebuild and reinstall: `tools/phonectl/build.sh` (needs `IOS_SDK` and ld64.lld like `native/build.sh`; signs
   on the phone with its `ldid`). It installs with `sudo -n`; `PHONE_SUDO_PASS` is only a fallback if that fails. It survives reboots (it's in `/var/jb`).
 
-## Installing Cydian on it
+## Installing iFizBox on it
 
 ```sh
 native/build.sh deb                                 # -> native/build/Cydian.deb
@@ -79,13 +79,13 @@ ssh 7 'launchctl list | grep com.ryha.cydian'       # the upgrades daemon
 `sudo` needs no password (passwordless rule since 2026-11-18); scripts use `sudo -n` so they fail instead of
 hanging at a prompt if the rule is ever gone. Remove with `sudo apt-get remove -y com.ryha.cydian`.
 
-Cydian is installed on the phone: `com.ryha.cydian` 0.3.8-791 (checked 2026-11-18 with
+iFizBox is installed on the phone: `com.ryha.cydian` 0.3.8-791 (checked 2026-11-18 with
 `ssh 7 dpkg-query -W com.ryha.cydian`). Check the version before assuming what a test runs.
 
 ## What's installed
 
 Sileo 2.5.1, apt 2.9.4, dpkg 1.22.6, uikittools (`uicache`, `uiopen`, `sbreload`), `launchctl`, openssh 9.7,
-`unzip` and `ldid` (Cydian's Depends/Recommends), ElleKit 1.2 (tweak injection, for AppSync/paid tweaks in R10),
+`unzip` and `ldid` (iFizBox's Depends/Recommends), ElleKit 1.2 (tweak injection, for AppSync/paid tweaks in R10),
 `curl`. Sources: palera1n, ElleKit, Procursus, Havoc, Chariz, BigBoss. No `awk`.
 
 Known quirks:
@@ -113,7 +113,7 @@ still holding the phone: kill it and retry.
 
 The desktop's firewall blocks the phone from reaching it over the LAN. To serve a repo you built, use a reverse
 tunnel instead: `python3 -m http.server 8711 --bind 127.0.0.1` in the repo folder, then
-`ssh -N -R 8711:127.0.0.1:8711 7`. On the phone it is `http://127.0.0.1:8711/`, in Cydian, Sileo
+`ssh -N -R 8711:127.0.0.1:8711 7`. On the phone it is `http://127.0.0.1:8711/`, in iFizBox, Sileo
 (`sileo://source/http://127.0.0.1:8711/`) and Zebra alike. Keep the pids, stop both when you're done, and take the
 stanzas back out of `sileo.sources` and Zebra.
 

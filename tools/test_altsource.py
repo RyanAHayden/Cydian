@@ -1,4 +1,4 @@
-"""I7: Cydian's own AltStore source (web/app/source.json, tools/altsource.py) is well formed, names its own release's
+"""I7: iFizBox's own AltStore source (web/app/source.json, tools/altsource.py) is well formed, names its own release's
 IPA, is never ahead of native/VERSION, and is first among the site's default AltStore sources."""
 import json
 import os

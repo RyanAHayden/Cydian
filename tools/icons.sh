@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cydian's icons, all from one master: web/app/icons/icon.svg (flat, square; iOS 7+ masks the corners itself),
+# iFizBox's icons, all from one master: web/app/icons/icon.svg (flat, square; iOS 7+ masks the corners itself),
 # itself built from tools/icon.svg.in and tools/icon_bg.py.
 #
 # Writes:

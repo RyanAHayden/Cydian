@@ -1,6 +1,6 @@
 # Agent rules
 
-Cydian: a package manager with the iOS 6 Cydia look, for modern iPhones. Two front doors, one brain:
+iFizBox: a package manager with the iOS 6 Cydia look, for modern iPhones. Two front doors, one brain:
 
 1. `web/app/`: **the one frontend** (HTML, CSS, vanilla JS modules, no build step). It runs on the public site and
    inside the jailbreak app. `core/` is pure JS (parsing, versions, Changes, upgrades), tested with `node --test`.
@@ -31,8 +31,11 @@ Shortcuts recipes live in `docs/shortcuts.md`.
   original for comparison only: use its HD counterpart from the kit (`ref/4s/hd/`, from `tools/kitmatch.py`;
   `ref/4s/kitmatch.html` flips HD/Original). Cydia's behaviour: `docs/cydia.md` (R2) and Cydia's GPLv3 source at
   https://git.saurik.com/cydia.git.
-- Cydian is its own project, with its own patterns: don't copy or depend on the user's other projects (code,
+- iFizBox is its own project, with its own patterns: don't copy or depend on the user's other projects (code,
   CSS, deploy scripts, signing or hosting). Sideload installs happen on the phone, Feather-style (docs/sideload.md, R5).
+- The name (and domain, IDs, repo) come from one place: `web/app/brand.js` (`NAME`, imported by the frontend and
+  `worker/`) and `native/brand.env` (build.sh's `$(BRAND_NAME)` in plists, `Brand.name` in Swift, `brand.py` for
+  Python). Never spell the name in code or a user-visible string; `native/test_brand.py` checks it.
 - Bundle ID and package name: `com.ryha.cydian` (extensions and spikes add a suffix: `com.ryha.cydian.share`).
 - Drawing iOS 6 controls: take colours and shapes from the 4S's UIKit art (`ref/4s/artwork/Shared@2x/`, sample the
   pixels), pressed states from its `*Pressed` images. Never add highlights, glows or bottom lines the phone doesn't
@@ -47,7 +50,7 @@ Shortcuts recipes live in `docs/shortcuts.md`.
 - The server fetches URLs visitors type in. Every fetch goes through the SSRF guard (F3): no private, loopback or
   link-local addresses, size and time caps.
 - The iPhone 4S (iOS 6, jailbroken) is a reference device only: `ssh 4s` (see R1). It shows how iOS 6 and Cydia look
-  and behave. It will never run Cydian (the app or the site), so never test, benchmark or time Cydian on it.
+  and behave. It will never run iFizBox (the app or the site), so never test, benchmark or time iFizBox on it.
   Only touch it when your task says so.
   Never run `apt-get upgrade`, `dpkg -i` or `rm` on it unless the task says so. It can't be re-jailbroken
   easily.

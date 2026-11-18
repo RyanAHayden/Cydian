@@ -26,6 +26,7 @@
 // apps: its page shows the reason and the Open in row (F8).
 import { pool, withTimeout, healthFields, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 import { parseIpaSource } from "./sources/ipa.js";
+import { NAME } from "../brand.js";
 
 const ALT_PREFIX = "alt:";
 export const isAltKey = (key) => String(key ?? "").startsWith(ALT_PREFIX);
@@ -262,7 +263,7 @@ export function parseAltSource(input) {
   };
 }
 
-// AltStore's categories -> Cydian sections, under "Apps" so Search's Apps scope finds them (core/catalog.js
+// AltStore's categories -> iFizBox sections, under "Apps" so Search's Apps scope finds them (core/catalog.js
 // SECTION_GROUPS): "Apps (Games)", "Apps (Photo & Video)"; none: "Apps".
 const CATEGORY = { developer: "Developer", entertainment: "Entertainment", games: "Games", lifestyle: "Lifestyle",
   other: "Other", "photo-video": "Photo & Video", social: "Social", utilities: "Utilities" };
@@ -451,7 +452,7 @@ function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "cydian-al
 // F144: what Add says to an APT repo where APT sources aren't kept (withAltSources aptAllowed false): one short
 // alert (screens show `title` and `message`), the source not added.
 export const JAILBREAK_SOURCE_TITLE = "Jailbreak Source";
-export const JAILBREAK_SOURCE_MESSAGE = "This source lists tweaks for jailbroken iPhones. Cydian adds app sources here.";
+export const JAILBREAK_SOURCE_MESSAGE = `This source lists tweaks for jailbroken iPhones. ${NAME} adds app sources here.`;
 export function jailbreakSourceError() {
   const e = new Error(JAILBREAK_SOURCE_MESSAGE);
   e.title = JAILBREAK_SOURCE_TITLE;

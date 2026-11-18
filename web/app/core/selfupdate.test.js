@@ -1,4 +1,4 @@
-// F61: Cydian updates itself. The version compare, the release parse, the once-a-day gate, Later, Skip This Version,
+// F61: iFizBox updates itself. The version compare, the release parse, the once-a-day gate, Later, Skip This Version,
 // and which install each build takes (against fakes for the bridge, the signer and the alerts).
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -132,7 +132,7 @@ test("setSkip and offerAlert", () => {
   setSkip(s, null);
   assert.equal(loadState(s).skip, undefined);
   const a = offerAlert(release);
-  assert.equal(a.title, "Cydian 0.2.0 Is Available");
+  assert.equal(a.title, "iFizBox 0.2.0 Is Available");
   assert.deepEqual(a.buttons, ["Later", "Install"]);
   assert.equal(a.message.split("\n").length, 4);
   assert.match(offerAlert({ version: "1.0.0", notes: [] }).message, /new version/);
@@ -173,7 +173,7 @@ test("checkForUpdates: the site does nothing", async () => {
 test("checkForUpdates: newer -> alert; Install installs", async () => {
   const h = harness({ answers: [1] });
   assert.equal(await checkForUpdates(h.deps), "install");
-  assert.equal(h.alerts[0].title, "Cydian 0.2.0 Is Available");
+  assert.equal(h.alerts[0].title, "iFizBox 0.2.0 Is Available");
   assert.deepEqual(h.installs, [release]);
   const st = loadState(h.storage);
   assert.equal(st.lastCheck, 1_800_000_000_000);
@@ -222,7 +222,7 @@ test("checkForUpdates: Skip This Version", async () => {
   const next = parseRelease({ ...GH, tag_name: "v0.3.0" });
   const h2 = harness({ storage, rel: next, t: 1_800_000_000_000 + DAY });
   assert.equal(await checkForUpdates(h2.deps), "later");
-  assert.equal(h2.alerts[0].title, "Cydian 0.3.0 Is Available");
+  assert.equal(h2.alerts[0].title, "iFizBox 0.3.0 Is Available");
   // Check for Updates offers even a skipped one
   saveState(storage, { skip: "0.2.0", laterAt: null });
   const h3 = harness({ storage, answers: [1] });
@@ -235,8 +235,8 @@ test("checkForUpdates: up to date and errors", async () => {
   assert.equal(h.alerts.length, 0);
   const m = harness({ current: "0.2.0" });
   assert.equal(await checkForUpdates(m.deps, { manual: true }), "current");
-  assert.equal(m.alerts[0].title, "Cydian Is Up to Date");
-  assert.equal(m.alerts[0].message, "Cydian 0.2.0 is the newest version.");
+  assert.equal(m.alerts[0].title, "iFizBox Is Up to Date");
+  assert.equal(m.alerts[0].message, "iFizBox 0.2.0 is the newest version.");
   const n = harness({ rel: null });
   assert.equal(await checkForUpdates(n.deps), "current"); // no usable release (rate limit, odd tag)
   const e = harness({ fail: new Error("offline") });
@@ -275,7 +275,7 @@ function installDeps(over = {}) {
 test("runInstall sideload: signs Cydian.ipa on the phone", async () => {
   const d = installDeps();
   assert.equal(await runInstall(release, "sideload", d.deps), "installed");
-  assert.deepEqual(d.signed, [{ url: release.ipa, name: "Cydian" }]);
+  assert.deepEqual(d.signed, [{ url: release.ipa, name: "iFizBox" }]);
   assert.equal(d.calls.length, 0); // nothing through the helper
 });
 
@@ -307,8 +307,8 @@ test("runInstall jailbreak: download the arch's .deb, dpkg -i through the helper
   ]);
   assert.deepEqual(d.huds[0].texts, ["Downloading", "Installing"]);
   assert.equal(d.huds[0].hidden, true);
-  assert.equal(d.alerts[0].title, "Cydian Updated");
-  assert.deepEqual(d.alerts[0].buttons, ["Later", "Close Cydian"]);
+  assert.equal(d.alerts[0].title, "iFizBox Updated");
+  assert.deepEqual(d.alerts[0].buttons, ["Later", "Close iFizBox"]);
   assert.equal(d.signed.length, 0); // never the signer
   const later = installDeps({ answer: 0 });
   await runInstall(release, "jailbreak", later.deps);

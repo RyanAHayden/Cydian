@@ -1,6 +1,6 @@
 // F145: the website's lock. Browse Anyway (and Lock Home) redraw Home at once; Lock Home and Install on the Website
 // live in Settings > General > Website, not Signing; while locked, Install on the Website is padlocked and asks
-// "Install Cydian First" like Home's rows.
+// "Install iFizBox First" like Home's rows.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -101,7 +101,7 @@ test("F145: Browse Anyway redraws Home at once, and so does locking it again", a
   assert.deepEqual(draws, [true]);
   // Browse Anyway on the alert (a locked row, a locked tab or Settings): redrawn unlocked, with no reload.
   const r = await askToBrowse({ alert: async (a) => {
-    assert.deepEqual(a.buttons, ["Install Cydian", "Browse Anyway", "Cancel"]);
+    assert.deepEqual(a.buttons, ["Install iFizBox", "Browse Anyway", "Cancel"]);
     return { index: 1 };
   }, storage });
   assert.equal(r, "browse");
@@ -157,7 +157,7 @@ test("F145: Lock Home and Install on the Website are in General > Website on the
 
 // ---- 3) the locked rows -----------------------------------------------------------------------------------------
 
-test("F145: while the site is locked, Install on the Website is padlocked and asks Install Cydian First", async () => {
+test("F145: while the site is locked, Install on the Website is padlocked and asks Install iFizBox First", async () => {
   await withDom(async (doc) => {
     const { websiteSection, WEBSITE_INSTALLS_LABEL } = await import("./website-settings.js");
     const { setFirstVisit, websiteInstallsOn } = await import("../websign-gate.js");
@@ -188,13 +188,13 @@ test("F145: while the site is locked, Install on the Website is padlocked and as
       await row().click();
       await new Promise((r) => setImmediate(r));
       assert.equal(asked.length, 1);
-      assert.equal(asked[0].title, "Install Cydian First");
-      assert.deepEqual(asked[0].buttons, ["Install Cydian", "Browse Anyway", "Cancel"]);
+      assert.equal(asked[0].title, "Install iFizBox First");
+      assert.deepEqual(asked[0].buttons, ["Install iFizBox", "Browse Anyway", "Cancel"]);
       assert.deepEqual(asked[0].countdown, { button: 1, seconds: 5 }, "Browse Anyway (5)");
       assert.equal(box.dataset.locked, "true");
       assert.equal(websiteInstallsOn(storage), false);
 
-      // Install Cydian: Home's install flow.
+      // Install iFizBox: Home's install flow.
       answer = 0;
       row().click();
       await new Promise((r) => setImmediate(r));

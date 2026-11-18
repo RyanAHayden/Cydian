@@ -24,6 +24,7 @@
 //             so the source still gets the "Open in" row (F8) for GBox.
 import { parseControl, parseRelease } from "../apt.js";
 import { SourceError } from "../sources.js";
+import { NAME } from "../../brand.js";
 
 // Who reads each format: the apps an "Open in" row (F8) can hand a source of this format to.
 export const FORMATS = {
@@ -214,7 +215,7 @@ export function detect(url, body) {
     }
     const d = detectJson(json);
     if (!d) {
-      throw new SourceFormatError(`${host(url)} sent JSON that is no source format Cydian knows: not AltStore, ESign, `
+      throw new SourceFormatError(`${host(url)} sent JSON that is no source format ${NAME} knows: not AltStore, ESign, `
         + "Scarlet or GBox (it has no list of apps).", "unknown_json");
     }
     return result(d.format, { parsable: d.parsable, ...(d.reason ? { reason: d.reason } : {}), json });

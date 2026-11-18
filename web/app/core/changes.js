@@ -10,7 +10,7 @@
 //   last  = the earliest record of its current candidate version: when that version showed up.
 // The tab groups packages by `last` (a bumped version moves the package to the refresh that found it), newest
 // first, under "New at <date>", and drops the oldest group: that is everything from the first load, so a fresh
-// install doesn't list the whole archive. A row is "updated" when last > first, else "new" (Cydian's addition:
+// install doesn't list the whole archive. A row is "updated" when last > first, else "new" (iFizBox's addition:
 // Cydia doesn't mark rows).
 //
 //   const store = await openSeenStore();
@@ -23,7 +23,7 @@ export const recordKey = (key, id, version) => `${key}\u0000${id}\u0000${version
 
 // The records a refresh at `now` adds: every (key, id, version) in `current` not in `known` (a Set of recordKey).
 // F51: a fourth element, the version's own date (AltStore versions[] carry one; epoch ms), is kept as `date`, so
-// the version files under the day it came out rather than the day Cydian first saw it. `known` may instead be a
+// the version files under the day it came out rather than the day iFizBox first saw it. `known` may instead be a
 // Map(recordKey -> record): then a known record that has no date yet and now gets one is returned too, updated.
 export function newRecords(known, current, now) {
   const out = [];

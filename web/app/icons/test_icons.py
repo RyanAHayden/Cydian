@@ -1,4 +1,4 @@
-"""Cydian's icons (F31): every PNG tools/icons.sh writes is there at its size, the glossy variant still holds the
+"""iFizBox's icons (F31): every PNG tools/icons.sh writes is there at its size, the glossy variant still holds the
 master's drawing, and the manifest, page and native app point at files that exist."""
 import json
 import re

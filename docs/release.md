@@ -1,13 +1,13 @@
 # Releases
 
-Cydian's app checks GitHub for a newer release once a day and offers to install it (F61,
+iFizBox's app checks GitHub for a newer release once a day and offers to install it (F61,
 `web/app/core/selfupdate.js`). `tools/release.sh` (T6) publishes that release. Run it only when a person asks
 for a release.
 
 ## What a release is
 
 - Tag `vX.Y.Z`, where X.Y.Z is `native/VERSION`, on `RyanAHayden/Cydian`, at a commit that is already pushed.
-- Title `Cydian X.Y.Z`. The app shows the first 4 lines of the notes (Markdown taken off) in its "Cydian X.Y.Z Is
+- Title `iFizBox X.Y.Z`. The app shows the first 4 lines of the notes (Markdown taken off) in its "iFizBox X.Y.Z Is
   Available" alert, so the most important change goes first.
 - Assets, under the names the app looks for:
 
@@ -17,7 +17,7 @@ for a release.
   | `Cydian.deb` | rootless jailbreak build (iphoneos-arm64) | jailbreak app on iphoneos-arm64, as the fallback |
   | `com.ryha.cydian_<ver>-<build>_iphoneos-arm64.deb` | the same .deb under Debian's name | `debFor`'s exact arch match; the APT repo's `Filename:` |
   | `com.ryha.cydian_<ver>-<build>_<arch>.deb` | any other arch build found in `--dist` under that name | its arch, and the APT repo |
-  | `Packages`, `Packages.gz`, `Release` | Cydian's own flat APT repo over the Debian-named .debs (F72, `tools/selfrepo.py`) | the jailbreak app's built-in source |
+  | `Packages`, `Packages.gz`, `Release` | iFizBox's own flat APT repo over the Debian-named .debs (F72, `tools/selfrepo.py`) | the jailbreak app's built-in source |
 
   `debFor` takes the asset ending `_<arch>.deb` first, and uses plain `Cydian.deb` only for iphoneos-arm64. So a
   roothide (iphoneos-arm64e) or rootful build would only need its own `<pkg>_<ver>_<arch>.deb` added. Nothing
@@ -25,12 +25,12 @@ for a release.
 - The update offer compares the tag with the app's `CFBundleShortVersionString`. Both come from `native/VERSION`,
   and the script refuses a build where they differ. Otherwise the app would offer the same version again and again.
 
-## Cydian's own sources (F72)
+## iFizBox's own sources (F72)
 
-Like Cydia's apt.saurik.com, Cydian has a source of its own that is built in and can't be removed
+Like Cydia's apt.saurik.com, iFizBox has a source of its own that is built in and can't be removed
 (`web/app/core/essential.js` `builtinSources`). The release script regenerates both on every release:
 
-- **APT repo** (the jailbreak app, and what the website's Install Full Cydian sheet adds to Sileo and Zebra):
+- **APT repo** (the jailbreak app, and what the website's Install Full iFizBox sheet adds to Sileo and Zebra):
   `https://cydian.dev/repo/`, a flat repo (`dist ./`). Its files are the latest release's assets: the Worker's
   `/repo/<file>` fetches `https://github.com/RyanAHayden/Cydian/releases/latest/download/<file>`, follows GitHub's
   redirect itself and answers with the file (B17; only `Release`, `Packages`, `Packages.gz` and `*.deb`). Zebra
@@ -47,19 +47,19 @@ Like Cydia's apt.saurik.com, Cydian has a source of its own that is built in and
   `tools/altsource.py update`: the new version first in `versions[]`, with its date and the notes' first lines,
   and the versions already listed kept below it (at most 20). Commit it after the release.
 
-`--minimum X.Y.Z` sets Cydian's own field in both: `X-Cydian-Minimum-Version` in the Release (and in Cydian's
+`--minimum X.Y.Z` sets iFizBox's own field in both: `X-Cydian-Minimum-Version` in the Release (and in iFizBox's
 Packages stanza), `"minimumVersion"` on the app in the AltStore JSON. apt and other AltStore clients ignore it. A
-running Cydian older than that gets the Essential Upgrade alert without Ignore (Temporary), and nothing else in the
+running iFizBox older than that gets the Essential Upgrade alert without Ignore (Temporary), and nothing else in the
 app works until it upgrades. Without `--minimum` the field is left out and the alert can always be ignored. The
 script refuses a minimum newer than the release itself.
 
-The Essential Upgrade alert (Cydia's) runs on every launch in the app: when Cydian (or, jailbroken, apt, dpkg or an
+The Essential Upgrade alert (Cydia's) runs on every launch in the app: when iFizBox (or, jailbroken, apt, dpkg or an
 installed `Essential: yes` package) has an upgrade on the built-in source, it shows Complete Upgrade, Essential Only and
 Ignore (Temporary). It replaces F61's GitHub popup. F61's check still runs when the built-in source can't be read,
-and Settings > About > Check for Updates still works. In the sideload app Cydian's own IPA never goes through the
-local install server, because iOS closes Cydian, and the server with it, when it starts installing. Instead it is
+and Settings > About > Check for Updates still works. In the sideload app iFizBox's own IPA never goes through the
+local install server, because iOS closes iFizBox, and the server with it, when it starts installing. Instead it is
 signed on the phone and held on the Signing Server (worker/, `POST /sign/host`) for iOS to install from, or, with no
-bridge to sign with, the user is sent to cydian.dev's Install Cydian App (AltStore, SideStore, Feather or the IPA: F89).
+bridge to sign with, the user is sent to cydian.dev's Install iFizBox App (AltStore, SideStore, Feather or the IPA: F89).
 
 ## Cutting one
 
@@ -89,7 +89,7 @@ Options:
 - Without `--notes`, the notes are the commit subjects since the last `v*` tag (minus `plan:` commits), followed by
   the standard footer about the two files. Those subjects are long, so write notes for a real release.
 - `CYDIAN_RELEASE_REPO=owner/name` publishes somewhere else, for a trial run on a fork.
-- `--minimum X.Y.Z`: the oldest Cydian that may keep running without upgrading first (above).
+- `--minimum X.Y.Z`: the oldest iFizBox that may keep running without upgrading first (above).
 - `--out DIR`: also leave `Packages`, `Packages.gz`, `Release`, the notes and the updated `source.json` in DIR. With
   `--dry-run`, the source is written there only, never into `web/app/source.json`, so you can look before publishing.
 

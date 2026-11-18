@@ -1,4 +1,4 @@
-// F77: My IPAs, the user's own IPAs kept in the app's Documents (visible in Files under On My iPhone > Cydian, so
+// F77: My IPAs, the user's own IPAs kept in the app's Documents (visible in Files under On My iPhone > iFizBox, so
 // IPAs can be dropped in from Files too) and signed on the phone, ahead of time or as they install. Foundation only,
 // so native/sign/tests runs it on Linux; the bridge calls (library.*) are native/Sources/MyIPAs.swift.
 //

@@ -1,4 +1,4 @@
-/* cydian-upgrades (N5, N7): Cydian's background upgrade check and automatic updates, a launchd daemon running as root.
+/* cydian-upgrades (N5, N7): iFizBox's background upgrade check and automatic updates, a launchd daemon running as root.
  *
  *   cydian-upgrades [--force] [--no-update] [--dry-run]
  *
@@ -18,7 +18,7 @@
  *
  * The notification and badge go through UNUserNotificationCenter's private -initWithBundleIdentifier:, which
  * usernotificationsd allows for a process entitled with com.apple.private.usernotifications.bundle-identifiers
- * (entitlements.plist here). Cydian must have asked for notification permission once, or iOS drops them.
+ * (entitlements.plist here). iFizBox must have asked for notification permission once, or iOS drops them.
  * SPDX-License-Identifier: GPL-3.0-or-later */
 #import <Foundation/Foundation.h>
 #import <SystemConfiguration/SystemConfiguration.h>
@@ -179,7 +179,7 @@ struct phone {
     UNUserNotificationCenter *center;
 };
 
-/* A value from Cydian's preferences as the settings text has it: true/false, a number, or a string. */
+/* A value from iFizBox's preferences as the settings text has it: true/false, a number, or a string. */
 static NSString *flat(id v) {
     if ([v isKindOfClass:NSNumber.class]) {
         if (CFGetTypeID((__bridge CFTypeRef)v) == CFBooleanGetTypeID()) return [v boolValue] ? @"true" : @"false";
@@ -199,7 +199,7 @@ static NSArray *flatList(id v) {
 
 static char *dupString(NSString *s) { return s ? strdup(s.UTF8String) : NULL; }
 
-/* The F13 settings from Cydian's preferences (user mobile, through cfprefsd, so the app's last write counts), as
+/* The F13 settings from iFizBox's preferences (user mobile, through cfprefsd, so the app's last write counts), as
  * "key=value" lines; missing preferences: NULL, every setting at its default. */
 static char *e_settings(void *ctx) {
     (void)ctx;

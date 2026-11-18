@@ -21,6 +21,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { compareVersions, parseRelations } from "./apt.js";
+import { NAME } from "../brand.js";
 
 export const MODES = ["install", "reinstall", "upgrade", "downgrade", "remove"];
 // Cydia's words for each mode (Localizable.strings INSTALL, REINSTALL, UPGRADE, DOWNGRADE, REMOVE).
@@ -179,7 +180,7 @@ export function createRepeatFilter() {
 // screen's icon cache rebuilt, for an app) between return and reopen.
 const FINISH = ["return", "uicache", "reopen", "restart", "reload", "reboot"];
 export const FINISH_LABEL = {
-  return: "Return to Cydian", uicache: "Reload Data", reopen: "Close Cydian", restart: "Restart SpringBoard", reload: "Reload SpringBoard",
+  return: `Return to ${NAME}`, uicache: "Reload Data", reopen: `Close ${NAME}`, restart: "Restart SpringBoard", reload: "Reload SpringBoard",
   reboot: "Reboot Device",
 };
 export function finishOf(...levels) {
@@ -260,7 +261,7 @@ export function runTitle(jobs) {
 // ---- F131: packages whose Filename is a full URL ------------------------------------------------------------------
 //
 // Some repos list `Filename: https://github.com/.../x.deb` (ios.jjolano.me). apt joins it to the repo's URL and 404s
-// ("Failed to fetch https://ios.jjolano.me/https://github.com/..."); Sileo fetches the link itself. Cydian does too:
+// ("Failed to fetch https://ios.jjolano.me/https://github.com/..."); Sileo fetches the link itself. iFizBox does too:
 // the Confirm sheet gives such a job its `debUrl` (debUrlOf over catalog.history), and the native backend downloads
 // it (share.debFetch) and hands the file to cydian-helper simulate-deb / install-deb, beside apt's run for the rest.
 

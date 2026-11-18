@@ -1,4 +1,4 @@
-// N9: what the share sheet and Open in Cydian do with what they're handed, Foundation only, so it builds and is tested
+// N9: what the share sheet and Open in iFizBox do with what they're handed, Foundation only, so it builds and is tested
 // on Linux (native/share/test_share.py, against the fake helper and a fake signer). The phone's parts are in App/
 // (the shell's side) and Extension/ (the share extension, which only turns a shared link into cydian://share?url=…).
 //
@@ -26,7 +26,7 @@ struct SharedItem: Equatable {
     var url: URL?            // the link, or the file
     var isFile = false
     var name = ""            // what to call it: the file's name, the link's last part
-    var why: String? = nil   // unknown: why Cydian can't take it
+    var why: String? = nil   // unknown: why iFizBox can't take it
     var aptLink = false      // F144: unwrapped from an APT manager's link (cydia://, sileo://, zbra://, installer://)
 
     static func unknown(_ why: String, name: String = "") -> SharedItem { SharedItem(kind: .unknown, url: nil, name: name, why: why) }
@@ -47,9 +47,9 @@ enum ShareClassifier {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
               let host = url.host, !host.isEmpty else {
             if link.scheme?.lowercased() == "itms-services" {
-                return .unknown("That's an install link for iOS itself (itms-services). Open it in Safari, or share the .ipa's own link with Cydian.")
+                return .unknown("That's an install link for iOS itself (itms-services). Open it in Safari, or share the .ipa's own link with \(Brand.name).")
             }
-            return .unknown("Cydian takes http and https links, .ipa and .deb files, APT repos and app sources.",
+            return .unknown("\(Brand.name) takes http and https links, .ipa and .deb files, APT repos and app sources.",
                             name: link.absoluteString)
         }
         let name = url.lastPathComponent.removingPercentEncoding ?? url.lastPathComponent
@@ -116,11 +116,11 @@ enum ShareClassifier {
             return .unknown("That's a zip file, not an IPA (an IPA holds Payload/<App>.app).", name: name)
         }
         if ext == "json" || b.first(where: { ![0x20, 0x09, 0x0A, 0x0D, 0xEF, 0xBB, 0xBF].contains($0) }) == UInt8(ascii: "{") {
-            return .unknown("That's a file, not a link. Add an app source by its link (https://…/apps.json) so Cydian can check it for updates.", name: name)
+            return .unknown("That's a file, not a link. Add an app source by its link (https://…/apps.json) so \(Brand.name) can check it for updates.", name: name)
         }
         if ext == "deb" { return .unknown("That file is named .deb but isn't a Debian package.", name: name) }
         if ext == "ipa" { return .unknown("That file is named .ipa but isn't an IPA (not a zip).", name: name) }
-        return .unknown("Cydian opens .ipa and .deb files, and links to APT repos and app sources.", name: name)
+        return .unknown("\(Brand.name) opens .ipa and .deb files, and links to APT repos and app sources.", name: name)
     }
 
     // The first entry's name in a zip's local file header.
@@ -181,15 +181,15 @@ enum ShareRoute: Equatable {
 
 enum ShareRouter {
     static let needsJailbreak = (title: "Needs a Jailbreak",
-                                 message: "A .deb is a jailbreak package: installing it needs a jailbroken iPhone and Cydian's jailbreak build. This is the sideloaded Cydian, which can install IPAs but not .debs.")
+                                 message: "A .deb is a jailbreak package: installing it needs a jailbroken iPhone and \(Brand.name)'s jailbreak build. This is the sideloaded \(Brand.name), which can install IPAs but not .debs.")
     static let noInstaller = (title: "Can't Install IPAs",
-                              message: "Installing an IPA on this jailbreak needs AppSync Unified (or ldid, to sign it ad hoc). Install AppSync Unified from its repo, then share the IPA with Cydian again.")
+                              message: "Installing an IPA on this jailbreak needs AppSync Unified (or ldid, to sign it ad hoc). Install AppSync Unified from its repo, then share the IPA with \(Brand.name) again.")
 
     // F144: the sideload build keeps no APT sources. A link only an APT manager opens is refused here, with the words
     // the page's Add uses (web/app/core/altstore.js JAILBREAK_SOURCE_TITLE/MESSAGE); a bare https link may still be an
     // app source, so it goes to Add, which checks it and refuses an APT repo the same way.
     static let jailbreakSource = (title: "Jailbreak Source",
-                                  message: "This source lists tweaks for jailbroken iPhones. Cydian adds app sources here.")
+                                  message: "This source lists tweaks for jailbroken iPhones. \(Brand.name) adds app sources here.")
 
     static func route(_ item: SharedItem, _ host: ShareHost) -> ShareRoute {
         switch item.kind {
@@ -207,7 +207,7 @@ enum ShareRouter {
                 return .helperIPA(item)
             case .sideload:
                 guard let signer = host.signer else {
-                    return .refuse(title: "Can't Sign", message: "This Cydian can't sign apps on the phone.")
+                    return .refuse(title: "Can't Sign", message: "This \(Brand.name) can't sign apps on the phone.")
                 }
                 if let why = signer.problem() { return .refuse(title: "Import Your Certificate", message: why) }
                 return .signIPA(item)
@@ -216,7 +216,7 @@ enum ShareRouter {
             guard host.mode == .jailbreak else { return .refuse(title: needsJailbreak.title, message: needsJailbreak.message) }
             return .confirmDeb(item)
         case .unknown:
-            return .refuse(title: "Can't Open This", message: item.why ?? "Cydian can't open that.")
+            return .refuse(title: "Can't Open This", message: item.why ?? "\(Brand.name) can't open that.")
         }
     }
 

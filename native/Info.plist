@@ -4,8 +4,8 @@
 <dict>
 	<key>CFBundleExecutable</key><string>Cydian</string>
 	<key>CFBundleIdentifier</key><string>com.ryha.cydian</string>
-	<key>CFBundleName</key><string>Cydian</string>
-	<key>CFBundleDisplayName</key><string>Cydian</string>
+	<key>CFBundleName</key><string>$(BRAND_NAME)</string>
+	<key>CFBundleDisplayName</key><string>$(BRAND_NAME)</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>@VERSION@</string>
 	<key>CFBundleVersion</key><string>@BUILD@</string>
@@ -42,7 +42,7 @@
 	<key>UIStatusBarStyle</key><string>UIStatusBarStyleLightContent</string>
 	<key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
 	<key>CADisableMinimumFrameDurationOnPhone</key><true/>
-	<!-- N9: Open in Cydian for .ipa and .deb (Files, Mail, AirDrop, Safari's downloads; share/App/ShareBridge.swift),
+	<!-- N9: Open in iFizBox for .ipa and .deb (Files, Mail, AirDrop, Safari's downloads; share/App/ShareBridge.swift),
 	     and the cydian:// scheme the share extension opens (cydian://share?url=…). Info-sideload.plist repeats these
 	     with F77's types, since mkipa.py's overlay replaces a key whole. iOS copies a file into Documents/Inbox. -->
 	<key>LSSupportsOpeningDocumentsInPlace</key><false/>

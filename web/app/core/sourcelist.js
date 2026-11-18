@@ -17,6 +17,7 @@ import { sourceWarning } from "./warnings.js";
 import { description, matchesArch, compareVersions } from "./apt.js";
 import { sectionName, isVisible, compareNames } from "./catalog.js";
 import { altKey, isAltKey, normalizeAltUrl, looksLikeAltUrl, seedRecord } from "./altstore.js";
+import { NAME } from "../brand.js";
 
 export const EXPORT_FILENAME = "cydian-sources.txt";
 
@@ -31,7 +32,7 @@ export function exportLine(source) {
 export function exportText(sources, { date = new Date() } = {}) {
   const lines = [...new Set((sources ?? []).filter((s) => s?.uri).map(exportLine))];
   const day = date.toISOString().slice(0, 10);
-  return [`# Cydian sources (${lines.length}), ${day}`, ...lines].join("\n") + "\n";
+  return [`# ${NAME} sources (${lines.length}), ${day}`, ...lines].join("\n") + "\n";
 }
 
 // F52: Export > Copy to Clipboard: the same lines without the header comment, one URL (or deb line) per line, for

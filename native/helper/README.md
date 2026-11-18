@@ -1,8 +1,8 @@
 # native/helper/: cydian-helper, the root helper (N2)
 
-How root works and why: docs/native.md, "3. Root". In short: no setuid bit. Cydian (signed with
+How root works and why: docs/native.md, "3. Root". In short: no setuid bit. iFizBox (signed with
 `com.apple.private.persona-mgmt`) spawns `/var/jb/usr/libexec/cydian/cydian-helper` as root with the persona spawn
-attributes; the helper checks its words and `execve`s one apt command, or edits Cydian's one apt source file.
+attributes; the helper checks its words and `execve`s one apt command, or edits iFizBox's one apt source file.
 
     cydian-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
     cydian-helper hold <pkg>... | unhold <pkg>... | showhold
@@ -10,10 +10,10 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     cydian-helper simulate <item>... | apply <item>... | respring          (N4: the install queue)
     cydian-helper apply-ask <item>...                                      (F63: apply that asks about conffiles)
     cydian-helper install-ipa <path>                                      (F59: an IPA, through installd)
-    cydian-helper selfupdate <path.deb>                                    (F61: Cydian updates itself)
+    cydian-helper selfupdate <path.deb>                                    (F61: iFizBox updates itself)
     cydian-helper rollbacks <pkg> | rollback <pkg> <version>              (F71: Roll Back to a kept .deb)
     cydian-helper install-paid <path.deb> <pkg> <version>                 (F57: a paid package's .deb)
-    cydian-helper simulate-deb <path.deb> | install-deb <path.deb>         (N9: a .deb shared with Cydian)
+    cydian-helper simulate-deb <path.deb> | install-deb <path.deb>         (N9: a .deb shared with iFizBox)
     cydian-helper notifications on|off                                     (F65: Upgrade Notifications)
     cydian-helper app-versions                                             (I4: installed apps' real versions)
     cydian-helper userspace-reboot                                         (N8: the Userspace Reboot intent)
@@ -35,7 +35,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `apply`     | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --reinstall --allow-downgrades --allow-unauthenticated [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <items>`, with `CYDIA=3 1` in its environment when fd 3 is open (N4) |
 | `apply-ask` | `apt-get -y --reinstall --allow-downgrades --allow-unauthenticated -o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install <items>` (no conffile options; refused without fd 3), `CYDIA=3 1`, as a child whose stdin is a pipe the helper feeds (F63; below) |
 | `install-ipa` | runs no apt: installs one IPA through `LSApplicationWorkspace installApplication:withOptions:error:` as AppSync's `appinst` does (`ipa.c`, F59; below) |
-| `selfupdate` | `dpkg --force-confdef --force-confold [--status-fd 3] -i <path>`: Cydian's own update (F61). The path is absolute, `[A-Za-z0-9._/-]`, no `.`/`..` segment, ends in `.deb`, at most 1024 bytes, and a regular file (not a symlink). Any .deb is accepted: the caller check is the boundary, and Cydian can already install anything through `addsource` + `install` |
+| `selfupdate` | `dpkg --force-confdef --force-confold [--status-fd 3] -i <path>`: iFizBox's own update (F61). The path is absolute, `[A-Za-z0-9._/-]`, no `.`/`..` segment, ends in `.deb`, at most 1024 bytes, and a regular file (not a symlink). Any .deb is accepted: the caller check is the boundary, and iFizBox can already install anything through `addsource` + `install` |
 | `rollbacks` | runs nothing: `<version> <file>` per line for each .deb of the package N7's daemon kept in `/var/jb/var/cache/cydian/rollback/<pkg>/` that `rollback` would take (F71; below) |
 | `notifications` | runs nothing: `off` creates `/var/jb/var/lib/cydian/upgrades.off` (empty, 0644; the folder 0755 if missing), `on` deletes it (F65, Settings' Upgrade Notifications; N5's daemon reads it, `../daemon/quiet.h`). A symlink or anything but a regular file there is refused (exit 74), never followed. Prints `Upgrade notifications on\|off` |
 | `app-versions` | runs nothing: `<id>\t<short>\t<build>\t<store>` per app installd put in `/var/containers/Bundle/Application` (`HELPER_APPS_DIR`): `<UUID>/<the one>.app/Info.plist`'s CFBundleIdentifier, CFBundleShortVersionString and CFBundleVersion, and `<UUID>/iTunesMetadata.plist`'s bundleShortVersionString (App Store apps). Real directories and regular files only (`lstat`, `O_NOFOLLOW`, at most 4 MiB), a bundle id `[A-Za-z0-9.-]`, a value with a control character or over 255 bytes printed empty, at most 4096 apps. A missing folder lists nothing (exit 0), an unreadable one is exit 74 (I4; `ipa.c`) |
@@ -85,7 +85,7 @@ absolute path, so dependencies the old version needs come from the sources, and 
 an older version. Since everything on the path is root's and only root can write it, mobile can't swap the file
 between the checks and apt. A missing folder lists nothing (exit 0); anything refused is exit 64 with the reason.
 
-**Unsigned repos (N6):** most jailbreak repos have no signed Release (BigBoss, Cydian's own GitHub repo, and repo.palera.in, whose key palera1n's keyring lacks), and `apt-get update` exits 100 on any one of them, so `update` passes `Acquire::AllowInsecureRepositories=true` and the verbs that install pass `--allow-unauthenticated`, as Sileo and Zebra do. `Acquire::AllowDowngradeToInsecureRepositories` stays false: a repo apt has seen signed can't drop its signature unnoticed. The daemon (`native/daemon/main.m`) passes the same to its update and automatic installs.
+**Unsigned repos (N6):** most jailbreak repos have no signed Release (BigBoss, iFizBox's own GitHub repo, and repo.palera.in, whose key palera1n's keyring lacks), and `apt-get update` exits 100 on any one of them, so `update` passes `Acquire::AllowInsecureRepositories=true` and the verbs that install pass `--allow-unauthenticated`, as Sileo and Zebra do. `Acquire::AllowDowngradeToInsecureRepositories` stays false: a repo apt has seen signed can't drop its signature unnoticed. The daemon (`native/daemon/main.m`) passes the same to its update and automatic installs.
 
 **Sources (F33):** sources added in the app go into `cydian.sources` and nowhere else, so `apt-get update` and
 installs use them; the app never edits apt's other files. Checks: the URI is `http://` or `https://` (lower case), a
@@ -165,5 +165,5 @@ Files:
   pipe, `cydian_helper_spawn_in()`, F63),
   `POSIX_SPAWN_CLOEXEC_DEFAULT` and the persona attributes (99, override, uid/gid 0) on Apple. For the Swift shell
   to call (N3); on Linux it spawns as the current user, for the tests.
-- `test_driver.c`, `test_helper.py`: unit tests and the whole chain on Linux (stand-in Cydian → helper → stand-in
+- `test_driver.c`, `test_helper.py`: unit tests and the whole chain on Linux (stand-in iFizBox → helper → stand-in
   apt-get). `make host` / `make ios` build by hand; `../build.sh` builds both into the .deb (N3).

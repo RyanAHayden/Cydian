@@ -27,7 +27,7 @@ function fakes() {
   return { srcs, backend, store, vals, holds: () => holds, db, appStore: async () => db, wishes };
 }
 
-test("collect: sources as one line each, the settings that travel, holds, apps (not Cydian itself), the certificate", async () => {
+test("collect: sources as one line each, the settings that travel, holds, apps (not iFizBox itself), the certificate", async () => {
   const f = fakes();
   const cert = { p12: new Uint8Array([1, 2]), profile: new Uint8Array([3]), password: "pw", p12Name: "me.p12" };
   const p = await collectHere({ backend: f.backend, store: f.store, appStore: f.appStore, mode: "site", load: async () => cert });

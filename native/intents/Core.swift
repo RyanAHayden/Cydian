@@ -1,4 +1,4 @@
-// N8: what Cydian's App Intents do, without AppIntents or UIKit, so it builds and is tested on Linux against the fake
+// N8: what iFizBox's App Intents do, without AppIntents or UIKit, so it builds and is tested on Linux against the fake
 // helper (native/intents/test_intents.py). The intents themselves (App/Intents.swift) and the widget's controls
 // (native/widget/) only turn their parameters into one of these calls and its result into a dialog and a value.
 //
@@ -37,7 +37,7 @@ struct IntentFailure: Error, CustomStringConvertible, Equatable {
     let message: String
     init(_ m: String) { message = m }
     var description: String { message }
-    static let needsJailbreak = IntentFailure("This needs Cydian's jailbreak build: in the sideload app there is no root helper.")
+    static let needsJailbreak = IntentFailure("This needs \(Brand.name)'s jailbreak build: in the sideload app there is no root helper.")
 }
 
 struct UpdatesReport: Equatable {
@@ -75,7 +75,7 @@ struct BackupSource: Codable, Hashable {
 
     var key: String { BackupSource.normal(uri) + " " + suite }
     static func normal(_ uri: String) -> String { uri.hasSuffix("/") ? uri : uri + "/" }
-    // How Cydian's Import (web/app/core/sourcelist.js exportLine) writes one: a flat repo's URL, else a deb line.
+    // How iFizBox's Import (web/app/core/sourcelist.js exportLine) writes one: a flat repo's URL, else a deb line.
     var exportLine: String { suite.hasSuffix("/") ? uri : (["deb", uri, suite] + components).joined(separator: " ") }
 }
 
@@ -108,7 +108,7 @@ struct RestoreReport: Equatable {
     var refreshed = true
 
     var dialog: String {
-        if let _ = importLink { return "Opening Cydian to add the sources." }
+        if let _ = importLink { return "Opening \(Brand.name) to add the sources." }
         var parts = [String]()
         parts.append(addedSources.count == 1 ? "Added 1 source" : "Added \(addedSources.count) sources")
         if let e = installError { parts.append("installing failed: \(e)") } else {
@@ -256,7 +256,7 @@ enum IntentsCore {
     // ---- Add Source
 
     // cydian://add?url=… (and suite/component for a dist repo, core/handoff.js parseAddLink): the page opens its
-    // Add Source alert filled in, so the user still sees the URL, Cydian's source warnings and Verifying URL.
+    // Add Source alert filled in, so the user still sees the URL, iFizBox's source warnings and Verifying URL.
     static func addSourceLink(_ url: URL, suite: String? = nil, components: [String] = []) throws -> URL {
         let s = url.absoluteString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https", let host = url.host, !host.isEmpty
@@ -301,7 +301,7 @@ enum IntentsCore {
         return f.string(from: d)
     }
 
-    static func backupFileName(_ now: Date = Date()) -> String { "Cydian Packages \(iso(now).prefix(10)).json" }
+    static func backupFileName(_ now: Date = Date()) -> String { "\(Brand.name) Packages \(iso(now).prefix(10)).json" }
 
     // apt's extended_states: the packages apt installed as dependencies (Auto-Installed: 1). They come back by
     // themselves when what needs them is restored, so the file lists only what the user chose.
@@ -369,11 +369,11 @@ enum IntentsCore {
     // ---- Restore My Packages
 
     static func parseBackup(_ data: Data) throws -> Backup {
-        guard data.count <= maxBackup else { throw IntentFailure("That file is too big to be a Cydian backup.") }
+        guard data.count <= maxBackup else { throw IntentFailure("That file is too big to be a \(Brand.name) backup.") }
         guard let b = try? JSONDecoder().decode(Backup.self, from: data), b.format == Backup.formatName else {
             throw IntentFailure("That isn't a file from Export My Packages.")
         }
-        guard b.version == 1 else { throw IntentFailure("That backup is from a newer Cydian; update Cydian first.") }
+        guard b.version == 1 else { throw IntentFailure("That backup is from a newer \(Brand.name); update \(Brand.name) first.") }
         return b
     }
 
@@ -391,7 +391,7 @@ enum IntentsCore {
             r.importLink = "cydian://import?d=" + base64url(try gzip(try importPayload(b)))
             return r
         }
-        // 1. the sources this phone doesn't have yet, into Cydian's own file (cydian-helper addsource)
+        // 1. the sources this phone doesn't have yet, into iFizBox's own file (cydian-helper addsource)
         let have = Set(sources(host).map(\.key))
         for s in b.sources where !have.contains(s.key) {
             let res = try host.helper(["addsource", BackupSource.normal(s.uri), s.suite] + s.components)
@@ -470,7 +470,7 @@ enum WidgetShare {
     }
 
     static func label(_ s: Snapshot?) -> String {
-        guard let s else { return "Open Cydian" }
+        guard let s else { return "Open \(Brand.name)" }
         return s.count == 0 ? "Up to Date" : UpdateCheck.title(s.count)
     }
 }

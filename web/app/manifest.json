@@ -1,6 +1,6 @@
 {
-  "name": "Cydian",
-  "short_name": "Cydian",
+  "name": "iFizBox",
+  "short_name": "iFizBox",
   "description": "Packages and upgrades for your iPhone's APT and AltStore sources.",
   "id": "/",
   "start_url": "/",

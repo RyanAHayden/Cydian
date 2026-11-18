@@ -5,7 +5,7 @@
 //   targetBundleId(appId, bundleId)         the ID the app is signed as (a com.you.* profile signs any app)
 //   appEntitlements(info, bundleId)         the profile's entitlements narrowed to that app (Xcode's way)
 //   plistXml(value)                         an XML plist (dict, array, string, integer, real, bool, data, date)
-//   identityPlist({ p12, password, profile })   Cydian's own IPA's cydian-identity.plist (native BundledIdentity)
+//   identityPlist({ p12, password, profile })   iFizBox's own IPA's cydian-identity.plist (native BundledIdentity)
 //   zsignArgs({ ... })                      zsign's command line in the worker's in-memory files
 //   zsignError(lines)                       the line of zsign's output that says what went wrong
 //   appInfo(plist)                          { bundleId, name, version } from an app's Info.plist (as JSON)

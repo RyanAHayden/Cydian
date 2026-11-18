@@ -17,12 +17,13 @@
 //       recommended-sources.json) are EU marketplace (PAL) sources, which a sideloaded app can't install from.
 //   FIZL0's own source stays, as the user asked. Every `why` says what the source actually carries, read from its
 //   Packages or source.json on CHECKED with tools/recommended_check.py (which re-checks them all).
+import { NAME } from "../brand.js";
 
 export const CHECKED = "2026-11-18";
 
 export const RECOMMENDED_SOURCES = [
   { kind: "source", name: "FIZL0", url: "https://fizl0.github.io/apps/source.json", own: true,
-    why: "openMX, OpenTennis and Party Board in one source: the games Cydian's default list is built around." },
+    why: `openMX, OpenTennis and Party Board in one source: the games ${NAME}'s default list is built around.` },
   // ---- APT repos: the jailbreak build ----
   { kind: "source", name: "Havoc", url: "https://havoc.app/", jailbreak: true, for: ["dopamine", "palera1n", "nathanlr"],
     why: "Havoc: over 500 paid and free tweaks, themes and apps, most with rootless builds, iOS 15 and later." },

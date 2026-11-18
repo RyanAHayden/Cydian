@@ -40,7 +40,7 @@ A Swift shell around one WKWebView that shows `web/app/` from the app bundle (do
 - `sign/` (I6): the on-device signer, plain Swift that also builds on Linux: `Zip.swift` (streaming zip read/write
   over zlib), `Hash.swift`, `DER.swift`, `CodeSign.swift` (Mach-O signatures, CMS, DER entitlements),
   `Profile.swift` (I5's profile rules), `IPASigner.swift` (bundles inside out, CodeResources), `Manifest.swift` (the
-  itms-services manifest and link), `Handoff.swift` (F75: the certificate inside Cydian's own IPA, the `cydian://`
+  itms-services manifest and link), `Handoff.swift` (F75: the certificate inside iFizBox's own IPA, the `cydian://`
   links the shell takes, gunzip), `HTTP.swift`, `certs/` (Apple's
   public WWDR and root certificates, copied into the app). `tests/main.swift` + `test_sign.py` test it on Linux.
 - `intents/` (N8): App Intents for Shortcuts, Siri, Spotlight and the Action button (Check for Updates, Add Source,
@@ -49,7 +49,7 @@ A Swift shell around one WKWebView that shows `web/app/` from the app bundle (do
   in place of Xcode (intents/README.md; docs/shortcuts.md).
 - `widget/` (N8): `PlugIns/CydianWidget.appex` (iOS 17+), the update-count widget, and in the .deb's build Respring and
   Userspace Reboot as Control Center controls (widget/README.md).
-- `share/` (N9): the share sheet and Open in Cydian: `PlugIns/CydianShare.appex` for links, document types (.ipa, .deb)
+- `share/` (N9): the share sheet and Open in iFizBox: `PlugIns/CydianShare.appex` for links, document types (.ipa, .deb)
   for files, and what each build does with a repo, an AltStore source, an IPA or a .deb (share/README.md).
 - `Sources/SignStore.swift`, `Sources/InstallServer.swift`, `Sources/SignBridge.swift` (I6): the Keychain identity,
   the loopback HTTP server for the signed IPA, and the `signing.*` bridge calls (sideload build only). See

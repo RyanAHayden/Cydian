@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Publish a Cydian release on GitHub (T6), the one F61's self-update reads (web/app/core/selfupdate.js): tag
+# Publish a iFizBox release on GitHub (T6), the one F61's self-update reads (web/app/core/selfupdate.js): tag
 # v<native/VERSION> on RyanAHayden/Cydian, with these assets:
 #   Cydian.ipa                       the sideload build (parseRelease's `ipa`)
 #   Cydian.deb                       the rootless jailbreak build (debFor's fallback, iphoneos-arm64 only)
 #   <pkg>_<ver>_<arch>.deb           the same .deb under Debian's name (debFor's exact-arch match), e.g.
 #                                    com.ryha.cydian_0.2.0-412_iphoneos-arm64.deb
 #   <pkg>_<ver>_<arch>.deb           any other arch build found in --dist under that name (roothide, rootful)
-#   Packages, Packages.gz, Release   Cydian's own flat APT repo over those .debs (F72, tools/selfrepo.py): the
+#   Packages, Packages.gz, Release   iFizBox's own flat APT repo over those .debs (F72, tools/selfrepo.py): the
 #                                    jailbreak app's built-in source, https://cydian.dev/repo/ (the Worker
 #                                    serves releases/latest/download/ of RyanAHayden/Cydian without the redirect)
-# Then it points Cydian's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new Cydian.ipa, the
+# Then it points iFizBox's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new Cydian.ipa, the
 # sideload app's and the site's built-in source (F72), versions[] newest first: commit web/app/source.json afterwards.
 # Run it only when a person asks for a release. How to cut one: docs/release.md.
 #
@@ -19,14 +19,15 @@
 #                 commit subjects since the last v* tag, then the standard footer about the two files
 #     --dist DIR  publish DIR/Cydian.deb and DIR/Cydian.ipa as they are instead of running `make -C native package`
 #     --draft     create the release as a draft (the app ignores drafts until it is published on GitHub)
-#     --minimum V the oldest Cydian that may keep running without upgrading first (F72): X-Cydian-Minimum-Version in
-#                 the Release and Cydian's stanza, "minimumVersion" in the AltStore source. Older ones get the
+#     --minimum V the oldest iFizBox that may keep running without upgrading first (F72): X-Cydian-Minimum-Version in
+#                 the Release and iFizBox's stanza, "minimumVersion" in the AltStore source. Older ones get the
 #                 Essential Upgrade alert without Ignore. Default: none (the alert can always be ignored)
 #     --out DIR   also leave the repo files, the notes and the updated AltStore source (source.json) in DIR; a dry
 #                 run writes the source there only, never into web/app/source.json
 #   CYDIAN_RELEASE_REPO  owner/name to publish on (default RyanAHayden/Cydian)
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. native/brand.env # F170: BRAND_NAME for the release title and notes
 
 repo=${CYDIAN_RELEASE_REPO:-RyanAHayden/Cydian}
 dry=0 notes= dist= draft=() minimum= out=
@@ -133,7 +134,7 @@ for f in "$dist/${pkg}"_*_*.deb; do
   cp "$f" "$stage/$b"
   extra+=("$b")
 done
-# F72: Cydian's own APT repo over the Debian-named .debs (Filename: is the asset's name beside the Release).
+# F72: iFizBox's own APT repo over the Debian-named .debs (Filename: is the asset's name beside the Release).
 repodebs=("$stage/$debname")
 for b in "${extra[@]}"; do repodebs+=("$stage/$b"); done
 python3 tools/selfrepo.py "$stage" "${repodebs[@]}" ${minimum:+--minimum "$minimum"} >/dev/null ||
@@ -148,7 +149,7 @@ else
   {
     git log --no-merges --format='- %s' ${prev:+"$prev.."}"$sha" | grep -v '^- plan:' | head -n 30 || true
     echo
-    echo "Cydian.ipa is unsigned: sign it with your own certificate (Feather, AltStore, SideStore, or Cydian's own"
+    echo "Cydian.ipa is unsigned: sign it with your own certificate (Feather, AltStore, SideStore, or $BRAND_NAME's own"
     echo "Settings > Signing). Cydian.deb ($debname) is the rootless jailbreak build."
   } > "$stage/notes.md"
 fi
@@ -178,7 +179,7 @@ fi
 assets=("$stage/Cydian.ipa" "$stage/Cydian.deb" "$stage/$debname")
 for b in "${extra[@]}"; do assets+=("$stage/$b"); done
 for f in "${repofiles[@]}"; do assets+=("$stage/$f"); done
-gh release create "$tag" --repo "$repo" --target "$sha" --title "Cydian $version" --notes-file "$stage/notes.md" \
+gh release create "$tag" --repo "$repo" --target "$sha" --title "$BRAND_NAME $version" --notes-file "$stage/notes.md" \
   "${draft[@]}" "${assets[@]}"
 git fetch -q origin "refs/tags/$tag:refs/tags/$tag" || true
 echo "release: published https://github.com/$repo/releases/tag/$tag"

@@ -1,7 +1,7 @@
 # Signing with your own certificate (I5, I6)
 
-The Cydian app's sideload build signs every app **on the iPhone** with your certificate, which never leaves the phone
-for other apps, and needs a server only for iOS's install manifest and Cydian's own update; the website signs in the
+The iFizBox app's sideload build signs every app **on the iPhone** with your certificate, which never leaves the phone
+for other apps, and needs a server only for iOS's install manifest and iFizBox's own update; the website signs in the
 browser (F93, below). That
 server is the Signing Server: `https://sign.cydian.dev` by default, a Cloudflare Worker anyone can deploy for
 themselves (`worker/`, `worker/README.md`). [On the phone (I6)](#on-the-phone-i6) has the whole picture.
@@ -19,7 +19,7 @@ WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for i
   read a plist (binary or XML) as JSON. The build is reproducible: `tools/check.sh` rebuilds it where emcc is (emsdk
   on PATH or in `~/emsdk`) and fails when the committed copy differs from what the same emcc builds.
 - **Settings > Signing** (as before F89): the `.p12`, its password and the `.mobileprovision` in this browser's
-  IndexedDB (`signing-client.js`), the profile's details, **Install Cydian App** and **Bring My Certificate**,
+  IndexedDB (`signing-client.js`), the profile's details, **Install iFizBox App** and **Bring My Certificate**,
   Remove Certificate. Home has the Signing tile beside Featured again.
 - **Install** (an app's page, first row; the nav bar's Install runs it): `signing-client.js signInBrowser`:
   1. *Downloading*: the IPA through the Worker's `/api/fetch?url=…&kind=ipa` (most hosts send no CORS headers),
@@ -32,7 +32,7 @@ WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for i
      (`TTL`), served at `/sign/up/<token>/manifest.plist` and `app.ipa` (Range too).
   4. iOS's install prompt (`itms-services`), with a banner saying to press Install.
   F121: when the bundle ID it will be signed as is known at the tap (an explicit profile, or a wildcard one for
-  Cydian's own IPA or a caller's `bundleId`; `expectedBundleId`, from the profile kept in memory, `identityNow`),
+  iFizBox's own IPA or a caller's `bundleId`; `expectedBundleId`, from the profile kept in memory, `identityNow`),
   step 4 comes first, inside the tap: the website makes its own token, opens
   `/sign/up/<token>/manifest.plist?bundleid=&version=&title=` (the Worker answers it from the query), reserves the
   token (`POST /sign/upload?token=`, no size), then signs and uploads into it (`&token=&size=`). The Worker holds
@@ -44,24 +44,24 @@ WebAssembly runs in a Web Worker, and the Worker only hosts the signed IPA for i
   drops it after 30 s of silence, a second HEAD (30 s), then a GET it drops at 60 s *from the request's start*
   (headers sent part-way don't reset it), then HEAD/GET pairs again. A link whose upload finished 300 s after the
   Install tap still got its app. Each retry is a new request, so the Worker's 2-minute wait per request never runs out.
-  Download IPA is its own row. F92 removed the hand-offs that followed Install (Open in Cydian, Get in AltStore /
+  Download IPA is its own row. F92 removed the hand-offs that followed Install (Open in iFizBox, Get in AltStore /
   SideStore / Feather); the nav bar's Share (F76) still offers the source to those sideloaders. The app still opens a
   `cydian://install?url=<ipa>&name=…` link (`incoming.js`: Install IPAs, "Install IPA", then `signAndInstall`) for
   links already out there. A source's own signed link (`itms-services`) still installs straight away. Nothing queues
   on the website (the F80 queue is the sideload app's).
 - **My IPAs' links** (F95): Install is still the alert saying the certificate is needed, with **Download IPA** beside
   OK (`altstore.js siteCertificateAlert`).
-- **Home's Install Cydian App** (Not Jailbroken; `home.js installApp`): with a certificate, Cydian's IPA signed and
+- **Home's Install iFizBox App** (Not Jailbroken; `home.js installApp`): with a certificate, iFizBox's IPA signed and
   installed as above, carrying the certificate (`cydian-identity.plist`, the shell's `BundledIdentity` imports it on
   first launch) unless Bring My Certificate is off, and always the website's sources and settings
   (`web/transfer.link`, which `app.js` imports once on first launch). Both files go in before zsign seals the
   bundle. Without a certificate it opens Settings > Signing. Jailbroken visitors get the release's `.deb`.
-- **Send Settings** (Open in Cydian App): sources, travelling settings, Ignored Upgrades and the certificate.
-- The app's own Essential Upgrade, when it can't sign Cydian itself (no bridge), opens cydian.dev in Safari for Home's
-  Install Cydian App (`core/essential.js installSelf`).
+- **Send Settings** (Open in iFizBox App): sources, travelling settings, Ignored Upgrades and the certificate.
+- The app's own Essential Upgrade, when it can't sign iFizBox itself (no bridge), opens cydian.dev in Safari for Home's
+  Install iFizBox App (`core/essential.js installSelf`).
 
 What leaves the browser: the IPA's address (to `/api/fetch`) and the signed app (to `/sign/upload`, for 10 minutes).
-The certificate, key and password never do, except inside Cydian's own signed IPA with Bring My Certificate (that
+The certificate, key and password never do, except inside iFizBox's own signed IPA with Bring My Certificate (that
 copy waits on the Worker for the same 10 minutes, as the old server signer's did).
 
 Limits: the whole IPA, unpacked, and the signed copy sit in the browser's memory at once (WebAssembly up to 4 GB,
@@ -71,8 +71,8 @@ A browser that registered the old push service worker drops it at the next visit
 
 ## On the phone (I6)
 
-The Cydian app's sideload build (I2) signs IPAs by itself and serves the signed IPA from the phone; the certificate
-never leaves it when installing other apps (the one exception, Cydian updating itself, is F73 below). Only the
+The iFizBox app's sideload build (I2) signs IPAs by itself and serves the signed IPA from the phone; the certificate
+never leaves it when installing other apps (the one exception, iFizBox updating itself, is F73 below). Only the
 install manifest comes from a server: the Signing Server (sign.cydian.dev by default, or the user's own deployment of
 `worker/`), which sees the app's bundle ID, version and name. User 2026-11-17 first asked for it all
 local ("so they dont rely on me"); F75 removed the fully local mode because iOS refused it (below). In the jailbreak build none of this runs: the N2 helper installs IPAs directly, and the `signing.*` calls answer
@@ -89,7 +89,7 @@ relies on it). What could serve a trusted manifest:
 | --- | --- | --- | --- |
 | **A. backloop.dev** (Feather's Fully Local): `*.backloop.dev` resolves to 127.0.0.1, served with a public CA's wildcard certificate whose private key is published | a public CA | backloop's pack fetched, public DNS | **No.** A CA must revoke a certificate whose key is public, so the pack lives on borrowed time: on 2026-11-17 it had expired 19 days earlier (docs/sideload.md). Shipping our own such key breaks CA rules; using theirs makes installs depend on a third party re-issuing it. |
 | **B. A manifest from a server, IPA from the phone** (Feather's Semi Local, **built**, 0.1.4): `GET <server>/sign/manifest?bundleid=&version=&title=&port=&path=` answers a manifest whose IPA URL is `http://127.0.0.1:<port>/<path>` | the server's own certificate | the Signing Server (sign.cydian.dev by default, or the user's own), which sees the app's bundle ID, name and version on every install | **Used.** Nothing to set up on the phone; the certificate and the IPA stay there. |
-| C. A CA made on the phone: the user installs Cydian's own root as a profile and turns on full trust; an HTTPS server on 127.0.0.1 uses a certificate it issues | the user's own trust setting | a one-time setup in Settings | **Removed (F75).** Built in I6, but it never worked: iOS's installer ignores a hand-trusted root. The user's test page on that server opened fine in Safari while every install through it failed. |
+| C. A CA made on the phone: the user installs iFizBox's own root as a profile and turns on full trust; an HTTPS server on 127.0.0.1 uses a certificate it issues | the user's own trust setting | a one-time setup in Settings | **Removed (F75).** Built in I6, but it never worked: iOS's installer ignores a hand-trusted root. The user's test page on that server opened fine in Safari while every install through it failed. |
 | D. A pairing file + LocalDevVPN (idevice, Feather's third mode) | lockdownd, no TLS | a computer once to make the pairing file, an App Store VPN app | Works without any certificate, but it needs a computer and keeps a full lockdown credential on the phone. Later, maybe, behind an advanced switch (docs/sideload.md). |
 | E. A `data:` URL or a file URL as the manifest | – | – | Not accepted: the manifest URL must be https. |
 
@@ -103,7 +103,7 @@ server step.
    to `signing.import`: the `.p12` is opened with `SecPKCS12Import` and its identity (certificate and private key)
    is added to the iOS Keychain, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` (never synced to iCloud, never in
    a backup that restores to another phone). F73: the `.p12` file as picked and its password are kept too, as one
-   Keychain generic-password item (service `com.ryha.cydian.signing.p12`, also `...ThisDeviceOnly`), for Cydian's own
+   Keychain generic-password item (service `com.ryha.cydian.signing.p12`, also `...ThisDeviceOnly`), for iFizBox's own
    update (below); nothing else reads it. The checks are I5's: a wrong password, an expired certificate or profile, a certificate the profile
    doesn't list.
 2. **A Signing Server**: sign.cydian.dev unless the user enters their own (a saved cydian.dev, the website's old
@@ -117,10 +117,10 @@ file.
 ### What leaves the phone, and when (F73)
 
 Installing other apps sends only the app's bundle ID, version and name (to the Signing Server, for the manifest):
-they are signed on the phone and served from 127.0.0.1. Cydian itself can't be served that way (iOS closes Cydian
-while it installs, which stops its install server), so Cydian's own update is signed on the phone too and then
+they are signed on the phone and served from 127.0.0.1. iFizBox itself can't be served that way (iOS closes iFizBox
+while it installs, which stops its install server), so iFizBox's own update is signed on the phone too and then
 uploaded to the Signing Server (`signing.install {host: true}`, `POST /sign/host`), which holds that signed IPA for
-10 minutes and serves it to iOS (`worker/README.md`). The certificate and key stay on the phone; the signed Cydian
+10 minutes and serves it to iOS (`worker/README.md`). The certificate and key stay on the phone; the signed iFizBox
 (which embeds the profile, as every signed app does) is on the server for those 10 minutes.
 
 `signing.export` (F73: the `.p12` and password kept in the Keychain) is still in the shell, but nothing on the page
@@ -147,20 +147,20 @@ Signing. Tests: `web/app/signing-client-device.test.js`, `web/app/screens/signin
 
 ### From the website to the app (F75, F89, F93)
 
-- **Open in Cydian App** (Home's Send Settings, and Settings; Not Jailbroken only): `cydian://import?d=<base64url of
+- **Open in iFizBox App** (Home's Send Settings, and Settings; Not Jailbroken only): `cydian://import?d=<base64url of
   gzipped JSON>`, the source list as export lines, the settings in `core/settings.js TRAVELS`, Ignored Upgrades and
   (F93, as before F89) the website's certificate, after a banner saying to press Open. The app adds what's new
   straight away and puts the certificate into the Keychain (`signing.import`). Gzip keeps 400 sources around 5 kB.
   No Signing Server travels.
-- `cydian://install?url=…&name=…`: the app's Install IPA alert. The website's app page sent it (Open in Cydian)
+- `cydian://install?url=…&name=…`: the app's Install IPA alert. The website's app page sent it (Open in iFizBox)
   until F92/F95 removed the hand-offs; the app still opens one ("The website signs in the browser", above).
-- **Install Cydian App** on the website: Cydian's IPA, signed in the browser, carries `cydian-identity.plist`
+- **Install iFizBox App** on the website: iFizBox's IPA, signed in the browser, carries `cydian-identity.plist`
   (Bring My Certificate) and `web/transfer.link` (sources and settings), imported on first launch.
-- **Cydian first** (F96, `web/app/websign-gate.js`): the website asks "Install Cydian First" at launch until Cydian
-  is installed from it or the user taps Not Now. Other apps' pages offer **Install in Cydian**
+- **iFizBox first** (F96, `web/app/websign-gate.js`): the website asks "Install iFizBox First" at launch until iFizBox
+  is installed from it or the user taps Not Now. Other apps' pages offer **Install in iFizBox**
   (`cydian://package?id=<id>`: the app opens that app's page, Search's `package:<id>`), Download IPA, then **Install
   on the Website**, greyed out until the user accepts a warning once (its I Understand counts down 5 seconds); the
-  acceptance is kept in localStorage and Settings > Signing > Other Apps turns it back off. Cydian's own IPA always
+  acceptance is kept in localStorage and Settings > Signing > Other Apps turns it back off. iFizBox's own IPA always
   installs from the website.
 
 Gone with the website's old signer (F89) and not back: Import from Safari (`cydian://signing-import`).
@@ -181,13 +181,13 @@ where WebKit has no `DecompressionStream` (before iOS 16.4).
    pointing at `http://127.0.0.1:<port>/<token>/app.ipa`.
 4. iOS asks to install and fetches the IPA from 127.0.0.1. Once the whole IPA has gone out the token is spent and the
    file is deleted a minute later; unused, it goes after 15 minutes. A background task keeps the server alive while
-   the install sheet covers Cydian.
+   the install sheet covers iFizBox.
 
 Nothing listens on Wi-Fi or cellular; every path has a random 128-bit token.
 
 ### The signer (`native/sign/`)
 
-Cydian's own, in Swift, with no OpenSSL: the private key stays inside Security.framework (`SecKeyCreateSignature`)
+iFizBox's own, in Swift, with no OpenSSL: the private key stays inside Security.framework (`SecKeyCreateSignature`)
 and only the CMS signature comes out. zsign (I5's server signer) would need the key handed over as a file or bytes
 and OpenSSL cross-compiled into the app; this way neither. It writes what Apple's `codesign` writes:
 
@@ -238,9 +238,9 @@ F14 added the arm64e fix-up and the user's edits (below). Not done: dylib inject
   the signer signs, before signing (Feather only does `.dylib`s and frameworks' executables; the change only touches
   a fat file's old-ABI arm64e slice, so doing all of them costs nothing and covers bundles' and extensions' too); the reply lists the fixed ones in `fixedArm64e`.
 - **Keep-alive.** From the moment the itms-services link opens until iOS has fetched the whole IPA (plus a minute),
-  or the link expires, Cydian plays one second of silence on a loop (`AVAudioPlayer`, volume 0, mixed with other
+  or the link expires, iFizBox plays one second of silence on a loop (`AVAudioPlayer`, volume 0, mixed with other
   audio; `UIBackgroundModes: audio` is in `Info-sideload.plist`), as Feather's `BackgroundAudioManager` does: the
-  install sheet sends Cydian to the background, and I6's `beginBackgroundTask` alone gives about 30 seconds.
+  install sheet sends iFizBox to the background, and I6's `beginBackgroundTask` alone gives about 30 seconds.
 - **Install progress.** `signing.progress {bundleId}` streams iOS's own progress from the private
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:` (looked up at run time, as Feather does) and
   answers `installed: true/false` when it ends, `false` when none showed in 45 seconds, `null` when the API isn't
@@ -260,7 +260,7 @@ F14 added the arm64e fix-up and the user's edits (below). Not done: dylib inject
   `identity.signatureExpires` and `profile.kind`. Asking is an internet call to Apple only when the page asks.
 - **Re-sign reminder.** `signing.remind {days}` (the Settings row F13 made) keeps one local notification at 10:00,
   `days` before the earliest recorded signature expiry (or the certificate's and profile's, with no apps yet):
-  "Delta stops opening in 2 days. Open Cydian and tap Re-sign All." It moves after every install and `forget`; 0 turns
+  "Delta stops opening in 2 days. Open iFizBox and tap Re-sign All." It moves after every install and `forget`; 0 turns
   it off. The first call asks for notification permission.
 
 Not built from F14's original brief, and why: backloop.dev and api.palera.in installs (I6 chose the phone's own CA
@@ -300,10 +300,10 @@ it).
 
 ### My IPAs (F77)
 
-Installed > My IPAs is the user's own IPAs. In the sideload app they are plain files in Cydian's Documents, which
-Files shows under On My iPhone > Cydian (`UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace`), so an IPA
+Installed > My IPAs is the user's own IPAs. In the sideload app they are plain files in iFizBox's Documents, which
+Files shows under On My iPhone > iFizBox (`UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace`), so an IPA
 dropped there from Files is listed too. Add offers Browse (the iOS Files picker, several at once) and From URL (the
-Add alert with Paste); an .ipa another app opens in Cydian (AirDrop, Files, Mail: the document type in
+Add alert with Paste); an .ipa another app opens in iFizBox (AirDrop, Files, Mail: the document type in
 `Info-sideload.plist`) is copied in and its page opens (`cydian://myipas?file=<name>`, `web/app/incoming.js`).
 
 - `native/sign/Library.swift` (`IPALibrary`, Foundation only, tested on Linux in `native/sign/tests/main.swift`):
@@ -337,7 +337,7 @@ the HTTP parsing and ranges. F75: `test_sideload.py`'s Swift also covers `Bundle
 rule), `IncomingLink` and `gunzip`; its `HandoffSourceTest` reads the sources for the URL hand-off, the launch import
 and that nothing of the local CA is left. Node: `core/transfer.test.js` (the import link's encode/decode and
 review), `incoming.test.js` (the hand-off, `cydian://install` and the import's merge), `screens/siteinstall.test.js`
-(the website's Install rows and certificate alert, Home's Install Cydian App, My IPAs' Install). `rcodesign verify`
+(the website's Install rows and certificate alert, Home's Install iFizBox App, My IPAs' Install). `rcodesign verify`
 also passed on the signed fixture and the signed Cydian.ipa (by hand, not in the gate).
 
 The phone half (Keychain, `NWListener`, opening the links, the scene's URL contexts) compiles in the native build but runs only on an iPhone.

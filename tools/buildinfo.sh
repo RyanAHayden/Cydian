@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Writes build.json (Cydian's version, the commit, the time and the website's file list) into DIR (default
+# Writes build.json (iFizBox's version, the commit, the time and the website's file list) into DIR (default
 # web/app). Home's footer shows the version and commit, as Cydia's does; the website's Reload re-downloads the
 # listed files so a phone never keeps a stale one. Run by the Worker deploy and the native build.
 #   tools/buildinfo.sh [DIR]

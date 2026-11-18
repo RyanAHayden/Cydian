@@ -24,6 +24,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "./ui.js";
 import { createFollow, hudLine } from "../core/progress.js";
+import { NAME } from "../brand.js";
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 const MAX_LINES = 1500; // lines kept on screen while it follows; the callers' logs keep everything
@@ -135,7 +136,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     setTitle,
     flush,
     cancellable(on, { disabled = false } = {}) { cancel.hidden = !on; cancel.disabled = Boolean(disabled); },
-    finish({ label = "Return to Cydian", action = null, status = null, title: t = "Complete" } = {}) {
+    finish({ label = `Return to ${NAME}`, action = null, status = null, title: t = "Complete" } = {}) {
       flush();
       finished = true;
       setTitle(t);
@@ -187,7 +188,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
 let hudPage = null; // the page progressHUD drew last, while it is up
 
 // `open` stands in for openProgress (tests).
-export function progressHUD(label = "Preparing", { open = openProgress, done: doneLabel = "Return to Cydian" } = {}) {
+export function progressHUD(label = "Preparing", { open = openProgress, done: doneLabel = `Return to ${NAME}` } = {}) {
   let page = hudPage && !hudPage.closed ? hudPage : null;
   if (page) page.reopen();
   else {

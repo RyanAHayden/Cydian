@@ -1,5 +1,5 @@
-// F75: Open in Cydian App (Home's Send Settings), like Feather's feather:// links. On the website (Settings, and
-// Home's Install Cydian App area) a row that opens cydian://import?d=<base64url of gzipped JSON> with the visitor's
+// F75: Open in iFizBox App (Home's Send Settings), like Feather's feather:// links. On the website (Settings, and
+// Home's Install iFizBox App area) a row that opens cydian://import?d=<base64url of gzipped JSON> with the visitor's
 // sources, the settings that travel (core/settings.js TRAVELS), Ignored Upgrades and, F93, the certificate saved in
 // the website's Settings > Signing (as before F89; no Signing Server). In the app, incoming.js hands the link to
 // reviewAndImport, which adds only what's new and puts the certificate into the Keychain (signing.import).
@@ -22,12 +22,13 @@ import { toBase64 } from "../core/signing.js";
 import { getBackend } from "../backend.js";
 import { loadIdentity, saveIdentity } from "../signing-client.js";
 import { settings } from "./settings.js";
+import { NAME } from "../brand.js";
 
 export function openInAppSection() {
   const box = document.createElement("div");
   if (detectMode() !== "site" || settings.deviceType() !== "none") return box; // the sideload app takes the link
-  box.append(grouped([{ header: "Cydian App", rows: [{ label: "Open in Cydian App", onClick: () => openInApp() }],
-    footer: "Brings your certificate, sources and settings into the Cydian app on this iPhone." }]));
+  box.append(grouped([{ header: `${NAME} App`, rows: [{ label: `Open in ${NAME} App`, onClick: () => openInApp() }],
+    footer: `Brings your certificate, sources and settings into the ${NAME} app on this iPhone.` }]));
   return box;
 }
 
@@ -52,12 +53,12 @@ async function openInApp() {
   let link;
   try { link = await encodeLink(await websitePayload()); } catch {
     hide();
-    await showAlert({ title: "Can't Open Cydian", message: "This browser can't pack the list (it needs Safari 16.4 or later).", buttons: ["OK"] });
+    await showAlert({ title: `Can't Open ${NAME}`, message: "This browser can't pack the list (it needs Safari 16.4 or later).", buttons: ["OK"] });
     return;
   }
   hide();
-  // Safari's own "Open in Cydian?" can't be reworded: the banner says which button to press.
-  showBanner({ title: "Cydian", message: "Press Open to bring your certificate, sources and settings into Cydian." });
+  // Safari's own "Open in iFizBox?" can't be reworded: the banner says which button to press.
+  showBanner({ title: NAME, message: `Press Open to bring your certificate, sources and settings into ${NAME}.` });
   location.href = link;
 }
 
@@ -105,7 +106,7 @@ export async function reviewAndImport(url, { native = globalThis.cydianNative, b
   }
   if (r.empty && !payload.identity) {
     hide();
-    await alert({ title: "Nothing New", message: "Cydian already has the website's sources and settings.", buttons: ["OK"] });
+    await alert({ title: "Nothing New", message: `${NAME} already has the website's sources and settings.`, buttons: ["OK"] });
     return "nothing";
   }
   // Sources on the Source Warning list (core/warnings.js) stay out, as Manage's import leaves them unticked.
@@ -119,7 +120,7 @@ export async function reviewAndImport(url, { native = globalThis.cydianNative, b
   else hide();
   if (failed.length) {
     const names = failed.map((f) => f.split(": ")[0].replace(/^https?:\/\//, "").replace(/\/$/, ""));
-    banner({ title: "Cydian", duration: 6000,
+    banner({ title: NAME, duration: 6000,
       message: `${names.length === 1 ? names[0] : `${names.length} items`} couldn't be added: ${failed.length === 1 ? "try it again in Sources" : names.slice(0, 3).join(", ")}.` });
   }
   return "imported";

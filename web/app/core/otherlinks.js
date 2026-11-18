@@ -1,6 +1,6 @@
 // F83: other sideloaders' links, which the sideload build claims (native/Info-sideload.plist CFBundleURLTypes) and
-// turns into Cydian's own: add a source, or install an IPA. Pure JS, no DOM. Settings > Sideloading's "Open Other
-// Apps' Links" (on by default) decides whether Cydian takes them; screens/settings.js draws it, incoming.js acts.
+// turns into iFizBox's own: add a source, or install an IPA. Pure JS, no DOM. Settings > Sideloading's "Open Other
+// Apps' Links" (on by default) decides whether iFizBox takes them; screens/settings.js draws it, incoming.js acts.
 //
 //   OTHER_SCHEMES              the schemes claimed; the plist and App.swift's OtherLink.schemes hold the same list
 //   parseOtherLink(link)       -> { app, scheme, action: "source" | "install" | "other", url } or null (not one)
@@ -21,7 +21,7 @@
 // Anything else on these schemes goes by its first word (host, or path for scarlet's "repo="): add / source / repo /
 // addsource / add-source -> source, install / download -> install; a link with no such word whose URL ends in .ipa
 // or .tipa -> install. The rest (Feather's import-certificate, SideStore's pairing, AltStore's backup callbacks)
-// is "other": it was meant for that app, and Cydian can only hand it back (incoming.js).
+// is "other": it was meant for that app, and iFizBox can only hand it back (incoming.js).
 //
 // Not claimed: livecontainer (LiveContainer launches its apps through it), apple-magnifier (the system Magnifier,
 // which TrollStore borrows), altstore-pal (AltStore PAL's marketplace flows).

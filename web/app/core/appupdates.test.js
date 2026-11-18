@@ -26,7 +26,7 @@ test("versions compare as versions, not text: 1.10 is newer than 1.9", () => {
   assert.equal(rememberedUpgrades([rec("a", "1.10")], cands({ a: "1.9" })).available.length, 0);
 });
 
-test("Ignored Upgrades holds an app's upgrade under ignored; no version remembered, or Cydian itself, is skipped", () => {
+test("Ignored Upgrades holds an app's upgrade under ignored; no version remembered, or iFizBox itself, is skipped", () => {
   const records = [rec("delta", "1.5"), rec("utm", "4.0"), rec("blank", ""), { ...rec(SELF_ID, "0.1"), self: true }];
   const up = rememberedUpgrades(records, cands({ delta: "1.6", utm: "4.5", blank: "1.0", [SELF_ID]: "9.9" }), ["utm"]);
   assert.deepEqual(up.available.map((r) => r.id), ["delta"]);
@@ -53,8 +53,8 @@ test("Install records the version downloaded; a later source refresh with a bump
   assert.equal(rememberedUpgrades(await store.all(), pkgs(appStanza(v3.apps[0], { url: SRC }, "17.0"))).available.length, 0);
 });
 
-test("merge: dpkg's and the remembered apps' upgrades in one list, each id once, Cydian's own row first", () => {
-  const dpkg = { available: [{ id: SELF_ID, name: "Cydian", version: "2" }, { id: "zeta", name: "Zeta", version: "1" }], ignored: [{ id: "held", name: "Held", version: "1" }] };
+test("merge: dpkg's and the remembered apps' upgrades in one list, each id once, iFizBox's own row first", () => {
+  const dpkg = { available: [{ id: SELF_ID, name: "iFizBox", version: "2" }, { id: "zeta", name: "Zeta", version: "1" }], ignored: [{ id: "held", name: "Held", version: "1" }] };
   const apps_ = { available: [{ id: "alpha", name: "Alpha", version: "2" }, { id: "zeta", name: "Zeta (app)", version: "9" }, { id: "held", name: "Held", version: "3" }], ignored: [] };
   const m = mergeUpgrades(dpkg, apps_);
   assert.deepEqual(m.available.map((r) => r.id), [SELF_ID, "alpha", "zeta"]);
@@ -63,7 +63,7 @@ test("merge: dpkg's and the remembered apps' upgrades in one list, each id once,
   assert.deepEqual(mergeUpgrades(null, null), { available: [], ignored: [] });
 });
 
-test("watch list for the shell: http(s) source and a version only; Cydian's self record is left to essential.js", async () => {
+test("watch list for the shell: http(s) source and a version only; iFizBox's self record is left to essential.js", async () => {
   const native = { call: async () => ({ mode: "sideload", version: "0.2.6" }) };
   const store = withSelf(memoryAppStore([rec("delta", "1.5"), rec("local", "1", { source: null }), rec("bad", "1", { source: "javascript:x" }),
     rec("nov", "")]), native);

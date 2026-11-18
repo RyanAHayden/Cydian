@@ -1,10 +1,10 @@
-// N8: Cydian's widget extension (Cydian.app/PlugIns/CydianWidget.appex, iOS 17+): a Home Screen and Lock Screen widget
+// N8: iFizBox's widget extension (Cydian.app/PlugIns/CydianWidget.appex, iOS 17+): a Home Screen and Lock Screen widget
 // with the update count, and in the jailbreak build Respring and Userspace Reboot as Control Center controls (iOS 18,
 // Controls.swift, built with -D CYDIAN_JAILBREAK; also what the Action button can run).
 // The count comes from the App Group's defaults, which the app writes (native/intents/App/WidgetStore.swift: Check for
 // Updates, Install All Updates and every count the page shows in Changes); in the jailbreak build also from N5's
 // daemon's state file (its daily apt check), whichever is newer. Without the App Group and before any check it says
-// "Open Cydian".
+// "Open iFizBox".
 // SPDX-License-Identifier: GPL-3.0-or-later
 import SwiftUI
 import WidgetKit
@@ -57,14 +57,14 @@ struct UpdatesView: View {
             }
         default:
             VStack(alignment: .leading, spacing: 2) {
-                Text("Cydian").font(.system(size: 13, weight: .semibold)).foregroundColor(.secondary)
+                Text(Brand.name).font(.system(size: 13, weight: .semibold)).foregroundColor(.secondary)
                 Spacer(minLength: 0)
                 if let s = entry.snapshot {
                     Text("\(s.count)").font(.system(size: 44, weight: .bold)).minimumScaleFactor(0.5)
                     Text(s.count == 1 ? "Update" : "Updates").font(.system(size: 15, weight: .semibold))
                     Text(s.checked, style: .relative).font(.system(size: 11)).foregroundColor(.secondary)
                 } else {
-                    Text("Open Cydian").font(.system(size: 17, weight: .semibold))
+                    Text("Open \(Brand.name)").font(.system(size: 17, weight: .semibold))
                     Text("to check for updates").font(.system(size: 12)).foregroundColor(.secondary)
                 }
             }
@@ -79,7 +79,7 @@ struct UpdatesWidget: Widget {
             UpdatesView(entry: entry).containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("Updates")
-        .description("How many updates Cydian has found.")
+        .description("How many updates \(Brand.name) has found.")
         .supportedFamilies([.systemSmall, .accessoryCircular, .accessoryInline])
     }
 }

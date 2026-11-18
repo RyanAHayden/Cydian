@@ -4,7 +4,7 @@
 //   up.badge("changes", n);   // beside the tab badge: 0 while the Changes tab is on screen clears the icon badge
 //   up.start();               // once at launch: Upgrade Notifications off reaches the daemon again
 //
-// The daemon sets Cydian's icon badge to the upgrades it found. Once the Changes tab shows no upgrades (the
+// The daemon sets iFizBox's icon badge to the upgrades it found. Once the Changes tab shows no upgrades (the
 // user installed them, or ignored them), the page asks the shell to clear it (Notifications.swift app.badge, which
 // also takes the "3 Upgrades" notification away). Only while the Changes tab is the one shown: a count of 0 worked out
 // in the background, before the sources have loaded, would otherwise wipe a badge that is right. A zero counted

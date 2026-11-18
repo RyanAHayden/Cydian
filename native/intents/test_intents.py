@@ -1,10 +1,10 @@
-"""N8: Cydian's App Intents, widget and controls.
+"""N8: iFizBox's App Intents, widget and controls.
 
 - SwiftIntents: native/intents/tests/main.swift, built on Linux with Core.swift and native/sign/Updates.swift, runs
   each intent against the fake helper (native/fake/cydian-helper) over native/fake/fixture/prefix. The sideload
   restore's cydian://import link is decoded here as web/app/core/transfer.js decodeLink would.
 - Metadata: metadata.py writes what Xcode 27's appintentsmetadataprocessor wrote for sweetpad's capture (fixtures/),
-  covers Cydian's own intent shapes, and refuses what it doesn't handle.
+  covers iFizBox's own intent shapes, and refuses what it doesn't handle.
 - Built: when native/build.sh has built the .deb and the IPA (tools/check.sh does, where the toolchain is), the
   jailbreak app lists every intent and its widget the controls; the IPA only the both-modes intents, and a widget
   with no controls and no jailbreak entitlements.
@@ -55,7 +55,7 @@ class SwiftIntents(unittest.TestCase):
             os.symlink("/usr/lib/libncursesw.so.6", os.path.join(shim, "libncurses.so.6"))
             env["LD_LIBRARY_PATH"] = shim + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
         r = subprocess.run([SWIFTC, "-module-cache-path", os.path.join(cls.tmp, "modules"),
-                            os.path.join(HERE, "Core.swift"), os.path.join(NATIVE, "sign", "Updates.swift"),
+                            os.path.join(HERE, "Core.swift"), os.path.join(NATIVE, "sign", "Updates.swift"), os.path.join(NATIVE, "sign", "Brand.swift"),
                             os.path.join(HERE, "tests", "main.swift"), "-o", binary],
                            capture_output=True, text=True, env=env, timeout=600)
         cls.build_error = None if r.returncode == 0 else (r.stdout + r.stderr)[-4000:]

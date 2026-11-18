@@ -3,7 +3,7 @@
 which Xcode's appintentsmetadataprocessor (macOS only) writes from the Swift compiler's constant values. build.sh
 compiles with -emit-const-values-path (the swift.org Linux toolchain has it), and this script turns that JSON into
 extract.actionsdata and version.json in the shape Xcode 27 writes (checked against Xcode's own captures: the llios
-sample and sweetpad's fixtures, see native/intents/README.md). It covers what Cydian's intents use and refuses the rest
+sample and sweetpad's fixtures, see native/intents/README.md). It covers what iFizBox's intents use and refuses the rest
 loudly rather than writing something iOS would skip silently:
 
   AppIntent         title, description, openAppWhenRun, isDiscoverable, authenticationPolicy; parameters of

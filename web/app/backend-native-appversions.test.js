@@ -39,8 +39,8 @@ function setup(t, { mode = "jailbreak", helper, apps } = {}) {
 }
 
 const records = [
-  { id: "com.ryha.cydian", name: "Cydian", version: "0.2.8", self: true },
-  { id: "com.rileytestut.Delta", name: "Delta", version: "1.5", key: "altstore:x" }, // updated outside Cydian
+  { id: "com.ryha.cydian", name: "iFizBox", version: "0.2.8", self: true },
+  { id: "com.rileytestut.Delta", name: "Delta", version: "1.5", key: "altstore:x" }, // updated outside iFizBox
   { id: "com.utmapp.UTM", name: "UTM", version: "4.5.2" }, // as remembered
   { id: "com.example.gone", name: "Gone", version: "2.0" }, // deleted from the Home Screen
 ];
@@ -59,24 +59,24 @@ test("appVersions: every app in the containers, through cydian-helper app-versio
 test("installedApps: the real version replaces the remembered one, with a note where they disagree", async (t) => {
   const { backend } = setup(t, { apps: containers(t) });
   const [self, delta, utm, gone] = await backend.installedApps(records);
-  assert.deepEqual(self, records[0]); // Cydian itself is dpkg's in jailbreak mode
+  assert.deepEqual(self, records[0]); // iFizBox itself is dpkg's in jailbreak mode
   assert.equal(delta.version, "1.6");
   assert.equal(delta.remembered, "1.5");
   assert.equal(delta.disagrees, true);
-  assert.equal(delta.note, "Installed: 1.6 (Cydian remembered 1.5)");
+  assert.equal(delta.note, "Installed: 1.6 (iFizBox remembered 1.5)");
   assert.equal(delta.key, "altstore:x"); // the rest of the record kept
   assert.deepEqual({ v: utm.version, d: utm.disagrees, n: utm.note }, { v: "4.5.2", d: false, n: null });
   assert.equal(gone.actual, null);
   assert.equal(gone.version, "2.0");
-  assert.equal(gone.note, "Not installed (Cydian remembered 2.0)");
+  assert.equal(gone.note, "Not installed (iFizBox remembered 2.0)");
 });
 
 test("no containers folder: nothing installed, every remembered app says so", async (t) => {
   const { backend } = setup(t, { apps: "/nonexistent/containers" });
   assert.deepEqual(await backend.appVersions(), []);
   const notes = (await backend.installedApps(records)).slice(1).map((r) => r.note);
-  assert.deepEqual(notes, ["Not installed (Cydian remembered 1.5)", "Not installed (Cydian remembered 4.5.2)",
-    "Not installed (Cydian remembered 2.0)"]);
+  assert.deepEqual(notes, ["Not installed (iFizBox remembered 1.5)", "Not installed (iFizBox remembered 4.5.2)",
+    "Not installed (iFizBox remembered 2.0)"]);
 });
 
 test("no helper keeps the remembered versions; the sideload build has no app-versions at all", async (t) => {

@@ -1,6 +1,6 @@
 // F75: the native URL hand-off (incoming.js): app.takeURL at start and on "cydian:url", each link to its handler;
-// Open in Cydian App's review (screens/importlink.js reviewAndImport) adds only what's new; F89: the website's
-// Open in Cydian (cydian://install) asks, then installs.
+// Open in iFizBox App's review (screens/importlink.js reviewAndImport) adds only what's new; F89: the website's
+// Open in iFizBox (cydian://install) asks, then installs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { handleIncoming, startIncoming } from "./incoming.js";
@@ -25,7 +25,7 @@ test("not ours: nothing happens", async () => {
   assert.deepEqual([u.alerts.length, u.huds.length, u.went], [0, 0, 0]);
 });
 
-test("F89 install: the website's Open in Cydian asks, then installs the IPA with its name", async () => {
+test("F89 install: the website's Open in iFizBox asks, then installs the IPA with its name", async () => {
   const u = ui();
   const ran = [];
   const opened = [];
@@ -68,7 +68,7 @@ test("startIncoming takes the pending link at start and again on cydian:url", as
   startIncoming({ native: null }); // the website: nothing to listen to
 });
 
-// ---- Open in Cydian App ----
+// ---- Open in iFizBox App ----
 
 function fakeStore(values, holds = []) {
   const v = { ...values };

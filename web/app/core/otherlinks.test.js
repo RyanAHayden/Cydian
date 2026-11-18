@@ -1,4 +1,4 @@
-// F83: other sideloaders' links -> Cydian's own (core/otherlinks.js), one test per app's link shape, and the scheme
+// F83: other sideloaders' links -> iFizBox's own (core/otherlinks.js), one test per app's link shape, and the scheme
 // list kept the same in the plist, the shell and the page.
 import { test } from "node:test";
 import assert from "node:assert/strict";

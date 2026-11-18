@@ -1,21 +1,21 @@
 // F75: cydian:// links the shell hands over (native/Sources/App.swift, Incoming): it keeps the latest, sends
 // "cydian:url" on window, and the page takes it with app.takeURL (also once at start, for a link that launched the
 // app before the page was there).
-//   cydian://import?d=<gzipped JSON>   Open in Cydian App on the website: the review alert (screens/importlink.js)
+//   cydian://import?d=<gzipped JSON>   Open in iFizBox App on the website: the review alert (screens/importlink.js)
 //   cydian://install?url=<ipa>[&name=…]  F89: the Install IPA alert, then Install (signAndInstall). The website's app
-//                                      page sent it (Open in Cydian) until F92/F95 dropped the hand-offs; kept for
+//                                      page sent it (Open in iFizBox) until F92/F95 dropped the hand-offs; kept for
 //                                      links already out there and anyone's own pages
 //   cydian://myipas?file=<name>        F77: an .ipa another app sent, already in My IPAs (MyIPAs.swift): its page
 //   cydian://add?url=<url>[&suite=…]   N8: the Add Source intent: Add Source's alert, filled in (core/handoff.js);
-//                                      N9: also an APT repo or AltStore source shared with Cydian
-//   cydian://shared?route=…            N9: an .ipa or .deb shared with Cydian, or why not (share.js)
-//   cydian://package?id=<id>           F96: the website's Install in Cydian: that app's page (Search's package:<id>)
-//   cydian://account?k=<key>           F97: a Cydian Account's link or QR code: Sign In With Key, filled in
+//                                      N9: also an APT repo or AltStore source shared with iFizBox
+//   cydian://shared?route=…            N9: an .ipa or .deb shared with iFizBox, or why not (share.js)
+//   cydian://package?id=<id>           F96: the website's Install in iFizBox: that app's page (Search's package:<id>)
+//   cydian://account?k=<key>           F97: a iFizBox Account's link or QR code: Sign In With Key, filled in
 //   cydian://<tab>                     B14: home, sources, changes, installed, search, settings: that tab, at its root
 //   altstore://source?url=…, feather://install/<ipa>, …   F83: other sideloaders' links (core/otherlinks.js), when
 //                                      Settings > Sideloading > Open Other Apps' Links is on: a source goes to Sources >
 //                                      Manage's Add, filled in; an IPA to Install IPAs, then Install (signAndInstall).
-//                                      Off, or a link Cydian has no use for: handed back (handBack below)
+//                                      Off, or a link iFizBox has no use for: handed back (handBack below)
 //
 //   startIncoming({ native })          once, in the app
 //   await handleIncoming(url, deps)    -> "import" | "install" | "myipas" | "add" | "shared" | "package" | "account" | "tab" | "other-source" |
@@ -27,6 +27,7 @@ import { format, ALL_TABS } from "./router.js";
 import { parseAddLink } from "./core/handoff.js";
 import { parseOtherLink, otherLinksOn } from "./core/otherlinks.js";
 import { packageIdOf } from "./websign-gate.js";
+import { NAME } from "./brand.js";
 
 export function startIncoming({ native = globalThis.cydianNative } = {}) {
   if (!native?.call) return;
@@ -107,7 +108,7 @@ export function tabOf(link) {
 
 const goHash = (hash) => { if (typeof location !== "undefined") location.hash = hash.replace(/^#/, ""); };
 
-// F83: another sideloader's link. On: Cydian does what that app would have (a source, an IPA). Off, or a link only
+// F83: another sideloader's link. On: iFizBox does what that app would have (a source, an IPA). Off, or a link only
 // that app understands (a certificate export, a pairing callback): handed back.
 async function handleOtherLink(u, other, { native, alert, hud, add, install, on, open, now }) {
   if (!on() || other.action === "other") return handBack(u, other, { native, alert, now, off: !on() });
@@ -140,9 +141,9 @@ export function installAsk(link) {
   return { url, name: (q.get("name") ?? "").trim().slice(0, 100) };
 }
 
-// iOS fixes URL schemes at install time and gives a scheme to one app when several claim it, so Cydian can't pass a
+// iOS fixes URL schemes at install time and gives a scheme to one app when several claim it, so iFizBox can't pass a
 // link on to the app it was for: it can only open it again, which reaches another app only where iOS picks that one
-// (UIApplication.open says false when nothing answers). Where iOS picked Cydian, opening it again comes straight
+// (UIApplication.open says false when nothing answers). Where iOS picked iFizBox, opening it again comes straight
 // back here: the same link within LOOP_MS is that echo, and gets the alert instead of a second try.
 const LOOP_MS = 10_000;
 let lastHandBack = { url: null, at: 0 };
@@ -161,8 +162,8 @@ async function handBack(u, other, { native, alert, now, off }) {
 }
 
 export function handBackText(other, off) {
-  const why = `This link was for ${other.app}, and iOS sent it to Cydian: iOS gives each kind of link to one app, so Cydian can't pass it on.`;
-  if (off) return `${why} Turn on Settings > Sideloading > Open Other Apps' Links to open links like it in Cydian.`;
+  const why = `This link was for ${other.app}, and iOS sent it to ${NAME}: iOS gives each kind of link to one app, so ${NAME} can't pass it on.`;
+  if (off) return `${why} Turn on Settings > Sideloading > Open Other Apps' Links to open links like it in ${NAME}.`;
   return `${why} Only ${other.app} can do what this link asks.`;
 }
 

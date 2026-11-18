@@ -1,8 +1,8 @@
-// F97: Settings > Account (iOS 6 grouped tables). Cydian Account keeps this device's sources, the settings that
+// F97: Settings > Account (iOS 6 grouped tables). iFizBox Account keeps this device's sources, the settings that
 // travel, Ignored Upgrades, the Wish List, installed-app records and the signing certificate on cydian.dev, encrypted with an account
 // key only the user's devices have (core/account.js has the rules; worker/src/account.js the storage).
 //
-//   accountSection()          the root Settings page's row: Cydian Account, Signed In / Off; pushes #/settings/account
+//   accountSection()          the root Settings page's row: iFizBox Account, Signed In / Off; pushes #/settings/account
 //   drawAccount(el)           the page: Create Account / Sign In With Key; signed in: Sync Now, Last Synced, the Sync
 //                             Certificate switch, Show Account Key, Delete Account
 //   startAccountSync()        once at start: read on launch; save when the app goes to the background or the page is
@@ -29,6 +29,7 @@ import { apps, recordInstall, removeInstall } from "../core/installed.js";
 import { getBackend } from "../backend.js";
 import { loadIdentity, saveIdentity } from "../signing-client.js";
 import { settings, createSwitch } from "./settings.js";
+import { NAME } from "../brand.js";
 
 const STATE_KEY = "cydian.account";
 
@@ -115,7 +116,7 @@ export async function applyHere(c, { backend = getBackend(), store = settings, n
     const have = await backend.sources().catch(() => []);
     for (const line of c.removeSources) {
       const s = have.find((x) => x?.uri && sourceLine(exportLine(x)) === line);
-      if (s) await backend.removeSource(s.key).catch(() => {}); // a source in a file Cydian doesn't change stays
+      if (s) await backend.removeSource(s.key).catch(() => {}); // a source in a file iFizBox doesn't change stays
     }
   }
   for (const line of c.addSources) await backend.addSource(line).catch(() => {}); // offline, or gone: next sync tries again
@@ -181,7 +182,7 @@ export function lastSyncedText(t, now = Date.now()) {
 
 export function accountSection() {
   const box = document.createElement("div");
-  const fill = (detail) => box.replaceChildren(grouped([{ rows: [{ label: "Cydian Account", detail,
+  const fill = (detail) => box.replaceChildren(grouped([{ rows: [{ label: `${NAME} Account`, detail,
     href: format(settingsRoute(["account"])) }] }]));
   fill("");
   accountSync().status().then((s) => fill(s.signedIn ? "On" : "Off")).catch(() => fill("Off"));
@@ -208,7 +209,7 @@ export async function drawAccount(el) {
     return;
   }
   const parts = [grouped([{ rows: [{ label: "Sync Now", onClick: () => syncNow(el) }, { label: "Last Synced", detail: lastSyncedText(s.lastSynced) }],
-    footer: "Cydian saves to your account when you leave it, and reads it when it opens." }])];
+    footer: `${NAME} saves to your account when you leave it, and reads it when it opens.` }])];
   if (certBuild()) {
     const g = grouped([{ rows: [{ label: "Sync Certificate" }], footer: CERT_FOOTER }]);
     const cell = g.querySelector(".cell-inner");
@@ -227,7 +228,7 @@ export async function drawAccount(el) {
   el.replaceChildren(...parts);
 }
 
-// The key as a code, a link and a QR code another device's Camera opens in Cydian.
+// The key as a code, a link and a QR code another device's Camera opens in iFizBox.
 function keyBlock(code) {
   const box = document.createElement("div");
   const link = keyLink(parseKey(code));
@@ -240,7 +241,7 @@ function keyBlock(code) {
     img.alt = "QR code of your account link";
     img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(qrSvg(link, { ecc: "M" }));
     const note = Object.assign(document.createElement("p"), { className: "group-footer",
-      textContent: "Scan it with another iPhone's Camera to sign in there in Cydian." });
+      textContent: `Scan it with another iPhone's Camera to sign in there in ${NAME}.` });
     qr.append(img, note);
     box.append(qr);
   } catch { /* a 26-letter link always fits */ }
@@ -251,7 +252,7 @@ const alertOK = (title, message) => showAlert({ title, message, buttons: ["OK"] 
 const problem = (e) => e?.message ?? String(e);
 
 async function createFlow(el) {
-  const { index } = await showAlert({ title: "Create Account", message: `Cydian makes an account key on this device. ${KEY_WARNING}`,
+  const { index } = await showAlert({ title: "Create Account", message: `${NAME} makes an account key on this device. ${KEY_WARNING}`,
     buttons: ["Cancel", "Create"], cancel: 0 });
   if (index !== 1) return;
   const hide = showHUD("Creating");

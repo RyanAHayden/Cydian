@@ -189,7 +189,7 @@ test("F133: a download that doesn't match its stanza is refused on Cannot Comply
   const r = await backend.simulate([{ ...linked, debSha256: sha("something else") }]);
   assert.equal(r.ok, false);
   assert.equal(r.issues.length, 1);
-  assert.match(r.issues[0], /^Linked from https:\/\/github\.com\/.* isn't the file its source lists \(the download's SHA256 is [0-9a-f]{64}, not .*\), so Cydian won't install it\.$/);
+  assert.match(r.issues[0], /^Linked from https:\/\/github\.com\/.* isn't the file its source lists \(the download's SHA256 is [0-9a-f]{64}, not .*\), so iFizBox won't install it\.$/);
   assert.deepEqual(readdirSync(debDir), []);
   const m = await backend.simulate([{ ...linked, debMd5: md5("other") }]);
   assert.match(m.issues[0], /MD5 is/);

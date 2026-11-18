@@ -42,7 +42,7 @@ helper. Parsing, Changes, upgrades and search all run in `core/` in both places.
 - The upcoming iOS 27 jailbreak first, and older jailbreakable versions too, since more phones run them:
   rootless (`/var/jb`, Dopamine, palera1n) from iOS 15 up. Deployment target iOS 15. arm64 only (R3: an app, its
   helper and its daemon run as arm64 on arm64e phones; arm64e is only needed for code injected into system processes).
-- The iPhone 4S (iOS 6) is a reference device only. It never runs Cydian.
+- The iPhone 4S (iOS 6) is a reference device only. It never runs iFizBox.
 
 
 ## R3 answers (2026-11-17)
@@ -145,7 +145,7 @@ folder in the Files app. Paste the table here when it exists.
   `.swiftinterface` files (made by Apple Swift 6.4). A different minor version refuses with "this SDK is not
   supported by the compiler". On Arch it wants `libncurses.so.6`; a symlink to `libncursesw.so.6` on
   `LD_LIBRARY_PATH` does it.
-- **SDK:** `iPhoneOS.sdk` extracted from an Xcode `.xip` on Linux by Cydian's own `tools/ios-sdk.sh` (T3), found
+- **SDK:** `iPhoneOS.sdk` extracted from an Xcode `.xip` on Linux by iFizBox's own `tools/ios-sdk.sh` (T3), found
   through `$IOS_SDK`. On this machine an extracted Xcode 27.1 SDK (iOS 27.1) already exists and `$IOS_SDK` can point at it. It also renames `arm64e.x1` to `arm64` in the
   `.tbd` stubs, which lld needs.
 - **Compile:** `swiftc -parse-as-library -wmo -swift-version 5 -target arm64-apple-ios15.0 -sdk $SDK
@@ -153,7 +153,7 @@ folder in the Files app. Paste the table here when it exists.
   - `R` holds a copy of the toolchain's `usr/lib/swift/shims` and a link to its `clang` headers. The toolchain's own
     resource dir is the Linux one: its CoreFoundation/dispatch module maps clash with the SDK's.
   - `-runtime-compatibility-version none` drops `libswiftCompatibility56.a`, Xcode's back-deploy shim for iOS
-    15.0–15.3. It's needed only for concurrency on those releases; Cydian avoids `async` until it targets 15.4+.
+    15.0–15.3. It's needed only for concurrency on those releases; iFizBox avoids `async` until it targets 15.4+.
   - The SDK only has arm64e interfaces; the arm64 build reads them without complaint.
 - **Link:** `clang -target arm64-apple-ios15.0 -isysroot $SDK -fuse-ld=lld --ld-path=<rustup>/gcc-ld/ld64.lld
   -L $SDK/usr/lib/swift -Wl,-rpath,/usr/lib/swift`. Plus `availability.c` (in the spike): `#available` calls
@@ -161,7 +161,7 @@ folder in the Files app. Paste the table here when it exists.
   links only against the OS's Swift runtime in `/usr/lib/swift` (present since iOS 12.2), with minos 15.0.
 - **arm64e does not link** (rustup's lld 23.1 rejects arm64e's authenticated-pointer relocations). It isn't needed:
   apps, setuid/spawned helpers and launch daemons run as arm64 on arm64e phones, and Procursus' rootless packages
-  are arm64. Only tweaks injected into arm64e system processes need arm64e. If Cydian ever needs it, Theos' Linux
+  are arm64. Only tweaks injected into arm64e system processes need arm64e. If iFizBox ever needs it, Theos' Linux
   toolchain (`bin/install-theos`, which ships Apple's ld64 via cctools-port) can link it.
 - **Rootless .deb (N1, not built here):**
   - Package architecture `iphoneos-arm64`. The app goes in `/var/jb/Applications/Cydian.app`; the helper and daemon
@@ -177,7 +177,7 @@ folder in the Files app. Paste the table here when it exists.
   - On Dopamine and palera1n rootless, `/var/jb` is a symlink to the real (randomised) prefix, so plain
     `/var/jb/...` paths work.
   - roothide (a Dopamine variant) has no `/var/jb`; there, `jbroot()` from libroothide maps paths.
-  - Cydian resolves the prefix once at start: `jbroot("/")` if libroothide loads (dlopen/dlsym), else `/var/jb` if
+  - iFizBox resolves the prefix once at start: `jbroot("/")` if libroothide loads (dlopen/dlsym), else `/var/jb` if
     it exists, else `/` (rootful). Every apt/dpkg path goes through that one function. libroot does the same for C
     code but isn't needed from Swift.
 
@@ -198,7 +198,7 @@ folder in the Files app. Paste the table here when it exists.
   themselves.
 - Sileo also has an XPC root daemon (`SileoRootDaemon`), but only for Mac Catalyst.
 
-**Cydian (iOS 15+):**
+**iFizBox (iOS 15+):**
 
 - The app gets those four entitlements. It runs one small helper, `/var/jb/usr/libexec/cydian/cydian-helper`, as
   root through the persona attributes. The helper has no setuid bit.
@@ -212,7 +212,7 @@ folder in the Files app. Paste the table here when it exists.
   its parent's executable (`proc_pidpath(getppid())`) is the same file (device + inode) as
   `<prefix>/Applications/Cydian.app/Cydian`.
 - **Does it work on Dopamine and palera1n?** Sileo is the default package manager on both, and it works this way
-  there. That's the evidence; Cydian itself hasn't been run on either (N6).
+  there. That's the evidence; iFizBox itself hasn't been run on either (N6).
 - **For the iOS 27 jailbreak:** it isn't out, so this can't be checked. If it doesn't honour private entitlements
   for ad hoc apps, the fallback is a root LaunchDaemon (`/var/jb/Library/LaunchDaemons`, `UserName root`) holding
   the same allowlist behind a Unix socket. It would check the peer's uid and executable with `LOCAL_PEERPID` +
@@ -268,7 +268,7 @@ N2's text still says "a setuid binary (per R3)"; R3 put a note on N2.
 ## Launch screen (N10, 2026-11-17)
 
 What opening the app shows before the page draws: Home as it loads, like the website's launch images
-(`tools/launch_images.py`, `web/app/icons/launch/`): the nav bar titled Cydian, the pinstripes with the Loading
+(`tools/launch_images.py`, `web/app/icons/launch/`): the nav bar titled iFizBox, the pinstripes with the Loading
 spinner in the middle, the tab bar with its six icons and Home selected. Before N10 the app showed black
 (`UILaunchScreen` was `{UIColorName: ""}`).
 
@@ -288,7 +288,7 @@ bar items and no per-screen image.
   image in your asset catalog". **Whether SpringBoard's launch-screen renderer takes loose PNGs is not verified**
   (no phone in this run): see "If it doesn't work" below.
 
-**What Cydian ships** (`native/Info.plist`, images in `native/launch/`, copied into both the .deb's and the IPA's
+**What iFizBox ships** (`native/Info.plist`, images in `native/launch/`, copied into both the .deb's and the IPA's
 `Cydian.app/` by `build.sh`):
 
 | key | image | what it is |
@@ -301,7 +301,7 @@ bar items and no per-screen image.
 `native/launch/make.py` cuts them (stdlib only) from the website's `launch-828x1792.png` (@2x) and
 `launch-1179x2556.png` (@3x). Rerun it when those change; `test_native.py` fails until the two match.
 
-**What the system launch screen can't show:** the nav bar's "Cydian" and the tab bar's icons. A bar image is
+**What the system launch screen can't show:** the nav bar's "iFizBox" and the tab bar's icons. A bar image is
 stretched to the bar's size, and the bar's height varies with the status bar (44 to 62 pt above the nav bar), so
 text or icons baked into it would be squashed on some phones. The bars are plain, and the title and icons come in
 a moment later with the app's own cover (below). The image is centred on the screen, while the page's spinner is
@@ -338,7 +338,7 @@ undocumented BOM format; no Linux writer exists that I know of), so it takes one
    `LaunchBackground.colorset` (`--pin-light`, `#ced3dc`).
 2. `xcrun actool Launch.xcassets --compile out --platform iphoneos --minimum-deployment-target 15.0
    --target-device iphone --output-partial-info-plist out/partial.plist`
-3. Commit `out/Assets.car` as `native/launch/Assets.car` (it holds only Cydian's own images), have `build.sh` copy
+3. Commit `out/Assets.car` as `native/launch/Assets.car` (it holds only iFizBox's own images), have `build.sh` copy
    it into `Cydian.app/`, and add `UIColorName: LaunchBackground` to `UILaunchScreen` (and drop the `UIColorName`
    refusal in `launch_check.py`). Rebuild it whenever the images change.
 
@@ -349,12 +349,12 @@ in the shell. That shell (`native/Sources/App.swift`) sets a `WKNavigationDelega
 `decidePolicyFor`) and no `WKUIDelegate`. No iOS 15+ phone was reachable from the run, so the answer comes from
 WebKit's source (main, `Source/WebKit/UIProcess/Cocoa/`), not from a tap on a phone:
 
-| What the page does | What WebKit does in this shell | Where Cydian does it |
+| What the page does | What WebKit does in this shell | Where iFizBox does it |
 |---|---|---|
 | `window.open(url)` (any scheme) | `UIDelegate::UIClient::createNewPage`: no `webView:createWebViewWithConfiguration:…`, so no new page. `window.open` returns `null`. **Nothing happens.** | Home > Source Code, browse.js More Information, AltStore Website, `installRows`' default opener |
 | `location.href = "itms-services://…"`, `feather://`, `altstore://`, `sidestore://`, `cydia://`, `sileo://`… | `NavigationState::NavigationClient::decidePolicyForNavigationAction`, with the delegate method missing: `NSURLConnection canHandleRequest` says no, and only macOS hands the URL to `NSWorkspace`. On iOS it calls `listener->ignore()`. **Nothing happens.** | AltStore Install / Get / Open in (`screens/altstore.js`), handoff.js Open in, `signing-client.js` (`location.href = body.itms`) |
-| `location.href = "https://…"` | Same path, with `canHandleRequest` true: `listener->use()`. If an app claims the URL as a universal link (`tryInterceptNavigation`, LSAppLink) that app opens. Otherwise **the web view itself loads the site, replacing Cydian's UI**, and there's no way back (no back gesture, no toolbar) short of killing the app. | `openOutside`'s fallback when the shell has no `app.openURL` |
-| `app.openURL` (F72, Bridge.swift) | `UIApplication.shared.open`: works, but takes **only https and itms-services**, so `feather://` and its kind are refused. | `essential-ui.js` `openOutside` (Cydian's own update) |
+| `location.href = "https://…"` | Same path, with `canHandleRequest` true: `listener->use()`. If an app claims the URL as a universal link (`tryInterceptNavigation`, LSAppLink) that app opens. Otherwise **the web view itself loads the site, replacing iFizBox's UI**, and there's no way back (no back gesture, no toolbar) short of killing the app. | `openOutside`'s fallback when the shell has no `app.openURL` |
+| `app.openURL` (F72, Bridge.swift) | `UIApplication.shared.open`: works, but takes **only https and itms-services**, so `feather://` and its kind are refused. | `essential-ui.js` `openOutside` (iFizBox's own update) |
 
 So every link out of the app is dead except F72's. The fix is filed as a B: give the shell a `WKUIDelegate` whose
 `createWebViewWith` hands the URL to `UIApplication.shared.open` and returns nil, and a `decidePolicyFor` that
@@ -364,7 +364,7 @@ lets `cydian:` (`AppScheme.scheme`, the bundle) and `about:`/`blob:` load. Any o
 
 **Check on a phone once the fix lands:** Home > Source Code opens Safari (or the GitHub app). An AltStore app's
 Get or Open in Feather opens Feather, or iOS says no app opens it. Install with a signed link brings up iOS's
-install prompt. More Information opens Safari, and Cydian stays where it was.
+install prompt. More Information opens Safari, and iFizBox stays where it was.
 
 **Fixed in B8 (2026-11-17), not yet tried on a phone.** `WebController` (`native/Sources/App.swift`) is now also
 the web view's `WKUIDelegate`, and `LinkOut` decides:
@@ -372,7 +372,7 @@ the web view's `WKUIDelegate`, and `LinkOut` decides:
 - `decidePolicyFor`: `cydian:`, `about:`, `blob:` and `data:` load in the web view, and so does any subframe
   navigation. Any other main-frame navigation (including a new-window one, `targetFrame == nil`) is cancelled and
   handed to `UIApplication.shared.open`. So `location.href = "https://…"` opens Safari (or the app claiming the
-  link) and Cydian's UI stays put; itms-services and `feather://`, `altstore://`, `cydia://`, `sileo://`… go to iOS.
+  link) and iFizBox's UI stays put; itms-services and `feather://`, `altstore://`, `cydia://`, `sileo://`… go to iOS.
 - `createWebViewWith` (`window.open`): hands the URL to `UIApplication.shared.open` and returns nil, so
   `window.open` still returns `null` but the link opens.
 - `app.openURL` takes any scheme except `cydian`, `about`, `blob`, `data`, `javascript` and `file`

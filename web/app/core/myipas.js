@@ -6,7 +6,7 @@
 //     icon (base64 PNG) | null, error | null, options: {name, bundleId, icon, removeExtensions, fixArm64e},
 //     signed: { at, bundleId, name, version, size, expires? } | null }
 // On the website there is no signer on the phone: the library is a list of links kept on this device
-// (siteEntries/addSiteUrl/removeSiteUrl over localStorage), handed to Cydian or another sideloader on Install (F89).
+// (siteEntries/addSiteUrl/removeSiteUrl over localStorage), handed to iFizBox or another sideloader on Install (F89).
 //
 //   stateOf(entry, { identity, site })   { kind: "signed" | "unsigned" | "broken" | "link", label }
 //   libraryRows(entries, opts)           A to Z, with the subtitle the list shows

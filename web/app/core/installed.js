@@ -8,9 +8,10 @@
 //
 // Cydia's rule (docs/cydia.md "Changes and metadata.cb0"): a package is upgradable when it is installed and its
 // candidate (the newest version on any source) is newer than the installed one. Held packages (dpkg's `hold`
-// selection, or Cydian's Ignored Upgrades list) go under Ignored Upgrades, not Available Upgrades.
+// selection, or iFizBox's Ignored Upgrades list) go under Ignored Upgrades, not Available Upgrades.
 import { parseControl, description, compareVersions, parseRelations } from "./apt.js";
 import { sectionName, parseAuthor, compareNames, sectionGroup } from "./catalog.js";
+import { NAME } from "../brand.js";
 
 // Where dpkg keeps it: rootful, then rootless (Dopamine, palera1n rootless).
 export const STATUS_PATHS = ["/var/lib/dpkg/status", "/var/jb/var/lib/dpkg/status"];
@@ -64,7 +65,7 @@ export function looksLikeStatus(text) {
 }
 
 // `installed`: parseStatus rows. `candidateOf(id)`: the row of the newest version on any source (with `version`),
-// or null. `holds`: Cydian's Ignored Upgrades (package ids). Each result row is the candidate's row with
+// or null. `holds`: iFizBox's Ignored Upgrades (package ids). Each result row is the candidate's row with
 // `installed` (the version on the device) added; both lists sorted by name. `dpkgHolds` off ignores the status
 // file's hold flags: the app passes that, since there `holds` already is dpkg's list (apt-mark showhold, F22) and
 // is newer than the status file it read.
@@ -172,7 +173,7 @@ export function openAppStore({ indexedDB: idb = globalThis.indexedDB, name = APP
 
 let shared = null;
 // Where IndexedDB is missing (Safari private mode can refuse it) the records last for this session only.
-// The sideload app always lists itself, at the version it is (app.info), whatever was recorded: so Cydian's own
+// The sideload app always lists itself, at the version it is (app.info), whatever was recorded: so iFizBox's own
 // updates show in Installed and Changes like any app's. (The jailbreak app reads dpkg, which already has it.)
 export const apps = () => (shared ??= openAppStore().catch(() => memoryAppStore()).then(withSelf));
 
@@ -181,7 +182,7 @@ let selfInfo = null;
 function selfRecord(native = globalThis.cydianNative) {
   if (!native?.call) return Promise.resolve(null);
   selfInfo ??= Promise.resolve().then(() => native.call("app.info", {})).then((i) => (i?.mode === "jailbreak" || !i?.version ? null
-    : { id: SELF_ID, name: "Cydian", version: String(i.version), key: null, source: null, sourceName: "Cydian",
+    : { id: SELF_ID, name: NAME, version: String(i.version), key: null, source: null, sourceName: NAME,
       icon: "icons/icon-lite-glossy-76.png", date: 0, self: true }), () => null); // the sideload app's LITE icon
   return selfInfo;
 }

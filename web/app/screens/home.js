@@ -1,5 +1,5 @@
 // Home tab, laid out like Cydia's on the 4S (ref/4s/screens/cydia-home.png; styles in home.css):
-//   - Cydian's icon beside "Welcome to Cydian" and a by-line
+//   - iFizBox's icon beside "Welcome to iFizBox" and a by-line
 //   - tile rows: GitHub | Sources as one outlined pair (Cydia: Facebook | Twitter), then Featured and Themes as two
 //     white half-width tiles
 //   - a full-width green tile for the current state (stateTile: Add a Source, n Upgrades Available, ...; Cydia's
@@ -34,6 +34,7 @@ import { refreshInBackground } from "./sources.js";
 import { markCydianInstalled, browsingLocked, askToBrowse } from "../websign-gate.js";
 import * as guides from "./guides.js";
 import { guideRows, JAILBREAK_INFO_URL } from "./guides.js";
+import { NAME } from "../brand.js";
 
 const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
 
@@ -71,10 +72,10 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
 
 // F79: Home's Install IPAs tile, beside Browse: the Installed tab's Install IPAs page (screens/myipas.js). Not in the
 // jailbreak app, which has no such page (apt installs there).
-// F93 (as before F89): Install Cydian App on the website, Not Jailbroken: with a certificate in Settings > Signing,
-// Cydian's IPA signed in the browser and installed, carrying the certificate (Bring My Certificate), sources and
+// F93 (as before F89): Install iFizBox App on the website, Not Jailbroken: with a certificate in Settings > Signing,
+// iFizBox's IPA signed in the browser and installed, carrying the certificate (Bring My Certificate), sources and
 // settings into its first launch; without one, Settings > Signing first. -> "install" | "signing"
-// F96: once iOS was asked to install it, the website stops asking "Install Cydian First" (websign-gate.js).
+// F96: once iOS was asked to install it, the website stops asking "Install iFizBox First" (websign-gate.js).
 export async function installApp({ ready = signingReady, install = signAndInstall, bring = getBring, go = (h) => { location.hash = h; },
   installed = markCydianInstalled } = {}) {
   if (!(await ready())) { go(format(settingsRoute(["signing"])).replace(/^#/, "")); return "signing"; }
@@ -82,7 +83,7 @@ export async function installApp({ ready = signingReady, install = signAndInstal
   return "install";
 }
 
-// F96: Home's Install Cydian App tile's action, also the first-visit prompt's Install Cydian: Not Jailbroken, signed
+// F96: Home's Install iFizBox App tile's action, also the first-visit prompt's Install iFizBox: Not Jailbroken, signed
 // in the browser (installApp); jailbroken, the .deb for the device's arch (installDeb).
 export function installCydian({ offer = homeOffer({ mode: settings.mode, deviceType: settings.deviceType() }) } = {}) {
   if (!offer) return null;
@@ -176,7 +177,7 @@ export const DEVICE_HINT = "Showing apps for iPhones without a jailbreak. Jailbr
 export function deviceHint(type, mode = "site") {
   if (type !== "none") return null;
   // The sideload build is always Not Jailbroken: nothing to change there, so no hint. Nor on the website (user
-  // 2026-11-18: it's obviously the web; jailbroken visitors get "Jailbroken? Get Cydian.deb" in the Cydian App card).
+  // 2026-11-18: it's obviously the web; jailbroken visitors get "Jailbroken? Get Cydian.deb" in the iFizBox App card).
   if (mode === "sideload" || mode === "site") return null;
   return { text: DEVICE_HINT, href: format(settingsRoute(["device"])) };
 }
@@ -218,7 +219,7 @@ export function nav(route, ctx) {
     case "wishlist": return route.path.length === 1 ? { title: "Wish List", style: "plain" } : browse.nav(route); // F102; F125 moved its row to Installed, the route stays for old links
   }
   return {
-    title: "Cydian",
+    title: NAME,
     back: "Home", // the back button above it reads Home, as Cydia's
     left: { label: "About", onClick: () => showAbout(ctx) },
     // F82 Reload, as Cydia's: the button turns into the small white spinner in its own spot while the sources and
@@ -233,8 +234,8 @@ export function nav(route, ctx) {
 async function showAbout(ctx) {
   const version = (await globalThis.cydianNative?.call?.("app.info", {}).catch(() => null))?.version;
   await ctx.showAlert({
-    title: "About Cydian",
-    message: `${version ? `Version ${version}` : "Cydian Web"}\nFree and open source`
+    title: `About ${NAME}`,
+    message: `${version ? `Version ${version}` : `${NAME} Web`}\nFree and open source`
       + "\n\nRyan Hayden (Fizlo)\n\nInspired by Cydia\nby Jay Freeman (saurik)\nNot affiliated with SaurikIT",
     buttons: ["Close"],
   });
@@ -284,7 +285,7 @@ export function untilRefreshed(ms = 120000) {
 
 // What Reload does, each step injectable for the test: refresh the sources (Settings' Refresh on Launch's way: the
 // Sources tab's spinning badge, no HUD; when a refresh already runs, wait for that one), load the new package lists
-// (new versions: Changes' badge and list), re-read dpkg in the app, look for Cydian's own update (app.js listens for
+// (new versions: Changes' badge and list), re-read dpkg in the app, look for iFizBox's own update (app.js listens for
 // cydian:reloaded, as a launch does), then redraw Home in place.
 const loadNew = async () => {
   await catalog.ensure();
@@ -343,7 +344,7 @@ const state = { tile: null, seq: 0, redraw: null };
 export function init() {
   // Sources tells when a refresh starts and each time one ends (screens/sources.js markLoading): repaint the tile.
   globalThis.addEventListener?.("cydian:refreshing", () => refreshState());
-  // F96: no question at launch (user 2026-11-18); Home's rows below the Cydian App card are locked instead (renderRoot).
+  // F96: no question at launch (user 2026-11-18); Home's rows below the iFizBox App card are locked instead (renderRoot).
   // The root page stays in the stack while other tabs add or remove sources: look again whenever Home shows.
   globalThis.addEventListener?.("hashchange", () => {
     if (/^#\/home\/?$/.test(globalThis.location.hash)) refreshState();
@@ -435,7 +436,7 @@ function renderRoot(body) {
   icon.width = icon.height = 76;
   icon.alt = "";
   const words = el("div", "home-words");
-  const title = el("h2", "home-title", "Welcome to Cydian");
+  const title = el("h2", "home-title", `Welcome to ${NAME}`);
   words.append(title);
   const by = el("p", "home-by", "by ");
   const who = el("a", null, "Ryan Hayden (Fizlo)"); // as Cydia's "Jay Freeman (saurik)"
@@ -487,19 +488,19 @@ function renderRoot(body) {
     drawApp();
   });
 
-  // Install Cydian App, full width under Featured | Signing, on the website only (I7, core/appoffer.js homeOffer):
+  // Install iFizBox App, full width under Featured | Signing, on the website only (I7, core/appoffer.js homeOffer):
   // Not Jailbroken, the sideload build signed in the browser with the user's own certificate (F93, installApp), or
   // Settings > Signing first when there's none; jailbroken, the release's .deb for the device's arch.
-  // One green split button (user 2026-11-17): Install Cydian App | Send Settings (Open in Cydian App: the
+  // One green split button (user 2026-11-17): Install iFizBox App | Send Settings (Open in iFizBox App: the
   // certificate, sources and settings into the app).
-  // The website: jailbroken visitors get Cydian from its own APT repo (Sileo, Zebra) or as a .deb (user 2026-11-18).
-  // Its own purple tile (user 2026-11-18): the full Cydian, for a jailbroken phone, from Cydian's APT repo or a .deb.
-  const debTile = settings.mode === "site" ? tile({ label: "Install Full Cydian", subtitle: "Jailbroken: tweaks, themes and apt",
+  // The website: jailbroken visitors get iFizBox from its own APT repo (Sileo, Zebra) or as a .deb (user 2026-11-18).
+  // Its own purple tile (user 2026-11-18): the full iFizBox, for a jailbroken phone, from iFizBox's APT repo or a .deb.
+  const debTile = settings.mode === "site" ? tile({ label: `Install Full ${NAME}`, subtitle: "Jailbroken: tweaks, themes and apt",
     href: format({ tab: "home" }), glyph: "jailbreak" }) : null;
   debTile?.querySelector("a").addEventListener("click", (e) => { e.preventDefault(); e.stopImmediatePropagation(); jailbrokenSheet(); }, true);
-  const appRow = tileRow("green stack", tile({ label: "Install Cydian App", subtitle: "Signed with your certificate",
+  const appRow = tileRow("green stack", tile({ label: `Install ${NAME} App`, subtitle: "Signed with your certificate",
     href: format(settingsRoute(["signing"])), glyph: "install" }));
-  // No Send Settings to Cydian (user 2026-11-18): Install Cydian App already carries the certificate and settings.
+  // No Send Settings to iFizBox (user 2026-11-18): Install iFizBox App already carries the certificate and settings.
   const debRow = debTile ? tileRow("purple", debTile) : null;
   const appLink = appRow.querySelector("a");
   const appSub = appLink.querySelector(".cell-subtitle");
@@ -528,7 +529,7 @@ function renderRoot(body) {
   const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));
   state.tile = stateRow.querySelector("a");
   paintTile(stateTile());
-  // Locked Home (the website before Cydian is installed): Signing full width at the top, Browse down among the
+  // Locked Home (the website before iFizBox is installed): Signing full width at the top, Browse down among the
   // locked rows (user 2026-11-18); unlocked, Browse is the first row under GitHub | Discord.
 
   home.append(
@@ -554,7 +555,7 @@ function renderRoot(body) {
   const groups = [...list.children]; // the fragment empties once appended
   for (const group of groups) group.classList.add("home-links");
   home.append(list);
-  // The website before Cydian is installed: everything below the Cydian App card is locked; a tap asks first. Not
+  // The website before iFizBox is installed: everything below the iFizBox App card is locked; a tap asks first. Not
   // Settings (F123: unlocked like Home, as its tab was), nor help, guides and credits (F156, lockHomeLinks).
   if (browsingLocked({ mode: settings.mode })) {
     const locked = [browseRow, ...(ipasRow ? [ipasRow] : []), stateRow];
@@ -585,7 +586,7 @@ function renderRoot(body) {
   });
   refreshState();
   // F82: Reload's redraw. Everything stays on screen; each part is updated where it is: the green tile and the
-  // Install Cydian App offer at once.
+  // Install iFizBox App offer at once.
   state.redraw = async () => {
     if (!home.isConnected) return;
     drawHint();
@@ -596,9 +597,9 @@ function renderRoot(body) {
   };
 }
 
-// The Home footer: "iPhone17,3, iOS 26.1, Cydian 0.1.1 (en-us)"; on the website "iPhone, iOS 26.1, Cydian Web (en-us)".
+// The Home footer: "iPhone17,3, iOS 26.1, iFizBox 0.1.1 (en-us)"; on the website "iPhone, iOS 26.1, iFizBox Web (en-us)".
 export function footLine({ machine = "", ios = "", version = "", web = false } = {}, lang = globalThis.navigator?.language ?? "en") {
-  const app = web ? `Cydian Web${version ? ` ${version}` : ""}` : version ? `Cydian ${version}` : "Cydian Web";
+  const app = web ? `${NAME} Web${version ? ` ${version}` : ""}` : version ? `${NAME} ${version}` : `${NAME} Web`;
   return [machine || "iPhone", ios ? `iOS ${ios}` : "", app].filter(Boolean).join(", ") + ` (${String(lang).toLowerCase()})`;
 }
 
@@ -606,16 +607,16 @@ export function footLine({ machine = "", ios = "", version = "", web = false } =
 // way to tweaks there; the website and the jailbreak app keep the Device hint.
 export function helpJailbreakFooter(mode = "site") {
   if (mode === "sideload") {
-    return "On a phone without a jailbreak Cydian lists apps from AltStore-style sources, signed and installed on "
-      + "the phone. Tweaks and themes need a jailbroken iPhone and Cydian's jailbreak app.";
+    return `On a phone without a jailbreak ${NAME} lists apps from AltStore-style sources, signed and installed on `
+      + `the phone. Tweaks and themes need a jailbroken iPhone and ${NAME}'s jailbreak app.`;
   }
-  return "On a phone without a jailbreak Cydian lists apps from AltStore-style sources, installed with a "
+  return `On a phone without a jailbreak ${NAME} lists apps from AltStore-style sources, installed with a `
     + "sideloader. Set Settings > Device to Jailbroken to list tweaks and themes built for rootless "
     + "(iphoneos-arm64), rootful (iphoneos-arm) or roothide (iphoneos-arm64e) jailbreaks. A package built for "
     + "another kind will not install.";
 }
 
-// Our own help page: what Cydian lists, for which jailbreaks, and how upgrades reach the phone.
+// Our own help page: what iFizBox lists, for which jailbreaks, and how upgrades reach the phone.
 function renderHelp(body) {
   body.append(wrap(grouped([
     {
@@ -647,7 +648,7 @@ function renderHelp(body) {
 
 // Who Special Thanks thanks: [name, handle, their page, GitHub account for the picture, what for].
 const THANKS = [
-  ["Jay Freeman", "@saurik", "https://x.com/saurik", "saurik", "For Cydia, whose look and GPLv3 source Cydian follows."],
+  ["Jay Freeman", "@saurik", "https://x.com/saurik", "saurik", `For Cydia, whose look and GPLv3 source ${NAME} follows.`],
   ["Teehan+Lax", "@teehanlax", "https://x.com/teehanlax", "teehanlax", "For the iOS 6 GUI kit."],
   ["Riley Testut", "@rileytestut", "https://x.com/rileytestut", "rileytestut", "For AltStore and its source format."],
   ["Procursus", "GitHub", "https://github.com/ProcursusTeam", "ProcursusTeam", "For the bootstrap today's jailbreaks run on."],
@@ -656,12 +657,12 @@ const THANKS = [
   ["Calif", "@calif_io", "https://x.com/calif_io", "califio", "For the iOS 27.0.1 exploit."],
 ];
 
-// Credits / Thank You (Cydia's credits.html: who it thanks), with what Cydian is and its version.
+// Credits / Thank You (Cydia's credits.html: who it thanks), with what iFizBox is and its version.
 function renderCredits(body) {
-  const rows = [{ label: "Version", detail: "Cydian Web" }, { label: "License", detail: "GPL-3.0+" },
+  const rows = [{ label: "Version", detail: `${NAME} Web` }, { label: "License", detail: "GPL-3.0+" },
     { label: "Source Code", detail: "GitHub", chevron: true, onClick: () => window.open(REPO_URL, "_blank", "noopener") }];
   body.append(wrap(grouped([
-    { header: "Cydian", rows, footer: "A package manager with the iOS 6 look, for modern iPhones, by Ryan Hayden (Fizlo)." },
+    { header: NAME, rows, footer: "A package manager with the iOS 6 look, for modern iPhones, by Ryan Hayden (Fizlo)." },
     {
       header: "Special Thanks",
       rows: THANKS.map(([label, handle, url, gh, why]) => ({
@@ -669,7 +670,7 @@ function renderCredits(body) {
         icon: { text: label.charAt(0), color: "#7a8a99", src: `https://github.com/${gh}.png?size=128` },
         onClick: () => window.open(url, "_blank", "noopener"),
       })),
-      footer: "Cydian is not affiliated with SaurikIT or any of the above.",
+      footer: `${NAME} is not affiliated with SaurikIT or any of the above.`,
     },
     { // F126: Cydia's artwork we use, with its licence
       header: "Artwork",
@@ -842,14 +843,14 @@ export function render(el, route, ctx) {
   }
 }
 
-// I7: Cydian's .deb for a jailbroken visitor's arch: the latest release's asset for it (GitHub's API, which answers
+// I7: iFizBox's .deb for a jailbroken visitor's arch: the latest release's asset for it (GitHub's API, which answers
 // browsers), else the rootless Cydian.deb. Safari downloads it to Files, where Sileo or Filza installs it.
-// "Jailbroken? Get Cydian.deb": Cydian's own APT repo (tools/release.sh: a flat repo beside each release's assets)
-// added in Sileo or Zebra, which then keep Cydian updated; or the URL to paste elsewhere; or the .deb itself.
+// "Jailbroken? Get Cydian.deb": iFizBox's own APT repo (tools/release.sh: a flat repo beside each release's assets)
+// added in Sileo or Zebra, which then keep iFizBox updated; or the URL to paste elsewhere; or the .deb itself.
 // B17: cydian.dev/repo/ (the Worker serves the release assets itself): GitHub's latest/download redirect ends at a
 // signed URL too long for Zebra's cache file name.
 export const CYDIAN_APT_REPO = "https://cydian.dev/repo/";
-export const JAILBROKEN_SHEET = { title: "Install Cydian with your jailbreak's package manager: it keeps Cydian updated.",
+export const JAILBROKEN_SHEET = { title: `Install ${NAME} with your jailbreak's package manager: it keeps ${NAME} updated.`,
   buttons: ["Add to Sileo", "Add to Zebra", "Copy Repo URL", "Download .deb"] };
 const CYDIAN_PACKAGE = "com.ryha.cydian";
 export const repoLinks = (repo = CYDIAN_APT_REPO, id = CYDIAN_PACKAGE) => ({
@@ -858,14 +859,14 @@ export const repoLinks = (repo = CYDIAN_APT_REPO, id = CYDIAN_PACKAGE) => ({
   sileoPackage: `sileo://package/${id}`, zebraPackage: `zbra://packages/${id}` });
 
 // Sileo and Zebra can't add a repo and open a package in one link: after Add to Sileo/Zebra, coming back here asks
-// to open Cydian's page there (the alert's tap opens it, as Safari requires), so Get is one tap away (user 2026-11-18).
+// to open iFizBox's page there (the alert's tap opens it, as Safari requires), so Get is one tap away (user 2026-11-18).
 function offerPackageOnReturn(name, link) {
   let away = false;
   const onVis = async () => {
     if (document.visibilityState === "hidden") { away = true; return; }
     if (!away) return;
     document.removeEventListener("visibilitychange", onVis);
-    await showAlert({ title: `Open Cydian in ${name}?`, message: `Cydian's repo is in ${name} now. Its page there has Get.`,
+    await showAlert({ title: `Open ${NAME} in ${name}?`, message: `${NAME}'s repo is in ${name} now. Its page there has Get.`,
       buttons: ["Not Now", `Open in ${name}`], cancel: 0, colors: { 1: "green" },
       onTap: (i) => { if (i === 1) location.href = link; } });
   };

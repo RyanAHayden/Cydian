@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cydian's iOS SDK setup on Linux: pull iPhoneOS.sdk out of an Xcode .xip and make it linkable with lld.
+# iFizBox's iOS SDK setup on Linux: pull iPhoneOS.sdk out of an Xcode .xip and make it linkable with lld.
 #
 #   tools/ios-sdk.sh Xcode_27.1.xip [DEST]   extract the SDK to DEST and fix its .tbd stubs
 #   tools/ios-sdk.sh fix-tbd SDK             fix the .tbd stubs of an SDK that is already extracted

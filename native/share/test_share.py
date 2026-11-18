@@ -1,4 +1,4 @@
-"""N9: the share sheet and Open in Cydian.
+"""N9: the share sheet and Open in iFizBox.
 
 - SwiftShare: native/share/tests/main.swift, built on Linux with Share.swift, ../intents/Core.swift,
   ../sign/Updates.swift and ../sign/Hash.swift (F133's SHA256), classifies shared links, text and files (repo, AltStore source, ipa, deb, unknown) and runs
@@ -73,6 +73,7 @@ class SwiftShare(unittest.TestCase):
         r = subprocess.run([SWIFTC, "-module-cache-path", os.path.join(cls.tmp, "modules"),
                             os.path.join(HERE, "Share.swift"), os.path.join(NATIVE, "intents", "Core.swift"),
                             os.path.join(NATIVE, "sign", "Updates.swift"), os.path.join(NATIVE, "sign", "Hash.swift"),
+                            os.path.join(NATIVE, "sign", "Brand.swift"),
                             os.path.join(HERE, "tests", "main.swift"),
                             "-o", binary], capture_output=True, text=True, env=env, timeout=600)
         cls.build_error = None if r.returncode == 0 else (r.stdout + r.stderr)[-4000:]

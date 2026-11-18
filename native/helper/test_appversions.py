@@ -104,7 +104,7 @@ class AppVersions(unittest.TestCase):
         ])
 
     def test_chain(self):
-        """The whole chain: stand-in Cydian spawns the helper, which prints the tree's apps and exits 0."""
+        """The whole chain: stand-in app spawns the helper, which prints the tree's apps and exits 0."""
         p = tempfile.mkdtemp(dir=self.tmp)
         os.makedirs(os.path.join(p, "Applications/Cydian.app"))
         cydian = os.path.join(p, "Applications/Cydian.app/Cydian")

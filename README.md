@@ -1,6 +1,7 @@
-# Cydian
+# iFizBox
 
-A package manager with the iOS 6 Cydia look, for modern iPhones.
+A package manager with the iOS 6 Cydia look, for modern iPhones. Inspired by Cydia by Jay Freeman (saurik); not
+affiliated with Cydia or SaurikIT (Cydia is SaurikIT's trademark).
 
 - **Web**: browse APT repos and AltStore sources, add sources, check for upgrades. Public, no login.
 - **Jailbreak app**: installs `.deb`s through a root helper, with background upgrade checks.
@@ -33,14 +34,14 @@ cydian.dev is a single Cloudflare Worker, with no server of our own:
 
 Deploys: Cloudflare builds every push to `main` itself (Workers Builds, connected to this repo; deploy command
 `tools/buildinfo.sh && cd worker && npx wrangler deploy -c wrangler.ifizbox.toml`). By hand, from a clean checkout:
-the same command (needs `npx wrangler login` on the ifizbox.com Cloudflare account once). Anyone can run their own copy for free and point Cydian at it:
+the same command (needs `npx wrangler login` on the ifizbox.com Cloudflare account once). Anyone can run their own copy for free and point iFizBox at it:
 `worker/README.md` (a Deploy to Cloudflare button).
 
 Signing happens on the user's own device: in the app on the iPhone, or on the website in the browser (F93: zsign as
-WebAssembly, `web/app/vendor/zsign`). No server signs anything; Cydian Account (`docs/account.md`) only keeps an
+WebAssembly, `web/app/vendor/zsign`). No server signs anything; iFizBox Account (`docs/account.md`) only keeps an
 end-to-end encrypted copy of the certificate for sync.
 
 ## License
 
-GPL-3.0-or-later (see `LICENSE`). Anyone who distributes Cydian or a modified version has to release the
+GPL-3.0-or-later (see `LICENSE`). Anyone who distributes iFizBox or a modified version has to release the
 source under the same license.

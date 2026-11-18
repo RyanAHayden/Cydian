@@ -1,5 +1,5 @@
 // "Open in" (F8): a grouped section on a source's page and a package's page with one row per package manager that
-// takes that format (core/handoff.js builds the links), and a QR code of Cydian's /add link for adding the source
+// takes that format (core/handoff.js builds the links), and a QR code of iFizBox's /add link for adding the source
 // from another device. Since F76 only an APT package's page keeps the group; a source's page and an app's page
 // have Share in the nav bar instead (shareItems below). In the jailbreak app the real install queue takes this
 // place (N4).
@@ -11,6 +11,7 @@ import { settings } from "./settings.js";
 import { showShareSheet, setShare } from "../nav/sharesheet.js";
 import { showHUD } from "../nav/hud.js";
 import { appIcon, loadAppIcons } from "../app-icons.js";
+import { NAME } from "../brand.js";
 
 // pkg: an id for a package's page; leave it out on a source's page.
 // Only the visitor's format: APT managers run on jailbroken iPhones, so a phone set to Not Jailbroken (Settings >
@@ -56,7 +57,7 @@ function showAddQR(link) {
   img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   const note = document.createElement("p");
   note.className = "group-footer";
-  note.textContent = "Scan it with the other phone's Camera: Cydian opens with Add Source filled in.";
+  note.textContent = `Scan it with the other phone's Camera: ${NAME} opens with Add Source filled in.`;
   const url = document.createElement("p");
   url.className = "group-footer handoff-link";
   url.textContent = link;
@@ -69,7 +70,7 @@ function showAddQR(link) {
 // The iOS 6 share sheet (nav/sharesheet.js) takes the Open In group's place there: Copy Link (the source's URL), Add
 // on Another Device (the QR code of the /add link), then the apps that take the source (core/handoff.js
 // sourceLinks), under the same rule as openInGroup: APT managers only for a phone set to Jailbroken. An app's page
-// lists them too: they add its source to that app (Cydian's own Install stays the way to install it here).
+// lists them too: they add its source to that app (iFizBox's own Install stays the way to install it here).
 
 // Each app's tile: its real icon once app-icons.js has fetched it, until then (and for apps without one) its initial on
 // a colour close to its icon's.

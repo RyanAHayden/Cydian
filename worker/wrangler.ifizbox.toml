@@ -13,7 +13,7 @@ routes = [
 ]
 
 [vars]
-HOST_IDS = "*.cydian"   # bundle IDs /sign/host keeps: any ending in .cydian (each team's own Cydian ID)
+HOST_IDS = "*.cydian"   # bundle IDs /sign/host keeps: any ending in .cydian (each team's own iFizBox ID)
 TTL = "600"              # seconds a hosted update (or a website-signed app) stays
 MAX_UPLOAD_MB = "512"    # largest IPA the website signs in the browser (/api/fetch?kind=ipa, /sign/upload); "0": none
 

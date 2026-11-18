@@ -1,36 +1,37 @@
-// Cydian's own built-in source and Cydia's Essential Upgrade (F72). Pure JS: everything that touches the network,
+// iFizBox's own built-in source and Cydia's Essential Upgrade (F72). Pure JS: everything that touches the network,
 // the bridge, storage or the screen comes in through `deps`, so node tests drive every path (essential.test.js);
 // essential-ui.js binds the real ones.
 //
 // The built-in source, like Cydia's apt.saurik.com: always in the list, first, with a lock instead of Delete; Manage
 // can't remove it and Export skips it. Which one, by build (builtinSources):
-//   jailbreak   Cydian's flat APT repo, https://cydian.dev/repo/ (Packages, Release and the .debs are assets of
+//   jailbreak   iFizBox's flat APT repo, https://cydian.dev/repo/ (Packages, Release and the .debs are assets of
 //               every release, tools/release.sh and tools/selfrepo.py; the Worker serves the latest one's, B17)
-//   sideload    Cydian's AltStore source, web/app/source.json on GitHub (tools/altsource.py)
+//   sideload    iFizBox's AltStore source, web/app/source.json on GitHub (tools/altsource.py)
 //   site        the same AltStore source (the site only installs IPAs)
 // withBuiltins wraps a backend's source calls: sources() puts the built-in first (a seed record until it is read),
 // removeSource refuses it, and refreshSources adds it back (apt's sources in the app) if it went missing.
 //
-// The Essential Upgrade alert, Cydia's (docs/cydia.md ESSENTIAL_UPGRADE) in Cydian's words: on launch, when Cydian
+// The Essential Upgrade alert, Cydia's (docs/cydia.md ESSENTIAL_UPGRADE) in iFizBox's words: on launch, when iFizBox
 // itself (or, in the jailbreak build, apt, dpkg or anything installed with Essential: yes) has an upgrade:
 //   Complete Upgrade      every upgrade in Changes
-//   Essential Only        just the essential ones (sideload: Cydian itself, signed on the phone)
+//   Essential Only        just the essential ones (sideload: iFizBox itself, signed on the phone)
 //   Ignore (Temporary)    asks again on the next launch
-// Cydian's own source may name a minimum version (AltStore "minimumVersion", APT X-Cydian-Minimum-Version): a
-// running Cydian older than that gets the alert without Ignore, and nothing else is usable until it upgrades.
-// For IPAs only Cydian itself (com.ryha.cydian from its own source) is ever essential.
+// iFizBox's own source may name a minimum version (AltStore "minimumVersion", APT X-Cydian-Minimum-Version): a
+// running iFizBox older than that gets the alert without Ignore, and nothing else is usable until it upgrades.
+// For IPAs only iFizBox itself (com.ryha.cydian from its own source) is ever essential.
 import { compareVersions, isNewer, parseVersion } from "./selfupdate.js";
 import { altKey, seedRecord } from "./altstore.js";
+import { NAME } from "../brand.js";
 
 export const SELF_ID = "com.ryha.cydian";
-const SELF_NAME = "Cydian";
+const SELF_NAME = NAME;
 export const SELF_APT_URI = "https://cydian.dev/repo/";
 export const SELF_ALT_URL = "https://raw.githubusercontent.com/RyanAHayden/Cydian/main/web/app/source.json";
 export const SELF_SITE = "https://cydian.dev/";
-// The .debs that are essential whatever their control says (Cydian's helper is in Cydian's own package).
+// The .debs that are essential whatever their control says (iFizBox's helper is in iFizBox's own package).
 const ESSENTIAL_IDS = [SELF_ID, "apt", "dpkg"];
 export const MIN_FIELD = "x-cydian-minimum-version"; // the Release field, lower-cased as core/apt.js keeps them
-const LOCKED_TEXT = "Cydian's own source is built in and can't be removed.";
+const LOCKED_TEXT = `${NAME}'s own source is built in and can't be removed.`;
 export const STORE_KEY = "cydian.essential";
 
 // core/sources.js sourceKey, repeated here so this file doesn't import sources.js (which imports altstore.js).
@@ -62,7 +63,7 @@ export function withBuiltinRecords(list, builtins = []) {
 // After any reorder (Manage's order, sort by name): the built-in ones go back to the top.
 export const builtinFirst = (list) => [...(list ?? []).filter(isBuiltin), ...(list ?? []).filter((s) => !isBuiltin(s))];
 
-// Export (Manage > Import & Export) leaves the built-in out: every Cydian has it already.
+// Export (Manage > Import & Export) leaves the built-in out: every iFizBox has it already.
 export const exportable = (list) => (list ?? []).filter((s) => !isBuiltin(s));
 
 export class BuiltinError extends Error {
@@ -125,14 +126,14 @@ export function minimumOf(x) {
   return raw == null ? null : cleanVersion(raw);
 }
 
-// True when the running Cydian is older than the minimum. An unknown version (the site) is never below it.
+// True when the running iFizBox is older than the minimum. An unknown version (the site) is never below it.
 export function belowMinimum(current, minimum) {
   if (!minimum || !parseVersion(minimum) || !parseVersion(current)) return false;
   return compareVersions(current, minimum) < 0;
 }
 
-// Cydian's AltStore source (text or parsed JSON) -> { version, ipa, date, notes, minimum, size } for the newest
-// Cydian it lists, or null when it lists none.
+// iFizBox's AltStore source (text or parsed JSON) -> { version, ipa, date, notes, minimum, size } for the newest
+// iFizBox it lists, or null when it lists none.
 export function selfFromAltSource(input) {
   let json = input;
   if (typeof input === "string") {
@@ -164,7 +165,7 @@ export function essentialIds(statusRows) {
 // The essential ones among the available upgrades (Changes' rows).
 export const essentialUpgrades = (available, ids = new Set(ESSENTIAL_IDS)) => (available ?? []).filter((r) => r && ids.has(r.id));
 
-// Cydian's own upgrade as a Changes row (sideload and site: no dpkg to compare with), or null when `info` (from
+// iFizBox's own upgrade as a Changes row (sideload and site: no dpkg to compare with), or null when `info` (from
 // selfFromAltSource) isn't newer than `current`. `key`: the built-in source, so the row opens its package page.
 export function selfUpgradeRow(info, current, key = altKey(SELF_ALT_URL)) {
   if (!info?.version || !current || !isNewer(info.version, current)) return null;
@@ -174,7 +175,7 @@ export function selfUpgradeRow(info, current, key = altKey(SELF_ALT_URL)) {
   };
 }
 
-// Changes' upgrades with Cydian's own row on top (once).
+// Changes' upgrades with iFizBox's own row on top (once).
 export function withSelfUpgrade(upgrades, row) {
   const available = upgrades?.available ?? [];
   const ignored = upgrades?.ignored ?? [];
@@ -182,7 +183,7 @@ export function withSelfUpgrade(upgrades, row) {
   return { available: [row, ...available], ignored };
 }
 
-// ---- what was last read from the source (sideload: Changes shows Cydian's row from it) ------------------------
+// ---- what was last read from the source (sideload: Changes shows iFizBox's row from it) ------------------------
 
 export function loadInfo(storage) {
   try {
@@ -198,7 +199,7 @@ export function saveInfo(storage, info, now = Date.now()) {
 // ---- the alert -----------------------------------------------------------------------------------------------
 
 export const TITLE = "Essential Upgrade";
-export const MESSAGE = "Cydian needs to upgrade itself before it can do anything else.";
+export const MESSAGE = `${NAME} needs to upgrade itself before it can do anything else.`;
 export const COMPLETE = "Complete Upgrade";
 export const ESSENTIAL_ONLY = "Essential Only";
 export const IGNORE = "Ignore (Temporary)";
@@ -206,7 +207,7 @@ export const IGNORE = "Ignore (Temporary)";
 // forced (below the minimum): no Ignore, and Escape does nothing.
 export function essentialAlert({ forced = false, minimum = null } = {}) {
   if (forced) {
-    return { title: TITLE, message: `${MESSAGE}\n\nThis Cydian is older than ${minimum}, the oldest one that still works with its source.`,
+    return { title: TITLE, message: `${MESSAGE}\n\nThis ${NAME} is older than ${minimum}, the oldest one that still works with its source.`,
       buttons: [COMPLETE, ESSENTIAL_ONLY], cancel: -1 };
   }
   return { title: TITLE, message: MESSAGE, buttons: [COMPLETE, ESSENTIAL_ONLY, IGNORE], cancel: 2 };
@@ -246,19 +247,19 @@ export async function runEssential(deps) {
   return ask();
 }
 
-// ---- Cydian's own IPA (sideload) -----------------------------------------------------------------------------
+// ---- iFizBox's own IPA (sideload) -----------------------------------------------------------------------------
 // The sideload app signs its own update on the phone and hosts it on the Signing Server (essential-ui.js
 // installSelfNow, signing.install host: true). Only without that (no bridge, no IPA) does this answer: the user
-// opens cydian.dev's Install Cydian App in Safari, which hands Cydian's source to AltStore, SideStore or Feather (F89:
+// opens cydian.dev's Install iFizBox App in Safari, which hands iFizBox's source to AltStore, SideStore or Feather (F89:
 // the website signs nothing).
 
 // row: { version, ipa } (selfUpgradeRow). deps: { alert(spec) -> { index }, open(url) }   open: outside the app.
 // Resolves "site" | "cancelled" | "no-asset".
 export async function installSelf(row, deps) {
   const { alert, open } = deps;
-  const v = row?.version ? `Cydian ${row.version}` : "Cydian";
+  const v = row?.version ? `${NAME} ${row.version}` : NAME;
   if (!row?.ipa) {
-    await alert({ title: "Can't Install", message: `${v} has no Cydian.ipa in Cydian's source.`, buttons: ["OK"] });
+    await alert({ title: "Can't Install", message: `${v} has no Cydian.ipa in ${NAME}'s source.`, buttons: ["OK"] });
     return "no-asset";
   }
   const { index } = await alert({ title: `Install ${v}`,
@@ -270,7 +271,7 @@ export async function installSelf(row, deps) {
 }
 
 // F86: Complete Upgrade and Essential Only queue like Cydia's: the rows go in the install queue (the jailbreak
-// build's apt queue, the sideload build's app queue, Cydian last there since installing it closes the app) and
+// build's apt queue, the sideload build's app queue, iFizBox last there since installing it closes the app) and
 // Confirm opens over them; the button's answer waits for Confirm. deps: {
 //   queue(rows) -> how many were queued (async allowed); queuing opens Confirm (screens/queue.js)
 //   confirmed() -> "confirm" | "cancel" | "closed"        how the Confirm sheet went away (whenConfirmEnds)

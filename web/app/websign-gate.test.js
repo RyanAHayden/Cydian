@@ -1,4 +1,4 @@
-// F96: the website pushes Cydian first. The first-visit prompt's state, the install rows per app (Cydian vs others,
+// F96: the website pushes iFizBox first. The first-visit prompt's state, the install rows per app (iFizBox vs others,
 // website installs accepted or not), the warning whose I Understand counts down 5 seconds (nav/alert.js countdown),
 // and the cydian://package link the app opens at that app's page (incoming.js).
 import { test, mock } from "node:test";
@@ -24,7 +24,7 @@ const SITE = { site: true, jailbreak: false, custom: false };
 
 // ---- first visit -----------------------------------------------------------------------------------------------
 
-test("first visit: asks on the website until Not Now or Cydian is installed; never in the app", () => {
+test("first visit: asks on the website until Not Now or iFizBox is installed; never in the app", () => {
   const s = memory();
   assert.equal(firstVisitState(s), "ask");
   assert.equal(shouldAskFirst({ mode: "site", storage: s }), true);
@@ -42,7 +42,7 @@ test("first visit: asks on the website until Not Now or Cydian is installed; nev
   assert.equal(firstVisitState(null), "ask", "no storage: asks (this page only)");
 });
 
-test("first-visit prompt: Not Now is remembered; Install Cydian runs Home's flow and keeps asking until it installs", async () => {
+test("first-visit prompt: Not Now is remembered; Install iFizBox runs Home's flow and keeps asking until it installs", async () => {
   const s = memory();
   const shown = [];
   const alert = (index) => async (o) => { shown.push(o); return { index }; };
@@ -50,7 +50,7 @@ test("first-visit prompt: Not Now is remembered; Install Cydian runs Home's flow
   assert.equal(await promptFirstVisit({ mode: "site", storage: s, alert: alert(1), install: async () => { installs++; }, once: false }), "install");
   assert.equal(installs, 1);
   assert.deepEqual(shown[0].buttons, FIRST_VISIT.buttons);
-  assert.equal(shown[0].title, "Install Cydian First");
+  assert.equal(shown[0].title, "Install iFizBox First");
   assert.equal(firstVisitState(s), "ask", "not installed yet: asks again next launch");
   assert.equal(await promptFirstVisit({ mode: "site", storage: s, alert: alert(0), install: async () => { installs++; }, once: false }), "later");
   assert.equal(installs, 1);
@@ -74,19 +74,19 @@ function rowsFor(version, storage, log, { alertIndex = 1 } = {}) {
 }
 const newLog = () => ({ opened: [], alerts: [], installs: 0, downloads: [] });
 
-test("Cydian always installs from the website: Install and Download IPA, no gate", () => {
+test("iFizBox always installs from the website: Install and Download IPA, no gate", () => {
   const log = newLog();
   const r = rowsFor(CYDIAN, memory(), log);
   assert.deepEqual(labels(r.rows), ["Install", "Download IPA"]);
   assert.equal(r.gated, undefined);
 });
 
-test("other apps, not accepted: Install in Cydian, Download IPA, then Install on the Website greyed out", async () => {
+test("other apps, not accepted: Install in iFizBox, Download IPA, then Install on the Website greyed out", async () => {
   const s = memory();
   const log = newLog();
   const { rows, gated } = rowsFor(OTHER, s, log, { alertIndex: 0 });
   assert.equal(gated, true);
-  assert.deepEqual(labels(rows), ["Install in Cydian", "Download IPA", "Install on the Website"]);
+  assert.deepEqual(labels(rows), ["Install in iFizBox", "Download IPA", "Install on the Website"]);
   assert.equal(rows[2].cls, "websign-off");
   assert.equal(rows[2].subtitle, WEBSITE_OFF_SUBTITLE);
   rows[0].onClick();
@@ -124,7 +124,7 @@ test("acceptWebsiteInstalls: true at once when on; the countdown alert otherwise
   assert.equal(await acceptWebsiteInstalls({ storage: memory(), alert: async () => ({ index: 0 }) }), false);
 });
 
-test("Install in Cydian without an id from the caller takes it from the page's hash", () => {
+test("Install in iFizBox without an id from the caller takes it from the page's hash", () => {
   assert.equal(idFromHash("#/sources/https%3A%2F%2Fa.example%2Fapps.json/package:com.a.b"), "com.a.b");
   assert.equal(idFromHash("#/search/package:com.a.b/versions:com.a.b"), "com.a.b");
   assert.equal(idFromHash("#/home"), null);
@@ -215,7 +215,7 @@ test("the warning can be cancelled during the countdown", async () => {
   }
 });
 
-test("the website stays locked after Cydian is installed from it; only Browse Anyway unlocks", async () => {
+test("the website stays locked after iFizBox is installed from it; only Browse Anyway unlocks", async () => {
   const { browsingLocked } = await import("./websign-gate.js");
   const s = memory();
   assert.equal(browsingLocked({ storage: s }), true);

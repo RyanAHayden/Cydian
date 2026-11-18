@@ -1,5 +1,5 @@
 // Handoff to a real package manager (F8): the "Open in" links on a source's page and a package's page, one per app
-// that takes that source's format, and Cydian's own /add?url= link (plus its QR code) for adding from another
+// that takes that source's format, and iFizBox's own /add?url= link (plus its QR code) for adding from another
 // device. Pure JS, no DOM. Every scheme here was checked in that app's own source (journal/2026-11-17-f8-handoff):
 //
 //   sourceLinks(source)        -> [{ app, url }]  APT ({ uri, dist, components }) or AltStore ({ key: "alt:…" })
@@ -135,7 +135,7 @@ export function packageLinks(id, source) {
   ];
 }
 
-// Cydian's own link: opens Cydian with Add Source's alert filled in. The site's origin where Cydian runs on the
+// iFizBox's own link: opens iFizBox with Add Source's alert filled in. The site's origin where iFizBox runs on the
 // web; the app (file:// or its own scheme) links to the public site.
 export const PUBLIC_SITE = "https://cydian.dev";
 export function siteOrigin(location) {

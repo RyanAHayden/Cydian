@@ -96,8 +96,8 @@ test("packageKind: tweaks by their hooking library or section, apps by section o
 });
 
 test("chooseFinish: Return by default; Restart SpringBoard for a tweak; Reload Data for an app; the highest wins", () => {
-  assert.deepEqual(chooseFinish({}), { level: "return", label: "Return to Cydian", uicache: false });
-  assert.deepEqual(chooseFinish({ kinds: ["package"] }), { level: "return", label: "Return to Cydian", uicache: false });
+  assert.deepEqual(chooseFinish({}), { level: "return", label: "Return to iFizBox", uicache: false });
+  assert.deepEqual(chooseFinish({ kinds: ["package"] }), { level: "return", label: "Return to iFizBox", uicache: false });
   assert.deepEqual(chooseFinish({ kinds: ["tweak"] }), { level: "restart", label: "Restart SpringBoard", uicache: false });
   assert.deepEqual(chooseFinish({ kinds: ["app"] }), { level: "uicache", label: "Reload Data", uicache: false });
   // an app and a tweak in one run: Restart SpringBoard, the icon cache rebuilt first
@@ -110,7 +110,7 @@ test("chooseFinish: the maintainer scripts' finish: lines, as Cydia reads them",
   assert.equal(chooseFinish({ levels: levels(["finish:uicache"]) }).label, "Reload Data");
   assert.equal(chooseFinish({ levels: levels(["finish:reboot", "finish:restart"]), kinds: ["tweak"] }).label, "Reboot Device");
   assert.equal(chooseFinish({ levels: levels(["finish:reload"]) }).label, "Reload SpringBoard");
-  assert.equal(chooseFinish({ levels: levels(["finish:reopen"]) }).label, "Close Cydian");
+  assert.equal(chooseFinish({ levels: levels(["finish:reopen"]) }).label, "Close iFizBox");
   assert.equal(chooseFinish({ levels: ["uicache", "restart"] }).uicache, true);
   assert.equal(chooseFinish({ levels: ["reboot"], kinds: ["app"] }).uicache, true);
   assert.equal(finishOf("uicache", "return"), "uicache");

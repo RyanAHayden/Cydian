@@ -1,4 +1,4 @@
-// F97: Cydian Account's storage. One encrypted blob per account in KV (HOSTED, keys "acct:<hash>"). The device
+// F97: iFizBox Account's storage. One encrypted blob per account in KV (HOSTED, keys "acct:<hash>"). The device
 // encrypts everything with its account key before sending (web/app/core/account.js), so this only ever sees
 // ciphertext, and never the key: the path's id is derived from the key with HKDF, and KV's key is the SHA-256 of
 // that id, so even a dump of KV doesn't give the URLs.

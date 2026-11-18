@@ -1,6 +1,6 @@
-// I3: the sideload build's background update check. The page hands over the apps Cydian remembers (each with the
+// I3: the sideload build's background update check. The page hands over the apps iFizBox remembers (each with the
 // version Install recorded and the AltStore source it came from) and the updates it already shows; a
-// BGAppRefreshTask then fetches those sources now and then while Cydian isn't open, and when one offers an app a
+// BGAppRefreshTask then fetches those sources now and then while iFizBox isn't open, and when one offers an app a
 // newer version than remembered, beyond the ones already counted or notified, posts "n Updates" (a tap opens
 // Changes) and sets the icon badge. The rules are native/sign/Updates.swift (tested on Linux, native/test_updates.py).
 //
@@ -9,7 +9,7 @@
 // iOS decides when the task runs (how often the app is used, battery, Low Power Mode): earliestBeginDate is only
 // "not before". It never runs in the jailbreak build (N5's daemon checks apt there), and only registers where the
 // Info.plist permits its identifier: register(forTaskWithIdentifier:) traps on one that isn't listed.
-// Notification permission is asked once the page follows an app other than Cydian itself (an Install was recorded),
+// Notification permission is asked once the page follows an app other than iFizBox itself (an Install was recorded),
 // or by app.badge's first count (Notifications.swift); in the background iOS can't ask, so until then the check only
 // updates what it knows and sets nothing.
 // SPDX-License-Identifier: GPL-3.0-or-later

@@ -1,6 +1,6 @@
 // The sideload build's signing identity (I6): the user's .p12 goes into the iOS Keychain (this device only, never
 // synced or backed up) and is used there. F73: the imported .p12 file and its password are also kept, as one Keychain
-// generic-password item (this device only), so signing.export can hand them to Cydian Account's certificate sync
+// generic-password item (this device only), so signing.export can hand them to iFizBox Account's certificate sync
 // (screens/account.js); signing.remove deletes it with the identity. The profile is a plain file in
 // Application Support (it holds no secret). docs/signing.md, "On the phone (I6)".
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -109,7 +109,7 @@ enum SignStore {
     }
 
     // The kept .p12 and password, when they belong to the identity in use; nil when there is none (no certificate,
-    // or one imported before F73: the user imports it again for Cydian to update itself through the Signing Server).
+    // or one imported before F73: the user imports it again for iFizBox to update itself through the Signing Server).
     static func exportP12() -> (p12: Data, password: String)? {
         guard let want = UserDefaults.standard.string(forKey: certKey) else { return nil }
         var q = p12Query

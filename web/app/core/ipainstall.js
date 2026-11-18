@@ -11,6 +11,7 @@
 //   IPA_FOOTER, NO_ADHOC_HELP  the words the screens show
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
+import { NAME } from "../brand.js";
 
 export function ipaUrl(text) {
   let s = String(text ?? "").trim();
@@ -56,7 +57,7 @@ export function ipaStatus(line) {
 export const NO_ADHOC_HELP = [
   "This jailbreak can't install an app that isn't signed for this iPhone on its own. Any one of these fixes it:",
   "• Install AppSync Unified (from its repo, cydia.akemi.ai), then install the IPA again.",
-  "• Or install ldid (Procursus and most jailbreaks' default repos have it): Cydian then signs the app ad hoc before installing it.",
+  `• Or install ldid (Procursus and most jailbreaks' default repos have it): ${NAME} then signs the app ad hoc before installing it.`,
   "• Or sign the IPA for this iPhone first (with your own certificate or a sideloader) and install that copy.",
 ];
 
@@ -89,13 +90,13 @@ export function ipaError(err, name = "") {
       message = `${said ? `${said}\n\n` : ""}${NO_ADHOC_HELP.join("\n")}`;
       lines = NO_ADHOC_HELP;
       break;
-    case "bad_url": message = `Cydian installs IPAs from http or https links. ${said}`.trim(); break;
+    case "bad_url": message = `${NAME} installs IPAs from http or https links. ${said}`.trim(); break;
     case "not_found": message = `The server doesn't have ${app}'s IPA (${said}). The link may be old: try the source again later.`; break;
     case "timeout": message = `The download of ${app} took too long. Check the connection and try again.`; break;
-    case "network": message = `Cydian couldn't download ${app}: ${said || "no connection"}.`; break;
+    case "network": message = `${NAME} couldn't download ${app}: ${said || "no connection"}.`; break;
     case "bad_ipa": message = `What the link gave isn't an iOS app (${said}).`; break;
-    case "helper": message = `Cydian's helper couldn't run (${said}). Reinstall Cydian from your package manager.`; break;
-    case "sideload": message = "Installing IPAs this way needs the jailbreak build of Cydian."; break;
+    case "helper": message = `${NAME}'s helper couldn't run (${said}). Reinstall ${NAME} from your package manager.`; break;
+    case "sideload": message = `Installing IPAs this way needs the jailbreak build of ${NAME}.`; break;
     default: message = `iOS didn't install ${app}${said ? `: ${said}` : "."}`;
   }
   return { code, title: TITLES[code], message, detail: said, lines };

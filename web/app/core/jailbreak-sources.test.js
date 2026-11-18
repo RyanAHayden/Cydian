@@ -10,6 +10,7 @@ import { withAltSources, altKey, JAILBREAK_SOURCE_TITLE, JAILBREAK_SOURCE_MESSAG
 import { recommendedRows } from "./sourcelist.js";
 import { RECOMMENDED_SOURCES } from "./recommended.js";
 import { siteJailbroken } from "../backend.js";
+import { NAME } from "../brand.js";
 
 const ALT = "https://example.dev/apps.json";
 const ALT_JSON = JSON.stringify({ name: "Example Apps", identifier: "dev.example", apps: [
@@ -97,7 +98,8 @@ test("F144: the refusal is one short alert that says jailbreak source, with no h
   // The share extension refuses an APT manager's link with the same words (native/share/Share.swift).
   const swift = readFileSync(new URL("../../../native/share/Share.swift", import.meta.url), "utf8");
   assert.ok(swift.includes(`title: "${JAILBREAK_SOURCE_TITLE}"`), "Share.swift's title");
-  assert.ok(swift.includes(`message: "${JAILBREAK_SOURCE_MESSAGE}"`), "Share.swift's message");
+  // F170: Swift spells the name as Brand.name (native/sign/Brand.swift), the JS as NAME (brand.js).
+  assert.ok(swift.includes(`message: "${JAILBREAK_SOURCE_MESSAGE.replaceAll(NAME, "\\(Brand.name)")}"`), "Share.swift's message");
 });
 
 test("F144 sideload: Add refuses an APT repo (a URL, a dist repo, a cydia:// link) and still adds an app source", async () => {

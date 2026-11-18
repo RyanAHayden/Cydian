@@ -119,7 +119,7 @@ class Release(unittest.TestCase):
             self.assertEqual(gzip.decompress(f.read()).decode(), packages)
         with open(os.path.join(out, "Release")) as f:
             release = f.read()
-        self.assertIn("Origin: Cydian\n", release)
+        self.assertIn("Origin: iFizBox\n", release)
         self.assertIn("Architectures: iphoneos-arm64\n", release)
         self.assertIn("X-Cydian-Minimum-Version: %s\n" % VERSION, release)
         self.assertIn(" %s %d Packages\n" % (hashlib.sha256(packages.encode()).hexdigest(), len(packages)), release)

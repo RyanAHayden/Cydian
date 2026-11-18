@@ -13,10 +13,10 @@
 //                                           Options, Sign Now, Save Signed IPA, details, Delete
 //   #/installed/myipas/ipa:<file>/options   Sign Options: name, bundle ID, icon, extensions, arm64e fix-up
 //
-// In the sideload app the files live in Cydian's Documents (Files > On My iPhone > Cydian) and the shell signs them
+// In the sideload app the files live in iFizBox's Documents (Files > On My iPhone > iFizBox) and the shell signs them
 // (signing-client.js libraryCall, native/Sources/MyIPAs.swift). On the website there is no signer on the phone:
 // Add is From URL only, the list is links kept on this device, and Install is an app page's (F95, user 2026-11-18: no
-// Open in Cydian / Get in AltStore / SideStore / Feather): it signs in the browser (F93), and until that lands it says
+// Open in iFizBox / Get in AltStore / SideStore / Feather): it signs in the browser (F93), and until that lands it says
 // the certificate is needed, with Download IPA (altstore.js siteCertificateAlert).
 // Rules and labels: core/myipas.js.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -37,6 +37,7 @@ import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optio
   STATE_LABELS } from "../core/myipas.js";
 import { localSigning, libraryCall, installFromLibrary } from "../signing-client.js";
 import { siteCertificateAlert } from "./altstore.js";
+import { NAME } from "../brand.js";
 
 export { MYIPAS };
 
@@ -188,8 +189,8 @@ function draw(list) {
 
 export function libraryEmptyText(site) {
   return site
-    ? "No IPAs yet. Tap Add to keep a link to an IPA here: Install opens it in Cydian, AltStore, SideStore or Feather."
-    : "No IPAs yet. Tap Add to choose one in Files or download one, or put IPAs in Files under On My iPhone > Cydian.";
+    ? `No IPAs yet. Tap Add to keep a link to an IPA here: Install opens it in ${NAME}, AltStore, SideStore or Feather.`
+    : `No IPAs yet. Tap Add to choose one in Files or download one, or put IPAs in Files under On My iPhone > ${NAME}.`;
 }
 
 // ---- F79: Browse, the apps of the user's AltStore sources ------------------------------------------------------
@@ -363,7 +364,7 @@ async function pickFiles() {
 async function addFromUrl() {
   const { index, value } = await showAlert({
     title: "Enter IPA URL",
-    message: site() ? "A link to an .ipa, kept on this iPhone. Install opens it in a sideloader." : "A link to an .ipa: Cydian downloads it into My IPAs.",
+    message: site() ? "A link to an .ipa, kept on this iPhone. Install opens it in a sideloader." : `A link to an .ipa: ${NAME} downloads it into My IPAs.`,
     input: { placeholder: "https://", value: "https://", type: "url", paste: cleanSourceUrl },
     buttons: ["Cancel", "Add"],
     cancel: 0,
@@ -454,7 +455,7 @@ async function renderIpa(body, route, file) {
   if (site()) {
     body.append(grouped([
       { header: "Link", rows: [{ label: entry.url, chevron: false }],
-        footer: "Install opens this link in Cydian, AltStore, SideStore or Feather, which sign it on the iPhone, or downloads the IPA." },
+        footer: `Install opens this link in ${NAME}, AltStore, SideStore or Feather, which sign it on the iPhone, or downloads the IPA.` },
       { rows: [{ label: "Delete", onClick: () => confirmDelete(entry) }] },
     ]));
     markDelete(body);
@@ -646,7 +647,7 @@ async function renderOptions(body, route, file) {
       iconState.textContent = "Chosen";
       choose.textContent = "Reset";
     } catch {
-      await showAlert({ title: "Can't Use This Image", message: "Cydian couldn't read it. Choose a PNG or JPEG.", buttons: ["OK"] });
+      await showAlert({ title: "Can't Use This Image", message: `${NAME} couldn't read it. Choose a PNG or JPEG.`, buttons: ["OK"] });
     }
   });
   iconLi.append(iconRow, fileInput, choose);
@@ -711,5 +712,5 @@ async function saveOptions(file) {
 
 export { STATE_LABELS };
 
-// N9: an IPA shared with Cydian (share.js): Install, as the IPA page's button does (signs, installs, remembers it).
+// N9: an IPA shared with iFizBox (share.js): Install, as the IPA page's button does (signs, installs, remembers it).
 export const installLibraryFile = (file) => install(file);

@@ -40,7 +40,7 @@ enum MachO {
         return le == magic64 || le == magic32 || be == fatMagic
     }
 
-    // Signs a thin or fat Mach-O. A fat file keeps its 64-bit slices only (Cydian's sideload build targets
+    // Signs a thin or fat Mach-O. A fat file keeps its 64-bit slices only (iFizBox's sideload build targets
     // iOS 15+, where 32-bit code can't run) and each is signed with the same parameters.
     static func sign(_ file: Data, _ p: CodeSignParams, _ id: SigningIdentity?, time: Date = Date()) throws -> Data {
         let b = [UInt8](file.prefix(8))

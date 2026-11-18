@@ -60,7 +60,7 @@ test("F79: Home links to Install IPAs, except in the jailbreak app", async () =>
   assert.equal(ipasTile("jailbreak"), null);
 });
 
-test("Jailbroken? Get Cydian.deb: Cydian's APT repo in Sileo and Zebra", async () => {
+test("Jailbroken? Get Cydian.deb: iFizBox's APT repo in Sileo and Zebra", async () => {
   const { repoLinks, CYDIAN_APT_REPO, JAILBROKEN_SHEET } = await import("./home.js");
   assert.equal(CYDIAN_APT_REPO, "https://cydian.dev/repo/");
   assert.deepEqual(repoLinks("https://r/"), { sileo: "sileo://source/https://r/", zebra: "zbra://sources/add/https://r/",

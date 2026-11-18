@@ -1,5 +1,5 @@
 // F83: other sideloaders' links reaching incoming.js: a source opens Sources > Manage's Add filled in, an IPA opens
-// Install IPAs and asks, and with Open Other Apps' Links off (or a link only that app understands) Cydian opens it
+// Install IPAs and asks, and with Open Other Apps' Links off (or a link only that app understands) iFizBox opens it
 // again, and says the link was for another app when nothing else answers or it comes straight back.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -62,7 +62,7 @@ test("off: nothing else answers -> the alert names the app and the switch", asyn
   assert.match(log.alerts[0].message, /Open Other Apps' Links/);
 });
 
-test("off: the same link coming straight back (iOS picked Cydian) is not opened a second time", async () => {
+test("off: the same link coming straight back (iOS picked iFizBox) is not opened a second time", async () => {
   const { d, log, clock } = deps({ on: false, opened: true, t: 100_000 });
   const link = `scarlet://repo=${SRC}`;
   await handleIncoming(link, d);
@@ -70,7 +70,7 @@ test("off: the same link coming straight back (iOS picked Cydian) is not opened 
   await handleIncoming(link, d);
   assert.equal(log.opens.length, 1);
   assert.equal(log.alerts.length, 1);
-  assert.match(log.alerts[0].message, /iOS sent it to Cydian/);
+  assert.match(log.alerts[0].message, /iOS sent it to iFizBox/);
 });
 
 test("on, but a link only that app understands: handed back too", async () => {

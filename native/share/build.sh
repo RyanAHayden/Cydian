@@ -11,7 +11,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 native=$(dirname "$here")
 [ $# -eq 2 ] || { sed -n '2,8p' "$0" >&2; exit 2; }
 variant=$1 app=$2
-: "${SWIFTC:?}" "${SDK:?}" "${RD:?}" "${LLD:?}" "${OUT:?}" "${VERSION:?}" "${BUILD:?}"
+: "${SWIFTC:?}" "${SDK:?}" "${RD:?}" "${LLD:?}" "${OUT:?}" "${VERSION:?}" "${BUILD:?}" "${BRAND_NAME:?}"
 case $variant in jailbreak|sideload) ;; *) echo "share/build.sh: jailbreak or sideload, not $variant" >&2; exit 2 ;; esac
 min=15.0 target=arm64-apple-ios15.0
 obj=$OUT/share
@@ -19,11 +19,12 @@ appex=$app/PlugIns/CydianShare.appex
 mkdir -p "$obj" "$appex"
 
 # Built once per build dir: the extension is the same for both variants.
-if [ ! -f "$obj/CydianShare" ] || [ "$here/Extension/ShareViewController.swift" -nt "$obj/CydianShare" ]; then
+if [ ! -f "$obj/CydianShare" ] || [ "$here/Extension/ShareViewController.swift" -nt "$obj/CydianShare" ] ||
+   [ "$native/sign/Brand.swift" -nt "$obj/CydianShare" ]; then
   "$SWIFTC" -parse-as-library -O -wmo -swift-version 5 -runtime-compatibility-version none -application-extension \
     -target "$target" -sdk "$SDK" -resource-dir "$RD" -I "$RD/shims" -module-cache-path "$OUT/modules" \
     -Xcc -Wno-nullability-completeness -Xcc -Wno-nullability-inferred-on-nested-type \
-    -module-name CydianShare -c "$here/Extension/ShareViewController.swift" -o "$obj/CydianShare.o"
+    -module-name CydianShare -c "$here/Extension/ShareViewController.swift" "$native/sign/Brand.swift" -o "$obj/CydianShare.o"
   clang -target "$target" -isysroot "$SDK" -O2 -c "$native/Sources/availability.c" -o "$obj/availability.o"
   # An NSExtensionPrincipalClass extension starts in Foundation's NSExtensionMain, as Xcode links it.
   clang -target "$target" -isysroot "$SDK" -fuse-ld=lld --ld-path="$LLD" -fapplication-extension "$obj/CydianShare.o" \
@@ -31,7 +32,7 @@ if [ ! -f "$obj/CydianShare" ] || [ "$here/Extension/ShareViewController.swift" 
     -Wl,-e,_NSExtensionMain -framework Foundation -o "$obj/CydianShare"
 fi
 cp "$obj/CydianShare" "$appex/CydianShare"
-sed -e "s/@VERSION@/$VERSION/" -e "s/@BUILD@/$BUILD/" -e "s/@MIN@/$min/" "$here/Info.plist" > "$appex/Info.plist"
+sed -e "s/@VERSION@/$VERSION/" -e "s/@BUILD@/$BUILD/" -e "s/@MIN@/$min/" -e "s/\$(BRAND_NAME)/$BRAND_NAME/g" "$here/Info.plist" > "$appex/Info.plist"
 
 ents=$here/entitlements.plist
 [ "$variant" = jailbreak ] || ents=$here/entitlements-sideload.plist

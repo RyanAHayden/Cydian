@@ -6,8 +6,8 @@
 //   GET  /sign/manifest?bundleid=&version=&title=&port=&path=
 //                                           the itms-services manifest for an IPA the phone serves itself at
 //                                           http://127.0.0.1:<port>/<path> (iOS wants HTTPS only for the manifest)
-//   POST /sign/host?bundleid=&version=&title=   body: an IPA the phone signed (Cydian's own update: iOS closes
-//                                           Cydian, and its local server, while installing over it) -> {itms, ...};
+//   POST /sign/host?bundleid=&version=&title=   body: an IPA the phone signed (iFizBox's own update: iOS closes
+//                                           iFizBox, and its local server, while installing over it) -> {itms, ...};
 //                                           kept TTL seconds in KV, then gone
 //   GET  /sign/host/<token>/manifest.plist, /sign/host/<token>/app.ipa   what that itms link fetches
 //
@@ -21,13 +21,13 @@
 //                                           its own query (bundleid, version, title), else once the reservation lands
 //                                           (up to 15 s); app.ipa holds up to 2 minutes: headers once the upload has
 //                                           started, the body once it's done. The same POST with token and size starts it
-//   GET/PUT/DELETE /api/account/<id>       F97: Cydian Account's encrypted blob (src/account.js)
+//   GET/PUT/DELETE /api/account/<id>       F97: iFizBox Account's encrypted blob (src/account.js)
 //   GET  /api/fetch?url=&kind=ipa           F93: an IPA for the website's signer, streamed, up to MAX_UPLOAD_MB
 //   GET  /api/applookup?bundleId=&country=  F161: Apple's iTunes Search API lookup of one app by bundle ID (the
 //                                           app page's App Store details), its first result only; cached a day
 //   GET  /api/ipainfo?url=<IPA URL>          F160: MinimumOSVersion, UIDeviceFamily, bundle ID and version from the IPA's
 //                                           own Info.plist, read with Range requests (src/ipainfo.js); cached 30 days
-//   GET  /repo/<file>                       B17: Cydian's own flat APT repo (Release, Packages, Packages.gz, *.deb),
+//   GET  /repo/<file>                       B17: iFizBox's own flat APT repo (Release, Packages, Packages.gz, *.deb),
 //                                           the latest release's asset fetched here, redirects followed here
 //
 // Settings (wrangler.toml [vars]): HOST_IDS, the bundle IDs /sign/host takes ("*.cydian" = any ending in .cydian);
@@ -36,6 +36,7 @@
 
 import { account, isAccountPath } from "./account.js";
 import { readIpaInfo, IpaError } from "./ipainfo.js";
+import { NAME } from "../../web/app/brand.js";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
@@ -88,7 +89,7 @@ export function httpUrl(raw) {
 // not every time. Everything else (sources, Packages) is fetched fresh.
 export const releaseFile = (url) => /^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/download\/[^/]+\/[^/]+$/.test(String(url));
 // GitHub limits requests per address, and Workers share theirs with other sites: a 429 (or a 5xx) is tried again
-// after a short wait, up to 3 times (user 2026-11-18: "upstream answered HTTP 429" installing Cydian).
+// after a short wait, up to 3 times (user 2026-11-18: "upstream answered HTTP 429" installing iFizBox).
 // A GitHub release file: { owner, repo, tag (null for latest), file }, or null.
 export function githubRelease(url) {
   const m = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/releases\/(?:download\/([^/]+)|latest\/download)\/([^/?#]+)$/.exec(String(url));
@@ -131,7 +132,7 @@ export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promis
   return r;
 }
 
-// ---- /repo/: Cydian's own APT repo (B17) -----------------------------------------------------------------------
+// ---- /repo/: iFizBox's own APT repo (B17) -----------------------------------------------------------------------
 // The repo's files are assets of every GitHub release (tools/release.sh, tools/selfrepo.py), and
 // github.com/<repo>/releases/latest/download/<file> redirects to release-assets.githubusercontent.com/...?sig=&jwt=,
 // a URL Zebra 1.1.36 names its cache file after: too long, "the file name is invalid", the source shows red. Here
@@ -151,7 +152,7 @@ export function repoFile(pathname) {
 export async function repo(req, u, env = {}, { fetcher = fetch, wait } = {}) {
   if (u.pathname === "/repo" || u.pathname === "/repo/") {
     if (u.pathname === "/repo") return Response.redirect(`${u.origin}/repo/`, 301);
-    return new Response("Cydian's own APT repo: add this address in Cydian, Sileo or Zebra.\n", { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=300" } });
+    return new Response(`${NAME}'s own APT repo: add this address in ${NAME}, Sileo or Zebra.\n`, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=300" } });
   }
   const f = repoFile(u.pathname);
   if (!f || !["GET", "HEAD"].includes(req.method)) return new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
@@ -453,7 +454,7 @@ export default {
   async fetch(req, env) {
     const u = new URL(req.url);
     const ttl = Math.max(60, Number(env.TTL) || 600);
-    if (isAccountPath(u.pathname)) return account(req, env); // F97: Cydian Account (src/account.js)
+    if (isAccountPath(u.pathname)) return account(req, env); // F97: iFizBox Account (src/account.js)
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null);
@@ -474,7 +475,7 @@ export default {
     if (u.pathname === "/sign/host" && req.method === "POST") {
       const app = appOf(u.searchParams);
       if (!app) return fail("bad_request", "Send bundleid, version and title in the query.");
-      if (!allowed(app.bundleId, env.HOST_IDS)) return fail("not_allowed", "This server hosts only Cydian's own signed app.", 403);
+      if (!allowed(app.bundleId, env.HOST_IDS)) return fail("not_allowed", `This server hosts only ${NAME}'s own signed app.`, 403);
       const size = Number(req.headers.get("Content-Length") || 0);
       if (!size || size > MAX_IPA) return fail("too_large", "Send the signed IPA as the body (up to 25 MB).", 413);
       const body = await req.arrayBuffer();
@@ -512,6 +513,6 @@ export default {
     // keeps an old file). /add?url=… and other app routes fall back to index.html (single-page application).
     // Only /sign and /sign/... are the server's: /signing-client.js and /signing-worker.js are the website's files.
     if (env.ASSETS && !/^\/sign(\/|$)/.test(u.pathname)) return env.ASSETS.fetch(req);
-    return fail("not_found", "Nothing here. This is Cydian's install server (github.com/RyanAHayden/Cydian).", 404);
+    return fail("not_found", `Nothing here. This is ${NAME}'s install server (github.com/RyanAHayden/Cydian).`, 404);
   },
 };

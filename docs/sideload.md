@@ -1,12 +1,12 @@
 # Sideload: signing and installing IPAs on the phone
 
 R5, 2026-11-17. How Feather signs and installs IPAs with nothing but the phone, how jailbreak installers do it,
-and what Cydian takes from each. The user's rule (2026-11-17): Cydian is its own project. It never routes through
+and what iFizBox takes from each. The user's rule (2026-11-17): iFizBox is its own project. It never routes through
 sidedrop, and there is **no server of ours** in the install path.
 
 This is desk research. I read the source and ran nothing on a phone. Sources, read at these commits:
 
-| Project | Commit | Licence | Can Cydian (GPL-3.0-or-later) take code? |
+| Project | Commit | Licence | Can iFizBox (GPL-3.0-or-later) take code? |
 |---|---|---|---|
 | [Feather](https://github.com/khcrysalis/Feather) (incl. its `NimbleKit/`, `AltSourceKit/`) | `31ab6de`, 2026-11-01 | GPL-3.0 | Yes, keep the file headers and credit |
 | [Zsign-Package](https://github.com/khcrysalis/Zsign-Package) (`package` branch: zsign + Swift wrapper) | `c4ba9da`, 2026-09-19 | MIT | Yes |
@@ -32,14 +32,14 @@ That is AltStore/SideStore's job, and it needs Apple's servers plus an anisette 
 
 - `Feather/Utilities/Handlers/CertificateFileHandler.swift`: parse the profile, copy both files to
   `Documents/Feather/Certificates/<uuid>/`, then add a Core Data row (password, nickname, expiry, `PPQCheck`).
-  **The p12 password is kept in Core Data, not the Keychain.** Cydian should keep it in the Keychain.
+  **The p12 password is kept in Core Data, not the Keychain.** iFizBox should keep it in the Keychain.
 - `Feather/Utilities/CertificateReader/CertificateReader.swift` reads the profile cheaply: find `<?xml` in the
   CMS blob and decode the plist from there. It does not verify the CMS signature. Enough to show the name,
   team, expiry, entitlements, `ProvisionedDevices`, `ProvisionsAllDevices` and `PPQCheck`.
 - `FR.checkPasswordForCertificate` uses zsign's `p12_password_check` to test the password before saving.
 - Ways in: the Files picker, `.p12`/`.mobileprovision` document types, and
   `feather://import-certificate?p12=<b64>&mobileprovision=<b64>&password=<b64>`. `feather://export-certificate?callback_template=…`
-  hands the p12 and password to another app (LiveContainer uses it). Cydian should **not** copy the export
+  hands the p12 and password to another app (LiveContainer uses it). iFizBox should **not** copy the export
   route. Any app that opens that URL gets the user's private key after one tap.
 - Revocation: `Storage+Certificate.swift` → `Zsign.checkRevokage` → `checkCert` in `swift/zsign.mm`. It reads
   the OCSP URL from the cert's AIA extension and asks Apple's OCSP responder. That is an internet call, but only
@@ -57,7 +57,7 @@ That is AltStore/SideStore's job, and it needs Apple's servers plus an anisette 
    and so on. It always drops `UISupportedDevices`.
 3. **Cleanup**: remove `_CodeSignature` everywhere, `embedded.mobileprovision` ("zsign doesn't replace it"),
    `com.apple.WatchPlaceholder`, `SignedByEsign`, and Watch apps with no Info.plist.
-4. Optional dylib injection (`TweakHandler`, can unpack `.deb` tweaks, bundles ElleKit). Cydian doesn't need it.
+4. Optional dylib injection (`TweakHandler`, can unpack `.deb` tweaks, bundles ElleKit). iFizBox doesn't need it.
 5. **arm64e fix-up** (`_locateMachosAndFixupArm64eSlice`): rewrites old-ABI arm64e slices so iOS 26 accepts them.
    This is mostly for CydiaSubstrate. Keep it: an IPA from an AltStore source may carry one.
 6. **Entitlements**. By default zsign takes the profile's `Entitlements` dict as-is
@@ -110,12 +110,12 @@ published** at `https://backloop.dev/pack.json` (`cert`, `ca`, `key1` + `key2`, 
   `https://<commonName>:<port>/<uuid>.plist`, opened with `UIApplication.shared.open`.
 - Feather puts the `commonName` straight into the URL host. Today that is the literal `*.backloop.dev`. It
   resolves (a `*` label matches the wildcard record; checked here: `*.backloop.dev` → `127.0.0.1`), but a
-  concrete label like `local.backloop.dev` is cleaner and certainly matches the wildcard cert. Cydian should use
+  concrete label like `local.backloop.dev` is cleaner and certainly matches the wildcard cert. iFizBox should use
   one.
 - **Checked today (2026-11-17): the live pack's cert has `notAfter 2026-10-29`. It expired 19 days ago.**
   Every Feather install that fetched it, and every build made since, fails Fully Local until backloop.dev
   rotates it. This is how the scheme works: a CA must revoke a cert whose key is public, so the pack is short-lived
-  and someone has to keep reissuing it. **Cydian must never publish such a key itself.** That would break CA
+  and someone has to keep reissuing it. **iFizBox must never publish such a key itself.** That would break CA
   rules. It can use backloop.dev's pack, and it must check `notAfter` before it offers this mode.
 - The phone (its `installd`/`appstored`, not our app) then connects to `127.0.0.1:<port>` for the manifest,
   images and IPA.
@@ -137,7 +137,7 @@ checks (below). The IPA never leaves the phone.
   It closes the sheet once the payload starts.
 
 What touches the internet: **api.palera.in sees the app's bundle ID, name, version and the phone's LAN IP**,
-on every install. The IPA stays on the phone. "No server of ours" holds, but it's a third party. Cydian must
+on every install. The IPA stays on the phone. "No server of ours" holds, but it's a third party. iFizBox must
 say so in the UI.
 
 #### Both server modes: keeping the server alive, progress, self-update
@@ -152,7 +152,7 @@ say so in the UI.
   `docs/ipa.md`'s blanket "`LSApplicationWorkspace` is blocked for third-party apps": some calls do work for
   sideloaded apps. Listing all installed apps is still not shown to work.
 - Feather won't install **itself** through the server ("use an alternative tool to update it"), because the
-  install kills the process that serves the IPA. Cydian has the same limit: it can't update itself in sideload
+  install kills the process that serves the IPA. iFizBox has the same limit: it can't update itself in sideload
   mode by itself.
 
 #### idevice: no server, no TLS, no internet
@@ -169,7 +169,7 @@ library. The app talks to the phone's own lockdownd as if it were a computer on 
 - Internet: none. The pairing file is the risk. It's a full lockdown credential for the phone, so keep it like
   a key.
 - Cost: IDeviceKit pulls `IDevice.xcframework` as a binary download from idevice's GitHub release. Build it from
-  source for Cydian, to keep GPL corresponding-source simple.
+  source for iFizBox, to keep GPL corresponding-source simple.
 
 ### 4. What Apple still checks, whatever the mode
 
@@ -184,7 +184,7 @@ This is iOS behaviour, not Feather's. It is from Apple's docs and common knowled
 
 ## How jailbreak installers do it (N9's jailbreak route)
 
-On a jailbreak, Cydian's root helper (N2) can install an IPA directly. There's no itms-services and no server.
+On a jailbreak, iFizBox's root helper (N2) can install an IPA directly. There's no itms-services and no server.
 
 - **AppSync Unified** (`AppSyncUnified-installd/AppSyncUnified-installd.x`): a Substrate tweak in installd that
   hooks `MISValidateSignatureAndCopyInfo` (`…WithProgress` since iOS 14) and returns success, so installd takes
@@ -202,18 +202,18 @@ On a jailbreak, Cydian's root helper (N2) can install an IPA directly. There's n
   `[MCMAppContainer containerWithIdentifier:createIfNecessary:YES …]`, copies the `.app` in, fixes permissions,
   and registers it with LaunchServices (`registerPath`, in `uicache.m`). On stock iOS (14.0-16.6.1, 16.7 RC, 17.0)
   it signs with the **CoreTrust bug** (`apply_coretrust_bypass`, from ChOma), so apps run with any entitlements and
-  never expire. Those versions aren't Cydian's iOS 26/27 target.
+  never expire. Those versions aren't iFizBox's iOS 26/27 target.
 - **TrollStore Lite** (`TrollStoreLite/`, `#ifdef TROLLSTORE_LITE`): the same installer for jailbroken phones.
   No CoreTrust bypass: it ad hoc-signs with **ldid** (`signAdhoc`, `Depends: ldid`) and relies on the jailbreak
-  to run ad hoc code. It only refuses FairPlay-encrypted main binaries. This is the closest model for Cydian's
+  to run ad hoc code. It only refuses FairPlay-encrypted main binaries. This is the closest model for iFizBox's
   jailbreak mode: helper + ldid + `installApplication`, falling back to MCM + register.
 - **Hand-off**: TrollStore and TrollStore Lite take `apple-magnifier://install?url=<IPA URL>` when the user turns
-  the URL scheme on. Cydian can offer "Install with TrollStore" when `canOpenURL` says it's there (that needs
+  the URL scheme on. iFizBox can offer "Install with TrollStore" when `canOpenURL` says it's there (that needs
   `apple-magnifier` in `LSApplicationQueriesSchemes`).
 - **Licence trap**: don't copy TrollStore's `uicache.m` (BSD-4-Clause). Use the jailbreak's own `uicache -p <path>`
   (uikittools, a dependency) or write our own `registerApplicationDictionary:` call.
 
-## What Cydian reuses
+## What iFizBox reuses
 
 | Piece | Take from | How |
 |---|---|---|
@@ -259,18 +259,18 @@ Tests N9 can run on Linux: classify the profile (wildcard/explicit, device count
 `.mobileprovision` plists, the bundle-ID rewrite on a fixture `.app` tree, the manifest plist and the double-encoded
 genPlist URL, and the pack-expiry check.
 
-## What I2 needs (Cydian itself as a sideload IPA)
+## What I2 needs (iFizBox itself as a sideload IPA)
 
 - I2's text says "signed through sidedrop's ad hoc profile". **Overruled the same way.** Build the IPA unsigned,
   then `codesign -s -`/`ldid -S` ad hoc, as Feather's `Makefile` does (`CODE_SIGNING_ALLOWED=NO`, then copy
   `.app` → `Payload/`, zip). The user signs and installs it with whatever they already use (Feather, SideStore,
-  AltStore, a computer). Once installed, Cydian signs other IPAs itself.
+  AltStore, a computer). Once installed, iFizBox signs other IPAs itself.
 - Entitlements for the sideload build: `get-task-allow` only, like Feather. No App Groups or push (wildcard
   profiles can't have them; see `docs/ipa.md`).
 - Info.plist for the sideload build: `UIBackgroundModes: [audio]` (install keep-alive, alongside I3's
   `fetch`/`processing` for BGAppRefreshTask), `CFBundleDocumentTypes` for `.ipa` (`com.apple.itunes.ipa`),
   `.p12`, `.mobileprovision`, a URL scheme (`cydian://`), and `apple-magnifier` in `LSApplicationQueriesSchemes`.
-- If Cydian bundles a backloop pack at build time, that's an internet fetch in the build. Better: fetch it at
+- If iFizBox bundles a backloop pack at build time, that's an internet fetch in the build. Better: fetch it at
   first use and keep it in `Documents/`.
 - Self-update: as with Feather, the server route can't update the running app. Say so, and point to the user's
   original tool (or the idevice route once it exists).
@@ -282,7 +282,7 @@ Everything below comes from reading code, not from a phone. There is no phone in
 - That itms-services on current iOS (26) still accepts a `127.0.0.1` manifest over HTTPS, a plain-HTTP
   payload URL, and the literal `*.backloop.dev` hostname. Feather ships all three, which suggests they work. Not
   tested.
-- Whether a user-installed, fully trusted root CA would let Cydian make its own cert for a local manifest
+- Whether a user-installed, fully trusted root CA would let iFizBox make its own cert for a local manifest
   (that would remove backloop.dev). Not checked. It also needs the user to install a profile, which is heavy UX.
   Answered later (F75, 2026-11-17): it doesn't. I6 built it; Safari reached the HTTPS server with that certificate
   fine, but iOS's installer ignored the hand-trusted root and every install failed. Removed; the app takes the

@@ -8,16 +8,16 @@
 // as it was: dpkg's status file is what's installed there (I4 reads real app versions).
 //
 // F87: the jailbreak app does count the remembered apps now, at the version on the phone: rememberedApps() runs the
-// records through backend.installedApps (I4, backend-native.js withRealVersions), so an app updated outside Cydian
+// records through backend.installedApps (I4, backend-native.js withRealVersions), so an app updated outside iFizBox
 // is compared at its real version, and one no longer installed (`actual` null) is left out. dpkg's rows win where
 // both list an id. Where the real versions can't be read (an older helper) the remembered ones stand, as in the
 // sideload app. The Installed tab's Apps page and the app page show the record's `note` (screens/installed.js,
 // screens/browse.js).
 //
-// The sideload app then hands its shell what to follow while Cydian isn't open (BackgroundCheck.swift):
+// The sideload app then hands its shell what to follow while iFizBox isn't open (BackgroundCheck.swift):
 //   updates.watch { apps: [{ id, name, version, source }], known: ["<id> <version>"] } -> { scheduled }
 // `known` are the upgrades already counted on screen: the background check only notifies about ones beyond them.
-// Cydian itself is followed through its own source (essential.js SELF_ALT_URL). Sent again only when it changes.
+// iFizBox itself is followed through its own source (essential.js SELF_ALT_URL). Sent again only when it changes.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { catalog } from "./catalog.js";
 import { getBackend } from "./backend.js";
@@ -25,6 +25,7 @@ import { apps } from "./core/installed.js";
 import { detectMode } from "./core/settings.js";
 import { SELF_ALT_URL } from "./core/essential.js";
 import { rememberedUpgrades, mergeUpgrades, watchList, upgradeKeys, SELF_ID } from "./core/appupdates.js";
+import { NAME } from "./brand.js";
 
 let lastSent = null;
 
@@ -38,11 +39,11 @@ async function candidates(records, lookup = (id) => catalog.package(id)) {
   return out;
 }
 
-// What the shell follows: the watch list, plus Cydian itself at the version it runs.
+// What the shell follows: the watch list, plus iFizBox itself at the version it runs.
 export function shellWatch(records, available) {
   const list = watchList(records);
   const me = (records ?? []).find((r) => r?.self && r.id === SELF_ID && r.version);
-  if (me) list.unshift({ id: SELF_ID, name: "Cydian", version: String(me.version), source: SELF_ALT_URL });
+  if (me) list.unshift({ id: SELF_ID, name: NAME, version: String(me.version), source: SELF_ALT_URL });
   return { apps: list, known: upgradeKeys(available) };
 }
 

@@ -4,9 +4,9 @@ uicache -p /var/jb/Applications/Cydian.app || true
 # N5: start the daily upgrade check (unload first so an upgrade picks up a changed job).
 launchctl unload /var/jb/Library/LaunchDaemons/com.ryha.cydian.upgrades.plist 2>/dev/null || true
 launchctl load /var/jb/Library/LaunchDaemons/com.ryha.cydian.upgrades.plist || true
-# B17: Cydian's own source moved from GitHub's releases/latest/download/ (whose redirect Zebra can't follow) to
+# B17: iFizBox's own source moved from GitHub's releases/latest/download/ (whose redirect Zebra can't follow) to
 # cydian.dev/repo/, which serves the same files. Rewrite the old address in cydian.sources (the app's file, F33), or
-# drop its stanza when the new one is already there, so apt doesn't list Cydian twice. Plain sh (dash): the phone has
+# drop its stanza when the new one is already there, so apt doesn't list iFizBox twice. Plain sh (dash): the phone has
 # no awk. Stanzas are split by blank lines (deb822); every other stanza is copied as it is.
 src=/var/jb/etc/apt/sources.list.d/cydian.sources
 old=https://github.com/RyanAHayden/Cydian/releases/latest/download/

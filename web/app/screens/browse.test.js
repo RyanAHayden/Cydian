@@ -47,9 +47,9 @@ test("sizes, letter headers and proxied depiction HTML", () => {
 });
 
 test("F87: the jailbreak app page's Installed App group: the phone's version, and I4's note where it differs", () => {
-  assert.deepEqual(installedAppSection({ id: "d", version: "1.6", actual: "1.6", note: "Installed: 1.6 (Cydian remembered 1.5)" }),
-    { header: "Installed App", rows: [{ label: "Version", detail: "1.6" }], footer: "Installed: 1.6 (Cydian remembered 1.5)" });
-  assert.deepEqual(installedAppSection({ id: "g", version: "2.0", actual: null, note: "Not installed (Cydian remembered 2.0)" }).rows,
+  assert.deepEqual(installedAppSection({ id: "d", version: "1.6", actual: "1.6", note: "Installed: 1.6 (iFizBox remembered 1.5)" }),
+    { header: "Installed App", rows: [{ label: "Version", detail: "1.6" }], footer: "Installed: 1.6 (iFizBox remembered 1.5)" });
+  assert.deepEqual(installedAppSection({ id: "g", version: "2.0", actual: null, note: "Not installed (iFizBox remembered 2.0)" }).rows,
     [{ label: "Version", detail: "Not Installed" }]);
   assert.equal(installedAppSection({ id: "u", version: "4.5.2", actual: "4.5.2", note: null }).footer, null);
   assert.equal(installedAppSection({ id: "o", version: "1.0" }).rows[0].detail, "1.0"); // real versions unreadable: the remembered one

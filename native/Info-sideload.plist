@@ -6,7 +6,7 @@
 	<key>UIBackgroundModes</key><array><string>audio</string><string>fetch</string></array>
 	<!-- I3: the background update check (BackgroundCheck.swift), a BGAppRefreshTask. -->
 	<key>BGTaskSchedulerPermittedIdentifiers</key><array><string>com.ryha.cydian.updates</string></array>
-	<!-- F77: Documents (My IPAs) shows in Files under On My iPhone > Cydian; IPAs dropped there are listed. -->
+	<!-- F77: Documents (My IPAs) shows in Files under On My iPhone > iFizBox; IPAs dropped there are listed. -->
 	<key>UIFileSharingEnabled</key><true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key><true/>
 	<key>CFBundleDocumentTypes</key><array>
@@ -41,7 +41,7 @@
 			<key>CFBundleURLName</key><string>com.ryha.cydian</string>
 			<key>CFBundleURLSchemes</key><array><string>cydian</string></array>
 		</dict>
-		<!-- F83: other sideloaders' links, turned into Cydian's own (web/app/core/otherlinks.js; App.swift OtherLink holds
+		<!-- F83: other sideloaders' links, turned into iFizBox's own (web/app/core/otherlinks.js; App.swift OtherLink holds
 		     the same list). iOS gives a scheme to one app when several claim it. -->
 		<dict>
 			<key>CFBundleURLName</key><string>com.ryha.cydian.other</string>

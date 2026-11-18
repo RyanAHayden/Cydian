@@ -1,4 +1,4 @@
-"""B17: the .deb's postinst moves Cydian's own source in cydian.sources from GitHub's releases/latest/download/ to
+"""B17: the .deb's postinst moves iFizBox's own source in cydian.sources from GitHub's releases/latest/download/ to
 cydian.dev/repo/ (or drops the old stanza when the new one is there). The postinst runs under the phone's dash, which
 has no awk: this runs its sources block with sh (dash where installed) against copies of the file."""
 import os

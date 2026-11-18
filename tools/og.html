@@ -1,20 +1,22 @@
 <!doctype html>
-<!-- The cydian.dev link-preview card (web/app/icons/og.png): the app itself (a live iframe) on the white iPhone 4S
+<!-- The site's link-preview card (web/app/icons/og.png): the app itself (a live iframe) on the white iPhone 4S
      from the Teehan+Lax iOS 5 kit (ref/, not committed; ios5 img-hd/11.png, screen at 128,529 of its 1518x2974 bitmap) with its screen
-     glare, the icon and name on Cydian's pinstripes on the left. Render from the repo root:
+     glare, the icon and name (web/app/brand.js) on the app's pinstripes on the left. Render from the repo root, with a server
+     that also answers / and paths outside the repo from web/app/ (index.html's deep-path script sends the iframe to /;
+     F170 used a 10-line http.server subclass for that):
      python3 -m http.server 8000 & chromium --headless --hide-scrollbars --force-device-scale-factor=2 --window-size=1200,630 \
        --virtual-time-budget=4000 --user-agent="Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148" \
        --screenshot=og.png http://localhost:8000/tools/og.html && magick og.png -strip web/app/icons/og.png -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Cydian card</title>
+<title>Link card</title>
 <link rel="stylesheet" href="../web/app/ios6.css">
 <style>
   html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
   body {
     display: flex; align-items: center; font-family: "Helvetica Neue", Helvetica, sans-serif;
-    /* Cydian's pinstripes at 2.5x their width, so they survive a chat app shrinking the card to a thumbnail */
+    /* iFizBox's pinstripes at 2.5x their width, so they survive a chat app shrinking the card to a thumbnail */
     background: repeating-linear-gradient(90deg, #c4cad6 0 6px, var(--pin-light) 6px 20px) var(--pin-light);
   }
   .side { flex: 1; padding: 0 30px 0 86px; color: var(--head); text-shadow: var(--emboss); }
@@ -29,7 +31,7 @@
   .screen iframe { display: block; width: 320px; height: 460px; border: 0; }
   .glare { position: absolute; inset: 0; z-index: 1; display: block; pointer-events: none; background: linear-gradient(200deg, rgba(255,255,255,.3), rgba(255,255,255,.1)); clip-path: polygon(58.7% -1%, 101% -1%, 101% 77.2%); } /* the kit's "Screen Glare" */
 
-  /* iOS 6 status bar, opaque black, as Cydian asks for */
+  /* iOS 6 status bar, opaque black, as iFizBox asks for */
   .status { display: flex; align-items: center; height: 20px; padding: 0 5px; background: #000; color: #fff; font-size: 12px; font-weight: bold; text-shadow: 0 -1px 0 rgba(0,0,0,.6); }
   .status .bars { display: flex; align-items: flex-end; gap: 1px; height: 10px; margin-right: 4px; }
   .status .bars i { width: 3px; background: #fff; }
@@ -44,9 +46,9 @@
 <body>
 <div class="side">
   <img src="../web/app/icons/icon-glossy-228.png" alt="">
-  <h1>Cydian</h1>
+  <h1 id="name"></h1>
   <p>The iOS 6 package manager,<br>for modern iPhones.</p>
-  <span class="bar-button">cydian.dev</span>
+  <span class="bar-button" id="domain"></span>
 </div>
 <div class="phone">
   <img src="../ref/teehanlax/ios5/img-hd/11.png" alt="">
@@ -60,5 +62,10 @@
     <i class="glare"></i>
   </div>
 </div>
+<script type="module">
+  import { NAME, DOMAIN } from "../web/app/brand.js";
+  document.getElementById("name").textContent = NAME;
+  document.getElementById("domain").textContent = DOMAIN;
+</script>
 </body>
 </html>

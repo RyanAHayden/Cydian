@@ -36,8 +36,8 @@ test("F87: the jailbreak app's Apps page: the phone's versions, I4's notes, no u
   assert.equal(pageKind(r(APPS), "jailbreak"), "apps");
   assert.equal(pageKind(r(APPS, "package:x"), "jailbreak"), "browse");
   assert.equal(pageKind(r(APPS), "sideload"), "browse"); // the list is the root there
-  assert.equal(appSubtitle({ note: "Installed: 1.6 (Cydian remembered 1.5)", sourceName: "AltStore", date: 0, upgrade: "1.7" }),
-    "Installed: 1.6 (Cydian remembered 1.5) · Upgrade to 1.7 · AltStore");
+  assert.equal(appSubtitle({ note: "Installed: 1.6 (iFizBox remembered 1.5)", sourceName: "AltStore", date: 0, upgrade: "1.7" }),
+    "Installed: 1.6 (iFizBox remembered 1.5) · Upgrade to 1.7 · AltStore");
   const rows = appListRows([
     { id: "delta", name: "Delta", version: "1.6", actual: "1.6", remembered: "1.5", date: 2 },
     { id: "gone", name: "Gone", version: "2.0", actual: null, remembered: "2.0", date: 1 },
@@ -283,11 +283,11 @@ test("F127: Recent is offered where install dates can be read (the jailbreak app
 test("F127: the apps list: User A–Z, Recent newest first by day, both searchable", () => {
   const t = (d) => Date.UTC(2026, 10, d, 12);
   const recs = [{ id: "b", name: "Beta", date: t(17), sourceName: "AltStore" }, { id: "a", name: "alpha", date: t(16) },
-    { id: "c", name: "Cydian", date: 0, self: true }, { id: "d", name: "Delta", date: t(17) }];
+    { id: "c", name: "iFizBox", date: 0, self: true }, { id: "d", name: "Delta", date: t(17) }];
   const shape = (secs) => secs.map((s) => [s.header, s.rows.map((r) => r.id)]);
-  assert.deepEqual(shape(appSections(recs, { mode: "user" })), [["A", ["a"]], ["B", ["b"]], ["C", ["c"]], ["D", ["d"]]]);
+  assert.deepEqual(shape(appSections(recs, { mode: "user" })), [["A", ["a"]], ["B", ["b"]], ["D", ["d"]], ["I", ["c"]]]);
   assert.deepEqual(shape(appSections(recs, { mode: "recent", locale: "en-US" })),
-    [["November 17, 2026", ["b", "d"]], ["November 16, 2026", ["a"]], ["Cydian", ["c"]]]);
+    [["November 17, 2026", ["b", "d"]], ["November 16, 2026", ["a"]], ["iFizBox", ["c"]]]);
   assert.deepEqual(shape(appSections(recs, { mode: "recent", query: "ta", locale: "en-US" })), [["November 17, 2026", ["b", "d"]]]);
   assert.deepEqual(appSections(recs, { query: "nothing" }), []);
 });

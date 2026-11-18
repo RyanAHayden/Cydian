@@ -32,7 +32,7 @@ queue. They only cover what F2, F4, F6 and N4 need. Device pulls live in `ref/4s
   or from the web bridge `cydia.addSource(href, dist, sections)`.
 - On first run (`CydiaVersion` 0) Cydia adds BigBoss (`http://apt.thebigboss.org/repofiles/cydia/ stable main`),
   ModMyi (`http://apt.modmyi.com/ stable main`) and ZodTTD (`http://cydia.zodttd.com/repo/cydia/ stable main`).
-  Cydian's defaults are F4's list instead.
+  iFizBox's defaults are F4's list instead.
 - At launch, Cydia drops keys that contain `#` or a space, and URIs that don't end in `/`.
 
 ### Add Source check (`SourcesController`, l.7856–7870, 7726–7808)
@@ -51,7 +51,7 @@ queue. They only cover what F2, F4, F6 and N4 need. Device pulls live in `ref/4s
 5. On success Cydia saves the source as flat (`./`) and refreshes at once ("Updating Sources").
 
 So Cydia rejects a flat repo that only serves `Packages`, `Packages.xz`, `Packages.lzma` or `Packages.zst`. It
-also rejects any dists-style URL. For Cydian's add-source check (F4), try `Packages.bz2`, `.gz`, `.xz`, `.lzma`,
+also rejects any dists-style URL. For iFizBox's add-source check (F4), try `Packages.bz2`, `.gz`, `.xz`, `.lzma`,
 `.zst` and plain `Packages`, then `Release`. Modern repos often only have `.xz`/`.zst`. Keep Cydia's alert
 wording.
 
@@ -104,7 +104,7 @@ wording.
   `Version/<Safari product> Mobile/<kern.osversion build> Safari/<Safari bundle version> Cydia/<version> CyF/<CF>`.
   On the 4S that should be something like
   `… Version/6.0 Mobile/10B329 Safari/8536.25 Cydia/1.1.30 CyF/793.00`.
-- For Cydian:
+- For iFizBox:
   - The proxy (F3) and the app's native fetch should send `X-Machine`, `X-Firmware` and the Telesphoreo
     `User-Agent`. Some repos serve different files or refuse requests without them.
   - **Never send a real UDID from the public site.** In the app, send `X-Unique-ID` only if a repo needs it (paid
@@ -132,10 +132,10 @@ compares without case or diacritics (`LaxCompareOptions_`).
 - A source row has:
   - the icon: `unknown.png` first, then `<base>CydiaIcon.png` fetched in the background (base as above, so
     dist-style repos use `…/dists/<dist>/CydiaIcon.png`). Many dist repos (Procursus) only serve it at the
-    top level, so Cydian falls back to `<URI>CydiaIcon.png` for dist repos (B1);
+    top level, so iFizBox falls back to `<URI>CydiaIcon.png` for dist repos (B1);
   - the name (Origin) and, underneath, the root URI;
   - a small grey spinner on the right while that source is fetching.
-  Cydia shows **no package count**; F4's count is Cydian's own addition.
+  Cydia shows **no package count**; F4's count is iFizBox's own addition.
 - Nav bar:
   - left: Refresh, or Cancel while updating, or Add in edit mode;
   - right: Edit / Done.
@@ -174,10 +174,10 @@ compares without case or diacritics (`LaxCompareOptions_`).
   3. the source's `Default-Icon` if it is `file:///`;
   4. `unknown.png`.
 - Remote `Icon:` URLs are **ignored** in Cydia's lists. The package page swaps in an icon from saurik's API.
-  Cydian can show http(s) icons (F2 resolves them), but should keep the fallback chain behind them.
+  iFizBox can show http(s) icons (F2 resolves them), but should keep the fallback chain behind them.
 - Purpose badges: the tag `purpose::<x>` puts `Purposes/<x>.png` on the cell. The 4S has commercial, console,
   daemon, extension, library, uikit and x.
-- Cydian (F126): `web/app/core/sectionicons.js` and Cydia's own icons in `web/app/icons/sections/` (GPLv3, from
+- iFizBox (F126): `web/app/core/sectionicons.js` and Cydia's own icons in `web/app/icons/sections/` (GPLv3, from
   Cydia's repo: 39 section icons; the 4S's other 29 came from third-party repos).
 - Hidden from every list:
   - packages tagged `cydia::obsolete`;
@@ -237,7 +237,7 @@ For F6:
   oldest group.
 - The brief's per-(repo, package, version) record is a superset of Cydia's model. If F6 keeps it, take
   `first`/`last` as the minimum over repos, so a package mirrored on two repos isn't "new" twice.
-- "Updated" can mean `last > first` with a version change. That's Cydian's addition.
+- "Updated" can mean `last > first` with a version change. That's iFizBox's addition.
 - The F6 test (a bumped version files under today, and a repeat refresh doesn't) matches the version rule above.
 
 ## Package page and depictions
@@ -278,7 +278,7 @@ to bottom:
   4. Downgrade, if other versions exist. It opens a sheet listing those versions.
 - Depiction web views get `X-Cydia-Cf` and `X-Machine`. Cydia injects the `cydia` JS object only on `file:` pages
   and https pages from bridged hosts. Links with `target="_popup"` open in a modal browser.
-- For Cydian: show depictions in a sandboxed iframe (site and app) with no bridge. Sileo's native JSON depictions
+- For iFizBox: show depictions in a sandboxed iframe (site and app) with no bridge. Sileo's native JSON depictions
   (`SileoDepiction:`) aren't part of Cydia; any support for them is separate work.
 
 ## `cydia://` URLs (F4, N4)
@@ -311,7 +311,7 @@ Each tab's navigation stack is saved as these URLs (`SavedState.plist`) and rest
 - `cydia://application-icon/<bundle id>`;
 - `cydia://uikit-image/<name>`.
 
-For Cydian: the site uses hash routes with the same shape, `#/package/<id>`, `#/sources/add`, and so on. The app
+For iFizBox: the site uses hash routes with the same shape, `#/package/<id>`, `#/sources/add`, and so on. The app
 can register its own scheme with these paths. It can't take over `cydia://` while Cydia or Sileo is installed.
 Repo websites' "Add to Cydia" buttons are usually `cydia://url/https://cydia.saurik.com/api/share#?source=<repo
 URL>`. That isn't in this source, so the app should read the `source=` parameter of such a link if it receives
@@ -353,7 +353,7 @@ one.
 - Essential packages being removed:
   - normally: an "Unable to Comply" alert;
   - in Advanced mode: a "Removing Essentials" alert with "Cancel Operation (Safe)" and "Force Removal (Unsafe)".
-- Cydian runs `apt-get -s` in the root helper to get the same five lists, plus the broken-dependency reasons.
+- iFizBox runs `apt-get -s` in the root helper to get the same five lists, plus the broken-dependency reasons.
 
 ### Running: the console (`ProgressController`, l.5057; page `#!/progress/`)
 
@@ -397,13 +397,13 @@ one.
     example `echo finish:restart >&${CYDIA%% *}`.
   - The button runs the action. Restart and Reload show a "Loading" HUD and restart SpringBoard.
   - After any run, Cydia reloads its data and runs `uicache`.
-- For Cydian (N4):
+- For iFizBox (N4):
   - The root helper should export `CYDIA="<fd> 1"` and read `finish:` lines from it, so existing
     `postinst`/`extrainst_` scripts keep working.
   - It should run apt with `-o APT::Status-Fd=<fd>`, and dpkg's `--status-fd`, to get the
     `pmstatus`/`pmerror`/`pmconffile` lines.
   - Stream all three over the bridge as these event types.
-  - Labels: "Return to Cydian", "Restart SpringBoard" (on rootless: `sbreload`/`killall backboardd`), "Reboot
+  - Labels: "Return to iFizBox", "Restart SpringBoard" (on rootless: `sbreload`/`killall backboardd`), "Reboot
     Device".
 
 ## UI strings

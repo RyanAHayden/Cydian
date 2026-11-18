@@ -1,4 +1,4 @@
-// N9: a .deb shared with Cydian (jailbreak build): the Confirm sheet for that one file, then the console. The shell
+// N9: a .deb shared with iFizBox (jailbreak build): the Confirm sheet for that one file, then the console. The shell
 // staged the file where cydian-helper takes it (native/share/App/ShareBridge.swift); share.debSimulate is
 // `apt-get -s install ./file.deb` (cydian-helper simulate-deb), so the sheet lists every package apt would change,
 // its dependencies resolved from the sources, like the install queue's (screens/queue.js); Confirm runs
@@ -10,6 +10,7 @@ import { showAlert } from "../nav/alert.js";
 import { modal, runPaidInstall } from "./queue.js";
 import { catalog } from "../catalog.js";
 import { MODES, MODE_LABEL, parseSimulation, changeCount } from "../core/queue.js";
+import { NAME } from "../brand.js";
 
 const call = (native, method, params, onEvent) => native.call(`share.${method}`, params, onEvent);
 
@@ -40,7 +41,7 @@ export async function openDebConfirm({ file, name = "" }, { native = globalThis.
     let problems = [];
     if (!r.ok) { try { problems = (await catalog.aptProblems(r.output)) ?? []; } catch { problems = []; } }
     const lines = [
-      ...plan.essential.map((id) => `Installing ${name} would remove ${id}, part of the jailbreak itself (an essential package), so Cydian won't do it.`),
+      ...plan.essential.map((id) => `Installing ${name} would remove ${id}, part of the jailbreak itself (an essential package), so ${NAME} won't do it.`),
       ...problems.map((p) => p.sentence),
     ];
     if (!lines.length) lines.push(`apt refused ${name || "this package"}${r.code ? ` (exit ${r.code})` : ""}. Its own words are below.`);
@@ -70,7 +71,7 @@ export async function openDebConfirm({ file, name = "" }, { native = globalThis.
   // The console's title: "Install <package> <version>" from apt's plan, else the file's name.
   const done = runPaidInstall({ id: pkg || name || file, version: (pkg && r?.version) || "", name: pkg || name || file, run });
   if (!done) {
-    await showAlert({ title: "Busy", message: "Another install is running. Share the file with Cydian again when it's done.", buttons: ["OK"] });
+    await showAlert({ title: "Busy", message: `Another install is running. Share the file with ${NAME} again when it's done.`, buttons: ["OK"] });
     try { await call(native, "discard", { file, kind: "deb" }); } catch { /* swept after a day */ }
     return { ok: false };
   }

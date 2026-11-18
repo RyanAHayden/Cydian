@@ -1,5 +1,5 @@
 // I3: the sideload app's background update check, the pure half (the Linux tests build it; BackgroundCheck.swift
-// does the BGAppRefreshTask, URLSession and notification half). The page hands over the apps Cydian remembers
+// does the BGAppRefreshTask, URLSession and notification half). The page hands over the apps iFizBox remembers
 // (web/app/app-updates.js, updates.watch): each with the version Install recorded and the AltStore source it came
 // from. In the background each source is fetched and read like web/app/core/altstore.js reads it, and an app
 // whose source now offers this phone a newer version is an update. The notification says "n Updates".

@@ -81,7 +81,7 @@ test("mergeDetails: the source's fields win; the App Store fills only the gaps",
 const urlsOf = (rows) => rows.filter((r) => r.url).map((r) => pageKey(r.url));
 const source = { label: "AppTesters", subtitle: "https://repository.apptesters.org/", href: "#sources/k" };
 
-test("pageLinks: AppTesters: the App Store page, the source in Cydian, the source's website", () => {
+test("pageLinks: AppTesters: the App Store page, the source in iFizBox, the source's website", () => {
   const store = parseLookup(APPLE);
   const rows = pageLinks({ ownLinks: appLinks(appTesters), store, source, sourceWebsite: "https://apptesters.org", appUrls: [appTesters.sourceUrl] });
   assert.deepEqual(rows.map((r) => r.kind), ["appstore", "source", "website"]);

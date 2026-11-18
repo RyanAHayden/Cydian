@@ -1,11 +1,11 @@
 // F145: Settings > General > Website (the website only; user 2026-11-18: "the lock home setting and install on website
 // should not be in signing and it should have the error too"). Two groups:
-//   Lock Home Until Cydian Is Installed  a switch, on while Home is locked (websign-gate.js browsingLocked); off is
+//   Lock Home Until iFizBox Is Installed  a switch, on while Home is locked (websign-gate.js browsingLocked); off is
 //                                        Browse Anyway, on locks Home and the tabs again.
 //   Other Apps > Install on the Website  F96's switch (on once the warning was accepted). While the site is locked
 //                                        it's locked like Home's rows (.home-locked: dimmed, a padlock where the
-//                                        switch was), and a tap asks the same "Install Cydian First" as Home
-//                                        (askToBrowse: Install Cydian / Browse Anyway (5) / Cancel).
+//                                        switch was), and a tap asks the same "Install iFizBox First" as Home
+//                                        (askToBrowse: Install iFizBox / Browse Anyway (5) / Cancel).
 // The box redraws itself on cydian:browse-lock (websign-gate.js setFirstVisit), so Browse Anyway from anywhere, or the
 // Lock Home switch, unlocks or locks the row at once.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -15,16 +15,17 @@ import { showAlert } from "../nav/alert.js";
 import { websiteInstallsOn, setWebsiteInstalls, acceptWebsiteInstalls, firstVisitState, setFirstVisit,
   browsingLocked, askToBrowse } from "../websign-gate.js";
 import { createSwitch } from "./settings.js";
+import { NAME } from "../brand.js";
 
-export const LOCK_HOME_LABEL = "Lock Home Until Cydian Is Installed";
-export const LOCK_HOME_FOOTER = "Home's rows below Install Cydian App and the other tabs stay locked, and ask to install "
-  + "Cydian first, until you tap Browse Anyway.";
+export const LOCK_HOME_LABEL = `Lock Home Until ${NAME} Is Installed`;
+export const LOCK_HOME_FOOTER = `Home's rows below Install ${NAME} App and the other tabs stay locked, and ask to install `
+  + `${NAME} first, until you tap Browse Anyway.`;
 export const WEBSITE_INSTALLS_LABEL = "Install on the Website";
-export const WEBSITE_INSTALLS_FOOTER = "Other apps' pages offer Install in Cydian first. Installing on the website is "
+export const WEBSITE_INSTALLS_FOOTER = `Other apps' pages offer Install in ${NAME} first. Installing on the website is `
   + "slower (download, sign in Safari, upload, then iOS downloads it again), can fail on big apps and uses this "
-  + "site's limited storage. Cydian itself always installs from here.";
+  + `site's limited storage. ${NAME} itself always installs from here.`;
 
-// Home's Install Cydian App flow, loaded when asked (home.js imports Settings' module graph).
+// Home's Install iFizBox App flow, loaded when asked (home.js imports Settings' module graph).
 const installCydian = () => import("./home.js").then((h) => h.installCydian());
 
 function switchRow(frag, label, sw) {

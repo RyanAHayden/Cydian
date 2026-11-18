@@ -37,6 +37,7 @@ import { copyText, nativePaste } from "../nav/menu.js";
 import { builtinFirst, isBuiltin, exportable } from "../core/essential.js";
 import { lockMark } from "../nav/lock.js";
 import { settings, createSwitch } from "./settings.js";
+import { NAME } from "../brand.js";
 
 export const SEGMENT = "manage";
 export const isManage = (route) => route.path[0] === SEGMENT;
@@ -89,7 +90,7 @@ export function render(body, route, ctx) {
 
 // The list in the user's order, as the Sources tab shows it (Not Jailbroken: AltStore sources only).
 async function shownSources() {
-  // F72: Cydian's own source (built in) stays first whatever the order.
+  // F72: iFizBox's own source (built in) stays first whatever the order.
   const all = builtinFirst(orderSources(await getBackend().sources(), loadOrder()));
   return { all, ...sourcesFor(all, settings.deviceType()) };
 }
@@ -200,7 +201,7 @@ function editRow(li, source, backend, body) {
   img.onerror = () => (urls.length ? (img.src = urls.shift()) : img.remove());
   if (urls.length) img.src = urls.shift();
   li.querySelector(".cell-icon").append(img);
-  // F72: Cydian's own source is built in: a lock where the minus goes, no Delete, and it doesn't move.
+  // F72: iFizBox's own source is built in: a lock where the minus goes, no Delete, and it doesn't move.
   if (isBuiltin(source)) {
     li.dataset.builtin = "1";
     li.append(lockMark("source-lock", `${displayName(source)} is built in: it can't be removed`));
@@ -357,17 +358,17 @@ function renderIO(body, route, ctx) {
       { label: "Copy to Clipboard", onClick: () => copyList() },
       { label: "Save as File", onClick: () => saveFile() },
       { label: "Show QR Code", onClick: () => showQR() },
-    ], footer: "Every source's URL, one per line. Another phone's Cydian reads it back (Import), and so do most "
+    ], footer: `Every source's URL, one per line. Another phone's ${NAME} reads it back (Import), and so do most `
       + "package managers, one URL at a time." },
     { header: "Import", rows: [
       { label: "From File", onClick: () => file.click() },
       { label: "From Clipboard", onClick: (e) => importClipboard(e.currentTarget, route, ctx) },
-    ], footer: "Reads Cydian's export, a list of URLs, AltStore, SideStore and Feather source lists (JSON), "
+    ], footer: `Reads ${NAME}'s export, a list of URLs, AltStore, SideStore and Feather source lists (JSON), `
       + "Sileo's .sources and Cydia's .list. You see which are new before anything is added." },
   ]), file);
 }
 
-// F72: Cydian's own source (built in) is left out: every Cydian has it.
+// F72: iFizBox's own source (built in) is left out: every iFizBox has it.
 async function exportNow() {
   const all = exportable((await shownSources()).all);
   return { text: exportText(all), count: all.length };
@@ -383,7 +384,7 @@ async function copyList() {
 async function shareList() {
   const { text } = await exportNow();
   if (navigator.share) {
-    try { await navigator.share({ title: "Cydian Sources", text }); return; } catch (e) { if (e?.name === "AbortError") return; }
+    try { await navigator.share({ title: `${NAME} Sources`, text }); return; } catch (e) { if (e?.name === "AbortError") return; }
   }
   try {
     await navigator.clipboard.writeText(text);
@@ -399,7 +400,7 @@ async function saveFile() {
   const blob = new Blob([text], { type: "text/plain" });
   const f = typeof File === "function" ? new File([blob], EXPORT_FILENAME, { type: "text/plain" }) : null;
   if (f && navigator.canShare?.({ files: [f] })) {
-    try { await navigator.share({ files: [f], title: "Cydian Sources" }); return; } catch (e) { if (e?.name === "AbortError") return; }
+    try { await navigator.share({ files: [f], title: `${NAME} Sources` }); return; } catch (e) { if (e?.name === "AbortError") return; }
   }
   const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: EXPORT_FILENAME });
   document.body.append(a);
@@ -472,13 +473,13 @@ function renderReview(body) {
   if (warned.length) {
     sections.push({ header: `Source Warning (${warned.length})`,
       rows: warned.map((e) => ({ ...row(e), subtitle: e.warning.reason, checked: e.pick, onClick: toggle(e) })),
-      footer: "These are on Cydian's list of piracy sources. "
+      footer: `These are on ${NAME}'s list of piracy sources. `
         + "Tap one to add it anyway." });
   }
   if (listed.length) sections.push({ header: `Already Listed (${listed.length})`, rows: listed.map(row) });
   if (unsupported.length) {
     sections.push({ header: `Can't Add (${unsupported.length})`, rows: unsupported.map(row),
-      footer: "These lines name no source Cydian can add." });
+      footer: `These lines name no source ${NAME} can add.` });
   }
   body.replaceChildren(grouped(sections));
   body.classList.add("manage-review");

@@ -55,12 +55,12 @@ test("signedIndex: by installed and original bundle ID", () => {
   assert.equal(ix.get("zzz"), undefined);
 });
 
-test("resign jobs: queued without an IPA, their own Re-sign group, Cydian last", () => {
+test("resign jobs: queued without an IPA, their own Re-sign group, iFizBox last", () => {
   const q = createAppQueue();
   const rows = needsResign(installed, { now, window: 2 });
   const j = q.add(resignJob(rows[0]));
   assert.deepEqual([j.op, j.mode, j.id, j.version, j.url], ["resign", "resign", "c", "3.0", null]);
-  q.add(resignJob({ bundleId: SELF_ID, name: "Cydian", version: "0.3.6" }));
+  q.add(resignJob({ bundleId: SELF_ID, name: "iFizBox", version: "0.3.6" }));
   q.add({ id: "x", name: "X", version: "2", installed: "1", url: "https://s/x.ipa" });
   const plan = appPlan(q.list());
   assert.deepEqual(plan.resigns, [{ id: "c", from: "3.0", to: "3.0" }, { id: SELF_ID, from: "0.3.6", to: "0.3.6" }]);
@@ -82,7 +82,7 @@ test("resignJob: from a Signed Apps row, a Needs Re-sign row or a record; none w
   assert.equal(resignJob(null), null);
 });
 
-test("Modify (F91): Re-sign last for an app Cydian signed", () => {
+test("Modify (F91): Re-sign last for an app iFizBox signed", () => {
   assert.deepEqual(modifyActions({ installed: "1", newest: "1", signed: true }), ["Reinstall", "Re-sign"]);
   assert.deepEqual(modifyActions({ installed: "1", newest: "2", older: true, signed: true }), ["Upgrade", "Downgrade", "Re-sign"]);
   assert.deepEqual(modifyActions({ queued: true, installed: "1", newest: "1", signed: true }), ["Clear", "Reinstall", "Re-sign"]);

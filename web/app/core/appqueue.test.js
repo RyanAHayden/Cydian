@@ -50,7 +50,7 @@ test("appPlan: Confirm's groups (core/queue.js parseSimulation's shape) and the 
   assert.equal(sizeText(2048), "2 kB");
 });
 
-test("runOrder: as queued, Cydian itself last", () => {
+test("runOrder: as queued, iFizBox itself last", () => {
   assert.deepEqual(runOrder([{ id: SELF_ID }, { id: "a" }, { id: "b" }]).map((j) => j.id), ["a", "b", SELF_ID]);
 });
 

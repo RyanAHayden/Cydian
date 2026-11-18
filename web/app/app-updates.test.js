@@ -13,7 +13,7 @@ import { memoryAppStore } from "./core/installed.js";
 import { SELF_ALT_URL } from "./core/essential.js";
 
 const SRC = "https://a.example/apps.json";
-const self = { id: "com.ryha.cydian", name: "Cydian", version: "0.2.6", self: true, source: null, date: 0 };
+const self = { id: "com.ryha.cydian", name: "iFizBox", version: "0.2.6", self: true, source: null, date: 0 };
 
 test("jailbreak mode leaves dpkg's upgrades as they are", async () => {
   const up = { available: [{ id: "x", version: "2" }], ignored: [] };
@@ -29,7 +29,7 @@ test("sideload: no sources loaded yet, nothing new to show, and the shell is tol
   assert.deepEqual(up, { available: [], ignored: [] });
   await new Promise((r) => setTimeout(r, 0));
   assert.deepEqual(calls, [["updates.watch", { apps: [
-    { id: "com.ryha.cydian", name: "Cydian", version: "0.2.6", source: SELF_ALT_URL },
+    { id: "com.ryha.cydian", name: "iFizBox", version: "0.2.6", source: SELF_ALT_URL },
     { id: "delta", name: "Delta", version: "1.5", source: SRC }], known: [] }]]);
   // The same list again isn't sent twice.
   await withAppUpgrades({ available: [], ignored: [] }, [], { mode: "sideload", native, store });
@@ -70,7 +70,7 @@ function jailbreakBackend(t, { apps = true } = {}) {
 
 const jbRecords = [
   { ...self, version: "0.2.8" },
-  { id: "com.rileytestut.Delta", name: "Delta", version: "1.5", source: SRC, date: 3 }, // updated outside Cydian to 1.6
+  { id: "com.rileytestut.Delta", name: "Delta", version: "1.5", source: SRC, date: 3 }, // updated outside iFizBox to 1.6
   { id: "com.utmapp.UTM", name: "UTM", version: "4.5.2", source: SRC, date: 2 },
   { id: "com.example.gone", name: "Gone", version: "2.0", source: SRC, date: 1 }, // deleted from the Home Screen
 ];
@@ -89,7 +89,7 @@ test("jailbreak: a remembered app's upgrade is worked out from the version on th
   assert.deepEqual(up.ignored.map((r) => r.id), ["com.utmapp.UTM"]); // Ignored Upgrades still apply
 });
 
-test("jailbreak: an app the source has at the phone's version is no upgrade, though Cydian remembered an older one", async (t) => {
+test("jailbreak: an app the source has at the phone's version is no upgrade, though iFizBox remembered an older one", async (t) => {
   const backend = jailbreakBackend(t);
   const store = async () => memoryAppStore(jbRecords);
   const dpkg = { available: [], ignored: [] };
@@ -110,9 +110,9 @@ test("jailbreak: rememberedApps carries I4's notes; the site and the sideload ap
   const notes = Object.fromEntries((await rememberedApps({ mode: "jailbreak", backend, store })).map((r) => [r.id, r.note ?? null]));
   assert.deepEqual(notes, {
     "com.ryha.cydian": null,
-    "com.rileytestut.Delta": "Installed: 1.6 (Cydian remembered 1.5)",
+    "com.rileytestut.Delta": "Installed: 1.6 (iFizBox remembered 1.5)",
     "com.utmapp.UTM": null,
-    "com.example.gone": "Not installed (Cydian remembered 2.0)",
+    "com.example.gone": "Not installed (iFizBox remembered 2.0)",
   });
   const boom = { installedApps: () => { throw new Error("must not be asked"); } };
   assert.deepEqual(await rememberedApps({ mode: "sideload", backend: boom, store }), jbRecords);

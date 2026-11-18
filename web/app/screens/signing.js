@@ -1,7 +1,7 @@
 // F69, F75: Settings > Signing in the sideload build, as one walkthrough page (Home's Signing tile opens it too, and
 // so does the first Install with something missing): numbered steps, each collapsible, a green tick once done.
 //   1  Import your certificate: Select All Files (or the three rows' own Browse): settings.js certificateBlock
-//   2  A Signing Server: cydian.dev unless the user runs their own; it hands iOS the manifest for the IPA Cydian
+//   2  A Signing Server: cydian.dev unless the user runs their own; it hands iOS the manifest for the IPA iFizBox
 //      serves at 127.0.0.1 (native/Sources/Sideload.swift). There is no install without one (F75: the old local
 //      HTTPS mode is gone; iOS's installer ignores a hand-trusted certificate).
 //

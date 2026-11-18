@@ -1,4 +1,4 @@
-// I3: updates to the apps Cydian remembers (core/installed.js, F30), where there's no dpkg to ask (the site and the
+// I3: updates to the apps iFizBox remembers (core/installed.js, F30), where there's no dpkg to ask (the site and the
 // sideload app). Tapping Install on an app page records the version it installs; when a source later lists a newer
 // one, it shows in Changes under Available Upgrades beside dpkg's (so the tab badge and, in the app, the icon badge
 // count it), and the sideload app's shell checks for it in the background (native/Sources/BackgroundCheck.swift,
@@ -13,7 +13,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { compareVersions } from "./apt.js";
 
-export const SELF_ID = "com.ryha.cydian"; // core/installed.js SELF_ID: Cydian's own row is essential.js's
+export const SELF_ID = "com.ryha.cydian"; // core/installed.js SELF_ID: iFizBox's own row is essential.js's
 
 const byName = (a, b) => String(a.name ?? a.id).localeCompare(String(b.name ?? b.id), undefined, { sensitivity: "base" }) ||
   String(a.id).localeCompare(String(b.id));
@@ -44,7 +44,7 @@ export function mergeUpgrades(a, b) {
     }
     return out;
   };
-  // An id ignored on either side stays ignored; essential.js puts Cydian's own row first, and it stays first.
+  // An id ignored on either side stays ignored; essential.js puts iFizBox's own row first, and it stays first.
   const ignored = merge(a?.ignored, b?.ignored).sort(byName);
   const ignoredIds = new Set(ignored.map((r) => r.id));
   const available = merge(a?.available, b?.available, ignoredIds);

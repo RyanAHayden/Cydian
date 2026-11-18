@@ -7,7 +7,7 @@
 // F88: a successful install is remembered (core/installed.js) for the Installed tab's Apps page and Changes: the
 // AltStore row's with its source (installRows' onInstall), a URL's or link's by bundle id (rememberIpa).
 // All open the same progress page as the install queue's (F151: nav/progress.js): the shell's and helper's lines as
-// they come, installd's pmstatus progress on the bar, then Reload Data (uicache) or Return to Cydian. A jailbreak that
+// they come, installd's pmstatus progress on the bar, then Reload Data (uicache) or Return to iFizBox. A jailbreak that
 // can't install ad hoc apps (no_adhoc) ends with the console's red line and an alert saying what to install
 // (AppSync Unified or ldid) or to sign the IPA. Each run is kept in Settings > Console Logs.
 // The sideload build has none of this: it keeps signing.install (signing-client.js).
@@ -22,13 +22,14 @@ import { runLogs } from "../queue.js";
 import { ipaInstallAvailable, runIpaInstall } from "../ipa-install.js";
 import { ipaUrl, ipaName, looksLikeIpa, IPA_FOOTER } from "../core/ipainstall.js";
 import { apps, recordInstall } from "../core/installed.js";
+import { NAME } from "../brand.js";
 
 let running = false;
 
 // The console page for one IPA (F151: nav/progress.js, as the queue's). Resolves the run's result once it has ended
 // (the page stays up until Close or the finish button). False when another IPA install's console is already up.
 // N9: `native` stands in for the bridge (a shared file's share.ipaInstall, share.js). An app went in, so the button
-// is Reload Data (uicache, as Cydia runs after a run) when the backend can, else Return to Cydian.
+// is Reload Data (uicache, as Cydia runs after a run) when the backend can, else Return to iFizBox.
 export async function openIpaInstall({ url, name = "", onInstalled = () => {}, native = undefined }) {
   if (running) return false;
   running = true;
@@ -79,7 +80,7 @@ async function askIpaUrl(value = "") {
   for (;;) {
     const { index, value: typed } = await showAlert({
       title: "Install IPA",
-      message: "The IPA's link (http or https). Cydian downloads it and installs it with the jailbreak.",
+      message: `The IPA's link (http or https). ${NAME} downloads it and installs it with the jailbreak.`,
       input: { placeholder: "https://example.com/App.ipa", value, type: "url", paste: (t) => ipaUrl(t) ?? String(t ?? "").trim() },
       buttons: ["Cancel", "Install"], cancel: 0,
     });

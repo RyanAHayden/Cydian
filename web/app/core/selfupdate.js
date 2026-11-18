@@ -1,6 +1,6 @@
-// Cydian updates itself (F61). In the app only (sideload and jailbreak builds): on launch and at most once a day, read
+// iFizBox updates itself (F61). In the app only (sideload and jailbreak builds): on launch and at most once a day, read
 // GitHub's latest release, compare its tag (vX.Y.Z) with the app's own version (Bridge.swift app.info `version`,
-// CFBundleShortVersionString) and, when it's newer, ask with an iOS 6 alert: "Cydian X.Y.Z Is Available", the first
+// CFBundleShortVersionString) and, when it's newer, ask with an iOS 6 alert: "iFizBox X.Y.Z Is Available", the first
 // lines of the release notes, Later / Install. Later asks again on the next launch a day on; Settings > About has
 // Check for Updates and Skip This Version (screens/settings.js aboutSection).
 //
@@ -8,14 +8,15 @@
 //   sideload   the release's Cydian.ipa, signed on the phone with the user's certificate and installed over the
 //              running app (F58's installOnDevice: same bundle ID com.ryha.cydian, so its data stays). No certificate
 //              in the Keychain: an alert says so and Settings > Signing opens.
-//              F72: given `installSelf` (core/essential.js), that takes over: iOS closes Cydian, and the local install
-//              server with it, as soon as the install starts, so Cydian's own IPA is signed on the Signing Server.
+//              F72: given `installSelf` (core/essential.js), that takes over: iOS closes iFizBox, and the local install
+//              server with it, as soon as the install starts, so iFizBox's own IPA is signed on the Signing Server.
 //   jailbreak  the release's .deb for this device's architecture, downloaded by the shell (selfupdate.download) and
-//              installed with `cydian-helper selfupdate <path>` (dpkg -i, N2), then an offer to close Cydian so the
+//              installed with `cydian-helper selfupdate <path>` (dpkg -i, N2), then an offer to close iFizBox so the
 //              next launch runs the new build (Cydia's own "Close Cydia" after finish:reopen).
 //
 // Pure: everything that touches the network, the bridge, storage or the screen comes in through `deps`, so node
 // tests drive every path (selfupdate.test.js). app.js and screens/settings.js wire the real ones.
+import { NAME } from "../brand.js";
 
 export const RELEASES_URL = "https://api.github.com/repos/RyanAHayden/Cydian/releases/latest";
 export const DAY = 24 * 60 * 60 * 1000;
@@ -136,8 +137,8 @@ export function setSkip(storage, version) {
 
 export function offerAlert(release) {
   return {
-    title: `Cydian ${release.version} Is Available`,
-    message: release.notes?.length ? release.notes.join("\n") : "A new version of Cydian is out.",
+    title: `${NAME} ${release.version} Is Available`,
+    message: release.notes?.length ? release.notes.join("\n") : `A new version of ${NAME} is out.`,
     buttons: ["Later", "Install"],
     cancel: 0,
   };
@@ -187,7 +188,7 @@ export async function checkForUpdates(deps, { manual = false, always = false } =
   state = saveState(storage, { ...(manual ? {} : { lastCheck: t }), latest: release ?? null, current: current || null });
   const newer = release && isNewer(release.version, current);
   if (!newer) {
-    if (manual) await deps.alert({ title: "Cydian Is Up to Date", message: `Cydian ${current || ""} is the newest version.`.replace("  ", " "), buttons: ["OK"] });
+    if (manual) await deps.alert({ title: `${NAME} Is Up to Date`, message: `${NAME} ${current || ""} is the newest version.`.replace("  ", " "), buttons: ["OK"] });
     return "current";
   }
   if (always && !manual && state.skip && compareVersions(state.skip, release.version) === 0) return "skipped";
@@ -222,10 +223,10 @@ export async function runInstall(release, mode, deps) {
 
 async function installSideload(release, { status, installOnDevice, installSelf, alert, go }) {
   if (!release.ipa) {
-    await alert({ title: "Can't Install", message: `Cydian ${release.version} has no Cydian.ipa on GitHub.`, buttons: ["OK"] });
+    await alert({ title: "Can't Install", message: `${NAME} ${release.version} has no Cydian.ipa on GitHub.`, buttons: ["OK"] });
     return "no-asset";
   }
-  // F72: Cydian's own IPA can't come through the local install server (iOS closes Cydian, and the server, as it
+  // F72: iFizBox's own IPA can't come through the local install server (iOS closes iFizBox, and the server, as it
   // starts installing): installSelf (core/essential.js) signs it on the Signing Server or opens cydian.dev.
   if (installSelf) {
     const r = await installSelf({ version: release.version, ipa: release.ipa });
@@ -234,11 +235,11 @@ async function installSideload(release, { status, installOnDevice, installSelf, 
   let st = null;
   try { st = await status(); } catch { /* the signer didn't answer: as if no certificate, Settings > Signing says why */ }
   if (!st?.identity) {
-    await alert({ title: "No Certificate", message: `To install Cydian ${release.version}, add your certificate in Settings > Signing. Cydian signs its update with it on this iPhone.`, buttons: ["OK"] });
+    await alert({ title: "No Certificate", message: `To install ${NAME} ${release.version}, add your certificate in Settings > Signing. ${NAME} signs its update with it on this iPhone.`, buttons: ["OK"] });
     go(["signing"]);
     return "no-certificate";
   }
-  return (await installOnDevice({ url: release.ipa, name: "Cydian" })) ? "installed" : "failed";
+  return (await installOnDevice({ url: release.ipa, name: NAME })) ? "installed" : "failed";
 }
 
 const lastLine = (s) => String(s ?? "").trim().split(/\r?\n/).filter(Boolean).at(-1) ?? "";
@@ -246,7 +247,7 @@ const lastLine = (s) => String(s ?? "").trim().split(/\r?\n/).filter(Boolean).at
 async function installJailbreak(release, { native, arch, hud, alert }) {
   const url = debFor(release, arch);
   if (!url) {
-    await alert({ title: "Can't Install", message: `Cydian ${release.version} has no .deb for ${arch || "this iPhone"} on GitHub.`, buttons: ["OK"] });
+    await alert({ title: "Can't Install", message: `${NAME} ${release.version} has no .deb for ${arch || "this iPhone"} on GitHub.`, buttons: ["OK"] });
     return "no-asset";
   }
   const h = hud("Downloading");
@@ -265,8 +266,8 @@ async function installJailbreak(release, { native, arch, hud, alert }) {
     await alert({ title: "Couldn't Update", message: `dpkg failed (${r?.code}): ${lastLine(r?.stderr) || lastLine(r?.stdout) || "no output"}`, buttons: ["OK"] });
     return "failed";
   }
-  const { index } = await alert({ title: "Cydian Updated", message: `Cydian ${release.version} is installed. Close Cydian and open it again to use it.`,
-    buttons: ["Later", "Close Cydian"], cancel: 0 });
+  const { index } = await alert({ title: `${NAME} Updated`, message: `${NAME} ${release.version} is installed. Close ${NAME} and open it again to use it.`,
+    buttons: ["Later", `Close ${NAME}`], cancel: 0 });
   if (index === 1) await native.call("app.quit", {}).catch(() => {});
   return "installed";
 }

@@ -5,7 +5,7 @@
 //                               a certificate that was imported doesn't show
 //   signing.import {p12, password, profile}   (both files base64) -> status; the .p12 goes into the Keychain
 //   signing.remove              forgets the identity, the kept .p12 and the profile -> status
-//   signing.export              F73: {p12, profile, password} (files base64) as imported, for Cydian Account's
+//   signing.export              F73: {p12, profile, password} (files base64) as imported, for iFizBox Account's
 //                               certificate sync (screens/account.js) | null
 //                               when there is no certificate or it was imported before F73
 //   signing.install {url, manifestServer} (stream: {phase: "downloading"|"reading"|"signing"|"installing", progress})
@@ -84,7 +84,7 @@ enum SignBridge {
         return out
     }
 
-    // ---- F75: the certificate that came inside Cydian's own IPA (BundledIdentity, native/sign/Handoff.swift)
+    // ---- F75: the certificate that came inside iFizBox's own IPA (BundledIdentity, native/sign/Handoff.swift)
 
     // At launch, sideload build only: imports Payload/Cydian.app/cydian-identity.plist into the Keychain unless the
     // Keychain already holds an identity or this same file was looked at before (its digest in UserDefaults; the
@@ -105,7 +105,7 @@ enum SignBridge {
                 _ = try SignStore.importIdentity(p12: c.p12, password: c.password, profile: c.profile)
                 try confirmImport(p12: c.p12, password: c.password)
             } catch {
-                NSLog("Cydian: the certificate inside the app didn't import: %@", text(error))
+                NSLog("\(Brand.name): the certificate inside the app didn't import: %@", text(error))
             }
         }
     }

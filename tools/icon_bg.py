@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cydian's icon background: a soft starburst, made the way the old iOS icons made theirs.
+"""iFizBox's icon background: a soft starburst, made the way the old iOS icons made theirs.
 
 Not hand-drawn rays (those come out sharp): random noise along the angle, blurred into soft streaks, wrapped around
 the centre (Photoshop's noise + motion blur + Polar Coordinates), then coloured with a top-to-bottom gradient that has

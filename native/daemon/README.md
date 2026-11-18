@@ -1,7 +1,7 @@
 # native/daemon/: cydian-upgrades, the background upgrade check (N5) and automatic updates (N7)
 
 A launchd daemon in the jailbreak .deb (not in the sideload IPA). Once a day it runs `apt-get update`, counts the
-upgrades and sets the badge on Cydian's icon to that number. When an upgrade is new since the last notification, it
+upgrades and sets the badge on iFizBox's icon to that number. When an upgrade is new since the last notification, it
 also posts a local notification: "3 Upgrades" / "3 upgrades: A, B and C.".
 
 - `auto.c`, `auto.h`: N7's decisions and the whole hourly run (below).
@@ -19,7 +19,7 @@ also posts a local notification: "3 Upgrades" / "3 upgrades: A, B and C.".
 - Notifications: `-[UNUserNotificationCenter initWithBundleIdentifier:@"com.ryha.cydian"]` (private). It needs the
   `com.apple.private.usernotifications.bundle-identifiers` entitlement (`entitlements.plist`). The badge goes up
   with the notification (`content.badge`) or through `setBadgeCount:` (iOS 16+) / `setBadgeNumber:` (before 16).
-  iOS shows them only once Cydian has notification permission: the jailbreak app asks once, at its first launch
+  iOS shows them only once iFizBox has notification permission: the jailbreak app asks once, at its first launch
   (F65, `../Sources/Notifications.swift`). A tap opens the notification's `url` route (`#/changes`) in the app, and
   the app clears the badge once its Changes tab shows no upgrades (`web/app/settings.js`, bridge `app.badge`).
 - Upgrade Notifications (F65, `quiet.h`): with `/var/jb/var/lib/cydian/upgrades.off` there (Settings' switch, written
@@ -35,7 +35,7 @@ also posts a local notification: "3 Upgrades" / "3 upgrades: A, B and C.".
 Every hourly run is `auto_step` in `auto.c` (tested on Linux by `test_auto.py` through `auto_driver.c`, with a fake
 clock, phone and apt in a folder); `main.m` only fills `struct auto_env` with the phone's facts and apt's work.
 
-- **Settings:** the F13 keys, read from Cydian's preferences (`com.ryha.cydian`, user mobile, through cfprefsd):
+- **Settings:** the F13 keys, read from iFizBox's preferences (`com.ryha.cydian`, user mobile, through cfprefsd):
   `cydian.checkUpdates` (off / launch / 6h / daily), `cydian.cellular`, `cydian.autoInstall` (off / marked / all),
   `cydian.autoInstallIdle`, `cydian.respring` (notify / locked), `cydian.keepVersions` (0-2), and the lists
   `cydian.autoMarked` (Only Packages I Mark) and `cydian.holds` (an array, or localStorage's JSON text). No

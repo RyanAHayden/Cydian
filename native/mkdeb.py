@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write and check Cydian's rootless .deb with the stdlib only (no dpkg-deb on the build machine).
+"""Write and check iFizBox's rootless .deb with the stdlib only (no dpkg-deb on the build machine).
 
     mkdeb.py build <root> <debian-dir> <out.deb>   root holds ./var/jb/...; debian-dir holds control, postinst, prerm
     mkdeb.py check <file.deb>                      exit 1 and list every problem if the package is not right

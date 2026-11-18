@@ -11,6 +11,7 @@
 //   getServer() / setServer(s)   Settings > Signing's server, https://sign.cydian.dev unless the user set another
 //   await serverStatus()         what GET <server>/sign/status says
 //   await signAndInstall({ url, name, onInstalled })   signs on the phone and installs (installOnDevice)
+import { showBanner } from "./nav/banner.js";
 import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError } from "./core/signing.js";
 import { format } from "./router.js";
 import { detectMode } from "./core/settings.js";
@@ -196,6 +197,9 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   }
   h.set("Installing");
   onInstalled(result);
+  // Cydian itself (host): iOS's Install prompt is up, and Cydian closes once it's answered so the install finishes
+  // (native CloseForUpdate): say so first (user 2026-11-18).
+  if (host) showBanner({ title: "Cydian", message: "Press Install. Cydian closes to finish updating; tap its notification to open the new one." });
   if (after) { after(result, h); return true; }
   // iOS asks "Install …?" over the app: the HUD ends on a checkmark (signed and handed to iOS) and fades.
   later(() => (h.done ? h.done("Done") : h.hide()), 1200);

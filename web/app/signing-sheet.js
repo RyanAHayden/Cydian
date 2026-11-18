@@ -7,6 +7,9 @@
 //
 //   await inspectAndInstall({ url, name, onInstalled })   true once iOS was asked to install, false otherwise
 //   await customInstall({ url, name, onInstalled })       the same, after F75's first-install check (the row's tap)
+//   await customInstall({ url, name, queue })             F84: the sheet's Install queues instead: queue(options) with
+//                                                         core/appqueue.js's job options, then Confirm signs it in turn
+//   await inspectToQueue({ url, name, queue })            that sheet, without the first-install check
 //
 // The sheet's buttons (F81, user 2026-11-17): Install at the top right of its nav bar, a red Cancel at the bottom.
 //
@@ -87,11 +90,54 @@ export async function inspectAndInstall({ url, name = "", onInstalled = () => {}
   });
 }
 
-// The Custom Install row's tap: the Signing walkthrough first when something is missing (F75), else the sheet.
-export async function customInstall(opts, { check = null, inspect = inspectAndInstall } = {}) {
+// The Custom Install row's tap: the Signing walkthrough first when something is missing (F75), else the sheet. With
+// `opts.queue` (F84, the app page) the sheet's Install queues the app with its options instead of signing now.
+export async function customInstall(opts, { check = null, inspect = inspectAndInstall, toQueue = inspectToQueue } = {}) {
   const missing = check ? await check() : await (await import("./signing-client.js")).firstInstallCheck();
   if (missing) return false;
-  return inspect(opts);
+  return opts?.queue ? toQueue(opts) : inspect(opts);
+}
+
+// F84: look first, then the sheet; its Install hands `queue` the job's options (core/appqueue.js: token and when it
+// was looked at, the edits, the name to show, the ID iOS will know it by) and closes. True once queued, false on
+// Cancel or an error (shown). An older shell without signing.inspect queues it plain (queue(null)), as Install would.
+export async function inspectToQueue({ url, name = "", queue },
+  { native = globalThis.cydianNative, hud = liveHUD, alert = showAlert, sheet = openSignSheet, now = Date.now } = {}) {
+  const h = hud("Downloading");
+  let info;
+  try {
+    info = await native.call("signing.inspect", { url }, (ev) => { const t = phaseLabel(ev); if (t) h.set(t); });
+  } catch (e) {
+    h.hide();
+    if (unknownMethod(e)) { queue(null); return true; }
+    const why = deviceError(e, name);
+    await alert({ title: why.title, message: why.message, buttons: ["OK"] });
+    if (why.open === "signing") location.hash = format({ tab: "settings", path: ["signing"] }).replace(/^#/, "");
+    return false;
+  }
+  h.hide();
+  return new Promise((resolve) => {
+    let queued = false;
+    const close = sheet(info, {
+      fallbackName: name,
+      async onSign(edits) {
+        let params;
+        try {
+          params = installParams(info, edits);
+        } catch (e) {
+          await alert({ title: "Can't Sign", message: e.message, buttons: ["OK"] });
+          return;
+        }
+        queued = true;
+        close();
+        const { token, ...rest } = params;
+        queue({ token, at: now(), edits: rest, name: params.name || info.app?.name || name || null,
+          signsAs: installedId(null, params, info) });
+        resolve(true);
+      },
+      onClose: () => { if (!queued) resolve(false); },
+    });
+  });
 }
 
 // The sheet's chrome (F81): `right` (the nav bar's right side) gets Install, done-styled, in place of Done; `box` (the

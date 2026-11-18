@@ -8,6 +8,10 @@
 //   job: { op: "install", id, name, version, installed, mode, url, size, icon, key, source, sourceName, deps }
 //       mode (core/queue.js modeOf): install | reinstall | upgrade | downgrade
 //       deps: what a tweak needs installed with it (none yet: Confirm lists them under Install when there are)
+//       options (F84): Custom Install's, kept per job: { token, at, edits: { name?, bundleId?, icon?, removeExtensions? },
+//                name, signsAs } (token/at: signing.inspect's look, good for 15 minutes); null for a plain Install
+//   customParams(job, now) -> signing.install's params for a job with options: its token while fresh, else its url,
+//                        with the edits either way (null for a plain job)
 //   appJob(pkg, { installed, version, source })  -> a job for a catalog package whose stanza is an app, or null
 //                                                   (no IPA to sign, or a source-signed itms-services link)
 //   appPlan(jobs)     -> core/queue.js parseSimulation's shape: { installs, reinstalls, upgrades, downgrades, removes,
@@ -37,12 +41,12 @@ export function createAppQueue() {
   const emit = (event) => { for (const f of [...listeners]) { try { f(event); } catch { /* a listener's bug isn't the queue's */ } } };
   return {
     // An app is queued once: queuing it again replaces it (Cydia's marks work the same).
-    add({ id, name = null, version = null, installed = null, url, size = null, icon = null, key = null, source = null, sourceName = null, deps = [] }) {
+    add({ id, name = null, version = null, installed = null, url, size = null, icon = null, key = null, source = null, sourceName = null, deps = [], options = null }) {
       if (!id) throw new Error("no app id");
       if (!url) throw new Error(`no IPA to install for ${name || id}`);
       const job = { op: "install", id, name: name || null, version: version || null, installed: installed || null,
         mode: modeOf({ op: "install", version, installed }), url, size: Number(size) || null, icon, key, source, sourceName,
-        deps: Array.isArray(deps) ? deps : [] };
+        deps: Array.isArray(deps) ? deps : [], options: options && typeof options === "object" ? options : null };
       jobs.set(id, job);
       emit({ type: "add", job });
       return job;
@@ -106,4 +110,18 @@ export function appNavLabel({ queued = false, installed = null, newest = null } 
 
 export function modifyActions({ queued = false, installed = null, newest = null } = {}) {
   return queued ? ["Clear", verb({ installed, newest })] : [verb({ installed, newest })];
+}
+
+// F84: signing.install's params for a Custom Install job. The look's token holds the downloaded IPA on the phone for
+// 15 minutes (native Sideload.swift inspect) and goes with the first try; past 14 minutes, or once it was used (a
+// failed run keeps the job queued), the url downloads it again. The edits go either way.
+export const TOKEN_LIFE = 14 * 60 * 1000;
+export function customParams(job, now = Date.now()) {
+  const o = job?.options;
+  if (!o) return null;
+  const edits = { ...(o.edits ?? {}) };
+  delete edits.token;
+  delete edits.url;
+  const fresh = o.token && Number.isFinite(o.at) && now - o.at < TOKEN_LIFE;
+  return fresh ? { token: o.token, ...edits } : { url: job.url, ...edits };
 }

@@ -70,3 +70,5 @@ agent-runner merges every task into `~/repos/iFizBox` (the main checkout). Don't
 commit and push it, or work in a worktree or a clone of your own. Edits left in files a merge changes are moved to
 a `wip/main-checkout-<time>` branch (and a stash) after 3 minutes so the merge can land (`runner.toml`
 `land_edited = "wip"`); get them back with `git checkout wip/main-checkout-…` or `git stash pop`.
+
+Tasks: this repo is worked by agent-runner. Use the agent-runner skill (or run `agent-runner guide`): queue work with `agent-runner plan add`, never edit the plan's TODO.md by hand, never merge task/* or wip/* branches.

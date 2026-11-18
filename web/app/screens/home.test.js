@@ -40,7 +40,7 @@ test("Home pages: titles below the root, and curated sources are flat repos with
 
 test("F37: Home's hint shows while Not Jailbroken and taps through to Settings > Device", () => {
   assert.equal(deviceHint("none"), null, "the website: no hint (Jailbroken? Get Cydian.deb instead)");
-  assert.deepEqual(deviceHint("none", "jailbreak"), { text: DEVICE_HINT, href: "#/settings/device" });
+  assert.deepEqual(deviceHint("none", "jailbreak"), { text: DEVICE_HINT, href: "#/home/settings/device" });
   assert.equal(DEVICE_HINT, "Showing apps for iPhones without a jailbreak. Jailbroken? Settings > Device.");
   assert.equal(deviceHint("iphoneos-arm64"), null);
   assert.equal(deviceHint("iphoneos-arm"), null);
@@ -66,4 +66,43 @@ test("Jailbroken? Get Cydian.deb: Cydian's APT repo in Sileo and Zebra", async (
   assert.deepEqual(repoLinks("https://r/"), { sileo: "sileo://source/https://r/", zebra: "zbra://sources/add/https://r/",
     sileoPackage: "sileo://package/com.ryha.cydian", zebraPackage: "zbra://packages/com.ryha.cydian" });
   assert.deepEqual(JAILBROKEN_SHEET.buttons, ["Add to Sileo", "Add to Zebra", "Copy Repo URL", "Download .deb"]);
+});
+
+test("F123: Home's list ends with Settings in its own group, above Credits", async () => {
+  const { homeLinks } = await import("./home.js");
+  const groups = homeLinks();
+  assert.deepEqual(groups.at(-2), { rows: [{ label: "Settings", href: "#/home/settings" }] });
+  assert.equal(groups.at(-1).rows[0].label, "Credits / Thank You");
+  assert.equal(groups.at(-1).rows.length, 1);
+});
+
+test("F123: the Signing tile shows only while signing isn't set up, where something signs", async () => {
+  const { showsSigningTile, signingSetUp } = await import("./home.js");
+  assert.equal(showsSigningTile("site"), true);
+  assert.equal(showsSigningTile("sideload", false), true);
+  assert.equal(showsSigningTile("site", true), false);
+  assert.equal(showsSigningTile("sideload", true), false);
+  assert.equal(showsSigningTile("jailbreak", false), false);
+  // the website: a certificate and profile saved (signingReady)
+  assert.equal(await signingSetUp("site", { ready: async () => true }), true);
+  assert.equal(await signingSetUp("site", { ready: async () => false }), false);
+  assert.equal(await signingSetUp("site", { ready: async () => { throw new Error("idb"); } }), false);
+  // the sideload app: every walkthrough step (the real signing.js missingStep: certificate, then an https server)
+  const id = { identity: { name: "Me" } };
+  assert.equal(await signingSetUp("sideload", { status: async () => id, server: () => "https://cydian.dev" }), true);
+  assert.equal(await signingSetUp("sideload", { status: async () => ({ identity: null }), server: () => "https://cydian.dev" }), false);
+  assert.equal(await signingSetUp("sideload", { status: async () => id, server: () => "" }), false);
+  assert.equal(await signingSetUp("sideload", { status: async () => { throw new Error("no bridge"); }, server: () => "https://x" }), false);
+  assert.equal(await signingSetUp("jailbreak"), false);
+});
+
+test("F123: every Settings link in the screens goes through settingsRoute (Home's stack)", async () => {
+  const { readFileSync, readdirSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const dirs = [import.meta.dirname, join(import.meta.dirname, "..")];
+  for (const d of dirs) {
+    for (const f of readdirSync(d).filter((n) => n.endsWith(".js") && !n.endsWith(".test.js") && n !== "router.js")) {
+      assert.doesNotMatch(readFileSync(join(d, f), "utf8"), /tab: "settings"/, f);
+    }
+  }
 });

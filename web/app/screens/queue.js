@@ -23,7 +23,7 @@ import { grouped } from "../nav/ui.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
-import { format } from "../router.js";
+import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
 import { catalog } from "../catalog.js";
 import { installQueue, runLogs } from "../queue.js";
@@ -645,7 +645,7 @@ export function logsTitle(id) {
 export function logsSection(mode) {
   const list = runLogs.list();
   if (mode !== "jailbreak" && !list.length) return document.createDocumentFragment();
-  return grouped([{ header: "Console", rows: [{ label: "Console Logs", detail: list.length ? String(list.length) : "None", href: format({ tab: "settings", path: [LOGS] }) }],
+  return grouped([{ header: "Console", rows: [{ label: "Console Logs", detail: list.length ? String(list.length) : "None", href: format(settingsRoute([LOGS])) }],
     footer: "The output of every install, upgrade and removal, kept on this iPhone." }]);
 }
 
@@ -666,7 +666,7 @@ export function logsPage(id, redraw = () => {}) {
   if (!list.length) return grouped([{ rows: [{ label: "No Logs Yet" }], footer: "Each run of the install queue keeps its console output here." }]);
   return grouped([
     { rows: list.map((e) => ({ label: e.title || "Run", subtitle: `${when(e.at)} · ${e.ok ? "Completed" : `Failed (${e.code})`}`,
-      href: format({ tab: "settings", path: [LOGS, e.id] }) })), footer: "The newest 20 runs." },
+      href: format(settingsRoute([LOGS, e.id])) })), footer: "The newest 20 runs." },
     { rows: [{ label: "Clear Logs", onClick: async () => {
       const i = await showActionSheet({ buttons: ["Clear Logs"], destructive: 0 });
       if (i === 0) { runLogs.clear(); redraw(); }

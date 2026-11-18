@@ -27,6 +27,60 @@ test("tabs are the five iOS 6 tabs in order, then Settings", () => {
   assert.deepEqual(TABS, ["home", "sources", "changes", "installed", "search", "settings"]);
 });
 
+test("F123: the tab bar is Cydia's five, Settings' pages are on Home's stack", async () => {
+  const { BAR_TABS, settingsRoute, mounted, mountLink } = await import("./router.js");
+  assert.deepEqual(BAR_TABS, ["home", "sources", "changes", "installed", "search"]);
+  assert.deepEqual(settingsRoute(), { tab: "home", path: ["settings"] });
+  assert.equal(format(settingsRoute(["signing"])), "#/home/settings/signing");
+  // links made before (#/settings/…, format({ tab: "settings" })) land on Home's Settings
+  assert.deepEqual(parse("#/settings"), { tab: "home", path: ["settings"] });
+  assert.deepEqual(parse("#/settings/signing"), { tab: "home", path: ["settings", "signing"] });
+  assert.deepEqual(parse(format({ tab: "settings", path: ["device"] })), settingsRoute(["device"]));
+  // the Settings screen draws them: Home's settings/… and a ~settings mount
+  assert.deepEqual(mounted(settingsRoute()), { tab: "settings", path: [] });
+  assert.deepEqual(mounted(settingsRoute(["logs", "7"])), { tab: "settings", path: ["logs", "7"] });
+  assert.deepEqual(mounted({ tab: "sources", path: ["pkg", "~settings", "iosVersion"] }), { tab: "settings", path: ["iosVersion"] });
+  assert.deepEqual(prefixes(settingsRoute(["signing"]).path), [[], ["settings"], ["settings", "signing"]]);
+  assert.deepEqual(parent(settingsRoute(["signing"])), settingsRoute());
+  // from Home: a plain push; from another tab: a Settings page mounts there (Back returns), Settings' root goes Home
+  assert.equal(mountLink({ tab: "home", path: [] }, settingsRoute(["signing"])), null);
+  assert.deepEqual(mountLink({ tab: "sources", path: ["pkg"] }, settingsRoute(["iosVersion"])),
+    { tab: "sources", path: ["pkg", "~settings", "iosVersion"] });
+  assert.deepEqual(mountLink({ tab: "sources", path: ["pkg", "~settings", "iosVersion"] }, settingsRoute(["device"])),
+    { tab: "sources", path: ["pkg", "~settings", "device"] });
+  assert.equal(mountLink({ tab: "sources", path: ["pkg"] }, settingsRoute()), null);
+});
+
+test("F123: the router walks Home > Settings > Signing, and an old #/settings link is rewritten in place", () => {
+  const win = fakeWindow("#/settings/signing");
+  const seen = [];
+  const router = createRouter({ win, onRoute: (r) => seen.push(format(r)) });
+  router.start();
+  assert.equal(win.location.hash, "#/home/settings/signing");
+  router.go({ tab: "home", path: [] });
+  router.go({ tab: "home", path: ["settings"] });
+  router.go({ tab: "settings", path: ["device"] }); // format({ tab: "settings" }): still Home's stack
+  router.selectTab("search");
+  router.go({ tab: "settings", path: ["iosVersion"] }); // from another tab: mounted there
+  router.selectTab("settings"); // no such tab button any more; a stray call opens Home's Settings
+  assert.deepEqual(seen, ["#/home/settings/signing", "#/home", "#/home/settings", "#/home/settings/device", "#/search",
+    "#/search/~settings/iosVersion", "#/home/settings"]);
+});
+
+test("F123: the stacks hold only the tab-bar tabs; Settings pages build on Home's", async () => {
+  const { BAR_TABS } = await import("./router.js");
+  const win = fakeWindow("#/home");
+  const stacks = createStacks({ tabs: BAR_TABS, create: (tab, path) => ({ tab, path }) });
+  const results = [];
+  const router = createRouter({ win, onRoute: (r) => results.push(stacks.sync(r)) });
+  router.start();
+  router.go({ tab: "home", path: ["settings"] });
+  assert.equal(results.at(-1).kind, "push");
+  router.go({ tab: "settings", path: ["signing"] });
+  assert.equal(results.at(-1).kind, "push");
+  assert.deepEqual(stacks.stack("home").map((e) => e.path.join("/")), ["", "settings", "settings/signing"]);
+});
+
 test("parse and format", () => {
   assert.deepEqual(parse(""), { tab: "home", path: [] });
   assert.deepEqual(parse("#/"), { tab: "home", path: [] });

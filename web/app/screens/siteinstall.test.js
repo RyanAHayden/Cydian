@@ -87,7 +87,7 @@ test("Home's Install Cydian App (F93): signs Cydian with the certificate, or ope
     install: ({ onInstalled, ...o }) => { calls.push(["install", o]); onInstalled(); } });
   assert.equal(await installApp(deps(false, true)), "signing");
   assert.equal(await installApp(deps(true, false)), "install");
-  assert.deepEqual(calls, [["go", "/settings/signing"], ["install", { url: APP_IPA_URL, name: APP_NAME, bring: false }]]);
+  assert.deepEqual(calls, [["go", "/home/settings/signing"], ["install", { url: APP_IPA_URL, name: APP_NAME, bring: false }]]);
   assert.equal(marked, 1, "F96: once installed, the first-visit prompt stops");
   assert.equal(showsSigningTile("site"), true);
   assert.equal(showsSigningTile("sideload"), true);

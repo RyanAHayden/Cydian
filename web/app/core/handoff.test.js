@@ -122,3 +122,58 @@ test("isAddPath", () => {
   assert.ok(!isAddPath("/address"));
   assert.ok(!isAddPath("/index.html"));
 });
+
+// F50: Open In by the alt: record's format (F16a keeps `format` on it).
+const E = (u) => encodeURIComponent(u);
+const ipa = (format, uri, extra = {}) => ({ key: `alt:${uri}`, uri, format, ...extra });
+
+test("format: an alt: record's format, AltStore when it has none or an unknown one", () => {
+  assert.equal(formatOf(ipa("scarlet", "https://x/r.json")), "scarlet");
+  assert.equal(formatOf(ipa("esign", "https://x/r.json")), "esign");
+  assert.equal(formatOf(ipa("gbox", "https://x/r.json")), "gbox");
+  assert.equal(formatOf(ipa("altstore", "https://x/r.json")), "altstore");
+  assert.equal(formatOf(ipa("bogus", "https://x/r.json")), "altstore");
+  assert.equal(formatOf({ ...FLAT, format: "scarlet" }), "apt"); // only alt: records carry a format
+});
+
+test("Scarlet repo: Open in Scarlet alone, scarlet://repo=<url> as unwrapLink reads it", async () => {
+  const u = "https://raw.githubusercontent.com/suprstarrd/locus-ios/main/scarlet.json";
+  const links = sourceLinks(ipa("scarlet", u));
+  assert.deepEqual(links, [{ app: "Scarlet", url: `scarlet://repo=${u}` }]);
+  const { unwrapLink } = await import("./sources/detect.js");
+  assert.equal(unwrapLink(links[0].url).url, u);
+  assert.equal(unwrapLink(links[0].url).hint, "scarlet");
+});
+
+test("ESign source: ESign first, then the AltStore-format sideloaders (its JSON is AltStore 1.x)", () => {
+  const u = "https://example.com/esign.json";
+  const links = sourceLinks(ipa("esign", u));
+  assert.deepEqual(links[0], { app: "ESign", url: `esign://addsource?url=${u}` });
+  assert.equal(links.length, 8);
+  assert.deepEqual(links.slice(1).map((l) => l.url), sourceLinks(ipa("altstore", u)).map((l) => l.url));
+  // & and # stay inside url=.
+  assert.equal(sourceLinks(ipa("esign", "https://x.example/s?a=1&b=2"))[0].url,
+    "esign://addsource?url=https://x.example/s?a=1%26b=2");
+});
+
+test("GBox source: Open in GBox alone; an encrypted one too, with no sideloader", () => {
+  const u = "https://raw.githubusercontent.com/qoli/GboxApps/main/apps.json";
+  assert.deepEqual(sourceLinks(ipa("gbox", u)), [{ app: "GBox", url: `gbox://AddSource/${u}` }]);
+  const enc = ipa("gbox", u, { unsupported: "This GBox source is encrypted, so only GBox can read it." });
+  assert.deepEqual(sourceLinks(enc), [{ app: "GBox", url: `gbox://AddSource/${u}` }]);
+  assert.deepEqual(packageLinks("gbox.app", enc), sourceLinks(enc));
+});
+
+test("an unsupported AltStore record offers no sideloader that can't read it", () => {
+  assert.deepEqual(sourceLinks(ipa("altstore", "https://x/a.json", { unsupported: "no" })), []);
+  assert.equal(sourceLinks(ipa("esign", "https://x/a.json", { unsupported: "no" })).map((l) => l.app).join(), "ESign");
+});
+
+test("IPA formats: a package's links are its source's, and the add link carries no suite", () => {
+  for (const f of ["scarlet", "esign", "gbox"]) {
+    const s = ipa(f, "https://example.com/r.json");
+    assert.deepEqual(packageLinks("com.x", s), sourceLinks(s));
+    assert.equal(addLink(s), `${PUBLIC_SITE}/add?url=${E("https://example.com/r.json")}`);
+  }
+  assert.deepEqual(sourceLinks(ipa("scarlet", "file:///x.json")), []);
+});

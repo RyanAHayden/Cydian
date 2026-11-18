@@ -6,7 +6,8 @@
 //   s.get("appearance");            // "auto" | "light" | "dark" (light unless chosen: iOS 6 was light)
 //   s.set("appearance", "dark");    // stored at localStorage["cydian.appearance"], listeners told
 //   s.onChange((key, value) => …);  // returns an unsubscribe function
-//   s.sections();                   // [{ id, title, footer, settings: [def…] }], only the rows this mode shows
+//   s.sections();                   // [{ id, page, title, footer, settings: [def…] }], only the rows this mode shows
+//   s.pages();                      // [{ id, title, sections }]: Settings' root rows (General, Display, Updates…)
 //   s.holds.set("com.example.tweak", true);  // Ignore upgrades, kept on the device (jailbreak: also a dpkg hold)
 //   await s.holds.sync();                    // jailbreak: take dpkg's holds (apt-mark showhold) as the list
 //   s.hiddenSections.set("Themes", true);    // Section Visibility (F24): listeners hear ("hiddenSections", list)
@@ -29,10 +30,7 @@ export const MODES = ["site", "jailbreak", "sideload"];
 
 // Features that exist today. "appearance": this task's theme. "sources": the source list and its refresh (F4).
 // "holds": Ignored Upgrades (F7's upgrades list leaves them out; the helper's apt-mark side is F22's).
-// Still to come, by the setting that waits on it: "update-check" (Check for updates), "cellular" (Use cellular
-// data, app only), "notifications" (Notifications), "badge" (App icon badge), "auto-install" (the three
-// automatic-install rows), "rollback" (Keep previous versions), "resign" (Re-sign reminder, F14).
-// "compat": Works on My Phone (F17). "device": Device type and Sideloader (F37).
+// "compat": Works on My Phone (F17). "device": Device type (F37).
 // "resign": Re-sign Reminder, which F68 turns on (signing.remind, F14).
 // "upgrade-notifications": Upgrade Notifications, N5's daemon's "n Upgrades" in the jailbreak app (F65).
 // "auto-install", "rollback": N7's Automatic Installs rows, which F70 hands to the daemon (daemonPrefs below).
@@ -43,16 +41,33 @@ const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
 const onOff = [{ value: false, label: "Off" }, { value: true, label: "On" }];
 
-export const SECTIONS = [
-  { id: "appearance", title: "Appearance" },
-  { id: "device", title: "Device" },
-  { id: "sources", title: "Sources" },
-  { id: "compat", title: "Works on My Phone" },
+// F128: laid out like iOS 6's Settings app. The root is one list of short rows, one per page (General, Display,
+// Updates); each page holds its groups (SECTIONS, in order), a group's footer says in a line what its rows do. The
+// "signing" page has no root row of its own: its group goes on Settings > Signing (screens/settings.js).
+export const PAGES = [
+  { id: "general", title: "General" },
+  { id: "display", title: "Display" },
   { id: "updates", title: "Updates" },
-  { id: "notifications", title: "Notifications" },
-  { id: "automatic", title: "Automatic Installs" },
   { id: "signing", title: "Signing" },
 ];
+
+export const SECTIONS = [
+  { id: "device", page: "general" },
+  { id: "compat", page: "general" },
+  { id: "sources", page: "general" },
+  { id: "appearance", page: "display", title: "Appearance" },
+  { id: "display", page: "display" },
+  { id: "zoom", page: "display" },
+  { id: "updates", page: "updates" },
+  { id: "notifications", page: "updates" },
+  { id: "automatic", page: "updates", title: "Automatic Installs" },
+  { id: "signing", page: "signing" },
+];
+
+// F128: settings that went (docs/settings.md says why). Nothing reads them; createSettings() drops their stored
+// values, and a full daemonPrefs() sends the daemon's two as null so the shell removes them there too.
+export const RETIRED = ["sideloader", "checkUpdates", "cellular", "notifications", "badge"];
+export const RETIRED_DAEMON_KEYS = ["checkUpdates", "cellular"];
 
 // kind: "choice" (one row per option, the chosen one checked), "toggle" (a switch), "list" (pushes a page that
 // picks one option; its footer shows there), "holds" (pushes the held packages). `default` is a value, or a function of the mode.
@@ -64,8 +79,8 @@ export const SETTINGS = [
     footer: "Automatic follows the iPhone's own Light or Dark setting.",
   },
   {
-    key: "allowZoom", section: "appearance", kind: "toggle", feature: "appearance", modes: ALL, default: false,
-    label: "Allow Zoom", options: onOff, footer: "Lets you pinch to zoom, for screenshots. Off, the app stays at its own size.",
+    key: "allowZoom", section: "zoom", kind: "toggle", feature: "appearance", modes: ALL, default: false,
+    label: "Zoom", options: onOff, footer: "Zoom lets you pinch to zoom in.",
   },
   {
     // F37: what kind of iPhone this is. The site only: the jailbreak app takes it from the bridge (deviceType) and
@@ -79,20 +94,7 @@ export const SETTINGS = [
       { value: "iphoneos-arm", label: "Jailbroken (Rootful)", subtitle: "iphoneos-arm: palera1n rootful, older jailbreaks" },
       { value: "iphoneos-arm64e", label: "Jailbroken (Roothide)", subtitle: "iphoneos-arm64e: Dopamine roothide, Bootstrap" },
     ],
-    footer: "Not Jailbroken lists apps from AltStore-style sources. Jailbroken also lists tweaks and themes from APT sources, built for this architecture.",
-  },
-  {
-    // F37: where an app's GET goes on a phone without a jailbreak. Never through a server of ours. The site only:
-    // the sideload build signs and installs on the phone itself (F14).
-    key: "sideloader", section: "device", kind: "list", feature: "device", modes: [], default: "feather", // hidden: app pages no longer hand apps to other sideloaders (user 2026-11-17)
-    label: "Sideloader",
-    options: [
-      { value: "feather", label: "Feather", subtitle: "Signs on the phone with your certificate" },
-      { value: "altstore", label: "AltStore", subtitle: "Signs with your Apple ID" },
-      { value: "sidestore", label: "SideStore", subtitle: "Signs with your Apple ID, no computer" },
-      { value: "download", label: "Download .ipa", subtitle: "Save the file and open it yourself" },
-    ],
-    footer: "GET on an app opens it in this app, which signs and installs it on your iPhone.",
+    footer: "Jailbroken also lists tweaks and themes from APT sources, built for its architecture.",
   },
   {
     // The architecture APT packages are listed for, kept for backend.js getArch() (`cydian.arch`). No row of its
@@ -108,18 +110,17 @@ export const SETTINGS = [
   {
     key: "worksOnMyPhone", section: "compat", kind: "toggle", feature: "compat", modes: ALL, default: true,
     label: "Works on My Phone", options: onOff,
-    footer: (mode) => "Hides packages that say they don't work on this iPhone's iOS version or jailbreak type"
-      + (mode === "site" ? " (set under Device)." : ".") + " Packages that don't say are kept.",
+    footer: (mode) => "Hides packages that say they don't work on " + (mode === "site" ? "the iPhone set above." : "this iPhone."),
   },
   {
     // F35: the check, X or ? beside every package in lists, Search and the package page.
-    key: "compatMarks", section: "compat", kind: "toggle", feature: "compat", modes: ALL, default: true,
-    label: "Show Compatibility Marks", options: onOff,
-    footer: "A green check beside packages that work on this iPhone, a red X beside those that don't, a grey ? where the package doesn't say.",
+    key: "compatMarks", section: "display", kind: "toggle", feature: "compat", modes: ALL, default: true,
+    label: "Compatibility Marks", options: onOff,
+    footer: "Compatibility Marks put a check, an X or a ? beside each package.",
   },
   {
     // The site's picker (F17): the app knows its iOS version from the bridge.
-    key: "iosVersion", section: "compat", kind: "list", feature: "compat", modes: ["site"], default: "auto",
+    key: "iosVersion", section: "device", kind: "list", feature: "compat", modes: ["site"], default: "auto",
     label: "iOS Version",
     options: [{ value: "auto", label: "Automatic", subtitle: "From this browser" },
       ...IOS_VERSIONS.map((v) => ({ value: v, label: `iOS ${v}` }))],
@@ -129,20 +130,8 @@ export const SETTINGS = [
     key: "refreshOnLaunch", section: "sources", kind: "toggle", feature: "sources", modes: ALL,
     default: (mode) => mode !== "site", // the site fetches through our proxy: opt in there
     label: "Refresh Sources on Launch", options: onOff,
+    footer: "Looks for new packages in every source each time Cydian opens.",
   },
-  {
-    key: "checkUpdates", section: "updates", kind: "list", feature: "update-check", modes: ALL, default: "launch",
-    label: "Check for Updates",
-    options: [
-      { value: "off", label: "Off" }, { value: "launch", label: "On Launch" },
-      { value: "6h", label: "Every 6 Hours" }, { value: "daily", label: "Daily" },
-    ],
-    footer: (mode) => mode === "sideload"
-      ? "Looks for new versions of the apps you sideloaded."
-      : "Looks for new versions of the packages you installed.",
-  },
-  { key: "cellular", section: "updates", kind: "toggle", feature: "cellular", modes: BOTH, default: true,
-    label: "Use Cellular Data", options: onOff },
   {
     key: "holds", section: "updates", kind: "holds", feature: "holds", modes: ALL, label: "Ignored Upgrades",
     footer: (mode) => mode === "jailbreak"
@@ -150,26 +139,20 @@ export const SETTINGS = [
       : "Kept on this device, and synced by a Cydian Account.",
   },
   {
-    key: "notifications", section: "notifications", kind: "list", feature: "notifications", modes: ALL, default: "summary",
-    label: "Notifications",
-    options: [{ value: "off", label: "Off" }, { value: "summary", label: "Summary" }, { value: "each", label: "One per Package" }],
-  },
-  {
     // F65: N5's background check (native/daemon/) posts "3 Upgrades". Off: `cydian-helper notifications off` writes
     // /var/jb/var/lib/cydian/upgrades.off and the daemon only updates the icon's count (daemon/quiet.h).
     key: "upgradeNotifications", section: "notifications", kind: "toggle", feature: "upgrade-notifications",
     modes: ["jailbreak"], default: true, label: "Upgrade Notifications", options: onOff,
-    footer: "A notification when the daily check finds new upgrades. Off, Cydian's icon still shows how many there are.",
+    footer: "Off, Cydian's icon still shows how many upgrades there are.",
   },
-  { key: "badge", section: "notifications", kind: "toggle", feature: "badge", modes: ALL, default: true,
-    label: "App Icon Badge", options: onOff },
   {
     key: "autoInstall", section: "automatic", kind: "list", feature: "auto-install", modes: ["jailbreak"], default: "off",
     label: "Install Updates Automatically",
     options: [{ value: "off", label: "Off" }, { value: "marked", label: "Only Packages I Mark" }, { value: "all", label: "Everything" }],
   },
   { key: "autoInstallIdle", section: "automatic", kind: "toggle", feature: "auto-install", modes: ["jailbreak"], default: true,
-    label: "Only When Charging and Locked", options: onOff },
+    label: "When Charging and Locked", options: onOff,
+    footer: "On, automatic installs wait until this iPhone is charging and locked." },
   {
     key: "respring", section: "automatic", kind: "list", feature: "auto-install", modes: ["jailbreak"], default: "notify",
     label: "After a Respring Update",
@@ -215,7 +198,7 @@ export function addRecent(list, query, max = RECENT_MAX) {
 // appearance, device, the compat options; Ignored Upgrades (holds) and the Signing Server travel beside them. The
 // app takes only those it shows itself (settings.isShown).
 export const TRAVELS = ["appearance", "allowZoom", "device", "worksOnMyPhone", "compatMarks", "iosVersion"];
-export const DAEMON_KEYS = ["checkUpdates", "cellular", "autoInstall", "autoInstallIdle", "respring", "keepVersions"];
+export const DAEMON_KEYS = ["autoInstall", "autoInstallIdle", "respring", "keepVersions"];
 export const DAEMON_LISTS = ["holds", "autoMarked"];
 const byKey = new Map(SETTINGS.map((d) => [d.key, d]));
 
@@ -258,7 +241,24 @@ function safeStorage(storage) {
       mem.set(k, v);
       try { storage?.setItem(k, v); } catch { /* unavailable: the memory copy stands */ }
     },
+    remove(k) {
+      mem.delete(k);
+      try { storage?.removeItem?.(k); } catch { /* unavailable */ }
+    },
   };
+}
+
+// F128: drops the stored values of the settings that went (RETIRED). Runs with every createSettings(); a value
+// that isn't there costs one lookup. Returns the keys it removed, for the tests.
+export function dropRetired(storage = globalThis.localStorage) {
+  const store = storage?.remove ? storage : safeStorage(storage);
+  const gone = [];
+  for (const k of RETIRED) {
+    if (store.get(PREFIX + k) == null) continue;
+    store.remove(PREFIX + k);
+    gone.push(k);
+  }
+  return gone;
 }
 
 // `helper` (jailbreak mode only): runs cydian-helper with the given words and resolves to { code, stdout }, e.g.
@@ -268,6 +268,7 @@ function safeStorage(storage) {
 export function createSettings({ storage = globalThis.localStorage, mode = "site", features = FEATURES, helper, native = null } = {}) {
   if (!MODES.includes(mode)) throw new Error(`unknown mode ${mode}`);
   const store = safeStorage(storage);
+  dropRetired(store);
   // F37: a site visitor who picked an Architecture before Device existed keeps it as their device type; the app's
   // detected type becomes `arch` for getArch().
   const detected = mode === "jailbreak" ? bridgeArch(native) : null;
@@ -489,13 +490,15 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
 
   // F70: the daemon's preferences, { "cydian.<key>": value }: string, bool or number as get() gives them, the lists
   // as arrays of package ids. A setting nobody has picked is null (the shell removes the key), so the daemon keeps
-  // its own default: F13's, except Check for Updates, which stays Daily (N5's check) until it is really chosen;
-  // its row isn't shown yet, and the app's "launch" default would otherwise switch the background check off.
+  // its own default.
   // `keys`: only these (a setting's key or a list's name), for one change.
-  function daemonPrefs(keys = [...DAEMON_KEYS, ...DAEMON_LISTS]) {
+  // F128: the full set also sends RETIRED_DAEMON_KEYS as null, so a value an older app left there goes and the
+  // daemon keeps its own default (Check for Updates Daily, cellular data on).
+  function daemonPrefs(keys = [...DAEMON_KEYS, ...DAEMON_LISTS, ...RETIRED_DAEMON_KEYS]) {
     const out = {};
     for (const k of keys) {
-      if (k === "holds") out[HOLDS_KEY] = readHolds().sort();
+      if (RETIRED_DAEMON_KEYS.includes(k)) out[PREFIX + k] = null;
+      else if (k === "holds") out[HOLDS_KEY] = readHolds().sort();
       else if (k === "autoMarked") out[AUTO_MARKED_KEY] = readMarked();
       else if (DAEMON_KEYS.includes(k)) {
         const raw = store.get(PREFIX + k);
@@ -503,6 +506,14 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
       }
     }
     return out;
+  }
+
+  function sections() {
+    return SECTIONS.map((s) => {
+      const settings = SETTINGS.filter((d) => d.section === s.id && shown(d));
+      const footers = settings.filter((d) => d.kind !== "list").map((d) => resolve(d.footer, mode)).filter(Boolean);
+      return { ...s, settings, footer: footers.join(" ") || undefined };
+    }).filter((s) => s.settings.length);
   }
 
   return {
@@ -522,12 +533,14 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     onChange(f) { listeners.add(f); return () => listeners.delete(f); },
     isShown: (key) => { const d = byKey.get(key); return Boolean(d && shown(d)); },
     visible: () => SETTINGS.filter(shown),
-    sections: () => SECTIONS.map((s) => {
-      const settings = SETTINGS.filter((d) => d.section === s.id && shown(d));
-      const footers = settings.filter((d) => d.kind !== "list").map((d) => resolve(d.footer, mode)).filter(Boolean);
-      return { ...s, settings, footer: footers.join(" ") || undefined };
-    }).filter((s) => s.settings.length),
+    sections,
     footerOf: (key) => resolve(byKey.get(key)?.footer, mode),
+    // F128: Settings' pages, each with the groups this mode shows; pages left empty are dropped.
+    pages() {
+      const all = sections();
+      return PAGES.map((p) => ({ ...p, sections: all.filter((s) => s.page === p.id) })).filter((p) => p.sections.length);
+    },
+    pageOf: (id) => PAGES.find((p) => p.id === id) ?? null,
   };
 }
 

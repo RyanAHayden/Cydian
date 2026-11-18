@@ -41,3 +41,23 @@ test("Update Alerts: what iOS allows, the last background check, and a way to Se
   assert.equal(quiet.rows[0].detail, "Off"); // turned off here: no nudge to Settings
   assert.equal(quiet.rows.some((r) => r.open), false);
 });
+
+// F128: Settings' pages and their titles, like iOS 6's (the root, General, Display, Updates, a list page under one),
+// and the older one-segment routes other screens still link to.
+test("F128: page titles for the iOS 6-style routes and the old ones", async () => {
+  const { nav } = await import("./settings.js");
+  const t = (...path) => nav({ tab: "home", path }).title;
+  assert.equal(t(), "Settings");
+  assert.equal(t("general"), "General");
+  assert.equal(t("display"), "Display");
+  assert.equal(t("updates"), "Updates");
+  assert.equal(t("about"), "About");
+  assert.equal(t("general", "device"), "Device");
+  assert.equal(t("updates", "holds"), "Ignored Upgrades");
+  assert.equal(t("signing"), "Signing");
+  assert.equal(t("signing", "resignReminder"), "Re-sign Reminder");
+  assert.equal(t("device"), "Device"); // Home's hint
+  assert.equal(t("iosVersion"), "iOS Version"); // a package page's link
+  assert.equal(t("holds"), "Ignored Upgrades");
+  assert.equal(t("account"), "Cydian Account");
+});

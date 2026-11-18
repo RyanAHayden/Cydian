@@ -14,6 +14,13 @@ export function el(tag, cls, text) {
   return e;
 }
 
+// A navigation bar button (ios6.css .bar-button); cls adds a variant class.
+export function barButton(label, cls = "") {
+  const b = el("button", `bar-button${cls ? ` ${cls}` : ""}`, label);
+  b.type = "button";
+  return b;
+}
+
 function cell(row) {
   const li = el("li", "cell");
   if (row.cls) li.classList.add(row.cls);

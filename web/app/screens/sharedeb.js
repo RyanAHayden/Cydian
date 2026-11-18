@@ -5,17 +5,11 @@
 // share.debInstall (install-deb) in the same console (runPaidInstall's: outside the queue, kept in Console Logs).
 // Cancel removes the staged file. When apt says no, F18's sentences come first, then apt's own words.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { grouped, el } from "../nav/ui.js";
+import { grouped, el, barButton } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { modal, runPaidInstall } from "./queue.js";
 import { catalog } from "../catalog.js";
 import { MODES, MODE_LABEL, parseSimulation, changeCount } from "../core/queue.js";
-
-function barButton(label, cls = "") {
-  const b = el("button", `bar-button${cls ? ` ${cls}` : ""}`, label);
-  b.type = "button";
-  return b;
-}
 
 const call = (native, method, params, onEvent) => native.call(`share.${method}`, params, onEvent);
 

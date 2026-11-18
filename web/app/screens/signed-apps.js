@@ -3,11 +3,14 @@
 // signatures end within 7 days (core/signing.js certificateWarnings), and Signed Apps from signing.installed, with
 // Re-sign All (signing.resignAll, the HUD following each app) and a left swipe on an app to forget it
 // (signing.forget). settings.js drawDeviceSigning puts what signingExtras() returns into the page.
+// F91: Re-sign All queues every app as a "resign" job (core/appqueue.js resignJob) and opens Confirm (screens/queue.js
+// queueApp), which signs each through signing.resign, Cydian last, instead of running at once.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, collapse } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { certificateWarnings, revocationLabel, resignLabel, signedAppRows, deviceError } from "../core/signing.js";
+import { resignJob } from "../core/appqueue.js";
 import { getServer } from "../signing-client.js";
 
 let styled = false;
@@ -87,9 +90,9 @@ async function fillApps(box, { identity, redraw, native, alert, hud }) {
   const sections = [{ header: "Signed Apps",
     rows: rows.length ? rows.map((r) => ({ label: r.label, subtitle: r.subtitle, detail: r.detail })) : [{ label: "None Yet" }],
     footer: rows.length
-      ? `Apps you installed with your certificate, soonest to expire first${next ? ` (next: ${next})` : ""}. Re-sign All downloads each again, signs it with the current certificate and its edits, and installs it. Swipe left on one to forget it.`
+      ? `Apps you installed with your certificate, soonest to expire first${next ? ` (next: ${next})` : ""}. Re-sign All queues them all: Confirm downloads each again, signs it with the current certificate and its edits, and installs it. Swipe left on one to forget it.`
       : "Apps you install with your certificate show here, with when their signatures end." }];
-  if (rows.length && identity) sections.push({ rows: [{ label: "Re-sign All", onClick: () => resignAll(rows.length, { redraw, native, alert, hud }) }] });
+  if (rows.length && identity) sections.push({ rows: [{ label: "Re-sign All", onClick: () => queueResignAll(rows) }] });
   box.replaceChildren(grouped(sections));
   if (!rows.length) return;
   const cells = box.querySelectorAll(".group")[0].querySelectorAll(".cell");
@@ -151,7 +154,16 @@ function attachSwipe(ul) {
   ul.addEventListener("pointercancel", stop);
 }
 
-async function resignAll(count, { redraw, native, alert, hud }) {
+// F91: every signed app queued for Re-sign; the first add opens Confirm, the rest redraw it. -> the jobs queued.
+export async function queueResignAll(rows, { add = null } = {}) {
+  add ??= (await import("./queue.js")).queueApp;
+  const jobs = (rows ?? []).map((r) => resignJob(r)).filter(Boolean);
+  for (const j of jobs) add(j);
+  return jobs;
+}
+
+// Before F91: signing.resignAll straight away, the HUD following each app. Kept for a caller that wants it at once.
+export async function resignAll(count, { redraw, native, alert, hud }) {
   const { index } = await alert({ title: "Re-sign All?",
     message: `${count === 1 ? "The app is" : `All ${count} apps are`} downloaded again, signed with your current certificate and installed, one after another. iOS asks before each install.`,
     buttons: ["Cancel", "Re-sign"], cancel: 0 });

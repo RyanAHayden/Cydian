@@ -20,6 +20,12 @@
 //   appNavLabel({ queued, installed, newest }) -> the app page's nav button: Modify while the app is queued (Cydia),
 //                        else Install, Upgrade or Reinstall
 //   modifyActions({ queued, installed, newest }) -> the Modify sheet's buttons: Clear first (Cydia's), then the rest
+// F91: re-signs go through the same queue.
+//   job mode "resign": { op: "resign", id, name, version, installed, mode: "resign", url: null }: signing.resign {bundleId}
+//       signs the app again from the phone's record (native Sideload.swift), no IPA url of its own
+//   resignJob({ bundleId, name, version }) -> such a job, from a signing.installed record or a Needs Re-sign row
+//   APP_MODES, APP_MODE_LABEL -> Confirm's Modifications for apps: core/queue.js's modes, Remove out, Re-sign in
+//   modifyActions({ ..., signed }) -> "Re-sign" last for an app Cydian signed
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { modeOf } from "./queue.js";
 import { compareVersions } from "./apt.js";
@@ -41,8 +47,15 @@ export function createAppQueue() {
   const emit = (event) => { for (const f of [...listeners]) { try { f(event); } catch { /* a listener's bug isn't the queue's */ } } };
   return {
     // An app is queued once: queuing it again replaces it (Cydia's marks work the same).
-    add({ id, name = null, version = null, installed = null, url, size = null, icon = null, key = null, source = null, sourceName = null, deps = [], options = null }) {
+    add({ id, name = null, version = null, installed = null, url, size = null, icon = null, key = null, source = null, sourceName = null, deps = [], options = null, mode = null }) {
       if (!id) throw new Error("no app id");
+      if (mode === "resign") { // F91: signed again from the phone's record, nothing to download here
+        const job = { op: "resign", id, name: name || null, version: version || installed || null, installed: installed || version || null,
+          mode: "resign", url: null, size: null, icon, key, source, sourceName, deps: [], options: null };
+        jobs.set(id, job);
+        emit({ type: "add", job });
+        return job;
+      }
       if (!url) throw new Error(`no IPA to install for ${name || id}`);
       const job = { op: "install", id, name: name || null, version: version || null, installed: installed || null,
         mode: modeOf({ op: "install", version, installed }), url, size: Number(size) || null, icon, key, source, sourceName,
@@ -78,7 +91,7 @@ export function appJob(pkg, { installed = null, version = null, source = null } 
 
 // Confirm's Modifications and Statistics, from the queue alone: every app and what it needs, under its mode.
 export function appPlan(jobs = []) {
-  const out = { installs: [], reinstalls: [], upgrades: [], downgrades: [], removes: [], essential: [], download: null };
+  const out = { installs: [], reinstalls: [], upgrades: [], downgrades: [], removes: [], resigns: [], essential: [], download: null };
   const seen = new Set();
   let bytes = 0;
   const put = (e, mode) => {
@@ -113,10 +126,24 @@ export function appNavLabel({ queued = false, installed = null, newest = null } 
 // Modify's sheet. Queued: Clear, or queue it again. Installed: Upgrade (a newer one is out) or Reinstall, and
 // Downgrade when the source has an older version than the installed one (`older`). No Remove: the sideload app
 // can't delete apps.
-export function modifyActions({ queued = false, installed = null, newest = null, older = false } = {}) {
-  if (queued) return ["Clear", verb({ installed, newest })];
-  if (installed == null) return [verb({ installed, newest })];
-  return [verb({ installed, newest }), ...(older ? ["Downgrade"] : [])];
+export function modifyActions({ queued = false, installed = null, newest = null, older = false, signed = false } = {}) {
+  const resign = signed ? ["Re-sign"] : []; // F91: an app Cydian signed can be signed again, as it is
+  if (queued) return ["Clear", verb({ installed, newest }), ...resign];
+  if (installed == null) return [verb({ installed, newest }), ...resign];
+  return [verb({ installed, newest }), ...(older ? ["Downgrade"] : []), ...resign];
+}
+
+// ---- F91: re-signs ------------------------------------------------------------------------------------------------
+
+export const APP_MODES = ["install", "reinstall", "upgrade", "downgrade", "resign"];
+export const APP_MODE_LABEL = { install: "Install", reinstall: "Reinstall", upgrade: "Upgrade", downgrade: "Downgrade", resign: "Re-sign" };
+
+export function resignJob(app) {
+  const id = app?.bundleId ?? app?.id;
+  if (!id) return null;
+  // a Needs Re-sign row (core/signing.js needsResign) shows the days left as its version: the app's own is `installed`
+  const v = app.change === "resign" ? app.installed ?? null : app.version ?? app.installed ?? null;
+  return { id, name: app.name || app.label || id, version: v || null, installed: v || null, mode: "resign", icon: app.icon ?? null };
 }
 
 // F84: signing.install's params for a Custom Install job. The look's token holds the downloaded IPA on the phone for

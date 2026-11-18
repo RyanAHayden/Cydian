@@ -598,7 +598,8 @@ export function signedAppRows(installed, now = new Date()) {
     const days = Math.floor((t - now.getTime()) / DAY);
     const detail = t === Infinity ? "" : t <= now.getTime() ? "Expired" : days < 1 ? "Today" : plural(days, "day");
     const sub = [a.version ? `Version ${a.version}` : null, a.bundleId].filter(Boolean).join(" · ");
-    return { bundleId: a.bundleId, label: a.name || a.bundleId, subtitle: sub || null, detail, expiring: t !== Infinity && t - now.getTime() < 7 * DAY };
+    return { bundleId: a.bundleId, label: a.name || a.bundleId, subtitle: sub || null, detail, expiring: t !== Infinity && t - now.getTime() < 7 * DAY,
+      name: a.name || a.bundleId, version: a.version || null }; // F91: Re-sign All queues each row (core/appqueue.js resignJob)
   });
 }
 
@@ -612,4 +613,60 @@ export async function syncReminder(get, call) {
   } catch {
     return null;
   }
+}
+
+// ---- Signature status and re-signs through the queue (F91) ------------------------------------------------------
+//
+//   resignWindow(get)                    Re-sign Reminder's days (the "resignReminder" setting; default 2, Off is 0)
+//   signatureState(expires, { now, window })
+//        -> { state: "ok" | "soon" | "expired", text, long, days } or null (no date): Installed's pill and the app
+//           page's row. ok: outside the window (green), soon: inside it (amber), expired (red).
+//   needsResign(installed, { now, window, skip })
+//        -> Changes' Needs Re-sign rows from signing.installed: every app inside the window or expired, soonest first,
+//           leaving out the ids in `skip` (apps with an upgrade, which re-signs them anyway)
+//   signedIndex(installed)               a Map from bundle ID (installed and original) to its signing.installed record
+
+export const RESIGN_WINDOW = 2;
+
+export function resignWindow(get) {
+  let v;
+  try { v = typeof get === "function" ? get("resignReminder") : undefined; } catch { v = undefined; }
+  const n = Number(v);
+  return v != null && v !== "" && Number.isFinite(n) && n >= 0 ? n : RESIGN_WINDOW;
+}
+
+export function signatureState(expires, { now = new Date(), window = RESIGN_WINDOW } = {}) {
+  const t = expires instanceof Date ? expires.getTime() : Date.parse(expires ?? "");
+  if (!Number.isFinite(t)) return null;
+  const left = t - now.getTime();
+  const days = Math.floor(left / DAY);
+  if (left <= 0) return { state: "expired", text: "Expired", long: "Expired", days };
+  const text = days < 1 ? "Today" : plural(days, "day");
+  const long = days < 1 ? "Expires today" : `${plural(days, "day")} left`;
+  return { state: left <= Math.max(0, Number(window) || 0) * DAY ? "soon" : "ok", text, long, days };
+}
+
+export function signedIndex(installed) {
+  const out = new Map();
+  for (const a of Array.isArray(installed?.apps) ? installed.apps : []) {
+    if (!a?.bundleId) continue;
+    out.set(a.bundleId, a);
+    if (a.originalBundleId && !out.has(a.originalBundleId)) out.set(a.originalBundleId, a);
+  }
+  return out;
+}
+
+export function needsResign(installed, { now = new Date(), window = RESIGN_WINDOW, skip = new Set() } = {}) {
+  const apps = Array.isArray(installed?.apps) ? installed.apps : [];
+  const out = [];
+  for (const a of apps) {
+    if (!a?.bundleId || skip.has(a.bundleId) || (a.originalBundleId && skip.has(a.originalBundleId))) continue;
+    const sig = signatureState(a.expires, { now, window });
+    if (!sig || sig.state === "ok") continue;
+    out.push({ id: a.bundleId, name: a.name || a.bundleId, version: sig.text, installed: a.version || null, sig: sig.state,
+      short: sig.state === "expired" ? "Signature expired: re-sign it to open it again" : `Signature ends ${sig.days < 1 ? "today" : `in ${plural(sig.days, "day")}`}`,
+      expires: a.expires, change: "resign" });
+  }
+  const at = (r) => Date.parse(r.expires);
+  return out.sort((a, b) => at(a) - at(b) || String(a.name).localeCompare(String(b.name)));
 }

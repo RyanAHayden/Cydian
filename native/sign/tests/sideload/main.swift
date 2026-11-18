@@ -206,6 +206,11 @@ test("signed records") {
     check(next?.0 == day("2026-11-24T00:00:00Z") && next?.1.sorted() == ["A", "B"], "next \(String(describing: next))")
     check(SignedRecords.decode(Data("nope".utf8)).isEmpty, "bad file: empty")
     check(JSONSerialization.isValidJSONObject(a.json), "json")
+    // F91: signing.resign {bundleId} signs only that app's record: by its installed ID, else its original one
+    check(SignedRecords.only(list, bundleID: "b").map(\.bundleID) == ["b"], "one by id")
+    check(SignedRecords.only(list, bundleID: "a0").map(\.bundleID) == ["b"], "first by original id")
+    check(SignedRecords.only(list, bundleID: "a").first?.version == "2", "the newest record of a")
+    check(SignedRecords.only(list, bundleID: "nope").isEmpty && SignedRecords.only(list, bundleID: "").isEmpty, "none")
 }
 
 // F75: Cydian's own IPA with the user's certificate inside (BundledIdentity), the cydian:// links the shell takes,

@@ -15,6 +15,11 @@
 // Hidden while there are none, as Cydia's is.
 // F80: the sideload app's Upgrade (N) queues every available app upgrade too, in the app queue (app-queue.js), and
 // opens the same Confirm (screens/queue.js openAppConfirm), which installs them in turn, Cydian last.
+// F91: the sideload app's apps whose signature is inside the re-sign window (Settings > Signing > Re-sign Reminder,
+// default 2 days) or over get their own group above the upgrades, "Needs Re-sign" (core/signing.js needsResign, from
+// signing.installed), count in the tab badge (and so the icon badge) and in Upgrade (N), which queues them as
+// "resign" jobs (core/appqueue.js resignJob): Cydia's queue does both. An app with an upgrade is left to the upgrade,
+// which signs it anew.
 import { placeholder } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
@@ -27,7 +32,8 @@ import { sourceFilter } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
 import { upgradesWithSelf } from "../essential-ui.js";
 import { withAppUpgrades } from "../app-updates.js";
-import { appJob } from "../core/appqueue.js";
+import { appJob, resignJob } from "../core/appqueue.js";
+import { needsResign, resignWindow } from "../core/signing.js";
 
 export const title = "Changes";
 
@@ -42,23 +48,24 @@ export function init(ctx) {
   state.ctx = ctx;
   catalog.onChange(() => { if (state.body) load(); else badge(); });
   onAppsChange(() => { if (state.body) load(); else badge(); }); // I3: a recorded install can end an upgrade
-  settings.onChange((key) => { if (key === "holds") { if (state.body) load(); else badge(); } });
+  settings.onChange((key) => { if (key === "holds" || key === "resignReminder") { if (state.body) load(); else badge(); } });
   // At launch, only with a status file: without one there are no upgrades, and no reason to load every source.
   // Without one (the site, the sideload app) the remembered apps count, and Cydian itself in the app: badge at
   // launch whenever there is anything installed to follow.
   catalog.hasStatus().then((has) => {
-    if (has) return badge();
+    if (has || detectMode() === "sideload") return badge(); // F91: signed apps can need a re-sign with nothing recorded
     return apps().then((s) => s.all()).then((recs) => { if (recs.length) badge(); });
   }).catch(() => {});
   // The app: take dpkg's holds (apt-mark showhold) as Ignored Upgrades; a change redraws through onChange.
   if (catalog.statusSource() === "native") settings.holds.sync().catch(() => {});
 }
 
-// The tab badge: how many upgrades are available (ignored ones don't count).
-async function badge(upgrades) {
+// The tab badge: how many upgrades are available (ignored ones don't count), and F91's apps that need a re-sign.
+async function badge(upgrades, resign) {
   try {
     upgrades ??= await withAppUpgrades(await upgradesWithSelf(await catalog.upgrades(settings.holds.list())), settings.holds.list()); // F72, I3
-    state.ctx?.setBadge("changes", upgrades.available.length);
+    resign ??= await resignNow(upgrades);
+    state.ctx?.setBadge("changes", badgeCount(upgrades, resign));
   } catch {
     // no catalog yet: no badge
   }
@@ -69,7 +76,7 @@ export function nav(route, ctx) {
   const info = { title: "Changes", style: "plain", left: { label: "Refresh", onClick: () => refresh(ctx) } };
   if (canUpgrade()) info.right = { label: upgradeLabel(0), onClick: () => upgradeAll(queueFn(), state.data?.upgrades.available) };
   // The sideload app: Upgrade (N) queues each app's new IPA and opens Confirm (F80), signed on the phone in turn.
-  else if (detectMode() === "sideload") info.right = { label: upgradeLabel(0), onClick: () => queueUpgrades(state.data?.upgrades.available) };
+  else if (detectMode() === "sideload") info.right = { label: upgradeLabel(0), onClick: () => queueAll(state.data?.upgrades.available, state.data?.resign) };
   return info;
 }
 
@@ -81,6 +88,36 @@ export function canUpgrade(mode = detectMode(), backend = () => getBackend()) {
 }
 
 export const upgradeLabel = (n) => `Upgrade (${n})`;
+
+// ---- F91: Needs Re-sign -----------------------------------------------------------------------------------------
+
+// The tab badge's number: available upgrades and apps that need a re-sign (needsResign already leaves out the ones
+// with an upgrade).
+export const badgeCount = (upgrades, resign = []) => (upgrades?.available?.length ?? 0) + (resign?.length ?? 0);
+
+// The apps Cydian signed that are inside the re-sign window, from signing.installed (sideload app only; [] anywhere
+// else or when the call fails). `upgrades`: those with an upgrade are left to it.
+export async function resignNow(upgrades, { mode = detectMode(), native = globalThis.cydianNative, get = (k) => settings.get(k), now = new Date() } = {}) {
+  if (mode !== "sideload" || typeof native?.call !== "function") return [];
+  let installed;
+  try { installed = await native.call("signing.installed", {}); } catch { return []; }
+  const skip = new Set((upgrades?.available ?? []).map((r) => r?.id).filter(Boolean));
+  return needsResign(installed, { now, window: resignWindow(get), skip });
+}
+
+// Upgrade (N) in the sideload app: the re-signs first, then the upgrades (an app in both is the upgrade's). -> jobs.
+export async function queueAll(available = [], resign = [], { add = null, pkgOf } = {}) {
+  add ??= (await import("./queue.js")).queueApp;
+  const out = queueResigns(resign, { add });
+  return [...out, ...(await queueUpgrades(available, { add, ...(pkgOf ? { pkgOf } : {}) }))];
+}
+
+// Each Needs Re-sign row as a "resign" job (core/appqueue.js resignJob), through `add` (screens/queue.js queueApp).
+export function queueResigns(rows = [], { add }) {
+  const jobs = (rows ?? []).map(resignJob).filter(Boolean);
+  for (const j of jobs) add(j);
+  return jobs;
+}
 
 // One install job per available upgrade, as browse.js's Upgrade action queues it. F87: not the jailbreak app's
 // remembered apps (`remembered`, app-updates.js): apt has no package by an app's bundle id; their row opens the app page.
@@ -104,7 +141,7 @@ export async function upgradeEverything() {
   await catalog.ensure();
   const holds = settings.holds.list();
   const u = await withAppUpgrades(await upgradesWithSelf(await catalog.upgrades(holds)), holds);
-  return queueUpgrades(u.available);
+  return queueAll(u.available, await resignNow(u)); // F91: and the apps that need a re-sign
 }
 
 export async function queueUpgrades(available = [], { pkgOf = (id) => catalog.package(id), add = null } = {}) {
@@ -221,16 +258,17 @@ function note(text) {
 // Rows as the package list draws them, with each group's header in front: the upgrades first, then a group per
 // day. An installed package shows under its upgrade, not again under its day (Cydia's rule). `filter`: the search
 // field and scope (core/changes.js filterRows); upgrades are installed packages, so the scope never hides them.
-export function itemsOf(groups, locale, upgrades = { available: [], ignored: [] }, { now = Date.now(), query = "", scope = "all", installed = new Set() } = {}) {
+// F91: `resign` (core/signing.js needsResign rows) comes first, as "Needs Re-sign".
+export function itemsOf(groups, locale, upgrades = { available: [], ignored: [] }, { now = Date.now(), query = "", scope = "all", installed = new Set(), resign = [] } = {}) {
   const items = [];
   const upgraded = new Set();
-  for (const [header, all] of [["Available Upgrades", upgrades.available], ["Ignored Upgrades", upgrades.ignored]]) {
+  for (const [header, all] of [["Needs Re-sign", resign ?? []], ["Available Upgrades", upgrades.available], ["Ignored Upgrades", upgrades.ignored]]) {
     const rows = filterRows(all, { query });
     for (const r of all) upgraded.add(r.id);
     if (!rows.length) continue;
     items.push({ header });
     for (const r of rows) {
-      items.push({ ...r, change: "upgrade" });
+      items.push({ ...r, change: r.change === "resign" ? "resign" : "upgrade" });
     }
   }
   for (const g of filterGroups(groups, { query, scope, installed })) {
@@ -251,6 +289,7 @@ export function emptyText({ query = "", scope = "all" } = {}) {
 
 function decorate(row, item) {
   row.dataset.change = item.change;
+  if (item.sig) row.dataset.sig = item.sig; else delete row.dataset.sig; // F91: the pill's colour (packages.css)
 }
 
 // Everything installed (dpkg's packages and the apps recorded on the device), as ids; failures count as none.
@@ -261,19 +300,20 @@ async function installedNow() {
 
 async function load() {
   const seq = ++state.seq;
-  let groups, upgrades, installed;
+  let groups, upgrades, installed, resign;
   try {
     await catalog.ensure();
     [groups, upgrades, installed] = await Promise.all([catalog.changes(), catalog.upgrades(settings.holds.list()), installedNow()]);
     upgrades = await upgradesWithSelf(upgrades); // F72: the sideload build lists Cydian's own upgrade here
     upgrades = await withAppUpgrades(upgrades, settings.holds.list()); // I3: the apps Install remembered (app-updates.js)
+    resign = await resignNow(upgrades); // F91
   } catch (e) {
     if (seq === state.seq && state.note) { state.ph?.remove(); state.note.textContent = e.message; state.note.hidden = false; }
     return;
   }
   if (seq !== state.seq) return;
-  badge(upgrades);
-  state.data = { groups, upgrades, installed };
+  badge(upgrades, resign);
+  state.data = { groups, upgrades, installed, resign };
   draw();
 }
 
@@ -281,13 +321,13 @@ async function load() {
 function draw() {
   const body = state.body;
   if (!body || !state.data) return;
-  const { groups, upgrades, installed } = state.data;
+  const { groups, upgrades, installed, resign = [] } = state.data;
   state.ph?.remove();
   state.ph = null;
-  drawUpgradeButton(canUpgrade() ? upgradeJobs(upgrades.available).length : upgrades.available.length); // F87: what Upgrade queues
+  drawUpgradeButton(canUpgrade() ? upgradeJobs(upgrades.available).length : upgrades.available.length + resign.length); // F87: what Upgrade queues; F91: re-signs too
   const scope = scopeOf(state.scope, installed);
   drawScope(scope);
-  const items = itemsOf(groups, undefined, upgrades, { query: state.query, scope, installed });
+  const items = itemsOf(groups, undefined, upgrades, { query: state.query, scope, installed, resign });
   state.note.hidden = items.length > 0;
   state.note.textContent = items.length ? "" : emptyText({ query: state.query, scope });
   if (!state.list) {

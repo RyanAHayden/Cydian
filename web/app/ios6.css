@@ -9,6 +9,8 @@
   --head: #4c566c;      /* "Table Label" */
   --emboss: 0 1px 0 rgba(255,255,255,.75); /* its white emboss under the label */
   --detail: #385487;
+  --field-text: #4c566c; /* F149: an editable field's text, the kit's blue-grey (its "Table Label" colour) */
+  --field-hint: #b3b3b3; /* F149: a field's placeholder, the kit's "URL field" hint ("Google") */
   --select: linear-gradient(#85a7e9, #2765db); /* cell selection: the kit's "Button (Matte Blue)" gradient */
   --text: #000;
   --subtitle: #7f7f7f;
@@ -35,6 +37,8 @@ html[data-theme="dark"] {
   --head: #e4e8ef;
   --emboss: 0 -1px 0 rgba(0,0,0,.8);
   --detail: #a9c4f2;
+  --field-text: #d6deeb;
+  --field-hint: #868c96;
   --text: #fff;
   --subtitle: #c3c8d0;
   --table: #3b3f46;
@@ -344,6 +348,10 @@ html[data-theme="dark"] { background: #5f656f; }
 }
 .sign-value.is-empty { color: var(--subtitle); }
 input.sign-value { border: 0; padding: 0; margin: 0; background: none; font: inherit; font-size: 17px; -webkit-user-select: text; user-select: text; outline: none; }
+/* F149: the Password row is a field iOS 6's way: no box, its text left after the label in the field blue-grey, a grey
+   "Required" hint, a blue caret. */
+input.sign-field { text-align: left; color: var(--field-text); caret-color: #426bf2; cursor: text; }
+input.sign-field::placeholder { color: var(--field-hint); opacity: 1; }
 .sign-browse { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); min-width: 0; display: inline-block; }
 
 /* iOS 6's notification banner (nav/banner.js): black glossy strip over the status bar, the app's icon, a bold white

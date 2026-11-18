@@ -479,7 +479,8 @@ function certificateBlock(el, id, status = null, { files = false } = {}) {
   };
 
   const input = Object.assign(document.createElement("input"), { type: "password", className: "sign-value",
-    placeholder: kept && !id?.p12 ? "Not Kept" : "None", value: id?.password ?? "" });
+    placeholder: passwordPlaceholder(kept, id?.p12), value: id?.password ?? "" });
+  input.classList.add("sign-field"); // F149: drawn as an editable field, not a read-only value
   input.autocomplete = "off";
   input.setAttribute("autocapitalize", "off");
   input.setAttribute("autocorrect", "off");
@@ -510,7 +511,7 @@ function certificateBlock(el, id, status = null, { files = false } = {}) {
   const p12Shown = !status || id?.p12 ? id?.p12Name ?? (kept ? "In Keychain" : null) : kept ? id?.p12Name ?? "In Keychain" : null;
   const profShown = !status || id?.profile ? id?.profileName ?? kept?.profile?.name : kept ? id?.profileName ?? kept.profile?.name : null;
   ul.append(fileRow(".p12", p12Shown, "p12"),
-    fileRow(".mobileprovision", profShown, "profile"), signRow("Password", input, pwBrowse));
+    fileRow(".mobileprovision", profShown, "profile"), focusOnRowTap(signRow("Password", input, pwBrowse), input));
   const state = id?.p12 && id?.password != null ? (id.passwordOk === false ? " The password doesn't open this certificate." : id.passwordOk ? " The password opens it." : "") : "";
   const kind = browserSigning() ? "They're kept in this browser only, and apps are signed here in the browser: they go to no server, except inside Cydian's own app with Bring My Certificate."
     : "Once all three are here, they go into this iPhone's Keychain, where only Cydian can use them; the password isn't kept. To change one, choose the .p12 and the profile again.";
@@ -525,6 +526,22 @@ function certificateBlock(el, id, status = null, { files = false } = {}) {
   allLabel.textContent = "Select All Files";
   box.append(head, allInput, allLabel, ul, foot);
   return box;
+}
+
+// F149: the Password row's grey hint, iOS 6's "Required" (Mail's account fields), never the file rows' "None".
+// "Not Kept" while the Keychain holds the identity and no .p12 is picked: the password isn't kept with it.
+export function passwordPlaceholder(kept, p12) {
+  return kept && !p12 ? "Not Kept" : "Required";
+}
+
+// F149: a tap anywhere on the row (its padding and edges too, outside the <label>) puts the caret in the field,
+// except on the Browse button, which opens its picker.
+export function focusOnRowTap(li, input) {
+  li.addEventListener("click", (e) => {
+    if (e.target === input || e.target?.closest?.(".sign-browse")) return;
+    input.focus();
+  });
+  return li;
 }
 
 function signRow(name, value, button) {

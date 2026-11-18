@@ -19,6 +19,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.9.6",
+          "date": "2026-11-18T21:54:22Z",
+          "localizedDescription": "Version 0.9.6\nF204: archive ticked tasks\nF204 Top notices stop moving the page: banner under the nav bar (5s/8s timer line, pause on touch, tap/swipe up), reload bar on top of the tab bar, scrollers get 44pt room; no has-banner/has-reload push\nB41 App page: Related tab icons fill their tile over the letter fallback; header icon and Share inset 21px like the grouped rows\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.6",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.6/iFizBox.ipa",
+          "size": 5154509,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.9.5",
           "date": "2026-11-18T21:28:19Z",
           "localizedDescription": "Version 0.9.5\nApp: turn off shake to undo (accidental Undo Typing alerts)\nSearch: iOS 6 Cancel button right of the field, clears it and hides the keyboard\nF178 iFizBox's AltStore source at https://ifizbox.com/repo/source.json (Worker /repo route, release asset fallback) and lite/full kept apart: the jailbreak app hides the lite IPA, the sideload app offers no .deb or APT repo\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.5",

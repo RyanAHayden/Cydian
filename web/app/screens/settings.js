@@ -22,6 +22,7 @@ import { drawWalkthrough, walkOpen } from "./signing.js";
 import { openInAppSection } from "./importlink.js";
 import { signingExtras } from "./signed-apps.js";
 import { syncReminder } from "../core/signing.js";
+import { websiteInstallsOn, setWebsiteInstalls, acceptWebsiteInstalls } from "../websign-gate.js";
 import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installPath, isNewer, compareVersions } from "../core/selfupdate.js";
 import { getArch } from "../backend.js";
 import { ipaSection } from "./ipa-install.js";
@@ -782,6 +783,23 @@ function siteAppSection(id) {
   return [frag, bring];
 }
 
+// F96: Install on the Website for apps other than Cydian, on once the user accepted the warning on an app page
+// (websign-gate.js). Off here puts the warning back; on here shows it first, and Cancel leaves the switch off.
+export const WEBSITE_INSTALLS_FOOTER = "Other apps' pages offer Install in Cydian first. Installing on the website is "
+  + "slower (download, sign in Safari, upload, then iOS downloads it again), can fail on big apps and uses this "
+  + "site's limited storage. Cydian itself always installs from here.";
+export function websiteInstallsSection({ on = websiteInstallsOn, set = setWebsiteInstalls, accept = acceptWebsiteInstalls } = {}) {
+  const frag = grouped([{ header: "Other Apps", rows: [{ label: "Install on the Website" }], footer: WEBSITE_INSTALLS_FOOTER }]);
+  const cell = frag.querySelector(".cell-inner");
+  const sw = createSwitch({ label: "Install on the Website", checked: on(), onToggle: async (want) => {
+    if (!want) { set(false); return; }
+    if (!(await accept())) sw.setAttribute("aria-checked", "false"); // Cancel: back off
+  } });
+  cell?.append(sw);
+  cell?.classList.add("has-switch");
+  return frag;
+}
+
 async function removeSiteCertificate() {
   const { index } = await showAlert({ title: "Remove Certificate?", message: "The .p12, its password and the profile are deleted from this browser.",
     buttons: ["Cancel", "Remove"], cancel: 0 });
@@ -816,7 +834,7 @@ async function drawSiteSigning(el) {
     certificate: certificateBlock(el, id),
     server: here, serverUrl: location.origin,
     open: walkOpen,
-    extra: [...siteAppSection(id), grouped(sections)],
+    extra: [...siteAppSection(id), websiteInstallsSection(), grouped(sections)],
   });
   el.scrollTop = top;
 }

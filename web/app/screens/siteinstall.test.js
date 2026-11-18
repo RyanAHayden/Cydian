@@ -15,10 +15,14 @@ const labels = (rows) => rows.map((r) => r.label);
 
 const SITE = { site: true, jailbreak: false, custom: false };
 
-test("the website's Install rows: Install (in the browser) and Download IPA, no hand-offs", () => {
+const CYDIAN = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/Cydian/releases/download/v0.3.7/Cydian.ipa" };
+
+test("the website's Install rows: Cydian installs in the browser; other apps go to Cydian first (F96), no hand-offs", () => {
+  const own = installRows(CYDIAN, "https://example.com/apps.json", () => {}, () => {}, null, "Cydian", SITE).rows;
+  assert.deepEqual(labels(own), ["Install", "Download IPA"]);
+  assert.equal(own[0].subtitle, SITE_INSTALL_SUBTITLE);
   const { rows } = installRows(V, "https://example.com/apps.json", () => {}, () => {}, null, "Delta", SITE);
-  assert.deepEqual(labels(rows), ["Install", "Download IPA"]);
-  assert.equal(rows[0].subtitle, SITE_INSTALL_SUBTITLE);
+  assert.deepEqual(labels(rows), ["Install in Cydian", "Download IPA", "Install on the Website"]);
   assert.ok(!rows.some((r) => r.handoff), "no hand-off rows");
   assert.ok(!rows.some((r) => /Open in|Get in|AltStore|SideStore|Feather/.test(`${r.label} ${r.subtitle}`)), labels(rows).join());
   assert.doesNotMatch(SITE_INSTALL_FOOTER, /AltStore|SideStore|Feather|Open in/);
@@ -61,11 +65,12 @@ test("the sideload app still signs: Install, no hand-offs", () => {
   assert.equal(rows[0].needsCertificate, undefined);
 });
 
-test("by default (no bridge: the website in node) the rows are Install in the browser and Download IPA", () => {
+test("by default (no bridge: the website in node) Cydian installs in the browser and other apps get the F96 rows", () => {
   const saved = globalThis.cydianNative;
   try {
     delete globalThis.cydianNative;
-    assert.deepEqual(labels(installRows(V, null).rows), ["Install", "Download IPA"]);
+    assert.deepEqual(labels(installRows(CYDIAN, null).rows), ["Install", "Download IPA"]);
+    assert.deepEqual(labels(installRows(V, null).rows), ["Install in Cydian", "Download IPA", "Install on the Website"]);
   } finally { if (saved) globalThis.cydianNative = saved; }
   assert.match(SITE_INSTALL_FOOTER, /signs the app here in the browser/);
 });
@@ -77,10 +82,13 @@ test("the install hand-offs are gone (F95): nothing builds Open in Cydian / Get 
 
 test("Home's Install Cydian App (F93): signs Cydian with the certificate, or opens Settings > Signing; no sideloaders", async () => {
   const calls = [];
-  const deps = (ready, bring) => ({ ready: async () => ready, bring: () => bring, install: (o) => calls.push(["install", o]), go: (h) => calls.push(["go", h]) });
+  let marked = 0;
+  const deps = (ready, bring) => ({ ready: async () => ready, bring: () => bring, go: (h) => calls.push(["go", h]), installed: () => marked++,
+    install: ({ onInstalled, ...o }) => { calls.push(["install", o]); onInstalled(); } });
   assert.equal(await installApp(deps(false, true)), "signing");
   assert.equal(await installApp(deps(true, false)), "install");
   assert.deepEqual(calls, [["go", "/settings/signing"], ["install", { url: APP_IPA_URL, name: APP_NAME, bring: false }]]);
+  assert.equal(marked, 1, "F96: once installed, the first-visit prompt stops");
   assert.equal(showsSigningTile("site"), true);
   assert.equal(showsSigningTile("sideload"), true);
   assert.equal(showsSigningTile("jailbreak"), false);

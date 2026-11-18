@@ -143,6 +143,12 @@ Signing. Tests: `web/app/signing-client-device.test.js`, `web/app/screens/signin
   until F92/F95 removed the hand-offs; the app still opens one ("The website signs in the browser", above).
 - **Install Cydian App** on the website: Cydian's IPA, signed in the browser, carries `cydian-identity.plist`
   (Bring My Certificate) and `web/transfer.link` (sources and settings), imported on first launch.
+- **Cydian first** (F96, `web/app/websign-gate.js`): the website asks "Install Cydian First" at launch until Cydian
+  is installed from it or the user taps Not Now. Other apps' pages offer **Install in Cydian**
+  (`cydian://package?id=<id>`: the app opens that app's page, Search's `package:<id>`), Download IPA, then **Install
+  on the Website**, greyed out until the user accepts a warning once (its I Understand counts down 5 seconds); the
+  acceptance is kept in localStorage and Settings > Signing > Other Apps turns it back off. Cydian's own IPA always
+  installs from the website.
 
 Gone with the website's old signer (F89) and not back: Import from Safari (`cydian://signing-import`).
 

@@ -215,6 +215,8 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
 .cell-inner.chevron.is-pressed::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
 }
+/* F163 (nav/selection.js): the opened row's blue, a copy over the row that fades by opacity alone during the pop. */
+.cell-inner.sel-ghost { position: absolute; inset: 0; width: auto; pointer-events: none; will-change: opacity; }
 
 /* "switch (on)" / "switch (off)": 77 x 27, a pill with the kit's edge gradient (on #819fb9 to #255985, off #ccc to
    #878787), track #007fe9 or #ededed with an inner shadow, ON in white or OFF in grey, and the 27px handle

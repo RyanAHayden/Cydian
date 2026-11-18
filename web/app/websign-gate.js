@@ -34,7 +34,7 @@ export const WARNING = {
   message: "Installing here is slow: Safari downloads the app, signs it with your certificate, uploads it to this "
     + "site, and then iOS downloads it again. Big apps or a weak connection can make it fail, and the signed apps use "
     + `this site's limited storage.\n\nInstall in ${NAME} signs and installs on the iPhone itself: much faster, with no `
-    + "upload and no limits.",
+    + "upload.",
   buttons: ["Cancel", "I Understand"],
   cancel: 0,
 };
@@ -70,7 +70,7 @@ export function idFromHash(hash = globalThis.location?.hash ?? "") {
   return null;
 }
 
-const IN_IFIZBOX_SUBTITLE = "Signed and installed on the iPhone: fast, no limits";
+const IN_IFIZBOX_SUBTITLE = "Signed and installed on the iPhone: faster";
 export const WEBSITE_ON_SUBTITLE = "Signed in the browser with your certificate";
 export const WEBSITE_OFF_SUBTITLE = "Slow, and can fail on big apps: tap to read why";
 export const SITE_GATE_FOOTER = `Install in ${NAME} opens this app in the ${NAME} app, which signs and installs it on the `
@@ -115,7 +115,7 @@ export const shouldAskFirst = ({ mode = "site", storage = store() } = {}) => mod
 export const FIRST_VISIT = {
   title: `Install ${NAME} First`,
   message: `Apps installed in the ${NAME} app are signed and installed on the iPhone itself: much faster than this `
-    + `website, with no upload and no limits.\n\nInstall ${NAME} now, then install everything else from it.`,
+    + `website, with no upload.\n\nInstall ${NAME} now, then install your IPAs from it.`,
   buttons: ["Not Now", `Install ${NAME}`],
   cancel: 0,
 };
@@ -141,7 +141,7 @@ export const browsingLocked = ({ mode = "site", storage = store() } = {}) => mod
 const BROWSE_GATE = {
   title: `Install ${NAME} First`,
   message: `Apps installed in the ${NAME} app are signed and installed on the iPhone itself: much faster than this `
-    + "website, with no upload and no limits.\n\nYou can browse the website anyway, but installing here is slow and can fail on big apps.",
+    + "website, with no upload.\n\nYou can browse the website anyway, but installing here is slow and can fail on big apps.",
   // stacked, as iOS 6 stacks three: Cancel closes it and Home stays locked (user 2026-11-18). Install iFizBox green,
   // Browse Anyway red (the one we'd rather nobody pressed), and it counts down first.
   buttons: [`Install ${NAME}`, "Browse Anyway", "Cancel"],

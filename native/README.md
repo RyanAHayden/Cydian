@@ -30,6 +30,14 @@ A Swift shell around one WKWebView that shows `web/app/` from the app bundle (do
   ad hoc with `get-task-allow` only, Info.plist plus the overlay (docs/sideload.md, "What I2 needs"), zipped as
   `Payload/Cydian.app` with no helper. Ship it unsigned/ad hoc: the user signs it with Feather, AltStore,
   SideStore or TrollStore. `mkipa.py check` refuses a helper, jailbreak entitlements or a missing overlay.
+- `sign/` (I6): the on-device signer, plain Swift that also builds on Linux: `Zip.swift` (streaming zip read/write
+  over zlib), `Hash.swift`, `DER.swift`, `CodeSign.swift` (Mach-O signatures, CMS, DER entitlements),
+  `Profile.swift` (I5's profile rules), `IPASigner.swift` (bundles inside out, CodeResources), `LocalCA.swift` (the
+  phone's install CA, its TLS certificate, the mobileconfig and the manifest), `HTTP.swift`, `certs/` (Apple's
+  public WWDR and root certificates, copied into the app). `tests/main.swift` + `test_sign.py` test it on Linux.
+- `Sources/SignStore.swift`, `Sources/InstallServer.swift`, `Sources/SignBridge.swift` (I6): the Keychain identity
+  and local CA keys, the loopback HTTPS server, and the `signing.*` bridge calls (sideload build only). See
+  docs/signing.md, "On the phone (I6)".
 
 ## Build
 

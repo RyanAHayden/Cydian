@@ -19,7 +19,7 @@
 import { getBackend, getParser, getArch } from "./backend.js";
 import { repoLayout } from "./core/apt.js";
 import { openIndexCache } from "./core/cache.js";
-import { ALL } from "./core/catalog.js";
+import { ALL, freshLists } from "./core/catalog.js";
 import { openSeenStore, recordRefresh, dayGroups } from "./core/changes.js";
 import { looksLikeStatus } from "./core/installed.js";
 import { isAltKey } from "./core/altstore.js";
@@ -270,6 +270,18 @@ export const catalog = {
   categories: () => ask("categories"), // F46: Home's Browse (core/catalog.js)
   browse: (category) => ask("browse", [category]),
   popular: (opts) => ask("popular", opts ? [opts] : []),
+  // F124, Browse's lists (core/catalog.js): Free Apps / Tweaks / Themes, Featured (refs [{ key, id }]), and New or
+  // Recently Updated (`kind` "new" | "updated") from the Changes tab's records; with no IndexedDB, from the
+  // sources' own version dates only.
+  free: (kind) => ask("free", [kind]),
+  featured: (refs) => ask("featured", [refs]),
+  fresh: async (kind, now = Date.now()) => {
+    const rows = await ask("list", [ALL, ALL]);
+    const store = await seen();
+    const records = store ? await store.all()
+      : (await ask("versions", [])).filter((v) => Number.isFinite(v[3])).map(([, id, version, date]) => ({ id, version, first: date, date }));
+    return freshLists(records, rows, { now })[kind] ?? [];
+  },
   package: (id, key = ALL) => ask("package", [id, key]),
   history: (id, key = ALL) => ask("history", [id, key]), // F29: Version History (core/catalog.js history)
   altSource: (key) => ask("altSource", [key]),

@@ -26,7 +26,7 @@ import { showHUD } from "../nav/hud.js";
 import { mediaUrl } from "./depiction.js";
 import { settings } from "./settings.js";
 import { runPaidInstall } from "./queue.js";
-import { createFeaturedStore } from "../core/featured.js";
+import { createFeaturedStore, MAX_BANNERS } from "../core/featured.js";
 import { createCanister, mapResults, priceFor, normalRepo, askable } from "../core/canister.js";
 import {
   isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore,
@@ -95,6 +95,15 @@ export function homeFeatured() {
     if (banners.length) box.append(bannerRow(banners));
   }, () => {});
   return box;
+}
+
+// F124, Browse's Featured list: every banner of every APT source (in source order, round-robin like Home's), as
+// [{ key, id }] for catalog.featured. None while Not Jailbroken: APT sources are hidden then.
+export async function featuredRefs() {
+  if (settings.deviceType() === "none") return [];
+  const list = await getBackend().sources();
+  const banners = await featuredStore().forHome(list, MAX_BANNERS, MAX_BANNERS * 50);
+  return banners.map((b) => ({ key: b.key, id: b.package }));
 }
 
 // ---- Canister discovery (Search) ---------------------------------------------------------------------------

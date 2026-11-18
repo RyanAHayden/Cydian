@@ -220,6 +220,66 @@ export function rankPopular(items, limit = 50) {
     .slice(0, limit);
 }
 
+// ---- Browse's lists (F124) ----------------------------------------------------------------------------------
+
+// Browse's Cydia-style lists, in the order its page shows them, before the categories. `jailbreak`: only where the
+// phone is jailbroken (Settings > Device; Not Jailbroken lists apps only, F37).
+export const BROWSE_LISTS = [
+  { id: "new", title: "New" },
+  { id: "updated", title: "Recently Updated" },
+  { id: "popular", title: "Popular" },
+  { id: "featured", title: "Featured" },
+  { id: "free-apps", title: "Free Apps", free: "apps" },
+  { id: "free-tweaks", title: "Free Tweaks", free: "tweaks", jailbreak: true },
+  { id: "free-themes", title: "Free Themes", free: "themes", jailbreak: true },
+];
+export const browseList = (id) => BROWSE_LISTS.find((l) => l.id === id) ?? null;
+export const browseListsFor = (jailbroken = true) => BROWSE_LISTS.filter((l) => jailbroken || !l.jailbreak);
+
+// New and Recently Updated: how many days back they reach, and how many rows each keeps.
+export const FRESH_DAYS = 30;
+export const FRESH_LIMIT = 100;
+
+// The Changes tab's records (core/changes.js: { id, version, first, date? }) and the catalog's rows (All Sources,
+// one per id, the candidate version) -> { new: [row], updated: [row] }, each row with `seen` (epoch ms) and
+// `change`. Times as the Changes tab counts them (core/changes.js dayGroups): a version's own date where the
+// source gives one (AltStore versions[]), else the refresh that first saw it; undated records from the first
+// refresh are the archive, never new. A row is new when its candidate is the first version ever seen of it, and
+// updated when an older one came before. Newest first (rows keep their order on a tie), the last `days` only.
+export function freshLists(records, rows, { now = Date.now(), days = FRESH_DAYS, limit = FRESH_LIMIT } = {}) {
+  let baseline = Infinity;
+  for (const r of records) if (r.date == null && r.first < baseline) baseline = r.first;
+  const times = new Map(); // id -> { first, byVersion: version -> earliest counted time }
+  for (const r of records) {
+    const t = r.date ?? r.first;
+    let p = times.get(r.id);
+    if (!p) times.set(r.id, (p = { first: t, byVersion: new Map() }));
+    if (t < p.first) p.first = t;
+    if (r.date == null && r.first === baseline) continue;
+    const v = p.byVersion.get(r.version);
+    if (v === undefined || t < v) p.byVersion.set(r.version, t);
+  }
+  const from = now - days * 86400000;
+  const out = { new: [], updated: [] };
+  rows.forEach((row, i) => {
+    const p = times.get(row.id);
+    const at = p?.byVersion.get(row.version ?? "");
+    if (at === undefined || at < from) return;
+    const change = at > p.first ? "updated" : "new";
+    out[change].push([{ ...row, change, seen: Math.min(at, now) }, i]);
+  });
+  const order = (list) => list.sort((a, b) => b[0].seen - a[0].seen || a[1] - b[1]).slice(0, limit).map(([r]) => r);
+  return { new: order(out.new), updated: order(out.updated) };
+}
+
+// Free Apps / Tweaks / Themes: a row's kind for those lists. Apps are AltStore apps (IPAs) and APT packages in an
+// app section; Tweaks and Themes are Browse's categories of those names.
+export function freeKind(row) {
+  if (row?.kind === "ipa" || sectionGroup(row?.section ?? "") === "Apps") return "apps";
+  const c = browseCategory(row);
+  return c === "Tweaks" ? "tweaks" : c === "Themes" ? "themes" : null;
+}
+
 // Search (F101, docs/sileo-zebra.md 'Search'). Zebra's short-query rule: one Latin character (code point below
 // U+0100) is too broad to search, locally or on Canister; one CJK (or other non-Latin) character is a word.
 export function searchable(query) {
@@ -567,6 +627,29 @@ export function createCatalog() {
     return rankPopular(items, limit).map(({ row, sources: n }) => ({ ...slim(row), sources: n }));
   }
 
+  // F124, Browse's Free Apps / Tweaks / Themes: the free rows of that kind (freeKind), by name. Tweaks and Themes
+  // are empty while Not Jailbroken.
+  function free(kind) {
+    if (appsOnly && kind !== "apps") return [];
+    return visibleOf(ALL).filter((r) => !r.paid && freeKind(r) === kind).map(slim);
+  }
+
+  // F124, Browse's Featured: `refs` ([{ key, id }], the sources' banners and AltStore featured apps, in order) ->
+  // their rows, the source's own version (else All Sources'), each package once, hidden and unfit ones left out.
+  function featured(refs = []) {
+    const seen = new Set();
+    const out = [];
+    for (const ref of Array.isArray(refs) ? refs : []) {
+      const id = ref?.id;
+      if (typeof id !== "string" || seen.has(id)) continue;
+      const e = (ref.key !== ALL && counts(ref.key) && sources.get(ref.key)?.byId.get(id)) || entries(ALL).get(id);
+      if (!e || isHidden(e.row) || (fitFilter && isIncompatible(e.row.compat))) continue;
+      seen.add(id);
+      out.push(slim(e.row));
+    }
+    return out;
+  }
+
   // Which of `names` the catalog has (for linking Depends on the package page): on a source, or installed (its
   // page then comes from the status stanza).
   const has = (names) => names.filter((n) => entries(ALL).has(n) || statusById.has(n));
@@ -681,7 +764,7 @@ export function createCatalog() {
   }
 
   return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
-    categories, browse, popular,
+    categories, browse, popular, free, featured,
     setInstalled, installed, upgrades, setDevice,
     deps, aptProblems, queueInfo };
 }
@@ -698,7 +781,7 @@ export function runCatalog(catalog, op, args = []) {
     search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys,
     versions: catalog.versions, setHidden: catalog.setHidden, setHiddenAuthors: catalog.setHiddenAuthors, setInstalled: catalog.setInstalled,
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice,
-    categories: catalog.categories, browse: catalog.browse, popular: catalog.popular,
+    categories: catalog.categories, browse: catalog.browse, popular: catalog.popular, free: catalog.free, featured: catalog.featured,
     deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);

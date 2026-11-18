@@ -46,6 +46,7 @@ import { queuedFor, MODE_LABEL } from "../core/queue.js";
 import { hasRollback, rollbackSlot } from "./rollback.js";
 import { autoMarkShown, AUTO_MARK_LABEL, AUTO_MARK_FOOTER } from "../core/automark.js";
 import { createWishlist, wishLabel, wishRows, WISH_EMPTY } from "../core/wishlist.js";
+import { filterRows } from "../core/changes.js";
 
 export const ROW_HEIGHT = 58;
 export const SECTION_ROW_HEIGHT = 46;
@@ -392,6 +393,61 @@ export async function renderList(body, route, fetchRows, letters) {
   if (!rows.length) { body.append(el("p", "empty", "No packages.")); return; }
   const list = packageList(body, route, rows, { letters });
   body.append(list.el);
+}
+
+// F124: Browse's lists (New, Recently Updated, Popular, Featured, Free..., a category): the grey search bar, then the
+// package list, filtered as you type (name, id, description, author: core/changes.js filterRows). `letters`: A–Z
+// headers (lists by name); else `headers(rows)` may return the items with { header } rows of its own (New's days).
+export async function renderSearchableList(body, route, fetchRows, { letters = false, headers = null, empty = "No packages.", label = "Search this list" } = {}) {
+  const bar = listSearchBar(label);
+  const note = el("p", "empty");
+  note.hidden = true;
+  const ph = placeholder("list");
+  body.append(bar.el, note, ph);
+  let rows;
+  try {
+    await catalog.ensure();
+    rows = await fetchRows();
+  } catch (e) {
+    ph.remove();
+    note.textContent = e.message;
+    note.hidden = false;
+    return;
+  }
+  ph.remove();
+  const itemsFor = (rs) => (letters ? withLetterHeaders(rs, (r) => indexLetter(r.name)) : headers ? headers(rs) : rs);
+  const shown = (q) => filterRows(rows, { query: q });
+  let list = null;
+  const draw = (q) => {
+    const rs = shown(q);
+    note.textContent = rs.length ? "" : q.trim() ? "No packages match your search." : empty;
+    note.hidden = rs.length > 0;
+    rememberNames(rs);
+    if (!list) {
+      list = packageList(body, route, letters ? rs : itemsFor(rs), { letters }); // packageList adds the letters itself
+      body.append(list.el);
+    } else list.setItems(itemsFor(rs));
+  };
+  draw(bar.input.value);
+  bar.onQuery(draw);
+}
+
+// The grey search bar alone (Changes' and Search's look, packages.css), for a list's own filter.
+function listSearchBar(label) {
+  const form = el("form", "search-bar list-search");
+  form.setAttribute("role", "search");
+  const field = el("label", "search-field");
+  const input = document.createElement("input");
+  Object.assign(input, { type: "search", placeholder: "Search", autocapitalize: "off", autocomplete: "off", spellcheck: false, enterKeyHint: "search" });
+  input.setAttribute("autocorrect", "off");
+  input.setAttribute("aria-label", label);
+  field.append(input);
+  form.append(field);
+  let handler = () => {};
+  let timer = 0;
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => handler(input.value), 120); });
+  form.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); handler(input.value); input.blur(); });
+  return { el: form, input, onQuery: (f) => { handler = f; } };
 }
 
 // ---- Wish List (F102) --------------------------------------------------------------------------------------

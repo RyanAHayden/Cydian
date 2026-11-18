@@ -45,7 +45,7 @@
 }
 .walk-action:active { background: linear-gradient(#2765db, #1b4fb5); background-origin: border-box; }
 /* Select All Files: the big blue glossy button over the certificate rows (a <label> on a hidden file input) */
-.sign-files .sign-all { box-sizing: border-box; margin: 0 0 12px; text-align: center; -webkit-tap-highlight-color: transparent; }
+.sign-files .sign-all { box-sizing: border-box; display: block; width: auto; margin: 0 10px 12px; /* inset like the grouped tables (user 2026-11-18) */ text-align: center; -webkit-tap-highlight-color: transparent; }
 
 /* ---- the certificate step's picture (F78): the user's own screenshot of the iOS Files picker, light or dark by
    the theme (screens/signing.js picture), set in like an inset screenshot: rounded corners and a thin border */

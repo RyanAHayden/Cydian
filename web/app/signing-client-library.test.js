@@ -90,3 +90,14 @@ test("the Signing Server's reachability and the library calls' names", async () 
   assert.deepEqual(await libraryCall("list", {}, undefined, native), { ipas: [] });
   assert.equal(native.calls[0].method, "library.list");
 });
+
+test("the log starts on the first step the shell reports: Reading, or Installing for a signed copy (no placeholder Signing)", async () => {
+  const native = fakeNative({ "library.sign": (p, on) => { on({ phase: "reading" }); on({ phase: "signing" }); return {}; }, "library.install": { bundleId: "a" } });
+  let ui = fakeUI();
+  await installFromLibrary({ file: "A.ipa", name: "A" }, { ...ui.deps, native, reachable: async () => true });
+  assert.deepEqual(ui.labels.slice(0, 3), ["Reading", "Reading", "Signing"]); // the HUD drops the repeated Reading
+  assert.ok(!ui.labels.slice(0, 1).includes("Signing"));
+  ui = fakeUI();
+  await installFromLibrary({ file: "A.ipa", name: "A", signed: true }, { ...ui.deps, native: fakeNative({ "library.sign": {}, "library.install": { bundleId: "a" } }), reachable: async () => true });
+  assert.deepEqual(ui.labels, ["Installing", "Installing"]);
+});

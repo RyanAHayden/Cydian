@@ -640,7 +640,7 @@ async function install(file) {
     return;
   }
   const name = entry?.options?.name || entry?.name || file.replace(/\.ipa$/i, "");
-  await installFromLibrary({ file, name, onInstalled: (r) => {
+  await installFromLibrary({ file, name, signed: Boolean(entry?.signed), onInstalled: (r) => {
     if (r?.bundleId) record(r.bundleId, r.name || name, r.version || entry?.version || "", entry?.options?.icon || entry?.icon);
   } });
   refresh();

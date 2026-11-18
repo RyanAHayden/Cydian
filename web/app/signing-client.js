@@ -302,7 +302,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
 //   await libraryCall(method, params, onEvent, native)   one library.* call ("list", "add", "pick", "options",
 //                                      "sign", "install", "export", "delete")
 //   await serverReachable(server)      true when <server>/sign/status answers within a few seconds
-//   await installFromLibrary({ file, name, signed, onInstalled })
+//   await installFromLibrary({ file, name, signed, onInstalled })   signed: the library already has a signed copy
 //                                      Install on an IPA's page: signs if needed (offline is fine), then, with the
 //                                      Signing Server reachable, installs; offline it says so and keeps the signed copy.
 //                                      Resolves "installed" | "offline" | false (an error, shown) | null (walkthrough)
@@ -326,12 +326,13 @@ export const offlineText = (name, server) => `${name || "The app"} is signed and
 
 const hostOf = (server) => { try { return new URL(server).host; } catch { return String(server ?? ""); } };
 
-export async function installFromLibrary({ file, name = "", onInstalled = () => {} },
+export async function installFromLibrary({ file, name = "", signed = false, onInstalled = () => {} },
   { native, hud = progressHUD, alert = showAlert, go = openRoute, check = firstInstallCheck, reachable = serverReachable,
     follow = null, later = setTimeout } = {}) {
   if (await check({ native })) return null;
   const server = getServer();
-  const h = hud("Signing");
+  // The first step the shell will report: a placeholder "Signing" put Signing, Reading, Signing on the log (user 2026-11-18).
+  const h = hud(signed ? "Installing" : "Reading");
   h.onCancel?.(() => stopNative(native));
   const onEvent = (ev) => {
     if (ev?.log) h.page?.raw?.(ev.log); // B29: the shell's console lines (MyIPAs.swift install's log)

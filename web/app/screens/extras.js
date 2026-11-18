@@ -29,7 +29,7 @@ import { runPaidInstall } from "./queue.js";
 import { createFeaturedStore, MAX_BANNERS } from "../core/featured.js";
 import { createCanister, mapResults, priceFor, normalRepo, askable } from "../core/canister.js";
 import {
-  isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore,
+  isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore, isFreePrice,
 } from "../core/payment.js";
 
 function el(tag, cls, text) {
@@ -364,6 +364,14 @@ export async function vendorSignIn(client, call = shell) {
   if (!(await client.finishSignIn(cb))) throw new Error("The vendor sent nothing back that Cydian could read.");
 }
 
+// B13: the Price row's detail. "Free" for a package the vendor gives away (Chariz answers purchased: true for those
+// even signed out), "Purchased" only for a signed-in account that owns it, else the vendor's price (or "Paid").
+export function priceDetail(info, signedIn) {
+  if (isFreePrice(info?.price)) return "Free";
+  if (signedIn && info?.purchased) return "Purchased";
+  return info?.price ?? "Paid";
+}
+
 async function drawApp(st, source, base, draw, ctx, box) {
   const client = clientFor(base);
   const id = st.package;
@@ -384,12 +392,12 @@ async function drawApp(st, source, base, draw, ctx, box) {
     return draw([{ header: "Purchase", footer: e.message }]);
   }
   const name = vendor?.name || new URL(base).hostname;
-  const rows = [{ label: "Price", detail: info.purchased ? "Purchased" : info.price ?? "Paid" }];
+  const rows = [{ label: "Price", detail: priceDetail(info, signedIn) }];
   const signIn = busy("Signing In", () => vendorSignIn(client));
   if (!info.available) rows.push({ label: "Not available to buy" });
   else if (!signedIn) rows.push({ label: vendor?.banner?.button || `Sign In to ${name}`, onClick: signIn });
   else if (!info.purchased) {
-    rows.push({ label: `Buy${info.price ? ` for ${info.price}` : ""}`, onClick: busy("Purchasing", async () => {
+    rows.push({ label: `Buy${info.price ? ` for ${isFreePrice(info.price) ? "Free" : info.price}` : ""}`, onClick: busy("Purchasing", async () => {
       const r = await client.purchase(id);
       if (r.status === "action") await shell("auth.session", { url: r.url, callbackScheme: "sileo" });
       else if (r.status !== "done") throw new Error("The purchase did not go through.");

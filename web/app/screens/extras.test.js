@@ -51,3 +51,21 @@ test("B12: a good sign-in draws the page again", async () => {
   assert.deepEqual(log, ["show Signing In", "hide", "refresh"]);
   assert.equal(client.seen.length, 1);
 });
+
+// B13: Chariz answers {"price":"FREE","purchased":true,"available":true} for betterAlarm without a token.
+import { priceDetail } from "./extras.js";
+
+test("B13: a free commercial package says Free, signed in or out, whatever `purchased` says", () => {
+  for (const price of ["FREE", "free", " Free "]) {
+    assert.equal(priceDetail({ price, purchased: true, available: true }, false), "Free");
+    assert.equal(priceDetail({ price, purchased: true, available: true }, true), "Free");
+    assert.equal(priceDetail({ price, purchased: false, available: true }, false), "Free");
+  }
+});
+
+test("B13: Purchased only for a signed-in account; signed out shows the price", () => {
+  assert.equal(priceDetail({ price: "$1.99", purchased: true, available: true }, true), "Purchased");
+  assert.equal(priceDetail({ price: "$1.99", purchased: true, available: true }, false), "$1.99");
+  assert.equal(priceDetail({ price: "$1.99", purchased: false, available: true }, true), "$1.99");
+  assert.equal(priceDetail({ price: null, purchased: false, available: true }, false), "Paid");
+});

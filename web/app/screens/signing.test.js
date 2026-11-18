@@ -71,3 +71,32 @@ test("nothing on the page or in the code still talks about trusting Cydian's cer
     assert.equal(hit?.[0] ?? null, null, f);
   }
 });
+
+// F78: the certificate step shows the user's Files picker screenshot for the current theme, in place of a drawing.
+test("the certificate step's picture is the screenshot for <html data-theme>", async () => {
+  const { picture, shotFor } = await import("./signing.js");
+  const { existsSync } = await import("node:fs");
+  const { fileURLToPath } = await import("node:url");
+  for (const t of ["light", "dark"]) {
+    assert.match(shotFor(t), new RegExp(`/icons/steps/select-files-${t}\\.jpg$`));
+    assert.ok(existsSync(fileURLToPath(shotFor(t))), `${t} screenshot is in the repo`);
+  }
+  assert.equal(shotFor(null), shotFor("light"));
+  const el = (tag) => ({ tagName: tag.toUpperCase(), className: "", children: [], append(...c) { this.children.push(...c); } });
+  const saved = globalThis.document;
+  try {
+    for (const t of ["light", "dark"]) {
+      globalThis.document = { createElement: el, documentElement: { getAttribute: (a) => (a === "data-theme" ? t : null) } };
+      const fig = picture();
+      assert.equal(fig.className, "step-picture");
+      assert.equal(fig.children.length, 1);
+      const [img] = fig.children;
+      assert.equal(img.tagName, "IMG");
+      assert.equal(img.className, "step-shot");
+      assert.equal(img.src, shotFor(t));
+      assert.ok(img.alt);
+    }
+  } finally {
+    globalThis.document = saved;
+  }
+});

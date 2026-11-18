@@ -12,8 +12,8 @@
 //   walkOpen / openAt(id)                  the expand/collapse state kept across redraws; openAt opens one step only
 //   drawWalkthrough(el, opts)              the page; settings.js passes the certificate block, the server rows, …
 //
-// The certificate step's picture is today's iOS file picker drawn in HTML (modernPicker), not an Apple screenshot.
-// A real screenshot of the user's own replaces it: web/app/icons/steps/select-files.png (SHOTS below).
+//   picture()                              the certificate step's picture: the user's Files picker screenshot for
+//                                          the current theme (F78), shotFor(theme) its address
 import { statusReady } from "../signing-client.js";
 import { normalizeServer } from "../core/signing.js";
 
@@ -69,43 +69,32 @@ function style() {
 }
 style();
 
-const SHOT = () => new URL("../icons/steps/select-files.png", import.meta.url).href;
+// F78: the certificate step's picture is the user's own screenshot of the iOS Files picker with the three files
+// selected, one per theme (600 px wide, no status bar): the one matching <html data-theme> shows, and it follows a
+// theme change while the page is open (Automatic flips with iOS).
+export const shotFor = (theme) => new URL(`../icons/steps/select-files-${theme === "dark" ? "dark" : "light"}.jpg`,
+  import.meta.url).href;
+const theme = () => (typeof document === "undefined" ? null : document.documentElement?.getAttribute("data-theme"));
 
-// Today's iOS document picker (the iOS 26 look: large title, a rounded list, blue filled checkmark circles) with
-// the three files selected and Open to tap.
-export function modernPicker(files = [["cert.p12", "3 KB"], ["profile.mobileprovision", "12 KB"], ["password.txt", "9 bytes"]]) {
-  const scr = h("div", "mp-screen");
-  scr.setAttribute("role", "img");
-  scr.setAttribute("aria-label", "The iOS file picker with your three files selected and Open highlighted");
-  const bar = h("div", "mp-bar");
-  bar.append(h("span", "mp-cancel", "Cancel"), h("span", "mp-count", `${files.length} Selected`), h("span", "mp-open mock-tap", "Open"));
-  const search = h("div", "mp-search", "Search");
-  const list = h("ul", "mp-list");
-  for (const [name, size] of files) {
-    const li = h("li", "mp-row");
-    const ext = name.split(".").pop();
-    const icon = h("span", `mp-icon mp-${ext}`, ext === "mobileprovision" ? "" : ext.toUpperCase());
-    const text = h("span", "mp-text");
-    text.append(h("span", "mp-name", name), h("span", "mp-sub", `Today · ${size}`));
-    li.append(h("span", "mp-check"), icon, text);
-    list.append(li);
-  }
-  scr.append(bar, h("div", "mp-title", "Recents"), search, list);
-  return scr;
+let watching = false;
+function watchTheme() {
+  if (watching || typeof MutationObserver === "undefined") return;
+  watching = true;
+  new MutationObserver(() => {
+    for (const img of document.querySelectorAll("img.step-shot")) img.src = shotFor(theme());
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 }
 
-// The certificate step's picture: the user's screenshot when there is one, else the drawing. Looked for once.
-let shot = null; // true (it loaded) | false (none) | null (not tried)
-function picture() {
-  const fig = h("figure", "step-picture step-picture-modern");
-  fig.append(modernPicker());
-  if (shot === false || typeof Image === "undefined") return fig;
-  const img = new Image();
-  img.alt = "";
-  img.className = "step-shot";
-  img.onload = () => { shot = true; fig.replaceChildren(img); };
-  img.onerror = () => { shot = false; };
-  img.src = SHOT();
+export function picture() {
+  watchTheme();
+  const fig = h("figure", "step-picture");
+  const img = h("img", "step-shot");
+  img.alt = "The iOS Files picker with your .p12, .mobileprovision and password file selected";
+  img.width = 600;
+  img.height = 517;
+  img.decoding = "async";
+  img.src = shotFor(theme());
+  fig.append(img);
   return fig;
 }
 

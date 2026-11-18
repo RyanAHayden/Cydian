@@ -21,6 +21,19 @@ def fake_macho(cpu=0x0100000C, minos=(15, 0), signed=True):
     return head[:32] + cmds
 
 
+def signed_fake(entitlements):
+    """fake_macho() whose LC_CODE_SIGNATURE points at a SuperBlob holding an entitlements blob."""
+    xml = plistlib.dumps(entitlements)
+    ent = struct.pack(">II", 0xFADE7171, 8 + len(xml)) + xml
+    sb = struct.pack(">III", 0xFADE0CC0, 20 + len(ent), 1) + struct.pack(">II", 5, 20) + ent
+    head = bytearray(fake_macho())
+    struct.pack_into("<II", head, len(head) - 8, len(head), len(sb))
+    return bytes(head) + sb
+
+
+DAEMON_ENTS = {mkdeb.NOTIFY_ENTITLEMENT: ["com.ryha.cydian"], "platform-application": True}
+
+
 def plist(version="0.1.0", build="7"):
     with open(os.path.join(HERE, "Info.plist")) as f:
         text = f.read().replace("@VERSION@", version).replace("@BUILD@", build).replace("@MIN@", "15.0")
@@ -41,6 +54,11 @@ class Deb(unittest.TestCase):
         self.write(self.app, "bridge.js", b"x")
         os.makedirs(os.path.join(self.root, "var/jb/usr/libexec/cydian"))
         self.write(self.root, mkdeb.HELPER[len("./"):], fake_macho(), 0o755)
+        self.write(self.root, mkdeb.DAEMON[len("./"):], signed_fake(DAEMON_ENTS), 0o755)
+        os.makedirs(os.path.join(self.root, "var/jb/Library/LaunchDaemons"))
+        shutil.copy(os.path.join(HERE, "daemon/com.ryha.cydian.upgrades.plist"),
+                    os.path.join(self.root, mkdeb.DAEMON_JOB[len("./"):]))
+        os.chmod(os.path.join(self.root, mkdeb.DAEMON_JOB[len("./"):]), 0o644)
         for name in ("AppIcon60x60@2x.png", "AppIcon60x60@3x.png"):
             shutil.copy(os.path.join(HERE, "icon", name), self.app)
         for name in ("index.html", "app.js", "style.css", "router.js", "nav/stack.js"):
@@ -61,6 +79,17 @@ class Deb(unittest.TestCase):
     def problems(self):
         mkdeb.build(self.root, self.debian, self.deb, mtime=0)
         return mkdeb.check(self.deb)[0]
+
+    def problems_with_mode(self, name, mode):
+        """problems() for a package whose entry name has mode (build() itself only writes 0755 and 0644)."""
+        walk = mkdeb._walk
+
+        def walk_with_mode(root):
+            entries, size = walk(root)
+            return [(n, d, mode if n == name else m) for n, d, m in entries], size
+        mkdeb._walk = walk_with_mode
+        self.addCleanup(setattr, mkdeb, "_walk", walk)
+        return self.problems()
 
     def test_good_package(self):
         self.assertEqual(self.problems(), [])
@@ -113,6 +142,39 @@ class Deb(unittest.TestCase):
         self.assertTrue(any("bridge.js" in p for p in self.problems()))
 
 
+    def test_daemon_flagged(self):
+        """T5: N5's daemon ships 0755, signed arm64, with the notification entitlement."""
+        rel = mkdeb.DAEMON[len("./"):]
+        os.remove(os.path.join(self.root, rel))
+        self.assertTrue(any("no upgrade daemon" in p for p in self.problems()))
+        self.write(self.root, rel, fake_macho(), 0o755)  # signed, but without entitlements
+        self.assertTrue(any("usernotifications" in p for p in self.problems()))
+        self.write(self.root, rel, signed_fake({mkdeb.NOTIFY_ENTITLEMENT: ["com.example"]}), 0o755)
+        self.assertTrue(any("usernotifications" in p for p in self.problems()))
+        self.write(self.root, rel, fake_macho(cpu=0x01000007, signed=False), 0o755)
+        self.assertTrue(any("daemon is not" in p for p in self.problems()))
+        self.write(self.root, rel, signed_fake(DAEMON_ENTS), 0o755)
+        self.assertTrue(any("daemon mode is 4755" in p for p in self.problems_with_mode(mkdeb.DAEMON, 0o4755)))
+
+    def test_daemon_job_flagged(self):
+        rel = mkdeb.DAEMON_JOB[len("./"):]
+        path = os.path.join(self.root, rel)
+        os.remove(path)
+        self.assertTrue(any("no launchd job" in p for p in self.problems()))
+        self.write(self.root, rel, plistlib.dumps({"Label": "x", "ProgramArguments": ["/usr/bin/true"]}))
+        p = " | ".join(self.problems_with_mode(mkdeb.DAEMON_JOB, 0o666))
+        self.assertIn("launchd job mode is 666", p)
+        self.assertIn("Label is 'x'", p)
+        self.assertIn("does not run /var/jb/usr/libexec/cydian/cydian-upgrades", p)
+
+    def test_postinst_must_load_daemon(self):
+        self.write(self.debian, "postinst", b"#!/bin/sh\nuicache -p /var/jb/Applications/Cydian.app\n", 0o755)
+        self.write(self.debian, "prerm", b"#!/bin/sh\nexit 0\n", 0o755)
+        p = " | ".join(self.problems())
+        self.assertIn("postinst does not launchctl load", p)
+        self.assertIn("launchctl unload", p)
+
+
 class Plists(unittest.TestCase):
     def test_info_plist(self):
         p = plistlib.loads(plist())
@@ -127,6 +189,11 @@ class Plists(unittest.TestCase):
         self.assertTrue(e["platform-application"])
         self.assertTrue(e["com.apple.private.security.no-container"])
         self.assertTrue(e["com.apple.private.persona-mgmt"])  # N3: spawning cydian-helper as root
+
+    def test_daemon_entitlements(self):
+        with open(os.path.join(HERE, "daemon/entitlements.plist"), "rb") as f:
+            e = plistlib.load(f)
+        self.assertEqual(e[mkdeb.NOTIFY_ENTITLEMENT], ["com.ryha.cydian"])
 
     def test_version_file(self):
         with open(os.path.join(HERE, "VERSION")) as f:

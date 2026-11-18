@@ -78,6 +78,19 @@ class Ipa(unittest.TestCase):
         self.write("cydian-helper", b"x", 0o755)
         self.assertTrue(any("jailbreak files" in p for p in self.problems()))
 
+    def test_daemon_flagged(self):
+        """T5: N5's upgrade daemon and its launchd job belong to the .deb only."""
+        self.write("cydian-upgrades", b"x", 0o755)
+        self.write("Library/LaunchDaemons/com.ryha.cydian.upgrades.plist", b"x")
+        p = " | ".join(self.problems())
+        self.assertIn("Payload/Cydian.app/cydian-upgrades", p)
+        self.assertIn("com.ryha.cydian.upgrades.plist", p)
+
+    def test_notification_entitlement_flagged(self):
+        self.write("Cydian", signed_macho({"get-task-allow": True,
+                                           "com.apple.private.usernotifications.bundle-identifiers": ["x"]}), 0o755)
+        self.assertTrue(any("usernotifications" in p for p in self.problems()))
+
     def test_jailbreak_entitlements_flagged(self):
         self.write("Cydian", signed_macho({"platform-application": True, "com.apple.private.security.no-sandbox": True}),
                    0o755)

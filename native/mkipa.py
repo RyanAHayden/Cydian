@@ -135,7 +135,10 @@ def check(path):
             if not png or not png[1].startswith(b"\x89PNG"):
                 problems.append("icon %s%s.png missing" % (name, scale))
 
-    helpers = sorted(n for n in files if n.rsplit("/", 1)[-1] == "cydian-helper" or "/var/jb/" in n)
+    # The root helper and N5's upgrade daemon and its launchd job are the .deb's alone (T5).
+    jailbreak_only = ("cydian-helper", "cydian-upgrades", "com.ryha.cydian.upgrades.plist")
+    helpers = sorted(n for n in files if n.rsplit("/", 1)[-1] in jailbreak_only or "/var/jb/" in n
+                     or "/LaunchDaemons/" in n)
     if helpers:
         problems.append("jailbreak files in the IPA: %s" % ", ".join(helpers))
 

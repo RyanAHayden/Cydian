@@ -114,13 +114,10 @@ export function render(body, route, ctx) {
       hint.textContent = rows.length ? "" : "No Results";
     });
     page.append(bar, view.browse, view.body, results);
-    // Cydia's spinner in the middle until Browse and My IPAs are both in (user 2026-11-17: the page popped in in
-    // pieces); then the whole page shows at once.
-    const wait = el("div", "loading");
-    wait.append(el("span", "loading-spinner"), el("span", null, "Loading"));
-    page.hidden = true;
-    body.append(wait, page);
-    Promise.allSettled([loadBrowse(), load()]).then(() => { wait.remove(); page.hidden = false; });
+    body.append(page);
+    markPlaceholders(view.browse);
+    loadBrowse();
+    load();
     return;
   }
   if (p?.page === "search") return renderSearch(body, route);
@@ -210,8 +207,12 @@ const browseHref = (seg) => format({ tab: "installed", path: [MYIPAS, seg] });
 // then the categories with their counts. No apps: a line saying where they come from.
 export function browseGroups(apps) {
   const top = []; // the page's search bar searches (Search Apps' own page stays for older links)
+  // Still loading: the same shape with grey bars where the counts and categories go (myipas.css .ph), so the page
+  // shows at once and fills in place (user 2026-11-17).
   if (apps == null) {
-    return [{ header: "Browse", rows: [...top, { label: "Loading Apps", chevron: false }] }];
+    const bar = { label: "\u00a0", detail: "\u00a0", chevron: false, placeholder: true };
+    return [{ header: "Browse", rows: [...top, { label: "All Apps", detail: "\u00a0", chevron: false, placeholder: true }] },
+      { rows: [bar, bar, bar, bar] }];
   }
   if (!apps.length) {
     return [{ header: "Browse", rows: top,
@@ -222,6 +223,15 @@ export function browseGroups(apps) {
     { rows: mergeCategories(apps, { jailbroken: false }).map((c) => ({ label: c.name, detail: String(c.count), href: browseHref(`category:${c.name}`) })),
       footer: "Apps from your AltStore sources, signed with your certificate when you install one." },
   ];
+}
+
+// grouped() has no row classes: the placeholder rows are the ones whose label is a lone no-break space.
+function markPlaceholders(root) {
+  for (const li of root.querySelectorAll(".cell")) {
+    const label = li.querySelector(".cell-label")?.textContent;
+    const detail = li.querySelector(".cell-detail")?.textContent;
+    if (label === "\u00a0" || detail === "\u00a0") li.classList.add("ph");
+  }
 }
 
 async function loadBrowse() {

@@ -9,3 +9,18 @@
 .cell-inner.myipa-delete { justify-content: center; }
 .cell-inner.myipa-delete .cell-text { flex: none; }
 .cell-inner.myipa-delete .cell-label { color: #b5322c; text-align: center; }
+
+/* Placeholder rows while Install IPAs' Browse loads (screens/myipas.js markPlaceholders): grey bars that pulse where
+   a category's name and count will be. */
+.cell.ph .cell-label:empty, .cell.ph .cell-label, .cell.ph .cell-detail { color: transparent; }
+.cell.ph .cell-detail, .cell.ph .cell-label:not(:first-child) { display: inline-block; }
+.cell.ph .cell-detail { width: 26px; height: 12px; border-radius: 6px; background: #dcdfe3; animation: ph-pulse 1.2s ease-in-out infinite alternate; }
+.cell.ph .cell-text { position: relative; }
+.cell.ph .cell-text:has(.cell-label) .cell-label { background: none; }
+.cell.ph:not(:first-child) .cell-label, .install-ipas-browse .group + .group .cell.ph .cell-label {
+  display: inline-block; height: 13px; width: 45%; border-radius: 6px; background: #dcdfe3; animation: ph-pulse 1.2s ease-in-out infinite alternate;
+}
+.install-ipas-browse .group + .group .cell.ph:nth-child(2n) .cell-label { width: 32%; }
+.install-ipas-browse .group:first-child .cell.ph .cell-label { color: inherit; background: none; width: auto; animation: none; }
+html[data-theme="dark"] .cell.ph .cell-detail, html[data-theme="dark"] .install-ipas-browse .group + .group .cell.ph .cell-label { background: #3a3d42; }
+@keyframes ph-pulse { from { opacity: 1; } to { opacity: .45; } }

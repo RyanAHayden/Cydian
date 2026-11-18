@@ -79,7 +79,8 @@ test("Install IPAs' Browse section: All Apps and the categories of the AltStore 
   assert.deepEqual(cats.rows.map((x) => [x.label, x.detail]), [["Games", "1"], ["Emulators", "1"], ["Developer", "1"]]);
   assert.equal(cats.rows[0].href, "#/installed/myipas/category%3AGames");
   // loading, and no AltStore source
-  assert.deepEqual(browseGroups(null)[0].rows.map((x) => x.label), ["Loading Apps"]);
+  assert.deepEqual(browseGroups(null)[0].rows.map((x) => x.label), ["All Apps"]); // placeholders while loading
+  assert.equal(browseGroups(null)[1].rows.length, 4);
   const none = browseGroups([]);
   assert.equal(none.length, 1);
   assert.match(none[0].footer, /AltStore source/);

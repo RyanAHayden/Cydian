@@ -412,7 +412,11 @@ if (globalThis.cydianNative) {
     if (!v) return;
     let last = null;
     try { last = localStorage.getItem("cydian.lastVersion"); localStorage.setItem("cydian.lastVersion", v); } catch { return; }
-    if (last && last !== v) showBanner({ title: "Cydian", message: `Updated to ${v}.`, duration: 4000 });
+    if (last && last !== v) {
+      showBanner({ title: "Cydian", message: `Updated to ${v}.`, duration: 4000 });
+      // The icon badge counted this very update: clear it; Changes sets it again with what's still waiting (user 2026-11-18).
+      Promise.resolve(globalThis.cydianNative.call("app.badge", { count: 0 })).catch(() => {});
+    }
   }).catch(() => {});
   // Back in the foreground after a while: look again (an essential update can come out while Cydian sits in the
   // background, and iOS rarely cold-launches it).

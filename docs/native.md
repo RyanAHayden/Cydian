@@ -340,3 +340,27 @@ undocumented BOM format; no Linux writer exists that I know of), so it takes one
 3. Commit `out/Assets.car` as `native/launch/Assets.car` (it holds only Cydian's own images), have `build.sh` copy
    it into `Cydian.app/`, and add `UIColorName: LaunchBackground` to `UILaunchScreen` (and drop the `UIColorName`
    refusal in `launch_check.py`). Rebuild it whenever the images change.
+
+## Links out of the app (R8, 2026-11-17)
+
+R8 asked whether `window.open` and `location.href` to https, itms-services and other apps' schemes do anything
+in the shell. That shell (`native/Sources/App.swift`) sets a `WKNavigationDelegate` for the launch cover only (no
+`decidePolicyFor`) and no `WKUIDelegate`. No iOS 15+ phone was reachable from the run, so the answer comes from
+WebKit's source (main, `Source/WebKit/UIProcess/Cocoa/`), not from a tap on a phone:
+
+| What the page does | What WebKit does in this shell | Where Cydian does it |
+|---|---|---|
+| `window.open(url)` (any scheme) | `UIDelegate::UIClient::createNewPage`: no `webView:createWebViewWithConfiguration:…`, so no new page. `window.open` returns `null`. **Nothing happens.** | Home > Source Code, browse.js More Information, AltStore Website, `installRows`' default opener |
+| `location.href = "itms-services://…"`, `feather://`, `altstore://`, `sidestore://`, `cydia://`, `sileo://`… | `NavigationState::NavigationClient::decidePolicyForNavigationAction`, with the delegate method missing: `NSURLConnection canHandleRequest` says no, and only macOS hands the URL to `NSWorkspace`. On iOS it calls `listener->ignore()`. **Nothing happens.** | AltStore Install / Get / Open in (`screens/altstore.js`), handoff.js Open in, `signing-client.js` (`location.href = body.itms`) |
+| `location.href = "https://…"` | Same path, with `canHandleRequest` true: `listener->use()`. If an app claims the URL as a universal link (`tryInterceptNavigation`, LSAppLink) that app opens. Otherwise **the web view itself loads the site, replacing Cydian's UI**, and there's no way back (no back gesture, no toolbar) short of killing the app. | `openOutside`'s fallback when the shell has no `app.openURL` |
+| `app.openURL` (F72, Bridge.swift) | `UIApplication.shared.open`: works, but takes **only https and itms-services**, so `feather://` and its kind are refused. | `essential-ui.js` `openOutside` (Cydian's own update) |
+
+So every link out of the app is dead except F72's. The fix is filed as a B: give the shell a `WKUIDelegate` whose
+`createWebViewWith` hands the URL to `UIApplication.shared.open` and returns nil, and a `decidePolicyFor` that
+lets `cydian:` (`AppScheme.scheme`, the bundle) and `about:`/`blob:` load. Any other main-frame scheme goes to
+`UIApplication.shared.open` and is cancelled. That fixes all the call sites with no JS change. Also widen
+`app.openURL` to the schemes the page builds (or leave it alone and let the delegate do the work).
+
+**Check on a phone once the fix lands:** Home > Source Code opens Safari (or the GitHub app). An AltStore app's
+Get or Open in Feather opens Feather, or iOS says no app opens it. Install with a signed link brings up iOS's
+install prompt. More Information opens Safari, and Cydian stays where it was.

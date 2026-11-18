@@ -32,7 +32,6 @@ export const ESSENTIAL_IDS = [SELF_ID, "apt", "dpkg"];
 export const MIN_FIELD = "x-cydian-minimum-version"; // the Release field, lower-cased as core/apt.js keeps them
 export const LOCKED_TEXT = "Cydian's own source is built in and can't be removed.";
 export const STORE_KEY = "cydian.essential";
-export const SERVER_OK_KEY = "cydian.essential.server";
 
 // core/sources.js sourceKey, repeated here so this file doesn't import sources.js (which imports altstore.js).
 const aptKey = (uri, dist = "./") => `deb:${uri}:${dist}`;
@@ -245,56 +244,22 @@ export async function runEssential(deps) {
 }
 
 // ---- Cydian's own IPA (sideload) -----------------------------------------------------------------------------
-// iOS closes the running Cydian as soon as it starts installing the new one, and with it the local install server
-// that would serve the IPA (F58's path: 'Cannot connect to 127.0.0.1'). So Cydian's own update never uses it: it is
-// signed on the Signing Server (cydian.dev or the user's own) and installed from its itms-services link, or, with no
-// certificate this app can send, the user opens cydian.dev's Install Cydian App in Safari.
+// The sideload app signs its own update on the phone and hosts it on the Signing Server (essential-ui.js
+// installSelfNow, signing.install host: true). Only without that (no bridge, no IPA) does this answer: the user
+// opens cydian.dev's Install Cydian App in Safari, which hands Cydian's source to AltStore, SideStore or Feather (F89:
+// the website signs nothing).
 
-export const SELF_REASON = "iOS closes Cydian while it installs a new Cydian, and Cydian's own install server "
-  + "closes with it, so Cydian can't install itself from this iPhone.";
-
-const hostOf = (server) => { try { return new URL(server).host; } catch { return String(server ?? ""); } };
-
-// row: { version, ipa } (selfUpgradeRow). deps: {
-//   exportIdentity() -> { p12, password, profile } | null   the certificate the Signing Server may use
-//   server                                                 Settings > Signing's server (signing-client getServer)
-//   signOnServer({ url, identity, server }) -> itms link   throws an Error with a message
-//   alert(spec) -> { index }, open(url), storage            open: outside the app; storage: the ask-once flag
-// }
-// Resolves "installing" | "site" | "cancelled" | "failed" | "no-asset".
+// row: { version, ipa } (selfUpgradeRow). deps: { alert(spec) -> { index }, open(url) }   open: outside the app.
+// Resolves "site" | "cancelled" | "no-asset".
 export async function installSelf(row, deps) {
-  const { alert, open, storage } = deps;
+  const { alert, open } = deps;
   const v = row?.version ? `Cydian ${row.version}` : "Cydian";
   if (!row?.ipa) {
     await alert({ title: "Can't Install", message: `${v} has no Cydian.ipa in Cydian's source.`, buttons: ["OK"] });
     return "no-asset";
   }
-  let identity = null;
-  try { identity = await deps.exportIdentity?.(); } catch { identity = null; }
-  if (identity?.p12 && identity?.profile) {
-    const host = hostOf(deps.server);
-    let asked = null;
-    try { asked = storage?.getItem(SERVER_OK_KEY); } catch { /* private: ask */ }
-    if (asked !== host) {
-      const { index } = await alert({ title: `Sign on ${host}?`,
-        message: `${SELF_REASON} So ${v} is signed on your Signing Server, ${host}, and installed from there. Your `
-          + `certificate and its key go to ${host} for this one request, over HTTPS.`,
-        buttons: ["Cancel", "Sign"], cancel: 0 });
-      if (index !== 1) return "cancelled";
-      try { storage?.setItem(SERVER_OK_KEY, host); } catch { /* asks again next time */ }
-    }
-    let link;
-    try {
-      link = await deps.signOnServer({ url: row.ipa, identity, server: deps.server });
-    } catch (e) {
-      await alert({ title: "Couldn't Sign Cydian", message: e?.message || `${host} didn't answer.`, buttons: ["OK"] });
-      return "failed";
-    }
-    await open(link);
-    return "installing";
-  }
   const { index } = await alert({ title: `Install ${v}`,
-    message: "Add your certificate in Settings > Signing, or install it from cydian.dev in Safari.",
+    message: "Install it from cydian.dev in Safari: AltStore, SideStore or Feather, or the IPA.",
     buttons: ["Cancel", "Open Safari"], cancel: 0 });
   if (index !== 1) return "cancelled";
   await open(SELF_SITE);

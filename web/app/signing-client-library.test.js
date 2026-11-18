@@ -56,7 +56,7 @@ test("online: signs, installs with the manifest server, records and follows iOS'
     { ...ui.deps, native, reachable: async () => true });
   assert.equal(r, "installed");
   assert.deepEqual(native.calls.map((c) => c.method), ["library.sign", "library.install"]);
-  assert.deepEqual(native.calls[1].params, { file: "Delta.ipa", manifestServer: "https://cydian.dev" });
+  assert.deepEqual(native.calls[1].params, { file: "Delta.ipa", manifestServer: "https://sign.cydian.dev" });
   assert.equal(got[0].bundleId, "com.me.delta");
   assert.deepEqual(ui.followed, ["com.me.delta"]);
   assert.deepEqual(ui.alerts, []);

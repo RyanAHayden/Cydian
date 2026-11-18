@@ -17,7 +17,8 @@ import { compat } from "../core/compat.js";
 import { currentDevice, compatBadge } from "../device.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall, onAppsChange } from "../core/installed.js";
-import { signAndInstall, localSigning, signingReady } from "../signing-client.js";
+import { signAndInstall, localSigning } from "../signing-client.js";
+import { installLinks } from "./handoff.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { setSourceShare } from "./handoff.js";
 import { openIpaInstall } from "./ipa-install.js";
@@ -77,11 +78,13 @@ function card(children, cls = "") {
   return g;
 }
 
-// The install rows for a version (user 2026-11-17: Cydian's own signing is the way, no hand-offs to other sideloaders):
+// The install rows for a version (user 2026-11-17: Cydian's own signing is the way in the app):
 //   - jailbreak build: Install through the helper (F67, screens/ipa-install.js), the console titled with `name`
 //   - a source's own signed link (itms-services): Install, signed by the source
-//   - otherwise: Install, signed with the user's certificate (signing-client signAndInstall: the Signing Server on
-//     the site, the phone itself in the sideload app; without a certificate it says how to add one)
+//   - the sideload app: Install, signed with the user's certificate on the phone (signing-client signAndInstall;
+//     without one it opens the Signing walkthrough)
+//   - the website (F89: no server, nothing signs there): the hand-offs, screens/handoff.js installLinks: Open in
+//     Cydian, Get in AltStore / SideStore / Feather. Each is marked `handoff: true` (browse.js's nav button lists them)
 //   - always: Download IPA, to keep the file
 // `opener` opens a URL outside the app (window.open on the site). `onInstall` runs first on any of them (F30: the
 // Installed tab's record). F80: `queue`, when given, is what "Signed with your certificate" does instead (the app page
@@ -91,7 +94,7 @@ function card(children, cls = "") {
 // overrides whether it shows, `customize` what it runs (tests; F84: the app page's appPageCustom, which queues).
 export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {},
   queue = null, name = "", { custom = localSigning() && !ipaInstallAvailable(), customize = null, jailbreak = ipaInstallAvailable(),
-    ipaInstall = openIpaInstall } = {}) {
+    ipaInstall = openIpaInstall, site = detectMode() === "site", open = (u) => { location.href = u; } } = {}) {
   const o = installOptions(version, sourceUrl);
   const rows = [];
   if (o.download && jailbreak) {
@@ -100,6 +103,10 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
       onClick: () => ipaInstall({ url: o.download, name, onInstalled: () => onInstall() }) });
   } else if (o.itms) {
     rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
+  } else if (o.download && site) {
+    for (const l of installLinks(o.download, { name })) {
+      rows.push({ label: l.label, subtitle: l.subtitle, handoff: true, onClick: () => { onInstall(); open(l.url); } });
+    }
   } else if (o.download) {
     const direct = () => signAndInstall({ url: o.download, name, onInstalled: () => onInstall() });
     rows.push({ label: "Install", subtitle: "Signed with your certificate",
@@ -240,15 +247,15 @@ function trackingSection(app, pkg, source) {
 }
 
 // F80: the app page's nav button (browse.js packageActions) and its Install row, where the phone signs (the sideload
-// app) or the user's certificate is saved (the website): Install / Upgrade / Reinstall queue the app and open Confirm
-// (screens/queue.js); while it is queued the button reads Modify and offers Clear, as Cydia's does. False when the
-// queue doesn't apply (the jailbreak build, a source-signed link, no IPA, no certificate on the website): the caller
+// app): Install / Upgrade / Reinstall queue the app and open Confirm (screens/queue.js); while it is queued the
+// button reads Modify and offers Clear, as Cydia's does. False when the queue doesn't apply (the jailbreak build, the
+// website, a source-signed link, no IPA): the caller
 // does what it did before. F85: `version` (Version History's row) queues that version instead of the newest, with no
 // Modify sheet: queuing it replaces whatever version of the app was queued.
 export async function appPageAction(pkg, source, { queue = appQueue, ask = showActionSheet, add = queueApp,
-  mode = detectMode(), ready = () => localSigning() || signingReady(), store = apps, version = null } = {}) {
+  mode = detectMode(), ready = async () => true, store = apps, version = null } = {}) {
   const app = pkg?.stanza?.ipa;
-  if (mode === "jailbreak" || !app) return false;
+  if (mode !== "sideload" || !app) return false; // F89: the website signs nothing, so it queues nothing
   let rec = null;
   try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
   const job = appJob(pkg, { installed: rec ? rec.version || null : null, version, source: source ? displayName(source) : null });
@@ -280,6 +287,10 @@ export async function appPageCustom(pkg, source, opts, { queue = appQueue, add =
   if (!job) return custom(opts);
   return custom({ url: job.url, name: opts?.name || job.name || "", queue: (options) => add({ ...job, options }, { queue }) });
 }
+
+// F89: the website's Install group says why it hands the app on.
+export const SITE_INSTALL_FOOTER = "The website can't install apps itself. Open in Cydian signs it with your certificate in the Cydian app; "
+  + "AltStore, SideStore and Feather install it their own way. Download IPA keeps the file.";
 
 export function renderApp(body, route, pkg, source) {
   const st = pkg.stanza;
@@ -362,7 +373,7 @@ export function renderApp(body, route, pkg, source) {
     footer: options.download && ipaInstallAvailable() ? IPA_FOOTER
       : options.itms ? "Installs over the air with the source's signed link."
       : localSigning() ? "Install queues it and opens Confirm, which signs it with your own certificate (Settings > Signing) and installs it. Custom Install first lets you change its bundle ID, name, icon or extensions. Download IPA keeps the file."
-      : "Install signs it with your own certificate (Settings > Signing) and installs it. Download IPA keeps the file." }]));
+      : options.download ? SITE_INSTALL_FOOTER : null }]));
 
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on
   // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.

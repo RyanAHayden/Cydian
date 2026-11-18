@@ -5,8 +5,8 @@
 //                      Signing Server adds to Cydian's own IPA when Install Cydian App asks (bring: true). Imported
 //                      into the Keychain on the first launch that finds it, unless the Keychain already holds one;
 //                      the bundle is read-only, so its digest is remembered and the same file is never looked at again.
-//   IncomingLink       which cydian:// links the shell hands to the page: cydian://import?d=… (sources and settings)
-//                      and cydian://signing-import#… (Import from Safari's ciphertext), cydian://myipas (F77) and
+//   IncomingLink       which cydian:// links the shell hands to the page: cydian://import?d=… (sources and settings),
+//                      cydian://install?url=… (F89: the website's Open in Cydian on an app page), cydian://myipas (F77),
 //                      cydian://add?url=… (N8's Add Source intent), cydian://shared?route=… (N9); nothing else, nothing huge.
 //   gunzip(_:)         a gzip member's contents, for the page on an iOS without DecompressionStream (app.gunzip)
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -36,8 +36,9 @@ enum BundledIdentity {
 
 enum IncomingLink {
     // myipas: F77, an .ipa opened in Cydian; add: N8, the Add Source intent (cydian://add?url=…)
-    // shared: N9, a shared item's route (native/share/, web/app/share.js)
-    static let hosts: Set<String> = ["import", "signing-import", "myipas", "add", "shared"]
+    // shared: N9, a shared item's route (native/share/, web/app/share.js); install: F89, the website's Open in Cydian
+    // (Import from Safari's signing-import went with the website's signer)
+    static let hosts: Set<String> = ["import", "install", "myipas", "add", "shared"]
     static let maxLength = 512 * 1024
 
     static func accepts(_ url: URL) -> Bool {

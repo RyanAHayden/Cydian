@@ -6,7 +6,7 @@ import {
   builtinSources, withBuiltins, withBuiltinRecords, builtinFirst, exportable, isBuiltin, BuiltinError,
   minimumOf, belowMinimum, selfFromAltSource, essentialIds, essentialUpgrades, selfUpgradeRow, withSelfUpgrade,
   essentialAlert, runEssential, queueEssential, installSelf, loadInfo, saveInfo,
-  SELF_ID, SELF_APT_URI, SELF_ALT_URL, SELF_SITE, SERVER_OK_KEY, TITLE, MESSAGE, COMPLETE, ESSENTIAL_ONLY, IGNORE,
+  SELF_ID, SELF_APT_URI, SELF_ALT_URL, SELF_SITE, TITLE, MESSAGE, COMPLETE, ESSENTIAL_ONLY, IGNORE,
 } from "./essential.js";
 import { altKey } from "./altstore.js";
 import { sourceKey, refreshSource } from "./sources.js";
@@ -333,67 +333,28 @@ test("F86: Continue Queuing keeps the queue and doesn't ask again; nothing queua
 
 // ---- Cydian's own IPA in the sideload app ---------------------------------------------------------------------
 
-function selfDeps({ identity = null, answers = [], sign = async () => "itms-services://?action=download-manifest&url=x", storage = memStorage() } = {}) {
+function selfDeps({ answers = [] } = {}) {
   const log = [];
   const queue = [...answers];
   return {
-    log, storage,
+    log,
     deps: {
-      exportIdentity: async () => identity, server: "https://cydian.dev", storage,
-      signOnServer: async (o) => { log.push(["sign", o.url, o.server]); return sign(o); },
       alert: async (spec) => { log.push(["alert", spec.title, spec.message]); return { index: queue.shift() ?? 0 }; },
       open: async (url) => log.push(["open", url]),
     },
   };
 }
 const ROW = { version: "0.1.3", ipa: "https://github.com/RyanAHayden/Cydian/releases/download/v0.1.3/Cydian.ipa" };
-const ID = { p12: new Uint8Array([1]), profile: new Uint8Array([2]), password: "" };
 
-test("installSelf: with a certificate it asks once, explaining the key goes to the server, then opens its itms link", async () => {
-  const s = selfDeps({ identity: ID, answers: [1] });
-  assert.equal(await installSelf(ROW, s.deps), "installing");
-  assert.equal(s.log[0][0], "alert");
-  assert.match(s.log[0][1], /cydian\.dev/);
-  assert.match(s.log[0][2], /iOS closes Cydian/);
-  assert.match(s.log[0][2], /key go to cydian\.dev for this one request/);
-  assert.deepEqual(s.log[1], ["sign", ROW.ipa, "https://cydian.dev"]);
-  assert.equal(s.log[2][0], "open");
-  assert.match(s.log[2][1], /^itms-services:/);
-  assert.equal(s.storage.getItem(SERVER_OK_KEY), "cydian.dev");
-  // Asked once: the second time signs straight away.
-  const again = selfDeps({ identity: ID, storage: s.storage });
-  assert.equal(await installSelf(ROW, again.deps), "installing");
-  assert.deepEqual(again.log.map((l) => l[0]), ["sign", "open"]);
-});
-
-test("installSelf: Cancel on the ask sends nothing", async () => {
-  const s = selfDeps({ identity: ID, answers: [0] });
-  assert.equal(await installSelf(ROW, s.deps), "cancelled");
-  assert.deepEqual(s.log.map((l) => l[0]), ["alert"]);
-});
-
-test("installSelf: a server error is said plainly", async () => {
-  const s = selfDeps({ identity: ID, answers: [1, 0], sign: async () => { throw new Error("The signing server answered HTTP 500."); } });
-  assert.equal(await installSelf(ROW, s.deps), "failed");
-  assert.deepEqual(s.log.at(-1).slice(0, 3), ["alert", "Couldn't Sign Cydian", "The signing server answered HTTP 500."]);
-});
-
-test("installSelf: without a certificate to send, it offers Settings > Signing or cydian.dev, never the local server", async () => {
+test("installSelf (no bridge to sign with): it offers cydian.dev in Safari, which hands Cydian to a sideloader (F89)", async () => {
   const s = selfDeps({ answers: [1] });
   assert.equal(await installSelf(ROW, s.deps), "site");
-  assert.match(s.log[0][2], /Settings > Signing/);
   assert.match(s.log[0][2], /cydian\.dev/);
+  assert.match(s.log[0][2], /AltStore, SideStore or Feather/);
   assert.deepEqual(s.log[1], ["open", SELF_SITE]);
-  assert.ok(!s.log.some((l) => l[0] === "sign"));
   const no = selfDeps({ answers: [0] });
   assert.equal(await installSelf(ROW, no.deps), "cancelled");
   assert.ok(!no.log.some((l) => l[0] === "open"));
-});
-
-test("installSelf: an exportIdentity that throws (an older shell) is the no-certificate path", async () => {
-  const s = selfDeps({ answers: [1] });
-  s.deps.exportIdentity = async () => { throw new Error("unknown method signing.export"); };
-  assert.equal(await installSelf(ROW, s.deps), "site");
 });
 
 test("installSelf: no IPA in the source says so", async () => {

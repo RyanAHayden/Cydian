@@ -53,8 +53,8 @@ installed `Essential: yes` package) has an upgrade on the built-in source, it sh
 Ignore (Temporary). It replaces F61's GitHub popup. F61's check still runs when the built-in source can't be read,
 and Settings > About > Check for Updates still works. In the sideload app Cydian's own IPA never goes through the
 local install server, because iOS closes Cydian, and the server with it, when it starts installing. Instead it is
-signed on the Signing Server and installed from its itms-services link, or the user is sent to cydian.dev's Install
-Cydian App.
+signed on the phone and held on the Signing Server (worker/, `POST /sign/host`) for iOS to install from, or, with no
+bridge to sign with, the user is sent to cydian.dev's Install Cydian App (AltStore, SideStore, Feather or the IPA: F89).
 
 ## Cutting one
 

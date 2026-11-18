@@ -9,22 +9,17 @@
 import { grouped } from "../nav/ui.js";
 import { format } from "../router.js";
 import { createSettings, detectMode, themeFor, SETTINGS } from "../core/settings.js";
-import { drawSection as drawPushSection } from "../push-client.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
-import { showBanner } from "../nav/banner.js";
-import { parseProfile, checkP12Password, summary, profileKind, DEFAULT_SERVER, deviceSummary, deviceError } from "../core/signing.js";
+import { parseProfile, checkP12Password, deviceSummary, deviceError } from "../core/signing.js";
 import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
-import { loadIdentity, saveIdentity, clearIdentity, signingAvailable, getServer, setServer, serverStatus,
-  localSigning, deviceStatus, importToDevice, removeFromDevice, installOnDevice, signAndInstall, statusReady,
-  importFromSafari, getBring, setBring, exportToApp, defaultServer } from "../signing-client.js";
+import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, serverStatus,
+  localSigning, deviceStatus, importToDevice, removeFromDevice, installOnDevice, statusReady, defaultServer } from "../signing-client.js";
 import { drawWalkthrough, walkOpen } from "./signing.js";
-import { exportKey, EXPORT_SEGMENT } from "../core/transfer.js";
 import { openInAppSection } from "./importlink.js";
 import { signingExtras } from "./signed-apps.js";
 import { syncReminder } from "../core/signing.js";
-import { signingRowShows, offerAfterImport, IMPORT_ALERT, APP_IPA_URL, APP_NAME, APP_LABEL } from "../core/appoffer.js";
 import { checkForUpdates, runInstall, fetchRelease, loadState, setSkip, installPath, isNewer, compareVersions } from "../core/selfupdate.js";
 import { getArch } from "../backend.js";
 import { ipaSection } from "./ipa-install.js";
@@ -46,7 +41,6 @@ export function nav(route) {
   const key = route.path[0];
   if (key === "holds") return { title: "Ignored Upgrades" };
   if (key === "signing") return { title: "Signing" };
-  if (String(key ?? "").startsWith(EXPORT_SEGMENT + ".")) return { title: "Import into Cydian" }; // F75
   if (key === LOGS) return { title: logsTitle(route.path[1]) }; // N4: Console Logs
   if (key && defOf(key)) return { title: defOf(key).label };
   return { title: "Settings" };
@@ -78,10 +72,9 @@ function draw({ el, route }) {
   const top = el.scrollTop;
   if (key === "holds") el.replaceChildren(holdsPage());
   else if (key === "signing") drawSigning(el);
-  else if (String(key ?? "").startsWith(EXPORT_SEGMENT + ".")) drawExport(el, exportKey(key)); // F75: Import from Safari
   else if (key === LOGS) el.replaceChildren(logsPage(route.path[1], () => draw({ el, route })));
   else if (key) el.replaceChildren(listPage(key));
-  else el.replaceChildren(rootPage(), signingSection(), sideloadingSection(), openInAppSection(), ipaSection(), pushSection(), logsSection(detectMode()), aboutSection());
+  else el.replaceChildren(rootPage(), signingSection(), sideloadingSection(), openInAppSection(), ipaSection(), logsSection(detectMode()), aboutSection());
   el.scrollTop = top;
 }
 
@@ -116,15 +109,6 @@ function rootPage() {
     }
   });
   return frag;
-}
-
-// Upgrade Alerts (F10, push-client.js): the site only; the app's alerts are native.
-function pushSection() {
-  const box = document.createElement("div");
-  if (detectMode() === "site") {
-    drawPushSection(box, { grouped, createSwitch, showAlert, showHUD, holds: () => settings.holds.list() });
-  }
-  return box;
 }
 
 // A settings row's switch: createSwitch bound to the toggle setting `d`.
@@ -295,31 +279,17 @@ function remindNow() {
   syncReminder((k) => settings.get(k), n?.call ? (m, p) => n.call(m, p) : null);
 }
 
-// ---- Signing (I5) --------------------------------------------------------------------------------------------
-// Settings > Signing: the user's .p12, its password and a .mobileprovision, kept in IndexedDB on this phone only
-// (signing-client.js), and the signing server. With them, Install on an AltStore app's page signs the app with
-// this certificate and installs it (browse.js packageActions). The site only: the jailbreak app has no need, and
-// the sideload build signs on the phone itself (F14, I6).
+// ---- Signing (I5, F58) ---------------------------------------------------------------------------------------
+// Settings > Signing, in the sideload build only: the user's .p12, its password and a .mobileprovision go into the
+// Keychain, and the Signing Server hands iOS the manifests. The website signs nothing since F89 (its server is
+// gone: an app page there hands the app on, screens/handoff.js), and the jailbreak app installs with its helper.
 
 // The root page's row: the certificate's name once one is set.
 function signingSection() {
   const box = document.createElement("div");
   if (localSigning()) return deviceSigningSection(box);
-  if (!signingAvailable()) return box;
-  const fill = (detail) => box.replaceChildren(grouped([{ header: "Signing",
-    rows: [{ label: "Certificate", detail, href: format({ tab: "settings", path: ["signing"] }) }],
-    footer: "Your own certificate: Install signs AltStore apps with it." }]));
-  fill("");
-  loadIdentity().then((id) => {
-    let name = "None";
-    if (id?.profile) {
-      try { name = summary({ profile: parseProfile(id.profile) }).rows[0].detail; } catch { name = "Unreadable"; }
-    } else if (id?.p12) name = "Incomplete";
-    fill(name);
-  });
   return box;
 }
-
 // After a change on the Signing page: redraw every Settings page on screen (the root's Certificate row too).
 function redrawAll() {
   for (const p of pages) {
@@ -333,7 +303,6 @@ const alertOK = (title, message) => showAlert({ title, message, buttons: ["OK"] 
 // Everything picked at once: the .p12 and profile are checked and saved as if picked alone, then the password is
 // found among any text files (or the empty password), unless the saved one already opens the certificate.
 async function chooseFiles(el, files, slot) {
-  const before = await loadIdentity();
   const hide = showHUD("Reading");
   let found;
   try { found = await sortCertFiles(files); } catch { found = { p12: null, profile: null, passwords: [] }; }
@@ -354,29 +323,6 @@ async function chooseFiles(el, files, slot) {
   if (id?.p12) await recheckPassword(el, false);
   if (localSigning()) await importIfComplete(el, false);
   redrawAll();
-  await offerApp(before);
-}
-
-// I7: right after an import that made the certificate work (website only), offer Cydian itself: Not Now / Install,
-// which signs the app's IPA with that certificate through the signing server and installs it.
-// F75: with "Bring my certificate into the app" on (the default), the Signing Server puts the certificate inside
-// Cydian's own IPA and the app imports it on its first launch.
-const installApp = () => signAndInstall({ url: APP_IPA_URL, name: APP_NAME, bring: getBring() });
-async function offerApp(before) {
-  if (location.hash.includes(EXPORT_SEGMENT)) return; // F75: on Import from Safari's page the app is already there
-  if (!offerAfterImport({ mode: detectMode(), before, after: await loadIdentity() })) return;
-  const { index } = await showAlert(IMPORT_ALERT);
-  if (index === 1) await installApp();
-}
-
-// I7: the green Install Cydian App row on the Signing page, once the certificate works (website only).
-function appOfferSection(id) {
-  if (!signingRowShows({ mode: detectMode(), identity: id })) return [];
-  const frag = grouped([{ rows: [{ label: APP_LABEL, onClick: installApp, icon: { text: "" } }],
-    footer: "Cydian as an app on your Home Screen, signed with this certificate: it signs apps on the iPhone itself." }]);
-  frag.firstChild.classList.add("app-offer");
-  frag.querySelector(".cell-icon")?.classList.add("home-glyph", "glyph-install");
-  return [frag, bringSection()];
 }
 
 // F83: Sideloading > Open Other Apps' Links (sideload build only, which claims the schemes; on by default). The
@@ -394,17 +340,6 @@ export function sideloadingSection(mode = detectMode()) {
   cell?.classList.add("has-switch");
   box.append(frag);
   return box;
-}
-
-// F75: the website's "Bring my certificate into the app" switch, on by default.
-function bringSection() {
-  const frag = grouped([{ rows: [{ label: "Bring My Certificate" }],
-    footer: "Install Cydian App puts a copy of your certificate inside the app, so Cydian has it on first launch. "
-      + "The copy sits in the app's own files until the next update. Off: use Import from Safari in the app instead." }]);
-  const cell = frag.querySelector(".cell-inner");
-  cell?.append(createSwitch({ label: "Bring my certificate into the app", checked: getBring(), onToggle: (on) => setBring(on) }));
-  cell?.classList.add("has-switch");
-  return frag;
 }
 
 async function chooseP12(el, f, redraw = true) {
@@ -446,7 +381,7 @@ async function recheckPassword(el, redraw = true) {
 }
 
 async function askServer(el) {
-  const { index, value } = await showAlert({ title: "Signing Server", message: `Where apps are signed. Empty for ${new URL(DEFAULT_SERVER).host}.`,
+  const { index, value } = await showAlert({ title: "Signing Server", message: `Hands iOS the install manifests. Empty for ${new URL(defaultServer()).host}.`,
     input: { type: "url", placeholder: defaultServer(), value: getServer() === defaultServer() ? "" : getServer() }, buttons: ["Cancel", "Save"], cancel: 0 });
   if (index !== 1) return;
   setServer(value.trim() || defaultServer());
@@ -459,55 +394,18 @@ async function checkServer() {
     const st = await serverStatus();
     hide();
     const host = new URL(getServer()).host;
-    // The app needs only manifests and the update hand-off (a Worker answers worker: true); the website needs zsign.
-    if (st.worker || (localSigning() && st.ok)) await alertOK("Server Works", `${host} hands iOS the install manifests and holds Cydian's own updates. Signing happens on this iPhone.`);
-    else await alertOK(st.zsign ? "Server Signs Apps" : "Server Can't Sign",
-      st.zsign ? `${host} signs IPAs up to ${Math.round(st.maxBytes / 1048576)} MB and keeps each signed app for ${Math.round(st.ttl / 60)} minutes.`
-        : `${host} answers but has no signer (zsign) installed.`);
+    // The app needs only manifests and the update hand-off (worker/ answers worker: true).
+    if (st?.worker || st?.ok) await alertOK("Server Works", `${host} hands iOS the install manifests and holds Cydian's own updates. Signing happens on this iPhone.`);
+    else await alertOK("Server Not Ready", `${host} answers but isn't a Signing Server.`);
   } catch (e) {
     hide();
     await alertOK("Server Not Reachable", `${new URL(getServer()).host}: ${e.message || "no answer"}.`);
   }
 }
 
-async function removeCertificate(el) {
-  const { index } = await showAlert({ title: "Remove Certificate?", message: "The .p12, its password and the profile are deleted from this iPhone.",
-    buttons: ["Cancel", "Remove"], cancel: 0 });
-  if (index !== 1) return;
-  await clearIdentity();
-  redrawAll();
-}
-
 async function drawSigning(el) {
   if (localSigning()) return drawDeviceSigning(el);
-  const id = await loadIdentity();
-  if (!signingAvailable()) {
-    el.replaceChildren(grouped([{ footer: "Signing with your own certificate is on the website. This app signs on the iPhone itself." }]));
-    return;
-  }
-  const top = el.scrollTop;
-  let profile = null;
-  try { profile = id?.profile ? parseProfile(id.profile) : null; } catch { /* checked when picked */ }
-  const info = summary({ profile, passwordOk: id?.passwordOk ?? null });
-  const sections = [];
-  if (profile) {
-    sections.push({ header: profile.name ? `${profileKind(profile)} Profile: ${profile.name}` : `${profileKind(profile)} Profile`,
-      // Long values (a certificate's name, a team) go under the label, where they wrap, not cut off on the right.
-      rows: info.rows.map((r) => (r.detail.length > 16 ? { label: r.label, subtitle: r.detail } : r)),
-      footer: info.problems.length ? info.problems.join(" ") : null });
-  }
-  const server = getServer();
-  sections.push({
-    header: "Signing Server",
-    rows: [{ label: new URL(server).host, subtitle: server === DEFAULT_SERVER ? "Default" : server, onClick: () => askServer(el), chevron: true },
-      { label: "Check Server", onClick: () => checkServer() }],
-    footer: "Install sends the app's link, the certificate, its password and the profile to this server over HTTPS. "
-      + "The server uses them in memory for that one request and never writes them to disk or logs; the signed app is deleted after 10 minutes. "
-      + "Run your own with docker compose up (docs/signing.md) and put its address here.",
-  });
-  if (id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeCertificate(el) }] });
-  el.replaceChildren(certificateBlock(el, id), ...appOfferSection(id), grouped(sections));
-  el.scrollTop = top;
+  el.replaceChildren(grouped([{ footer: "Apps are signed in the Cydian app, on the iPhone itself, with your own certificate." }]));
 }
 
 // The certificate, its profile and its password: one group of rows, each with its name on the left, its value in the
@@ -538,14 +436,8 @@ function certificateBlock(el, id, status = null) {
   // entry) sends all three to the Keychain.
   const save = async (done = false) => {
     clearTimeout(timer);
-    const before = await loadIdentity();
     await saveIdentity({ password: input.value });
     await recheckPassword(el, false);
-    // I7: the password that made the certificate work: show the Install Cydian App row and offer it.
-    if (!localSigning() && offerAfterImport({ mode: detectMode(), before, after: await loadIdentity() })) {
-      redrawAll();
-      await offerApp(before);
-    }
     if (localSigning()) {
       const now = await loadIdentity();
       if (now?.passwordOk === true || (done && now?.passwordOk !== false)) await importIfComplete(el, true);
@@ -568,8 +460,7 @@ function certificateBlock(el, id, status = null) {
   ul.append(fileRow(".p12", p12Shown, "p12"),
     fileRow(".mobileprovision", profShown, "profile"), signRow("Password", input, pwBrowse));
   const state = id?.p12 && id?.password != null ? (id.passwordOk === false ? " The password doesn't open this certificate." : id.passwordOk ? " The password opens it." : "") : "";
-  const kind = status ? "Once all three are here, they go into this iPhone's Keychain, where only Cydian can use them; the password isn't kept. To change one, choose the .p12 and the profile again."
-    : "They're kept on this iPhone only, in this browser's storage.";
+  const kind = "Once all three are here, they go into this iPhone's Keychain, where only Cydian can use them; the password isn't kept. To change one, choose the .p12 and the profile again.";
   const foot = Object.assign(document.createElement("p"), { className: "group-footer",
     textContent: "Your .p12 (the certificate and its key), its .mobileprovision and the password. Each row's Browse picks one. " + kind + state });
   const [allInput, allLabel] = browseButton(accept, true, (files) => chooseFiles(el, files, null));
@@ -694,8 +585,8 @@ function watchReturn() {
   }, 2000);
 }
 
-// F69, F75: the page is the walkthrough (screens/signing.js): the certificate (Select All Files, the rows, Import
-// from Safari), then the Signing Server. The Keychain's details and Remove Certificate go under the steps.
+// F69, F75: the page is the walkthrough (screens/signing.js): the certificate (Select All Files, the rows), then
+// the Signing Server. The Keychain's details and Remove Certificate go under the steps.
 // walkOpen keeps the user's expand/collapse taps across redraws (and Install's redirect sets it: openAt).
 async function drawDeviceSigning(el) {
   watchReturn();
@@ -713,46 +604,15 @@ async function drawDeviceSigning(el) {
   if (kept || id?.p12 || id?.profile) sections.push({ rows: [{ label: "Remove Certificate", onClick: () => removeDeviceCertificate() }] });
   const server = getServer();
   const serverRows = grouped([{ rows: [
-    { label: new URL(server).host, subtitle: server === DEFAULT_SERVER ? "Default" : server, onClick: () => askServer(el), chevron: true },
+    { label: new URL(server).host, subtitle: server === defaultServer() ? "Default" : server, onClick: () => askServer(el), chevron: true },
     { label: "Check Server", onClick: () => checkServer() }] }]);
   drawWalkthrough(el, {
     status, failure: failure ? deviceError(failure).message : "",
     certificate: certificateBlock(el, id, status ?? { identity: null }),
     server: serverRows, serverUrl: server,
-    actions: { importSafari: () => importFromSafari() },
     open: walkOpen,
     extra: [...(sections.length ? [grouped(sections)] : []), signingExtras({ identity: kept, redraw: redrawAll })],
   });
-}
-
-// ---- Import from Safari, the website's half (F75) ---------------------------------------------------------------
-// #/settings/signing-export.<key>: the app opened Safari here with a fresh key in the fragment. The identity this
-// origin keeps (IndexedDB: Safari and a Home Screen web app keep separate storage, and every site is its own origin)
-// is sealed under that key and handed back as cydian://signing-import#<ciphertext>. With none here the page says
-// so and offers the certificate rows, then goes on by itself once they're complete.
-async function drawExport(el, key) {
-  if (detectMode() !== "site") {
-    el.replaceChildren(grouped([{ footer: "This page is for Safari: Import from Safari in Cydian's Settings > Signing opens it." }]));
-    return;
-  }
-  if (!key) {
-    el.replaceChildren(grouped([{ footer: "This link is cut short. In Cydian, tap Import from Safari in Settings > Signing again." }]));
-    return;
-  }
-  const id = await loadIdentity();
-  let link = null;
-  if (id?.passwordOk !== false) { try { link = await exportToApp(key); } catch { /* unreadable: treated as none */ } }
-  if (!link) {
-    el.replaceChildren(grouped([{ header: "No Certificate Here",
-      footer: `${location.host} has no certificate in this browser. Safari and Home Screen apps keep separate files, and so does each site. Choose your files here and Cydian gets them next.` }]),
-    certificateBlock(el, id));
-    return;
-  }
-  const open = () => { showBanner({ title: "Cydian", message: "Press Open to bring your certificate into Cydian." }); location.href = link; };
-  const frag = grouped([{ rows: [{ label: "Open Cydian", onClick: open }],
-    footer: "Your certificate goes to Cydian encrypted with a key only Cydian holds." }]);
-  el.replaceChildren(frag);
-  if (!drawExport.sent?.has(key)) { (drawExport.sent ??= new Set()).add(key); open(); }
 }
 
 // ---- About and updates (F61) ---------------------------------------------------------------------------------

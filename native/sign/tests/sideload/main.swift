@@ -228,7 +228,8 @@ test("bundled identity: first launch imports, once") {
 
 test("incoming cydian:// links") {
     check(IncomingLink.accepts(URL(string: "cydian://import?d=H4sI")!), "import")
-    check(IncomingLink.accepts(URL(string: "cydian://signing-import#abc")!), "signing-import")
+    check(IncomingLink.accepts(URL(string: "cydian://install?url=https%3A%2F%2Fe.example%2Fa.ipa")!), "install (F89)")
+    check(!IncomingLink.accepts(URL(string: "cydian://signing-import#abc")!), "signing-import is gone (F89)")
     check(!IncomingLink.accepts(URL(string: "cydian://other")!), "other host")
     check(IncomingLink.accepts(URL(string: "cydian://myipas?file=A.ipa")!), "myipas (F77)")
     check(!IncomingLink.accepts(URL(string: "https://import/x")!), "other scheme")

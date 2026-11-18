@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   parseProfile, parseCert, parsePlist, checkP12Password, summary, profileCert, profileKind, normalizeServer,
-  signBody, errorText, bmpPassword, toBase64, DEFAULT_SERVER,
+  bmpPassword, toBase64, APP_SERVER, LEGACY_SERVER,
 } from "./signing.js";
 
 // Throwaway certificates with fixed dates, written by web/signer/make_fixtures.py.
@@ -85,7 +85,8 @@ test("summary rows and problems", () => {
 });
 
 test("signing server addresses", () => {
-  assert.equal(DEFAULT_SERVER, "https://cydian.dev");
+  assert.equal(APP_SERVER, "https://sign.cydian.dev");
+  assert.equal(LEGACY_SERVER, "https://cydian.dev");
   assert.equal(normalizeServer("sign.example.org"), "https://sign.example.org");
   assert.equal(normalizeServer(" https://box.tail1234.ts.net:8443/ "), "https://box.tail1234.ts.net:8443");
   assert.equal(normalizeServer("http://192.168.1.5:8080"), "http://192.168.1.5:8080");
@@ -95,13 +96,6 @@ test("signing server addresses", () => {
   assert.equal(normalizeServer("https://u:p@x.org"), null);
 });
 
-test("the request body and error text", () => {
-  const body = JSON.parse(signBody({ url: "https://e.org/a.ipa", p12: P12, profile: PROFILE, password: "hunter2" }));
-  assert.equal(body.url, "https://e.org/a.ipa");
-  assert.equal(body.password, "hunter2");
-  assert.deepEqual(new Uint8Array(Buffer.from(body.p12, "base64")), P12);
+test("bytes go to the bridge as base64", () => {
   assert.equal(toBase64(new Uint8Array([255, 0, 1])), "/wAB");
-  assert.equal(errorText(400, { error: "The certificate's password is wrong.", code: "bad_password" }), "The certificate's password is wrong.");
-  assert.match(errorText(429, null), /Too many/);
-  assert.match(errorText(404, null), /doesn't sign/);
 });

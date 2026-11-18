@@ -14,7 +14,7 @@ test("Install group: Custom Install under Install where the phone signs; not on 
   const seen = [];
   let installed = 0;
   const { rows } = installRows(V, "https://example.com/apps.json", () => {}, () => { installed++; }, null, "Delta",
-    { custom: true, customize: (o) => { seen.push(o); return true; } });
+    { custom: true, site: false, customize: (o) => { seen.push(o); return true; } });
   assert.deepEqual(labels(rows), ["Install", "Custom Install", "Download IPA"]);
   const row = rows[1];
   assert.match(row.subtitle, /Bundle ID/);
@@ -25,7 +25,7 @@ test("Install group: Custom Install under Install where the phone signs; not on 
   seen[0].onInstalled();
   assert.equal(installed, 1); // the Installed tab's record, as Install's
 
-  assert.deepEqual(labels(installRows(V, null, () => {}, () => {}, null, "Delta", { custom: false }).rows), ["Install", "Download IPA"]);
+  assert.deepEqual(labels(installRows(V, null, () => {}, () => {}, null, "Delta", { custom: false, site: false }).rows), ["Install", "Download IPA"]);
   // A source-signed link with no IPA: nothing to re-sign.
   const itms = { version: "1", downloadURL: "itms-services://?action=download-manifest&url=x" };
   assert.deepEqual(labels(installRows(itms, null, () => {}, () => {}, null, "X", { custom: true, customize: () => {} }).rows), ["Install"]);

@@ -44,10 +44,6 @@
   font: bold 17px/42px "Helvetica Neue", Helvetica, sans-serif; text-shadow: 0 -1px 0 rgba(0,0,0,.4); cursor: pointer;
 }
 .walk-action:active { background: linear-gradient(#2765db, #1b4fb5); background-origin: border-box; }
-/* Import from Safari: the white glossy button beside the blue one */
-.walk-secondary { background: linear-gradient(#fdfdfd, #d9d9d9); background-origin: border-box; border-color: #a5a5a5; color: #385487; text-shadow: 0 1px 0 #fff; }
-.walk-secondary:active { background: linear-gradient(#85a7e9, #2765db); background-origin: border-box; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4); }
-.walk-note { margin: 7px 2px 0; }
 /* Select All Files: the big blue glossy button over the certificate rows (a <label> on a hidden file input) */
 .sign-files .sign-all { box-sizing: border-box; margin: 0 0 12px; text-align: center; -webkit-tap-highlight-color: transparent; }
 

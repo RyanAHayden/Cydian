@@ -1,8 +1,9 @@
 // F75: cydian:// links the shell hands over (native/Sources/App.swift, Incoming): it keeps the latest, sends
 // "cydian:url" on window, and the page takes it with app.takeURL (also once at start, for a link that launched the
 // app before the page was there).
-//   cydian://signing-import#<sealed>   Import from Safari coming back: into the Keychain, then Settings > Signing
 //   cydian://import?d=<gzipped JSON>   Open in Cydian App on the website: the review alert (screens/importlink.js)
+//   cydian://install?url=<ipa>[&name=…]  F89: Open in Cydian on the website's app page (screens/handoff.js
+//                                      installLinks): the Install IPA alert, then Install (signAndInstall)
 //   cydian://myipas?file=<name>        F77: an .ipa another app sent, already in My IPAs (MyIPAs.swift): its page
 //   cydian://add?url=<url>[&suite=…]   N8: the Add Source intent: Add Source's alert, filled in (core/handoff.js);
 //                                      N9: also an APT repo or AltStore source shared with Cydian
@@ -13,18 +14,14 @@
 //                                      Off, or a link Cydian has no use for: handed back (handBack below)
 //
 //   startIncoming({ native })          once, in the app
-//   await handleIncoming(url, deps)    -> "signing-import" | "import" | "myipas" | "add" | "shared" | "other-source" |
+//   await handleIncoming(url, deps)    -> "import" | "install" | "myipas" | "add" | "shared" | "other-source" |
 //                                         "other-install" | "other-app" | null (not one of ours)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showAlert } from "./nav/alert.js";
 import { showHUD } from "./nav/hud.js";
 import { format } from "./router.js";
-import { finishSafariImport, statusReady } from "./signing-client.js";
-import { deviceError } from "./core/signing.js";
 import { parseAddLink } from "./core/handoff.js";
 import { parseOtherLink, otherLinksOn } from "./core/otherlinks.js";
-
-const openSigning = () => { location.hash = format({ tab: "settings", path: ["signing"] }).replace(/^#/, ""); };
 
 export function startIncoming({ native = globalThis.cydianNative } = {}) {
   if (!native?.call) return;
@@ -45,28 +42,13 @@ export function startIncoming({ native = globalThis.cydianNative } = {}) {
   take();
 }
 
-export async function handleIncoming(url, { native = globalThis.cydianNative, alert = showAlert, hud = showHUD, go = openSigning,
-  finish = finishSafariImport, review = null, add = null, shared = null, install = null, on = otherLinksOn, open = goHash,
-  now = Date.now } = {}) {
+export async function handleIncoming(url, { native = globalThis.cydianNative, alert = showAlert, hud = showHUD,
+  review = null, add = null, shared = null, install = null, on = otherLinksOn, open = goHash, now = Date.now } = {}) {
   const u = String(url ?? "");
-  if (/^cydian:\/\/signing-import\b/i.test(u)) {
-    const hide = hud("Importing");
-    let st;
-    try {
-      st = await finish(u, { native });
-    } catch (e) {
-      hide();
-      await alert({ title: "Couldn't Import", message: e?.code ? deviceError(e).message : e?.message || "Something went wrong.", buttons: ["OK"] });
-      go();
-      return "signing-import";
-    }
-    if (!statusReady(st)) {
-      hide();
-      await alert({ title: "Couldn't Import", message: st?.identityProblem || "The certificate went into the Keychain but Cydian can't find it there.", buttons: ["OK"] });
-    } else if (hide.done) hide.done("Imported");
-    else hide();
-    go(); // the walkthrough, ticked
-    return "signing-import";
+  if (/^cydian:\/\/install\b/i.test(u)) {
+    const ask = installAsk(u);
+    if (ask) await confirmInstall(ask.url, ask.name, `${ask.name || ipaFileName(ask.url)}\n${ask.url}`, { alert, install, open });
+    return "install";
   }
   if (/^cydian:\/\/myipas\b/i.test(u)) {
     const path = myIpasPath(u);
@@ -108,14 +90,27 @@ async function handleOtherLink(u, other, { native, alert, hud, add, install, on,
     await run({ showHUD: hud }, { url: other.url });
     return "other-source";
   }
-  open(format({ tab: "installed", path: ["myipas"] }));
-  const name = ipaFileName(other.url);
-  const { index } = await alert({ title: "Install IPA", message: `${other.app} link: ${name}\n${other.url}`,
-    buttons: ["Cancel", "Install"], cancel: 0 });
-  if (index !== 1) return "other-install";
-  const run = install ?? (await import("./signing-client.js")).signAndInstall;
-  await run({ url: other.url, name: "" });
+  await confirmInstall(other.url, "", `${other.app} link: ${ipaFileName(other.url)}\n${other.url}`, { alert, install, open });
   return "other-install";
+}
+
+// Install IPAs opens under the alert; Install signs and installs (the sideload build's signAndInstall).
+async function confirmInstall(url, name, message, { alert, install, open }) {
+  open(format({ tab: "installed", path: ["myipas"] }));
+  const { index } = await alert({ title: "Install IPA", message, buttons: ["Cancel", "Install"], cancel: 0 });
+  if (index !== 1) return false;
+  const run = install ?? (await import("./signing-client.js")).signAndInstall;
+  await run({ url, name });
+  return true;
+}
+
+// F89: cydian://install?url=<https IPA>[&name=…] -> { url, name }, or null (no http(s) URL in it).
+export function installAsk(link) {
+  let q;
+  try { q = new URL(String(link)).searchParams; } catch { return null; }
+  const url = (q.get("url") ?? "").trim();
+  if (!/^https?:\/\/[^\s/?#]+/i.test(url)) return null;
+  return { url, name: (q.get("name") ?? "").trim().slice(0, 100) };
 }
 
 // iOS fixes URL schemes at install time and gives a scheme to one app when several claim it, so Cydian can't pass a

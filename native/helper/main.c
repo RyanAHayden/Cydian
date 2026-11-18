@@ -5,6 +5,8 @@
  *   cydian-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
  *   cydian-helper simulate <item>... | apply <item>... | respring      (N4: the install queue; item: name,
  *                                                                        name=version or -name)
+ *   cydian-helper apply-ask <item>...        (F63: apply, but dpkg asks about changed conffiles; answers "Y"/"N"
+ *                                             lines on stdin, relayed to apt-get by ask_relay below)
  *   cydian-helper install-ipa <path>            (F59: an IPA the app downloaded, installed through installd as
  *                                                AppSync's appinst does; ipa.c. Exit 69: can't install ad hoc)
  *   cydian-helper selfupdate <path.deb>                                 (F61: dpkg -i of Cydian's own update)
@@ -31,7 +33,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <poll.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #ifdef __APPLE__
 /* <libproc.h> ships in the macOS SDK but not the iOS one; proc_pidpath is in libSystem on iOS too, so declare it
@@ -59,6 +63,62 @@ static int parent_exe(char *buf, size_t size) {
     buf[n] = 0;
     return 0;
 #endif
+}
+
+/* F63: apply-ask. apt-get runs as a child with a pipe on its stdin (dpkg, under apt, reads its conffile answer
+ * there); the caller's answers come on `answers` (the helper's own stdin) and only lines helper_answer_ok takes
+ * ("Y" or "N") are copied over, so dpkg's D and Z (a root shell) can't be reached. Once the caller closes its end,
+ * apt's stdin is closed too (a later prompt then fails as dpkg does at end of file). Ends when apt-get does, even
+ * with the caller's end still open. Returns apt-get's exit status (128 + signal), or HELPER_EX_EXEC. */
+static int ask_relay(const struct helper_plan *plan, char *const env[], int answers) {
+    int in[2];
+    if (pipe(in)) { perror("cydian-helper: pipe"); return HELPER_EX_EXEC; }
+    fcntl(in[1], F_SETFD, FD_CLOEXEC);
+    fcntl(answers, F_SETFD, FD_CLOEXEC);
+    pid_t pid = fork();
+    if (pid < 0) { perror("cydian-helper: fork"); return HELPER_EX_EXEC; }
+    if (pid == 0) {
+        if (dup2(in[0], 0) < 0) _exit(HELPER_EX_EXEC);
+        close(in[0]);
+        execve(plan->path, (char *const *)plan->argv, env);
+        fprintf(stderr, "cydian-helper: %s: %s\n", plan->path, strerror(errno));
+        _exit(HELPER_EX_EXEC);
+    }
+    close(in[0]);
+    signal(SIGPIPE, SIG_IGN); /* dpkg gone: a late answer is dropped, not fatal (the child has SIG_DFL) */
+    char line[256];
+    size_t used = 0;
+    int skipping = 0, st = 0;
+    for (;;) {
+        pid_t w = waitpid(pid, &st, answers >= 0 ? WNOHANG : 0);
+        if (w == pid) break;
+        if (w < 0 && errno != EINTR) { perror("cydian-helper: waitpid"); return HELPER_EX_EXEC; }
+        if (answers < 0) continue;
+        struct pollfd pf = {answers, POLLIN, 0};
+        if (poll(&pf, 1, 200) <= 0) continue;
+        char buf[256];
+        ssize_t n = read(answers, buf, sizeof buf);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) { close(answers); answers = -1; close(in[1]); in[1] = -1; continue; }
+        for (ssize_t i = 0; i < n; i++) {
+            if (buf[i] != '\n') {
+                if (used < sizeof line) line[used++] = buf[i];
+                else skipping = 1; /* too long to be an answer */
+                continue;
+            }
+            if (!skipping && helper_answer_ok(line, used)) {
+                char out[2] = {line[0], '\n'};
+                if (write(in[1], out, 2) != 2) { /* dpkg stopped reading: nothing to tell it */ }
+            } else {
+                fprintf(stderr, "cydian-helper: ignored an answer that isn't Y or N\n");
+            }
+            used = 0;
+            skipping = 0;
+        }
+    }
+    if (in[1] >= 0) close(in[1]);
+    if (answers >= 0) close(answers);
+    return WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
 }
 
 int main(int argc, char *argv[]) {
@@ -89,6 +149,9 @@ int main(int argc, char *argv[]) {
     long maxfd = sysconf(_SC_OPEN_MAX);
     if (maxfd < 0 || maxfd > 65536) maxfd = 65536;
     for (int fd = status_fd >= 0 ? 4 : 3; fd < maxfd; fd++) close(fd);
+    /* F63: apply-ask keeps the caller's stdin (its answers) on a high fd; apt itself still never reads it. */
+    int answers = plan.verb == HV_APPLY_ASK ? fcntl(0, F_DUPFD_CLOEXEC, 4) : -1;
+    if (plan.verb == HV_APPLY_ASK && answers < 0) { perror("cydian-helper: stdin"); return HELPER_EX_EXEC; }
     int null = open("/dev/null", O_RDONLY);
     if (null < 0 || dup2(null, 0) < 0) { perror("cydian-helper: /dev/null"); return HELPER_EX_EXEC; }
     if (null != 0) close(null);
@@ -130,7 +193,7 @@ int main(int argc, char *argv[]) {
              "PATH=%1$s/usr/bin:%1$s/bin:%1$s/usr/sbin:%1$s/sbin:/usr/bin:/bin:/usr/sbin:/sbin", prefix);
     /* N4: Cydia's finish protocol. Maintainer scripts write "finish:restart" (and so on) to the fd named in CYDIA;
      * apply keeps fd 3 open through apt (APT::Keep-Fds) so those lines reach the console beside apt's status. */
-    char *cydia_env = (plan.verb == HV_APPLY || plan.verb == HV_ROLLBACK) && status_fd >= 0 ? "CYDIA=3 1" : NULL;
+    char *cydia_env = (plan.verb == HV_APPLY || plan.verb == HV_APPLY_ASK || plan.verb == HV_ROLLBACK) && status_fd >= 0 ? "CYDIA=3 1" : NULL;
     char *env[] = {path_env, "HOME=/var/root", "USER=root", "LOGNAME=root", "LANG=C", "DEBIAN_FRONTEND=noninteractive",
                    cydia_env, NULL};
     if (plan.verb == HV_INSTALL_IPA) {
@@ -138,6 +201,7 @@ int main(int argc, char *argv[]) {
         if (rc) fprintf(stderr, "cydian-helper: %s\n", err);
         return rc;
     }
+    if (plan.verb == HV_APPLY_ASK) return ask_relay(&plan, env, answers);
     execve(plan.path, (char *const *)plan.argv, env);
     fprintf(stderr, "cydian-helper: %s: %s\n", plan.path, strerror(errno));
     return HELPER_EX_EXEC;

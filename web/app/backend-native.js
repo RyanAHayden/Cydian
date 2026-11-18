@@ -120,7 +120,7 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
       return r;
     },
   };
-  if ((sourceOptions.mode ?? detectMode()) === "jailbreak") Object.assign(backend, queueCalls(backend, sourceOptions.queue ?? installQueue));
+  if ((sourceOptions.mode ?? detectMode()) === "jailbreak") Object.assign(backend, queueCalls(backend, sourceOptions.queue ?? installQueue, call));
   // AltStore sources (F9) stay on the device, never in apt's sources (core/altstore.js withAltSources).
   // F49: the phone's kCFCoreFoundationVersionNumber (Bridge.swift app.info `cf`) adds Telesphoreo's ios/<cf> suite
   // to the dists Add Source tries, unless sourceOptions brings its own coreFoundation.
@@ -136,7 +136,7 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
 
 // N4: the install queue's calls. A helper that can't be run, or refuses, is an error with its message (never
 // silent, Zebra #2052); apt saying no is not: simulate resolves with ok false and apt's output for the Confirm sheet.
-function queueCalls(backend, q) {
+function queueCalls(backend, q, call) {
   const run = async (words, onEvent) => {
     const r = await backend.helper(words, onEvent);
     if (r.code === 64 || r.code === 77 || r.code === 126) {
@@ -154,7 +154,11 @@ function queueCalls(backend, q) {
       return { ok: r.code === 0, code: r.code, plan: parseSimulation(r.stdout), output };
     },
     // onEvent({ fd: "out" | "err" | "status", line }) as it runs. -> { code, stdout, stderr }
-    apply: (jobs, onEvent) => run(["apply", ...queueWords(jobs)], onEvent),
+    // F63: with onEvent it is apply-ask: a conffile changed by both you and the package arrives as a pmconffile:
+    // status line, and the run waits for answerConffile. Without one nobody could answer, so dpkg keeps your copy.
+    apply: (jobs, onEvent) => run([onEvent ? "apply-ask" : "apply", ...queueWords(jobs)], onEvent),
+    // F63: the Configuration Upgrade answer for the running apply: "keep" (Keep My Old Copy) or "new".
+    answerConffile: async (answer) => { await call("helper.answer", { answer }); },
     // F71: [] when nothing is stored, or the helper can't list (not installed, or an older one without the verb).
     async rollbacks(id) {
       let r;

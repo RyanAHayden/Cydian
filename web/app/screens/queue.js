@@ -10,7 +10,9 @@
 //   3. The console ("Running", then "Complete"): apt's and dpkg's lines streamed over the bridge as they come, the
 //      status fd's lines in white, errors in red, a progress bar, then the finish button: Restart SpringBoard when
 //      a changed package hooks SpringBoard (or a script asked, $CYDIA), else Return to Cydian. The run's output is
-//      kept (queue.js runLogs) for Settings > Console Logs (logsPage below).
+//      kept (queue.js runLogs) for Settings > Console Logs (logsPage below). A conffile changed by both the user and
+//      the package opens Cydia's Configuration Upgrade alert (F63): Keep My Old Copy or Accept The New Copy, sent
+//      back to dpkg through backend.answerConffile while the run waits.
 //
 // While the queue holds packages: they are marked in every list (browse.js), the Installed tab's badge reads Q'd
 // and its nav bar has a Queue button that reopens Confirm. Styles: queue.css.
@@ -23,7 +25,8 @@ import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { catalog } from "../catalog.js";
 import { installQueue, runLogs } from "../queue.js";
-import { MODES, MODE_LABEL, changeCount, parseStatusLine, consoleText, finishOf, FINISH_LABEL, runTitle } from "../core/queue.js";
+import { MODES, MODE_LABEL, changeCount, parseStatusLine, consoleText, finishOf, FINISH_LABEL, runTitle, CONFFILE_TITLE,
+  CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine } from "../core/queue.js";
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 
@@ -289,12 +292,14 @@ const MAX_LINES = 1500; // lines kept on screen; the log keeps everything (trimm
 export function runRollback({ id, version, installed = null, name = "" }) {
   if (running) return false;
   const jobs = [{ op: "install", id, version, installed, name, mode: "rollback" }];
-  runConsole({ jobs, ids: [id], keepQueue: true, title: (names) => `Roll Back ${name || names[id] || id} to ${version}`,
+  runConsole({ jobs, ids: [id], keepQueue: true, asks: false, title: (names) => `Roll Back ${name || names[id] || id} to ${version}`,
     run: (onEvent) => getBackend().rollback(id, version, onEvent) });
   return true;
 }
 
-async function runConsole({ jobs, ids, keepQueue = false, title = null, run = (onEvent) => getBackend().apply(jobs, onEvent) }) {
+// asks: the run is apply-ask (F63), so a conffile line opens the Configuration Upgrade alert and its answer goes back
+// through backend.answerConffile; otherwise dpkg keeps the old copy (--force-confold) and the console says so.
+async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = null, run = (onEvent) => getBackend().apply(jobs, onEvent) }) {
   running = true;
   updateChrome();
   const close = barButton("Close");
@@ -341,17 +346,38 @@ async function runConsole({ jobs, ids, keepQueue = false, title = null, run = (o
     if (Object.values(info ?? {}).some((v) => v?.restart)) finish = "restart";
   } catch { /* the scripts' own finish lines still count */ }
 
-  let result = null, error = null;
+  let result = null, error = null, ended = false;
+  // F63: dpkg waits on one question at a time; alerts are shown one after another all the same.
+  let asking = Promise.resolve();
+  const ask = (file) => {
+    asking = asking.then(async () => {
+      const { index } = await showAlert({ title: CONFFILE_TITLE, message: conffileMessage(file), buttons: CONFFILE_BUTTONS, cancel: 0, stacked: true });
+      if (ended) return;
+      const answer = conffileAnswer(index);
+      try {
+        await getBackend().answerConffile(answer);
+        line("status", conffileLine(file, answer));
+      } catch (e) {
+        line("error", `Configuration file ${file}: ${e.message || String(e)}`);
+      }
+    });
+  };
+  const canAsk = asks && typeof getBackend().answerConffile === "function";
   try {
     result = await run(({ fd, line: raw }) => {
       if (fd === "status") {
         const s = parseStatusLine(raw);
         if (s.type === "finish") { finish = finishOf(finish, s.finish); return; }
-        if (s.type === "status" || s.type === "conffile") {
+        if (s.type === "conffile") {
+          if (s.percent != null) setProgress(s.percent);
+          statusText.textContent = `Configuration file ${s.file}`;
+          if (canAsk) ask(s.file);
+          else line("status", conffileLine(s.file, "keep"));
+        } else if (s.type === "status") {
           const text = s.pkg && s.text ? s.text.replaceAll(s.pkg, label(s.pkg)) : s.text;
           if (s.percent != null && !s.download) setProgress(s.percent);
           statusText.textContent = text;
-          line("status", s.type === "conffile" ? `Configuration file ${s.file}: keeping your copy` : text);
+          line("status", text);
         } else if (s.type === "error") line("error", `${label(s.pkg)}: ${s.text}`);
         else line("info", s.text);
         return;
@@ -363,6 +389,7 @@ async function runConsole({ jobs, ids, keepQueue = false, title = null, run = (o
   } catch (e) {
     error = e;
   }
+  ended = true;
   flush();
 
   const ok = result?.code === 0 && !error;

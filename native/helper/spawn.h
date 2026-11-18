@@ -11,4 +11,9 @@
 int cydian_helper_spawn(const char *helper, const char *const args[], pid_t *pid, int *out_fd, int *err_fd,
                         int *status_fd);
 
+/* F63: the same, with a pipe on the child's stdin instead of /dev/null: *in_fd gets its write end (close-on-exec
+ * here). For cydian-helper apply-ask, whose answers ("Y\n" / "N\n") go there; the caller closes it when done. */
+int cydian_helper_spawn_in(const char *helper, const char *const args[], pid_t *pid, int *in_fd, int *out_fd,
+                           int *err_fd, int *status_fd);
+
 #endif

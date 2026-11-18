@@ -14,6 +14,7 @@
  *   test_driver control <id> <version> <text>  F71: "ok" or "bad" (helper_control_matches; \n in text is a newline)
  *   test_driver rbverify <prefix> <deb> <id> <version>   F71: "ok" or "error: ..." (runs <prefix>/usr/bin/dpkg-deb)
  *   test_driver spawn <helper> [args]...       spawn helper, print its streams as "1: ...", "2: ...", "3: ..."
+ *   test_driver spawn-ask keep|close <helper> [args]...   the same with a stdin pipe carrying $TEST_ANSWERS (F63)
  *                                              lines, then "exit: <code>"
  * SPDX-License-Identifier: GPL-3.0-or-later */
 #include "ipa.h"
@@ -28,12 +29,22 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static int spawn(int argc, char **argv) {
+/* ask: NULL for spawn; "keep" or "close" for spawn-ask, which writes $TEST_ANSWERS (lines split at ',') to the
+ * helper's stdin, then closes it ("close") or holds it open until the helper is done ("keep"). */
+static int spawn(int argc, char **argv, const char *ask) {
     pid_t pid;
-    int fds[3];
-    int rc = cydian_helper_spawn(argv[0], (const char *const *)argv + 1, &pid, &fds[0], &fds[1], &fds[2]);
+    int fds[3], in = -1;
+    int rc = ask ? cydian_helper_spawn_in(argv[0], (const char *const *)argv + 1, &pid, &in, &fds[0], &fds[1], &fds[2])
+                 : cydian_helper_spawn(argv[0], (const char *const *)argv + 1, &pid, &fds[0], &fds[1], &fds[2]);
     if (rc) { printf("spawn error: %s\n", strerror(rc)); return 1; }
     (void)argc;
+    if (ask) {
+        const char *a = getenv("TEST_ANSWERS");
+        for (const char *p = a ? a : ""; *p; p++)
+            if (write(in, *p == ',' ? "\n" : p, 1) != 1) break;
+        if (a && *a && write(in, "\n", 1) != 1) { /* the helper is gone */ }
+        if (!strcmp(ask, "close")) close(in), in = -1;
+    }
     /* Read the three pipes as they come, like the app's console will; lines tagged by fd. */
     char buf[3][8192];
     size_t used[3] = {0, 0, 0};
@@ -64,6 +75,7 @@ static int spawn(int argc, char **argv) {
     }
     int st;
     waitpid(pid, &st, 0);
+    if (in >= 0) close(in);
     printf("exit: %d\n", WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st));
     return 0;
 }
@@ -133,7 +145,9 @@ int main(int argc, char **argv) {
         if (helper_rollback_verify(argv[2], argv[3], argv[4], argv[5], &err)) printf("error: %s\n", err);
         else printf("ok\n");
     } else if (!strcmp(cmd, "spawn") && argc >= 3) {
-        return spawn(argc - 2, argv + 2);
+        return spawn(argc - 2, argv + 2, NULL);
+    } else if (!strcmp(cmd, "spawn-ask") && argc >= 4) {
+        return spawn(argc - 3, argv + 3, argv[2]);
     } else return 2;
     return 0;
 }

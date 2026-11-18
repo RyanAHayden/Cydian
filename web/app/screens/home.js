@@ -576,6 +576,12 @@ function renderCredits(body) {
       })),
       footer: "Cydian is not affiliated with SaurikIT or any of the above.",
     },
+    { // F126: Cydia's artwork we use, with its licence
+      header: "Artwork",
+      rows: [{ label: "Section Icons", subtitle: "Jay Freeman (saurik)\nFrom Cydia, GPLv3", cls: "thanks-row",
+        icon: { text: "C", color: "#7a8a99", src: "icons/sections/Tweaks.png" } }],
+      footer: "Cydia's section icons and purpose badges, from its source at git.saurik.com/cydia.git.",
+    },
   ])));
   globalThis.cydianNative?.call?.("app.info", {}).then((i) => {
     if (i?.version) body.querySelector(".cell-detail").textContent = i.version;

@@ -17,7 +17,8 @@ import { showSheet } from "../nav/sheet.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { catalog, ALL } from "../catalog.js";
-import { NO_SECTION, indexLetter, parseAuthor, simpleSection } from "../core/catalog.js";
+import { NO_SECTION, indexLetter, parseAuthor } from "../core/catalog.js";
+import { packageIcon } from "../core/sectionicons.js";
 import { description, parseRelations, compareVersions } from "../core/apt.js";
 import { displayName, releaseDepiction } from "../core/sources.js";
 import { renderSileo, mediaUrl } from "./depiction.js";
@@ -243,33 +244,50 @@ function sectionRow(name, count, href) {
 const iconOk = new Set();  // icon URLs that loaded once: shown at once when their row comes back
 const iconBad = new Set(); // and those that failed: never asked again
 
-// A letter tile until the icon loads (Cydia: the section icon, then unknown.png; those are Cydia's artwork).
-const TINTS = ["#8c99b3", "#7a9a8c", "#a38c7a", "#8c7aa3", "#7a8ca3", "#a37a8c", "#909090"];
-function tint(section) {
-  let h = 0;
-  for (const c of simpleSection(section)) h = (h * 31 + c.charCodeAt(0)) | 0;
-  return TINTS[Math.abs(h) % TINTS.length];
+// F126, Cydia's PackageCell: the section's icon (else unknown.png) until the package's own icon loads, and a small
+// badge in the bottom-right corner (core/sectionicons.js packageIcon: the purpose:: tag's, else the section's on
+// an own icon). `art` holds the icon and the badge, which hangs over the icon's corner as in Cydia.
+function createArt(large = false) {
+  const art = el("span", large ? "pkg-art large" : "pkg-art");
+  const icon = el("span", large ? "pkg-icon cy large" : "pkg-icon cy");
+  const img = el("img");
+  img.alt = "";
+  img.decoding = "async";
+  const badge = el("img", "pkg-badge");
+  badge.alt = "";
+  badge.hidden = true;
+  icon.append(img);
+  art.append(icon, badge);
+  return { art, icon, img, badge };
+}
+
+// Fallback and badge for `item`; the own icon's <img> is the caller's (lists load it only once scrolling stops).
+function paintArt(r, item) {
+  const look = packageIcon(item);
+  if (r.icon.dataset.fallback !== look.fallback) {
+    r.icon.dataset.fallback = look.fallback;
+    r.icon.style.backgroundImage = `url("${look.fallback}")`;
+  }
+  const badge = look.badgeKind === "section" && iconBad.has(item.icon) ? null : look.badge;
+  r.badge.hidden = !badge;
+  r.badge.classList.toggle("section", look.badgeKind === "section");
+  if (badge && r.badge.dataset.url !== badge) { r.badge.dataset.url = badge; r.badge.src = badge; }
 }
 
 function createRow() {
   const row = el("div", "pkg-row");
   const a = el("a", "cell-inner pkg");
-  const icon = el("span", "pkg-icon");
-  const letter = el("span", "pkg-letter");
-  const img = el("img");
-  img.alt = "";
-  img.decoding = "async";
-  img.onload = () => { iconOk.add(img.dataset.url); img.classList.add("loaded"); };
-  img.onerror = () => { iconBad.add(img.dataset.url); img.removeAttribute("src"); };
-  icon.append(letter, img);
+  const { art, icon, img, badge } = createArt();
+  img.onload = () => { iconOk.add(img.dataset.url); img.classList.add("loaded"); art.classList.add("own"); };
+  img.onerror = () => { iconBad.add(img.dataset.url); img.removeAttribute("src"); badge.classList.contains("section") && (badge.hidden = true); };
   const text = el("span", "pkg-text");
   const top = el("span", "pkg-top");
   const compatEl = el("span", "compat-mark"); // F35: the check, X or ? (F17's text badge is on the package page)
   top.append(el("span", "pkg-name"), compatEl, el("span", "pkg-version"));
   text.append(top, el("span", "pkg-desc"));
-  a.append(icon, text);
+  a.append(art, text);
   row.append(a);
-  row._ = { a, icon, letter, img, name: top.firstChild, compat: compatEl, version: top.lastChild, desc: text.lastChild };
+  row._ = { a, art, icon, img, badge, name: top.firstChild, compat: compatEl, version: top.lastChild, desc: text.lastChild };
   return row;
 }
 
@@ -292,15 +310,16 @@ function bindRow(row, item, route) {
   r.name.classList.toggle("incompatible", flagged);
   r.desc.textContent = flagged && item.why ? item.why : item.short;
   markQueued(row);
-  r.letter.textContent = indexLetter(item.name) === "#" ? item.name.charAt(0) : indexLetter(item.name);
-  r.icon.style.background = tint(item.section);
+  paintArt(r, item);
   const src = iconSrc(item);
   // Icons only load once scrolling stops (idle), unless this one already loaded: a fling starts no fetches.
   if (src && iconOk.has(item.icon)) {
     if (r.img.dataset.url !== item.icon) { r.img.dataset.url = item.icon; r.img.src = src; }
     r.img.classList.add("loaded");
+    r.art.classList.add("own");
   } else {
     r.img.classList.remove("loaded");
+    r.art.classList.remove("own");
     if (r.img.dataset.url) { r.img.removeAttribute("src"); delete r.img.dataset.url; }
   }
 }
@@ -490,18 +509,14 @@ async function renderPackage(body, route, key, id, ctx) {
 
   // Header: icon, name, version, size.
   const head = el("div", "pkg-head");
-  const icon = el("span", "pkg-icon large");
-  icon.style.background = tint(pkg.row.section);
-  icon.append(el("span", "pkg-letter", name.charAt(0).toUpperCase()));
+  const art = createArt(true);
+  paintArt(art, { ...pkg.row, icon: st.iconUrl ?? pkg.row.icon });
   const src = st.iconUrl && mediaUrl(st.iconUrl);
   if (src) {
-    const img = el("img");
-    img.alt = "";
-    img.onload = () => img.classList.add("loaded");
-    img.onerror = () => img.remove();
-    img.src = src;
-    icon.append(img);
-  }
+    art.img.onload = () => { art.img.classList.add("loaded"); art.art.classList.add("own"); };
+    art.img.onerror = () => { art.img.remove(); if (art.badge.classList.contains("section")) art.badge.hidden = true; };
+    art.img.src = src;
+  } else art.img.remove();
   const ht = el("div", "pkg-head-text");
   // Works on my phone (F17): judged here from the stanza, so an installed-only page gets one too.
   const fit = compat(st, currentDevice());
@@ -522,7 +537,7 @@ async function renderPackage(body, route, key, id, ctx) {
   fitBadge.dataset.compat = fitCode;
   ht.append(fitBadge);
   const size = formatSize(st.size);
-  head.append(icon, ht);
+  head.append(art.art, ht);
   if (size) head.append(el("span", "pkg-head-size", size));
   const headGroup = el("div", "group");
   const headTable = el("div", "table grouped pkg-head-table");

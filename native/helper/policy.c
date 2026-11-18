@@ -306,6 +306,7 @@ static int queue_plan(int argc, char *const argv[], const char *prefix, int stat
     }
     a[k++] = "--reinstall";
     a[k++] = "--allow-downgrades";
+    a[k++] = "--allow-unauthenticated"; /* N6: packages from unsigned repos (most of them); see update below */
     if (apply && status_fd >= 0) {
         snprintf(keep_fd, sizeof keep_fd, "APT::Keep-Fds::=%d", status_fd);
         snprintf(status_apt, sizeof status_apt, "APT::Status-Fd=%d", status_fd);
@@ -701,6 +702,12 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
             a[k++] = "-y";
             a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confdef";
             a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confold";
+            a[k++] = "--allow-unauthenticated";
+        } else {
+            /* N6: most jailbreak repos (BigBoss, Cydian's own, repo.palera.in with its key missing) are unsigned, and
+             * apt-get update exits 100 on one. Read them, as Sileo and Zebra do. A repo that was signed still can't
+             * go unsigned unnoticed: Acquire::AllowDowngradeToInsecureRepositories stays false. */
+            a[k++] = "-o"; a[k++] = "Acquire::AllowInsecureRepositories=true";
         }
         if (status_fd >= 0) {
             snprintf(status_apt, sizeof status_apt, "APT::Status-Fd=%d", status_fd);

@@ -20,8 +20,8 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
-| `update`    | `apt-get [-o APT::Status-Fd=3] update`                                                      |
-| `install`   | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold [-o APT::Status-Fd=3] install <pkg>...` |
+| `update`    | `apt-get -o Acquire::AllowInsecureRepositories=true [-o APT::Status-Fd=3] update` (unsigned repos; below) |
+| `install`   | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --allow-unauthenticated [-o APT::Status-Fd=3] install <pkg>...` |
 | `remove`    | same options, `remove <pkg>...`                                                             |
 | `upgrade`   | same options, `upgrade`                                                                     |
 | `configure` | `dpkg --force-confdef --force-confold [--status-fd 3] --configure -a`                       |
@@ -30,9 +30,9 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `showhold`  | `apt-mark showhold`: the held packages on stdout, one per line                              |
 | `addsource` | runs nothing: writes a deb822 stanza (`Types: deb`, `URIs:`, `Suites:`, `Components:`) into `/var/jb/etc/apt/sources.list.d/cydian.sources` (F33) |
 | `removesource` | runs nothing: drops the stanza for that URI and suite from `cydian.sources`              |
-| `simulate`  | `apt-get -s --reinstall --allow-downgrades install <items>`: the Confirm sheet's plan (N4)       |
-| `apply`     | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --reinstall --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <items>`, with `CYDIA=3 1` in its environment when fd 3 is open (N4) |
-| `apply-ask` | `apt-get -y --reinstall --allow-downgrades -o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install <items>` (no conffile options; refused without fd 3), `CYDIA=3 1`, as a child whose stdin is a pipe the helper feeds (F63; below) |
+| `simulate`  | `apt-get -s --reinstall --allow-downgrades --allow-unauthenticated install <items>`: the Confirm sheet's plan (N4)       |
+| `apply`     | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --reinstall --allow-downgrades --allow-unauthenticated [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <items>`, with `CYDIA=3 1` in its environment when fd 3 is open (N4) |
+| `apply-ask` | `apt-get -y --reinstall --allow-downgrades --allow-unauthenticated -o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install <items>` (no conffile options; refused without fd 3), `CYDIA=3 1`, as a child whose stdin is a pipe the helper feeds (F63; below) |
 | `install-ipa` | runs no apt: installs one IPA through `LSApplicationWorkspace installApplication:withOptions:error:` as AppSync's `appinst` does (`ipa.c`, F59; below) |
 | `selfupdate` | `dpkg --force-confdef --force-confold [--status-fd 3] -i <path>`: Cydian's own update (F61). The path is absolute, `[A-Za-z0-9._/-]`, no `.`/`..` segment, ends in `.deb`, at most 1024 bytes, and a regular file (not a symlink). Any .deb is accepted: the caller check is the boundary, and Cydian can already install anything through `addsource` + `install` |
 | `rollbacks` | runs nothing: `<version> <file>` per line for each .deb of the package N7's daemon kept in `/var/jb/var/cache/cydian/rollback/<pkg>/` that `rollback` would take (F71; below) |
@@ -82,6 +82,8 @@ and `Version: <version>`, so a file whose name lies is refused. apt-get (not `dp
 absolute path, so dependencies the old version needs come from the sources, and `--allow-downgrades` lets `-y` take
 an older version. Since everything on the path is root's and only root can write it, mobile can't swap the file
 between the checks and apt. A missing folder lists nothing (exit 0); anything refused is exit 64 with the reason.
+
+**Unsigned repos (N6):** most jailbreak repos have no signed Release (BigBoss, Cydian's own GitHub repo, and repo.palera.in, whose key palera1n's keyring lacks), and `apt-get update` exits 100 on any one of them, so `update` passes `Acquire::AllowInsecureRepositories=true` and the verbs that install pass `--allow-unauthenticated`, as Sileo and Zebra do. `Acquire::AllowDowngradeToInsecureRepositories` stays false: a repo apt has seen signed can't drop its signature unnoticed. The daemon (`native/daemon/main.m`) passes the same to its update and automatic installs.
 
 **Sources (F33):** sources added in the app go into `cydian.sources` and nowhere else, so `apt-get update` and
 installs use them; the app never edits apt's other files. Checks: the URI is `http://` or `https://` (lower case), a

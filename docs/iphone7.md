@@ -9,7 +9,7 @@ Cydia look reference only and never runs Cydian.
 | iOS | 15.8.8 (19H422), the last iOS for the iPhone 7 |
 | Jailbreak | palera1n v2.4, **rootless** (`/var/jb`, iphoneos-arm64), semi-tethered |
 | Network | Wi-Fi `192.168.0.189`, `ssh 7` (Host 7 in `~/.ssh/config` on the desktop) |
-| Login | `mobile`, the desktop's key. `sudo` for root asks a password: ask the user, never store it |
+| Login | `mobile`, the desktop's key. `sudo` is passwordless since 2026-11-18 (`/var/jb/etc/sudoers.d/mobile`); if `sudo -n true` fails, ask the user, never store a password |
 | Plugged into | the T490 (`ssh rytp@omarchy-tp`), used to re-jailbreak it |
 
 ## Rules
@@ -40,6 +40,8 @@ tools/ui-7.sh unlock N6               # always, also after a failure
   Bottom-edge gestures probably need something phonectl doesn't send (a touch starting below the screen, or a
   different digitizer flag). Until that's fixed, a person checks the Control Centre controls (N8).
 - Left-edge swipe-back (`swipe 2 600 600 600 0.3`) is the same kind of gesture, untested so far.
+- Typing: tap the on-screen keyboard's keys (coordinates in `journal/N6/notes.md`); there is no pbcopy.
+- Tapping a notification in Notification Centre through phonectl does nothing (N6); a person checks notification taps.
 - `lock-button` presses the side button (sleeps or wakes the screen). If a screenshot is all black, the screen is
   asleep: `home` wakes it. The phone has no passcode, so `home` again opens it from the lock screen.
 - A lock unused for 30 minutes is stale and can be taken over.

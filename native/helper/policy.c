@@ -160,6 +160,42 @@ static int paid_plan(int argc, char *const argv[], const char *prefix, int statu
     return 0;
 }
 
+/* N9: simulate-deb <path> | install-deb <path>. The plan is apt-get on p->deb; paid.c (helper_local_deb) copies the
+ * caller's file into a root-owned directory and points p->deb at the copy. */
+static int local_deb_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
+                          const char **err) {
+    static char status_apt[64], keep_fd[64];
+    int sim = p->verb == HV_SIMULATE_DEB;
+    if (argc != 2) { *err = sim ? "simulate-deb takes one .deb path" : "install-deb takes one .deb path"; return -1; }
+    if (!helper_paid_path_ok(HELPER_DEB_DIR, argv[1])) { *err = "bad .deb path (only " HELPER_DEB_DIR "/<name>.deb)"; return -1; }
+    if ((size_t)snprintf(p->deb, sizeof p->deb, "%s", argv[1]) >= sizeof p->deb) { *err = "path too long"; return -1; }
+    if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/apt-get", prefix) >= sizeof p->path) {
+        *err = "prefix too long"; return -1;
+    }
+    int k = 0;
+    const char **a = p->argv;
+    a[k++] = "apt-get";
+    if (sim) a[k++] = "-s";
+    else {
+        a[k++] = "-y";
+        a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confdef";
+        a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confold";
+    }
+    a[k++] = "--reinstall";
+    a[k++] = "--allow-downgrades";
+    if (!sim && status_fd >= 0) {
+        snprintf(keep_fd, sizeof keep_fd, "APT::Keep-Fds::=%d", status_fd);
+        snprintf(status_apt, sizeof status_apt, "APT::Status-Fd=%d", status_fd);
+        a[k++] = "-o"; a[k++] = keep_fd;
+        a[k++] = "-o"; a[k++] = status_apt;
+    }
+    a[k++] = "install";
+    a[k++] = p->deb; /* absolute: apt-get reads an argument with a "/" as a file */
+    a[k] = NULL;
+    p->argc = k;
+    return 0;
+}
+
 /* addsource <uri> <suite> [component...] | removesource <uri> <suite>: checked here, done by helper_sources_apply. */
 static int source_plan(int argc, char *const argv[], const char *prefix, struct helper_plan *p, const char **err) {
     int add = p->verb == HV_ADDSOURCE;
@@ -610,6 +646,8 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "rollback")) { p->verb = HV_ROLLBACK; return rollback_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "install-paid")) { p->verb = HV_INSTALL_PAID; return paid_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "notifications")) { p->verb = HV_NOTIFICATIONS; return notify_plan(argc, argv, prefix, p, err); }
+    else if (!strcmp(verb, "simulate-deb")) { p->verb = HV_SIMULATE_DEB; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
+    else if (!strcmp(verb, "install-deb")) { p->verb = HV_INSTALL_DEB; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "selfupdate")) { p->verb = HV_SELFUPDATE; return selfupdate_plan(argc, argv, prefix, status_fd, p, err); }
     else { *err = "unknown verb (" HELPER_VERBS ")"; return -1; }
 

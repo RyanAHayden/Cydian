@@ -50,6 +50,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         Prefs.register(self) // F70: prefs.set, N7's settings for the daemon (below)
         Incoming.register(self) // F75: cydian:// links for the page, app.takeURL and app.gunzip (App.swift)
         BackgroundCheck.register(self) // I3: updates.watch, the sideload build's background update check
+        ShareBridge.register(self) // N9: share.*, what the share sheet and Open in Cydian handed over (share/App/)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }

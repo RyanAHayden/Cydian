@@ -4,14 +4,16 @@
 //   cydian://signing-import#<sealed>   Import from Safari coming back: into the Keychain, then Settings > Signing
 //   cydian://import?d=<gzipped JSON>   Open in Cydian App on the website: the review alert (screens/importlink.js)
 //   cydian://myipas?file=<name>        F77: an .ipa another app sent, already in My IPAs (MyIPAs.swift): its page
-//   cydian://add?url=<url>[&suite=…]   N8: the Add Source intent: Add Source's alert, filled in (core/handoff.js)
+//   cydian://add?url=<url>[&suite=…]   N8: the Add Source intent: Add Source's alert, filled in (core/handoff.js);
+//                                      N9: also an APT repo or AltStore source shared with Cydian
+//   cydian://shared?route=…            N9: an .ipa or .deb shared with Cydian, or why not (share.js)
 //   altstore://source?url=…, feather://install/<ipa>, …   F83: other sideloaders' links (core/otherlinks.js), when
 //                                      Settings > Sideloading > Open Other Apps' Links is on: a source goes to Sources >
 //                                      Manage's Add, filled in; an IPA to Install IPAs, then Install (signAndInstall).
 //                                      Off, or a link Cydian has no use for: handed back (handBack below)
 //
 //   startIncoming({ native })          once, in the app
-//   await handleIncoming(url, deps)    -> "signing-import" | "import" | "myipas" | "add" | "other-source" |
+//   await handleIncoming(url, deps)    -> "signing-import" | "import" | "myipas" | "add" | "shared" | "other-source" |
 //                                         "other-install" | "other-app" | null (not one of ours)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showAlert } from "./nav/alert.js";
@@ -44,7 +46,8 @@ export function startIncoming({ native = globalThis.cydianNative } = {}) {
 }
 
 export async function handleIncoming(url, { native = globalThis.cydianNative, alert = showAlert, hud = showHUD, go = openSigning,
-  finish = finishSafariImport, review = null, add = null, install = null, on = otherLinksOn, open = goHash, now = Date.now } = {}) {
+  finish = finishSafariImport, review = null, add = null, shared = null, install = null, on = otherLinksOn, open = goHash,
+  now = Date.now } = {}) {
   const u = String(url ?? "");
   if (/^cydian:\/\/signing-import\b/i.test(u)) {
     const hide = hud("Importing");
@@ -77,6 +80,11 @@ export async function handleIncoming(url, { native = globalThis.cydianNative, al
     const run = add ?? (await import("./screens/manage.js")).addSource;
     await run({ showHUD: hud }, prefill);
     return "add";
+  }
+  if (/^cydian:\/\/shared\b/i.test(u)) {
+    const run = shared ?? (await import("./share.js")).handleShared;
+    await run(u, { native, alert, hud });
+    return "shared";
   }
   if (/^cydian:\/\/import\b/i.test(u)) {
     const run = review ?? (await import("./screens/importlink.js")).reviewAndImport;

@@ -11,6 +11,8 @@
  *   cydian-helper install-ipa <path>            (F59: an IPA the app downloaded, installed through installd as
  *                                                AppSync's appinst does; ipa.c. Exit 69: can't install ad hoc)
  *   cydian-helper selfupdate <path.deb>                                 (F61: dpkg -i of Cydian's own update)
+ *   cydian-helper simulate-deb | install-deb <path.deb>   (N9: a .deb shared with Cydian; apt-get -s / install on a
+ *                                                           root-owned copy, dependencies from the sources; paid.c)
  *   cydian-helper install-paid <path.deb> <pkg> <version>  (F57: a paid package's .deb the app downloaded from the
  *                                                           vendor; copied, its control checked, apt-get install; paid.c)
  *   cydian-helper rollbacks <pkg> | rollback <pkg> <version>  (F71: the .debs N7's daemon kept, and apt-get install
@@ -216,7 +218,7 @@ int main(int argc, char *argv[]) {
     /* N4: Cydia's finish protocol. Maintainer scripts write "finish:restart" (and so on) to the fd named in CYDIA;
      * apply keeps fd 3 open through apt (APT::Keep-Fds) so those lines reach the console beside apt's status. */
     char *cydia_env = (plan.verb == HV_APPLY || plan.verb == HV_APPLY_ASK || plan.verb == HV_ROLLBACK ||
-                       plan.verb == HV_INSTALL_PAID) && status_fd >= 0 ? "CYDIA=3 1" : NULL;
+                       plan.verb == HV_INSTALL_PAID || plan.verb == HV_INSTALL_DEB) && status_fd >= 0 ? "CYDIA=3 1" : NULL;
     char *env[] = {path_env, "HOME=/var/root", "USER=root", "LOGNAME=root", "LANG=C", "DEBIAN_FRONTEND=noninteractive",
                    cydia_env, NULL};
     if (plan.verb == HV_INSTALL_IPA) {
@@ -226,6 +228,11 @@ int main(int argc, char *argv[]) {
     }
     if (plan.verb == HV_INSTALL_PAID) {
         int rc = helper_install_paid(prefix, &plan, env, &err);
+        if (err) fprintf(stderr, "cydian-helper: %s\n", err);
+        return rc;
+    }
+    if (plan.verb == HV_SIMULATE_DEB || plan.verb == HV_INSTALL_DEB) {
+        int rc = helper_local_deb(prefix, &plan, env, &err);
         if (err) fprintf(stderr, "cydian-helper: %s\n", err);
         return rc;
     }

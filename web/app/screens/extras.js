@@ -321,7 +321,8 @@ async function downloadAndInstall(st, source, client, box, ctx, fail) {
   const route = parse(location.hash);
   const hide = (ctx?.showHUD ?? showHUD)("Authorizing");
   let url;
-  try { url = await client.authorizeDownload(id, { version: st.version, repo: source.uri }); } catch (e) { hide(); await fail(e); return; }
+  try { url = await client.authorizeDownload(id, { version: st.version, repo: source.uri,
+    architecture: st.architecture || getArch() }); } catch (e) { hide(); await fail(e); return; }
   hide();
   const run = runPaidInstall({ id, version: st.version, name: st.name || "",
     run: (onEvent) => shell("paid.install", { url, package: id, version: st.version, stream: true }, onEvent) });

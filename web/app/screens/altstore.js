@@ -465,7 +465,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
 
   // F181: the sideways info tiles: Rating (once the App Store answers), Works On, Size, Section, Updated.
   tiles.set("works", worksOnTile(fit));
-  tiles.set("size", sizeTile(size));
+  tiles.set("size", sizeTile(size, "Free"));
   tiles.set("section", sectionTile(pkg.row.section, "App"));
   tiles.set("updated", updatedTile(v.date));
   details.append(tiles.row);

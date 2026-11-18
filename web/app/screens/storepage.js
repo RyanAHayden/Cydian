@@ -13,7 +13,7 @@
 //     filled by the caller at once; reviews(pane) and related(pane) run the first time their tab is chosen.
 //   tileRow()                              -> { row, set(key, tile | null) }  the sideways info tiles, in TILE_ORDER
 //   worksOnTile(fit)                       -> { label, value, sub, ok }  compat()'s verdict as the Works On tile
-//   ratingTile(r), sizeTile(text), sectionTile(name, sub), updatedTile(date, now)
+//   ratingTile(r), sizeTile(text, price), sectionTile(name, sub), updatedTile(date, now)
 //   ratingsCard(r)                         -> the Reviews tab's ratings card (the bar chart when r.histogram)
 //   reviewsGroup(reviews, renderText)      -> the review cells: title, stars, "by name – Version – date", text
 //   storeStars(rating, cls)                -> five stars filled to the rating (the App Store's orange)
@@ -152,12 +152,14 @@ export function tileRow() {
     set(key, data) {
       tiles.get(key)?.remove();
       tiles.delete(key);
+      row.dataset.count = String(tiles.size);
       if (!data) return;
       const t = tile(data);
       t.dataset.key = key;
       const after = TILE_ORDER.slice(TILE_ORDER.indexOf(key) + 1).map((k) => tiles.get(k)).find(Boolean);
       if (after) after.before(t); else row.append(t);
       tiles.set(key, t);
+      row.dataset.count = String(tiles.size);
     },
   };
 }
@@ -201,11 +203,10 @@ export function ratingTile(r) {
   return { label: "Rating", value: (Math.round(r.average * 10) / 10).toFixed(1), stars: r.average };
 }
 
-// "412 kB" -> 412 over kB; "4.7 MB" -> 4.7 over MB
-export function sizeTile(text) {
+// F195: the unit stays in the value ("48 kB"); under it the price ("Free"), or nothing.
+export function sizeTile(text, price = null) {
   if (!text) return null;
-  const m = String(text).match(/^([\d.,]+)\s*(\S+)$/);
-  return m ? { label: "Size", value: m[1], sub: m[2] } : { label: "Size", value: String(text) };
+  return { label: "Size", value: String(text), sub: price || null };
 }
 
 export function sectionTile(name, sub = null) {

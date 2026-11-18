@@ -156,8 +156,9 @@ test("F181: the tile row keeps Rating, Works On, Size, Section, Updated in order
   assert.ok(one(label("rating"), "store-stars"));
   assert.equal(one(label("works"), "store-tile-sub").dataset.ok, "true");
   assert.equal(one(label("works"), "store-tile-sub").textContent, "Your iPhone ✓");
-  assert.equal(one(label("size"), "store-tile-value").textContent, "412");
-  assert.equal(one(label("size"), "store-tile-sub").textContent, "kB");
+  assert.equal(one(label("size"), "store-tile-value").textContent, "412 kB"); // F195: the unit in the value
+  assert.equal(label("size").children.find((c) => c.className === "store-tile-sub"), undefined); // no price: blank
+  assert.equal(t.row.dataset.count, "5");
   assert.equal(one(label("updated"), "store-tile-value").textContent, "Nov 12");
   assert.equal(one(label("updated"), "store-tile-sub").textContent, "6 days ago");
   // Works On judged again (an IPA read): the tile is replaced in place; no rating takes the tile away.
@@ -247,4 +248,23 @@ test("F194: storeHeader's action goes on the header's right edge, after the text
   assert.equal(h.head.children.at(-1), share);
   assert.equal(h.head.children.length, 3, "icon, text, action");
   assert.equal(sp.storeHeader({ name: "Velvet" }).head.children.length, 2, "no action, nothing added");
+});
+
+test("F195: Size keeps its unit in the value, the price under it; the row counts its columns; ONE card in the CSS", () => {
+  assert.deepEqual(sp.sizeTile("48 kB", "Free"), { label: "Size", value: "48 kB", sub: "Free" });
+  assert.deepEqual(sp.sizeTile("4.7 MB"), { label: "Size", value: "4.7 MB", sub: null });
+  const t = sp.tileRow();
+  t.set("works", sp.worksOnTile({ status: "works", range: "iOS 15.0 or later" }));
+  t.set("size", sp.sizeTile("48 kB", "Free"));
+  assert.equal(t.row.dataset.count, "2");
+  assert.equal(one(t.row.children[1], "store-tile-sub").textContent, "Free");
+  t.set("size", null);
+  assert.equal(t.row.dataset.count, "1");
+  const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
+  const card = css.match(/\.store-tiles \{[^}]*\}/s)[0];
+  for (const want of ["margin: 16px 10px 0", "var(--table)", "var(--table-edge)", "border-radius: 9.5px", "overflow-x: auto"]) assert.ok(card.includes(want), want);
+  assert.match(css, /\.store-tile \{[^}]*flex: 1 1 0/s);
+  assert.match(css, /\.store-tile \+ \.store-tile \{[^}]*var\(--divider\)[^}]*var\(--divider-hi\)/s);
+  assert.match(css, /\.store-tiles\[data-count="5"\] \.store-tile[^{]*\{[^}]*width: 29%/s);
+  assert.match(css, /\.store-tile-value \{[^}]*font-size: 15px/s);
 });

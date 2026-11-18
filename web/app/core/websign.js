@@ -91,7 +91,8 @@ export function plistXml(value) {
 export const identityPlist = ({ p12, password, profile }) => plistXml({ p12: new Uint8Array(p12), password: password ?? "", profile: new Uint8Array(profile) });
 
 export function zsignArgs({ p12, password, profile, entitlements, bundleId = null, input, output, temp }) {
-  const a = ["-f", "-k", p12, "-p", password ?? "", "-m", profile, "-t", temp, "-z", "6", "-o", output];
+  // -z 1: fast deflate. Level 6 took most of the time for a 40 MB app in WebAssembly on a phone (user 2026-11-18).
+  const a = ["-f", "-k", p12, "-p", password ?? "", "-m", profile, "-t", temp, "-z", "1", "-o", output];
   if (bundleId) a.push("-b", bundleId);
   if (entitlements) a.push("-e", entitlements);
   a.push(input);

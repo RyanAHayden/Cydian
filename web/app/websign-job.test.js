@@ -56,7 +56,7 @@ test("signs: unzips, reads the app, passes zsign the certificate, profile, narro
   assert.deepEqual([...seen.unzipped], [...ZIP]);
   assert.equal(seen.inputGone, true, "the zip is freed once it's unpacked");
   assert.deepEqual(seen.args, ["-f", "-k", "/w/key.p12", "-p", "hunter2", "-m", "/w/app.mobileprovision", "-t", "/w/tmp",
-    "-z", "6", "-o", "/w/out.ipa", "-e", "/w/ents.plist", "/w/app/Payload/Delta.app"]);
+    "-z", "1", "-o", "/w/out.ipa", "-e", "/w/ents.plist", "/w/app/Payload/Delta.app"]);
   const ents = parsePlist(text(seen.files.get("/w/ents.plist")));
   assert.equal(ents["application-identifier"], "TESTTEAM42.io.github.x.delta");
   assert.equal(ents["get-task-allow"], false);

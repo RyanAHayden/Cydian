@@ -327,3 +327,167 @@ async function autoInstalledOf(native) {
   const { autoInstalled } = await import("./installed.js");
   return autoInstalled(native);
 }
+
+// ---- B36: every app row opens, holds and swipes ------------------------------------------------------------------
+import { appListElement, appRowHref, appActions, appSheet, appPageSections, keptIpaOf, appIdOf, appToken, OPEN, RESIGN,
+  SAVE_IPA, REMOVE } from "./installed.js";
+
+// A fake DOM good enough for nav/ui.js plain() and the list's decoration: class selectors only.
+function b36Dom() {
+  const matches = (n, sel) => sel.split(".").filter(Boolean).every((c) => n._cls?.has(c));
+  const walk = (n, out = []) => { for (const c of n.children) { out.push(c); walk(c, out); } return out; };
+  const make = (tag, frag = false) => {
+    const e = {
+      tagName: String(tag).toUpperCase(), isFragment: frag, children: [], attrs: {}, listeners: {}, style: {}, dataset: {},
+      parentNode: null, _text: "", _cls: new Set(),
+      get className() { return [...e._cls].join(" "); },
+      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
+      classList: {
+        add: (...c) => c.forEach((x) => e._cls.add(x)), remove: (...c) => c.forEach((x) => e._cls.delete(x)),
+        contains: (c) => e._cls.has(c), toggle: (c, on = !e._cls.has(c)) => { if (on) e._cls.add(c); else e._cls.delete(c); return on; },
+      },
+      get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
+      set textContent(v) { e._text = String(v); e.children = []; },
+      setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute: (k) => e.attrs[k] ?? null,
+      append(...c) {
+        for (const x of c) {
+          if (typeof x === "string") { e._text += x; continue; }
+          if (x.isFragment) { x.children.splice(0).forEach((k) => e.append(k)); continue; }
+          x.parentNode = e;
+          e.children.push(x);
+        }
+      },
+      remove() { if (e.parentNode) e.parentNode.children = e.parentNode.children.filter((y) => y !== e); },
+      contains: (x) => { for (let n = x; n; n = n.parentNode) if (n === e) return true; return false; },
+      closest(sel) { for (const s of sel.split(",").map((x) => x.trim())) for (let n = e; n; n = n.parentNode) if (matches(n, s)) return n; return null; },
+      querySelectorAll(sel) {
+        if (sel.startsWith(":scope > ")) return e.children.filter((c) => matches(c, sel.slice(9)));
+        return walk(e).filter((c) => matches(c, sel));
+      },
+      querySelector: (sel) => e.querySelectorAll(sel)[0] ?? null,
+      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
+      fire(t, ev) { for (const f of e.listeners[t] ?? []) f(ev); },
+      click() {},
+    };
+    return e;
+  };
+  return { createElement: (t) => make(t), createDocumentFragment: () => make("#fragment", true), body: make("body") };
+}
+
+function withDom(fn) {
+  const had = Object.getOwnPropertyDescriptor(globalThis, "document");
+  globalThis.document = b36Dom();
+  try { return fn(); } finally { if (had) Object.defineProperty(globalThis, "document", had); else delete globalThis.document; }
+}
+
+const B36_ROWS = [
+  { id: "com.ryha.ifizbox", name: "iFizBox", version: "0.4", self: true },
+  { id: "com.example.opentennis", name: "OpenTennis Beta", version: "1.0", sourceName: "Beta" }, // no source lists it now
+];
+const B36_EXTRA = [{ id: "com.example.mine", name: "Mine", version: "2.0", signedOnly: true }];
+const B36_SIGNED = { apps: [{ bundleId: "com.example.opentennis", name: "OpenTennis Beta", version: "1.0", expires: "2099-01-01T00:00:00Z" },
+  { bundleId: "com.example.mine", name: "Mine", version: "2.0", expires: "2099-01-01T00:00:00Z" }] };
+
+test("B36: a row no source lists and an extra row open a page; the source's page while a source has it", () => {
+  const root = r();
+  assert.match(appRowHref(B36_ROWS[1], null, root), /app(:|%3A)com\.example\.opentennis$/);
+  assert.match(appRowHref(B36_ROWS[1], new Map([["com.example.opentennis", {}]]), root), /package(:|%3A)com\.example\.opentennis$/);
+  assert.equal(appIdOf(appToken("a.b")), "a.b");
+  assert.equal(appIdOf("app:"), null);
+  assert.equal(appIdOf("package:a"), null);
+  assert.equal(pageKind(r("app:a.b"), "sideload"), "app");
+  assert.equal(pageKind(r("app:a.b"), "site"), "app");
+  assert.equal(pageKind(r(APPS, "app:a.b"), "jailbreak"), "app");
+  assert.equal(pageKind(r("app:a.b"), "jailbreak"), "browse"); // the list is one row down there
+  assert.equal(pageKind(r(APPS, "package:a"), "jailbreak"), "browse");
+});
+
+test("B36: every row is a link (pressed highlight), extra rows included; Delete on every row but iFizBox's own", () => withDom(() => {
+  const ul = appListElement([{ rows: B36_ROWS }], B36_EXTRA, { route: r(), cands: new Map([["com.ryha.ifizbox", {}]]), signed: B36_SIGNED, editing: false });
+  const cells = ul.querySelectorAll(":scope > .cell");
+  assert.equal(cells.length, 3);
+  for (const li of cells) {
+    const inner = li.querySelector(".cell-inner");
+    // app.js's PRESSABLE is "a.cell-inner": a link row gets .is-pressed under the finger
+    assert.equal(inner.tagName, "A", li.textContent);
+    assert.ok(inner.href, li.textContent);
+    assert.ok(li.classList.contains("installed-app"));
+  }
+  assert.match(cells[0].querySelector(".cell-inner").href, /package/); // iFizBox: its source's page, as before
+  assert.match(cells[1].querySelector(".cell-inner").href, /app(:|%3A)com\.example\.opentennis/);
+  assert.match(cells[2].querySelector(".cell-inner").href, /app(:|%3A)com\.example\.mine/);
+  assert.equal(cells[0].querySelector(".del-confirm"), null, "no Delete on the app's own row");
+  assert.ok(cells[1].querySelector(".del-confirm"));
+  assert.ok(cells[2].querySelector(".del-confirm"), "the extra row deletes too");
+  assert.equal(cells[1]._app.signed.bundleId, "com.example.opentennis");
+  // A left swipe shows the red Delete, on the extra row too; never on iFizBox's own.
+  const swipe = (li) => {
+    const target = li.querySelector(".cell-label");
+    ul.fire("pointerdown", { target, clientX: 300, clientY: 10 });
+    ul.fire("pointermove", { target, clientX: 240, clientY: 12 });
+  };
+  swipe(cells[2]);
+  assert.ok(cells[2].classList.contains("armed"));
+  swipe(cells[1]);
+  assert.ok(cells[1].classList.contains("armed"));
+  assert.ok(!cells[2].classList.contains("armed"), "one Delete at a time");
+  swipe(cells[0]);
+  assert.ok(!cells[0].classList.contains("armed"));
+}));
+
+test("B36: a hold opens the sheet with the actions that apply", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const sheets = [];
+  const acted = [];
+  withDom(() => {
+    const hold = { mode: "sideload", findIpa: async () => null, sheet: async (o) => { sheets.push(o); return o.buttons.indexOf(RESIGN); },
+      act: async (label, row) => acted.push([label, row.id]) };
+    const ul = appListElement([{ rows: B36_ROWS }], B36_EXTRA, { route: r(), signed: B36_SIGNED, editing: false, hold });
+    const cells = ul.querySelectorAll(":scope > .cell");
+    ul.fire("pointerdown", { target: cells[1].querySelector(".cell-label"), clientX: 100, clientY: 10 });
+    t.mock.timers.tick(499);
+    assert.equal(sheets.length, 0, "not before 500 ms");
+    t.mock.timers.tick(1);
+  });
+  return new Promise((done) => setImmediate(done)).then(() => {
+    assert.equal(sheets.length, 1);
+    assert.equal(sheets[0].title, "OpenTennis Beta");
+    assert.deepEqual(sheets[0].buttons, [OPEN, RESIGN, REMOVE]);
+    assert.equal(sheets[0].destructive, 2);
+    assert.deepEqual(acted, [[RESIGN, "com.example.opentennis"]]);
+  });
+});
+
+test("B36: the sheet's actions per row and build; Save Signed IPA when My IPAs keeps a signed copy", async () => {
+  const signed = { bundleId: "com.example.x.custom", originalBundleId: "com.example.x" };
+  assert.deepEqual(appActions({ id: "a", name: "A" }, { mode: "site" }), [REMOVE]);
+  assert.deepEqual(appActions({ id: "a", name: "A" }, { mode: "jailbreak" }), [REMOVE]);
+  assert.deepEqual(appActions({ id: "a", name: "A", signed: null }, { mode: "sideload" }), [OPEN, REMOVE]);
+  assert.deepEqual(appActions({ id: "a", name: "A", signed }, { mode: "sideload", ipa: { file: "X.ipa" } }), [OPEN, RESIGN, SAVE_IPA, REMOVE]);
+  assert.deepEqual(appActions({ id: "s", name: "Me", self: true, signed }, { mode: "sideload" }), [RESIGN]); // no Open, no Remove
+  const entries = [{ file: "Y.ipa", bundleId: "com.example.x", signed: null }, { file: "X.ipa", bundleId: "com.example.x", signed: { bundleId: "com.example.x.custom" } }];
+  assert.equal(keptIpaOf({ id: "com.example.x", signed }, entries).file, "X.ipa");
+  assert.equal(keptIpaOf({ id: "com.example.z", signed: null }, entries), null);
+  // Cancel does nothing; nothing to offer, no sheet
+  let asked = 0;
+  assert.equal(await appSheet({ id: "a", name: "A" }, { mode: "site", sheet: async () => { asked++; return -1; }, act: () => assert.fail() }), null);
+  assert.equal(asked, 1);
+  assert.equal(await appSheet({ id: "s", name: "Me", self: true }, { mode: "site", sheet: async () => assert.fail() }), null);
+});
+
+test("B36: the installed-app page shows version, bundle ID, source and signature, then the actions", () => {
+  const now = new Date("2026-11-18T00:00:00Z");
+  const rec = { id: "com.example.opentennis", name: "OpenTennis Beta", version: "1.0", sourceName: "Beta",
+    signed: { bundleId: "com.example.opentennis", expires: "2026-11-25T00:00:00Z" } };
+  const secs = appPageSections(rec, { mode: "sideload", now, window: 2 });
+  const rows = Object.fromEntries(secs[0].rows.map((x) => [x.label, x.detail]));
+  assert.equal(rows.Version, "1.0");
+  assert.equal(rows["Bundle ID"], "com.example.opentennis");
+  assert.equal(rows.Source, "Beta");
+  assert.equal(rows.Signature, "7 days left");
+  assert.deepEqual(secs[1].rows.map((x) => x.label), [OPEN, RESIGN]);
+  assert.deepEqual(secs[2].rows.map((x) => x.label), [REMOVE]);
+  const extra = appPageSections({ id: "com.example.mine", name: "Mine", version: "2", signedOnly: true, signed: { bundleId: "com.example.mine" } }, { mode: "site" });
+  assert.match(extra[0].footer, /No source lists it/);
+  assert.match(extra.at(-1).footer, /stays on your iPhone/);
+});

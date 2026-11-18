@@ -60,3 +60,13 @@ test("error codes: no_server and no_identity lead to Settings > Signing, the res
   assert.deepEqual(net, { title: "Couldn't Install Delta", open: null, message: "The server answered 404" });
   assert.equal(deviceError(err("bad_ipa", "")).message, "Something went wrong.");
 });
+
+test("no_manifest (B30): the native text naming the host, and where the Signing Server is set", () => {
+  const e = Object.assign(new Error("Couldn't reach sign.ifizbox.com: The request timed out. iOS can't show Install without it."),
+    { code: "no_manifest" });
+  assert.deepEqual(deviceError(e, "Delta"), {
+    title: "Couldn't Install Delta", open: null,
+    message: "Couldn't reach sign.ifizbox.com: The request timed out. iOS can't show Install without it. "
+      + "Check the connection, or the Signing Server in Settings > Signing.",
+  });
+});

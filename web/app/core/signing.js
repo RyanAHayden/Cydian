@@ -425,6 +425,12 @@ export function deviceError(err, name = "") {
   if (code === "no_identity") {
     return { title: "No Certificate", open: "signing", message: "Add your certificate and provisioning profile in Settings > Signing." };
   }
+  if (code === "no_manifest") {
+    // B30: the app fetched the install manifest itself before handing iOS the link (iOS shows nothing when it can't).
+    // The native text names the host and why; a Signing Server set by hand may be the cause, so say where it is.
+    return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null,
+      message: `${message} Check the connection, or the Signing Server in Settings > Signing.` };
+  }
   return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null, message };
 }
 

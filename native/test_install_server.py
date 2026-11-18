@@ -46,7 +46,8 @@ class InstallServerSource(unittest.TestCase):
         self.assertIn("cutShort?(left)", body(self.server, "private func stream("))
 
     def test_route_kept_for_the_grace(self):
-        serve = body(self.sideload, "static func serveAndOpen(", "\n    }\n\n")
+        # B30: serveAndOpen checks the manifest first; the serving moved to serveChecked.
+        serve = body(self.sideload, "private static func serveChecked(", "\n    }\n\n")
         end = serve[serve.index("let end = {"):serve.index("server.serve(")]
         # Served: removed only inside the grace's asyncAfter, not at once.
         self.assertNotRegex(end, r"job\?\.end\(\)\n\s*server\.remove\(ipaPath\)")

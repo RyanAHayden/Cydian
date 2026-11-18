@@ -179,6 +179,11 @@ where WebKit has no `DecompressionStream` (before iOS 16.4).
    (ranges supported), and opens `itms-services://?action=download-manifest&url=<server>/sign/manifest?bundleid=…
    &version=…&title=…&port=<port>&path=<token>/app.ipa` (`InstallManifest`): the Signing Server answers a manifest
    pointing at `http://127.0.0.1:<port>/<token>/app.ipa`.
+   B30: before the link goes to iOS, the app GETs that exact manifest URL itself (10 s, `ManifestCheck`). iOS shows
+   no prompt and no error when it can't load the manifest, so anything but HTTP 200 with a plist holding `items`
+   fails the install with `no_manifest: Couldn't reach <host>: <why>. iOS can't show Install without it.` (or
+   `<host> didn't give the install manifest: <why>` when the server answered), and the install log says which.
+   My IPAs' install takes the same path (`Sideload.serveAndOpen`).
 4. iOS asks to install and fetches the IPA from 127.0.0.1. Once the whole IPA has gone out the token is spent and the
    file is deleted a minute later; unused, it goes after 15 minutes. A background task keeps the server alive while
    the install sheet covers iFizBox.

@@ -14,7 +14,7 @@ import { format } from "../router.js";
 import { catalog } from "../catalog.js";
 import { haptic } from "../nav/haptic.js";
 import { ROULETTE_TYPES, ROULETTE_VIBES, ROULETTE_PRICES, spinPick, choosePick, dayKey, dayBefore } from "../core/catalog.js";
-import { wishlist, iconBox, rememberNames, token } from "./browse.js";
+import { wishlist, iconBox, rememberNames, token, storeLabel } from "./browse.js";
 
 export const ROULETTE_KEY = "ifizbox.roulette";
 const ROW = 40;        // a wheel row's height (px)
@@ -289,7 +289,8 @@ function ticking(wheels) {
   return () => cancelAnimationFrame(frame);
 }
 
-// "You landed on": the package (a row that opens it, like any other), then Wish List and View.
+// "You landed on": an iOS 6 App Store cell (icon, name, author and section, the price button; the whole cell opens
+// the package), its description under it, then Wish List.
 function resultCard(row, route) {
   rememberNames([row]);
   const href = format({ tab: route.tab, path: [...route.path, token("package", row.id)] });
@@ -297,15 +298,21 @@ function resultCard(row, route) {
   g.append(el("h2", "group-header", "You landed on"));
   const ul = el("ul", "table grouped");
   const top = el("li", "cell");
-  const inner = el("a", "cell-inner chevron roulette-pick");
+  const inner = el("a", "cell-inner store-cell");
   inner.href = href;
   const words = el("span", "cell-text");
-  words.append(el("span", "cell-label", row.name), el("span", "roulette-desc", row.short || row.section || ""));
-  inner.append(iconBox(row, "roulette-icon"), words);
+  words.append(el("span", "cell-label", row.name), el("span", "store-meta", [row.author, row.section].filter(Boolean).join(" · ")));
+  inner.append(iconBox(row, "roulette-icon"), words, el("span", "store-btn", storeLabel(row)));
   top.append(inner);
+  ul.append(top);
+  if (row.short) {
+    const desc = el("li", "cell");
+    desc.append(el("div", "cell-inner store-desc", row.short));
+    ul.append(desc);
+  }
   const actions = el("li", "cell");
   const bar = el("div", "cell-inner roulette-actions");
-  const wish = el("button", "roulette-pill grey");
+  const wish = el("button", "roulette-pill");
   wish.type = "button";
   const paintWish = () => {
     const on = wishlist().has(row.id);
@@ -314,11 +321,9 @@ function resultCard(row, route) {
   };
   paintWish();
   wish.addEventListener("click", () => { wishlist().set(row.id, !wishlist().has(row.id)); paintWish(); });
-  const view = el("a", "roulette-pill", "View");
-  view.href = href;
-  bar.append(wish, view);
+  bar.append(wish);
   actions.append(bar);
-  ul.append(top, actions);
+  ul.append(actions);
   g.append(ul);
   return g;
 }

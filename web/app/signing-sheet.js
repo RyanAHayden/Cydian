@@ -162,6 +162,8 @@ export async function followInstall(native, bundleId, h, { later = setTimeout, n
     let mid = false;
     try {
       r = await native.call("signing.progress", { bundleId }, (ev) => {
+        // B29: the install server's lines (what iOS fetched) for the console; not progress.
+        if (ev?.log) { h.page?.raw?.(ev.log); return; }
         const pct = Math.round(Number(ev?.progress) * 100);
         mid = pct > 0 && pct < 100;
         h.set(mid ? `Installing ${pct}%` : "Installing");

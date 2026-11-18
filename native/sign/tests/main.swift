@@ -346,6 +346,27 @@ test("HTTP requests and ranges") {
     check(head.hasPrefix("HTTP/1.1 206 Partial Content\r\n") && head.hasSuffix("\r\n\r\n"), head)
 }
 
+test("B29: the IPA counts as served only once every byte went out, over all requests") {
+    // A 42.7 MB IPA as iOS's installer may fetch it: the zip's end first, then the whole file cut short and resumed.
+    let size: UInt64 = 43_709_494
+    var c = ByteCoverage()
+    check(!c.covers(size: size) && c.count == 0, "nothing sent")
+    c.add(size - 65_536...size - 1)
+    check(!c.covers(size: size), "the end alone (it reaches the last byte) isn't the whole IPA")
+    c.add(0...20_000_000)
+    check(!c.covers(size: size) && c.ranges.count == 2, "a gap left: \(c.ranges)")
+    c.add(20_000_001...size - 65_537)
+    check(c.covers(size: size) && c.ranges == [0...size - 1], "touching ranges joined: \(c.ranges)")
+    check(c.count == size, "each byte counted once: \(c.count)")
+    var d = ByteCoverage()
+    d.add(0...size - 1); d.add(100...200)
+    check(d.covers(size: size) && d.count == size, "a repeat adds nothing")
+    var e = ByteCoverage()
+    e.add(10...19); e.add(0...4); e.add(5...9)
+    check(e.ranges == [0...19] && e.covers(size: 20) && !e.covers(size: 21), "\(e.ranges)")
+    check(ByteCoverage().covers(size: 0), "an empty file")
+}
+
 test("manifest and itms link") {
     let m = try InstallManifest.manifest(ipaURL: "http://127.0.0.1:4242/t/app.ipa", bundleID: "dev.cydian.fixture", version: "1.0", title: "Fixture")
     let pl = try PropertyListSerialization.propertyList(from: m, format: nil) as? [String: Any]

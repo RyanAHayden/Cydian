@@ -335,7 +335,11 @@ export async function installFromLibrary({ file, name = "", onInstalled = () => 
   const server = getServer();
   const h = hud("Signing");
   h.onCancel?.(() => stopNative(native));
-  const onEvent = (ev) => { const t = phaseLabel(ev); if (t) h.set(t); };
+  const onEvent = (ev) => {
+    if (ev?.log) h.page?.raw?.(ev.log); // B29: the shell's console lines (MyIPAs.swift install's log)
+    const t = phaseLabel(ev);
+    if (t) h.set(t);
+  };
   const fail = async (e) => {
     if (h.cancelled) return false;
     const why = deviceError(e, name);

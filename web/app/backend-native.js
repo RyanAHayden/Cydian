@@ -37,6 +37,7 @@
 // can't be run (not installed) is it kept on the device alone (IndexedDB, `added: true`); refreshSources moves such
 // records into cydian.sources once it can. Removing works for cydian.sources' sources; apt's other files are left
 // to the user. Counts, origin and refresh times of every source are kept in IndexedDB.
+import { freshUrl } from "./core/sources.js";
 import { BackendError } from "./backend-http.js";
 import { verifySource, refreshSource, openSourceStore, sortSources } from "./core/sources.js";
 import { parseAptSources, listNamesFor } from "./core/aptsources.js";
@@ -87,7 +88,7 @@ export function createNativeBackend({ native = globalThis.cydianNative, sourceOp
 
   async function fetchUrl(url) {
     if (!/^https?:\/\//i.test(String(url))) throw new BackendError("bad_url", `not an http(s) URL: ${url}`);
-    const r = await call("net.fetch", { url });
+    const r = await call("net.fetch", { url: freshUrl(url) });
     if (r.status >= 400) throw new BackendError("upstream", `the repo answered HTTP ${r.status}`, r.status);
     const empty = [101, 204, 205, 304].includes(r.status);
     return new Response(empty ? null : fromBase64(r.body), { status: r.status, headers: r.headers ?? {} });

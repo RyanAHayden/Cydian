@@ -341,3 +341,10 @@ test("add a dist repo: no Release, a wrong component, a bad suite, a flat dist",
   const flat = fakeBackend({ "https://f.example/Packages": PACKAGES });
   assert.equal((await verifySource(flat, { uri: "https://f.example/", dist: "./", components: [] })).key, "deb:https://f.example/:./");
 });
+
+test("freshUrl: raw.githubusercontent.com gets a per-minute query, other hosts and queried URLs stay", async () => {
+  const { freshUrl } = await import("./sources.js");
+  assert.equal(freshUrl("https://raw.githubusercontent.com/o/r/main/source.json", 120000), "https://raw.githubusercontent.com/o/r/main/source.json?t=2");
+  assert.equal(freshUrl("https://repo.example/"), "https://repo.example/");
+  assert.equal(freshUrl("https://raw.githubusercontent.com/o/r/main/x.json?a=1"), "https://raw.githubusercontent.com/o/r/main/x.json?a=1");
+});

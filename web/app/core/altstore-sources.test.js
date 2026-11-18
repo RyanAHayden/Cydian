@@ -176,7 +176,7 @@ function fakeProxy(bodies = {}) {
   const asked = [];
   const fetchFn = async (url) => {
     const q = new URL(url, "http://site.test").searchParams;
-    const target = q.get("url");
+    const target = q.get("url").replace(/\?t=\d+$/, ""); // freshUrl's per-minute query on raw GitHub
     asked.push(target);
     const crystal = target.startsWith("https://alt.crystall1ne.dev/");
     if (q.get("kind") === "packages" && !crystal) {

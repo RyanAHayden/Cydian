@@ -171,8 +171,22 @@ const VIEWS = {
   DepictionTableButtonView(v, opts) {
     return linkRow(v.title ?? "", v.action || v.backupAction, opts, "dep-row dep-button-row");
   },
+  // B18: like Sileo's DepictionButtonView, a nested `view` (a label, an image) is drawn inside the button, in place
+  // of `text`. isLink: a plain link in the tint colour (Sileo clears the button's fill and its label takes the
+  // tint), not the filled tint bar.
   DepictionButtonView(v, opts) {
-    return linkRow(v.text ?? "", v.action || v.backupAction, opts, "dep-button");
+    const inner = v.view && typeof v.view === "object" ? view(v.view, opts) : null;
+    const label = String(v.text ?? v.view?.text ?? v.view?.title ?? v.view?.accessibilityText ?? "");
+    const cls = "dep-button" + (v.isLink ? " link" : "") + (inner ? " has-view" : "");
+    const a = linkRow(label, v.action || v.backupAction, opts, cls);
+    if (inner) {
+      a.textContent = "";
+      a.append(inner);
+      if (label) a.setAttribute("aria-label", label);
+    }
+    const y = Number(v.yPadding);
+    if (y > 0) a.style.paddingBlock = `${Math.min(100, y)}px`;
+    return a;
   },
   DepictionSeparatorView() {
     return el("hr", "dep-separator");

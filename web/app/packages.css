@@ -125,6 +125,11 @@ a.cell-inner.download .cell-label { color: var(--detail); }
 .dep-button-row { font-weight: bold; }
 .dep-button-row::after { content: ""; margin-left: auto; flex: none; width: 9px; height: 13px; background: var(--chevron) center / contain no-repeat; }
 .dep-button { display: block; margin: 6px 12px; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; color: #fff !important; background: var(--dep-tint); }
+/* B18: Sileo's isLink buttons are plain tint-colour links; a nested view brings its own margins. */
+.dep-button.link { padding: 0; border-radius: 0; text-align: inherit; font-weight: normal; color: var(--dep-tint) !important; background: none; }
+.dep-button.has-view { margin: 0; }
+.dep-button.has-view:not(.link) { margin: 6px 12px; }
+.dep-button.link .dep-label { color: inherit !important; }
 .dep-button-row.disabled, .dep-button.disabled { opacity: .5; pointer-events: none; }
 .dep-separator { margin: 6px 12px; border: 0; border-top: 1px solid var(--divider); }
 

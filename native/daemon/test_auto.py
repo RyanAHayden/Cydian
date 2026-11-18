@@ -208,6 +208,64 @@ class Decisions(Base):
         self.assertEqual(state("-", 0, old, 0), ["failed com.ex.tweak=1.2"])
 
 
+# B16: ios.jjolano.me lists its .debs by full GitHub links; apt joins them to the repo URL and 404s.
+LINKED = """\
+Package: com.ex.tweak
+Version: 1.1
+Filename: https://github.com/ex/tweak/releases/download/1.1/tweak.deb
+
+Package: com.ex.tweak
+Version: 1.2
+Architecture: iphoneos-arm64
+Filename:  HTTPS://github.com/ex/tweak/releases/download/1.2/com.ex.tweak_1.2_iphoneos-arm64-with-a-long-name.deb\r
+Size: 10
+
+Package: libfoo
+Version: 2:3.2-1
+Filename: ./debs/libfoo_3.2-1_iphoneos-arm64.deb
+"""
+PROCURSUS = """\
+Package: com.ex.held
+Version: 2.0
+Filename: pool/main/c/com.ex.held_2.0.deb
+
+Package: hookkit
+Version: 1.0
+Filename: https://github.com/ex/hookkit/hookkit.deb
+"""
+
+
+class Linked(Base):
+    """B16: upgrades whose Filename is a full URL are left to the app's queue (F131)."""
+
+    def lists(self):
+        d = tempfile.mkdtemp(dir=self.tmp)
+        for name, text in (("ios.jjolano.me_._Packages", LINKED), ("repo_dists_main_binary-iphoneos-arm64_Packages", PROCURSUS),
+                           ("ios.jjolano.me_._Release", "Filename: https://x/y\\nPackage: libfoo\\n")):
+            with open(os.path.join(d, name), "w") as f:
+                f.write(text)
+        return d
+
+    def test_url_filename(self):
+        for f, want in (("https://github.com/a.deb", "1"), ("http://x/y.deb", "1"), ("HTTPS://x", "1"),
+                        ("git+ssh://x", "1"), ("./debs/a.deb", "0"), ("debs/https://x", "0"), ("https:/x", "0"),
+                        ("1http://x", "0"), ("", "0")):
+            self.assertEqual(self.run_driver("url", f).strip(), want, f)
+
+    def test_linked(self):
+        d = self.lists()
+        out = self.run_driver("linked", d, "com.ex.tweak=1.2", "libfoo=2:3.2-1", "com.ex.held=2.0", "hookkit=1.0",
+                              "hookkit=0.9", "other=1").split()
+        self.assertEqual(out, ["com.ex.tweak=1.2", "hookkit=1.0"])
+        self.assertEqual(self.run_driver("linked", d, "com.ex.tweak=1.1").split(), ["com.ex.tweak=1.1"])
+        self.assertEqual(self.run_driver("linked", os.path.join(d, "missing"), "hookkit=1.0"), "")
+
+    def test_plan_installs(self):
+        plan = PLAN + "Inst hookkit:iphoneos-arm64 (1.0 jjolano [iphoneos-arm64])\nRemv x [1]\nInst bad\n"
+        self.assertEqual(self.run_driver("installs", self.file(plan)).split(),
+                         ["com.ex.tweak=1.2", "libfoo=2:3.2-1", "com.ex.held=2.0", "hookkit=1.0"])
+
+
 class Runs(Base):
     """Whole hourly runs: the fake phone's facts, settings and apt in a folder, the calls printed."""
 
@@ -448,6 +506,49 @@ class Runs(Base):
         self.put("codes", "simulate 100\n")
         self.assertEqual(self.calls(self.step()), ["update", "simulate"])
         self.assertIsNone(self.get("state"))
+
+    def put_lists(self):
+        os.makedirs(os.path.join(self.d, "lists"), exist_ok=True)
+        self.put("lists/ios.jjolano.me_._Packages", LINKED)
+        self.put("lists/repo_Packages", PROCURSUS)
+
+    def test_linked_upgrade_is_left_for_the_app(self):
+        # B16: com.ex.tweak 1.2 is a GitHub link: the others install, it stays an upgrade and isn't a failure.
+        self.put("settings", "autoInstall=all\nautoInstallIdle=false\n")
+        self.put_lists()
+        self.put("plan.after", "Inst com.ex.tweak [1.0] (1.2 Example:1.0/stable [iphoneos-arm64])\n")
+        log = self.step()
+        self.assertTrue(any("com.ex.tweak 1.2 downloads from a link" in l for l in log), log)
+        log = self.calls(log)
+        self.assertIn("simulate libfoo com.ex.held", log)
+        self.assertIn("install libfoo com.ex.held", log)
+        self.assertIn("notify updated 1 2 Packages Updated | libfoo and com.ex.held were installed.", log)
+        self.assertNotIn("failed", self.get("state"))
+        self.assertIn("com.ex.tweak=1.2", self.get("state"))
+
+    def test_only_linked_upgrades_install_nothing(self):
+        self.put("settings", "autoInstall=marked\nautoInstallIdle=false\nmarked=com.ex.tweak\n")
+        self.put_lists()
+        log = self.calls(self.step())
+        self.assertFalse([l for l in log if l.startswith(("install", "notify failed", "notify updated"))], log)
+        self.assertFalse([l for l in log if l.startswith("simulate ")], log)
+        self.assertNotIn("failed", self.get("state"))
+
+    def test_linked_dependency_waits_for_a_person(self):
+        # libfoo 3.2 would pull in hookkit, a link: apt would 404, so it's an Update Failed, not an install.
+        self.put("settings", "autoInstall=marked\nautoInstallIdle=false\nmarked=libfoo\n")
+        self.put_lists()
+        self.put("plan.install", "Inst hookkit (1.0 jjolano [iphoneos-arm64])\nInst libfoo [2:3.1-1] (2:3.2-1 R)\n")
+        log = self.step()
+        self.assertTrue(any("need hookkit 1.0, a link" in l for l in log), log)
+        log = self.calls(log)
+        self.assertFalse([l for l in log if l.startswith("install")], log)
+        self.assertIn("notify failed 3 Update Failed | libfoo couldn't be updated automatically.", log)
+        self.assertIn("failed libfoo=2:3.2-1", self.get("state"))
+
+    def test_no_lists_installs_as_before(self):
+        self.put("settings", "autoInstall=all\nautoInstallIdle=false\n")
+        self.assertIn("install com.ex.tweak libfoo com.ex.held", self.calls(self.step()))
 
 
 DAY_S = 86400

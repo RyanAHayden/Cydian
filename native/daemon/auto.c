@@ -481,6 +481,98 @@ int auto_prune_dir(const char *rollback, const char *id, const char *installed, 
     return n;
 }
 
+int auto_url_filename(const char *f) {
+    if (!f || !((*f >= 'a' && *f <= 'z') || (*f >= 'A' && *f <= 'Z'))) return 0;
+    const char *p = f + 1;
+    while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '+' || *p == '-' || *p == '.')
+        p++;
+    return p[0] == ':' && p[1] == '/' && p[2] == '/';
+}
+
+/* One stanza's fields as auto_linked reads them. */
+struct stanza { char pkg[UPD_FIELD], ver[UPD_FIELD]; int url; };
+
+static void stanza_end(struct stanza *st, const char *const *ids, const char *const *vers, int n, unsigned char *hit, int *hits) {
+    if (st->url && st->pkg[0] && st->ver[0])
+        for (int i = 0; i < n; i++)
+            if (!hit[i] && !strcmp(ids[i], st->pkg) && !strcmp(vers[i], st->ver)) { hit[i] = 1; (*hits)++; }
+    st->pkg[0] = st->ver[0] = 0;
+    st->url = 0;
+}
+
+/* The field's value after "<key>:" and blanks, without the line's end, into val; 0 if the line isn't key's. */
+static int field(const char *ln, const char *key, char *val, size_t size) {
+    size_t kl = strlen(key);
+    if (strncmp(ln, key, kl) || ln[kl] != ':') return 0;
+    const char *v = ln + kl + 1;
+    while (*v == ' ' || *v == '\t') v++;
+    size_t vl = strcspn(v, "\r\n");
+    while (vl && (v[vl - 1] == ' ' || v[vl - 1] == '\t')) vl--;
+    if (vl >= size) vl = 0; /* longer than any id or version: no match */
+    memcpy(val, v, vl);
+    val[vl] = 0;
+    return 1;
+}
+
+int auto_linked(const char *lists, const char *const *ids, const char *const *vers, int n, unsigned char *hit) {
+    for (int i = 0; i < n; i++) hit[i] = 0;
+    if (!lists || n <= 0) return 0;
+    DIR *d = opendir(lists);
+    if (!d) return 0;
+    int hits = 0;
+    struct dirent *e;
+    char *buf = NULL;
+    size_t cap = 0;
+    while (hits < n && (e = readdir(d))) {
+        size_t nl = strlen(e->d_name);
+        char path[4096];
+        if (nl < 9 || strcmp(e->d_name + nl - 9, "_Packages") || !join(path, sizeof path, lists, e->d_name)) continue;
+        FILE *f = fopen(path, "r");
+        if (!f) continue;
+        struct stanza st = {{0}, {0}, 0};
+        while (getline(&buf, &cap, f) > 0) {
+            if (buf[0] == '\n' || (buf[0] == '\r' && buf[1] == '\n')) stanza_end(&st, ids, vers, n, hit, &hits);
+            else if (field(buf, "Package", st.pkg, sizeof st.pkg) || field(buf, "Version", st.ver, sizeof st.ver)) {}
+            else if (!strncmp(buf, "Filename:", 9)) {
+                const char *v = buf + 9;
+                while (*v == ' ' || *v == '\t') v++;
+                st.url = auto_url_filename(v);
+            }
+        }
+        stanza_end(&st, ids, vers, n, hit, &hits);
+        fclose(f);
+    }
+    free(buf);
+    closedir(d);
+    return hits;
+}
+
+int auto_plan_installs(const char *plan, char (*ids)[UPD_FIELD], char (*vers)[UPD_FIELD], int max) {
+    int k = 0;
+    for (const char *p = plan; p && *p && k < max; ) {
+        size_t n;
+        const char *next = line(p, &n);
+        if (n > 5 && !memcmp(p, "Inst ", 5)) {
+            const char *a = p + 5, *end = p + n;
+            size_t il = 0;
+            while (a + il < end && a[il] != ' ' && a[il] != ':') il++;
+            const char *o = memchr(a, '(', (size_t)(end - a));
+            if (o && il && il < UPD_FIELD) {
+                o++;
+                size_t vl = 0;
+                while (o + vl < end && o[vl] != ' ' && o[vl] != ')') vl++;
+                if (vl && vl < UPD_FIELD) {
+                    memcpy(ids[k], a, il); ids[k][il] = 0;
+                    memcpy(vers[k], o, vl); vers[k][vl] = 0;
+                    k++;
+                }
+            }
+        }
+        p = next;
+    }
+    return k;
+}
+
 /* A file's text (at most 16 MiB), malloc'd, or NULL. */
 static char *slurp(const char *path) {
     int fd = open(path, O_RDONLY | O_CLOEXEC);
@@ -570,6 +662,10 @@ static int plan(const struct auto_env *env, struct upd_list *list) {
 
 static unsigned char chosen[UPD_MAX];
 static const char *ids[UPD_MAX];
+static const char *vers[UPD_MAX];
+static unsigned char linked[UPD_MAX];
+static char plan_ids[UPD_MAX][UPD_FIELD], plan_vers[UPD_MAX][UPD_FIELD];
+static const char *pi[UPD_MAX], *pv[UPD_MAX];
 
 int auto_step(const struct auto_env *env, int force, int update, int dry, struct upd_list *before,
               struct upd_list *after) {
@@ -626,6 +722,24 @@ int auto_step(const struct auto_env *env, int force, int update, int dry, struct
             else chosen[i] = 0;
         n = k;
     }
+    /* B16: an upgrade whose .deb is a full-URL Filename 404s through apt: left to the app's queue (F131). */
+    if (n > 0 && may == AUTO_INSTALL_NOW && env->lists_dir) {
+        int k = 0;
+        for (int i = 0; i < before->kept; i++)
+            if (chosen[i]) { ids[k] = before->items[i].id; vers[k] = before->items[i].to; k++; }
+        if (auto_linked(env->lists_dir, ids, vers, k, linked) > 0) {
+            int j = 0, m = 0;
+            for (int i = 0; i < before->kept; i++) {
+                if (!chosen[i]) continue;
+                if (linked[j++]) {
+                    say(env, "%s %s downloads from a link apt can't fetch: left for Cydian's queue", before->items[i].id,
+                        before->items[i].to);
+                    chosen[i] = 0;
+                } else ids[m++] = before->items[i].id;
+            }
+            n = m;
+        }
+    }
     if (n > 0 && may == AUTO_INSTALL_NOW && !dry && env->busy && env->busy(env->ctx)) {
         say(env, "dpkg is busy (another install): the automatic upgrades wait for the next start");
         n = 0;
@@ -637,6 +751,15 @@ int auto_step(const struct auto_env *env, int force, int update, int dry, struct
             say(env, st != 0 ? "apt-get -s install refused the automatic upgrades (%d)"
                              : "the automatic upgrades would remove packages (%d): left for you", st);
             failed = 1;
+        } else if (env->lists_dir) {
+            /* B16: a dependency apt would pull in from a link fails the same way: left for a person too. */
+            int k = auto_plan_installs(out, plan_ids, plan_vers, UPD_MAX);
+            for (int i = 0; i < k; i++) { pi[i] = plan_ids[i]; pv[i] = plan_vers[i]; }
+            if (auto_linked(env->lists_dir, pi, pv, k, linked) > 0) {
+                for (int i = 0; i < k; i++)
+                    if (linked[i]) { say(env, "the automatic upgrades need %s %s, a link apt can't fetch: left for you", pi[i], pv[i]); break; }
+                failed = 1;
+            }
         }
         free(out);
         if (dry) {

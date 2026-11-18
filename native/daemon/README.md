@@ -55,6 +55,10 @@ clock, phone and apt in a folder); `main.m` only fills `struct auto_env` with th
   free (else they wait, without counting as a failure), and an `apt-get -s install --only-upgrade --no-remove`
   plan with no `Remv` line (else they wait for a person: an "Update Failed" notification). The install is
   `apt-get -y install --only-upgrade --no-remove <ids>` with `CYDIA=1 1`.
+- **Links apt can't fetch (B16):** an upgrade whose candidate's `Filename:` is a full URL (ios.jjolano.me's GitHub
+  links, found in `/var/jb/var/lib/apt/lists/*_Packages`) never installs automatically: apt would 404 on it. It is
+  logged and skipped (not a failure; it stays in the count and the badge), and the app's queue installs it (F131).
+  A plan whose other upgrades would pull in such a package as a dependency waits for a person ("Update Failed").
 - **Respring:** needed when a maintainer script says `finish:reload|restart` (Cydia's protocol, on stdout) or the
   package puts files where SpringBoard loads tweaks, preference bundles or themes from (its dpkg `.list`).
   Just Notify Me: the "2 Packages Updated" notification ends "Respring to finish." Respring When Locked: respring

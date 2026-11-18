@@ -12,10 +12,13 @@
  *   auto_driver prune <listing> <id> <installed> <keep> the files to delete
  *   auto_driver words <plan> <status|-> <id,id,...|-> <need>   title=, body=, failed=
  *   auto_driver state <plan> <id,...|-> <failed> <old state|-> <since>     auto_state's lines
+ *   auto_driver linked <lists> <id=version>...          B16: the pairs offered with a full-URL Filename
+ *   auto_driver installs <plan>                         B16: id=version of each Inst line
+ *   auto_driver url <filename>                          B16: 1 if it is a full URL
  *   auto_driver step <dir> [--force] [--no-update] [--dry-run]
  *
  * step's folder: facts ("now <t>", "net <none|wifi|cell>", "charging <0|1>", "locked <0|1>", "sb <t>", "busy <0|1>"), settings,
- * held, state, status, info/, cache/, rollback/; the fake apt answers from plan (dist-upgrade before an install),
+ * held, state, status, info/, cache/, rollback/, lists/ (apt's *_Packages); the fake apt answers from plan (dist-upgrade before an install),
  * plan.after (after one; plan when missing), plan.install (install --only-upgrade -s) and install.out, with exit
  * codes from codes ("update <n>", "simulate <n>", "siminstall <n>", "install <n>", all 0 when missing). An install
  * moves download/'s files into cache/, as apt's download would. Every call is printed, one per line. */
@@ -219,6 +222,30 @@ int main(int argc, char **argv) {
         char *b = malloc(need + 1);
         if (auto_state(&list, chosen, atoi(argv[4]), old, atol(argv[6]), b, need + 1) != need || strlen(b) != need) return 3;
         printf("%s", b);
+    } else if (!strcmp(cmd, "linked") && argc >= 3) {
+        /* auto_driver linked <lists dir> <id=version>...   the linked pairs, one per line */
+        static char pid[UPD_MAX][UPD_FIELD], pver[UPD_MAX][UPD_FIELD];
+        static const char *qi[UPD_MAX], *qv[UPD_MAX];
+        static unsigned char hit[UPD_MAX];
+        int n = 0;
+        for (int i = 3; i < argc && n < UPD_MAX; i++, n++) {
+            const char *eq = strchr(argv[i], '=');
+            if (!eq) return 2;
+            snprintf(pid[n], UPD_FIELD, "%.*s", (int)(eq - argv[i]), argv[i]);
+            snprintf(pver[n], UPD_FIELD, "%s", eq + 1);
+            qi[n] = pid[n]; qv[n] = pver[n];
+        }
+        int k = auto_linked(argv[2], qi, qv, n, hit), seen = 0;
+        for (int i = 0; i < n; i++)
+            if (hit[i]) { printf("%s=%s\n", qi[i], qv[i]); seen++; }
+        if (seen != k) return 3;
+    } else if (!strcmp(cmd, "installs") && argc == 3) {
+        /* auto_driver installs <plan>    id=version per Inst line */
+        static char pid[UPD_MAX][UPD_FIELD], pver[UPD_MAX][UPD_FIELD];
+        int k = auto_plan_installs(slurp(argv[2]), pid, pver, UPD_MAX);
+        for (int i = 0; i < k; i++) printf("%s=%s\n", pid[i], pver[i]);
+    } else if (!strcmp(cmd, "url") && argc == 3) {
+        printf("%d\n", auto_url_filename(argv[2]));
     } else if (!strcmp(cmd, "step") && argc >= 3) {
         dir = argv[2];
         int force = 0, update = 1, dry = 0;
@@ -230,16 +257,17 @@ int main(int argc, char **argv) {
         }
         struct auto_env env = {
             .state_path = path("state"), .status_path = path("status"), .info_dir = path("info"),
-            .cache_dir = path("cache"), .rollback_dir = path("rollback"),
+            .cache_dir = path("cache"), .rollback_dir = path("rollback"), .lists_dir = path("lists"),
             .settings = f_settings, .held = f_held, .now = f_now, .net = f_net, .charging = f_charging,
             .locked = f_locked, .springboard_started = f_sb, .busy = f_busy, .update = f_update, .simulate = f_simulate,
             .install = f_install, .respring = f_respring, .notify = f_notify, .say = f_say,
         };
-        /* path() hands out 8 rotating buffers: copy the five kept in env. */
-        static char p[5][4096];
+        /* path() hands out 8 rotating buffers: copy the six kept in env. */
+        static char p[6][4096];
         strcpy(p[0], env.state_path); strcpy(p[1], env.status_path); strcpy(p[2], env.info_dir);
-        strcpy(p[3], env.cache_dir); strcpy(p[4], env.rollback_dir);
+        strcpy(p[3], env.cache_dir); strcpy(p[4], env.rollback_dir); strcpy(p[5], env.lists_dir);
         env.state_path = p[0]; env.status_path = p[1]; env.info_dir = p[2]; env.cache_dir = p[3]; env.rollback_dir = p[4];
+        env.lists_dir = p[5];
         return auto_step(&env, force, update, dry, &list, &list2);
     } else {
         fprintf(stderr, "usage: see auto_driver.c\n");

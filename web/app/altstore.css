@@ -53,3 +53,16 @@ html[data-theme="dark"] .perm-more .cell-label { color: var(--dk-link); }
 /* F194: an app page's Share on the header's right edge (screens/handoff.js headerShareButton), where the iOS 6 App
    Store's price/install button sat: the nav bar's bar button and action glyph (ios6.css .bar-button.share-button). */
 .store-head .store-head-share { flex: none; align-self: flex-start; margin-top: 21px; } /* level with the icon's middle (72pt icon, 30pt button), as iOS 6's price button */
+
+/* F210: the app page's Installed toggle in the nav bar (screens/altstore.js markToggle), left of Install / Modify: a
+   narrow bordered bar button (the Share button's approach, ios6.css .bar-button.share-button) holding a circled
+   checkmark, white on a dark shadow 1pt up. Outline: not installed (a tap marks it); filled with the check cut out:
+   installed (a tap forgets it). */
+.bar-button.bar-icon.mark-toggle { min-width: 34px; width: 34px; }
+.bar-button.mark-toggle::before {
+  content: ""; width: 19px; height: 19px; filter: drop-shadow(0 -1px 0 rgba(0,0,0,.45));
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='8.6' fill='none' stroke='%23fff' stroke-width='1.7'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 19px 19px no-repeat;
+}
+.bar-button.mark-toggle.is-marked::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cmask id='m'%3E%3Crect width='20' height='20' fill='%23fff'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/mask%3E%3Ccircle cx='10' cy='10' r='9.4' fill='%23fff' mask='url(%23m)'/%3E%3C/svg%3E");
+}

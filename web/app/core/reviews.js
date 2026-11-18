@@ -133,3 +133,18 @@ export function mergeReviews({ ours = null, depiction = null, appStore = null, n
 // B37: one App Store review as the tab's cell: "by name – Version 2.0.1 – Nov 17" (plain text, drawn with textContent).
 export const appStoreReview = (rv, now = Date.now()) => ({ appStore: true, title: rv.title, author: rv.author || null,
   rating: rv.rating ?? null, version: rv.version || null, date: rv.at ? reviewDate(rv.at, now) : null, text: rv.text });
+
+// F206: the ratings card's bars when the source gives no histogram: the written reviews we have (ours, the
+// depiction's, the App Store's), counted by their whole stars, as [n5, n4, n3, n2, n1]. A review with no rating, or one
+// outside 1-5, isn't counted. `starsOf(review)`: a review's whole stars (a half rounds up), or null.
+export const starsOf = (rv) => {
+  const n = Math.round(Number(rv?.rating ?? rv?.stars));
+  return rv && (rv.rating ?? rv.stars) != null && n >= 1 && n <= 5 ? n : null;
+};
+export function starCounts(reviews = []) {
+  const h = [0, 0, 0, 0, 0];
+  for (const rv of reviews) { const n = starsOf(rv); if (n) h[5 - n]++; }
+  return h;
+}
+// F206: only the reviews with `stars` whole stars (null: all of them).
+export const withStars = (reviews = [], stars = null) => (stars ? reviews.filter((rv) => starsOf(rv) === stars) : [...reviews]);

@@ -3,24 +3,27 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 //   storeHeader({ art, name, author, authorHref, line, mark, action })  -> { head, setRating(r), setLine(text), setAuthor(name, href) }
-//     The band at the top: the large glossy icon with its reflection, the name, the author, a stars row (only once
-//     setRating gets a rating) and "Version 2.1.3 · 412 kB · Free". No install button: Install / Modify stays the
+//     The band at the top: the large glossy icon with its reflection, the name, the author, a stars row (F206: there
+//     from the first paint as grey empty stars, filled in place by setRating, "No Ratings" with none) and "Version 2.1.3 · 412 kB · Free". No install button: Install / Modify stays the
 //     nav bar's right button (user 2026-11-18: "keep the install / modify button in the top right"). `action`: an
 //     element for the header's right edge, where the App Store's install button sat (F194: an app page's Share).
 //   headerLine({ version, size, price })   -> "Version 2.1.3 · 412 kB · Free"
 //   storeTabs({ details, reviews, related }) -> { control, panes: { details, reviews, related }, select(i), nodes }
 //     The Details / Reviews / Related segmented control (ios6.css .store-segmented) over three panes. Details is
 //     filled by the caller at once; reviews(pane) and related(pane) run the first time their tab is chosen.
-//   tileRow()                              -> { row, set(key, tile | null) }  the sideways info tiles, in TILE_ORDER
+//   tileRow({ rating })                    -> { row, set(key, tile | null) }  the sideways info tiles, in TILE_ORDER
+//     (F206: starts with the Rating tile's placeholder, pendingRatingTile(), unless rating: false)
 //   worksOnTile(fit)                       -> { label, value, sub, ok }  compat()'s verdict as the Works On tile
 //   ratingTile(r), sizeTile(text, price), sectionTile(name, sub), updatedTile(date, now)
-//   ratingsCard(r)                         -> the Reviews tab's ratings card (the bar chart when r.histogram)
+//   ratingsCard(r, { reviews, selected, onPick, pending }) -> the Reviews tab's ratings card: the average beside
+//     five tappable bars (F206: r.histogram, else the written `reviews` counted), .select(stars), .table, .rows
 //   reviewsGroup(reviews, renderText)      -> the review cells: title, stars, "by name – Version – date", text
 //   storeStars(rating, cls)                -> five stars filled to the rating (the App Store's orange)
 //
 // A rating r: { average (0-5), count, noun: "Ratings" | "Reviews", histogram?: [n5, n4, n3, n2, n1], from }.
 // Everything moves by transform/opacity only (120 Hz); the panes switch with `hidden`, as the App Store did.
 import { el, grouped } from "../nav/ui.js";
+import { starCounts } from "../core/reviews.js";
 
 export const TAB_LABELS = ["Details", "Reviews", "Related"];
 export const TILE_ORDER = ["rating", "works", "size", "section", "updated"];
@@ -64,19 +67,26 @@ export function storeHeader({ art, name, author = null, authorHref = null, line 
     authorEl = a;
   };
   setAuthor(author, authorHref);
+  // F206: the stars row is there from the first paint (grey empty stars while the reviews load) and filled in place,
+  // so the page under it never moves; no rating at all says "No Ratings" rather than taking the row away.
   const rating = el("span", "store-head-rating");
-  rating.hidden = true;
+  rating.dataset.state = "pending";
+  rating.append(storeStars(0));
   const lineEl = el("span", "store-head-line", line);
   text.append(rating, lineEl);
   head.append(icon, text);
   if (action) head.append(action);
   return {
     head,
-    // No rating, no stars row (the concept's "(212)" only when there is one to count).
+    // The concept's "(212)" only when there is one to count.
     setRating(r) {
-      if (!hasRating(r)) { rating.hidden = true; rating.replaceChildren?.(); return; }
+      if (!hasRating(r)) {
+        rating.dataset.state = "none";
+        rating.replaceChildren(storeStars(0), el("span", "store-head-count", "No Ratings"));
+        return;
+      }
+      rating.dataset.state = "rated";
       rating.replaceChildren(storeStars(r.average), ...(r.count ? [el("span", "store-head-count", `(${Number(r.count).toLocaleString("en-US")})`)] : []));
-      rating.hidden = false;
     },
     setLine(t) { lineEl.textContent = t; },
     setAuthor,
@@ -130,8 +140,9 @@ export function storeTabs({ reviews = null, related = null } = {}) {
 
 // ---- the info tiles --------------------------------------------------------------------------------------------
 
-function tile({ label, value, sub = null, ok = null, stars = null }) {
+function tile({ label, value, sub = null, ok = null, stars = null, pending = false }) {
   const t = el("div", "store-tile");
+  if (pending) t.dataset.pending = "true";
   t.append(el("span", "store-tile-label", label), el("span", "store-tile-value", value ?? "—"));
   if (stars != null) t.append(storeStars(stars, "small"));
   else if (sub) {
@@ -143,10 +154,12 @@ function tile({ label, value, sub = null, ok = null, stars = null }) {
   return t;
 }
 
-export function tileRow() {
+// F206: the Rating tile holds its place from the first paint (a dash over grey empty stars) and is filled in place
+// when the reviews arrive, so the other tiles never shift sideways. `{ rating: false }` for a row without one.
+export function tileRow({ rating = true } = {}) {
   const row = el("div", "store-tiles");
   const tiles = new Map();
-  return {
+  const api = {
     row,
     tiles,
     set(key, data) {
@@ -162,6 +175,8 @@ export function tileRow() {
       row.dataset.count = String(tiles.size);
     },
   };
+  if (rating) api.set("rating", pendingRatingTile());
+  return api;
 }
 
 // "iOS 15.0 or later" -> "iOS 15+"; "iOS 14.0 – 16.2" -> "iOS 14–16.2"; "iOS 15 to below 17" -> "iOS 15–16"
@@ -198,10 +213,13 @@ export function worksOnTile(fit) {
   return { label: "Works On", value, sub: "Unknown", ok: null };
 }
 
+// F206: never null: no rating is "—" with "No Ratings" under it, so the tile stays and nothing moves.
 export function ratingTile(r) {
-  if (!hasRating(r)) return null;
+  if (!hasRating(r)) return { label: "Rating", value: "—", sub: "No Ratings" };
   return { label: "Rating", value: (Math.round(r.average * 10) / 10).toFixed(1), stars: r.average };
 }
+// F206: the placeholder while the reviews load: a dash over grey empty stars (the filled tile's shape).
+export const pendingRatingTile = () => ({ label: "Rating", value: "—", stars: 0, pending: true });
 
 // F195: the unit stays in the value ("48 kB"); under it the price ("Free"), or nothing.
 export function sizeTile(text, price = null) {
@@ -226,39 +244,82 @@ export function updatedTile(date, now = Date.now(), locale = "en-US") {
 
 // ---- the Reviews tab -------------------------------------------------------------------------------------------
 
-export function ratingsCard(r) {
+// F206: the hint under the ratings card, by what the list shows.
+export const barsHint = (stars) => (stars ? `Showing ${stars}-star reviews. Tap the row again for all.` : "Tap a row to see only those reviews.");
+
+const validHistogram = (h) => (Array.isArray(h) && h.length === 5 && h.every((n) => Number(n) >= 0) ? h.map(Number) : null);
+
+// F206: the card always draws the five bars beside the average, iOS 6 style: each row five small stars (the rating's
+// dark, the rest light grey), the grey bar, the count in bold and a chevron. The bars are the source's histogram, else
+// the written reviews we have counted (`reviews`), and the line under the card says how many they come from. Each row
+// is a button: onPick(stars) when tapped (the Reviews tab filters its list); card.select(stars | null) marks one.
+// `pending`: the skeleton drawn while the reviews load, the same shape (so filling it moves nothing).
+// No rating keeps the card, saying "No Ratings".
+export function ratingsCard(r, { reviews = null, selected = null, onPick = null, pending = false } = {}) {
   const g = el("div", "group store-ratings-group");
   g.append(el("h2", "group-header", "Ratings"));
   const card = el("div", "table grouped store-ratings");
-  if (!hasRating(r)) {
-    card.append(el("div", "store-ratings-none", r?.count ? `${r.count} ${r.noun ?? "Reviews"}, none rated` : "No Ratings"));
-    g.append(card);
-    return g;
-  }
+  if (pending) card.dataset.pending = "true";
+  const rated = !pending && hasRating(r);
   const top = el("div", "store-ratings-top");
   const avg = el("div", "store-ratings-avg");
-  avg.append(el("span", "store-ratings-big", (Math.round(r.average * 10) / 10).toFixed(1)), storeStars(r.average));
-  if (r.count) avg.append(el("span", "store-ratings-count", `${Number(r.count).toLocaleString("en-US")} ${r.count === 1 ? (r.noun ?? "Ratings").replace(/s$/, "") : r.noun ?? "Ratings"}`));
+  avg.append(el("span", "store-ratings-big", rated ? (Math.round(r.average * 10) / 10).toFixed(1) : "—"), storeStars(rated ? r.average : 0));
+  const noun = r?.noun ?? "Ratings";
+  const countText = pending ? " " : rated ? (r.count ? `${Number(r.count).toLocaleString("en-US")} ${r.count === 1 ? noun.replace(/s$/, "") : noun}` : " ")
+    : r?.count ? `${r.count} ${r.noun ?? "Reviews"}, none rated` : "No Ratings";
+  avg.append(el("span", "store-ratings-count", countText));
   top.append(avg);
-  const h = Array.isArray(r.histogram) && r.histogram.length === 5 && r.histogram.every((n) => Number(n) >= 0) ? r.histogram.map(Number) : null;
-  if (h) {
-    const most = Math.max(1, ...h);
-    const bars = el("div", "store-bars");
-    h.forEach((n, i) => {
-      const line = el("div", "store-bar");
-      const track = el("span", "store-bar-track");
-      const fill = el("span", "store-bar-fill");
-      // transform, not width: the bar is drawn once at full width and scaled (120 Hz rule; no layout).
-      fill.style.transform = `scaleX(${n / most})`;
-      track.append(fill);
-      line.append(el("span", "store-bar-stars", "★".repeat(5 - i)), track, el("span", "store-bar-n", String(n)));
-      bars.append(line);
-    });
-    top.append(bars);
-  }
+
+  const given = pending ? null : validHistogram(r?.histogram);
+  const h = given ?? (pending || !reviews ? [0, 0, 0, 0, 0] : starCounts(reviews));
+  const total = h.reduce((a, b) => a + b, 0);
+  const most = Math.max(1, ...h);
+  const bars = el("div", "store-bars");
+  bars.setAttribute("role", "group");
+  bars.setAttribute("aria-label", "Ratings by stars");
+  const rows = h.map((n, i) => {
+    const stars = 5 - i;
+    const row = el("button", "store-bar");
+    row.type = "button";
+    row.dataset.stars = String(stars);
+    row.setAttribute("aria-label", `${stars} star${stars === 1 ? "" : "s"}: ${n}`);
+    if (pending || !onPick) row.disabled = true;
+    const st = el("span", "store-bar-stars");
+    for (let k = 1; k <= 5; k++) st.append(el("span", k <= stars ? "store-bar-star on" : "store-bar-star", "★"));
+    const track = el("span", "store-bar-track");
+    const fill = el("span", "store-bar-fill");
+    // transform, not width: the bar is drawn once at full width and scaled (120 Hz rule; no layout).
+    fill.style.transform = `scaleX(${n / most})`;
+    track.append(fill);
+    row.append(st, track, el("b", "store-bar-n", pending ? "" : String(n)), el("span", "store-bar-chevron"));
+    if (onPick && !pending) row.addEventListener("click", () => onPick(stars));
+    bars.append(row);
+    return row;
+  });
+  top.append(bars);
   card.append(top);
-  if (r.from) card.append(el("div", "store-ratings-from", r.from));
+
+  const plural = (n, one) => `${n.toLocaleString("en-US")} ${one}${n === 1 ? "" : "s"}`;
+  const source = pending ? "Loading Reviews…"
+    : given ? `Bars from ${plural(total, "rating")}.`
+    : total ? `Bars from ${plural(total, "review")}.` : "No reviews to count yet.";
+  const lead = rated && r.from ? String(r.from).replace(/([^.!?])$/, "$1.") : null;
+  card.append(el("div", "store-ratings-from", [lead, source].filter(Boolean).join(" ")));
   g.append(card);
+
+  const hint = onPick && !pending ? el("p", "group-footer store-ratings-hint", barsHint(null)) : null;
+  if (hint) g.append(hint);
+  g.select = (stars) => {
+    rows.forEach((row) => {
+      const on = Number(row.dataset.stars) === stars;
+      row.classList.toggle("selected", on);
+      row.setAttribute("aria-pressed", String(on));
+    });
+    if (hint) hint.textContent = barsHint(stars);
+  };
+  g.select(selected);
+  g.table = card;
+  g.rows = rows;
   return g;
 }
 
@@ -291,7 +352,7 @@ export function reviewsGroup(reviews, renderText) {
 
 // The Reviews tab: the ratings card, the reviews, and a footer saying where they come from.
 export function reviewsPane(pane, { rating = null, reviews = [], renderText, footer = null } = {}) {
-  const parts = [ratingsCard(rating)];
+  const parts = [ratingsCard(rating, { reviews })];
   if (reviews.length) parts.push(reviewsGroup(reviews, renderText));
   pane.replaceChildren(...parts);
   if (footer) pane.append(grouped([{ footer }]));

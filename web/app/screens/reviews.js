@@ -6,6 +6,8 @@
 //     The ratings card (ours, the depiction's and the App Store's merged, core/reviews.js mergeReviews) with Tap to
 //     Rate under it, Write a Review, the reviews (ours first, newest first, "by name – Version – date", each with
 //     Report; then the depiction's), More Reviews for the next page, and a footer saying where they come from.
+//     F206: the card's skeleton while it loads; the card's five bars filter the list to one rating (`filter`, kept
+//     across a redraw after a post). Returns { card, area, setFilter(stars | null), filter() }.
 //     `depiction`: core/previews.js sileoRatings(); `appStore`: { average, count, reviews? } (core/applookup.js; B37:
 //     its written reviews drawn as an "App Store Reviews" group after ours and the depiction's); both may be
 //     null or a promise. `renderText(review)`: the body of a depiction's review (ours are always plain text).
@@ -20,7 +22,7 @@
 import { el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { ratingsCard, reviewCell } from "./storepage.js";
-import { checkDraft, mergeReviews, ourReview, LIMITS } from "../core/reviews.js";
+import { checkDraft, mergeReviews, ourReview, withStars, LIMITS } from "../core/reviews.js";
 
 export function starPicker(value = 0, onPick = () => {}, { cls = "" } = {}) {
   const node = el("span", `review-stars${cls ? ` ${cls}` : ""}`);
@@ -135,15 +137,16 @@ export function writeReviewSheet({ initial = null, version = "", onSend = async 
 const resolved = (p) => Promise.resolve(p).catch(() => null);
 
 export async function reviewsTab(pane, { id, version = "", depiction = null, appStore = null, api, renderText = null, now = Date.now(),
-  first = null, onRating = null, sheet = writeReviewSheet, confirm = confirmReport } = {}) {
-  const loading = el("div", "loading");
-  loading.append(el("span", "loading-spinner"), el("span", null, "Loading Reviews"));
-  pane.replaceChildren(loading);
+  first = null, onRating = null, sheet = writeReviewSheet, confirm = confirmReport, filter = null } = {}) {
+  // F206: the card's skeleton (the filled card's shape, "Loading Reviews…" in its last line), not a spinner, so the
+  // tab doesn't jump when the reviews arrive.
+  pane.replaceChildren(ratingsCard(null, { pending: true }));
   const [ours, dep, store] = await Promise.all([first ? resolved(first) : api.list(id, 0).catch(() => null), resolved(depiction), resolved(appStore)]);
   let mine = ours?.mine ?? null;
   let page = 0;
+  let stars = [1, 2, 3, 4, 5].includes(filter) ? filter : null; // F206: the star filter, null for all
 
-  const redraw = async () => { await reviewsTab(pane, { id, version, depiction: dep, appStore: store, api, renderText, now: Date.now(), onRating, sheet, confirm }); };
+  const redraw = async () => { await reviewsTab(pane, { id, version, depiction: dep, appStore: store, api, renderText, now: Date.now(), onRating, sheet, confirm, filter: stars }); };
   // Tap to Rate keeps the words of a review this device wrote: it only changes the stars.
   const post = async (draft) => {
     const r = await api.post(id, draft);
@@ -153,7 +156,14 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
 
   const merged = mergeReviews({ ours, depiction: dep, appStore: store, now });
   if (first === null) onRating?.(merged.rating); // drawn again after a post: the header's stars follow
-  const card = ratingsCard(merged.rating);
+  // Ours first (each page of More Reviews after the last), then the depiction's; B37's App Store reviews apart.
+  const oursShown = [...(ours?.reviews ?? [])];
+  const theirs = merged.reviews.filter((rv) => !rv.ours);
+  const mainReviews = () => [...oursShown.map((rv) => ourReview(rv, now)), ...theirs];
+  const written = () => [...mainReviews(), ...merged.appStoreReviews];
+  // F206: the bars count the reviews we have when the source gives no histogram; a row filters the list below to its
+  // rating, the same row again (or Show All) clears it.
+  const card = ratingsCard(merged.rating, { reviews: written(), selected: stars, onPick: (n) => setFilter(stars === n ? null : n) });
   const parts = [card];
   if (ours?.enabled) {
     const tap = el("div", "review-tap");
@@ -165,7 +175,7 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
       } catch (e) { status.textContent = e?.message || "Not sent."; picker.set(mine?.stars ?? 0); }
     }, { cls: "small" });
     tap.append(el("span", "review-tap-label", mine ? "Your Rating:" : "Tap to Rate:"), status, picker.node);
-    (card.children[card.children.length - 1] ?? card).append(tap); // inside the ratings card, under the bars
+    card.table.append(tap); // inside the ratings card, under the bars
     const actions = el("div", "review-actions");
     const write = el("button", "review-button", mine?.title || mine?.text ? "Edit Your Review" : "Write a Review");
     write.type = "button";
@@ -175,8 +185,8 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
     if (mine?.hidden) parts.push(el("p", "review-hidden-note", "Your review was hidden after other people reported it. Changing it shows it again."));
   }
 
-  const list = el("div", "table grouped store-review-list");
   const cellOf = (rv, i) => {
+    if (rv.appStore) return reviewCell(rv, i); // B37: plain text (reviewCell's textContent), no Report
     const c = reviewCell(rv, i, rv.ours ? undefined : renderText ?? undefined);
     if (rv.ours && rv.id !== mine?.id) {
       const rep = el("button", "review-report", "Report");
@@ -193,39 +203,72 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
     }
     return c;
   };
-  // Ours first (each page of More Reviews after the last), then the depiction's.
-  const oursShown = [...(ours?.reviews ?? [])];
-  const theirs = merged.reviews.filter((rv) => !rv.ours);
-  const fillList = () => list.replaceChildren(...[...oursShown.map((rv) => ourReview(rv, now)), ...theirs].map(cellOf));
-  fillList();
-  if (merged.reviews.length) {
-    const g = el("div", "group store-reviews-group");
-    g.append(el("h2", "group-header", "Reviews"), list);
-    parts.push(g);
-    if (ours?.more) {
-      const more = el("button", "review-button review-more", "More Reviews…");
-      more.type = "button";
-      more.addEventListener("click", async () => {
-        more.disabled = true;
-        const next = await api.list(id, page + 1).catch(() => null);
-        if (next?.reviews?.length) { page++; oursShown.push(...next.reviews); fillList(); }
-        more.disabled = false;
-        if (next && !next.more) more.remove();
-      });
-      parts.push(more);
+  // More Reviews: the next page of ours, kept below the list whether it is filtered or not.
+  let moreLeft = Boolean(ours?.more);
+  const moreButton = () => {
+    const more = el("button", "review-button review-more", "More Reviews…");
+    more.type = "button";
+    more.addEventListener("click", async () => {
+      more.disabled = true;
+      const next = await api.list(id, page + 1).catch(() => null);
+      if (next) moreLeft = Boolean(next.more);
+      more.disabled = false;
+      if (next?.reviews?.length) { page++; oursShown.push(...next.reviews); }
+      if (next) fillArea();
+    });
+    return more;
+  };
+  // The list(s) under the card: all of them as before (ours and the depiction's, then B37's App Store group), or
+  // F206's one filtered group: "4-Star Reviews (3)", or a cell saying there are none, and Show All N Reviews.
+  const area = el("div", "store-reviews-area");
+  function fillArea() {
+    const out = [];
+    const main = mainReviews();
+    if (stars) {
+      const shown = withStars(written(), stars);
+      const g = el("div", "group store-reviews-group store-reviews-filtered");
+      const l = el("div", "table grouped store-review-list");
+      if (shown.length) l.append(...shown.map(cellOf));
+      else l.append(el("div", "store-reviews-none", "No reviews with this rating."));
+      g.append(el("h2", "group-header", `${stars}-Star Reviews (${shown.length})`), l);
+      out.push(g);
+      if (moreLeft) out.push(moreButton());
+      const all = el("button", "review-button review-more review-show-all", `Show All ${written().length} Reviews`);
+      all.type = "button";
+      all.addEventListener("click", () => setFilter(null));
+      out.push(all);
+    } else {
+      if (main.length) {
+        const g = el("div", "group store-reviews-group");
+        const l = el("div", "table grouped store-review-list");
+        l.append(...main.map(cellOf));
+        g.append(el("h2", "group-header", "Reviews"), l);
+        out.push(g);
+        if (moreLeft) out.push(moreButton());
+      }
+      // B37: the App Store's written reviews, newest first, as a group of their own.
+      if (merged.appStoreReviews.length) {
+        const g = el("div", "group store-reviews-group store-reviews-appstore");
+        const l = el("div", "table grouped store-review-list");
+        l.append(...merged.appStoreReviews.map(cellOf));
+        g.append(el("h2", "group-header", merged.appStoreLabel), l);
+        out.push(g);
+      }
     }
+    area.replaceChildren(...out);
   }
-  // B37: the App Store's written reviews, newest first, as a group of their own (plain text: reviewCell's textContent).
-  if (merged.appStoreReviews.length) {
-    const g = el("div", "group store-reviews-group store-reviews-appstore");
-    const l = el("div", "table grouped store-review-list");
-    l.append(...merged.appStoreReviews.map((rv, i) => reviewCell(rv, i)));
-    g.append(el("h2", "group-header", merged.appStoreLabel), l);
-    parts.push(g);
+  function setFilter(n) {
+    stars = n;
+    card.select(n);
+    fillArea();
+    area.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease-out" }); // opacity only (120 Hz)
   }
+  fillArea();
+  parts.push(area);
   const foot = el("p", "group-footer store-reviews-footer", merged.footer);
   parts.push(foot);
   pane.replaceChildren(...parts);
+  return { card, area, setFilter, filter: () => stars };
 }
 
 async function confirmReport() {

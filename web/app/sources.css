@@ -116,3 +116,4 @@
 .rec-get:active:not(:disabled), .rec-get.is-pressed { background: #2f7de1; color: #fff; }
 .rec-get.added, .rec-get:disabled { border-color: #c4c4c9; color: #9a9aa0; background: #fff; cursor: default; }
 .rec-apps { margin-top: 10px; } /* a preview's apps under its grouped head */
+.rec-packages .pkg-row > .cell-inner::after { content: none; } /* F54: a repo not added yet has no package pages: no chevron */

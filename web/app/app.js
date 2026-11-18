@@ -8,7 +8,7 @@
 // Screens (screens/*.js) export `title`, `render(body, route, ctx)` and optionally `nav(route, ctx)` returning
 // { title, style: "grouped" | "plain", left: { label, onClick }, right: { label, onClick } | [several] } and `init(ctx)`,
 // run once at start (e.g. to set the tab's badge). ctx: { go, back, setBadge, showHUD }.
-import { TABS, createRouter, format, parent } from "./router.js";
+import { TABS, createRouter, format, parent, mounted } from "./router.js";
 import { createStacks, swipeCommits } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transition.js";
 import { attachEdgeSwipe } from "./nav/swipe.js";
@@ -74,8 +74,8 @@ function button(spec, cls) {
 
 // Called by stacks.sync while it builds a stack, root first: the parent is already the stack's last entry.
 function makePage(tab, path) {
-  const route = { tab, path };
-  const screen = SCREENS[tab];
+  const route = mounted({ tab, path }); // another tab's page opened here (router.js mounted): that screen draws it
+  const screen = SCREENS[route.tab];
   const info = (screen.nav && screen.nav(route, ctx)) || {};
   const below = stacks.stack(tab).at(-1);
   const title = info.title ?? screen.title;
@@ -169,15 +169,9 @@ const router = createRouter({
       }
       tabbar.select(r.tab);
     }
-    // A link into another tab's page (Home's Install IPAs): the tab comes forward and the page slides in over that
-    // tab's own page, as a push, instead of appearing at once.
-    const under = r.kind === "tab" && r.from && r.added.length && !r.removed.length && all.length > 1 ? all[all.length - 2] : null;
     if (r.kind === "push" && r.from) {
       setTop(r.to, true);
       slide(r.to, r.from, 0, 1, () => setTop(r.from, false));
-    } else if (under) {
-      for (const e of all) setTop(e, e === r.to || e === under);
-      slide(r.to, under, 0, 1, () => setTop(under, false));
     } else if (r.kind === "pop" && !swipedBack && !(webBack && !ownBack)) {
       const [old, ...deeper] = r.removed;
       drop(deeper);

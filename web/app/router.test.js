@@ -58,7 +58,8 @@ test("go, back and repeated routes", () => {
   router.go({ tab: "sources", path: ["repo"] });
   router.go({ tab: "sources", path: ["repo"] }); // same route: nothing
   win.back("#/changes");
-  assert.deepEqual(seen, ["#/changes", "#/sources/repo", "#/changes"]);
+  // a link into another tab's page opens it on this tab's stack (user 2026-11-17); back returns here
+  assert.deepEqual(seen, ["#/changes", "#/changes/~sources/repo", "#/changes"]);
   assert.deepEqual(router.current(), { tab: "changes", path: [] });
   router.stop();
   win.location.hash = "#/search";
@@ -192,4 +193,20 @@ test("after a tab switch, Back goes to the parent, not back through history (Sou
   h.router.selectTab("sources");
   assert.deepEqual(h.stacks.top().path, ["bigboss"]);
   assert.equal(h.stacks.top().pushed, false); // the entry behind is Search now: Back must replace with the parent
+});
+
+test("another tab's pages inside this one: mounted, prefixes and parent skip the mount, links stay inside it", async () => {
+  const { mounted, mountLink, prefixes, parent } = await import("./router.js");
+  const r = { tab: "home", path: ["~installed", "myipas", "apps"] };
+  assert.deepEqual(mounted(r), { tab: "installed", path: ["myipas", "apps"] });
+  assert.deepEqual(mounted({ tab: "home", path: ["browse"] }), { tab: "home", path: ["browse"] });
+  assert.deepEqual(prefixes(r.path), [[], ["~installed", "myipas"], ["~installed", "myipas", "apps"]]);
+  assert.deepEqual(parent({ tab: "home", path: ["~installed", "myipas"] }), { tab: "home", path: [] });
+  // a link from inside the mount to that tab stays in the mount; from elsewhere it opens one
+  assert.deepEqual(mountLink(r, { tab: "installed", path: ["myipas", "category:Games"] }),
+    { tab: "home", path: ["~installed", "myipas", "category:Games"] });
+  assert.deepEqual(mountLink({ tab: "changes", path: ["x"] }, { tab: "installed", path: ["myipas"] }),
+    { tab: "changes", path: ["x", "~installed", "myipas"] });
+  assert.equal(mountLink(r, { tab: "home", path: ["about"] }), null); // same tab
+  assert.equal(mountLink(r, { tab: "sources", path: [] }), null); // a tab's root: a switch
 });

@@ -81,8 +81,8 @@ hanging at a prompt if the rule is ever gone. Remove with `sudo apt-get remove -
 
 iFizBox is installed on the phone: `com.ryha.ifizbox` 0.9.2-1152, built from F171 (checked 2026-11-18 with
 `ssh 7 dpkg-query -W com.ryha.ifizbox`). Leave it installed: later tasks test iFizBox here. A build from before
-F171 (package `com.ryha.cydian`) is a different package, so it installs beside iFizBox instead of over it: don't
-install one on this phone; if one is there, remove it and its files as below. Check the version before assuming
+F171 has the old package ID, so it installs beside iFizBox instead of over it: don't install one on this phone; if
+one is there, remove it and its files as below. Check the version before assuming
 what a test runs. To reinstall a newer build, install the new .deb over it as above (`--allow-downgrades` if its version is lower).
 
 Where it lives (F171 renamed every path; the old-name package and all its files were removed from the phone):

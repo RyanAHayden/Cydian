@@ -16,6 +16,9 @@
 //                                           holds 25 MB a value, a Worker request ~100 MB), POST /sign/upload/<token>/done
 //                                           -> {itms, ...}; GET /sign/up/<token>/manifest.plist and app.ipa (HEAD,
 //                                           Range) for TTL seconds, like /sign/host
+//   GET  /sign/up/<token>/status            F190: what iOS has done with that link, from its own requests:
+//                                           {manifest, started, finished} (manifest.plist fetched, app.ipa's body begun,
+//                                           and streamed to its end); the website shows it after "Installing"
 //                                           F121: &token=<48 hex> without size reserves the website's own token, whose
 //                                           link it opened inside the Install tap: manifest.plist answers at once from
 //                                           its own query (bundleid, version, title), else once the reservation lands
@@ -230,6 +233,25 @@ async function ipaFetch(target, maxBytes, token = null) {
 }
 
 const upKey = (t) => `up.${t}`, partKey = (t, i) => `up.${t}.${i}`;
+
+// F190: iOS's own requests on an upload's link, so the website can say what iOS is doing (Safari never hears back
+// from itms-services). A key of its own, not the upload's metadata: the website's reservation, size and done
+// writes replace that metadata whole and would drop a mark iOS made in between. Each mark is written once
+// (read first; KV's free tier counts writes, 1,000 a day), so an install costs at most 3 writes.
+const iosKey = (t) => `up.${t}.ios`;
+export const IOS_MARKS = ["manifest", "started", "finished"];
+async function iosStatus(env, t) {
+  const r = await env.HOSTED.getWithMetadata(iosKey(t), { type: "stream" });
+  r.value?.cancel?.();
+  return r.metadata ?? {};
+}
+async function markIos(env, t, mark, ttl) {
+  try {
+    const s = await iosStatus(env, t);
+    if (s[mark]) return;
+    await env.HOSTED.put(iosKey(t), "", { expirationTtl: ttl + 300, metadata: { ...s, [mark]: true } });
+  } catch { /* a missed mark only leaves the website's log a step behind */ }
+}
 const partLen = (m, i) => (i < m.parts - 1 ? m.partSize : m.size - m.partSize * (m.parts - 1));
 
 // /sign/upload/... and /sign/up/...: a Response, or null for a path that isn't these.
@@ -280,6 +302,11 @@ async function uploads(req, u, env, ttl) {
     await env.HOSTED.put(partKey(p[1], i), body.buffer, { expirationTtl: ttl + 300, metadata: { n: body.byteLength } });
     return json({ ok: true, part: i });
   }
+  const st = /^\/sign\/up\/([0-9a-f]{48})\/status$/.exec(u.pathname);
+  if (st && req.method === "GET") {
+    const s = await iosStatus(env, st[1]);
+    return json(Object.fromEntries(IOS_MARKS.map((k) => [k, Boolean(s[k])])));
+  }
   const h = /^\/sign\/up\/([0-9a-f]{48})\/(manifest\.plist|app\.ipa)$/.exec(u.pathname);
   if (h && (req.method === "GET" || req.method === "HEAD")) {
     // F121: a reserved link is opened before its upload. Its manifest answers at once from the link's own query (the
@@ -292,9 +319,13 @@ async function uploads(req, u, env, ttl) {
     if (h[2] === "manifest.plist") {
       meta = await metaOf(env, h[1]);
       const asked = appOf(u.searchParams);
-      if (!meta && asked) return plist(manifest({ url: `${u.origin}/sign/up/${h[1]}/app.ipa`, ...asked }));
+      if (!meta && asked) {
+        if (req.method === "GET") await markIos(env, h[1], "manifest", ttl);
+        return plist(manifest({ url: `${u.origin}/sign/up/${h[1]}/app.ipa`, ...asked }));
+      }
       if (!meta) meta = await waitFor(() => metaOf(env, h[1]), (m) => Boolean(m), MANIFEST_WAIT, env);
       if (!meta?.done && !meta?.reserved) return fail("gone", "That install link has expired.", 404);
+      if (req.method === "GET") await markIos(env, h[1], "manifest", ttl);
       return plist(manifest({ url: `${u.origin}/sign/up/${h[1]}/app.ipa`, ...meta }));
     }
     meta = await waitFor(() => metaOf(env, h[1]), started, IPA_WAIT, env);
@@ -316,6 +347,7 @@ async function uploads(req, u, env, ttl) {
     if (req.method === "HEAD") return new Response(null, { status, headers });
     let i = Math.floor(start / meta.partSize);
     const last = Math.floor(end / meta.partSize);
+    let begun = false;
     const body = new ReadableStream({
       async pull(c) {
         if (bodyWait) {
@@ -326,9 +358,12 @@ async function uploads(req, u, env, ttl) {
         if (i > last) { c.close(); return; }
         const data = await env.HOSTED.get(partKey(h[1], i), { type: "arrayBuffer" });
         if (!data) { c.error(new Error("expired")); return; }
+        if (!begun) { begun = true; await markIos(env, h[1], "started", ttl); } // F190
         const from = i * meta.partSize;
         c.enqueue(new Uint8Array(data.slice(Math.max(0, start - from), Math.min(data.byteLength, end - from + 1))));
         i++;
+        // F190: the app's last byte is handed over (a Range that stops short of it isn't the end)
+        if (i > last && end === n - 1) await markIos(env, h[1], "finished", ttl);
       },
     });
     if (typeof FixedLengthStream === "function") { // Cloudflare: keeps the Content-Length on a streamed body

@@ -149,10 +149,9 @@ export async function serverStatus(server = getServer()) {
 }
 
 // F72: an IPA of iFizBox itself (its GitHub releases, where iFizBox's own source points).
-// Only iFizBox's own IPA files count: any IPA of a versioned release (v<X.Y.Z>: only iFizBox builds; F171 renamed the
-// asset to ${NAME}.ipa, and the releases before it carry the old one), a release's ${NAME}.ipa, or the test source's
-// <name>-<version>.ipa. Other files under the test-fixtures pre-release (Test Alpha, Test Beta...) are ordinary apps.
-const SELF_IPA = new RegExp(`^https://github\\.com/${GITHUB_REPO.replace(/[.]/g, "\\.")}/releases/(?:download/v[\\d.]+/[\\w.-]+|(?:latest/)?download/(?:[^/]+/)?(?:${NAME}|${NAME}-[\\d.]+))\\.ipa$`, "i");
+// Only iFizBox's own IPA files count: a release's ${NAME}.ipa, or the test source's <name>-<version>.ipa (F180: no
+// old asset names). Other files under the test-fixtures pre-release (Test Alpha, Test Beta...) are ordinary apps.
+const SELF_IPA = new RegExp(`^https://github\\.com/${GITHUB_REPO.replace(/[.]/g, "\\.")}/releases/(?:latest/)?download/(?:[^/]+/)?(?:${NAME}|${NAME}-[\\d.]+)\\.ipa$`, "i");
 export const isSelfIpa = (url) => SELF_IPA.test(String(url ?? ""));
 
 // Signs `url` (an IPA) on the phone and installs it. Resolves true once iOS was asked to install; false after an

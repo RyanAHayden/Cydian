@@ -19,8 +19,9 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mkdeb import macho_info  # noqa: E402
 import launch_check  # noqa: E402
+from brand import NAME  # noqa: E402  (F180: native/brand.env)
 
-APP = "Payload/iFizBox.app/"
+APP = "Payload/%s.app/" % NAME
 # Entitlements only a jailbreak (or TrollStore) build may carry; a sideload signer would refuse or strip them.
 PRIVATE = ("platform-application", "com.apple.private.")
 
@@ -106,14 +107,14 @@ def check(path):
         if not i.filename.startswith("Payload/") or ".." in i.filename.split("/"):
             problems.append("not under Payload/: %s" % i.filename)
     apps = {n.split("/")[1] for n in files if n.startswith("Payload/") and n.count("/") >= 2}
-    if apps != {"iFizBox.app"}:
-        problems.append("Payload holds %s, want just iFizBox.app" % sorted(apps))
+    if apps != {NAME + ".app"}:
+        problems.append("Payload holds %s, want just %s.app" % (sorted(apps), NAME))
 
     plist = files.get(APP + "Info.plist")
     if not plist:
-        return problems + ["no iFizBox.app/Info.plist"], ""
+        return problems + ["no %s.app/Info.plist" % NAME], ""
     info = plistlib.loads(plist[1])
-    want = {"CFBundleExecutable": "iFizBox", "MinimumOSVersion": "15.0", "CADisableMinimumFrameDurationOnPhone": True}
+    want = {"CFBundleExecutable": NAME, "MinimumOSVersion": "15.0", "CADisableMinimumFrameDurationOnPhone": True}
     for k, v in want.items():
         if info.get(k) != v:
             problems.append("Info.plist %s is %r, want %r" % (k, info.get(k), v))
@@ -191,7 +192,7 @@ def check(path):
 # N8: the IPA carries the intents that work without a jailbreak (native/build.sh SIDELOAD_INTENTS), and a widget
 # extension without controls (no intents of its own) and without jailbreak entitlements.
 SIDELOAD_INTENTS = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent"}
-WIDGET = APP + "PlugIns/iFizBoxWidget.appex/"
+WIDGET = APP + "PlugIns/%sWidget.appex/" % NAME
 
 
 def intents_problems(files):
@@ -208,9 +209,9 @@ def intents_problems(files):
         problems.append("App Intents %s, want the both-modes %s" % (sorted(actions), sorted(SIDELOAD_INTENTS)))
     if WIDGET + "Metadata.appintents/extract.actionsdata" in files:
         problems.append("the widget extension carries intents (the controls are the .deb's)")
-    exe = files.get(WIDGET + "iFizBoxWidget")
+    exe = files.get(WIDGET + NAME + "Widget")
     if not exe or WIDGET + "Info.plist" not in files:
-        problems.append("no widget extension (PlugIns/iFizBoxWidget.appex)")
+        problems.append("no widget extension (PlugIns/%sWidget.appex)" % NAME)
     else:
         ents = macho_entitlements(exe[1]) or {}
         bad = sorted(k for k in ents if k.startswith(PRIVATE))

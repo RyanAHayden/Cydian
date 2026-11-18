@@ -16,9 +16,10 @@ import tarfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import launch_check  # noqa: E402
+from brand import NAME  # noqa: E402  (F180: native/brand.env)
 
 PREFIX = "./var/jb/"
-APP = PREFIX + "Applications/iFizBox.app/"
+APP = PREFIX + "Applications/%s.app/" % NAME
 HELPER = PREFIX + "usr/libexec/ifizbox/ifizbox-helper"
 # N5: the background upgrade check, a launchd daemon that posts "n upgrades" as the app (jailbreak only).
 DAEMON = PREFIX + "usr/libexec/ifizbox/ifizbox-upgrades"
@@ -179,7 +180,7 @@ def check(path):
     if "@" in ctl["control"][1].decode():
         problems.append("control has an unfilled @PLACEHOLDER@")
     post = ctl.get("postinst")
-    if not post or not post[0].mode & 0o111 or b"uicache -p /var/jb/Applications/iFizBox.app" not in post[1]:
+    if not post or not post[0].mode & 0o111 or b"uicache -p /var/jb/Applications/%s.app" % NAME.encode() not in post[1]:
         problems.append("postinst missing, not executable, or not running uicache -p on the app")
     if not post or b'chown mobile:mobile "$wk/com.ryha.ifizbox"' not in post[1]:
         problems.append("postinst does not make WebKit's storage folder (without it nothing in the web view persists)")
@@ -205,10 +206,10 @@ def check(path):
 
     plist = files.get(APP + "Info.plist")
     if not plist:
-        return problems + ["no iFizBox.app/Info.plist"], ""
+        return problems + ["no %s.app/Info.plist" % NAME], ""
     info = plistlib.loads(plist[1])
     exe = APP + info.get("CFBundleExecutable", "?")
-    want = {"CFBundleExecutable": "iFizBox", "MinimumOSVersion": "15.0", "CADisableMinimumFrameDurationOnPhone": True,
+    want = {"CFBundleExecutable": NAME, "MinimumOSVersion": "15.0", "CADisableMinimumFrameDurationOnPhone": True,
             "CFBundleShortVersionString": fields.get("Version", "").split("-")[0],
             "CFBundleVersion": fields.get("Version", "-").split("-")[-1]}
     for k, v in want.items():
@@ -262,7 +263,7 @@ def check(path):
             problems.append("helper: %s" % e)
     problems += _check_daemon(files)
     if APP + "bridge.js" not in files:
-        problems.append("no iFizBox.app/bridge.js (the script that sets up ifizboxNative)")
+        problems.append("no %s.app/bridge.js (the script that sets up ifizboxNative)" % NAME)
 
     web = {n[len(APP + "web/"):] for n in files if n.startswith(APP + "web/")}
     for need in ("index.html", "app.js", "style.css", "router.js"):

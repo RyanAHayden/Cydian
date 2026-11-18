@@ -19,6 +19,12 @@ for a release.
   | `com.ryha.ifizbox_<ver>-<build>_<arch>.deb` | any other arch build found in `--dist` under that name | its arch, and the APT repo |
   | `Packages`, `Packages.gz`, `Release` | iFizBox's own flat APT repo over the Debian-named .debs (F72, `tools/selfrepo.py`) | the jailbreak app's built-in source |
 
+  F180: the names come from `native/brand.env` (`BRAND_NAME` gives `iFizBox.ipa`, `iFizBox.deb`, `iFizBox.app`;
+  `BRAND_PACKAGE` gives the Debian name), in `native/build.sh`, `mkipa.py`/`mkdeb.py`, `release.sh` and
+  `publish.sh`. The app takes only `iFizBox.ipa` (no other IPA of the release) and nothing under the old name;
+  `tools/altsource.py update` drops older `source.json` entries whose IPA is named otherwise (the releases up to
+  v0.9.3). `native/test_assetnames.py` checks all of this.
+
   `debFor` takes the asset ending `_<arch>.deb` first, and uses plain `iFizBox.deb` only for iphoneos-arm64. So a
   roothide (iphoneos-arm64e) or rootful build would only need its own `<pkg>_<ver>_<arch>.deb` added. Nothing
   builds those yet.

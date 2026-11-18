@@ -4,7 +4,8 @@ app itself (core/sources.js DEFAULT_ALT_SOURCES, core/appoffer.js APP_SOURCE_URL
 
   tools/altsource.py update VERSION IPA [DATE] [--notes FILE] [--minimum X.Y.Z]
         point the source at release vVERSION's iFizBox.ipa (its size from IPA), newest first in versions[], the
-        versions already listed kept below it (at most KEEP), with the notes' first lines as its description
+        versions already listed kept below it (at most KEEP; F180: only those whose IPA is iFizBox.ipa), with the
+        notes' first lines as its description
   tools/altsource.py check                       the source is well formed and names a release tag of its own version
 
 tools/release.sh runs `update` when it publishes a release, so the source keeps naming the newest IPA. F72: this is
@@ -22,8 +23,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "native"))
 from brand import BRAND, NAME  # noqa: E402  (F170: native/brand.env)
 SOURCE = os.path.join(ROOT, "web", "app", "source.json")
-REPO = "https://github.com/RyanAHayden/iFizBox"
-RAW = "https://raw.githubusercontent.com/RyanAHayden/iFizBox/main"
+REPO = f"https://github.com/{BRAND['BRAND_GITHUB_REPO']}"
+RAW = f"https://raw.githubusercontent.com/{BRAND['BRAND_GITHUB_REPO']}/main"
 BUNDLE_ID = BRAND["BRAND_BUNDLE_ID"]
 MIN_OS = "15.0"  # native/mkipa.py's MinimumOSVersion
 KEEP = 20  # versions[] entries kept (newest first)
@@ -32,6 +33,12 @@ VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 def ipa_url(version):
     return f"{REPO}/releases/download/v{version}/{NAME}.ipa"
+
+
+def is_own_ipa(entry):
+    """F180: a versions[] entry whose downloadURL is its release's {NAME}.ipa. The releases before v0.9.4 carry
+    the IPA under the old name; `update` drops those entries (no old asset names, user 2026-11-18)."""
+    return str(entry.get("downloadURL")) == ipa_url(entry.get("version"))
 
 
 def note_text(version, notes=None):
@@ -60,7 +67,7 @@ def build(version, size, date, notes=None, minimum=None, previous=()):
         "size": size,
         "minOSVersion": MIN_OS,
     }
-    older = [v for v in previous if isinstance(v, dict) and v.get("version") != version][:KEEP - 1]
+    older = [v for v in previous if isinstance(v, dict) and v.get("version") != version and is_own_ipa(v)][:KEEP - 1]
     app = app_entry([newest] + older)
     if minimum:
         app["minimumVersion"] = minimum

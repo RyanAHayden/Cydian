@@ -66,6 +66,8 @@ test("parseRelease", () => {
   assert.equal(parseRelease(null), null);
   const bare = parseRelease({ tag_name: "v1.0.0", assets: [{ name: "x" }, null] });
   assert.equal(bare.ipa, null);
+  // F180: only the release's iFizBox.ipa, never an IPA under another (old) name.
+  assert.equal(parseRelease({ tag_name: "v0.9.3", assets: [{ name: "Old.ipa", browser_download_url: "https://x/Old.ipa" }] }).ipa, null);
   assert.deepEqual(bare.debs, []);
   assert.deepEqual(bare.notes, []);
 });

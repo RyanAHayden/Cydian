@@ -79,11 +79,12 @@ test("a native bridge passed in is the one asked", async () => {
   assert.equal(await signingReady({ native: fakeNative([KEPT]), wait: async () => {} }), true);
 });
 
-test("F171: isSelfIpa takes any IPA of a versioned release (old asset names too), iFizBox.ipa and ifizbox-<v>.ipa", async () => {
+test("F180: isSelfIpa takes only a release's iFizBox.ipa and the test source's ifizbox-<v>.ipa", async () => {
   const { isSelfIpa } = await import("./signing-client.js");
   const r = "https://github.com/RyanAHayden/iFizBox/releases/";
-  for (const u of [r + "download/v0.5.0/Old.ipa", r + "download/v0.6.0/iFizBox.ipa", r + "latest/download/iFizBox.ipa",
+  for (const u of [r + "download/v0.6.0/iFizBox.ipa", r + "latest/download/iFizBox.ipa",
     r + "download/test-fixtures/ifizbox-0.2.8.1.ipa"]) assert.ok(isSelfIpa(u), u);
-  for (const u of [r + "download/test-fixtures/alpha-1.0.0.ipa", r + "download/v0.5.0/x/y.ipa", "https://example.com/iFizBox.ipa"])
+  for (const u of [r + "download/test-fixtures/alpha-1.0.0.ipa", r + "download/v0.5.0/x/y.ipa", "https://example.com/iFizBox.ipa",
+    r + "download/v0.5.0/Old.ipa", r + "download/v0.9.3/" + "Cy" + "dian.ipa", r + "download/test-fixtures/" + "cy" + "dian-0.2.8.1.ipa"])
     assert.ok(!isSelfIpa(u), u);
 });

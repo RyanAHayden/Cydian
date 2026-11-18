@@ -19,7 +19,7 @@
      "buildVersion": "9008",
      "date": "2026-11-17",
      "size": 2671389,
-     "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/test-fixtures/cydian-0.2.8.1.ipa",
+     "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/test-fixtures/ifizbox-0.2.8.1.ipa",
      "localizedDescription": "Test update: the 0.2.8 app marked one step higher.",
      "minOSVersion": "15.0"
     },
@@ -28,7 +28,7 @@
      "buildVersion": "9005",
      "date": "2026-11-17",
      "size": 2602475,
-     "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/test-fixtures/cydian-0.2.5.1.ipa",
+     "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/test-fixtures/ifizbox-0.2.5.1.ipa",
      "localizedDescription": "Test update: the 0.2.5 app marked one step higher.",
      "minOSVersion": "15.0"
     },
@@ -37,7 +37,7 @@
      "buildVersion": "9001",
      "date": "2026-11-17",
      "size": 2331007,
-     "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/test-fixtures/cydian-0.1.1.1.ipa",
+     "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/test-fixtures/ifizbox-0.1.1.1.ipa",
      "localizedDescription": "Test essential update.",
      "minOSVersion": "15.0"
     }

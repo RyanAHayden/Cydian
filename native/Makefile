@@ -8,7 +8,7 @@ deb:
 ipa:
 	./build.sh ipa
 check:
-	python3 mkdeb.py check build/iFizBox.deb
-	python3 mkipa.py check build/iFizBox.ipa
+	python3 mkdeb.py check build/$$(. ./brand.env; echo $$BRAND_NAME).deb
+	python3 mkipa.py check build/$$(. ./brand.env; echo $$BRAND_NAME).ipa
 clean:
 	rm -rf build

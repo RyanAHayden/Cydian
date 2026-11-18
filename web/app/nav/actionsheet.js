@@ -21,17 +21,21 @@ export function showActionSheet({ title = "", buttons = [], cancel = "Cancel", d
       sheet.setAttribute("aria-label", title);
       sheet.append(Object.assign(document.createElement("p"), { className: "action-title", textContent: title }));
     }
-    const make = (label, cls, index) => {
+    // The choices scroll in their own list; the title and Cancel stay put, so Cancel is always a tap away.
+    const list = document.createElement("div");
+    list.className = "action-list";
+    sheet.append(list);
+    const make = (label, cls, index, parent = list) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = `action-button${cls ? ` ${cls}` : ""}`;
       b.textContent = label;
       b.addEventListener("click", (e) => { e.stopPropagation(); close(index); });
-      sheet.append(b);
+      parent.append(b);
       return b;
     };
     buttons.forEach((label, i) => make(label, i === destructive ? "destructive" : "", i));
-    const cancelButton = cancel ? make(cancel, "cancel", -1) : null;
+    const cancelButton = cancel ? make(cancel, "cancel", -1, sheet) : null;
     dim.addEventListener("click", () => close(-1));
     scrim.append(dim, sheet);
     document.body.append(scrim);

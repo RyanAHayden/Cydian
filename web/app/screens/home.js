@@ -330,7 +330,10 @@ function renderRoot(body) {
   icon.width = icon.height = 76;
   icon.alt = "";
   const words = el("div", "home-words");
-  words.append(el("h2", "home-title", "Welcome to Cydian"));
+  const title = el("h2", "home-title", "Welcome to Cydian");
+  // The website says so beside it, greyed, so it's never taken for the app (user 2026-11-18).
+  if (!globalThis.cydianNative) title.append(el("span", "home-title-web", "(Web)"));
+  words.append(title);
   const by = el("p", "home-by", "by ");
   const who = el("a", null, "Ryan Hayden (Fizlo)"); // as Cydia's "Jay Freeman (saurik)"
   who.href = REPO_URL;

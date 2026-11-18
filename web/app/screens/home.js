@@ -21,10 +21,9 @@ import { settings } from "./settings.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
 import { currentDevice } from "../device.js";
-import { showActionSheet } from "../nav/actionsheet.js";
-import { sourceHandoffs } from "./handoff.js";
+import { siteCertificateAlert } from "./altstore.js";
 import { homeFeatured } from "./extras.js";
-import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_SOURCE_URL } from "../core/appoffer.js";
+import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 import { refreshInBackground } from "./sources.js";
 import { GUIDES, guideRows, JAILBREAK_INFO_URL } from "./guides.js";
@@ -65,18 +64,12 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
 
 // F79: Home's Install IPAs tile, beside Browse: the Installed tab's Install IPAs page (screens/myipas.js). Not in the
 // jailbreak app, which has no such page (apt installs there).
-// F89: Install Cydian App on the website, Not Jailbroken: the website signs nothing, so the sheet adds Cydian's own
-// source to AltStore, SideStore or Feather (screens/handoff.js sourceHandoffs), or downloads the IPA.
-// -> [{ label, url }]
-export function appInstallChoices(sourceUrl = APP_SOURCE_URL, ipaUrl = APP_IPA_URL) {
-  return [...sourceHandoffs(sourceUrl).map((l) => ({ label: l.label, url: l.url })), { label: "Download IPA", url: ipaUrl }];
-}
-export const APP_SHEET_TITLE = "Cydian installs with your sideloader: add its source there, or keep the IPA.";
-
-async function installAppSheet({ ask = showActionSheet, open = (u) => { location.href = u; } } = {}) {
-  const choices = appInstallChoices();
-  const i = await ask({ title: APP_SHEET_TITLE, buttons: choices.map((c) => c.label) });
-  if (i >= 0 && choices[i]) open(choices[i].url);
+// Install Cydian App on the website, Not Jailbroken. F92 (user 2026-11-18): no hand-offs to AltStore / SideStore /
+// Feather; Install signs Cydian in the browser (F93), and until that lands it says the certificate is needed and
+// offers Download IPA (altstore.js siteCertificateAlert, as an app page's Install does).
+export const APP_INSTALL_SUBTITLE = "With your certificate, or the IPA";
+export function installAppSheet({ alert, open = (u) => { location.href = u; }, ipaUrl = APP_IPA_URL } = {}) {
+  return siteCertificateAlert({ download: () => open(ipaUrl), ...(alert ? { alert } : {}) });
 }
 
 // F89: Home's Signing tile (Settings > Signing) only where something signs: the sideload app. Elsewhere Featured
@@ -377,12 +370,12 @@ function renderRoot(body) {
   });
 
   // Install Cydian App, full width under Featured, on the website only (I7, core/appoffer.js homeOffer): Not
-  // Jailbroken, F89's sheet (Cydian's source in AltStore / SideStore / Feather, or Download IPA); jailbroken, the
+  // Jailbroken, Install with your certificate or Download IPA (installAppSheet, F92); jailbroken, the
   // release's .deb for the device's arch.
   // One green split button (user 2026-11-17): Install Cydian App | Send Settings (Open in Cydian App: the sources
   // and settings into the app).
   const sendTile = tile({ label: "Send Settings to App", subtitle: "Your sources and settings", href: format({ tab: "home" }), glyph: "send" });
-  const appRow = tileRow("green stack", tile({ label: "Install Cydian App", subtitle: "AltStore, SideStore, Feather or the IPA",
+  const appRow = tileRow("green stack", tile({ label: "Install Cydian App", subtitle: APP_INSTALL_SUBTITLE,
     href: format({ tab: "home" }), glyph: "install" }), sendTile);
   const appLink = appRow.querySelector("a");
   const appSub = appLink.querySelector(".cell-subtitle");
@@ -406,7 +399,7 @@ function renderRoot(body) {
     offer = homeOffer({ mode: settings.mode, deviceType: type });
     appRow.hidden = !offer;
     openRow.hidden = !(settings.mode === "site" && type === "none");
-    if (appSub) appSub.textContent = offer?.action === "deb" ? "The .deb for your jailbreak" : "AltStore, SideStore, Feather or the IPA";
+    if (appSub) appSub.textContent = offer?.action === "deb" ? "The .deb for your jailbreak" : APP_INSTALL_SUBTITLE;
   };
   drawApp();
 

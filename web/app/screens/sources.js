@@ -47,38 +47,14 @@ function reset(button) {
   parent.insertBefore(button, next);
 }
 
-// Add: asks iOS for the clipboard. While iOS's Paste bubble is up the button turns blue and reads Type: tapping it
-// (or anywhere but another button) dismisses the bubble and opens the Enter APT URL alert to type one in.
-// Touch-down on the website: Safari reads the clipboard only straight from the tap (no timer between), and nothing
-// paints while the bubble is up, so Type goes on now, painted before the release opens the bubble.
-function showType(button) {
-  if (globalThis.cydianNative) return; // the app reads UIPasteboard: no bubble
-  button.textContent = "Type";
-  button.classList.add("done");
-  setTimeout(() => button.classList.remove("is-pressed")); // app.js presses it after this listener
-  button.addEventListener("pointercancel", () => { button.textContent = "Add"; button.classList.remove("done"); }, { once: true });
-}
-
+// Add opens the Enter APT URL alert inside the tap. The website reads no clipboard on its own: the alert's Paste
+// button asks Safari (nav/alert.js), so there is no Paste bubble on Add and no blue Type state. The app reads
+// UIPasteboard on Add (addFromPasteboard, below).
 // `native` and `open` are for tests (screens/addsource.test.js): the bridge, and manage.addSource.
 export async function addFromClipboard(ctx, button, { native = globalThis.cydianNative, open = manage.addSource } = {}) {
   if (native) return addFromPasteboard(ctx, button, native, open);
   reset(button);
-  button.textContent = "Type";
-  button.classList.add("done"); // the blue Done look (sources.css)
-  let elsewhere = false; // a touch on another button while the bubble was up: that button's tap wins
-  const watch = (e) => { const b = e.target.closest?.(".bar-button, .tab"); if (b && b !== button) elsewhere = true; };
-  document.addEventListener("pointerdown", watch, true);
-  // readText blocks WebKit's main thread while the Paste bubble is up, so nothing set here paints: Safari reads only
-  // straight from the tap (no timer between), so showType put Type on at touch-down instead.
-  let text = "";
-  try { text = await navigator.clipboard.readText(); } catch { /* dismissed: type it in */ }
-  document.removeEventListener("pointerdown", watch, true);
-  button.textContent = "Add";
-  button.classList.remove("done");
-  reset(button);
-  if (elsewhere || !button.isConnected || !/^#\/sources\/?$/.test(location.hash)) return;
-  const url = cleanSourceUrl(text);
-  manage.addSource(ctx, url ? { url } : null);
+  return open(ctx, null);
 }
 
 // The app (F105): UIPasteboard, no Paste bubble, so no Type. Enter APT URL opens inside the tap, the field "https://"
@@ -112,11 +88,8 @@ export function nav(route, ctx) {
     title: "Sources", style: "plain",
     left: { label: "Refresh", onClick: () => refresh(ctx) },
     right: [
-      // Add: the clipboard (the app: UIPasteboard; the website: iOS's Paste bubble, the button blue and reading Type
-      // while it waits). Then the Enter APT URL alert, filled with a copied source URL.
-      // F146: the app has no Type switch at all (no onPress): Add opens Enter APT URL and iFizBox reads the clipboard.
-      { label: "Add", ...(globalThis.cydianNative ? {} : { onPress: (e) => showType(e.currentTarget) }),
-        onClick: (e) => addFromClipboard(ctx, e.currentTarget) },
+      // Add: the Enter APT URL alert at once; the app fills it from UIPasteboard, the website through its Paste button.
+      { label: "Add", onClick: (e) => addFromClipboard(ctx, e.currentTarget) },
       { label: "Manage", onClick: () => ctx.go({ tab: "sources", path: [manage.SEGMENT] }) },
     ],
   };

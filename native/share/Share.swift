@@ -182,8 +182,6 @@ enum ShareRoute: Equatable {
 enum ShareRouter {
     static let needsJailbreak = (title: "Needs a Jailbreak",
                                  message: "A .deb is a jailbreak package: installing it needs a jailbroken iPhone and \(Brand.name)'s jailbreak build. This is the sideloaded \(Brand.name), which can install IPAs but not .debs.")
-    static let noInstaller = (title: "Can't Install IPAs",
-                              message: "Installing an IPA on this jailbreak needs AppSync Unified (or ldid, to sign it ad hoc). Install AppSync Unified from its repo, then share the IPA with \(Brand.name) again.")
 
     // F144: the sideload build keeps no APT sources. A link only an APT manager opens is refused here, with the words
     // the page's Add uses (web/app/core/altstore.js JAILBREAK_SOURCE_TITLE/MESSAGE); a bare https link may still be an
@@ -203,7 +201,8 @@ enum ShareRouter {
         case .ipa:
             switch host.mode {
             case .jailbreak:
-                if host.appInstaller == .none { return .refuse(title: noInstaller.title, message: noInstaller.message) }
+                // F189: with neither AppSync Unified nor ldid too: the app installs AppSync Unified first
+                // (web/app/screens/ipa-install.js ensureAppSync).
                 return .helperIPA(item)
             case .sideload:
                 guard host.signer != nil else {

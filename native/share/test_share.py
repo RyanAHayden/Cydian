@@ -96,7 +96,7 @@ class SwiftShare(unittest.TestCase):
         self.assertIsNone(self.build_error, self.build_error)
         self.assertEqual(self.out.returncode, 0, self.out.stdout + self.out.stderr)
         for name in ("classify links: repo, AltStore source, ipa, deb, unknown", "classify files by their bytes, then their name",
-                     "route: sources open Add Source in both modes", "route: ipa in jailbreak mode needs AppSync Unified or ldid",
+                     "route: sources open Add Source in both modes", "route: ipa in jailbreak mode goes to the helper, AppSync Unified or not (F189: the app installs it first)",
                      "route: ipa in sideload mode is signed with the user's certificate (fake signer)",
                      "route: deb is the Confirm sheet in jailbreak mode, needs a jailbreak in sideload mode",
                      "jailbreak ipa: install-ipa through the helper, version for I3",

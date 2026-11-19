@@ -7,9 +7,10 @@
 // F88: a successful install is remembered (core/installed.js) for the Installed tab's Apps page and Changes: the
 // AltStore row's with its source (installRows' onInstall), a URL's or link's by bundle id (rememberIpa).
 // All open the same progress page as the install queue's (F151: nav/progress.js): the shell's and helper's lines as
-// they come, installd's pmstatus progress on the bar, then Reload Data (uicache) or Close iFizBox. A jailbreak that
-// can't install ad hoc apps (no_adhoc) ends with the console's red line and an alert saying what to install
-// (AppSync Unified or ldid) or to sign the IPA. Each run is kept in Settings > Console Logs.
+// they come, installd's pmstatus progress on the bar, then Reload Data (uicache) or Close iFizBox. F189: AppSync
+// Unified first when it's missing (ensureAppSync: akemi's source, then the Confirm sheet with it under Install); a
+// failure there, or installd still refusing the app (no_adhoc), ends in one short alert (appSyncFallback: Try Again,
+// Open Source, OK). Each run is kept in Settings > Console Logs.
 // The sideload build has none of this: it keeps signing.install (signing-client.js).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped } from "../nav/ui.js";
@@ -24,14 +25,124 @@ import { ipaUrl, ipaName, looksLikeIpa, IPA_FOOTER } from "../core/ipainstall.js
 import { apps, recordInstall } from "../core/installed.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
+import { showHUD } from "../nav/hud.js";
+import { APPSYNC_ID, APPSYNC_NAME, APPSYNC_SOURCE, APPSYNC_PAGE, appSyncInstalled, sameSource, appSyncFailure,
+  afterAppSyncNote, TRY_AGAIN, OPEN_SOURCE } from "../core/appsync.js";
 
 let running = false;
+let preparing = false; // F189: ensureAppSync is getting AppSync Unified for an IPA
+
+// F189: before an IPA install, AppSync Unified (core/appsync.js). Where the backend has apt's queue (the jailbreak
+// build) and dpkg's status says it's missing ("Getting AppSync Unified" HUD): akemi's source added when missing,
+// refreshed on its own, each under a time limit (APPSYNC_LIMITS), then AppSync Unified queued, which opens Confirm with it under Install and a note that the
+// IPA follows; the promise waits for that queue run (screens/queue.js whenQueueRuns). Every outside call comes in
+// `deps`, so the steps can be tested without a page. Resolves:
+//   { ok: true, present: true }       AppSync was there already
+//   { ok: true }                      the backend can't tell (no queue, no dpkg status): the IPA goes as before
+//   { ok: true, installed: true }     the queue run installed it
+//   { cancelled: true }               Confirm's Cancel (or the run's): nothing more is done
+//   { ok: false, step }               add | refresh | missing | install: core/appsync.js appSyncFailure(step)
+// The time limits: a host behind Cloudflare that is down answers 522 only after about 19 s per request, and Add
+// Source's check makes several (seen on the iPhone 7: over 3 minutes of spinner), so the add gets 25 s and the
+// refresh (apt-get update of every source) 2 minutes; past that, the fallback alert.
+export const APPSYNC_LIMITS = { add: 25_000, refresh: 120_000 };
+
+function deadline(promise, ms) {
+  let timer;
+  const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("timeout")), ms); });
+  promise.catch?.(() => {}); // left running past the limit: its failure is no one's
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
+
+export async function ensureAppSync({ name = "", backend = getBackend(), catalog = null, hud = showHUD, wait = null,
+  limits = APPSYNC_LIMITS } = {}) {
+  if (typeof backend?.queue !== "function" || typeof backend?.dpkgStatus !== "function") return { ok: true };
+  let status = null;
+  try { status = await backend.dpkgStatus(); } catch { status = null; }
+  if (typeof status !== "string") return { ok: true };
+  if (appSyncInstalled(status)) return { ok: true, present: true };
+
+  // One HUD for the whole step (the user tapped Install on an IPA, not Add Source), hidden before any alert.
+  const hide = hud(`Getting ${APPSYNC_NAME}`);
+  let key = null;
+  try {
+    key = (await backend.sources()).find((s) => sameSource(s.uri))?.key ?? null;
+    if (!key) {
+      key = (await deadline(backend.addSource(APPSYNC_SOURCE), limits.add))?.key ?? null;
+      key ??= (await backend.sources()).find((s) => sameSource(s.uri))?.key ?? null;
+    }
+  } catch { key = null; }
+  if (!key) { hide(); return { ok: false, step: "add" }; }
+
+  let pkg = null;
+  try {
+    const only = (s) => s.key === key;
+    const rows = await deadline(backend.refreshSources(() => {}, { filter: only }), limits.refresh);
+    if ((rows ?? []).find(only)?.aptError || (rows?.failed ?? []).some((f) => f.key === key)) throw new Error("refresh");
+    const cat = catalog ?? (await import("../catalog.js")).catalog; // late: catalog.js pulls in the parse worker
+    await cat.ensure();
+    pkg = await cat.package(APPSYNC_ID, key);
+  } catch {
+    hide();
+    return { ok: false, step: "refresh" };
+  }
+  hide();
+  if (!pkg || pkg.installedOnly || (pkg.key && pkg.key !== key)) return { ok: false, step: "missing" };
+
+  const until = wait ?? (await import("./queue.js")).whenQueueRuns;
+  const outcome = until(APPSYNC_ID, { note: afterAppSyncNote(name) }); // before the add: Confirm draws the note
+  backend.queue({ op: "install", id: APPSYNC_ID, version: pkg.stanza?.version ?? null,
+    name: pkg.row?.name || pkg.stanza?.name || APPSYNC_NAME });
+  const how = await outcome;
+  if (how === "installed") return { ok: true, installed: true };
+  if (how === "cancelled") return { cancelled: true };
+  return { ok: false, step: "install" };
+}
+
+// F189: the short fallback when AppSync Unified couldn't be had (or installd still refused the app): one plain
+// sentence, Try Again, Open Source (AppSync's page on akemi's repo, to install it by hand) and OK. -> true for Try Again.
+export async function appSyncFallback(step, { alert = showAlert, open = (url) => window.open(url, "_blank", "noopener") } = {}) {
+  const f = appSyncFailure(step);
+  const { index } = await alert({ title: f.title, message: f.message, buttons: f.buttons, cancel: f.buttons.length - 1 });
+  if (index === OPEN_SOURCE) open(APPSYNC_PAGE);
+  return index === TRY_AGAIN;
+}
+
+// F189: openIpaInstall's way in: AppSync Unified first (ensureAppSync), its fallback alert when that fails (Try Again
+// goes round again), then the IPA's console; installd still refusing the app (no_adhoc) gets the same short alert.
+// `deps` stand in for ensureAppSync, the alert and the console in tests.
+export async function installWithAppSync({ url, name = "", onInstalled = () => {}, native = undefined },
+  { ensure = ensureAppSync, fallback = appSyncFallback, run = runIpaConsole } = {}) {
+  if (running || preparing) return false;
+  const title = name || ipaName(url);
+  for (;;) {
+    preparing = true;
+    let got;
+    try { got = await ensure({ name: title }); } catch { got = { ok: false, step: "install" }; } finally { preparing = false; }
+    if (got.cancelled) return false;
+    if (!got.ok) {
+      if (await fallback(got.step)) continue;
+      return false;
+    }
+    const r = await run({ url, name: title, onInstalled, native });
+    if (r?.error?.code !== "no_adhoc") return r;
+    if (!(await fallback(got.installed || got.present ? "refused" : "absent"))) return r;
+    await r.close?.(); // Try Again: this run's console makes way for the next
+  }
+}
 
 // The console page for one IPA (F151: nav/progress.js, as the queue's). Resolves the run's result once it has ended
 // (the page stays up until Close or the finish button). False when another IPA install's console is already up.
 // N9: `native` stands in for the bridge (a shared file's share.ipaInstall, share.js). An app went in, so the button
 // is Reload Data (uicache, as Cydia runs after a run) when the backend can, else Close iFizBox.
-export async function openIpaInstall({ url, name = "", onInstalled = () => {}, native = undefined }) {
+// F189: AppSync Unified comes first when it's missing (installWithAppSync above).
+export function openIpaInstall(opts) {
+  return installWithAppSync(opts);
+}
+
+// The console part of openIpaInstall. installd's no_adhoc refusal gets no alert here: installWithAppSync's short
+// fallback says it.
+export async function runIpaConsole({ url, name = "", onInstalled = () => {}, native = undefined }) {
   if (running) return false;
   running = true;
   const title = name || ipaName(url);
@@ -63,8 +174,8 @@ export async function openIpaInstall({ url, name = "", onInstalled = () => {}, n
     }
     return false;
   } : null });
-  if (r.error) await showAlert({ title: r.error.title, message: r.error.message, buttons: ["OK"] });
-  return r;
+  if (r.error && r.error.code !== "no_adhoc") await showAlert({ title: r.error.title, message: r.error.message, buttons: ["OK"] });
+  return { ...r, close: () => page.close() };
 }
 
 // F196: asks the shell to stop ipa.install (its download, or the helper before it starts: Apt.swift ipa.cancel).

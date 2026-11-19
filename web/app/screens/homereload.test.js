@@ -124,3 +124,26 @@ test("the website refreshes its files and reloads once when build.json names a n
   assert.deepEqual(refreshed, ["bbb"]);
   assert.equal(await refreshIfNewBuild({ store, info: async () => null }), false, "no build.json (a local checkout): nothing");
 });
+
+test("B56: a new build found while an alert is open doesn't reload until it closes, and a page left with it up still reloads next time", async () => {
+  const mem = new Map([["ifizbox.webBuild", "aaa"]]);
+  const store = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  let open = true;
+  let closeAlert;
+  const closed = new Promise((r) => { closeAlert = r; });
+  const reloads = [];
+  const opts = { store, info: async () => ({ commit: "bbb", files: ["app.js"] }),
+    busy: () => open, hold: () => closed, refresh: async ({ info }) => { reloads.push((await info()).commit); return true; } };
+  const first = refreshIfNewBuild(opts);
+  const again = refreshIfNewBuild(opts); // the next return to the foreground joins the held one
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(reloads, [], "no reload while the alert is up");
+  assert.equal(mem.get("ifizbox.webBuild"), "aaa", "the new commit isn't noted yet: a page closed with the popup up reloads on its next open");
+  open = false;
+  closeAlert();
+  assert.equal(await first, true);
+  assert.equal(await again, true);
+  assert.deepEqual(reloads, ["bbb"], "one reload once the alert closed");
+  assert.equal(mem.get("ifizbox.webBuild"), "bbb");
+  assert.equal(await refreshIfNewBuild(opts), false, "the reloaded page doesn't loop");
+});

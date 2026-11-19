@@ -17,6 +17,7 @@ import { grouped, el, placeholder } from "../nav/ui.js";
 import { format, settingsRoute, parse } from "../router.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
+import { popupOpen, whenNoPopup } from "../nav/popups.js";
 import { sourceKey, sourcesFor } from "../core/sources.js";
 import { settings } from "./settings.js";
 import * as browse from "./browse.js";
@@ -321,13 +322,30 @@ export async function refreshWebFiles({ fetcher = globalThis.fetch, info = build
 // The website, on every open, reload and return to the foreground: build.json (never cached) names a commit other
 // than the one this browser last loaded -> refreshWebFiles (every file again, then one page load), so a phone never
 // sits on an old build (user 2026-11-18). A first visit only notes the commit. True when it reloaded the page.
-export async function refreshIfNewBuild({ info = buildInfo, store = globalThis.localStorage, refresh = refreshWebFiles } = {}) {
+// B56: never while a popup is up (?install's popup vanished under a reload, and ?install was already gone from the
+// URL): `hold` waits until the last alert/sheet closes, and the new commit is noted only when the reload runs, so a
+// page left with the popup up still reloads on its next open. A check made while one is already held joins it.
+let buildCheck = null;
+export function refreshIfNewBuild(opts = {}) {
+  if (!buildCheck) buildCheck = checkBuildOnce(opts).finally(() => { buildCheck = null; });
+  return buildCheck;
+}
+async function checkBuildOnce({ info = buildInfo, store = globalThis.localStorage, refresh = refreshWebFiles,
+  busy = () => popupOpen(), hold = () => whenNoPopup() } = {}) {
   const b = await info();
   if (!b?.commit) return false;
   let last;
-  try { last = store.getItem("ifizbox.webBuild"); store.setItem("ifizbox.webBuild", b.commit); } catch { return false; }
-  if (!last || last === b.commit) return false;
-  return refresh({ info: async () => b });
+  try { last = store.getItem("ifizbox.webBuild"); } catch { return false; }
+  if (!last) { try { store.setItem("ifizbox.webBuild", b.commit); } catch { /* private mode */ } return false; }
+  if (last === b.commit) return false;
+  // A popup that opens while the files download holds the page load itself too.
+  const reloadPage = () => (busy() ? Promise.resolve(hold()) : Promise.resolve()).then(() => location.reload());
+  const go = () => {
+    try { store.setItem("ifizbox.webBuild", b.commit); } catch { return false; }
+    return refresh({ info: async () => b, reloadPage });
+  };
+  if (busy()) await hold();
+  return go();
 }
 
 export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ctx), settled = untilRefreshed, reload = loadNew, redraw = () => state.redraw?.(),

@@ -69,6 +69,46 @@ class InstallServerSource(unittest.TestCase):
         install = body(self.myipas, "static func install(")
         self.assertIn("serveAndOpen(out, server: servers.manifest, app: s.app, record: record, log: log,", install)
 
+    def test_freeze_seen_and_listener_remade(self):
+        """B89: iOS 27 froze iFizBox mid-serve and the listener's socket stayed suspended. A heartbeat sees the gap,
+        the listener is re-created on the same port (the link names it), and the app's lifecycle goes to the log."""
+        tick = body(self.server, "private func tick(")
+        self.assertIn("InstallServer.freezeGap", tick)
+        self.assertIn('revive("after the freeze")', tick)
+        self.assertIn("where !fired.contains(path) { r.onFrozen?(f) }", tick)
+        # notes never go through route.log: Sideload's serverLog takes any log line as iOS asking (InstallPrompt.heard)
+        self.assertNotIn("route.log", tick)
+        self.assertIn("r.note?(line)", body(self.server, "private func noteAll("))
+        revive = body(self.server, "private func revive(")
+        self.assertIn("old?.cancel()", revive)
+        self.assertIn("NWEndpoint.Port(rawValue: port)", revive)
+        self.assertIn('NWEndpoint.Host("127.0.0.1"), port: p)', revive)
+        self.assertIn("tries: tries - 1", revive)
+        beat = body(self.server, "private func startBeat(")
+        for n in ("didEnterBackgroundNotification", "willEnterForegroundNotification",
+                  "protectedDataWillBecomeUnavailableNotification"):
+            self.assertIn(n, beat)
+        self.assertIn("self.stopBeat()", body(self.server, "func stop("))
+        self.assertIn("asked[req.path] = Date()", body(self.server, "private func answer("))
+
+    def test_freeze_falls_back_to_the_server(self):
+        """B89: after a freeze, an IPA iOS hasn't asked for again goes to the Signing Server's /sign/host and iOS gets
+        that link; the server's status ends it, and the local 15-minute expiry doesn't while that copy is up."""
+        serve = body(self.sideload, "private static func serveChecked(", "\n    }\n\n")
+        self.assertIn("route.onFrozen = { f in", serve)
+        self.assertIn("guard !server.asked(ipaPath, since: f.to)", serve)
+        self.assertIn("hostAfterFreeze(output, remote: remote,", serve)
+        self.assertIn("if !fallback.hosting { end(false) }", serve)
+        self.assertIn("fallback.finish()", serve[serve.index("let end = {"):])
+        host = body(self.sideload, "static func hostAfterFreeze(", "\n    }\n\n")
+        self.assertIn("state.begin()", host)
+        self.assertIn("copyItem(at: output, to: copy)", host)  # the local route keeps its file
+        self.assertIn("InstallPrompt.open(hosted, bundleID: bid", host)
+        self.assertIn("InstallPrompt.end(bid, link: hosted)", host)
+        self.assertNotIn("CloseForUpdate", host)  # that closes iFizBox: only for its own update
+        self.assertIn('server + "/sign/host"', body(self.sideload, "static func uploadHosted(", "\n    }\n\n"))
+        self.assertIn("InstallPrompt.heard(bid)", body(self.sideload, "private static func pollHosted(", "\n    }\n\n"))
+
 
 if __name__ == "__main__":
     unittest.main()

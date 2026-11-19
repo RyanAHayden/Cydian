@@ -407,7 +407,7 @@ enum Sideload {
                         return
                     }
                     log?(ManifestCheck.okLine(host: ManifestCheck.host(of: q.url!)))
-                    serveChecked(output, server: server, ipaPath: ipaPath, link: link, app: app, record: record, log: log,
+                    serveChecked(output, server: server, remote: remote, ipaPath: ipaPath, link: link, app: app, record: record, log: log,
                                  job: job, opened: opened, served: served)
                 }
             }
@@ -438,11 +438,12 @@ enum Sideload {
     }
 
     // The rest of serveAndOpen once the manifest checked out (B30): serve the IPA, record it, hand iOS the link.
-    private static func serveChecked(_ output: URL, server: InstallServer, ipaPath: String, link: String, app: SignedApp,
+    private static func serveChecked(_ output: URL, server: InstallServer, remote: String, ipaPath: String, link: String, app: SignedApp,
                                      record: SignedRecord, log: ((String) -> Void)?, job: SignJob?,
                                      opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
                                      served: ((Bool) -> Void)?) {
         let once = Once()
+        let fallback = HostFallback() // B89
         KeepAlive.shared.begin()
         // B29: the bundle ID iOS is told to install (the manifest's, the signed Info.plist's) and what the
         // server sends, in the install log; the server's lines reach the page through signing.progress.
@@ -456,6 +457,7 @@ enum Sideload {
         let serverLog = { (s: String) in InstallPrompt.heard(bid); InstallLog.say(bid, s) }
         let end = { (ok: Bool) in
             guard once.first() else { return }
+            fallback.finish() // B89
             InstallPrompt.end(bid, link: iosLink)
             job?.end()
             if !ok { serverLog("iOS didn't fetch the whole IPA within 15 minutes; it is no longer served"); server.remove(ipaPath) }
@@ -468,8 +470,23 @@ enum Sideload {
             }
             served?(ok)
         }
-        server.serve(ipaPath, .init(type: "application/octet-stream", body: .file(output), log: serverLog,
-                                    onServed: { serverLog("iOS has the whole IPA"); Handoff.served(bid); end(true) }))
+        var route = InstallServer.Route(type: "application/octet-stream", body: .file(output), log: serverLog,
+                                        onServed: { serverLog("iOS has the whole IPA"); Handoff.served(bid); end(true) })
+        // B89: iOS froze iFizBox while it served: the IPA goes to the Signing Server too, and iOS gets that link
+        let note = { (s: String) in InstallLog.say(bid, s) }
+        route.note = note
+        route.onFrozen = { f in
+            SignBridge.queue.asyncAfter(deadline: .now() + frozenGrace) {
+                guard !server.asked(ipaPath, since: f.to) else {
+                    return note("iOS asked for the IPA again after the freeze; it stays served here")
+                }
+                hostAfterFreeze(output, remote: remote, app: app, state: fallback, job: job, note: note) { ok in
+                    if ok { Handoff.served(bid) }
+                    end(ok)
+                }
+            }
+        }
+        server.serve(ipaPath, route)
         // F196: Cancel: no more serving, no minute's grace, the listener ends when nothing else is served.
         job?.onCancel {
             guard once.first() else { return }
@@ -482,7 +499,8 @@ enum Sideload {
             }
             served?(false)
         }
-        SignBridge.queue.asyncAfter(deadline: .now() + 15 * 60) { end(false) }
+        // B89: an IPA handed to the Signing Server after a freeze ends by that copy's status instead
+        SignBridge.queue.asyncAfter(deadline: .now() + 15 * 60) { if !fallback.hosting { end(false) } }
         SignBridge.queue.async {
             saveRecords(SignedRecords.adding(record, to: records()))
             reschedule()
@@ -529,6 +547,125 @@ enum Sideload {
 
     // B29: how long a fully fetched IPA stays served (and KeepAlive held) for iOS's late or repeated requests.
     static let servedGrace: TimeInterval = 120
+
+    // ---- B89: the Signing Server's copy when iOS froze iFizBox mid-serve (InstallServer's heartbeat)
+    //
+    // iOS 27 can suspend iFizBox while it serves an IPA, and its listening socket stays shut: iOS's installer, sent to
+    // 127.0.0.1, says "Unable to Install". Once iFizBox runs again (woken, or opened), and iOS hasn't asked for the IPA
+    // within `frozenGrace` of that, the signed IPA goes up to the call's Signing Server (POST /sign/host, as iFizBox's
+    // own update does) and iOS gets that link (InstallPrompt.open: a new prompt once iFizBox is in front). iOS then
+    // installs from the server whether iFizBox is frozen again or not; its GET status says when iOS has the whole IPA.
+    // The local route stays served meanwhile. Once per IPA.
+
+    static let frozenGrace: TimeInterval = 5
+    static let hostedLimit: TimeInterval = 10 * 60 // the Worker keeps a hosted IPA this long
+
+    // One IPA's fallback: begun once, never after the IPA ended (served, expired, cancelled). Any queue.
+    final class HostFallback {
+        private let lock = NSLock()
+        private var begun = false, ended = false, up = false
+        var hosting: Bool { lock.lock(); defer { lock.unlock() }; return up }
+        var over: Bool { lock.lock(); defer { lock.unlock() }; return ended }
+        func begin() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            if begun || ended { return false }
+            begun = true; up = true
+            return true
+        }
+        func dropped() { lock.lock(); up = false; lock.unlock() } // the upload failed: the local timer ends it again
+        func finish() { lock.lock(); ended = true; lock.unlock() }
+    }
+
+    // Uploads a copy of `output` (the local route keeps the original) and hands iOS the server's link; `done(true)` once
+    // the server says iOS has the whole IPA, `done(false)` when its copy expired unfetched. Not called back on a Cancel
+    // (the job's own onCancel ends the IPA) or when the upload failed (the local route's 15 minutes go on).
+    static func hostAfterFreeze(_ output: URL, remote: String, app: SignedApp, state: HostFallback, job: SignJob?,
+                                note: @escaping (String) -> Void, done: @escaping (Bool) -> Void) {
+        guard job?.cancelled != true, state.begin() else { return }
+        let bid = app.bundleID
+        note("iOS hasn't asked for \(app.name) since the freeze; uploading it to \(remote)/sign/host so iOS can install "
+             + "it from there")
+        let copy = SignBridge.work.appendingPathComponent("\(SignBridge.token())-host.ipa")
+        do { try FileManager.default.copyItem(at: output, to: copy) } catch {
+            state.dropped()
+            return note("Couldn't copy the IPA for the upload (\(error.localizedDescription)); it stays served here only")
+        }
+        uploadHosted(copy, server: remote, app: app) { res in
+            try? FileManager.default.removeItem(at: copy)
+            switch res {
+            case .failure(let e):
+                state.dropped()
+                note("The upload failed (\(e.localizedDescription)); the IPA stays served here only")
+            case .success(let (hosted, status)):
+                if state.over || job?.cancelled == true { return } // iOS got it here meanwhile, or Cancel
+                note("The Signing Server holds \(app.name); handing iOS its link (a new Install prompt)")
+                DispatchQueue.main.async { InstallPrompt.open(hosted, bundleID: bid, name: app.name) { _ in } }
+                guard let status = status else {
+                    note("The server gave no status route: \(Brand.name) can't tell when iOS has the IPA")
+                    return SignBridge.queue.asyncAfter(deadline: .now() + hostedLimit) { done(false) }
+                }
+                pollHosted(status, bundleID: bid, since: Date(), started: false, job: job, state: state) { finished, started in
+                    if started && !finished { return note("iOS is fetching \(app.name) from the Signing Server") }
+                    InstallPrompt.end(bid, link: hosted)
+                    if job?.cancelled == true || state.over { return }
+                    note(finished ? "iOS has the whole IPA (from the Signing Server)"
+                         : "iOS didn't fetch the Signing Server's copy within \(Int(hostedLimit / 60)) minutes")
+                    done(finished)
+                }
+            }
+        }
+    }
+
+    // POST /sign/host (worker/src/index.js): the itms-services link and its status route. On SignBridge.queue.
+    static func uploadHosted(_ file: URL, server: String, app: SignedApp, done: @escaping (Result<(URL, URL?), Error>) -> Void) {
+        var q = URLComponents(string: server + "/sign/host")!
+        q.queryItems = [URLQueryItem(name: "bundleid", value: app.bundleID), URLQueryItem(name: "version", value: app.version),
+                        URLQueryItem(name: "title", value: app.name)]
+        var req = URLRequest(url: q.url!)
+        req.httpMethod = "POST"
+        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 300
+        URLSession.shared.uploadTask(with: req, fromFile: file) { data, resp, error in
+            let json = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any]
+            let result: Result<(URL, URL?), Error>
+            if error == nil, (resp as? HTTPURLResponse)?.statusCode == 200, let itms = json?["itms"] as? String,
+               let link = URL(string: itms) {
+                let status = (json?["manifest"] as? String).flatMap { m in
+                    m.hasSuffix("/manifest.plist") ? URL(string: String(m.dropLast("manifest.plist".count)) + "status") : nil
+                }
+                result = .success((link, status))
+            } else {
+                let why = (json?["error"] as? String) ?? error?.localizedDescription ?? "the server didn't answer"
+                result = .failure(Failed(text: "server: \(why)"))
+            }
+            SignBridge.queue.async { done(result) }
+        }.resume()
+    }
+
+    // Polls the hosted link's GET status every 2 s: `step(false, true)` once when iOS begins fetching, then
+    // `step(true, _)` when it has the whole IPA or `step(false, false)` after `hostedLimit`. Stops on Cancel or once the
+    // IPA ended. On SignBridge.queue.
+    private static func pollHosted(_ url: URL, bundleID bid: String, since: Date, started: Bool, job: SignJob?, state: HostFallback,
+                                   step: @escaping (Bool, Bool) -> Void) {
+        if job?.cancelled == true || state.over { return step(false, false) }
+        let req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        URLSession.shared.dataTask(with: req) { data, resp, _ in
+            let marks = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any]
+            let ok = (resp as? HTTPURLResponse)?.statusCode == 200
+            SignBridge.queue.async {
+                if ok, marks?["finished"] as? Bool == true { return step(true, true) }
+                let now = ok && marks?["started"] as? Bool == true
+                if now && !started {
+                    InstallPrompt.heard(bid) // the prompt was answered with Install
+                    step(false, true)
+                }
+                if Date().timeIntervalSince(since) > hostedLimit { return step(false, false) }
+                SignBridge.queue.asyncAfter(deadline: .now() + 2) {
+                    pollHosted(url, bundleID: bid, since: since, started: started || now, job: job, state: state, step: step)
+                }
+            }
+        }.resume()
+    }
 
     // F155: the progress page's "Open <app>" once iOS says it installed it. False when iOS refuses (or lacks the call).
     static func openApp(_ c: Bridge.Call) {
@@ -795,6 +932,22 @@ final class KeepAlive {
                 p.play()
                 self.player = p
             }
+            self.resumeAfterInterruptions()
+        }
+    }
+
+    // B89: an audio interruption (a call, Siri, another app's audio session) stops the silent loop, and iOS may then
+    // suspend iFizBox mid-serve; once the interruption ends, the loop plays again while any install still holds it.
+    private var interruptions: NSObjectProtocol?
+    private func resumeAfterInterruptions() {
+        guard interruptions == nil else { return }
+        interruptions = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil,
+                                                               queue: .main) { [weak self] n in
+            let raw = n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            guard let self = self, raw.flatMap(AVAudioSession.InterruptionType.init) == .ended, let p = self.player else { return }
+            try? AVAudioSession.sharedInstance().setActive(true)
+            p.play()
+            NSLog("\(Brand.name) KeepAlive: audio interruption ended; silent loop playing again")
         }
     }
 

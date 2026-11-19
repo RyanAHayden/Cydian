@@ -22,15 +22,15 @@ test("ipaFinish: without a fresh AppSync, a normal IPA ends on Close, no action 
   const b = fakeBackend();
   for (const bundleId of [undefined, null, "com.example.opentennis"]) {
     const f = ipaFinish({ ok: true, name: "A.ipa", bundleId, backend: b, pending: false, alert: noAlert });
-    assert.deepEqual({ label: f.label, level: f.level, note: f.note, action: f.action }, { label: "Close", level: "return", note: null, action: null });
+    assert.deepEqual({ label: f.label, level: f.level, note: f.note, action: f.action }, { label: "Return to iFizBox", level: "return", note: null, action: null });
   }
   assert.deepEqual(b.log, []);
   const failed = ipaFinish({ ok: false, backend: fakeBackend(), pending: true, alert: noAlert });
-  assert.equal(failed.label, "Close");
+  assert.equal(failed.label, "Return to iFizBox");
   assert.equal(failed.action, null);
   assert.equal(failed.note, null);
   const bare = ipaFinish({ ok: true, backend: {}, pending: false, alert: noAlert });
-  assert.equal(bare.label, "Close");
+  assert.equal(bare.label, "Return to iFizBox");
   assert.equal(bare.action, null);
 });
 
@@ -39,7 +39,7 @@ test("ipaFinish: iFizBox's own IPA ends on Close iFizBox (reopen); failed, on Cl
   assert.equal(f.label, "Close iFizBox");
   assert.equal(f.level, "reopen");
   assert.equal(f.action, null);
-  assert.equal(ipaFinish({ ok: false, bundleId: BUNDLE_ID, backend: fakeBackend(), pending: false, alert: noAlert }).label, "Close");
+  assert.equal(ipaFinish({ ok: false, bundleId: BUNDLE_ID, backend: fakeBackend(), pending: false, alert: noAlert }).label, "Return to iFizBox");
 });
 
 test("ipaFinish: right after AppSync went in, Restart SpringBoard (uicache first) with a line saying why", async () => {
@@ -53,7 +53,7 @@ test("ipaFinish: right after AppSync went in, Restart SpringBoard (uicache first
   assert.equal(await f.action(), false);
   assert.deepEqual(b.log, ["uicache", "respring"]);
   assert.equal(appSyncRespringPending(), false); // done: the next IPA is back to Close
-  assert.equal(ipaFinish({ ok: true, backend: fakeBackend(), alert: noAlert }).label, "Close");
+  assert.equal(ipaFinish({ ok: true, backend: fakeBackend(), alert: noAlert }).label, "Return to iFizBox");
 });
 
 test("ipaFinish: a failed respring keeps the page up, says so, and stays pending", async () => {
@@ -68,7 +68,7 @@ test("ipaFinish: a failed respring keeps the page up, says so, and stays pending
 
 test("ipaFinish: a backend that can't respring says the app opens after a respring", () => {
   const f = ipaFinish({ ok: true, name: "A", backend: fakeBackend({ respring: false }), pending: true, alert: noAlert });
-  assert.equal(f.label, "Close");
+  assert.equal(f.label, "Return to iFizBox");
   assert.match(f.note, /^A opens after a respring/);
 });
 

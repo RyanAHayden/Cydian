@@ -26,7 +26,7 @@ import { catalog } from "../catalog.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { dayTitle, filterGroups, filterRows, defaultScope } from "../core/changes.js";
-import { apps, installedIds, onAppsChange, recordInstall } from "../core/installed.js";
+import { apps, installedIds, onAppsChange } from "../core/installed.js";
 import { settings } from "./settings.js";
 import { sourceFilter } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
@@ -36,6 +36,7 @@ import { appJob, resignJob, runOrder } from "../core/appqueue.js";
 import { needsResign, resignWindow } from "../core/signing.js";
 import { vendorSoldIds } from "./extras.js";
 import { SELF_ID } from "../core/essential.js";
+import { appQueue } from "../app-queue.js"; // F255: the jailbreak app's Upgrade (N) queues app upgrades there
 
 export const title = "Changes";
 
@@ -149,9 +150,10 @@ export function upgradeAll(queue, available, skip = null) {
 //
 // Changes lists the remembered apps' upgrades (app-updates.js withAppUpgrades, `remembered`) beside dpkg's, but apt
 // can't fetch them (F87), so upgradeJobs leaves them out; counting only its jobs hid the button whenever every listed
-// upgrade was an app. The count is both, and the tap queues apt's rows in the install queue (Confirm opens) and installs
-// each app's new IPA the way the jailbreak build installs an IPA (ipa-install.js openIpaInstall: AppSync Unified first,
-// then its console), in turn, iFizBox last, after apt's run went through. Only `available` rows: never the ignored ones.
+// upgrade was an app. The count is both. Only `available` rows: never the ignored ones.
+// F255: the tap queues apt's rows in the install queue and each app's new IPA in the app queue (app-queue.js), as a
+// row's swipe queues an app there (B71a), so one Confirm lists them all and runs them (screens/queue.js
+// runJailbreakApps: the apps on the helper's black page first, then apt's packages).
 
 // The remembered apps' rows among the available upgrades (B19's `skip` too).
 export const appUpgradeRows = (available = [], skip = null) =>
@@ -161,38 +163,18 @@ export const appUpgradeRows = (available = [], skip = null) =>
 export const jailbreakUpgradeCount = (available = [], skip = null) =>
   upgradeJobs(available ?? [], skip).length + appUpgradeRows(available, skip).length;
 
-// The tap. `queue`: the install queue's add (queueFn); `wait(id, note)`: screens/queue.js whenQueueRuns; `install(job)`:
-// one IPA's install, resolving { ok, close() } (installIpaJob). -> { apt, apps, installed }.
-export async function upgradeAllJailbreak(available = [], skip = null, { queue = queueFn(), pkgOf = null, install = installIpaJob,
-  wait = (id, note) => import("./queue.js").then((m) => m.whenQueueRuns(id, { note })) } = {}) {
+// The tap. `queue`: the install queue's add (queueFn: its first add opens Confirm); `apps`: the app queue (its first
+// add opens Confirm when apt's didn't, later ones redraw it). The run records each app at its new version
+// (screens/queue.js recordJbApp). -> { apt, apps }: the jobs queued in each.
+export async function upgradeAllJailbreak(available = [], skip = null, { queue = queueFn(), pkgOf = null, apps: appq = appQueue } = {}) {
   const rows = appUpgradeRows(available, skip);
   const apt = upgradeAll(queue, available, skip);
-  // Before anything awaits, so the waiter is there when Confirm runs.
-  const outcome = apt.length && rows.length
-    ? wait(apt[apt.length - 1].id, `${rows.length === 1 ? "1 app upgrade follows" : `${rows.length} app upgrades follow`} once these are installed.`)
-    : Promise.resolve("installed");
   const appJobs = runOrder(await queueUpgrades(rows, { add: () => {}, ...(pkgOf ? { pkgOf } : {}) }));
-  if (!appJobs.length) return { apt, apps: [], installed: 0 };
-  if ((await outcome) !== "installed") return { apt, apps: appJobs, installed: 0 };
-  let installed = 0;
-  for (const [i, job] of appJobs.entries()) {
-    let r = null;
-    try { r = await install(job); } catch { r = null; }
-    if (!r?.ok) break; // its console or alert says why; the rest stay listed in Changes
-    installed++;
-    if (i < appJobs.length - 1) await r.close?.(); // the next one's console takes its place; the last stays up
+  const queued = [];
+  for (const job of appJobs) {
+    try { queued.push(appq.add(job)); } catch { /* no id: it stays listed in Changes */ }
   }
-  return { apt, apps: appJobs, installed };
-}
-
-// One app upgrade through the jailbreak build's IPA install, remembered at its new version once installed (as an
-// app page's Install row records it, F88).
-async function installIpaJob(job) {
-  const { openIpaInstall } = await import("./ipa-install.js");
-  return openIpaInstall({ url: job.url, name: job.name || "", onInstalled: () => {
-    apps().then((store) => recordInstall(store, { id: job.id, name: job.name, version: job.version, key: job.key, source: job.source,
-      sourceName: job.sourceName || "", icon: job.icon })).catch(() => {});
-  } });
+  return { apt, apps: queued };
 }
 
 // Sideload Upgrade (N) (F80): every available upgrade with an IPA as an app queue job (core/appqueue.js appJob, the

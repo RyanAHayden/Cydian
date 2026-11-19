@@ -1,0 +1,31 @@
+/* F254: Settings > Signing's Free Apple ID (screens/free-apple-id.js). The setup checklist: each step's mark is iOS 6's
+   grey spinner while it runs (the same image and spoke-at-a-time turn as the HUD's), the walkthrough's green tick
+   badge once done, a red cross when it failed; steps not reached yet are grey. Fields reuse Signing's .sign-field. */
+.free-route { margin-top: 8px; }
+.free-route[hidden] { display: none; }
+.free-checklist { list-style: none; padding: 0; }
+.free-step .cell-inner { gap: 10px; }
+.free-mark { flex: none; width: 22px; height: 22px; border-radius: 50%; box-sizing: border-box; }
+.free-step.is-waiting .free-mark { border: 2px solid var(--subtitle); }
+.free-step.is-waiting .cell-label { color: var(--subtitle); }
+.free-step.is-running .free-mark { border-radius: 0; background: var(--spinner-gray) center / 20px no-repeat; animation: hud-spin .96s linear infinite; }
+.free-step.is-done .free-mark {
+  border: 1px solid #2a7a1c;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M7 13.5l4 4 8-9' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat,
+    linear-gradient(#7fd36b, #2f9a1f);
+  background-origin: border-box;
+}
+.free-step.is-failed .free-mark {
+  border: 1px solid #8f241f;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M8.5 8.5l9 9M17.5 8.5l-9 9' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% no-repeat,
+    linear-gradient(#e2716a, #b5322c);
+  background-origin: border-box;
+}
+.free-step.is-failed .cell-subtitle { color: #b5322c; }
+.free-input { flex: 1; text-align: left; }
+.free-code .free-input { letter-spacing: 4px; font-size: 20px; }
+:is(.free-button, .free-primary, .free-danger) .cell-inner { justify-content: center; }
+:is(.free-button, .free-primary, .free-danger) .cell-text { flex: none; text-align: center; }
+.free-primary .cell-label { color: var(--detail); }
+.free-danger .cell-label { color: #b5322c; }
+@media (prefers-reduced-motion: reduce) { .free-step.is-running .free-mark { animation-duration: 3s; } }

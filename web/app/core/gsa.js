@@ -1,10 +1,11 @@
-// Free Apple ID sign-in in the browser (spike for the free route; no product UI uses it yet). Pure JS: BigInt SRP and
-// WebCrypto, no storage or network of its own.
+// Free Apple ID sign-in in the browser (the website's free route: screens/free-apple-id.js, core/freeroute.js). Pure
+// JS: BigInt SRP and WebCrypto, no storage or network of its own.
 //
 //   Apple's sign-in (GrandSlam, gsa.apple.com): SRP-6a (s2k / s2k_fo password keys), the session data (spd), two-factor
 //   (a push to trusted devices or an SMS code), and the o=apptokens call for com.apple.gs.xcode.auth (Xcode's token).
 //   Anisette v3 from a public anisette server (a machine of our own; the server never sees the Apple ID).
-//   Developer services (developerservices2.apple.com, Xcode's QH65B2 protocol): listTeams, and call() for the rest.
+//   Developer services (developerservices2.apple.com, Xcode's QH65B2 protocol): listTeams, the setup calls (devices,
+//   development certificates and CSRs, App IDs, the team profile) and call() for anything else.
 //
 // The HTTP goes through `transport({ url, method, headers, body }) -> { status, headers, body: Uint8Array }`. On the
 // website that's relayTransport(): the Worker's /apple/<host>/<path> relay (worker/src/apple-relay.js), because Apple
@@ -654,7 +655,30 @@ export class DevPortal {
 
   // -> [{ teamId, name, type, memberships: [...] }]; a free account has one team ("Individual", a Personal Team).
   async listTeams() { return (await this.call("listTeams", {}, { platform: "" })).teams || []; }
+
+  // F254: the free route's setup calls (as the R32 test site ran them on a real free account, iOS 27.0.1).
+  async listDevices(teamId) { return (await this.call("listDevices", { teamId })).devices || []; }
+  async addDevice(teamId, udid, name) { return (await this.call("addDevice", { teamId, deviceNumber: udid, name })).device; }
+  // -> [{ serialNumber, status, expirationDate, certContent (DER bytes), machineName, ... }]
+  async listCerts(teamId) { return (await this.call("listAllDevelopmentCerts", { teamId })).certificates || []; }
+  async submitCsr(teamId, csrPem, machineName) {
+    return (await this.call("submitDevelopmentCSR", { teamId, csrContent: csrPem, machineName,
+      machineId: crypto.randomUUID().toUpperCase() })).certRequest;
+  }
+  async revokeCert(teamId, serialNumber) { return this.call("revokeDevelopmentCert", { teamId, serialNumber }); }
+  async listAppIds(teamId) {
+    const p = await this.call("listAppIds", { teamId });
+    return { appIds: p.appIds || [], maxQuantity: p.maxQuantity ?? null, availableQuantity: p.availableQuantity ?? null };
+  }
+  async addAppId(teamId, identifier, name) { return (await this.call("addAppId", { teamId, identifier, name: appIdName(name) })).appId; }
+  // -> { encodedProfile (bytes), provisioningProfileId, ... }: the team's 7-day development profile for that App ID
+  async downloadProfile(teamId, appIdId) {
+    return (await this.call("downloadTeamProvisioningProfile", { teamId, appIdId })).provisioningProfile;
+  }
 }
+
+// Apple takes only letters and digits in an App ID's name.
+export const appIdName = (s) => String(s ?? "").replace(/[^A-Za-z0-9]/g, "") || "App";
 
 // ---- what to tell the user (iOS-style alert: { kind, title, message, code }) ----
 // -20101 / -22406 wrong Apple ID or password; -20970 no such account; -36607 Apple refusing the machine (anisette, R32);

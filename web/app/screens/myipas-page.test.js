@@ -3,7 +3,7 @@
 // (Sign, Unsign keeping the file, Delete) against a fake library, and which IPAs iOS has.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { libraryGroup, swipeDelete, deleteMany, selectButton, runManage, signMany, installedOf, buttonHud, paintPrice,
+import { libraryGroup, swipeDelete, deleteMany, selectButton, runManage, signMany, installedOf, paintPrice,
   sharedInstalls, sharedSections, confirmReplace } from "./myipas.js";
 import { priceTap, priceButton, listState, memoryIpaStore, siteEntries } from "../core/myipas.js";
 
@@ -128,13 +128,6 @@ test("F224: SIGN -> green INSTALL -> install: the button's tap goes to on.price,
 test("F224: the filling button: SIGNING then INSTALLING, --fill rising; running it is disabled", () => withDom(() => {
   const b = document.createElement("button");
   b.style.setProperty = (k, v) => { b.style[k] = v; };
-  let ended = 0;
-  const h = buttonHud("Delta.ipa", () => { ended++; });
-  h.set("Signing 50%");
-  h.set("Installing");
-  h.hide();
-  h.hide();
-  assert.equal(ended, 1, "ends once");
   paintPrice(b, priceButton({ file: "a.ipa" }, { busy: { label: "INSTALLING", fill: 0.775 } }), "A");
   assert.equal(b.textContent, "INSTALLING");
   assert.ok(b.classList.contains("busy") && b.disabled);

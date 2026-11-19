@@ -3,7 +3,7 @@
 // (browsing source apps is Sources' and Search's): back | Install IPAs | Manage; a search bar over the IPAs, an
 // 'Add an IPA' group (Choose from Files, Download from URL; the website's Choose File), then Not Installed and
 // Installed, A-Z, each row with iOS 6's App Store price button (grey SIGN, a first tap turns it green INSTALL, the
-// second signs and installs with the button filling; installed rows OPEN). A left swipe shows Delete in place of the
+// second is the IPA page's Install, Confirm and all; installed rows OPEN). A left swipe shows Delete in place of the
 // button (deletes at once); Manage is Installed's (F222): select circles, Select… presets, the grey summary line and a
 // Sign / Unsign / Delete toolbar, each confirmed by an action sheet, then the 1-of-n HUD.
 //
@@ -688,7 +688,7 @@ export async function deleteMany(es, { sheet = showActionSheet, isSite = site(),
   return swipeDelete(es, { isSite, ...rest });
 }
 
-// ---- F224: the price button: SIGN, then INSTALL (green), then it fills while it signs and installs; OPEN ------------
+// ---- F224: the price button: SIGN, then INSTALL (green), which is the IPA page's Install; OPEN ------------
 
 async function onPrice(r) {
   if (lib.state.armed) { lib.ctl?.step({ type: "tap", file: lib.state.armed }); return; } // a tap only puts a Delete away
@@ -697,45 +697,7 @@ async function onPrice(r) {
   lib.price = state;
   repaintPrices();
   if (act === "open") return openApp(r);
-  if (act === "install") return priceInstall(r);
-}
-
-// The second tap: the IPA signed and installed with the button as its progress (no progress page); the website's
-// kept file signs in this browser on its own progress page, a link opens its sheet, the jailbreak app's console.
-export async function priceInstall(r, { install = installFromLibrary, siteInstall = siteFileInstall, linkSheet = siteInstallSheet,
-  helper = jailbreakInstall, confirm = confirmReplace } = {}) {
-  if (!(await confirm(r))) return; // B80: Cancel on Replace App?
-  const name = r.options?.name || r.name || r.file.replace(/\.ipa$/i, "");
-  const onInstalled = recorder(r, name);
-  const after = () => { lib.busy.delete(r.file); repaintPrices(); refresh(); };
-  if (site() && !r.stored) return linkSheet(r);
-  if (jailbreak()) { await helper(r.file, name, { onInstalled }); return after(); }
-  setBusy(r.file, { label: "SIGNING", fill: 0 });
-  if (site()) { try { await siteInstall(r, { onInstalled }); } finally { after(); } return; }
-  try { await install({ file: r.file, name, signed: Boolean(r.signed), onInstalled }, { hud: () => buttonHud(r.file, after) }); } catch { after(); }
-  if (lib.busy.has(r.file) && !lib.busy.get(r.file)?.live) after();
-}
-
-function setBusy(file, b) {
-  lib.busy.set(file, b);
-  repaintPrices();
-}
-
-// The HUD interface installFromLibrary drives (set, hide, done, fail), drawn on the row's button: each label fills it
-// further (core/myipas.js priceProgress); the end puts it back (OPEN once iOS reports the app).
-export function buttonHud(file, end) {
-  let cur = { label: "SIGNING", fill: 0, live: true };
-  lib.busy.set(file, cur);
-  let over = false;
-  const finish = () => { if (over) return; over = true; end(); };
-  return {
-    cancelled: false,
-    set(t) { if (over) return; cur = { ...priceProgress(t, cur), live: true }; setBusy(file, cur); },
-    hide: finish,
-    done(t) { if (over) return; setBusy(file, { ...cur, fill: 1 }); setTimeout(finish, 600); },
-    fail: finish,
-    page: null,
-  };
+  if (act === "install") return install(r.file, r); // the IPA page's Install: Confirm in the sideload app (user 2026-11-19)
 }
 
 async function openApp(r, { native = globalThis.ifizboxNative, alert = showAlert } = {}) {
@@ -1187,9 +1149,9 @@ async function confirmDelete(entry) {
   refresh();
 }
 
-// Install (nav bar): F30's record in Installed once iOS has it.
-async function install(file) {
-  let entry = known.get(file);
+// Install (nav bar, and the list's green INSTALL): F30's record in Installed once iOS has it.
+async function install(file, row = null) {
+  let entry = known.get(file) ?? row;
   const record = (id, name, version, icon) => apps().then((store) => recordInstall(store, {
     id, name, version, key: libraryKey(file), source: null, sourceName: "My IPAs", icon: icon ? `data:image/png;base64,${icon}` : null })).catch(() => {});
   if (site()) {

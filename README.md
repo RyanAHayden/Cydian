@@ -238,6 +238,8 @@ Tailscale, a Cloudflare Tunnel or a reverse proxy with a real domain.
 ifizbox.com itself is deployed by Cloudflare Workers Builds on every push to `main`
 (`tools/buildinfo.sh && cd worker && npx wrangler deploy -c wrangler.ifizbox.toml`).
 
+<br clear="right">
+
 ## Project layout
 
 | Path | What's there |

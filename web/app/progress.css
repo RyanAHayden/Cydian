@@ -66,6 +66,7 @@
   min-height: 16px; max-width: 100%; color: #fff; font: bold 12px/16px "Helvetica Neue", Helvetica, sans-serif;
   text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.progress-status[hidden] { display: none; }
 /* Cydia's bar: 158px, a 1px white border, 6px radius, a 4px #eee fill */
 .progress-track { width: 158px; height: 12px; padding: 3px; border: 1px solid #fff; border-radius: 6px; box-sizing: border-box; }
 .progress-track[hidden] { display: none; }

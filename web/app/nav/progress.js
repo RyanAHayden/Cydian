@@ -37,6 +37,10 @@
 import { el, barButton } from "./ui.js";
 import { createFollow, hudLine } from "../core/progress.js";
 import { NAME } from "../brand.js";
+import { FINISH_LABEL } from "../core/queue.js";
+
+// B67: the plain finish button, Cydia's "Return to Cydia"
+export const RETURN_LABEL = FINISH_LABEL.return;
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 const MAX_LINES = 1500; // lines kept on screen while it follows; the callers' logs keep everything
@@ -168,7 +172,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     cancellable(on, { disabled = false } = {}) { cancel.hidden = !on; cancel.disabled = Boolean(disabled); },
     stoppable(fn) { stop = typeof fn === "function" ? fn : null; rightButton(); },
     get stopping() { return Boolean(stop) && !finished; },
-    finish({ label = "Close", action = null, status = null, title: t = "Complete", locked: lock = false, unlockAfter = LOCK_LIMIT } = {}) {
+    finish({ label = RETURN_LABEL, action = null, status = null, title: t = "Complete", locked: lock = false, unlockAfter = LOCK_LIMIT } = {}) {
       flush();
       finished = true;
       clearTimeout(lockTimer);
@@ -178,6 +182,8 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       setTitle(t);
       setProgress(100);
       if (status != null) statusText.textContent = status;
+      // B67: no status line over the finished page's button (it only repeated the log's last line)
+      statusText.hidden = true;
       cancel.hidden = true;
       cursor.hidden = true;
       track.hidden = true;
@@ -205,6 +211,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       finishButton.disabled = false;
       setTitle(t);
       statusText.textContent = status;
+      statusText.hidden = false;
       setProgress(0);
       track.hidden = false;
       cursor.hidden = false;
@@ -255,7 +262,7 @@ export function lockSelfUpdate(h, { later = setTimeout } = {}) {
 }
 
 // `open` stands in for openProgress (tests).
-export function progressHUD(label = "Preparing", { open = openProgress, done: doneLabel = "Close" } = {}) {
+export function progressHUD(label = "Preparing", { open = openProgress, done: doneLabel = RETURN_LABEL } = {}) {
   let page = hudPage && !hudPage.closed ? hudPage : null;
   if (page) page.reopen();
   else {

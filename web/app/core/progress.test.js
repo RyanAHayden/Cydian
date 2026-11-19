@@ -97,8 +97,8 @@ test("packageKind: tweaks by their hooking library or section, apps by section o
 });
 
 test("chooseFinish: Return by default; Restart SpringBoard for a tweak; Reload Data for an app; the highest wins", () => {
-  assert.deepEqual(chooseFinish({}), { level: "return", label: "Close", uicache: false });
-  assert.deepEqual(chooseFinish({ kinds: ["package"] }), { level: "return", label: "Close", uicache: false });
+  assert.deepEqual(chooseFinish({}), { level: "return", label: "Return to iFizBox", uicache: false });
+  assert.deepEqual(chooseFinish({ kinds: ["package"] }), { level: "return", label: "Return to iFizBox", uicache: false });
   assert.deepEqual(chooseFinish({ kinds: ["tweak"] }), { level: "restart", label: "Restart SpringBoard", uicache: false });
   assert.deepEqual(chooseFinish({ kinds: ["app"] }), { level: "uicache", label: "Reload Data", uicache: false });
   // an app and a tweak in one run: Restart SpringBoard, the icon cache rebuilt first
@@ -127,7 +127,7 @@ test("chooseFinish: a failed run, the sideload IPA and the website only return",
 // B45: Close iFizBox (reopen) is only for iFizBox upgrading itself; every other run ends on plain Close.
 test("selfLevels: a normal apt run ends on Close; iFizBox's own upgrade on Close iFizBox", () => {
   const run = (jobs, kinds = []) => chooseFinish({ levels: selfLevels(jobs), kinds });
-  assert.deepEqual(run([{ op: "install", id: "com.example.lib" }], ["package"]), { level: "return", label: "Close", uicache: false });
+  assert.deepEqual(run([{ op: "install", id: "com.example.lib" }], ["package"]), { level: "return", label: "Return to iFizBox", uicache: false });
   assert.equal(run([{ op: "install", id: "com.example.app" }], ["app"]).label, "Reload Data");
   assert.deepEqual(run([{ op: "install", id: PACKAGE }], ["app"]), { level: "reopen", label: "Close iFizBox", uicache: false });
   assert.equal(run([{ op: "install", id: "com.example.lib" }, { op: "install", id: PACKAGE }]).label, "Close iFizBox");
@@ -137,5 +137,5 @@ test("selfLevels: a normal apt run ends on Close; iFizBox's own upgrade on Close
   assert.deepEqual(selfLevels([BUNDLE_ID]), ["reopen"]);
   assert.deepEqual(selfLevels(["com.example.other", null, undefined]), []);
   assert.deepEqual(selfLevels([`${BUNDLE_ID}.share`]), []);
-  assert.equal(chooseFinish({ ok: false, levels: selfLevels([{ op: "install", id: PACKAGE }]) }).label, "Close");
+  assert.equal(chooseFinish({ ok: false, levels: selfLevels([{ op: "install", id: PACKAGE }]) }).label, "Return to iFizBox");
 });

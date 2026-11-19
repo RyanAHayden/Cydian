@@ -63,6 +63,11 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
   (public repositories only). GitHub limits anonymous downloads per address, and a Worker's address is shared with
   other sites, so the website's downloads of IPAs on GitHub releases can get "429". With the token, those retry
   through GitHub's API, limited per token instead. A copy on your own PC doesn't need it (your address is yours).
+- `APPLE_RELAY` (off unless `"1"`): the `/apple/<host>/<path>` relay for a free Apple ID sign-in in the browser
+  (`src/apple-relay.js`, used by `web/app/core/gsa.js`). It forwards only to gsa.apple.com's sign-in paths,
+  developerservices2.apple.com's Xcode API and a few public anisette servers, from this site's own pages, with size
+  and time caps, and it never logs or keeps what passes through. No product page uses it yet, so ifizbox.com leaves
+  it off. Self-hosted with `node.mjs`, gsa.apple.com needs Apple Root CA (`NODE_EXTRA_CA_CERTS`).
 
 ## Routes
 

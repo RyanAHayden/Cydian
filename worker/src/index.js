@@ -53,6 +53,7 @@ import { account, isAccountPath } from "./account.js";
 import { readIpaInfo, IpaError } from "./ipainfo.js";
 import { reviews, isReviewsPath } from "./reviews.js";
 import { udid, isUdidPath } from "./udid.js";
+import { appleRelay, isApplePath } from "./apple-relay.js";
 import { NAME, GITHUB_REPO, DOMAIN } from "../../web/app/brand.js";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -721,6 +722,7 @@ export default {
     if (isAccountPath(u.pathname)) return account(req, env); // F97: iFizBox Account (src/account.js)
     if (isReviewsPath(u.pathname)) return reviews(req, env); // F182: user reviews (src/reviews.js)
     if (isUdidPath(u.pathname)) return udid(req, env); // F253: this iPhone's UDID via a profile (src/udid.js)
+    if (isApplePath(u.pathname)) return appleRelay(req, env); // F251: Apple sign-in relay (src/apple-relay.js)
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null, env, req.headers.get("Range"));

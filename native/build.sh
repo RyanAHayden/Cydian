@@ -121,6 +121,12 @@ bundle() {
   (cd ../web/app && find . -type f ! -name '*.test.js' ! -name '.*' ! -path './vendor/zsign/*' -print0) |
     while IFS= read -r -d '' f; do mkdir -p "$app/web/$(dirname "$f")" && cp "../web/app/$f" "$app/web/$f"; done
   ../tools/buildinfo.sh "$(cd "$app/web" && pwd)" >/dev/null # version and commit for Home's footer
+  # The bundled web/ must start (web/app/startup.test.js, skipped without Chromium): a module that fails to load
+  # leaves the app on its Loading screen with no crash to show for it.
+  if command -v node >/dev/null; then
+    IFIZBOX_WEB_DIR="$(cd "$app/web" && pwd)" node --test ../web/app/startup.test.js >"$out/startup.log" 2>&1 ||
+      { cat "$out/startup.log" >&2; echo "native build: $app/web doesn't start (web/app/startup.test.js)" >&2; exit 1; }
+  fi
   # The sideload IPA's icon has a LITE sash (tools/icons.sh), so it isn't taken for the jailbreak app.
   local icon=AppIcon60x60; [ -z "$overlay" ] || icon=AppIconLite60x60
   for x in @2x @3x; do cp "icon/$icon$x.png" "$app/AppIcon60x60$x.png"; done

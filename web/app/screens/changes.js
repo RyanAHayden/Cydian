@@ -21,6 +21,7 @@
 // "resign" jobs (core/appqueue.js resignJob): Cydia's queue does both. An app with an upgrade is left to the upgrade,
 // which signs it anew.
 import { placeholder, el } from "../nav/ui.js";
+import { searchBar, pinned } from "../nav/searchbar.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
 import { getBackend } from "../backend.js";
@@ -270,34 +271,19 @@ export function render(body, route, ctx) {
   state.list = null;
   state.data = null;
   drawUpgradeButton(0);
-  body.append(...filterBar());
+  // C10: the bar and the scope row stay put; the list scrolls under them (nav/searchbar.js pinned).
+  state.results = pinned(body, ...filterBar());
   state.note = note("");
   state.note.hidden = true; // errors and "no changes" show here; while loading, placeholder rows
   state.ph = placeholder("list");
-  body.append(state.note, state.ph);
+  state.results.append(state.note, state.ph);
   load();
 }
 
-// Search's grey bar and scope bar (screens/search.js, packages.css), without the Filter button.
+// The shared bar (nav/searchbar.js) and Search's scope bar (screens/search.js, packages.css), without the Filter button.
 function filterBar() {
-  const bar = el("form", "search-bar has-scope");
-  bar.setAttribute("role", "search");
-  const field = el("label", "search-field");
-  const input = document.createElement("input");
-  input.type = "search";
-  input.placeholder = "Search";
-  input.autocapitalize = "off";
-  input.autocomplete = "off";
-  input.spellcheck = false;
-  input.setAttribute("autocorrect", "off");
-  input.setAttribute("aria-label", "Search changes: name, description or author");
-  input.enterKeyHint = "search";
-  input.value = state.query;
-  field.append(input);
-  bar.append(field);
-  let timer = 0;
-  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => { state.query = input.value; draw(); }, 120); });
-  bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); state.query = input.value; draw(); input.blur(); });
+  const bar = searchBar({ placeholder: "Search Changes", ariaLabel: "Search changes: name, description or author",
+    value: state.query, delay: 120, className: "has-scope", onQuery: (q) => { state.query = q; draw(); } });
 
   const scope = el("div", "search-scope");
   const seg = el("div", "scope-segments");
@@ -412,8 +398,9 @@ function draw() {
   state.note.hidden = items.length > 0;
   state.note.textContent = items.length ? "" : emptyText({ query: state.query, scope });
   if (!state.list) {
-    state.list = browse.packageList(body, state.route, items, { letters: false, decorate });
-    body.append(state.list.el);
+    const results = state.results ?? body;
+    state.list = browse.packageList(results, state.route, items, { letters: false, decorate });
+    results.append(state.list.el);
   } else {
     browse.rememberNames(items.filter((r) => r.id));
     state.list.setItems(items);

@@ -26,6 +26,7 @@
 // Rules and labels: core/myipas.js.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, placeholder, el } from "../nav/ui.js";
+import { searchBar, pinned } from "../nav/searchbar.js";
 import * as browse from "./browse.js";
 import { catalog, ALL } from "../catalog.js";
 import { indexLetter } from "../core/catalog.js";
@@ -128,14 +129,16 @@ export function render(body, route, ctx) {
     lib.query = "";
     // F257: the link the Too Big alert just kept: its row at the top for this visit, and the note under the bar
     view.fresh = site() ? freshNote() : null;
-    view.search = searchBar("Search IPAs", (q) => { lib.query = q; redraw(); });
+    // C10: the shared bar (nav/searchbar.js), pinned: the IPAs scroll under it.
+    view.search = searchBar({ placeholder: "Search Apps", ariaLabel: "Search IPAs", delay: 120,
+      onQuery: (q) => { if (q.trim() !== lib.query) { lib.query = q.trim(); redraw(); } } });
     view.add = el("div", "install-ipas-add");
     view.add.append(grouped(addGroups(site())));
     view.body = el("div", "install-ipas-mine");
     view.body.append(note("Loading"));
     if (view.fresh?.note) page.append(el("p", "myipa-fresh-note", view.fresh.note));
-    page.append(view.search, view.add, view.body);
-    body.append(page);
+    page.append(view.add, view.body);
+    pinned(body, view.search).append(page);
     load();
     return;
   }
@@ -476,7 +479,7 @@ function attachLibraryGestures(ul, ctl, on) {
 // an IPA hide; the circles slide in (packages.css .manage-check); the grey line and the toolbar come or go.
 export function setManaging(on) {
   if (!lib.ctl) { lib.state = on ? listStep(lib.state, { type: "edit" }) : listState(); onListChange(lib.state); return; }
-  if (on && lib.query) { lib.query = ""; const input = view.search?.querySelector?.("input"); if (input) input.value = ""; }
+  if (on && lib.query) { lib.query = ""; if (view.search?.set) view.search.set(""); else { const input = view.search?.querySelector?.("input"); if (input) input.value = ""; } }
   lib.price = { armed: null };
   if (on) { lib.state = listStep(lib.state, { type: "edit" }); redraw(); } else lib.ctl.step({ type: "done" });
 }
@@ -728,27 +731,9 @@ async function holdSheet(entry) {
 // The catalog's rows that are AltStore apps (core/catalog.js slim: kind "ipa"); APT packages stay out.
 export const appsOf = (rows) => (rows ?? []).filter((r) => r?.kind === "ipa");
 
-// Search's bar (packages.css); onQuery(trimmed text) runs as the user types (debounced) and on Search.
-function searchBar(placeholder, onQuery) {
-  const bar = el("form", "search-bar");
-  bar.setAttribute("role", "search");
-  const field = el("label", "search-field");
-  const input = Object.assign(el("input"), { type: "search", placeholder, autocomplete: "off", spellcheck: false });
-  input.setAttribute("autocapitalize", "off");
-  input.setAttribute("autocorrect", "off");
-  input.setAttribute("aria-label", placeholder);
-  input.enterKeyHint = "search";
-  field.append(input);
-  bar.append(field);
-  let timer = 0;
-  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => onQuery(input.value.trim()), 120); });
-  bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); onQuery(input.value.trim()); input.blur(); });
-  return bar;
-}
-
 // All Apps and a category: their list with a search bar that narrows this list only.
 export const matchApp = (r, q) => [r.name, r.short, r.author, r.id].some((v) => String(v ?? "").toLowerCase().includes(q.toLowerCase()));
-async function renderFiltered(body, route, fetchRows, hint) { // hint: the search bar's (not "placeholder", the loading rows)
+async function renderFiltered(body, route, fetchRows, hint) { // hint: the search bar's label (not "placeholder", the loading rows)
   const wait = placeholder("list");
   body.append(wait);
   let rows;
@@ -758,32 +743,28 @@ async function renderFiltered(body, route, fetchRows, hint) { // hint: the searc
   const lettered = (list) => withLetterHeaders(list, (r) => indexLetter(r.name));
   const none = el("p", "empty", "No Results");
   none.hidden = true;
-  const list = browse.packageList(body, route, rows, { letters: true });
-  body.append(searchBar(hint, (q) => {
+  // C10: the shared bar (nav/searchbar.js), pinned over the list.
+  const results = pinned(body, searchBar({ placeholder: "Search Apps", ariaLabel: hint, delay: 120, onQuery: (t) => {
+    const q = t.trim();
     const shown = q ? rows.filter((r) => matchApp(r, q)) : rows;
     list.setItems(q ? shown : lettered(shown));
     none.hidden = shown.length > 0;
-  }), none, list.el);
+  } }));
+  const list = browse.packageList(results, route, rows, { letters: true });
+  results.append(none, list.el);
 }
 
-// Search Apps (older links): Search's bar (packages.css) over the AltStore apps only, results as browse.js rows.
+// Search Apps (older links): the shared bar (nav/searchbar.js) over the AltStore apps only, results as browse.js rows.
 function renderSearch(body, route) {
-  const bar = el("form", "search-bar");
-  bar.setAttribute("role", "search");
-  const field = el("label", "search-field");
-  const input = Object.assign(el("input"), { type: "search", placeholder: "Search Apps", autocomplete: "off", spellcheck: false });
-  input.setAttribute("autocapitalize", "off");
-  input.setAttribute("autocorrect", "off");
-  input.setAttribute("aria-label", "Search apps: name, description or developer");
-  input.enterKeyHint = "search";
-  field.append(input);
-  bar.append(field);
+  const bar = searchBar({ placeholder: "Search Apps", ariaLabel: "Search apps: name, description or developer", delay: 120,
+    onQuery: () => run() });
+  const input = bar.input;
   const hint = el("p", "empty search-note", "App names, descriptions and developers.");
-  body.append(bar, hint);
-  const list = browse.packageList(body, route, [], { letters: false });
-  body.append(list.el);
+  const results = pinned(body, bar);
+  results.append(hint);
+  const list = browse.packageList(results, route, [], { letters: false });
+  results.append(list.el);
   let seq = 0;
-  let timer = 0;
   async function run() {
     const q = input.value.trim();
     const mine = ++seq;
@@ -801,8 +782,6 @@ function renderSearch(body, route) {
     list.setItems(rows);
     hint.textContent = rows.length ? "" : "No Results";
   }
-  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 120); });
-  bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); run(); input.blur(); });
   setTimeout(() => { if (input.isConnected) input.focus(); }, 350); // after the push animation
 }
 

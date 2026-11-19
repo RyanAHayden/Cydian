@@ -371,7 +371,7 @@ html.has-reload .section-index { bottom: calc(var(--tab-h) + 44px + 6px); }
 .section-index.held { background: rgba(0,0,0,.18); }
 html[data-theme="dark"] .section-index { color: var(--dk-index); }
 html[data-theme="dark"] .section-index.held { background: rgba(255,255,255,.15); }
-.page-body[data-section-index] .pkg-row > .cell-inner { padding-right: 26px; } /* rows end before the index, as UITableView's */
+:is(.page-body, .search-results)[data-section-index] .pkg-row > .cell-inner { padding-right: 26px; } /* rows end before the index, as UITableView's */
 
 /* Before the app's first page (index.html #boot): the pinstripes between the bars with Loading in the middle. */
 .boot {
@@ -390,11 +390,14 @@ html[data-theme="dark"] .section-index.held { background: rgba(255,255,255,.15);
 .search-field:has(input:not(:placeholder-shown))::after { display: block; }
 html[data-theme="dark"] .search-field::after { background-color: var(--dk-clear); }
 
-/* Search's root page: the bar and scope row fixed at the top, the results their own scroller below. */
-.page-body.search-root { overflow: hidden; display: flex; flex-direction: column; }
-.search-root > .search-bar, .search-root > .search-scope { flex: none; }
+/* Search's root page: the bar and scope row fixed at the top, the results their own scroller below. C10: every page
+   with the shared search bar (nav/searchbar.js pinned): Sources, Changes, Installed, My IPAs. Whatever a page pins
+   (Sources' refresh strip too) keeps its height; only while the scroller is there (a page redrawn without its bar,
+   an error note, scrolls as any page). */
+.page-body.search-root:has(> .search-results) { overflow: hidden; display: flex; flex-direction: column; }
+.search-root > :not(.search-results) { flex: none; }
 .search-results { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; position: relative; }
-.page-body.search-root::before { display: none; } /* the always-bounce spacer (ios6.css) belongs to the results now */
+.page-body.search-root:has(> .search-results)::before { display: none; } /* the always-bounce spacer (ios6.css) belongs to the results now */
 .search-results::before { content: ""; float: left; width: 1px; margin-right: -1px; height: calc(100% + 1px); }
 
 /* F91: a signature's days left (Installed, Changes' Needs Re-sign, the app page's Signature row): the tab bar's red
@@ -462,6 +465,9 @@ html[data-theme="dark"] .search-field::after { background-color: var(--dk-clear)
    as UISearchBar does over an indexed table on iOS 6. */
 .page-body[data-section-index] > .installed-search, .page-body[data-section-index] > .installed-scope { padding-right: 24px; }
 .page-body[data-section-index] > .installed-top { margin-right: 24px; }
+/* C10: pinned (nav/searchbar.js), the index is the results scroller's: the bars over it end short of it too. */
+.search-root:has(> .search-results[data-section-index]) > :is(.search-bar, .search-scope) { padding-right: 24px; }
+.search-results[data-section-index] > .installed-top { margin-right: 24px; }
 .page-body[data-section-index] > .list-search { padding-right: 24px; } /* F124: Browse's list search ends before the A–Z index */
 
 /* F147: Installed's Wish List bar button (screens/installed.js): beside the segmented title the name may end in "…",

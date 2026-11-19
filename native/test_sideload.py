@@ -331,3 +331,29 @@ class HandoffSourceTest(unittest.TestCase):
         progress = self.body(side, "    static func progress(")
         self.assertIn("Handoff.lostSight(served: Handoff.wasServed(bid), away: away, seen: seen)", progress)
         self.assertIn('"handedOff": handedOff', progress)
+
+    def test_install_prompt_one_at_a_time(self):
+        """B85: the itms-services link opens through InstallPrompt (once iFizBox is in front, again when iOS drops it),
+        a dismissed prompt answers dismissed (not handed off) and stops that app's serving, and signing.reprompt opens
+        the link again; what the watch saw goes to the page's console."""
+        side = self.files["Sideload.swift"]
+        prompt = self.files["InstallPrompt.swift"]
+        self.assertNotIn("UIApplication.shared.open(URL(string: link)!)", side)
+        self.assertIn("InstallPrompt.open(iosLink, bundleID: bid, name: app.name)", side)
+        self.assertIn("InstallPrompt.heard(bid); InstallLog.say(bid, s)", side)
+        self.assertEqual(side.count("InstallPrompt.end(bid, link: iosLink)"), 2)  # served/expired, and cancelled
+        self.assertIn('b.on("signing.reprompt")', side)
+        self.assertIn("InstallPrompt.reprompt(bid)", side)
+        watch = self.body(side, "    static func watch(")
+        self.assertIn("} else if InstallPrompt.dismissed(bid) {", watch)
+        progress = self.body(side, "    static func progress(")
+        self.assertIn("!InstallPrompt.dismissed(bid) && Handoff.lostSight(", progress)
+        self.assertIn("if dismissed, let t = tag { SignJob.cancel(tag: t) }", progress)
+        self.assertIn('"dismissed": dismissed', progress)
+        self.assertIn("InstallPrompt.summary(bid)", progress)
+        # it waits for iFizBox in front, retries a refused open, and opens once more when no prompt showed
+        self.assertIn("UIApplication.shared.applicationState == .active", prompt)
+        self.assertIn("UIApplication.willResignActiveNotification", prompt)
+        self.assertIn("UIApplication.didBecomeActiveNotification", prompt)
+        self.assertIn("} else if n < tries {", prompt)
+        self.assertIn("e.reopened = true", prompt)

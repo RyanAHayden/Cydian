@@ -3,8 +3,8 @@
 // the phone's calls are signing-client.js prepareOnDevice / openPrepared (native signing.prepare / signing.open).
 //
 //   appRows(jobs)              -> [row]  one row per queued app (core/appqueue.js jobs), in runOrder (iFizBox last)
-//   row: { id, name, mode, job, size, state, phase, fraction, error, token, bundleId, expires, unsure }
-//   createAppRun({ rows, sign, install, discard, ahead = 2, stallMs, later, clear, onChange, onLog })
+//   row: { id, name, mode, job, size, state, phase, fraction, error, token, bundleId, expires, unsure, dismissed }
+//   createAppRun({ rows, sign, install, discard, reprompt, ahead = 2, stallMs, later, clear, onChange, onLog })
 //       sign(row, hooks)    -> { token, bundleId?, expires?, name? }  the download and the signing, ahead of the installs
 //                              (hooks: { signal, progress(phase "downloading" | "signing", fraction 0..1) })
 //       install(row, hooks) -> { installed: true | false | null, expires? }  hands the signed app to iOS and waits for
@@ -12,8 +12,11 @@
 //                              while iOS's Install prompt is up, "installing" once iOS reports progress. null: iOS
 //                              can't be asked whether it installed (the row ends as sent). handedOff: true (the
 //                              shell's word that iOS had the whole IPA, or iFizBox was in the background) turns a
-//                              false into "sent" too (B76, below).
+//                              false into "sent" too (B76, below). dismissed: true (B85: the user closed iOS's
+//                              prompt) ends the row Cancelled ("Cancelled on the iOS prompt", retryable) and the
+//                              next app goes on.
 //       discard(row)        frees a signed copy that will never be installed (its row stopped, or the run cancelled)
+//       reprompt(row)       -> true | false: B85, iOS's prompt for the app with iOS ("asking") again
 //     .start() -> a promise for the end (every row installed, failed or cancelled)
 //     .stop(id)   the working row's round stop button: aborts that app only (its download, signing or iOS's prompt);
 //                 the next one goes on
@@ -21,6 +24,7 @@
 //     .retry(id) / .retryAll()   failed and cancelled rows go again (a new pass when the run had ended)
 //     .away()     B76: iFizBox went to the background while a row was with iOS: that row is handed off to iOS
 //     .confirm(id) B76: iOS has an app whose row ended "Sent to iOS" (apps.isInstalled on the way back): Installed
+//     .reprompt(id) B85: the "Tap Install on the iOS prompt" row's tap: reprompt(row), logged -> a promise for true | false
 //     .rows / .running / .stopping / .current (the row with iOS)
 //
 // B76: a stock phone can't watch iOS's install once iFizBox is in the background, so installed: false after a handoff
@@ -55,6 +59,7 @@ export function appRows(jobs = []) {
   return runOrder(jobs).map((j) => ({
     id: j.id, name: j.name || j.id, mode: j.mode || "install", job: j, size: Number(j.size) > 0 ? Number(j.size) : null,
     state: "waiting", phase: null, fraction: 0, error: null, token: null, bundleId: null, expires: null, unsure: false,
+    dismissed: false,
   }));
 }
 
@@ -70,7 +75,7 @@ export function stallText(row, limit = APP_STALL) {
   return `stopped at ${where}: nothing moved for ${span}`;
 }
 
-export function createAppRun({ rows, sign, install, discard = () => {}, ahead = 2, stallMs = APP_STALL,
+export function createAppRun({ rows, sign, install, discard = () => {}, reprompt = null, ahead = 2, stallMs = APP_STALL,
   later = setTimeout, clear = clearTimeout, onChange = () => {}, onLog = () => {} }) {
   const flights = new Map(); // id -> { ctl: AbortController, timer, why }
   let running = false;
@@ -173,6 +178,13 @@ export function createAppRun({ rows, sign, install, discard = () => {}, ahead = 
       return;
     }
     if (f.why || ended(r)) return;
+    if (res?.dismissed && res?.installed !== true) {
+      // B85: the user closed iOS's prompt: that app is cancelled (retryable), and the next one goes on
+      finishRow(r, "cancelled", { token: null, dismissed: true, phase: null, fraction: 0 });
+      log(r, "step", `Cancelled ${label(r)} on the iOS prompt`);
+      pump();
+      return;
+    }
     const expires = res?.expires ?? r.expires;
     const handedOff = Boolean(res?.handedOff || f.away);
     if (res?.installed === false && !handedOff) { fail(r, "iOS didn't install it"); return; }
@@ -240,6 +252,15 @@ export function createAppRun({ rows, sign, install, discard = () => {}, ahead = 
       if (r.mode !== "resign") log(r, "step", `Installed ${label(r)}`);
       return true;
     },
+    async reprompt(id) {
+      const r = rows.find((x) => x.id === id);
+      if (!r || r.state !== "asking" || !reprompt || !flights.has(r.id)) return false;
+      let ok = false;
+      try { ok = Boolean(await reprompt(r)); } catch { ok = false; }
+      if (r.state !== "asking") return false;
+      log(r, "step", ok ? `Asked iOS again to install ${label(r)}` : `iOS's prompt for ${label(r)} can't be shown again`);
+      return ok;
+    },
     stop(id) {
       const r = rows.find((x) => x.id === id);
       if (!r || ended(r)) return false;
@@ -257,14 +278,14 @@ export function createAppRun({ rows, sign, install, discard = () => {}, ahead = 
     retry(id) {
       const r = rows.find((x) => x.id === id);
       if (!r || !["failed", "cancelled"].includes(r.state)) return null;
-      set(r, { state: "waiting", phase: null, fraction: 0, error: null, token: null, unsure: false });
+      set(r, { state: "waiting", phase: null, fraction: 0, error: null, token: null, unsure: false, dismissed: false });
       if (running) { pump(); return endPromise; }
       return start();
     },
     retryAll() {
       const again = rows.filter((r) => ["failed", "cancelled"].includes(r.state));
       if (!again.length) return null;
-      for (const r of again) set(r, { state: "waiting", phase: null, fraction: 0, error: null, token: null, unsure: false });
+      for (const r of again) set(r, { state: "waiting", phase: null, fraction: 0, error: null, token: null, unsure: false, dismissed: false });
       if (running) { pump(); return endPromise; }
       return start();
     },
@@ -296,7 +317,7 @@ export function rowStatus(row, opts = {}) {
       if (row.mode === "resign") return row.expires ? `Re-signed, expires ${dateText(row.expires, opts)}` : "Re-signed";
       return row.unsure ? "Sent to iOS" : "Installed";
     case "failed": return row.error ? `Failed: ${row.error}` : "Failed";
-    case "cancelled": return "Cancelled";
+    case "cancelled": return row.dismissed ? "Cancelled on the iOS prompt" : "Cancelled";
     default: return "";
   }
 }

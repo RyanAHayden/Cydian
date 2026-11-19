@@ -6,8 +6,10 @@
 //     (Waiting / Downloading 12.0 of 48.0 MB / Signing 40% / Signed / Tap Install on the iOS prompt / Installing /
 //     Installed / Re-signed, expires <date> / Failed: why / Cancelled), an iOS 6 progress bar while it works, and the
 //     round stop button on a working row: it cancels only that app (its download, its signing or iOS's prompt) and the
-//     next goes on. A failed or cancelled row's tap retries it once the run has ended; any other row opens the Log with
-//     that app's lines only. The summary ("2 installed, 1 failed") ends the list and the log.
+//     next goes on. A failed or cancelled row's tap retries it once the run has ended; a "Tap Install on the iOS
+//     prompt" row's tap shows iOS's prompt for it again (B85, signing.reprompt: the user dismissed it); any other row
+//     opens the Log with that app's lines only. A prompt the user closed with Cancel ends its row "Cancelled on the iOS
+//     prompt" and the next app goes on. The summary ("2 installed, 1 failed") ends the list and the log.
 //   Log: one line per phase per app (Downloading Delta 48 MB, Signed Delta, Asked iOS to install Delta, Installed
 //     Delta / the reason it failed) with the shell's own lines grey under its app. Percents only move the rows' bars
 //     and the bottom status.
@@ -34,6 +36,8 @@ export function phoneLanes(sc, { native } = {}) {
     sign: (r, { signal, progress }, log = () => {}) => sc.prepareOnDevice(r.job, { tag: tagOf(r), signal, progress, log, native }),
     install: (r, { signal, progress }, log = () => {}) => sc.openPrepared(r, { tag: tagOf(r), signal, progress, log, host: isSelf(r), native }),
     discard: (r) => sc.discardPrepared(r.token, native),
+    // B85: the "Tap Install on the iOS prompt" row's tap: iOS's prompt for that app again
+    reprompt: (r) => sc.repromptPrepared?.(r, native) ?? false,
     // B76: which of these apps iOS has now ({ bundleId: true | false | null }); apps.isInstalled works in both builds
     isInstalled: async (bundleIds) => {
       const n = native ?? globalThis.ifizboxNative;
@@ -106,6 +110,7 @@ export async function runAppRun(jobs, deps) {
     list.append(li);
     main.addEventListener("click", () => {
       if (!run.running && (r.state === "failed" || r.state === "cancelled")) retry(r.id);
+      else if (r.state === "asking" && lanes.reprompt) run.reprompt(r.id); // B85: the prompt again
       else showLog(r.id);
     });
     act.addEventListener("click", () => run.stop(r.id));
@@ -133,6 +138,7 @@ export async function runAppRun(jobs, deps) {
     sign: (r, hooks) => lanes.sign(r, hooks, (text) => line("raw", text, r.id)),
     install: (r, hooks) => lanes.install(r, hooks, (text) => line("raw", text, r.id)),
     discard: (r) => lanes.discard(r),
+    ...(lanes.reprompt ? { reprompt: (r) => lanes.reprompt(r) } : {}),
     ...(deps.stallMs ? { stallMs: deps.stallMs } : {}),
     ...(deps.later ? { later: deps.later, clear: deps.clear } : {}),
     onChange: (r) => {

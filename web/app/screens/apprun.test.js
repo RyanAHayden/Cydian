@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runAppRun, phoneLanes } from "./apprun.js";
 import { createAppQueue, SELF_ID } from "../core/appqueue.js";
-import { prepareParams, prepareOnDevice, openPrepared } from "../signing-client.js";
+import { prepareParams, prepareOnDevice, openPrepared, repromptPrepared } from "../signing-client.js";
 
 function fakeDom() {
   const make = (tag) => {
@@ -326,4 +326,62 @@ test("B76: phoneLanes asks apps.isInstalled; no bridge or a failed call is unkno
   assert.deepEqual(native.calls, [["apps.isInstalled", { bundleIds: ["com.a"] }]]);
   const bad = phoneLanes({}, { native: fakeNative({ "apps.isInstalled": async () => { throw new Error("x"); } }) });
   assert.deepEqual(await bad.isInstalled(["com.a"]), {});
+});
+
+// B85: a 2-app run: the first app's prompt dismissed ends that row Cancelled and the second still goes to iOS; the
+// "Tap Install on the iOS prompt" row's tap asks iOS for the prompt again instead of opening the Log.
+test("B85: tapping the asking row re-prompts; a dismissed prompt cancels that row and the next app goes on", () => withDom(async () => {
+  const s = setup([app("a", "Alpha"), app("b", "Beta")]);
+  const reprompted = [];
+  const answers = new Map();
+  const l = {
+    ...s.l,
+    install: (r, hooks) => new Promise((resolve) => {
+      s.l.calls.install.push(r.id);
+      hooks.progress("asking", 0);
+      answers.set(r.id, resolve);
+    }),
+    reprompt: async (r) => { reprompted.push(r.id); return true; },
+  };
+  const done = runAppRun(s.queue.list(), { queue: s.queue, lanes: l, open: () => s.page });
+  await settle();
+  const rows = rowsOf(s.page);
+  assert.equal(statusOf(rows[0]), "Tap Install on the iOS prompt");
+  rows[0].children[0].click();
+  await settle();
+  assert.deepEqual(reprompted, ["a"]);
+  assert.equal(s.page.filtered, null); // not the Log
+  assert.equal(s.page.lines.filter((x) => x.id === "a").at(-1).text, "Asked iOS again to install Alpha");
+  // Beta waits its turn: its tap opens the Log
+  rows[1].children[0].click();
+  assert.equal(s.page.filtered, "b");
+  answers.get("a")({ installed: false, dismissed: true });
+  await settle();
+  assert.equal(statusOf(rows[0]), "Cancelled on the iOS prompt");
+  assert.deepEqual(s.l.calls.install, ["a", "b"]);
+  assert.equal(statusOf(rows[1]), "Tap Install on the iOS prompt");
+  answers.get("b")({ installed: true });
+  const r = await done;
+  assert.deepEqual(r.rows.map((x) => x.state), ["cancelled", "installed"]);
+  assert.deepEqual(s.queue.list().map((j) => j.id), ["a"]); // still queued, retryable
+  assert.equal(s.page.lines.at(-1).text, "1 installed, 1 cancelled");
+}));
+
+test("B85: openPrepared passes the shell's dismissed; repromptPrepared asks signing.reprompt by bundle ID", async () => {
+  const native = fakeNative({
+    "signing.open": () => Promise.resolve({ bundleId: "com.a" }),
+    "signing.progress": () => Promise.resolve({ installed: false, handedOff: false, dismissed: true }),
+    "signing.reprompt": (p) => Promise.resolve({ reopened: p.bundleId === "com.a" }),
+  });
+  const r = await openPrepared({ id: "a", name: "Alpha", token: "t1" }, { tag: "a#2", native });
+  assert.deepEqual(r, { installed: false, expires: null, dismissed: true });
+  assert.equal(await repromptPrepared({ id: "a", bundleId: "com.a" }, native), true);
+  assert.equal(await repromptPrepared({ id: "b", bundleId: "com.b" }, native), false);
+  assert.equal(await repromptPrepared({ id: "c" }, native), false); // no bundle ID: nothing to ask
+  assert.deepEqual(native.calls.slice(2), [["signing.reprompt", { bundleId: "com.a" }], ["signing.reprompt", { bundleId: "com.b" }]]);
+  const broken = fakeNative({ "signing.reprompt": () => Promise.reject(new Error("x")) });
+  assert.equal(await repromptPrepared({ id: "a", bundleId: "com.a" }, broken), false);
+  // phoneLanes hands the row to it
+  const sc = { repromptPrepared: async (row, n) => [row.id, n === native] };
+  assert.deepEqual(await phoneLanes(sc, { native }).reprompt({ id: "a" }), ["a", true]);
 });

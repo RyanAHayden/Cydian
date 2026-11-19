@@ -398,8 +398,10 @@ export async function followSelfUpdate(h, { native, retry = null } = {}) {
 //                                      -> { token, bundleId, name, version, expires }; progress(phase, fraction) with
 //                                      phase "downloading" | "signing"; the signal's abort sends signing.cancel {tag}
 //   await openPrepared(row, { tag, signal, progress, log, host, wait })   hand it to iOS (progress("asking")), then
-//                                      wait for iOS's install (progress("installing", f)) -> { installed, expires };
+//                                      wait for iOS's install (progress("installing", f)) -> { installed, expires,
+//                                      dismissed? (B85: the user closed iOS's prompt) };
 //                                      host (iFizBox's own) doesn't wait: iOS closes iFizBox to install it
+//   await repromptPrepared(row)        B85: iOS's Install prompt for that app again (signing.reprompt) -> true | false
 //   discardPrepared(token)             frees a signed copy that won't be installed
 // Errors come as deviceError's message (core/signing.js), so a row's "Failed: ..." reads as the alerts do.
 
@@ -468,7 +470,14 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     if (e?.code === "cancelled") throw e;
     return { installed: null, expires: opened?.expires ?? null }; // iOS can't be asked: the prompt was shown
   }
-  return { installed: r?.installed ?? null, expires: opened?.expires ?? null };
+  // B85: dismissed: iOS's prompt closed and iOS never asked for the IPA (the user tapped Cancel on it)
+  return { installed: r?.installed ?? null, expires: opened?.expires ?? null, ...(r?.dismissed ? { dismissed: true } : {}) };
+}
+
+// B85: the run's "Tap Install on the iOS prompt" row: iOS's prompt for that app again -> true when the shell re-opened it
+export async function repromptPrepared(row, native) {
+  if (!row?.bundleId) return false;
+  try { return Boolean((await bridge(native).call("signing.reprompt", { bundleId: row.bundleId }))?.reopened); } catch { return false; }
 }
 
 export function discardPrepared(token, native) {

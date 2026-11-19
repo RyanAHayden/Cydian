@@ -225,3 +225,14 @@ test("the website stays locked after iFizBox is installed from it; only Browse A
   assert.equal(browsingLocked({ storage: s }), false); // Browse Anyway
   assert.equal(browsingLocked({ mode: "sideload", storage: memory() }), false); // the app is never locked
 });
+
+test("app pitch doesn't overclaim: signing stays on the iPhone, our server sends the install prompt", async () => {
+  const { askToBrowse } = await import("./websign-gate.js");
+  let gate;
+  await askToBrowse({ alert: async (o) => { gate = o; return { index: 2 }; }, storage: memory() });
+  for (const m of [FIRST_VISIT.message, gate.message, WARNING.message]) {
+    assert.doesNotMatch(m, /no upload|installed on the iPhone itself|installs on the iPhone itself/);
+    assert.match(m, /on the iPhone, so your apps never leave it/);
+    assert.match(m, /Our server only sends iOS the install prompt/);
+  }
+});

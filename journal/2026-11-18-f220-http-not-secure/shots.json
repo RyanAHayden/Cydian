@@ -1,0 +1,16 @@
+[
+  {"wait": 3000},
+  {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.device','iphoneos-arm64'); localStorage.setItem('ifizbox.arch','iphoneos-arm64'); 'ok'"},
+  {"nav": "#/sources/manage/sources", "ms": 8000},
+  {"clicktext": "Add", "ms": 1500},
+  {"eval": "(()=>{const f=document.querySelector('.alert-field'); if(!f) return 'no field'; f.value='http://repo.example.invalid/'; f.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+  {"clicktext": "Add Source", "ms": 8000},
+  {"eval": "document.querySelector('.alert-title')?.textContent"},
+  {"shot": "f220-alert"},
+  {"nav": "#/sources/deb%3Ahttp%3A%2F%2Fapt.thebigboss.org%2Frepofiles%2Fcydia%2F%3Astable", "ms": 20000},
+  {"eval": "[...document.querySelectorAll('.group-footer')].map(e=>e.textContent).join(' | ')"},
+  {"shot": "f220-source-page"},
+  {"nav": "#/sources/deb%3Ahttps%3A%2F%2Frepo.chariz.com%2F%3A.%2F", "ms": 15000},
+  {"eval": "[...document.querySelectorAll('.group-footer')].map(e=>e.textContent).join(' | ')"},
+  {"shot": "f220-https-source-page"}
+]

@@ -379,7 +379,8 @@ initIpaLinks(); // F67: a tapped .ipa link offers Install IPA (jailbreak build o
 const startAt = launchURL(window);
 if (startAt) history.replaceState(null, "", startAt);
 // F184: ifizbox.com/?install (a site's Add to iFizBox button, when the app isn't installed) opens Home without the
-// param, then asks Install iFizBox First (below, once the router started). Website only.
+// param, then asks Install iFizBox First, Not Now / Install iFizBox (F217: not the browse gate; below, once the
+// router started). Website only.
 const installLink = takeInstallParam(window, { mode: detectMode() });
 // F8: a /add?url=… link (core/handoff.js) opens Sources > Manage > Sources with Add Source's alert filled in.
 const addFrom = isAddPath(location.pathname) ? parseAddLink(location.search) : null;

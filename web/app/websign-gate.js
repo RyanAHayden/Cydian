@@ -159,8 +159,10 @@ export async function askToBrowse({ install, alert = showAlert, storage = store(
 // ---- ?install (F184) -------------------------------------------------------------------------------------------
 
 // fizl0.github.io/apps' Add to iFizBox button tries ifizbox://add and, when the app isn't there, opens the site at
-// /?install (user 2026-11-18). Website only: on launch, Home, the param gone from the URL, then the Install iFizBox
-// First popup a locked row shows, whatever firstVisitState is (they came because the app isn't installed).
+// /?install (user 2026-11-18). Website only: on launch, Home, the param gone from the URL, then the plain first-visit
+// popup (FIRST_VISIT: Not Now / Install iFizBox), whatever firstVisitState is (they came because the app isn't
+// installed). F217: not the browse gate a locked row shows: no Browse Anyway, no countdown (user 2026-11-18: "thats
+// the wrong popup"), and Not Now changes nothing, so Home's lock stays as it was.
 
 // Before the router starts: true when the URL carries ?install in site mode; then it's replaced (history, no reload)
 // by the same URL without the param, on Home. The app and native shells never take it.
@@ -175,7 +177,12 @@ export function takeInstallParam(win = globalThis, { mode = "site" } = {}) {
   return true;
 }
 
-// After the router started: asks when takeInstallParam took the param. -> askToBrowse's answer, or null.
-export async function askFromInstallLink(took, { install, alert = showAlert, storage = store() } = {}) {
-  return took ? askToBrowse({ install, alert, storage }) : null;
+// After the router started: asks when takeInstallParam took the param. Install iFizBox runs `install` (Home's
+// installiFizBox); Not Now writes nothing. -> "install" | null (Not Now, or no param)
+export async function askFromInstallLink(took, { install, alert = showAlert } = {}) {
+  if (!took) return null;
+  const { index } = await alert(FIRST_VISIT);
+  if (index !== 1) return null;
+  await install?.();
+  return "install";
 }

@@ -7,8 +7,8 @@ for a release.
 ## What a release is
 
 - Tag `vX.Y.Z`, where X.Y.Z is `native/VERSION`, on `RyanAHayden/iFizBox`, at a commit that is already pushed.
-- Title `iFizBox X.Y.Z`. The app shows the first 4 lines of the notes (Markdown taken off) in its "iFizBox X.Y.Z Is
-  Available" alert, so the most important change goes first.
+- Title `iFizBox X.Y.Z`. The app keeps the first 4 lines of the notes (Markdown taken off) and shows the first as
+  the short line of its upgrade row in Changes, so the most important change goes first.
 - Assets, under the names the app looks for:
 
   | asset | what | who takes it |
@@ -18,6 +18,7 @@ for a release.
   | `com.ryha.ifizbox_<ver>-<build>_iphoneos-arm64.deb` | the same .deb under Debian's name | `debFor`'s exact arch match; the APT repo's `Filename:` |
   | `com.ryha.ifizbox_<ver>-<build>_<arch>.deb` | any other arch build found in `--dist` under that name | its arch, and the APT repo |
   | `Packages`, `Packages.gz`, `Release` | iFizBox's own flat APT repo over the Debian-named .debs (`tools/selfrepo.py`) | the jailbreak app's built-in source |
+  | `source.json` | the updated AltStore source | the Worker's `/repo/source.json` when the deployed copy is missing |
 
   The names come from `native/brand.env` (`BRAND_NAME` gives `iFizBox.ipa`, `iFizBox.deb`, `iFizBox.app`;
   `BRAND_PACKAGE` gives the Debian name), in `native/build.sh`, `mkipa.py`/`mkdeb.py`, `release.sh` and
@@ -47,8 +48,9 @@ Like Cydia's apt.saurik.com, iFizBox has a source of its own that is built in an
   com.ryha.ifizbox_0.1.3-12_iphoneos-arm64.deb`), which resolves against the same URL to the same release.
   Drafts and pre-releases don't count as latest, so a draft doesn't change what the app sees. The repo is unsigned,
   like most jailbreak repos.
-- **AltStore source** (the sideload app and the site): `web/app/source.json`, served from
-  `https://raw.githubusercontent.com/RyanAHayden/iFizBox/main/web/app/source.json` (a fixed URL), rewritten by
+- **AltStore source** (the sideload app and the site): `web/app/source.json`, served at
+  `https://ifizbox.com/repo/source.json` (the Worker answers with the deployed copy, else the latest release's
+  `source.json` asset), rewritten by
   `tools/altsource.py update`: the new version first in `versions[]`, with its date and the notes' first lines,
   and the versions already listed kept below it (at most 20). Commit it after the release.
 
@@ -65,7 +67,7 @@ and the built-in repo). A newer iFizBox is only an upgrade row on top of Changes
 there; there is no popup, no Essential Upgrade alert and no Settings > About. In the sideload app iFizBox's own IPA
 never goes through the local install server, because iOS closes iFizBox, and the server with it, when it starts
 installing. Instead it is signed on the phone and held on the Signing Server (worker/, `POST /sign/host`) for iOS to install from, or, with no
-bridge to sign with, the user is sent to ifizbox.com's Install iFizBox Lite (AltStore, SideStore, Feather or the IPA).
+bridge to sign with, the user is sent to ifizbox.com in Safari.
 
 ## Cutting one
 
@@ -79,13 +81,13 @@ iOS SDK, which can't go on a hosted runner. The steps below are what it runs.
 
 
 1. Bump `native/VERSION` (it is X.Y.Z: the script refuses a tag that already exists), commit it and push to main.
-2. Write the notes in a file. The first lines are the ones the alert shows.
+2. Write the notes in a file. The first line is the one Changes shows.
 3. Look at the plan first: `tools/release.sh --dry-run --notes notes.md`. That builds `native/` (it needs the
    toolchain from `docs/native.md`: `SWIFT_TOOLCHAIN`, `IOS_SDK`), runs mkdeb/mkipa's checks, and prints the tag,
    the asset names and the notes. It publishes nothing and makes no network calls.
 4. Publish: `tools/release.sh --notes notes.md`. It needs `gh`, logged in with push rights on the repo. It checks for
    a clean tree, a HEAD that is on origin, and a tag that doesn't exist yet locally, on origin or as a release. Then it
-   runs `gh release create` with the three assets. GitHub creates the tag at HEAD.
+   runs `gh release create` with the assets above. GitHub creates the tag at HEAD.
    Before building it refreshes `web/app/core/piracy-list.js` from Canister (`tools/sync-piracy-list.py`),
    warns when the committed copy is older than cnstr/manifests' newest piracy-list commit, and stops if the file
    changed: commit and push it, then run again (with `publish.sh`, run that again). A dry run stays offline and only

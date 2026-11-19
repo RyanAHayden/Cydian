@@ -201,10 +201,12 @@ folder in the Files app. Paste the table here when it exists.
 
 - The app gets those four entitlements. It runs one small helper, `/var/jb/usr/libexec/ifizbox/ifizbox-helper`, as
   root through the persona attributes. The helper has no setuid bit.
-- The helper keeps an allowlist: only `apt-get update|install|remove|upgrade` and `dpkg --configure -a`, package
-  names matching `[a-z0-9.+-]+`, no options from the caller, plus the queue's `simulate`/`apply` (one
-  `apt-get [-s] install` over `name`, `name=version` and `-name` items) and `respring`: native/helper/README.md. Then it `execv`s apt from the resolved prefix. So all
-  root work goes through one checked place even though the app could spawn anything.
+- The helper keeps an allowlist of verbs, each mapped to a fixed command: `apt-get update|install|remove|upgrade`,
+  `dpkg --configure -a`, the queue's `simulate`/`apply` (one `apt-get [-s] install` over `name`, `name=version` and
+  `-name` items), holds, sources, IPA installs and uninstalls, rollbacks, paid downloads, respring, userspace reboot
+  and a few more (the full table: native/helper/README.md). Package names must match `[a-z0-9.+-]+`, and the caller
+  passes no options. Then it `execv`s from the resolved prefix. So all root work goes through one checked place even
+  though the app could spawn anything.
 - **Caller check:** without a setuid bit the helper can't become root unless an entitled process spawns it. Any other
   process running it gets plain `mobile`, and apt fails on the lock files. So the check that matters is the
   entitlement, which the kernel enforces. As defence in depth, the helper still refuses unless `getuid() == 0` and
@@ -261,13 +263,11 @@ folder in the Files app. Paste the table here when it exists.
   - bridge round-trip time (200 pings);
   - a 2000-line stream;
   - error rejection.
-- **Not verified** until it runs on a phone (the desktop runs used `http://`).
 
 ## Launch screen
 
-What opening the app shows before the page draws: Home as it loads, like the website's launch images
-(`tools/launch_images.py`, `web/app/icons/launch/`): the nav bar titled iFizBox, the pinstripes with the Loading
-spinner in the middle, the tab bar with its six icons and Home selected.
+What opening the app shows before the page draws: a plain fill in the pinstripes' light colour, then the page's own
+loading screen (`index.html` `#boot`: the bars, the pinstripes and Loading).
 
 **Constraints.** The app is built on Linux: no storyboard (no `ibtool`), no asset catalog (no `actool`, so no
 `Assets.car`). That leaves Info.plist's `UILaunchScreen` dictionary (iOS 14+). Keeping one at all matters: without
@@ -282,66 +282,39 @@ bar items and no per-screen image.
   there is no background colour: leave the key out (an empty one gives a black launch).
 - `UIImageName` is looked up by name in the bundle as `UIImage(named:in:)` does, and that finds loose
   `Name@2x.png`/`Name@3x.png` files in the app's top folder as well as catalog images. Apple's docs only say "an
-  image in your asset catalog". **Whether SpringBoard's launch-screen renderer takes loose PNGs is not verified**
-  on a phone: see "If it doesn't work" below.
+  image in your asset catalog", but SpringBoard's launch-screen renderer takes the loose PNGs.
+- A bar image is stretched to the bar, and an image is drawn centred at its own size, so bars, a title or a
+  pictured screen only line up on screens whose size is known. iFizBox uses none of them.
 
 **What iFizBox ships** (`native/Info.plist`, images in `native/launch/`, copied into both the .deb's and the IPA's
 `iFizBox.app/` by `build.sh`):
 
 | key | image | what it is |
 |---|---|---|
-| `UIImageName` | `LaunchLoading@2x/@3x.png` | the pinstripes with Loading in the middle, as big as the largest screen of each scale (414x896 pt @2x, 440x956 pt @3x), so centred it fills any screen and the bars hide the edges |
-| `UIImageRespectsSafeAreaInsets` | `false` | centred on the whole screen, so the stripes go edge to edge |
-| `UINavigationBar` → `UIImageName` | `LaunchNavBar@2x/@3x.png` | the nav bar's 44 pt gradient (highlight on top, dark line below), 1 pt wide; UIKit stretches it across the bar |
-| `UITabBar` → `UIImageName` | `LaunchTabBar@2x/@3x.png` | the tab bar's 49 pt two-tone black, 1 pt wide |
+| `UIImageName` | `LaunchLoading@2x/@3x.png` | a plain fill in `--pin-light` (`#ced3dc`), 1800x3600 px, bigger than any iPhone screen, so centred it fills every screen |
+| `UIImageRespectsSafeAreaInsets` | `false` | centred on the whole screen, so the fill goes edge to edge |
 
-`native/launch/make.py` cuts them (stdlib only) from the website's `launch-828x1792.png` (@2x) and
-`launch-1179x2556.png` (@3x). Rerun it when those change; `test_native.py` fails until the two match.
-
-**What the system launch screen can't show:** the nav bar's "iFizBox" and the tab bar's icons. A bar image is
-stretched to the bar's size, and the bar's height varies with the status bar (44 to 62 pt above the nav bar), so
-text or icons baked into it would be squashed on some phones. The bars are plain, and the title and icons come in
-a moment later with the app's own cover (below). The image is centred on the screen, while the page's spinner is
-centred between the bars, so the Loading block can sit up to about 10 pt off; the cover puts it in place.
+`native/launch/make.py` writes the two PNGs (stdlib only).
 
 **No black flash after the launch screen** (`native/Sources/App.swift`):
 
 - The window's background is the pinstripes (an 8x1 pt pattern colour of `--pin-dark`/`--pin-light`), not black.
 - The WKWebView stays `isOpaque = false` with the pinstripes as its and its scroll view's background, and
   `underPageBackgroundColor` (iOS 15+) is the light pinstripe colour.
-- **The app's cover:** until the page's first load ends (`didFinish`, or a failed load), a full-screen image view sits
-  over the web view showing this screen's exact website launch image (`web/icons/launch/launch-<W>x<H>.png` by
-  `UIScreen.nativeBounds`, already in the bundle). It then fades out over 0.2 s, onto `index.html`'s `#boot`, which
-  looks the same. So the title and icons appear as soon as the app's first frame is up, whatever the system launch
-  screen managed. On a screen with no website image (a new iPhone size) there is no cover, and the window's
-  pinstripes show until the page draws; add the size to `tools/launch_images.py`.
-- The cover and the launch images are the light theme. With Appearance set to Dark the page switches to dark when
-  the cover fades (the stored theme lives in the web view's localStorage, which the native side can't read before
-  the page loads).
+- There is no native cover over the web view: a per-screen picture would only fit screens whose size is known. The
+  window's pinstripes show until the page draws `#boot`.
 - The shell keeps the last `app.theme` (`{style, darkPalette}`, UserDefaults `ifizbox.shellTheme`). When that
   was dark (Dark, or Automatic on a dark iPhone), the window and web view start on the palette's ground (black for
   OLED Black, the dark pinstripes for Gunmetal) instead of the light pinstripes. `Theme.apply` repaints them on every
   change. The system launch screen itself is still light.
 
 **Checked by the builds:** `mkdeb.py check` and `mkipa.py check` (through `native/launch_check.py`) refuse a bundle
-whose `UILaunchScreen` doesn't name the three images, lacks any of their @2x/@3x PNGs, has a `UIColorName`, or has
-no `web/icons/launch/launch-*.png`.
+whose `UILaunchScreen` doesn't name `LaunchLoading`, lacks its @2x or @3x PNG, has bar images or a `UIColorName`, or
+doesn't set `UIImageRespectsSafeAreaInsets` to false.
 
 **Testing on a phone.** iOS caches launch screens per app (SplashBoard snapshots) and may keep showing the old one
 after an update. If the launch still looks old, delete and reinstall the app, or reboot.
 
-**If it doesn't work** (the launch is white with white bars, or still black, after a reinstall): SpringBoard didn't
-take loose PNGs, and the images need a compiled `Assets.car`. Only Apple's `actool` writes one (CoreUI's
-undocumented BOM format; no known Linux writer), so it takes one Mac run:
-
-1. Make `Launch.xcassets/` with `LaunchLoading.imageset`, `LaunchNavBar.imageset`, `LaunchTabBar.imageset` (each
-   a `Contents.json` listing the @2x and @3x PNGs from `native/launch/` with `"idiom": "universal"`) and
-   `LaunchBackground.colorset` (`--pin-light`, `#ced3dc`).
-2. `xcrun actool Launch.xcassets --compile out --platform iphoneos --minimum-deployment-target 15.0
-   --target-device iphone --output-partial-info-plist out/partial.plist`
-3. Commit `out/Assets.car` as `native/launch/Assets.car` (it holds only iFizBox's own images), have `build.sh` copy
-   it into `iFizBox.app/`, and add `UIColorName: LaunchBackground` to `UILaunchScreen` (and drop the `UIColorName`
-   refusal in `launch_check.py`). Rebuild it whenever the images change.
 
 ## Links out of the app
 

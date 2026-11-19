@@ -1,6 +1,6 @@
 # Settings
 
-Settings is at the bottom of Home. It is laid out like iOS 6's Settings app: short rows, one-line footers, each row
+Settings is on Home, directly under the tiles, beside Theme. It is laid out like iOS 6's Settings app: short rows, one-line footers, each row
 opening its own page.
 
 The settings and their pages are defined in `web/app/core/settings.js` (`SETTINGS`, `SECTIONS`, `PAGES`).
@@ -13,7 +13,7 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 | Root row | Builds | Page |
 |---|---|---|
 | iFizBox Account | all | sign in, create an account (screens/account.js) |
-| General | all | Device and iOS Version (website only, one group); Works on My Phone and Compatibility Marks; Refresh Sources on Launch; Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only; Install on the Website is padlocked while Home is locked) |
+| General | all | Device and iOS Version (website only, one group); Works on My Phone and Compatibility Marks; Refresh Sources on Launch and Return to Home After; Blocked (packages and authors); Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only; Install on the Website is padlocked while Home is locked) |
 | Theme | all | Mode (Automatic / Light / Dark, a segmented control) and Themes (Light and Dark, each a checklist of themes) |
 | Updates | all | Ignored Upgrades; Upgrade Notifications (jailbreak only); Automatic Installs (jailbreak only: Install Updates Automatically, When Charging and Locked, After a Respring Update, Keep Previous Versions); Update Alerts (sideload only) |
 | Signing | website, sideload | the certificate's name as its detail; see "Settings > Signing" below |
@@ -26,7 +26,7 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
   Re-sign Reminder).
 - Each group's footer says what its rows do in one line. A test keeps each footer to 120 characters or fewer.
 - Routes below Settings (`#/home/settings/…`): `general`, `theme` (`display` opens it too), `updates`, `<page>/<key>` (a list page),
-  `<page>/holds`, `signing[/<key>]`, `signing/help` (How Signing Works), `account`, `about`, `logs[/<id>]`. The one-segment routes (`device`,
+  `<page>/holds`, `general/blocked`, `signing[/<key>]`, `signing/help` (How Signing Works), `account`, `logs[/<id>]`. The one-segment routes (`device`,
   `iosVersion`, `holds`) open their page too. Home's device hint and a package's "Set iOS Version" use them.
 
 ## Settings > Signing
@@ -70,12 +70,14 @@ runs on every launch and costs one lookup per key when nothing is left to remove
 | Key | Builds | Default | Read by |
 |---|---|---|---|
 | `appearance` | all | light | theme (screens/settings.js applyTheme, theme-boot.js) |
+| `lightTheme`, `darkTheme` | all | classic, oled | the palette for Light and Dark (core/settings.js themeState, theme-boot.js) |
 | `device` | website | none (Not Jailbroken) | device.js, home.js, sources.js, search.js |
 | `arch` | none (stored only) | iphoneos-arm64 | backend.js getArch(). Device and the bridge set it |
 | `worksOnMyPhone` | all | on | device.js, search.js |
 | `compatMarks` | all | on | browse.js |
 | `iosVersion` | website | auto | device.js |
 | `refreshOnLaunch` | all | off on the website, on in the apps | app.js |
+| `returnHome` | all | 2 minutes | app.js: back after this long, iFizBox opens on Home as if just launched |
 | `holds` | all | none | upgrades, Changes, dpkg holds (jailbreak) |
 | `upgradeNotifications` | jailbreak | on | ifizbox-helper notifications (the `ifizbox-upgrades` daemon) |
 | `autoInstall`, `autoInstallIdle`, `respring`, `keepVersions` | jailbreak | off, on, notify, 1 | the `ifizbox-upgrades` daemon (daemonPrefs) |

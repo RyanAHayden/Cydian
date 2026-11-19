@@ -449,7 +449,7 @@ export async function jailbreakModify(pkg, { install, history = null, ask = show
   const older = installed ? versions.filter((x) => compareVersions(x.version, installed) < 0) : [];
   const held = holds.has(app.bundleIdentifier);
   const buttons = jailbreakModifyButtons({ installed, newest, held, older: older.length > 0, history: Boolean(history) && versions.length > 1 });
-  const i = await ask({ title: app.name, buttons, destructive: buttons.indexOf("Remove") });
+  const i = await ask({ title: app.name, buttons, destructive: [buttons.indexOf(IGNORE_UPGRADES), buttons.indexOf("Remove")] });
   if (i < 0) return true;
   const b = buttons[i];
   if (b === "Upgrade" || b === "Install") await install(versions[0]);

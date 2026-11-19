@@ -5,6 +5,7 @@
 //
 //   const i = await showActionSheet({ title, buttons: ["Reinstall", "Remove"], destructive: 1 });
 //   // i: the tapped button's index, or -1 for Cancel (also a tap on the dimmed screen and Escape)
+//   // destructive: one index or a list of them (red buttons)
 //
 // All text goes in through textContent.
 export function showActionSheet({ title = "", buttons = [], cancel = "Cancel", destructive = -1 } = {}) {
@@ -35,7 +36,7 @@ export function showActionSheet({ title = "", buttons = [], cancel = "Cancel", d
       parent.append(b);
       return b;
     };
-    buttons.forEach((label, i) => make(label, i === destructive ? "destructive" : "", i));
+    buttons.forEach((label, i) => make(label, [].concat(destructive).includes(i) ? "destructive" : "", i));
     const cancelButton = cancel ? make(cancel, "cancel", -1, sheet) : null;
     dim.addEventListener("click", () => close(-1));
     scrim.append(dim, sheet);

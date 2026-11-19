@@ -1254,7 +1254,8 @@ function recordApp(pkg, source, v) {
 
 // An action sheet over [{ label, run }]; runs the tapped one.
 async function sheet(title, actions) {
-  const i = await showActionSheet({ title, buttons: actions.map((a) => a.label) });
+  const i = await showActionSheet({ title, buttons: actions.map((a) => a.label),
+    destructive: actions.flatMap((a, j) => (a.red ? [j] : [])) });
   if (i >= 0) actions[i].run();
 }
 
@@ -1335,7 +1336,7 @@ async function packageActions(route, button) {
 // it's ignored (a dpkg hold in the app, core/settings.js holds). Null when neither applies.
 export function ignoreAction(id, upgrade, holds = settings.holds) {
   if (holds.has(id)) return { label: "Stop Ignoring Upgrades", run: () => holds.set(id, false) };
-  return upgrade ? { label: "Ignore Upgrades", run: () => holds.set(id, true) } : null;
+  return upgrade ? { label: "Ignore Upgrades", red: true, run: () => holds.set(id, true) } : null;
 }
 
 // B11: the nav bar sheet of a paid package its vendor sells, in the app (`paid`: extras.js paidNav). Not installed:

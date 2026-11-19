@@ -39,7 +39,7 @@ test("installed, upgrade out: the sheet, nothing installed until a button is pic
   assert.deepEqual(r.installs, []);
   assert.equal(r.asked[0].title, "A");
   assert.deepEqual(r.asked[0].buttons, ["Upgrade", IGNORE_UPGRADES, "Remove", "Downgrade", "Version History"]);
-  assert.equal(r.asked[0].destructive, 2);
+  assert.deepEqual(r.asked[0].destructive, [1, 2]);
 });
 
 test("Upgrade installs the newest; Reinstall the installed version; Downgrade asks which", async () => {

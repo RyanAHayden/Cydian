@@ -97,6 +97,8 @@ function fakeBody(scrollTop) {
   return { body, calls, overflow };
 }
 
+// Without requestAnimationFrame (these fake windows) it falls back to native scrollTo; tabbar-slide.test.js has the
+// frame-by-frame slide (B57).
 test("scrollToTop stops a fling, then scrolls smoothly to 0 (instantly with reduced motion)", () => {
   const f = fakeBody(1200);
   assert.equal(scrollToTop(f.body, { matchMedia: () => ({ matches: false }) }), true);

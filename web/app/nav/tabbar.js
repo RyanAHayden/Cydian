@@ -50,17 +50,58 @@ export function tapTab(tab, current, { selectTab, reselect, scrollTop }) {
   return "select";
 }
 
-// Scroll a page's scroller (.page-body) back to the top, smoothly unless the user asked for less motion. A fling
-// still coasting would win over scrollTo on iOS WebKit, so it is stopped first (overflow off for one layout), as
-// UIKit's status-bar tap stops the deceleration. Virtualised lists (nav/vlist.js) re-bind their rows from the
-// scroll events this sends, so the top rows are drawn when it lands.
+// Scroll a page's scroller (.page-body) back to the top, like UIKit's status-bar tap: a quick slide (TOP_MS,
+// ease-out), or an instant jump when the user asked for less motion. A fling still coasting would win over the
+// scroll on iOS WebKit, so it is stopped first (overflow off for one layout), as UIKit stops the deceleration.
+// B57: scrollTo({behavior: "smooth"}) jumped straight to the top on the iPhone 7 (iOS 15.8 WebKit, app and Safari;
+// journal/2026-11-18-b57-*), so the slide is our own: scrollTop set on each animation frame. A touch on the list
+// ends it where it is, and a new call replaces a running one. Only without requestAnimationFrame does it fall back
+// to scrollTo. Virtualised lists (nav/vlist.js) re-bind their rows from the scroll events this sends, so the top
+// rows are drawn when it lands.
+export const TOP_MS = 300;
+const slides = new WeakMap(); // body -> stop() of its running slide
+
+// Ease-out cubic: fast at first, settling into the top.
+export const easeOut = (p) => 1 - (1 - p) ** 3;
+
 export function scrollToTop(body, win = globalThis) {
   if (!body) return false;
   if (body.scrollTop <= 0) return false;
+  slides.get(body)?.();
   body.style.overflowY = "hidden";
   void body.offsetHeight;
   body.style.overflowY = "";
   const reduce = win.matchMedia && win.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  body.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  const raf = win.requestAnimationFrame;
+  if (!raf) {
+    body.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    return true;
+  }
+  if (reduce) {
+    body.scrollTop = 0;
+    return true;
+  }
+  const from = body.scrollTop;
+  let t0 = null, id = 0, done = false;
+  const stop = () => {
+    if (done) return;
+    done = true;
+    if (id && win.cancelAnimationFrame) win.cancelAnimationFrame.call(win, id);
+    if (body.removeEventListener) body.removeEventListener("touchstart", stop);
+    if (slides.get(body) === stop) slides.delete(body);
+  };
+  const frame = (now) => {
+    if (done) return;
+    if (t0 === null) t0 = now;
+    const p = Math.min(1, Math.max(0, (now - t0) / TOP_MS)); // a frame's time can predate the tap
+
+    body.scrollTop = p >= 1 ? 0 : Math.round(from * (1 - easeOut(p)));
+    if (p >= 1) stop();
+    else id = raf.call(win, frame);
+  };
+  slides.set(body, stop);
+  if (body.addEventListener) body.addEventListener("touchstart", stop, { passive: true });
+  // The first step runs now, inside the tap, so the list moves on the very next frame.
+  frame(win.performance?.now?.() ?? Date.now());
   return true;
 }

@@ -170,6 +170,8 @@ export function initScroller(screens) {
     held = body;
     held.style.overflowY = "hidden";
     sb.classList.add("grab");
+    // The finger is on the bar now, not the row under it: no blue row (app.js's .is-pressed).
+    for (const el of document.querySelectorAll(".is-pressed:not(.sel-ghost)")) el.classList.remove("is-pressed");
     clearTimeout(hideTimer);
     if (globalThis.ifizboxApp) haptic(); // the app's bridge can tick any time; Safari only at the touch's end
   };
@@ -178,6 +180,8 @@ export function initScroller(screens) {
     const t = e.touches[0];
     if (!onBar(t.clientX, t.clientY)) return;
     clearTimeout(hideTimer); // keep it showing while the finger decides
+    // A hold here must not select text or open the callout on what's behind the bar (ios6.css .bar-touch).
+    document.documentElement.classList.add("bar-touch");
     pending = { id: t.identifier, x: t.clientX, y: t.clientY, timer: setTimeout(() => {
       if (pending) { const y = pending.y; pending = null; startGrab(y); }
     }, HOLD) };
@@ -186,7 +190,9 @@ export function initScroller(screens) {
     const t = [...e.touches].find((x) => pending ? x.identifier === pending.id : true);
     if (!t) return;
     if (pending) {
-      if (Math.hypot(t.clientX - pending.x, t.clientY - pending.y) > SLOP) { clearTimeout(pending.timer); pending = null; fadeSoon(); }
+      if (Math.hypot(t.clientX - pending.x, t.clientY - pending.y) > SLOP) {
+        clearTimeout(pending.timer); pending = null; document.documentElement.classList.remove("bar-touch"); fadeSoon();
+      }
       return;
     }
     if (grab === null || !body) return;
@@ -200,8 +206,10 @@ export function initScroller(screens) {
   }, { capture: true, passive: false });
   const end = (e) => {
     if (pending) { clearTimeout(pending.timer); pending = null; }
+    document.documentElement.classList.remove("bar-touch");
     if (grab === null) { if (sb.classList.contains("on")) fadeSoon(); return; }
     grab = null;
+    if (e?.cancelable) e.preventDefault(); // no click on the row under the bar after a grab
     sb.classList.remove("grab");
     if (held) { held.style.overflowY = ""; held = null; }
     // Safari plays its switch haptic only inside a finished touch (touchend counts, a timer doesn't).
@@ -214,7 +222,7 @@ export function initScroller(screens) {
     }
     draw();
   };
-  document.addEventListener("touchend", end, { capture: true, passive: true });
+  document.addEventListener("touchend", end, { capture: true, passive: false });
   document.addEventListener("touchcancel", end, { capture: true, passive: true });
   return sb;
 }

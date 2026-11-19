@@ -88,3 +88,59 @@ test("signInBrowser: the first Install's cut download goes on to sign and upload
   assert.deepEqual(signedBytes, IPA);
   assert.deepEqual(alerts.map((a) => a.title), ["Ready to Install"]);
 });
+
+// B95: the Worker hands the body on untouched, so a body that breaks off is resumed from the bytes already here, with
+// Range: bytes=n- (passed on by the Worker), as long as each try brings more.
+function ranged(cuts) {
+  const calls = [];
+  const fetcher = async (url, init = {}) => {
+    const range = init.headers?.Range ?? null;
+    calls.push(range);
+    const from = range ? Number(/^bytes=(\d+)-$/.exec(range)[1]) : 0;
+    const stop = cuts[calls.length - 1] ?? IPA.length; // where this answer's body breaks off
+    let sent = false; // the bytes first, then the break (an error in start would drop the queued bytes)
+    const body = new ReadableStream({
+      pull(c) {
+        if (!sent) { sent = true; c.enqueue(IPA.slice(from, Math.max(from, stop))); return; }
+        if (stop < IPA.length) c.error(new TypeError("Load failed")); else c.close();
+      },
+    }, { highWaterMark: 0 });
+    return new Response(body, range
+      ? { status: 206, headers: { "X-IPA-Length": String(IPA.length), "Content-Range": `bytes ${from}-${IPA.length - 1}/${IPA.length}` } }
+      : { headers: { "X-IPA-Length": String(IPA.length), "Content-Length": String(IPA.length) } });
+  };
+  return { fetcher, calls };
+}
+
+test("downloadIpa: a broken body is resumed from where it broke off (Range)", async () => {
+  const s = ranged([3, 6, 8]);
+  assert.deepEqual(await downloadIpa("https://a.example/x.ipa", { fetcher: s.fetcher }), IPA);
+  assert.deepEqual(s.calls, [null, "bytes=3-", "bytes=6-", "bytes=8-"]);
+});
+
+test("downloadIpa: a resume that brings nothing new ends in words", async () => {
+  const s = ranged([4, 4]);
+  await assert.rejects(downloadIpa("https://a.example/x.ipa", { fetcher: s.fetcher }), (e) => e.code === "network" && e.message === CUT_TEXT);
+  assert.deepEqual(s.calls, [null, "bytes=4-"]);
+});
+
+test("downloadIpa: an answer to a resume that isn't the asked-for part starts again from byte 0", async () => {
+  const calls = [];
+  const fetcher = async (url, init = {}) => {
+    calls.push(init.headers?.Range ?? null);
+    const first = calls.length === 1;
+    let sent = false;
+    const body = new ReadableStream({ pull(c) {
+      if (!sent) { sent = true; c.enqueue(IPA.slice(0, first ? 4 : IPA.length)); return; }
+      if (first) c.error(new TypeError("Load failed")); else c.close();
+    } }, { highWaterMark: 0 });
+    return new Response(body, { headers: { "X-IPA-Length": String(IPA.length) } }); // a 200: the Range was ignored
+  };
+  assert.deepEqual(await downloadIpa("https://a.example/x.ipa", { fetcher }), IPA);
+  assert.deepEqual(calls, [null, "bytes=4-"]);
+});
+
+test("downloadIpa: a body over the cap is stopped here, without a length too", async () => {
+  const fetcher = async () => new Response(new ReadableStream({ start(c) { c.enqueue(IPA); c.close(); } }));
+  await assert.rejects(downloadIpa("https://a.example/x.ipa", { fetcher, max: 5 }), (e) => e.code === "too_large");
+});

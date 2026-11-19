@@ -27,6 +27,8 @@
 //                                           its own query (bundleid, version, title), else once the reservation lands
 //                                           (up to 15 s); app.ipa holds up to 2 minutes: headers once the upload has
 //                                           started, the body once it's done. The same POST with token and size starts it
+//   POST /sign/upload/<token>/fail          B95: the website's sign failed after iOS was sent to that link: its held and
+//                                           later manifest.plist and app.ipa answer 404 at once (refused once parts came)
 //   GET/PUT/DELETE /api/account/<id>       F97: iFizBox Account's encrypted blob (src/account.js)
 //   GET  /api/fetch?url=&kind=ipa           F93: an IPA for the website's signer, streamed, up to MAX_UPLOAD_MB
 //   GET  /api/applookup?bundleId=&country=  F161: Apple's iTunes Search API lookup of one app by bundle ID (the
@@ -130,17 +132,19 @@ async function viaGitHubApi(url, token, { fetcher = fetch } = {}) {
   return fetcher(where, { headers: { "User-Agent": DOMAIN }, cf: RELEASE_CACHE });
 }
 
-export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promise((r) => setTimeout(r, ms)), token = null } = {}) {
+export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promise((r) => setTimeout(r, ms)), token = null, range = null } = {}) {
   const cf = releaseFile(url) ? RELEASE_CACHE : { cacheTtl: 0 };
+  // B95: a Range (bytes=n-) goes on, so the website can resume an IPA whose body broke off
+  const asked = range ? { ...CYDIA, Range: range } : CYDIA;
   let r;
   for (let attempt = 0; attempt < 3; attempt++) {
     // 30 s for the answer to start, not for the whole body: a 40 MB IPA streams for longer than that ("Load failed")
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 30000);
-    try { r = await fetcher(url, { headers: CYDIA, redirect: "follow", cf, signal: ctl.signal }); } finally { clearTimeout(timer); }
+    try { r = await fetcher(url, { headers: asked, redirect: "follow", cf, signal: ctl.signal }); } finally { clearTimeout(timer); }
     // A 404 the edge kept (from before RELEASE_CACHE, or a redirect's hop, as releases/latest/download's to the
     // tagged file): ask the server itself once.
-    if (r.status === 404) r = await fetcher(url, { headers: CYDIA, redirect: "follow", cache: "no-store" });
+    if (r.status === 404) r = await fetcher(url, { headers: asked, redirect: "follow", cache: "no-store" });
     if (r.status !== 429 && r.status < 500) return r;
     const after = Number(r.headers.get("retry-after"));
     await wait(Number.isFinite(after) && after > 0 && after <= 5 ? after * 1000 : 600 * (attempt + 1));
@@ -257,7 +261,7 @@ export function ownRepoUrl(target, u) {
   return target.protocol === "https:" && hosts.has(target.host) && /^\/repo(\/|$)/.test(target.pathname) ? target : null;
 }
 
-async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null, env = {}) {
+async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null, env = {}, range = null) {
   const target = httpUrl(u.searchParams.get("url") ?? "");
   if (!target) return fetchErr("bad_url", "Only http(s) URLs can be fetched.", 400);
   const kind = u.searchParams.get("kind") ?? "";
@@ -278,7 +282,7 @@ async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null, env = {}) {
       }
       return fetchErr("not_found", "This repo has no Packages.gz or Packages file.", 404);
     }
-    if (kind === "ipa") return ipaFetch(target, maxBytes, token);
+    if (kind === "ipa") return ipaFetch(target, maxBytes, token, range);
     if (kind) return fetchErr("bad_url", `unknown kind ${kind}`, 400);
     const r = await upstream(target.href, { token });
     if (!r.ok) return fetchErr("upstream", `upstream answered HTTP ${r.status}`, r.status >= 400 && r.status < 600 ? r.status : 502);
@@ -297,27 +301,26 @@ export const uploadCap = (env) => (env.MAX_UPLOAD_MB === undefined || env.MAX_UP
 const tooBig = (max) => `Apps up to ${Math.round(max / 1024 / 1024)} MB can be signed on the website.`;
 
 // The IPA, streamed through (no buffering: a Worker has 128 MB): headers within 30 s, then as long as the body takes,
-// cut at maxBytes.
-async function ipaFetch(target, maxBytes, token = null) {
+// refused up front when its Content-Length is over maxBytes. `rangeAsked`: the website's Range (bytes=n-) to resume.
+async function ipaFetch(target, maxBytes, token = null, rangeAsked = null) {
   if (!maxBytes) return fetchErr("refused", "This server doesn't sign on the website.", 403);
+  const range = /^bytes=\d+-$/.test(rangeAsked ?? "") ? rangeAsked : null;
   // The same download as everything else: retries, a day's edge cache for GitHub release files, the token on a 429.
-  const r = await upstream(target.href, { token });
+  const r = await upstream(target.href, { token, range });
   if (!r.ok) return fetchErr("upstream", `upstream answered HTTP ${r.status}`, r.status >= 400 && r.status < 600 ? r.status : 502);
   const len = Number(r.headers.get("content-length") || 0);
   if (len > maxBytes) { r.body?.cancel(); return fetchErr("too_large", tooBig(maxBytes), 413); }
-  let seen = 0;
-  // B87: a stream from upstream that ends short of its Content-Length is an error, not a clean (and short) end: the
-  // browser's read then fails and the website fetches it again, instead of signing half an IPA.
-  const cap = new TransformStream({ transform(chunk, c) {
-    seen += chunk.byteLength;
-    if (seen > maxBytes) c.error(new Error(tooBig(maxBytes))); else c.enqueue(chunk);
-  }, flush(c) {
-    if (len && seen < len) c.error(new Error(`upstream stopped after ${seen} of ${len} bytes`));
-  } });
-  // B87: Cloudflare drops Content-Length from a body a Worker streams through JS, so the length goes again in
-  // X-IPA-Length: the website checks it got every byte (signing-client.js downloadIpa).
-  return new Response(r.body.pipeThrough(cap), { headers: { ...SAFE, "Content-Type": "application/octet-stream",
-    ...(len ? { "Content-Length": String(len), "X-IPA-Length": String(len), "Access-Control-Expose-Headers": "X-IPA-Length" } : {}),
+  // B95: the body goes out untouched, no JS per chunk: a JS TransformStream here (byte cap, short-end check) cost
+  // Worker CPU for every chunk, and a 104 MB IPA ran out of it ("exceededCpu"), its body ending short but cleanly.
+  // Untouched, Cloudflare streams it natively and Content-Length survives. The website checks the cap and the length
+  // itself (signing-client.js downloadIpa, X-IPA-Length), and resumes a short body with Range, passed through here.
+  const total = range && r.status === 206 ? Number(/\/(\d+)$/.exec(r.headers.get("content-range") ?? "")?.[1] || 0) : len;
+  if (total > maxBytes) { r.body?.cancel(); return fetchErr("too_large", tooBig(maxBytes), 413); }
+  return new Response(r.body, { status: r.status === 206 ? 206 : 200, headers: { ...SAFE, "Content-Type": "application/octet-stream",
+    ...(len ? { "Content-Length": String(len) } : {}),
+    ...(total ? { "X-IPA-Length": String(total) } : {}),
+    ...(r.status === 206 && r.headers.get("content-range") ? { "Content-Range": r.headers.get("content-range") } : {}),
+    "Access-Control-Expose-Headers": "X-IPA-Length, Content-Range",
     "X-Source-URL": encodeURI(r.url) } });
 }
 
@@ -356,7 +359,7 @@ async function uploads(req, u, env, ttl) {
     const own = u.searchParams.get("token");
     if (own !== null && !TOKEN.test(own)) return fail("bad_request", "A token is 48 hex digits.");
     const before = own ? await metaOf(env, own) : null;
-    if (before && (!before.reserved || before.parts || before.bundleId !== app.bundleId)) return fail("bad_request", "That token is taken.", 409);
+    if (before && (!before.reserved || before.parts || before.failed || before.bundleId !== app.bundleId)) return fail("bad_request", "That token is taken.", 409);
     if (!u.searchParams.has("size") && own) {
       if (!before) await env.HOSTED.put(upKey(own), "", { expirationTtl: ttl, metadata: { ...app, reserved: true, done: false } });
       return json({ token: own, reserved: true, expiresIn: ttl });
@@ -366,6 +369,15 @@ async function uploads(req, u, env, ttl) {
     const t = own ?? token(), parts = Math.ceil(size / PART);
     await env.HOSTED.put(upKey(t), "", { expirationTtl: ttl, metadata: { ...app, ...(own ? { reserved: true } : {}), size, parts, partSize: PART, done: false } });
     return json({ token: t, partSize: PART, parts, expiresIn: ttl });
+  }
+  // B95: the website's sign failed (or was cancelled) after iOS was sent to its early link: iOS's held app.ipa, and
+  // every request on the link after it, answer an error at once instead of holding (iOS showed a blank, stuck icon).
+  const f = /^\/sign\/upload\/([0-9a-f]{48})\/fail$/.exec(u.pathname);
+  if (f && req.method === "POST") {
+    const meta = await metaOf(env, f[1]);
+    if (meta?.done || meta?.parts) return fail("bad_request", "That upload has begun.", 409);
+    if (!meta?.failed) await env.HOSTED.put(upKey(f[1]), "", { expirationTtl: ttl, metadata: { ...(meta ?? {}), reserved: true, failed: true, done: false } });
+    return json({ ok: true });
   }
   const p = /^\/sign\/upload\/([0-9a-f]{48})\/(\d{1,4}|done)$/.exec(u.pathname);
   if (p && (req.method === "PUT" || req.method === "POST")) {
@@ -403,7 +415,8 @@ async function uploads(req, u, env, ttl) {
     // website knows the bundle ID it will sign as), else from the reservation, waited for (the website sends it just
     // after opening the link); app.ipa answers its headers once the upload has started (its size known), and its body
     // once it's done (bodyWait). A plain upload's link is only made once it's done, so nothing there waits.
-    const started = (m) => !m || m.done || !m.reserved || (m.parts && !req.headers.get("Range"));
+    const started = (m) => !m || m.done || !m.reserved || m.failed || (m.parts && !req.headers.get("Range"));
+    const stopped = () => fail("gone", "That install was stopped: the app couldn't be signed.", 404); // B95
     const t0 = Date.now();
     let meta;
     if (h[2] === "manifest.plist") {
@@ -415,10 +428,12 @@ async function uploads(req, u, env, ttl) {
       }
       if (!meta) meta = await waitFor(() => metaOf(env, h[1]), (m) => Boolean(m), MANIFEST_WAIT, env);
       if (!meta?.done && !meta?.reserved) return fail("gone", "That install link has expired.", 404);
+      if (meta.failed) return stopped();
       if (req.method === "GET") await markIos(env, h[1], "manifest", ttl);
       return plist(manifest({ url: `${u.origin}/sign/up/${h[1]}/app.ipa`, ...meta }));
     }
     meta = await waitFor(() => metaOf(env, h[1]), started, IPA_WAIT, env);
+    if (meta?.failed) return stopped();
     if (!meta?.done && !(meta?.reserved && meta.parts && !req.headers.get("Range"))) {
       return fail("gone", meta ? "The app wasn't uploaded in time. Install again." : "That install link has expired.", 404);
     }
@@ -435,35 +450,39 @@ async function uploads(req, u, env, ttl) {
     const headers = { "Content-Type": "application/octet-stream", "Accept-Ranges": "bytes", "Cache-Control": "no-store",
       "Content-Length": String(end - start + 1), ...(status === 206 ? { "Content-Range": `bytes ${start}-${end}/${n}` } : {}) };
     if (req.method === "HEAD") return new Response(null, { status, headers });
-    let i = Math.floor(start / meta.partSize);
-    const last = Math.floor(end / meta.partSize);
-    let begun = false;
-    const body = new ReadableStream({
-      async pull(c) {
-        if (bodyWait) {
-          const m = await bodyWait();
-          bodyWait = null;
-          if (!m?.done) { c.error(new Error("not uploaded in time")); return; }
-        }
-        if (i > last) { c.close(); return; }
-        const data = await env.HOSTED.get(partKey(h[1], i), { type: "arrayBuffer" });
-        if (!data) { c.error(new Error("expired")); return; }
-        if (!begun) { begun = true; await markIos(env, h[1], "started", ttl); } // F190
-        const from = i * meta.partSize;
-        c.enqueue(new Uint8Array(data.slice(Math.max(0, start - from), Math.min(data.byteLength, end - from + 1))));
-        i++;
-        // F190: the app's last byte is handed over (a Range that stops short of it isn't the end)
-        if (i > last && end === n - 1) await markIos(env, h[1], "finished", ttl);
-      },
-    });
-    if (typeof FixedLengthStream === "function") { // Cloudflare: keeps the Content-Length on a streamed body
-      const f = new FixedLengthStream(end - start + 1);
-      body.pipeTo(f.writable).catch(() => {});
-      return new Response(f.readable, { status, headers });
-    }
-    return new Response(body, { status, headers });
+    // FixedLengthStream (Cloudflare) keeps the Content-Length on a streamed body; Node's tests use a plain one.
+    const f = typeof FixedLengthStream === "function" ? new FixedLengthStream(end - start + 1) : new TransformStream();
+    upPump(env, h[1], meta, start, end, n, ttl, f.writable, bodyWait).catch((e) => f.writable.abort(e).catch(() => {}));
+    return new Response(f.readable, { status, headers });
   }
   return null;
+}
+
+// B95: app.ipa's bytes, part by part from KV into `out`. A part sent whole is KV's own stream piped natively (no JS per
+// chunk, no copy: a 104 MB app copied through JS ran into the Worker's CPU limit); only a Range's first and last
+// part, cut, go through JS, as views of the part read. F190: started with the first part, finished once the app's
+// last byte is handed over (a Range that stops short of it isn't the end).
+async function upPump(env, t, meta, start, end, n, ttl, out, bodyWait) {
+  if (bodyWait) {
+    const m = await bodyWait();
+    if (!m?.done) throw new Error("not uploaded in time");
+  }
+  const last = Math.floor(end / meta.partSize);
+  for (let i = Math.floor(start / meta.partSize); i <= last; i++) {
+    const from = i * meta.partSize, size = partLen(meta, i);
+    const a = Math.max(0, start - from), b = Math.min(size, end - from + 1);
+    const whole = a === 0 && b === size;
+    const data = await env.HOSTED.get(partKey(t, i), { type: whole ? "stream" : "arrayBuffer" });
+    if (!data) throw new Error("expired");
+    if (i === Math.floor(start / meta.partSize)) await markIos(env, t, "started", ttl);
+    if (whole) await data.pipeTo(out, { preventClose: true });
+    else {
+      const w = out.getWriter();
+      try { await w.write(new Uint8Array(data, a, b - a)); } finally { w.releaseLock(); }
+    }
+  }
+  if (end === n - 1) await markIos(env, t, "finished", ttl);
+  await out.close();
 }
 
 // F121: how long a reserved link's requests wait (ms), and how often they look again. iOS asks for the manifest the
@@ -673,7 +692,7 @@ export default {
     if (isUdidPath(u.pathname)) return udid(req, env); // F253: this iPhone's UDID via a profile (src/udid.js)
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
-    if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null, env);
+    if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null, env, req.headers.get("Range"));
     if (u.pathname === "/api/applookup" && req.method === "GET") return appLookup(u, env);
     if (u.pathname === "/api/appreviews" && req.method === "GET") return appReviews(u, env); // B37
     if (u.pathname === "/api/ipainfo" && req.method === "GET") return ipaInfo(u, env); // F160

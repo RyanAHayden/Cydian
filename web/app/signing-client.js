@@ -629,39 +629,56 @@ async function retrying(send, { tries = 3, wait = (ms) => new Promise((r) => set
 // from the start. Once, because what breaks is a cold download: the first request for a release file streams from
 // GitHub through Cloudflare while the edge keeps a copy (worker/src/index.js RELEASE_CACHE), and the second comes from
 // that copy (user 2026-11-19: Install failed the first time, then worked). A second break says so in words.
+// B95: the Worker now hands the body on untouched (it used to run out of CPU on big apps, cutting them short), so the
+// cap and the length are checked only here. A body that broke off is resumed from the bytes already here (Range:
+// bytes=n-, which the Worker passes on), up to CUT_TRIES times while each try brings more; an answer that isn't the
+// asked-for part (200) starts again from byte 0. A try that brings nothing new ends it, in words.
 export const CUT_TEXT = "The app's download broke off before the end. Check the connection and tap Install again.";
+export const CUT_TRIES = 5;
 export async function downloadIpa(url, opts = {}) {
-  try { return await downloadIpaOnce(url, opts); } catch (e) {
-    if (e?.code !== "cut" || opts.signal?.aborted) throw e;
-  }
-  try { return await downloadIpaOnce(url, opts); } catch (e) {
-    if (e?.code === "cut") throw signFail("network", CUT_TEXT);
-    throw e;
+  const got = { buf: null, n: 0 };
+  for (let tries = 0; ; tries++) {
+    const before = got.n;
+    try { return await downloadIpaOnce(url, opts, got); } catch (e) {
+      if (e?.code !== "cut" || opts.signal?.aborted) throw e;
+      if (tries >= CUT_TRIES || (tries >= 1 && got.n <= before)) throw signFail("network", CUT_TEXT);
+    }
   }
 }
 
-async function downloadIpaOnce(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, max = IPA_MAX, wait = undefined, signal = null } = {}) {
+async function downloadIpaOnce(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, max = IPA_MAX, wait = undefined, signal = null } = {}, got = { buf: null, n: 0 }) {
   let res;
-  try { res = await retrying(() => fetcher(`${base}/api/fetch?${new URLSearchParams({ url, kind: "ipa" })}`, { cache: "no-store", ...(signal ? { signal } : {}) }), { wait, signal }); } catch {
+  const init = { cache: "no-store", ...(got.n ? { headers: { Range: `bytes=${got.n}-` } } : {}), ...(signal ? { signal } : {}) };
+  try { res = await retrying(() => fetcher(`${base}/api/fetch?${new URLSearchParams({ url, kind: "ipa" })}`, init), { wait, signal }); } catch {
     if (signal?.aborted) throw signFail("cancelled", "Cancelled");
     throw signFail("network", "The app couldn't be downloaded: no connection to the server.");
   }
   if (!res.ok) throw await answerError(res);
-  const total = Number(res.headers?.get?.("content-length") || res.headers?.get?.("x-ipa-length") || 0);
+  const head = (k) => res.headers?.get?.(k);
+  // a resume goes on only from the asked-for byte; anything else is the whole app again
+  const resumed = got.n > 0 && res.status === 206 && Number(/^bytes (\d+)-/.exec(head("content-range") ?? "")?.[1]) === got.n;
+  if (!resumed) { got.n = 0; }
+  const total = Number(head("x-ipa-length") || (resumed ? 0 : head("content-length")) || 0);
   if (total > max) throw signFail("too_large", `Apps up to ${Math.round(max / 1048576)} MB can be signed on the website.`);
   const cut = (e) => (signal?.aborted ? signFail("cancelled", "Cancelled") : signFail("cut", `The download broke off: ${e?.message ?? e}`));
   if (!res.body?.getReader) {
     let whole;
     try { whole = new Uint8Array(await res.arrayBuffer()); } catch (e) { throw cut(e); }
+    if (resumed) { const b = new Uint8Array(got.n + whole.length); b.set(got.buf.subarray(0, got.n)); b.set(whole, got.n); whole = b; }
+    if (whole.length > max) throw signFail("too_large", `Apps up to ${Math.round(max / 1048576)} MB can be signed on the website.`);
+    got.buf = whole; got.n = whole.length;
     if (total && whole.length < total) throw cut(`${whole.length} of ${total} bytes`);
     return whole;
   }
   const reader = res.body.getReader();
-  let buf = new Uint8Array(total || 1 << 20), n = 0;
+  let buf = resumed ? got.buf : new Uint8Array(total || 1 << 20), n = resumed ? got.n : 0;
+  if (resumed && total > buf.length) { const b = new Uint8Array(total); b.set(buf.subarray(0, n)); buf = b; }
+  // what came stays in `got` when the body breaks off, for the next try to resume from
+  const keep = () => { got.buf = buf; got.n = n; };
   for (;;) {
     if (signal?.aborted) { reader.cancel?.()?.catch?.(() => {}); throw signFail("cancelled", "Cancelled"); } // a broken body's cancel rejects
     let step;
-    try { step = await reader.read(); } catch (e) { throw cut(e); }
+    try { step = await reader.read(); } catch (e) { keep(); throw cut(e); }
     const { done, value } = step;
     if (done) break;
     if (n + value.length > max) { reader.cancel?.(); throw signFail("too_large", `Apps up to ${Math.round(max / 1048576)} MB can be signed on the website.`); }
@@ -670,6 +687,7 @@ async function downloadIpaOnce(url, { base = "", fetcher = globalThis.fetch, onP
     n += value.length;
     if (total) onProgress(Math.min(99, Math.floor((n / total) * 100)));
   }
+  keep();
   if (total && n < total) throw cut(`${n} of ${total} bytes`);
   return buf.length === n ? buf : buf.slice(0, n);
 }
@@ -751,6 +769,16 @@ export async function reserveUpload(token, { bundleId, name, version }, { base =
   } catch { return false; }
 }
 
+// B95: the sign failed (or was cancelled, or the app came out under another bundle ID) after iOS was sent to the early
+// link: POST /sign/upload/<token>/fail, so the Worker answers iOS's held app.ipa at once instead of holding it, and
+// iOS isn't left waiting on an app that never comes (a blank icon stuck on the Home Screen). Not awaited by callers
+// past the alert; never throws.
+export async function dropEarly(token, { base = "", fetcher = globalThis.fetch } = {}) {
+  try { return (await fetcher(`${base}/sign/upload/${token}/fail`, { method: "POST", cache: "no-store" })).ok; } catch { return false; }
+}
+// What the failure says when iOS was sent to the early link: iOS may still show the app's icon, blank.
+export const iconLeftText = (app) => `If a blank ${app ? `${app} ` : ""}icon stays on the Home Screen, press and hold it and delete it.`;
+
 // F197: the bytes of an IPA kept in this browser (My IPAs' Choose File): a Uint8Array, ArrayBuffer or Blob, or a
 // function answering one (read only after Install's tap has opened iOS's prompt).
 async function keptBytes(src) {
@@ -788,8 +816,13 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     } catch { early = null; }
   }
   const reserved = early ? reserveUpload(early.token, { bundleId: expected, name: name || expected, version }, { base, fetcher }) : null;
+  // B95: the early link dropped once it can't get this app; `intoEarly` is set when the upload goes into it
+  let intoEarly = false;
+  const opened = Boolean(early); // iOS was sent to a link: the failure text says what to do with its icon
+  const drop =() => { if (early && !intoEarly) { const t = early.token; early = null; return dropEarly(t, { base, fetcher }); } return null; };
   const id = await identity();
   if (!id?.p12 || !id?.profile) {
+    drop();
     await alert({ title: "No Certificate", message: "Add your certificate, its password and provisioning profile in Settings > Signing.", buttons: ["OK"] });
     (await import("./screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version, bytes }) }); // F177
     go(["signing"]);
@@ -810,8 +843,9 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     h.set("Uploading");
     const ipaBytes = signed.ipa instanceof Uint8Array ? signed.ipa : new Uint8Array(signed.ipa);
     // the early link takes this app only if it came out with the reserved bundle ID (iOS already has its manifest)
-    const intoEarly = early && signed.bundleId === early.bundleId && (await reserved);
-    const body = await untilCancel(h, uploadSigned(ipaBytes, signed, { base, fetcher, onProgress: pct("Uploading"), token: intoEarly ? early.token : null,
+    intoEarly = Boolean(early && signed.bundleId === early.bundleId && (await reserved));
+    if (!intoEarly) drop(); // the Ready to Install alert's own link follows
+    const body =await untilCancel(h, uploadSigned(ipaBytes, signed, { base, fetcher, onProgress: pct("Uploading"), token: intoEarly ? early.token : null,
       ...(signal ? { signal } : {}) }));
     if (h.cancelled) return false;
     onInstalled({ ...body, bundleId: signed.bundleId, name: signed.name, version: signed.version });
@@ -831,9 +865,11 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
       buttons: ["Cancel", "Install"], cancel: 0, onTap: (i) => { if (i === 1) open(body.itms); } });
     return index === 1;
   } catch (e) {
+    drop();
     if (h.cancelled) return false; // F188: Cancel closed the page; no alert after it
     failed(h, String(e?.message ?? e));
-    await alert({ title: name ? `Couldn't Install ${name}` : "Couldn't Install", message: String(e?.message ?? e), buttons: ["OK"] });
+    const message = String(e?.message ?? e) + (opened ? `\n\n${iconLeftText(name)}` : "");
+    await alert({ title: name ? `Couldn't Install ${name}` : "Couldn't Install", message, buttons: ["OK"] });
     return false;
   }
 }

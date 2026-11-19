@@ -4,7 +4,13 @@ import w, { manifest, allowed, loopbackUrl, appOf } from "./src/index.js";
 const store = new Map();
 const env = { HOST_IDS: "*.ifizbox", TTL: "600", HOSTED: {
   put: async (k, v, o) => store.set(k, { v, m: o.metadata }),
-  get: async (k) => store.get(k)?.v ?? null,
+  // B95: type "stream" as KV gives it (app.ipa pipes whole parts), the value in two chunks
+  get: async (k, o) => {
+    const v = store.get(k)?.v ?? null;
+    if (v === null || o?.type !== "stream") return v;
+    const b = new Uint8Array(v), half = b.length >> 1;
+    return new ReadableStream({ start(c) { c.enqueue(b.slice(0, half)); c.enqueue(b.slice(half)); c.close(); } });
+  },
   getWithMetadata: async (k) => ({ value: null, metadata: store.get(k)?.m ?? null }) } };
 const go = (path, init) => w.fetch(new Request("https://sign.example" + path, init), env);
 
@@ -284,6 +290,26 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   const t0 = Date.now();
   assert.equal((await go(`/sign/up/${plainUp.token}/app.ipa`)).status, 404);
   assert.ok(Date.now() - t0 < 1000);
+  // B95: the website's sign failed: iOS's held app.ipa answers at once, and the link's later requests too; the token
+  // can't be started after it, and a link whose upload began can't be failed
+  const t4 = "f4".repeat(24);
+  await at(`/sign/upload?bundleid=com.a&version=1&title=A&token=${t4}`, { method: "POST" });
+  const held4 = at(`/sign/up/${t4}/app.ipa`), t4s = Date.now();
+  await new Promise((res) => setTimeout(res, 20));
+  assert.deepEqual(await (await at(`/sign/upload/${t4}/fail`, { method: "POST" })).json(), { ok: true });
+  r = await held4;
+  assert.equal(r.status, 404);
+  assert.match((await r.json()).error, /stopped/);
+  assert.ok(Date.now() - t4s < 3000, "answered once the fail landed, not after the whole wait");
+  assert.equal((await at(`/sign/up/${t4}/manifest.plist?bundleid=com.a&version=1&title=A`)).status, 404);
+  assert.equal((await at(`/sign/up/${t4}/app.ipa`, { method: "HEAD" })).status, 404);
+  assert.equal((await at(`/sign/upload?bundleid=com.a&token=${t4}&size=6`, { method: "POST" })).status, 409);
+  assert.equal((await at(`/sign/upload/${t4}/fail`, { method: "POST" })).status, 200); // again: nothing more
+  const t5 = "f5".repeat(24); // failed before its reservation landed: the reservation can't take it back
+  assert.equal((await at(`/sign/upload/${t5}/fail`, { method: "POST" })).status, 200);
+  assert.equal((await at(`/sign/upload?bundleid=com.a&version=1&title=A&token=${t5}`, { method: "POST" })).status, 409);
+  assert.equal((await at(`/sign/up/${t5}/manifest.plist?bundleid=com.a&version=1&title=A`)).status, 404);
+  assert.equal((await at(`/sign/upload/${tok}/fail`, { method: "POST" })).status, 409);
   // waitFor: looks until ok or out of time
   let n = 0;
   assert.equal(await waitFor(async () => ++n, (v) => v === 3, 60000, {}, async () => {}), 3);
@@ -872,26 +898,51 @@ import { d1 } from "./src/d1-sqlite.js";
   console.log("worker self source: ok");
 }
 
-// B87: /api/fetch?kind=ipa keeps the IPA's length where the browser can read it (X-IPA-Length: Cloudflare drops
-// Content-Length from a body streamed through JS), and an upstream that stops short of its length errors the stream
-// instead of ending it cleanly, so the website sees the cut rather than signing half an IPA.
+// B87/B95: /api/fetch?kind=ipa hands on upstream's body untouched (no JS per chunk: a 104 MB IPA through a JS
+// TransformStream ran out of Worker CPU), with Content-Length and X-IPA-Length for the website's own checks; one
+// over the cap is refused up front; a Range (bytes=n-) goes on, so the website can resume a body that broke off.
 {
   const realFetch = globalThis.fetch;
   const bytes = new Uint8Array([0x50, 0x4b, 3, 4, 5, 6, 7, 8]);
-  const answer = (sent) => new Response(new ReadableStream({ start(c) { c.enqueue(bytes.slice(0, sent)); c.close(); } }),
-    { headers: { "Content-Length": String(bytes.length) } });
-  const ipaGo = () => w.fetch(new Request("https://sign.example/api/fetch?kind=ipa&url=" + encodeURIComponent("https://example.com/x.ipa")), env);
+  let sentBody = null, asked = [];
+  const answer = (headers, data = bytes, status = 200) => async (url, init) => {
+    asked.push(init?.headers?.Range ?? null);
+    sentBody = new ReadableStream({ start(c) { c.enqueue(data); c.close(); } });
+    return new Response(sentBody, { status, headers });
+  };
+  const ipaGo = (init) => w.fetch(new Request("https://sign.example/api/fetch?kind=ipa&url=" + encodeURIComponent("https://example.com/x.ipa"), init), env);
   try {
-    globalThis.fetch = async () => answer(bytes.length);
+    globalThis.fetch = answer({ "Content-Length": "8" });
     let r = await ipaGo();
     assert.equal(r.status, 200);
+    assert.equal(r.body, sentBody, "the body is upstream's own stream, not piped through JS");
+    assert.equal(r.headers.get("content-length"), "8");
     assert.equal(r.headers.get("x-ipa-length"), "8");
     assert.match(r.headers.get("access-control-expose-headers"), /X-IPA-Length/);
     assert.deepEqual(new Uint8Array(await r.arrayBuffer()), bytes);
-    globalThis.fetch = async () => answer(5);
+    assert.deepEqual(asked, [null]);
+    // over the cap: refused before any byte
+    globalThis.fetch = answer({ "Content-Length": String(600 * 1024 * 1024) });
     r = await ipaGo();
+    assert.equal(r.status, 413);
+    assert.equal((await r.json()).code, "too_large");
+    // resumed: the Range goes on, the answer's total in X-IPA-Length
+    asked = [];
+    globalThis.fetch = answer({ "Content-Length": "3", "Content-Range": "bytes 5-7/8" }, bytes.slice(5), 206);
+    r = await ipaGo({ headers: { Range: "bytes=5-" } });
+    assert.equal(r.status, 206);
+    assert.deepEqual(asked, ["bytes=5-"]);
+    assert.equal(r.headers.get("x-ipa-length"), "8");
+    assert.equal(r.headers.get("content-range"), "bytes 5-7/8");
+    assert.deepEqual(new Uint8Array(await r.arrayBuffer()), bytes.slice(5));
+    // a resumed total over the cap is refused too; a Range of another shape isn't passed on
+    globalThis.fetch = answer({ "Content-Length": "3", "Content-Range": `bytes 5-7/${600 * 1024 * 1024}` }, bytes.slice(5), 206);
+    assert.equal((await ipaGo({ headers: { Range: "bytes=5-" } })).status, 413);
+    asked = [];
+    globalThis.fetch = answer({ "Content-Length": "8" });
+    r = await ipaGo({ headers: { Range: "bytes=0-3" } });
     assert.equal(r.status, 200);
-    await assert.rejects(r.arrayBuffer(), /upstream stopped after 5 of 8 bytes/);
+    assert.deepEqual(asked, [null]);
   } finally { globalThis.fetch = realFetch; }
   console.log("worker ipa length: ok");
 }

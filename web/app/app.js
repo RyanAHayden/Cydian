@@ -18,7 +18,6 @@ import { createTabbar, tapTab, scrollToTop } from "./nav/tabbar.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
-import { initMomentumTap, heldTap } from "./nav/momentum-tap.js";
 import { makeScrollToTop } from "./nav/statusbar.js";
 import * as home from "./screens/home.js";
 import * as sources from "./screens/sources.js";
@@ -353,8 +352,7 @@ document.addEventListener("pointermove", (e) => {
 }, { passive: true });
 // A held row lets go the moment its list scrolls (UIKit cancels the cell's highlight when the pan starts); iOS's
 // pointercancel alone can come late or not at all after a long hold.
-// F153: not while a tap stops a coasting list (its last scroll events come after the touch-down); that tap opens the row.
-document.addEventListener("scroll", () => { if (pressed && !heldTap()) { pressed.classList.remove("is-pressed"); pressed = null; lastPress = null; } }, { capture: true, passive: true });
+document.addEventListener("scroll", () => { if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; lastPress = null; } }, { capture: true, passive: true });
 // The search fields' clear button (packages.css .search-field::after): a tap at the field's right end, while it has
 // text, empties it and searches again (the field's own input listener), keeping the keyboard up.
 document.addEventListener("click", (e) => {
@@ -371,7 +369,6 @@ document.addEventListener("click", (e) => {
 document.addEventListener("touchstart", () => {}, { passive: true });
 
 initScroller(document.getElementById("screens"));
-initMomentumTap(); // F153: a quick tap during momentum opens the row, not only stops the scroll
 for (const tab of TABS) if (SCREENS[tab].init) SCREENS[tab].init(ctx);
 // N4: the install queue (jailbreak build: the backend has one): Confirm opens when a package is queued.
 if (typeof getBackend().queue === "function") initQueue(ctx);

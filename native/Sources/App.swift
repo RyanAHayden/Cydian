@@ -205,7 +205,6 @@ enum Web {
         w.scrollView.contentInsetAdjustmentBehavior = .never
         w.scrollView.bounces = false
         if #available(iOS 16.4, *) { w.isInspectable = true }
-        MomentumTap.attach(to: w) // F153: a quick tap on a coasting list opens the row
         StatusBarTap.attach(to: w) // F167: a status bar tap scrolls the page on top to the top
         return w
     }

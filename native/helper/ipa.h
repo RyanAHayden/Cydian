@@ -34,6 +34,15 @@ int helper_ipa_plist_id(const char *data, size_t len, char *out, size_t size);
 int helper_ipa_team_ok(const char *s);
 int helper_ipa_exe_ok(const char *s);
 
+/* B72: compare two iOS versions ("15.8.8", "17.0"; at most 3 numeric parts): -1, 0 or 1 like strcmp, or 2 when either
+ * isn't a version. install-ipa refuses an app whose MinimumOSVersion is above this iPhone's ProductVersion
+ * (SystemVersion.plist) before installd sees it, saying both. */
+int helper_ipa_os_cmp(const char *a, const char *b);
+
+/* B72: installd's localizedDescription made one console line in place: newlines become spaces and its staging paths
+ * ("/var/installd/Library/Caches/com.apple.mobile.installd.staging/temp.X/extracted/") are cut down to what follows. */
+void helper_ipa_why_clean(char *s);
+
 /* I4: app-versions. Every app installd put under dir (HELPER_APPS_DIR: <dir>/<UUID>/<Name>.app, plus App Store
  * apps' <dir>/<UUID>/iTunesMetadata.plist) as one line each, "<id>\t<short>\t<build>\t<store>\n": the bundle id
  * (helper_ipa_bundle_id_ok), Info.plist's CFBundleShortVersionString and CFBundleVersion, and iTunesMetadata's

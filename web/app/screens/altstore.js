@@ -24,7 +24,7 @@ import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { guarded } from "../nav/tapguard.js";
 import { setSourceShare, headerShareButton } from "./handoff.js";
-import { openIpaInstall } from "./ipa-install.js";
+import { openIpaInstall, markIpaNeeds } from "./ipa-install.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { appQueue } from "../app-queue.js";
@@ -704,12 +704,15 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   const { rows, options, gated } = installRows(v, app.sourceUrl, undefined, record, queued ? () => appPageAction(pkg, source) : null, app.name,
     { ...(queued ? { customize: (o) => appPageCustom(pkg, source, o) } : {}), appId: pkg.row?.id ?? st.package ?? app.bundleIdentifier,
       bundleId: appBundleId(app, pkg.row?.id) });
-  details.append(grouped([{ header: "Install", rows,
+  const installGroup = grouped([{ header: "Install", rows,
     footer: gated ? SITE_GATE_FOOTER
       : options.download && ipaInstallAvailable() ? IPA_FOOTER
       : options.itms ? "Installs over the air with the source's signed link."
       : localSigning() ? "Install queues it and opens Confirm, which signs it with your own certificate (Settings > Signing) and installs it. Custom Install first lets you change its bundle ID, name, icon or extensions. Download IPA keeps the file."
-      : options.download ? SITE_INSTALL_FOOTER : null }]));
+      : options.download ? SITE_INSTALL_FOOTER : null }]);
+  details.append(installGroup);
+  // B72: the IPA's own MinimumOSVersion (the source's can be wrong) on the jailbreak Install row
+  if (options.download && ipaInstallAvailable()) markIpaNeeds(installGroup, options.download);
 
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on
   // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.

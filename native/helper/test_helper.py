@@ -672,7 +672,7 @@ PLIST = ('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\
          '\t<key>CFBundleIdentifier</key>\n\t<string>{}</string>\n</dict>\n</plist>\n')
 # The ldid stand-in. -s <app>: ad hoc signs (needs <app>/Info.plist). -e <bin>: prints <bin>.ent, the fixture's
 # entitlements, or fails as ldid does on an unsigned binary. -M -S<file> <bin>: prints the entitlements it was given
-# on one line ("ent: ..."); fails when <app>/Demo.nosign exists.
+# on one line ("ent: ..."); fails when Demo.nosign exists beside <bin>.
 LDID = r'''#!/bin/sh
 case "$1" in
 -e) echo "ldid -e $2" >&2
@@ -680,7 +680,7 @@ case "$1" in
     cat "$2.ent" ;;
 -M) echo "ldid $*"
     echo "ent: $(tr -d '\n\t' < "${2#-S}")"
-    [ ! -f "$3/Demo.nosign" ] ;;
+    [ ! -f "$(dirname "$3")/Demo.nosign" ] ;;
 *) echo "ldid $*"
    [ -f "$2/Info.plist" ] ;;
 esac
@@ -776,11 +776,18 @@ class InstallIpa(unittest.TestCase):
 
     # --- the chain
 
-    def chain(self, ldid=False, appsync=False):
+    def chain(self, ldid=False, appsync=False, ios=None):
+        """ios: this "iPhone"'s ProductVersion (B72: <prefix>/System/Library/CoreServices/SystemVersion.plist off iOS)."""
         base = tempfile.mkdtemp(dir=self.tmp)
         p, ipa_dir, work = (os.path.join(base, n) for n in ("prefix", "ipa", "work"))
         for d in ("Applications/iFizBox.app", "usr/bin"):
             os.makedirs(os.path.join(p, d))
+        if ios:
+            os.makedirs(os.path.join(p, "System/Library/CoreServices"))
+            with open(os.path.join(p, "System/Library/CoreServices/SystemVersion.plist"), "w") as f:
+                f.write('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n'
+                        f'\t<key>ProductName</key>\n\t<string>iPhone OS</string>\n'
+                        f'\t<key>ProductVersion</key>\n\t<string>{ios}</string>\n</dict>\n</plist>\n')
         os.makedirs(ipa_dir)
         os.makedirs(work)
         app = os.path.join(p, "Applications/iFizBox.app/iFizBox")
@@ -804,8 +811,10 @@ class InstallIpa(unittest.TestCase):
         return p, app, helper, ipa_dir, work
 
     def ipa(self, ipa_dir, bundle_id="com.example.demo", name="A1.ipa", app="Demo.app", ents=None, plist=None,
-            nosign=False):
-        """ents: the binary's entitlements (the dict's inner XML) as ldid -e shows them; None: unsigned."""
+            nosign=False, exts=()):
+        """ents: the binary's entitlements (the dict's inner XML) as ldid -e shows them; None: unsigned.
+        exts (B72): (path in the .app, bundle id, ents or None) per extension, e.g. ("PlugIns/W.appex", "….w", None);
+        a bundle id of None writes an extension without an Info.plist."""
         import zipfile
         path = os.path.join(ipa_dir, name)
         with zipfile.ZipFile(path, "w") as z:
@@ -816,6 +825,12 @@ class InstallIpa(unittest.TestCase):
                     z.writestr(f"Payload/{app}/Demo.ent", ENTS.format(ents))
                 if nosign:
                     z.writestr(f"Payload/{app}/Demo.nosign", "")
+                for rel, xid, xents in exts:
+                    if xid:
+                        z.writestr(f"Payload/{app}/{rel}/Info.plist", PLIST.format(xid))
+                    z.writestr(f"Payload/{app}/{rel}/Demo", b"\xcf\xfa\xed\xfe")
+                    if xents is not None:
+                        z.writestr(f"Payload/{app}/{rel}/Demo.ent", ENTS.format(xents))
         return path
 
     def spawn(self, app, helper, *words):
@@ -865,9 +880,14 @@ class InstallIpa(unittest.TestCase):
         sign = [l for l in out if l.startswith("1: ldid -M -S")]
         self.assertEqual(len(sign), 1, out)
         self.assertTrue(sign[0].startswith(f"1: ldid -M -S{work}/ifizbox-ipa."), sign)
-        # the whole .app (B59: SpringBoard won't launch an app whose bundle has no CodeResources)
-        self.assertTrue(sign[0].endswith("/ent.xml " + sign[0].split(" ")[-1]) and
-                        sign[0].endswith("/pkg/Payload/Demo.app"), sign)
+        # B72: the binary alone, then the whole .app sealed with ldid -s (B59: SpringBoard won't launch an app whose
+        # bundle has no CodeResources), which keeps each binary's entitlements
+        self.assertTrue(sign[0].endswith("/ent0.xml " + sign[0].split(" ")[-1]) and
+                        sign[0].endswith("/pkg/Payload/Demo.app/Demo"), sign)
+        seal = [i for i, l in enumerate(out) if l.startswith("1: ldid -s ") and l.endswith("/pkg/Payload/Demo.app")]
+        self.assertEqual(len(seal), 1, out)
+        self.assertGreater(seal[0], out.index(sign[0]), out)
+        self.assertIn("3: pmstatus:com.example.demo:48:Sealing the app (ldid)", out)
         ent = next(l for l in out if l.startswith("1: ent: "))
         self.assertIn("<key>application-identifier</key><string>FAKESIGNED.com.example.demo</string>", ent)
         self.assertIn("<key>com.apple.developer.team-identifier</key><string>FAKESIGNED</string>", ent)
@@ -899,6 +919,8 @@ class InstallIpa(unittest.TestCase):
                   "isn't a plain file in the app", 64),
                  (PLIST.replace("\t<key>CFBundleExecutable</key><string>Demo</string>\n", ""), False,
                   "no usable CFBundleExecutable", 64),
+                 (PLIST.replace("<string>Demo</string>", "<string>.</string>"), False,
+                  "no usable CFBundleExecutable", 64),
                  (None, True, "ldid couldn't add the application-identifier entitlement", 69)]
         for i, (plist, nosign, msg, code) in enumerate(cases):
             with self.subTest(msg=msg):
@@ -923,6 +945,98 @@ class InstallIpa(unittest.TestCase):
         self.assertEqual(out[-1], "exit: 0", out)
         self.assertFalse(any(l.startswith("1: ldid -M") for l in out), out)
         self.assert_clean(work)
+
+    def test_chain_appex_fakesign(self):
+        """B72: every extension without application-identifier gets its own <team>.<its id> (the main binary's team),
+        signed alone; ldid -s then seals the .app, which goes to installd unpacked."""
+        p, app, helper, ipa_dir, work = self.chain(ldid=True, appsync=True)
+        has = lambda i: f"\t<key>application-identifier</key>\n\t<string>{i}</string>\n"
+        exts = [("PlugIns/Widget.appex", "com.example.demo.widget", None),
+                ("Extensions/Share.appex", "com.example.demo.share", has("ABCDE12345.com.example.demo.share")),
+                ("PlugIns/Broken.appex", None, None)]
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, ents=has("ABCDE12345.com.example.demo"), exts=exts))
+        self.assertEqual(out[-1], "exit: 0", out)
+        sign = [l for l in out if l.startswith("1: ldid -M -S")]
+        self.assertEqual(len(sign), 1, out)
+        self.assertTrue(sign[0].endswith("/pkg/Payload/Demo.app/PlugIns/Widget.appex/Demo"), sign)
+        ent = next(l for l in out if l.startswith("1: ent: "))
+        self.assertIn("<key>application-identifier</key><string>ABCDE12345.com.example.demo.widget</string>", ent)
+        self.assertIn("<key>com.apple.developer.team-identifier</key><string>ABCDE12345</string>", ent)
+        self.assertIn("3: pmstatus:com.example.demo:46:Adding the application-identifier entitlement to Widget.appex (ldid)", out)
+        seal = [i for i, l in enumerate(out) if l.startswith("1: ldid -s ") and l.endswith("/pkg/Payload/Demo.app")]
+        self.assertEqual(len(seal), 1, out)
+        self.assertGreater(seal[0], out.index(sign[0]), out)
+        self.assertIn("1: install app com.example.demo (PackageType Developer)", out)
+        self.assert_clean(work)
+        # The main binary unsigned too: each binary its own id, both FAKESIGNED, one seal
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, name="X.ipa", exts=exts[:1]))
+        self.assertEqual(out[-1], "exit: 0", out)
+        sign = [l for l in out if l.startswith("1: ldid -M -S")]
+        self.assertEqual([s.split(" ")[-1].split("/pkg/Payload/")[-1] for s in sign],
+                         ["Demo.app/Demo", "Demo.app/PlugIns/Widget.appex/Demo"], out)
+        ents = [l for l in out if l.startswith("1: ent: ")]
+        self.assertIn("<string>FAKESIGNED.com.example.demo</string>", ents[0])
+        self.assertIn("<string>FAKESIGNED.com.example.demo.widget</string>", ents[1])
+        self.assertEqual(len([l for l in out if l.startswith("1: ldid -s ")]), 1, out)
+        self.assert_clean(work)
+        # Everything signed already: nothing is touched and the IPA goes as it is
+        exts = [("PlugIns/Widget.appex", "com.example.demo.widget", has("ABCDE12345.com.example.demo.widget"))]
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, name="Y.ipa", ents=has("ABCDE12345.com.example.demo"),
+                                                              exts=exts))
+        self.assertEqual(out[-1], "exit: 0", out)
+        self.assertFalse(any(l.startswith("1: ldid") for l in out), out)
+        self.assertIn("1: install ipa com.example.demo", out)
+        self.assert_clean(work)
+
+    def test_chain_min_os(self):
+        """B72: an app whose MinimumOSVersion is above this iPhone's iOS stops before ldid and installd, saying both
+        (YouMod's YouTube 21.45.4 on the iPhone 7: installd's "Have 15.8.8; need 17.0")."""
+        p, app, helper, ipa_dir, work = self.chain(ldid=True, appsync=True, ios="15.8.8")
+        plist = lambda mn: (PLIST.replace("</dict>", "\t<key>CFBundleName</key><string>YouTube</string>\n"
+                                          "\t<key>CFBundleShortVersionString</key><string>21.45.4</string>\n"
+                                          f"\t<key>MinimumOSVersion</key><string>{mn}</string>\n</dict>")
+                            .format("com.google.ios.youtube"))
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, plist=plist("17.0")))
+        self.assertEqual(out[-1], "exit: 1", out)
+        self.assertIn("2: ifizbox-helper: YouTube 21.45.4 needs iOS 17.0 or later (its MinimumOSVersion); "
+                      "this iPhone has iOS 15.8.8", out)
+        self.assertFalse(any(l.startswith("1: install ") or l.startswith("1: ldid") for l in out), out)
+        self.assert_clean(work)
+        for i, mn in enumerate(("15.0", "15.8.8", "14", "junk")):
+            with self.subTest(min=mn):
+                out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, name=f"M{i}.ipa", plist=plist(mn)))
+                self.assertEqual(out[-1], "exit: 0", out)
+                self.assertIn("1: install app com.google.ios.youtube (PackageType Developer)", out)
+        # No SystemVersion.plist to read: installd judges
+        p, app, helper, ipa_dir, work = self.chain(ldid=True, appsync=True)
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, plist=plist("99.0")))
+        self.assertEqual(out[-1], "exit: 0", out)
+        self.assert_clean(work)
+
+    def test_chain_installd_words(self):
+        """B72: installd's refusal is the last ifizbox-helper line, in installd's own words (the app's alert shows it)."""
+        p, app, helper, ipa_dir, work = self.chain(ldid=True, appsync=True)
+        ents = "\t<key>application-identifier</key>\n\t<string>ABCDE12345.com.example.refused</string>\n"
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, bundle_id="com.example.refused", ents=ents))
+        self.assertEqual(out[-1], "exit: 1", out)
+        said = [l for l in out if l.startswith("2: ifizbox-helper: ")]
+        self.assertEqual(said[-1], "2: ifizbox-helper: installd refused the app: test installd refused it", out)
+        self.assert_clean(work)
+
+    def test_os_cmp(self):
+        pairs = [("15.8.8", "17.0", "-1"), ("17.0", "17", "0"), ("17.0.1", "17.0", "1"), ("15.10", "15.9", "1"),
+                 ("16", "15.8.8", "1"), ("", "1", "2"), ("15.x", "1", "2"), ("1.2.3.4", "1", "2"), ("15.", "1", "2"),
+                 ("-1", "1", "2"), ("15 ", "1", "2"), ("123456", "1", "2")]
+        out = self.run_driver("oscmp", *[x for a, b, _ in pairs for x in (a, b)])
+        self.assertEqual(out, [w for _, _, w in pairs])
+
+    def test_why_clean(self):
+        said = ("The system version is lower than the minimum OS version specified for bundle at /var/installd/Library/"
+                "Caches/com.apple.mobile.installd.staging/temp.FkcxR5/extracted/Payload/YouTube.app. Have 15.8.8; need 17.0")
+        self.assertEqual(self.run_driver("whyclean", said),
+                         ["The system version is lower than the minimum OS version specified for bundle at "
+                          "Payload/YouTube.app. Have 15.8.8; need 17.0"])
+        self.assertEqual(self.run_driver("whyclean", "a\nb\tc /private/var/x/com.apple.mobile.installd.staging/q"), ["a b c q"])
 
     def test_chain_cant_adhoc(self):
         """Exit 69 says the jailbreak can't install ad hoc apps: no AppSync and no ldid, or installd refuses."""

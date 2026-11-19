@@ -8,6 +8,7 @@
 //   ipaName(url)              -> the file's name without .ipa, for the console's title ("App" when there's none)
 //   ipaStatus(line)           -> { text, percent } for one status-fd line (dlstatus / pmstatus / pmerror), or null
 //   ipaError(err, name)       -> { code, title, message, detail: the shell's own words, lines: [help lines] } for an ipa.install error
+//   needsNewerIos, needsIosText  B72: an IPA's MinimumOSVersion above this iPhone's iOS, and what to say
 //   IPA_FOOTER, NO_ADHOC_HELP  the words the screens show
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -75,13 +76,38 @@ const TITLES = {
   sideload: "Not Available",
 };
 
+// B72: an IPA's own MinimumOSVersion against this iPhone's iOS. The source's minOSVersion can be wrong (YouMod's says
+// 14.0 for a YouTube that needs 17.0), so the jailbreak install asks the IPA itself (screens/ipa-install.js ipaNeeds).
+//   needsNewerIos(min, ios)     -> true when both are versions and ios is below min
+//   needsIosText(name, min, ios) -> the one sentence the alert and the install row say
+const OS = /^\d{1,2}(\.\d{1,2}){0,2}$/;
+export function needsNewerIos(min, ios) {
+  const a = String(min ?? "").trim(), b = String(ios ?? "").trim();
+  if (!OS.test(a) || !OS.test(b)) return false;
+  const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    const d = (pb[i] ?? 0) - (pa[i] ?? 0);
+    if (d) return d < 0;
+  }
+  return false;
+}
+export function needsIosText(name, min, ios) {
+  return `${name || "This app"} needs iOS ${min} or later; this iPhone has iOS ${ios}.`;
+}
+
 // err: what ipa.install rejected with, "<code>: <message>" (bridge.js also puts the code on err.code).
+// B72: the helper's "<app> needs iOS 17.0 or later …" (its MinimumOSVersion check) and installd's own "Have 15.8.8;
+// need 17.0" get the title "Needs iOS 17.0" and the helper's words as they are (code os_version).
 export function ipaError(err, name = "") {
   const raw = String(err?.message ?? err ?? "");
   const m = raw.match(/^([a-z_]+): ([\s\S]*)$/);
   const code = err?.code && TITLES[err.code] ? err.code : m && TITLES[m[1]] ? m[1] : "install";
   const said = (m && TITLES[m[1]] ? m[2] : raw).trim();
   const app = name || "the app";
+  if (code === "install") {
+    const os = /\bneeds iOS (\d+(?:\.\d+){0,2}) or later\b/.exec(said) ?? /\bHave [\d.]+; need (\d+(?:\.\d+){0,2})\b/.exec(said);
+    if (os) return { code: "os_version", title: `Needs iOS ${os[1]}`, message: said, detail: said, lines: [] };
+  }
   let message;
   let lines = [];
   switch (code) {

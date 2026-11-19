@@ -210,8 +210,7 @@ print(v)' "$1")
     if [ "${FAKE_APPSYNC:-}" = 1 ]; then
       st "pmstatus:$id:50:Installing (AppSync Unified)"
       echo "install ipa $id"
-      case $id in *.refused) echo "ifizbox-helper: installd: fake installd refused it" >&2
-        echo "ifizbox-helper: installd refused the app" >&2; exit 1 ;; esac
+      case $id in *.refused) echo "ifizbox-helper: installd refused the app: fake installd refused it" >&2; exit 1 ;; esac
     elif [ "${FAKE_LDID:-}" = 1 ]; then
       st "pmstatus:$id:40:Signing ad hoc (ldid)"
       echo "ldid -s Payload/$id.app (fake)"

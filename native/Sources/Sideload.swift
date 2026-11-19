@@ -12,6 +12,9 @@
 //        -> I6's reply + {fixedArm64e, expires}
 //   signing.progress {bundleId} (stream: {phase: "installing", progress}) -> {installed: true | false | null}
 //        + handedOff (B76): true when a false became null because iFizBox lost sight of the install (Handoff below)
+//        + dismissed (B85): true when the false is iOS's prompt closed without iOS asking for the IPA (Cancel; its
+//        serving stops); the itms-services link opens through InstallPrompt.swift, one prompt at a time
+//   signing.reprompt {bundleId} -> {reopened}: B85, opens that app's install link again (its IPA still served)
 //   signing.selfUpdate (stream: {state}) -> {state}: B83, iFizBox's own update after iOS's prompt (CloseForUpdate):
 //        prompt | waiting | downloading, then finished (it exits) | notStarted | stalled | guessed; null: none running
 //   signing.installed            -> {apps: [record], next: {expires, apps} | null}
@@ -58,6 +61,12 @@ enum Sideload {
         }
         b.on("signing.installed") { c in SignBridge.run(c) { installedJSON() } }
         b.on("signing.openApp") { c in openApp(c) }
+        // B85: the IPA run's "Tap Install on the iOS prompt" row: open that app's install link again (InstallPrompt)
+        b.on("signing.reprompt") { c in
+            guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: not in the jailbreak app") }
+            let bid = c.params["bundleId"] as? String ?? ""
+            DispatchQueue.main.async { Apt.reply(c, ["reopened": InstallPrompt.reprompt(bid)], nil) }
+        }
         b.on("signing.forget") { c in
             SignBridge.run(c) {
                 let id = c.params["bundleId"] as? String ?? ""
@@ -442,9 +451,12 @@ enum Sideload {
         log?("Bundle ID: \(app.bundleID)" + (app.bundleID == app.originalBundleID ? "" : " (the app's own: \(app.originalBundleID))")
              + ", version \(app.version); serving \(Sideload.size(output))")
         let bid = app.bundleID
-        let serverLog = { (s: String) in InstallLog.say(bid, s) }
+        let iosLink = URL(string: link)!
+        // B85: any line from the IPA's route is iOS asking for it: Install was tapped (InstallPrompt.heard)
+        let serverLog = { (s: String) in InstallPrompt.heard(bid); InstallLog.say(bid, s) }
         let end = { (ok: Bool) in
             guard once.first() else { return }
+            InstallPrompt.end(bid, link: iosLink)
             job?.end()
             if !ok { serverLog("iOS didn't fetch the whole IPA within 15 minutes; it is no longer served"); server.remove(ipaPath) }
             // B29: served: the route stays for the grace too. iOS's installer may ask again for parts, and
@@ -461,6 +473,7 @@ enum Sideload {
         // F196: Cancel: no more serving, no minute's grace, the listener ends when nothing else is served.
         job?.onCancel {
             guard once.first() else { return }
+            InstallPrompt.end(bid, link: iosLink)
             log?("Cancelled: the IPA is no longer served")
             server.cancel(ipaPath)
             SignBridge.queue.async {
@@ -476,8 +489,10 @@ enum Sideload {
         }
         DispatchQueue.main.async {
             log?("Handing iOS the install link; it asks \"Install \(app.name)?\"")
-            UIApplication.shared.open(URL(string: link)!)
-            opened(.success((app, record)))
+            // B85: once iFizBox is in front (an earlier app's prompt answered), and again when iOS drops it
+            InstallPrompt.open(iosLink, bundleID: bid, name: app.name) { _ in
+                if job?.cancelled == true { opened(.failure(SignJob.cancelledError)) } else { opened(.success((app, record))) }
+            }
         }
     }
 
@@ -493,10 +508,22 @@ enum Sideload {
         watch(bid, ask: wait, tag: tag, onProgress: { c.emitOnMain([["phase": "installing", "progress": $0]]) },
               lost: { seen, away in
             // B76: a false here after a handoff is iFizBox losing sight of iOS's install, not iOS refusing it
-            Handoff.lostSight(served: Handoff.wasServed(bid), away: away, seen: seen)
+            // (B85: a prompt the user dismissed is neither)
+            !InstallPrompt.dismissed(bid) && Handoff.lostSight(served: Handoff.wasServed(bid), away: away, seen: seen)
         }) { installed, handedOff in
-            DispatchQueue.main.async { InstallLog.detach(bid) }
-            Apt.reply(c, ["installed": installed.map { $0 as Any } ?? NSNull(), "handedOff": handedOff], nil)
+            DispatchQueue.main.async {
+                // B85: a dismissed prompt ends that app: no more serving it, and the run moves on (dismissed: true)
+                let dismissed = installed == false && InstallPrompt.dismissed(bid)
+                if dismissed, let t = tag { SignJob.cancel(tag: t) }
+                // B85: what the watch saw, so a row that ends wrong says why
+                let seen = "Install watch ended: installed \(installed.map { String($0) } ?? "unknown")"
+                    + (handedOff ? " (handed off to iOS)" : "") + (dismissed ? " (prompt dismissed)" : "")
+                    + "; " + InstallPrompt.summary(bid) + ", IPA fetched in full \(Handoff.wasServed(bid) ? "yes" : "no")"
+                NSLog("\(Brand.name) install \(bid): " + seen.replacingOccurrences(of: "%", with: "%%"))
+                c.emit([["log": seen]])
+                InstallLog.detach(bid)
+                Apt.reply(c, ["installed": installed.map { $0 as Any } ?? NSNull(), "handedOff": handedOff, "dismissed": dismissed], nil)
+            }
         }
     }
 
@@ -558,6 +585,8 @@ enum Sideload {
                 let since = servedAt ?? Date()
                 servedAt = since
                 if Date().timeIntervalSince(since) >= Handoff.servedQuiet { return done(false) }
+            } else if InstallPrompt.dismissed(bid) {
+                return done(false) // B85: the prompt closed and iOS never asked for the IPA: Cancel was tapped
             }
             if Date().timeIntervalSince(start) > 15 * 60 { return done(seen ? Workspace.isInstalled(bid) : false) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: tick)

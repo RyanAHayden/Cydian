@@ -274,3 +274,98 @@ test("B76: away() before a row reaches iOS doesn't excuse that row's refusal", a
   await end;
   assert.equal(rows[0].state, "failed");
 });
+
+// B85: a multi-app run after the downloads: each app gets its own turn with iOS's prompt; a prompt the user closed
+// cancels that app only (retryable) and never hangs the run; the asking row's tap asks iOS for the prompt again.
+test("B85: a dismissed prompt cancels that app only; the second app still goes to iOS and the run ends", async () => {
+  const ph = phone();
+  const lines = [];
+  const rows = appRows(jobs("a", "b"));
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, discard: ph.discard, onLog: (l) => lines.push(l.text) });
+  const end = run.start();
+  await flush();
+  ph.signed("a"); ph.signed("b");
+  await flush();
+  assert.equal(run.current?.id, "a");
+  // the shell: iOS's prompt for a closed and iOS never asked for the IPA
+  ph.pending.install.get("a").resolve({ installed: false, dismissed: true });
+  await flush();
+  assert.equal(rows[0].state, "cancelled");
+  assert.equal(rowStatus(rows[0]), "Cancelled on the iOS prompt");
+  assert.ok(lines.includes("Cancelled A on the iOS prompt"));
+  // b gets its own prompt
+  assert.deepEqual(ph.events.filter((e) => e.startsWith("install")), ["install:a", "install:b"]);
+  assert.equal(run.current?.id, "b");
+  assert.equal(rowStatus(rows[1]), "Tap Install on the iOS prompt");
+  ph.installed("b");
+  await end;
+  assert.equal(run.running, false);
+  assert.deepEqual(rows.map((r) => r.state), ["cancelled", "installed"]);
+  assert.equal(summaryLine(rows), "1 installed, 1 cancelled");
+  // retryable: it signs again and goes to iOS again, the dismissed mark cleared
+  const again = run.retry("a");
+  assert.ok(again);
+  assert.equal(rows[0].dismissed, false);
+  await flush();
+  ph.signed("a");
+  await flush();
+  assert.equal(run.current?.id, "a");
+  ph.installed("a");
+  await again;
+  assert.equal(summaryLine(rows), "2 installed");
+});
+
+test("B85: a dismissed answer on the last app still ends the run (no stuck wait); a refusal stays Failed", async () => {
+  const ph = phone();
+  const rows = appRows(jobs("a", "b"));
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install });
+  const end = run.start();
+  await flush();
+  ph.signed("a"); ph.signed("b");
+  await flush();
+  ph.pending.install.get("a").resolve({ installed: false });
+  await flush();
+  ph.pending.install.get("b").resolve({ installed: false, dismissed: true });
+  await end;
+  assert.deepEqual(rows.map((r) => r.state), ["failed", "cancelled"]);
+  assert.equal(rowStatus(rows[0]), "Failed: iOS didn't install it");
+});
+
+test("B85: the asking row's reprompt asks the phone again and logs it; only while that app is with iOS", async () => {
+  const ph = phone();
+  const lines = [];
+  const asked = [];
+  let answer = true;
+  const rows = appRows(jobs("a", "b"));
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, onLog: (l) => lines.push(l.text),
+    reprompt: async (r) => { asked.push(r.id); return answer; } });
+  const end = run.start();
+  await flush();
+  // not with iOS yet: nothing to show again
+  assert.equal(await run.reprompt("a"), false);
+  ph.signed("a"); ph.signed("b");
+  await flush();
+  assert.equal(await run.reprompt("b"), false); // b waits its turn (signed)
+  assert.equal(await run.reprompt("a"), true);
+  assert.deepEqual(asked, ["a"]);
+  assert.equal(lines.at(-1), "Asked iOS again to install A");
+  assert.equal(rows[0].state, "asking"); // still waits for the Install tap
+  answer = false;
+  assert.equal(await run.reprompt("a"), false);
+  assert.equal(lines.at(-1), "iOS's prompt for A can't be shown again");
+  ph.installed("a");
+  await flush();
+  assert.equal(await run.reprompt("a"), false); // ended
+  ph.installed("b");
+  await end;
+  // a run without a reprompt lane says no
+  const r2 = appRows(jobs("c"));
+  const run2 = createAppRun({ rows: r2, sign: ph.sign, install: ph.install });
+  run2.start();
+  await flush();
+  ph.signed("c");
+  await flush();
+  assert.equal(r2[0].state, "asking");
+  assert.equal(await run2.reprompt("c"), false);
+  run2.cancel();
+});

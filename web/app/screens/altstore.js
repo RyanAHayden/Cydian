@@ -710,9 +710,10 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
       : options.itms ? "Installs over the air with the source's signed link."
       : localSigning() ? "Install queues it and opens Confirm, which signs it with your own certificate (Settings > Signing) and installs it. Custom Install first lets you change its bundle ID, name, icon or extensions. Download IPA keeps the file."
       : options.download ? SITE_INSTALL_FOOTER : null }]);
+  const installBox = installGroup.firstElementChild; // grouped() gives a fragment, empty once appended
   details.append(installGroup);
   // B72: the IPA's own MinimumOSVersion (the source's can be wrong) on the jailbreak Install row
-  if (options.download && ipaInstallAvailable()) markIpaNeeds(installGroup, options.download);
+  if (options.download && ipaInstallAvailable()) markIpaNeeds(installBox, options.download);
 
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on
   // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.

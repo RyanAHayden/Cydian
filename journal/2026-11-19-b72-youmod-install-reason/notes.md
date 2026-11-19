@@ -65,6 +65,37 @@ is no `appinst` on the phone, and no akemi source in apt to get it from.
 - Tests: `native/helper/test_helper.py` (appex fakesign, min-OS check, installd's words, os_cmp, why_clean) and
   `web/app/screens/ipa-needs.test.js`.
 
+## On the iPhone 7 (builds 0.9.8-1622, then 1623, installed with apt; screenshots in ref/7/screens/b72-*.png)
+
+- `ifizbox://install?url=<YouMod 21.45.4>&name=YouMod`, then Install: the alert "Needs iOS 17.0 / YouMod needs iOS
+  17.0 or later; this iPhone has iOS 15.8.8." appeared, and nothing was downloaded (the IPA folder stayed empty).
+- The helper's own check: a 66 KB test IPA (`com.example.b72test`, MinimumOSVersion 17.0) served over `ssh -R` from
+  127.0.0.1, which the Worker can't read, so the web check let it through. The console said "ifizbox-helper:
+  B72Test 1.0 needs iOS 17.0 or later (its MinimumOSVersion); this iPhone has iOS 15.8.8", and the alert was
+  "Needs iOS 17.0". On iOS, CFPropertyList read SystemVersion.plist and the binary Info.plist. That run showed the
+  line twice; `runIpaInstall` no longer repeats a final error that is the helper's line word for word.
+- Extension fakesign: the same app with no MinimumOSVersion, main binary and `PlugIns/B72Ext.appex` both unsigned.
+  The console went "Adding the application-identifier entitlement", "… to B72Ext.appex", "Sealing the app",
+  "Installed". On the phone the installed binaries carry `FAKESIGNED.com.example.b72test` and
+  `FAKESIGNED.com.example.b72test.ext`, and both bundles have `_CodeSignature/CodeResources`. I removed it with
+  Installed > Apps > swipe > Delete; its container is gone.
+- The YouMod app page (build 1623): the Install row reads "Needs iOS 17.0 (this iPhone has 15.8.8)". Build 1622
+  didn't mark it, because `grouped()` returns a DocumentFragment, which is empty once appended; altstore.js now
+  keeps its first element.
+- Cleanup: `/var/tmp/b72` (probe, IPA copies) and `/tmp/b72-iFizBox.deb` deleted on the phone; the http server and
+  tunnel stopped by pid. iFizBox 0.9.8-1623 (this branch) is left installed on the 7.
+
+Follow-up filed: B74. App rows and the page's Compatibility row still judge YouMod on the source's 14.0 (green
+check, "Made for iOS 14.0 or later").
+
 ## Not verified
 
-(filled in below after the phone run)
+- Launching a fakesigned app that has an extension, and the extension running: B72Test's binaries are an empty
+  `main` and its appex is a placeholder widget, so only the install and the signatures were checked.
+- The older YouMod versions in the same source (21.18.4, 21.17.3): their real MinimumOSVersion wasn't checked
+  (120–145 MB each); they may install on iOS 15.8.8.
+- The `/api/ipainfo` check when the Worker is slow or down: the 8 s cut-off and the fallback to the helper's check
+  are tested in node only.
+- An installd refusal other than DeviceOSVersionTooLow through the real helper: the "installd refused the app:
+  <words>" line was checked with the off-iOS stand-in and the fake helper, not on the phone. The only real refusal I
+  produced was the min-OS one, which the helper now catches before installd.

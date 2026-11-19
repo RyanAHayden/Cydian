@@ -85,3 +85,23 @@ test("ipaError: the helper's MinimumOSVersion refusal and installd's own 'Have â
   assert.equal(o.code, "install");
   assert.equal(o.message, "iOS didn't install YouMod: installd refused the app: Failed to verify code signature");
 });
+
+test("the console: the helper's MinimumOSVersion line is said once, and installd's other refusals keep their context", async () => {
+  const { runIpaInstall } = await import("../ipa-install.js");
+  const view = () => ({ lines: [], line(type, text) { this.lines.push([type, text]); }, status() {}, progress() {} });
+  const words = "YouTube 21.45.4 needs iOS 17.0 or later (its MinimumOSVersion); this iPhone has iOS 15.8.8";
+  const v = view();
+  const r = await runIpaInstall({ url: URL_, name: "YouMod" }, v, { native: { async call(m, p, on) {
+    on({ fd: "err", line: `ifizbox-helper: ${words}` });
+    throw new Error(`install: ${words}`);
+  } } });
+  assert.equal(r.error.title, "Needs iOS 17.0");
+  assert.equal(v.lines.filter(([, t]) => t.includes("needs iOS 17.0")).length, 1);
+  const w = view();
+  await runIpaInstall({ url: URL_, name: "YouMod" }, w, { native: { async call(m, p, on) {
+    on({ fd: "err", line: "ifizbox-helper: installd refused the app: boom" });
+    throw new Error("install: installd refused the app: boom");
+  } } });
+  assert.deepEqual(w.lines.filter(([type]) => type === "error").map(([, t]) => t),
+    ["ifizbox-helper: installd refused the app: boom", "iOS didn't install YouMod: installd refused the app: boom"]);
+});

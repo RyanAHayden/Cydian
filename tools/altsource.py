@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """iFizBox's own AltStore source (I7): web/app/source.json, the package page iFizBox's default sources show for the
-app itself (core/sources.js DEFAULT_ALT_SOURCES, core/appoffer.js APP_SOURCE_URL). F178: published at
+app itself (first in web/app/app-sources.json, as "/repo/source.json"; core/appoffer.js APP_SOURCE_URL). F178: published at
 https://<BRAND_DOMAIN>/repo/source.json (SOURCE_URL; the Worker's /repo route serves the deployed web/app/source.json),
 beside iFizBox's APT repo at https://<BRAND_DOMAIN>/repo/.
 

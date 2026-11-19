@@ -1,11 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  DEFAULT_SOURCES, DEFAULT_ALT_SOURCES, normalizeSourceUrl, sourceKey, sourceIconUrls, displayName, sortSources, verifySource,
+  loadTweakSources, loadAppSources, tweakSourcesFrom, appSourcesFrom, normalizeSourceUrl, sourceKey, sourceIconUrls, displayName, sortSources, verifySource,
   refreshSource, releaseDepiction, openSourceStore, sourceCalls, SourceError, sourcesFor, sourceFilter,
 } from "./sources.js";
 import { createHttpBackend, BackendError } from "../backend-http.js";
 import { createParser } from "./parser.js";
+
+const DEFAULT_SOURCES = await loadTweakSources(); // web/app/tweak-sources.json
+const DEFAULT_ALT_SOURCES = await loadAppSources(); // web/app/app-sources.json
 
 // The slice of IndexedDB that sources.js uses, in memory: several keyPath stores, get/getAll/put/delete, async
 // requests and transaction completion.

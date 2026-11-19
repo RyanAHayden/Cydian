@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -34,14 +35,14 @@ class SourceTest(unittest.TestCase):
         self.assertLessEqual(ver(listed), ver(current), "source.json names a version native/VERSION hasn't reached")
 
     def test_default_source(self):
-        with open(os.path.join(ROOT, "web", "app", "core", "sources.js")) as f:
-            js = f.read()
-        block = js[js.index("DEFAULT_ALT_SOURCES = dedupeUrls(["):]
-        first = re.search(r'["`](https?://[^"`]+)["`]', block).group(1)
+        # web/app/app-sources.json: the app's own source first, relative to the site (core/sources.js appSourcesFrom
+        # reads it against https://<DOMAIN>/), so the data file never spells the domain.
+        with open(os.path.join(ROOT, "web", "app", "app-sources.json")) as f:
+            first = json.load(f)[0]
         with open(os.path.join(ROOT, "native", "brand.env")) as f:
             domain = re.search(r"^BRAND_DOMAIN=(\S+)", f.read(), re.M).group(1)
         # F178: the site's /repo/source.json, not raw.githubusercontent.com
-        self.assertEqual(first.replace("${DOMAIN}", domain), f"https://{domain}/repo/source.json")
+        self.assertEqual(urllib.parse.urljoin(f"https://{domain}/", first), f"https://{domain}/repo/source.json")
         self.assertEqual(altsource.SOURCE_URL, f"https://{domain}/repo/source.json")
         self.assertEqual(self.data.get("sourceURL"), altsource.SOURCE_URL)
 

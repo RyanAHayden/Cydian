@@ -405,8 +405,9 @@ export function seedRecord(url) {
 export const neverLoaded = (source) => Boolean(source) && source.updated == null && !source.error;
 
 // The AltStore source list: its own IndexedDB database, so the APT list, apt's sources.list in the app (F33) and
-// its helper never see these. `defaults` (URLs, core/sources.js DEFAULT_ALT_SOURCES on the site) go in once, the
-// first time a store with a "meta" store opens (version 2), so a default the user deletes stays deleted.
+// its helper never see these. `defaults` (URLs, or a function resolving to them, asked only then: core/sources.js
+// loadAppSources on the site) go in once, the first time a store with a "meta" store opens (version 2), so a
+// default the user deletes stays deleted.
 function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-altsources", defaults = [] } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
   return new Promise((resolve, reject) => {
@@ -440,8 +441,11 @@ function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-a
         remove: (key) => run("readwrite", (s) => s.delete(key)).then(() => undefined),
       };
       const seed = async () => {
-        if (!defaults.length || await meta("readonly", (s) => s.get("seeded"))) return;
-        for (const url of defaults) if (!(await store.get(altKey(url)))) await store.put(seedRecord(url));
+        if (!defaults || (Array.isArray(defaults) && !defaults.length)) return;
+        if (await meta("readonly", (s) => s.get("seeded"))) return;
+        const urls = (typeof defaults === "function" ? await defaults() : defaults) ?? [];
+        if (!urls.length) return;
+        for (const url of urls) if (!(await store.get(altKey(url)))) await store.put(seedRecord(url));
         await meta("readwrite", (s) => s.put({ key: "seeded", at: Date.now() }));
       };
       seed().then(() => resolve(store), reject);
@@ -467,7 +471,7 @@ export function jailbreakSourceError() {
 // with its `format`; an APT repo (flat, or dist under dists/<d>/ for each `dists` candidate) goes to the wrapped
 // calls, which save it their own way (apt's sources in the app). A dist repo given as { uri, dist, components }
 // (F48) goes straight to the wrapped calls.
-// opts: { indexedDB, altName, sort, altDefaults: URLs seeded once (F28), arch: () => string, count,
+// opts: { indexedDB, altName, sort, altDefaults: URLs (or () => Promise<URLs>) seeded once (F28), arch: () => string, count,
 //         dists: [suite] or () => [suite] (add.js DEFAULT_DISTS when none; give it coreFoundationDist's suite),
 //         coreFoundation: () => number, the phone's kCFCoreFoundationVersionNumber (adds its Telesphoreo suite),
 //         aptAllowed: bool or () => bool (F144, default true), dropApt: bool (F144) }.

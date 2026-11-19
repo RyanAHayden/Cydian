@@ -1,7 +1,9 @@
 // F44: GitHub-hosted sources: the user/repo parse, and the title, subtitle and icon fallbacks built on it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { githubRepo, displayName, sourceSubtitle, githubAvatarUrl, sourceIcons, DEFAULT_ALT_SOURCES } from "./sources.js";
+import { githubRepo, displayName, sourceSubtitle, githubAvatarUrl, sourceIcons, loadAppSources } from "./sources.js";
+
+const DEFAULT_ALT_SOURCES = await loadAppSources(); // web/app/app-sources.json
 import { seedRecord, altKey } from "./altstore.js";
 
 test("githubRepo reads the four URL shapes", () => {

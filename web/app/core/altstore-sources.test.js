@@ -5,12 +5,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { DEFAULT_ALT_SOURCES, DEFAULT_SOURCES, dedupeUrls } from "./sources.js";
+import { loadAppSources, loadTweakSources, dedupeUrls } from "./sources.js";
 import { parseAltSource, altKey, isAltKey } from "./altstore.js";
 import { detect } from "./sources/detect.js";
 import { createCatalog } from "./catalog.js";
 import { createHttpBackend } from "../backend-http.js";
 
+const DEFAULT_SOURCES = await loadTweakSources(); // web/app/tweak-sources.json
+const DEFAULT_ALT_SOURCES = await loadAppSources(); // web/app/app-sources.json
 const fixture = (name) => readFileSync(new URL(`../../fixtures/altstore/${name}.json`, import.meta.url), "utf8");
 
 // Each default URL, its fixture, and what the fixture holds: [source name, apps after the parse].

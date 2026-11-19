@@ -19,33 +19,85 @@ const MIN_FIELD = "x-ifizbox-minimum-version";
 // A source: { key, uri, dist, components, name?, origin?, depiction?, count?, updated?, error? }. `name` is ours
 // (the defaults), `origin` comes from the repo's Release; the row shows the first there is, else the host.
 // `depiction` is the Release's Depiction: template (see releaseDepiction), null when the Release has none.
-export const DEFAULT_SOURCES = [
-  { name: "Telesphoreo", uri: "http://apt.saurik.com/", dist: "ios/1800.00", components: ["main"] },
-  { name: "BigBoss", uri: "http://apt.thebigboss.org/repofiles/cydia/", dist: "stable", components: ["main"] },
-  { name: "Chariz", uri: "https://repo.chariz.com/", dist: "./", components: [] },
-  { name: "Havoc", uri: "https://havoc.app/", dist: "./", components: [] },
-  { name: "Procursus", uri: "https://apt.procurs.us/", dist: "1800", components: ["main"] },
-].map((s) => ({ ...s, key: sourceKey(s) }));
+//
+// The default sources are data, not code: two files beside index.html, each read on its own.
+//   web/app/tweak-sources.json  the APT repos, [{ name, uri, dist, components }]
+//   web/app/app-sources.json    the AltStore sources, [url]: the app's own first, as "/repo/source.json" (read
+//                               against https://<DOMAIN>/, like core/appoffer.js APP_SOURCE_URL; tools/altsource.py)
+// The site serves both (https://<DOMAIN>/tweak-sources.json, /app-sources.json), so changing a list is a site
+// deploy, not an app release. A new store seeds from them once (a default the user deletes stays deleted):
+// loadTweakSources / loadAppSources ask the site's copy first through `remote` (the app's backend.text, its own
+// fetch path) within DEFAULTS_TIMEOUT, and fall back to the copy bundled with the frontend (offline, a first
+// launch without network). The site itself passes no `remote`: its bundled copy is the site's copy.
+export const TWEAK_SOURCES_FILE = "tweak-sources.json";
+export const APP_SOURCES_FILE = "app-sources.json";
+export const DEFAULTS_TIMEOUT = 3000;
 
-// F28: the AltStore sources the site lists by default (the user's own test sources, 2026-11-17): URLs only. They
-// go in the AltStore list (core/altstore.js withAltSources `defaults`, seeded once like DEFAULT_SOURCES), not this
-// one. Several redirect (github.com/.../raw/..., releases/latest/download/...): the proxy follows each hop, so the
-// URL kept is the one given. Deduped on the parsed URL.
-export const DEFAULT_ALT_SOURCES = dedupeUrls([
-  // I7: iFizBox's own source first, the app's own package page (web/app/source.json, tools/altsource.py).
-  // F178: at the site, beside its APT repo (the Worker's /repo/source.json), like core/appoffer.js APP_SOURCE_URL.
-  `https://${DOMAIN}/repo/source.json`,
-  "https://provenance-emu.com/apps.json",
-  "https://fizl0.github.io/apps/source.json",
-  "https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json",
-  "https://github.com/chachillie/Flycast-iOS/raw/main/flycast-ios.json",
-  "https://xitrix.github.io/iTorrent/AltStore.json",
-  "https://alt.crystall1ne.dev/",
-  "https://repository.apptesters.org/",
-  "https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json",
-  "https://source.ryuksign.com/source.json",
-  "https://repo.unbound.rip/app-repo.json",
-]);
+// tweak-sources.json's entries as source records (each with its sourceKey); anything without an http(s) uri is
+// dropped, and a repeated key keeps the first.
+export function tweakSourcesFrom(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const s of list) {
+    if (!s || typeof s.uri !== "string" || !/^https?:\/\//i.test(s.uri)) continue;
+    const rec = {
+      ...(typeof s.name === "string" && s.name ? { name: s.name } : {}),
+      uri: s.uri,
+      dist: typeof s.dist === "string" && s.dist ? s.dist : "./",
+      components: Array.isArray(s.components) ? s.components.filter((c) => typeof c === "string" && c) : [],
+    };
+    rec.key = sourceKey(rec);
+    if (seen.has(rec.key)) continue;
+    seen.add(rec.key);
+    out.push(rec);
+  }
+  return out;
+}
+
+// app-sources.json's URLs, a relative one read against https://<DOMAIN>/, deduped (dedupeUrls).
+export function appSourcesFrom(list) {
+  if (!Array.isArray(list)) return [];
+  const base = `https://${DOMAIN}/`;
+  return dedupeUrls(list.filter((u) => typeof u === "string").map((u) => {
+    try { return new URL(u.trim(), base).href; } catch { return ""; }
+  }));
+}
+
+// The frontend's own copy of web/app/<file>: an app:// file in the app, the site's in a browser, from disk in node.
+export async function readBundled(file) {
+  const url = new URL(`../${file}`, import.meta.url);
+  if (url.protocol === "file:") {
+    const { readFile } = await import("node:fs/promises");
+    return readFile(url, "utf8");
+  }
+  const res = await fetch(url.href);
+  if (!res.ok) throw new Error(`${file}: HTTP ${res.status}`);
+  return res.text();
+}
+
+// One default list: the site's copy (remote(url) -> its text) when it answers in time with a non-empty list,
+// else the bundled one, else [].
+async function loadDefaultList(file, from, { remote = null, bundled = readBundled, timeout = DEFAULTS_TIMEOUT } = {}) {
+  if (remote) {
+    try {
+      const text = await withTimeout(Promise.resolve().then(() => remote(`https://${DOMAIN}/${file}`)), timeout);
+      const list = from(JSON.parse(text));
+      if (list.length) return list;
+    } catch {
+      // offline, too slow, or not a list: the bundled copy
+    }
+  }
+  try {
+    return from(JSON.parse(await bundled(file)));
+  } catch {
+    return [];
+  }
+}
+
+// opts: { remote: (url) => Promise<text>, bundled: (file) => Promise<text>, timeout: ms }.
+export const loadTweakSources = (opts) => loadDefaultList(TWEAK_SOURCES_FILE, tweakSourcesFrom, opts);
+export const loadAppSources = (opts) => loadDefaultList(APP_SOURCES_FILE, appSourcesFrom, opts);
 
 // URLs -> their parsed hrefs (host lower-cased, a bare host gets its "/"), first of each kept, in order.
 export function dedupeUrls(urls) {
@@ -385,8 +437,10 @@ async function refreshTimed(backend, source, { timeout = REFRESH_TIMEOUT, ...res
 // ---- the store ----------------------------------------------------------------------------------------------
 
 // IndexedDB: store "sources" (keyPath "key") and "meta". The defaults go in once, on the first open, so a source
-// the user deletes stays deleted. The IDBFactory is passed in so node tests can hand it a fake.
-export function openSourceStore({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-sources" } = {}) {
+// the user deletes stays deleted. The IDBFactory is passed in so node tests can hand it a fake. `defaults`: the
+// records seeded, or a function resolving to them, asked only on that first open (loadTweakSources: the bundled
+// tweak-sources.json); when it gives none the store isn't marked seeded, so the next open tries again.
+export function openSourceStore({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-sources", defaults = loadTweakSources } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
   return new Promise((resolve, reject) => {
     const req = idb.open(name, 1);
@@ -397,13 +451,13 @@ export function openSourceStore({ indexedDB: idb = globalThis.indexedDB, name = 
     };
     req.onerror = () => reject(req.error);
     req.onsuccess = () => {
-      const store = wrap(req.result);
+      const store = wrap(req.result, defaults);
       store.seed().then(() => resolve(store), reject);
     };
   });
 }
 
-function wrap(db) {
+function wrap(db, defaults = []) {
   const run = (storeName, mode, f) => new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, mode);
     const req = f(tx.objectStore(storeName));
@@ -414,7 +468,9 @@ function wrap(db) {
   const store = {
     async seed() {
       if (await run("meta", "readonly", (s) => s.get("seeded"))) return;
-      for (const s of DEFAULT_SOURCES) await run("sources", "readwrite", (st) => st.put(s));
+      const list = (typeof defaults === "function" ? await defaults() : defaults) ?? [];
+      if (!list.length) return;
+      for (const s of list) await run("sources", "readwrite", (st) => st.put(s));
       await run("meta", "readwrite", (s) => s.put({ key: "seeded", at: Date.now() }));
     },
     // Every source, in the Sources tab's order.
@@ -436,10 +492,11 @@ function wrap(db) {
 
 // The source-list calls every backend exposes (docs/native.md): `sources()`, `addSource(input)`,
 // `removeSource(key)`, `refreshSources(onEach)`. Both backends mix these in over their own fetch calls, so the
-// list lives on the device either way. `opts`: { indexedDB, arch: () => string, count }.
+// list lives on the device either way. `opts`: { indexedDB, arch: () => string, count, tweakDefaults: the store's
+// seed (openSourceStore `defaults`; the bundled tweak-sources.json when not given) }.
 export function sourceCalls(backend, opts = {}) {
   let opened = null;
-  const store = () => (opened ??= openSourceStore(opts));
+  const store = () => (opened ??= openSourceStore(opts.tweakDefaults ? { ...opts, defaults: opts.tweakDefaults } : opts));
   const arch = () => (typeof opts.arch === "function" ? opts.arch() : opts.arch) || DEFAULT_ARCH;
   const count = opts.count;
   return {

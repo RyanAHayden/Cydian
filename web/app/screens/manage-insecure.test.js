@@ -4,7 +4,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { addSecure, INSECURE_ALERT } from "./manage.js";
-import { DEFAULT_SOURCES } from "../core/sources.js";
+import { loadTweakSources } from "../core/sources.js";
+
+const DEFAULT_SOURCES = await loadTweakSources(); // web/app/tweak-sources.json
 import { httpsInput, insecureNote, isInsecureSource, INSECURE_NOTE } from "../core/sources.js";
 
 // A backend that adds only the URLs in `works`, and an alert that answers `tap` (a button index).

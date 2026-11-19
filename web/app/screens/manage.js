@@ -51,7 +51,8 @@ export const isManage = (route) => route.path[0] === SEGMENT;
 
 const listeners = new Set();
 export const onSourcesChanged = (f) => listeners.add(f);
-const changed = () => { for (const f of listeners) f(); };
+// B75: the add paths pass their ctx, so the Sources tab can load what was added under the reload bar (screens/sources.js).
+const changed = (ctx) => { for (const f of listeners) f(ctx); };
 
 let pending = null; // the import under review: [entry with status and `pick`]
 
@@ -337,7 +338,7 @@ export async function addSource(ctx, prefill = null) {
     await showAlert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
     return;
   }
-  changed();
+  changed(ctx);
   const body = document.querySelector(".page.is-top .manage-list")?.closest(".page-body");
   if (body) renderSources(body);
 }
@@ -539,7 +540,7 @@ async function addPicked(ctx) {
     try { await getBackend().addSource(e.input); e.status = "listed"; } catch (err) { failed.push(`${e.uri}: ${err.message}`); }
   }
   hide();
-  changed();
+  changed(ctx);
   const ok = picks.length - failed.length;
   await showAlert({ title: failed.length ? "Some Sources Failed" : "Sources Added",
     message: [`Added ${plural(ok, "source")}.`, ...failed].join("\n\n"), buttons: ["OK"] });
@@ -635,7 +636,7 @@ export async function addRecommended(row, ctx) {
     await showAlert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
     return false;
   }
-  changed();
+  changed(ctx);
   return true;
 }
 
@@ -691,7 +692,7 @@ async function addAll(ctx) {
   } finally {
     hide();
   }
-  changed();
+  changed(ctx);
   if (failed.length) await showAlert({ title: "Verification Error", message: `Couldn't add ${failed.join(", ")}.`, buttons: ["OK"] });
   if (recBox?.isConnected) renderRecommended(recBox, ctx);
 }

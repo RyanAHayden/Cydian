@@ -513,7 +513,7 @@ export async function loadNeverLoaded(backend, list, type, { tried = new Set(), 
   try {
     return await backend.refreshSources(onEach, { filter: (s) => keys.has(s?.key), ...(onRow ? { onRow } : {}) });
   } finally {
-    end();
+    if (typeof end === "function") end(); // B75: a begin() that returns nothing is fine
   }
 }
 

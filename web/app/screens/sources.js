@@ -115,7 +115,9 @@ export function nav(route, ctx) {
 settings.onChange((key) => { if (key === "device" && state.body?.isConnected) draw(); });
 
 // F45: an add, delete or reorder in Manage reloads the list, so it is right when the user goes back.
-manage.onSourcesChanged(() => { if (state.body) load(); });
+// B75: and a source just added starts loading at once, under the reload bar (`ctx` from Manage's Add paths), even
+// when the Sources list was never drawn, so Search finds its packages without a visit here.
+manage.onSourcesChanged((ctx) => { if (state.body) load(ctx ?? state.ctx); else loadNew(ctx); });
 
 export function render(el, route, ctx) {
   if (manage.isManage(route)) {
@@ -134,6 +136,7 @@ export function render(el, route, ctx) {
 }
 
 async function load(ctx) {
+  if (ctx) state.ctx = ctx;
   try {
     state.sources = await getBackend().sources();
   } catch (e) {
@@ -146,28 +149,70 @@ async function load(ctx) {
 
 // F43: sources seeded by default (F28) hold only their URL until something reads them: refresh those once, with
 // the reload bar, so a first visit shows names, icons and counts without a tap.
-async function firstLoad(ctx) {
-  if (state.busy) return;
+// B75: `fresh` reads the list first (a source just added, Search), inside the busy section so two callers never
+// start two runs; a call while another run is busy marks `again` and gets that run's promise (null for a Refresh).
+// Resolves to the refreshed records, or null when nothing needed loading.
+function firstLoad(ctx, { fresh = false, backend = getBackend() } = {}) {
+  if (state.busy) { state.again = true; return state.current ?? Promise.resolve(null); }
   state.busy = true;
   let run = null;
-  try {
-    // F150: the reload bar instead of a HUD, so the list stays usable while the new sources load.
-    const done = await loadNeverLoaded(getBackend(), state.sources, settings.deviceType(), {
-      tried: state.tried,
-      begin: (keys) => { run = startRun(ctx, [...(keys ?? [])]); },
-      onEach: (d) => run?.onEach(d),
-      onRow: (k, st, why) => run?.onRow(k, st, why),
-    });
-    if (done && !run?.cancelled) {
-      state.sources = await getBackend().sources();
-      draw();
+  const job = (async () => {
+    let done = null;
+    try {
+      if (fresh) state.sources = await backend.sources();
+      // F150: the reload bar instead of a HUD, so the list stays usable while the new sources load.
+      done = await loadNeverLoaded(backend, state.sources, settings.deviceType(), {
+        tried: state.tried,
+        // the bar ends in the finally below; begin hands back a no-op `end` (B75: none made end() throw, so the
+        // list was never read again after a first load)
+        begin: (keys) => { run = startRun(ctx, [...(keys ?? [])]); return () => {}; },
+        onEach: (d) => run?.onEach(d),
+        onRow: (k, st, why) => run?.onRow(k, st, why),
+      });
+      if (done && !run?.cancelled) {
+        state.sources = await backend.sources();
+        draw();
+      }
+    } catch {
+      // a failed first load leaves the rows as they were; Refresh shows the error
+    } finally {
+      if (run && !run.cancelled) { clearLoading(ctx); run.end(); }
+      state.busy = false;
+      state.current = null;
+      runAgain(ctx, run?.cancelled);
     }
-  } catch {
-    // a failed first load leaves the rows as they were; Refresh shows the error
-  } finally {
-    if (!run?.cancelled) { clearLoading(ctx); run?.end(); }
-    state.busy = false;
-  }
+    return done;
+  })();
+  state.current = job;
+  return job;
+}
+
+// ---- B75: sources just added load at once, wherever the user is ----------------------------------------------
+
+// Sources the device has never loaded (one just added by Add, Add All, Import, or Search's Recommended Add) start
+// loading now: firstLoad's one run under the reload bar, with the words, rows, badge and Cancel of Refresh, whichever
+// tab is open. Search calls it on opening and as a query is typed; Manage's adds through onSourcesChanged. Each
+// source is tried once per session (state.tried, shared by every caller). `backend` is for the tests.
+export function loadNew(ctx = state.ctx, { backend } = {}) {
+  if (ctx) state.ctx = ctx;
+  return firstLoad(ctx ?? state.ctx, { fresh: true, ...(backend ? { backend } : {}) });
+}
+
+// Called with no arguments each time a landed source's packages are in the catalog (after ctx.loadData), for a
+// Refresh, a retry or loadNew alike: Search runs its query again. Returns unsubscribe.
+const landedListeners = new Set();
+export function onLanded(f) { landedListeners.add(f); return () => landedListeners.delete(f); }
+function fireLanded() {
+  for (const f of [...landedListeners]) { try { f(); } catch { /* one listener's error stops no other */ } }
+}
+
+// A loadNew asked for while another run held the busy flag (a source added during a Refresh): run it once that ends,
+// unless that run was cancelled (Cancel means stop, not start the next bar).
+function runAgain(ctx, cancelled = false) {
+  if (!state.again) return;
+  state.again = false;
+  if (cancelled) return;
+  loadNew(ctx ?? state.ctx);
 }
 
 // Loading marks: the rows of `keys` spin and the Sources tab's badge spins until each answers (onEach), as
@@ -221,7 +266,12 @@ function rowEvent(key, rowState, reason) {
 let feeding = null;
 function feedCatalog(ctx) {
   if (!ctx?.loadData) return;
-  feeding ??= coalesce(() => ctx.loadData());
+  // B75: onLanded's listeners hang off the same promise, so the load's own timing is as it was
+  feeding ??= coalesce(() => {
+    const p = ctx.loadData();
+    Promise.resolve(p).then(fireLanded, () => {});
+    return p;
+  });
   feeding();
 }
 
@@ -329,6 +379,7 @@ export async function retrySource(ctx, key) {
     state.retrying = null;
     state.running = false;
     state.busy = false;
+    runAgain(ctx); // B75
     state.rows?.finish();
     announce();
     ctx?.setBadge?.("sources", tabBadge(state.rows?.counts(), false));
@@ -360,6 +411,7 @@ export async function refreshInBackground(ctx) {
   } finally {
     if (!run?.cancelled) { clearLoading(ctx); run?.end(); }
     state.busy = false;
+    runAgain(ctx, run?.cancelled); // B75
   }
 }
 
@@ -650,5 +702,6 @@ async function refresh(ctx) {
   } finally {
     if (!run?.cancelled) { clearLoading(ctx); run?.end(); }
     state.busy = false;
+    runAgain(ctx, run?.cancelled); // B75
   }
 }

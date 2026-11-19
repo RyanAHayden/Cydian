@@ -16,7 +16,8 @@ import { catalog, ALL } from "../catalog.js";
 import { compatFilterOn } from "../device.js";
 import { settings, createSwitch } from "./settings.js";
 import { SECTION_GROUPS, searchable } from "../core/catalog.js";
-import { displayName, sourcesFor, loadNeverLoaded } from "../core/sources.js";
+import { displayName, sourcesFor } from "../core/sources.js";
+import { loadNew, onLanded } from "./sources.js";
 import { orderSources, loadOrder } from "../core/sourcelist.js";
 import { getBackend } from "../backend.js";
 import { grouped, el } from "../nav/ui.js";
@@ -56,7 +57,18 @@ export function searchFilters(f) {
 export function sourceChoices(list, type, order = null) {
   return sourcesFor(orderSources(list, order), type).shown.map((s) => ({ label: displayName(s), value: s.key }));
 }
-const triedFirstLoad = new Set(); // F53: never-loaded sources the panel already asked for (loadNeverLoaded `tried`)
+
+// B75: sources added but never loaded (Manage > Recommended > Add All, then Search) load at once, under the Sources
+// tab's reload bar (screens/sources.js loadNew: one shared run, Refresh's words, progress and Cancel), and the query
+// runs again each time one's packages reach the catalog, so they show without leaving Search. Called on opening;
+// `follow.load()` again as a query is typed (a source tried once is not asked again). `alive()` false (the page was
+// left) unsubscribes. `load` and `landed` are for the tests.
+export function followNewSources(ctx, rerun, alive = () => true, { load = loadNew, landed = onLanded } = {}) {
+  const off = landed(() => { if (!alive()) { off(); return; } rerun(); });
+  const kick = async () => { try { return await load(ctx); } catch { return null; } };
+  kick();
+  return { load: kick, off };
+}
 
 // F100: the Recent table's rows (nav/ui.js grouped), one per query, a tap hands it to `pick`.
 export function recentRows(list, pick) {
@@ -209,20 +221,25 @@ export function render(body, route, ctx) {
   results.addEventListener("click", (e) => {
     if (e.target.closest?.("a[href]") && !recent.contains(e.target)) settings.recentSearches.add(input.value);
   });
-  async function run() {
+  // B75: `again`: the same query run once more because a source's packages landed: the list keeps its scroll and
+  // Other Sources and Recommended Sources aren't asked again.
+  async function run({ again = false } = {}) {
     const q = input.value.trim();
     state.query = input.value;
     const seq = ++state.seq;
-    // One character searches here; Canister needs two (core/canister.js askable()).
-    others.search(searchable(q) && settings.deviceType() !== "none" ? q : ""); // jailbreak packages only
-    recs.search(searchable(q) ? q : "");
-    drawRecent();
+    if (!again) {
+      // One character searches here; Canister needs two (core/canister.js askable()).
+      others.search(searchable(q) && settings.deviceType() !== "none" ? q : ""); // jailbreak packages only
+      recs.search(searchable(q) ? q : "");
+      drawRecent();
+      if (searchable(q)) follow.load(); // B75: anything added since opening loads too
+    }
     if (!searchable(q)) {
       list.setItems([]);
       note.textContent = "Package names, descriptions and authors.";
       return;
     }
-    note.textContent = "";
+    if (!again) note.textContent = "";
     let rows;
     try {
       rows = await catalog.search(q, searchFilters(state.filters));
@@ -231,11 +248,13 @@ export function render(body, route, ctx) {
       return;
     }
     if (seq !== state.seq) return; // a newer keystroke won
-    results.scrollTop = 0;
+    if (!again) results.scrollTop = 0;
     browse.rememberNames(rows);
     list.setItems(rows);
     note.textContent = rows.length ? "" : "No Results";
   }
+  // B75: opening Search loads sources never loaded; each one landing runs a typed query again.
+  const follow = followNewSources(ctx, () => { if (searchable(input.value.trim())) run({ again: true }); }, () => body.isConnected);
   cancel.addEventListener("click", () => { input.value = ""; clearTimeout(timer); run(); input.blur(); });
   input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 120); });
   bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); settings.recentSearches.add(input.value); run(); input.blur(); });
@@ -353,8 +372,9 @@ async function openFilters(scope, changed, redraw) {
     if (f.source != null && !sources.some((o) => o.value === f.source)) { f.source = null; changed(); }
     if (box.isConnected) draw();
     // F53: AltStore sources seeded by URL (F28) have no name until loaded, as on the Sources tab's first visit
-    // (F43): load them quietly and redraw with their names.
-    if (await loadNeverLoaded(getBackend(), list, type, { tried: triedFirstLoad })) {
+    // (F43): load them (B75: Search's shared run under the reload bar, screens/sources.js loadNew) and redraw with
+    // their names.
+    if (await loadNew()) {
       sources = sourceChoices(await getBackend().sources(), type, loadOrder());
       if (box.isConnected) draw();
     }

@@ -305,12 +305,19 @@ async function ipaFetch(target, maxBytes, token = null) {
   const len = Number(r.headers.get("content-length") || 0);
   if (len > maxBytes) { r.body?.cancel(); return fetchErr("too_large", tooBig(maxBytes), 413); }
   let seen = 0;
+  // B87: a stream from upstream that ends short of its Content-Length is an error, not a clean (and short) end: the
+  // browser's read then fails and the website fetches it again, instead of signing half an IPA.
   const cap = new TransformStream({ transform(chunk, c) {
     seen += chunk.byteLength;
     if (seen > maxBytes) c.error(new Error(tooBig(maxBytes))); else c.enqueue(chunk);
+  }, flush(c) {
+    if (len && seen < len) c.error(new Error(`upstream stopped after ${seen} of ${len} bytes`));
   } });
+  // B87: Cloudflare drops Content-Length from a body a Worker streams through JS, so the length goes again in
+  // X-IPA-Length: the website checks it got every byte (signing-client.js downloadIpa).
   return new Response(r.body.pipeThrough(cap), { headers: { ...SAFE, "Content-Type": "application/octet-stream",
-    ...(len ? { "Content-Length": String(len) } : {}), "X-Source-URL": encodeURI(r.url) } });
+    ...(len ? { "Content-Length": String(len), "X-IPA-Length": String(len), "Access-Control-Expose-Headers": "X-IPA-Length" } : {}),
+    "X-Source-URL": encodeURI(r.url) } });
 }
 
 const upKey = (t) => `up.${t}`, partKey = (t, i) => `up.${t}.${i}`;

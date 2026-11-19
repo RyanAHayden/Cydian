@@ -871,3 +871,27 @@ import { d1 } from "./src/d1-sqlite.js";
   assert.equal(r.headers.get("content-type"), "application/json; charset=utf-8");
   console.log("worker self source: ok");
 }
+
+// B87: /api/fetch?kind=ipa keeps the IPA's length where the browser can read it (X-IPA-Length: Cloudflare drops
+// Content-Length from a body streamed through JS), and an upstream that stops short of its length errors the stream
+// instead of ending it cleanly, so the website sees the cut rather than signing half an IPA.
+{
+  const realFetch = globalThis.fetch;
+  const bytes = new Uint8Array([0x50, 0x4b, 3, 4, 5, 6, 7, 8]);
+  const answer = (sent) => new Response(new ReadableStream({ start(c) { c.enqueue(bytes.slice(0, sent)); c.close(); } }),
+    { headers: { "Content-Length": String(bytes.length) } });
+  const ipaGo = () => w.fetch(new Request("https://sign.example/api/fetch?kind=ipa&url=" + encodeURIComponent("https://example.com/x.ipa")), env);
+  try {
+    globalThis.fetch = async () => answer(bytes.length);
+    let r = await ipaGo();
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get("x-ipa-length"), "8");
+    assert.match(r.headers.get("access-control-expose-headers"), /X-IPA-Length/);
+    assert.deepEqual(new Uint8Array(await r.arrayBuffer()), bytes);
+    globalThis.fetch = async () => answer(5);
+    r = await ipaGo();
+    assert.equal(r.status, 200);
+    await assert.rejects(r.arrayBuffer(), /upstream stopped after 5 of 8 bytes/);
+  } finally { globalThis.fetch = realFetch; }
+  console.log("worker ipa length: ok");
+}

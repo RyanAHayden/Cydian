@@ -83,6 +83,16 @@ class Wiring(unittest.TestCase):
         self.assertIn("setTaskCompleted", self.src)
         self.assertIn("expirationHandler", self.src)
 
+    def test_badge_is_changes_count(self):
+        # B47: the background badge starts from Changes' last count (app.badge stores it) and its keys (updates.watch),
+        # never found.count alone, which badged updates Changes didn't list.
+        self.assertIn("UpdateCheck.badge(found, pageCount:", self.src)
+        self.assertNotIn("setBadgeCount(found.count)", self.src)
+        self.assertNotIn("applicationIconBadgeNumber = found.count", self.src)
+        self.assertIn("forKey: pageKeysKey", self.src)
+        self.assertIn("content.badge = NSNumber(value: badge)", self.src)
+        self.assertIn("forKey: BackgroundCheck.pageCountKey", read("Sources", "Notifications.swift"))
+
     def test_bridge(self):
         self.assertIn('b.on("updates.watch")', self.src)
         self.assertIn("BackgroundCheck.register(self)", read("Sources", "Bridge.swift"))

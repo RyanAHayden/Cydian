@@ -21,18 +21,20 @@ test("jailbreak mode leaves dpkg's upgrades as they are", async () => {
   assert.equal(await withAppUpgrades(up, [], { mode: "jailbreak", store }), up);
 });
 
-test("sideload: no sources loaded yet, nothing new to show, and the shell is told what to follow", async () => {
+test("sideload: nothing new to show, and the shell is told what to follow", async () => {
   const calls = [];
   const native = { call: async (m, p) => { calls.push([m, p]); return { scheduled: true }; } };
   const store = async () => memoryAppStore([self, { id: "delta", name: "Delta", version: "1.5", source: SRC, date: 1 }]);
-  const up = await withAppUpgrades({ available: [], ignored: [] }, [], { mode: "sideload", native, store });
+  // B47: the shell follows an app at the source Changes reads it from (its row's key), here at Delta's own version.
+  const lookup = async (id) => (id === "delta" ? { key: `alt:${SRC}`, stanza: { version: "1.5" }, row: { name: "Delta" } } : null);
+  const up = await withAppUpgrades({ available: [], ignored: [] }, [], { mode: "sideload", native, store, lookup });
   assert.deepEqual(up, { available: [], ignored: [] });
   await new Promise((r) => setTimeout(r, 0));
   assert.deepEqual(calls, [["updates.watch", { apps: [
     { id: "com.ryha.ifizbox", name: "iFizBox", version: "0.2.6", source: SELF_ALT_URL },
     { id: "delta", name: "Delta", version: "1.5", source: SRC }], known: [] }]]);
   // The same list again isn't sent twice.
-  await withAppUpgrades({ available: [], ignored: [] }, [], { mode: "sideload", native, store });
+  await withAppUpgrades({ available: [], ignored: [] }, [], { mode: "sideload", native, store, lookup });
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(calls.length, 1);
 });

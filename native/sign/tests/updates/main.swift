@@ -115,5 +115,17 @@ test("known updates after the page sends a new watch list") {
     check(UpdateCheck.mergeKnown(old: ["junk"], oldWatch: [], page: [], newWatch: [d15]).isEmpty, "a key without a space")
 }
 
+test("B47: the icon badge is Changes' last count plus updates it didn't count") {
+    func f(_ id: String, _ v: String) -> UpdateCheck.Found { found(id, id, "1", v) }
+    // Changes counted Delta 1.6 and a re-sign (2): Delta 1.7 found now is the same row, UTM is new.
+    check(UpdateCheck.badge([f("d", "1.7"), f("u", "2")], pageCount: 2, pageKeys: ["d 1.6"]) == 3, "newer version of a counted row")
+    // Nothing found (a source failed in the background): Changes' count stands, never 0 by accident.
+    check(UpdateCheck.badge([], pageCount: 2, pageKeys: ["d 1.6"]) == 2, "nothing found")
+    // Changes showed nothing and nothing is found: no badge (before, an ignored or removed app could count here).
+    check(UpdateCheck.badge([], pageCount: 0, pageKeys: []) == 0, "up to date")
+    check(UpdateCheck.badge([f("d", "1.6")], pageCount: 1, pageKeys: ["d 1.6"]) == 1, "the counted row itself")
+    check(UpdateCheck.badge([f("d", "1.6")], pageCount: -3, pageKeys: ["junk"]) == 1, "a bad count or key")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

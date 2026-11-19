@@ -11,7 +11,8 @@
 //   UpdateCheck.updates(_:offers:) the watched apps with a newer offer, as [Found], sorted by name
 //   UpdateCheck.fresh(_:known:)   the ones not yet counted on screen or notified (key "<id> <version>")
 //   UpdateCheck.mergeKnown(...)   the known keys after the page sends a new watch list
-//   UpdateCheck.title(_:)         "1 Update" / "3 Updates" (app-updates.js updatesTitle)
+//   UpdateCheck.badge(_:pageCount:pageKeys:) the icon badge: Changes' last count plus updates it didn't count (B47)
+//   UpdateCheck.title(_:)       "1 Update" / "3 Updates" (app-updates.js updatesTitle)
 //   UpdateCheck.body(_:)          "Delta 1.6" / "Delta 1.6 and UTM 4.5" / "Delta 1.6, UTM 4.5 and 2 more"
 //   DebVersion.compare(_:_:)         -1, 0, 1 by dpkg's rules, as web/app/core/apt.js compareVersions
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -126,6 +127,16 @@ enum UpdateCheck {
             if let v = now[id], before[id] == v { out.insert(k) }
         }
         return out
+    }
+
+    // B47: the icon badge a background run sets. It must equal Changes' rows, which this side can't fully see (re-signs,
+    // the page's own rules), so it starts from what Changes counted when last open (`pageCount`, the page's app.badge)
+    // and adds only the updates found for apps that count left out (`pageKeys`, the page's "<id> <version>" keys from
+    // updates.watch): a newer version of a row already counted is the same row. The page follows only apps Changes
+    // can count (no ignored app, none whose source is gone), so nothing Changes hides gets in.
+    static func badge(_ found: [Found], pageCount: Int, pageKeys: Set<String>) -> Int {
+        let counted = Set(pageKeys.compactMap { k in k.firstIndex(of: " ").map { String(k[..<$0]) } })
+        return max(0, pageCount) + Set(found.map(\.id)).subtracting(counted).count
     }
 
     static func title(_ n: Int) -> String { n == 1 ? "1 Update" : "\(n) Updates" }

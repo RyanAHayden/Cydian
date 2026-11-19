@@ -2,7 +2,7 @@
 // version Install recorded and the AltStore source it came from) and the updates it already shows; a
 // BGAppRefreshTask then fetches those sources now and then while iFizBox isn't open, and when one offers an app a
 // newer version than remembered, beyond the ones already counted or notified, posts "n Updates" (a tap opens
-// Changes) and sets the icon badge. The rules are native/sign/Updates.swift (tested on Linux, native/test_updates.py).
+// Changes) and sets the icon badge (B47: Changes' last count plus updates it didn't count, UpdateCheck.badge). The rules are native/sign/Updates.swift (tested on Linux, native/test_updates.py).
 //
 //   updates.watch {apps: [{id, name, version, source}], known: ["<id> <version>"]} -> {scheduled: Bool}
 //
@@ -23,6 +23,10 @@ enum BackgroundCheck {
     static let taskID = "com.ryha.ifizbox.updates"
     static let watchKey = "ifizbox.updates.watch" // UserDefaults: [UpdateCheck.Watched] as JSON
     static let knownKey = "ifizbox.updates.known" // UserDefaults: ["<id> <version>"]
+    // B47: what Changes counted when last open: its "<id> <version>" keys (updates.watch's `known`, as sent) and the
+    // icon count it set (app.badge, Notifications.swift). A background run's badge starts from these.
+    static let pageKeysKey = "ifizbox.updates.pageKeys"
+    static let pageCountKey = "ifizbox.updates.pageCount"
     static let interval: TimeInterval = 4 * 3600
     static let maxBytes = 8 << 20 // AltStore's own source is about 1 MB; the biggest seen (F9) under 8 MB
     private static let queue = DispatchQueue(label: "com.ryha.ifizbox.updates")
@@ -50,6 +54,7 @@ enum BackgroundCheck {
             queue.async {
                 let known = UpdateCheck.mergeKnown(old: loadKnown(), oldWatch: loadWatch(), page: page, newWatch: apps)
                 save(apps, known: known)
+                UserDefaults.standard.set(page.sorted(), forKey: pageKeysKey)
                 // B34: iFizBox itself counts too, or a phone following only iFizBox never gets asked and its own
                 // update can neither badge the icon nor notify from here.
                 if !apps.isEmpty { askOnce() }
@@ -141,15 +146,19 @@ enum BackgroundCheck {
                 group.notify(queue: BackgroundCheck.queue) { [self] in
                     if isFinished { return }
                     let found = UpdateCheck.updates(watch, offers: offers)
-                    // The icon badge is every update available, seen or not, each time (a notification only for new ones).
+                    // B47: the icon badge is Changes' count: what it counted when last open, plus updates for apps it
+                    // didn't count (before, found.count alone, which disagreed with Changes' rows).
+                    let pageKeys = Set(UserDefaults.standard.stringArray(forKey: BackgroundCheck.pageKeysKey) ?? [])
+                    let badge = UpdateCheck.badge(found, pageCount: UserDefaults.standard.integer(forKey: BackgroundCheck.pageCountKey),
+                                                  pageKeys: pageKeys)
                     UNUserNotificationCenter.current().getNotificationSettings { st in
                         guard st.badgeSetting == .enabled else { return }
-                        if #available(iOS 16.0, *) { UNUserNotificationCenter.current().setBadgeCount(found.count) }
-                        else { DispatchQueue.main.async { UIApplication.shared.applicationIconBadgeNumber = found.count } }
+                        if #available(iOS 16.0, *) { UNUserNotificationCenter.current().setBadgeCount(badge) }
+                        else { DispatchQueue.main.async { UIApplication.shared.applicationIconBadgeNumber = badge } }
                     }
                     let known = BackgroundCheck.loadKnown()
                     guard !UpdateCheck.fresh(found, known: known).isEmpty else { return finish(true) }
-                    post(found) { posted in
+                    post(found, badge: badge) { posted in
                         BackgroundCheck.queue.async { [self] in
                             // Only what reached the user counts as told: without permission, the next run tries again.
                             if posted { UserDefaults.standard.set(known.union(found.map(\.key)).sorted(), forKey: BackgroundCheck.knownKey) }
@@ -182,7 +191,7 @@ enum BackgroundCheck {
 
         // "n Updates" with every update found (not only the new ones), under N5's identifier so app.badge's 0 takes
         // it away and Notifications.swift opens its route.
-        private func post(_ found: [UpdateCheck.Found], _ done: @escaping (Bool) -> Void) {
+        private func post(_ found: [UpdateCheck.Found], badge: Int, _ done: @escaping (Bool) -> Void) {
             let center = UNUserNotificationCenter.current()
             center.getNotificationSettings { s in
                 let ok: Set<UNAuthorizationStatus> = [.authorized, .provisional, .ephemeral]
@@ -191,7 +200,7 @@ enum BackgroundCheck {
                 content.title = UpdateCheck.title(found.count)
                 content.body = UpdateCheck.body(found)
                 content.sound = .default
-                content.badge = NSNumber(value: found.count)
+                content.badge = NSNumber(value: badge) // B47: the same count as the icon badge above
                 content.userInfo = ["url": "#/changes"]
                 let req = UNNotificationRequest(identifier: Notifications.upgradesID, content: content, trigger: nil)
                 center.add(req) { e in done(e == nil) }

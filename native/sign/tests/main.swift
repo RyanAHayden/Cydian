@@ -427,5 +427,32 @@ test("F77: My IPAs signs a local IPA file") {
     check(((try? FileManager.default.contentsOfDirectory(atPath: lib.store.path)) ?? ["x"]).isEmpty, "sweep clears leftovers")
 }
 
+// F236: this iPhone in the profile (DeviceCheck.swift; core/signing.js deviceCheck is the same check).
+test("device check") {
+    func prof(_ extra: String) -> Data {
+        Data(("junk<?xml version=\"1.0\" encoding=\"UTF-8\"?><plist version=\"1.0\"><dict><key>Name</key><string>T</string>"
+            + extra + "</dict></plist>junk").utf8)
+    }
+    func devs(_ u: String...) -> String { "<key>ProvisionedDevices</key><array>" + u.map { "<string>\($0)</string>" }.joined() + "</array>" }
+    let seven = "cb21a7f0caffd4807d41e713456f134cc958b076", other = "00008030-0011223344556677", new = "00008110-000A1B2C3D4E5F60"
+    let two = prof(devs(seven, new))
+    check(DeviceCheck.devices(profile: two).udids == [seven.uppercased(), new], "two devices read")
+    check(DeviceCheck.check(profile: two, phone: .udid(seven)).state == .inProfile, "UDID in the profile")
+    let out = DeviceCheck.check(profile: two, phone: .udid(other))
+    check(out.state == .out && out.udid == other && out.count == 2, "UDID not in the profile")
+    check(DeviceCheck.problem(out)?.code == "device_not_in_profile", "out is a problem")
+    check(DeviceCheck.problem(out)?.message == DeviceCheck.notInText(other), "with the sentence")
+    check(DeviceCheck.check(profile: two, phone: .candidates([seven, new])).state == .inProfile, "every candidate listed")
+    check(DeviceCheck.check(profile: two, phone: .candidates([other])).state == .out, "no candidate listed")
+    check(DeviceCheck.check(profile: two, phone: .candidates([seven, other])).state == .unknown, "some candidates listed")
+    check(DeviceCheck.check(profile: two, phone: nil).state == .unknown, "no UDID")
+    check(DeviceCheck.problem(DeviceCheck.check(profile: two, phone: nil)) == nil, "unknown isn't a problem")
+    check(DeviceCheck.check(profile: prof("<key>ProvisionsAllDevices</key><true/>"), phone: .udid(other)).state == .skip, "all devices")
+    check(DeviceCheck.check(profile: prof(""), phone: .udid(other)).state == .skip, "no device list")
+    check(DeviceCheck.phone(fromEmbedded: prof(devs(seven))) == .udid(seven.uppercased()), "embedded: one device")
+    check(DeviceCheck.phone(fromEmbedded: prof(devs(seven, new))) == .candidates([seven.uppercased(), new]), "embedded: a set")
+    check(DeviceCheck.phone(fromEmbedded: prof("")) == nil, "embedded: no list")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failure(s)")
 exit(failures == 0 ? 0 : 1)

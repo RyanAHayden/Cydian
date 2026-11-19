@@ -22,7 +22,7 @@ import { grouped, el } from "./nav/ui.js";
 import { format, settingsRoute } from "./router.js";
 import { installOnDevice, openSigning } from "./signing-client.js";
 import { createSwitch } from "./screens/settings.js";
-import { phaseLabel, deviceError, inspectGroups, installParams, installedId, isCgBI, fromBase64 } from "./core/signing.js";
+import { phaseLabel, deviceError, inspectGroups, installParams, installedId, isCgBI, fromBase64, notLandedText } from "./core/signing.js";
 import { NAME } from "./brand.js";
 import { selfLevels } from "./core/progress.js";
 import { lockSelfUpdate } from "./nav/progress.js";
@@ -73,7 +73,7 @@ export async function inspectAndInstall({ url, name = "", onInstalled = () => {}
         close();
         const shown = params.name || info.app?.name || name;
         resolve(await install({ url, name: shown, onInstalled, params,
-          after: (result, hh) => followInstall(native, installedId(result, params, info), hh, { later, name: shown }) }));
+          after: (result, hh) => followInstall(native, installedId(result, params, info), hh, { later, name: shown, device: result?.device }) }));
       },
       onClose: () => { if (!started) resolve(false); },
     });
@@ -153,10 +153,14 @@ export function signSheetButtons({ right, box, onInstall, onCancel, doc = docume
 // signing.progress, which could sit on "iOS has the whole IPA" long after the app was in.
 // The button is Close (progressHUD's).
 // B49: for iFizBox itself it ends locked on "Closing iFizBox" (nav/progress.js lockSelfUpdate) until iOS closes it.
-export async function followInstall(_native, bundleId, h, { later = setTimeout } = {}) {
+// F236: `device` (signing.install's, or signing.status's profile.device): when the shell couldn't tell whether this
+// iPhone is in the profile, the page's last line says that is the likely cause if the app doesn't appear.
+export async function followInstall(_native, bundleId, h, { later = setTimeout, name = "", device = null } = {}) {
   const own = selfLevels([bundleId]).length > 0;
   if (own && typeof h.finish === "function") { lockSelfUpdate(h, { later }); return null; }
   h.set("Done");
+  const cause = notLandedText(name, device);
+  if (cause) h.page?.line?.("warning", cause);
   if (typeof h.finish === "function") h.finish({ status: "Done" });
   else later(h.hide, 1200);
   return null;

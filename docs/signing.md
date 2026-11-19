@@ -272,6 +272,26 @@ Plus the arm64e fix-up and the user's edits (below). No dylib injection.
 Not in the app: backloop.dev and api.palera.in installs (the Signing Server serves the manifest instead, above), so
 no backloop pack expiry check or genPlist URL encoding; and no Zsign-Package (iFizBox's own signer does the job).
 
+### Is this iPhone in the profile?
+
+A development or ad hoc profile installs only on the devices it lists (`ProvisionedDevices`, by UDID). On any other
+iPhone iOS refuses the app with "integrity could not be verified", which doesn't say why. So the profile is checked
+against this phone (`native/sign/DeviceCheck.swift`, and the same check and sentences in `core/signing.js`
+`deviceCheck`):
+
+- **This phone's UDID.** The jailbreak build asks `ifizbox-helper udid` (MobileGestalt's `UniqueDeviceID`). The
+  sideload build reads its own `embedded.mobileprovision`: one device there is this phone's UDID; several are a set
+  it is one of, so a profile that lists all of them has it and one that lists none can't. There is no "identify
+  this iPhone" configuration profile. `device.udid` answers it in every build (`native/Sources/PhoneID.swift`).
+- **Settings > Signing**, under the Provisioning Profile: "This iPhone is in the profile.", or in red "This iPhone
+  isn't in the profile: add its UDID … to the developer account, then make the profile again." with Copy UDID. When
+  the UDID can't be read, it gives the profile's device count and how to find the UDID (Finder, or `idevice_id -l`).
+  `signing.status`'s `profile.device` is `{state: in | out | unknown | skip, udid?, count, shared}`.
+- **Before signing**, `signing.install`, Re-sign and My IPAs fail with `device_not_in_profile` and that sentence.
+- An enterprise profile (`ProvisionsAllDevices`) or one with no device list skips the check.
+- **When nobody could check** (the website, which can't read a UDID; the app when the check came out unknown), the
+  progress page adds a warning once iOS has the app: if it doesn't appear, the likely cause is this, with the steps.
+
 ### The page's side: installing
 
 - **Install** on an AltStore app in the sideload build (`signing-client.js` `signAndInstall`, so the package page,

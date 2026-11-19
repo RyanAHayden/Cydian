@@ -126,6 +126,7 @@ enum MyIPAs {
     static func signIfNeeded(_ file: String, id: SecIdentity, profile: Profile, emit: @escaping (String, Double) -> Void,
                              job: SignJob? = nil) throws -> IPALibrary.Signed {
         let identity = try KeychainIdentity(id)
+        if let p = DeviceCheck.problem(PhoneID.check(profile)) { throw p } // F236: before iOS's "integrity" alert
         if let s = library.signed(file, certificate: identity.certificate) { return s }
         if let p = profile.problem(with: identity.certificate) { throw p }
         if let why = try library.details(file).error { throw SignError("bad_ipa", why) }

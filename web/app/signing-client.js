@@ -624,21 +624,45 @@ async function retrying(send, { tries = 3, wait = (ms) => new Promise((r) => set
 
 // The IPA's bytes through /api/fetch, the label following the download ("Downloading 40%").
 // F188: `signal` (the progress page's Cancel) aborts the download.
-export async function downloadIpa(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, max = IPA_MAX, wait = undefined, signal = null } = {}) {
+// B87: `retrying` covers a request until its answer starts; a body that breaks off after that (Safari's bare "Load
+// failed" from the reader, the first Install's error) or ends short of the Worker's X-IPA-Length is fetched once more,
+// from the start. Once, because what breaks is a cold download: the first request for a release file streams from
+// GitHub through Cloudflare while the edge keeps a copy (worker/src/index.js RELEASE_CACHE), and the second comes from
+// that copy (user 2026-11-19: Install failed the first time, then worked). A second break says so in words.
+export const CUT_TEXT = "The app's download broke off before the end. Check the connection and tap Install again.";
+export async function downloadIpa(url, opts = {}) {
+  try { return await downloadIpaOnce(url, opts); } catch (e) {
+    if (e?.code !== "cut" || opts.signal?.aborted) throw e;
+  }
+  try { return await downloadIpaOnce(url, opts); } catch (e) {
+    if (e?.code === "cut") throw signFail("network", CUT_TEXT);
+    throw e;
+  }
+}
+
+async function downloadIpaOnce(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, max = IPA_MAX, wait = undefined, signal = null } = {}) {
   let res;
   try { res = await retrying(() => fetcher(`${base}/api/fetch?${new URLSearchParams({ url, kind: "ipa" })}`, { cache: "no-store", ...(signal ? { signal } : {}) }), { wait, signal }); } catch {
     if (signal?.aborted) throw signFail("cancelled", "Cancelled");
     throw signFail("network", "The app couldn't be downloaded: no connection to the server.");
   }
   if (!res.ok) throw await answerError(res);
-  const total = Number(res.headers?.get?.("content-length") || 0);
+  const total = Number(res.headers?.get?.("content-length") || res.headers?.get?.("x-ipa-length") || 0);
   if (total > max) throw signFail("too_large", `Apps up to ${Math.round(max / 1048576)} MB can be signed on the website.`);
-  if (!res.body?.getReader) return new Uint8Array(await res.arrayBuffer());
+  const cut = (e) => (signal?.aborted ? signFail("cancelled", "Cancelled") : signFail("cut", `The download broke off: ${e?.message ?? e}`));
+  if (!res.body?.getReader) {
+    let whole;
+    try { whole = new Uint8Array(await res.arrayBuffer()); } catch (e) { throw cut(e); }
+    if (total && whole.length < total) throw cut(`${whole.length} of ${total} bytes`);
+    return whole;
+  }
   const reader = res.body.getReader();
   let buf = new Uint8Array(total || 1 << 20), n = 0;
   for (;;) {
-    if (signal?.aborted) { reader.cancel?.(); throw signFail("cancelled", "Cancelled"); }
-    const { done, value } = await reader.read();
+    if (signal?.aborted) { reader.cancel?.()?.catch?.(() => {}); throw signFail("cancelled", "Cancelled"); } // a broken body's cancel rejects
+    let step;
+    try { step = await reader.read(); } catch (e) { throw cut(e); }
+    const { done, value } = step;
     if (done) break;
     if (n + value.length > max) { reader.cancel?.(); throw signFail("too_large", `Apps up to ${Math.round(max / 1048576)} MB can be signed on the website.`); }
     if (n + value.length > buf.length) { const b = new Uint8Array(Math.max(buf.length * 2, n + value.length)); b.set(buf.subarray(0, n)); buf = b; }
@@ -646,6 +670,7 @@ export async function downloadIpa(url, { base = "", fetcher = globalThis.fetch, 
     n += value.length;
     if (total) onProgress(Math.min(99, Math.floor((n / total) * 100)));
   }
+  if (total && n < total) throw cut(`${n} of ${total} bytes`);
   return buf.length === n ? buf : buf.slice(0, n);
 }
 

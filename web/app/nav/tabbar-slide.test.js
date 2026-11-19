@@ -2,7 +2,7 @@
 // instead of one jump; an instant jump only with reduced motion.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scrollToTop, TOP_MS, easeOut } from "./tabbar.js";
+import { scrollToTop, TOP_MS, easeOut, isSliding, tapTab } from "./tabbar.js";
 
 // A scroller that records every scrollTop write, and a window whose frames we step by hand.
 function rig(top, { reduce = false } = {}) {
@@ -71,12 +71,51 @@ test("a touch on the list stops the slide where it is", () => {
   assert.equal(r.body.scrollTop, at);
 });
 
-test("a second tap mid-slide replaces the first: one slide at a time, still lands on 0", () => {
+test("B60: a second call mid-slide is ignored: the running slide goes on untouched and lands on 0", () => {
   const r = rig(2000);
   scrollToTop(r.body, r.win);
   r.step(); r.step();
-  scrollToTop(r.body, r.win);
+  const writes = r.writes.length, overflow = r.overflow.length;
+  assert.equal(isSliding(r.body), true);
+  assert.equal(scrollToTop(r.body, r.win), true);
+  assert.equal(r.writes.length, writes, "no restart step");
+  assert.equal(r.overflow.length, overflow, "no second momentum stop");
   assert.equal(r.pending(), 1);
+  for (let i = 0; i < 100 && r.pending(); i++) r.step();
+  assert.equal(r.body.scrollTop, 0);
+  assert.equal(isSliding(r.body), false);
+});
+
+test("B60: 5 quick reselects make one slide that ends at 0, with reselect() run once", () => {
+  const r = rig(3000);
+  let reselects = 0;
+  const results = [];
+  const opts = { selectTab: () => assert.fail("no tab switch"), reselect: () => { reselects++; },
+    scrollTop: () => scrollToTop(r.body, r.win), sliding: () => isSliding(r.body) };
+  for (let i = 0; i < 5; i++) {
+    results.push(tapTab("search", { tab: "search", path: [] }, opts));
+    r.step(40); // taps ~40 ms apart, well inside TOP_MS
+  }
+  assert.deepEqual(results, ["reselect", "busy", "busy", "busy", "busy"]);
+  assert.equal(reselects, 1);
+  assert.deepEqual(r.overflow, ["hidden", ""], "one momentum stop: one slide");
+  for (let i = 0; i < 100 && r.pending(); i++) r.step();
+  assert.equal(r.body.scrollTop, 0);
+  for (let i = 1; i < r.writes.length; i++) assert.ok(r.writes[i] <= r.writes[i - 1], "never moves back down");
+  // at the top, a further tap does nothing to the scroller, as before (reselect still runs, e.g. Search focuses)
+  const n = r.writes.length;
+  assert.equal(tapTab("search", { tab: "search", path: [] }, opts), "reselect");
+  assert.equal(r.writes.length, n);
+  assert.equal(r.pending(), 0);
+});
+
+test("B60: after a touch stops the slide, the next tap slides again", () => {
+  const r = rig(2000);
+  scrollToTop(r.body, r.win);
+  r.step();
+  r.listeners.touchstart();
+  assert.equal(isSliding(r.body), false);
+  assert.equal(scrollToTop(r.body, r.win), true);
   for (let i = 0; i < 100 && r.pending(); i++) r.step();
   assert.equal(r.body.scrollTop, 0);
 });

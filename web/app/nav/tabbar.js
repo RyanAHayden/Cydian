@@ -40,8 +40,11 @@ export function createTabbar(el, tabs, titleOf) {
 // root -> scrollTop() (the screen's scroller back to the top, like UIKit's status-bar tap, F148) and then the
 // screen's reselect(), e.g. Search focuses its field (F36). Everything runs synchronously inside the tap's click
 // handler, so iOS counts a focus() there as user-initiated and shows the keyboard.
-export function tapTab(tab, current, { selectTab, reselect, scrollTop }) {
+// B60: while that page's slide to the top is still running (sliding() true), a further tap on the same tab is
+// ignored: no restart of the slide and no second reselect(); it returns "busy".
+export function tapTab(tab, current, { selectTab, reselect, scrollTop, sliding }) {
   if (current && current.tab === tab && current.path.length === 0) {
+    if (sliding && sliding()) return "busy";
     if (scrollTop) scrollTop();
     if (reselect) reselect();
     return "reselect";
@@ -55,7 +58,8 @@ export function tapTab(tab, current, { selectTab, reselect, scrollTop }) {
 // scroll on iOS WebKit, so it is stopped first (overflow off for one layout), as UIKit stops the deceleration.
 // B57: scrollTo({behavior: "smooth"}) jumped straight to the top on the iPhone 7 (iOS 15.8 WebKit, app and Safari;
 // journal/2026-11-18-b57-*), so the slide is our own: scrollTop set on each animation frame. A touch on the list
-// ends it where it is, and a new call replaces a running one. Only without requestAnimationFrame does it fall back
+// ends it where it is; a new call while one runs is ignored (B60: it returns true and the running slide goes on,
+// so spamming the tab makes one smooth slide). Only without requestAnimationFrame does it fall back
 // to scrollTo. Virtualised lists (nav/vlist.js) re-bind their rows from the scroll events this sends, so the top
 // rows are drawn when it lands.
 export const TOP_MS = 300;
@@ -64,10 +68,13 @@ const slides = new WeakMap(); // body -> stop() of its running slide
 // Ease-out cubic: fast at first, settling into the top.
 export const easeOut = (p) => 1 - (1 - p) ** 3;
 
+// True while a slide to the top runs on `body` (B60: tapTab ignores reselects then).
+export const isSliding = (body) => !!body && slides.has(body);
+
 export function scrollToTop(body, win = globalThis) {
   if (!body) return false;
+  if (slides.has(body)) return true; // B60: already on its way up; restarting would stutter
   if (body.scrollTop <= 0) return false;
-  slides.get(body)?.();
   body.style.overflowY = "hidden";
   void body.offsetHeight;
   body.style.overflowY = "";

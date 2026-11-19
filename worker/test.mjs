@@ -2,14 +2,18 @@
 import assert from "node:assert/strict";
 import w, { manifest, allowed, loopbackUrl, appOf } from "./src/index.js";
 const store = new Map();
+const kvReads = [], kvCancels = []; // B96: every KV get's type, every KV stream cancelled
 const env = { HOST_IDS: "*.ifizbox", TTL: "600", HOSTED: {
   put: async (k, v, o) => store.set(k, { v, m: o.metadata }),
   // B95: type "stream" as KV gives it (app.ipa pipes whole parts), the value in two chunks
   get: async (k, o) => {
     const v = store.get(k)?.v ?? null;
+    kvReads.push({ k, type: o?.type ?? "text" });
     if (v === null || o?.type !== "stream") return v;
-    const b = new Uint8Array(v), half = b.length >> 1;
-    return new ReadableStream({ start(c) { c.enqueue(b.slice(0, half)); c.enqueue(b.slice(half)); c.close(); } });
+    const b = new Uint8Array(v), half = b.length >> 1, chunks = [b.slice(0, half), b.slice(half)];
+    // B96: pulled a chunk at a time, so a reader that stops early leaves the rest unread (counted in kvCancels)
+    return new ReadableStream({ pull(c) { chunks.length ? c.enqueue(chunks.shift()) : c.close(); },
+      cancel() { kvCancels.push({ k, left: chunks.length }); } }, { highWaterMark: 0 });
   },
   getWithMetadata: async (k) => ({ value: null, metadata: store.get(k)?.m ?? null }) } };
 const go = (path, init) => w.fetch(new Request("https://sign.example" + path, init), env);
@@ -88,6 +92,21 @@ import { PART, uploadCap } from "./src/index.js";
   r = await go(appPath, { headers: { Range: `bytes=${PART - 2}-${PART + 1}` } }); // across the parts
   assert.equal(r.status, 206);
   assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [...app.slice(PART - 2, PART + 2)]);
+  // B96: a Range's cut parts are streamed, never read whole: a Range in the first part's first half stops (cancels)
+  // KV's read with the second half unread; one from the middle of a part to the end skips, then pipes the rest
+  const ranged = async (range, want) => {
+    kvReads.length = 0; kvCancels.length = 0;
+    r = await go(appPath, { headers: { Range: range } });
+    assert.equal(r.status, 206);
+    assert.deepEqual(new Uint8Array(await r.arrayBuffer()), want, range);
+    assert.ok(kvReads.filter((g) => /^up\.[0-9a-f]{48}\.\d+$/.test(g.k)).every((g) => g.type === "stream"), JSON.stringify(kvReads));
+  };
+  await ranged("bytes=10-20", app.slice(10, 21));
+  assert.deepEqual(kvCancels.map((c) => c.left), [1]);
+  await ranged(`bytes=${PART / 2 + 3}-`, app.slice(PART / 2 + 3));
+  await ranged("bytes=-3", app.slice(size - 3));
+  await ranged(`bytes=${PART / 2 - 1}-${PART / 2}`, app.slice(PART / 2 - 1, PART / 2 + 1)); // across KV's chunks
+  await ranged(`bytes=0-${PART - 1}`, app.slice(0, PART)); // a whole part, piped
   assert.equal((await go(appPath, { method: "HEAD" })).headers.get("content-length"), String(size));
   // too big, not a zip, finished twice, uploads off
   assert.equal((await go(`/sign/upload?bundleid=com.a&size=${600 * 1024 * 1024}`, { method: "POST" })).status, 413);

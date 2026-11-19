@@ -11,13 +11,14 @@ import shutil
 import struct
 import subprocess
 import sys
-import tempfile
 import unittest
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
+
+import disktmp  # noqa: E402  (scratch dirs off the shared /tmp tmpfs: see native/disktmp.py)
 
 
 def toolchain():
@@ -26,25 +27,6 @@ def toolchain():
         tc = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(shutil.which("swiftc")))))
     swiftc = os.path.join(tc, "usr/bin/swiftc") if tc else None
     return swiftc if swiftc and os.access(swiftc, os.X_OK) else None
-
-
-def disk_tmpdir(prefix):
-    """A scratch dir for a Swift build on the checkout's own disk (native/build/tmp, gitignored), not in /tmp. /tmp can
-    be a size-capped tmpfs shared by every session on the machine, and swiftc -O's object files ran it out of quota
-    ("Disk quota exceeded") when other gates ran beside this one. Pass swift_env(dir) to swiftc so its own
-    temporaries (TMPDIR) go there too."""
-    base = os.path.join(HERE, "build", "tmp")
-    os.makedirs(base, exist_ok=True)
-    return tempfile.mkdtemp(prefix=prefix, dir=base)
-
-
-def swift_env(tmp, env=None):
-    """env (default os.environ) with TMPDIR inside tmp, so swiftc's TemporaryDirectory.* stays off /tmp."""
-    env = dict(os.environ if env is None else env)
-    t = os.path.join(tmp, "tmpdir")
-    os.makedirs(t, exist_ok=True)
-    env["TMPDIR"] = t
-    return env
 
 
 SWIFTC = toolchain()
@@ -198,7 +180,7 @@ def slots(binary):
 class OnDeviceSigner(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = disk_tmpdir("ifizbox-signtest-")
+        cls.tmp = disktmp.build_dir("ifizbox-signtest-")
         cls.fx = os.path.join(cls.tmp, "fixtures")
         cls.work = os.path.join(cls.tmp, "work")
         os.makedirs(cls.fx)
@@ -232,7 +214,7 @@ class OnDeviceSigner(unittest.TestCase):
         enc = io.BytesIO(rich_ipa(macho(encrypted=True)))
         w("encrypted.ipa", enc.getvalue())
         cls.binary = os.path.join(cls.tmp, "signtest")
-        env = swift_env(cls.tmp)
+        env = disktmp.swift_env(dict(os.environ), cls.tmp)
         # The ubuntu toolchain wants libncurses.so.6; Arch has only the wide one (as native/build.sh does).
         shim = os.path.join(cls.tmp, "libshim")
         if os.path.exists("/usr/lib/libncursesw.so.6") and not os.path.exists("/usr/lib/libncurses.so.6"):
@@ -253,7 +235,7 @@ class OnDeviceSigner(unittest.TestCase):
 
     def test_swift(self):
         self.assertIsNone(self.build_error, self.build_error)
-        env = swift_env(self.tmp)  # the signer's own scratch files (openssl, unzip) stay off /tmp too
+        env = disktmp.swift_env(dict(os.environ), self.tmp)  # the signer's own scratch files (openssl, unzip) stay off /tmp too
         real = os.path.join(HERE, "build", "iFizBox.ipa")  # the sideload build, where tools/check.sh made one
         if os.path.exists(real):
             env["IFIZBOX_REAL_IPA"] = real

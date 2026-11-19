@@ -20,7 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from test_sign import MISSING, SWIFTC, OPENSSL, T, macho, info, slots  # noqa: E402
-from test_sign import disk_tmpdir, swift_env  # noqa: E402
+import disktmp  # noqa: E402
 
 try:
     from cryptography import x509
@@ -105,7 +105,7 @@ def cd_identifier(blob):
 class Sideload(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = disk_tmpdir("ifizbox-sideloadtest-")  # off /tmp: see test_sign.disk_tmpdir
+        cls.tmp = disktmp.build_dir("ifizbox-sideloadtest-")  # off the shared /tmp tmpfs: see native/disktmp.py
         cls.fx = os.path.join(cls.tmp, "fixtures")
         cls.work = os.path.join(cls.tmp, "work")
         os.makedirs(cls.fx)
@@ -160,7 +160,7 @@ class Sideload(unittest.TestCase):
         w("other.der", other.public_bytes(der))
 
         cls.binary = os.path.join(cls.tmp, "sideloadtest")
-        env = swift_env(cls.tmp)
+        env = disktmp.swift_env(dict(os.environ), cls.tmp)
         shim = os.path.join(cls.tmp, "libshim")
         if os.path.exists("/usr/lib/libncursesw.so.6") and not os.path.exists("/usr/lib/libncurses.so.6"):
             os.makedirs(shim)
@@ -176,7 +176,7 @@ class Sideload(unittest.TestCase):
         cls.out = None
         if cls.build_error is None:
             cls.out = subprocess.run([cls.binary, cls.fx, cls.work], capture_output=True, text=True, timeout=600,
-                                     env=swift_env(cls.tmp))
+                                     env=disktmp.swift_env(dict(os.environ), cls.tmp))
 
     @classmethod
     def tearDownClass(cls):

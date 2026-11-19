@@ -176,3 +176,105 @@ test("handMarking follows the build the page runs in (detectMode: no native brid
     if (saved === undefined) delete globalThis.ifizboxNative; else globalThis.ifizboxNative = saved;
   }
 });
+
+// F242a: the jailbreak build's nav bar has a queue toggle where the mark toggle sits elsewhere: + puts the app in the
+// app queue quietly (haptic, undo bar), x takes it back out, and it follows the queue.
+import { queueToggle, queueToggleApplies, queueToggleJob, queueToggleMessage, QUEUE_ADD_LABEL, QUEUE_REMOVE_LABEL } from "./altstore.js";
+import { createAppQueue } from "../core/appqueue.js";
+
+test("queueToggleApplies: the jailbreak build only (with the helper), never iFizBox itself; the mark toggle is the other builds'", () => {
+  assert.equal(queueToggleApplies(APP, { mode: "jailbreak", available: true }), true);
+  assert.equal(queueToggleApplies(APP, { mode: "jailbreak", available: false }), false, "no native bridge: nothing installs it");
+  assert.equal(queueToggleApplies(APP, { mode: "sideload", available: true }), false);
+  assert.equal(queueToggleApplies(APP, { mode: "site", available: true }), false);
+  assert.equal(queueToggleApplies({ ...APP, bundleIdentifier: BUNDLE_ID }, { mode: "jailbreak", available: true }), false);
+  assert.equal(queueToggleApplies({ ...APP, bundleIdentifier: `${BUNDLE_ID}.lite` }, { mode: "jailbreak", available: true }), false);
+  assert.equal(queueToggleApplies({ ...APP, bundleIdentifier: "" }, { mode: "jailbreak", available: true }), false);
+  assert.equal(queueToggleApplies(null, { mode: "jailbreak", available: true }), false);
+  // one toggle per build: the jailbreak build has this one and no mark toggle, the others the mark toggle only
+  for (const mode of ["jailbreak", "sideload", "site"]) {
+    const n = Number(queueToggleApplies(APP, { mode, available: true })) + Number(markToggleApplies(APP, { mode }));
+    assert.equal(n, 1, mode);
+  }
+});
+
+test("queueToggleJob: the newest version, Install when not installed, Upgrade or Reinstall from the record", async () => {
+  const mem = memoryAppStore();
+  const store = async () => mem;
+  let j = await queueToggleJob(PKG, null, { store });
+  assert.equal(j.app, "install");
+  assert.equal(j.id, "com.x.a");
+  assert.equal(j.version, "2.1");
+  assert.equal(j.url, "https://s/a2.ipa");
+  assert.equal(j.installed, null);
+  await recordInstall(mem, { id: "com.x.a", version: "2.0" });
+  j = await queueToggleJob(PKG, null, { store });
+  assert.equal(j.installed, "2.0");
+  assert.equal(createAppQueue().add(j).mode, "upgrade");
+  await recordInstall(mem, { id: "com.x.a", version: "2.1" });
+  assert.equal(createAppQueue().add(await queueToggleJob(PKG, null, { store })).mode, "reinstall");
+  assert.equal(await queueToggleJob({ stanza: { ipa: { ...APP, versions: [] } } }, null, { store }), null);
+});
+
+test("queueToggleMessage words it as a row's swipe does", () => {
+  assert.equal(queueToggleMessage({ mode: "install" }, "A", true), "Install A queued");
+  assert.equal(queueToggleMessage({ mode: "upgrade" }, "A", false), "Upgrade A cancelled");
+  assert.equal(queueToggleMessage({ mode: "remove" }, "A", false), "Remove A cancelled");
+  assert.equal(queueToggleMessage(null, "A", true), "Install A queued");
+});
+
+test("queueToggle: + queues quietly with a haptic and undo bar, x takes it out, Undo puts back, and it follows the queue", async () => {
+  await withDocument({ createElement: fakeElement }, async () => {
+    const queue = createAppQueue();
+    const events = [];
+    queue.subscribe((e) => events.push(e));
+    const bars = [];
+    let buzzes = 0;
+    const b = queueToggle(PKG, null, { queue, store: async () => memoryAppStore(), buzz: () => { buzzes += 1; }, undo: (o) => bars.push(o) });
+    assert.equal(b.tagName, "BUTTON");
+    for (const c of ["bar-button", "bar-icon", "queue-toggle"]) assert.ok(b.classList.contains(c), c);
+    assert.equal(b.classList.contains("is-queued"), false);
+    assert.equal(b.getAttribute("aria-label"), QUEUE_ADD_LABEL);
+
+    await b.click();
+    assert.equal(queue.get("com.x.a").version, "2.1");
+    assert.equal(queue.get("com.x.a").mode, "install");
+    assert.equal(events.at(-1).quiet, true, "quiet: no Confirm sheet opens");
+    assert.ok(b.classList.contains("is-queued"));
+    assert.equal(b.getAttribute("aria-label"), QUEUE_REMOVE_LABEL);
+    assert.equal(bars.at(-1).message, "Install A queued");
+    assert.equal(buzzes, 1);
+
+    bars.at(-1).onUndo();
+    assert.equal(queue.get("com.x.a"), null, "Undo of a + takes it back out");
+    b.refresh();
+    assert.equal(b.classList.contains("is-queued"), false);
+
+    // queued elsewhere (a row's swipe, Modify): refresh follows; x takes it out and Undo puts the same job back
+    queue.add({ id: "com.x.a", name: "A", version: "2.0", url: "https://s/a1.ipa", installed: "2.1" });
+    b.refresh();
+    assert.ok(b.classList.contains("is-queued"));
+    await b.click();
+    assert.equal(queue.get("com.x.a"), null);
+    assert.equal(b.classList.contains("is-queued"), false);
+    assert.equal(bars.at(-1).message, "Downgrade A cancelled");
+    assert.equal(buzzes, 2);
+    bars.at(-1).onUndo();
+    assert.equal(queue.get("com.x.a").version, "2.0");
+    assert.equal(events.at(-1).quiet, true);
+    queue.clearAll();
+    b.refresh();
+    assert.equal(b.getAttribute("aria-label"), QUEUE_ADD_LABEL);
+  });
+});
+
+test("queueToggle: nothing to install, nothing queued and no undo bar claims it was", async () => {
+  await withDocument({ createElement: fakeElement }, async () => {
+    const queue = createAppQueue();
+    const bars = [];
+    const b = queueToggle({ stanza: { ipa: { ...APP, versions: [] } } }, null, { queue, store: async () => memoryAppStore(), buzz() {}, undo: (o) => bars.push(o) });
+    await b.click();
+    assert.equal(queue.size, 0);
+    assert.deepEqual(bars, []);
+  });
+});

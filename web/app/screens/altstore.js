@@ -45,6 +45,8 @@ import { NAME, BUNDLE_ID } from "../brand.js";
 import { addNavIcon } from "../nav/navbar.js";
 import { haptic } from "../nav/haptic.js";
 import { showHUD } from "../nav/hud.js";
+import { showUndoBar } from "../nav/undobar.js"; // F242a
+import { APP_MODE_LABEL } from "../core/appqueue.js"; // F242a
 
 function img(url, cls) {
   const src = mediaUrl(url);
@@ -354,6 +356,78 @@ export function markToggle(app, pkg, source, { store = apps, buzz = haptic, feed
   });
   b.refresh = async () => show(Boolean(await markedRecord(app, store)));
   b.refreshed = b.refresh();
+  return b;
+}
+
+// ---- F242a: the jailbreak app page's queue toggle, where F210's mark toggle sits in the other builds ----------------
+// A + bar button left of Install / Modify: a tap puts the app in the jailbreak app queue (B71a, app-queue.js, run by
+// the helper from Confirm) quietly, as a row's swipe does (no Confirm sheet), with a haptic tick and F193's undo bar.
+// The job is the one the nav button's Install / Upgrade / Reinstall queues (core/appqueue.js appJob at the newest
+// version; its mode says which). While the app is queued (by this, a row's swipe, Modify or Confirm) it shows an x
+// that takes it back out; it follows the queue live. Hidden for iFizBox's own app and an app with no IPA to install.
+export const QUEUE_ADD_LABEL = "Add to Queue";
+export const QUEUE_REMOVE_LABEL = "Remove from Queue";
+
+export function queueToggleApplies(app, { mode = detectMode(), available = ipaInstallAvailable(mode) } = {}) {
+  if (mode !== "jailbreak" || !available) return false;
+  const id = String(app?.bundleIdentifier ?? "");
+  if (!id || id === BUNDLE_ID || id.startsWith(`${BUNDLE_ID}.`)) return false;
+  return !app.versions?.some((x) => isSelfIpa(x?.downloadURL));
+}
+
+// What a + tap queues: the newest version's job, its mode from the installed record (Install, Upgrade, Reinstall).
+export async function queueToggleJob(pkg, source, { store = apps } = {}) {
+  const app = pkg?.stanza?.ipa;
+  const rec = app ? await markedRecord(app, store) : null;
+  const job = appJob(pkg, { installed: rec ? rec.version || null : null, source: source ? displayName(source) : null });
+  return job ? { app: "install", ...job } : null;
+}
+
+// The undo bar's line, as a row's swipe words it (browse.js swipeMessage): "Install Foo queued", "Upgrade Foo cancelled".
+export function queueToggleMessage(job, name, added) {
+  const label = job?.mode === "remove" ? "Remove" : APP_MODE_LABEL[job?.mode] ?? "Install";
+  return `${label} ${name} ${added ? "queued" : "cancelled"}`;
+}
+
+const queueUndo = (opts) => showUndoBar(opts);
+
+// The button. `refresh()` redraws it from the queue; the page's subscription calls it on every change.
+export function queueToggle(pkg, source, { queue = appQueue, store = apps, buzz = haptic, undo = queueUndo } = {}) {
+  const app = pkg?.stanza?.ipa;
+  const id = app?.bundleIdentifier;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "bar-button bar-icon queue-toggle";
+  const show = () => {
+    const on = Boolean(queue.get(id));
+    b.classList.toggle("is-queued", on);
+    b.setAttribute("aria-label", on ? QUEUE_REMOVE_LABEL : QUEUE_ADD_LABEL);
+    return on;
+  };
+  show();
+  let busy = false;
+  b.addEventListener("click", async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      const prev = queue.get(id);
+      let job = null;
+      if (!prev) {
+        job = await queueToggleJob(pkg, source, { store });
+        if (!job) return; // nothing to install: leave the queue as it is
+      }
+      try { buzz(); } catch { /* no haptics here */ }
+      const name = prev?.name || job?.name || app?.name || id;
+      if (prev) queue.clear(id);
+      else queue.add(job, { quiet: true });
+      show();
+      undo({ message: queueToggleMessage(prev ?? queue.get(id) ?? job, name, !prev), onUndo: () => {
+        if (!prev) queue.clear(id);
+        else { try { queue.add(prev, { quiet: true }); } catch { /* it can't be queued again */ } }
+      } });
+    } catch { /* the queue refused it: nothing changed */ } finally { busy = false; show(); }
+  });
+  b.refresh = show;
   return b;
 }
 
@@ -752,6 +826,15 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     const toggle = markToggle(app, pkg, source);
     if (!addNavIcon(body, toggle, "mark")) setTimeout(() => addNavIcon(body, toggle, "mark"), 0);
     const offMark = onAppsChange(() => { if (body.isConnected && toggle.isConnected) toggle.refresh(); else offMark(); });
+  }
+  // F242a: the jailbreak build puts a queue toggle there instead, following the app queue while the page is up.
+  if (queueToggleApplies(app) && appJob(pkg)) {
+    const toggle = queueToggle(pkg, source);
+    if (!addNavIcon(body, toggle, "queue")) setTimeout(() => addNavIcon(body, toggle, "queue"), 0);
+    let placed = false;
+    const offQueue = appQueue.subscribe(() => {
+      if (toggle.isConnected) { placed = true; toggle.refresh(); } else if (placed) offQueue(); // the page is gone
+    });
   }
 
   if (needsCheck(v) && !keptInfo) {

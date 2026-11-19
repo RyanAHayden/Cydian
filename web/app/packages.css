@@ -783,3 +783,62 @@ html[data-theme="dark"] .store-review-response { background: var(--dk-inset-box)
 .row-swipe[data-kind="cancel"] .row-swipe-control::after { transform: rotate(45deg); }
 /* The first-run hint shows the control at rest size. */
 .row-swipe.hint .row-swipe-control { transform: none; transition-duration: 0s; }
+
+/* F222: Installed's Manage (screens/installed.js). Each row gets UIKit's multi-select circle where the red minus goes
+   (sources.css .del-toggle), slid in with the row's content. Sampled from the 4S's UIRemoveControlMulti* art (29pt
+   images, the circle 23pt): not picked, a 2pt ring of 10% black; picked, a 2pt white rim round a red disc, its top
+   half a gloss (#bb646e to #a4313e), the bottom flat #900413, a soft shadow below, and a white tick. A picked row is
+   UITableView's pale blue multi-select fill (as My IPAs' Edit, myipas.css). */
+.manage-check {
+  position: absolute; left: 10px; top: 50%; width: 23px; height: 23px; margin-top: -11.5px; box-sizing: border-box;
+  border-radius: 50%; border: 2px solid rgba(0,0,0,.1); pointer-events: none;
+  transform: translateX(-40px); transition: transform .3s ease-in-out;
+}
+.managing .manage-check { transform: none; }
+.manage-row.picked .manage-check {
+  border-color: #fff; box-shadow: 0 1px 2.5px rgba(0,0,0,.7);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 38 38'%3E%3Cpath d='M11 17 19.5 26.5 28 7.5' fill='none' stroke='%23500008' stroke-opacity='.45' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M11 18.5 19.5 28 28 9' fill='none' stroke='%23fff' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat padding-box,
+    linear-gradient(#bb646e, #a4313e 50%, #900413 50%, #900413) padding-box;
+}
+.managing .installed-app .cell-inner { transform: translateX(37px); width: calc(100% - 37px); }
+.managing .installed-app .cell-inner.chevron::after { opacity: 0; }
+.managing .manage-row.picked, .managing .manage-row.picked .cell-inner { background-color: #e1e8f5; }
+html[data-theme="dark"] .manage-check { border-color: rgba(255,255,255,.18); } /* a picked one keeps its white rim (0,3,0 wins) */
+html[data-theme="dark"] .managing .manage-row.picked, html[data-theme="dark"] .managing .manage-row.picked .cell-inner { background-color: rgba(255,255,255,.15); }
+/* The grey line above the list: "2 selected · 5 apps · 1 expiring · 3 updates". */
+.manage-summary {
+  margin: 0; padding: 7px 10px; font-size: 14px; line-height: 18px; text-align: center; color: #7f7f7f;
+  border-bottom: 1px solid #e0e0e0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+html[data-theme="dark"] .manage-summary { color: var(--subtitle); border-bottom-color: var(--divider); }
+/* Under the list (and in its empty state): the way to Install IPAs, Home's tile. */
+.installed-footer { margin: 16px 20px 22px; font-size: 14px; text-align: center; color: #7f7f7f; }
+.installed-footer a, p.empty a { color: #385487; text-decoration: none; }
+html[data-theme="dark"] .installed-footer a, html[data-theme="dark"] p.empty a { color: var(--dk-link); }
+/* The toolbar: My IPAs' edit toolbar (myipas.css .myipa-toolbar, which loads only with My IPAs, so its rules are
+   repeated here): the navigation bar's colours as a 44pt UIToolbar docked above the tab bar, sliding up from behind
+   it. Re-sign is the blue Done button, Update a plain bar button, Delete the alert's red; one with nothing to act on
+   is dimmed. */
+.manage-toolbar {
+  position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 2; height: 44px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 0 max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
+  background:
+    linear-gradient(#eff2f7, #eff2f7) top / 100% 1px no-repeat,
+    linear-gradient(#bdcbdc, #597498);
+  opacity: 0; transform: translate3d(0,100%,0); pointer-events: none;
+  transition: transform .3s cubic-bezier(.25,.1,.25,1), opacity .3s cubic-bezier(.25,.1,.25,1);
+}
+.manage-toolbar.shown { opacity: 1; transform: none; pointer-events: auto; }
+html[data-theme="dark"] .manage-toolbar { background: var(--dk-nav-bar); }
+.manage-toolbar .bar-button { flex: none; }
+.manage-toolbar .bar-button.manage-delete:not(.back):not(.done) {
+  border-color: #5e0909; border-top-color: #3a0606;
+  background: linear-gradient(#e46a6a, #c51f1f 49%, #b30f0f 50%, #bd1a1a); background-origin: border-box;
+}
+.manage-toolbar .bar-button.manage-delete:not(.back):not(.done):is(:active, .is-pressed) {
+  background: linear-gradient(#bf4c4c, #9c1414 49%, #880909 50%, #941010); background-origin: border-box;
+}
+.manage-toolbar .bar-button:disabled { opacity: .5; cursor: default; }
+html.has-manage-toolbar .page-body::after { content: ""; display: block; flex: none; clear: both; height: 44px; }

@@ -44,15 +44,28 @@
 // instead of as an entry in installed"): a bordered "Wish List" bar button in the left slot of Installed's root (the
 // apps list without a jailbreak, dpkg's list in the jailbreak app), with the count as Mail's "Inbox (3)" does,
 // opening the same #installed/wishlist page. Edit was already on the right, so nothing had to move.
+//
+// F222: Manage, bulk actions on the apps list without a jailbreak (the sideload app, the site). The root's nav bar is
+// Wish List | User/Recent | Manage (Add and the Install IPAs tile left: Install IPAs is Home's tile, linked from the
+// list's footer and empty state). Manage: Select… | User/Recent (sorting and headers keep working) | Done; each row
+// gets UIKit's multi-select circle (UIRemoveControlMulti*: a faint ring, red with a white tick when picked, the row
+// pale blue), a grey line above the list counts what is picked and what there is, and a bottom toolbar in the nav
+// bar's colours (myipas.css .myipa-toolbar) has Re-sign (n), Update (n) and Delete (n). Select… opens a sheet of
+// presets (core/installed.js selectSheet); with every row picked it reads Deselect. Each toolbar action confirms with
+// a sheet, then runs its jobs through the app queue (screens/queue.js runAppQueue) on the progress page, labelled
+// "Re-signing Delta (1 of 3)" with the run's progress on its bar; the list (and its pills) loads again at the end.
+// Signed apps the list doesn't remember that came from the user's own IPAs say "From My IPAs" (the signature
+// record's url is library:..., native MyIPAs.fileOf) and re-sign from that file (signing.resign does).
 import * as browse from "./browse.js";
 import * as myipas from "./myipas.js";
-import { grouped, plain, placeholder, segments } from "../nav/ui.js";
-import { format } from "../router.js";
+import { grouped, plain, placeholder, segments, barButton } from "../nav/ui.js";
+import { format, mounted, parse } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
 import { showAlert } from "../nav/alert.js";
 import { detectMode } from "../core/settings.js";
 import { apps, appRows, appUpgrades, removeInstall, onAppsChange, MODES, MODE_LABEL, TYPES, modeRows, typeRows, queryRows,
-  dayHeaders, dayLabel, markedRows } from "../core/installed.js";
+  dayHeaders, dayLabel, markedRows, manageKinds, manageable, presetIds, selectSheet, selectLabel, manageCounts, manageSummary,
+  manageToolbar, pruneSelection, SELECT } from "../core/installed.js";
 import { mediaUrl } from "./depiction.js";
 import { rememberedApps } from "../app-updates.js";
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
@@ -63,7 +76,8 @@ import { NAME } from "../brand.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { longPress } from "../nav/menu.js";
 import { libraryCall } from "../signing-client.js";
-import { resignJob } from "../core/appqueue.js";
+import { resignJob, appJob, markedResignJob, markedVersionOnSource } from "../core/appqueue.js";
+import { hudLine } from "../core/progress.js";
 import { deviceError } from "../core/signing.js";
 import { getBackend } from "../backend.js";
 import { liveHUD } from "../nav/hud.js";
@@ -179,7 +193,8 @@ function filterControls(view, { types = false, onChange }) {
   scope.append(segments(TYPES, {}, view.type, (t) => { view.type = t; onChange(); }));
   return [bar, scope];
 }
-const appView = { body: null, route: null, seq: 0, editing: false, right: null, mode: "user", query: "", tail: [], last: null };
+const appView = { body: null, route: null, seq: 0, editing: false, right: null, mode: "user", query: "", tail: [], last: null,
+  managing: false, selected: new Set(), manageRows: [] }; // F222
 
 // Records apps (F30) rather than reading dpkg: everywhere but the jailbreak app.
 export const recordsApps = (mode = detectMode()) => mode !== "jailbreak";
@@ -198,7 +213,8 @@ export function pageKind(route, mode = detectMode()) {
 // field and out of Edit (jailbreak: pushed from Installed), the dpkg page on User / All (the site: pushed from
 // Installed), the Wish List out of Edit. A tab root is built once, so Installed's own root keeps its choice; Back
 // rebuilds nothing, so a page below keeps what it showed.
-onPageOpen((r) => r.tab === "installed" && pageKind(r) === "apps", () => Object.assign(appView, { mode: "user", query: "", editing: false }));
+onPageOpen((r) => r.tab === "installed" && pageKind(r) === "apps", () => Object.assign(appView, { mode: "user", query: "", editing: false,
+  managing: false, selected: new Set() }));
 onPageOpen((r) => r.tab === "installed" && pageKind(r) === "dpkg", () => Object.assign(state, { mode: "user", type: "All", query: "" }));
 onPageOpen((r) => r.tab === "installed" && pageKind(r) === "wishlist", () => { wishView.editing = false; });
 // The live state objects, for tests.
@@ -226,6 +242,11 @@ export function nav(route, ctx) {
   const info = navInfo(route);
   // F147: the Wish List button, top left of Installed's root (no back button there).
   if (isRoot(route)) info.left = wishButton(route, wishCount(browse.wishlist().list(), knownInstalled()), { go: ctx?.go, ref: (b) => { wishBar.el = b; b.classList.add("wish-button"); updateWishButton(); } });
+  // F222: while managing, the same button is Select… (or Deselect).
+  if (isRoot(route) && pageKind(route) === "apps") {
+    const open = info.left.onClick;
+    info.left.onClick = () => (appView.managing ? onSelectButton() : open());
+  }
   return info;
 }
 
@@ -241,9 +262,10 @@ function navInfo(route) {
   if (kind === "apps") {
     return { title: recordsApps() ? "Installed" : "Apps", style: "plain", // F87: "Apps" one row down in the jailbreak app
       // F127: User | Recent on the apps list's root (the jailbreak app's Apps page stays newest first).
-      titleView: recordsApps() ? modeControl(APP_MODES, appView.mode, (m) => { appView.mode = m; redrawApps(); }) : undefined,
-      // Add (Install IPAs' Files / From URL), not Edit: a row still deletes with a swipe (user 2026-11-18).
-      right: recordsApps() ? { label: "Add", onClick: () => myipas.addMenu() }
+      titleView: recordsApps() ? modeControl(APP_MODES, appView.mode, pickMode) : undefined,
+      // F222: Manage (bulk Re-sign, Update, Delete), not Edit or F208's Add: a row still deletes with a swipe.
+      right: recordsApps() ? { label: appView.managing ? "Done" : "Manage", onClick: () => setManaging(!appView.managing),
+        ref: (b) => { manageBar.right = b; b.classList.add("manage-button"); b.classList.toggle("done", appView.managing); } }
         : { label: appView.editing ? "Done" : "Edit", onClick: (e) => setEditing(!appView.editing, e.currentTarget) } };
   }
   const info = { title: recordsApps() ? "dpkg Status" : "Installed", style: "plain" };
@@ -434,6 +456,12 @@ function knownInstalled() {
 function updateWishButton() {
   const b = wishBar.el;
   if (!b || (b.parentNode && !b.isConnected)) return; // not drawn, or drawn and since dropped
+  if (appView.managing && recordsApps()) { // F222: Select… / Deselect while managing
+    const label = selectLabel(appView.manageRows, appView.selected);
+    b.replaceChildren(label);
+    b.setAttribute("aria-label", label === SELECT ? "Select" : label);
+    return;
+  }
   const n = wishCount(browse.wishlist().list(), knownInstalled());
   const name = Object.assign(document.createElement("span"), { className: "wish-name", textContent: "Wish List" });
   const count = n > 0 ? [Object.assign(document.createElement("span"), { className: "wish-count", textContent: `(${n})` })] : [];
@@ -463,7 +491,7 @@ async function candidates(rows) {
   const out = new Map();
   await Promise.all(rows.map(async (r) => {
     const p = await catalog.package(r.id, ALL).catch(() => null);
-    if (p?.key && p.stanza?.version) out.set(r.id, { version: p.stanza.version, key: p.key });
+    if (p?.key && p.stanza?.version) out.set(r.id, { version: p.stanza.version, key: p.key, pkg: p }); // F222: pkg for Manage's jobs
   }));
   return out;
 }
@@ -501,7 +529,7 @@ export function withSignatures(rows, installed, { now = new Date(), window, show
     if (!a?.bundleId || used.has(a.bundleId)) continue;
     used.add(a.bundleId);
     extra.push({ id: a.bundleId, name: a.name || a.bundleId, version: a.version || "", signedOnly: true,
-      sig: shown(signatureState(a.expires, { now, window })) ?? undefined });
+      sig: shown(signatureState(a.expires, { now, window })) ?? undefined, ...(fromMyIpas(a) ? { fromMyIpas: true } : {}) });
   }
   return { rows: out, extra };
 }
@@ -547,12 +575,11 @@ async function loadApps() {
 
 function drawApps(listRows, cands, site, hasStatus) {
   const body = appView.body;
-  const route = appView.route;
   appView.last = { listRows, cands, site, hasStatus };
   body.classList.replace("grouped", "plain");
-  // F87: no Install IPAs tile on the jailbreak app's Apps page (My IPAs is a sideload page). F127: the search bar under
-  // it, on the root, once there are apps to search.
-  const head = recordsApps() ? [myIpasTile(route, site)] : [];
+  // F127: the search bar on the root, once there are apps to search. F222: the Install IPAs tile above it is gone
+  // (Home's tile, linked from the list's footer).
+  const head = [];
   if (recordsApps() && listRows.length) head.push(...filterControls(appView, { onChange: drawAppList }));
   body.replaceChildren(...head);
   appView.tail = [];
@@ -579,20 +606,32 @@ function drawAppList() {
     ? { label: "dpkg Status File", subtitle: "Packages installed with apt", href: format({ tab: route.tab, path: [DPKG] }) }
     : { label: "Choose Status File", subtitle: "See the packages a jailbroken iPhone has", onClick: () => chooseStatus() }] }] : [];
   updateWishButton(); // F147 (F125's Packages section with the Wish List row is gone)
-  const ul = appListElement(appSecs, extra, { route, cands, signed: appView.signed, more });
+  // F222: the rows Manage picks from (the whole list, not only the search's), each with its signature record and,
+  // for a marked app, whether its installed version is on its source.
+  const index = signedIndex(appView.signed);
+  if (recordsApps()) {
+    appView.manageRows = [...signed.rows, ...signed.extra].map((r) => withManage(withSigned(r, index), cands));
+    appView.selected = pruneSelection(appView.selected, appView.manageRows);
+  }
+  const ul = appListElement(appSecs, extra, { route, cands, signed: appView.signed, more, manage: recordsApps() });
   appView.tail = [ul];
   if (!listRows.length) {
-    appView.tail.unshift(note("No apps yet. Apps you install from an app's page are listed here, on this device.")); // under My IPAs
+    appView.tail.unshift(installIpasNote(route, "No apps yet. Apps you install from an app's page or from ", ", on this device, are listed here.", "empty"));
   } else if (!rows.length && !extra.length) {
     appView.tail.unshift(note("No matches."));
   }
+  if (recordsApps() && listRows.length) appView.tail.push(installIpasNote(route, "Sign and install your own apps from ", ".", "installed-footer"));
+  if (recordsApps() && appView.managing) appView.tail.unshift(manageSummaryLine());
   body.append(...appView.tail);
+  syncManage();
 }
 
 // The apps list's table: the sections' rows, F91's extra rows, then `more` (the site's dpkg row). B36: every app row
 // is a link (the package page or the installed-app page, so it highlights on press), carries its signing.installed
 // record, swipes to Delete (not iFizBox's own) and holds for the sheet (`hold`: attachRowHold's options).
-export function appListElement(appSecs, extra, { route, cands = new Map(), signed = null, more = [], editing = appView.editing, hold = {} } = {}) {
+// F222: `manage` (the root without a jailbreak) gives each row Manage can pick its select circle.
+export function appListElement(appSecs, extra, { route, cands = new Map(), signed = null, more = [], editing = appView.editing, hold = {},
+  manage = false, managing = appView.managing, selected = appView.selected } = {}) {
   const rows = appSecs.flatMap((sec) => sec.rows);
   const appRow = (r) => ({
     label: r.name, subtitle: r.marked && !r.upgrade ? markedSubtitle(r)
@@ -605,10 +644,12 @@ export function appListElement(appSecs, extra, { route, cands = new Map(), signe
   sections.push({ rows: extra.map(extraRow(route)) }, ...more);
   const ul = plain(sections);
   ul.classList.toggle("editing", editing);
+  ul.classList.toggle("managing", manage && managing);
   const cells = ul.querySelectorAll(":scope > .cell");
   const index = signedIndex(signed);
   [...rows, ...extra].forEach((r, i) => decorateApp(cells[i], withSigned(r, index)));
   [...rows, ...extra].forEach((r, i) => { if (r.sig && !r.upgrade) sigPill(cells[i], r.sig); });
+  if (manage) [...rows, ...extra].forEach((r, i) => { if (manageKinds(r)) selectCircle(cells[i], selected.has(r.id)); });
   attachRowGestures(ul);
   attachRowHold(ul, hold);
   return ul;
@@ -632,20 +673,6 @@ function sigPill(li, sig) {
 export function myIpasRow(route, site) {
   return { label: myipas.PAGE_TITLE, subtitle: site ? "Browse apps, or add links to IPAs" : "Browse apps, or sign your own IPAs",
     href: format({ tab: route.tab, path: [myipas.MYIPAS] }) };
-}
-
-// Install IPAs as a button above the list, Home's tile look (home.css), not a row like an installed app (user 2026-11-17).
-function myIpasTile(route, site) {
-  const r = myIpasRow(route, site);
-  const row = document.createElement("div");
-  row.className = "home-row installed-myipas";
-  row.innerHTML = `<ul class="table grouped home-tiles"><li class="cell"><a class="cell-inner chevron home-tile">
-    <span class="cell-icon home-glyph glyph-install"></span><span class="home-tile-text"><span class="cell-label"></span>
-    <span class="cell-subtitle"></span></span></a></li></ul>`;
-  row.querySelector("a").href = r.href;
-  row.querySelector(".cell-label").textContent = r.label;
-  row.querySelector(".cell-subtitle").textContent = r.subtitle;
-  return row;
 }
 
 // Delete controls as on the Sources tab (sources.css styles .source-row: the red minus, Delete, the swipe).
@@ -686,6 +713,14 @@ function attachRowGestures(ul) {
   let swiped = false;
   ul.addEventListener("click", (e) => {
     if (e.target.closest(".del-toggle, .del-confirm")) return;
+    if (appView.managing && ul.classList.contains("managing")) { // F222: a tap picks the row
+      const li = e.target.closest(".installed-app");
+      if (!li) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (li.classList.contains("manage-row")) togglePick(li._app?.id);
+      return;
+    }
     const armed = ul.querySelector(".installed-app.armed");
     if (!(appView.editing && e.target.closest(".installed-app")) && !armed && !swiped) return;
     e.preventDefault();
@@ -696,7 +731,7 @@ function attachRowGestures(ul) {
   ul.addEventListener("pointerdown", (e) => {
     const li = e.target.closest(".installed-app");
     swiped = false;
-    start = li && !li.dataset.self && !appView.editing && !e.target.closest(".del-confirm") ? { li, x: e.clientX, y: e.clientY } : null;
+    start = li && !li.dataset.self && !appView.editing && !appView.managing && !e.target.closest(".del-confirm") ? { li, x: e.clientX, y: e.clientY } : null;
   });
   ul.addEventListener("pointermove", (e) => {
     if (!start) return;
@@ -759,7 +794,7 @@ export function appRowHref(r, cands, route) {
 
 // F91's extra row (a signed app the list doesn't remember), now with its page.
 export function extraRow(route) {
-  return (r) => ({ label: r.name, subtitle: [r.version ? `Version ${r.version}` : null, `Signed by ${NAME}`].filter(Boolean).join(" · "),
+  return (r) => ({ label: r.name, subtitle: [r.version ? `Version ${r.version}` : null, r.fromMyIpas ? "From My IPAs" : `Signed by ${NAME}`].filter(Boolean).join(" · "),
     detail: r.sig?.text, icon: { text: r.name.charAt(0).toUpperCase() }, href: appRowHref(r, null, route) });
 }
 
@@ -927,7 +962,7 @@ export async function appSheet(r, { mode = detectMode(), sheet = showActionSheet
 // A hold on a row (500 ms, nav/menu.js longPress) opens its sheet; not while editing or while it shows Delete.
 export function attachRowHold(ul, opts = {}) {
   longPress(ul, ".installed-app", (li) => {
-    if (appView.editing || li.classList.contains("armed") || !li._app) return;
+    if (appView.editing || appView.managing || li.classList.contains("armed") || !li._app) return;
     li.querySelector(".cell-inner")?.classList.remove("is-pressed");
     appSheet(li._app, { li, ...opts });
   });
@@ -977,6 +1012,285 @@ export function appPageSections(r, { ipa = null, mode = detectMode(), now = new 
       footer: a.kind === "uninstall" ? `Deletes ${r.name} and its data from your iPhone.` : a.note });
   }
   return out;
+}
+
+// ---- F222: Manage: pick apps, then Re-sign, Update or Delete them together ----------------------------------------
+
+const manageBar = { right: null, toolbar: null, summary: null };
+
+// A signature record made from the user's own IPA: native MyIPAs.fileOf's library:<file> url (signing.resign signs
+// such an app again from that file, not a download).
+export const fromMyIpas = (rec) => typeof rec?.url === "string" && rec.url.startsWith("library:");
+
+// A list row with what Manage needs: `pkg` (the catalog package, for Update and a marked app's re-sign) and, for an app
+// iFizBox holds no signature for, `onSource`: its installed version is still on its source (F221).
+export function withManage(r, cands) {
+  const pkg = cands?.get?.(r.id)?.pkg ?? null;
+  const onSource = !r.signed && !r.signedOnly && Boolean(markedVersionOnSource(pkg, r.version));
+  return { ...r, pkg, onSource };
+}
+
+// The row's select circle (packages.css .manage-check), slid in with the row's content while managing.
+function selectCircle(li, on) {
+  if (!li) return;
+  li.classList.add("manage-row");
+  li.classList.toggle("picked", on && appView.managing);
+  const c = Object.assign(document.createElement("span"), { className: "manage-check" });
+  c.setAttribute("aria-hidden", "true");
+  li.append(c);
+}
+
+// User | Recent's pick: the list again under the same mode, managing or not.
+export function pickMode(m) {
+  appView.mode = m;
+  redrawApps();
+}
+
+// Manage on or off: Done (blue) or Manage on the right, Select… or Wish List on the left, the circles slide in or out,
+// the grey line and the toolbar come or go. Off drops the selection.
+export function setManaging(on) {
+  if (!recordsApps()) return;
+  appView.managing = Boolean(on);
+  if (!on) appView.selected = new Set();
+  if (typeof document === "undefined") return;
+  for (const li of appView.body?.querySelectorAll(".installed-app.armed") ?? []) li.classList.remove("armed");
+  const b = manageBar.right;
+  if (b?.isConnected) { b.textContent = on ? "Done" : "Manage"; b.classList.toggle("done", Boolean(on)); }
+  const ul = appView.body?.querySelector(":scope > .table");
+  ul?.classList.toggle("managing", Boolean(on));
+  if (on && ul && !manageBar.summary?.isConnected) {
+    const line = manageSummaryLine();
+    ul.before(line);
+    appView.tail.unshift(line);
+  }
+  if (!on) manageBar.summary?.remove();
+  syncManage();
+}
+
+export function togglePick(id, view = appView) {
+  if (!id || !view.managing) return;
+  const next = new Set(view.selected);
+  if (next.has(id)) next.delete(id); else next.add(id);
+  view.selected = next;
+  if (view === appView) syncManage();
+}
+
+// Select…'s sheet (All Apps, Expiring Soon (n), Not Signed Here (n), With Updates (n), Cancel) picks a preset's apps in
+// place of the selection; with every row picked the button is Deselect, which drops it. -> the preset, or null.
+export async function selectButton({ view = appView, sheet = showActionSheet, sync = syncManage } = {}) {
+  if (selectLabel(view.manageRows, view.selected) !== SELECT) {
+    view.selected = new Set();
+    sync();
+    return "none";
+  }
+  const opts = selectSheet(view.manageRows);
+  const i = await sheet({ buttons: opts.map((o) => o.label) });
+  if (!(i >= 0)) return null;
+  view.selected = new Set(presetIds(view.manageRows, opts[i].preset));
+  sync();
+  return opts[i].preset;
+}
+const onSelectButton = () => selectButton();
+
+function manageSummaryLine() {
+  const p = Object.assign(document.createElement("p"), { className: "manage-summary" });
+  p.textContent = manageSummary(appView.manageRows, appView.selected);
+  manageBar.summary = p;
+  return p;
+}
+
+// "<before>Install IPAs<after>" with a link to Install IPAs (Home's tile): the list's empty state and its footer.
+function installIpasNote(route, before, after, cls) {
+  const p = Object.assign(document.createElement("p"), { className: cls });
+  const a = Object.assign(document.createElement("a"), { textContent: myipas.PAGE_TITLE, href: myIpasRow(route, detectMode() === "site").href });
+  p.append(before, a, after);
+  return p;
+}
+
+// Whether Installed's root is the page on screen (the toolbar shows only over it).
+function rootShown() {
+  if (!appView.body?.isConnected || typeof location === "undefined") return false;
+  const r = mounted(parse(location.hash));
+  return r.tab === "installed" && isRoot(r) && pageKind(r) === "apps";
+}
+
+// The picked circles, the grey line, Select…/Deselect and the toolbar's counts, from appView.
+function syncManage() {
+  if (typeof document === "undefined") return;
+  for (const li of appView.body?.querySelectorAll(".manage-row") ?? []) {
+    const picked = appView.managing && appView.selected.has(li._app?.id);
+    li.classList.toggle("picked", picked);
+    li.querySelector(".cell-inner")?.setAttribute("aria-selected", String(picked));
+  }
+  if (manageBar.summary) manageBar.summary.textContent = manageSummary(appView.manageRows, appView.selected);
+  updateWishButton();
+  const show = appView.managing && recordsApps() && rootShown();
+  if (!show && !manageBar.toolbar) return;
+  const t = manageToolbarEl();
+  if (show) {
+    const specs = manageToolbar(manageCounts(appView.manageRows, appView.selected));
+    for (const s of specs) {
+      t.buttons[s.kind].textContent = s.label;
+      t.buttons[s.kind].disabled = s.disabled;
+    }
+    if (!t.el.isConnected) document.body.append(t.el);
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (appView.managing) t.el.classList.add("shown"); }));
+  } else {
+    t.el.classList.remove("shown");
+  }
+  document.documentElement.classList.toggle("has-manage-toolbar", show);
+}
+
+// The bottom toolbar (packages.css .manage-toolbar, My IPAs' bar): Re-sign (blue, the Done button's look), Update, Delete (red).
+function manageToolbarEl() {
+  if (manageBar.toolbar) return manageBar.toolbar;
+  const el = Object.assign(document.createElement("div"), { className: "manage-toolbar" });
+  el.setAttribute("role", "toolbar");
+  const buttons = { resign: barButton("Re-sign", "done manage-resign"), update: barButton("Update", "manage-update"),
+    delete: barButton("Delete", "manage-delete") };
+  for (const [kind, b] of Object.entries(buttons)) b.addEventListener("click", () => runManage(kind));
+  el.append(buttons.resign, buttons.update, buttons.delete);
+  manageBar.toolbar = { el, buttons };
+  return manageBar.toolbar;
+}
+
+// Leaving the root (another tab, a pushed page) ends Manage, so the toolbar never shows over another page.
+if (typeof window !== "undefined") {
+  window.addEventListener("hashchange", () => { if (appView.managing && !rootShown()) setManaging(false); });
+}
+
+// The queue jobs for `kind` ("resign" | "update") from the picked rows: Re-sign signs an app iFizBox signed again from
+// its record (resignJob; one from My IPAs from the stored file), a marked app from its installed version's IPA on the
+// source (markedResignJob); Update queues the newest version (appJob). Rows the kind doesn't apply to are left out.
+export function manageJobs(kind, picked) {
+  const out = [];
+  for (const r of picked ?? []) {
+    const k = manageKinds(r);
+    if (!k) continue;
+    let j = null;
+    if (kind === "resign" && k.resign) j = r.signed ? resignJob(r.signed) : markedResignJob(r.pkg, r.version, { source: r.sourceName || null });
+    else if (kind === "update" && k.update && r.pkg) j = appJob(r.pkg, { installed: r.version || null, source: r.sourceName || null });
+    if (j) out.push(j);
+  }
+  return out;
+}
+
+export const MANAGE_VERB = { resign: "Re-signing", update: "Updating" };
+
+// The confirm sheet's title and its button for Re-sign and Update.
+export function manageSheet(kind, n, marked = 0) {
+  const apps = n === 1 ? "App" : `${n} Apps`;
+  if (kind === "resign") {
+    const dl = marked === 0 ? "" : marked === 1 ? " 1 app is downloaded from its source first." : ` ${marked} apps are downloaded from their sources first.`;
+    return { title: `Each app keeps its data.${dl}`, button: n === 1 ? "Re-sign App" : `Re-sign ${apps}` };
+  }
+  return { title: "Each app is updated to its newest version and keeps its data.", button: n === 1 ? "Update App" : `Update ${apps}` };
+}
+
+// B46 per app for a bulk Delete: { act: [{ r, a }] (uninstalled or removed from the list), stay: [r] (iOS still has
+// them and iFizBox can't delete them: the sideload app) }.
+export function bulkDeletePlan(picked, { mode = detectMode() } = {}) {
+  const act = [];
+  const stay = [];
+  for (const r of picked ?? []) {
+    const a = deleteAction(r, { mode });
+    if (!a) continue;
+    if (a.kind === "installed") stay.push(r); else act.push({ r, a });
+  }
+  return { act, stay };
+}
+
+const stayLine = (stay) => (stay.length === 1 ? `${stay[0].name} is still on your iPhone and stays on the list.`
+  : `${stay.length} apps are still on your iPhone and stay on the list.`);
+
+// The bulk Delete's sheet: { title, button } (button null: nothing to do but explain, an alert).
+export function bulkDeleteSheet(plan) {
+  const n = plan.act.length;
+  const un = plan.act.filter((x) => x.a.kind === "uninstall").length;
+  const lines = [];
+  if (un) lines.push(un === 1 ? "Deletes the app and its data from your iPhone." : `Deletes ${un} apps and their data from your iPhone.`);
+  if (n > un) lines.push(n - un === 1 ? `Removes 1 app from the list. ${HOME_SCREEN}` : `Removes ${n - un} apps from the list. ${HOME_SCREEN}`);
+  if (plan.stay.length) lines.push(stayLine(plan.stay));
+  const button = !n ? null : un === n ? (n === 1 ? `Delete ${plan.act[0].r.name}` : `Delete ${n} Apps`)
+    : un ? `Delete ${n} Apps` : n === 1 ? REMOVE : `Remove ${n} Apps from List`;
+  return { title: lines.join(" "), button };
+}
+
+// A toolbar button: the confirm sheet, then the jobs (Re-sign, Update) or the deletes; Manage ends and the list loads
+// again (its pills follow). -> true when it went ahead.
+export async function runManage(kind, { view = appView, mode = detectMode(), sheet = showActionSheet, alert = showAlert, run = runManageJobs,
+  remove = deleteOne, done = () => { setManaging(false); if (appView.body) loadApps(); } } = {}) {
+  const picked = manageable(view.manageRows).filter((r) => view.selected.has(r.id));
+  if (!picked.length) return false;
+  if (kind === "delete") {
+    const plan = bulkDeletePlan(picked, { mode });
+    const s = bulkDeleteSheet(plan);
+    if (!s.button) { await alert({ title: "Still Installed", message: `${s.title} ${HOME_SCREEN}`, buttons: ["OK"] }); return false; }
+    if (await sheet({ title: s.title, buttons: [s.button], destructive: 0 }) !== 0) return false;
+    const failed = [];
+    for (const { r, a } of plan.act) {
+      try { await remove(a, r); } catch (e) { failed.push(`${r.name}: ${deviceError(e).message}`); }
+    }
+    done();
+    if (failed.length) await alert({ title: "Couldn't Remove", message: failed.join("\n"), buttons: ["OK"] });
+    return true;
+  }
+  const jobs = manageJobs(kind, picked);
+  if (!jobs.length) return false;
+  const s = manageSheet(kind, jobs.length, kind === "resign" ? jobs.filter((j) => j.url).length : 0);
+  if (await sheet({ title: s.title, buttons: [s.button] }) !== 0) return false;
+  await run(kind, jobs);
+  done();
+  return true;
+}
+
+// One app of a bulk Delete: the helper's uninstall behind its HUD, or forgetting the record.
+async function deleteOne(a, r) {
+  if (a.kind === "uninstall") return runDelete(a, r);
+  return forgetApp(r);
+}
+
+// The run: every job into the app queue (screens/queue.js runAppQueue, as Confirm's: one at a time, iFizBox last, the
+// first failure stops it and leaves the rest queued), each on the progress page as "Re-signing Delta (1 of 3)".
+export async function runManageJobs(kind, jobs, { queue = null, run = null, install = manageInstall, hud = null } = {}) {
+  const q = queue ?? (await import("../app-queue.js")).appQueue;
+  const runner = run ?? (await import("./queue.js")).runAppQueue;
+  for (const j of jobs) q.add(j);
+  let i = 0;
+  const n = jobs.length;
+  return runner(jobs, { queue: q, install: (j) => install(j, { verb: MANAGE_VERB[kind] ?? "Installing", i: ++i, n, hud }) });
+}
+
+// One job of the run with the bulk label: a re-sign through screens/queue.js resignApp, an update signed on the phone
+// (installOnDevice) or, on the site, in the browser (signAndInstall).
+export async function manageInstall(job, { verb, i, n, hud = null, sc = null, resign = null } = {}) {
+  sc ??= await import("../signing-client.js");
+  hud ??= (await import("../nav/progress.js")).progressHUD;
+  const h = bulkHud(hud, { verb, name: job.name || job.id, i, n });
+  if (job.mode === "resign") {
+    resign ??= (await import("./queue.js")).resignApp;
+    return resign(job, { sc, hud: h, deps: { hud: h } });
+  }
+  if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" }, { hud: h });
+  return sc.signAndInstall({ url: job.url, name: job.name || "" });
+}
+
+// A HUD factory for job `i` of `n`: its label is always "<verb> <name> (i of n)", the bar the whole run's progress
+// (the job's own percent counted in), and the job's own phases go to the page's log.
+export function bulkHud(factory, { verb, name, i, n }) {
+  return () => {
+    let p = 0;
+    const label = () => `${verb} ${name} (${i} of ${n}) ${Math.round(((i - 1) + p / 100) / n * 100)}%`;
+    const h = factory(label());
+    const w = Object.create(h);
+    w.set = (t) => {
+      const { text, percent } = hudLine(t);
+      if (percent != null) p = percent;
+      if (text) h.page?.raw?.(String(t));
+      h.set(label());
+    };
+    return w;
+  };
 }
 
 // ---- F125: the Wish List page --------------------------------------------------------------------------------

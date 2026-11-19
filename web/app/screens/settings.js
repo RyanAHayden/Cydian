@@ -151,6 +151,7 @@ function groupPage(id) {
 function settingsGroups(list, page) {
   const switches = [];
   const segs = [];
+  const needs = [];
   const sections = list.map((s) => {
     const rows = [];
     // F205: a setting's tile (SETTING_ICONS); a choice's option rows stay bare.
@@ -165,13 +166,14 @@ function settingsGroups(list, page) {
         switches.push([rows.length, d]);
         rows.push({ label: d.label, ...icon(d) });
       } else if (d.kind === "list") {
+        if (d.needs) needs.push([rows.length, d]); // F244: shown only while its switch is on (Expiry Warning)
         rows.push({ label: d.label, detail: optionLabel(d, settings.get(d.key)), href: format(settingsRoute([page, d.key])), ...icon(d) });
       } else if (d.kind === "holds") {
         const n = settings.holds.list().length;
         rows.push({ label: d.label, detail: n ? String(n) : "None", href: format(settingsRoute([page, "holds"])), ...icon(d) });
       }
     }
-    return { header: s.title, footer: s.footer, rows, id: s.id, switches: switches.splice(0), segs: segs.splice(0) };
+    return { header: s.title, footer: s.footer, rows, id: s.id, switches: switches.splice(0), segs: segs.splice(0), needs: needs.splice(0) };
   });
   const frag = grouped(sections);
   // grouped() draws plain rows; the switches go into their cells afterwards, a segmented control under its header.
@@ -188,8 +190,23 @@ function settingsGroups(list, page) {
       cells[row].append(makeSwitch(d));
       cells[row].classList.add("has-switch");
     }
+    for (const [row, d] of s.needs) followNeeds(cells[row].closest(".cell") ?? cells[row], d);
   });
   return frag;
+}
+
+// F244: a row that only means something while a switch is on (Expiry Warning under Show Expiry Warning) hides while
+// it is off. Switch changes don't redraw the page (the switch keeps its slide), so the row follows on its own.
+export function needsShown(d, get = (k) => settings.get(k)) {
+  return !d?.needs || get(d.needs) === true;
+}
+function followNeeds(row, d) {
+  row.hidden = !needsShown(d);
+  const off = settings.onChange((key) => {
+    if (key !== d.needs) return;
+    if (!row.isConnected) { off(); return; } // a redraw replaced it, or its page was popped
+    row.hidden = !needsShown(d);
+  });
 }
 
 // A settings row's switch: createSwitch bound to the toggle setting `d`.
@@ -1145,6 +1162,8 @@ function withKeepNotes(frag, profile) {
 async function drawDeviceSigning(el) {
   watchReturn();
   const { id, status, failure, kept } = await deviceSigningState(el);
+  // F244: Home's certificate tile follows the status this page just read (an import, a removal, a new profile)
+  if (!failure && typeof CustomEvent === "function") globalThis.dispatchEvent?.(new CustomEvent("ifizbox:signing-status", { detail: kept }));
   const info = deviceSummary(kept);
   const staged = Boolean(id?.p12 || id?.profile);
   const notes = [failure ? `The signer didn't answer: ${deviceError(failure).message}` : null, status?.identityProblem ?? null,

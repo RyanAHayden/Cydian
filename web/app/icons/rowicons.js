@@ -115,6 +115,7 @@ export const ROW_ICONS = {
   holds: [C.red, "minusCircle"], notifications: [C.red, "bell"], autoInstall: [C.purple, "bolt"], idle: [C.green, "battery"],
   respring: [C.dark, "power"], keepVersions: [C.brown, "clock"], showExpiry: [C.red, "calendar"], resignReminder: [C.orange, "hourglass"],
   keepBundleId: [C.indigo, "copy"], // F237: Keep Bundle IDs (no duplicate copies)
+  showExpiryWarning: [C.gold, "seal"], expiryWarning: [C.gold, "clock"], // F244: Home's certificate warning
   otherLinks: [C.purple, "link"], lockHome: [C.dark, "lock"], websiteApps: [C.blue, "apps"],
   help: [C.blue, "question"], server: [C.teal, "globe"], checkServer: [C.green, "pulse"], runYourOwn: [C.orange, "cloud"],
   sources: [C.blue, "list"], transfer: [C.green, "transfer"], hidden: [C.grey, "eyeSlash"], recommended: [C.gold, "star"],
@@ -128,6 +129,7 @@ export const SETTING_ICONS = {
   refreshOnLaunch: "refresh", returnHome: "returnHome", holds: "holds", upgradeNotifications: "notifications",
   autoInstall: "autoInstall", autoInstallIdle: "idle", respring: "respring", keepVersions: "keepVersions",
   showExpiry: "showExpiry", resignReminder: "resignReminder", keepBundleId: "keepBundleId",
+  showExpiryWarning: "showExpiryWarning", expiryWarning: "expiryWarning", // F244
 };
 
 // Settings' pages (core/settings.js PAGES) -> their root row's icon.

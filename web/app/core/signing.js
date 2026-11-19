@@ -825,3 +825,47 @@ export function notLandedText(app, check) {
   return `If ${app || "the app"} doesn't appear on the Home Screen, or iOS says its integrity could not be verified: `
     + likelyCauseText({ count: Number(check.count) || 0, udid: check.udid ?? null });
 }
+
+// ---- F244: Home's certificate-expiry warning (sideload build) -----------------------------------------------------
+// The tile under Home's welcome while the signing certificate or the provisioning profile nears its end, whichever
+// ends first (apps signed with it stop opening then).
+//
+//   expiryWarning(identity, { now, warn, resign, show })
+//        -> null (no identity, no date, or outside the warning window) or
+//           { stage: "soon" | "close" | "gone", what: "Certificate" | "Profile", days, expires, title, subtitle }
+//   soon: amber, inside Expiry Warning's `warn` days; close: red tint, inside Re-sign Reminder's `resign` days (Off,
+//   0, uses RESIGN_WINDOW so the tile still turns red near the end); gone: expired, solid red. `show` false (Show
+//   Expiry Warning off, for people with auto-renew) hides soon and close; gone shows whatever it says.
+//   expiryWarningDays(get)  Expiry Warning's days (the "expiryWarning" setting), EXPIRY_WARNING (7) when unset
+
+export const EXPIRY_WARNING = 7;
+
+export function expiryWarningDays(get) {
+  let v;
+  try { v = typeof get === "function" ? get("expiryWarning") : undefined; } catch { v = undefined; }
+  const n = Number(v);
+  return v != null && v !== "" && Number.isFinite(n) && n > 0 ? n : EXPIRY_WARNING;
+}
+
+export function expiryWarning(identity, { now = new Date(), warn = EXPIRY_WARNING, resign = RESIGN_WINDOW, show = true } = {}) {
+  if (!identity || typeof identity !== "object") return null;
+  const cert = isoDate(identity.expires);
+  const prof = isoDate(identity.profile?.expires);
+  if (!cert && !prof) return null;
+  const what = prof && (!cert || prof < cert) ? "Profile" : "Certificate";
+  const expires = what === "Profile" ? prof : cert;
+  const left = expires.getTime() - now.getTime();
+  const days = Math.floor(left / DAY);
+  if (left <= 0) {
+    return { stage: "gone", what, days, expires, title: `${what} Expired`, subtitle: "Apps won't open · Renew in Signing" };
+  }
+  if (!show) return null;
+  const warnDays = Number(warn) > 0 ? Number(warn) : EXPIRY_WARNING;
+  if (left > warnDays * DAY) return null;
+  const red = Number(resign) > 0 ? Number(resign) : RESIGN_WINDOW;
+  const stage = left <= red * DAY ? "close" : "soon";
+  const when = days < 1 ? "Today" : days === 1 ? "Tomorrow" : `in ${days} Days`;
+  const title = stage === "soon" ? `${what} Expires Soon` : `${what} Expires ${when}`;
+  const subtitle = `${days < 1 ? "Expires today" : `Expires in ${plural(days, "day")}`} · Renew in Signing`;
+  return { stage, what, days, expires, title, subtitle };
+}

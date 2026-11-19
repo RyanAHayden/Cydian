@@ -24,7 +24,8 @@ import * as browse from "./browse.js";
 import * as roulette from "./roulette.js";
 import { catalog } from "../catalog.js";
 import { footLine, versionLines, buildInfo } from "./version-foot.js";
-import { signAndInstall, signingReady, getBring, deviceStatus, getServer } from "../signing-client.js";
+import { signAndInstall, signingReady, getBring, deviceStatus, getServer, statusReady } from "../signing-client.js";
+import { expiryWarning, expiryWarningDays, resignWindow } from "../core/signing.js";
 import { rememberInstall } from "./signing.js";
 import { featuredRefs } from "./extras.js";
 import { browseList, browseListsFor, FRESH_DAYS, collection } from "../core/catalog.js";
@@ -474,6 +475,72 @@ function tileRow(cls, ...tiles) {
   return row;
 }
 
+// ---- F244: the certificate-expiry tile (sideload build) ----------------------------------------------------------
+// A full-width stack tile under the welcome, above GitHub | Discord, while the certificate or the profile (whichever
+// ends first, core/signing.js expiryWarning) nears its end or has ended; a tap opens Settings > Signing. No dismiss.
+// home.css .home-row.cert draws its three stages: soon (amber), close (red tint), gone (solid red).
+export const CERT_STAGES = ["soon", "close", "gone"];
+export const showsCertTile = (mode, shown = settings.isShown("showExpiryWarning")) => mode === "sideload" && Boolean(shown);
+// The warning for `identity` with Settings' values (`get` reads a setting).
+export function certWarning(identity, { get = (k) => settings.get(k), now = new Date() } = {}) {
+  return expiryWarning(identity, { now, warn: expiryWarningDays(get), resign: resignWindow(get), show: get("showExpiryWarning") !== false });
+}
+// signing.status's identity, or null (none, the signer didn't answer, or not the sideload build).
+export async function certIdentity({ status = () => deviceStatus() } = {}) {
+  try {
+    let st = await status();
+    if (typeof st === "string") st = JSON.parse(st);
+    return statusReady(st) ? st.identity : null;
+  } catch {
+    return null;
+  }
+}
+// Paints `row` (tileRow "stack cert") for warning `w`: hidden for null.
+export function paintCert(row, w) {
+  row.hidden = !w;
+  for (const s of CERT_STAGES) row.classList.toggle(s, w?.stage === s);
+  if (!w) return;
+  row.querySelector(".cell-label").textContent = w.title;
+  row.querySelector(".cell-subtitle").textContent = w.subtitle;
+}
+// The tile, kept up to date: Home showing again (Back from Settings > Signing), the app coming back, Settings'
+// Expiry Warning, Show Expiry Warning and Re-sign Reminder, and Settings > Signing's status ("ifizbox:signing-status",
+// its identity as the detail) after an import or removal. Stops once the row leaves the page.
+function certRow() {
+  const row = tileRow("stack cert", tile({ label: "", subtitle: " ", href: format(settingsRoute(["signing"])), glyph: "failed" }));
+  row.hidden = true;
+  if (!showsCertTile(settings.mode)) return row;
+  let seq = 0;
+  let last = null;
+  const draw = (identity) => { seq++; last = identity; paintCert(row, certWarning(identity)); };
+  const check = async () => {
+    const mine = ++seq;
+    const identity = await certIdentity();
+    if (mine === seq && alive()) draw(identity);
+  };
+  const onHash = () => { if (/^#\/home\/?$/.test(location.hash)) check(); };
+  const onVis = () => { if (document.visibilityState !== "hidden") check(); };
+  const onStatus = (e) => { if (alive()) draw(e?.detail ?? null); };
+  const offSettings = settings.onChange((key) => {
+    if (["showExpiryWarning", "expiryWarning", "resignReminder"].includes(key) && alive()) draw(last);
+  });
+  let seen = false; // on the page at least once: not connected before then is "not drawn yet", after it is "gone"
+  const alive = () => {
+    if (row.isConnected) { seen = true; return true; }
+    if (!seen) return true;
+    removeEventListener("hashchange", onHash);
+    removeEventListener("ifizbox:signing-status", onStatus);
+    document.removeEventListener("visibilitychange", onVis);
+    offSettings();
+    return false;
+  };
+  addEventListener("hashchange", onHash);
+  addEventListener("ifizbox:signing-status", onStatus);
+  document.addEventListener("visibilitychange", onVis);
+  check();
+  return row;
+}
+
 // The icon on the website and in the sideload (LITE) app: what that version can't do, the jailbreak app can.
 export function versionLimits(kind) {
   if (kind === "web") return { title: `${NAME} Web`, message: "The website can't:\n• install tweaks or themes\n• see the apps on your phone\n• remove apps\n• keep signed copies of your IPAs\n• remind you to re-sign apps\n\nThe app does all of this." };
@@ -604,6 +671,7 @@ function renderRoot(body) {
 
   home.append(
     head,
+    certRow(), // F244: hidden unless the sideload build's certificate or profile nears its end
     hintBox,
     tileRow("pair",
       tile({ label: "GitHub", href: REPO_URL, glyph: "github", external: true }),

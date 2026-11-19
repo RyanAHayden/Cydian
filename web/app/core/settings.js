@@ -38,7 +38,7 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // "upgrade-notifications": Upgrade Notifications, N5's daemon's "n Upgrades" in the jailbreak app (F65).
 // "auto-install", "rollback": N7's Automatic Installs rows, which F70 hands to the daemon (daemonPrefs below).
 export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device", "resign", "upgrade-notifications",
-  "auto-install", "rollback", "keep-id"]); // "keep-id": Keep Bundle IDs (F237)
+  "auto-install", "rollback", "keep-id", "expiry-warning"]); // "keep-id": Keep Bundle IDs (F237); "expiry-warning": F244
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
@@ -64,6 +64,7 @@ export const SECTIONS = [
   { id: "notifications", page: "updates" },
   { id: "automatic", page: "updates", title: "Automatic Installs" },
   { id: "signing", page: "signing" },
+  { id: "expiry", page: "signing" }, // F244: Show Expiry Warning and Expiry Warning, Home's certificate tile
 ];
 
 // F134: Settings > Signing's groups, top to bottom, like an iOS 6 settings page: the certificate (its name, team and
@@ -229,6 +230,22 @@ export const SETTINGS = [
     key: "keepBundleId", section: "signing", kind: "toggle", feature: "keep-id", modes: ["site", "sideload"], default: true,
     label: "Keep Bundle IDs", options: onOff, confirmOff: OLD_WAY_ALERT,
     footer: "Apps keep their own IDs and notifications. Off: a copy under your ID.",
+  },
+  {
+    // F244: Home's certificate-expiry tile (core/signing.js expiryWarning). Off (people with auto-renew): no amber or
+    // red tile, and Expiry Warning's row hides (`needs`); the solid red Expired tile still shows. Sideload build only.
+    key: "showExpiryWarning", section: "expiry", kind: "toggle", feature: "expiry-warning", modes: ["sideload"], default: true,
+    label: "Show Expiry Warning", options: onOff,
+    footer: "Warns on Home before your certificate or profile expires.",
+  },
+  {
+    key: "expiryWarning", section: "expiry", kind: "list", feature: "expiry-warning", modes: ["sideload"], default: 7,
+    needs: "showExpiryWarning", label: "Expiry Warning",
+    options: [
+      { value: 3, label: "3 Days" }, { value: 7, label: "1 Week" }, { value: 14, label: "2 Weeks" },
+      { value: 30, label: "1 Month" }, { value: 60, label: "2 Months" },
+    ],
+    footer: "How far ahead Home shows the warning.",
   },
 ];
 

@@ -75,7 +75,7 @@ test("F128: pages like iOS 6's Settings: General, Theme, Updates (Signing in the
   const theme = ["theme", "Theme", [["appearance"], ["lightTheme", "darkTheme"]]]; // F199: Mode, then Themes
   const compat = ["worksOnMyPhone", "compatMarks"];
   assert.deepEqual(layout("site"), [
-    ["general", "General", [["device", "iosVersion"], compat, ["refreshOnLaunch", "returnHome"]]],
+    ["general", "General", [["device", "iosVersion"], compat, ["returnHome"]]], // C14: the site refreshes by itself
     theme,
     ["updates", "Updates", [["holds"]]],
     ["signing", "Signing", [["keepBundleId"]]], // F237: the website signs too
@@ -108,8 +108,12 @@ test("F128: pages like iOS 6's Settings: General, Theme, Updates (Signing in the
   for (const p of PAGES) assert.equal(SETTINGS.some((d) => d.key === p.id && p.id !== "signing"), false, p.id);
 });
 
-test("refresh on launch is off on the site and on in the app", () => {
-  assert.equal(createSettings({ storage: memStorage(), mode: "site" }).get("refreshOnLaunch"), false);
+test("refresh on launch: on in the apps; the site hides the toggle (it refreshes each unlocked launch itself)", () => {
+  const site = createSettings({ storage: memStorage(), mode: "site" });
+  assert.equal(site.isShown("refreshOnLaunch"), false);
+  assert.equal(site.get("refreshOnLaunch"), false);
+  assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak" }).isShown("refreshOnLaunch"), true);
+  assert.equal(createSettings({ storage: memStorage(), mode: "sideload" }).isShown("refreshOnLaunch"), true);
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak" }).get("refreshOnLaunch"), true);
   assert.equal(createSettings({ storage: memStorage(), mode: "sideload" }).get("refreshOnLaunch"), true);
 });
@@ -247,7 +251,7 @@ test("holds: the helper is only used in jailbreak mode", async () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "returnHome", "holds", "keepBundleId"]);
+    ["appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "returnHome", "holds", "keepBundleId"]);
   assert.deepEqual(show("jailbreak"),
     ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds",
       "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);

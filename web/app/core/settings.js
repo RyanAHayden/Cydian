@@ -163,8 +163,10 @@ export const SETTINGS = [
     footer: "Packages are checked against this version. Automatic reads it from this browser.",
   },
   {
-    key: "refreshOnLaunch", section: "sources", kind: "toggle", feature: "sources", modes: ALL,
-    default: (mode) => mode !== "site", // the site fetches through our proxy: opt in there
+    // The apps only: the website refreshes on every unlocked launch by itself (websign-gate.js refreshOnLaunch),
+    // so a toggle there would do nothing.
+    key: "refreshOnLaunch", section: "sources", kind: "toggle", feature: "sources", modes: BOTH,
+    default: (mode) => mode !== "site",
     label: "Refresh Sources on Launch", options: onOff,
     footer: `Looks for new packages in every source each time ${NAME} opens.`,
   },

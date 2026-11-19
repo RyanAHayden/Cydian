@@ -13,7 +13,7 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 | Root row | Builds | Page |
 |---|---|---|
 | iFizBox Account | all | sign in, create an account (screens/account.js) |
-| General | all | Device and iOS Version (website only, one group); Works on My Phone and Compatibility Marks; Refresh Sources on Launch and Return to Home After; Blocked (packages and authors); Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only; Install on the Website is padlocked while Home is locked) |
+| General | all | Device and iOS Version (website only, one group); Works on My Phone and Compatibility Marks; Refresh Sources on Launch (apps only) and Return to Home After; Blocked (packages and authors); Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only; Install on the Website is padlocked while Home is locked) |
 | Theme | all | Mode (Automatic / Light / Dark, a segmented control) and Themes (Light and Dark, each a checklist of themes) |
 | Updates | all | Ignored Upgrades; Upgrade Notifications (jailbreak only); Automatic Installs (jailbreak only: Install Updates Automatically, When Charging and Locked, After a Respring Update, Keep Previous Versions); Update Alerts (sideload only) |
 | Installation | sideload | Install Apps With: Signing Server (default) or This iPhone ("With LocalDevVPN. No server, updates iFizBox itself."); see "Settings > Installation" below |
@@ -93,7 +93,7 @@ runs on every launch and costs one lookup per key when nothing is left to remove
 | `worksOnMyPhone` | all | on | device.js, search.js |
 | `compatMarks` | all | on | browse.js |
 | `iosVersion` | website | auto | device.js |
-| `refreshOnLaunch` | all | off on the website, on in the apps | app.js |
+| `refreshOnLaunch` | apps | on | app.js (the website refreshes on every unlocked launch by itself, so it shows no toggle) |
 | `returnHome` | all | 2 minutes | app.js: back after this long, iFizBox opens on Home as if just launched |
 | `holds` | all | none | upgrades, Changes, dpkg holds (jailbreak) |
 | `upgradeNotifications` | jailbreak | on | ifizbox-helper notifications (the `ifizbox-upgrades` daemon) |

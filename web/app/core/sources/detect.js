@@ -42,7 +42,7 @@ export class SourceFormatError extends SourceError {
   constructor(message, reason = "not_source") {
     super("not_source", message);
     this.name = "SourceFormatError";
-    this.title = "Did not Find Source";
+    this.title = "Did Not Find Source";
     this.reason = reason; // web_page, empty, bad_json, unknown_json, unknown_text
   }
 }

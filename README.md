@@ -20,7 +20,8 @@ certificate, on the website or in the sideloaded app.</p>
 
 > [!NOTE]
 > iFizBox is inspired by Cydia by Jay Freeman (saurik). It is **not affiliated with Cydia or SaurikIT**, and Cydia
-> is SaurikIT's trademark. See [Credits](#credits) for the one piece of Cydia's artwork it uses.
+> is SaurikIT's trademark. It uses Cydia's section icons and purpose badges and some of its interface wording, under
+> GPLv3: see [Credits](#credits).
 
 ## Contents
 
@@ -241,9 +242,12 @@ Bugs and ideas: [GitHub issues](https://github.com/RyanAHayden/iFizBox/issues) o
 ## Credits
 
 - Inspired by **Cydia** by Jay Freeman (saurik). iFizBox is not affiliated with Cydia or SaurikIT, and Cydia is
-  SaurikIT's trademark. The interface is redrawn in CSS and SVG, and no Apple artwork is included. The one exception
-  is Cydia's section icons and purpose badges (`web/app/icons/sections/`), copied unchanged from Cydia's GPLv3
-  source; credit and details are in [that folder's README](web/app/icons/sections/README.md).
+  SaurikIT's trademark. The interface is redrawn in CSS and SVG, and no Apple artwork is included. From Cydia's
+  GPLv3 source iFizBox uses:
+  - its section icons and purpose badges (`web/app/icons/sections/`), copied unchanged; credit and details are in
+    [that folder's README](web/app/icons/sections/README.md);
+  - some of its interface wording (titles, buttons and alert sentences, listed in
+    [docs/cydia.md](docs/cydia.md#ui-strings)), with typos fixed.
 - The phone in the screenshots is the iPhone 5 from Teehan+Lax's iOS 6 GUI PSD. Only the rendered screenshots are
   in the repository, not the kit.
 - [zsign](https://github.com/zhlynn/zsign) (MIT) and OpenSSL (Apache-2.0) in the website's signer, with their licences

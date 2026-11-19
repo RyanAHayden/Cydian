@@ -288,7 +288,7 @@ enum Helper {
     }
 
     // F63: the console's answer to dpkg's conffile question (apt's pmconffile: line): keep -> "N" (Keep My Old
-    // Copy), new -> "Y" (Accept The New Copy). ifizbox-helper passes on only those two lines.
+    // Copy), new -> "Y" (Accept the New Copy). ifizbox-helper passes on only those two lines.
     static func answer(_ word: String) throws {
         guard let line = ["keep": "N\n", "new": "Y\n"][word] else { throw BridgeError("helper", "answer is keep or new") }
         answerLock.lock(); defer { answerLock.unlock() }

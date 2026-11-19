@@ -69,7 +69,7 @@ export function sourceKey({ uri, dist }) {
 // Cydia's alert texts (docs/cydia.md "UI strings"). `kind`: invalid_url, not_repository, verification.
 const ALERTS = {
   invalid_url: ["Invalid URL", "That is not a valid source URL. Please check it and try again."],
-  not_repository: ["Did not Find Repository", "The indicated repository could not be found. This could be because "
+  not_repository: ["Did Not Find Repository", "The indicated repository could not be found. This could be because "
     + "you are trying to add a legacy Installer repository (these are not supported). Also, this interface is only "
     + "capable of working with exact repository URLs."],
   verification: ["Verification Error", ""],

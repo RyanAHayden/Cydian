@@ -239,7 +239,7 @@ test("links from package managers and sideloaders give the source URL", () => {
 test("garbage is refused with a clear message", () => {
   const refused = (body, reason, re) => assert.throws(() => detect("https://junk.example/x", body),
     (e) => e instanceof SourceFormatError && e instanceof SourceError && e.kind === "not_source" && e.reason === reason
-      && e.title === "Did not Find Source" && re.test(e.message));
+      && e.title === "Did Not Find Source" && re.test(e.message));
   refused(text("page-repo-landing.html"), "web_page", /junk\.example sent a web page, not a source/);
   refused(text("garbage.txt"), "unknown_text", /not a source: no APT Release or Packages, and no app source JSON/);
   refused(text("garbage.json"), "unknown_json", /no source format iFizBox knows/);

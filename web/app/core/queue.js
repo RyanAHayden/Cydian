@@ -159,7 +159,7 @@ export function parseStatusLine(line) {
 // F63: Cydia's Configuration Upgrade alert (CONFIGURATION_UPGRADE, CONFIGURATION_UPGRADE_EX, KEEP_OLD_COPY,
 // ACCEPT_NEW_COPY). Keep is first and is the cancel button: dpkg's own default.
 export const CONFFILE_TITLE = "Configuration Upgrade";
-export const CONFFILE_BUTTONS = ["Keep My Old Copy", "Accept The New Copy"];
+export const CONFFILE_BUTTONS = ["Keep My Old Copy", "Accept the New Copy"];
 export const conffileMessage = (file) =>
   `The following file has been changed by both the package maintainer and by you (or for you by a script).\n\n${file}`;
 // The alert's button index -> the word backend.answerConffile takes (anything but Accept keeps).

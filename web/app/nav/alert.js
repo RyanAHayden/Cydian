@@ -7,7 +7,7 @@
 //
 // Resolves with the tapped button's index and the field's text. Return in the field taps the last button,
 // Escape taps `cancel`. All text goes in through textContent. `stacked` stacks two buttons whose titles don't fit
-// side by side, as UIAlertView does (F63's Keep My Old Copy / Accept The New Copy).
+// side by side, as UIAlertView does (F63's Keep My Old Copy / Accept the New Copy).
 // F96: `countdown: { button, seconds }` greys that button out for `seconds`, its title counting down ("I Understand
 // (5)"), before it can be tapped.
 // `colors`: { [button index]: "green" | "red" } (sources.css .alert-button.green/.red): the way to go, and the one to avoid.

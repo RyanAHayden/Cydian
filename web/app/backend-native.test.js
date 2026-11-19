@@ -238,7 +238,7 @@ test("F48: addSource takes a dist repo { uri, dist, components }: Release under 
   assert.deepEqual(native.calls.filter((c) => c.method === "helper.run").map((c) => c.params.words),
     [["addsource", "https://dist.test/", "stable", "main"]]);
   assert.match(readOrNull(ifizboxSources(fx)), /URIs: https:\/\/dist\.test\/\nSuites: stable\nComponents: main\n/);
-  // no Release there: APT's "Did not Find Repository", not an AltStore attempt with the object
+  // no Release there: APT's "Did Not Find Repository", not an AltStore attempt with the object
   await assert.rejects(backend.addSource({ uri: "https://dist.test/", dist: "nope", components: ["main"] }), { kind: "not_repository" });
 });
 

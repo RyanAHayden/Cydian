@@ -319,7 +319,7 @@ function draw() {
   const rec = searching ? null : recommendedRow();
   const top = searching ? [] : [{
     label: "All Sources",
-    subtitle: "combined package list for below sources",
+    subtitle: "combined package list for the sources below",
     href: format({ tab: "sources", path: ["*"] }),
   }, ...(rec ? [rec] : [])];
   const ul = plain([...(top.length ? [{ rows: top }] : []), {

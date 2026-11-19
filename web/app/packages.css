@@ -498,6 +498,10 @@ html[data-theme="dark"] .search-field::after { background-color: var(--dk-clear)
 .browse-hero-meta { min-width: 0; font-size: 12px; color: rgba(255,255,255,.8); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .browse-hero.is-loading .ph-bar, .browse-hero.is-loading .ph-box { background: rgba(255,255,255,.18); }
 .browse-hero.is-loading .browse-hero-icon { box-shadow: none; -webkit-box-reflect: none; }
+/* Held (app.js PRESSABLE, 140 ms on a quick tap): the whole banner goes down, as the iOS 6 App Store's did: a flat
+   dark veil over the card, above the icon and words, clipped by the card's radius. No glow or highlight. */
+.browse-hero::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: rgba(0,0,0,.3); opacity: 0; }
+.browse-hero.is-pressed::after { opacity: 1; }
 /* The iOS 6 App Store's price button (FREE / VIEW): grey-blue outline, a pale gradient, embossed slate text. The
    card or cell around it is the link, so pressing that presses it. Drawn from memory of the store: the kit has none. */
 .store-btn { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 4px;

@@ -96,3 +96,27 @@ test("progressHUD: done ends on Return to <NAME>, with no status line", withDom(
   assert.equal(status(h.page).hidden, true);
   await h.page.close();
 }));
+
+// B90: an install cancelled in iOS's prompt ends "Not Installed" with Try Again (finish's `also`) above Return
+test("finish({ also }): a second button above the finish one, gone again for the next job", withDom(async () => {
+  const also = (page) => find(page.sheet, "progress-also");
+  const h = progressHUD("Uploading 33%");
+  assert.equal(also(h.page).hidden, true);
+  let tries = 0;
+  h.finish({ title: "Not Installed", status: "Cancelled in iOS.", also: { label: "Try Again", action: () => { tries++; return true; } } });
+  const page = h.page;
+  assert.equal(also(page).hidden, false);
+  assert.equal(also(page).textContent, "Try Again");
+  assert.equal(button(page).textContent, `Return to ${NAME}`);
+  assert.ok(Number(also(page).style.order) < Number(button(page).style.order), "drawn above Return");
+  assert.equal(page.sheet.attrs["aria-label"], "Not Installed");
+  await also(page).onclick();
+  assert.equal(tries, 1);
+  assert.equal(page.closed, false, "a truthy return keeps the page (the next run opens on it)");
+  progressHUD("Downloading");
+  assert.equal(also(page).hidden, true, "reopened: no Try Again");
+  page.finish({ status: "Done" });
+  assert.equal(also(page).hidden, true, "a plain finish has none");
+  await button(page).onclick();
+  assert.equal(page.closed, true);
+}));

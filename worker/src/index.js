@@ -20,8 +20,9 @@
 //                                           -> {itms, ...}; GET /sign/up/<token>/manifest.plist and app.ipa (HEAD,
 //                                           Range) for TTL seconds, like /sign/host
 //   GET  /sign/up/<token>/status            F190: what iOS has done with that link, from its own requests:
-//                                           {manifest, started, finished} (manifest.plist fetched, app.ipa's body begun,
-//                                           and streamed to its end); the website shows it after "Installing"
+//                                           {manifest, asked, started, finished} (manifest.plist fetched, app.ipa asked
+//                                           for at all: Install tapped in iOS's prompt, its body begun, and streamed
+//                                           to its end); the website shows it after "Installing"
 //                                           F121: &token=<48 hex> without size reserves the website's own token, whose
 //                                           link it opened inside the Install tap: manifest.plist answers at once from
 //                                           its own query (bundleid, version, title), else once the reservation lands
@@ -333,6 +334,10 @@ const upKey = (t) => `up.${t}`, partKey = (t, i) => `up.${t}.${i}`;
 // (read first; KV's free tier counts writes, 1,000 a day), so an install costs at most 3 writes.
 const iosKey = (t) => `up.${t}.ios`;
 export const IOS_MARKS = ["manifest", "started", "finished"];
+// B90: /sign/up's links also mark "asked": iOS's first app.ipa request (HEAD or GET, even one held while the website
+// signs), which only comes once Install was tapped in iOS's prompt. The website reads a manifest without it, after
+// the page comes back, as the prompt cancelled. A worker without it answers no "asked" key: the website carries on.
+export const UP_MARKS = ["manifest", "asked", "started", "finished"];
 // B83: iFizBox's own update (/sign/host/<t>) keeps the same marks under hostIosKey; `key` picks which.
 async function iosStatus(env, t, key = iosKey(t)) {
   const r = await env.HOSTED.getWithMetadata(key, { type: "stream" });
@@ -408,7 +413,7 @@ async function uploads(req, u, env, ttl, ctx = null) {
   const st = /^\/sign\/up\/([0-9a-f]{48})\/status$/.exec(u.pathname);
   if (st && req.method === "GET") {
     const s = await iosStatus(env, st[1]);
-    return json(Object.fromEntries(IOS_MARKS.map((k) => [k, Boolean(s[k])])));
+    return json(Object.fromEntries(UP_MARKS.map((k) => [k, Boolean(s[k])])));
   }
   const h = /^\/sign\/up\/([0-9a-f]{48})\/(manifest\.plist|app\.ipa)$/.exec(u.pathname);
   if (h && (req.method === "GET" || req.method === "HEAD")) {
@@ -433,6 +438,7 @@ async function uploads(req, u, env, ttl, ctx = null) {
       if (req.method === "GET") await markIos(env, h[1], "manifest", ttl);
       return plist(manifest({ url: `${u.origin}/sign/up/${h[1]}/app.ipa`, ...meta }));
     }
+    await markIos(env, h[1], "asked", ttl); // B90: before the hold, so the website hears of it while it signs
     meta = await waitFor(() => metaOf(env, h[1]), started, IPA_WAIT, env);
     if (meta?.failed) return stopped();
     if (!meta?.done && !(meta?.reserved && meta.parts && !req.headers.get("Range"))) {

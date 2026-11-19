@@ -13,6 +13,8 @@
 //                                          locked: true (B49, iFizBox's own sideload update handed to iOS): the button
 //                                          and Close are greyed and do nothing (iOS closes iFizBox to install over
 //                                          it; a Close tap had lost the update), Close coming back after LOCK_LIMIT.
+//                                          also: { label, action } (B90) a second button above it, the same way
+//                                          (Try Again over Return on an install cancelled in iOS's prompt).
 //   p.reopen()                             "Running" again, for the next job of a run (progressHUD)
 //   p.stoppable(fn)                        F188: Cancel at the top right from now until finish (the IPA installs: iOS's
 //                                          own Install prompt can be cancelled, which would leave the page waiting for
@@ -112,7 +114,13 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
   const finishButton = el("button", "progress-finish");
   finishButton.type = "button";
   finishButton.hidden = true;
-  foot.append(statusText, track, finishButton);
+  // B90: finish({ also }) draws a second button above it (Try Again over Return)
+  const alsoButton = el("button", "progress-finish progress-also");
+  alsoButton.type = "button";
+  alsoButton.hidden = true;
+  alsoButton.style.order = "1"; // drawn above the finish button, after it in the DOM (the finish button stays first)
+  finishButton.style.order = "2";
+  foot.append(statusText, track, finishButton, alsoButton);
   body.append(scroll, jump, foot);
   sheet.append(bar, body);
   document.body.append(sheet);
@@ -283,7 +291,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     cancellable(on, { disabled = false } = {}) { cancel.hidden = custom || !on; cancel.disabled = Boolean(disabled); },
     stoppable(fn) { stop = typeof fn === "function" ? fn : null; rightButton(); },
     get stopping() { return Boolean(stop) && !finished; },
-    finish({ label = RETURN_LABEL, action = null, status = null, title: t = "Complete", locked: lock = false, unlockAfter = LOCK_LIMIT } = {}) {
+    finish({ label = RETURN_LABEL, action = null, status = null, title: t = "Complete", locked: lock = false, unlockAfter = LOCK_LIMIT, also = null } = {}) {
       flush();
       finished = true;
       clearTimeout(lockTimer);
@@ -310,6 +318,18 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
         finishButton.disabled = false;
         if (!keep) page.close();
       };
+      // B90: { label, action } a second button above the first, the same way (a truthy return keeps the page up)
+      alsoButton.hidden = locked || !also?.label;
+      alsoButton.textContent = also?.label ?? "";
+      alsoButton.disabled = false;
+      alsoButton.onclick = alsoButton.hidden ? null : async () => {
+        if (alsoButton.disabled) return;
+        alsoButton.disabled = true;
+        let keep = false;
+        try { keep = also.action ? await also.action() : false; } catch { keep = true; }
+        alsoButton.disabled = false;
+        if (!keep) page.close();
+      };
       rightButton();
       if (follow.shouldScroll()) toBottom();
     },
@@ -327,6 +347,8 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       track.hidden = false;
       cursor.hidden = false;
       finishButton.hidden = true;
+      alsoButton.hidden = true;
+      alsoButton.onclick = null;
       rightButton();
     },
     onClose(fn) { closers.push(fn); },
@@ -433,7 +455,7 @@ export function progressHUD(label = "Preparing", { open = openProgress, done: do
     if (percent != null) page.progress(percent);
   };
   set(label);
-  const end = (status, { label = doneLabel, action = null, locked = false } = {}) => {
+  const end = (status, { label = doneLabel, action = null, locked = false, title = undefined, also = null } = {}) => {
     if (ended) return;
     ended = true;
     if (locked) lockedPages.set(page, label);
@@ -442,7 +464,7 @@ export function progressHUD(label = "Preparing", { open = openProgress, done: do
     if (open?.size) return; // another job still runs on the page: it stays Running
     // B49: once one job on the page was iFizBox's own update, the page ends locked whichever job ends last
     if (lockedPages.has(page)) page.finish({ label: lockedPages.get(page), status, locked: true });
-    else page.finish({ label, action, status });
+    else page.finish({ label, action, status, ...(title ? { title } : {}), ...(also ? { also } : {}) });
   };
   return {
     set,
@@ -450,7 +472,8 @@ export function progressHUD(label = "Preparing", { open = openProgress, done: do
     hide: () => end(null),
     done: (t = "Done") => { if (!ended) { if (t !== last) page.step(t); last = t; } end(t); },
     fail: (message) => { if (!ended && message) page.error(message); end("Failed"); },
-    finish: ({ label = doneLabel, action = null, status = last, locked = false } = {}) => end(status, { label, action, locked }),
+    // B90: title ("Not Installed") in place of Complete, and also: { label, action }, a second button above
+    finish: ({ label = doneLabel, action = null, status = last, locked = false, title = undefined, also = null } = {}) => end(status, { label, action, locked, title, also }),
     get cancelled() { return cancelled; },
     signal: ctl?.signal ?? null,
     onCancel: (fn) => { if (typeof fn !== "function") return; if (cancelled) runStop(fn); else stops.push(fn); },

@@ -766,17 +766,18 @@ import { d1 } from "./src/d1-sqlite.js";
   const at = (path, init) => w.fetch(new Request("https://sign.example" + path, init), counted);
   const status = async (t) => (await at(`/sign/up/${t}/status`)).json();
   const tok = "f1".repeat(24), app = new Uint8Array([0x50, 0x4b, 1, 2, 3, 4]);
-  assert.deepEqual(await status(tok), { manifest: false, started: false, finished: false });
+  assert.deepEqual(await status(tok), { manifest: false, asked: false, started: false, finished: false });
   // the early link: iOS asks for the manifest (from its query) before anything is reserved
   let r = await at(`/sign/up/${tok}/manifest.plist?bundleid=com.you.ifizbox&version=1&title=iFizBox`);
   assert.equal(r.status, 200);
-  assert.deepEqual(await status(tok), { manifest: true, started: false, finished: false });
+  assert.deepEqual(await status(tok), { manifest: true, asked: false, started: false, finished: false });
   await at(`/sign/up/${tok}/manifest.plist?bundleid=com.you.ifizbox&version=1&title=iFizBox`); // asked again: no write
   await at(`/sign/upload?bundleid=com.you.ifizbox&version=1&title=iFizBox&token=${tok}`, { method: "POST" });
   await at(`/sign/upload?bundleid=com.you.ifizbox&version=1&title=iFizBox&token=${tok}&size=${app.length}`, { method: "POST" });
-  // the reservation and size writes leave iOS's mark alone; HEAD is no download
+  // the reservation and size writes leave iOS's mark alone; HEAD is no download, but iOS asked (B90)
+  assert.deepEqual(await status(tok), { manifest: true, asked: false, started: false, finished: false });
   assert.equal((await at(`/sign/up/${tok}/app.ipa`, { method: "HEAD" })).status, 200);
-  assert.deepEqual(await status(tok), { manifest: true, started: false, finished: false });
+  assert.deepEqual(await status(tok), { manifest: true, asked: true, started: false, finished: false });
   // GET held until done, then streamed whole: started, finished
   const held = at(`/sign/up/${tok}/app.ipa`);
   await at(`/sign/upload/${tok}/0`, { method: "PUT", body: app });
@@ -784,14 +785,14 @@ import { d1 } from "./src/d1-sqlite.js";
   r = await held;
   const whole = r.arrayBuffer();
   assert.deepEqual(new Uint8Array(await whole), app);
-  assert.deepEqual(await status(tok), { manifest: true, started: true, finished: true });
+  assert.deepEqual(await status(tok), { manifest: true, asked: true, started: true, finished: true });
   // a Range short of the end, and the download again: nothing more written
   const before = writes.filter((k) => k.endsWith(".ios")).length;
-  assert.equal(before, 3);
+  assert.equal(before, 4);
   await (await at(`/sign/up/${tok}/app.ipa`, { headers: { Range: "bytes=0-1" } })).arrayBuffer();
   await (await at(`/sign/up/${tok}/app.ipa`)).arrayBuffer();
   await at(`/sign/up/${tok}/manifest.plist`);
-  assert.equal(writes.filter((k) => k.endsWith(".ios")).length, 3);
+  assert.equal(writes.filter((k) => k.endsWith(".ios")).length, 4);
   // a Range short of the end on a fresh link starts but doesn't finish
   const t2 = "f2".repeat(24);
   await at(`/sign/upload?bundleid=com.a&version=1&title=A&token=${t2}`, { method: "POST" });
@@ -800,10 +801,20 @@ import { d1 } from "./src/d1-sqlite.js";
   await at(`/sign/upload/${t2}/done`, { method: "POST" });
   await (await at(`/sign/up/${t2}/manifest.plist`)).text();
   await (await at(`/sign/up/${t2}/app.ipa`, { headers: { Range: "bytes=0-2" } })).arrayBuffer();
-  assert.deepEqual(await status(t2), { manifest: true, started: true, finished: false });
+  assert.deepEqual(await status(t2), { manifest: true, asked: true, started: true, finished: false });
   await (await at(`/sign/up/${t2}/app.ipa`, { headers: { Range: "bytes=3-" } })).arrayBuffer();
-  assert.deepEqual(await status(t2), { manifest: true, started: true, finished: true });
+  assert.deepEqual(await status(t2), { manifest: true, asked: true, started: true, finished: true });
   assert.equal((await at(`/sign/up/xyz/status`)).status, 404);
+  // B90: "asked" lands while app.ipa is still held for the website's upload, before any byte goes out
+  const t3 = "f3".repeat(24);
+  await at(`/sign/upload?bundleid=com.a&version=1&title=A&token=${t3}`, { method: "POST" });
+  const held3 = at(`/sign/up/${t3}/app.ipa`);
+  let seen3 = false;
+  for (let i = 0; i < 100 && !seen3; i++) { seen3 = (await status(t3)).asked; if (!seen3) await new Promise((res) => setTimeout(res, 10)); }
+  assert.ok(seen3, "asked while held");
+  assert.equal((await status(t3)).started, false);
+  await at(`/sign/upload/${t3}/fail`, { method: "POST" });
+  assert.equal((await held3).status, 404);
   console.log("worker ios status: ok");
 }
 

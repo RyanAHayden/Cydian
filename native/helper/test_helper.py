@@ -1474,6 +1474,57 @@ class LocalDeb(unittest.TestCase):
                                  2 if answers.startswith("Z") else 0, out)
                 self.assertEqual(os.listdir(work), [])
 
+    def test_chain_seeds_archive(self):
+        """B70: an install puts the copy in apt's archive cache under apt's own name for that version for the run
+        (so apt doesn't fetch a source's copy of the same version and hash), and takes it out after; simulate-deb,
+        a control dpkg-deb can't read or isn't plain, and a name already in the cache leave the cache alone."""
+        control = "Package: com.example.shared\nVersion: 1:1.0~b1\nArchitecture: iphoneos-arm64\n"
+        name = "com.example.shared_1%3a1.0~b1_iphoneos-arm64.deb"
+        for verb, text, before, seeded in (
+                ("install-deb", control, None, True),
+                ("install-deb-ask", control, None, True),
+                ("simulate-deb", control, None, False),
+                ("install-deb", control, "apt's own", False),
+                ("install-deb", "junk", None, False),
+                ("install-deb", control.replace("iphoneos-arm64", "x/../y"), None, False),
+                ("install-deb", control + "Package: twice\n", None, False)):
+            with self.subTest(verb=verb, text=text, before=before):
+                p, app, helper, debs, work = self.chain()
+                archives = os.path.join(p, "var/cache/apt/archives")
+                os.makedirs(archives)
+                if before:
+                    with open(os.path.join(archives, name), "w") as f:
+                        f.write(before)
+                dpkg_deb = os.path.join(p, "usr/bin/dpkg-deb")  # dpkg-deb -f <deb> Package Version Architecture
+                with open(dpkg_deb, "w") as f:
+                    f.write('#!/bin/sh\n[ "$1" = -f ] && [ "$3" = Package ] && [ "$4" = Version ] && '
+                            '[ "$5" = Architecture ] && [ $# -eq 5 ] || exit 2\n'
+                            '[ "$(head -c 4 "$2")" = junk ] && exit 2\ncat "$2"\n')
+                os.chmod(dpkg_deb, 0o755)
+                with open(os.path.join(p, "usr/bin/apt-get"), "w") as f:
+                    f.write(f'#!/bin/sh\nfor a in "{archives}"/*; do echo "cached: ${{a##*/}} $(cat "$a")"; done\n'
+                            'echo "pmstatus:com.example.shared:50:Installing" >&3\nexit 0\n')
+                deb = self.deb(debs, text=text)
+                if verb == "install-deb-ask":
+                    r = subprocess.run([app, "spawn-ask", "close", helper, verb, deb], capture_output=True, text=True,
+                                       timeout=30, env={**os.environ, "TEST_ANSWERS": ""})
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    out = r.stdout.splitlines()
+                else:
+                    out = self.run_driver("spawn", helper, verb, deb, driver=app)
+                self.assertEqual(out[-1], "exit: 0", out)
+                cached = [l for l in out if l.startswith("1: cached: ")]
+                if seeded:
+                    self.assertEqual(cached, [f"1: cached: {name} {text.splitlines()[0]}"], out)
+                    self.assertEqual(os.listdir(archives), [])
+                elif before:
+                    self.assertEqual(cached, [f"1: cached: {name} {before}"], out)
+                    self.assertEqual(os.listdir(archives), [name])
+                else:
+                    self.assertEqual(cached, ["1: cached: * "], out)  # the glob matched nothing
+                    self.assertEqual(os.listdir(archives), [])
+                self.assertEqual(os.listdir(work), [])
+
     def test_chain_refuses(self):
         p, app, helper, debs, work = self.chain()
         good = self.deb(debs)

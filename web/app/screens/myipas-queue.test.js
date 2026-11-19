@@ -79,3 +79,25 @@ test("the IPA page's Install queues the entry while the Signing Server answers, 
   assert.equal(await queueLibraryInstall(undefined, { reachable: async () => true, add: () => assert.fail("queued") }), false);
   assert.equal(await queueLibraryInstall({ file: "B.ipa", error: "bad" }, { reachable: async () => true, add: () => assert.fail("queued") }), false);
 });
+
+test("B80: queueing an IPA that replaces another app with its bundle ID asks first; the job keys the record by its file", async () => {
+  const PLAIN = { file: "RyukGram.ipa", name: "RyukGram", bundleId: "com.burbn.instagram", version: "1.0", size: 1, signed: null };
+  const NOPLUG = { ...PLAIN, file: "RyukGram No Plugins.ipa", options: { name: "RyukGram No Plugins" } };
+  const shared = { "com.burbn.instagram": { file: "RyukGram.ipa", name: "RyukGram" } };
+  const installed = { "com.burbn.instagram": true };
+  const added = [];
+  const add = (j) => added.push(j);
+  const asked = [];
+  const cancel = async (a) => { asked.push(a.message); return { index: 0 }; };
+  assert.equal(await queueLibraryInstall(NOPLUG, { reachable: async () => true, add, installed, shared, alert: cancel }), "cancelled");
+  assert.deepEqual(added, [], "Cancel queues nothing");
+  assert.deepEqual(asked, ["RyukGram is already on this iPhone with the same ID. Installing RyukGram No Plugins will replace it."]);
+  assert.equal(await queueLibraryInstall(NOPLUG, { reachable: async () => true, add, installed, shared, alert: async () => ({ index: 1 }) }), true);
+  assert.equal(added[0].installed, "1.0", "queued as a reinstall over what's on the phone");
+  assert.equal(added[0].key, "library:RyukGram No Plugins.ipa");
+  // the one on the phone, and a lone ID, queue without asking
+  const never = () => assert.fail("asked");
+  assert.equal(await queueLibraryInstall(PLAIN, { reachable: async () => true, add, installed, shared, alert: never }), true);
+  assert.equal(await queueLibraryInstall(DELTA, { reachable: async () => true, add, installed: {}, shared: {}, alert: never }), true);
+  assert.equal(added.length, 3);
+});

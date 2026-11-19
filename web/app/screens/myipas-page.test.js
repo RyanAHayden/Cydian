@@ -3,7 +3,8 @@
 // (Sign, Unsign keeping the file, Delete) against a fake library, and which IPAs iOS has.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { libraryGroup, swipeDelete, deleteMany, selectButton, runManage, signMany, installedOf, buttonHud, paintPrice } from "./myipas.js";
+import { libraryGroup, swipeDelete, deleteMany, selectButton, runManage, signMany, installedOf, buttonHud, paintPrice,
+  sharedInstalls, sharedSections, confirmReplace } from "./myipas.js";
 import { priceTap, priceButton, listState, memoryIpaStore, siteEntries } from "../core/myipas.js";
 
 // A fake DOM good enough for nav/ui.js grouped() and the rows' decoration: class selectors only (installed.test.js's).
@@ -304,4 +305,60 @@ test("F224: the hold sheet's Delete still asks first ('Delete n IPAs'), then del
   assert.deepEqual(siteEntries(storage).map((e) => e.file), ["B.ipa"]);
   assert.deepEqual([...store.files.keys()], ["B.ipa"]);
   assert.deepEqual(listState(), { editing: false, armed: null, selected: [] });
+});
+
+// B80: two IPAs in the library with one bundle ID, one of them on the phone.
+const RYUK = [
+  { file: "RyukGram.ipa", name: "RyukGram", bundleId: "com.burbn.instagram", version: "1.0", size: 10 * MB, signed: null },
+  { file: "RyukGram No Plugins.ipa", name: "RyukGram", options: { name: "RyukGram No Plugins" }, bundleId: "com.burbn.instagram",
+    version: "1.0", size: 9 * MB, signed: null },
+  { file: "Delta.ipa", name: "Delta", bundleId: "com.x.delta", version: "1.5", size: 10 * MB, signed: null },
+];
+const RYUK_ON = { "com.burbn.instagram": true, "com.x.delta": true };
+
+test("B80: a shared bundle ID: only the IPA Installed's record names is Installed; the other says what it replaces", () => withDom(async () => {
+  const shared = await sharedInstalls(RYUK, RYUK_ON, { records: async () => [
+    { id: "com.burbn.instagram", name: "RyukGram", version: "1.0", key: "library:RyukGram.ipa" }, { id: "com.x.delta", name: "Delta" }] });
+  assert.deepEqual(shared, { "com.burbn.instagram": { file: "RyukGram.ipa", name: "RyukGram" } }, "an ID with one IPA is left out");
+  const g = libraryGroup(RYUK, { site: false, jailbreak: false, installed: RYUK_ON, shared });
+  assert.deepEqual(groupsOf(g).map((x) => [x.header, x.rows]),
+    [["Not Installed", ["RyukGram No Plugins.ipa"]], ["Installed", ["Delta.ipa", "RyukGram.ipa"]]]);
+  assert.equal(g.cellOf("RyukGram No Plugins.ipa").querySelector(".cell-subtitle").textContent,
+    "Replaces RyukGram · Version 1.0 · 9.0 MB · Not signed");
+  assert.equal(g.cellOf("RyukGram.ipa").querySelector(".cell-subtitle").textContent, "Version 1.0 · 10.0 MB · Not signed");
+  assert.equal(g.price("RyukGram No Plugins.ipa").textContent, "SIGN");
+  assert.equal(g.price("RyukGram.ipa").textContent, "OPEN");
+  // its install asks first: Cancel stops it, Replace goes on; the installed one and Delta don't ask
+  const asked = [];
+  const alert = async (a) => { asked.push(a); return { index: asked.length === 1 ? 0 : 1 }; };
+  assert.equal(await confirmReplace(RYUK[1], { shared, alert }), false);
+  assert.equal(await confirmReplace(RYUK[1], { shared, alert }), true);
+  assert.equal(asked[0].message, "RyukGram is already on this iPhone with the same ID. Installing RyukGram No Plugins will replace it.");
+  assert.deepEqual(asked[0].buttons, ["Cancel", "Replace"]);
+  assert.equal(await confirmReplace(RYUK[0], { shared, alert: () => assert.fail("asked") }), true);
+  assert.equal(await confirmReplace(RYUK[2], { shared, alert: () => assert.fail("asked") }), true);
+  // Sign (n): a cancelled replace skips that IPA and the run goes on
+  const runs = [];
+  const out = await signMany([RYUK[1], RYUK[2]], { isSite: false, hudFor: () => () => ({}), confirm: (e) => confirmReplace(e, { shared, alert: async () => ({ index: 0 }) }),
+    install: async ({ file }) => { runs.push(file); return "installed"; } });
+  assert.deepEqual(runs, ["Delta.ipa"]);
+  assert.deepEqual(out, ["cancelled", "installed"]);
+}));
+
+test("B80: the record's name and version match when there's no file key; nothing to tell them apart marks none Installed", async () => {
+  const byName = await sharedInstalls(RYUK, RYUK_ON, { records: async () => [{ id: "com.burbn.instagram", name: "RyukGram No Plugins", version: "1.0", key: null }] });
+  assert.deepEqual(byName, { "com.burbn.instagram": { file: "RyukGram No Plugins.ipa", name: "RyukGram No Plugins" } });
+  // both IPAs carry the name "RyukGram": a tie, so none
+  const tie = await sharedInstalls(RYUK, RYUK_ON, { records: async () => [{ id: "com.burbn.instagram", name: "RyukGram", version: "1.0" }] });
+  assert.deepEqual(tie, { "com.burbn.instagram": { file: null, name: "RyukGram" } });
+  // installed outside the app: no record
+  const none = await sharedInstalls(RYUK, RYUK_ON, { records: async () => [] });
+  assert.deepEqual(none, { "com.burbn.instagram": { file: null, name: "com.burbn.instagram" } });
+  const s = sharedSections(RYUK, { installed: RYUK_ON, shared: none });
+  assert.deepEqual(s.map((x) => [x.header, x.rows.map((r) => r.file)]),
+    [["Not Installed", ["RyukGram No Plugins.ipa", "RyukGram.ipa"]], ["Installed", ["Delta.ipa"]]]);
+  assert.ok(s[0].rows.every((r) => r.replaces === "com.burbn.instagram"));
+  assert.equal(await confirmReplace(RYUK[0], { shared: none, alert: async () => ({ index: 1 }) }), true);
+  // not on the phone: nothing shared, today's list
+  assert.deepEqual(await sharedInstalls(RYUK, { "com.x.delta": true }, { records: async () => assert.fail("read") }), {});
 });

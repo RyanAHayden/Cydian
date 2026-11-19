@@ -17,7 +17,10 @@
 //   ratingTile(r), sizeTile(text, price), sectionTile(name, sub), updatedTile(date, now)
 //   ratingsCard(r, { reviews, selected, onPick, pending }) -> the Reviews tab's ratings card: the average beside
 //     five tappable bars (F206: r.histogram, else the written `reviews` counted), .select(stars), .table, .rows
-//   reviewsGroup(reviews, renderText)      -> the review cells: title, stars, "by name – Version – date", text
+//     B82: { build: true } is an app page's This Build card (no header, ours alone, "Rated by people using this build.")
+//   appStoreCard(r, { name, seller })      -> B82: the App Store view's card: big average, stars, count, no bars, and
+//     "For <name> by <seller> on the App Store, not this build."
+//   reviewsGroup(reviews, renderText)    -> the review cells: title, stars, "by name – Version – date", text
 //   storeStars(rating, cls)                -> five stars filled to the rating (the App Store's orange)
 //
 // A rating r: { average (0-5), count, noun: "Ratings" | "Reviews", histogram?: [n5, n4, n3, n2, n1], from }.
@@ -86,7 +89,11 @@ export function storeHeader({ art, name, author = null, authorHref = null, line 
         return;
       }
       rating.dataset.state = "rated";
-      rating.replaceChildren(storeStars(r.average), ...(r.count ? [el("span", "store-head-count", `(${Number(r.count).toLocaleString("en-US")})`)] : []));
+      // B82: the App Store's, shown only when nobody rated this build here, says whose it is.
+      const count = r.count ? `(${Number(r.count).toLocaleString("en-US")})` : null;
+      const label = r.onAppStore ? [count, "on the App Store"].filter(Boolean).join(" ") : count;
+      rating.dataset.from = r.onAppStore ? "appstore" : "build";
+      rating.replaceChildren(storeStars(r.average), ...(label ? [el("span", "store-head-count", label)] : []));
     },
     setLine(t) { lineEl.textContent = t; },
     setAuthor,
@@ -216,6 +223,8 @@ export function worksOnTile(fit) {
 // F206: never null: no rating is "—" with "No Ratings" under it, so the tile stays and nothing moves.
 export function ratingTile(r) {
   if (!hasRating(r)) return { label: "Rating", value: "—", sub: "No Ratings" };
+  // B82: the App Store's (nobody rated this build here yet): the tile names it rather than drawing it as ours.
+  if (r.onAppStore) return { label: "Rating", value: (Math.round(r.average * 10) / 10).toFixed(1), sub: "App Store" };
   return { label: "Rating", value: (Math.round(r.average * 10) / 10).toFixed(1), stars: r.average };
 }
 // F206: the placeholder while the reviews load: a dash over grey empty stars (the filled tile's shape).
@@ -255,9 +264,13 @@ const validHistogram = (h) => (Array.isArray(h) && h.length === 5 && h.every((n)
 // is a button: onPick(stars) when tapped (the Reviews tab filters its list); card.select(stars | null) marks one.
 // `pending`: the skeleton drawn while the reviews load, the same shape (so filling it moves nothing).
 // No rating keeps the card, saying "No Ratings".
-export function ratingsCard(r, { reviews = null, selected = null, onPick = null, pending = false } = {}) {
+// B82: `build`: an app page's This Build card: no group header (the This Build / App Store toggle names it), ours alone,
+// and its line "Rated by people using this build. Bars from N ratings." or, with none, "Nobody has rated this build
+// yet. Be the first." (the card and its empty bars stay).
+export function ratingsCard(r, { reviews = null, selected = null, onPick = null, pending = false, build = false } = {}) {
   const g = el("div", "group store-ratings-group");
-  g.append(el("h2", "group-header", "Ratings"));
+  if (build) g.dataset.build = "true";
+  else g.append(el("h2", "group-header", "Ratings"));
   const card = el("div", "table grouped store-ratings");
   if (pending) card.dataset.pending = "true";
   const rated = !pending && hasRating(r);
@@ -304,7 +317,10 @@ export function ratingsCard(r, { reviews = null, selected = null, onPick = null,
     : given ? `Bars from ${plural(total, "rating")}.`
     : total ? `Bars from ${plural(total, "review")}.` : "No reviews to count yet.";
   const lead = rated && r.from ? String(r.from).replace(/([^.!?])$/, "$1.") : null;
-  card.append(el("div", "store-ratings-from", [lead, source].filter(Boolean).join(" ")));
+  const line = !build || pending ? [lead, source].filter(Boolean).join(" ")
+    : rated || total ? `Rated by people using this build. Bars from ${plural(total, "rating")}.`
+    : "Nobody has rated this build yet. Be the first.";
+  card.append(el("div", "store-ratings-from", line));
   g.append(card);
 
   const hint = onPick && !pending ? el("p", "group-footer store-ratings-hint", barsHint(null)) : null;
@@ -320,6 +336,26 @@ export function ratingsCard(r, { reviews = null, selected = null, onPick = null,
   g.select(selected);
   g.table = card;
   g.rows = rows;
+  return g;
+}
+
+// B82: the App Store view's one grouped card: the average big beside its stars and "50,123,456 Ratings" (no bars:
+// Apple gives no per-star counts), and a note row saying whose rating it is. r: { average, count } or null.
+export function appStoreCard(r, { name = null, seller = null } = {}) {
+  const g = el("div", "group store-appstore-group");
+  const card = el("div", "table grouped store-appstore");
+  const rated = hasRating(r) && Number(r.average) > 0;
+  const top = el("div", "store-appstore-top");
+  top.append(el("span", "store-appstore-big", rated ? (Math.round(r.average * 10) / 10).toFixed(1) : "—"));
+  const side = el("span", "store-appstore-side");
+  const n = Number(r?.count) || 0;
+  side.append(storeStars(rated ? r.average : 0), el("span", "store-appstore-count",
+    !rated ? "No Ratings" : n ? `${n.toLocaleString("en-US")} ${n === 1 ? "Rating" : "Ratings"}` : "Ratings"));
+  top.append(side);
+  const what = name ? `${name}${seller ? ` by ${seller}` : ""}` : "the original app";
+  card.append(top, el("div", "store-ratings-from store-appstore-note", `For ${what} on the App Store, not this build.`));
+  g.append(card);
+  g.table = card;
   return g;
 }
 

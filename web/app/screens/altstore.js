@@ -36,7 +36,7 @@ import { queueApp } from "./queue.js";
 import { descriptionGroup } from "./description.js";
 import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, updatedTile, whatsNewGroup } from "./storepage.js";
 import { reviewsTab } from "./reviews.js";
-import { reviewsApi, reviewsBase, mergeReviews } from "../core/reviews.js";
+import { reviewsApi, reviewsBase, pageRating } from "../core/reviews.js";
 import { needsCheck, savedInfo, withIpaInfo, checkIpa, ipaInfoUrl, ipaRaises } from "../core/ipainfo.js";
 import { PUBLIC_SITE } from "../core/handoff.js";
 import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText,
@@ -580,9 +580,9 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   let ratingKnown;
   const ratingReady = new Promise((res) => { ratingKnown = res; });
   const tabs = storeTabs({
-    // F182: reviews written here (screens/reviews.js), with the App Store's rating merged in.
-    // B37: and the App Store's written reviews, asked for only when the tab opens.
-    reviews: (pane) => reviewsTab(pane, { id: reviewId, version: v.version ?? "", appStore: withStoreReviews(ratingReady, looked), first: oursFirst, api: reviewApi,
+    // F182: reviews written here (screens/reviews.js). B82: This Build | App Store, never averaged; the App Store's
+    // written reviews are asked for only when its view first opens.
+    reviews: (pane) => reviewsTab(pane, { id: reviewId, version: v.version ?? "", build: true, appStore: appStoreTab(ratingReady, looked), first: oursFirst, api: reviewApi,
       onRating: (r) => { header.setRating(r); tiles.set("rating", ratingTile(r)); } }),
     related,
   });
@@ -599,15 +599,14 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   const merged = looked.then((store) => mergeDetails(app, store, need));
   merged.then((m) => {
     if (m.developer && !app.developerName) header.setAuthor(m.developer); // F161: the App Store's, when the source names none
-    if (m.rating != null) storeRating = { average: m.rating, count: m.ratingCount ?? null, noun: "Ratings", from: "App Store" };
-    header.setRating(storeRating);
-    tiles.set("rating", ratingTile(storeRating));
+    if (m.rating != null) storeRating = { average: m.rating, count: m.ratingCount ?? null, noun: "Ratings" };
     if (m.category) tiles.set("section", sectionTile(m.category, "App"));
     ratingKnown(storeRating);
   }, () => ratingKnown(null));
-  Promise.all([ratingReady, oursFirst]).then(([store, ours]) => { // F182: the stars count reviews written here too
-    if (!ours?.count) return;
-    const r = mergeReviews({ ours, appStore: store }).rating;
+  // B82: the header stars and the Rating tile: this build's when anyone rated it here, else the App Store's (marked
+  // "on the App Store"); never the two averaged. Drawn once both are known, so they don't flip from one to the other.
+  Promise.all([ratingReady, oursFirst]).then(([store, ours]) => {
+    const r = pageRating({ ours, appStore: store });
     header.setRating(r);
     tiles.set("rating", ratingTile(r));
   });
@@ -822,6 +821,14 @@ export function withStoreReviews(ratingReady, looked, opts = {}) {
   const list = Promise.resolve(looked).then((s) => (s ? appStoreReviews(s, opts) : []), () => []);
   return Promise.all([Promise.resolve(ratingReady).catch(() => null), list])
     .then(([r, reviews]) => (r || reviews.length ? { ...(r ?? {}), reviews } : null));
+}
+
+// B82: the Reviews tab's App Store view: Apple's rating (ratingReady), the app's App Store name and seller, and its
+// written reviews as a function, asked only when the view first opens. Null when the App Store doesn't have the app
+// (the tab then shows This Build alone, no toggle).
+export function appStoreTab(ratingReady, looked, opts = {}) {
+  return Promise.all([Promise.resolve(ratingReady).catch(() => null), Promise.resolve(looked).catch(() => null)])
+    .then(([r, s]) => (s ? { ...(r ?? {}), name: s.trackName || null, seller: s.developer || null, reviews: () => appStoreReviews(s, opts) } : null));
 }
 
 // F160: localStorage, or null where it's blocked.

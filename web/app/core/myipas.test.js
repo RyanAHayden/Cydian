@@ -74,12 +74,26 @@ test("the website's library: links kept on this device, one entry per link, uniq
   assert.deepEqual(a, { file: "Delta.ipa", url: "https://x.test/Delta.ipa", name: "Delta", added: "2026-11-17T00:00:00.000Z" });
   assert.equal(addSiteUrl(s, "https://x.test/Delta.ipa").file, "Delta.ipa"); // the same link: the same entry
   assert.equal(addSiteUrl(s, "https://y.test/Delta.ipa").file, "Delta 2.ipa");
-  assert.equal(addSiteUrl(s, "https://y.test/get?id=1").file, "App.ipa");
+  assert.equal(addSiteUrl(s, "https://y.test/get?id=1", 0, { name: "Big Game" }).file, "Big Game.ipa");
   assert.throws(() => addSiteUrl(s, "javascript:alert(1)"), /https/);
   assert.throws(() => addSiteUrl(s, "nonsense"), /link/);
   assert.equal(siteEntries(s).length, 3);
   removeSiteUrl(s, "Delta.ipa");
-  assert.deepEqual(siteEntries(s).map((e) => e.file), ["Delta 2.ipa", "App.ipa"]);
+  assert.deepEqual(siteEntries(s).map((e) => e.file), ["Delta 2.ipa", "Big Game.ipa"]);
   s.setItem("ifizbox.myIpas", "{broken");
   assert.deepEqual(siteEntries(s), []);
+});
+
+test("addSiteUrl refuses a link that isn't an .ipa, unless the page named the app; no 'App' entry", () => {
+  const s = memoryStorage();
+  assert.throws(() => addSiteUrl(s, "https://example.com/page"), /doesn't end in \.ipa/);
+  assert.throws(() => addSiteUrl(s, "https://example.com"), /doesn't end in \.ipa/);
+  assert.throws(() => addSiteUrl(s, "https://example.com/get?id=1", 0, { name: "  " }), /doesn't end in \.ipa/);
+  assert.throws(() => addSiteUrl(s, "https://example.com/get?id=1", 0, { name: "..." }), /doesn't end in \.ipa/);
+  assert.deepEqual(siteEntries(s), []);
+  assert.equal(addSiteUrl(s, "https://example.com/dl/x.ipa").file, "x.ipa");
+  const named = addSiteUrl(s, "https://example.com/get?id=7", 0, { name: "Big Game", version: "2" });
+  assert.equal(named.file, "Big Game.ipa");
+  assert.equal(named.name, "Big Game");
+  assert.deepEqual(siteEntries(s).map((e) => e.file), ["x.ipa", "Big Game.ipa"]);
 });

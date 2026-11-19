@@ -72,6 +72,7 @@ const TITLES = {
   network: "Download Failed",
   timeout: "Download Failed",
   bad_ipa: "Not an IPA",
+  not_ipa: "Not an IPA",
   install: "Install Failed",
   helper: "Install Failed",
   sideload: "Not Available",
@@ -122,6 +123,7 @@ export function ipaError(err, name = "") {
     case "timeout": message = `The download of ${app} took too long. Check the connection and try again.`; break;
     case "network": message = `${NAME} couldn't download ${app}: ${said || "no connection"}.`; break;
     case "bad_ipa": message = `What the link gave isn't an iOS app (${said}).`; break;
+    case "not_ipa": message = "That link didn't give an IPA: it may be a web page or another kind of file."; break;
     case "helper": message = `${NAME}'s helper couldn't run (${said}). Reinstall ${NAME} from your package manager.`; break;
     case "sideload": message = `Installing IPAs this way needs the jailbreak build of ${NAME}.`; break;
     default: message = `iOS didn't install ${app}${said ? `: ${said}` : "."}`;

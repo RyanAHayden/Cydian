@@ -157,11 +157,19 @@ enum MyIPAs {
             case .success(let f): tmp = f
             }
             SignBridge.queue.async {
+                // What came back must be an IPA (a zip with one Payload/<App>.app/Info.plist): a web page or any
+                // other file is refused and deleted, never kept under the link's name or "App".
+                let d: AppDetails
+                do { d = try Inspect.ipa(tmp) } catch {
+                    try? FileManager.default.removeItem(at: tmp)
+                    return Apt.reply(c, nil, "not_ipa: That link didn't give an IPA (it may be a web page or another kind of file).")
+                }
                 do {
                     // A link that doesn't end in .ipa (a redirect, ?download=1): named after the app inside.
                     var name = url.lastPathComponent
-                    if !name.lowercased().hasSuffix(".ipa"), let d = try? Inspect.ipa(tmp) {
-                        name = [d.name, d.version].filter { !$0.isEmpty }.joined(separator: " ")
+                    if !name.lowercased().hasSuffix(".ipa") {
+                        let n = [d.name.isEmpty ? d.bundleID : d.name, d.version].filter { !$0.isEmpty }.joined(separator: " ")
+                        name = n + ".ipa"
                     }
                     let file = try library.add(tmp, name: name, move: true)
                     var out = list(keep(c))

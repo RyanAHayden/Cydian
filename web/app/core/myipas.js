@@ -137,7 +137,7 @@ function saveSite(storage, list) {
 }
 
 // Adds a link (an https URL to an .ipa); the same link twice is one entry. Answers the entry. Throws on a link
-// that isn't http(s).
+// that isn't http(s), and on one that doesn't end in .ipa when about.name doesn't name the app.
 export function addSiteUrl(storage, url, now = Date.now(), about = null) {
   const u = String(url ?? "").trim();
   let parsed;
@@ -152,7 +152,10 @@ export function addSiteUrl(storage, url, now = Date.now(), about = null) {
     saveSite(storage, list.map((e) => (e === had ? next : e)));
     return next;
   }
-  const base = nameFromUrl(parsed.href) || (extra.name ? `${extra.name.replace(/[\u0000-\u001f\u007f:\\/]/g, "").replace(/^\.+/, "").trim() || "App"}.ipa` : "App.ipa");
+  // The browser can't look inside the link, so it has to end in .ipa unless the page that sent it named the app.
+  const named = extra.name ? extra.name.replace(/[\u0000-\u001f\u007f:\\/]/g, "").replace(/^\.+/, "").trim() : "";
+  const base = nameFromUrl(parsed.href) || (named ? `${named}.ipa` : "");
+  if (!base) throw new Error("That link doesn't end in .ipa.");
   const taken = new Set(list.map((e) => e.file));
   let file = base;
   for (let n = 2; taken.has(file); n++) file = `${base.slice(0, -4)} ${n}.ipa`;

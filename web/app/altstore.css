@@ -53,6 +53,9 @@ html[data-theme="dark"] .perm-more .cell-label { color: var(--dk-link); }
 /* F194: an app page's Share on the header's right edge (screens/handoff.js headerShareButton), where the iOS 6 App
    Store's price/install button sat: the nav bar's bar button and action glyph (ios6.css .bar-button.share-button). */
 .store-head .store-head-share { flex: none; align-self: flex-start; margin-top: 21px; } /* level with the icon's middle (72pt icon, 30pt button), as iOS 6's price button */
+/* B99: a long name or author ellipsises clearly short of the button: 8pt on top of the header's 12pt gap, only where a
+   button is there (a header without one keeps the full width). */
+.store-head .store-head-share { margin-left: 8px; }
 
 /* F210: the app page's Installed toggle in the nav bar (screens/altstore.js markToggle), left of Install / Modify: a
    narrow bordered bar button (the Share button's approach, ios6.css .bar-button.share-button) holding a circled

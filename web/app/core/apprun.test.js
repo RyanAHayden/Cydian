@@ -225,3 +225,52 @@ test("status and percent while it runs", () => {
   rows[0].state = "installed";
   assert.equal(runStatus(rows), "Signing B (2 of 2)");
 });
+
+// B76: a stock phone loses sight of iOS's install once iFizBox is in the background; that isn't a refusal.
+test("B76: installed:false after a served or backgrounded handoff ends as sent (unsure), not failed; confirm upgrades it", async () => {
+  const ph = phone();
+  const lines = [];
+  const rows = appRows(jobs("a", "b", "c"));
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, ahead: 3, onLog: (l) => lines.push(l.text) });
+  const end = run.start();
+  await flush();
+  ph.signed("a"); ph.signed("b"); ph.signed("c");
+  await flush();
+  // a: the shell says iOS had the whole IPA
+  ph.pending.install.get("a").resolve({ installed: false, handedOff: true });
+  await flush();
+  // b: iFizBox went to the background while iOS had it
+  assert.equal(run.current?.id, "b");
+  assert.equal(run.away(), true);
+  ph.pending.install.get("b").resolve({ installed: false });
+  await flush();
+  // c: refused while iFizBox stayed in front
+  ph.pending.install.get("c").resolve({ installed: false });
+  await end;
+  assert.deepEqual(rows.map((r) => [r.state, r.unsure]), [["installed", true], ["installed", true], ["failed", false]]);
+  assert.equal(rowStatus(rows[0]), "Sent to iOS");
+  assert.equal(rowStatus(rows[2]), "Failed: iOS didn't install it");
+  assert.ok(lines.includes("Sent A to iOS") && lines.includes("Sent B to iOS"));
+  assert.equal(summaryLine(rows), "2 installed, 1 failed");
+  // back in front, iOS has a: Installed
+  assert.equal(run.confirm("a"), true);
+  assert.equal(rowStatus(rows[0]), "Installed");
+  assert.equal(lines.at(-1), "Installed A");
+  assert.equal(run.confirm("a"), false);
+  assert.equal(run.confirm("c"), false);
+  assert.equal(run.away(), false); // nothing with iOS
+});
+
+test("B76: away() before a row reaches iOS doesn't excuse that row's refusal", async () => {
+  const ph = phone();
+  const rows = appRows(jobs("a"));
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install });
+  const end = run.start();
+  await flush();
+  assert.equal(run.away(), false); // still signing
+  ph.signed("a");
+  await flush();
+  ph.pending.install.get("a").resolve({ installed: false });
+  await end;
+  assert.equal(rows[0].state, "failed");
+});

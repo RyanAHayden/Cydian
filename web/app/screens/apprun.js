@@ -18,6 +18,8 @@
 //     iFizBox's own IPA went to iOS, which closes iFizBox to install it.
 //
 // What iOS took leaves the queue (and is recorded for Installed) as it goes; failed and cancelled apps stay queued.
+// An app handed to iOS while iFizBox was in the background ends "Sent to iOS", and turns Installed once iOS says it has
+// it when iFizBox is back in front (followHandoff, B76).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "../nav/ui.js";
 import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL } from "../nav/progress.js";
@@ -32,7 +34,34 @@ export function phoneLanes(sc, { native } = {}) {
     sign: (r, { signal, progress }, log = () => {}) => sc.prepareOnDevice(r.job, { tag: tagOf(r), signal, progress, log, native }),
     install: (r, { signal, progress }, log = () => {}) => sc.openPrepared(r, { tag: tagOf(r), signal, progress, log, host: isSelf(r), native }),
     discard: (r) => sc.discardPrepared(r.token, native),
+    // B76: which of these apps iOS has now ({ bundleId: true | false | null }); apps.isInstalled works in both builds
+    isInstalled: async (bundleIds) => {
+      const n = native ?? globalThis.ifizboxNative;
+      if (!n?.call) return {};
+      try { return (await n.call("apps.isInstalled", { bundleIds }))?.installed ?? {}; } catch { return {}; }
+    },
   };
+}
+
+// B76: iFizBox leaving the screen while an app is with iOS hands that app to iOS (run.away(): a false from the watch
+// then reads "Sent to iOS", not Failed), and coming back asks iOS which "Sent to iOS" rows it has (run.confirm: Installed).
+// Also asked when such a row ends while iFizBox is in front. -> { check, stop }
+export function followHandoff(run, rows, { isInstalled, doc = globalThis.document } = {}) {
+  const hidden = () => doc?.visibilityState === "hidden";
+  let asking = false;
+  const check = async () => {
+    if (!isInstalled || asking || hidden()) return;
+    const sent = rows.filter((r) => r.state === "installed" && r.unsure && r.mode !== "resign" && r.bundleId && !isSelf(r));
+    if (!sent.length) return;
+    asking = true;
+    let answer = {};
+    try { answer = (await isInstalled(sent.map((r) => r.bundleId))) ?? {}; } catch { /* unknown: they stay sent */ }
+    asking = false;
+    for (const r of sent) if (answer[r.bundleId] === true) run.confirm(r.id);
+  };
+  const onVisibility = () => { if (hidden()) run.away(); else check(); };
+  doc?.addEventListener?.("visibilitychange", onVisibility);
+  return { check, stop: () => doc?.removeEventListener?.("visibilitychange", onVisibility) };
 }
 
 // jobs: the app queue's (core/appqueue.js). deps: { queue, lanes ({ sign, install, discard }, phoneLanes's),
@@ -113,11 +142,15 @@ export async function runAppRun(jobs, deps) {
         if (isSelf(r)) sentSelf = true;
         queue.clear(r.id);
         Promise.resolve().then(() => record(r.job)).catch(() => {}); // no store: Installed won't list it
+        if (r.unsure) Promise.resolve().then(() => handoff?.check()); // B76: iOS may have it already
       }
       tick();
     },
     onLog: ({ id, kind, text }) => line(kind, text, id),
   });
+  const isInstalled = deps.isInstalled ?? lanes.isInstalled;
+  const handoff = followHandoff(run, rows, { isInstalled, ...(deps.doc ? { doc: deps.doc } : {}) });
+  page.onClose?.(() => handoff.stop());
   let tickQueued = false;
   const tick = () => {
     if (tickQueued) return;

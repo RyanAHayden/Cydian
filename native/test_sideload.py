@@ -305,3 +305,29 @@ class HandoffSourceTest(unittest.TestCase):
         self.assertIn("resign(c, allowHost: false) { $0 }", side)
         self.assertIn("Sideload.servers(c, allowHost: false)", lib)
         self.assertIn("serveAndOpen(out, server: servers.manifest,", lib)
+
+    def body(self, text, start):
+        i = text.index(start)
+        return text[i:text.index("\n    }\n", i)]
+
+    def test_handoff_not_refusal(self):
+        """B76: signing.progress's false after a handoff (iOS fetched the whole IPA, or iFizBox went to the
+        background during the watch) is lost sight, not a refusal: it answers installed null + handedOff true."""
+        side = self.files["Sideload.swift"]
+        handoff = side[side.index("enum Handoff {"):]
+        handoff = handoff[:handoff.index("\n}\n")]
+        self.assertIn("away || (served && !seen)", handoff)
+        # each serve starts clean, and onServed marks it
+        self.assertIn("Handoff.reset(app.bundleID)", side)
+        self.assertIn('onServed: { serverLog("iOS has the whole IPA"); Handoff.served(bid); end(true) }', side)
+        watch = self.body(side, "    static func watch(")
+        self.assertIn("UIApplication.didEnterBackgroundNotification", watch)
+        self.assertIn("{ _ in away = true }", watch)
+        self.assertIn("nc.removeObserver(bg)", watch)
+        self.assertIn("if installed == false, lost(seen, away) { return finish(nil, true) }", watch)
+        self.assertIn("Handoff.servedQuiet { return done(false) }", watch)
+        # every end of the watch goes through done(), so the observer is always removed and lost() always asked
+        self.assertNotIn("return finish(", watch.replace("return finish(nil, false) }", "").replace("return finish(nil, true) }", ""))
+        progress = self.body(side, "    static func progress(")
+        self.assertIn("Handoff.lostSight(served: Handoff.wasServed(bid), away: away, seen: seen)", progress)
+        self.assertIn('"handedOff": handedOff', progress)

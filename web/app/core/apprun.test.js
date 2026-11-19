@@ -275,9 +275,9 @@ test("B76: away() before a row reaches iOS doesn't excuse that row's refusal", a
   assert.equal(rows[0].state, "failed");
 });
 
-// B85: a multi-app run after the downloads: each app gets its own turn with iOS's prompt; a prompt the user closed
-// cancels that app only (retryable) and never hangs the run; the asking row's tap asks iOS for the prompt again.
-test("B85: a dismissed prompt cancels that app only; the second app still goes to iOS and the run ends", async () => {
+// B85: a multi-app run after the downloads: each app gets its own turn with iOS's prompt; a prompt that closed with
+// no download fails that app only (B91: "iOS didn't download it", not Cancelled) and never hangs the run.
+test("B85/B91: a dismissed prompt fails that app only (iOS didn't download it); the second app still goes to iOS", async () => {
   const ph = phone();
   const lines = [];
   const rows = appRows(jobs("a", "b"));
@@ -290,9 +290,10 @@ test("B85: a dismissed prompt cancels that app only; the second app still goes t
   // the shell: iOS's prompt for a closed and iOS never asked for the IPA
   ph.pending.install.get("a").resolve({ installed: false, dismissed: true });
   await flush();
-  assert.equal(rows[0].state, "cancelled");
-  assert.equal(rowStatus(rows[0]), "Cancelled on the iOS prompt");
-  assert.ok(lines.includes("Cancelled A on the iOS prompt"));
+  assert.equal(rows[0].state, "failed");
+  assert.equal(rowStatus(rows[0]), "Failed: iOS didn't download it");
+  assert.ok(lines.includes("A: iOS didn't download it"));
+  assert.ok(!lines.some((l) => /Cancelled/.test(l)));
   // b gets its own prompt
   assert.deepEqual(ph.events.filter((e) => e.startsWith("install")), ["install:a", "install:b"]);
   assert.equal(run.current?.id, "b");
@@ -300,9 +301,9 @@ test("B85: a dismissed prompt cancels that app only; the second app still goes t
   ph.installed("b");
   await end;
   assert.equal(run.running, false);
-  assert.deepEqual(rows.map((r) => r.state), ["cancelled", "installed"]);
-  assert.equal(summaryLine(rows), "1 installed, 1 cancelled");
-  // retryable: it signs again and goes to iOS again, the dismissed mark cleared
+  assert.deepEqual(rows.map((r) => r.state), ["failed", "installed"]);
+  assert.equal(summaryLine(rows), "1 installed, 1 failed");
+  // no reprompt lane (the website): Try Again signs it again and goes to iOS again, the dismissed mark cleared
   const again = run.retry("a");
   assert.ok(again);
   assert.equal(rows[0].dismissed, false);
@@ -327,8 +328,73 @@ test("B85: a dismissed answer on the last app still ends the run (no stuck wait)
   await flush();
   ph.pending.install.get("b").resolve({ installed: false, dismissed: true });
   await end;
-  assert.deepEqual(rows.map((r) => r.state), ["failed", "cancelled"]);
+  assert.deepEqual(rows.map((r) => r.state), ["failed", "failed"]);
   assert.equal(rowStatus(rows[0]), "Failed: iOS didn't install it");
+  assert.equal(rowStatus(rows[1]), "Failed: iOS didn't download it");
+});
+
+// B91: the row iOS didn't download: its Try Again offers the IPA the shell still serves (hooks.again, no new
+// signing); only that tap opens a new prompt. When the shell no longer serves it ("gone") the row signs again.
+test("B91: Try Again on a row iOS didn't download goes back to iOS's prompt without signing again", async () => {
+  const ph = phone();
+  const lines = [];
+  const rows = appRows(jobs("a"));
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, reprompt: async () => true,
+    onLog: (l) => lines.push(l.text) });
+  const end = run.start();
+  await flush();
+  ph.signed("a");
+  await flush();
+  ph.pending.install.get("a").resolve({ installed: false, dismissed: true });
+  await end;
+  assert.equal(rowStatus(rows[0]), "Failed: iOS didn't download it");
+  // nothing more goes to the phone by itself
+  await flush();
+  assert.deepEqual(ph.events, ["sign:a", "install:a"]);
+  const again = run.retry("a");
+  assert.ok(again);
+  await flush();
+  assert.deepEqual(ph.events, ["sign:a", "install:a", "install:a"]); // no second sign
+  assert.equal(ph.pending.install.get("a").hooks.again, true);
+  assert.equal(rows[0].state, "asking");
+  assert.equal(rowStatus(rows[0]), "Tap Install on the iOS prompt");
+  ph.installed("a");
+  await again;
+  assert.equal(rows[0].state, "installed");
+  assert.equal(summaryLine(rows), "1 installed");
+});
+
+test("B91: Try Again when the shell no longer serves the IPA signs it again; a plain failure always signs again", async () => {
+  const ph = phone();
+  const lines = [];
+  const rows = appRows(jobs("a", "b"));
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, reprompt: async () => true,
+    onLog: (l) => lines.push(l.text) });
+  const end = run.start();
+  await flush();
+  ph.signed("a"); ph.signed("b");
+  await flush();
+  ph.pending.install.get("a").resolve({ installed: false, dismissed: true });
+  await flush();
+  ph.pending.install.get("b").resolve({ installed: false });
+  await end;
+  const again = run.retryAll();
+  await flush();
+  // a goes back to iOS (again), b signs from the start
+  assert.equal(ph.pending.install.get("a").hooks.again, true);
+  assert.deepEqual(ph.events.slice(4), ["sign:b", "install:a"]);
+  ph.pending.install.get("a").reject(Object.assign(new Error("no longer served"), { code: "gone" }));
+  await flush();
+  assert.ok(ph.events.slice(4).includes("sign:a"));
+  assert.ok(lines.includes("A is no longer with iOS; signing it again"));
+  ph.signed("a"); ph.signed("b");
+  await flush();
+  assert.equal(ph.pending.install.get("a").hooks.again, undefined);
+  ph.installed("a");
+  await flush();
+  ph.installed("b");
+  await again;
+  assert.equal(summaryLine(rows), "2 installed");
 });
 
 test("B85: the asking row's reprompt asks the phone again and logs it; only while that app is with iOS", async () => {

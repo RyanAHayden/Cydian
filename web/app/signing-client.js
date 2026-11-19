@@ -399,7 +399,9 @@ export async function followSelfUpdate(h, { native, retry = null } = {}) {
 //                                      phase "downloading" | "signing"; the signal's abort sends signing.cancel {tag}
 //   await openPrepared(row, { tag, signal, progress, log, host, wait })   hand it to iOS (progress("asking")), then
 //                                      wait for iOS's install (progress("installing", f)) -> { installed, expires,
-//                                      dismissed? (B85: the user closed iOS's prompt) };
+//                                      dismissed? (B85: iOS's prompt closed and iOS never asked for the IPA) };
+//                                      again (B91): signing.reprompt instead of signing.open (the IPA is still
+//                                      served), then the same wait; throws code "gone" when it isn't
 //                                      host (iFizBox's own) doesn't wait: iOS closes iFizBox to install it
 //   await repromptPrepared(row)        B85: iOS's Install prompt for that app again (signing.reprompt) -> true | false
 //   discardPrepared(token)             frees a signed copy that won't be installed
@@ -448,10 +450,15 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
   } catch (e) { throw rowError(e, job?.name || job?.id || ""); }
 }
 
-export async function openPrepared(row, { tag, signal = null, progress = () => {}, log = () => {}, host = false, wait = ASK_WAIT, native } = {}) {
+export async function openPrepared(row, { tag, signal = null, progress = () => {}, log = () => {}, host = false, wait = ASK_WAIT, native, again = false } = {}) {
   const name = row?.name || row?.id || "";
   let opened;
-  try {
+  if (again && !host) {
+    // B91: a row iOS didn't download, tapped: the shell's IPA (still served) gets iOS's prompt again, no new signing;
+    // code "gone" when it isn't served any more
+    if (!(await repromptPrepared(row, native))) throw Object.assign(new Error("no longer served"), { code: "gone" });
+    opened = { bundleId: row.bundleId, expires: row.expires ?? null };
+  } else try {
     opened = await abortable(native, "signing.open", { token: row.token, manifestServer: getServer(), ...(host ? { host: true } : {}) },
       (ev) => { if (ev?.log) log(ev.log); }, { tag, signal });
   } catch (e) { throw rowError(e, name); }

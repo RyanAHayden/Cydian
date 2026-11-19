@@ -31,6 +31,12 @@ Then I searched "you" from the Recent row and scrolled to the bottom. Screenshot
   redrew with its "Other device" rows back (ZodTTD & MacCiti archive ringtones and so on).
 I switched it back OFF afterwards, so the phone is left as I found it, with this branch's build installed.
 
+## Reopened session (2026-11-18)
+
+The run reopened B33 unticked, but commit 6b4f968 (the code, the tests and this journal) was already on main. I
+checked it again: the extras and search tests pass (16/16), the B33 filter code is in extras.js and search.js, and
+both device screenshots show what the brief asks for. I made no code change and only ran the gate to tick the task.
+
 ## Not verified
 
 - I didn't see the "every row hidden, no group" case on the device: "you" always has some compatible rows. The node

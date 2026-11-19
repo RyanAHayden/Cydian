@@ -3,7 +3,8 @@
 // HUD says Downloading, Signing, Uploading. Errors (zsign's own, the server's) end in an alert.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { signInBrowser, downloadIpa, uploadSigned, runInWorker, getBring, setBring } from "./signing-client.js";
+import { signInBrowser, downloadIpa, uploadSigned, runInWorker, getBring, setBring, siteCause, siteRefusal } from "./signing-client.js";
+import { notInProfileText } from "./core/signing.js";
 
 const ID = { p12: new Uint8Array([0x30, 1]), profile: new Uint8Array([2, 3]), password: "pw", passwordOk: true };
 const IPA = new Uint8Array([0x50, 0x4b, 3, 4, 5, 6, 7, 8, 9, 10]);
@@ -150,4 +151,35 @@ test("Bring My Certificate: on unless turned off", () => {
     setBring(true);
     assert.equal(getBring(), true);
   } finally { globalThis.localStorage = saved; }
+});
+
+// F256: the UDID F253's profile found (screens/signing.js storedUdid) checked against the profile on the website.
+const SEVEN = "00008030-001A2B3C4D5E6F70";
+const listing = (...udids) => new TextEncoder().encode(`xx<?xml version="1.0"?><plist version="1.0"><dict><key>ProvisionedDevices</key><array>${udids.map((u) => `<string>${u}</string>`).join("")}</array></dict></plist>xx`);
+
+test("siteCause: names the stored UDID when it isn't listed, drops out when it is, guesses without one", () => {
+  const id = { profile: listing("aaaa", "bbbb") };
+  assert.match(siteCause(id, "Foo", { udid: SEVEN }), new RegExp(`Add its UDID ${SEVEN} to the developer account`));
+  assert.equal(siteCause({ profile: listing("aaaa", SEVEN.toLowerCase()) }, "Foo", { udid: SEVEN }), null);
+  assert.match(siteCause(id, "Foo", null), /likely cause.*\(it lists 2 devices\)/);
+  assert.equal(siteRefusal(id, null), null);
+  assert.equal(siteRefusal({ profile: listing(SEVEN) }, { udid: SEVEN }), null);
+  assert.equal(siteRefusal(id, { udid: SEVEN }), notInProfileText(SEVEN));
+  assert.equal(siteRefusal({ profile: new Uint8Array([1]) }, { udid: SEVEN }), null, "an unreadable profile: no refusal");
+});
+
+test("Install on the website refuses before downloading when the stored UDID isn't in the profile", async () => {
+  const srv = fakeServer();
+  const { d, log } = deps({ fetcher: srv.fetcher, identity: async () => ({ ...ID, profile: listing("aaaa") }), phone: async () => ({ udid: SEVEN }) });
+  assert.equal(await signInBrowser({ url: "https://a.example/x.ipa", name: "X" }, d), false);
+  assert.deepEqual(log.alerts.map((a) => [a.title, a.message]), [["iPhone Not in Profile", notInProfileText(SEVEN)]]);
+  assert.deepEqual(srv.calls, [], "nothing downloaded");
+  assert.deepEqual(log.jobs, [], "nothing signed");
+  // listed, or no UDID kept (or reading it fails): the install goes on
+  for (const phone of [async () => ({ udid: SEVEN }), async () => null, async () => { throw new Error("blocked"); }]) {
+    const s = fakeServer();
+    const r = deps({ fetcher: s.fetcher, identity: async () => ({ ...ID, profile: listing(SEVEN) }), phone });
+    assert.equal(await signInBrowser({ url: "https://a.example/x.ipa", name: "X" }, r.d), true);
+    assert.equal(r.log.jobs.length, 1);
+  }
 });

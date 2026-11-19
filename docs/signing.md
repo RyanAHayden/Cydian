@@ -23,7 +23,16 @@ iOS's install prompt.
   Remove Certificate. Until signing is set up, Home has the Signing tile beside Featured.
 - **Install** (an app's page, first row; the nav bar's Install runs it): `signing-client.js signInBrowser`:
   1. *Downloading*: the IPA through the Worker's `/api/fetch?url=…&kind=ipa` (most hosts send no CORS headers),
-     streamed, up to 512 MB (`MAX_UPLOAD_MB`).
+     streamed, up to 512 MB (`MAX_UPLOAD_MB`). The Worker hands the upstream body on untouched (no JS per chunk:
+     a TransformStream there ran a 104 MB IPA out of Worker CPU, `exceededCpu`, and cut it short), with
+     `Content-Length` and `X-IPA-Length` (the whole app's size, also on a 206). So the browser checks the cap and
+     the length itself (`downloadIpa`). A body that breaks off ("Load failed") or ends short of `X-IPA-Length` is
+     resumed from the bytes already here: the next request sends `Range: bytes=n-`, which `/api/fetch?kind=ipa`
+     passes upstream (only that form; others are dropped) and answers with the upstream's 206 and `Content-Range`.
+     Up to `CUT_TRIES` (5) more tries, each of which has to bring more bytes; an answer that isn't the asked-for
+     part (a 200, or a `Content-Range` starting elsewhere) starts again from byte 0. Cancel isn't retried. When it
+     gives up, the alert says "The app's download broke off before the end. Check the connection and tap Install
+     again." (`CUT_TEXT`).
   2. *Signing*: `signing-worker.js` (a module Web Worker) runs `websign-job.js`: unzip, read `Info.plist`, the
      IDs (`core/websign.js signingIds`, see "Keep Bundle IDs" below), the profile's entitlements narrowed to the
      profile's App ID (`appEntitlements`, never `get-task-allow`), then zsign on the folder (`-b` only when the app
@@ -38,6 +47,14 @@ iOS's install prompt.
   token (`POST /sign/upload?token=`, no size), then signs and uploads into it (`&token=&size=`). The Worker holds
   iOS's `app.ipa` up to 2 minutes: headers once the upload has started, the body once it's done. A different bundle
   ID out of zsign, a failed reservation, or more than 8 minutes (iOS retries a held `app.ipa` for 5+ minutes) fall back to the Ready to Install alert.
+  When the early link won't get this app (signing failed or was cancelled, no certificate, or a different bundle
+  ID out of zsign), the website drops it (`dropEarly`, not awaited, never throws): `POST /sign/upload/<token>/fail`
+  marks the token failed, and from then on the Worker answers its manifest and `app.ipa` (also a request it's
+  holding) with 404 "That install was stopped: the app couldn't be signed." instead of holding them. Before, iOS
+  waited on an app that never came and left a blank icon on the Home Screen. A token whose parts have started
+  coming in is refused (409), and a failed token can't be reserved or uploaded into again (409, "That token is
+  taken."). When iOS was already sent to the link, the failure alert ends with "If a blank <app> icon stays on the Home Screen, press and hold it and delete it."
+  (`iconLeftText`).
   On the iPhone 7 (iOS 15.8.8, seen with `wrangler tail`) the prompt opens straight from the tap (manifest
   fetched 0.6 s after it, no "Open in iTunes?"), and Safari keeps downloading, signing and uploading behind iOS's
   alert. iOS's installer (`com.apple.appstored`) never gives up on a held `app.ipa`; it retries. It sends a HEAD and

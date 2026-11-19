@@ -57,3 +57,31 @@
 - `node --test web/app/source-icon.test.js`: http icon as a blob: URL never an http `<img>`, cached icon with no
   network and instant redraw, fallback rules, website path unchanged, `iconBytes` codes.
 - `worker/test.mjs`: "worker repo icon".
+- `tools/check.sh`: passed (1303 node tests, worker, deb and IPA builds).
+
+## On the iPhone 7 (ui-7.sh lock B58, 2026-11-18 20:14)
+
+Installed build 0.9.7-1445 (this branch) over 0.9.7-1435.
+
+- `b58-before.png` (0.9.7-1435): iFizBox and BigBoss show only their letters.
+- `b58-after-1.png` (this build, first open): BigBoss shows its icon, fetched over http by `net.icon`. The
+  https repos' icons (Chariz, ElleKit, GitHub avatars) still show.
+- `b58-relaunch-0s.png`: the app killed (by its launchd pid) and opened again; the first screenshot, taken while
+  "Downloading Packages" still runs, already has every icon, BigBoss included: they come from IndexedDB, with no
+  refetch (each was fetched less than a day ago). A shot 1 s later and one after the refresh's redraws were the same.
+- `b58-manage-sources.png`: Manage > Sources rows use the same cache.
+- AltStore (apps.altstore.io) is a letter before and after: unchanged by this task.
+
+## Not verified
+
+- **iFizBox's own repo icon on the phone**: `https://ifizbox.com/repo/CydiaIcon.png` is still a 404, because the
+  Worker change goes live only when this branch is merged and deployed (and this task must not deploy). The phone
+  has now stored "no icon" for that source, so after the deploy it shows the icon at the next check, within a day
+  (or at once after the app's WebKit data is cleared). Covered by the worker test only.
+- **Flicker during a redraw**: checked with still screenshots (icons there at 0 s and 1 s after relaunch, and after
+  the refresh's redraws). A still can't prove there's no single-frame blink. A screen recording would.
+- **The NWConnection paths besides BigBoss'** (chunked bodies, an http -> https redirect, an over-256 KB or non-image
+  answer on a live repo) ran only through the code. There's no Network.framework on the Linux build host, so no unit
+  test exercises `PlainGet.parse`/`dechunk`. BigBoss's plain Content-Length answer was checked on the phone.
+- **Sideload build**: it uses the same `net.icon` and cache, but was not installed or looked at (no task need, and
+  the 7 runs the jailbreak build).

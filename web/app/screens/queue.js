@@ -24,7 +24,8 @@
 //      Back, paid installs and a backend without per-package calls.
 //
 // While the queue holds packages: they are marked in every list (browse.js), the Installed tab's badge reads Q'd
-// and its nav bar has a Queue button that reopens Confirm. Styles: queue.css.
+// and its nav bar has a Queue button that reopens Confirm. Styles: queue.css. Without a jailbreak the IPA queue
+// (app-queue.js) drives the same badge and a Queue button on the left of Installed's root (initAppQueueChrome).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, el, barButton } from "../nav/ui.js";
 import { showActionSheet } from "../nav/actionsheet.js";
@@ -382,6 +383,56 @@ let appConfirm = null;  // the open Confirm sheet for apps: { refresh(), close()
 let appRunning = false; // Confirm's installs are going: queuing adds without opening a second sheet
 export const appQueueRunning = () => appRunning; // B66: Manage says so instead of runAppQueue's quiet 0
 
+// ---- B81: the app queue's Q'd badge and Queue button (the sideload app and the site) ------------------------------
+//
+// The apt queue's updateChrome above, driven by appQueue: Installed's badge reads Q'd while apps are queued and neither
+// Confirm nor a run is up; Installed's root has a Queue button that reopens Confirm. It goes on the left, as Cydia's
+// Installed has it, in the Wish List button's place (hidden while Queue shows; Manage keeps the right). Manage on
+// hides Queue (the left button is Select… then). installed.js init starts it and tells it when Manage turns.
+
+const appChrome = { ctx: null, queue: appQueue, managing: false };
+
+// What the chrome shows for a state. -> { badge: "Q'd" | null, button: boolean }
+export function appChromeState({ size = 0, confirmOpen = false, running = false, managing = false } = {}) {
+  return { badge: size > 0 && !confirmOpen && !running ? "Q'd" : null, button: size > 0 && !running && !managing };
+}
+
+export function initAppQueueChrome(ctx, { queue = appQueue } = {}) {
+  appChrome.ctx = ctx;
+  appChrome.queue = queue;
+  queue.subscribe(() => updateAppChrome());
+  // Installed's root nav bar is built when the tab is first shown: put the button in after each route change too.
+  globalThis.addEventListener?.("hashchange", () => (globalThis.requestAnimationFrame ?? setTimeout)(() => updateAppChrome()));
+  (globalThis.requestAnimationFrame ?? setTimeout)(() => updateAppChrome());
+}
+
+// installed.js setManaging: Manage on hides Queue, off brings it back.
+export function setAppChromeManaging(on) {
+  appChrome.managing = Boolean(on);
+  updateAppChrome();
+}
+
+const installedRootLeft = () => globalThis.document?.querySelector?.('.nav-stack[data-tab="installed"] > .nav-item:first-child .nav-left') ?? null;
+
+// `left`: the root's left slot (tests pass their own). -> the state drawn.
+export function updateAppChrome({ left, open = () => openAppConfirm(appChrome.queue) } = {}) {
+  if (!appChrome.ctx && !left) return null; // not started (the jailbreak app: updateChrome follows apt's queue)
+  left ??= installedRootLeft();
+  const s = appChromeState({ size: appChrome.queue.size, confirmOpen: Boolean(appConfirm) || Boolean(appChrome.starting),
+    running: appRunning, managing: appChrome.managing });
+  appChrome.ctx?.setBadge?.("installed", s.badge);
+  if (!left) return s;
+  let b = left.querySelector(".queue-button");
+  if (s.button && !b) {
+    b = barButton("Queue", "done queue-button");
+    b.addEventListener("click", () => open());
+    left.prepend(b);
+  } else if (!s.button && b) b.remove();
+  const wish = left.querySelector(".wish-button");
+  if (wish) wish.style.display = s.button ? "none" : "";
+  return s;
+}
+
 // Queues an app (a core/appqueue.js job) and opens Confirm, or redraws the open one. -> the job.
 export function queueApp(job, { queue = appQueue, open = openAppConfirm } = {}) {
   const j = queue.add(job);
@@ -399,11 +450,18 @@ export function openAppConfirm(queue = appQueue, { footer = null, run = null } =
   const m = modal({ title: "Confirm", left: cancel, right: ok, cls: "confirm-sheet" });
   // A Clear (here or on an app page's Modify) or a run's progress redraws it; an add redraws it through queueApp.
   const off = queue.subscribe((e) => { if (e.type !== "add") refresh(); });
-  const close = () => { off(); if (appConfirm === sheet) appConfirm = null; return m.close(); };
+  const close = () => { off(); if (appConfirm === sheet) appConfirm = null; updateAppChrome(); return m.close(); };
   cancel.addEventListener("click", () => { close(); queue.clearAll(); });
   ok.addEventListener("click", () => {
     const jobs = queue.list();
-    close().then(async () => (run ?? ((await useAppRun()) ? runAppQueueRun : runAppQueue))(jobs, { queue }));
+    appChrome.starting = true; // B81: no Q'd flash while the sheet slides down and the run starts
+    close().then(async () => {
+      const go = run ?? ((await useAppRun()) ? runAppQueueRun : runAppQueue);
+      appChrome.starting = false;
+      const p = go(jobs, { queue }); // sets appRunning before its first await
+      updateAppChrome();
+      return p;
+    });
   });
   function refresh() {
     const jobs = queue.list();
@@ -420,6 +478,7 @@ export function openAppConfirm(queue = appQueue, { footer = null, run = null } =
   const sheet = { refresh, close };
   appConfirm = sheet;
   refresh();
+  updateAppChrome();
 }
 
 
@@ -506,6 +565,7 @@ async function readyToInstall() {
 export async function runAppQueue(jobs, { queue = appQueue, install = installApp, record = recordApp, ready = readyToInstall } = {}) {
   if (appRunning) return 0;
   appRunning = true;
+  updateAppChrome();
   let done = 0;
   try {
     if (!(await ready())) return 0;
@@ -520,6 +580,7 @@ export async function runAppQueue(jobs, { queue = appQueue, install = installApp
     }
   } finally {
     appRunning = false;
+    updateAppChrome();
   }
   return done;
 }
@@ -538,17 +599,19 @@ async function useAppRun() {
 export async function runAppQueueRun(jobs, { queue = appQueue, record = recordApp, ready = readyToInstall, run = null, lanes = null } = {}) {
   if (appRunning) return null;
   appRunning = true;
+  updateAppChrome();
   try {
-    if (!(await ready())) { appRunning = false; return null; }
+    if (!(await ready())) { appRunning = false; updateAppChrome(); return null; }
     const sc = lanes ? null : await import("../signing-client.js");
     const { runAppRun, phoneLanes } = await import("./apprun.js");
     return await (run ?? runAppRun)(jobs.filter((j) => queue.get(j.id)), {
       queue, record, lanes: lanes ?? phoneLanes(sc),
-      onClose: () => { appRunning = false; },
+      onClose: () => { appRunning = false; updateAppChrome(); },
       reopenConfirm: (footer) => { appRunning = false; openAppConfirm(queue, { footer }); },
     });
   } catch (e) {
     appRunning = false;
+    updateAppChrome();
     throw e;
   }
 }

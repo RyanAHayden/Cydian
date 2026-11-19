@@ -227,7 +227,9 @@ onPageOpen((r) => r.tab === "installed" && pageKind(r) === "wishlist", () => { w
 // The live state objects, for tests.
 export const pageStates = () => ({ apps: appView, dpkg: state, wish: wishView });
 
-export function init() {
+export function init(ctx) {
+  // B81: the IPA queue's Q'd badge and Queue button (the jailbreak app's come from apt's queue, queue.js initQueue).
+  if (recordsApps() && typeof document !== "undefined") import("./queue.js").then((q) => q.initAppQueueChrome(ctx), () => {});
   catalog.onChange(() => {
     if (state.body) load();
     if (appView.body) loadApps();
@@ -1125,6 +1127,7 @@ export function setManaging(on) {
   }
   if (!on) manageBar.summary?.remove();
   syncManage();
+  import("./queue.js").then((q) => q.setAppChromeManaging(on), () => {}); // B81: Manage on hides Queue
 }
 
 export function togglePick(id, view = appView) {

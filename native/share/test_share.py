@@ -13,7 +13,6 @@ import plistlib
 import shutil
 import subprocess
 import sys
-import tempfile
 import unittest
 import zipfile
 
@@ -24,6 +23,7 @@ sys.path.insert(0, NATIVE)
 
 from test_sign import toolchain  # noqa: E402
 import brand  # noqa: E402
+import disktmp  # noqa: E402
 
 SWIFTC = toolchain()
 INFO_PLIST = b"""<?xml version="1.0" encoding="UTF-8"?>
@@ -63,9 +63,9 @@ def make_files(d):
 class SwiftShare(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.mkdtemp(prefix="ifizbox-sharetest-")
+        cls.tmp = disktmp.build_dir("ifizbox-sharetest-")  # off the shared /tmp tmpfs: see native/disktmp.py
         binary = os.path.join(cls.tmp, "sharetest")
-        env = dict(os.environ)
+        env = disktmp.swift_env(dict(os.environ), cls.tmp)
         shim = os.path.join(cls.tmp, "libshim")
         if os.path.exists("/usr/lib/libncursesw.so.6") and not os.path.exists("/usr/lib/libncurses.so.6"):
             os.makedirs(shim)

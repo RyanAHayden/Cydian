@@ -29,6 +29,7 @@ sys.path.insert(0, NATIVE)
 
 import metadata as M  # noqa: E402
 from test_sign import toolchain  # noqa: E402
+import disktmp  # noqa: E402
 from mkipa import macho_entitlements  # noqa: E402
 
 SWIFTC = toolchain()
@@ -46,9 +47,9 @@ def read(*p):
 class SwiftIntents(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.mkdtemp(prefix="ifizbox-intentstest-")
+        cls.tmp = disktmp.build_dir("ifizbox-intentstest-")  # off the shared /tmp tmpfs: see native/disktmp.py
         binary = os.path.join(cls.tmp, "intentstest")
-        env = dict(os.environ)
+        env = disktmp.swift_env(dict(os.environ), cls.tmp)
         shim = os.path.join(cls.tmp, "libshim")
         if os.path.exists("/usr/lib/libncursesw.so.6") and not os.path.exists("/usr/lib/libncurses.so.6"):
             os.makedirs(shim)

@@ -250,7 +250,9 @@ async function showAbout(ctx) {
   await ctx.showAlert({
     title: `About ${NAME}`,
     message: `${version ? `Version ${version}` : `${NAME} Web`}\nFree and open source`
-      + "\n\nRyan Hayden (Fizlo)\n\nInspired by Cydia\nby Jay Freeman (saurik)\nNot affiliated with SaurikIT",
+      + "\n\nRyan Hayden (Fizlo)\n\nInspired by Cydia\nby Jay Freeman (saurik)\nNot affiliated with SaurikIT"
+      // C9: what we take from Cydia, and under what licence
+      + "\n\nUses Cydia's section icons,\npurpose badges and some of\nits interface wording (GPLv3)",
     buttons: ["Close"],
   });
 }
@@ -712,11 +714,15 @@ function renderCredits(body) {
       })),
       footer: `${NAME} is not affiliated with SaurikIT or any of the above.`,
     },
-    { // F126: Cydia's artwork we use, with its licence
+    { // F126, C9: what we use from Cydia (artwork and wording), with its licence
       header: "Artwork",
       rows: [{ label: "Section Icons", subtitle: "Jay Freeman (saurik)\nFrom Cydia, GPLv3", cls: "thanks-row",
-        icon: { text: "C", color: "#7a8a99", src: "icons/sections/Tweaks.png" } }],
-      footer: "Cydia's section icons and purpose badges, from its source at git.saurik.com/cydia.git.",
+        icon: { text: "C", color: "#7a8a99", src: "icons/sections/Tweaks.png" } },
+      { label: "Interface Wording", subtitle: "Jay Freeman (saurik)\nFrom Cydia, GPLv3", cls: "thanks-row",
+        icon: { text: "C", color: "#7a8a99", src: "icons/sections/Text_Editors.png" } }],
+      footer: `${NAME} uses Cydia's section icons and purpose badges and some of its interface wording (titles, `
+        + "buttons and alerts, typos fixed), under GPLv3, from its source at git.saurik.com/cydia.git. "
+        + `${NAME} is not affiliated with SaurikIT.`,
     },
   ])));
   globalThis.ifizboxNative?.call?.("app.info", {}).then((i) => {

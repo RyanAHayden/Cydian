@@ -136,10 +136,10 @@ test("add: repos Cydia's check misses (Release only, .zst only) still pass", asy
   await assert.rejects(verifySource(html, "https://h.example/"), { kind: "not_repository" });
 });
 
-test("add: a URL that isn't a repo is 'Did not Find Repository'", async () => {
+test("add: a URL that isn't a repo is 'Did Not Find Repository'", async () => {
   const b = fakeBackend({});
   await assert.rejects(verifySource(b, "https://example.org/"), (e) => e instanceof SourceError &&
-    e.kind === "not_repository" && e.title === "Did not Find Repository" && /legacy Installer/.test(e.message));
+    e.kind === "not_repository" && e.title === "Did Not Find Repository" && /legacy Installer/.test(e.message));
   assert.deepEqual(b.calls, ["packages https://example.org/", "https://example.org/Release",
     "https://example.org/InRelease", "https://example.org/Packages.zst", "https://example.org/Packages.lzma"]);
 });

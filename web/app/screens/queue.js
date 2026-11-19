@@ -13,7 +13,7 @@
 //      package is a tweak, Reload Data (uicache) for an app, or what a script asked ($CYDIA's finish: words, up to
 //      Reboot Device), else Close iFizBox. The run's output is
 //      kept (queue.js runLogs) for Settings > Console Logs (logsPage below). A conffile changed by both the user and
-//      the package opens Cydia's Configuration Upgrade alert (F63): Keep My Old Copy or Accept The New Copy, sent
+//      the package opens Cydia's Configuration Upgrade alert (F63): Keep My Old Copy or Accept the New Copy, sent
 //      back to dpkg through backend.answerConffile while the run waits. While apt is still downloading (no dpkg
 //      status line yet) the bar has Cydia's Cancel (F64, backend.cancelApply): the run stops, nothing is installed
 //      and the queue stays.

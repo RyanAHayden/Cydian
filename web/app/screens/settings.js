@@ -926,6 +926,18 @@ function paintPasswordState(cell, input, foot, st) {
   if (st.warn) foot.append(Object.assign(document.createElement("b"), { className: "sign-pw-wrong", textContent: st.warn }), " ");
   foot.append(st.footer);
   foot.hidden = !st.warn && !st.footer;
+  // B94: Read From a .txt File only while a password is still wanted
+  const txt = cell.parentElement?.querySelector(".sign-pw-txt-cell");
+  if (txt) txt.hidden = !wantsPasswordFile(st.state);
+}
+// B94: whether the Password group shows Read From a .txt File: not once the password opens the .p12 or none is needed.
+export const wantsPasswordFile = (state) => state !== "right" && state !== "notNeeded";
+// B94: the website's page redraws (its focus goes) only when the typed password made the certificate ready: once it
+// opens the .p12, or, for a .p12 that can't be checked here, when the entry is finished. Never per keystroke.
+export function siteBecameReady(before, now, done = false) {
+  if (siteReady(before) && before?.passwordOk === true) return false;
+  if (now?.passwordOk === true) return siteReady(now);
+  return done && siteReady(now) && !siteReady(before);
 }
 function showPasswordState(el, id) {
   const cell = el.querySelector(".sign-pw-cell"), input = el.querySelector(".sign-pw-input"), foot = el.querySelector(".sign-pw-status");
@@ -958,12 +970,13 @@ function passwordBlock(el, id, kept) {
   // entry) sends all three to the Keychain.
   const save = async (done = false) => {
     clearTimeout(timer);
+    const before = await loadIdentity();
     await saveIdentity({ password: input.value });
     await recheckPassword(el, false);
+    const now = await loadIdentity();
     if (localSigning()) {
-      const now = await loadIdentity();
       if (now?.passwordOk === true || (done && now?.passwordOk !== false)) await importIfComplete(el, true);
-    }
+    } else if (siteBecameReady(before, now, done)) redrawAll(); // B94: the Certificate group's rows, no files group
   };
   input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(save, 500); });
   input.addEventListener("change", () => save(true));
@@ -976,7 +989,8 @@ function passwordBlock(el, id, kept) {
     await save(true);
   });
   const txt = document.createElement("li");
-  txt.className = "cell";
+  txt.className = "cell sign-pw-txt-cell";
+  txt.hidden = !wantsPasswordFile(passwordState(id, kept).state);
   const btn = Object.assign(document.createElement("button"), { type: "button", className: "cell-inner sign-pw-txt", textContent: "Read From a .txt File" });
   btn.addEventListener("click", () => file.click());
   txt.append(btn, file);
@@ -1229,7 +1243,9 @@ export function signingLayout({ mode, certificate = false, staged = false, profi
   const site = mode === "site";
   const on = {
     certificate: true,
-    files: staged,
+    // B94: no files (and with them no Password group) once the certificate is good: the site's ready identity, or
+    // the sideload Keychain's with no picks left (its caller clears the picks after an import)
+    files: staged && !(site && ready),
     profile,
     options,
     server: mode === "sideload",
@@ -1431,7 +1447,7 @@ async function drawSiteSigning(el) {
   const id = await loadIdentity();
   let profile = null;
   try { profile = id?.profile ? parseProfile(id.profile) : null; } catch { /* checked when picked */ }
-  const info = summary({ profile, passwordOk: id?.passwordOk ?? null });
+  const info = summary({ profile, passwordOk: id?.passwordOk ?? null, password: id?.password ?? null });
   const ready = Boolean(id?.p12 && id?.profile && id?.passwordOk !== false);
   const staged = Boolean(id?.p12 || id?.profile) && !ready;
   const rows = profile ? [{ label: "Profile", detail: profile.name || "Unnamed" }, { label: "Type", detail: profileKind(profile) }, ...info.rows] : [];

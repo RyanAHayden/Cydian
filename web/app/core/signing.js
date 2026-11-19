@@ -343,7 +343,9 @@ export function profileCert(p) {
 }
 
 // The Signing page's facts and problems for a saved identity: { rows: [{label, detail}], problems: [text] }.
-export function summary({ profile, passwordOk = null, now = new Date(), locale, timeZone } = {}) {
+// `password`: the one typed or read, when the caller has it. A .p12 checked with no password ("" or null) isn't
+// called wrong: the Password group's footer asks for one instead.
+export function summary({ profile, passwordOk = null, password, now = new Date(), locale, timeZone } = {}) {
   const rows = [];
   const problems = [];
   if (!profile) return { rows, problems };
@@ -357,7 +359,7 @@ export function summary({ profile, passwordOk = null, now = new Date(), locale, 
   if (profile.certs.length > 1) rows.push({ label: "Certificates in Profile", detail: String(profile.certs.length) });
   if (cert?.notAfter && cert.notAfter < now) problems.push(`The certificate expired on ${fmtDate(cert.notAfter, locale, timeZone)}.`);
   if (profile.expires && profile.expires < now) problems.push(`The provisioning profile expired on ${fmtDate(profile.expires, locale, timeZone)}.`);
-  if (passwordOk === false) problems.push("The certificate's password is wrong.");
+  if (passwordOk === false && (password === undefined || password)) problems.push("The certificate's password is wrong.");
   return { rows, problems };
 }
 

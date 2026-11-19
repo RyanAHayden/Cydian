@@ -9,7 +9,10 @@
 //   POST /sign/host?bundleid=&version=&title=   body: an IPA the phone signed (iFizBox's own update: iOS closes
 //                                           iFizBox, and its local server, while installing over it) -> {itms, ...};
 //                                           kept TTL seconds in KV, then gone
-//   GET  /sign/host/<token>/manifest.plist, /sign/host/<token>/app.ipa   what that itms link fetches
+//   GET  /sign/host/<token>/manifest.plist, /sign/host/<token>/app.ipa   what that itms link fetches (each looks
+//                                           again for a few seconds before a 404: KV is eventually consistent)
+//   GET  /sign/host/<token>/status          B83: {manifest, started, finished} as /sign/up's: the app stays open
+//                                           until iOS has the whole IPA, then closes so iOS can install over it
 //
 //   POST /sign/upload?bundleid=&version=&title=&size=   F93: an app the website signed in the browser (any app) ->
 //                                           {token, partSize, parts}; then PUT /sign/upload/<token>/<i> each part (KV
@@ -318,16 +321,17 @@ const upKey = (t) => `up.${t}`, partKey = (t, i) => `up.${t}.${i}`;
 // (read first; KV's free tier counts writes, 1,000 a day), so an install costs at most 3 writes.
 const iosKey = (t) => `up.${t}.ios`;
 export const IOS_MARKS = ["manifest", "started", "finished"];
-async function iosStatus(env, t) {
-  const r = await env.HOSTED.getWithMetadata(iosKey(t), { type: "stream" });
+// B83: iFizBox's own update (/sign/host/<t>) keeps the same marks under hostIosKey; `key` picks which.
+async function iosStatus(env, t, key = iosKey(t)) {
+  const r = await env.HOSTED.getWithMetadata(key, { type: "stream" });
   r.value?.cancel?.();
   return r.metadata ?? {};
 }
-async function markIos(env, t, mark, ttl) {
+async function markIos(env, t, mark, ttl, key = iosKey(t)) {
   try {
-    const s = await iosStatus(env, t);
+    const s = await iosStatus(env, t, key);
     if (s[mark]) return;
-    await env.HOSTED.put(iosKey(t), "", { expirationTtl: ttl + 300, metadata: { ...s, [mark]: true } });
+    await env.HOSTED.put(key, "", { expirationTtl: ttl + 300, metadata: { ...s, [mark]: true } });
   } catch { /* a missed mark only leaves the website's log a step behind */ }
 }
 const partLen = (m, i) => (i < m.parts - 1 ? m.partSize : m.size - m.partSize * (m.parts - 1));
@@ -466,6 +470,62 @@ export async function waitFor(read, ok, ms, env = {}, sleep = (t) => new Promise
     if (ok(v) || Date.now() + POLL * scale > end) return v;
     await sleep(POLL * scale);
   }
+}
+
+// ---- /sign/host/<t>/...: iFizBox's own update, the IPA the phone uploaded (B83) ---------------------------------
+// manifest.plist and app.ipa look again for HOST_WAIT ms before answering 404: KV is eventually consistent, and iOS
+// asks for them seconds after the put (it gives up silently on a 404). iOS's requests leave F190's marks (manifest,
+// started, finished: app.ipa's body streamed to its end) under hostIosKey, read at GET status by the app, which
+// closes for iOS to install over it only once iOS has the whole IPA.
+export const HOST_WAIT = 6000;
+const HOST_CHUNK = 1024 * 1024; // app.ipa goes out a MB a pull, so "finished" waits for iOS to read the last of it
+const hostIosKey = (t) => `${t}.ios`;
+async function hosted(req, u, env, ttl, t, what) {
+  const gone = () => fail("gone", "That install link has expired.", 404);
+  if (what === "status") {
+    const s = await iosStatus(env, t, hostIosKey(t));
+    return json(Object.fromEntries(IOS_MARKS.map((k) => [k, Boolean(s[k])])));
+  }
+  const get = req.method === "GET";
+  if (what === "manifest.plist") {
+    const read = () => env.HOSTED.getWithMetadata(t, { type: "stream" }).then((r) => { r.value?.cancel?.(); return r.metadata ?? null; });
+    const metadata = await waitFor(read, Boolean, HOST_WAIT, env);
+    if (!metadata) return gone();
+    if (get) await markIos(env, t, "manifest", ttl, hostIosKey(t));
+    return plist(manifest({ url: `${u.origin}/sign/host/${t}/app.ipa`, ...metadata }));
+  }
+  const data = await waitFor(() => env.HOSTED.get(t, { type: "arrayBuffer" }), Boolean, HOST_WAIT, env);
+  if (!data) return gone();
+  const n = data.byteLength;
+  let start = 0, end = n - 1, status = 200;
+  const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get("Range") ?? "");
+  if (r && (r[1] || r[2])) { // iOS's installer may ask for parts
+    start = r[1] ? Number(r[1]) : Math.max(0, n - Number(r[2]));
+    end = r[1] && r[2] ? Math.min(n - 1, Number(r[2])) : n - 1;
+    if (start > end || start >= n) return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${n}` } });
+    status = 206;
+  }
+  const headers = { "Content-Type": "application/octet-stream", "Accept-Ranges": "bytes", "Cache-Control": "no-store",
+    "Content-Length": String(end - start + 1), ...(status === 206 ? { "Content-Range": `bytes ${start}-${end}/${n}` } : {}) };
+  if (!get) return new Response(null, { status, headers });
+  let at = start, begun = false;
+  const body = new ReadableStream({
+    async pull(c) {
+      if (at > end) { c.close(); return; }
+      if (!begun) { begun = true; await markIos(env, t, "started", ttl, hostIosKey(t)); }
+      const stop = Math.min(end + 1, at + HOST_CHUNK);
+      c.enqueue(new Uint8Array(data.slice(at, stop)));
+      at = stop;
+      // the IPA's last byte is handed over (a Range that stops short of it isn't the end)
+      if (at > end && end === n - 1) await markIos(env, t, "finished", ttl, hostIosKey(t));
+    },
+  });
+  if (typeof FixedLengthStream === "function") { // Cloudflare: keeps the Content-Length on a streamed body
+    const f = new FixedLengthStream(end - start + 1);
+    body.pipeTo(f.writable).catch(() => {});
+    return new Response(f.readable, { status, headers });
+  }
+  return new Response(body, { status, headers });
 }
 
 async function metaOf(env, t, part = null) {
@@ -635,27 +695,8 @@ export default {
         expiresIn: ttl, bundleId: app.bundleId, name: app.title, version: app.version });
     }
 
-    const h = /^\/sign\/host\/([0-9a-f]{48})\/(manifest\.plist|app\.ipa)$/.exec(u.pathname);
-    if (h && (req.method === "GET" || req.method === "HEAD")) {
-      if (h[2] === "manifest.plist") {
-        const { metadata } = await env.HOSTED.getWithMetadata(h[1], { type: "stream" }).then((r) => { r.value?.cancel?.(); return r; });
-        if (!metadata) return fail("gone", "That install link has expired.", 404);
-        return plist(manifest({ url: `${u.origin}/sign/host/${h[1]}/app.ipa`, ...metadata }));
-      }
-      const data = await env.HOSTED.get(h[1], { type: "arrayBuffer" });
-      if (!data) return fail("gone", "That install link has expired.", 404);
-      const headers = { "Content-Type": "application/octet-stream", "Accept-Ranges": "bytes", "Cache-Control": "no-store" };
-      const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get("Range") ?? "");
-      if (r && (r[1] || r[2])) { // iOS's installer may ask for parts
-        const n = data.byteLength;
-        const start = r[1] ? Number(r[1]) : Math.max(0, n - Number(r[2]));
-        const end = r[1] && r[2] ? Math.min(n - 1, Number(r[2])) : n - 1;
-        if (start > end || start >= n) return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${n}` } });
-        return new Response(req.method === "HEAD" ? null : data.slice(start, end + 1), { status: 206,
-          headers: { ...headers, "Content-Range": `bytes ${start}-${end}/${n}`, "Content-Length": String(end - start + 1) } });
-      }
-      return new Response(req.method === "HEAD" ? null : data, { headers: { ...headers, "Content-Length": String(data.byteLength) } });
-    }
+    const h = /^\/sign\/host\/([0-9a-f]{48})\/(manifest\.plist|app\.ipa|status)$/.exec(u.pathname);
+    if (h && (req.method === "GET" || req.method === "HEAD")) return hosted(req, u, env, ttl, h[1], h[2]);
 
     // Everything else is the website (web/app/, Workers static assets: revalidated on every load, so a phone never
     // keeps an old file). /add?url=… and other app routes fall back to index.html (single-page application).

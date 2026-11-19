@@ -9,7 +9,7 @@
 //   jailbreak   GitHub's release is read and kept; the row itself is apt's, from iFizBox's built-in repo.
 import { installSelf, selfFromAltSource, selfUpgradeRow, saveInfo, loadInfo, withSelfUpgrade, selfInfoWith, lookForSelfUpdate,
   SELF_ALT_URL } from "./core/essential.js";
-import { checkForUpdates, fetchRelease, newerRelease } from "./core/selfupdate.js";
+import { checkForUpdates, fetchRelease, newerRelease, unfinishedSelfUpdate, clearSelfUpdate } from "./core/selfupdate.js";
 import { getBackend } from "./backend.js";
 import { detectMode } from "./core/settings.js";
 import { showAlert } from "./nav/alert.js";
@@ -82,7 +82,24 @@ export function lookForUpdates() {
     readSource: () => readSelfInfo(),
     checkRelease: () => checkForUpdates({ mode, storage: storage(), current: appVersion, release: () => fetchRelease({ native: native() }) }),
     changed: () => globalThis.dispatchEvent?.(new Event("ifizbox:self-info")),
-  }).then(async (r) => { await bannerOnce(mode).catch(() => {}); return r; }).finally(() => { running = null; }));
+  }).then(async (r) => {
+    if (!(await unfinishedOnce(mode).catch(() => false))) await bannerOnce(mode).catch(() => {});
+    return r;
+  }).finally(() => { running = null; }));
+}
+
+// B83: at launch (once a page load), a sideload self-update recorded earlier that app.info doesn't show yet: a banner
+// says it didn't finish, with Try Again (bannerUpgrade), in place of "X is out." for this check. -> true when shown.
+let unfinishedChecked = false;
+export async function unfinishedOnce(mode, { current = appVersion, banner = showBanner, upgrade = bannerUpgrade } = {}) {
+  if (unfinishedChecked || mode !== "sideload") return false;
+  unfinishedChecked = true;
+  const v = unfinishedSelfUpdate(storage(), await current());
+  if (!v) return false;
+  clearSelfUpdate(storage()); // said once; Try Again records it again
+  bannerSeen.version = v;
+  banner({ title: NAME, message: `${NAME} ${v} didn't finish installing.`, action: { label: "Try Again", onClick: () => { upgrade(); } } });
+  return true;
 }
 
 // The newer iFizBox the last check found, as Changes' row has it: sideload the source or GitHub's release, jailbreak

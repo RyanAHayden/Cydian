@@ -12,6 +12,8 @@
 //        -> I6's reply + {fixedArm64e, expires}
 //   signing.progress {bundleId} (stream: {phase: "installing", progress}) -> {installed: true | false | null}
 //        + handedOff (B76): true when a false became null because iFizBox lost sight of the install (Handoff below)
+//   signing.selfUpdate (stream: {state}) -> {state}: B83, iFizBox's own update after iOS's prompt (CloseForUpdate):
+//        prompt | waiting | downloading, then finished (it exits) | notStarted | stalled | guessed; null: none running
 //   signing.installed            -> {apps: [record], next: {expires, apps} | null}
 //   signing.openApp {bundleId}   -> {opened: true | false}: F155, launches an installed app (the progress page's Open)
 //   signing.forget {bundleId}    -> {apps}
@@ -43,6 +45,17 @@ enum Sideload {
     static func register(_ b: Bridge) {
         b.on("signing.inspect") { c in inspect(c) }
         b.on("signing.progress") { c in progress(c) }
+        // B83: iFizBox's own update after the prompt (CloseForUpdate): streams {state} and answers the last one
+        b.on("signing.selfUpdate") { c in
+            DispatchQueue.main.async {
+                CloseForUpdate.watch { s in
+                    if let s = s { c.emit([["state": s.rawValue]]) }
+                    guard s?.ends ?? true else { return true }
+                    c.reply(["state": s.map { $0.rawValue as Any } ?? NSNull()], nil)
+                    return false
+                }
+            }
+        }
         b.on("signing.installed") { c in SignBridge.run(c) { installedJSON() } }
         b.on("signing.openApp") { c in openApp(c) }
         b.on("signing.forget") { c in
@@ -277,9 +290,13 @@ enum Sideload {
                 saveRecords(SignedRecords.adding(record, to: records()))
                 reschedule()
             }
+            // B83: the link's status route, which says when iOS has the whole IPA (CloseForUpdate)
+            let status = (json?["manifest"] as? String).flatMap { m in
+                m.hasSuffix("/manifest.plist") ? URL(string: String(m.dropLast("manifest.plist".count)) + "status") : nil
+            }
             DispatchQueue.main.async {
                 UIApplication.shared.open(link)
-                CloseForUpdate.afterPrompt()
+                CloseForUpdate.afterPrompt(status: status)
                 opened(.success((app, record)))
                 served?(true)
             }
@@ -816,28 +833,119 @@ enum Workspace {
 }
 
 // iOS doesn't finish installing a new iFizBox over the one that's running (user 2026-11-18: the update waited until
-// iFizBox was closed by hand). Once iOS's "would like to install iFizBox" prompt has been answered (iFizBox becomes
-// active again), iFizBox leaves a notification and closes, so the install finishes; the notification opens the new one.
+// iFizBox was closed by hand), so iFizBox closes itself for its own update, but only once iOS has the whole new IPA.
+// B83: closing on a fixed 8 s guess lost updates (user 2026-11-19, 0.9.8 to 0.9.9 while another app installed: the
+// notification came before iOS had downloaded the IPA, the user opened the old iFizBox, and iOS wouldn't install over
+// it). Now, once iOS's "would like to install" prompt is answered (iFizBox active again), iFizBox stays alive
+// (KeepAlive's silent audio) and polls the Signing Server's GET /sign/host/<t>/status (worker/src/index.js): when iOS
+// has streamed app.ipa to its end it leaves a notification and exits so the install finishes. If iOS hasn't begun
+// the download within `startLimit` (the prompt was cancelled, the link failed) or not finished it within
+// `finishLimit` (the link's TTL), it doesn't exit: the progress page (signing.selfUpdate) offers Try Again.
+// A server without the status route (404 three times) gets the old 8 s close.
+// State on the main queue.
 enum CloseForUpdate {
+    enum State: String {
+        case prompt, waiting, downloading, finished, notStarted, stalled, guessed
+        var ends: Bool { [.finished, .notStarted, .stalled, .guessed].contains(self) }
+    }
     static var token: NSObjectProtocol?
-    static func afterPrompt() {
+    private static var resignToken: NSObjectProtocol?
+    private(set) static var state: State?
+    private static var sinks = [(State?) -> Bool]() // signing.selfUpdate watches; false: done with it
+    private static var run = 0 // each afterPrompt bumps it: an older run's polls stop
+    static let startLimit: TimeInterval = 120, finishLimit: TimeInterval = 600, pollEvery: TimeInterval = 2
+
+    // `status`: the link's GET status URL (nil: the old 8 s close). Main queue.
+    static func afterPrompt(status: URL?) {
+        run += 1
+        let mine = run
+        set(.prompt)
         var resigned = false
         let nc = NotificationCenter.default
-        let off = nc.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in resigned = true }
+        resignToken.map(nc.removeObserver)
+        resignToken = nc.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in resigned = true }
         token.map(nc.removeObserver)
         token = nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
             guard resigned else { return } // the prompt hasn't shown yet
-            token.map(nc.removeObserver); token = nil; nc.removeObserver(off)
-            let c = UNMutableNotificationContent()
-            // It arrives 8 s later, by when iOS has usually finished (user 2026-11-18: "tap when it's done" read wrong).
-            c.title = "\(Brand.name) Updated"
-            c.body = "Tap to open the new version."
-            let req = UNNotificationRequest(identifier: "ifizbox.updating", content: c,
-                                            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 8, repeats: false))
-            UNUserNotificationCenter.current().add(req) { _ in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { exit(0) }
-            }
+            token.map(nc.removeObserver); token = nil
+            resignToken.map(nc.removeObserver); resignToken = nil
+            guard mine == run else { return }
+            guard let status = status else { return guess() }
+            KeepAlive.shared.begin()
+            set(.waiting)
+            poll(status, run: mine, since: Date(), misses: 0)
         }
+    }
+
+    // signing.selfUpdate: `sink` gets the state now (nil: no self-update running) and each change after; it answers
+    // false once it is done listening.
+    static func watch(_ sink: @escaping (State?) -> Bool) {
+        if sink(state) { sinks.append(sink) }
+    }
+
+    private static func set(_ s: State) {
+        state = s
+        sinks = sinks.filter { $0(s) }
+    }
+
+    private static func poll(_ url: URL, run mine: Int, since: Date, misses: Int) {
+        guard mine == run else { return }
+        let req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        URLSession.shared.dataTask(with: req) { data, resp, _ in
+            let code = (resp as? HTTPURLResponse)?.statusCode
+            let marks = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any]
+            DispatchQueue.main.async {
+                guard mine == run else { return }
+                let known = code == 200 && marks?["finished"] != nil
+                if known, marks?["finished"] as? Bool == true { return finish() }
+                if known, marks?["started"] as? Bool == true, state != .downloading { set(.downloading) }
+                // an older Signing Server, without the status route: the old guess
+                let miss = !known && code == 404 ? misses + 1 : (known ? 0 : misses)
+                if miss >= 3, state == .waiting { return guess() }
+                let waited = Date().timeIntervalSince(since)
+                if state == .downloading ? waited > finishLimit : waited > startLimit {
+                    return giveUp(state == .downloading ? .stalled : .notStarted)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + pollEvery) { poll(url, run: mine, since: since, misses: miss) }
+            }
+        }.resume()
+    }
+
+    // iOS has the whole IPA: a notification to open the new one, and out, so iOS installs over this one.
+    private static func finish() {
+        set(.finished)
+        let c = UNMutableNotificationContent()
+        c.title = "Finishing the \(Brand.name) Update"
+        c.body = "iOS has the new version and is installing it. Tap to open it."
+        closeWith(c, after: 3)
+    }
+
+    private static func guess() {
+        set(.guessed)
+        let c = UNMutableNotificationContent()
+        // It arrives 8 s later, by when iOS has usually finished (user 2026-11-18: "tap when it's done" read wrong).
+        c.title = "Updating \(Brand.name)"
+        c.body = "Tap to open the new version."
+        closeWith(c, after: 8)
+    }
+
+    private static func closeWith(_ c: UNMutableNotificationContent, after: TimeInterval) {
+        let req = UNNotificationRequest(identifier: "ifizbox.updating", content: c,
+                                        trigger: UNTimeIntervalNotificationTrigger(timeInterval: after, repeats: false))
+        UNUserNotificationCenter.current().add(req) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { exit(0) }
+        }
+    }
+
+    // Not started, or stalled: iFizBox stays open (the page offers Try Again); from the background, a notification says so.
+    private static func giveUp(_ s: State) {
+        set(s)
+        KeepAlive.shared.end()
+        guard UIApplication.shared.applicationState != .active else { return }
+        let c = UNMutableNotificationContent()
+        c.title = s == .stalled ? "The \(Brand.name) Update Didn't Finish" : "The \(Brand.name) Update Didn't Start"
+        c.body = "Open \(Brand.name) to try again."
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "ifizbox.updating", content: c, trigger: nil))
     }
 }
 

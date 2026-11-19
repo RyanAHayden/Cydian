@@ -128,6 +128,13 @@ uploaded to the Signing Server (`signing.install {host: true}`, `POST /sign/host
 10 minutes and serves it to iOS (`worker/README.md`). The certificate and key stay on the phone; the signed iFizBox
 (which embeds the profile, as every signed app does) is on the server for those 10 minutes.
 
+iOS won't install the new iFizBox over the running one, so iFizBox closes itself, but only once iOS has the whole
+IPA: after the Install prompt is answered it stays alive (silent audio) and polls `GET /sign/host/<token>/status`;
+when iOS has fetched `app.ipa` to its end it leaves a "Finishing the update" notification and exits. If iOS hasn't
+started the download within 2 minutes (or not finished it within the link's 10), iFizBox stays open and the progress
+page offers Try Again (`signing.selfUpdate`). The version handed to iOS is remembered, and if the next launch is
+still the older version, a banner says the update didn't finish, with Try Again.
+
 `signing.export` (the `.p12` and password kept in the Keychain) is what iFizBox Account reads to sync the certificate
 (`screens/account.js`, with Sync Certificate on).
 

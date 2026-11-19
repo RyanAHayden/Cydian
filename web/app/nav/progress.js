@@ -358,6 +358,20 @@ export function lockSelfUpdate(h, { later = setTimeout } = {}) {
   return false;
 }
 
+// B83: iFizBox's own update ended without iOS taking it (native CloseForUpdate said notStarted or stalled; iFizBox
+// stays open): the locked page (lockSelfUpdate) gets its buttons back, the error in red, and Try Again as its finish
+// button (`retry`, which runs on the tap; the page closes first). -> true when the page was there to change.
+export const TRY_AGAIN_LABEL = "Try Again";
+export function unlockSelfUpdate(h, { message = "", retry = null } = {}) {
+  const page = h?.page;
+  if (!page || page.closed || typeof page.finish !== "function") return false;
+  lockedPages.delete(page);
+  if (message) page.error?.(message);
+  page.finish({ label: retry ? TRY_AGAIN_LABEL : RETURN_LABEL, status: "Failed", title: "Not Updated",
+    action: retry ? () => { setTimeout(() => { retry(); }, 0); return false; } : null });
+  return true;
+}
+
 // `open` stands in for openProgress (tests).
 export function progressHUD(label = "Preparing", { open = openProgress, done: doneLabel = RETURN_LABEL } = {}) {
   let page = hudPage && !hudPage.closed ? hudPage : null;

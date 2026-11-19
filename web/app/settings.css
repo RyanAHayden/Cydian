@@ -27,15 +27,26 @@
 .theme-preview-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 20px;
   -webkit-overflow-scrolling: touch; }
 .theme-preview-space { height: 100px; }
-/* F215: the divider on top of the preview, dragged to move the split (screens/settings.js dragSplit). Its grip is
-   UIKit's table grabber (the 4S's Shared@2x/UITableGrabber.png, sampled): three 19pt bars, each a 1pt dark line
-   (#000 at .31), 3pt of #bebebe at .68 and a 1pt white line at .51, 1pt apart. Nothing else is drawn. The strip is
-   taller than it looks to the finger: 12px more above it. */
+/* F215: the divider on top of the preview, dragged to move the split (screens/settings.js dragSplit). The strip is
+   taller than it looks to the finger: 12px more above it.
+   F231: its grip is iOS 6's Notification Center grabber, flipped (sampled from the 4S's ref/4s/screens/nc-grabber.png
+   at 2x): a 43x17pt black tab hanging from the preview's top edge, its bottom corners rounded 3pt, 1pt sides of
+   #121212. In it three 3.5pt bars, 1.5pt of black apart, starting 2pt down: each #727375 fading to #666768 over 3pt
+   and a 0.5pt #333435 edge at the bottom (on the phone they run the other way). A bar spans the tab inside its sides
+   at its top and 1pt less each end at its bottom: the black corner triangles cut the slant. */
 .theme-preview-grip { position: relative; flex: none; height: 25px; touch-action: none; cursor: row-resize; }
 .theme-preview-grip::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; bottom: 0; }
-.theme-preview-grip::after { content: ""; position: absolute; left: calc(50% - 9.5px); top: 4px; width: 19px; height: 17px;
-  background: linear-gradient(rgba(0,0,0,.31) 0 1px, rgba(190,190,190,.68) 1px 4px, rgba(255,255,255,.51) 4px 5px, transparent 5px)
-    0 0 / 19px 6px repeat-y; }
+.theme-preview-grip::after { content: ""; position: absolute; left: calc(50% - 21.5px); top: 0; width: 43px; height: 17px;
+  --nc-l: linear-gradient(to top right, #050505 50%, transparent 50%);
+  --nc-r: linear-gradient(to top left, #050505 50%, transparent 50%);
+  --nc-bar: linear-gradient(#727375, #666768 3px, #333435 3px);
+  border-radius: 0 0 3px 3px; box-shadow: inset 1px 0 #121212, inset -1px 0 #121212;
+  background: var(--nc-l) 1px 2px / 1px 3.5px, var(--nc-r) right 1px top 2px / 1px 3.5px,
+    var(--nc-l) 1px 7px / 1px 3.5px, var(--nc-r) right 1px top 7px / 1px 3.5px,
+    var(--nc-l) 1px 12px / 1px 3.5px, var(--nc-r) right 1px top 12px / 1px 3.5px,
+    var(--nc-bar) 1px 2px / 41px 3.5px, var(--nc-bar) 1px 7px / 41px 3.5px, var(--nc-bar) 1px 12px / 41px 3.5px,
+    #050505;
+  background-repeat: no-repeat; }
 .theme-preview-bar { position: relative; display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 5px; }
 .theme-preview-bar .nav-title { flex: 1; }
 .theme-preview-seg { margin: 10px; }

@@ -95,9 +95,13 @@ settings.onChange((key) => {
 
 export function render(el, route) {
   const p = { el, route };
-  pages.add(p);
   const [first, second] = pathOf(route);
-  if (defOf(second ?? first)?.tone) { resetSplit(); dropStoredSplit(); } // F215/F230: a theme list opens at its peek
+  const tone = defOf(second ?? first)?.tone;
+  // F231: opening Theme > Light or Dark switches Mode to that tone at once, as picking a theme there does (pick()),
+  // before this page joins `pages`, so the change redraws only the pages already open (Theme's Mode control).
+  if (tone && settings.get("appearance") !== tone) settings.set("appearance", tone);
+  pages.add(p);
+  if (tone) { resetSplit(); dropStoredSplit(); } // F215/F230: a theme list opens at its peek
   draw(p);
   // Holds can change outside the app (another package manager, apt-mark by hand): ask dpkg each time Settings
   // opens a page; a change redraws through onChange. Without a helper this does nothing.

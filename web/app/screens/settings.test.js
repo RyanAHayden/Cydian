@@ -356,6 +356,23 @@ test("picking a theme in Theme > Light / Dark switches Mode to that tone", async
   assert.equal(settings.get("appearance"), "dark");
 });
 
+test("F231: opening Theme > Light or Dark switches Mode to that tone, without picking a theme", async () => {
+  const { render } = await import("./settings.js");
+  const was = [settings.get("appearance"), settings.get("lightTheme"), settings.get("darkTheme")];
+  try {
+    settings.set("appearance", "light");
+    render(fakeElement("div"), { tab: "home", path: ["theme", "darkTheme"] });
+    assert.equal(settings.get("appearance"), "dark");
+    assert.deepEqual([settings.get("lightTheme"), settings.get("darkTheme")], was.slice(1), "no theme picked");
+    settings.set("appearance", "auto");
+    render(fakeElement("div"), { tab: "home", path: ["theme", "lightTheme"] });
+    assert.equal(settings.get("appearance"), "light");
+    render(fakeElement("div"), { tab: "home", path: ["theme"] }); // Theme itself, and other pages: Mode stays
+    render(fakeElement("div"), { tab: "home", path: ["general"] });
+    assert.equal(settings.get("appearance"), "light");
+  } finally { settings.set("appearance", was[0]); }
+});
+
 // F215/F230: Theme > Light / Dark's preview is a movable split. Geometry in page px (an iPhone 7 web app: 647 tall, nav
 // to 64, tab bar from 598); rows 44px from y 74 (a group's 10px margin), the footer 40px under the last.
 const rowsFrom = (n) => [...Array.from({ length: n }, (_, i) => 74 + 44 * (i + 1)), 74 + 44 * n + 40 + 10];

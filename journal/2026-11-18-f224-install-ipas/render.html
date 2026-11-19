@@ -1,0 +1,59 @@
+<!doctype html>
+<!-- F224: stills of Install IPAs for a 3x render (the real stylesheets, the markup nav/ui.js grouped() and
+     screens/myipas.js libraryGroup draw). chromium --headless --force-device-scale-factor=3 --screenshot. -->
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../../web/app/style.css">
+<link rel="stylesheet" href="../../web/app/ios6.css">
+<link rel="stylesheet" href="../../web/app/sources.css">
+<link rel="stylesheet" href="../../web/app/packages.css">
+<link rel="stylesheet" href="../../web/app/palettes.css">
+<link rel="stylesheet" href="../../web/app/myipas.css">
+<style>
+  :root { --tab-h: 0px; }
+  body { margin: 0; width: 320px; }
+  .still { position: static; overflow: visible; padding-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="page-body grouped still">
+<div class="install-ipas">
+  <form class="search-bar" role="search"><label class="search-field"><input type="search" placeholder="Search IPAs"></label></form>
+  <div class="install-ipas-add"><div class="group"><h2 class="group-header">Add an IPA</h2><ul class="table grouped">
+    <li class="cell"><button class="cell-inner" type="button"><span class="cell-text"><span class="cell-label">Choose from Files</span></span></button></li>
+    <li class="cell"><button class="cell-inner" type="button"><span class="cell-text"><span class="cell-label">Download from URL</span></span></button></li>
+  </ul></div></div>
+  <div class="install-ipas-mine"><div class="myipa-groups">
+    <div class="group"><h2 class="group-header">Not Installed</h2><ul class="table grouped">
+      <li class="cell myipa-row is-unsigned source-row manage-row has-price"><a class="cell-inner chevron" href="#"><span class="cell-icon">D</span><span class="cell-text"><span class="cell-label">Delta</span><span class="cell-subtitle">Version 1.5 · 10.0 MB · Not signed</span></span></a><button class="price-btn" type="button">SIGN</button><button class="del-confirm" type="button">Delete</button><span class="manage-check"></span></li>
+      <li class="cell myipa-row is-unsigned source-row manage-row has-price"><a class="cell-inner chevron" href="#"><span class="cell-icon">P</span><span class="cell-text"><span class="cell-label">Provenance</span><span class="cell-subtitle">Version 3.0 · 41.2 MB · Not signed</span></span></a><button class="price-btn go" type="button">INSTALL</button><button class="del-confirm" type="button">Delete</button><span class="manage-check"></span></li>
+      <li class="cell myipa-row is-signed source-row manage-row has-price"><a class="cell-inner chevron" href="#"><span class="cell-icon">U</span><span class="cell-text"><span class="cell-label">UTM</span><span class="cell-subtitle">Version 4.6 · 210 MB · Signed</span></span></a><button class="price-btn busy" type="button" disabled style="--fill:.62">INSTALLING</button><button class="del-confirm" type="button">Delete</button><span class="manage-check"></span></li>
+      <li class="cell myipa-row is-unsigned source-row manage-row has-price armed"><a class="cell-inner chevron" href="#"><span class="cell-icon">W</span><span class="cell-text"><span class="cell-label">Whale</span><span class="cell-subtitle">Version 2 · 5.1 MB · Not signed</span></span></a><button class="price-btn" type="button">SIGN</button><button class="del-confirm" type="button">Delete</button><span class="manage-check"></span></li>
+    </ul></div>
+    <div class="group"><h2 class="group-header">Installed</h2><ul class="table grouped">
+      <li class="cell myipa-row is-signed source-row manage-row has-price"><a class="cell-inner chevron" href="#"><span class="cell-icon">A</span><span class="cell-text"><span class="cell-label">Alpha</span><span class="cell-subtitle">Version 2.0 · 20.0 MB · Signed</span></span></a><button class="price-btn" type="button">OPEN</button><button class="del-confirm" type="button">Delete</button><span class="manage-check"></span></li>
+    </ul><p class="group-footer">You can also share an .ipa to iFizBox from Files, Safari or Mail.</p></div>
+  </div></div>
+</div>
+</div>
+<div class="page-body grouped still" id="manage">
+<div class="install-ipas">
+  <p class="manage-summary">2 selected · 5 IPAs · 2 signed · 1 installed</p>
+  <div class="install-ipas-mine"><div class="myipa-groups managing">
+    <div class="group"><h2 class="group-header">Not Installed</h2><ul class="table grouped">
+      <li class="cell myipa-row source-row manage-row has-price picked"><a class="cell-inner chevron" href="#"><span class="cell-icon">D</span><span class="cell-text"><span class="cell-label">Delta</span><span class="cell-subtitle">Version 1.5 · 10.0 MB · Not signed</span></span></a><button class="price-btn" type="button">SIGN</button><button class="del-confirm" type="button">Delete</button><span class="manage-check"></span></li>
+      <li class="cell myipa-row source-row manage-row has-price"><a class="cell-inner chevron" href="#"><span class="cell-icon">P</span><span class="cell-text"><span class="cell-label">Provenance</span><span class="cell-subtitle">Version 3.0 · 41.2 MB · Not signed</span></span></a><button class="price-btn" type="button">SIGN</button><button class="del-confirm" type="button">Delete</button><span class="manage-check"></span></li>
+      <li class="cell myipa-row source-row manage-row has-price picked"><a class="cell-inner chevron" href="#"><span class="cell-icon">U</span><span class="cell-text"><span class="cell-label">UTM</span><span class="cell-subtitle">Version 4.6 · 210 MB · Signed</span></span></a><button class="price-btn" type="button">INSTALL</button><button class="del-confirm" type="button">Delete</button><span class="manage-check"></span></li>
+    </ul></div>
+  </div></div>
+</div>
+</div>
+<div class="manage-toolbar myipa-toolbar shown" role="toolbar" style="position:static;transition:none">
+  <button class="bar-button done ipa-sign" type="button">Sign (2)</button>
+  <button class="bar-button ipa-unsign" type="button">Unsign (1)</button>
+  <button class="bar-button manage-delete ipa-delete" type="button">Delete (2)</button>
+</div>
+</body>
+</html>

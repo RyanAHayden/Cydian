@@ -27,7 +27,7 @@ test("F212: no Sign Options page in the jailbreak app (it doesn't sign)", () => 
 test("F212: the jailbreak app's empty list offers Files, a download and /var/mobile/Documents, no sideloaders", () => {
   const t = libraryEmptyText(false, { jailbreak: true });
   assert.match(t, /\/var\/mobile\/Documents/);
-  assert.match(t, /Add/);
+  assert.match(t, /Files/); // F224: the page's Add an IPA group (no Add button to name)
   assert.doesNotMatch(t, /AltStore|SideStore|Feather|sideload|browser/i);
   assert.match(libraryEmptyText(false), /On My iPhone > iFizBox/); // the sideload app's as before
 });

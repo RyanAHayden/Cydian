@@ -1,4 +1,4 @@
-/* F77: My IPAs (screens/myipas.js). The list reuses the plain table, the page the package page's header and grouped
+/* F77: My IPAs (screens/myipas.js). The list reuses the grouped table, the page the package page's header and grouped
    tables; only what's new is here. */
 .myipa-row .cell-icon { position: relative; overflow: hidden; }
 .myipa-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; }
@@ -10,57 +10,47 @@
 .cell-inner.myipa-delete .cell-text { flex: none; }
 .cell-inner.myipa-delete .cell-label { color: #b5322c; text-align: center; }
 
-/* Placeholder rows while Install IPAs' Browse loads (screens/myipas.js markPlaceholders): grey bars that pulse where
-   a category's name and count will be. */
-.cell.ph .cell-label:empty, .cell.ph .cell-label, .cell.ph .cell-detail { color: transparent; }
-.cell.ph .cell-detail, .cell.ph .cell-label:not(:first-child) { display: inline-block; }
-.cell.ph .cell-detail { width: 26px; height: 12px; border-radius: 6px; background: #dcdfe3; animation: ph-pulse 1.2s ease-in-out infinite alternate; }
-.cell.ph .cell-text { position: relative; }
-.cell.ph .cell-text:has(.cell-label) .cell-label { background: none; }
-.cell.ph:not(:first-child) .cell-label, .install-ipas-browse .group + .group .cell.ph .cell-label {
-  display: inline-block; height: 13px; width: 45%; border-radius: 6px; background: #dcdfe3; animation: ph-pulse 1.2s ease-in-out infinite alternate;
-}
-.install-ipas-browse .group + .group .cell.ph:nth-child(2n) .cell-label { width: 32%; }
-.install-ipas-browse .group:first-child .cell.ph .cell-label { color: inherit; background: none; width: auto; animation: none; }
-html[data-theme="dark"] .cell.ph .cell-detail, html[data-theme="dark"] .install-ipas-browse .group + .group .cell.ph .cell-label { background: var(--dk-placeholder); }
-@keyframes ph-pulse { from { opacity: 1; } to { opacity: .45; } }
+/* F224: Install IPAs. Rows wear sources.css's .source-row (the swipe's red Delete, .armed) and packages.css's
+   .manage-row / .manage-check (Installed's Manage circles, F222). The price button sits left of the chevron; a swipe's
+   Delete takes its place, Manage hides it and the chevron while the circles slide the row's content right. */
+/* The chevron is the cell's last flex item (ios6.css): the button's room is kept before it, so name and line
+   ellipsize short of the button and the chevron stays at the cell's right edge. A swipe or Manage gives the room back. */
+.myipa-row.has-price .cell-inner.chevron::after { margin-left: 96px; transition: margin-left .3s ease-in-out, opacity .2s ease; }
+.myipa-row.has-price.armed .cell-inner.chevron::after, .managing .myipa-row.has-price .cell-inner.chevron::after { margin-left: 0; }
+.myipa-row .price-btn { position: absolute; right: 28px; top: 50%; margin-top: -12px; transition: opacity .2s ease; }
+.myipa-row.armed .price-btn, .managing .myipa-row .price-btn { opacity: 0; pointer-events: none; }
+.managing .myipa-row .cell-inner { transform: translateX(37px); width: calc(100% - 37px); }
+.managing .myipa-row .cell-inner.chevron::after { opacity: 0; }
+.managing .myipa-row.picked, .managing .myipa-row.picked .cell-inner { background-color: #e1e8f5; }
+html[data-theme="dark"] .managing .myipa-row.picked, html[data-theme="dark"] .managing .myipa-row.picked .cell-inner { background-color: rgba(255,255,255,.15); }
+.install-ipas > .manage-summary { margin-top: 0; }
 
-/* F208: managing My IPAs. The red minus, Delete and swipe are sources.css's .source-row (the rows carry it). Edit
-   mode ticks rows for the toolbar: a ticked row gets the table's checkmark (ios6.css .cell-check's ✓ in --detail)
-   on the right, where the chevron was, and UITableView's pale blue multi-select fill. */
-.editing .myipa-row .cell-inner { padding-right: 34px; }
-.myipa-row::after {
-  content: "✓"; position: absolute; right: 12px; top: 50%; margin-top: -12px; line-height: 24px;
-  font-size: 20px; font-weight: bold; color: var(--detail); opacity: 0; transition: opacity .2s ease; pointer-events: none;
+/* iOS 6's App Store price button (packages.css .store-btn's: slate text embossed on a pale gradient, a grey-blue
+   outline, 24pt high, 4pt corners). SIGN / INSTALL / OPEN in the grey; the confirm tap's INSTALL in the store's green
+   (white text, a dark emboss, the gloss split at half); while it signs and installs a pale blue fill grows from the
+   left under the label (transform only, ::before). */
+.price-btn {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: hidden;
+  box-sizing: border-box; height: 24px; min-width: 62px; padding: 0 9px; border-radius: 4px; margin: 0; cursor: pointer;
+  font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; letter-spacing: 0; color: #5d6b81; text-shadow: 0 1px 0 #fff;
+  border: 1px solid #8f9aab; background: linear-gradient(#fdfdfe, #e2e6ec); background-origin: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
-.editing .myipa-row.picked::after { opacity: 1; }
-.editing .myipa-row.picked, .editing .myipa-row.picked .cell-inner { background-color: #e1e8f5; } /* the whole row, under the minus too */
-.myipa-row.armed::after { opacity: 0; }
-html[data-theme="dark"] .editing .myipa-row.picked, html[data-theme="dark"] .editing .myipa-row.picked .cell-inner { background-color: rgba(255,255,255,.15); }
-
-/* Edit mode's toolbar: the navigation bar's colours (ios6.css .navbar: #bdcbdc to #597498, the #eff2f7 highlight)
-   as UIToolbar in the same app, 44pt, docked above the tab bar and sliding up from behind it as the undo bar does.
-   Select All a plain bar button, Delete (n) red (nav/alert.js's red, the same gloss split at half). */
-.myipa-toolbar {
-  position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 2; height: 44px; box-sizing: border-box;
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 0 max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
-  background:
-    linear-gradient(#eff2f7, #eff2f7) top / 100% 1px no-repeat,
-    linear-gradient(#bdcbdc, #597498);
-  opacity: 0; transform: translate3d(0,100%,0); pointer-events: none;
-  transition: transform .3s cubic-bezier(.25,.1,.25,1), opacity .3s cubic-bezier(.25,.1,.25,1);
+.price-btn:active { background: linear-gradient(#d6dbe3, #eceff3); background-origin: border-box; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+.price-btn.go {
+  color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); border-color: #3a7a17; border-top-color: #2f6612;
+  background: linear-gradient(#8fd35d, #62b52c 49%, #52a61d 50%, #5cb024); background-origin: border-box;
 }
-.myipa-toolbar.shown { opacity: 1; transform: none; pointer-events: auto; }
-html[data-theme="dark"] .myipa-toolbar { background: var(--dk-nav-bar); }
-.myipa-toolbar .bar-button { flex: none; }
-/* Red in both themes, like the alert's red: specific enough (0,5,0) to beat the dark bar button (0,4,1). */
-.myipa-toolbar .bar-button.myipa-delete-many:not(.back):not(.done) {
-  border-color: #5e0909; border-top-color: #3a0606;
-  background: linear-gradient(#e46a6a, #c51f1f 49%, #b30f0f 50%, #bd1a1a); background-origin: border-box;
+.price-btn.go:active { background: linear-gradient(#73b446, #4c9a1d 49%, #3f8b11 50%, #489616); background-origin: border-box; box-shadow: none; }
+.price-btn.busy { cursor: default; }
+.price-btn.busy::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; transform-origin: left center;
+  transform: scaleX(var(--fill, 0)); transition: transform .3s linear;
+  background: linear-gradient(#d3e2f8, #a9c3ea);
 }
-.myipa-toolbar .bar-button.myipa-delete-many:not(.back):not(.done):is(:active, .is-pressed) {
-  background: linear-gradient(#bf4c4c, #9c1414 49%, #880909 50%, #941010); background-origin: border-box;
-}
-.bar-button.myipa-delete-many:disabled { opacity: .5; cursor: default; }
-html.has-myipa-toolbar .page-body::after { content: ""; display: block; flex: none; clear: both; height: 44px; }
+.price-btn.busy { isolation: isolate; }
+.price-btn:disabled { opacity: 1; }
+html[data-theme="dark"] .price-btn { color: var(--text); text-shadow: none; border-color: var(--dk-btn-edge); background: var(--dk-btn); background-origin: border-box; }
+html[data-theme="dark"] .price-btn:active { background: var(--dk-btn-pressed); background-origin: border-box; }
+html[data-theme="dark"] .price-btn.go { color: var(--text); border-color: var(--dk-btn-edge); background: var(--dk-green); }
+html[data-theme="dark"] .price-btn.busy::before { background: var(--dk-bar-fill); }

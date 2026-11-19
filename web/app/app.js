@@ -20,6 +20,7 @@ import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
 import { makeScrollToTop } from "./nav/statusbar.js";
 import { pageOpened } from "./nav/pagestate.js";
+import { createHomeTop, homeRootOf } from "./nav/hometop.js";
 import * as home from "./screens/home.js";
 import * as sources from "./screens/sources.js";
 import * as changes from "./screens/changes.js";
@@ -320,6 +321,7 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
   // A second tap at the root scrolls the page to the top (F148), then runs the screen's reselect() (Search focuses
   // its field), in this handler (F36).
   const tab = a.dataset.tab;
+  homeTop.tabTapped(tab); // F211: Home shows at its top when its tab is tapped from elsewhere (nav/hometop.js)
   // Back to the root of the tab you are on is our own pop, so it slides like Back (not a jump).
   tapTab(tab, router.current(), { selectTab: (t) => { ownBack = true; router.selectTab(t); }, reselect: SCREENS[tab].reselect,
     scrollTop: () => scrollToTop(stacks.top()?.page.body), sliding: () => isSliding(stacks.top()?.page.body) });
@@ -468,6 +470,14 @@ const OVERLAYS = ".alert-scrim, .action-scrim, .hud-scrim, .share-scrim, .sheet,
     if (refreshOnLaunch()) SCREENS.sources.refreshInBackground?.(ctx);
   });
 }
+
+// F211: the app opening on Home (launch, back from the background at any time, a Home Screen web app out of the
+// back/forward cache) shows Home at its top; the tab bar's click handler calls tabTapped (nav/hometop.js).
+const homeTop = createHomeTop({ homeRoot: homeRootOf(stacks), current: () => router.current(),
+  overlayUp: () => !!document.querySelector(OVERLAYS) });
+homeTop.opened();
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") homeTop.opened(); });
+addEventListener("pageshow", (e) => { if (e.persisted) homeTop.opened(); });
 
 // F75: ifizbox:// links from the website (Send Settings, Home's Open in iFizBox App) and elsewhere (incoming.js).
 // ifizbox://install (F89) is no longer sent by the website since F92/F95: only for links already out there.

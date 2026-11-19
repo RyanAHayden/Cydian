@@ -32,6 +32,26 @@ import { showAlert } from "./nav/alert.js";
 import { NAME, GITHUB_REPO } from "./brand.js";
 import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams, VPN_POLL, VPN_WAIT, VPN_CONNECTED, vpnReady } from "./core/installroute.js";
 import { SELF_RESTART } from "./core/apprun.js";
+import { INSECURE_IPA_ALERT, INSTALL_ANYWAY, isInsecure } from "./core/insecureipa.js";
+
+// B104: a bridge call that downloads an IPA (signing.install, signing.prepare, signing.inspect, library.add), sent by
+// `send(extra)`. For an http link the shell tries the https twin first; when there is none it answers "insecure", and
+// INSECURE_IPA_ALERT asks: Install Anyway sends it again with { insecure: true } (the shell's plain-http download),
+// Cancel rejects with code "cancelled", as the progress page's own Cancel does. Any other answer passes through.
+// `url` is the link: one the user let through in this session goes straight to http (Custom Install's look, then the
+// queue's signing.prepare of the same link, asks once).
+const httpAllowed = new Set();
+export async function askInsecure(send, { alert = showAlert, url = null } = {}) {
+  if (url && httpAllowed.has(url)) return send({ insecure: true });
+  try {
+    return await send({});
+  } catch (e) {
+    if (!isInsecure(e)) throw e;
+    if ((await alert(INSECURE_IPA_ALERT))?.index !== INSTALL_ANYWAY) throw Object.assign(new Error("Cancelled"), { code: "cancelled" });
+    if (url) httpAllowed.add(url);
+    return send({ insecure: true });
+  }
+}
 
 // F151: a job's error on the progress page (the HUD interface's fail, nav/progress.js) before its alert; a HUD
 // without one (liveHUD, the tests') just goes.
@@ -434,7 +454,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   try {
     // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
     // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
-    result = await untilCancel(h, bridge(native).call("signing.install", { ...withKeep(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}), ...route }, (ev) => {
+    result = await untilCancel(h, askInsecure((extra) => bridge(native).call("signing.install", { ...withKeep(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}), ...route, ...extra }, (ev) => {
       if (ev?.log) h.page?.raw?.(ev.log); // the shell's console lines (Sideload.swift install's log)
       // B111: This iPhone: the copy's and installd's own percents ({here}), not the overall "Installing on this iPhone"
       const here = route.route ? hereLabel(ev) : null;
@@ -449,9 +469,10 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
       if (route.route && lastHere && ev?.phase === "here") return; // a newer shell sends both: {here} wins
       const t = phaseLabel(ev);
       if (t) h.set(t);
-    }));
+    }), { alert, url: params ? null : url }));
   } catch (e) {
     if (h.cancelled) return false;
+    if (e?.code === "cancelled") { h.hide(); return false; } // B104: Cancel on This Download Is Not Secure
     const why = deviceError(e, name);
     failed(h, why.message);
     await alert({ title: why.title, message: why.message, buttons: ["OK"] });
@@ -569,13 +590,14 @@ const rowError = (e, name) => {
   return Object.assign(new Error(why.message), { code: e?.code ?? null });
 };
 
-export async function prepareOnDevice(job, { tag, signal = null, progress = () => {}, log = () => {}, native } = {}) {
+export async function prepareOnDevice(job, { tag, signal = null, progress = () => {}, log = () => {}, native, alert = showAlert } = {}) {
   const params = prepareParams(job);
   try {
-    return await abortable(native, "signing.prepare", params, (ev) => {
+    // B104: an http link with no https twin asks first (askInsecure); Cancel ends the row as its stop does
+    return await askInsecure((extra) => abortable(native, "signing.prepare", { ...params, ...extra }, (ev) => {
       if (ev?.log) { log(ev.log); return; }
       if (ev?.phase) progress(ev.phase === "downloading" ? "downloading" : "signing", Number(ev.progress) || 0);
-    }, { tag, signal });
+    }, { tag, signal }), { alert, url: params?.url ?? null });
   } catch (e) { throw rowError(e, job?.name || job?.id || ""); }
 }
 
@@ -678,8 +700,9 @@ export function discardPrepared(token, native) {
 
 // F243: every call but options carries Keep Bundle IDs off (withKeep), so an IPA without Sign Options of its own signs,
 // and counts as signed, the way Settings > Signing says; options sends the Sign Options page's own switch.
-export async function libraryCall(method, params = {}, onEvent, native) {
-  return bridge(native).call(`library.${method}`, method === "options" ? params : withKeep(params), onEvent);
+export async function libraryCall(method, params = {}, onEvent, native, { alert = showAlert } = {}) {
+  const send = (extra = {}) => bridge(native).call(`library.${method}`, method === "options" ? params : withKeep({ ...params, ...extra }), onEvent);
+  return method === "add" ? askInsecure(send, { alert, url: params?.url ?? null }) : send(); // B104: an http link with no https twin asks first
 }
 
 export async function serverReachable(server = getServer(), { timeout = 6000, fetcher = globalThis.fetch } = {}) {

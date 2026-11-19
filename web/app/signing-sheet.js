@@ -21,6 +21,7 @@ import { liveHUD } from "./nav/hud.js";
 import { grouped, el, row } from "./nav/ui.js";
 import { format, settingsRoute } from "./router.js";
 import { installOnDevice, openSigning } from "./signing-client.js";
+import { askInsecure } from "./signing-client.js"; // B104
 import { createSwitch } from "./screens/settings.js";
 import { phaseLabel, deviceError, inspectGroups, installParams, installedId, signsAsFor, isCgBI, fromBase64, notLandedText, SENT_TO_IOS } from "./core/signing.js";
 import { NAME } from "./brand.js";
@@ -49,9 +50,10 @@ export async function inspectAndInstall({ url, name = "", onInstalled = () => {}
   const h = hud("Downloading");
   let info;
   try {
-    info = await native.call("signing.inspect", withKeep({ url }), (ev) => { const t = phaseLabel(ev); if (t) h.set(t); });
+    info = await askInsecure((extra) => native.call("signing.inspect", withKeep({ url, ...extra }), (ev) => { const t = phaseLabel(ev); if (t) h.set(t); }), { alert, url });
   } catch (e) {
     h.hide();
+    if (e?.code === "cancelled") return false; // B104: Cancel on This Download Is Not Secure
     if (unknownMethod(e)) return install({ url, name, onInstalled });
     const why = deviceError(e, name);
     await alert({ title: why.title, message: why.message, buttons: ["OK"] });
@@ -98,9 +100,10 @@ export async function inspectToQueue({ url, name = "", queue },
   const h = hud("Downloading");
   let info;
   try {
-    info = await native.call("signing.inspect", withKeep({ url }), (ev) => { const t = phaseLabel(ev); if (t) h.set(t); });
+    info = await askInsecure((extra) => native.call("signing.inspect", withKeep({ url, ...extra }), (ev) => { const t = phaseLabel(ev); if (t) h.set(t); }), { alert, url });
   } catch (e) {
     h.hide();
+    if (e?.code === "cancelled") return false; // B104: Cancel on This Download Is Not Secure
     if (unknownMethod(e)) { queue(null); return true; }
     const why = deviceError(e, name);
     await alert({ title: why.title, message: why.message, buttons: ["OK"] });

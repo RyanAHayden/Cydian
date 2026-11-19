@@ -76,6 +76,9 @@ const server = http.createServer(async (inc, out) => {
     if (res.body && inc.method !== "HEAD") for await (const chunk of res.body) out.write(chunk);
     out.end();
   } catch (e) {
+    // F257: a body that broke off after its headers went (an upstream IPA cut short): end this answer short, as
+    // Cloudflare does, so the website resumes it with Range; writing headers again threw and took the server down
+    if (out.headersSent) { out.destroy(); return; }
     out.writeHead(500, { "Content-Type": "text/plain" }); out.end(String(e?.message ?? e));
   }
 });

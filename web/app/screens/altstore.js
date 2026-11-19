@@ -18,7 +18,8 @@ import { compat } from "../core/compat.js";
 import { currentDevice } from "../device.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall, onAppsChange } from "../core/installed.js";
-import { signAndInstall, localSigning, isSelfIpa, originalWarning } from "../signing-client.js";
+import { signAndInstall, localSigning, isSelfIpa, originalWarning, TOO_BIG_FOOTER } from "../signing-client.js";
+import { overSiteLimit } from "../core/websign.js";
 import { siteGateRows, markiFizBoxInstalled, websiteInstallsOn, SITE_GATE_FOOTER } from "../websign-gate.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
@@ -107,9 +108,10 @@ function card(children, cls = "") {
 export function installRows(version, sourceUrl, opener = (u) => window.open(u, "_blank", "noopener"), onInstall = () => {},
   queue = null, name = "", { custom = localSigning() && !ipaInstallAvailable(), customize = null, jailbreak = ipaInstallAvailable(),
     ipaInstall = openIpaInstall, site = detectMode() === "site", needsCertificate = siteCertificateAlert, appId = null,
-    gate = siteGateRows, bundleId = null, sign = signAndInstall } = {}) {
+    gate = siteGateRows, bundleId = null, sign = signAndInstall, iconUrl = null } = {}) {
   const o = installOptions(version, sourceUrl);
-  const own = { bundleId: bundleId || null, version: version?.version ?? "" };
+  // F257: the listed size (and the icon, for Install IPAs' row) go to the website's Install, which checks the size first
+  const own = { bundleId: bundleId || null, version: version?.version ?? "", size: Number(version?.size) || null, iconUrl: iconUrl || null };
   const rows = [];
   if (o.download && jailbreak) {
     // F88: the helper says whether it installed, so the record waits for its success (openIpaInstall's onInstalled)
@@ -146,6 +148,12 @@ const tapOnly = (rows) => rows.map((r) => (r.onClick ? { ...r, onClick: guarded(
 
 // F129: an app's own bundle ID: its AltStore bundleIdentifier, else its package row's id without the `~name` suffix
 // a source adds when two apps share one ID (core/altstore.js). null when neither is there.
+// F257: on the website, a version whose listed size (versions[].size) is over what the website signs (core/websign.js
+// IPA_MAX): its Size shows red with a footer, and Install opens the Too Big alert (signing-client.js tooBigAlert).
+// The apps sign on the phone and have no such cap; a source's own signed link isn't signed here either.
+export const siteTooBigApp = (v, { site = detectMode() === "site" } = {}) =>
+  Boolean(site && v && !installOptions(v, null).itms && overSiteLimit(v.size));
+
 export const appBundleId = (app, rowId = null) => app?.bundleIdentifier || String(rowId ?? "").split("~")[0] || null;
 
 const downloadRow = (url, opener) => ({ label: "Download IPA", subtitle: decodeURIComponent(url.split("/").pop() || ""), onClick: () => opener(url) });
@@ -578,7 +586,7 @@ async function siteInstallVersion(pkg, v, source) {
   const record = () => apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: v.version, key: pkg.key,
     source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
   const { rows, gated } = installRows(v, app.sourceUrl, undefined, record, null, app.name, { appId: pkg.row?.id ?? pkg.stanza.package,
-    bundleId: appBundleId(app, pkg.row?.id) });
+    bundleId: appBundleId(app, pkg.row?.id), iconUrl: app.iconURL });
   // F96: once website installs are accepted the downgrade signs here; until then it's Install in iFizBox.
   const first = gated && websiteInstallsOn() ? rows.find((r) => r.label === "Install on the Website") : rows[0];
   if (first && first.label !== "Download IPA") return first.onClick();
@@ -641,6 +649,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   let raised = ipaRaises(v, keptInfo);
   const fit = compat(keptInfo ? withIpaInfo(st, keptInfo) : st, currentDevice());
   const size = formatSize(v.size);
+  const tooBig = siteTooBigApp(v); // F257: the website can't sign it (its listed size is over the cap)
   // F194: Share sits on the header, where the App Store's install button was (the nav bar keeps Install / Modify).
   const header = storeHeader({ art: icon, name: app.name, author: app.developerName || null,
     action: headerShareButton(source ?? { key: pkg.key }, { app: true }),
@@ -697,6 +706,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   // F181: the sideways info tiles: Rating (once the App Store answers), Works On, Size, Section, Updated.
   tiles.set("works", worksOnTile(fit));
   tiles.set("size", sizeTile(size, "Free"));
+  if (tooBig) tiles.tiles.get("size")?.classList.add("size-over"); // F257: the tile's size red too (user 2026-11-19)
   tiles.set("section", sectionTile(pkg.row.section, "App"));
   tiles.set("updated", updatedTile(v.date));
   details.append(tiles.row);
@@ -736,7 +746,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     const info = [];
     if (app.developerName || m.developer) info.push({ label: "Developer", detail: app.developerName || m.developer });
     info.push({ label: "Version", detail: v.version });
-    if (size) info.push({ label: "Size", detail: size });
+    if (size) info.push({ label: "Size", detail: size, ...(tooBig ? { cls: "size-over" } : {}) }); // F257: red past the website's cap
     if (v.date) info.push({ label: "Updated", detail: formatDate(v.date) });
     info.push({ label: "Category", detail: m.category || pkg.row.section });
     if (raised && ipaRow) info.push({ label: "Compatibility", detail: ipaRow }); // B74: the IPA needs more than the source says
@@ -745,7 +755,8 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     if (m.version) info.push({ label: "App Store Version", detail: m.version });
     if (m.minimumOs) info.push({ label: "App Store Requires", detail: `iOS ${m.minimumOs} or later` });
     info.push({ label: "Bundle ID", detail: app.bundleIdentifier });
-    detailsBox.replaceChildren(grouped([{ header: "Information", rows: info, footer: lastFit.detail }]));
+    detailsBox.replaceChildren(grouped([{ header: "Information", rows: info,
+      footer: [lastFit.detail, tooBig ? TOO_BIG_FOOTER : null].filter(Boolean).join("\n\n") }]));
   };
   drawDetails();
   details.append(detailsBox);
@@ -805,7 +816,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   const queued = detectMode() !== "jailbreak"; // the app queue (F80) and Custom Install (F84) aren't in the jailbreak build
   const { rows, options, gated } = installRows(v, app.sourceUrl, undefined, record, queued ? () => appPageAction(pkg, source) : null, app.name,
     { ...(queued ? { customize: (o) => appPageCustom(pkg, source, o) } : {}), appId: pkg.row?.id ?? st.package ?? app.bundleIdentifier,
-      bundleId: appBundleId(app, pkg.row?.id) });
+      bundleId: appBundleId(app, pkg.row?.id), iconUrl: app.iconURL });
   const installGroup = grouped([{ header: "Install", rows,
     footer: gated ? SITE_GATE_FOOTER
       : options.download && ipaInstallAvailable() ? IPA_FOOTER

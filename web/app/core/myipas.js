@@ -16,7 +16,10 @@
 //   nameFromUrl(url)                     the file name a link would save as ("My App.ipa"), or ""
 //   ipaToken(file) / fileOfToken(seg)    the route segment of an IPA's page: "ipa:<file>"
 //   optionsParams(info, edits)           Sign Options for library.options; throws on a bad bundle ID
-//   SITE_KEY, siteEntries(storage), addSiteUrl(storage, url, now), removeSiteUrl(storage, file)
+//   SITE_KEY, siteEntries(storage), addSiteUrl(storage, url, now, about), removeSiteUrl(storage, file)
+//                                        F257: `about` ({ name, version, size, iconUrl }) is kept on the link's entry
+//   F257: siteTooBig(entry)              a link whose listed size the website can't sign: its Install hands it on
+//   markFresh(file, note) / freshNote()  the row Install IPAs puts at the top for one visit, and the note under the bar
 //   F197: an IPA picked in Files on the website, its bytes kept in this browser (IndexedDB):
 //   addSiteFile(file, { storage, store, read, room, now })   the entry ({ file, stored: true, name, bundleId, version,
 //                                        size, icon, minimumOS, added }); throws a clear error when it isn't an IPA,
@@ -25,6 +28,8 @@
 //   openIpaStore({ indexedDB }) / memoryIpaStore()   { put(file, blob), get(file), remove(file) }
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { validBundleId } from "./signing.js";
+import { IPA_MAX } from "./websign.js";
+import { NAME } from "../brand.js";
 import { SELECT, DESELECT } from "./installed.js"; // F224: Manage's words, as Installed's (F222)
 
 export const MYIPAS = "myipas"; // the Installed tab's path segment for the library
@@ -133,22 +138,53 @@ function saveSite(storage, list) {
 
 // Adds a link (an https URL to an .ipa); the same link twice is one entry. Answers the entry. Throws on a link
 // that isn't http(s).
-export function addSiteUrl(storage, url, now = Date.now()) {
+export function addSiteUrl(storage, url, now = Date.now(), about = null) {
   const u = String(url ?? "").trim();
   let parsed;
   try { parsed = new URL(u); } catch { throw new Error("That isn't a link."); }
   if (!/^https?:$/.test(parsed.protocol)) throw new Error("The link has to start with https://.");
   const list = siteEntries(storage);
+  const extra = aboutOf(about);
   const had = list.find((e) => e.url === parsed.href);
-  if (had) return had;
-  const base = nameFromUrl(parsed.href) || "App.ipa";
+  if (had) {
+    if (!Object.keys(extra).length) return had;
+    const next = { ...had, ...extra };
+    saveSite(storage, list.map((e) => (e === had ? next : e)));
+    return next;
+  }
+  const base = nameFromUrl(parsed.href) || (extra.name ? `${extra.name.replace(/[\u0000-\u001f\u007f:\\/]/g, "").replace(/^\.+/, "").trim() || "App"}.ipa` : "App.ipa");
   const taken = new Set(list.map((e) => e.file));
   let file = base;
   for (let n = 2; taken.has(file); n++) file = `${base.slice(0, -4)} ${n}.ipa`;
-  const entry = { file, url: parsed.href, name: file.slice(0, -4), added: new Date(now).toISOString() };
+  const entry = { file, url: parsed.href, name: file.slice(0, -4), added: new Date(now).toISOString(), ...extra };
   saveSite(storage, [...list, entry]);
   return entry;
 }
+
+// F257: what an app page knows about a link (the Too Big alert's Download IPA): only plain, short values are kept.
+function aboutOf(about) {
+  const out = {};
+  if (!about || typeof about !== "object") return out;
+  const text = (v, n) => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null);
+  const name = text(about.name, 200), version = text(about.version, 64);
+  if (name) out.name = name;
+  if (version) out.version = version;
+  const size = Number(about.size);
+  if (Number.isFinite(size) && size > 0) out.size = Math.round(size);
+  const icon = text(about.iconUrl, 2048);
+  if (icon && /^https?:\/\//i.test(icon)) out.iconUrl = icon;
+  return out;
+}
+
+// F257: a link the website can't sign (its listed size is over the cap): Install hands it to a sideloader instead.
+export const siteTooBig = (entry) => Boolean(entry && !entry.stored && Number(entry.size) > IPA_MAX);
+
+// F257: the row Install IPAs shows at the top, marked new, the next time it opens (after the Too Big alert's Download
+// IPA), with `note` under the bar. freshNote() answers it once and forgets it: the mark lasts that one visit.
+let fresh = null;
+export function markFresh(file, note = "") { fresh = file ? { file: String(file), note: String(note ?? "") } : null; }
+export function freshNote() { const f = fresh; fresh = null; return f; }
+export const hasFresh = () => Boolean(fresh);
 
 export function removeSiteUrl(storage, file) {
   saveSite(storage, siteEntries(storage).filter((e) => e.file !== file));
@@ -156,9 +192,9 @@ export function removeSiteUrl(storage, file) {
 
 // ---- F197: IPAs picked in Files, kept in this browser ----------------------------------------------------------
 
-// Safari lets a site keep about 1 GB before iOS 17 (more since, up to a share of the disk): one IPA up to 400 MB
-// leaves room for signing it (the IPA, its signed copy in memory) and for the user's other data.
-export const SITE_FILE_MAX = 400 * 1024 * 1024;
+// Safari lets a site keep about 1 GB before iOS 17 (more since, up to a share of the disk). F257: the same cap as the
+// website's signer (core/websign.js IPA_MAX): a kept IPA the website can't sign is no use here.
+export const SITE_FILE_MAX = IPA_MAX;
 const MB = (n) => Math.round(n / 1048576);
 
 const IPA_DB = "ifizbox-myipas", IPA_STORE = "files";
@@ -202,7 +238,7 @@ export async function addSiteFile(file, { storage = globalThis.localStorage, sto
   if (!size) throw new Error("That file is empty.");
   const fname = String(file?.name ?? "");
   if (fname && !/\.ipa$/i.test(fname)) throw new Error(`${fname} isn't an IPA: choose an .ipa file.`);
-  if (size > SITE_FILE_MAX) throw new Error(`${fname || "That IPA"} is ${MB(size)} MB: the website keeps IPAs up to ${MB(SITE_FILE_MAX)} MB. Add a bigger one From URL instead.`);
+  if (size > SITE_FILE_MAX) throw new Error(`${fname || "That IPA"} is ${MB(size)} MB. The website signs apps up to ${MB(SITE_FILE_MAX)} MB. Install this one with ${NAME} Lite, or hand it to another sideloader.`);
   const info = await read(file);
   const free = await Promise.resolve().then(room).catch(() => null);
   if (typeof free === "number" && free < size + 8 * 1048576) throw noRoom(size);

@@ -34,6 +34,10 @@
 .managing .myipa-row.picked, .managing .myipa-row.picked .cell-inner { background-color: #e1e8f5; }
 html[data-theme="dark"] .managing .myipa-row.picked, html[data-theme="dark"] .managing .myipa-row.picked .cell-inner { background-color: rgba(255,255,255,.15); }
 .install-ipas > .manage-summary { margin-top: 0; }
+/* F257: the Too Big alert's Download IPA, back in the web app: a note under the bar in the grouped footer's type
+   (ios6.css .group-footer), for this visit only. The row sits in its own "New" group at the top. */
+.install-ipas > .myipa-fresh-note { margin: 10px 12px 2px; font-size: 15px; line-height: 19px; text-align: center;
+  color: var(--head); text-shadow: var(--emboss); overflow-wrap: anywhere; }
 
 /* iOS 6's App Store price button (packages.css .store-btn's: slate text embossed on a pale gradient, a grey-blue
    outline, 24pt high, 4pt corners). SIGN / INSTALL / OPEN in the grey; the confirm tap's INSTALL in the store's green

@@ -55,7 +55,7 @@ import { queueWords, parseSimulation, mergePlans } from "./core/queue.js";
 import { installQueue } from "./queue.js";
 import { NAME } from "./brand.js";
 import { reviewsApi, reviewsBase } from "./core/reviews.js";
-import { updateFailures, failureFor } from "./core/aptupdate.js";
+import { updateFailures, failureFor, liveUpdate } from "./core/aptupdate.js";
 
 // The one apt source file iFizBox writes (ifizbox-helper addsource/removesource, F33).
 const IFIZBOX_SOURCES = /(^|\/)sources\.list\.d\/ifizbox\.sources$/;
@@ -168,6 +168,20 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
     // 100, "E: Some index files failed to download") it is no error: the rest updated, and refreshSources marks them.
     async update(onEvent) {
       const r = await backend.helper(["update"], onEvent);
+      const failures = updateFailures(r.stdout, r.stderr);
+      if (r.code !== 0 && !(r.code === 100 && failures.length)) {
+        throw new BackendError("helper", `apt-get update failed (${r.code}): ${lastLine(r.stderr) || "no output"}`);
+      }
+      return { ...r, failures };
+    },
+    // F233: apt-get update for one source ({ uri, dist, components }), a failed row's retry: `ifizbox-helper
+    // update-source <uri> <suite> [component...]`, which updates that source's lists only. A helper without the
+    // verb (or one that refuses the words) answers 64: then the whole update runs, as before.
+    async updateSource(source, onEvent) {
+      const dist = source?.dist || "./";
+      const words = ["update-source", source?.uri, dist, ...(dist.endsWith("/") ? [] : source?.components ?? [])];
+      const r = await backend.helper(words, onEvent);
+      if (r.code === 64) return backend.update(onEvent);
       const failures = updateFailures(r.stdout, r.stderr);
       if (r.code !== 0 && !(r.code === 100 && failures.length)) {
         throw new BackendError("helper", `apt-get update failed (${r.code}): ${lastLine(r.stderr) || "no output"}`);
@@ -570,9 +584,17 @@ function nativeSourceCalls(backend, call, opts) {
     // B23: a source apt-get update couldn't fetch gets apt's reason as its `error` (its row says Not Responding, F19,
     // even when apt kept its old lists), and the answer's `failed` lists every such source, filtered out or not:
     // [{ key, uri, name, message }] (key null for a URI no listed source has), for the caller's banner.
-    async refreshSources(onEach = () => {}, { filter, signal } = {}) {
+    // F233: `onRow(key, state, reason)` follows apt-get update's lines live (core/aptupdate.js liveUpdate): a row
+    // spins at apt's first line for it and goes red at its Err, before the lists are read back. `retry` with a filter
+    // that keeps one source runs apt-get update for that source alone (backend.updateSource).
+    async refreshSources(onEach = () => {}, { filter, signal, onRow, retry } = {}) {
       await migrateAdded();
-      const { failures = [] } = (await backend.update()) ?? {};
+      const wanted = onRow || retry ? (await list()).filter(filter ?? (() => true)) : [];
+      const live = onRow ? liveUpdate(wanted, onRow) : null;
+      const feed = live ? (ev) => live.feed(ev) : undefined;
+      const one = retry && wanted.length === 1 ? wanted[0] : null;
+      const { failures = [] } = (one ? await backend.updateSource(one, feed) : await backend.update(feed)) ?? {};
+      live?.end();
       if (signal?.aborted) return Object.assign([], { failed: [] });
       const db = await store();
       const all = await list();

@@ -458,12 +458,14 @@ export function sourceCalls(backend, opts = {}) {
     // F19: at most REFRESH_CONCURRENCY at once, each given `timeout` ms (a dead host is marked Not Responding
     // instead of holding the rest), with the health fields (reachedAt, failures) saved beside the result.
     // F150: `signal` (the reload bar's Cancel) starts no more sources once aborted; those under way finish.
+    // F233: `onRow(key, "loading")` as each source's fetch starts (the pool holds the rest back: their rows wait).
     async refreshSources(onEach = () => {}, { filter, timeout = opts.timeout ?? REFRESH_TIMEOUT,
-      concurrency = opts.concurrency ?? REFRESH_CONCURRENCY, signal } = {}) {
+      concurrency = opts.concurrency ?? REFRESH_CONCURRENCY, signal, onRow } = {}) {
       const db = await store();
       const list = (await db.list()).filter(filter ?? (() => true));
       return pool(list, concurrency, async (s) => {
         if (signal?.aborted) return null;
+        onRow?.(s.key, "loading");
         const fields = await refreshTimed(backend, s, { arch: arch(), count, timeout });
         const next = await db.update(s.key, { ...fields, ...healthFields(s, fields) });
         if (next) onEach(next);
@@ -502,14 +504,14 @@ export function firstLoadFilter(type) {
 // F43: refreshes the never-loaded sources in `list` (firstLoadFilter), once each per `tried` (a Set of keys the
 // caller keeps, so a source whose fetch throws isn't asked again on every visit). `begin()` runs before the fetch
 // and returns what ends it (the screen's HUD). Resolves to the refreshed records, or null when nothing needed it.
-export async function loadNeverLoaded(backend, list, type, { tried = new Set(), begin = () => () => {}, onEach } = {}) {
+export async function loadNeverLoaded(backend, list, type, { tried = new Set(), begin = () => () => {}, onEach, onRow } = {}) {
   const want = firstLoadFilter(type);
   const keys = new Set((Array.isArray(list) ? list : []).filter((s) => want(s) && !tried.has(s.key)).map((s) => s.key));
   if (!keys.size) return null;
   for (const k of keys) tried.add(k);
   const end = begin(keys);
   try {
-    return await backend.refreshSources(onEach, { filter: (s) => keys.has(s?.key) });
+    return await backend.refreshSources(onEach, { filter: (s) => keys.has(s?.key), ...(onRow ? { onRow } : {}) });
   } finally {
     end();
   }

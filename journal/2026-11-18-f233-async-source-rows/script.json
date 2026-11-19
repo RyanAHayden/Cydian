@@ -1,0 +1,16 @@
+[
+  {"nav": "#/sources", "ms": 9000},
+  {"shot": "0-before"},
+  {"clicktext": "Refresh", "ms": 1600},
+  {"shot": "1-early"},
+  {"wait": 2200},
+  {"shot": "2-mid"},
+  {"wait": 6000},
+  {"shot": "3-after"},
+  {"eval": "[document.querySelector('.refresh-strip')?.textContent, document.querySelector('.tab[data-tab=sources] .badge')?.textContent, [...document.querySelectorAll('.source-row')].map(li => li.className + ' | ' + li.textContent.replace(/\\s+/g,' ').trim())]"},
+  {"click": ".source-row.is-failed .cell-inner", "ms": 900},
+  {"shot": "4-retry"},
+  {"wait": 4000},
+  {"shot": "5-retried"},
+  {"eval": "[document.querySelector('.refresh-strip')?.textContent, document.querySelector('.refresh-strip')?.hidden, document.querySelector('.tab[data-tab=sources] .badge')?.textContent, location.hash]"}
+]

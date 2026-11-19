@@ -99,3 +99,71 @@ export function failedBanner(failed) {
 function hostOf(uri) {
   try { return new URL(uri).host + new URL(uri).pathname.replace(/\/+$/, ""); } catch { return String(uri ?? ""); }
 }
+
+// F233: apt-get update's lines as they come (backend.update(onEvent), the helper's { fd, line } events), turned into
+// row states for the sources they name, so the Sources tab's rows move while the one apt-get update runs:
+//
+//   const live = liveUpdate(sources, (key, state, reason) => ...)   // sources: [{ key, uri, dist }]
+//   live.feed({ fd: "out" | "err", line })
+//
+//   "Get:n <uri> <suite> <target>", "Hit:n ...", "Ign:n ..."  -> the source's row spins ("loading"), once
+//   "Err:n <uri> <suite> <target>" + an indented reason line   -> "failed" with apt's reason (Translation-* never)
+//   stderr "E: Failed to fetch <url> <reason>" and "E: The repository '<uri> <suite> Release' ..."  -> "failed"
+// A line naming no listed source changes nothing. apt says nothing per source when it is done (it fetches them all
+// at once): the rows that didn't fail land when refreshSources reads their lists back.
+export function liveUpdate(sources, onRow = () => {}) {
+  const list = (sources ?? []).filter((s) => s?.key != null && s?.uri);
+  const states = new Map(); // key -> "loading" | "failed"
+  let pending = null; // an Err line waiting for its indented reason: { key, target }
+  const sourceOf = (f) => list.find((s) => names(f, s)) ?? null;
+  const emit = (key, state, reason) => {
+    const cur = states.get(key);
+    if (cur === "failed" || cur === state) return;
+    states.set(key, state);
+    onRow(key, state, reason);
+  };
+  const flush = (reason = "") => {
+    if (!pending) return;
+    const p = pending;
+    pending = null;
+    emit(p.key, "failed", message(p.target, reason));
+  };
+  return {
+    states,
+    feed(ev) {
+      const line = String(ev?.line ?? "");
+      const fd = ev?.fd ?? "out";
+      if (fd === "status") return;
+      if (fd === "err") {
+        flush();
+        let m = /^[EW]: Failed to fetch (\S+)\s*(.*)$/.exec(line);
+        if (m) {
+          const target = m[1].split("/").pop();
+          const s = OPTIONAL.test(target) ? null : sourceOf({ uri: m[1], suite: null });
+          if (s) emit(s.key, "failed", message(target, m[2]));
+          return;
+        }
+        m = /^E: The repository '(\S+) (\S+)(?: (\S+))?' (.*)$/.exec(line);
+        const s = m && sourceOf({ uri: m[1], suite: m[2] });
+        if (s) emit(s.key, "failed", `apt-get update: ${m[4].replace(/\.$/, "")}`);
+        return;
+      }
+      if (pending && /^\s+\S/.test(line)) { flush(line.trim()); return; }
+      flush();
+      const m = /^(Hit|Get|Ign|Err):(\d+)\s+(\S+)\s+(\S+)(?:\s+(.*))?$/.exec(line);
+      if (!m) return;
+      const [, status, , uri, suite, rest = ""] = m;
+      const s = sourceOf({ uri, suite });
+      if (!s) return;
+      const words = rest.replace(/\s*\[[^\]]*\]\s*$/, "").trim().split(/\s+/).filter(Boolean);
+      const target = words[words.length - 1] ?? "";
+      if (status === "Err" && !OPTIONAL.test(target)) {
+        emit(s.key, "loading");
+        pending = { key: s.key, target };
+        return;
+      }
+      emit(s.key, "loading");
+    },
+    end() { flush(); },
+  };
+}

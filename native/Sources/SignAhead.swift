@@ -9,6 +9,8 @@
 //        -> {token, bundleId, originalBundleId, name, version, expires?, device}: the signed IPA is kept for `life`
 //   signing.open {token, manifestServer, host?, tag}   serves the kept IPA and opens iOS's Install prompt (host: iFizBox's
 //        own, uploaded to the Signing Server as signing.install's) -> signing.install's reply; records the app
+//        route: "idevice" (This iPhone): installd installs it, no prompt (stream: {phase: "copying" | "installing",
+//        progress}); the reply comes once it is installed and says installed: true
 //   signing.discard {token}                       forgets a kept IPA that will not be installed -> {discarded}
 //
 // `tag` is the app's (one per try): signing.cancel {tag} stops that app's download, signing or serving only
@@ -161,11 +163,17 @@ enum SignAhead {
                     var j: [String: Any] = ["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": app.name,
                                             "version": app.version, "removed": app.removed, "fixedArm64e": app.fixedArm64e]
                     if let x = rec.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
+                    if servers.local { j["installed"] = true } // B111: installd has it, no iOS prompt to wait for
                     Apt.reply(c, j, nil)
                 }
             }
             if servers.local {
-                Sideload.installHere(k.output, app: k.app, record: k.record, emit: nil, log: log, job: job, opened: opened, served: nil)
+                // B111: {phase: "copying" | "installing", progress} as installHere goes (the run's row and bar)
+                let throttle = Throttle()
+                let step = { (phase: String, p: Double) in
+                    if throttle.pass(phase, p) { c.emitOnMain([["phase": phase, "progress": p]]) }
+                }
+                Sideload.installHere(k.output, app: k.app, record: k.record, emit: nil, log: log, job: job, opened: opened, served: nil, step: step)
                 return
             }
             if let host = servers.host {

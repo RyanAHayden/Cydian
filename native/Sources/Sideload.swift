@@ -199,6 +199,11 @@ enum Sideload {
         let emit = { (phase: String, p: Double) in
             if throttle.pass(phase, p) { c.emitOnMain([["phase": phase, "progress": p]]) }
         }
+        // B111: This iPhone's steps on their own: {here: "copying" | "installing", progress} (signing-client.js hereLabel)
+        let stepThrottle = Throttle()
+        let step = { (phase: String, p: Double) in
+            if stepThrottle.pass(phase, p) { c.emitOnMain([["here": phase, "progress": p]]) }
+        }
         // The progress page's console (signing-client.js): what each step did, a line each.
         let log = { (s: String) in c.emitOnMain([["log": s]]) }
         let finish = { (r: Result<(SignedApp, SignedRecord), Error>) in
@@ -222,7 +227,7 @@ enum Sideload {
                     return Apt.reply(c, nil, "gone: that IPA was looked at more than 15 minutes ago; start again")
                 }
                 log("Using the IPA downloaded for the look-first sheet (\(p.url))")
-                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish)
+                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step)
             }
             return
         }
@@ -233,7 +238,7 @@ enum Sideload {
             case .failure(let e): finish(.failure(e))
             case .success(let file):
                 log("Downloaded \(Sideload.size(file))")
-                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish)
+                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step)
             }
         }
         job.onCancel { d.cancel() }
@@ -325,7 +330,7 @@ enum Sideload {
     static func signAndOpen(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions, servers: Servers,
                             emit: @escaping (String, Double) -> Void, log: ((String) -> Void)? = nil, job: SignJob? = nil,
                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
-                            served: ((Bool) -> Void)? = nil) {
+                            served: ((Bool) -> Void)? = nil, step: ((String, Double) -> Void)? = nil) {
         let tok = SignBridge.token()
         let output = SignBridge.work.appendingPathComponent("\(tok).ipa")
         defer { try? FileManager.default.removeItem(at: input) }
@@ -360,7 +365,7 @@ enum Sideload {
                                   version: app.version, url: url, signed: Date(),
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored)
         if servers.local { // "Installing on this iPhone" (phase "here"), not iOS's own install
-            installHere(output, app: app, record: record, emit: emit, log: log, job: job, opened: opened, served: served)
+            installHere(output, app: app, record: record, emit: emit, log: log, job: job, opened: opened, served: served, step: step)
             return
         }
         emit("installing", 0)
@@ -380,7 +385,9 @@ enum Sideload {
     // so its record is kept first.
     static func installHere(_ output: URL, app: SignedApp, record: SignedRecord, emit: ((String, Double) -> Void)?,
                             log: ((String) -> Void)?, job: SignJob?, opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
-                            served: ((Bool) -> Void)?) {
+                            served: ((Bool) -> Void)?, step: ((String, Double) -> Void)? = nil) {
+        // B111: `step` (the IPA queue's signing.open) gets each step's own fraction: "copying" (the AFC upload's bytes
+        // sent) then "installing" (installd's percent), so the run's row shows them and no "iOS prompt" step
         let isSelf = app.bundleID == Bundle.main.bundleIdentifier
         IDevice.ilog("This iPhone: \(app.bundleID) \(app.version), \(Sideload.size(output))")
         log?("Installing on this iPhone through LocalDevVPN (\(IDevice.address)); nothing goes to a Signing Server")
@@ -395,11 +402,11 @@ enum Sideload {
             do {
                 try job?.check()
                 log?("Copying the IPA to iOS (\(Sideload.size(output))), then iOS installs it")
-                try IDevice.install(output, note: { log?($0) }) { step in
-                    switch step {
-                    case .connected: emit?("here", 0.02)
-                    case .upload(let p): emit?("here", 0.02 + p * 0.28)
-                    case .install(let p): emit?("here", 0.3 + p * 0.7)
+                try IDevice.install(output, note: { log?($0) }) { st in
+                    switch st {
+                    case .connected: emit?("here", 0.02); step?("copying", 0)
+                    case .upload(let p): emit?("here", 0.02 + p * 0.28); step?("copying", p)
+                    case .install(let p): emit?("here", 0.3 + p * 0.7); step?("installing", p)
                     }
                 }
                 result = .success(())

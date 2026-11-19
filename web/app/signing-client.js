@@ -31,6 +31,7 @@ import { recordSelfUpdate } from "./core/selfupdate.js";
 import { showAlert } from "./nav/alert.js";
 import { NAME, GITHUB_REPO } from "./brand.js";
 import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams, VPN_POLL, VPN_WAIT, VPN_CONNECTED, vpnReady } from "./core/installroute.js";
+import { SELF_RESTART } from "./core/apprun.js";
 
 // F151: a job's error on the progress page (the HUD interface's fail, nav/progress.js) before its alert; a HUD
 // without one (liveHUD, the tests') just goes.
@@ -424,15 +425,28 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   const route = await chooseRoute({ native, alert });
   if (!route) return false;
   // This iPhone: installd puts the app (iFizBox too) in place itself, so no Signing Server and no hosting.
+  const self = isSelfIpa(url) || host; // iFizBox itself, whichever route
   if (route.route) host = false;
   const h = hud("Downloading");
   h.onCancel?.(() => stopNative(native));
+  let lastHere = null;
   let result;
   try {
     // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
     // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
     result = await untilCancel(h, bridge(native).call("signing.install", { ...withKeep(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}), ...route }, (ev) => {
       if (ev?.log) h.page?.raw?.(ev.log); // the shell's console lines (Sideload.swift install's log)
+      // B111: This iPhone: the copy's and installd's own percents ({here}), not the overall "Installing on this iPhone"
+      const here = route.route ? hereLabel(ev) : null;
+      if (here) {
+        if (ev.here !== lastHere) {
+          lastHere = ev.here;
+          if (ev.here === "installing" && self) h.page?.step?.(SELF_RESTART);
+        }
+        h.set(here.label);
+        return;
+      }
+      if (route.route && lastHere && ev?.phase === "here") return; // a newer shell sends both: {here} wins
       const t = phaseLabel(ev);
       if (t) h.set(t);
     }));
@@ -445,6 +459,12 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     return false;
   }
   if (h.cancelled) return false;
+  if (route.route && !self && result?.bundleId !== IFIZBOX_ID) {
+    // B111: This iPhone answers once installd has the app: no iOS prompt to follow, so Installed and Open <app>
+    onInstalled(result);
+    finishHere(h, result, { native, name, later });
+    return true;
+  }
   h.set("Installing");
   onInstalled(result);
   // iFizBox itself (host): iOS's Install prompt is up, and iFizBox closes once it's answered so the install finishes
@@ -573,8 +593,16 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     const route = await chooseRoute({ native, signal: signal ?? new AbortController().signal, onWait: () => progress("vpn", 0) });
     if (!route) throw Object.assign(new Error("Cancelled"), { code: "cancelled" });
     if (route.route) host = false; // This iPhone: installd updates iFizBox in place
+    // B111: This iPhone has no iOS prompt: the row shows the copy and installd's percent (herePhase), and the reply
+    // comes once installd has the app
+    if (route.route) progress("copying", 0);
     opened = await abortable(native, "signing.open", { token: row.token, manifestServer: getServer(), ...(host ? { host: true } : {}), ...route },
-      (ev) => { if (ev?.log) log(ev.log); }, { tag, signal });
+      (ev) => {
+        if (ev?.log) { log(ev.log); return; }
+        const p = route.route ? herePhase(ev) : null;
+        if (p) progress(p.phase, p.fraction);
+      }, { tag, signal });
+    if (route.route) return { installed: opened?.installed ?? true, expires: opened?.expires ?? null };
   } catch (e) { throw rowError(e, name); }
   progress("asking", 0);
   if (host) recordSelfUpdate(storageOf(), opened?.version || row?.version); // B83: the next launch checks it landed
@@ -593,6 +621,36 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
   }
   // B85: dismissed: iOS's prompt closed and iOS never asked for the IPA (the user tapped Cancel on it)
   return { installed: r?.installed ?? null, expires: opened?.expires ?? null, ...(r?.dismissed ? { dismissed: true } : {}) };
+}
+
+// B111: signing.install's {here: "copying" | "installing", progress} event (This iPhone) -> { label } for the page's
+// step and bar ("Copying to iPhone 40%", "Installing 75%"), or null
+export function hereLabel(ev) {
+  const word = { copying: "Copying to iPhone", installing: "Installing" }[ev?.here];
+  if (!word) return null;
+  const p = Math.round(Math.max(0, Math.min(1, Number(ev.progress) || 0)) * 100);
+  return { label: p > 0 && p < 100 ? `${word} ${p}%` : word };
+}
+
+// B111: the single install's end on This iPhone: installd has the app, so "Installed <app>", the bar full, and
+// Open <app> (signing.openApp) above the Return button.
+export function finishHere(h, result, { native, name = "", later = setTimeout } = {}) {
+  const app = result?.name || name || "the app";
+  const text = `Installed ${app}`;
+  const bid = result?.bundleId;
+  if (typeof h.finish === "function") {
+    h.set(`${text} 100%`);
+    const open = () => { try { Promise.resolve(bridge(native).call("signing.openApp", { bundleId: bid })).catch(() => {}); } catch { /* no bridge */ } return false; };
+    h.finish({ status: text, ...(bid ? { also: { label: `Open ${app}`, action: open } } : {}) });
+  } else later(() => (h.done ? h.done(text) : h.hide()), 1200);
+}
+
+// B111: signing.open's event on the This iPhone route -> the run's { phase: "copying" | "installing", fraction 0..1 },
+// or null (not a step event)
+export function herePhase(ev) {
+  if (ev?.phase !== "copying" && ev?.phase !== "installing") return null;
+  const f = Number(ev.progress);
+  return { phase: ev.phase, fraction: Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : 0 };
 }
 
 // B85: the run's "Tap Install on the iOS prompt" row: iOS's prompt for that app again -> true when the shell re-opened it

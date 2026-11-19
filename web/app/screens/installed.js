@@ -54,6 +54,9 @@
 // presets (core/installed.js selectSheet); with every row picked it reads Deselect. Each toolbar action confirms with
 // a sheet, then runs its jobs through the app queue (screens/queue.js runAppQueue) on the progress page, labelled
 // "Re-signing Delta (1 of 3)" with the run's progress on its bar; the list (and its pills) loads again at the end.
+// F240: in the sideload app the jobs go through Confirm's sign-ahead run instead (screens/queue.js runAppQueueRun:
+// every app signed first, a row per app on the black page, one failure doesn't stop the rest); the website keeps
+// runAppQueue.
 // Signed apps the list doesn't remember that came from the user's own IPAs say "From My IPAs" (the signature
 // record's url is library:..., native MyIPAs.fileOf) and re-sign from that file (signing.resign does).
 import * as browse from "./browse.js";
@@ -1347,7 +1350,8 @@ export async function runManage(kind, { view = appView, mode = detectMode(), she
     return false;
   }
   const res = await run(kind, all);
-  // B66: the run stops at the first failure (its alert already shown) or before it starts (the Signing walkthrough):
+  // B66: the run stops at the first failure (its alert already shown) or before it starts (the Signing walkthrough);
+  // F240: the sign-ahead run's failed and cancelled rows stay queued the same way:
   // Manage stays on with the apps that didn't go through still picked, so nothing is dropped quietly.
   const left = Array.isArray(res?.left) ? res.left.filter((id) => picked.some((r) => r.id === id)) : [];
   if (!left.length) { done(); return true; }
@@ -1367,12 +1371,21 @@ async function deleteOne(a, r) {
   return forgetApp(r);
 }
 
-// The run: every job into the app queue (screens/queue.js runAppQueue, as Confirm's: one at a time, iFizBox last, the
-// first failure stops it and leaves the rest queued), each on the progress page as "Re-signing Delta (1 of 3)".
-export async function runManageJobs(kind, jobs, { queue = null, run = null, install = manageInstall, hud = null } = {}) {
+// The run: every job into the app queue. F240: in the sideload app it is Confirm's sign-ahead run (screens/queue.js
+// runAppQueueRun, screens/apprun.js: every app signed first, then handed to iOS in order, iFizBox last, on the black
+// page with Apps | Log rows); a failed or cancelled row stays queued and comes back as `left`, the rest go on. The
+// website (signing in the browser) keeps runAppQueue: one at a time, the first failure stops it and leaves the rest
+// queued, each on the progress page as "Re-signing Delta (1 of 3)". `ahead`: use the sign-ahead run (null: the
+// phone can sign ahead, unless a `run` was given); `aheadRun`: runAppQueueRun (tests).
+export async function runManageJobs(kind, jobs, { queue = null, run = null, install = manageInstall, hud = null, ahead = null, aheadRun = null } = {}) {
   const q = queue ?? (await import("../app-queue.js")).appQueue;
-  const runner = run ?? (await import("./queue.js")).runAppQueue;
   for (const j of jobs) q.add(j);
+  if (ahead ?? (!run && await canSignAhead())) {
+    const r = await (aheadRun ?? (await import("./queue.js")).runAppQueueRun)(jobs, { queue: q });
+    // null: the Signing walkthrough opened instead (or another run holds the queue), nothing ran
+    return { done: r?.installed ?? 0, left: jobs.filter((j) => q.get(j.id)).map((j) => j.id) };
+  }
+  const runner = run ?? (await import("./queue.js")).runAppQueue;
   let i = 0;
   const n = jobs.length;
   // B66: a blocked app's newest version under Re-sign is an install, and says so
@@ -1380,6 +1393,12 @@ export async function runManageJobs(kind, jobs, { queue = null, run = null, inst
   const done = await runner(jobs, { queue: q, install: (j) => install(j, { verb: verb(j), i: ++i, n, hud }) });
   // B66: the ids the run didn't get through (still queued: it stopped at a failure, or never started)
   return { done, left: jobs.filter((j) => q.get(j.id)).map((j) => j.id) };
+}
+
+// F240: the phone signs ahead (the sideload app with signing.prepare), as screens/queue.js useAppRun decides for Confirm.
+async function canSignAhead() {
+  const sc = await import("../signing-client.js");
+  return sc.localSigning() && typeof sc.prepareOnDevice === "function";
 }
 
 // One job of the run with the bulk label: a re-sign through screens/queue.js resignApp, an update signed on the phone

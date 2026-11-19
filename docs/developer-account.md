@@ -87,8 +87,9 @@ It should say `production`.
 
 ## 6. Use it in iFizBox
 
-1. **Settings > Signing**: the `.p12`, its password and the `.mobileprovision` (on the website, or in the app:
-   Replace Certificate).
+1. **Settings > Signing** > Import Certificate (Replace Certificate if one is in): the `.p12` and the
+   `.mobileprovision`, then the password in the Password group, typed or with Read From a .txt File. A `.p12` with no
+   password says Not Needed there.
 2. Leave **Keep Bundle IDs** on (the default). Settings > Signing lists anything the profile can't do (no Push, a
    wildcard, a development profile).
 3. Delete the App Store copy of the app first if it's on the phone: iOS won't put a signed app over it, and its data
@@ -106,4 +107,5 @@ The same steps are in the app: Home > User Guides > Notifications for Signed App
 - **No notifications**: the profile has no `aps-environment` (Push wasn't on when it was made, or it's a development
   profile), Keep Bundle IDs was off when the app was signed, or the app was never allowed to send notifications.
 - **Every app stops opening at once**: the certificate expired or was revoked. Make a new one (step 2) and a new
-  profile (step 5), then re-sign.
+  profile (step 5), then re-sign. In the sideload app, Home shows a tile when the certificate or profile is about to
+  expire (Settings > Signing > Show Expiry Warning sets how early).

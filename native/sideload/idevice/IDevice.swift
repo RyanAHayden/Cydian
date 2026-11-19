@@ -298,6 +298,124 @@ enum IDevice {
         return p.map { Data(bytes: $0, count: Int(n)) } ?? Data()
     }
 
+    // ---- Logging and time limits for connecting and installing
+    //
+    // One os_log line per step (subsystem ifizbox.idevice, category install), public, so the syslog relay shows it
+    // (NSLog never reached it on iOS 27). idevice's own log (Info: no keys, no payloads) goes to Caches/idevice.log;
+    // its last lines are copied into os_log when a step fails or stops answering.
+    //
+    // No idevice call has a read timeout (its 5 s limit covers TCP connects only), so a phone that stops answering
+    // left the install waiting for ever (f15pair4, 2026-11-19: the tunnel stayed up, 14.4 MB went over it, then only
+    // empty TCP segments, and the page never got an error). Every step now runs under a Watch: the work runs on its
+    // own thread, and when a step goes quiet past its limit the tunnel is closed (adapter_close on a clone), which
+    // makes idevice's waiting read fail, and the install fails with what stopped.
+
+    private static let installLog = OSLog(subsystem: "ifizbox.idevice", category: "install")
+    static func ilog(_ s: String) { os_log("%{public}@", log: installLog, type: .default, "\(Brand.name) install: \(s)") }
+
+    static let libraryLogURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("idevice.log")
+    private static let libraryLogStarted: Bool = {
+        var path = Array(libraryLogURL.path.utf8CString)
+        let r = path.withUnsafeMutableBufferPointer { idevice_init_logger(Disabled, Info, $0.baseAddress) }
+        ilog("idevice log: \(libraryLogURL.path) (\(r))")
+        return true
+    }()
+
+    /// The last lines of idevice's own log, into os_log (after a failure).
+    static func relayLibraryLog(_ lines: Int = 30) {
+        guard let fh = try? FileHandle(forReadingFrom: libraryLogURL) else { return }
+        defer { try? fh.close() }
+        let end = (try? fh.seekToEnd()) ?? 0
+        try? fh.seek(toOffset: end > 8192 ? end - 8192 : 0)
+        let text = String(decoding: (try? fh.readToEnd()) ?? Data(), as: UTF8.self)
+        for line in text.split(separator: "\n").suffix(lines) { ilog("idevice: \(line)") }
+    }
+
+    /// Time limits, in seconds. A step fails when nothing moved for its limit; progress (an uploaded chunk, an
+    /// installd percentage) starts the clock again.
+    enum Limit {
+        static let tunnel: TimeInterval = 30   // RPPairing verify, the tunnel, the RSD handshake (or lockdown)
+        static let service: TimeInterval = 20  // connecting to AFC or installation_proxy through RSD
+        static let afcStep: TimeInterval = 20  // one AFC request (mkdir, open, close, remove)
+        static let upload: TimeInterval = 30   // one 1 MB chunk
+        static let install: TimeInterval = 180 // installd's next percentage (a big app verifies for a while)
+        static let grace: TimeInterval = 10    // after closing the tunnel, for the stuck call to come back
+    }
+
+    /// The step running now and when it last moved; the watchdog's view of the work thread.
+    final class Watch {
+        private let lock = NSLock()
+        private var step = "starting", limit = Limit.tunnel, last = Date()
+        private var closer: OpaquePointer? // an AdapterHandle clone, only for adapter_close; freed here
+        private(set) var detail = ""
+
+        func begin(_ s: String, _ l: TimeInterval) {
+            lock.lock(); step = s; limit = l; last = Date(); lock.unlock()
+            IDevice.ilog("step: \(s) (limit \(Int(l)) s)")
+        }
+        func alive(_ d: String? = nil) { lock.lock(); last = Date(); if let d = d { detail = d }; lock.unlock() }
+        var now: (step: String, limit: TimeInterval, quiet: TimeInterval) {
+            lock.lock(); defer { lock.unlock() }
+            return (step, limit, Date().timeIntervalSince(last))
+        }
+        func setCloser(_ a: OpaquePointer?) { lock.lock(); closer = a; lock.unlock() }
+        /// Shuts the tunnel's TCP stack down: every read waiting on it fails at once.
+        func closeTunnel() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            guard let c = closer else { return false }
+            adapter_close(c).map(idevice_error_free)
+            return true
+        }
+        func releaseCloser() {
+            lock.lock(); let c = closer; closer = nil; lock.unlock()
+            if let c = c { adapter_free(c) }
+        }
+    }
+
+    private final class Outcome<T> {
+        let done = DispatchSemaphore(value: 0)
+        var result: Result<T, Error>?
+    }
+
+    /// Runs `body` on its own thread under a Watch and waits for it, at most each step's limit of quiet. A step that
+    /// overruns closes the tunnel and throws "timeout: <step> …"; if the call still doesn't come back, its thread is
+    /// left with everything it holds (nothing is freed under it).
+    static func watched<T>(_ what: String, _ body: @escaping (Watch) throws -> T) throws -> T {
+        _ = libraryLogStarted
+        let w = Watch(), out = Outcome<T>()
+        let t0 = Date()
+        let th = Thread {
+            do { out.result = .success(try body(w)) } catch { out.result = .failure(error) }
+            out.done.signal()
+        }
+        th.stackSize = 4 << 20 // idevice runs its futures on this thread (block_on)
+        th.start()
+        while out.done.wait(timeout: .now() + 0.5) == .timedOut {
+            let n = w.now
+            guard n.quiet > n.limit else { continue }
+            let why = "\(n.step): no answer from iOS for \(Int(n.limit)) s" + (w.detail.isEmpty ? "" : " (\(w.detail))")
+            ilog("TIMEOUT \(why); closing the tunnel")
+            let closed = w.closeTunnel()
+            if out.done.wait(timeout: .now() + Limit.grace) == .timedOut {
+                ilog("the stuck call didn't come back (tunnel closed: \(closed)); leaving it")
+            } else if case .failure(let e)? = out.result {
+                ilog("the stuck call ended with: \(e.localizedDescription)")
+            }
+            relayLibraryLog()
+            throw Failure(code: "timeout", text: "\(why). Check that LocalDevVPN is on, then try again")
+        }
+        switch out.result! {
+        case .success(let v):
+            ilog("\(what): done in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+            return v
+        case .failure(let e):
+            ilog("\(what): FAILED at \(w.now.step) after \(String(format: "%.1f", Date().timeIntervalSince(t0))) s: \((e as? Failure)?.errorDescription ?? e.localizedDescription)")
+            relayLibraryLog()
+            throw e
+        }
+    }
+
     // ---- Connecting
 
     static func sockaddr4(_ port: UInt16) -> sockaddr_in {
@@ -309,35 +427,54 @@ enum IDevice {
         return a
     }
 
-    /// One connection to the phone's services, over whichever route the stored pairing is for.
+    /// One connection to the phone's services, over whichever route the stored pairing is for. Made and used on the
+    /// one thread `watched` runs (idevice's handles aren't thread safe); only the Watch's adapter clone is touched
+    /// from the watchdog.
+    ///
+    /// RemotePairing (the order idevice's own pair_rsd_ios tool and StikDebug use): tunnel_create_rppairing does the
+    /// TCP connect to 49152, pair-verify, createListener, the TLS-PSK tunnel on the port the phone answers, and the
+    /// RSD handshake to the RSD port the tunnel's handshake names, all through idevice's userspace TCP stack (jktcp)
+    /// to the tunnel's server address (fd4f:…::1), not the OS network. The adapter's I/O task keeps running on
+    /// idevice's multi-thread runtime after the call returns, for as long as `adapter` (or a clone) lives. The
+    /// RPPairing control connection is dropped when the call returns ("host disconnected" in remotepairingdeviced's
+    /// log): the tunnel stays up without it (its stats go on every 30 s), as for every idevice user.
     final class Session {
         private var provider: OpaquePointer? // lockdown: IdeviceProviderHandle
         private var adapter: OpaquePointer?  // RemotePairing: AdapterHandle (the tunnel)
         private var handshake: OpaquePointer? // and its RsdHandshakeHandle
         private var heartbeat: OpaquePointer?
         private var beating = false
+        private let watch: Watch
         let kind: Kind
 
-        init() throws {
+        init(watch: Watch) throws {
+            self.watch = watch
             guard let (kind, data) = IDevice.pairing() else {
                 throw Failure(code: "not_paired", text: "pair this iPhone first (Settings > Installation)")
             }
             self.kind = kind
             switch kind {
             case .remotePairing:
+                watch.begin("connecting to iOS at \(address):\(remotePairingPort) (RemotePairing tunnel, RSD)", Limit.tunnel)
+                ilog("addresses: \(interfaceAddresses())")
                 var rp: OpaquePointer?
                 try data.withUnsafeBytes { try check(rp_pairing_file_from_bytes($0.baseAddress?.assumingMemoryBound(to: UInt8.self), UInt(data.count), &rp), "bad_pairing") }
                 defer { rp_pairing_file_free(rp) }
                 var a = sockaddr4(remotePairingPort)
+                let t0 = Date()
                 let err = withUnsafePointer(to: &a) {
                     $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                         tunnel_create_rppairing($0, socklen_t(MemoryLayout<sockaddr_in>.size), Brand.name, rp, nil, nil, &adapter, &handshake)
                     }
                 }
                 try check(err, "connect_failed")
+                guard adapter != nil, handshake != nil else { throw Failure(code: "connect_failed", text: "idevice made no tunnel") }
+                watch.setCloser(adapter_clone(adapter))
+                ilog("tunnel and RSD up in \(String(format: "%.2f", Date().timeIntervalSince(t0))) s: \(rsdSummary())")
                 // A pair-verify that fell back to pair-setup updates the file in place: keep what it is now.
                 if let now = try? IDevice.bytes(rp), now != data { try? savePairing(now, kind: .remotePairing) }
             case .lockdown:
+                watch.begin("connecting to iOS at \(address):\(lockdownPort) (lockdown)", Limit.tunnel)
                 var pf: OpaquePointer?
                 try data.withUnsafeBytes { try check(idevice_pairing_file_from_bytes($0.baseAddress?.assumingMemoryBound(to: UInt8.self), UInt(data.count), &pf), "bad_pairing") }
                 var a = sockaddr4(lockdownPort)
@@ -347,8 +484,28 @@ enum IDevice {
                 if err != nil { idevice_pairing_file_free(pf) } // consumed only on success
                 try check(err, "connect_failed")
                 try check(heartbeat_connect(provider, &heartbeat), "connect_failed")
+                ilog("lockdown connected, heartbeat on")
                 startHeartbeat()
             }
+        }
+
+        /// "RSD <uuid>, 63 services; AFC on 52012, installation_proxy on 52040", for the log.
+        private func rsdSummary() -> String {
+            var parts: [String] = []
+            var uuid: UnsafeMutablePointer<CChar>?
+            if rsd_get_uuid(handshake, &uuid).map({ idevice_error_free($0) }) == nil, let u = uuid {
+                parts.append("RSD \(String(cString: u))"); rsd_free_string(u)
+            }
+            var all: UnsafeMutablePointer<CRsdServiceArray>?
+            if rsd_get_services(handshake, &all).map({ idevice_error_free($0) }) == nil, let s = all {
+                parts.append("\(s.pointee.count) services"); rsd_free_services(s)
+            }
+            for (label, name) in [("AFC", "com.apple.afc.shim.remote"), ("installation_proxy", "com.apple.mobile.installation_proxy.shim.remote")] {
+                var info: UnsafeMutablePointer<CRsdService>?
+                if let e = rsd_get_service_info(handshake, name, &info) { idevice_error_free(e); parts.append("\(label) MISSING") }
+                else if let i = info { parts.append("\(label) on \(i.pointee.port)"); rsd_free_service(i) }
+            }
+            return parts.joined(separator: ", ")
         }
 
         /// lockdown drops a client that stops answering its heartbeat: answer marco with polo while connected.
@@ -365,25 +522,30 @@ enum IDevice {
         }
 
         func afc() throws -> OpaquePointer? {
+            watch.begin("connecting to AFC", Limit.service)
             var c: OpaquePointer?
             switch kind {
             case .remotePairing: try check(afc_client_connect_rsd(adapter, handshake, &c), "afc_failed")
             case .lockdown: try check(afc_client_connect(provider, &c), "afc_failed")
             }
+            ilog("AFC connected")
             return c
         }
 
         func installationProxy() throws -> OpaquePointer? {
+            watch.begin("connecting to installation_proxy", Limit.service)
             var c: OpaquePointer?
             switch kind {
             case .remotePairing: try check(installation_proxy_connect_rsd(adapter, handshake, &c), "install_failed")
             case .lockdown: try check(installation_proxy_connect(provider, &c), "install_failed")
             }
+            ilog("installation_proxy connected")
             return c
         }
 
         deinit {
             beating = false
+            watch.releaseCloser()
             if let h = heartbeat { heartbeat_client_free(h) }
             if let h = handshake { rsd_handshake_free(h) }
             if let a = adapter { adapter_free(a) }
@@ -392,56 +554,89 @@ enum IDevice {
     }
 
     /// Connects once with the stored pairing: "is the pairing still good and LocalDevVPN on". Blocking.
-    static func verify() throws -> Kind { try Session().kind }
+    static func verify() throws -> Kind { try watched("verify") { try Session(watch: $0).kind } }
 
     // ---- Installing
 
-    enum Step { case upload(Double), install(Double) }
+    enum Step { case connected, upload(Double), install(Double) }
 
-    private final class ProgressBox { let f: (Step) -> Void; init(_ f: @escaping (Step) -> Void) { self.f = f } }
+    private final class ProgressBox { let f: (UInt64) -> Void; init(_ f: @escaping (UInt64) -> Void) { self.f = f } }
 
-    /// Installs a signed IPA on this phone (blocking; call it on `queue`). Installing this app itself works too:
-    /// installd ends the process, so the call never returns then.
-    static func install(_ ipa: URL, progress: @escaping (Step) -> Void) throws {
-        let s = try Session()
-        let remote = "\(stagingDir)/\(UUID().uuidString).ipa"
-        try upload(ipa, to: remote, session: s, progress: progress)
-        let ip = try s.installationProxy()
-        defer { installation_proxy_client_free(ip) }
-        let box = Unmanaged.passRetained(ProgressBox(progress))
-        defer { box.release() }
-        let cb: @convention(c) (UInt64, UnsafeMutableRawPointer?) -> Void = { pct, ctx in
-            guard let ctx = ctx else { return }
-            Unmanaged<ProgressBox>.fromOpaque(ctx).takeUnretainedValue().f(.install(Double(min(pct, 100)) / 100))
+    /// Installs a signed IPA on this phone (blocking; call it on `queue`). Every step has a time limit (Limit), so
+    /// it ends with an error rather than waiting for ever. Installing this app itself works too: installd ends the
+    /// process, so the call never returns then. `note` gets a line per step for the progress page's console.
+    static func install(_ ipa: URL, note: @escaping (String) -> Void = { _ in }, progress: @escaping (Step) -> Void) throws {
+        let size = (try? ipa.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { $0 } ?? 0
+        ilog("installing \(ipa.lastPathComponent) (\(mb(size)))")
+        try watched("install") { (w: Watch) -> Void in
+            let s = try Session(watch: w)
+            note(s.kind == .remotePairing ? "Connected to iOS (RemotePairing tunnel)" : "Connected to iOS (lockdown)")
+            progress(.connected)
+            let remote = "\(stagingDir)/\(UUID().uuidString).ipa"
+            try upload(ipa, size: size, to: remote, session: s, watch: w, note: note, progress: progress)
+            let ip = try s.installationProxy()
+            defer { installation_proxy_client_free(ip) }
+            w.begin("iOS installing the app (installd)", Limit.install)
+            note("iOS is installing it")
+            var lastPct: UInt64 = .max
+            let box = Unmanaged.passRetained(ProgressBox { pct in
+                w.alive("\(pct)% installed")
+                if pct != lastPct { lastPct = pct; ilog("installd: \(pct)%") }
+                progress(.install(Double(min(pct, 100)) / 100))
+            })
+            defer { box.release() }
+            let cb: @convention(c) (UInt64, UnsafeMutableRawPointer?) -> Void = { pct, ctx in
+                guard let ctx = ctx else { return }
+                Unmanaged<ProgressBox>.fromOpaque(ctx).takeUnretainedValue().f(pct)
+            }
+            let err = installation_proxy_install_with_callback(ip, remote, nil, cb, box.toOpaque())
+            if err == nil { ilog("installd: Complete") }
+            if let afc = try? s.afc() {
+                w.begin("removing the staged IPA", Limit.afcStep)
+                afc_remove_path(afc, remote).map(idevice_error_free); afc_client_free(afc)
+            }
+            try check(err, "install_failed")
+            progress(.install(1))
         }
-        let err = installation_proxy_install_with_callback(ip, remote, nil, cb, box.toOpaque())
-        if let afc = try? s.afc() { afc_remove_path(afc, remote).map(idevice_error_free); afc_client_free(afc) }
-        try check(err, "install_failed")
-        progress(.install(1))
     }
 
     static let chunk = 1 << 20
 
-    private static func upload(_ ipa: URL, to remote: String, session s: Session, progress: (Step) -> Void) throws {
+    static func mb(_ n: Int) -> String { String(format: "%.1f MB", Double(n) / 1_048_576) }
+
+    private static func upload(_ ipa: URL, size total: Int, to remote: String, session s: Session, watch w: Watch,
+                               note: (String) -> Void, progress: (Step) -> Void) throws {
         let fh = try FileHandle(forReadingFrom: ipa)
         defer { try? fh.close() }
-        let total = (try? ipa.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { $0 } ?? 0
         let afc = try s.afc()
         defer { afc_client_free(afc) }
+        w.begin("opening \(remote) on iOS (AFC)", Limit.afcStep)
         afc_make_directory(afc, stagingDir).map(idevice_error_free) // there already: an error, and fine
         var file: OpaquePointer?
         try check(afc_file_open(afc, remote, AfcWrOnly, &file), "upload_failed")
-        var sent = 0
+        w.begin("copying the IPA to iOS (AFC)", Limit.upload)
+        note("Copying the IPA to iOS (\(mb(total)))")
+        var sent = 0, logged = 0
+        let t0 = Date()
         do {
             while let d = try fh.read(upToCount: chunk), !d.isEmpty {
                 try d.withUnsafeBytes { try check(afc_file_write(file, $0.baseAddress?.assumingMemoryBound(to: UInt8.self), d.count), "upload_failed") }
                 sent += d.count
+                w.alive("\(mb(sent)) of \(mb(total)) copied")
+                if sent - logged >= 8 * chunk || sent == total {
+                    logged = sent
+                    let secs = max(Date().timeIntervalSince(t0), 0.001)
+                    ilog("AFC: \(mb(sent)) of \(mb(total)) (\(String(format: "%.1f", Double(sent) / 1_048_576 / secs)) MB/s)")
+                }
                 progress(.upload(total > 0 ? Double(sent) / Double(total) : 0))
             }
         } catch {
             afc_file_close(file).map(idevice_error_free)
             throw error
         }
+        w.begin("closing \(remote) on iOS (AFC)", Limit.afcStep)
         try check(afc_file_close(file), "upload_failed")
+        ilog("AFC: copied \(mb(sent)) in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+        note("Copied \(mb(sent)) to iOS")
     }
 }

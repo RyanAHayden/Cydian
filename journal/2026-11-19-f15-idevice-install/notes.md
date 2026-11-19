@@ -137,3 +137,40 @@ Fix:
 - No timeout: the listener, Bonjour and KeepAlive's silent audio last until paired, Cancel, or leaving the page
   (hashchange sends idevice.pairCancel).
 - Logs: os_log `%{public}@`, subsystem `ifizbox.idevice`, category `pair`.
+
+## Paired, then the first install hung (iPhone 15 Pro, iOS 27.0.1, build 1899, f15pair4)
+
+Paired at 16:14:45. Install with This iPhone, Airplane Mode on, LocalDevVPN on. The page stayed on its install
+step; no line from the app (the install path still used NSLog). remotepairingdeviced only:
+- 16:17:07.92 a connection to 10.7.1.1:49152 opened and closed at once (the route check), then tcp-41: pair-verify
+  ok, `Creating tunnel`, `Server ready on port 56552`, TLS, `Tunnel established: utun10, fd4f:7e72:e906::1 ->
+  ::2`, RSD on 56553.
+- 16:17:08.106 `tcp-41: received error reading message`, `TCP connected peers updated. Total count: 0`, `Rolling
+  bonjour advert after host disconnected`. That is the RPPairing control connection only: idevice's
+  `tunnel_create_rppairing` drops its `RemotePairingClient` when it returns (ffi/src/tunnel_provider.rs). The tunnel
+  isn't torn down with it: its `Stats` line goes on every 30 s until the log ends (16:23). StikDebug does the same.
+- Stats: 16:17:38 packets in/out 2204/1083, bytes in 14,459,428 (the IPA going up by AFC). From then on +60 packets
+  in and +30 out every 30 s, ~62 bytes each: empty TCP segments, no data either way, for 6 minutes.
+
+So the app sat in an idevice call waiting for a reply that never came (an AFC write/close status, or
+installation_proxy's next status), with nothing to end it: idevice has no read timeouts (its global 5 s covers TCP
+connects only), jktcp has no zero-window probe, and `IDevice.install` ran with no limit, so the page never got an
+error. Which reply it was can't be told from the phone's side alone (installd isn't in this process-filtered log).
+
+Fix (coord/fix-pin):
+- `IDevice.watched`: the install (and idevice.verify) runs on its own thread under a `Watch`; each step has a limit of
+  quiet (`IDevice.Limit`: tunnel 30 s, AFC/installation_proxy connect 20 s, AFC request 20 s, each 1 MB chunk 30 s,
+  installd's next percentage 180 s). Over the limit, the watchdog closes the tunnel (`adapter_close` on an
+  `adapter_clone`, so idevice's waiting read fails at once) and fails with `timeout: <step>: no answer from iOS for
+  N s (<progress>)`. A call that still doesn't return is left with what it holds (nothing is freed under it).
+- os_log `%{public}@`, subsystem `ifizbox.idevice`, category `install`, one line per step: `step: …`,
+  `addresses: …`, `tunnel and RSD up in X s: RSD <uuid>, N services, AFC on P, installation_proxy on P`, `AFC: X MB
+  of Y MB (Z MB/s)`, `AFC: copied …`, `installd: N%`, `installd: Complete`, `install: done in …` or `install: FAILED
+  at <step> …`, `TIMEOUT …; closing the tunnel`. idevice's own log (Info) goes to Caches/idevice.log and its last 30
+  lines are relayed as `idevice: …` after a failure.
+- The page: This iPhone's install is its own phase, "Installing on this iPhone N%" (connected 2%, upload to 30%,
+  then installd), apart from "Downloading". A download that fails without internet says "No Internet Connection"
+  (`offline:`), including Airplane Mode with LocalDevVPN up (no address on en*/pdp_ip*).
+- Sideload.install's reply passes a `Failed`'s own code (`offline:`, `timeout:`) instead of `internal: …`.
+
+Next run: grep the relay for `ifizbox.idevice` / `install:`; the last `step:` line before a TIMEOUT is where it stops.

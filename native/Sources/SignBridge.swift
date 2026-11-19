@@ -194,6 +194,38 @@ final class Throttle {
 
 // An IPA download to a file, with progress and a size cap.
 final class Download: NSObject, URLSessionDownloadDelegate {
+    // Airplane Mode (LocalDevVPN still on, so iOS may not say "offline" at once): a download fails with "offline:
+    // No internet connection…", not a bare URLError, so the page says why the install stopped at Downloading.
+    static func offline(_ e: URLError) -> Bool {
+        switch e.code {
+        case .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff: return true
+        case .timedOut, .cannotFindHost, .dnsLookupFailed, .cannotConnectToHost, .networkConnectionLost: return !hasInternetInterface()
+        default: return false
+        }
+    }
+
+    static func offlineText(_ url: URL?) -> String {
+        "offline: No internet connection: downloading the IPA\(url?.host.map { " from \($0)" } ?? "") needs one. Turn off Airplane Mode or join Wi-Fi, then try again"
+    }
+
+    /// Wi-Fi (en*) or cellular (pdp_ip*) has a routable address. LocalDevVPN's utun and loopback don't count.
+    static func hasInternetInterface() -> Bool {
+        var list: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&list) == 0, let first = list else { return true } // can't tell: don't claim offline
+        defer { freeifaddrs(list) }
+        for p in sequence(first: first, next: { $0.pointee.ifa_next }) {
+            let name = String(cString: p.pointee.ifa_name)
+            guard name.hasPrefix("en") || name.hasPrefix("pdp_ip"), (p.pointee.ifa_flags & UInt32(IFF_UP)) != 0,
+                  let a = p.pointee.ifa_addr else { continue }
+            if Int32(a.pointee.sa_family) == AF_INET { return true }
+            if Int32(a.pointee.sa_family) == AF_INET6 {
+                let b = a.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) { $0.pointee.sin6_addr.__u6_addr.__u6_addr8.0 }
+                if b != 0xfe { return true } // not link-local fe80::
+            }
+        }
+        return false
+    }
+
     private let dest: URL, max: Int64
     private let progress: (Double) -> Void
     private let done: (String?) -> Void
@@ -253,7 +285,8 @@ final class Download: NSObject, URLSessionDownloadDelegate {
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let e = error as? URLError { finish(e.code == .timedOut ? "timeout: \(e.localizedDescription)" : "network: \(e.localizedDescription)") }
+        if let e = error as? URLError, Download.offline(e) { finish(Download.offlineText(task.originalRequest?.url)) }
+        else if let e = error as? URLError { finish(e.code == .timedOut ? "timeout: \(e.localizedDescription)" : "network: \(e.localizedDescription)") }
         else if let e = error { finish("network: \(e.localizedDescription)") }
         else { finish(nil) }
     }

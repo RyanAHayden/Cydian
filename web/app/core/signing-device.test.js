@@ -48,6 +48,9 @@ test("phase labels for the HUD", () => {
   assert.equal(phaseLabel({ phase: "reading", progress: 1 }), "Reading");
   assert.equal(phaseLabel({ phase: "signing", progress: 0.5 }), "Signing 50%");
   assert.equal(phaseLabel({ phase: "installing", progress: 0.5 }), "Installing");
+  // This iPhone's own install says so, with its percentage, apart from Downloading (an offline download is obvious)
+  assert.equal(phaseLabel({ phase: "here", progress: 0 }), "Installing on this iPhone");
+  assert.equal(phaseLabel({ phase: "here", progress: 0.42 }), "Installing on this iPhone 42%");
   assert.equal(phaseLabel({ phase: "what" }), null);
   assert.equal(phaseLabel(null), null);
 });
@@ -69,4 +72,16 @@ test("no_manifest (B30): the native text naming the host, and where the Signing 
     message: "Couldn't reach sign.ifizbox.com: The request timed out. iOS can't show Install without it. "
       + "Check the connection, or the Signing Server in Settings > Signing.",
   });
+});
+
+test("offline: a download without internet says No Internet Connection with the shell's words", () => {
+  const e = Object.assign(new Error("No internet connection: downloading the IPA from example.com needs one. Turn off Airplane Mode or join Wi-Fi, then try again"), { code: "offline" });
+  const why = deviceError(e, "Delta");
+  assert.equal(why.title, "No Internet Connection");
+  assert.equal(why.open, null);
+  assert.match(why.message, /^No internet connection/);
+  // This iPhone's time limits: the step that stopped, as the native text has it
+  const t = deviceError(Object.assign(new Error("copying the IPA to iOS (AFC): no answer from iOS for 30 s (14.0 MB of 20.0 MB copied)"), { code: "timeout" }), "Delta");
+  assert.equal(t.title, "Couldn't Install Delta");
+  assert.match(t.message, /^Copying the IPA to iOS/);
 });

@@ -205,7 +205,8 @@ enum Sideload {
             switch r {
             case .failure(let e):
                 job.end()
-                Apt.reply(c, nil, SignBridge.text(job.cancelled ? SignJob.cancelledError : e))
+                // Failed carries its own code ("offline: …", This iPhone's "timeout: …"), as MyIPAs replies it
+                Apt.reply(c, nil, job.cancelled ? SignBridge.text(SignJob.cancelledError) : (e as? Failed)?.text ?? SignBridge.text(e))
             case .success(let (app, rec)):
                 var j: [String: Any] = ["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": app.name,
                                         "version": app.version, "removed": app.removed, "fixedArm64e": app.fixedArm64e]
@@ -358,11 +359,11 @@ enum Sideload {
         let record = SignedRecord(bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                                   version: app.version, url: url, signed: Date(),
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored)
-        emit("installing", 0)
-        if servers.local {
+        if servers.local { // "Installing on this iPhone" (phase "here"), not iOS's own install
             installHere(output, app: app, record: record, emit: emit, log: log, job: job, opened: opened, served: served)
             return
         }
+        emit("installing", 0)
         if let host = servers.host { // B64: this call's own choice, made when it started
             log?("Uploading to \(host)/sign/host (\(app.name) replaces this app, so iOS installs it from the server)")
             hostAndOpen(output, server: host, app: app, record: record, job: job, opened: opened, served: served)
@@ -372,15 +373,18 @@ enum Sideload {
     }
 
     // The "This iPhone" route (Servers.local): `output` (deleted after) goes to installd over LocalDevVPN, AFC upload then
-    // installation_proxy (IDevice.install). Progress is the page's "installing" phase: the upload its first 30%, then
-    // installd's own percentage. `opened` and `served` get the result once installd has installed it, so the
+    // installation_proxy (IDevice.install). Progress is the page's "here" phase ("Installing on this iPhone", apart from
+    // "Downloading"): connected 2%, the upload up to 30%, then installd's own percentage. Every step has a time limit
+    // (IDevice.Limit), so a phone that stops answering ends the install with an error instead of a page left waiting. `opened` and `served` get the result once installd has installed it, so the
     // signing.progress that follows finds the app there. iFizBox itself: installd ends this process while it installs,
     // so its record is kept first.
     static func installHere(_ output: URL, app: SignedApp, record: SignedRecord, emit: ((String, Double) -> Void)?,
                             log: ((String) -> Void)?, job: SignJob?, opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
                             served: ((Bool) -> Void)?) {
         let isSelf = app.bundleID == Bundle.main.bundleIdentifier
+        IDevice.ilog("This iPhone: \(app.bundleID) \(app.version), \(Sideload.size(output))")
         log?("Installing on this iPhone through LocalDevVPN (\(IDevice.address)); nothing goes to a Signing Server")
+        emit?("here", 0)
         if isSelf {
             saveRecords(SignedRecords.adding(record, to: records()))
             log?("\(app.name) replaces this app: iOS closes it while it installs; open it again once it's done")
@@ -391,10 +395,11 @@ enum Sideload {
             do {
                 try job?.check()
                 log?("Copying the IPA to iOS (\(Sideload.size(output))), then iOS installs it")
-                try IDevice.install(output) { step in
+                try IDevice.install(output, note: { log?($0) }) { step in
                     switch step {
-                    case .upload(let p): emit?("installing", p * 0.3)
-                    case .install(let p): emit?("installing", 0.3 + p * 0.7)
+                    case .connected: emit?("here", 0.02)
+                    case .upload(let p): emit?("here", 0.02 + p * 0.28)
+                    case .install(let p): emit?("here", 0.3 + p * 0.7)
                     }
                 }
                 result = .success(())
@@ -406,9 +411,11 @@ enum Sideload {
                 switch result {
                 case .failure(let e):
                     let text = (e as? IDevice.Failure)?.errorDescription ?? SignBridge.text(e)
+                    IDevice.ilog("This iPhone: \(app.bundleID) failed: \(text)")
                     log?("This iPhone's install failed: \(text)")
                     opened(.failure(job?.cancelled == true ? SignJob.cancelledError : Failed(text: text))); served?(false)
                 case .success:
+                    IDevice.ilog("This iPhone: \(app.bundleID) installed")
                     log?("iOS installed \(app.name) \(app.version)")
                     if !isSelf { saveRecords(SignedRecords.adding(record, to: records())) }
                     reschedule()

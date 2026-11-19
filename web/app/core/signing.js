@@ -409,8 +409,11 @@ export function deviceSummary(identity, { now = new Date(), locale, timeZone } =
   return { rows, problems, device: deviceCheckText(p?.device) };
 }
 
-// The HUD's text for a signing.install progress event { phase, progress }.
-const PHASES = { downloading: "Downloading", reading: "Reading", signing: "Signing", installing: "Installing" };
+// The HUD's text for a signing.install progress event { phase, progress }. "here": This iPhone's own install (AFC
+// upload, then installd through LocalDevVPN, Sideload.swift installHere), with its percentage, so a page waiting
+// offline at Downloading can't be taken for one waiting on the phone.
+const PHASES = { downloading: "Downloading", reading: "Reading", signing: "Signing", installing: "Installing",
+  here: "Installing on this iPhone" };
 export function phaseLabel(ev) {
   const name = PHASES[ev?.phase];
   if (!name) return null;
@@ -433,6 +436,10 @@ export function deviceError(err, name = "") {
   if (code === "device_not_in_profile") {
     // F236: the shell checked the profile against this phone before signing (DeviceCheck.swift): its own sentence.
     return { title: "iPhone Not in Profile", open: "signing", message };
+  }
+  if (code === "offline") {
+    // The download needs the internet (Airplane Mode, no Wi-Fi): the native text says so and what to do.
+    return { title: "No Internet Connection", open: null, message };
   }
   if (code === "no_manifest") {
     // B30: the app fetched the install manifest itself before handing iOS the link (iOS shows nothing when it can't).

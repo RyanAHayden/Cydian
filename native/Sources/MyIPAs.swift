@@ -241,7 +241,7 @@ enum MyIPAs {
             }
             let record = SignedRecord(bundleID: s.bundleID, originalBundleID: s.originalBundleID, name: s.name, version: s.version,
                                       url: libraryURL(file), signed: s.signed, expires: s.expires, options: s.options)
-            emit("installing", 0)
+            if !servers.local { emit("installing", 0) } // This iPhone: installHere sends its own phase ("here")
             // B29: the progress page's console, as signing.install has it: the bundle ID and what iOS fetched.
             let log = { (line: String) in c.emitOnMain([["log": line]]) }
             log("Installing the signed copy of \(file): \(s.name) \(s.version) as \(s.bundleID)")

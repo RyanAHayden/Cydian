@@ -93,6 +93,45 @@ class PairOnPhone(unittest.TestCase):
         self.assertIn('"_remotepairing-pairable-host._tcp"', read("IDevice.swift"))
 
 
+class InstallNeverHangs(unittest.TestCase):
+    # f15pair4 (iPhone 15 Pro, iOS 27.0.1): the tunnel came up, 14.4 MB went over it, then nothing moved and the page
+    # waited for ever with no log line from the app (NSLog doesn't reach the syslog relay on iOS 27).
+    def test_os_log_public_not_nslog(self):
+        src = read("IDevice.swift")
+        self.assertNotIn("NSLog(", src)
+        self.assertIn('OSLog(subsystem: "ifizbox.idevice", category: "install")', src)
+        self.assertIn('"%{public}@", log: installLog', src)
+        side = open(os.path.join(NATIVE, "Sources", "Sideload.swift")).read()
+        body = side[side.index("static func installHere("):side.index("static func serveAndOpen(")]
+        self.assertNotIn("NSLog(", body)
+        self.assertIn("IDevice.ilog(", body)
+
+    def test_every_step_has_a_limit(self):
+        src = read("IDevice.swift")
+        # the whole install and verify run under the watchdog, which closes the tunnel when a step goes quiet
+        self.assertIn('try watched("install")', src)
+        self.assertIn('watched("verify")', src)
+        self.assertIn("adapter_clone(adapter)", src)
+        self.assertIn("adapter_close(c)", src)
+        self.assertIn('Failure(code: "timeout"', src)
+        install = src[src.index("static func install("):]
+        for step in ["Limit.install", "Limit.afcStep", "Limit.upload"]:
+            self.assertIn(step, install)
+        session = src[src.index("final class Session"):src.index("static func verify()")]
+        for step in ["Limit.tunnel", "Limit.service"]:
+            self.assertIn(step, session)
+        self.assertGreaterEqual(install.count("w.alive("), 2)  # an uploaded chunk, an installd percentage
+
+    def test_page_tells_installing_here_from_downloading(self):
+        side = open(os.path.join(NATIVE, "Sources", "Sideload.swift")).read()
+        body = side[side.index("static func installHere("):side.index("static func serveAndOpen(")]
+        self.assertIn('emit?("here"', body)
+        self.assertNotIn('emit?("installing"', body)
+        sign = open(os.path.join(NATIVE, "Sources", "SignBridge.swift")).read()
+        self.assertIn('"offline: No internet connection', sign)
+        self.assertIn(".notConnectedToInternet", sign)
+
+
 class Built(unittest.TestCase):
     # The built IPA is checked by mkipa.py check right after native/build.sh builds it (the gate's last step). A
     # check here would read whatever native/build/ipa a checkout last built, from before a merge brought idevice in.

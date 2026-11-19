@@ -26,10 +26,35 @@
   Z/D dropped, N and Y passed, end of file when the caller closes; CYDIA set; copy gone).
 - `web/app/backend-native-queuerun.test.js`: share.debInstall gets `ask: true` with onEvent, `false` without.
 
-## Device check (iPhone 7)
+## Device check (iPhone 7, 0.9.8-1605 of this branch)
 
-See below.
+- A test package `f239test-conf` with one conffile (`/var/jb/etc/f239test.conf`): 1.0 installed with dpkg, the file
+  then edited on the phone (the "user" change), 2.0 (a different file) in a flat `[trusted=yes]` repo served from
+  the scratchpad through `ssh -R` at http://127.0.0.1:18739/.
+- Before testing, the app binary's md5 on the phone matched this build's, and the phone's web/backend-native.js
+  and helper held the change. (A grep for "install-deb-ask" in the app binary finds nothing: Swift stores
+  strings of 15 bytes or less inline in the code, so compare md5s instead.)
+- Package page > Modify > Upgrade > Confirm. The queue run showed "Downloading F239 Test conf 1 KB / Downloaded"
+  (the shell's share.debFetch; the server log has the shell's GET, then apt's own GET of the same file, apt's
+  repo-copy preference F234 noted), then apt ran, and the **Configuration Upgrade** alert came with
+  `/var/jb/etc/f239test.conf` (ref/7/screens/f239-13.png). Accept the New Copy: the file became the package's
+  2.0 copy, dpkg kept the old one as `.dpkg-old`, the log showed "Configuration file …: installing the package's new
+  copy", the row ended Installed and the summary said "1 installed".
+- The first tries tapped the wrong buttons in the Modify sheet (it is still sliding up when the first screenshot
+  is taken, so a tap read off it lands one button lower): an Ignore Upgrades (undone with Stop Ignoring Upgrades)
+  and a Remove (cancelled at Confirm). A second screenshot before tapping fixed it.
+- Cleanup: f239test-conf purged; the source file, its lists, the .dpkg-old and the /tmp files deleted; no holds
+  left. This branch's iFizBox (0.9.8-1605) stays installed. The http server and tunnel run under `timeout 3600`
+  and stop on their own (started with `run_in_background`, so I kept no pid, and pattern kills are not allowed).
+- When I first installed this build, F238 held the phone's screen lock and its own 0.9.8-1605 was installed
+  ("Unpacking … (0.9.8-1605) over (0.9.8-1605)"): my install will have replaced F238's build in the middle of its
+  test. I waited for the lock and reinstalled before testing. If F238's device check looks odd, that is why.
 
 ## Not verified
 
-See below.
+- **Keep My Old Copy on the phone.** Only Accept the New Copy was tapped (one upgrade per test package). The N
+  answer goes the same relay as Y and is checked on Linux by `test_chain_ask`.
+- **Cancel during install-deb-ask on the phone.** The relay's `C` handling is apply-ask's code, unchanged; not
+  tried here (a 1 KB package left no time to tap it).
+- **The share sheet route.** share.debInstall without `ask` (Open in iFizBox's .deb) still runs plain install-deb;
+  not rerun on the phone, but its code path only gained the default `ask: false`.

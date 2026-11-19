@@ -21,7 +21,7 @@ import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, devic
 import { format, settingsRoute } from "./router.js";
 import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId } from "./core/websign.js";
 import { detectMode } from "./core/settings.js";
-import { progressHUD } from "./nav/progress.js";
+import { progressHUD, lockSelfUpdate } from "./nav/progress.js";
 import { showAlert } from "./nav/alert.js";
 import { NAME, GITHUB_REPO } from "./brand.js";
 
@@ -302,6 +302,8 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name });
     return true;
   }
+  // B49: iFizBox itself: the page ends locked on "Closing iFizBox" (no Close to tap) until iOS closes the app.
+  if (host || isSelfIpa(url) || result?.bundleId === IFIZBOX_ID) { lockSelfUpdate(h, { later }); return true; }
   // iOS asks "Install …?" over the app: the progress page ends on Done (signed and handed to iOS), Return under it.
   later(() => (h.done ? h.done("Done") : h.hide()), 1200);
   return true;

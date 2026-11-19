@@ -87,3 +87,6 @@
 }
 .progress-finish[hidden] { display: none; }
 .progress-finish:disabled { opacity: .6; }
+/* B49: iFizBox's own update with iOS: the button and Close greyed, not tappable, until iOS closes the app */
+.progress-finish.is-locked { pointer-events: none; }
+.progress-page .sheet-bar .bar-button:disabled { opacity: .5; pointer-events: none; }

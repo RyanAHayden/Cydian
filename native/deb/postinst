@@ -1,6 +1,19 @@
 #!/bin/sh
 # Register the app with SpringBoard (rootless: the jailbreak maps /var/jb).
-uicache -p /var/jb/Applications/$(BRAND_NAME).app || true
+# Installed from inside the app (ifizbox-helper sets IFIZBOX_HELPER_PID, the process the app waits on), uicache
+# would close the running app while apt and dpkg are still at work, so it waits in the background until that run
+# has ended (at most 10 minutes). Its fds are all let go, so neither dpkg nor the helper waits for it.
+register() { uicache -p /var/jb/Applications/$(BRAND_NAME).app; }
+case "$IFIZBOX_HELPER_PID" in
+'' | *[!0-9]*) register || true ;;
+*)
+    (
+        n=0
+        while [ "$n" -lt 600 ] && kill -0 "$IFIZBOX_HELPER_PID" 2>/dev/null; do sleep 1; n=$((n + 1)); done
+        register
+    ) </dev/null >/dev/null 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- &
+    ;;
+esac
 # The app has no container, so WebKit keeps its localStorage and IndexedDB (Settings, the source cache, Changes) in
 # /var/mobile/Library/WebKit/com.ryha.ifizbox/. iOS ships that parent as root:mobile 0700, so WebKit (running as
 # mobile) can't create it and keeps everything in memory: every launch starts empty and Changes never shows a

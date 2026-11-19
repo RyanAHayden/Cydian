@@ -20,6 +20,8 @@
  *   test_driver spawn <helper> [args]...       spawn helper, print its streams as "1: ...", "2: ...", "3: ..."
  *   test_driver spawn-ask keep|close <helper> [args]...   the same with a stdin pipe carrying $TEST_ANSWERS (F63)
  *                                              lines, then "exit: <code>"
+ *   test_driver spawn-quit <helper> [args]...  B84: spawn helper, read its stdout until a line holding "QUIT", then
+ *                                              exit at once without waiting (the app closed mid-run); prints "quit"
  * SPDX-License-Identifier: GPL-3.0-or-later */
 #include "ipa.h"
 #include "policy.h"
@@ -82,6 +84,29 @@ static int spawn(int argc, char **argv, const char *ask) {
     if (in >= 0) close(in);
     printf("exit: %d\n", WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st));
     return 0;
+}
+
+/* B84: the app closing in the middle of a run: its ends of the pipes close and the helper is left running. */
+static int spawn_quit(char **argv) {
+    pid_t pid;
+    int fds[3];
+    int rc = ifizbox_helper_spawn(argv[0], (const char *const *)argv + 1, &pid, &fds[0], &fds[1], &fds[2]);
+    if (rc) { printf("spawn error: %s\n", strerror(rc)); return 1; }
+    char buf[8192];
+    size_t used = 0;
+    for (;;) {
+        struct pollfd pf = {fds[0], POLLIN, 0};
+        if (poll(&pf, 1, 10000) <= 0) { printf("timeout\n"); return 1; }
+        ssize_t n = read(fds[0], buf + used, sizeof buf - 1 - used);
+        if (n <= 0) { printf("eof before QUIT\n"); return 1; }
+        used += (size_t)n;
+        buf[used] = 0;
+        if (strstr(buf, "QUIT")) break;
+        if (used > sizeof buf / 2) used = 0;
+    }
+    printf("quit\n");
+    fflush(stdout);
+    _exit(0);
 }
 
 int main(int argc, char **argv) {
@@ -173,6 +198,8 @@ int main(int argc, char **argv) {
         else printf("ok\n");
     } else if (!strcmp(cmd, "spawn") && argc >= 3) {
         return spawn(argc - 2, argv + 2, NULL);
+    } else if (!strcmp(cmd, "spawn-quit") && argc >= 3) {
+        return spawn_quit(argv + 2);
     } else if (!strcmp(cmd, "spawn-ask") && argc >= 4) {
         return spawn(argc - 3, argv + 3, argv[2]);
     } else return 2;

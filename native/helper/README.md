@@ -80,6 +80,24 @@ ends it (nothing unpacked; partial files stay in `archives/partial` for next tim
 (`Apt.swift` `helper.cancel`) sends it only before apt's first `pmstatus:` line on fd 3, so dpkg never starts; should
 it race one, apt's own SIGINT handler lets the running dpkg call finish and stops after it.
 
+**Installing iFizBox over itself (B84):** the app closes in the middle of such a run (its Replaced watcher once the
+new Info.plist is on disk, or iOS when the postinst's `uicache -p` registers the new copy). When apt wrote straight
+into the app's pipes, the next line after that was SIGPIPE: dpkg died in the postinst, the package stayed
+half-configured and every later apt-get refused with "dpkg was interrupted". So the verbs that run dpkg (`install`,
+`remove`, `upgrade`, `configure`, `apply`, `apply-ask`, `rollback`, `install-paid`, `install-deb`, `install-deb-ask`)
+don't `execve` apt in the process the app spawned: that process leaves the app's session (`setsid`), forks, and copies
+the child's fds 1, 2 and 3 (pipes of its own) to the app's. It ignores SIGPIPE and SIGHUP, stops copying to an fd the
+app has closed (apt keeps running; its output is read and dropped) and exits with the child's status, so for a live
+app nothing changes. Once the child has ended it reads what is already in the pipes and stops, so a maintainer
+script's background job holding an fd doesn't keep it waiting. These verbs also put `IFIZBOX_HELPER_PID=<that
+process>` in apt's environment: iFizBox's own postinst (`native/deb/postinst`) then runs its `uicache -p` in a
+background job (all fds let go) that waits until that pid is gone, at most 10 minutes, so the app is only closed once
+the run has ended; installed by anything else (no variable), it runs `uicache -p` at once as before.
+Before their own command, the same verbs (but `configure`) look for an interrupted dpkg: files named only by digits
+in `<prefix>/var/lib/dpkg/updates/` (dpkg's journal, which is what apt checks). If there are any, the helper says
+`ifizbox-helper: dpkg was interrupted: running dpkg --configure -a first` on stderr and runs the `configure` verb's
+command as a child (status lines on fd 3), then goes on whatever it exited with.
+
 **Roll Back (F71):** N7's daemon keeps the .debs automatic updates replace in `<prefix>/var/cache/ifizbox/rollback/<pkg>/`,
 named as apt's archive cache names them, `<pkg>_<version>_<arch>.deb` with the epoch's `:` as `%3a`. `rollbacks <pkg>`
 lists them; `rollback <pkg> <version>` installs one. Checks: the name and version rules of the queue; the `rollback`

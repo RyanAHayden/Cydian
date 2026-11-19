@@ -21,7 +21,7 @@ import { segmented } from "./storepage.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind, deviceCheck, deviceCheckText } from "../core/signing.js";
-import { sortCertFiles, findPassword } from "../core/certfiles.js";
+import { sortCertFiles, resolvePassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, serverStatus,
   localSigning, deviceStatus, importToDevice, removeFromDevice, statusReady, defaultServer,
@@ -715,13 +715,33 @@ async function chooseFiles(el, files, slot) {
   if (found.profile) await chooseProfile(el, found.profile, false);
   if (found.p12) await chooseP12(el, found.p12, false);
   const id = await loadIdentity();
-  if (id?.p12 && !(id.password != null && await checkP12Password(id.p12, id.password) === true)) {
-    const pw = await findPassword(id.p12, found.passwords);
-    if (pw != null) await saveIdentity({ password: pw, passwordOk: true });
+  // F248: a .p12 the empty password opens is saved with "" (the Password row says Not Needed); one that needs a
+  // password nobody gave gets the field focused after the redraw (the keyboard comes up in the app, FocusKeyboard).
+  let locked = false;
+  if (id?.p12) {
+    const r = await resolvePassword(id.p12, id.password ?? null, found.passwords);
+    if (r.passwordOk === true && r.password !== id.password) await saveIdentity({ password: r.password, passwordOk: true });
+    locked = r.locked;
   }
   if (id?.p12) await recheckPassword(el, false);
   if (localSigning()) await importIfComplete(el, false);
+  if (locked) wantPasswordFocus(el);
   redrawAll();
+}
+
+// F248: the next Password field certificateBlock draws in `el` takes the focus (once), scrolled into view.
+let passwordFocusIn = null;
+export const wantPasswordFocus = (el) => { passwordFocusIn = el; };
+export function takePasswordFocus(el, input) {
+  if (!el || passwordFocusIn !== el) return false;
+  passwordFocusIn = null;
+  const go = () => {
+    if (!input.isConnected) return;
+    input.scrollIntoView?.({ block: "center" });
+    input.focus({ preventScroll: true });
+  };
+  (globalThis.requestAnimationFrame ?? ((f) => setTimeout(f, 0)))(go);
+  return true;
 }
 
 // F83: Sideloading > Open Other Apps' Links (sideload build only, which claims the schemes; on by default). The
@@ -770,11 +790,7 @@ async function recheckPassword(el, redraw = true) {
   const ok = await checkP12Password(id.p12, id.password ?? "");
   await saveIdentity({ passwordOk: ok });
   if (redraw) redrawAll();
-  else {
-    const foot = el.querySelector(".sign-files .group-footer");
-    if (foot) foot.textContent = foot.textContent.replace(/ The password (doesn't open this certificate|opens it)\.$/, "")
-      + (ok === false ? " The password doesn't open this certificate." : ok ? " The password opens it." : "");
-  }
+  else showPasswordState(el, { ...id, passwordOk: ok });
 }
 
 // B20: the Signing Server row's alert: a text field with the server's URL (empty for the default), then Save stores
@@ -842,12 +858,83 @@ function certificateBlock(el, id, status = null, { files = false } = {}) {
     return signRow(name, shown, browseButton(accept, true, (files) => chooseFiles(el, files, slot)));
   };
 
-  const input = Object.assign(document.createElement("input"), { type: "password", className: "sign-value",
-    placeholder: passwordPlaceholder(kept, id?.p12), value: id?.password ?? "" });
-  input.classList.add("sign-field"); // F149: drawn as an editable field, not a read-only value
+  // F248: the password is its own group under the files (passwordBlock).
+  const pw = passwordBlock(el, id, kept);
+
+  // F69: in the sideload build a name stays on the row only while its file is picked (in memory) or the Keychain
+  // holds the identity (statusReady), never as a leftover of an import the signer can't see.
+  const p12Shown = !status || id?.p12 ? id?.p12Name ?? (kept ? "In Keychain" : null) : kept ? id?.p12Name ?? "In Keychain" : null;
+  const profShown = !status || id?.profile ? id?.profileName ?? kept?.profile?.name : kept ? id?.profileName ?? kept.profile?.name : null;
+  ul.append(fileRow(".p12", p12Shown, "p12"), fileRow(".mobileprovision", profShown, "profile"));
+  const kind = browserSigning() ? `They're kept in this browser only, and apps are signed here in the browser: they go to no server, except inside ${NAME}'s own app with Bring My Certificate.`
+    : `Once all three are here, they go into this iPhone's Keychain, where only ${NAME} can use them; the password isn't kept. To change one, choose the .p12 and the profile again.`;
+  const foot = Object.assign(document.createElement("p"), { className: "group-footer",
+    textContent: files ? "Browse for what's missing." : "Your .p12 (the certificate and its key), its .mobileprovision and the password. Each row's Browse picks one. " + kind });
+  if (files) {
+    box.append(head, ul, foot, pw);
+    return box;
+  }
+  const [allInput, allLabel] = browseButton(accept, true, (picked) => chooseFiles(el, picked, null));
+  allLabel.className = "walk-action sign-all";
+  allLabel.textContent = "Select All Files";
+  box.append(head, allInput, allLabel, ul, foot, pw);
+  return box;
+}
+
+// F248: the Password group: a full-width secure field with the state's glyph before it (a lock while it waits, in a
+// white row with a blue inset ring; a red x when wrong; a green check when it opens the .p12 or none is needed; a
+// grey lock while the Keychain holds the identity), "Read From a .txt File" under it, and the state as its footer.
+const PW_GLYPH = { none: "lock", waiting: "lock", unchecked: "lock", wrong: "wrong", right: "right", notNeeded: "right", kept: "kept" };
+export function passwordState(id, kept = null) {
+  const name = id?.p12Name || "the .p12";
+  const s = (state, footer = "", extra = {}) => ({ state, glyph: PW_GLYPH[state], placeholder: `Password for ${name}`, footer, ...extra });
+  if (!id?.p12) {
+    return kept ? s("kept", "The certificate is in the Keychain. Its password isn't kept.", { placeholder: passwordPlaceholder(kept, null) })
+      : s("none", "", { placeholder: passwordPlaceholder(kept, null) });
+  }
+  if (id.passwordOk === true) return id.password ? s("right", `Opens ${name}.`) : s("notNeeded", `${name} has no password.`, { placeholder: "Not Needed" });
+  if (!id.password) return s("waiting", `${name} is locked. Type the password it was exported with.`);
+  if (id.passwordOk === false) return s("wrong", `It doesn't open ${name}.`, { warn: "Wrong password." });
+  return s("unchecked"); // typed, and this .p12 can't be checked here: the import (or the signer) tries it
+}
+
+// The state onto a drawn Password group (typing keeps its focus: no redraw).
+function paintPasswordState(cell, input, foot, st) {
+  cell.dataset.state = st.state;
+  cell.querySelector(".sign-pw-glyph").className = `sign-pw-glyph pw-${st.glyph}`;
+  input.placeholder = st.placeholder;
+  input.readOnly = st.state === "notNeeded";
+  foot.replaceChildren();
+  if (st.warn) foot.append(Object.assign(document.createElement("b"), { className: "sign-pw-wrong", textContent: st.warn }), " ");
+  foot.append(st.footer);
+  foot.hidden = !st.warn && !st.footer;
+}
+function showPasswordState(el, id) {
+  const cell = el.querySelector(".sign-pw-cell"), input = el.querySelector(".sign-pw-input"), foot = el.querySelector(".sign-pw-status");
+  if (cell && input && foot) paintPasswordState(cell, input, foot, passwordState(id));
+}
+
+function passwordBlock(el, id, kept) {
+  const box = document.createElement("div");
+  box.className = "sign-password";
+  const head = Object.assign(document.createElement("h3"), { className: "group-header", textContent: "Password" });
+  const ul = document.createElement("ul");
+  ul.className = "table grouped";
+  const input = Object.assign(document.createElement("input"), { type: "password", className: "sign-value sign-field sign-pw-input",
+    value: id?.password ?? "" });
   input.autocomplete = "off";
   input.setAttribute("autocapitalize", "off");
   input.setAttribute("autocorrect", "off");
+  input.setAttribute("aria-label", "Password");
+  const cell = document.createElement("li");
+  cell.className = "cell sign-pw-cell";
+  const row = document.createElement("label");
+  row.className = "cell-inner sign-pw-row";
+  row.append(Object.assign(document.createElement("span"), { className: "sign-pw-glyph" }), input);
+  cell.append(row);
+  const foot = Object.assign(document.createElement("p"), { className: "group-footer sign-pw-status" });
+  paintPasswordState(cell, input, foot, passwordState(id, kept));
+
   let timer = 0;
   // F58: in the sideload build a password that opens the .p12 (or, where it can't be checked here, a finished
   // entry) sends all three to the Keychain.
@@ -863,32 +950,21 @@ function certificateBlock(el, id, status = null, { files = false } = {}) {
   input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(save, 500); });
   input.addEventListener("change", () => save(true));
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
-  // Browse here reads the password from a .txt (its first line).
-  const pwBrowse = browseButton(".txt,text/plain", false, async ([f]) => {
+
+  // Read From a .txt File: the password from a text file (its first line), a button row on a hidden file input.
+  const [file] = browseButton(".txt,text/plain", false, async ([f]) => {
     if (!f || f.bytes.length > 4096) return;
     input.value = new TextDecoder().decode(f.bytes).split(/\r?\n/)[0];
     await save(true);
   });
-
-  // F69: in the sideload build a name stays on the row only while its file is picked (in memory) or the Keychain
-  // holds the identity (statusReady), never as a leftover of an import the signer can't see.
-  const p12Shown = !status || id?.p12 ? id?.p12Name ?? (kept ? "In Keychain" : null) : kept ? id?.p12Name ?? "In Keychain" : null;
-  const profShown = !status || id?.profile ? id?.profileName ?? kept?.profile?.name : kept ? id?.profileName ?? kept.profile?.name : null;
-  ul.append(fileRow(".p12", p12Shown, "p12"),
-    fileRow(".mobileprovision", profShown, "profile"), focusOnRowTap(signRow("Password", input, pwBrowse), input));
-  const state = id?.p12 && id?.password != null ? (id.passwordOk === false ? " The password doesn't open this certificate." : id.passwordOk ? " The password opens it." : "") : "";
-  const kind = browserSigning() ? `They're kept in this browser only, and apps are signed here in the browser: they go to no server, except inside ${NAME}'s own app with Bring My Certificate.`
-    : `Once all three are here, they go into this iPhone's Keychain, where only ${NAME} can use them; the password isn't kept. To change one, choose the .p12 and the profile again.`;
-  const foot = Object.assign(document.createElement("p"), { className: "group-footer",
-    textContent: (files ? "Browse for what's missing, or type the password." : "Your .p12 (the certificate and its key), its .mobileprovision and the password. Each row's Browse picks one. " + kind) + state });
-  if (files) {
-    box.append(head, ul, foot);
-    return box;
-  }
-  const [allInput, allLabel] = browseButton(accept, true, (picked) => chooseFiles(el, picked, null));
-  allLabel.className = "walk-action sign-all";
-  allLabel.textContent = "Select All Files";
-  box.append(head, allInput, allLabel, ul, foot);
+  const txt = document.createElement("li");
+  txt.className = "cell";
+  const btn = Object.assign(document.createElement("button"), { type: "button", className: "cell-inner sign-pw-txt", textContent: "Read From a .txt File" });
+  btn.addEventListener("click", () => file.click());
+  txt.append(btn, file);
+  ul.append(focusOnRowTap(cell, input), txt);
+  box.append(head, ul, foot);
+  takePasswordFocus(el, input);
   return box;
 }
 
@@ -964,10 +1040,8 @@ async function importIfComplete(el, typing) {
     hide();
     if (e?.code === "wrong_password") {
       await saveIdentity({ passwordOk: false });
-      if (typing) {
-        const foot = el.querySelector(".sign-files .group-footer");
-        if (foot && !/doesn't open/.test(foot.textContent)) foot.textContent += " The password doesn't open this certificate.";
-      } else redrawAll();
+      if (typing) showPasswordState(el, { ...id, passwordOk: false });
+      else redrawAll();
       return false;
     }
     await alertOK("Couldn't Import", deviceError(e).message);

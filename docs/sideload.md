@@ -166,7 +166,8 @@ library. The app talks to the phone's own lockdownd as if it were a computer on 
 - Internet: none. The pairing file is the risk. It's a full lockdown credential for the phone, so keep it like
   a key.
 - Cost: IDeviceKit pulls `IDevice.xcframework` as a binary download from idevice's GitHub release; an app using it
-  under the GPL would build it from source, to keep corresponding source simple. iFizBox doesn't have this mode.
+  under the GPL would build it from source, to keep corresponding source simple. iFizBox builds it from source
+  (see "What iFizBox does").
 
 ### 4. What Apple still checks, whatever the mode
 
@@ -220,8 +221,11 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
 - **Installing**: Feather's Semi Local split, with iFizBox's own Signing Server (`worker/`, sign.ifizbox.com by
   default, or the user's own) in api.palera.in's place: the manifest comes from the server over HTTPS, the signed
   IPA from a plain HTTP server on 127.0.0.1. The server sees the app's bundle ID, name and version. A hand-trusted
-  root CA on the phone doesn't work for this: iOS's installer ignores it. There's no backloop.dev mode and no
-  idevice mode.
+  root CA on the phone doesn't work for this: iOS's installer ignores it. There's no backloop.dev mode.
+- **idevice** (`native/sideload/idevice/`, its README): idevice built from source on Linux and linked statically,
+  with pairing (imported file, or made on the phone on iOS 27), LocalDevVPN detection, AFC upload and
+  installation_proxy with progress, as `idevice.*` bridge calls. Settings doesn't offer it yet, so installs still
+  go through the Signing Server.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and

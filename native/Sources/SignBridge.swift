@@ -57,6 +57,7 @@ enum SignBridge {
         Sideload.register(b) // F14: inspect, progress, installed, forget, resignAll, checkCertificate, remind
         MyIPAs.register(b) // F77: library.*, My IPAs under Installed (MyIPAs.swift)
         SignAhead.register(b) // F235: signing.prepare / open / discard, the IPA queue's sign-ahead run
+        IDeviceBridge.register(b) // F15: idevice.*, the "no server" install route (native/sideload/idevice/)
     }
 
     static func status() -> [String: Any] {

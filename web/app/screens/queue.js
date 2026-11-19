@@ -26,7 +26,7 @@ import { grouped, el, barButton } from "../nav/ui.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
-import { openProgress, progressHUD } from "../nav/progress.js";
+import { openProgress, progressHUD, lockSelfUpdate } from "../nav/progress.js";
 import { classify, chooseFinish, selfLevels } from "../core/progress.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
@@ -460,6 +460,7 @@ export async function resignApp(job, { sc, native = globalThis.ifizboxNative, hu
     await alert({ title: `Couldn't Re-sign ${job.name || job.id}`, message, buttons: ["OK"] });
     return false;
   }
+  if (job.id === SELF_ID && typeof h.finish === "function") { lockSelfUpdate(h); return true; } // B49: iOS closes iFizBox
   if (typeof h.done === "function") h.done("Done"); else h.hide();
   return true;
 }

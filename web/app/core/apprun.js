@@ -10,7 +10,9 @@
 //       install(row, hooks) -> { installed: true | false | null, expires? }  hands the signed app to iOS and waits for
 //                              its install (hooks: { signal, progress("asking" | "installing", fraction) }): "asking"
 //                              while iOS's Install prompt is up, "installing" once iOS reports progress. null: iOS
-//                              can't be asked whether it installed (the row ends as sent). handedOff: true (the
+//                              can't be asked whether it installed (the row ends as sent). B111, This iPhone: no
+//                              prompt; progress("copying", f) then ("installing", installd's f), the row's `here`
+//                              turns true and its words say Copying to iPhone / Installing. handedOff: true (the
 //                              shell's word that iOS had the whole IPA, or iFizBox was in the background) turns a
 //                              false into "sent" too (B76, below). dismissed: true (B85: iOS's prompt closed and
 //                              iOS never asked for the IPA) ends the row Failed ("Failed: iOS didn't download it":
@@ -52,6 +54,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
 import { VPN_WAIT } from "./installroute.js";
+import { NAME } from "../brand.js";
 
 export const APP_STATES = ["waiting", "downloading", "signing", "signed", "asking", "installing", "installed", "failed", "cancelled"];
 const ENDED = new Set(["installed", "failed", "cancelled"]);
@@ -61,15 +64,21 @@ const WITH_IOS = new Set(["asking", "installing"]);
 // B65's limit for a phase that goes quiet (core/signing.js STALL_LIMIT), kept here so this module stays pure.
 export const APP_STALL = 180_000;
 
-const PHASE_WORD = { downloading: "Downloading", signing: "Signing", asking: "Asking iOS", installing: "Installing" };
+const PHASE_WORD = { downloading: "Downloading", signing: "Signing", asking: "Asking iOS", installing: "Installing",
+  copying: "Copying to iPhone" };
 
 export function appRows(jobs = []) {
   return runOrder(jobs).map((j) => ({
     id: j.id, name: j.name || j.id, mode: j.mode || "install", job: j, size: Number(j.size) > 0 ? Number(j.size) : null,
     state: "waiting", phase: null, fraction: 0, error: null, token: null, bundleId: null, expires: null, unsure: false,
-    dismissed: false, again: false,
+    dismissed: false, again: false, here: false,
   }));
 }
+
+// B111: the This iPhone route (installd over LocalDevVPN): no iOS prompt. install's progress goes "copying" (the IPA's
+// bytes to iOS) then "installing" (installd's percent), and the row's `here` says it took that route.
+export const SELF_RESTART = `${NAME} will restart`;
+export const copyingText = (row) => `Copying ${label(row)} to this iPhone`;
 
 // B91: a row whose iOS prompt closed without iOS asking for the IPA: the user's Cancel or a frozen server, iFizBox
 // can't tell which, so it doesn't say Cancelled.
@@ -116,11 +125,16 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       if (phase === "downloading") log(r, "step", `Downloading ${label(r)}${r.size ? ` ${sizeText(r.size)}` : ""}`);
       else if (phase === "signing") log(r, "step", `Signing ${label(r)}`);
       else if (phase === "asking") log(r, "step", `Asked iOS to install ${label(r)}`);
-      else if (phase === "installing") log(r, "step", `iOS is installing ${label(r)}`);
+      else if (phase === "copying") log(r, "step", copyingText(r)); // B111: This iPhone
+      else if (phase === "installing" && r.here) {
+        log(r, "step", `Installing ${label(r)}`);
+        if (isSelf(r)) log(r, "step", SELF_RESTART); // installd ends iFizBox once it has installed the new one
+      } else if (phase === "installing") log(r, "step", `iOS is installing ${label(r)}`);
       else if (phase === "vpn") log(r, "step", VPN_WAIT); // B110: Open LocalDevVPN: the row waits for it
     }
-    const state = SIGNING.has(phase) || WITH_IOS.has(phase) ? phase : r.state;
-    set(r, { phase, state, fraction: Math.max(0, Math.min(1, Number(fraction) || 0)) });
+    const here = r.here || phase === "copying";
+    const state = phase === "copying" ? "installing" : SIGNING.has(phase) || WITH_IOS.has(phase) ? phase : r.state;
+    set(r, { phase, state, here, fraction: Math.max(0, Math.min(1, Number(fraction) || 0)) });
     if (SIGNING.has(phase)) arm(r, f);
   };
 
@@ -184,7 +198,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   async function startInstall(r) {
     const f = fly(r);
     const again = Boolean(r.again);
-    set(r, { state: "asking", phase: null, fraction: 0, again: false });
+    set(r, { state: "asking", phase: null, fraction: 0, again: false, here: false });
     let res;
     try {
       res = await install(r, { signal: f.ctl.signal, progress: progressOf(r, f), ...(again ? { again: true } : {}) });
@@ -361,7 +375,10 @@ export function rowStatus(row, opts = {}) {
     case "signing": return p > 0 && p < 100 ? `Signing ${p}%` : "Signing";
     case "signed": return "Signed";
     case "asking": return row.phase === "vpn" ? VPN_WAIT : "Tap Install on the iOS prompt";
-    case "installing": return p > 0 && p < 100 ? `Installing ${p}%` : "Installing";
+    case "installing":
+      if (row.phase === "copying") return p > 0 && p < 100 ? `Copying to iPhone ${p}%` : "Copying to iPhone";
+      if (row.here && isSelf(row) && p >= 100) return SELF_RESTART;
+      return p > 0 && p < 100 ? `Installing ${p}%` : "Installing";
     case "installed":
       if (row.mode === "resign") return row.expires ? `Re-signed, expires ${dateText(row.expires, opts)}` : "Re-signed";
       return row.unsure ? "Sent to iOS" : "Installed";
@@ -388,6 +405,8 @@ export function runStatus(rows) {
   const ios = rows.find((r) => WITH_IOS.has(r.state));
   if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
   if (ios?.phase === "vpn") return VPN_WAIT;
+  if (ios?.phase === "copying") return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
+  if (ios?.here && isSelf(ios)) return `Installing ${label(ios)}: ${SELF_RESTART}`;
   if (ios) return ios.state === "asking" ? `Tap Install for ${label(ios)} (${pos(ios)})` : `Installing ${label(ios)} (${pos(ios)})`;
   const s = rows.filter((r) => SIGNING.has(r.state));
   if (s.length && s.every(helperRow)) return "Preparing";
@@ -396,12 +415,15 @@ export function runStatus(rows) {
   return "Preparing";
 }
 
-// Each row counts 1 once ended: half for its download and signing, half for iOS's install.
+// Each row counts 1 once ended: half for its download and signing, half for iOS's install. B111: on This iPhone that
+// half is the copy (a fifth) and installd's percent (the rest), so the bar follows both to 100%.
 export function runPercent(rows) {
   if (!rows.length) return 100;
   let n = 0;
   for (const r of rows) {
     if (ended(r)) n += 1;
+    else if (r.state === "installing" && r.phase === "copying") n += 0.5 + 0.1 * (r.fraction || 0);
+    else if (r.state === "installing" && r.here) n += 0.6 + 0.4 * (r.fraction || 0);
     else if (r.state === "downloading") n += 0.25 * (r.fraction || 0);
     else if (r.state === "signing") n += 0.25 + 0.25 * (r.fraction || 0);
     else if (r.state === "signed" || r.state === "asking") n += 0.5;

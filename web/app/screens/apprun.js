@@ -46,6 +46,11 @@ export function phoneLanes(sc, { native } = {}) {
     discard: (r) => sc.discardPrepared(r.token, native),
     // B85: the "Tap Install on the iOS prompt" row's tap: iOS's prompt for that app again
     reprompt: (r) => sc.repromptPrepared?.(r, native) ?? false,
+    // B111: a This iPhone install's Open <app> (iOS has it the moment the row ends)
+    open: (r) => {
+      const n = native ?? globalThis.ifizboxNative;
+      try { Promise.resolve(n?.call?.("signing.openApp", { bundleId: r.bundleId })).catch(() => {}); } catch { /* no bridge */ }
+    },
     // B76: which of these apps iOS has now ({ bundleId: true | false | null }); apps.isInstalled works in both builds
     isInstalled: async (bundleIds) => {
       const n = native ?? globalThis.ifizboxNative;
@@ -269,8 +274,10 @@ export async function runAppRun(jobs, deps) {
     page.bar(bad.length ? { left: closeB, right: retryAll } : { right: done });
     // B49: iFizBox's own IPA is with iOS, which closes iFizBox to install it: nothing to tap
     const fin = sentSelf ? null : deps.finish?.(result); // B71a: the jailbreak run's (AppSync Unified's respring)
+    const opener = sentSelf || fin ? null : openRow(rows, lanes); // B111: one app installed on This iPhone
     if (sentSelf) page.finish({ label: CLOSING_LABEL, status: text, locked: true });
     else if (fin) page.finish({ label: fin.label, status: text, action: fin.action ?? (() => false) });
+    else if (opener) page.finish({ label: RETURN_LABEL, status: text, action: () => false, also: opener });
     else page.finish({ label: RETURN_LABEL, status: text, action: () => false });
     return result;
   }
@@ -279,6 +286,15 @@ export async function runAppRun(jobs, deps) {
   for (const r of rows) draw(r);
   const p = run.start();
   return drive(p).then(() => first, () => first);
+}
+
+// B111: a run of one app that installd installed on This iPhone (row.here, not iFizBox itself) ends with Open <app>
+// above Return, as the single install does -> page.finish's `also` ({ label, action }) or null
+export function openRow(rows, lanes) {
+  if (rows.length !== 1 || typeof lanes?.open !== "function") return null;
+  const r = rows[0];
+  if (r.state !== "installed" || !r.here || r.unsure || r.mode !== "install" || !r.bundleId || isSelf(r)) return null;
+  return { label: `Open ${r.name}`, action: () => { lanes.open(r); return false; } };
 }
 
 export { ended };

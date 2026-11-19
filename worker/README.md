@@ -54,8 +54,8 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 
 ### Settings (`wrangler.toml`)
 
-- `HOST_IDS`: the bundle IDs it holds updates for. `*.ifizbox` (any ID ending in `.ifizbox`) covers iFizBox signed
-  with any team's profile. Use `*` to hold any app.
+- `HOST_IDS`: the bundle IDs it holds signed apps for. `*` (the default) holds any app. `*.ifizbox` limits it to IDs
+  ending in `.ifizbox`.
 - `TTL`: seconds a held update stays (600), and an app the website signed in the browser.
 - `MAX_UPLOAD_MB`: the largest IPA the website signs in the browser (512): it downloads through `/api/fetch?kind=ipa`
   and comes back signed to `/sign/upload`, in 20 MB parts, for `TTL` seconds. `0` turns website signing off here.

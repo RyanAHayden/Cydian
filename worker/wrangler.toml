@@ -6,7 +6,7 @@ assets = { directory = "../web/app", binding = "ASSETS", not_found_handling = "s
 compatibility_date = "2026-11-01"
 
 [vars]
-HOST_IDS = "*.ifizbox"   # bundle IDs /sign/host keeps: any ending in .ifizbox (each team's own iFizBox ID)
+HOST_IDS = "*"   # bundle IDs /sign/host keeps: any app, whatever ID the user's profile signs it under
 TTL = "600"              # seconds a hosted update (or a website-signed app) stays
 MAX_UPLOAD_MB = "512"    # largest IPA the website signs in the browser (/api/fetch?kind=ipa, /sign/upload); "0": none
 

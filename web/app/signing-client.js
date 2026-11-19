@@ -412,6 +412,9 @@ export function discardPrepared(token, native) {
 //                                      Install on an IPA's page: signs if needed (offline is fine), then, with the
 //                                      Signing Server reachable, installs; offline it says so and keeps the signed copy.
 //                                      Resolves "installed" | "offline" | false (an error, shown) | null (walkthrough)
+//                                      F241: with the Signing Server reachable the IPA page queues the file instead
+//                                      (screens/myipas.js queueLibraryInstall, prepareParams's `library` above); this
+//                                      stays the offline path and Sign (n)'s.
 
 export async function libraryCall(method, params = {}, onEvent, native) {
   return bridge(native).call(`library.${method}`, params, onEvent);

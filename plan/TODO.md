@@ -22,7 +22,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **F241** (follow-up, normal) My IPAs' Install through the IPA queue's run: a library job (core/appqueue.js add() takes { library: file } instead of a url; signing-client prepareParams already sends signing.prepare {library}, native SignAhead.swift signs from the library file), queued from the IPA's page so several My IPAs install signed-ahead, one at a time, with per-app stop. Offline (no Signing Server) keeps today's signed-copy message. | files: web/app/core/appqueue.js, web/app/screens/myipas.js, web/app/signing-client.js | after: F235
 - [~] **R19** (follow-up, low) B29 follow-up: on the user's iPhone 18 Pro (iOS 27), install opentennis-beta-p146.ipa from My IPAs again with the B29 build and read the progress page's console: the Bundle ID line and the install server's lines (iOS: GET/HEAD, Range, status, 'iOS has n of size bytes', any '404 after it stopped being served' or 'connection ended after'). If it still fails with all bytes served, the cause is past the transfer (signature/profile on iOS 27): compare against a Feather-signed copy on that phone. Journal: journal/2026-11-18-b29-big-ipa-install. | files: journal/** BLOCKED: Needs the user: install opentennis-beta-p146.ipa from My IPAs with the B29 build on their iPhone 18 Pro (iOS 27) and paste the progress page's console (Bundle ID line + install server lines). No agent can reach that phone or the user's certificate.
 
 ### Parked

@@ -14,6 +14,8 @@
 //                        with the edits either way (null for a plain job)
 //   appJob(pkg, { installed, version, source })  -> a job for a catalog package whose stanza is an app, or null
 //                                                   (no IPA to sign, or a source-signed itms-services link)
+//   job.library (F241): a My IPAs file instead of a url (add({ library: file })), signed from the shell's library
+//   libraryJob(entry, { installed }) -> such a job for a My IPAs entry, its Sign Options as options.edits
 //   appPlan(jobs)     -> core/queue.js parseSimulation's shape: { installs, reinstalls, upgrades, downgrades, removes,
 //                        essential, download }, so Confirm draws apps with the jailbreak queue's own groups
 //   runOrder(jobs)    -> the order Confirm installs in: as queued, iFizBox itself last (installing it closes the app)
@@ -57,7 +59,7 @@ export function createAppQueue() {
   const emit = (event) => { for (const f of [...listeners]) { try { f(event); } catch { /* a listener's bug isn't the queue's */ } } };
   return {
     // An app is queued once: queuing it again replaces it (Cydia's marks work the same).
-    add({ id, name = null, version = null, installed = null, url, size = null, icon = null, key = null, source = null, sourceName = null, deps = [], options = null, mode = null }) {
+    add({ id, name = null, version = null, installed = null, url, library = null, size = null, icon = null, key = null, source = null, sourceName = null, deps = [], options = null, mode = null }) {
       if (!id) throw new Error("no app id");
       if (mode === "resign") { // F91: signed again from the phone's record, nothing to download here
         // F221: a marked app's re-sign carries its installed version's IPA url (markedResignJob): that is downloaded
@@ -67,10 +69,13 @@ export function createAppQueue() {
         emit({ type: "add", job });
         return job;
       }
-      if (!url) throw new Error(`no IPA to install for ${name || id}`);
+      // F241: a My IPAs file (`library`: its name in the shell's library) instead of a url: signing.prepare {library}
+      const file = typeof library === "string" && library ? library : null;
+      if (!url && !file) throw new Error(`no IPA to install for ${name || id}`);
       const job = { op: "install", id, name: name || null, version: version || null, installed: installed || null,
-        mode: modeOf({ op: "install", version, installed }), url, size: Number(size) || null, icon, key, source, sourceName,
+        mode: modeOf({ op: "install", version, installed }), url: file ? null : url, size: Number(size) || null, icon, key, source, sourceName,
         deps: Array.isArray(deps) ? deps : [], options: options && typeof options === "object" ? options : null };
+      if (file) job.library = file;
       jobs.set(id, job);
       emit({ type: "add", job });
       return job;
@@ -97,6 +102,31 @@ export function appJob(pkg, { installed = null, version = null, source = null } 
     id: app.bundleIdentifier || pkg.row?.id, name: app.name || pkg.row?.name || null, version: v.version || null, installed,
     url: o.download, size: v.size ?? null, icon: app.iconURL ?? null, key: pkg.key ?? null, source: app.sourceUrl ?? null,
     sourceName: app.sourceName || source || null,
+  };
+}
+
+// F241: a My IPAs entry (core/myipas.js: { file, name, bundleId, version, size, icon, options }) as a queue job that the
+// run signs from the library file (signing-client.js prepareParams: signing.prepare {library, ...edits}). Its Sign
+// Options go with it as the job's edits (signing.prepare signs a library file with the edits it is sent). The id is
+// the bundle ID it installs as, so Installed records it (and a source's job for the same app is replaced). `installed`:
+// whether that app is on the phone (Confirm lists it under Reinstall). Null for an unreadable entry.
+export function libraryJob(entry, { installed = false } = {}) {
+  if (!entry?.file || entry.error) return null;
+  const o = entry.options ?? {};
+  const t = (v) => (typeof v === "string" ? v.trim() : "");
+  const edits = {};
+  if (t(o.name)) edits.name = t(o.name);
+  if (t(o.bundleId)) edits.bundleId = t(o.bundleId);
+  if (t(o.icon)) edits.icon = t(o.icon);
+  if (Array.isArray(o.removeExtensions) && o.removeExtensions.length) edits.removeExtensions = [...o.removeExtensions];
+  if (typeof o.fixArm64e === "boolean") edits.fixArm64e = o.fixArm64e;
+  const id = edits.bundleId || entry.bundleId || `library:${entry.file}`;
+  const version = entry.version || null;
+  const icon = edits.icon || entry.icon || null;
+  return {
+    id, name: edits.name || entry.name || entry.file.replace(/\.ipa$/i, ""), version, installed: installed ? version || "" : null,
+    library: entry.file, size: entry.size ?? null, icon: icon ? `data:image/png;base64,${icon}` : null, key: null, source: null,
+    sourceName: "My IPAs", options: Object.keys(edits).length ? { edits } : null,
   };
 }
 

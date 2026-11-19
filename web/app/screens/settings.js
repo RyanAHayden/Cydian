@@ -97,7 +97,7 @@ export function render(el, route) {
   const p = { el, route };
   pages.add(p);
   const [first, second] = pathOf(route);
-  if (defOf(second ?? first)?.tone) resetSplit(); // F215: a theme list opens at its entry split
+  if (defOf(second ?? first)?.tone) { resetSplit(); dropStoredSplit(); } // F215/F230: a theme list opens at its peek
   draw(p);
   // Holds can change outside the app (another package manager, apt-mark by hand): ask dpkg each time Settings
   // opens a page; a change redraws through onChange. Without a helper this does nothing.
@@ -292,7 +292,7 @@ function listPage(key) {
   }
   const v = settings.get(key);
   // F215: a tap on a theme also grows the preview to half the screen (until the divider has been dragged).
-  const choose = (value) => { if (d.tone) split.tapped = true; pick(d, value); if (d.tone) layoutSoon(); };
+  const choose = (value) => { if (d.tone) splitTapped(); pick(d, value); if (d.tone) layoutSoon(); };
   const frag = grouped([{
     rows: d.options.map((o) => ({ label: o.label, subtitle: o.subtitle, checked: o.value === v, onClick: () => choose(o.value),
       ...swatchIcon(o) })),
@@ -311,47 +311,51 @@ function listPage(key) {
 // ---- F215: Theme > Light / Dark's preview as a movable split (like iOS 6's resizable panes) ---------------------
 // The preview's height, in px, from where the page is laid out (geo: `top` the list's visible top under the nav bar,
 // `bottom` the preview's bottom on the tab bar, `screen` the page's height, `edges` the bottoms of the list's rows and
-// of its footer at scroll 0, all in the page's px). On entry the divider sits on a row's bottom edge: as many whole
-// rows show as fit while the preview keeps a quarter of the screen. A tap on a theme grows it to half. Once dragged,
-// the user's position (a fraction of the screen, in SPLIT_KEY) wins over both.
-export const SPLIT_KEY = "ifizbox.themePreviewSplit";
-export const SPLIT_FLOOR = 0.25;
+// of its footer at scroll 0, all in the page's px). F230: on entry it is a short peek (SPLIT_PEEK: the divider and the
+// sample's nav bar); when a row edge falls within a row of that line the divider snaps to it, so no row is cut. The
+// first tap on a theme springs it up to half the screen. A drag wins over both, for this visit only: the position
+// lives in `split` below, which a theme list clears when it opens (nothing is stored).
+export const SPLIT_KEY = "ifizbox.themePreviewSplit"; // F215 stored the dragged position here; F230 removes it
+export const SPLIT_PEEK = 100; // px: the grip (25) and the sample's nav bar (44), with a little of what is under it
 export const SPLIT_TAP = 0.5;
-const SPLIT_MIN = 64; // px: the dragged preview keeps its divider and a bit of sample
+export const SPLIT_MIN = 64; // px: the dragged preview keeps its divider and a bit of sample
 const LIST_MIN = 44; // px: and the list one row's height
 
-export function entrySplit({ top, bottom, screen, edges = [] }) {
-  const floor = Math.ceil(screen * SPLIT_FLOOR);
-  const fit = edges.filter((e) => e > top && bottom - e >= floor);
-  return fit.length ? bottom - Math.max(...fit) : floor;
+export function entrySplit({ top, bottom, edges = [] }) {
+  const fit = edges.filter((e) => e > top && bottom - e >= SPLIT_PEEK);
+  const low = fit.length ? Math.max(...fit) : null;
+  return low != null && bottom - low - SPLIT_PEEK < LIST_MIN ? bottom - low : SPLIT_PEEK;
 }
 
 export function clampSplit(h, { top, bottom }) {
   return Math.round(Math.max(SPLIT_MIN, Math.min(bottom - top - LIST_MIN, h)));
 }
 
-// state: { saved } the stored fraction (or null), { tapped } a theme was tapped since the page opened.
-export function splitHeight(geo, { saved = null, tapped = false } = {}) {
-  if (saved != null && Number.isFinite(saved)) return clampSplit(saved * geo.screen, geo);
+// state: { dragged } the height the divider was let go at this visit (px, or null), { tapped } a theme was tapped.
+export function splitHeight(geo, { dragged = null, tapped = false } = {}) {
+  if (dragged != null && Number.isFinite(dragged)) return clampSplit(dragged, geo);
   const entry = entrySplit(geo);
   return tapped ? Math.max(entry, Math.min(Math.round(geo.screen * SPLIT_TAP), geo.bottom - geo.top - LIST_MIN)) : entry;
 }
 
-export function savedSplit(storage = globalThis.localStorage) {
-  try {
-    const v = parseFloat(storage?.getItem(SPLIT_KEY));
-    return Number.isFinite(v) && v > 0 && v < 1 ? v : null;
-  } catch { return null; }
+// F230: F215 kept the dragged position in localStorage; drop that key once per launch so no stale one lingers.
+let oldKeyGone = false;
+export function dropStoredSplit(storage = globalThis.localStorage) {
+  if (oldKeyGone) return;
+  oldKeyGone = true;
+  try { storage?.removeItem(SPLIT_KEY); } catch { /* private mode */ }
 }
 
-export function saveSplit(h, screen, storage = globalThis.localStorage) {
-  try { storage?.setItem(SPLIT_KEY, String(Math.round((h / screen) * 10000) / 10000)); } catch { /* private mode */ }
-}
-
-// The live state: the preview on screen, its height now, and whether a theme was tapped since the list opened.
-// A theme tap redraws the page (a new preview), so the height carries over here and the new one animates from it.
-let split = { box: null, space: null, list: null, h: null, tapped: false, moving: false };
-const resetSplit = () => { split = { box: null, space: null, list: null, h: null, tapped: false, moving: false }; };
+// The live state: the preview on screen, its height now, whether a theme was tapped since the list opened, and where
+// the divider was dragged to. A theme tap redraws the page (a new preview), so the height carries over here and the
+// new one animates from it.
+let split = { box: null, space: null, list: null, h: null, tapped: false, dragged: null, moving: false };
+export const resetSplit = () => { split = { box: null, space: null, list: null, h: null, tapped: false, dragged: null, moving: false }; };
+// The state changes, apart from the DOM (settings.test.js drives them): a theme tapped, the divider let go, and the
+// height the preview should have now.
+export const splitTapped = () => { split.tapped = true; };
+export const splitDropped = (h) => { split.dragged = h; };
+export const splitNow = (geo) => splitHeight(geo, split);
 
 function splitPane(box, space, list) {
   Object.assign(split, { box, space, list });
@@ -392,10 +396,11 @@ function layoutSplit() {
   if (!box || split.moving) return;
   const geo = geometry(box, list);
   if (!geo) return;
-  const to = splitHeight(geo, { saved: savedSplit(), tapped: split.tapped });
+  const to = splitNow(geo);
   const from = split.h;
   split.h = to;
   if (from == null || from === to || globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return setSplit(box, space, to);
+  if (to > from) return springSplit(box, space, from, to);
   // Transform only (120 Hz): lay it out at the taller of the two once, slide, then settle at the new height.
   const tall = Math.max(from, to);
   box.style.height = tall + "px";
@@ -410,8 +415,28 @@ function layoutSplit() {
   });
 }
 
+// F230: the first theme tap pops the preview up: laid out once at the new height plus a small overshoot, it rises
+// past the line (~65% of the time), then settles back down onto it. Transform only (120 Hz); ~380ms in all.
+function springSplit(box, space, from, to) {
+  const over = Math.min(14, Math.max(4, Math.round((to - from) * 0.06)));
+  const tall = to + over;
+  box.style.height = tall + "px";
+  space.style.height = to + "px";
+  const anim = box.animate([
+    { transform: `translateY(${tall - from}px)`, offset: 0, easing: "cubic-bezier(.2,.75,.35,1)" },
+    { transform: "translateY(0px)", offset: 0.65, easing: "cubic-bezier(.45,0,.55,1)" },
+    { transform: `translateY(${over}px)`, offset: 1 },
+  ], { duration: 380, fill: "forwards" });
+  split.moving = true;
+  anim.finished.catch(() => {}).then(() => {
+    split.moving = false;
+    anim.cancel();
+    if (split.box === box) setSplit(box, space, split.h);
+  });
+}
+
 // Dragging the divider: the preview is laid out at its tallest once, the finger moves it by transform, and where it
-// is let go is the height from then on (saved for next time).
+// is let go is the height for the rest of this visit (F230: kept in `split` only, never stored).
 function dragSplit(e, box, space) {
   if (split.moving && !split.dragging) return;
   const geo = geometry(box, split.list);
@@ -440,7 +465,7 @@ function dragSplit(e, box, space) {
     grip.classList.remove("is-held");
     split.moving = split.dragging = false;
     split.h = h;
-    if (h !== h0) saveSplit(h, geo.screen);
+    if (h !== h0) splitDropped(h);
     setSplit(box, space, h);
   };
   grip.addEventListener("pointermove", move);

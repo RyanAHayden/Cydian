@@ -45,11 +45,12 @@ class Release(unittest.TestCase):
             plistlib.dump({"CFBundleShortVersionString": ipa_version, "CFBundleIdentifier": "com.ryha.ifizbox"}, f)
         mkipa.build(app, os.path.join(self.dist, "iFizBox.ipa"), mtime=0)
 
-    def dry_run(self, *extra):
+    def dry_run(self, *extra, env_extra=None):
         notes = os.path.join(self.tmp, "notes.md")
         with open(notes, "w") as f:
             f.write("- A test release\n")
-        env = {k: v for k, v in os.environ.items() if k != "IFIZBOX_RELEASE_REPO"}
+        env = {k: v for k, v in os.environ.items() if k not in ("IFIZBOX_RELEASE_REPO", "IFIZBOX_PIRACY_SYNC_ARGS")}
+        env.update(env_extra or {})
         return subprocess.run([SCRIPT, "--dry-run", "--dist", self.dist, "--notes", notes, *extra], cwd=ROOT,
                               env=env, capture_output=True, text=True, timeout=60)
 
@@ -159,6 +160,54 @@ class Release(unittest.TestCase):
         self.assertIn(other, self.assets(r.stdout))
         with open(os.path.join(out, "Packages")) as f:
             self.assertIn("Filename: %s\n" % other, f.read())
+
+    def piracy_answers(self, sha, hosts):
+        """Saved cnstr/manifests API answers for tools/sync-piracy-list.py: the list's tree and its newest commit."""
+        tree = os.path.join(self.tmp, "tree.json")
+        commits = os.path.join(self.tmp, "commits.json")
+        with open(tree, "w") as f:
+            json.dump({"truncated": False,
+                       "tree": [{"path": "configs/piracy-list/" + h, "type": "blob"} for h in hosts]}, f)
+        with open(commits, "w") as f:
+            json.dump([{"sha": sha, "commit": {"committer": {"date": "2099-01-02T00:00:00Z"}}}], f)
+        return {"IFIZBOX_PIRACY_SYNC_ARGS": "--tree %s --commits %s" % (tree, commits)}
+
+    def test_piracy_list_not_fetched_by_default(self):
+        """T11: a plain dry run makes no network call; it names the committed copy's Canister commit."""
+        self.fake_build("%s-7" % VERSION, VERSION)
+        r = self.dry_run()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(r.stdout, r"release: piracy list: Canister [0-9a-f]{12} \(\d{4}-\d\d-\d\d\), not checked")
+
+    def test_piracy_list_older_warned(self):
+        """T11: --sync-piracy compares with Canister's newest commit and warns; the repo's copy stays as it is."""
+        import re
+        piracy = os.path.join(ROOT, "web", "app", "core", "piracy-list.js")
+        with open(piracy) as f:
+            before = f.read()
+        hosts = re.findall(r'^  "([^"]+)",$', before, re.M)
+        self.fake_build("%s-7" % VERSION, VERSION)
+        r = self.dry_run("--sync-piracy", env_extra=self.piracy_answers("ab" * 20, hosts + ["new.example.org"]))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("older than its newest piracy-list commit abababababab (2099-01-02)", r.stderr)
+        self.assertIn("a real run would refresh", r.stderr)
+        with open(piracy) as f:
+            self.assertEqual(f.read(), before)
+
+    def test_piracy_list_current(self):
+        """T11: the same commit and hosts as the committed copy: no warning."""
+        import re
+        with open(os.path.join(ROOT, "web", "app", "core", "piracy-list.js")) as f:
+            js = f.read()
+        sha, date = re.search(r'commit: "([0-9a-f]{40})", date: "([0-9-]+)"', js).groups()
+        env = self.piracy_answers(sha, re.findall(r'^  "([^"]+)",$', js, re.M))
+        with open(env["IFIZBOX_PIRACY_SYNC_ARGS"].split()[-1], "w") as f:
+            json.dump([{"sha": sha, "commit": {"committer": {"date": date + "T00:00:00Z"}}}], f)
+        self.fake_build("%s-7" % VERSION, VERSION)
+        r = self.dry_run("--sync-piracy", env_extra=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("warning", r.stderr)
+        self.assertIn("release: piracy list: Canister %s (%s), current" % (sha[:12], date), r.stdout)
 
 
 if __name__ == "__main__":

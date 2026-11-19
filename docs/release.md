@@ -85,6 +85,10 @@ iOS SDK, which can't go on a hosted runner. The steps below are what it runs.
 4. Publish: `tools/release.sh --notes notes.md`. It needs `gh`, logged in with push rights on the repo. It checks for
    a clean tree, a HEAD that is on origin, and a tag that doesn't exist yet locally, on origin or as a release. Then it
    runs `gh release create` with the three assets. GitHub creates the tag at HEAD.
+   T11: before building it refreshes `web/app/core/piracy-list.js` from Canister (`tools/sync-piracy-list.py`, F228),
+   warns when the committed copy is older than cnstr/manifests' newest piracy-list commit, and stops if the file
+   changed: commit and push it, then run again (with `publish.sh`, run that again). A dry run stays offline and only
+   names the copy's Canister commit; `--sync-piracy` makes it compare too, without writing the repo's copy.
 
 Options:
 

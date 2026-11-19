@@ -15,7 +15,7 @@
 # sideload app's and the site's built-in source (F72), versions[] newest first: commit web/app/source.json afterwards.
 # Run it only when a person asks for a release. How to cut one: docs/release.md.
 #
-#   tools/release.sh [--dry-run] [--notes FILE] [--dist DIR] [--draft] [--minimum X.Y.Z] [--out DIR]
+#   tools/release.sh [--dry-run] [--notes FILE] [--dist DIR] [--draft] [--minimum X.Y.Z] [--out DIR] [--sync-piracy]
 #     --dry-run   build (or read --dist), check and print what would be published; publish nothing, no network
 #     --notes F   the release notes (Markdown; the first 4 lines show in the app's update alert). Default: the
 #                 commit subjects since the last v* tag, then the standard footer about the two files
@@ -26,13 +26,15 @@
 #                 F183 the app never blocks or pops up on it. Default: none
 #     --out DIR   also leave the repo files, the notes and the updated AltStore source (source.json) in DIR; a dry
 #                 run writes the source there only, never into web/app/source.json
+#     --sync-piracy  a dry run too fetches Canister's newest piracy list and warns when web/app/core/piracy-list.js
+#                 is older (a real run always refreshes it first and stops when it changed: commit it, run again)
 #   IFIZBOX_RELEASE_REPO  owner/name to publish on (default RyanAHayden/iFizBox)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . native/brand.env # F170: BRAND_NAME for the release title and notes; F180: the asset names ($BRAND_NAME.ipa, .deb)
 
 repo=${IFIZBOX_RELEASE_REPO:-$BRAND_GITHUB_REPO}
-dry=0 notes= dist= draft=() minimum= out=
+dry=0 notes= dist= draft=() minimum= out= sync_piracy=0
 while [ $# -gt 0 ]; do
   case $1 in
     --dry-run) dry=1 ;;
@@ -41,7 +43,8 @@ while [ $# -gt 0 ]; do
     --draft) draft=(--draft) ;;
     --minimum) minimum=${2:?--minimum needs a version}; shift ;;
     --out) out=${2:?--out needs a directory}; shift ;;
-    -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --sync-piracy) sync_piracy=1 ;;
+    -h|--help) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "release: unknown argument $1 (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -71,6 +74,41 @@ if [ $dry = 0 ]; then
     die "tag $tag already exists: bump native/VERSION (and commit and push it) first"
   fi
   if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then die "$repo already has a release $tag"; fi
+fi
+
+# T11: the malware check's copy of Canister's piracy list (web/app/core/piracy-list.js, F228) ships inside both builds,
+# so a real run refreshes it from cnstr/manifests first (tools/sync-piracy-list.py). When Canister has moved on, or
+# the script now writes something else, the file changes: that stops the run, because the release must be a clean,
+# pushed commit and the builds would carry the old list. Commit the refreshed file, push, and run again.
+# A dry run stays off the network: it only says which Canister commit the committed copy is from, unless
+# --sync-piracy asks it to compare with Canister's newest (into a temporary file; the repo's copy is left alone).
+# IFIZBOX_PIRACY_SYNC_ARGS: extra arguments for the sync script (tests feed it saved API answers: --tree F --commits F).
+piracy=web/app/core/piracy-list.js
+piracy_src() { sed -n 's/^export const PIRACY_LIST_SOURCE = .*commit: "\([0-9a-f]\{40\}\)", date: "\([0-9-]*\)".*/\1 \2/p' "$1"; }
+read -r pl_sha pl_date <<<"$(piracy_src "$piracy")" || true
+[ -n "${pl_sha:-}" ] || die "$piracy names no Canister commit (PIRACY_LIST_SOURCE): run tools/sync-piracy-list.py"
+# shellcheck disable=SC2206
+pl_args=(${IFIZBOX_PIRACY_SYNC_ARGS:-})
+if [ $dry = 1 ] && [ $sync_piracy = 0 ]; then
+  echo "release: piracy list: Canister ${pl_sha:0:12} ($pl_date), not checked against Canister (dry run; --sync-piracy checks)"
+else
+  pl_out=$piracy
+  if [ $dry = 1 ]; then pl_tmp=$(mktemp -d); pl_out=$pl_tmp/piracy-list.js; fi
+  python3 tools/sync-piracy-list.py "${pl_args[@]}" --out "$pl_out" >&2 ||
+    die "couldn't refresh $piracy from Canister (tools/sync-piracy-list.py above)"
+  read -r new_sha new_date <<<"$(piracy_src "$pl_out")" || true
+  if [ "$new_sha" != "$pl_sha" ]; then
+    echo "release: warning: $piracy is from Canister ${pl_sha:0:12} ($pl_date), older than its newest piracy-list commit ${new_sha:0:12} ($new_date)" >&2
+  fi
+  if [ $dry = 1 ]; then
+    if cmp -s "$pl_out" "$piracy"; then echo "release: piracy list: Canister ${pl_sha:0:12} ($pl_date), current"
+    else echo "release: (dry run: a real run would refresh $piracy and stop for it to be committed)" >&2; fi
+    rm -rf "$pl_tmp"
+  elif [ -n "$(git status --porcelain -- "$piracy")" ]; then
+    die "refreshed $piracy from Canister ${new_sha:0:12} ($new_date): commit and push it, then run again"
+  else
+    echo "release: piracy list: Canister ${pl_sha:0:12} ($pl_date), current"
+  fi
 fi
 
 if [ -z "$dist" ]; then

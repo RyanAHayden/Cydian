@@ -25,6 +25,11 @@
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%237f7f7f' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
   --category: linear-gradient(rgba(109,123,133,.9), rgba(133,145,153,.9) 2%, rgba(177,187,195,.9) 5%,
     rgba(140,154,165,.9) 8%, rgba(173,182,188,.9) 94%, rgba(137,149,158,.9) 96%);
+  /* F218: the red bar button (.bar-button.red), UINavigationBarRemoveButton and ...Pressed */
+  --lt-red-edge: #82131c; --lt-red-edge-top: #482e30;
+  --lt-red: linear-gradient(#d4848b, #b01a27);
+  --lt-red-pressed-edge: #521c20; --lt-red-pressed-edge-top: #3d3031;
+  --lt-red-pressed: linear-gradient(#b28b8e, #70272d);
 }
 /* Dark: our own themes in the iOS 6 spirit. <html data-theme> is the tone (light or dark), <html data-palette> the
    palette inside it (F198): "oled" (OLED Black, the default dark one, user 2026-11-18) or "gunmetal" (F13's dark,
@@ -108,6 +113,11 @@ html[data-theme="dark"] {
   --dk-warn-table: #241f08;
   --dk-warn-edge: #5a4f1a;
   --dk-warn-text: #fff3b0;
+  /* F218: the red bar button, UINavigationBarRemoveButtonDark and ...PressedDark (the black-bar art) */
+  --dk-red-edge: #610d14; --dk-red-edge-top: #251516;
+  --dk-red: linear-gradient(#d07079, #b82e3a 51.7%, #b01825 51.7%);
+  --dk-red-pressed-edge: #3d1418; --dk-red-pressed-edge-top: #1d1516;
+  --dk-red-pressed: linear-gradient(#9f7478, #76373b 51.7%, #6f252b 51.7%);
 }
 /* Gunmetal (F13, user 2026-11-17): the kit's black bars ("Status Bar (Black)", the black menu and tool bars,
    "Button (Black)") over gunmetal grouped tables, with white text at full contrast. The tab bar is the light
@@ -234,6 +244,28 @@ html[data-theme="dark"] .bar-button:not(.back):not(.done):active, html[data-them
 .bar-button.back:active, .bar-button.back.is-pressed { border-image-source: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzMwMzQzYyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzFjMmM0ZiIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzhiOTdhZiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzI4M2U2YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo="); background: none; }
 html[data-theme="dark"] .bar-button.back { border-image-source: var(--dk-back); }
 html[data-theme="dark"] .bar-button.back:active, html[data-theme="dark"] .bar-button.back.is-pressed { filter: brightness(.75); }
+
+/* F218: the red bar button, from the 4S's UINavigationBarRemoveButton (...Pressed, ...Dark, ...PressedDark): the same
+   shape as .bar-button, only its colours. Light is one gradient like the default button; the Dark art (for black
+   bars) has a gloss split at row 30 of 58, 51.7% down. Used only for the Confirm sheets' Cancel (screens/queue.js).
+   The :not()s lift it over the dark and light-palette bar-button rules, which carry the same two. Its tokens:
+   --lt-red* at the end of :root, --dk-red* at the end of OLED Black's block. */
+.bar-button.red:not(.back):not(.done) {
+  border-color: var(--lt-red-edge); border-top-color: var(--lt-red-edge-top);
+  background: var(--lt-red); background-origin: border-box;
+}
+.bar-button.red:not(.back):not(.done):is(:active, .is-pressed) {
+  border-color: var(--lt-red-pressed-edge); border-top-color: var(--lt-red-pressed-edge-top);
+  background: var(--lt-red-pressed); background-origin: border-box;
+}
+html[data-theme="dark"] .bar-button.red:not(.back):not(.done) {
+  border-color: var(--dk-red-edge); border-top-color: var(--dk-red-edge-top);
+  background: var(--dk-red); background-origin: border-box;
+}
+html[data-theme="dark"] .bar-button.red:not(.back):not(.done):is(:active, .is-pressed) {
+  border-color: var(--dk-red-pressed-edge); border-top-color: var(--dk-red-pressed-edge-top);
+  background: var(--dk-red-pressed); background-origin: border-box;
+}
 
 /* ---- Tab bar: "Tab bar" ---- */
 .tabbar {

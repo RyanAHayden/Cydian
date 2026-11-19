@@ -224,6 +224,11 @@ html[data-theme="dark"][data-palette="nord"] {
   --dk-warn-table: #4a4434;
   --dk-warn-edge: #8a7a50;
   --dk-warn-text: #ebcb8b;
+  /* F218: the red bar button in Nord red (#bf616a) */
+  --dk-red-edge: #69353a; --dk-red-edge-top: #2e2526;
+  --dk-red: linear-gradient(#d89fa4, #c36a73 51.7%, #bf616a 51.7%);
+  --dk-red-pressed-edge: #432225; --dk-red-pressed-edge-top: #1f1a1b;
+  --dk-red-pressed: linear-gradient(#a67a7e, #7d444a 51.7%, #783d43 51.7%);
 }
 
 /* Dracula: #282a36 ground, #44475a bars and lines, #f8f8f2 text, purple headers, pink details, cyan links, green and
@@ -297,6 +302,11 @@ html[data-theme="dark"][data-palette="dracula"] {
   --dk-warn-table: #3e3a20;
   --dk-warn-edge: #8a8440;
   --dk-warn-text: #f1fa8c;
+  /* F218: the red bar button in Dracula red (#ff5555 at 85%, for the white text) */
+  --dk-red-edge: #772828; --dk-red-edge-top: #221617;
+  --dk-red: linear-gradient(#e88f8f, #db5353 51.7%, #d94848 51.7%);
+  --dk-red-pressed-edge: #4c1919; --dk-red-pressed-edge-top: #1a1112;
+  --dk-red-pressed: linear-gradient(#b36e6e, #8c3535 51.7%, #892d2d 51.7%);
 }
 
 /* ---- Light ---- */
@@ -346,6 +356,11 @@ html[data-theme="light"][data-palette="sepia"] {
   --lt-seg-edge: #b8a37c;
   --lt-back: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzNmM2EzMyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzVhNDIyNCIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2M0YTc3ZCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzdmNWYzNiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=");
   --lt-back-pressed: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzNhMzUzMCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzRhMzYxYyIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2IzOTQ2OSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzVmNDQyNCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=");
+  /* F218: the red bar button keeps UIKit's red (ios6.css :root) */
+  --lt-red-edge: #82131c; --lt-red-edge-top: #482e30;
+  --lt-red: linear-gradient(#d4848b, #b01a27);
+  --lt-red-pressed-edge: #521c20; --lt-red-pressed-edge-top: #3d3031;
+  --lt-red-pressed: linear-gradient(#b28b8e, #70272d);
 }
 
 /* Solarized Light: base3 (#fdf6e3) tables on base2 (#eee8d5) pinstripes, base02/base01 text, blue (#268bd2) for
@@ -394,6 +409,11 @@ html[data-theme="light"][data-palette="solarized"] {
   --lt-seg-edge: #b9b29c;
   --lt-back: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzJmM2E0MCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzFkNGY3MyIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzc5YjNkZCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzIyNjc5YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=");
   --lt-back-pressed: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzJhMzQzYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzE2M2Y1ZCIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzZhYTBjOCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzFhNTQ3ZiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=");
+  /* F218: the red bar button in Solarized red (#dc322f at 90%) */
+  --lt-red-edge: #93211f; --lt-red-edge-top: #3f2e2e;
+  --lt-red: linear-gradient(#e08e8c, #c62d2a);
+  --lt-red-pressed-edge: #5d1514; --lt-red-pressed-edge-top: #352a2a;
+  --lt-red-pressed: linear-gradient(#bc7776, #7f1d1b);
 }
 
 /* The light palettes' chrome: ios6.css's nav bar, bar buttons and back arrow, with their colours from the --lt-*
@@ -442,4 +462,18 @@ html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) 
 html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .store-segment:not(.selected) + .store-segment:not(.selected) { border-left-color: var(--lt-seg-edge); }
 html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .store-segment:active:not(.selected) {
   background: var(--lt-seg-pressed); background-origin: border-box;
+}
+
+/* F218: the red bar button (ios6.css .bar-button.red, Confirm's Cancel). Palettes with a published red use it in the
+   UIKit art's steps (light: top 46% toward white, edge 74%; dark: gloss 39% / 6% toward white over the flat red, edge
+   55%; pressed darker the same way); the others keep UIKit's red, as they keep the kit's blue Done. The light rule
+   beats the bar-button rule above; the dark palettes only set tokens, which ios6.css's dark rule reads. The tokens
+   sit at the end of each palette's block (Sepia sets UIKit's, since every light palette sets every --lt-*). */
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .bar-button.red:not(.back):not(.done) {
+  border-color: var(--lt-red-edge); border-top-color: var(--lt-red-edge-top);
+  background: var(--lt-red); background-origin: border-box;
+}
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"]) .bar-button.red:not(.back):not(.done):is(:active, .is-pressed) {
+  border-color: var(--lt-red-pressed-edge); border-top-color: var(--lt-red-pressed-edge-top);
+  background: var(--lt-red-pressed); background-origin: border-box;
 }

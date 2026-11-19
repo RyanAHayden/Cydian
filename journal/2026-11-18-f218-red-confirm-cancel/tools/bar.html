@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- F218 harness: the Confirm sheet's nav bar with the app's real stylesheets. ?theme=light|dark&palette=<name>
+     Row 1 at rest, row 2 pressed (.is-pressed). Render at 3x: see shots.sh. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=320">
+<script>
+  const p = new URLSearchParams(location.search);
+  document.documentElement.dataset.theme = p.get("theme") || "light";
+  if (p.get("palette")) document.documentElement.dataset.palette = p.get("palette");
+</script>
+<link rel="stylesheet" href="../../../web/app/style.css">
+<link rel="stylesheet" href="../../../web/app/ios6.css">
+<link rel="stylesheet" href="../../../web/app/sources.css">
+<link rel="stylesheet" href="../../../web/app/packages.css">
+<link rel="stylesheet" href="../../../web/app/queue.css">
+<link rel="stylesheet" href="../../../web/app/palettes.css">
+<style>
+  body { margin: 0; width: 320px; }
+  .navbar { position: relative !important; top: auto !important; padding-top: 0 !important; }
+</style>
+</head>
+<body>
+  <header class="navbar sheet-bar"><div class="sheet-bar-row">
+    <div class="sheet-left"><button class="bar-button red">Cancel</button></div>
+    <h1 class="nav-title">Confirm</h1>
+    <div class="sheet-right"><button class="bar-button done">Confirm</button></div>
+  </div></header>
+  <header class="navbar sheet-bar"><div class="sheet-bar-row">
+    <div class="sheet-left"><button class="bar-button red is-pressed">Cancel</button></div>
+    <h1 class="nav-title">Pressed</h1>
+    <div class="sheet-right"><button class="bar-button">Edit</button></div>
+  </div></header>
+</body>
+</html>

@@ -231,3 +231,96 @@ export function deviceRows(device) {
   }
   return { rows, footer: device.text, warn: device.ok === false };
 }
+
+// ---- F253: the website reads This iPhone's UDID through a configuration profile ----------------------------------
+// The Worker (worker/src/udid.js) hands out a Profile Service configuration profile per visit; iOS sends it the UDID and
+// opens a "go back" page in Safari. Safari and the Home Screen web app don't share storage, so the page that started
+// it polls the Worker by the visit's challenge (the done page also writes Safari's own copy, UDID_KEY).
+//
+//   storedUdid(store)                  { udid, product, version } this browser has, or null
+//   saveUdid(phone, store) / forgetUdid(store)
+//   udidPending(store, now)            the visit being waited for { poll, expires }, or null (none, or it expired)
+//   await startUdid({ origin, fetcher, store, now })   POST /sign/udid, keep the visit: -> its profile URL
+//   await pollUdid({ fetcher, store, now })   one look: "done" (saved), "waiting", "expired" (forgotten) or null
+//   watchUdid(onDone, opts)            polls every 2 s while a visit is pending (and at once when the page shows
+//                                      again); calls onDone() once the UDID is saved. Idempotent across redraws
+//   canFindUdid(nav)                   an iPhone or iPad (where iOS takes a profile), not a computer
+//   udidFindText                       the footer under Find This iPhone's UDID (Not Verified, Settings steps)
+export const UDID_KEY = "ifizbox.udid";
+const UDID_PENDING = "ifizbox.udid.pending";
+const local = (store) => {
+  if (store !== undefined) return store;
+  try { return globalThis.localStorage ?? null; } catch { return null; }
+};
+const readJson = (store, k) => { try { return JSON.parse(local(store)?.getItem(k) ?? "null"); } catch { return null; } };
+const writeJson = (store, k, v) => { try { v == null ? local(store)?.removeItem(k) : local(store)?.setItem(k, JSON.stringify(v)); } catch { /* blocked */ } };
+
+export function storedUdid(store) {
+  const p = readJson(store, UDID_KEY);
+  return p && typeof p.udid === "string" && /^[0-9A-Fa-f-]{20,64}$/.test(p.udid)
+    ? { udid: p.udid, product: p.product ?? null, version: p.version ?? null } : null;
+}
+export const saveUdid = (phone, store) => writeJson(store, UDID_KEY, { udid: phone.udid, product: phone.product ?? null, version: phone.version ?? null });
+export const forgetUdid = (store) => writeJson(store, UDID_KEY, null);
+
+export function udidPending(store, now = Date.now()) {
+  const p = readJson(store, UDID_PENDING);
+  return p && typeof p.poll === "string" && Number(p.expires) > now ? p : null;
+}
+
+export async function startUdid({ origin = globalThis.location?.origin, fetcher = fetch, store, now = Date.now() } = {}) {
+  const r = await fetcher(`${origin}/sign/udid`, { method: "POST" });
+  const j = await r.json().catch(() => null);
+  if (!r.ok || !j?.challenge || !j?.profile || !j?.poll) throw new Error(j?.error || `The server answered ${r.status}.`);
+  writeJson(store, UDID_PENDING, { poll: j.poll, expires: now + (Number(j.expiresIn) || 600) * 1000 });
+  return j.profile;
+}
+
+export async function pollUdid({ fetcher = fetch, store, now = Date.now() } = {}) {
+  const p = udidPending(store, now);
+  if (!p) { writeJson(store, UDID_PENDING, null); return null; }
+  let r, j;
+  try { r = await fetcher(p.poll, { cache: "no-store" }); j = await r.json(); } catch { return "waiting"; } // offline a moment
+  if (r.status === 404) { writeJson(store, UDID_PENDING, null); return "expired"; }
+  if (j?.state === "done" && j.udid) {
+    saveUdid(j, store);
+    writeJson(store, UDID_PENDING, null);
+    return "done";
+  }
+  return "waiting";
+}
+
+let udidTimer = null;
+export function watchUdid(onDone, { fetcher = fetch, store, every = 2000 } = {}) {
+  if (udidTimer || !udidPending(store)) return false;
+  const tick = async () => {
+    const s = await pollUdid({ fetcher, store });
+    if (s === "waiting") return;
+    stop();
+    if (s === "done") onDone?.();
+  };
+  const seen = () => { if (globalThis.document?.visibilityState !== "hidden") tick(); };
+  const stop = () => { clearInterval(udidTimer); udidTimer = null; globalThis.document?.removeEventListener?.("visibilitychange", seen); };
+  udidTimer = setInterval(tick, every);
+  globalThis.document?.addEventListener?.("visibilitychange", seen);
+  return true;
+}
+
+export function canFindUdid(nav = globalThis.navigator) {
+  const ua = String(nav?.userAgent ?? "");
+  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && Number(nav?.maxTouchPoints) > 1);
+}
+
+export const udidFindText = `Find This iPhone's UDID downloads a small profile from ${NAME}'s website. Allow it, then open the `
+  + `Settings app > Profile Downloaded and tap Install: it shows "Not Verified" because it isn't signed, which is fine. `
+  + `iOS sends ${NAME} this iPhone's UDID, model and iOS version, keeps no profile, and opens a page in Safari; come back `
+  + `here and This iPhone fills in.`;
+
+// The website's extra rows under This iPhone: Find This iPhone's UDID (`find: true`: settings.js starts it) while
+// the check is "unknown" on an iPhone, "Waiting" once a visit is pending. Nothing when the UDID is known, the
+// profile lists no devices, or this is a computer. Pure.
+export const FIND_UDID = "Find This iPhone's UDID";
+export function udidFindRows(check, { pending = false, can = true } = {}) {
+  if (!can || check?.state !== "unknown") return null;
+  return { rows: [pending ? { label: FIND_UDID, detail: "Waiting" } : { label: FIND_UDID, find: true }], footer: udidFindText };
+}

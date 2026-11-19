@@ -895,3 +895,51 @@ import { d1 } from "./src/d1-sqlite.js";
   } finally { globalThis.fetch = realFetch; }
   console.log("worker ipa length: ok");
 }
+
+// F253: this iPhone's UDID via a Profile Service profile: start, the profile, iOS's signed answer, the poll.
+import { readAnswer, udidProfile, UDID_KEY } from "./src/udid.js";
+{
+  let r = await go("/sign/udid", { method: "POST" });
+  assert.equal(r.status, 200);
+  const s = await r.json();
+  assert.match(s.challenge, /^[0-9a-f]{32}$/);
+  assert.equal(s.poll, `https://sign.example/sign/udid/${s.challenge}`);
+  assert.equal(s.expiresIn, 600);
+  assert.deepEqual(await (await go(new URL(s.poll).pathname)).json(), { state: "waiting" });
+  r = await go(new URL(s.profile).pathname);
+  assert.equal(r.headers.get("content-type"), "application/x-apple-aspen-config");
+  const prof = await r.text();
+  assert.match(prof, /<key>PayloadType<\/key>\s*<string>Profile Service<\/string>/);
+  assert.match(prof, new RegExp(`<key>URL</key>\\s*<string>https://sign\\.example/sign/udid/${s.challenge}/answer</string>`));
+  assert.match(prof, new RegExp(`<key>Challenge</key>\\s*<string>${s.challenge}</string>`));
+  for (const a of ["UDID", "PRODUCT", "VERSION"]) assert.match(prof, new RegExp(`<string>${a}</string>`));
+  assert.match(udidProfile({ url: "https://x/a?b&c", challenge: "c" }), /<string>https:\/\/x\/a\?b&amp;c<\/string>/);
+
+  // iOS's answer: a plist inside CMS bytes (made up around it here; the Worker doesn't check the signature)
+  const plistOf = (udid, challenge) => `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>CHALLENGE</key><string>${challenge}</string><key>IMEI</key><string>35 000000 000000 0</string>
+<key>PRODUCT</key><string>iPhone9,3</string><key>UDID</key><string>${udid}</string><key>VERSION</key><string>19H410</string></dict></plist>`;
+  const cms = (text) => new Uint8Array([0x30, 0x80, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x02, 0xa0, 0x80,
+    ...new TextEncoder().encode(text), 0x00, 0x00, 0xff, 0xfe, 0x31, 0x00]);
+  const UDID = "00008030-001A2D3E0E38802E";
+  assert.deepEqual(readAnswer(cms(plistOf(UDID, "abc"))), { udid: UDID, product: "iPhone9,3", version: "19H410", challenge: "abc" });
+  assert.equal(readAnswer(cms(plistOf("<script>", "abc"))), null);
+  assert.equal(readAnswer(new Uint8Array([1, 2, 3])), null);
+  const answer = (c, body) => go(`/sign/udid/${c}/answer`, { method: "POST", body, headers: { "Content-Type": "application/pkcs7-signature" } });
+  assert.equal((await answer(s.challenge, cms(plistOf(UDID, "f".repeat(32))))).status, 400); // another visit's challenge
+  assert.equal((await answer("0".repeat(32), cms(plistOf(UDID, "0".repeat(32))))).status, 404); // never given out
+  assert.equal((await answer(s.challenge, new Uint8Array(70 * 1024))).status, 413);
+  r = await answer(s.challenge, cms(plistOf(UDID, s.challenge)));
+  assert.equal(r.status, 301);
+  assert.equal(r.headers.get("location"), `https://sign.example/sign/udid/${s.challenge}/done`);
+  assert.deepEqual(await (await go(new URL(s.poll).pathname)).json(), { state: "done", udid: UDID, product: "iPhone9,3", version: "19H410" });
+  const done = await (await go(`/sign/udid/${s.challenge}/done`)).text();
+  assert.match(done, /UDID Sent/);
+  assert.match(done, new RegExp(`localStorage\\.setItem\\("${UDID_KEY.replace(".", "\\.")}"`));
+  assert.match(done, /iPhone9,3/);
+  assert.equal((await go(`/sign/udid/${"1".repeat(32)}`)).status, 404);
+  assert.equal((await go("/sign/udid")).status, 405);
+  assert.equal((await go("/sign/udid/nothex")).status, 404);
+  console.log("worker udid: ok");
+}

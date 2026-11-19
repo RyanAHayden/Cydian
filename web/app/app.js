@@ -41,7 +41,7 @@ import { catalog } from "./catalog.js";
 import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
 import { NAME } from "./brand.js";
-import { takeInstallParam, askFromInstallLink } from "./websign-gate.js";
+import { takeInstallParam, askFromInstallLink, refreshOnLaunch } from "./websign-gate.js";
 
 const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
 
@@ -419,6 +419,7 @@ if (globalThis.ifizboxNative) {
 }
 router.start();
 askFromInstallLink(installLink, { install: () => home.installiFizBox() }).catch(() => {});
+refreshOnLaunch({ mode: detectMode() }); // F250: the website refreshes its sources each launch once browsing is unlocked
 // F93 (as before F89): first launch of a iFizBox installed from the website: its signed copy carries the website's
 // sources and settings as web/transfer.link (signed in the browser, websign-job.js); import them once, no question.
 // Only on the very first launch (user 2026-11-17: the website is rarely used after that).

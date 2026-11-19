@@ -149,11 +149,32 @@ const BROWSE_GATE = {
   colors: { 0: "green", 1: "red" },
 };
 // -> "browse" (Ignore: unlocked from now on; Settings > General > Website locks it again) | "install" | null (Cancel)
-export async function askToBrowse({ install, alert = showAlert, storage = store() } = {}) {
+// F250: Browse Anyway also starts a source refresh at once (`refresh`, not awaited): the site never refreshes them
+// by itself.
+export async function askToBrowse({ install, alert = showAlert, storage = store(), refresh = refreshSourcesNow } = {}) {
   const { index } = await alert({ ...BROWSE_GATE, countdown: { button: 1, seconds: WARNING_SECONDS } });
-  if (index === 1) { setFirstVisit("later", storage); return "browse"; }
+  if (index === 1) {
+    setFirstVisit("later", storage);
+    Promise.resolve().then(refresh).catch(() => {});
+    return "browse";
+  }
   if (index === 0) { await install?.(); return "install"; }
   return null;
+}
+
+// ---- Source refresh (F250) -------------------------------------------------------------------------------------
+
+// The website's source refresh: Changes' Refresh job (screens/changes.js reloadSources: refresh, Reloading Data HUD,
+// reload the lists), loaded on demand so this module stays light.
+export const refreshSourcesNow = () => import("./screens/changes.js").then((c) => c.reloadSources());
+
+// At launch, website only and only once browsing is unlocked (Browse Anyway: "later"): a locked Home, the app and
+// the native shells never refresh here (the app has its own update path). -> true when it started one
+export function refreshOnLaunch({ mode = "site", storage = store(), win = globalThis, refresh = refreshSourcesNow } = {}) {
+  if (mode !== "site" || win?.ifizboxApp || win?.ifizboxNative) return false;
+  if (browsingLocked({ mode, storage })) return false;
+  Promise.resolve().then(refresh).catch(() => {});
+  return true;
 }
 
 // ---- ?install (F184) -------------------------------------------------------------------------------------------

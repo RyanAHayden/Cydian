@@ -47,6 +47,13 @@ iOS's install prompt.
   token (`POST /sign/upload?token=`, no size), then signs and uploads into it (`&token=&size=`). The Worker holds
   iOS's `app.ipa` up to 2 minutes: headers once the upload has started, the body once it's done. A different bundle
   ID out of zsign, a failed reservation, or more than 8 minutes (iOS retries a held `app.ipa` for 5+ minutes) fall back to the Ready to Install alert.
+  The early link needs a password known to open the `.p12` (`passwordOk` true): a sign that fails after iOS was
+  sent to the link leaves iOS waiting. The page's own check (`core/signing.js checkP12Password`) can't read every
+  `.p12`, and synced identities come unchecked, so whenever a save leaves a `.p12`, a profile and a password not yet
+  known right or wrong, and once on load, `signing-client.js confirmPassword` asks zsign in the Web Worker
+  (`websign-job.js runPasswordCheck`: zsign on the certificate and profile with an empty folder; "Can't find app
+  folder" means both loaded, OpenSSL's "mac verify failure" a wrong password) and saves its answer. Settings >
+  Signing repaints its Password row from the `ifizbox:password` event.
   When the early link won't get this app (signing failed or was cancelled, no certificate, or a different bundle
   ID out of zsign), the website drops it (`dropEarly`, not awaited, never throws): `POST /sign/upload/<token>/fail`
   marks the token failed, and from then on the Worker answers its manifest and `app.ipa` (also a request it's

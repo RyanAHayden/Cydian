@@ -20,6 +20,7 @@ import { showAlert } from "../nav/alert.js";
 import { popupOpen, whenNoPopup } from "../nav/popups.js";
 import { sourceKey, sourcesFor } from "../core/sources.js";
 import { settings } from "./settings.js";
+import { pullToRefresh } from "../nav/pullrefresh.js";
 import * as browse from "./browse.js";
 import * as roulette from "./roulette.js";
 import { catalog } from "../catalog.js";
@@ -240,7 +241,7 @@ export function nav(route, ctx) {
     // F82 Reload, as Cydia's: the button turns into the small white spinner in its own spot while the sources and
     // Home's content reload, then back to Reload. The page keeps its content and swaps the new in place: no Loading
     // screen, no flash (it used to be location.reload()).
-    right: { label: "Reload", onClick: (e) => reloadHome(e?.currentTarget, ctx) },
+    right: { label: "Reload", onClick: (e) => reloadHome(e?.currentTarget, ctx), ref: (b) => { state.reloadButton = b; } },
   };
 }
 
@@ -712,6 +713,9 @@ function renderRoot(body) {
     } });
   // Cydia's line at the bottom of Home (and of Settings' root, F183): device, iOS, version, language, and the build.
   home.append(...versionLines());
+  // F270: pull Home down past its top: Reload, as the nav button (its spinner and all; a tap on it while it spins
+  // does nothing, and neither does a pull).
+  pullToRefresh(body, { onRefresh: () => state.reloadButton?.click(), busy: () => Boolean(state.reloadButton?.disabled), settings });
   refreshState();
   // F82: Reload's redraw. Everything stays on screen; each part is updated where it is: the green tile and the
   // Install iFizBox App offer at once.

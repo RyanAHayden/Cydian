@@ -22,6 +22,7 @@
 // which signs it anew.
 import { placeholder, el } from "../nav/ui.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
+import { pullToRefresh } from "../nav/pullrefresh.js";
 import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
 import { getBackend } from "../backend.js";
@@ -273,6 +274,8 @@ export function render(body, route, ctx) {
   drawUpgradeButton(0);
   // C10: the bar and the scope row stay put; the list scrolls under them (nav/searchbar.js pinned).
   state.results = pinned(body, ...filterBar());
+  // F270: pull the list down past its top: Refresh, as the nav button.
+  pullToRefresh(state.results, { onRefresh: () => refresh(ctx), busy: () => state.busy, settings });
   state.note = note("");
   state.note.hidden = true; // errors and "no changes" show here; while loading, placeholder rows
   state.ph = placeholder("list");
@@ -408,7 +411,7 @@ function draw() {
 }
 
 async function refresh(ctx) {
-  await reloadSources({ hud: ctx.showHUD });
+  if (await reloadSources({ hud: ctx.showHUD })) settings.lastRefresh?.set(); // F270: pull to refresh's Last Updated
 }
 
 // F250: Changes' Refresh as one job, which the website also runs on Browse Anyway and on launch once browsing is

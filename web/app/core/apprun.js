@@ -10,14 +10,22 @@
 //       install(row, hooks) -> { installed: true | false | null, expires? }  hands the signed app to iOS and waits for
 //                              its install (hooks: { signal, progress("asking" | "installing", fraction) }): "asking"
 //                              while iOS's Install prompt is up, "installing" once iOS reports progress. null: iOS
-//                              can't be asked whether it installed (the row ends as sent).
+//                              can't be asked whether it installed (the row ends as sent). handedOff: true (the
+//                              shell's word that iOS had the whole IPA, or iFizBox was in the background) turns a
+//                              false into "sent" too (B76, below).
 //       discard(row)        frees a signed copy that will never be installed (its row stopped, or the run cancelled)
 //     .start() -> a promise for the end (every row installed, failed or cancelled)
 //     .stop(id)   the working row's round stop button: aborts that app only (its download, signing or iOS's prompt);
 //                 the next one goes on
 //     .cancel()   the red Cancel: every app not finished is abandoned (in-flight ones aborted)
 //     .retry(id) / .retryAll()   failed and cancelled rows go again (a new pass when the run had ended)
+//     .away()     B76: iFizBox went to the background while a row was with iOS: that row is handed off to iOS
+//     .confirm(id) B76: iOS has an app whose row ended "Sent to iOS" (apps.isInstalled on the way back): Installed
 //     .rows / .running / .stopping / .current (the row with iOS)
+//
+// B76: a stock phone can't watch iOS's install once iFizBox is in the background, so installed: false after a handoff
+// (handedOff, or .away() during the watch) means "lost sight", not "refused": the row ends Done as sent (unsure) and
+// leaves the queue. Failed stays for a refusal seen while iFizBox stayed in front (iOS never fetched the IPA).
 //   rowStatus(row, { locale, timeZone }) -> the row's grey line ("Downloading 12.0 of 48.0 MB", "Tap Install on the
 //                              iOS prompt", "Re-signed, expires Dec 3, 2026")
 //   summaryLine(rows)          -> "2 installed, 1 re-signed, 1 failed, 1 cancelled"
@@ -166,8 +174,9 @@ export function createAppRun({ rows, sign, install, discard = () => {}, ahead = 
     }
     if (f.why || ended(r)) return;
     const expires = res?.expires ?? r.expires;
-    if (res?.installed === false) { fail(r, "iOS didn't install it"); return; }
-    const unsure = res?.installed == null;
+    const handedOff = Boolean(res?.handedOff || f.away);
+    if (res?.installed === false && !handedOff) { fail(r, "iOS didn't install it"); return; }
+    const unsure = res?.installed !== true;
     finishRow(r, "installed", { token: null, expires, unsure, phase: null, fraction: 1 });
     if (r.mode === "resign") log(r, "step", `Re-signed ${label(r)}${expires ? `, expires ${dateText(expires)}` : ""}`);
     else log(r, "step", unsure ? `Sent ${label(r)} to iOS` : `Installed ${label(r)}`);
@@ -216,6 +225,21 @@ export function createAppRun({ rows, sign, install, discard = () => {}, ahead = 
     get stopping() { return stopping; },
     get current() { return rows.find((r) => WITH_IOS.has(r.state)) ?? null; },
     start,
+    away() {
+      let n = 0;
+      for (const r of rows) {
+        const f = WITH_IOS.has(r.state) ? flights.get(r.id) : null;
+        if (f) { f.away = true; n++; }
+      }
+      return n > 0;
+    },
+    confirm(id) {
+      const r = rows.find((x) => x.id === id);
+      if (!r || r.state !== "installed" || !r.unsure) return false;
+      set(r, { unsure: false });
+      if (r.mode !== "resign") log(r, "step", `Installed ${label(r)}`);
+      return true;
+    },
     stop(id) {
       const r = rows.find((x) => x.id === id);
       if (!r || ended(r)) return false;

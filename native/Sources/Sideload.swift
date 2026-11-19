@@ -11,6 +11,7 @@
 //   signing.install {url | token, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?} (stream as I6)
 //        -> I6's reply + {fixedArm64e, expires}
 //   signing.progress {bundleId} (stream: {phase: "installing", progress}) -> {installed: true | false | null}
+//        + handedOff (B76): true when a false became null because iFizBox lost sight of the install (Handoff below)
 //   signing.installed            -> {apps: [record], next: {expires, apps} | null}
 //   signing.openApp {bundleId}   -> {opened: true | false}: F155, launches an installed app (the progress page's Open)
 //   signing.forget {bundleId}    -> {apps}
@@ -420,6 +421,7 @@ enum Sideload {
         // B29: the bundle ID iOS is told to install (the manifest's, the signed Info.plist's) and what the
         // server sends, in the install log; the server's lines reach the page through signing.progress.
         InstallLog.reset(app.bundleID)
+        Handoff.reset(app.bundleID)
         log?("Bundle ID: \(app.bundleID)" + (app.bundleID == app.originalBundleID ? "" : " (the app's own: \(app.originalBundleID))")
              + ", version \(app.version); serving \(Sideload.size(output))")
         let bid = app.bundleID
@@ -438,7 +440,7 @@ enum Sideload {
             served?(ok)
         }
         server.serve(ipaPath, .init(type: "application/octet-stream", body: .file(output), log: serverLog,
-                                    onServed: { serverLog("iOS has the whole IPA"); end(true) }))
+                                    onServed: { serverLog("iOS has the whole IPA"); Handoff.served(bid); end(true) }))
         // F196: Cancel: no more serving, no minute's grace, the listener ends when nothing else is served.
         job?.onCancel {
             guard once.first() else { return }
@@ -471,9 +473,13 @@ enum Sideload {
         // F235: the IPA queue waits longer for the Install tap (`wait` seconds) and stops one app's watch by its `tag`
         let wait = max(45, min(c.params["wait"] as? Double ?? 45, 15 * 60))
         let tag = (c.params["tag"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-        watch(bid, ask: wait, tag: tag, onProgress: { c.emitOnMain([["phase": "installing", "progress": $0]]) }) { installed in
+        watch(bid, ask: wait, tag: tag, onProgress: { c.emitOnMain([["phase": "installing", "progress": $0]]) },
+              lost: { seen, away in
+            // B76: a false here after a handoff is iFizBox losing sight of iOS's install, not iOS refusing it
+            Handoff.lostSight(served: Handoff.wasServed(bid), away: away, seen: seen)
+        }) { installed, handedOff in
             DispatchQueue.main.async { InstallLog.detach(bid) }
-            Apt.reply(c, ["installed": installed.map { $0 as Any } ?? NSNull()], nil)
+            Apt.reply(c, ["installed": installed.map { $0 as Any } ?? NSNull(), "handedOff": handedOff], nil)
         }
     }
 
@@ -492,14 +498,28 @@ enum Sideload {
     static let nilGrace: TimeInterval = 6, nilGraceDone: TimeInterval = 1.5
 
     // nil: the private API isn't there, so it can't be told.
+    // B76: `lost(seen, away)` is asked before a false is answered: true turns it into (nil, handedOff: true), as iFizBox
+    // lost sight of the install (it went to the background during the watch: `away`), it didn't see iOS refuse it.
     static func watch(_ bid: String, ask: TimeInterval = 45, tag: String? = nil, onProgress: @escaping (Double) -> Void,
-                      done: @escaping (Bool?) -> Void) {
-        guard Workspace.available else { return done(nil) }
+                      lost: @escaping (_ seen: Bool, _ away: Bool) -> Bool = { _, _ in false },
+                      done finish: @escaping (Bool?, Bool) -> Void) {
+        guard Workspace.available else { return finish(nil, false) }
         let start = Date()
         var cancels: Int?
         var seen = false, last = -1
         var nilSince: Date?
+        // B76: iFizBox in the background at any time during the watch (iOS's home screen showing the install)
+        var away = false
+        var servedAt: Date?
+        let nc = NotificationCenter.default
+        let bg = nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in away = true }
+        func done(_ installed: Bool?) {
+            nc.removeObserver(bg)
+            if installed == false, lost(seen, away) { return finish(nil, true) }
+            finish(installed, false)
+        }
         func tick() {
+            if UIApplication.shared.applicationState == .background { away = true }
             if cancels == nil { cancels = watchCancels }
             if cancels != watchCancels { return done(nil) } // F196: signing.cancel
             if let t = tag, SignJob.wasCancelled(tag: t) { return done(nil) } // F235: signing.cancel {tag}
@@ -516,6 +536,11 @@ enum Sideload {
                 }
             } else if Date().timeIntervalSince(start) > ask {
                 return done(false)
+            } else if Handoff.wasServed(bid) {
+                // B76: iOS has the whole IPA but shows iFizBox no progress: it's iOS's now (the queue needn't wait `ask`)
+                let since = servedAt ?? Date()
+                servedAt = since
+                if Date().timeIntervalSince(since) >= Handoff.servedQuiet { return done(false) }
             }
             if Date().timeIntervalSince(start) > 15 * 60 { return done(seen ? Workspace.isInstalled(bid) : false) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: tick)
@@ -814,6 +839,24 @@ enum CloseForUpdate {
             }
         }
     }
+}
+
+// B76: on a stock phone iFizBox can't watch iOS's install once it is in the background, so signing.progress's false
+// after a handoff means "lost sight", not "refused". Handed off: iFizBox went to the background during the watch, or
+// iOS fetched the whole IPA (the install server's onServed) and no progress was seen after. A false seen while iFizBox
+// stayed in front, with iOS never fetching the IPA or with progress seen to the end, stays a refusal.
+// State per bundle ID, on the main queue; served/reset from any queue.
+enum Handoff {
+    private static var fetched = Set<String>()
+
+    static func reset(_ bundleID: String) { DispatchQueue.main.async { fetched.remove(bundleID) } }
+    static func served(_ bundleID: String) { DispatchQueue.main.async { fetched.insert(bundleID) } }
+    static func wasServed(_ bundleID: String) -> Bool { fetched.contains(bundleID) }
+
+    static func lostSight(served: Bool, away: Bool, seen: Bool) -> Bool { away || (served && !seen) }
+
+    // How long a watch waits, once iOS has the whole IPA, for install progress to show before calling it handed off.
+    static let servedQuiet: TimeInterval = 30
 }
 
 // B29: the install server's lines (each request iOS makes for the IPA, the bytes it got, a 404 after serving ended)

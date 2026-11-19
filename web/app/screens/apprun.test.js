@@ -276,3 +276,54 @@ test("F247: a one-app run opens on the Log; two apps open on the Apps list", () 
   await two.l.release("b");
   await doneTwo;
 }));
+
+// B76: leaving iFizBox while an app is with iOS hands it off; coming back asks iOS (apps.isInstalled) and upgrades it.
+function fakeDoc() {
+  const d = { visibilityState: "visible", listeners: [],
+    addEventListener(t, f) { if (t === "visibilitychange") d.listeners.push(f); },
+    removeEventListener(t, f) { d.listeners = d.listeners.filter((x) => x !== f); },
+    set(state) { d.visibilityState = state; for (const f of [...d.listeners]) f(); } };
+  return d;
+}
+
+test("B76: an app whose watch answers false after iFizBox left ends Sent to iOS, cleared; back in front it turns Installed", () => withDom(async () => {
+  const s = setup([app("a", "Alpha"), app("b", "Beta")]);
+  const doc = fakeDoc();
+  const asked = [];
+  let has = {};
+  const isInstalled = async (ids) => { asked.push(ids); return has; };
+  s.l.install = (r, { signal, progress }) => new Promise((resolve) => {
+    s.l.calls.install.push(r.id);
+    progress("asking", 0);
+    s.l.waits.set(r.id, () => resolve({ installed: false }));
+  });
+  const done = runAppRun(s.queue.list(), { queue: s.queue, lanes: s.l, open: () => s.page, doc, isInstalled });
+  await settle();
+  doc.set("hidden"); // the user tapped Install, iOS's home screen shows
+  await s.l.release("a");
+  // b refused in front: Failed
+  await s.l.release("b");
+  const r = await done;
+  assert.deepEqual(r.rows.map((x) => x.state), ["installed", "failed"]);
+  const rows = rowsOf(s.page);
+  assert.equal(statusOf(rows[0]), "Sent to iOS");
+  assert.deepEqual(s.queue.list().map((j) => j.id), ["b"]);
+  assert.deepEqual(asked, []); // not asked while hidden
+  has = { a: true };
+  doc.set("visible");
+  await settle();
+  assert.deepEqual(asked, [["a"]]);
+  assert.equal(statusOf(rows[0]), "Installed");
+  assert.equal(s.page.lines.filter((l) => l.id === "a").at(-1).text, "Installed Alpha");
+  s.page.close();
+  assert.equal(doc.listeners.length, 0);
+}));
+
+test("B76: phoneLanes asks apps.isInstalled; no bridge or a failed call is unknown", async () => {
+  const native = fakeNative({ "apps.isInstalled": async (p) => ({ installed: { [p.bundleIds[0]]: true } }) });
+  const l = phoneLanes({}, { native });
+  assert.deepEqual(await l.isInstalled(["com.a"]), { "com.a": true });
+  assert.deepEqual(native.calls, [["apps.isInstalled", { bundleIds: ["com.a"] }]]);
+  const bad = phoneLanes({}, { native: fakeNative({ "apps.isInstalled": async () => { throw new Error("x"); } }) });
+  assert.deepEqual(await bad.isInstalled(["com.a"]), {});
+});

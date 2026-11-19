@@ -348,7 +348,7 @@ async function markIos(env, t, mark, ttl, key = iosKey(t)) {
 const partLen = (m, i) => (i < m.parts - 1 ? m.partSize : m.size - m.partSize * (m.parts - 1));
 
 // /sign/upload/... and /sign/up/...: a Response, or null for a path that isn't these.
-async function uploads(req, u, env, ttl) {
+async function uploads(req, u, env, ttl, ctx = null) {
   const max = uploadCap(env);
   if (u.pathname === "/sign/upload" && req.method === "POST") {
     if (!max) return fail("not_allowed", "This server doesn't take apps signed on the website.", 403);
@@ -452,7 +452,10 @@ async function uploads(req, u, env, ttl) {
     if (req.method === "HEAD") return new Response(null, { status, headers });
     // FixedLengthStream (Cloudflare) keeps the Content-Length on a streamed body; Node's tests use a plain one.
     const f = typeof FixedLengthStream === "function" ? new FixedLengthStream(end - start + 1) : new TransformStream();
-    upPump(env, h[1], meta, start, end, n, ttl, f.writable, bodyWait).catch((e) => f.writable.abort(e).catch(() => {}));
+    const job = upPump(env, h[1], meta, start, end, n, ttl, f.writable, bodyWait).catch((e) => f.writable.abort(e).catch(() => {}));
+    // the client hangs up once it has Content-Length bytes, which ended the request before the finished mark (seen in
+    // wrangler tail as "canceled"): the pump runs to its end
+    ctx?.waitUntil?.(job);
     return new Response(f.readable, { status, headers });
   }
   return null;
@@ -684,7 +687,7 @@ export async function ipaInfo(u, env = {}, { fetcher = fetch, cache = env.LOOKUP
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const u = new URL(req.url);
     const ttl = Math.max(60, Number(env.TTL) || 600);
     if (isAccountPath(u.pathname)) return account(req, env); // F97: iFizBox Account (src/account.js)
@@ -699,7 +702,7 @@ export default {
     if (u.pathname === "/repo" || u.pathname.startsWith("/repo/")) return repo(req, u, env);
     if (u.pathname === "/healthz") return new Response("ok\n", { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
     if (u.pathname === "/sign/status") return json({ ok: true, ttl, worker: true, zsign: false, upload: uploadCap(env) });
-    if (u.pathname.startsWith("/sign/up")) { const r = await uploads(req, u, env, ttl); if (r) return r; }
+    if (u.pathname.startsWith("/sign/up")) { const r = await uploads(req, u, env, ttl, ctx); if (r) return r; }
 
     if (u.pathname === "/sign/manifest" && req.method === "GET") {
       const url = loopbackUrl(u.searchParams), app = appOf(u.searchParams);

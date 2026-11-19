@@ -33,8 +33,8 @@ export const WARNING = {
   title: "Install on the Website?",
   message: "Installing here is slow: Safari downloads the app, signs it with your certificate, uploads it to this "
     + "site, and then iOS downloads it again. Big apps or a weak connection can make it fail, and the signed apps use "
-    + `this site's limited storage.\n\nInstall in ${NAME} signs and installs on the iPhone itself: much faster, with no `
-    + "upload.",
+    + `this site's limited storage.\n\nInstall in ${NAME} signs on the iPhone, so your apps never leave it: much `
+    + "faster. (Our server only sends iOS the install prompt.)",
   buttons: ["Cancel", "I Understand"],
   cancel: 0,
 };
@@ -114,8 +114,8 @@ export const shouldAskFirst = ({ mode = "site", storage = store() } = {}) => mod
 
 export const FIRST_VISIT = {
   title: `Install ${NAME} First`,
-  message: `Apps installed in the ${NAME} app are signed and installed on the iPhone itself: much faster than this `
-    + `website, with no upload.\n\nInstall ${NAME} now, then install your IPAs from it.`,
+  message: `The ${NAME} app signs your IPAs on the iPhone, so your apps never leave it: much faster than this `
+    + `website. (Our server only sends iOS the install prompt.)\n\nInstall ${NAME} now, then install your IPAs from it.`,
   buttons: ["Not Now", `Install ${NAME}`],
   cancel: 0,
 };
@@ -140,8 +140,8 @@ export async function promptFirstVisit({ mode, install, alert = showAlert, stora
 export const browsingLocked = ({ mode = "site", storage = store() } = {}) => mode === "site" && firstVisitState(storage) !== "later";
 const BROWSE_GATE = {
   title: `Install ${NAME} First`,
-  message: `Apps installed in the ${NAME} app are signed and installed on the iPhone itself: much faster than this `
-    + "website, with no upload.\n\nYou can browse the website anyway, but installing here is slow and can fail on big apps.",
+  message: `The ${NAME} app signs your IPAs on the iPhone, so your apps never leave it: much faster than this `
+    + "website. (Our server only sends iOS the install prompt.)\n\nYou can browse the website anyway, but installing here is slow and can fail on big apps.",
   // stacked, as iOS 6 stacks three: Cancel closes it and Home stays locked (user 2026-11-18). Install iFizBox green,
   // Browse Anyway red (the one we'd rather nobody pressed), and it counts down first.
   buttons: [`Install ${NAME}`, "Browse Anyway", "Cancel"],

@@ -26,6 +26,7 @@ import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, serverStatus,
   localSigning, deviceStatus, importToDevice, removeFromDevice, statusReady, defaultServer,
   browserSigning, getBring, setBring, signAndInstall } from "../signing-client.js";
+import { PASSWORD_EVENT } from "../signing-client.js";
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { drawWalkthrough, walkOpen, offerInstall, missingStep, siteReady, deviceRows } from "./signing.js";
 import { storedUdid, udidPending, startUdid, watchUdid, canFindUdid, udidFindRows } from "./signing.js";
@@ -684,6 +685,11 @@ export function init() {
     if (key === "appearance" || key === "lightTheme" || key === "darkTheme") applyTheme();
     if (key === "resignReminder") remindNow();
   });
+  // F260: the signer confirmed the website's password in the background: repaint the Password rows (no redraw: one
+  // may be in the middle of typing)
+  window.addEventListener?.(PASSWORD_EVENT, () => loadIdentity().then((id) => {
+    for (const p of pages) if (p.el.isConnected) showPasswordState(p.el, id);
+  }).catch(() => {}));
   startAccountSync(); // F97: read the account on launch, save it when iFizBox goes to the background
   remindNow(); // F68: on launch too, so the notification follows the setting (and any change the shell missed)
 }

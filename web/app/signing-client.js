@@ -96,6 +96,7 @@ export async function saveIdentity(patch) {
     const next = { ...((await loadIdentity()) ?? {}), ...patch, savedAt: Date.now() };
     await tx("readwrite", (st) => st.put(next, KEY));
     known = next;
+    if (needsConfirm(next)) confirmSoon(); // F260
     return next;
   }
   staged = { ...(staged ?? {}), ...patch, savedAt: Date.now() };
@@ -1106,5 +1107,73 @@ async function websiteTransfer() {
   return encodeLink(await websitePayload({ identity: false })); // the certificate goes as ifizbox-identity.plist (bring)
 }
 
+// ---- F260: the password checked by the signer itself ----------------------------------------------------------
+//
+// The early link (F121) opens only for a password known to open the .p12 (passwordOk true, expectedBundleId). The
+// page's own check (core/signing.js checkP12Password) answers null for a .p12 it can't read (no MAC, BER, another
+// hash), and synced or seeded identities (account.js) and older ones come with passwordOk unset: all of those went
+// the Ready to Install way. So the website asks zsign in the Web Worker (websign-job.js runPasswordCheck) whenever a
+// save leaves a .p12, a profile and a password not yet known right or wrong (Settings > Signing, the account's sync),
+// and once when this module loads, and saves its answer. A Settings page in view repaints its Password row on
+// PASSWORD_EVENT (window).
+//
+//   await checkPasswordInWorker({ p12, password, profile }, { worker })   true | false | null (unknown)
+//   await confirmPassword({ identity, save, check, notify })              the passwordOk it saved, or null
+//   confirmSoon(delay)                                                    confirmPassword after a pause, one at a time
+//                                                                         (no-op where there's no Worker: node, tests)
+export const PASSWORD_EVENT = "ifizbox:password";
+export const needsConfirm = (id) => Boolean(id?.p12 && id?.profile && id.passwordOk !== true && id.passwordOk !== false);
+
+const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b ?? []));
+const sameBytes = (a, b) => {
+  const x = bytesOf(a), y = bytesOf(b);
+  return x.length === y.length && x.every((v, i) => v === y[i]);
+};
+
+export async function checkPasswordInWorker({ p12, password = "", profile }, { worker = runInWorker } = {}) {
+  const m = await worker({ check: "password", p12: buffer(p12), profile: buffer(profile), password: password ?? "" });
+  return typeof m?.passwordOk === "boolean" ? m.passwordOk : null;
+}
+
+function notifyPassword() {
+  try { globalThis.dispatchEvent?.(new Event(PASSWORD_EVENT)); } catch { /* no window */ }
+}
+
+// The last answer zsign gave, so saves of the same files (Settings rechecks after each) don't run it again.
+let lastCheck = null;
+export async function confirmPassword({ identity = loadIdentity, save = saveIdentity, check = checkPasswordInWorker, notify = notifyPassword } = {}) {
+  const id = await identity();
+  if (!needsConfirm(id)) return null;
+  const password = id.password ?? ""; // none saved: a .p12 without one opens with ""
+  const same = (o) => Boolean(o && sameBytes(o.p12, id.p12) && sameBytes(o.profile, id.profile) && (o.password ?? "") === password);
+  let ok = same(lastCheck) ? lastCheck.ok : null;
+  if (ok === null) {
+    try { ok = await check({ p12: id.p12, password, profile: id.profile }); } catch { ok = null; }
+    if (typeof ok !== "boolean") return null;
+    lastCheck = { p12: id.p12, profile: id.profile, password, ok };
+  }
+  if (!ok && id.password == null) return null; // nobody typed one: the Password row keeps asking, not "wrong"
+  const now = await identity(); // typed over, picked again or checked meanwhile: that wins
+  if (!needsConfirm(now) || !same(now) || (now.password == null) !== (id.password == null)) return null;
+  await save(ok && id.password == null ? { password: "", passwordOk: true } : { passwordOk: ok });
+  notify();
+  return ok;
+}
+
+let confirmTimer = null, confirming = false, confirmAgain = false;
+export function confirmSoon(delay = 300) {
+  if (typeof globalThis.Worker !== "function" || !browserSigning()) return;
+  clearTimeout(confirmTimer);
+  confirmTimer = setTimeout(function run() {
+    if (confirming) { confirmAgain = true; return; }
+    confirming = true;
+    confirmPassword().catch(() => null).finally(() => {
+      confirming = false;
+      if (confirmAgain) { confirmAgain = false; run(); }
+    });
+  }, delay);
+}
+
 // F121: Install's tap needs the profile at once (identityNow), so the website reads it as soon as this module loads.
-if (browserSigning() && globalThis.indexedDB) loadIdentity().catch(() => {});
+// F260: and has the signer check a password nobody checked yet (passwordOk unset), so Install's tap finds it true.
+if (browserSigning() && globalThis.indexedDB) loadIdentity().then((id) => { if (needsConfirm(id)) confirmSoon(0); }).catch(() => {});

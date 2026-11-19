@@ -87,16 +87,10 @@ It should say `production`.
 
 ## 6. Use it in iFizBox
 
-1. **Settings > Signing** > Import Certificate (Replace Certificate if one is in): the `.p12` and the
-   `.mobileprovision`, then the password in the Password group, typed or with Read From a .txt File. A `.p12` with no
-   password says Not Needed there.
-2. Leave **Keep Bundle IDs** on (the default). Settings > Signing lists anything the profile can't do (no Push, a
-   wildcard, a development profile).
-3. Delete the App Store copy of the app first if it's on the phone: iOS won't put a signed app over it, and its data
-   goes with it.
-4. Install the app, open it and allow notifications when it asks.
+Import the `.p12`, the `.mobileprovision` and the password in **Settings > Signing**, and leave **Keep Bundle IDs** on.
+Delete the App Store copy of the app first (iOS won't sign over it), install, and allow notifications.
 
-The same steps are in the app: Home > User Guides > Notifications for Signed Apps.
+<p align="center"><img src="img/web-signing.png" alt="Settings > Signing" width="30%"></p>
 
 ## When it doesn't work
 

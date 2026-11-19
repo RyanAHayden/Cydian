@@ -101,6 +101,11 @@ iFizBox then updates itself like any other package.
 Add your certificate on the website, then tap **Home > Install iFizBox Lite**. The app arrives with your certificate,
 sources and settings, and updates itself.
 
+<p align="center">
+  <img src="docs/img/web-signing.png" alt="1. Add your certificate in Settings > Signing" width="30%">
+  <img src="docs/img/web-home.png" alt="2. Tap Install iFizBox Lite on Home" width="30%">
+</p>
+
 No certificate? [docs/developer-account.md](docs/developer-account.md). Have one? Help your friends by sharing it with
 [SideDrop](https://github.com/RyanAHayden/sidedrop) (only with people you trust: they can pull it out).
 

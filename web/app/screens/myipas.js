@@ -1,13 +1,14 @@
 // F77: My IPAs, under Installed (#/installed/myipas): the user's own IPAs, signed with their certificate.
-// F79: the page is Install IPAs now, linked from Home (a tile) and Installed (its tile button): Browse first (the
-// apps of the user's AltStore sources: Search, All Apps, then by category, browse.js's lists and app pages below),
-// then My IPAs, the user's own. Add (nav bar) as before.
+// F79: the page is Install IPAs, reached from Home's tile. F224 (user 2026-11-18): one page for the user's own IPAs only
+// (browsing source apps is Sources' and Search's): back | Install IPAs | Manage; a search bar over the IPAs, an
+// 'Add an IPA' group (Choose from Files, Download from URL; the website's Choose File), then Not Installed and
+// Installed, A-Z, each row with iOS 6's App Store price button (grey SIGN, a first tap turns it green INSTALL, the
+// second signs and installs with the button filling; installed rows OPEN). A left swipe shows Delete in place of the
+// button (deletes at once); Manage is Installed's (F222): select circles, Select… presets, the grey summary line and a
+// Sign / Unsign / Delete toolbar, each confirmed by an action sheet, then the 1-of-n HUD.
 //
-//   #/installed/myipas                      Install IPAs: Browse (grouped), then My IPAs: icon, name, version,
-//                                           size and state; Add (nav bar) -> action sheet Files / From URL
-//   #/installed/myipas/search               Search Apps: a search bar over the AltStore apps
-//   #/installed/myipas/apps                 All Apps, A-Z
-//   #/installed/myipas/category:<name>      one Browse category's apps (core/catalog.js browseCategory)
+//   #/installed/myipas                      Install IPAs (above)
+//   #/installed/myipas/search, /apps, /category:<name> and below   F79's Browse pages, kept for older links only
 //   .../package:<id> and deeper             browse.js's pages (an app's page, Version History)
 //   #/installed/myipas/ipa:<file>           an IPA's page, like a package page: header, Install (nav bar), Sign
 //                                           Options, Sign Now, Save Signed IPA, details, Delete
@@ -26,7 +27,7 @@
 import { grouped, placeholder, el } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { catalog, ALL } from "../catalog.js";
-import { mergeCategories, indexLetter } from "../core/catalog.js";
+import { indexLetter } from "../core/catalog.js";
 import { withLetterHeaders } from "../nav/vlist.js";
 import { format, mounted, parse, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";
@@ -37,8 +38,10 @@ import { detectMode } from "../core/settings.js";
 import { deviceError, phaseLabel, isCgBI, fromBase64 } from "../core/signing.js";
 import { apps, recordInstall } from "../core/installed.js";
 import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optionsParams, siteEntries, addSiteUrl,
-  STATE_LABELS, addSiteFile, removeSiteEntry, openIpaStore, memoryIpaStore, libraryFooter, listState, listStep, tapOpens,
-  allSelected, deleteLabel, deleteButtonText, deleteSheetTitle, deleteEntries, holdActions, HOLD, libraryMode } from "../core/myipas.js";
+  STATE_LABELS, addSiteFile, removeSiteEntry, openIpaStore, memoryIpaStore, listState, listStep, tapOpens,
+  deleteSheetTitle, deleteButtonText, deleteEntries, holdActions, HOLD, libraryMode, ipaSections, installedIdOf, priceButton, priceTap, priceAway,
+  priceProgress, ipaSelectSheet, ipaSelectLabel, ipaPresetFiles, ipaCounts, ipaSummary, ipaToolbar, ipaSheet, unsignEntries,
+  IPA_SELECT } from "../core/myipas.js";
 import { barButton } from "../nav/ui.js";
 import { longPress } from "../nav/menu.js";
 import { readIpaFile } from "../core/ipainfo.js";
@@ -48,10 +51,13 @@ import { NAME } from "../brand.js";
 
 export { MYIPAS };
 
-const view = { body: null, browse: null, route: null, seq: 0, browseSeq: 0 };
+const view = { body: null, add: null, search: null, route: null, seq: 0 };
 const known = new Map(); // file -> the last entry seen (titles, the page before its list call answers)
-// F208: the My IPAs list's edit/swipe/selection state (core/myipas.js listStep), its controller and bottom toolbar.
-const lib = { state: listState(), ctl: null, bar: null };
+// F208/F224: the list's swipe and Manage state (core/myipas.js listStep: `editing` is Manage, `armed` the row showing
+// Delete, `selected` the picked files), its controller, the bottom toolbar, the IPAs and which of them iOS has, the
+// search, the price buttons' state (`armed`: the green INSTALL) and the ones running (file -> { label, fill }).
+const lib = { state: listState(), ctl: null, bar: null, list: [], installed: {}, query: "", price: { armed: null }, busy: new Map(),
+  manageBtn: null, selectBtn: null, summary: null };
 
 export const PAGE_TITLE = "Install IPAs";
 
@@ -86,10 +92,11 @@ const jailbreak = () => listMode() === "jailbreak";
 export function nav(route) {
   const p = pageOf(route);
   switch (p?.page) {
-    case "list": // F208: Edit beside Add (Edit rightmost, as iOS 6 has it); a new list page starts out of edit mode
+    case "list": // F224: Manage only (Add is the page's own group); a new list page starts out of Manage
       lib.state = listState();
-      return { title: PAGE_TITLE, right: [{ label: "Add", onClick: () => addMenu() },
-        { label: "Edit", onClick: () => setListEditing(!lib.state.editing) }] };
+      lib.price = { armed: null };
+      return { title: PAGE_TITLE, right: { label: "Manage", onClick: () => setManaging(!lib.state.editing),
+        ref: (b) => { lib.manageBtn = b; b.classList.add("manage-button"); } } };
     case "search": return { title: "Search Apps", style: "plain" };
     case "apps": return { title: "All Apps", style: "plain" };
     case "category": return { title: p.value || "Apps", style: "plain" };
@@ -108,36 +115,17 @@ export function render(body, route, ctx) {
   style();
   const p = pageOf(route);
   if (p?.page === "list") {
-    // One wrapper (the first child of a page stretches, ios6.css): Browse, then the library.
+    // One wrapper (the first child of a page stretches, ios6.css): the search bar over the IPAs, Add an IPA, the IPAs.
     const page = el("div", "install-ipas");
-    view.browse = el("div", "install-ipas-browse");
-    view.body = el("div", "install-ipas-mine");
     view.route = route;
-    view.browse.append(grouped(browseGroups(null)));
+    lib.query = "";
+    view.search = searchBar("Search IPAs", (q) => { lib.query = q; redraw(); });
+    view.add = el("div", "install-ipas-add");
+    view.add.append(grouped(addGroups(site())));
+    view.body = el("div", "install-ipas-mine");
     view.body.append(note("Loading"));
-    // The search bar on top (user 2026-11-17): empty, Browse and My IPAs show; typed, every app on the sources.
-    const results = el("div", "install-ipas-results");
-    results.hidden = true;
-    const hint = el("p", "empty search-note");
-    const list = browse.packageList(results, route, [], { letters: false });
-    results.append(hint, list.el);
-    let seq = 0;
-    const bar = searchBar("Search Apps", async (q) => {
-      const mine = ++seq;
-      results.hidden = !q;
-      view.browse.hidden = view.body.hidden = Boolean(q);
-      if (!q) return list.setItems([]);
-      let rows;
-      try { await catalog.ensure(); rows = appsOf(await catalog.search(q)); } catch (e) { if (mine === seq) hint.textContent = e.message; return; }
-      if (mine !== seq) return;
-      browse.rememberNames(rows);
-      list.setItems(rows);
-      hint.textContent = rows.length ? "" : "No Results";
-    });
-    page.append(bar, view.browse, view.body, results);
+    page.append(view.search, view.add, view.body);
     body.append(page);
-    markPlaceholders(view.browse);
-    loadBrowse();
     load();
     return;
   }
@@ -187,26 +175,79 @@ async function load() {
   if (seq !== view.seq || !view.body) return;
   remember(r?.ipas);
   draw(r?.ipas ?? []);
+  refreshInstalled(r?.ipas ?? [], seq);
+}
+
+// Which IPAs iOS has: the apps.isInstalled answer per bundle ID, then redrawn when it changed.
+async function refreshInstalled(list, seq) {
+  let map;
+  try { map = await installedOf(list, { mode: listMode() }); } catch { return; }
+  if (seq !== view.seq || !view.body?.isConnected) return;
+  const same = JSON.stringify(map) === JSON.stringify(lib.installed);
+  lib.installed = map;
+  if (!same) redraw();
+}
+
+// F224: { bundleId: true } for the IPAs whose app is on the phone. The apps (both builds): the shell's apps.isInstalled
+// (every build, F219); an id it can't answer, and the website, go by Installed's records (recordInstall, F30).
+export async function installedOf(list, { mode = listMode(), native = globalThis.ifizboxNative, records = async () => (await apps()).all() } = {}) {
+  const ids = [...new Set((list ?? []).filter((e) => e && !e.error).map(installedIdOf).filter(Boolean))];
+  const out = {};
+  if (!ids.length) return out;
+  let answer = {};
+  if (mode !== "site" && typeof native?.call === "function") {
+    try { answer = (await native.call("apps.isInstalled", { bundleIds: ids }))?.installed ?? {}; } catch { answer = {}; }
+  }
+  let recorded = null;
+  for (const id of ids) {
+    if (typeof answer[id] === "boolean") { if (answer[id]) out[id] = true; continue; }
+    recorded ??= new Set(((await Promise.resolve().then(records).catch(() => [])) ?? []).map((r) => r?.id));
+    if (recorded.has(id)) out[id] = true;
+  }
+  return out;
 }
 
 function draw(list) {
+  lib.list = list ?? [];
+  redraw();
+}
+
+// The groups again from lib (a search typed, Manage, iOS's answer, an install's progress).
+function redraw() {
+  if (!view.body) return;
   const isSite = site();
   const jb = jailbreak();
-  const files = libraryRows(list, { site: isSite, jailbreak: jb }).map((r) => r.file);
-  lib.state = files.length ? listStep(lib.state, { type: "list", files }) : listState();
-  lib.ctl = libraryGroup(list, { site: isSite, jailbreak: jb, state: lib.state,
-    on: { change: onListChange, delete: (es) => deleteMany(es), hold: (e) => holdSheet(e) } });
+  const files = libraryRows(lib.list, { site: isSite, jailbreak: jb }).map((r) => r.file);
+  lib.state = files.length ? listStep(lib.state, { type: "list", files }) : { ...listState(), editing: lib.state.editing };
+  if (lib.price.armed && !files.includes(lib.price.armed)) lib.price = { armed: null };
+  lib.ctl = libraryGroup(lib.list, { site: isSite, jailbreak: jb, state: lib.state, installed: lib.installed,
+    query: lib.state.editing ? "" : lib.query, price: lib.price, busy: lib.busy,
+    on: { change: onListChange, delete: (es) => swipeDelete(es), hold: (e) => holdSheet(e), price: (r) => onPrice(r) } });
   view.body.replaceChildren(lib.ctl.el);
   onListChange(lib.state);
 }
 
-// F212: the jailbreak app's: no sideloaders (they aren't offered there), and its Documents is /var/mobile/Documents,
-// which the Files app doesn't show.
+// The Add an IPA group: the app's Files picker and a download; the website's Choose File (kept in this browser) and a link.
+export function addGroups(isSite) {
+  return [{ header: "Add an IPA", rows: [
+    { label: isSite ? "Choose File" : "Choose from Files", onClick: () => (isSite ? chooseSiteFile() : pickFiles()), chevron: false },
+    { label: "Download from URL", onClick: () => addFromUrl(), chevron: false },
+  ] }];
+}
+
+// Under the last group: how else IPAs get here. F212: the jailbreak app's Documents is /var/mobile/Documents, which the
+// Files app doesn't show; the website keeps what is chosen in this browser.
 export function libraryEmptyText(site, { jailbreak = false } = {}) {
-  if (!site && jailbreak) return "No IPAs yet. Tap Add to choose one in Files or download one, or put IPAs in /var/mobile/Documents.";
+  if (!site && jailbreak) return "No IPAs yet. Choose one in Files, download one, or put IPAs in /var/mobile/Documents.";
   return site
-    ? `No IPAs yet. Tap Add to choose an IPA in Files (kept in this browser, signed here when you install it) or to keep a link to one: Install opens it in ${NAME}, AltStore, SideStore or Feather.`
-    : `No IPAs yet. Tap Add to choose one in Files or download one, or put IPAs in Files under On My iPhone > ${NAME}.`;
+    ? "No IPAs yet. Choose an IPA in Files (kept in this browser, signed here when you install it) or keep a link to one."
+    : `No IPAs yet. Choose one in Files, download one, share an .ipa to ${NAME} from Files, Safari or Mail, or put IPAs in Files under On My iPhone > ${NAME}.`;
+}
+
+export function libraryFooterText(site, { jailbreak = false } = {}) {
+  if (site) return "IPAs you choose are kept in this browser and signed here when you install them.";
+  if (jailbreak) return `You can also share an .ipa to ${NAME} from Files, Safari or Mail, or put it in /var/mobile/Documents.`;
+  return `You can also share an .ipa to ${NAME} from Files, Safari or Mail.`;
 }
 
 // ---- F208: managing the list: swipe to Delete, Edit (red minus, multi-select, toolbar), hold for a sheet ----------
@@ -216,20 +257,29 @@ export function libraryEmptyText(site, { jailbreak = false } = {}) {
 // row, a right one or a tap puts it away). Editing, a tap on a row ticks it (.picked) for the toolbar's Delete (n).
 // The state is core/myipas.js listStep's; this only draws it.
 
-// The My IPAs group for `list`. -> { el (a fragment), ul, rows, state, step(action), cellOf(file) }.
-// on.change(state) after each step, on.delete([entry]) for a row's Delete, on.hold(entry) for a held row.
-export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jailbreak(), state = listState(), on = {} } = {}) {
-  const rows = libraryRows(list, { site: isSite, jailbreak: jb });
-  const el0 = grouped([{ header: "My IPAs", rows: rows.map((r) => ({
-    label: r.title, subtitle: r.subtitle, icon: { text: r.title.charAt(0).toUpperCase() },
+// The IPAs' groups for `list`: Not Installed, then Installed (core/myipas.js ipaSections), the footer under the last.
+// -> { el (a div holding the groups), ul (that div), rows (the rows shown, in order), sections, state, step(action),
+// cellOf(file), price(file) (the row's price button) }. on.change(state) after each step, on.delete([row]) for a row's
+// Delete, on.hold(row) for a held row, on.price(row) for a tap on its price button.
+export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jailbreak(), state = listState(), installed = {}, query = "",
+  price = { armed: null }, busy = new Map(), on = {} } = {}) {
+  const sections = ipaSections(list, { installed, query, site: isSite, jailbreak: jb });
+  const rows = sections.flatMap((s) => s.rows);
+  const any = libraryRows(list, { site: isSite, jailbreak: jb }).length > 0;
+  const groups = sections.map((s, i) => ({ header: s.header, rows: s.rows.map((r) => ({
+    label: r.title, subtitle: r.line, icon: { text: r.title.charAt(0).toUpperCase() },
     href: format({ tab: "installed", path: ipaPath(r.file) }),
-  })), footer: rows.length ? libraryFooter(list) : libraryEmptyText(isSite, { jailbreak: jb }) }]);
-  const ul = el0.querySelector(".table");
-  const cells = ul ? [...ul.querySelectorAll(":scope > .cell")] : [];
+  })), footer: i === sections.length - 1 ? libraryFooterText(isSite, { jailbreak: jb }) : "" }));
+  if (!sections.length) groups.push({ footer: any ? "No Results" : libraryEmptyText(isSite, { jailbreak: jb }) });
+  const box = el("div", "myipa-groups");
+  box.append(grouped(groups));
+  const cells = [...box.querySelectorAll(".cell")];
   const byFile = new Map();
+  const buttons = new Map();
   const ctl = {
-    el: el0, ul, rows, state,
+    el: box, ul: box, rows, sections, state,
     cellOf: (file) => byFile.get(file) ?? null,
+    price: (file) => buttons.get(file) ?? null,
     step(a) {
       const next = listStep(ctl.state, a);
       if (next === ctl.state) return next;
@@ -241,40 +291,59 @@ export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jail
   };
   rows.forEach((r, i) => {
     const li = cells[i];
-    li.classList.add("myipa-row", `is-${r.state.kind}`, "source-row");
+    li.classList.add("myipa-row", `is-${r.state.kind}`, "source-row", "manage-row");
     li.dataset.file = r.file;
     li._ipa = r;
     byFile.set(r.file, li);
     putIcon(li.querySelector(".cell-icon"), r.icon);
-    const toggle = Object.assign(document.createElement("button"), { type: "button", className: "del-toggle" });
-    toggle.setAttribute("aria-label", "Delete " + r.title);
-    toggle.addEventListener("click", () => ctl.step({ type: "minus", file: r.file }));
+    const spec = priceButton(r, { armed: price.armed, busy: busy.get(r.file) ?? null, site: isSite, jailbreak: jb });
+    if (spec) {
+      const b = Object.assign(document.createElement("button"), { type: "button", className: "price-btn" });
+      paintPrice(b, spec, r.title);
+      b.addEventListener("click", (e) => { e.preventDefault?.(); e.stopPropagation?.(); on.price?.(r); });
+      li.classList.add("has-price");
+      li.append(b);
+      buttons.set(r.file, b);
+    }
     const confirm = Object.assign(document.createElement("button"), { type: "button", className: "del-confirm", textContent: "Delete" });
     confirm.addEventListener("click", () => on.delete?.([r]));
-    li.append(toggle, confirm);
+    const circle = Object.assign(document.createElement("span"), { className: "manage-check" });
+    circle.setAttribute("aria-hidden", "true");
+    li.append(confirm, circle);
   });
   function paint() {
     const s = ctl.state;
-    ul?.classList.toggle("editing", s.editing);
+    box.classList.toggle("managing", s.editing);
     for (const [file, li] of byFile) {
       li.classList.toggle("armed", s.armed === file);
-      li.classList.toggle("picked", s.selected.includes(file));
+      li.classList.toggle("picked", s.editing && s.selected.includes(file));
       li.querySelector(".cell-inner")?.setAttribute("aria-selected", String(s.editing && s.selected.includes(file)));
     }
   }
   paint();
-  if (ul) attachLibraryGestures(ul, ctl, on);
+  attachLibraryGestures(box, ctl, on);
   return ctl;
 }
 
-// As Installed's attachRowGestures (B36): a left swipe shows Delete, a right swipe or a tap puts it away; editing,
-// a tap ticks the row instead of opening it. A hold (nav/menu.js longPress) opens the row's sheet, but not while
-// editing or while a Delete shows.
+// A price button's look from its spec (core/myipas.js priceButton): grey, green (.go), or filling (.busy, --fill).
+export function paintPrice(b, spec, name = "") {
+  b.textContent = spec.label;
+  b.dataset.kind = spec.kind;
+  b.classList.toggle("go", Boolean(spec.green));
+  b.classList.toggle("busy", spec.kind === "busy");
+  b.disabled = spec.kind === "busy";
+  b.style.setProperty?.("--fill", String(spec.kind === "busy" ? Math.round((spec.fill ?? 0) * 1000) / 1000 : 0));
+  b.setAttribute("aria-label", `${spec.label[0]}${spec.label.slice(1).toLowerCase()} ${name}`.trim());
+}
+
+// As Installed's attachRowGestures (B36): a left swipe shows Delete, a right swipe or a tap puts it away; managing,
+// a tap picks the row instead of opening it. A hold (nav/menu.js longPress) opens the row's sheet, but not while
+// managing or while a Delete shows.
 function attachLibraryGestures(ul, ctl, on) {
   let start = null;
   let swiped = false;
   ul.addEventListener("click", (e) => {
-    if (e.target.closest(".del-toggle, .del-confirm")) return;
+    if (e.target.closest(".del-confirm, .price-btn")) return;
     if (swiped) { swiped = false; e.preventDefault(); e.stopPropagation(); return; }
     const li = e.target.closest(".myipa-row");
     if (!li || tapOpens(ctl.state)) return;
@@ -285,7 +354,7 @@ function attachLibraryGestures(ul, ctl, on) {
   ul.addEventListener("pointerdown", (e) => {
     const li = e.target.closest(".myipa-row");
     swiped = false;
-    start = li && !ctl.state.editing && !e.target.closest(".del-confirm, .del-toggle") ? { li, x: e.clientX, y: e.clientY } : null;
+    start = li && !ctl.state.editing && !e.target.closest(".del-confirm, .price-btn") ? { li, x: e.clientX, y: e.clientY } : null;
   });
   ul.addEventListener("pointermove", (e) => {
     if (!start) return;
@@ -308,51 +377,77 @@ function attachLibraryGestures(ul, ctl, on) {
   });
 }
 
-function setListEditing(on) {
-  lib.ctl?.step({ type: on ? "edit" : "done" });
-}
+// ---- F224: Manage, as Installed's (F222): circles, Select…, the grey line, the Sign / Unsign / Delete toolbar ---------
 
-// The list page's nav-bar buttons ([Add, Edit]), found as setTitle finds the title.
-function listNavButtons() {
-  const page = view.body?.closest?.(".page");
-  const stack = page?.parentElement;
-  if (!stack) return [];
-  const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
-  const item = document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i];
-  return [...(item?.querySelectorAll(".nav-right .bar-button") ?? [])];
+// Manage on or off: Done (blue) or Manage on the right; Select… in the back button's place; the search bar and Add
+// an IPA hide; the circles slide in (packages.css .manage-check); the grey line and the toolbar come or go.
+export function setManaging(on) {
+  if (!lib.ctl) { lib.state = on ? listStep(lib.state, { type: "edit" }) : listState(); onListChange(lib.state); return; }
+  if (on && lib.query) { lib.query = ""; const input = view.search?.querySelector?.("input"); if (input) input.value = ""; }
+  lib.price = { armed: null };
+  if (on) { lib.state = listStep(lib.state, { type: "edit" }); redraw(); } else lib.ctl.step({ type: "done" });
 }
 
 function onListChange(s) {
   lib.state = s;
-  const [add, edit] = listNavButtons();
-  if (edit) {
-    edit.textContent = s.editing ? "Done" : "Edit";
-    edit.classList.toggle("done", s.editing);
-    edit.hidden = !lib.ctl?.rows.length && !s.editing;
+  syncManage();
+}
+
+// The rows Manage counts and picks from: every IPA (the search is cleared and hidden while managing).
+const manageRows = () => lib.ctl?.rows ?? [];
+
+// Select…'s sheet (All IPAs, Not Installed (n), Signed (n), Cancel) picks a preset in place of the selection; with every
+// row picked the button is Deselect, which drops it. -> the preset, "none" (Deselect), or null (Cancel).
+export async function selectButton({ sheet = showActionSheet, ctl = lib.ctl } = {}) {
+  const rows = ctl?.rows ?? [];
+  if (ipaSelectLabel(rows, ctl?.state.selected) !== IPA_SELECT) { ctl?.step({ type: "deselectAll" }); return "none"; }
+  const opts = ipaSelectSheet(rows);
+  const i = await sheet({ buttons: opts.map((o) => o.label) });
+  if (!(i >= 0) || !opts[i]) return null;
+  ctl?.step({ type: "selectAll", files: ipaPresetFiles(rows, opts[i].preset) });
+  return opts[i].preset;
+}
+
+function syncManage() {
+  if (typeof document === "undefined") return;
+  const on = lib.state.editing;
+  const rows = manageRows();
+  const b = lib.manageBtn;
+  if (b) { b.textContent = on ? "Done" : "Manage"; b.classList.toggle("done", on); b.hidden = !on && !rows.length; }
+  if (view.search) view.search.hidden = on;
+  if (view.add) view.add.hidden = on;
+  // The grey line above the IPAs.
+  if (on && view.body) {
+    if (!lib.summary) lib.summary = el("p", "manage-summary");
+    lib.summary.textContent = ipaSummary(rows, lib.state.selected);
+    if (lib.summary.parentNode !== view.body.parentNode) view.body.before?.(lib.summary);
+  } else lib.summary?.remove();
+  // Select… in the back button's place (the nav bar's left side).
+  const left = b?.closest?.(".nav-item")?.querySelector(".nav-left");
+  if (left) {
+    for (const x of left.children) if (x !== lib.selectBtn) x.hidden = on;
+    if (on) {
+      if (!lib.selectBtn) {
+        lib.selectBtn = barButton(IPA_SELECT, "manage-select");
+        lib.selectBtn.addEventListener("click", () => selectButton());
+      }
+      lib.selectBtn.textContent = ipaSelectLabel(rows, lib.state.selected);
+      if (lib.selectBtn.parentNode !== left) left.append(lib.selectBtn);
+    } else lib.selectBtn?.remove();
   }
-  if (add) add.hidden = s.editing;
   syncToolbar();
 }
 
-// Edit mode's bottom toolbar (above the tab bar, where the undo and reload bars dock): Select All on the left,
-// the red Delete (n) on the right.
+// The bottom toolbar (packages.css .manage-toolbar, Installed's): Sign (blue, the Done button's look), Unsign, Delete (red).
 function toolbar() {
   if (lib.bar) return lib.bar;
-  const bar = el("div", "myipa-toolbar");
+  const bar = el("div", "manage-toolbar myipa-toolbar");
   bar.setAttribute("role", "toolbar");
-  const all = barButton("Select All", "myipa-select-all");
-  const del = barButton("Delete", "myipa-delete-many");
-  all.addEventListener("click", () => {
-    const files = lib.ctl?.rows.map((r) => r.file) ?? [];
-    lib.ctl?.step(allSelected(lib.state, files) ? { type: "deselectAll" } : { type: "selectAll", files });
-  });
-  del.addEventListener("click", () => {
-    const picked = new Set(lib.state.selected);
-    const es = (lib.ctl?.rows ?? []).filter((r) => picked.has(r.file));
-    if (es.length) deleteMany(es);
-  });
-  bar.append(all, del);
-  lib.bar = { el: bar, all, del };
+  const buttons = { sign: barButton("Sign", "done ipa-sign"), unsign: barButton("Unsign", "ipa-unsign"),
+    delete: barButton("Delete", "manage-delete ipa-delete") };
+  for (const [kind, x] of Object.entries(buttons)) x.addEventListener("click", () => runManage(kind));
+  bar.append(buttons.sign, buttons.unsign, buttons.delete);
+  lib.bar = { el: bar, buttons };
   return lib.bar;
 }
 
@@ -361,37 +456,118 @@ function listShown() {
 }
 
 function syncToolbar() {
-  if (typeof document === "undefined") return;
   const show = lib.state.editing && listShown();
   if (!show && !lib.bar) return;
-  const { el: bar, all, del } = toolbar();
+  const { el: bar, buttons } = toolbar();
   if (show) {
-    const files = lib.ctl?.rows.map((r) => r.file) ?? [];
-    all.textContent = allSelected(lib.state, files) ? "Deselect All" : "Select All";
-    del.textContent = deleteLabel(lib.state.selected.length);
-    del.disabled = !lib.state.selected.length;
+    const opts = { site: site(), jailbreak: jailbreak() };
+    const specs = ipaToolbar(ipaCounts(manageRows(), lib.state.selected, opts), opts);
+    for (const [kind, x] of Object.entries(buttons)) x.hidden = !specs.some((s) => s.kind === kind);
+    for (const s of specs) { buttons[s.kind].textContent = s.label; buttons[s.kind].disabled = s.disabled; }
     if (!bar.isConnected) document.body.append(bar);
-    requestAnimationFrame(() => requestAnimationFrame(() => bar.classList.add("shown")));
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (lib.state.editing) bar.classList.add("shown"); }));
   } else {
     bar.classList.remove("shown");
   }
-  document.documentElement.classList.toggle("has-myipa-toolbar", show);
+  document.documentElement.classList.toggle("has-manage-toolbar", show);
 }
 
-// Leaving the page (another tab, Back) ends edit mode, so the toolbar never shows over another page.
+// Leaving the page (another tab, Back) ends Manage, so the toolbar never shows over another page.
 if (typeof window !== "undefined") {
-  window.addEventListener("hashchange", () => { if (lib.state.editing && !listShown()) setListEditing(false); });
+  window.addEventListener("hashchange", () => { if (lib.state.editing && !listShown()) setManaging(false); });
+  // Back from iOS's install prompt or another app: which IPAs are installed may have changed.
+  document.addEventListener?.("visibilitychange", () => { if (document.visibilityState === "visible" && listShown()) refreshInstalled(lib.list, view.seq); });
+  // A tap anywhere but a green INSTALL puts it back to SIGN (as the App Store's confirm button).
+  document.addEventListener?.("pointerdown", (e) => {
+    if (!lib.price.armed || e.target?.closest?.(".price-btn")) return;
+    lib.price = priceAway(lib.price);
+    repaintPrices();
+  }, true);
 }
 
-// Deletes `es` (rows of the list) after the sheet ('Delete n IPAs' red / Cancel): their records and stored files
-// (core/myipas.js deleteEntries), then the list again, its footer's total with it.
-export async function deleteMany(es, { sheet = showActionSheet, alert = showAlert, isSite = site(), isJailbreak = jailbreak(), store = siteStore,
-  call = libraryCall, storage = globalThis.localStorage } = {}) {
+// The price buttons again from lib (armed, busy) without rebuilding the rows.
+function repaintPrices() {
+  if (!lib.ctl) return;
+  for (const r of lib.ctl.rows) {
+    const b = lib.ctl.price(r.file);
+    const spec = priceButton(r, { armed: lib.price.armed, busy: lib.busy.get(r.file) ?? null, site: site(), jailbreak: jailbreak() });
+    if (b && spec) paintPrice(b, spec, r.title);
+  }
+}
+
+// A toolbar button: the confirm sheet, then each picked IPA in turn behind the 1-of-n HUD; Manage ends and the list
+// loads again. -> true when it went ahead.
+export async function runManage(kind, { rows = manageRows(), selected = lib.state.selected, isSite = site(), isJailbreak = jailbreak(),
+  sheet = showActionSheet, alert = showAlert, hud = showHUD, call = libraryCall, store = siteStore, storage = globalThis.localStorage,
+  sign = signMany, done = () => { setManaging(false); refresh(); } } = {}) {
+  const sel = new Set(selected ?? []);
+  const opts = { site: isSite, jailbreak: isJailbreak };
+  let picked = rows.filter((r) => sel.has(r.file));
+  if (kind === "sign") picked = picked.filter((r) => !isJailbreak && !r.error && (!isSite || r.stored));
+  if (kind === "unsign") picked = picked.filter((r) => !isSite && !isJailbreak && r.signed);
+  if (!picked.length) return false;
+  const s = ipaSheet(kind, picked, opts);
+  if (await sheet({ title: s.title, buttons: [s.button], ...(s.destructive ? { destructive: 0 } : {}) }) !== 0) return false;
+  if (kind === "sign") { await sign(picked, { isSite }); done(); return true; }
+  const verb = kind === "unsign" ? "Unsigning" : "Deleting";
+  const n = picked.length;
+  const failed = [];
+  let ipas = null;
+  for (let i = 0; i < n; i++) {
+    const e = picked[i];
+    const hide = hud(`${verb} ${e.title || e.file} (${i + 1} of ${n})`);
+    const r = kind === "unsign" ? await unsignEntries([e], { call })
+      : await deleteEntries([e], { site: isSite, store, call, storage });
+    hide?.();
+    if (r.ipas) ipas = r.ipas;
+    if (kind === "delete") for (const f of r.deleted) known.delete(f);
+    for (const f of r.failed) failed.push(`${e.title || f.file}: ${isSite ? f.message : deviceError(f.error).message}`);
+  }
+  if (ipas) remember(ipas);
+  done();
+  if (failed.length) await alert({ title: kind === "unsign" ? "Couldn't Unsign" : "Couldn't Delete", message: failed.join("\n"), buttons: ["OK"] });
+  return true;
+}
+
+// Sign (n): each picked IPA signed and installed in turn (installFromLibrary; the website signs a kept file in this
+// browser), its progress page labelled "Signing Delta (1 of 3)" (Installed's bulkHud). The first that doesn't install
+// (an error, already shown; no connection; the walkthrough) stops the run.
+export async function signMany(picked, { isSite = site(), install = installFromLibrary, siteInstall = siteFileInstall, hudFor = null } = {}) {
+  const n = picked.length;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const e = picked[i];
+    const name = e.options?.name || e.name || e.file.replace(/\.ipa$/i, "");
+    const onInstalled = recorder(e, name);
+    let r;
+    if (isSite) r = await siteInstall(e, { onInstalled });
+    else {
+      const hud = hudFor ? hudFor(name, i + 1, n) : await bulkHudFor(name, i + 1, n);
+      r = await install({ file: e.file, name, signed: Boolean(e.signed), onInstalled }, { hud });
+    }
+    out.push(r);
+    if (isSite ? r === false : r !== "installed") break;
+  }
+  return out;
+}
+
+async function bulkHudFor(name, i, n) {
+  const [{ bulkHud }, { progressHUD }] = await Promise.all([import("./installed.js"), import("../nav/progress.js")]);
+  return bulkHud(progressHUD, { verb: "Signing", name, i, n });
+}
+
+// Installed's record once iOS has the app (F30), as Install's.
+function recorder(entry, name) {
+  return (r) => {
+    if (!r?.bundleId) return;
+    apps().then((s) => recordInstall(s, { id: r.bundleId, name: r.name || name, version: r.version || entry?.version || "", source: null,
+      sourceName: "My IPAs", icon: (entry?.options?.icon || entry?.icon) ? `data:image/png;base64,${entry.options?.icon || entry.icon}` : null })).catch(() => {});
+  };
+}
+
+// A row's swipe Delete: the IPA file and its signed copy go at once (no sheet, as Mail's), then the list again.
+export async function swipeDelete(es, { alert = showAlert, isSite = site(), store = siteStore, call = libraryCall, storage = globalThis.localStorage } = {}) {
   if (!es?.length) return null;
-  const n = es.length;
-  const i = await sheet({ title: deleteSheetTitle(n, { site: isSite, jailbreak: isJailbreak, stored: es.some((e) => e.stored) }),
-    buttons: [deleteButtonText(n)], destructive: 0 });
-  if (i !== 0) return null;
   for (const e of es) lib.ctl?.cellOf(e.file)?.classList.add("removing");
   const r = await deleteEntries(es, { site: isSite, store, call, storage });
   for (const f of r.deleted) known.delete(f);
@@ -406,6 +582,76 @@ export async function deleteMany(es, { sheet = showActionSheet, alert = showAler
   return r;
 }
 
+// The hold sheet's Delete: asks first ('Delete n IPAs' red / Cancel), then as the swipe's.
+export async function deleteMany(es, { sheet = showActionSheet, isSite = site(), isJailbreak = jailbreak(), ...rest } = {}) {
+  if (!es?.length) return null;
+  const n = es.length;
+  const i = await sheet({ title: deleteSheetTitle(n, { site: isSite, jailbreak: isJailbreak, stored: es.some((e) => e.stored) }),
+    buttons: [deleteButtonText(n)], destructive: 0 });
+  if (i !== 0) return null;
+  return swipeDelete(es, { isSite, ...rest });
+}
+
+// ---- F224: the price button: SIGN, then INSTALL (green), then it fills while it signs and installs; OPEN ------------
+
+async function onPrice(r) {
+  if (lib.state.armed) { lib.ctl?.step({ type: "tap", file: lib.state.armed }); return; } // a tap only puts a Delete away
+  const opts = { site: site(), jailbreak: jailbreak(), busy: lib.busy.get(r.file) ?? null };
+  const { state, act } = priceTap(lib.price, r, opts);
+  lib.price = state;
+  repaintPrices();
+  if (act === "open") return openApp(r);
+  if (act === "install") return priceInstall(r);
+}
+
+// The second tap: the IPA signed and installed with the button as its progress (no progress page); the website's
+// kept file signs in this browser on its own progress page, a link opens its sheet, the jailbreak app's console.
+export async function priceInstall(r, { install = installFromLibrary, siteInstall = siteFileInstall, linkSheet = siteInstallSheet,
+  helper = jailbreakInstall } = {}) {
+  const name = r.options?.name || r.name || r.file.replace(/\.ipa$/i, "");
+  const onInstalled = recorder(r, name);
+  const after = () => { lib.busy.delete(r.file); repaintPrices(); refresh(); };
+  if (site() && !r.stored) return linkSheet(r);
+  if (jailbreak()) { await helper(r.file, name, { onInstalled }); return after(); }
+  setBusy(r.file, { label: "SIGNING", fill: 0 });
+  if (site()) { try { await siteInstall(r, { onInstalled }); } finally { after(); } return; }
+  try { await install({ file: r.file, name, signed: Boolean(r.signed), onInstalled }, { hud: () => buttonHud(r.file, after) }); } catch { after(); }
+  if (lib.busy.has(r.file) && !lib.busy.get(r.file)?.live) after();
+}
+
+function setBusy(file, b) {
+  lib.busy.set(file, b);
+  repaintPrices();
+}
+
+// The HUD interface installFromLibrary drives (set, hide, done, fail), drawn on the row's button: each label fills it
+// further (core/myipas.js priceProgress); the end puts it back (OPEN once iOS reports the app).
+export function buttonHud(file, end) {
+  let cur = { label: "SIGNING", fill: 0, live: true };
+  lib.busy.set(file, cur);
+  let over = false;
+  const finish = () => { if (over) return; over = true; end(); };
+  return {
+    cancelled: false,
+    set(t) { if (over) return; cur = { ...priceProgress(t, cur), live: true }; setBusy(file, cur); },
+    hide: finish,
+    done(t) { if (over) return; setBusy(file, { ...cur, fill: 1 }); setTimeout(finish, 600); },
+    fail: finish,
+    page: null,
+  };
+}
+
+async function openApp(r, { native = globalThis.ifizboxNative, alert = showAlert } = {}) {
+  const name = r.options?.name || r.name || r.title;
+  if (!site() && !jailbreak() && typeof native?.call === "function") {
+    try { if ((await native.call("signing.openApp", { bundleId: installedIdOf(r) }))?.opened) return true; } catch { /* below */ }
+    await alert({ title: "Couldn't Open", message: `iOS didn't open ${name}.`, buttons: ["OK"] });
+    return false;
+  }
+  await alert({ title: name, message: `Open ${name} from your Home Screen.`, buttons: ["OK"] });
+  return false;
+}
+
 // A held row's sheet: Install, Sign Now, Save Signed IPA, Delete (the website: Install, Delete).
 async function holdSheet(entry) {
   const buttons = holdActions(entry, { site: site(), jailbreak: jailbreak() });
@@ -418,57 +664,10 @@ async function holdSheet(entry) {
   if (b === HOLD.DELETE) return deleteMany([entry]);
 }
 
-// ---- F79: Browse, the apps of the user's AltStore sources ------------------------------------------------------
+// ---- F79's Browse pages (Search Apps, All Apps, a category), kept for older links: F224 took Browse off the page ----
 
 // The catalog's rows that are AltStore apps (core/catalog.js slim: kind "ipa"); APT packages stay out.
 export const appsOf = (rows) => (rows ?? []).filter((r) => r?.kind === "ipa");
-
-const browseHref = (seg) => format({ tab: "installed", path: [MYIPAS, seg] });
-
-// Install IPAs' Browse groups for `apps` (AltStore app rows), or null while the catalog loads: Search and All Apps,
-// then the categories with their counts. No apps: a line saying where they come from.
-export function browseGroups(apps) {
-  const top = []; // the page's search bar searches (Search Apps' own page stays for older links)
-  // Still loading: the same shape with grey bars where the counts and categories go (myipas.css .ph), so the page
-  // shows at once and fills in place (user 2026-11-17).
-  if (apps == null) {
-    const bar = { label: "\u00a0", detail: "\u00a0", chevron: false, placeholder: true };
-    return [{ header: "Browse", rows: [...top, { label: "All Apps", detail: "\u00a0", chevron: false, placeholder: true }] },
-      { rows: [bar, bar, bar, bar] }];
-  }
-  if (!apps.length) {
-    return [{ header: "Browse", rows: top,
-      footer: !localSigning() ? "Add an AltStore source in Sources to browse its apps here." : "Add an AltStore source in Sources to browse its apps here. Every app installs signed with your certificate." }];
-  }
-  return [
-    { header: "Browse", rows: [...top, { label: "All Apps", detail: String(apps.length), href: browseHref("apps") }] },
-    { rows: mergeCategories(apps, { jailbroken: false }).map((c) => ({ label: c.name, detail: String(c.count), href: browseHref(`category:${c.name}`) })),
-      footer: !localSigning() ? "Apps from your AltStore sources.": "Apps from your AltStore sources, signed with your certificate when you install one." },
-  ];
-}
-
-// grouped() has no row classes: the placeholder rows are the ones whose label is a lone no-break space.
-function markPlaceholders(root) {
-  for (const li of root.querySelectorAll(".cell")) {
-    const label = li.querySelector(".cell-label")?.textContent;
-    const detail = li.querySelector(".cell-detail")?.textContent;
-    if (label === "\u00a0" || detail === "\u00a0") li.classList.add("ph");
-  }
-}
-
-async function loadBrowse() {
-  const seq = ++view.browseSeq;
-  let apps;
-  try {
-    await catalog.ensure();
-    apps = appsOf(await catalog.list(ALL, ALL));
-  } catch (e) {
-    if (seq === view.browseSeq && view.browse) view.browse.replaceChildren(grouped([{ header: "Browse", footer: e.message }]));
-    return;
-  }
-  if (seq !== view.browseSeq || !view.browse) return;
-  view.browse.replaceChildren(grouped(browseGroups(apps)));
-}
 
 // Search's bar (packages.css); onQuery(trimmed text) runs as the user types (debounced) and on Search.
 function searchBar(placeholder, onQuery) {
@@ -564,9 +763,7 @@ function putIcon(box, b64) {
 
 const refresh = () => { if (view.body?.isConnected) load(); };
 
-// Sources refreshed or changed: Browse counts again.
-catalog.onChange?.(() => { if (view.browse?.isConnected) loadBrowse(); });
-
+// The Add sheet (Files / From URL), for callers outside the page; the page has its own Add an IPA group (F224).
 export async function addMenu() {
   if (site()) {
     // F197: the picker opens from the sheet's tap (Safari opens a file input only inside the user's tap).

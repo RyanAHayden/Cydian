@@ -16,7 +16,7 @@ test("My IPAs' pages", () => {
   assert.deepEqual(pageOf(r("myipas", "ipa:A b.ipa")), { page: "ipa", file: "A b.ipa" });
   assert.deepEqual(pageOf(r("myipas", "ipa:A.ipa", "options")), { page: "options", file: "A.ipa" });
   assert.deepEqual(pageOf(r("myipas", "junk")), { page: "missing" });
-  assert.deepEqual(nav(r("myipas")).right.map((b) => b.label), ["Add", "Edit"]); // F208: Edit beside Add
+  assert.equal(nav(r("myipas")).right.label, "Manage"); // F224: Manage only; Add is the page's own group
   assert.equal(nav(r("myipas", "ipa:A b.ipa")).title, "A b");
   assert.equal(nav(r("myipas", "ipa:A b.ipa")).right.label, "Install");
   assert.equal(nav(r("myipas", "ipa:A.ipa", "options")).title, "Sign Options");
@@ -36,13 +36,13 @@ test("an .ipa another app sent opens its page in My IPAs", async () => {
   assert.equal(await handleIncoming("ifizbox://myipas?file=A.ipa"), "myipas");
 });
 
-// F79: My IPAs became Install IPAs: Browse (AltStore apps) first, then the user's own IPAs.
-test("Install IPAs: the page's title, Add, and Browse's pages below it", async () => {
+// F79: My IPAs became Install IPAs. F224: only the user's IPAs on the page; F79's Browse pages stay for older links.
+test("Install IPAs: the page's title, Manage, and the older Browse pages below it", async () => {
   const { PAGE_TITLE } = await import("./myipas.js");
   globalThis.ifizboxNative = { mode: "sideload", call: async () => null };
   assert.equal(PAGE_TITLE, "Install IPAs");
   assert.equal(nav(r("myipas")).title, "Install IPAs");
-  assert.equal(nav(r("myipas")).right[0].label, "Add");
+  assert.equal(nav(r("myipas")).right.label, "Manage");
   assert.deepEqual(pageOf(r("myipas", "search")), { page: "search" });
   assert.deepEqual(pageOf(r("myipas", "apps")), { page: "apps" });
   assert.deepEqual(pageOf(r("myipas", "category:Games")), { page: "category", value: "Games" });
@@ -60,32 +60,17 @@ test("Install IPAs: the page's title, Add, and Browse's pages below it", async (
   assert.deepEqual(pageOf(r("myipas", "search")), { page: "search" });
 });
 
-test("Install IPAs' Browse section: All Apps and the categories of the AltStore apps only", async () => {
-  const { browseGroups, appsOf, libraryEmptyText } = await import("./myipas.js");
-  const rows = [
-    { id: "a", name: "Delta", short: "Game emulator", section: "Apps (Games)", kind: "ipa" },
-    { id: "b", name: "Provenance", section: "Apps (Games)", kind: "ipa" },
-    { id: "c", name: "UTM", section: "Apps (Developer)", kind: "ipa" },
-    { id: "d", name: "A Tweak", section: "Tweaks" }, // APT: not an IPA
-  ];
-  const apps = appsOf(rows);
-  assert.deepEqual(apps.map((x) => x.id), ["a", "b", "c"]);
-  assert.deepEqual(appsOf(null), []);
-  const [top, cats] = browseGroups(apps);
-  assert.equal(top.header, "Browse");
-  assert.deepEqual(top.rows.map((x) => x.label), ["All Apps"]); // the page's search bar replaced Search Apps
-  assert.equal(top.rows[0].detail, "3");
-  assert.equal(top.rows[0].href, "#/installed/myipas/apps");
-  assert.deepEqual(cats.rows.map((x) => [x.label, x.detail]), [["Games", "1"], ["Emulators", "1"], ["Developer", "1"]]);
-  assert.equal(cats.rows[0].href, "#/installed/myipas/category%3AGames");
-  // loading, and no AltStore source
-  assert.deepEqual(browseGroups(null)[0].rows.map((x) => x.label), ["All Apps"]); // placeholders while loading
-  assert.equal(browseGroups(null)[1].rows.length, 4);
-  const none = browseGroups([]);
-  assert.equal(none.length, 1);
-  assert.match(none[0].footer, /AltStore source/);
-  assert.match(libraryEmptyText(true), /AltStore, SideStore or Feather/);
-  assert.match(libraryEmptyText(false), /On My iPhone > iFizBox/);
+test("F224: no Browse on the page; Add an IPA has Files and a download (the website's Choose File)", async () => {
+  const mod = await import("./myipas.js");
+  assert.equal(mod.browseGroups, undefined);
+  assert.deepEqual(mod.appsOf([{ id: "a", kind: "ipa" }, { id: "d" }]).map((x) => x.id), ["a"]); // the older pages' filter
+  const [app] = mod.addGroups(false);
+  assert.equal(app.header, "Add an IPA");
+  assert.deepEqual(app.rows.map((x) => x.label), ["Choose from Files", "Download from URL"]);
+  assert.deepEqual(mod.addGroups(true)[0].rows.map((x) => x.label), ["Choose File", "Download from URL"]);
+  assert.match(mod.libraryFooterText(false), /share an \.ipa to iFizBox from Files, Safari or Mail/);
+  assert.match(mod.libraryEmptyText(false), /On My iPhone > iFizBox/);
+  assert.doesNotMatch(mod.libraryEmptyText(true), /AltStore|SideStore|Feather/);
 });
 
 test("Install IPAs: a list's search bar matches name, description, developer or ID", async () => {

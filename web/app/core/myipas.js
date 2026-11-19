@@ -25,6 +25,7 @@
 //   openIpaStore({ indexedDB }) / memoryIpaStore()   { put(file, blob), get(file), remove(file) }
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { validBundleId } from "./signing.js";
+import { SELECT, DESELECT } from "./installed.js"; // F224: Manage's words, as Installed's (F222)
 
 export const MYIPAS = "myipas"; // the Installed tab's path segment for the library
 
@@ -328,4 +329,180 @@ export async function deleteEntries(entries, { site = false, storage = globalThi
   }
   if (site) ipas = siteEntries(storage);
   return { deleted, failed, ipas };
+}
+
+// ---- F224: Install IPAs as one page: the user's IPAs only, Not Installed / Installed, the price button, Manage --------
+//
+//   installedIdOf(entry)                   the bundle ID iOS knows the app by (the signed copy's, Sign Options', the IPA's)
+//   ipaLine(entry, opts)                   the row's line: "Version 1.2 · 14.3 MB · Signed" ("Not signed"; the website's
+//                                          link "Link"; the jailbreak app no signing word)
+//   matchIpa(entry, q)                     the search bar: name, bundle ID or file name
+//   ipaSections(entries, { installed, query, site, jailbreak })   [{ key, header, rows }]: Not Installed, then
+//                                          Installed, A-Z, empty groups left out. `installed`: { bundleId: bool } (or a
+//                                          function id -> bool); each row gets `installed` and `line`
+//   priceButton(row, { armed, busy, site, jailbreak })   the row's price button: { kind, label, green } or null
+//                                          kind "sign" (grey SIGN, or INSTALL when signed: a first tap arms it),
+//                                          "confirm" (green INSTALL: the second tap), "install" (one tap: the jailbreak
+//                                          app, a website link), "open" (installed), "busy" (SIGNING / INSTALLING, filling)
+//   priceTap(state, row, opts)             -> { state, act: "arm" | "install" | "open" | null }; state { armed: file | null }
+//   priceProgress(label, prev)             a HUD label ("Signing 40%") -> { label, fill 0..1 } for the filling button
+//   IPA_PRESETS, ipaPresetFiles(rows, p), ipaSelectSheet(rows), ipaSelectLabel(rows, selected)   Manage's Select…
+//   ipaCounts(rows, selected, opts)        -> { n, sign, unsign, del, installed }
+//   ipaSummary(rows, selected)             "2 selected · 5 IPAs · 1 signed · 3 installed"
+//   ipaToolbar(counts, opts)               [{ kind, label, disabled }]: Sign (n), Unsign (n), Delete (n)
+//   ipaSheet(kind, picked, opts)           the confirm sheet: { title, button, destructive }
+//   unsignEntries(entries, { call })       library.unsign for each picked IPA with a signed copy -> { done, failed, ipas }
+
+export const installedIdOf = (e) => e?.signed?.bundleId || e?.options?.bundleId || e?.bundleId || null;
+
+export function ipaLine(entry, { site = false, jailbreak = false } = {}) {
+  let status = null;
+  if (site) status = entry?.stored ? "Not signed" : "Link";
+  else if (entry?.error) status = STATE_LABELS.broken;
+  else if (!jailbreak) status = entry?.signed ? "Signed" : "Not signed";
+  return [entry?.version ? `Version ${entry.version}` : null, formatBytes(entry?.size) || null, status].filter(Boolean).join(" · ");
+}
+
+export function matchIpa(entry, q) {
+  const s = String(q ?? "").trim().toLowerCase();
+  if (!s) return true;
+  return [entry?.name, entry?.title, entry?.bundleId, entry?.file].some((v) => String(v ?? "").toLowerCase().includes(s));
+}
+
+export function ipaSections(entries, { installed = {}, query = "", site = false, jailbreak = false } = {}) {
+  const has = typeof installed === "function" ? installed : (id) => Boolean(id && installed?.[id] === true);
+  const rows = libraryRows(entries, { site, jailbreak })
+    .map((r) => ({ ...r, installed: !r.error && Boolean(has(installedIdOf(r))), line: ipaLine(r, { site, jailbreak }) }))
+    .filter((r) => matchIpa(r, query));
+  return [
+    { key: "notInstalled", header: "Not Installed", rows: rows.filter((r) => !r.installed) },
+    { key: "installed", header: "Installed", rows: rows.filter((r) => r.installed) },
+  ].filter((s) => s.rows.length);
+}
+
+export const PRICE = { SIGN: "SIGN", INSTALL: "INSTALL", OPEN: "OPEN", SIGNING: "SIGNING", INSTALLING: "INSTALLING" };
+
+export function priceButton(row, { armed = null, busy = null, site = false, jailbreak = false } = {}) {
+  if (!row?.file || row.error) return null;
+  if (busy) return { kind: "busy", label: busy.label || PRICE.INSTALLING, fill: busy.fill ?? 0, green: false };
+  if (row.installed) return { kind: "open", label: PRICE.OPEN, green: false };
+  if (jailbreak || (site && !row.stored)) return { kind: "install", label: PRICE.INSTALL, green: false };
+  if (armed === row.file) return { kind: "confirm", label: PRICE.INSTALL, green: true };
+  return { kind: "sign", label: row.signed ? PRICE.INSTALL : PRICE.SIGN, green: false };
+}
+
+// A tap on a row's price button. A first tap on SIGN arms it (green INSTALL); the second installs. Tapping another
+// row's button moves the armed one; a tap anywhere else is { type: "away" } (priceAway).
+export function priceTap(state, row, opts = {}) {
+  const b = priceButton(row, { ...opts, armed: state?.armed ?? null });
+  if (!b || b.kind === "busy") return { state, act: null };
+  if (b.kind === "sign") return { state: { ...state, armed: row.file }, act: "arm" };
+  if (b.kind === "open") return { state: { ...state, armed: null }, act: "open" };
+  return { state: { ...state, armed: null }, act: "install" };
+}
+export const priceAway = (state) => (state?.armed ? { ...state, armed: null } : state);
+
+// The library's phases on the button: reading and signing fill the first 60%, installing the rest; it never goes back.
+export function priceProgress(text, prev = null) {
+  const s = String(text ?? "").trim();
+  const m = s.match(/^(.*?)\s*\(?(\d{1,3}(?:\.\d+)?)\s?%\)?$/);
+  const word = (m ? m[1] : s).toLowerCase();
+  const pct = m ? Math.max(0, Math.min(100, Number(m[2]))) / 100 : null;
+  let label = prev?.label ?? PRICE.SIGNING, fill = prev?.fill ?? 0;
+  if (/^(reading|downloading|looking)/.test(word)) { label = PRICE.SIGNING; fill = 0.1 * (pct ?? 0.5); }
+  else if (/^sign/.test(word)) { label = PRICE.SIGNING; fill = 0.1 + 0.5 * (pct ?? 0); }
+  else if (/^(install|upload|serv)/.test(word)) { label = PRICE.INSTALLING; fill = 0.6 + 0.35 * (pct ?? 0.5); }
+  else if (/^done/.test(word)) fill = 1;
+  return { label, fill: Math.max(prev?.fill ?? 0, Math.min(1, fill)) };
+}
+
+// ---- Manage (Installed's pattern, F222: core/installed.js's Select… / Deselect words) --------------------------------
+
+export const IPA_PRESETS = ["all", "notInstalled", "signed"];
+const IPA_PRESET_LABEL = { all: "All IPAs", notInstalled: "Not Installed", signed: "Signed" };
+export const IPA_SELECT = SELECT;
+export const IPA_DESELECT = DESELECT;
+
+export function ipaPresetFiles(rows, preset) {
+  const pick = { all: () => true, notInstalled: (r) => !r.installed, signed: (r) => Boolean(r.signed) }[preset];
+  return pick ? (rows ?? []).filter((r) => r?.file && pick(r)).map((r) => r.file) : [];
+}
+
+export function ipaSelectSheet(rows) {
+  return IPA_PRESETS.map((preset) => ({ preset,
+    label: preset === "all" ? IPA_PRESET_LABEL.all : `${IPA_PRESET_LABEL[preset]} (${ipaPresetFiles(rows, preset).length})` }));
+}
+
+export function ipaSelectLabel(rows, selected) {
+  const files = (rows ?? []).map((r) => r.file);
+  const sel = new Set(selected ?? []);
+  return files.length && files.every((f) => sel.has(f)) ? IPA_DESELECT : IPA_SELECT;
+}
+
+// Sign counts what can be signed here (not a broken file; on the website a kept file, not a link); Unsign only picked
+// IPAs with a signed copy; Delete every picked one.
+export function ipaCounts(rows, selected, { site = false, jailbreak = false } = {}) {
+  const sel = new Set(selected ?? []);
+  const out = { n: 0, sign: 0, unsign: 0, del: 0, installed: 0 };
+  for (const r of rows ?? []) {
+    if (!sel.has(r.file)) continue;
+    out.n++;
+    out.del++;
+    if (r.installed) out.installed++;
+    if (!jailbreak && !r.error && (!site || r.stored)) out.sign++;
+    if (!site && !jailbreak && r.signed) out.unsign++;
+  }
+  return out;
+}
+
+export function ipaSummary(rows, selected) {
+  const all = rows ?? [];
+  const sel = new Set(selected ?? []);
+  const n = all.filter((r) => sel.has(r.file)).length;
+  return [`${n} selected`, all.length === 1 ? "1 IPA" : `${all.length} IPAs`, `${all.filter((r) => r.signed).length} signed`,
+    `${all.filter((r) => r.installed).length} installed`].join(" · ");
+}
+
+const withCount = (label, n) => (n > 0 ? `${label} (${n})` : label);
+export function ipaToolbar(c, { site = false, jailbreak = false } = {}) {
+  const out = [];
+  if (!jailbreak) out.push({ kind: "sign", label: withCount("Sign", c.sign), disabled: !c.sign });
+  if (!jailbreak && !site) out.push({ kind: "unsign", label: withCount("Unsign", c.unsign), disabled: !c.unsign });
+  out.push({ kind: "delete", label: withCount("Delete", c.del), disabled: !c.del });
+  return out;
+}
+
+export function ipaSheet(kind, picked, { site = false, jailbreak = false } = {}) {
+  const list = picked ?? [];
+  if (kind === "sign") {
+    const n = list.filter((r) => !r.error && (!site || r.stored)).length;
+    return { title: site ? "Each IPA is signed in this browser with your certificate, then iOS installs it."
+      : "Each IPA is signed with your certificate and installed.", button: n === 1 ? "Sign and Install IPA" : `Sign and Install ${n} IPAs`, destructive: false };
+  }
+  if (kind === "unsign") {
+    const n = list.filter((r) => r.signed).length;
+    return { title: n === 1 ? "The signed copy is deleted. The IPA file stays." : `${n} signed copies are deleted. The IPA files stay.`,
+      button: n === 1 ? "Unsign IPA" : `Unsign ${n} IPAs`, destructive: true };
+  }
+  const n = list.length;
+  const inst = list.filter((r) => r.installed).length;
+  const stay = !inst ? "" : inst === 1 ? " The installed app stays on your iPhone: manage it in Installed."
+    : ` ${inst} installed apps stay on your iPhone: manage them in Installed.`;
+  return { title: deleteSheetTitle(n, { site, jailbreak, stored: list.some((r) => r.stored) }) + stay, button: deleteButtonText(n), destructive: true };
+}
+
+export async function unsignEntries(entries, { call } = {}) {
+  const done = [], failed = [];
+  let ipas = null;
+  for (const e of entries ?? []) {
+    if (!e?.file || !e.signed) continue;
+    try {
+      const r = await call("unsign", { file: e.file });
+      if (Array.isArray(r?.ipas)) ipas = r.ipas;
+      done.push(e.file);
+    } catch (err) {
+      failed.push({ file: e.file, message: String(err?.message ?? err), error: err });
+    }
+  }
+  return { done, failed, ipas };
 }

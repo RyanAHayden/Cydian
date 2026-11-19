@@ -11,6 +11,7 @@
 //                                   -> signing.install's reply + {file}; the signed copy stays either way
 //   library.export {file}           the share sheet (Save to Files, AirDrop...) for the signed copy -> {shared: bool}
 //   library.delete {file}           the IPA, its signed copy and options -> {ipas}
+//   library.unsign {file}           F224: only the signed copy (the IPA and its options stay) -> {ipas}
 //   library.helperInstall {file, stream}   F212, jailbreak only: ifizbox-helper installs the file as it is
 //                                   -> {code: 0, stdout, stderr, bundleId, name, version} (share.ipaInstall's reply)
 // F212: list, add, pick, delete and helperInstall work in the jailbreak app too (its Documents is
@@ -60,6 +61,15 @@ enum MyIPAs {
             }
         }
         b.on("library.install") { c in install(c) }
+        // F224: Install IPAs' Unsign: drops the signed copy, keeps the IPA and its options (sideload build only).
+        b.on("library.unsign") { c in
+            SignBridge.run(c) {
+                let file = c.params["file"] as? String ?? ""
+                _ = try library.url(file)
+                library.dropSigned(file)
+                return list()
+            }
+        }
         b.on("library.helperInstall") { c in helperInstall(c) } // F212
         b.on("library.export") { c in export(c) }
         b.on("library.delete") { c in

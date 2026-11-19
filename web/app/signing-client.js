@@ -20,7 +20,8 @@ import { showBanner } from "./nav/banner.js";
 import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError, parseProfile, deviceCheck, notLandedText, notInProfileText, SENT_TO_IOS } from "./core/signing.js";
 import { openAppHelp } from "./screens/guides.js";
 import { format, settingsRoute } from "./router.js";
-import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId, siteMB, SITE_LIMIT_TEXT, overSiteLimit } from "./core/websign.js";
+import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId, siteMB, SITE_LIMIT_TEXT, overSiteLimit,
+  memoryLimit, noteOutOfMemory, noteSigned, overMemoryLimit, isOutOfMemory } from "./core/websign.js";
 import { addSiteUrl, markFresh, MYIPAS } from "./core/myipas.js";
 import { showActionSheet } from "./nav/actionsheet.js";
 import { storedKeep, withKeep, originalState, originalNote } from "./core/keepid.js";
@@ -853,6 +854,13 @@ export const tooBigText = (name, size) => `${appOr(name)} is ${siteMB(size)} MB.
 export const tooBigNote = (name, size) => `${appOr(name)} (${siteMB(size)} MB) is in Safari's Downloads. It's too big for the website: tap Install to hand it to ${NAME} Lite or another sideloader.`;
 // the app page's footer under Details, by the red Size
 export const TOO_BIG_FOOTER = `${SITE_LIMIT_TEXT} Install this one with ${NAME} Lite, or hand it to another sideloader.`;
+// F261: the same alert for an app at or past the size that ran this browser out of memory (core/websign.js
+// memoryLimit): its own title and words, and Try Anyway (before Cancel) signs it after all.
+export const MEMORY_TITLE = "Too Big for This iPhone";
+export const MEMORY_BUTTONS = [...TOO_BIG_BUTTONS.slice(0, 3), "Try Anyway", "Cancel"];
+export const memoryText = (name, size, limit) => `${appOr(name)} is ${siteMB(size)} MB. Signing a ${siteMB(limit)} MB app ran this browser out of memory. Download the IPA and import it into ${NAME} Lite or another sideloader, or try anyway.`;
+// the failure's alert, under zsign's "Out of memory"
+export const memoryNote = (size) => `${NAME} Lite signs big apps on the phone without this limit. From now on, apps of ${siteMB(size)} MB or more open Too Big here first.`;
 // what the download's first answer says when no size was listed
 const tooLargeText = (n, max) => (n ? `This app is ${siteMB(n)} MB. ` : `This app is over ${siteMB(max)} MB. `)
   + (max === IPA_MAX ? SITE_LIMIT_TEXT : `The website signs apps up to ${siteMB(max)} MB.`);
@@ -893,13 +901,15 @@ export function whenBack(fn, doc = globalThis.document) {
   return off;
 }
 
-export async function tooBigAlert({ url, name = "", size = 0, version = "", iconUrl = null },
-  { alert = showAlert, open = (u) => globalThis.open?.(u, "_blank", "noopener"), storage = globalThis.localStorage, back = whenBack,
+export async function tooBigAlert({ url, name = "", size = 0, version = "", iconUrl = null, limit = null },
+  { alert = showAlert, anyway = () => {}, open = (u) => globalThis.open?.(u, "_blank", "noopener"), storage = globalThis.localStorage, back = whenBack,
     go = (path) => { location.hash = format({ tab: "installed", path }).replace(/^#/, ""); },
     lite = async () => (await import("./screens/home.js")).installApp(), handoff = handOffIpa } = {}) {
   let entry = null;
   // Download IPA opens the file from the tap itself (Safari opens a new page only inside the user's tap)
   const onTap = (i) => {
+    // F261: Try Anyway signs from the tap itself (signInBrowser opens iOS's early link there)
+    if (limit && i === 3) { try { Promise.resolve(anyway()).catch(() => {}); } catch { /* its own alert said it */ } return; }
     if (i !== 0) return;
     try { entry = addSiteUrl(storage, url, Date.now(), { name, version, size, iconUrl }); } catch { entry = null; }
     if (entry) {
@@ -908,23 +918,33 @@ export async function tooBigAlert({ url, name = "", size = 0, version = "", icon
     }
     open(url);
   };
-  const { index } = await alert({ title: TOO_BIG_TITLE, message: tooBigText(name, size), buttons: TOO_BIG_BUTTONS, cancel: 3,
-    colors: { 0: "blue" }, onTap });
+  const { index } = await alert(limit
+    ? { title: MEMORY_TITLE, message: memoryText(name, size, limit), buttons: MEMORY_BUTTONS, cancel: 4, colors: { 0: "blue" }, onTap }
+    : { title: TOO_BIG_TITLE, message: tooBigText(name, size), buttons: TOO_BIG_BUTTONS, cancel: 3, colors: { 0: "blue" }, onTap });
+  if (limit && index === 3) return "try";
   if (index === 0) return "download";
   if (index === 1) { await Promise.resolve().then(lite).catch(() => {}); return "lite"; }
   if (index === 2) { await Promise.resolve().then(() => handoff({ url, name })).catch(() => {}); return "other"; }
   return "cancel";
 }
 
-export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null, size = null, iconUrl = null },
+export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null, size = null, iconUrl = null, anyway = false },
   { hud = progressHUD, alert = showAlert, open = (u) => { location.href = u; }, go = openRoute,
     identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "",
     now = identityNow, origin = () => new URL(base || "/", globalThis.location?.href).origin, clock = Date.now,
-    watch = watchInstall, phone = siteUdid, tooBig = tooBigAlert, prompt = watchPrompt } = {}) {
+    watch = watchInstall, phone = siteUdid, tooBig = tooBigAlert, prompt = watchPrompt, storage = storageOf() } = {}) {
+  const deps = { hud, alert, open, go, identity, fetcher, worker, transfer, base, now, origin, clock, watch, phone, tooBig, prompt, storage };
   // F257: a listed size over the cap: the Too Big alert, before the early link or any download
   if (!bytes && url && overSiteLimit(size)) {
     await tooBig({ url, name, size, version, iconUrl }, { alert });
     return false;
+  }
+  // F261: at or past the size that ran this browser out of memory: the same alert with Try Anyway (from its tap)
+  if (!bytes && url && !anyway && overMemoryLimit(size, storage)) {
+    let tried = null;
+    const choice = await tooBig({ url, name, size, version, iconUrl, limit: memoryLimit(storage) }, { alert,
+      anyway: () => { tried = signInBrowser({ url, name, onInstalled, bring, bundleId, version, bytes, size, iconUrl, anyway: true }, deps); return tried; } });
+    return choice === "try" && tried ? tried : false;
   }
   // F121: before anything waits, while Safari still counts this as the user's tap: iOS's install prompt, for a link
   // whose app comes later. Only when the bundle ID it will be signed as is known now (expectedBundleId).
@@ -942,8 +962,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   const opened = Boolean(early); // iOS was sent to a link: the failure text says what to do with its icon
   // B90: iOS's prompt cancelled while this runs (watchPrompt) stops the download, the signer and the upload
   const ios = early ? promptStop(early.token, { base, fetcher, prompt }) : null;
-  const again = () => signInBrowser({ url, name, onInstalled, bring, bundleId, version, bytes, size, iconUrl },
-    { hud, alert, open, go, identity, fetcher, worker, transfer, base, now, origin, clock, watch, phone, tooBig, prompt });
+  const again = () => signInBrowser({ url, name, onInstalled, bring, bundleId, version, bytes, size, iconUrl, anyway }, deps);
   const drop =() => { ios?.stop(); if (early && !intoEarly) { const t = early.token; early = null; return dropEarly(t, { base, fetcher }); } return null; };
   const id = await identity();
   if (!id?.p12 || !id?.profile) {
@@ -967,6 +986,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   const signal = eitherSignal(h.signal ?? null, ios?.signal ?? null);
   const guard = (p) => untilCancel(h, ios ? ios.race(p) : p);
   let cutOnce = false; // F257: the download was resumed at least once (the log said so)
+  let ipaSize = 0; // F261: the IPA zsign got, for this browser's memory limit
   try {
     const ipa = bytes ? await guard(keptBytes(bytes))
       : await guard(downloadIpa(url, { base, fetcher, onProgress: pct("Downloading"), onCut: ({ attempt, at }) => {
@@ -975,11 +995,13 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
         h.set(reconnectText(attempt));
       }, ...(signal ? { signal } : {}) }));
     h.set("Signing");
+    ipaSize = ipa?.byteLength ?? ipa?.length ?? 0;
     const self = isSelfIpa(url) || bring;
     const carry = self ? { identity: Boolean(bring), transfer: await transfer().catch(() => null) } : null;
     const signed = await guard(worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(id.profile), password: id.password ?? "", bring: carry,
         appBundleId: bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null), ...withKeep({}) },
       { onProgress: (t) => h.set(t), ...(signal ? { signal } : {}) }));
+    noteSigned(storage, ipaSize); // F261
     h.set("Uploading");
     const ipaBytes = signed.ipa instanceof Uint8Array ? signed.ipa : new Uint8Array(signed.ipa);
     // the early link takes this app only if it came out with the reserved bundle ID (iOS already has its manifest)
@@ -1013,7 +1035,10 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     // F257: the download broke off past its last try: under the red error, what to do with iOS's icon (only once iOS
     // was sent to the early link: no icon can be left otherwise)
     if (cutOnce && e?.message === CUT_TEXT && opened) h.page?.warning?.(grayIconText(name));
-    const message = String(e?.message ?? e) + (opened ? `\n\n${iconLeftText(name)}` : "");
+    // F261: zsign ran out of memory: this browser remembers the size, and the alert says what that changes
+    const oom = ipaSize > 0 && isOutOfMemory(e?.message);
+    if (oom) noteOutOfMemory(storage, ipaSize);
+    const message = String(e?.message ?? e) + (oom ? `\n\n${memoryNote(memoryLimit(storage) ?? ipaSize)}` : "") + (opened ? `\n\n${iconLeftText(name)}` : "");
     await alert({ title: name ? `Couldn't Install ${name}` : "Couldn't Install", message, buttons: ["OK"] });
     return false;
   }

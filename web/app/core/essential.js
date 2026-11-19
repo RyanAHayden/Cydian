@@ -206,8 +206,8 @@ export function saveInfo(storage, info, now = Date.now()) {
 // ---- iFizBox's own IPA (sideload) -----------------------------------------------------------------------------
 // The sideload app signs its own update on the phone and hosts it on the Signing Server (essential-ui.js
 // installSelfNow, signing.install host: true). Only without that (no bridge, no IPA) does this answer: the user
-// opens the site's (brand.js DOMAIN) Install iFizBox App in Safari, which hands iFizBox's source to AltStore, SideStore or Feather (F89:
-// the website signs nothing).
+// opens the site (brand.js DOMAIN) in Safari, whose Home > Install iFizBox Lite signs the IPA with the user's own
+// certificate (home.js APP_ROW).
 
 // row: { version, ipa } (selfUpgradeRow). deps: { alert(spec) -> { index }, open(url) }   open: outside the app.
 // Resolves "site" | "cancelled" | "no-asset".
@@ -219,7 +219,7 @@ export async function installSelf(row, deps) {
     return "no-asset";
   }
   const { index } = await alert({ title: `Install ${v}`,
-    message: `Install it from ${DOMAIN} in Safari: AltStore, SideStore or Feather, or the IPA.`,
+    message: `Open ${DOMAIN} in Safari and tap Install ${NAME} Lite: it signs ${NAME} with your certificate.`,
     buttons: ["Cancel", "Open Safari"], cancel: 0 });
   if (index !== 1) return "cancelled";
   await open(SELF_SITE);

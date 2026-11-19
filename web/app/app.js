@@ -441,8 +441,8 @@ if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.
 // Refresh on Launch: in the background, with the Sources tab's spinning red badge (screens/sources.js).
-const refreshOnLaunch = () => settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch");
-if (refreshOnLaunch()) SCREENS.sources.refreshInBackground?.(ctx);
+const refreshSetting = () => settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch");
+if (refreshSetting()) SCREENS.sources.refreshInBackground?.(ctx);
 
 // Back from the background after Settings' Return to Home After (2 minutes unless changed; Never: 0) counts as a
 // fresh open (user 2026-11-18): Home's root, and the launch refresh again. iOS rarely cold-launches the app or a
@@ -463,7 +463,7 @@ const OVERLAYS = ".alert-scrim, .action-scrim, .hud-scrim, .share-scrim, .sheet,
     if (location.hash === format({ tab: "home", path: [] })) toTop();
     else addEventListener("hashchange", toTop, { once: true });
     router.go({ tab: "home", path: [] });
-    if (refreshOnLaunch()) SCREENS.sources.refreshInBackground?.(ctx);
+    if (refreshSetting()) SCREENS.sources.refreshInBackground?.(ctx);
   });
 }
 

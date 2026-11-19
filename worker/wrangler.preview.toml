@@ -1,0 +1,33 @@
+# A throwaway preview for the free Apple ID sign-in spike (gsa.js through the /apple/* relay). Not ifizbox.com and not
+# connected to Workers Builds: deploy it by hand, with the owner's OK, and delete it when the check is done.
+#
+#   cd worker && npx wrangler deploy -c wrangler.preview.toml    # -> https://ifizbox-gsa-preview.<account>.workers.dev
+#   open https://ifizbox-gsa-preview.<account>.workers.dev/gsa-spike     (/gsa-spike.html redirects there)
+#   npx wrangler delete -c wrangler.preview.toml                  # tear down
+#
+# Local run (workerd on this machine; Apple sees this machine's address, not Cloudflare's):
+#   cd worker && npx wrangler dev -c wrangler.preview.toml --port 8787   # -> http://localhost:8787/gsa-spike
+# Locally gsa.apple.com fails (workerd's own CA list lacks Apple Root CA: "UnknownIssuer"); the anisette socket works.
+#
+# Run wrangler from worker/: the build command's paths are relative to the directory wrangler starts in.
+name = "ifizbox-gsa-preview"
+main = "preview-entry.js"   # src/index.js's handler without its other exports, which workerd won't start with
+compatibility_date = "2026-11-01"
+workers_dev = true
+preview_urls = false
+
+# The site's files plus the spike page, put together in worker/.preview-site (it ignores itself in git).
+# The page is only on this preview and links nowhere; the site never links to it.
+[build]
+command = "test -f wrangler.preview.toml && rm -rf .preview-site && cp -R ../web/app .preview-site && cp ../tools/gsa-spike.html .preview-site/gsa-spike.html && printf '*\\n' > .preview-site/.gitignore && printf '.gitignore\\n.assetsignore\\n' > .preview-site/.assetsignore"
+watch_dir = ["../web/app/core", "../tools/gsa-spike.html", "src"]
+
+[assets]
+directory = ".preview-site"
+binding = "ASSETS"
+not_found_handling = "none"
+run_worker_first = ["/apple/*", "/healthz"]
+
+[vars]
+APPLE_RELAY = "1"   # the /apple/<host>/<path> relay (src/apple-relay.js); off everywhere else
+# No KV, D1 or rate limits: the preview is for /apple/* only. The other routes may fail here, and that's fine.

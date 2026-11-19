@@ -12,6 +12,7 @@
 //   await s.holds.sync();                    // jailbreak: take dpkg's holds (apt-mark showhold) as the list
 //   s.hiddenSections.set("Themes", true);    // Section Visibility (F24): listeners hear ("hiddenSections", list)
 //   s.hiddenAuthors.set("Jane Doe", true);  // Hide by Author (F104): listeners hear ("hiddenAuthors", list)
+//   await s.blocked.set("com.example.tweak", true, { name, installed }); // Block (F226): out of every list; jailbreak: held too
 //   s.autoMarked.set("com.example.tweak", true); // Update Automatically, for Only Packages I Mark (F70)
 //   s.recentSearches.add("snowboard");      // Search's Recent table (F100): last 5, newest first
 //   s.daemonPrefs();                         // { "ifizbox.autoInstall": "marked", … } for N7's daemon (F70)
@@ -228,6 +229,8 @@ const HIDDEN_SECTIONS_KEY = PREFIX + "hiddenSections";
 const AUTO_MARKED_KEY = PREFIX + "autoMarked";
 const RECENT_SEARCHES_KEY = PREFIX + "recentSearches";
 const HIDDEN_AUTHORS_KEY = PREFIX + "hiddenAuthors";
+const BLOCKED_KEY = PREFIX + "blockedPackages";
+const BLOCK_HOLDS_KEY = PREFIX + "blockHolds";
 
 // F100: Search's Recent table (from Zebra): the last RECENT_MAX queries, newest first, no duplicates (a query
 // already there moves to the top; case and surrounding spaces don't make a new one). Pure, for the tests.
@@ -491,6 +494,73 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     },
   };
 
+  // F226: Block (Zebra #1037, #998): packages blocked from the package page, kept on this device as a JSON object
+  // { id: name } (the name is for Settings > Blocked's rows), and the authors, which are F104's hidden authors (one
+  // list: Block on a package page and Hide Packages by on the author page are the same switch). core/catalog.js
+  // setBlocked leaves the packages out of Browse, Search, Sections and Changes. In jailbreak mode with a helper,
+  // blocking an installed package also holds it with dpkg (holds.set, F22), so N7 and other managers leave it
+  // alone; the ids whose hold the block made are kept apart (ifizbox.blockHolds), so Unblock lifts that hold and
+  // never one the user set with Ignore Upgrades. Listeners hear ("blockedPackages", ids) on a change.
+  function readBlocked() {
+    try {
+      const o = JSON.parse(store.get(BLOCKED_KEY) || "{}");
+      if (!o || typeof o !== "object" || Array.isArray(o)) return {};
+      const out = {};
+      for (const [id, name] of Object.entries(o)) if (id.trim()) out[id] = typeof name === "string" && name.trim() ? name : id;
+      return out;
+    } catch {
+      return {};
+    }
+  }
+  function readBlockHolds() {
+    try {
+      const list = JSON.parse(store.get(BLOCK_HOLDS_KEY) || "[]");
+      return Array.isArray(list) ? [...new Set(list.filter((p) => typeof p === "string"))].sort() : [];
+    } catch {
+      return [];
+    }
+  }
+  function writeBlockHolds(list) {
+    const sorted = [...new Set(list)].sort();
+    if (sorted.length) store.set(BLOCK_HOLDS_KEY, JSON.stringify(sorted));
+    else store.remove(BLOCK_HOLDS_KEY);
+  }
+  const blocked = {
+    list: () => Object.keys(readBlocked()).sort(),
+    has: (pkg) => Object.hasOwn(readBlocked(), pkg),
+    name: (pkg) => readBlocked()[pkg] ?? pkg,
+    // [{ id, name }] sorted by name, for Settings > Blocked.
+    entries: () => Object.entries(readBlocked()).map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) || (a.id < b.id ? -1 : 1)),
+    heldByBlock: (pkg) => readBlockHolds().includes(pkg),
+    // `installed`: whether dpkg has it, so a jailbreak block holds it too. Resolves to { held } once done: true when
+    // this block put a dpkg hold on it, false otherwise (not installed, not jailbreak, already held, dpkg refused).
+    async set(pkg, on, { name = null, installed = false } = {}) {
+      const id = String(pkg ?? "").trim();
+      if (!id) return { held: false };
+      const all = readBlocked();
+      const was = Object.hasOwn(all, id);
+      if (on) all[id] = typeof name === "string" && name.trim() ? name.trim() : all[id] ?? id;
+      else delete all[id];
+      if (on || was) store.set(BLOCKED_KEY, JSON.stringify(all));
+      if (on !== was) notify("blockedPackages", Object.keys(all).sort());
+      if (on) {
+        if (!dpkg || !installed || holds.has(id) || readBlockHolds().includes(id)) return { held: false };
+        const ok = await holds.set(id, true);
+        if (ok) writeBlockHolds([...readBlockHolds(), id]);
+        return { held: ok };
+      }
+      if (readBlockHolds().includes(id)) {
+        writeBlockHolds(readBlockHolds().filter((p) => p !== id));
+        if (holds.has(id)) await holds.set(id, false);
+      }
+      return { held: false };
+    },
+    authors: () => hiddenAuthors.list(),
+    hasAuthor: (name) => hiddenAuthors.has(name),
+    setAuthor: (name, on) => hiddenAuthors.set(name, on),
+  };
+
   // F70: Only Packages I Mark's marks (the package page's Update Automatically), package ids kept on the device as
   // a sorted JSON list like holds; listeners hear ("autoMarked", list) on a change.
   function readMarked() {
@@ -572,6 +642,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     daemonPrefs,
     hiddenSections,
     hiddenAuthors,
+    blocked, // F226
     upgradeNotifications,
     deviceType,
     jailbroken: () => deviceType() !== NOT_JAILBROKEN,

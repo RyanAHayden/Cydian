@@ -6,6 +6,7 @@
 //   catalog.package(id, key)  catalog.has(names)       // all promises; key "*" = All Sources
 //   catalog.changes()  catalog.onChange(f)             // the Changes tab (core/changes.js)
 //   catalog.setHiddenAuthors(names)                    // Hide by Author (F104): sent like the hidden sections
+//   catalog.setBlocked(ids)                            // Block (F226): blocked packages, sent likewise
 //   catalog.setHidden(names)                           // Section Visibility: sent to the worker before the next question
 //   catalog.setDevice(device, { filter })              // Works on my phone (F17, device.js): likewise
 //   catalog.installed()  catalog.upgrades(holds)       // dpkg's status file (F7): rows or null; { available, ignored }
@@ -191,6 +192,18 @@ function setHiddenAuthors(names) {
   for (const f of changeListeners) f();
 }
 
+// Block (F226): the blocked package ids (core/settings.js blocked), sent like the hidden sections
+// (core/catalog.js setBlocked).
+let blocked = [];
+let blockedSent = true;
+function setBlocked(ids) {
+  const next = [...new Set(ids ?? [])].sort();
+  if (JSON.stringify(next) === JSON.stringify(blocked)) return;
+  blocked = next;
+  blockedSent = false;
+  for (const f of changeListeners) f();
+}
+
 // Works on my phone (F17): the device every row is judged for, and whether what can't work is left out. Sent like
 // the hidden sections, ahead of the next question (core/catalog.js setDevice).
 let device = null;
@@ -263,6 +276,10 @@ const ask = async (op, args) => {
     hiddenAuthorsSent = true;
     await getParser().catalog("setHiddenAuthors", [hiddenAuthors]);
   }
+  if (!blockedSent) {
+    blockedSent = true;
+    await getParser().catalog("setBlocked", [blocked]);
+  }
   if (!deviceSent) {
     deviceSent = true;
     await getParser().catalog("setDevice", device ? [device.device, { filter: device.filter }] : [null]);
@@ -287,6 +304,7 @@ export const catalog = {
   sections: (key = ALL, opts) => ask("sections", opts ? [key, opts] : [key]),
   setHidden,
   setHiddenAuthors,
+  setBlocked, // F226
   setDevice,
   setIpaInfo, // F160
   list: (key = ALL, section = ALL) => ask("list", [key, section]),

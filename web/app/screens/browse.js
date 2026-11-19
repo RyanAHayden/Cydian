@@ -83,6 +83,11 @@ settings.onChange((key, value) => { if (key === "hiddenAuthors") catalog.setHidd
 // Works on My Phone (F17): the device and the filter reach the worker the same way.
 initDevice();
 
+// Block (F226): blocked packages reach the worker's catalog the same way (core/settings.js blocked); blocked
+// authors are F104's hidden authors, above.
+catalog.setBlocked(settings.blocked.list());
+settings.onChange((key, value) => { if (key === "blockedPackages") catalog.setBlocked(value); });
+
 // Compatibility marks (F35): Settings > Show Compatibility Marks hides them all with one attribute, so rows bound
 // while scrolling never read the setting.
 function applyMarks() {
@@ -810,6 +815,51 @@ async function renderAuthor(body, route, name) {
 
 // ---- the package page --------------------------------------------------------------------------------------
 
+// F226: the package page's Block group (Zebra #1037, #998): Block This Package, and Block Packages by <author>
+// (F104's Hide by Author list). Pure: labels, the confirm sheets' words and the footer, for the tests.
+export function blockRows({ name, author = null, blockedNow = false, authorBlocked = false, mode = "site", installed = false }) {
+  const rows = [{ key: "package", label: blockedNow ? "Unblock This Package" : "Block This Package",
+    confirm: blockedNow ? null : { title: `${name} will leave Browse, Search, Sections and Changes. Unblock it in Settings > General > Blocked.`, button: "Block Package" } }];
+  if (author) {
+    rows.push({ key: "author", label: authorBlocked ? `Unblock ${author}` : `Block Packages by ${author}`,
+      confirm: authorBlocked ? null : { title: `Every package by ${author} will leave Browse, Search, Sections and Changes.`, button: "Block Author" } });
+  }
+  const held = mode === "jailbreak" && installed;
+  const footer = blockedNow
+    ? (held ? "Blocked, and held with dpkg so other package managers leave it alone too." : "Blocked: left out of every list on this device.")
+    : held ? "Blocking an installed package also holds it with dpkg, so other package managers leave it alone."
+      : null;
+  return { rows, footer };
+}
+
+// The Block group, redrawn in place after each tap. In the app, blocking an installed package also holds it
+// (core/settings.js blocked.set).
+function blockGroup({ id, name, author }) {
+  const box = el("div", "package-block");
+  let installed = false;
+  const draw = () => {
+    const { rows, footer } = blockRows({ name, author, blockedNow: settings.blocked.has(id), authorBlocked: author ? settings.blocked.hasAuthor(author) : false,
+      mode: detectMode(), installed });
+    box.replaceChildren(grouped([{ rows: rows.map((r) => ({ label: r.label, chevron: false, onClick: () => tap(r) })), footer }]));
+  };
+  const tap = async (r) => {
+    if (r.confirm && await showActionSheet({ title: r.confirm.title, buttons: [r.confirm.button], destructive: 0 }) !== 0) return;
+    if (r.key === "package") {
+      const on = !settings.blocked.has(id);
+      // The helper's hold (or unhold) takes a moment: a HUD while it runs, as Reload Data's.
+      const hud = installed && detectMode() === "jailbreak" ? showHUD(on ? "Blocking" : "Unblocking") : null;
+      const { held } = await settings.blocked.set(id, on, { name, installed });
+      hud?.done(on ? (held ? "Blocked and Held" : "Blocked") : "Unblocked");
+    } else settings.blocked.setAuthor(author, !settings.blocked.hasAuthor(author));
+    draw();
+  };
+  draw();
+  if (detectMode() === "jailbreak") {
+    catalog.installed().then((list) => { installed = Boolean(list?.some((p) => p.id === id)); if (box.isConnected) draw(); }).catch(() => {});
+  }
+  return box;
+}
+
 const httpUrl = (u) => (/^https?:\/\//i.test(String(u ?? "").trim()) ? String(u).trim() : null);
 
 async function renderPackage(body, route, key, id, ctx) {
@@ -986,6 +1036,7 @@ async function renderPackage(body, route, key, id, ctx) {
   if (headAuthor) more.push({ label: `More by ${headAuthor.name}`, href: deeper(route, token("author", headAuthor.name)) });
   if (html) more.push({ label: "Depiction", onClick: () => openHtmlDepiction(html, name), chevron: true });
   if (more.length) details.append(grouped([{ rows: more }]));
+  details.append(blockGroup({ id: st.package || id, name, author: headAuthor?.name ?? null })); // F226
   const sourceLink = pkg.installedOnly ? null : { label: sourceName || "Unknown Source", subtitle: source?.uri,
     href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) };
   const links = el("div", "package-links");

@@ -1,0 +1,21 @@
+[
+  {"eval": "localStorage.clear(); localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.device','iphoneos-arm64'); localStorage.setItem('ifizbox.arch','iphoneos-arm64'); localStorage.setItem('ifizbox.appearance', 'dark'); 'ok'"},
+  {"nav": "#/search/package:jp.r-plus.activityaction2", "ms": 8000},
+  {"eval": "(()=>{const b=[...document.querySelectorAll('.package-block')].at(-1); if(!b) return 'no block group'; b.scrollIntoView({block:'center'}); return b.textContent})()"},
+  {"wait": 600},
+  {"shot": "dark-1-package-block"},
+  {"tap": ".package-block .cell-inner", "text": "Block This Package", "ms": 900},
+  {"shot": "dark-2-confirm"},
+  {"tap": ".action-button", "text": "Block Package", "ms": 1200},
+  {"eval": "(()=>{const b=[...document.querySelectorAll('.package-block')].at(-1); b.scrollIntoView({block:'center'}); return b.textContent+' | stored '+localStorage.getItem('ifizbox.blockedPackages')})()"},
+  {"wait": 600},
+  {"shot": "dark-3-blocked"},
+  {"eval": "(async()=>{const m=await import('./catalog.js'); const s=await m.catalog.search('activityaction'); const all=await m.catalog.list('*','*'); return 'search hits '+s.map(r=>r.id).join(',')+' in list '+all.some(r=>r.id==='jp.r-plus.activityaction2')})()"},
+  {"eval": "(async()=>{const m=await import('./screens/settings.js'); m.settings.blocked.setAuthor('jschiefner', true); await m.settings.blocked.set('com.b4db1r3.3dglassiertouch', true, {name:'3DGlassierTouch'}); return 'ok'})()"},
+  {"nav": "#/home/settings/general", "ms": 5000},
+  {"eval": "(()=>{const r=[...document.querySelectorAll('.cell-label')].filter(e=>e.textContent==='Blocked').at(-1); if(!r) return 'no row'; r.scrollIntoView({block:'center'}); return r.closest('li').textContent})()"},
+  {"wait": 500},
+  {"shot": "dark-4-general-row"},
+  {"go": "#/home/settings/general/blocked", "ms": 2000},
+  {"shot": "dark-5-blocked-list"}
+]

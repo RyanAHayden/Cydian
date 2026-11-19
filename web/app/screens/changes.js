@@ -52,7 +52,7 @@ export function init(ctx) {
   onAppsChange(() => { if (state.body) load(); else badge(); }); // I3: a recorded install can end an upgrade
   // iFizBox's own source read (essential-ui.js readSelfInfo): its upgrade row and the badge count again.
   globalThis.addEventListener?.("ifizbox:self-info", () => { if (state.body) load(); else badge(); });
-  settings.onChange((key) => { if (key === "holds" || key === "resignReminder") { if (state.body) load(); else badge(); } });
+  settings.onChange((key) => { if (key === "holds" || key === "blockedPackages" || key === "resignReminder") { if (state.body) load(); else badge(); } });
   // At launch, only with a status file: without one there are no upgrades, and no reason to load every source.
   // Without one (the site, the sideload app) the remembered apps count, and iFizBox itself in the app: badge at
   // launch whenever there is anything installed to follow.
@@ -64,10 +64,17 @@ export function init(ctx) {
   if (catalog.statusSource() === "native") settings.holds.sync().catch(() => {});
 }
 
+// F226: what Changes files under Ignored Upgrades: Settings' Ignored Upgrades (in the app dpkg's holds) and the
+// blocked packages, so a blocked package's upgrade is never in Upgrade (N) or the badge, on the site too.
+export function ignoredList(holds = [], blocked = []) {
+  return [...new Set([...holds, ...blocked])].sort();
+}
+const ignoredIds = () => ignoredList(settings.holds.list(), settings.blocked.list());
+
 // The tab badge: how many upgrades are available (ignored ones don't count), and F91's apps that need a re-sign.
 async function badge(upgrades, resign) {
   try {
-    upgrades ??= await withAppUpgrades(await upgradesWithSelf(await catalog.upgrades(settings.holds.list())), settings.holds.list()); // F72, I3
+    upgrades ??= await withAppUpgrades(await upgradesWithSelf(await catalog.upgrades(ignoredIds())), ignoredIds()); // F72, I3
     resign ??= await resignNow(upgrades);
     state.ctx?.setBadge("changes", badgeCount(upgrades, resign));
   } catch {
@@ -145,7 +152,7 @@ export function upgradeAll(queue, available, skip = null) {
 // and Confirm opens. -> the jobs queued.
 export async function upgradeEverything() {
   await catalog.ensure();
-  const holds = settings.holds.list();
+  const holds = ignoredIds();
   const u = await withAppUpgrades(await upgradesWithSelf(await catalog.upgrades(holds)), holds);
   return queueAll(u.available, await resignNow(u)); // F91: and the apps that need a re-sign
 }
@@ -175,7 +182,7 @@ export async function upgradeSelf({ mode = detectMode(), upgrades = null, queue 
 // The upgrades Changes lists, for upgradeSelf: sideload's iFizBox row is upgradesWithSelf's, read with or without the
 // catalog; the jailbreak row is apt's.
 async function selfUpgrades(mode) {
-  const holds = settings.holds.list();
+  const holds = ignoredIds();
   const none = { available: [], ignored: [] };
   if (mode === "sideload") return upgradesWithSelf(await catalog.ensure().then(() => catalog.upgrades(holds)).catch(() => none));
   await catalog.ensure();
@@ -341,9 +348,9 @@ async function load() {
   let groups, upgrades, installed, resign, vendorSold;
   try {
     await catalog.ensure();
-    [groups, upgrades, installed] = await Promise.all([catalog.changes(), catalog.upgrades(settings.holds.list()), installedNow()]);
+    [groups, upgrades, installed] = await Promise.all([catalog.changes(), catalog.upgrades(ignoredIds()), installedNow()]);
     upgrades = await upgradesWithSelf(upgrades); // F72: the sideload build lists iFizBox's own upgrade here
-    upgrades = await withAppUpgrades(upgrades, settings.holds.list()); // I3: the apps Install remembered (app-updates.js)
+    upgrades = await withAppUpgrades(upgrades, ignoredIds()); // I3: the apps Install remembered (app-updates.js)
     resign = await resignNow(upgrades); // F91
     vendorSold = await vendorSoldNow(upgrades); // B19
   } catch (e) {

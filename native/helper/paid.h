@@ -24,4 +24,11 @@ int helper_install_paid(const char *prefix, struct helper_plan *plan, char *cons
  * returns as helper_install_paid. */
 int helper_local_deb(const char *prefix, struct helper_plan *plan, char *const env[], const char **err);
 
+/* F239: an install-deb-ask plan: the same copy, but apt-get is run by `run` (main.c's ask_relay, with the caller's
+ * answers on `answers`) instead of a plain fork and exec; the directory is removed after. Returns what run does, or
+ * helper_local_deb's refusals. */
+typedef int (*helper_deb_runner)(const struct helper_plan *plan, char *const env[], int answers);
+int helper_local_deb_ask(const char *prefix, struct helper_plan *plan, char *const env[], helper_deb_runner run,
+                         int answers, const char **err);
+
 #endif

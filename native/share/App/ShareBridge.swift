@@ -18,7 +18,8 @@
 //   share.debCancel {tag}       F234: stops that share.debFetch (it fails "cancelled: Cancelled")
 //   share.debSimulate {file}    jailbreak: ifizbox-helper simulate-deb -> {ok, code, output, stdout, package, version}
 //   share.debInstall {file, stream}  jailbreak: ifizbox-helper install-deb, streamed as helper.run -> {code, stdout,
-//                               stderr}; the staged file is removed afterwards
+//                               stderr}; the staged file is removed afterwards. F239: {ask: true} runs install-deb-ask
+//                               (a conffile question arrives as a pmconffile: status line; helper.answer replies)
 //   share.discard {file, kind}  a staged file nobody installed (Cancel)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
@@ -218,10 +219,11 @@ enum ShareBridge {
         b.on("share.debInstall") { c in
             guard let path = staged(c, .deb) else { return }
             let emit = emitter(c)
+            let ask = (c.params["ask"] as? Bool) ?? false
             SharedInbox.queue.async {
                 defer { try? FileManager.default.removeItem(atPath: path) }
                 do {
-                    let r = try ShareRun.installDeb(path, PhoneShareHost(), emit: emit)
+                    let r = try ShareRun.installDeb(path, PhoneShareHost(), ask: ask, emit: emit)
                     Apt.reply(c, ["code": r.code, "stdout": r.out, "stderr": r.err], nil)
                 } catch { Apt.reply(c, nil, text(error)) }
             }

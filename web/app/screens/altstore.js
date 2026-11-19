@@ -22,6 +22,7 @@ import { signAndInstall, localSigning, isSelfIpa } from "../signing-client.js";
 import { siteGateRows, markiFizBoxInstalled, websiteInstallsOn, SITE_GATE_FOOTER } from "../websign-gate.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
+import { guarded } from "../nav/tapguard.js";
 import { setSourceShare, headerShareButton } from "./handoff.js";
 import { openIpaInstall } from "./ipa-install.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
@@ -117,7 +118,7 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   } else if (o.download && site && !isSelfIpa(o.download)) {
     // F96: other apps go to iFizBox first; Install on the Website (F93's browser signing) waits for the warning.
     const install = () => sign({ url: o.download, name, ...own, onInstalled: () => onInstall() });
-    return { rows: gate({ id: appId, install, download: downloadRow(o.download, opener) }), options: o, gated: true };
+    return { rows: tapOnly(gate({ id: appId, install, download: downloadRow(o.download, opener) })), options: o, gated: true };
   } else if (o.download && site) {
     // F93: Install signs in the browser with the certificate in Settings > Signing (signing-client.js
     // signInBrowser). F92: no hand-offs follow it. F96: iFizBox itself always installs from the website.
@@ -134,8 +135,12 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
       onClick: () => run({ url: o.download, name, onInstalled: () => onInstall() }) });
   }
   if (o.download) rows.push(downloadRow(o.download, opener));
-  return { rows, options: o };
+  return { rows: tapOnly(rows), options: o };
 }
+
+// B48: the install rows run on a tap only: a click that ends a drag or a scroll (a scroll that started on Install)
+// does nothing (nav/tapguard.js).
+const tapOnly = (rows) => rows.map((r) => (r.onClick ? { ...r, onClick: guarded(r.onClick) } : r));
 
 // F129: an app's own bundle ID: its AltStore bundleIdentifier, else its package row's id without the `~name` suffix
 // a source adds when two apps share one ID (core/altstore.js). null when neither is there.

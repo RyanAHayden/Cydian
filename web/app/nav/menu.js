@@ -2,8 +2,12 @@
 // held item. Styles: ios6.css (.menu). Any touch outside, a scroll or Escape puts it away.
 //
 //   showMenu(element, [{ label: "Copy URL", onClick }])
-//   longPress(element, (e) => ...)  a 500 ms hold that doesn't move; returns true from the hold to eat the click
+//   longPress(element, selector, (target, e) => ...)  a HOLD_MS hold that doesn't move or scroll; the click ending it is eaten
 import { haptic } from "./haptic.js";
+import { guarded } from "./tapguard.js";
+
+export const HOLD_MS = 550; // B48: a little longer than 500, nearer iOS's own, so a finger resting before a slow scroll doesn't hold
+export const HOLD_SLOP = 10;
 
 let open = null; // the menu on screen: { close() }
 
@@ -14,13 +18,21 @@ export function showMenu(anchor, items, { x = null } = {}) {
   menu.setAttribute("role", "menu");
   const row = document.createElement("div");
   row.className = "menu-items";
+  // B48: an item is chosen only by a touch that began on the menu. The finger that held a row to open it is still
+  // down when the menu appears (often right where it lands), and its lift or drift must not pick Install.
+  let touched = false;
+  menu.addEventListener("pointerdown", () => { touched = true; });
   for (const it of items) {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "menu-item";
     b.setAttribute("role", "menuitem");
     b.textContent = it.label;
-    b.addEventListener("click", () => { close(); it.onClick(); });
+    b.addEventListener("click", guarded((e) => {
+      if (!touched && e?.detail !== 0) return; // the opening touch's click (detail 0: the keyboard, el.click())
+      close();
+      it.onClick();
+    }));
     row.append(b);
   }
   const arrow = document.createElement("span");
@@ -86,23 +98,48 @@ export async function nativePaste(native = globalThis.ifizboxNative, params = {}
   try { return String((await native.call("clipboard.read", params)) ?? ""); } catch { return null; }
 }
 
-// A hold on `el` (or a descendant matching `selector`): 500 ms without moving more than 10px. `onHold(target, e)`
+// A hold on `el` (or a descendant matching `selector`): HOLD_MS without moving more than HOLD_SLOP px. `onHold(target, e)`
 // runs at the hold; the click that ends it is swallowed so the item doesn't open.
-export function longPress(el, selector, onHold) {
+// B48: any scroll while the finger is down (the pane under it, listened for on the document since the pointermoves
+// stop once iOS pans), or a pointercancel, ends the hold. Once it fired, the click ending that touch is swallowed
+// wherever it lands (the menu or sheet the hold opened may sit under the finger), until a new touch starts.
+export function longPress(el, selector, onHold, { doc = globalThis.document, hold = HOLD_MS } = {}) {
   let timer = 0, start = null, fired = false;
-  const cancel = () => { clearTimeout(timer); start = null; };
+  const cancel = () => {
+    clearTimeout(timer);
+    if (start) doc?.removeEventListener?.("scroll", cancel, true);
+    start = null;
+  };
   el.addEventListener("pointerdown", (e) => {
+    cancel();
     const target = e.target.closest(selector);
     fired = false;
     if (!target || !el.contains(target)) return;
     start = { x: e.clientX, y: e.clientY };
-    timer = setTimeout(() => { fired = true; start = null; haptic(); onHold(target, e); }, 500);
+    doc?.addEventListener?.("scroll", cancel, true);
+    timer = setTimeout(() => { cancel(); fired = true; swallowNextClick(doc); haptic(); onHold(target, e); }, hold);
   });
   el.addEventListener("pointermove", (e) => {
-    if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) cancel();
+    if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > HOLD_SLOP) cancel();
   });
   el.addEventListener("pointerup", cancel);
   el.addEventListener("pointercancel", cancel);
   el.addEventListener("click", (e) => { if (fired) { e.preventDefault(); e.stopPropagation(); fired = false; } }, true);
   el.addEventListener("contextmenu", (e) => { if (e.target.closest(selector)) e.preventDefault(); });
+}
+
+// The touch that is down now has done its job (a hold): its click, wherever it lands, is eaten. A new touch (its
+// pointerdown) or 2 s without a click ends this.
+function swallowNextClick(doc) {
+  if (!doc?.addEventListener) return;
+  let timer = 0;
+  const stop = () => {
+    clearTimeout(timer);
+    doc.removeEventListener("click", eat, true);
+    doc.removeEventListener("pointerdown", stop, true);
+  };
+  const eat = (e) => { stop(); e.preventDefault(); e.stopPropagation(); };
+  doc.addEventListener("click", eat, true);
+  doc.addEventListener("pointerdown", stop, true);
+  timer = setTimeout(stop, 2000);
 }

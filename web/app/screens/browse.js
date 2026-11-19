@@ -73,7 +73,7 @@ import { showUndoBar } from "../nav/undobar.js";
 import { runLogs } from "../queue.js";
 import { appQueue } from "../app-queue.js"; // F213: the sideload build's rows queue apps
 import { APP_MODE_LABEL } from "../core/appqueue.js";
-import { rowAppJob } from "./altstore.js";
+import { rowAppJob, queueOriginalCheck } from "./altstore.js";
 import { queueApp } from "./queue.js";
 
 const ROW_HEIGHT = 58;
@@ -499,10 +499,21 @@ function attachRowMenu(listEl, route) {
   });
 }
 
+// F249: the job an app row's swipe or hold-menu Install puts in the app queue. A fresh install (`installed` null: no
+// record) asks F243's once-per-app question first, as the app page does (altstore.js queueOriginalCheck): null for
+// Cancel (queue nothing), keepBundleId: false for Install a Copy. Upgrades go in as they are.
+export async function appRowQueueJob(job, installed, { check = queueOriginalCheck } = {}) {
+  if (!job || installed != null) return job;
+  return check(job);
+}
+
 // F213: an app row's Install / Upgrade queues it and opens Confirm, as the app page's button does; Cancel clears it.
-function runAppRowMenuItem(it, item, st) {
+async function runAppRowMenuItem(it, item, st) {
   if (it.kind === "cancel") return appQueue.clear(st.id);
-  if (it.kind === "queue") return queueApp(it.job);
+  if (it.kind === "queue") { // F249
+    const job = await appRowQueueJob(it.job, st.installed);
+    return job ? queueApp(job) : undefined;
+  }
   return runRowMenuItem(it, item, { installed: null, name: item.name });
 }
 
@@ -660,15 +671,18 @@ function attachAppSwipe(listEl, route) {
       const item = row._item;
       const st = await appRowState(item);
       const action = rowSwipeAction(item, { apps: true, ...st, listKey });
-      return action && { ...action, item, id: st.id };
+      return action && { ...action, item, id: st.id, installed: st.installed };
     },
     kindOf: (a) => a.kind,
-    commit: (row, a) => {
+    commit: async (row, a) => {
       const { item, id } = a;
       const name = a.job?.name || item.name || item.id;
+      // F249: a fresh install asks the original-app question first; Cancel queues nothing and shows no undo bar.
+      const job = a.kind === "cancel" ? null : await appRowQueueJob(a.job, a.installed);
+      if (a.kind !== "cancel" && !job) return;
       const prev = appQueue.get(id);
       if (a.kind === "cancel") appQueue.clear(id);
-      else appQueue.add(a.job);
+      else appQueue.add(job);
       markHintSeen();
       showUndoBar({ message: swipeMessage(a, prev?.name || name, prev, APP_MODE_LABEL), onUndo: () => restoreApp(id, prev) });
     },

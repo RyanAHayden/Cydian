@@ -1,0 +1,34 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="R30 itms">
+<title>R30 itms</title>
+<style>
+body{font:20px -apple-system,Helvetica;margin:20px;background:#fff}
+a,button{display:block;width:100%;margin:18px 0;padding:22px 0;font-size:22px;text-align:center;border:2px solid #36c;border-radius:10px;background:#eef;color:#036;text-decoration:none}
+#st{font-size:16px;color:#333}
+</style>
+</head><body>
+<div id="st">loading</div>
+<a id="link" href="#">1 plain link</a>
+<button id="loc">2 location.href in tap</button>
+<button id="late">3 location.href 2 s after tap</button>
+<script>
+const log = (m) => { fetch("/log?" + encodeURIComponent(m)).catch(() => {}); };
+let itms = "";
+fetch("/token.txt?" + Date.now()).then((r) => r.text()).then((t) => {
+  t = t.trim();
+  itms = "itms-services://?action=download-manifest&url=" + encodeURIComponent("https://ifizbox.com/sign/up/" + t + "/manifest.plist");
+  document.getElementById("link").href = itms;
+  document.getElementById("st").textContent = "standalone=" + navigator.standalone + " token=" + t.slice(0, 8);
+  log("load standalone=" + navigator.standalone + " ua=" + navigator.userAgent);
+});
+document.getElementById("link").addEventListener("click", () => log("click link"));
+document.getElementById("loc").addEventListener("click", () => { log("click loc"); location.href = itms; });
+document.getElementById("late").addEventListener("click", () => { log("click late"); setTimeout(() => { log("late fire"); location.href = itms; }, 2000); });
+document.addEventListener("visibilitychange", () => log("visibility " + document.visibilityState));
+window.addEventListener("pagehide", () => log("pagehide"));
+</script>
+</body></html>

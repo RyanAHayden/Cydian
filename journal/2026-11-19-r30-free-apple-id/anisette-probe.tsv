@@ -1,0 +1,69 @@
+1	https://ani.sidestore.io	v3 200 0.149211 [client_info,user_agent,]	v1 200 0.135709 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx/1.31.7
+1	https://ani.sidestore.app	v3 200 0.191730 [client_info,user_agent,]	v1 200 0.131461 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx/1.31.7
+1	https://ani.sidestore.zip	v3 200 0.154727 [client_info,user_agent,]	v1 200 0.118132 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.9.0
+1	https://ani.846969.xyz	v3 200 0.152095 [client_info,user_agent,]	v1 200 0.120511 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.9.0
+1	https://new.ani.sidestore.io	v3 200 0.362640 [client_info,user_agent,]	v1 200 0.346651 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+1	https://mac-ani.jkcoxson.com	v3 200 0.181730 [client_info,user_agent,]	v1 200 0.182887 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+1	https://ani.jkcoxson.com	v3 200 0.177815 [client_info,user_agent,]	v1 200 0.168962 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+1	https://win.ani.sidestore.io	v3 502 0.349081 []	v1 502 0.345487 []	Caddy
+1	https://ani.npeg.us	v3 200 0.145113 [client_info,user_agent,]	v1 200 0.117595 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.9.0
+1	http://5.249.163.88:6969	v3 200 0.059242 [client_info,user_agent,]	v1 200 0.062185 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.13.3
+1	https://anisette.wedotstud.io	v3 200 0.834645 [client_info,user_agent,]	v1 200 0.689844 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx
+1	https://ani.xu30.top	v3 200 0.740212 [client_info,user_agent,]	v1 200 0.495090 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	cloudflare
+1	https://ani.owoellen.rocks	v3 000 10.000991 []	v1 000 10.001033 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+1	https://ani.idevicehacked.com	v3 200 0.256685 [client_info,user_agent,]	v1 200 0.255826 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	cloudflare
+1	https://ani.neoarz.com	v3 000 10.001531 []	v1 000 10.001426 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+1	https://ani3server.fly.dev	v3 200 0.369478 [client_info,user_agent,]	v1 200 0.270530 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	Fly/781f3a6652 (2026-1
+1	https://ani.jaydenha.uk	v3 502 0.706742 []	v1 502 0.731171 []	nginx
+1	https://anisette.crystall1ne.dev	v3 200 0.254423 [client_info,user_agent,]	v1 200 0.101081 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx/1.24.0 (Ubuntu)
+1	https://omni.ethxn.xyz	v3 200 0.278663 [client_info,user_agent,]	v1 200 0.243985 [X-Apple-I-MD,X-MMe-Client-Info,X-Apple-I-MD-LU,X-Apple-I-SRL]	omnisette-server
+1	https://ani.sjwon0368.dpdns.org	v3 200 0.626114 [client_info,user_agent,]	v1 200 0.452102 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	Caddy
+vibe.d/2.13.3
+1	https://ani.uwucloud.fun	v3 200 0.574838 [client_info,user_agent,]	v1 200 0.572853 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	cloudflare
+1	https://anisette.lillq.me	v3 200 0.291987 [client_info,user_agent,]	v1 200 0.254775 []	cloudflare
+2	https://ani.sidestore.io	v3 200 0.128203 [client_info,user_agent,]	v1 200 0.127854 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx/1.31.7
+2	https://ani.sidestore.app	v3 200 0.136102 [client_info,user_agent,]	v1 200 0.120104 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx/1.31.7
+2	https://ani.sidestore.zip	v3 200 0.117690 [client_info,user_agent,]	v1 200 0.117727 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.9.0
+2	https://ani.846969.xyz	v3 200 0.113208 [client_info,user_agent,]	v1 200 0.117427 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.9.0
+2	https://new.ani.sidestore.io	v3 200 0.346305 [client_info,user_agent,]	v1 200 0.347327 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+2	https://mac-ani.jkcoxson.com	v3 200 0.171649 [client_info,user_agent,]	v1 200 0.167271 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+2	https://ani.jkcoxson.com	v3 200 0.166694 [client_info,user_agent,]	v1 200 0.182391 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+2	https://win.ani.sidestore.io	v3 502 0.345585 []	v1 502 0.345948 []	Caddy
+2	https://ani.npeg.us	v3 200 0.113545 [client_info,user_agent,]	v1 200 0.117337 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.9.0
+2	http://5.249.163.88:6969	v3 200 0.059924 [client_info,user_agent,]	v1 200 0.059740 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.13.3
+2	https://anisette.wedotstud.io	v3 200 0.689360 [client_info,user_agent,]	v1 200 0.689759 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx
+2	https://ani.xu30.top	v3 200 0.175571 [client_info,user_agent,]	v1 200 0.501367 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	cloudflare
+2	https://ani.owoellen.rocks	v3 000 10.001409 []	v1 000 10.001228 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+2	https://ani.idevicehacked.com	v3 200 0.272924 [client_info,user_agent,]	v1 200 0.243426 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	cloudflare
+2	https://ani.neoarz.com	v3 000 10.001831 []	v1 000 10.001209 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+2	https://ani3server.fly.dev	v3 200 0.257802 [client_info,user_agent,]	v1 200 0.261067 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	Fly/781f3a6652 (2026-1
+2	https://ani.jaydenha.uk	v3 502 0.679046 []	v1 502 0.720828 []	nginx
+2	https://anisette.crystall1ne.dev	v3 200 0.126376 [client_info,user_agent,]	v1 200 0.101163 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx/1.24.0 (Ubuntu)
+2	https://omni.ethxn.xyz	v3 200 0.250336 [client_info,user_agent,]	v1 200 0.227168 [X-MMe-Client-Info,X-Apple-I-SRL-NO,X-Apple-I-MD,X-Apple-I-MD]	omnisette-server
+2	https://ani.sjwon0368.dpdns.org	v3 200 0.491682 [client_info,user_agent,]	v1 200 0.477580 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	Caddy
+vibe.d/2.13.3
+2	https://ani.uwucloud.fun	v3 200 0.229046 [client_info,user_agent,]	v1 200 0.602142 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	cloudflare
+2	https://anisette.lillq.me	v3 200 0.236879 [client_info,user_agent,]	v1 200 0.274944 []	cloudflare
+3	https://ani.sidestore.io	v3 200 0.124418 [client_info,user_agent,]	v1 200 0.148822 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx/1.31.7
+3	https://ani.sidestore.app	v3 200 0.157680 [client_info,user_agent,]	v1 200 0.124947 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx/1.31.7
+3	https://ani.sidestore.zip	v3 200 0.114270 [client_info,user_agent,]	v1 200 0.114558 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.9.0
+3	https://ani.846969.xyz	v3 200 0.114383 [client_info,user_agent,]	v1 200 0.117956 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.9.0
+3	https://new.ani.sidestore.io	v3 200 0.345762 [client_info,user_agent,]	v1 200 0.347144 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+3	https://mac-ani.jkcoxson.com	v3 200 0.166498 [client_info,user_agent,]	v1 200 0.179579 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+3	https://ani.jkcoxson.com	v3 200 0.165629 [client_info,user_agent,]	v1 200 0.183557 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+3	https://win.ani.sidestore.io	v3 502 0.345671 []	v1 502 0.345604 []	Caddy
+3	https://ani.npeg.us	v3 200 0.118040 [client_info,user_agent,]	v1 200 0.113897 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.9.0
+3	http://5.249.163.88:6969	v3 200 0.058583 [client_info,user_agent,]	v1 200 0.062609 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	vibe.d/2.13.3
+3	https://anisette.wedotstud.io	v3 200 0.689884 [client_info,user_agent,]	v1 200 0.689263 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx
+3	https://ani.xu30.top	v3 200 0.484963 [client_info,user_agent,]	v1 200 0.171236 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	cloudflare
+3	https://ani.owoellen.rocks	v3 000 10.001379 []	v1 000 10.001537 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+3	https://ani.idevicehacked.com	v3 200 0.238201 [client_info,user_agent,]	v1 200 0.272589 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	cloudflare
+3	https://ani.neoarz.com	v3 000 10.001744 []	v1 000 10.000556 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	
+3	https://ani3server.fly.dev	v3 200 0.305463 [client_info,user_agent,]	v1 200 0.252274 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	Fly/781f3a6652 (2026-1
+3	https://ani.jaydenha.uk	v3 502 0.691044 []	v1 502 0.700214 []	nginx
+3	https://anisette.crystall1ne.dev	v3 200 0.134463 [client_info,user_agent,]	v1 200 0.101842 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	nginx/1.24.0 (Ubuntu)
+3	https://omni.ethxn.xyz	v3 200 0.245844 [client_info,user_agent,]	v1 200 0.240049 [X-Apple-I-MD-RINFO,X-Apple-I-MD,X-Apple-I-SRL-NO,X-MMe-Clien]	omnisette-server
+3	https://ani.sjwon0368.dpdns.org	v3 200 0.465852 [client_info,user_agent,]	v1 200 0.481254 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	Caddy
+vibe.d/2.13.3
+3	https://ani.uwucloud.fun	v3 200 0.584295 [client_info,user_agent,]	v1 200 0.580291 [X-Apple-I-MD,X-Apple-I-MD-LU,X-Apple-I-MD-M,X-Apple-I-MD-RIN]	cloudflare
+3	https://anisette.lillq.me	v3 200 0.288381 [client_info,user_agent,]	v1 200 0.150203 []	cloudflare

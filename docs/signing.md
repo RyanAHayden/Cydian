@@ -128,6 +128,14 @@ uploaded to the Signing Server (`signing.install {host: true}`, `POST /sign/host
 10 minutes and serves it to iOS (`worker/README.md`). The certificate and key stay on the phone; the signed iFizBox
 (which embeds the profile, as every signed app does) is on the server for those 10 minutes.
 
+One exception for other apps: iOS can freeze iFizBox while it serves an IPA (seen on iOS 27, even with the silent
+audio playing), and the frozen app's listening socket stays shut, so iOS's installer can't reach 127.0.0.1 and says
+"Unable to Install". iFizBox notices the freeze once it runs again (a heartbeat that finds a gap), re-creates the
+listener on the same port, and, if iOS doesn't ask for the IPA within 5 s, uploads that app's signed IPA to the
+Signing Server's `POST /sign/host` as for its own update and hands iOS that link (a new Install prompt). That app's
+signed IPA is then on the server for its 10 minutes. The install log says when iFizBox went to the background, the
+phone locked, how long it was frozen, and which copy iOS fetched.
+
 iOS won't install the new iFizBox over the running one, so iFizBox closes itself, but only once iOS has the whole
 IPA: after the Install prompt is answered it stays alive (silent audio) and polls `GET /sign/host/<token>/status`;
 when iOS has fetched `app.ipa` to its end it leaves a "Finishing the update" notification and exits. If iOS hasn't

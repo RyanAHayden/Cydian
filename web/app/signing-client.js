@@ -175,8 +175,10 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {}, b
   // iFizBox's own IPA: signed here on the phone like any app, then hosted on the Signing Server (host: true) since
   // iOS closes iFizBox, and its install server, while it installs over it. Straight to iOS's Install prompt.
   if (isSelfIpa(url)) return installOnDevice({ url, name: name || NAME, onInstalled, host: true });
-  // F75: the first Install with something missing opens the Signing walkthrough at that step, not an alert.
-  if (await firstInstallCheck()) {
+  // F75: the first Install with something missing says so, then opens the Signing walkthrough at that step.
+  const step = await firstInstallCheck();
+  if (step === "cancel") return false;
+  if (step) {
     // F177: Signing offers Install Now for this app once it's set up.
     (await import("./screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version, bytes }) });
     return false;
@@ -230,7 +232,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 //   statusReady(status)                F69: true when that status holds an identity (Install and Settings both ask)
 //   await importToDevice({ p12, password, profile })   signing.import (files base64) -> status
 //   await removeFromDevice()           signing.remove -> status
-//   await firstInstallCheck()          F75: the walkthrough's missing step ("certificate" | "server"), opened, or null
+//   await firstInstallCheck()          F75: the walkthrough's missing step ("certificate" | "server"), opened after a
+//                                      Set Up Signing alert ("cancel" when the user didn't), or null
 //   await installOnDevice({ url, name, onInstalled })  signing.install with the progress page following its phases (F151)
 //
 // Each takes `native` (the bridge, globalThis.ifizboxNative by default) so tests can pass a fake.
@@ -289,16 +292,23 @@ export async function removeFromDevice(native) {
 // page opens with that step open and this answers its id; null when Install can go on. A bridge that doesn't answer
 // counts as no certificate, as signingReady does.
 // B39: `from`, the page Install was tapped on (taken before any wait), is where Signing returns once it's ready.
-export async function firstInstallCheck({ native, server = getServer(), go = openRoute, wait = sleep, from = here() } = {}) {
+export async function firstInstallCheck({ native, server = getServer(), go = openRoute, wait = sleep, from = here(), alert = showAlert } = {}) {
   const { missingStep, openAt, rememberReturn } = await import("./screens/signing.js");
   const step = missingStep(await readyStatus(native, wait), server);
   if (!step) return null;
+  // Say why before leaving the page: Signing opens only on Set Up.
+  const { index } = await alert({ title: "Set Up Signing", message: SETUP_WHY[step] ?? SETUP_WHY.certificate, buttons: ["Cancel", "Set Up"], cancel: 0 });
+  if (index !== 1) return "cancel"; // truthy: Install stops; callers don't keep an Install Now for it
   openAt(step);
   rememberReturn(from);
   go(["signing"]);
   return step;
 }
 
+const SETUP_WHY = {
+  certificate: `${NAME} signs apps with your own certificate before iOS will install them. Add your certificate (.p12) and its provisioning profile first.`,
+  server: `${NAME} needs a Signing Server to hand the signed app to iOS. Choose one first.`,
+};
 const here = () => globalThis.location?.hash ?? "";
 // B39: every trip to Settings > Signing from a page (a missing certificate or server) comes back to that page once
 // signing is ready (screens/signing.js offerInstall), not to Home's stack.
@@ -572,7 +582,9 @@ const hostOf = (server) => { try { return new URL(server).host; } catch { return
 export async function installFromLibrary({ file, name = "", signed = false, onInstalled = () => {} },
   { native, hud = progressHUD, alert = showAlert, go = openRoute, check = firstInstallCheck, reachable = serverReachable,
     follow = null, later = setTimeout } = {}) {
-  if (await check({ native })) {
+  const step = await check({ native, alert });
+  if (step === "cancel") return false;
+  if (step) {
     // B39 (F177's Install Now): once Signing is ready it goes back to this IPA's page and offers this install there.
     const deps = { native, hud, alert, go, check, reachable, follow, later };
     (await import("./screens/signing.js")).rememberInstall({ name, run: () => installFromLibrary({ file, name, signed, onInstalled }, deps) });

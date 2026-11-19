@@ -32,7 +32,7 @@ function fakeUI() {
   const ui = { alerts: [], hud: 0, followed: [] };
   ui.deps = {
     hud: () => { ui.hud++; return { set() {}, hide() {} }; },
-    alert: async (a) => { ui.alerts.push(a); return { index: 0 }; },
+    alert: async (a) => { ui.alerts.push(a); return { index: a.title === "Set Up Signing" ? 1 : 0 }; }, // Set Up
     reachable: async () => true,
     follow: (n, id) => ui.followed.push(id),
     later: () => {},
@@ -83,6 +83,7 @@ for (const link of ["ifizbox://shared?route=sign-ipa&file=Demo.ipa&name=Demo.ipa
     const ui = fakeUI();
     const r = await installFromLibrary({ file: "Demo.ipa", name: "Demo" }, { ...ui.deps, native });
     assert.equal(r, null, "the walkthrough opened");
+    assert.deepEqual(ui.alerts.map((a) => a.title), ["Set Up Signing"], "told why first");
     assert.ok(onSigning(), `Signing opened: ${hash()}`);
     assert.deepEqual(signedFiles(native), [], "nothing signed without a certificate");
     assert.equal(pendingReturn(), IPA_PAGE);

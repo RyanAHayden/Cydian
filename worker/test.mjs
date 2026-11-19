@@ -33,7 +33,7 @@ assert.deepEqual(new Uint8Array(await (await go(ipaPath)).arrayBuffer()), ipa);
 r = await go(ipaPath, { headers: { Range: "bytes=2-4" } });
 assert.equal(r.status, 206);
 assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [3, 4, 1]);
-assert.equal((await go("/sign/host/" + "0".repeat(48) + "/app.ipa")).status, 404);
+assert.equal((await w.fetch(new Request("https://sign.example/sign/host/" + "0".repeat(48) + "/app.ipa"), { ...env, WAIT_SCALE: "0.002" })).status, 404);
 r = await go("/sign/host?bundleid=com.ryha.ifizbox&version=1", { method: "POST", body: new Uint8Array([1, 2]), headers: { "Content-Length": "2" } });
 assert.equal(r.status, 400); // not a zip
 console.log("worker: ok");
@@ -760,6 +760,64 @@ import { d1 } from "./src/d1-sqlite.js";
   assert.deepEqual(await status(t2), { manifest: true, started: true, finished: true });
   assert.equal((await at(`/sign/up/xyz/status`)).status, 404);
   console.log("worker ios status: ok");
+}
+
+// B83: iFizBox's own update (/sign/host): iOS's requests show in /sign/host/<t>/status (each mark written once), and
+// manifest.plist and app.ipa look again while KV hasn't caught up with the put.
+{
+  const writes = [];
+  const lag = new Set(); // keys KV doesn't show yet (eventual consistency)
+  const kv = { ...env.HOSTED,
+    put: async (k, v, o) => { writes.push(k); return env.HOSTED.put(k, v, o); },
+    get: async (k, o) => (lag.has(k) ? null : env.HOSTED.get(k, o)),
+    getWithMetadata: async (k, o) => (lag.has(k) ? { value: null, metadata: null } : env.HOSTED.getWithMetadata(k, o)) };
+  const henv = { ...env, WAIT_SCALE: "0.02", HOSTED: kv };
+  const at = (path, init) => w.fetch(new Request("https://sign.example" + path, init), henv);
+  const big = new Uint8Array(2.5 * 1024 * 1024 + 7);
+  big[0] = 0x50; big[1] = 0x4b; big[big.length - 1] = 9;
+  let r = await at("/sign/host?bundleid=com.ryha.ifizbox&version=0.9.9&title=iFizBox", { method: "POST", body: big, headers: { "Content-Length": String(big.length) } });
+  const tok = /\/sign\/host\/([0-9a-f]{48})\//.exec((await r.json()).manifest)[1];
+  const status = async () => (await at(`/sign/host/${tok}/status`)).json();
+  assert.deepEqual(await status(), { manifest: false, started: false, finished: false });
+  // KV shows the IPA only after a moment: the manifest waits for it instead of a 404
+  lag.add(tok);
+  setTimeout(() => lag.delete(tok), 40);
+  r = await at(`/sign/host/${tok}/manifest.plist`);
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), /<string>0\.9\.9<\/string>/);
+  assert.deepEqual(await status(), { manifest: true, started: false, finished: false });
+  // HEAD and a Range short of the end start nothing / finish nothing
+  assert.equal((await at(`/sign/host/${tok}/app.ipa`, { method: "HEAD" })).headers.get("Content-Length"), String(big.length));
+  assert.deepEqual(await status(), { manifest: true, started: false, finished: false });
+  r = await at(`/sign/host/${tok}/app.ipa`, { headers: { Range: "bytes=0-9" } });
+  assert.equal(r.status, 206);
+  assert.equal((await r.arrayBuffer()).byteLength, 10);
+  assert.deepEqual(await status(), { manifest: true, started: true, finished: false });
+  // app.ipa, lagging too, waits, then streams whole: finished only once its last byte is handed over
+  lag.add(tok);
+  setTimeout(() => lag.delete(tok), 40);
+  r = await at(`/sign/host/${tok}/app.ipa`);
+  assert.equal(r.status, 200);
+  const reader = r.body.getReader();
+  const first = await reader.read();
+  assert.ok(first.value.byteLength <= 1024 * 1024);
+  assert.equal((await status()).finished, false, "not finished after the first MB");
+  let got = first.value.byteLength, last = 0;
+  for (let c = await reader.read(); !c.done; c = await reader.read()) { got += c.value.byteLength; last = c.value[c.value.byteLength - 1]; }
+  assert.equal(got, big.length);
+  assert.equal(last, 9);
+  assert.deepEqual(await status(), { manifest: true, started: true, finished: true });
+  // asked again: no more writes (3 marks in all)
+  await (await at(`/sign/host/${tok}/app.ipa`)).arrayBuffer();
+  await (await at(`/sign/host/${tok}/manifest.plist`)).text();
+  assert.equal(writes.filter((k) => k.endsWith(".ios")).length, 3);
+  // a link KV never shows: 404 once the wait is over
+  const t0 = Date.now();
+  assert.equal((await at(`/sign/host/${"e".repeat(48)}/manifest.plist`)).status, 404);
+  assert.ok(Date.now() - t0 >= 0.02 * 6000 - 40, "it looked again before the 404");
+  assert.equal((await at(`/sign/host/${"e".repeat(48)}/app.ipa`)).status, 404);
+  assert.deepEqual(await (await at(`/sign/host/${"e".repeat(48)}/status`)).json(), { manifest: false, started: false, finished: false });
+  console.log("worker host status: ok");
 }
 
 // F178: iFizBox's AltStore source at https://<DOMAIN>/repo/source.json: the deployed web/app/source.json (ASSETS),

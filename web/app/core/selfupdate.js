@@ -144,3 +144,31 @@ export async function checkForUpdates(deps) {
   saveState(storage, { lastCheck: now(), latest: release ?? null, current: current || null });
   return release && isNewer(release.version, current) ? "newer" : "current";
 }
+
+// ---- B83: a sideload self-update that didn't land ------------------------------------------------------------
+// The sideload app records the version it handed to iOS (signing-client.js, iFizBox's own install); on the next
+// launch, if app.info still says an older version, the update didn't finish (iOS never installed it, or the old
+// iFizBox was opened before it could), and a banner says so with Try Again (essential-ui.js) instead of silence.
+//   recordSelfUpdate(storage, version, now)        kept for PENDING_TTL ms
+//   unfinishedSelfUpdate(storage, current, now)    -> the version that didn't land, or null; a landed or stale
+//                                                  record is dropped
+export const PENDING_KEY = "ifizbox.selfupdate.pending";
+export const PENDING_TTL = 24 * 60 * 60 * 1000;
+
+export function recordSelfUpdate(storage, version, now = Date.now()) {
+  if (!parseVersion(version)) return false;
+  try { storage?.setItem(PENDING_KEY, JSON.stringify({ version: String(version), at: now })); return true; } catch { return false; }
+}
+
+export function clearSelfUpdate(storage) {
+  try { storage?.removeItem(PENDING_KEY); } catch { /* nothing kept */ }
+}
+
+export function unfinishedSelfUpdate(storage, current, now = Date.now()) {
+  let p = null;
+  try { p = JSON.parse(storage?.getItem(PENDING_KEY) ?? "null"); } catch { p = null; }
+  if (!p || typeof p !== "object" || !current) return null;
+  const fresh = Number.isFinite(p.at) && now - p.at >= 0 && now - p.at < PENDING_TTL;
+  if (!fresh || !isNewer(p.version, current)) { clearSelfUpdate(storage); return null; }
+  return String(p.version);
+}

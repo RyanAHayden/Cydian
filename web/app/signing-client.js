@@ -22,7 +22,8 @@ import { format, settingsRoute } from "./router.js";
 import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId } from "./core/websign.js";
 import { storedKeep, withKeep, originalState, originalNote } from "./core/keepid.js";
 import { detectMode } from "./core/settings.js";
-import { progressHUD, lockSelfUpdate } from "./nav/progress.js";
+import { progressHUD, lockSelfUpdate, unlockSelfUpdate } from "./nav/progress.js";
+import { recordSelfUpdate } from "./core/selfupdate.js";
 import { showAlert } from "./nav/alert.js";
 import { NAME, GITHUB_REPO } from "./brand.js";
 
@@ -339,7 +340,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   onInstalled(result);
   // iFizBox itself (host): iOS's Install prompt is up, and iFizBox closes once it's answered so the install finishes
   // (native CloseForUpdate): say so first (user 2026-11-18).
-  if (host) showBanner({ title: NAME, message: `Press Install. ${NAME} closes to finish updating; open it again once the new icon appears.`, wait: true });
+  if (host) showBanner({ title: NAME, message: `Press Install and keep ${NAME} open: it closes by itself once iOS has downloaded the new version. Open it again once the new icon appears.`, wait: true });
   if (after) { after(result, h); return true; }
   // F169: a plain Install ends through followInstall (signing-sheet.js): Done once iOS has the link (user 2026-11-18).
   // Not for iFizBox itself (host, or its own IPA or ID): iOS closes iFizBox while it installs over it.
@@ -349,10 +350,43 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     return true;
   }
   // B49: iFizBox itself: the page ends locked on "Closing iFizBox" (no Close to tap) until iOS closes the app.
-  if (host || isSelfIpa(url) || result?.bundleId === IFIZBOX_ID) { lockSelfUpdate(h, { later }); return true; }
+  // B83: the shell closes it only once iOS has the whole IPA; the page follows that, and offers Try Again if iOS
+  // never took it. The version is kept so the next launch can tell it didn't land.
+  if (host || isSelfIpa(url) || result?.bundleId === IFIZBOX_ID) {
+    if (host) recordSelfUpdate(storageOf(), result?.version);
+    lockSelfUpdate(h, { later });
+    if (host) followSelfUpdate(h, { native, retry: () => installOnDevice({ url, name, onInstalled, params, after, host }, { native, hud, alert, go, later, follow }) });
+    return true;
+  }
   // iOS asks "Install …?" over the app: the progress page ends on Done (signed and handed to iOS), Return under it.
   later(() => (h.done ? h.done("Done") : h.hide()), 1200);
   return true;
+}
+
+// ---- B83: iFizBox's own update after iOS's prompt -----------------------------------------------------------
+// The shell (native CloseForUpdate) closes iFizBox only once iOS has fetched the whole new IPA from the Signing
+// Server; signing.selfUpdate streams how far it is. The locked page (lockSelfUpdate) gets a line a step, and when iOS
+// never took the update (notStarted, stalled) its buttons back with Try Again (`retry`). An older shell, without the
+// call, leaves the page as B49 does. -> the last state, or null.
+const storageOf = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
+export const SELF_UPDATE_LINES = {
+  waiting: `Finishing the update: waiting for iOS to download the new ${NAME}`,
+  downloading: `Finishing the update: iOS is downloading the new ${NAME}`,
+  finished: `iOS has the new ${NAME}. Closing so it can install it`,
+};
+export const SELF_UPDATE_FAILED = {
+  notStarted: `The update didn't start: iOS didn't download the new ${NAME}. If Install was pressed, try again.`,
+  stalled: `The update didn't finish: iOS stopped downloading the new ${NAME}.`,
+};
+export async function followSelfUpdate(h, { native, retry = null } = {}) {
+  let last = null;
+  const say = (s) => { if (s && s !== last && SELF_UPDATE_LINES[s]) { last = s; h?.page?.step?.(SELF_UPDATE_LINES[s]); } };
+  let r;
+  try { r = await bridge(native).call("signing.selfUpdate", {}, (ev) => say(ev?.state)); } catch { return null; }
+  const s = r?.state ?? null;
+  say(s);
+  if (SELF_UPDATE_FAILED[s]) unlockSelfUpdate(h, { message: SELF_UPDATE_FAILED[s], retry });
+  return s;
 }
 
 // ---- F235: the IPA queue's run, sign ahead and install one at a time (core/apprun.js, screens/apprun.js) --------
@@ -420,6 +454,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
       (ev) => { if (ev?.log) log(ev.log); }, { tag, signal });
   } catch (e) { throw rowError(e, name); }
   progress("asking", 0);
+  if (host) recordSelfUpdate(storageOf(), opened?.version || row?.version); // B83: the next launch checks it landed
   if (host) return { installed: null, expires: opened?.expires ?? null, host: true };
   const bundleId = opened?.bundleId || row.bundleId;
   if (!bundleId) return { installed: null, expires: opened?.expires ?? null };

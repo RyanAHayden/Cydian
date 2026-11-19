@@ -54,7 +54,8 @@
 //                                             not (lists, Search, package pages, installed rows and upgrades)
 //   c.setIpaInfo(map)                      -> F160: { downloadURL: info } read from IPAs on this device (core/ipainfo.js);
 //                                             merged into what is kept, and apps whose candidate is one of them are
-//                                             judged with it (the source's own range wins). Returns how many are kept
+//                                             judged with it (the source's own range wins, unless the IPA's own
+//                                             MinimumOSVersion is higher: ipainfo.js ipaRaises). Returns how many are kept
 //
 // A row is the slim record lists draw: { id, name, short, version, section, icon, key, author, compat, purpose }.
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH, parseRelations } from "./apt.js";

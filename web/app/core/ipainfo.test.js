@@ -2,7 +2,7 @@
 // IPA says into compat (the source's fields win), what is kept on the device, the fallbacks, and the catalog's rows.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { needsCheck, ipaInfoUrl, textMinOS, withIpaInfo, savedInfo, allSaved, checkIpa, createQueue, clearIpaMemory,
+import { needsCheck, ipaInfoUrl, textMinOS, withIpaInfo, ipaRaises, savedInfo, allSaved, checkIpa, createQueue, clearIpaMemory,
   UNKNOWN_TTL, GUESS_TTL } from "./ipainfo.js";
 import { compat, compatCode, markOf, isIncompatible, badge, needText } from "./compat.js";
 import { createCatalog, ALL } from "./catalog.js";
@@ -55,8 +55,11 @@ test("unchecked until the IPA is read; then the IPA's range judges it, and the s
   assert.equal(compatCode(withIpaInfo(st, read), iphone("16.5")), "ios");
   assert.equal(compatCode(withIpaInfo(st, read), iphone("17.1")), "works");
   assert.equal(compat(withIpaInfo(st, read), iphone("17.1")).range, "iOS 17.0 or later");
-  // the source's minOSVersion wins over the IPA's
-  assert.equal(compatCode(withIpaInfo(app({ minOSVersion: "15.0" }), read), iphone("16.5")), "works");
+  // the source's minOSVersion wins over a lower IPA value and over guesses; B74: an IPA's own higher value wins over it
+  assert.equal(compatCode(withIpaInfo(app({ minOSVersion: "15.0" }), { ...read, minOSVersion: "13.0" }), iphone("14.5")), "ios");
+  assert.equal(compatCode(withIpaInfo(app({ minOSVersion: "15.0" }), { ...read, from: "appstore" }), iphone("16.5")), "works");
+  assert.equal(compatCode(withIpaInfo(app({ minOSVersion: "15.0" }), { ...read, from: "text" }), iphone("16.5")), "works");
+  assert.equal(compatCode(withIpaInfo(app({ minOSVersion: "15.0" }), read), iphone("16.5")), "ios");
   // checked but unknown (the Range was refused): the filled grey ?, not the outlined one
   const none = { minOSVersion: null, deviceFamily: null, from: null, at: 1 };
   assert.equal(compatCode(withIpaInfo(st, none), iphone("16.5")), "unknown");
@@ -165,13 +168,40 @@ test("the catalog judges rows with what IPAs said (setIpaInfo), only apps whose 
   assert.equal(code("com.ex.ranged"), "works");
   c.setIpaInfo({ "https://x/none.ipa": { minOSVersion: "17.0", deviceFamily: [1], from: "ipa", at: 1 },
     "https://x/pad.ipa": { minOSVersion: "15.0", deviceFamily: [2], from: "ipa", at: 1 },
-    "https://x/ranged.ipa": { minOSVersion: "18.0", from: "ipa", at: 1 } });
+    "https://x/ranged.ipa": { minOSVersion: "13.0", from: "ipa", at: 1 } });
   assert.equal(code("com.ex.none"), "ios");
   assert.equal(code("com.ex.pad"), "ipad");
-  assert.equal(code("com.ex.ranged"), "works"); // the source's 14.0 wins
+  assert.equal(code("com.ex.ranged"), "works"); // the source's 14.0 wins over the IPA's lower 13.0
   c.setDevice({ ios: "16.5", jailbreak: "none" }, { filter: true });
   assert.deepEqual(c.list(ALL, ALL).map((r) => r.id), ["com.ex.ranged"]); // what can't work drops out, as F17's
   // a source loaded after the results came in is judged with them too
   c.loadAlt("alt:https://y/src.json", { name: "Other", apps: [{ name: "Again", bundleIdentifier: "com.ex.again", versions: [{ version: "2", downloadURL: "https://x/none.ipa" }] }] }, "16.5");
   assert.equal(c.package("com.ex.again", "alt:https://y/src.json").row.compat, "ios");
+});
+
+test("B74: an IPA whose own MinimumOSVersion is above the source's is judged by the IPA (rows and setIpaInfo)", () => {
+  const read = { minOSVersion: "17.0", deviceFamily: [1, 2], from: "ipa", at: 1 };
+  const yt = app({ minOSVersion: "14.0" });
+  assert.equal(ipaRaises(yt, read), true);
+  assert.equal(ipaRaises(yt, { ...read, minOSVersion: "14.0" }), false); // the same: nothing to raise
+  assert.equal(ipaRaises(yt, { ...read, minOSVersion: "13.4" }), false);
+  assert.equal(ipaRaises(yt, { ...read, from: "appstore" }), false);      // a guess never beats the source
+  assert.equal(ipaRaises(app(), read), false);                             // no source value: F160's fill, not a raise
+  assert.equal(ipaRaises(yt, null), false);
+  const v = withIpaInfo(yt, read);
+  assert.equal(v.minOSVersion, "17.0");
+  assert.equal(v.ipaFrom, "ipa");
+  assert.equal(compat(v, iphone("15.8.8")).status, "no");
+  assert.equal(needText(compat(v, iphone("15.8.8"))), needText(compat(app({ minOSVersion: "17.0" }), iphone("15.8.8"))));
+  assert.equal(withIpaInfo(app({ minOSVersion: "14.0", maxOSVersion: "18" }), read).maxOSVersion, "18"); // the max stays
+
+  const c = createCatalog();
+  c.loadAlt("alt:https://x/youmod.json", { name: "YouMod Repo", apps: [
+    { name: "YouTube", bundleIdentifier: "com.google.ios.youtube", versions: [{ version: "21.45.4", downloadURL: "https://x/yt.ipa", minOSVersion: "14.0" }] },
+  ] }, "15.8.8");
+  c.setDevice({ ios: "15.8.8", jailbreak: "rootless" }, { filter: false });
+  const code = () => c.list(ALL, ALL).find((r) => r.id === "com.google.ios.youtube").compat;
+  assert.equal(code(), "works");
+  c.setIpaInfo({ "https://x/yt.ipa": read });
+  assert.equal(code(), "ios");
 });

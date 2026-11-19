@@ -319,7 +319,8 @@ test("B21: a nested bundle or framework without its executable is sealed as reso
                      info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
     let cr = try PropertyListSerialization.propertyList(from: f[a + "_CodeSignature/CodeResources"]!, format: nil) as! [String: Any]
     let files2 = cr["files2"] as! [String: Any]
-    for rel in ["YTUHD.bundle/Info.plist", "Frameworks/Kit.framework/Info.plist", "Frameworks/Kit.framework/kit.txt"] {
+    for rel in ["YTUHD.bundle/Info.plist", "Frameworks/Kit.framework/Info.plist", "Frameworks/Kit.framework/kit.txt",
+                "DontEatMyContent.bundle/Info.plist"] { // an empty CFBundleExecutable: a resource bundle (YouMod)
         check((files2[rel] as? [String: Any])?["hash2"] as? Data == sha256(f[a + rel]!), "\(rel) sealed by the app")
     }
     check((files2["YTUHD.bundle/en.lproj/Localizable.strings"] as? [String: Any])?["optional"].flatMap(plistBool) == true, "lproj in the bundle")

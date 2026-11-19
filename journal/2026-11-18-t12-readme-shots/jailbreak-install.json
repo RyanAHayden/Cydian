@@ -1,0 +1,15 @@
+[
+  {"wait": 8000},
+  {"nav": "#/search", "ms": 12000},
+  {"eval": "(()=>{const i=document.querySelector('.search-field input'); i.value='figlet'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+  {"wait": 3000},
+  {"eval": "(()=>{const a=[...document.querySelectorAll('a')].filter(e=>e.offsetParent&&/^figlet\\d/i.test(e.textContent.trim())); if(!a.length) return 'none'; a[0].click(); return 'ok '+a[0].getAttribute('href')})()"},
+  {"wait": 5000},
+  {"clicktext": "Install", "ms": 2000},
+  {"clicktext": "Install", "ms": 20000},
+  {"shot": "dbg-confirm"},
+  {"eval": "[...document.querySelectorAll('button,a.bar-button,.bar-button')].filter(e=>e.offsetParent).map(e=>e.textContent.trim()).join(' | ')"},
+  {"clicktext": "Confirm", "ms": 60000},
+  {"shot": "jb-log"},
+  {"eval": "document.body.innerText.slice(-1500)"}
+]

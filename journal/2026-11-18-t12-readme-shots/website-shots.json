@@ -1,0 +1,104 @@
+[
+ {
+  "wait": 6000
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.firstVisit','later'); new Promise(res=>{const r=indexedDB.open('ifizbox-altsources');r.onsuccess=()=>{const db=r.result;if(!db.objectStoreNames.contains('sources'))return res('none');const tx=db.transaction('sources','readwrite');const st=tx.objectStore('sources');const q=st.getAllKeys();q.onsuccess=()=>{const gone=q.result.filter(k=>/apptesters|ryuksign|crystall1ne|unbound/.test(k));gone.forEach(k=>st.delete(k));tx.oncomplete=()=>res(gone.join(' '))}};r.onerror=()=>res('err')})"
+ },
+ {
+  "nav": "",
+  "ms": 20000
+ },
+ {
+  "shot": "web-home"
+ },
+ {
+  "nav": "#/sources",
+  "ms": 8000
+ },
+ {
+  "shot": "web-sources"
+ },
+ {
+  "nav": "#/changes",
+  "ms": 8000
+ },
+ {
+  "shot": "web-changes"
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance",
+  "ms": 9000
+ },
+ {
+  "shot": "web-app"
+ },
+ {
+  "nav": "#/search",
+  "ms": 8000
+ },
+ {
+  "eval": "(()=>{const i=document.querySelector('.search-field input'); i.value='emulator'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"
+ },
+ {
+  "wait": 3000
+ },
+ {
+  "shot": "web-search"
+ },
+ {
+  "eval": "import('/core/installed.js').then(async m=>{const s=await m.openAppStore();const now=Date.now();const A=[['com.provenance-emu.provenance','Provenance','3.3.0','https://provenance-emu.com/apps.json','Provenance Emulator','https://raw.githubusercontent.com/Provenance-Emu/Provenance/develop/Provenance/Resources/Assets.xcassets/AppIcon.appiconset/iTunesArtwork%402x.png',3],['com.xitrix.iTorrent2','iTorrent','2.2.0','https://xitrix.github.io/iTorrent/AltStore.json','iTorrent Source','https://raw.githubusercontent.com/XITRIX/xitrix.github.io/master/icon.png',26],['com.chachirie.FlycastiOS','Flycast','1.0','https://github.com/chachillie/Flycast-iOS/raw/main/flycast-ios.json','Flycast-iOS26','https://github.com/chachillie/Flycast-iOS/raw/main/shell/linux/flycast.png',50]];for(const [id,name,version,url,sourceName,icon,h] of A) await s.put({id,name,version,key:'alt:'+url,source:'alt:'+url,sourceName,icon,date:now-h*3600e3});return 'seeded'})"
+ },
+ {
+  "nav": "#/installed",
+  "ms": 8000
+ },
+ {
+  "shot": "web-installed"
+ },
+ {
+  "clicktext": "Manage",
+  "ms": 2500
+ },
+ {"clicktext": "Provenance", "ms": 800},
+ {"clicktext": "iTorrent", "ms": 1500},
+ {
+  "shot": "web-installed-manage"
+ },
+ {
+  "nav": "#/installed/myipas",
+  "ms": 8000
+ },
+ {
+  "shot": "web-myipas"
+ },
+ {
+  "nav": "#/sources/manage",
+  "ms": 8000
+ },
+ {
+  "shot": "web-manage"
+ },
+ {
+  "nav": "#/home/settings/lightTheme",
+  "ms": 8000
+ },
+ {"clicktext": "Classic", "ms": 2500},
+ {
+  "shot": "web-theme"
+ },
+ {
+  "nav": "#/home/settings",
+  "ms": 8000
+ },
+ {
+  "shot": "web-settings"
+ },
+ {
+  "nav": "#/home/settings/signing",
+  "ms": 8000
+ },
+ {
+  "shot": "web-signing"
+ }
+]

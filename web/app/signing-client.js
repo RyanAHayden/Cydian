@@ -30,7 +30,7 @@ import { progressHUD, lockSelfUpdate, unlockSelfUpdate, TRY_AGAIN_LABEL } from "
 import { recordSelfUpdate } from "./core/selfupdate.js";
 import { showAlert } from "./nav/alert.js";
 import { NAME, GITHUB_REPO } from "./brand.js";
-import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams } from "./core/installroute.js";
+import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams, VPN_POLL, VPN_WAIT, VPN_CONNECTED, vpnReady } from "./core/installroute.js";
 
 // F151: a job's error on the progress page (the HUD interface's fail, nav/progress.js) before its alert; a HUD
 // without one (liveHUD, the tests') just goes.
@@ -321,12 +321,17 @@ export const openSigning = () => openRoute(["signing"]);
 
 // ---- Settings > Installation's route (core/installroute.js) -----------------------------------------------------
 // The bridge params one install adds for the chosen route: { route: "idevice" } (This iPhone, LocalDevVPN on and
-// paired), {} (the Signing Server), or null when the user tapped Open LocalDevVPN (the install stops; they tap it
-// again once it's on). When This iPhone can't be used, an alert says the install goes through the server. A run of
-// installs (the IPA queue, Re-sign All) asks once: the answer holds for ROUTE_HOLD ms.
+// paired), {} (the Signing Server), or null when the install was cancelled. When This iPhone can't be used, an alert
+// says the install goes through the server. A run of installs (the IPA queue, Re-sign All) asks once: the answer
+// holds for ROUTE_HOLD ms.
+// B110: Open LocalDevVPN in that alert keeps the install waiting (waitForVPN): a progress page "Waiting for
+// LocalDevVPN…" with Cancel (`hud`), or, with a `signal` (the IPA queue's row), no page of its own: onWait(text) says
+// it on the run's page and the run's Cancel aborts the signal. Once connected it goes on through This iPhone; null
+// only after Cancel.
 export const ROUTE_HOLD = 60_000;
 let heldRoute = null;
-export async function chooseRoute({ native, alert = showAlert, storage = storageOf(), now = Date.now } = {}) {
+export async function chooseRoute({ native, alert = showAlert, storage = storageOf(), now = Date.now, hud = progressHUD,
+  signal = null, onWait = null, wait = waitForVPN, later = setTimeout } = {}) {
   const choice = storedRoute(storage);
   if (choice !== "iphone") return {};
   if (heldRoute && now() - heldRoute.at < ROUTE_HOLD) return heldRoute.params;
@@ -339,7 +344,10 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
     if (a.open != null && index === a.open) {
       try { await bridge(native).call("idevice.openLocalDevVPN", {}); } catch { /* nothing to open: the alert said what to do */ }
       heldRoute = null;
-      return null;
+      if (!(await waitVPN({ native, hud, signal, onWait, wait, later }))) return null;
+      const params = routeParams({ route: "idevice" });
+      heldRoute = { at: now(), params };
+      return params;
     }
   }
   const params = routeParams(d);
@@ -347,6 +355,56 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
   return params;
 }
 export const forgetRoute = () => { heldRoute = null; };
+
+// B110: the wait itself. Its own page ends a tick after the answer, so the install's next step (a HUD opened at once)
+// carries on on the same page instead of it showing Complete first. -> true once connected.
+async function waitVPN({ native, hud, signal, onWait, wait, later }) {
+  if (signal) {
+    try { onWait?.(VPN_WAIT); } catch { /* only words */ }
+    return wait({ native, signal });
+  }
+  const h = hud(VPN_WAIT);
+  const ok = await wait({ native, signal: h.signal ?? null });
+  if (!ok || h.cancelled) return false;
+  later(() => h.done(VPN_CONNECTED), 0);
+  return true;
+}
+
+// B110: resolves true once idevice.status says this iPhone is paired with LocalDevVPN on (core/installroute.js
+// vpnReady), false when `signal` aborts. It asks every `every` ms and at once when the app comes back to the
+// foreground (visibilitychange); a failed call counts as not yet.
+export function waitForVPN({ native, signal = null, every = VPN_POLL, later = setTimeout, clear = clearTimeout, doc = globalThis.document } = {}) {
+  return new Promise((resolve) => {
+    let timer = null, busy = false, over = false;
+    const onShow = () => { if (doc?.visibilityState !== "hidden") check(); };
+    const onAbort = () => finish(false);
+    function finish(ok) {
+      if (over) return;
+      over = true;
+      if (timer != null) clear(timer);
+      timer = null;
+      doc?.removeEventListener?.("visibilitychange", onShow);
+      signal?.removeEventListener?.("abort", onAbort);
+      resolve(ok);
+    }
+    async function check() {
+      if (over || busy) return;
+      busy = true;
+      let st = null;
+      try { st = await bridge(native).call("idevice.status", {}); } catch { st = null; }
+      busy = false;
+      if (!over && vpnReady(st)) finish(true);
+    }
+    function tick() {
+      timer = null;
+      check().finally(() => { if (!over) timer = later(tick, every); });
+    }
+    if (signal?.aborted) { finish(false); return; }
+    signal?.addEventListener?.("abort", onAbort, { once: true });
+    doc?.addEventListener?.("visibilitychange", onShow);
+    timer = later(tick, every);
+  });
+}
 
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an
 // error, which an alert explains (no_server and no_identity then open Settings > Signing).
@@ -510,8 +568,10 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     if (!(await repromptPrepared(row, native))) throw Object.assign(new Error("no longer served"), { code: "gone" });
     opened = { bundleId: row.bundleId, expires: row.expires ?? null };
   } else try {
-    const route = await chooseRoute({ native });
-    if (!route) throw Object.assign(new Error("Turn LocalDevVPN on, then try again."), { code: "cancelled" });
+    // B110: Open LocalDevVPN keeps this row (and so the queue, which installs one at a time) waiting on the run's page
+    // ("vpn": core/apprun.js says "Waiting for LocalDevVPN…"); the run's Cancel or the row's stop aborts the signal
+    const route = await chooseRoute({ native, signal: signal ?? new AbortController().signal, onWait: () => progress("vpn", 0) });
+    if (!route) throw Object.assign(new Error("Cancelled"), { code: "cancelled" });
     if (route.route) host = false; // This iPhone: installd updates iFizBox in place
     opened = await abortable(native, "signing.open", { token: row.token, manifestServer: getServer(), ...(host ? { host: true } : {}), ...route },
       (ev) => { if (ev?.log) log(ev.log); }, { tag, signal });

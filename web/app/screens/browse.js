@@ -1371,6 +1371,9 @@ async function packageActions(route, button) {
       history: many ? () => go(versionsHref(route, id)) : null, ...(jbq ?? {}) })) return;
     const qid = st.ipa.bundleIdentifier || id;
     if (jbq && appQueue.get(qid)) return sheet(st.ipa.name || "", [{ label: "Clear", run: () => appQueue.clear(qid) }]);
+    // F255: Install (not installed) queues it there too and Confirm opens, as a row's Install does; an app with no IPA
+    // the helper can install (a source-signed link) keeps the first row's one tap below.
+    if (jbq && appJob(pkg, { version: v?.version ?? null })) return jbq.install(v);
     const { rows, options } = rowsOf(v);
     if (rows[0] && rows[0].label !== "Download IPA") return rows[0].onClick();
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });

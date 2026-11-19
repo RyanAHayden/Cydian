@@ -35,6 +35,7 @@ import { withAppUpgrades } from "../app-updates.js";
 import { appJob, resignJob } from "../core/appqueue.js";
 import { needsResign, resignWindow } from "../core/signing.js";
 import { vendorSoldIds } from "./extras.js";
+import { SELF_ID } from "../core/essential.js";
 
 export const title = "Changes";
 
@@ -147,6 +148,38 @@ export async function upgradeEverything() {
   const holds = settings.holds.list();
   const u = await withAppUpgrades(await upgradesWithSelf(await catalog.upgrades(holds)), holds);
   return queueAll(u.available, await resignNow(u)); // F91: and the apps that need a re-sign
+}
+
+// B44: the "iFizBox X is out." banner's Upgrade (essential-ui.js bannerOnce). Queues iFizBox's own upgrade alone, as
+// its Changes row would be queued, and Confirm opens: jailbreak apt's com.ryha.ifizbox row through the install queue
+// (initQueue's add opens Confirm), sideload its IPA through the app queue (queueApp opens openAppConfirm). It waits for
+// the catalog (up to `wait` ms); with no row by then (not loaded, apt's repo not refreshed yet, ignored) it opens
+// Changes instead. -> "queued" | "changes".
+export async function upgradeSelf({ mode = detectMode(), upgrades = null, queue = queueFn, add = null, pkgOf = null, wait = 20000,
+  changes = () => { location.hash = "#/changes"; } } = {}) {
+  upgrades ??= () => selfUpgrades(mode);
+  let u = null;
+  let timer = 0;
+  try {
+    u = await Promise.race([upgrades(), new Promise((r) => { timer = setTimeout(() => r(null), wait); })]);
+  } catch { u = null; } finally { clearTimeout(timer); }
+  const row = (u?.available ?? []).find((r) => r?.id === SELF_ID);
+  let jobs = [];
+  if (row && mode === "jailbreak") jobs = upgradeAll(queue(), [row]); // queueFn: null without a backend queue
+  else if (row && mode === "sideload") jobs = await queueUpgrades([row], { add, ...(pkgOf ? { pkgOf } : {}) });
+  if (jobs.length) return "queued";
+  changes();
+  return "changes";
+}
+
+// The upgrades Changes lists, for upgradeSelf: sideload's iFizBox row is upgradesWithSelf's, read with or without the
+// catalog; the jailbreak row is apt's.
+async function selfUpgrades(mode) {
+  const holds = settings.holds.list();
+  const none = { available: [], ignored: [] };
+  if (mode === "sideload") return upgradesWithSelf(await catalog.ensure().then(() => catalog.upgrades(holds)).catch(() => none));
+  await catalog.ensure();
+  return catalog.upgrades(holds);
 }
 
 export async function queueUpgrades(available = [], { pkgOf = (id) => catalog.package(id), add = null } = {}) {

@@ -231,6 +231,7 @@ const RECENT_SEARCHES_KEY = PREFIX + "recentSearches";
 const HIDDEN_AUTHORS_KEY = PREFIX + "hiddenAuthors";
 const BLOCKED_KEY = PREFIX + "blockedPackages";
 const BLOCK_HOLDS_KEY = PREFIX + "blockHolds";
+const APP_HOLDS_KEY = PREFIX + "appHolds"; // B69: apps' Ignore Upgrades in the jailbreak app (no dpkg hold)
 
 // F100: Search's Recent table (from Zebra): the last RECENT_MAX queries, newest first, no duplicates (a query
 // already there moves to the top; case and surrounding spaces don't make a new one). Pure, for the tests.
@@ -374,7 +375,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
 
   function writeHolds(list) {
     store.set(HOLDS_KEY, JSON.stringify(list));
-    notify("holds", list);
+    notify("holds", holds.list());
   }
   const dpkg = mode === "jailbreak" && typeof helper === "function" ? helper : null;
   async function run(words) {
@@ -386,12 +387,25 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
   // Ignore upgrades, per package, on the device. In jailbreak mode with a helper the real hold is dpkg's
   // (apt-mark hold/unhold through ifizbox-helper, F22); this list is then the cache the row shows, set at once and
   // put right by `sync()` (apt-mark showhold) when the helper fails or something else changed the holds.
+  // B69: an app's Ignore Upgrades (no dpkg package to hold: { dpkg: false }) is kept on the device beside dpkg's list,
+  // which sync() never touches; list() and has() see both.
+  const readAppHolds = () => {
+    try { const l = JSON.parse(store.get(APP_HOLDS_KEY) || "[]"); return Array.isArray(l) ? l.filter((p) => typeof p === "string") : []; } catch { return []; }
+  };
   const holds = {
-    list: () => readHolds().sort(),
-    has: (pkg) => readHolds().includes(pkg),
+    list: () => [...new Set([...readHolds(), ...readAppHolds()])].sort(),
+    has: (pkg) => readHolds().includes(pkg) || readAppHolds().includes(pkg),
     // Resolves to true once the hold is in place (at once without a helper), false when dpkg refused it; the list
     // then shows dpkg's holds again (or the old list if showhold failed too).
-    async set(pkg, on) {
+    async set(pkg, on, { dpkg: viaDpkg = true } = {}) {
+      const app = readAppHolds();
+      if (!viaDpkg || (!on && app.includes(pkg) && !readHolds().includes(pkg))) {
+        const next = new Set(app);
+        if (on) next.add(pkg); else next.delete(pkg);
+        if (next.size) store.set(APP_HOLDS_KEY, JSON.stringify([...next].sort())); else store.remove(APP_HOLDS_KEY);
+        notify("holds", holds.list());
+        return true;
+      }
       const before = readHolds().sort();
       const list = new Set(before);
       if (on) list.add(pkg); else list.delete(pkg);
@@ -414,7 +428,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
       if (!dpkg) return holds.list();
       const { stdout = "" } = await run(["showhold"]);
       const held = [...new Set(String(stdout).split("\n").map((l) => l.trim()).filter((l) => l))].sort();
-      if (JSON.stringify(held) !== JSON.stringify(holds.list())) writeHolds(held);
+      if (JSON.stringify(held) !== JSON.stringify(readHolds().sort())) writeHolds(held);
       return held;
     },
   };

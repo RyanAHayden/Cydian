@@ -96,7 +96,11 @@ test("F134: the Signing page's groups, in order, for each build and state", asyn
   assert.deepEqual(signingLayout({ mode: "sideload", staged: true, options: true }), ["certificate", "files", "options", "server", "status", "remove", "help"]);
   // the website: no options, server or Signed Apps; Install iFizBox App once the certificate works
   assert.deepEqual(signingLayout({ mode: "site", certificate: true, profile: true, ready: true }), ["certificate", "profile", "app", "other", "remove", "help"]);
-  assert.deepEqual(signingLayout({ mode: "site" }), ["certificate", "other", "help"]);
+  // F254j: no certificate on the website: Use a Free Apple ID before the walkthrough's link; never in the app builds
+  assert.deepEqual(signingLayout({ mode: "site" }), ["certificate", "other", "free", "help"]);
+  assert.ok(signingLayout({ mode: "site", staged: true }).includes("free"));
+  assert.ok(!signingLayout({ mode: "sideload" }).includes("free"));
+  assert.ok(!signingLayout({ mode: "jailbreak" }).includes("free"));
   // each layout is in SIGNING_GROUPS order with no group twice
   for (const l of [signingLayout({ mode: "sideload", certificate: true, staged: true, profile: true, options: true }), signingLayout({ mode: "site", staged: true })]) {
     assert.deepEqual(l, SIGNING_GROUPS.filter((g) => l.includes(g)));

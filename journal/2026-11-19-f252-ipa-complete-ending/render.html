@@ -1,0 +1,20 @@
+<!doctype html>
+<!-- F252: the IPA install's Complete page as the app and the website end it, for a 3x render.
+     Serve the repo root and open /journal/2026-11-19-f252-ipa-complete-ending/render.html (?help=0: no help line). -->
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<link rel="stylesheet" href="/web/app/style.css"><link rel="stylesheet" href="/web/app/ios6.css">
+<link rel="stylesheet" href="/web/app/packages.css"><link rel="stylesheet" href="/web/app/queue.css"><link rel="stylesheet" href="/web/app/progress.css">
+</head><body>
+<script type="module">
+import { progressHUD } from "/web/app/nav/progress.js";
+import { installSteps } from "/web/app/signing-client.js";
+import { notLandedText } from "/web/app/core/signing.js";
+import { openAppHelp } from "/web/app/screens/guides.js";
+const q = new URLSearchParams(location.search);
+const h = progressHUD("Preparing");
+for (const t of ["Downloading", "Signing", "Uploading", "Installing", ...installSteps("Delta")]) h.set(t);
+const cause = q.get("help") === "0" ? null : notLandedText("Delta", { state: "unknown", count: 2 });
+if (cause) h.page.help(cause, { action: openAppHelp });
+h.done(installSteps("Delta")[2]);
+setTimeout(() => { document.title = "ready"; }, 600);
+</script></body></html>

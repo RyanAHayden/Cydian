@@ -125,7 +125,7 @@ test("Install: inspect, the sheet's edits, signing.install {token, ...edits}, th
   assert.deepEqual(installed, [{ bundleId: "com.me.delta", name: "Delta 2" }]);
   // let the progress call finish (after() runs it without awaiting)
   for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
-  assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Signing 30%", "Installing", "Done"]);
+  assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Signing 30%", "Installing", "Sent to iOS. Press Home to watch it install."]);
   assert.equal(ui.timers.length, 1); // the HUD goes a moment after Done
 });
 
@@ -181,7 +181,7 @@ test("followInstall: once iOS has the link the page says Done and ends on Return
   const native = { async call() { assert.fail("iOS's install isn't followed"); } };
   assert.equal(await followInstall(native, "com.a", progressHUD("Installing", { open: () => page }), { later: () => assert.fail("no timer") }), null);
   assert.equal(page.title, "Complete");
-  assert.equal(page.finished.status, "Done");
+  assert.equal(page.finished.status, "Sent to iOS. Press Home to watch it install."); // F252
   assert.equal(page.finished.label, "Return to iFizBox"); // B45/B67: a normal app's install says Return to iFizBox
   page.close(); // else the next job continues on this page (progressHUD)
   const own = fakePage();

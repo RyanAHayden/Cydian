@@ -41,6 +41,15 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M13 1.5L25 24H1z' fill='%23ffcc00' stroke='%23ffcc00' stroke-linejoin='round' stroke-width='2'/%3E%3Cpath d='M13 9v7' stroke='%23000' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='13' cy='20.2' r='1.7'/%3E%3C/svg%3E");
 }
 
+/* F252: page.help's line (the IPA install's "Not on the Home Screen?"): grey Helvetica Neue, a black-bar button at
+   the right, set off from the steps above */
+.pl-help {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px;
+  font: 13px/17px "Helvetica Neue", Helvetica, sans-serif; color: #a9a9a9; white-space: normal;
+}
+.pl-help-text { flex: 1; min-width: 0; }
+.pl-help .bar-button { flex: none; }
+
 /* a terminal's block cursor under the last line while it runs (opacity only). steps(1, end) on opacity blinks in the
    app on iOS 15 (R18, iPhone 7, journal/2026-11-18-r18-cursor-blink): it doesn't need ios6.css's hold keyframes. */
 .progress-cursor {

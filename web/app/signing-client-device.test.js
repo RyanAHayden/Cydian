@@ -168,7 +168,7 @@ test("Install: the real followInstall ends on Done once iOS has the link, withou
   assert.equal(await installOnDevice({ url: "https://e.example/x.ipa", name: "X" }, { native: n, ...ui.deps, hud }), true);
   for (let i = 0; i < 20 && !finished.length; i++) await new Promise((r) => setTimeout(r, 0));
   assert.deepEqual(n.calls.map((c) => c.method), ["signing.install"]);
-  assert.equal(finished[0]?.status, "Done");
+  assert.equal(finished[0]?.status, "Sent to iOS. Press Home to watch it install."); // F252
   assert.equal(ui.hidden, 0);
 });
 

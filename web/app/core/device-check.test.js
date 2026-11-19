@@ -4,8 +4,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  parseProfile, phoneFromDevices, deviceCheck, deviceCheckText, notInProfileText, likelyCauseText, unknownDeviceText,
-  deviceSummary, deviceError, IN_PROFILE_TEXT, UDID_HOW,
+  parseProfile, phoneFromDevices, deviceCheck, deviceCheckText, notInProfileText, unknownDeviceText,
+  deviceSummary, deviceError, IN_PROFILE_TEXT, UDID_HOW, notLandedText, NOT_LANDED_TEXT, SENT_TO_IOS,
 } from "./signing.js";
 
 const SEVEN = "cb21a7f0caffd4807d41e713456f134cc958b076"; // the iPhone 7's, as its helper reads it
@@ -103,11 +103,11 @@ test("the sentences", () => {
   assert.match(unk.text, /4 devices/);
 });
 
-test("an install that didn't land names the likely cause first, with the steps", () => {
-  const t = likelyCauseText({ count: 2 });
-  assert.match(t, /^The likely cause: this iPhone isn't in the provisioning profile \(it lists 2 devices\)\./);
-  assert.ok(t.endsWith(UDID_HOW));
-  assert.match(likelyCauseText({ udid: SEVEN }), new RegExp(`Add its UDID ${SEVEN} to the developer account`));
+test("an install nobody could check ends on the short help line; the UDID steps live in the guide", () => {
+  assert.equal(NOT_LANDED_TEXT, "Not on the Home Screen?");
+  for (const state of ["unknown", "out"]) assert.equal(notLandedText("Foo", { state, count: 2 }), NOT_LANDED_TEXT, state);
+  for (const c of [{ state: "in", count: 2 }, { state: "skip", count: 0 }, null]) assert.equal(notLandedText("Foo", c), null);
+  assert.equal(SENT_TO_IOS, "Sent to iOS. Press Home to watch it install.");
 });
 
 test("Settings > Signing: signing.status's profile.device as the page's line", () => {

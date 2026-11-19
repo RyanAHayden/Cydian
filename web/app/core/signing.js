@@ -764,7 +764,7 @@ export function needsResign(installed, { now = new Date(), window = RESIGN_WINDO
 //                                    profile: parseProfile's { udids, allDevices } or { udids, devices } (-1: all)
 //   deviceCheckText(check)           { ok: true | false | null, text, udid } for Settings > Signing; null for "skip"
 //   notInProfileText(udid)           the sentence an install fails with when this phone isn't in the profile
-//   likelyCauseText({ count, udid }) the first thing an install that didn't land says, when the check couldn't run
+//   notLandedText(app, check)        the grey help line under an IPA install's last step, when the check couldn't run
 
 export const UDID_HOW = "To find the UDID, plug the iPhone into a Mac and click the line under its name in Finder, "
   + "or run idevice_id -l on a computer it's plugged into.";
@@ -775,12 +775,6 @@ export const notInProfileText = (udid) => (udid
 export const unknownDeviceText = (count) => `This iPhone's UDID can't be read here, so it can't be checked against the `
   + `profile's ${plural(count, "device")}. If installs fail with "integrity could not be verified", add the UDID to the `
   + `developer account, then make the profile again. ${UDID_HOW}`;
-export function likelyCauseText({ count = 0, udid = null } = {}) {
-  const list = count > 0 ? ` (it lists ${plural(count, "device")})` : "";
-  return `The likely cause: this iPhone isn't in the provisioning profile${list}. Add its UDID${udid ? ` ${udid}` : ""} to the `
-    + `developer account, make the profile again and import it in Settings > Signing.${udid ? "" : ` ${UDID_HOW}`}`;
-}
-
 // UDIDs compare without case or spaces: the 40-hex ones are often written in capitals, the newer 8-16 ones in either.
 export const normalUdid = (s) => String(s ?? "").trim().toUpperCase();
 
@@ -819,13 +813,17 @@ export function deviceCheckText(check) {
   return { ok: null, text: unknownDeviceText(Number(c.count) || 0), udid: null };
 }
 
-// An install handed to iOS whose landing nobody could check (the website, where no UDID can be read; the app when
-// its check came out "unknown"): the line the progress page adds under Done, the likely cause first. null when the
-// profile isn't limited by device or the phone is known to be in it.
-export function notLandedText(app, check) {
+// An IPA install handed to iOS (F252): the last step says so, short; whether it lands is on the Home Screen.
+export const SENT_TO_IOS = "Sent to iOS. Press Home to watch it install.";
+// Where an install whose landing nobody could check (the website, where no UDID can be read; the app when its check
+// came out "unknown", or "out") ends: one grey line under the last step with a Help button (nav/progress.js
+// page.help) that opens Guides > FAQ > "An app won't install" (screens/guides.js APP_HELP), which explains the UDID in
+// the profile. null when the profile isn't limited by device or the phone is known to be in it. `app` is unused (kept
+// for the callers' shape).
+export const NOT_LANDED_TEXT = "Not on the Home Screen?";
+export function notLandedText(_app, check) {
   if (!check || check.state === "skip" || check.state === "in") return null;
-  return `If ${app || "the app"} doesn't appear on the Home Screen, or iOS says its integrity could not be verified: `
-    + likelyCauseText({ count: Number(check.count) || 0, udid: check.udid ?? null });
+  return NOT_LANDED_TEXT;
 }
 
 // ---- F244: Home's certificate-expiry warning (sideload build) -----------------------------------------------------

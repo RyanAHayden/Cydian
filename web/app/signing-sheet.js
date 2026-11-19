@@ -22,12 +22,12 @@ import { grouped, el, row } from "./nav/ui.js";
 import { format, settingsRoute } from "./router.js";
 import { installOnDevice, openSigning } from "./signing-client.js";
 import { createSwitch } from "./screens/settings.js";
-import { phaseLabel, deviceError, inspectGroups, installParams, installedId, signsAsFor, isCgBI, fromBase64, notLandedText } from "./core/signing.js";
+import { phaseLabel, deviceError, inspectGroups, installParams, installedId, signsAsFor, isCgBI, fromBase64, notLandedText, SENT_TO_IOS } from "./core/signing.js";
 import { NAME } from "./brand.js";
 import { selfLevels } from "./core/progress.js";
 import { lockSelfUpdate } from "./nav/progress.js";
 import { storedKeep, withKeep, sheetNotes, originalState, OLD_WAY_ALERT, OLD_WAY_TEXT, GUIDE_LINK } from "./core/keepid.js";
-import { keepGuideHref } from "./screens/guides.js";
+import { keepGuideHref, openAppHelp } from "./screens/guides.js";
 
 const ICON_SIZE = 180; // the 60pt @3x icon; the signer writes the same PNG as @2x and @3x
 
@@ -155,15 +155,16 @@ export function signSheetButtons({ right, box, onInstall, onCancel, doc = docume
 // signing.progress, which could sit on "iOS has the whole IPA" long after the app was in.
 // The button is Close (progressHUD's).
 // B49: for iFizBox itself it ends locked on "Closing iFizBox" (nav/progress.js lockSelfUpdate) until iOS closes it.
-// F236: `device` (signing.install's, or signing.status's profile.device): when the shell couldn't tell whether this
-// iPhone is in the profile, the page's last line says that is the likely cause if the app doesn't appear.
-export async function followInstall(_native, bundleId, h, { later = setTimeout, name = "", device = null } = {}) {
+// F236/F252: `device` (signing.install's, or signing.status's profile.device): when the shell couldn't tell whether
+// this iPhone is in the profile, a grey "Not on the Home Screen?" line with Help (page.help; `help(page)` opens
+// Guides > "An app won't install") goes under the last step. No Retry: iOS already has the app.
+export async function followInstall(_native, bundleId, h, { later = setTimeout, name = "", device = null, help = openAppHelp } = {}) {
   const own = selfLevels([bundleId]).length > 0;
   if (own && typeof h.finish === "function") { lockSelfUpdate(h, { later }); return null; }
-  h.set("Done");
+  h.set(SENT_TO_IOS);
   const cause = notLandedText(name, device);
-  if (cause) h.page?.line?.("warning", cause);
-  if (typeof h.finish === "function") h.finish({ status: "Done" });
+  if (cause) h.page?.help?.(cause, { action: help });
+  if (typeof h.finish === "function") h.finish({ status: SENT_TO_IOS });
   else later(h.hide, 1200);
   return null;
 }

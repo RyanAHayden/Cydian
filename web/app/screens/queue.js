@@ -120,10 +120,16 @@ export function modal({ title, left = null, right = null, cls = "" }) {
 
 // ---- Confirm ---------------------------------------------------------------------------------------------------
 
+// F218: Confirm's Cancel (it clears the queue) is the red bar button (ios6.css .bar-button.red, user 2026-11-18), on
+// both Confirm sheets (packages and apps). Nowhere else uses it.
+export function confirmCancel() {
+  return barButton("Cancel", "red");
+}
+
 function openConfirm() {
   if (confirm || running) { confirm?.refresh(); return; }
   if (!installQueue.size) return;
-  const cancel = barButton("Cancel");
+  const cancel = confirmCancel();
   const ok = barButton("Confirm", "done");
   ok.hidden = true;
   const m = modal({ title: "Confirm", left: cancel, right: ok, cls: "confirm-sheet" });
@@ -371,7 +377,7 @@ export function queueApp(job, { queue = appQueue, open = openAppConfirm } = {}) 
 export function openAppConfirm(queue = appQueue) {
   if (appConfirm) { appConfirm.refresh(); return; }
   if (!queue.size) return;
-  const cancel = barButton("Cancel");
+  const cancel = confirmCancel();
   const ok = barButton("Confirm", "done");
   const m = modal({ title: "Confirm", left: cancel, right: ok, cls: "confirm-sheet" });
   // A Clear (here or on an app page's Modify) or a run's progress redraws it; an add redraws it through queueApp.

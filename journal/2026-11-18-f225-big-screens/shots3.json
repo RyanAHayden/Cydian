@@ -1,0 +1,14 @@
+[
+  {"wait": 3000},
+  {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
+  {"nav": "#/sources", "ms": 6000},
+  {"clicktext": "iFizBox", "ms": 4000},
+  {"clicktext": "All Apps", "ms": 4000},
+  {"shot": "applist"},
+  {"eval": "(()=>{const e=document.querySelector('.tab-stack.is-active .page.is-top .pkg-row a, .tab-stack.is-active .page.is-top .pkg-row .cell-inner'); if(!e) return 'none'; e.click(); return 'ok'})()"},
+  {"wait": 5000},
+  {"shot": "package"},
+  {"nav": "#/home", "ms": 4000},
+  {"clicktext": "Browse", "ms": 6000},
+  {"shot": "browse"}
+]

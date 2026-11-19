@@ -258,3 +258,21 @@ test("runAppQueueRun: the Signing walkthrough first; then the queued jobs to the
   deps.onClose();
   assert.equal(appQueueRunning(), false);
 });
+
+test("F247: a one-app run opens on the Log; two apps open on the Apps list", () => withDom(async () => {
+  const one = setup([app("a", "Alpha")]);
+  const doneOne = runAppRun(one.queue.list(), { queue: one.queue, lanes: one.l, open: () => one.page });
+  assert.equal(one.page.views[0], "log");
+  assert.equal(one.page.selected, 1);
+  await settle();
+  await one.l.release("a");
+  await doneOne;
+  const two = setup([app("a", "Alpha"), app("b", "Beta")]);
+  const doneTwo = runAppRun(two.queue.list(), { queue: two.queue, lanes: two.l, open: () => two.page });
+  assert.equal(two.page.views[0], "pane");
+  assert.equal(two.page.selected, 0);
+  await settle();
+  await two.l.release("a");
+  await two.l.release("b");
+  await doneTwo;
+}));

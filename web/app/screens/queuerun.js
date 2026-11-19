@@ -1,7 +1,7 @@
 // F234: the install queue's run where one failure doesn't stop the rest (the brain is core/installrun.js), on the
 // black progress page (nav/progress.js) with Packages | Log in its nav bar (user 2026-11-18, mockup in the plan):
 //
-//   Packages (the default): one row per package apt's plan changes, in the dpkg lane's order: its name, a grey line
+//   Packages (the default; a run of one package opens on the Log instead): one row per package apt's plan changes, in the dpkg lane's order: its name, a grey line
 //     (Waiting / Downloading 1.2 of 4.0 MB / Waiting to install / Installing / Installed / Failed: why / Needs X,
 //     which failed / Cancelled), an iOS 6 progress bar while it downloads, and a stop button until dpkg takes it.
 //     Tapping a failed row retries it; a skipped one retries what it needs, then it; any other row opens the Log
@@ -21,7 +21,7 @@
 // What installed leaves the queue as it goes; what failed or was skipped stays queued, so Confirm shows it again.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "../nav/ui.js";
-import { openProgress } from "../nav/progress.js";
+import { openProgress, openOn } from "../nav/progress.js";
 import { showAlert } from "../nav/alert.js";
 import { classify, chooseFinish, selfLevels } from "../core/progress.js";
 import { runRows, neededBy, createInstallRun, rowStatus, summaryLine, runStatus, runPercent, ended } from "../core/installrun.js";
@@ -101,7 +101,7 @@ export async function runQueue({ jobs, plan }, deps) {
   const seg = page.segmented(["Packages", "Log"], (i) => {
     if (i === 0) { page.filter(null); page.view("pane"); } else page.view("log");
   });
-  page.view("pane");
+  openOn(page, seg, rows.length); // F247: one package opens on the Log
   const showLog = (pkg) => { seg.select(1); page.filter(pkg); page.view("log"); };
 
   const views = new Map();

@@ -144,3 +144,19 @@ test("a row's tap opens the Log filtered to its package; a failed row's tap retr
   for (let i = 0; i < 20 && s.calls.logs.length < 2; i++) await settle();
   assert.deepEqual(s.calls.install.map(([id]) => id), ["other", "lib", "tweak"]);
 }));
+
+test("F247: a one-package run opens on the Log; two or more open on the Packages list", () => withDom(async () => {
+  const one = setup();
+  const onePlan = parseSimulation("Inst other (1.0 R [a])");
+  await runQueue({ jobs: [jobs[1]], plan: onePlan }, { backend: one.backend, catalog: one.catalog, queue: one.queue, runLogs: one.runLogs, open: () => one.page });
+  assert.equal(one.page.views[0], "log");
+  assert.equal(one.page.selected, 1);
+  // Packages still works from the tab
+  one.page.seg.onPick(0);
+  assert.equal(one.page.views.at(-1), "pane");
+  const two = setup({ badLib: false });
+  const twoPlan = parseSimulation("Inst tweak (1.0 R [a])\nInst other (1.0 R [a])");
+  await runQueue({ jobs, plan: twoPlan }, { backend: two.backend, catalog: two.catalog, queue: two.queue, runLogs: two.runLogs, open: () => two.page });
+  assert.equal(two.page.views[0], "pane");
+  assert.equal(two.page.selected, 0);
+}));

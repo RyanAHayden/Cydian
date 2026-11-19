@@ -1,7 +1,7 @@
 // F151: progressHUD, the HUD interface on the progress page (the sideload IPA's and the website's installs).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { progressHUD } from "./progress.js";
+import { progressHUD, startView, openOn } from "./progress.js";
 
 function fakePage() {
   const p = {
@@ -90,4 +90,19 @@ test("progressHUD (B27): two jobs on one page: it completes when the last one en
   a.finish({ label: "Open A", status: "Installed" });
   assert.deepEqual(page.calls.at(-1), ["finish", "Open A", "Installed"]);
   page.close();
+});
+
+test("F247: startView: one item opens on the Log, none or two or more on the rows list; openOn selects the tab", () => {
+  assert.equal(startView(1), "log");
+  assert.equal(startView(2), "pane");
+  assert.equal(startView(5), "pane");
+  assert.equal(startView(0), "pane");
+  const views = [];
+  const picked = [];
+  const page = { view: (v) => views.push(v) };
+  const seg = { select: (i) => picked.push(i) };
+  assert.equal(openOn(page, seg, 1), "log");
+  assert.equal(openOn(page, seg, 3), "pane");
+  assert.deepEqual(views, ["log", "pane"]);
+  assert.deepEqual(picked, [1, 0]);
 });

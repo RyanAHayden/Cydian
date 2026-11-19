@@ -121,8 +121,9 @@ export function libraryJob(entry, { installed = false } = {}) {
   if (Array.isArray(o.removeExtensions) && o.removeExtensions.length) edits.removeExtensions = [...o.removeExtensions];
   if (typeof o.fixArm64e === "boolean") edits.fixArm64e = o.fixArm64e;
   // F237: Sign Options saved before Keep Bundle IDs signed the old way and say so (false); otherwise the global
-  // setting decides (signing-client.js withKeep)
-  if (o.keepBundleId === false) edits.keepBundleId = false;
+  // setting decides (signing-client.js withKeep). F243: the Sign Options page's switch (true or false) goes as it is;
+  // null (no Sign Options saved) leaves it to the global setting.
+  if (typeof o.keepBundleId === "boolean") edits.keepBundleId = o.keepBundleId;
   const id = edits.bundleId || entry.bundleId || `library:${entry.file}`;
   const version = entry.version || null;
   const icon = edits.icon || entry.icon || null;

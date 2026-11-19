@@ -52,6 +52,7 @@ import { NAME } from "../brand.js";
 import { serverReachable } from "../signing-client.js";
 import { libraryJob } from "../core/appqueue.js";
 import { queueApp } from "./queue.js";
+import { storedKeep, originalState, originalNote, OLD_WAY_ALERT, OLD_WAY_TEXT } from "../core/keepid.js";
 
 export { MYIPAS };
 
@@ -1013,7 +1014,8 @@ function markDelete(body) {
   last?.querySelector(".cell-inner")?.classList.add("myipa-delete");
 }
 
-const optionsChanged = (o) => Boolean(o && (o.name || o.bundleId || o.icon || o.removeExtensions?.length || o.fixArm64e === false));
+const optionsChanged = (o) => Boolean(o && (o.name || o.bundleId || o.icon || o.removeExtensions?.length || o.fixArm64e === false
+  || o.keepBundleId === false)); // F243: the old way (or Sign Options saved before Keep Bundle IDs)
 
 function rerender(body, route) {
   if (!body?.isConnected) return; // F208: a hold's Sign Now from the list has no page to redraw
@@ -1162,7 +1164,8 @@ async function renderOptions(body, route, file) {
   }
   const o = entry.options ?? {};
   const ed = { name: o.name || "", bundleId: o.bundleId || "", icon: o.icon || null,
-    removeExtensions: [...(o.removeExtensions ?? [])], fixArm64e: o.fixArm64e !== false };
+    removeExtensions: [...(o.removeExtensions ?? [])], fixArm64e: o.fixArm64e !== false,
+    keepBundleId: keepStart(o) }; // F243
   edits.set(file, { entry, ed });
   const { iconPNG } = await import("../signing-sheet.js");
   const { createSwitch } = await import("./settings.js");
@@ -1248,13 +1251,53 @@ async function renderOptions(body, route, file) {
   aul.append(ali);
   ag.append(aul, el("p", "group-footer", "Mends binaries built for the old arm64e ABI so they run on newer iPhones. Leave it on unless an app won't open."));
   body.append(ag);
+
+  // F243: Keep Bundle ID, as Custom Install's (signing-sheet.js): starts as this IPA's saved choice, else Settings >
+  // Signing's; turning it off says what the old way does first; the footer warns when the original is on the phone.
+  const kg = el("div", "group");
+  const kul = el("ul", "table grouped");
+  const kli = el("li", "cell");
+  const kinner = el("div", "cell-inner has-switch");
+  const kfoot = el("p", "group-footer", "");
+  let orig = { installed: false, ours: false };
+  const drawKeep = () => { kfoot.textContent = keepFooter(entry, ed, orig); };
+  kinner.append(el("span", "cell-label", "Keep Bundle ID"), createSwitch({ label: "Keep Bundle ID", checked: ed.keepBundleId, onToggle: async (on) => {
+    if (!on) {
+      const { index } = await showAlert({ title: OLD_WAY_ALERT.title, message: OLD_WAY_TEXT(ed.name || entry.name, ""),
+        buttons: OLD_WAY_ALERT.buttons, cancel: 0 });
+      if (index !== 1) { kinner.querySelector?.(".switch")?.setAttribute("aria-checked", "true"); return; }
+    }
+    ed.keepBundleId = on;
+    drawKeep();
+  } }));
+  kli.append(kinner);
+  kul.append(kli);
+  kg.append(kul, kfoot);
+  body.append(kg);
+  drawKeep();
+  originalState(globalThis.ifizboxNative, entry.bundleId).then((s) => { orig = s; if (kfoot.isConnected) drawKeep(); }, () => {});
+}
+
+// F243: the Sign Options page's Keep Bundle ID at first: the IPA's saved choice (library.options keepBundleId; null
+// when none was saved), else Settings > Signing's Keep Bundle IDs.
+export const keepStart = (o, keep = storedKeep()) => (typeof o?.keepBundleId === "boolean" ? o.keepBundleId : keep);
+
+// Its footer: what the switch does now, and, while the ID is kept, the original on the phone (core/keepid.js
+// originalNote) when the user typed no other bundle ID.
+export function keepFooter(entry, ed, orig = { installed: false, ours: false }) {
+  const name = String(ed?.name ?? "").trim() || entry?.name || "";
+  if (!ed?.keepBundleId) return OLD_WAY_TEXT(name, "");
+  const own = !String(ed?.bundleId ?? "").trim() || String(ed.bundleId).trim() === entry?.bundleId;
+  const note = own ? originalNote(name, orig) : null;
+  return note ? note.text : "The app keeps its own ID: it replaces the original and can get its notifications. Settings > Signing's Keep Bundle IDs decides for IPAs without Sign Options.";
 }
 
 async function saveOptions(file) {
   const cur = edits.get(file);
   if (!cur) return;
   let params;
-  try { params = optionsParams(cur.entry, cur.ed); } catch (e) {
+  // F243: the Keep Bundle ID switch is saved as it stands (library.options keepBundleId)
+  try { params = { ...optionsParams(cur.entry, cur.ed), keepBundleId: cur.ed.keepBundleId !== false }; } catch (e) {
     await showAlert({ title: "Can't Save", message: e.message, buttons: ["OK"] });
     return;
   }

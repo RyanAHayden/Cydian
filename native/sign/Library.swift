@@ -154,6 +154,17 @@ struct IPALibrary {
         return SignOptions(s)
     }
 
+    // F243: whether the user saved Sign Options for this IPA (library.options). Without, Keep Bundle IDs is the
+    // global setting the page sends (`keep`); with, the file's own switch (nil in one saved before F237: the old way).
+    func hasOptions(_ file: String) -> Bool { FileManager.default.fileExists(atPath: side(file, ".options.json").path) }
+
+    // The options a sign of this IPA uses: its own, or the defaults with Keep Bundle IDs as `keep` (nil: on).
+    func options(_ file: String, keep: Bool?) -> SignOptions {
+        var o = options(file)
+        if !hasOptions(file), let k = keep { o.keepBundleID = k }
+        return o
+    }
+
     // Keeps the options; a signed copy made with others no longer counts, so it goes.
     func setOptions(_ file: String, _ o: SignOptions) throws {
         _ = try url(file)
@@ -170,12 +181,12 @@ struct IPALibrary {
     }
 
     // The signed copy while it still fits (above); nil otherwise. `certificate`: the DER in use (nil: none, so no
-    // copy counts).
-    func signed(_ file: String, certificate: Data?, now: Date = Date()) -> Signed? {
+    // copy counts). F243: `keep`, the global Keep Bundle IDs (options(_:keep:)): a copy signed the other way doesn't count.
+    func signed(_ file: String, certificate: Data?, now: Date = Date(), keep: Bool? = nil) -> Signed? {
         guard let cert = certificate, let s = rawSigned(file), let u = try? url(file) else { return nil }
         let (size, modified) = stat(u)
         guard s.sourceSize == size, IPALibrary.same(s.sourceModified, modified), s.certificate == IPALibrary.hex(sha1(cert)),
-              s.options == options(file).stored else { return nil }
+              s.options == options(file, keep: keep).stored else { return nil }
         if let x = s.expires, x <= now { return nil }
         return s
     }
@@ -186,13 +197,14 @@ struct IPALibrary {
     }
 
     // Signs the IPA with its Sign Options into the signed copy (replacing any earlier one). Offline: nothing leaves
-    // the phone. `expires`: the signature's end (the certificate's or the profile's, the earlier).
+    // the phone. `expires`: the signature's end (the certificate's or the profile's, the earlier). F243: `keep`, the
+    // global Keep Bundle IDs, for an IPA without Sign Options of its own (options(_:keep:)).
     @discardableResult
     func sign(_ file: String, signer: IPASigner, certificate: Data, expires: Date?, work: URL,
-              progress: ((String, Double) -> Void)? = nil) throws -> Signed {
+              progress: ((String, Double) -> Void)? = nil, keep: Bool? = nil) throws -> Signed {
         let u = try url(file)
         let (size, modified) = stat(u)
-        let opts = options(file)
+        let opts = options(file, keep: keep)
         signer.options = opts
         let tmp = work.appendingPathComponent("lib-\(UUID().uuidString).ipa")
         defer { try? FileManager.default.removeItem(at: tmp) }
@@ -238,7 +250,9 @@ struct IPALibrary {
     // ---- for the page
 
     // One IPA as library.list hands it to the page (web/app/core/myipas.js reads it).
-    func json(_ file: String, certificate: Data?, now: Date = Date()) -> [String: Any] {
+    // F243: options.keepBundleId is null without Sign Options of its own (the global setting decides); `keep` is that
+    // setting, for whether the signed copy counts.
+    func json(_ file: String, certificate: Data?, now: Date = Date(), keep: Bool? = nil) -> [String: Any] {
         guard let d = try? details(file) else { return ["file": file, "error": "gone"] }
         let iso = ISO8601DateFormatter()
         var j: [String: Any] = ["file": file, "name": d.name, "bundleId": d.bundleID, "version": d.version, "size": d.size,
@@ -247,8 +261,9 @@ struct IPALibrary {
                                 "icon": d.icon?.base64EncodedString() ?? NSNull(), "error": d.error ?? NSNull()]
         let o = options(file)
         j["options"] = ["name": o.name.map { $0 as Any } ?? NSNull(), "bundleId": o.bundleID.map { $0 as Any } ?? NSNull(), "icon": o.icon?.base64EncodedString() ?? NSNull(),
-                        "removeExtensions": o.removeExtensions, "fixArm64e": o.fixArm64e, "keepBundleId": o.keepBundleID]
-        if let s = signed(file, certificate: certificate, now: now) {
+                        "removeExtensions": o.removeExtensions, "fixArm64e": o.fixArm64e,
+                        "keepBundleId": hasOptions(file) ? o.keepBundleID as Any : NSNull()]
+        if let s = signed(file, certificate: certificate, now: now, keep: keep) {
             var sj: [String: Any] = ["at": iso.string(from: s.signed), "bundleId": s.bundleID, "name": s.name, "version": s.version,
                                      "size": stat(signedURL(file)).0]
             if let x = s.expires { sj["expires"] = iso.string(from: x) }

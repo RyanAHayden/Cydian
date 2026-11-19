@@ -114,7 +114,9 @@ test("Custom Install: the switch always goes, and the ID compares with what that
 
 test("My IPAs in the queue: Sign Options saved the old way stay so; otherwise the global setting decides", () => {
   const entry = { file: "A.ipa", name: "A", bundleId: "io.dev.a", version: "1" };
-  assert.equal(libraryJob({ ...entry, options: { keepBundleId: true } }).options, null);
+  // F243: null is "no Sign Options saved" (the setting decides); true is the Sign Options page's switch, sent as it is
+  assert.equal(libraryJob({ ...entry, options: { keepBundleId: null } }).options, null);
+  assert.deepEqual(libraryJob({ ...entry, options: { keepBundleId: true } }).options, { edits: { keepBundleId: true } });
   assert.deepEqual(libraryJob({ ...entry, options: { keepBundleId: false } }).options, { edits: { keepBundleId: false } });
   assert.equal(libraryJob(entry).id, "io.dev.a", "it installs as its own ID");
 });

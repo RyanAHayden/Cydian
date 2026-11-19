@@ -293,6 +293,12 @@ with the bundle ID, and keys the app's data by the bundle ID:
   (and the website's worker job) only while it's off (`core/keepid.js withKeep`); absent means on. Custom Install
   always sends its switch. Records and My IPAs Sign Options saved before the setting existed have no
   `keepBundleID` and keep the old way, so Re-sign replaces what they installed.
+- My IPAs: Sign Options has the same **Keep Bundle ID** switch, starting as the IPA's saved choice or else the global
+  setting, and saved as it stands (`library.options keepBundleId`). An IPA without saved Sign Options follows the
+  global setting: every `library.*` call but `options` carries `keepBundleId: false` while it's off
+  (`signing-client.js libraryCall`), `IPALibrary.options(_:keep:)` signs with it, and a signed copy made the other way
+  no longer counts. `library.list` answers `options.keepBundleId` null for such an IPA, so the IPA queue's job
+  (`core/appqueue.js libraryJob`) leaves it to the setting and sends a saved switch as it is.
 - iFizBox's own IPA keeps its ID only when the running iFizBox has it (`SignOptions.keeps`); on the website it is
   always signed the old way (the website can't see under which ID an earlier one went in).
 - Warnings (`core/keepid.js profileNotes`, under the switch and in Custom Install): a wildcard profile (Apple gives
@@ -300,6 +306,9 @@ with the bundle ID, and keys the app's data by the bundle ID:
   one share their keychain). Custom Install also warns when the original (same ID, not signed by iFizBox:
   `apps.isInstalled`, `signing.installed`) is on the phone: iOS refuses to put a signed app over the App Store copy,
   which must be deleted first. None of these falls back to the old way: every profile kind installs with the ID kept.
+  A plain Install (`signAndInstall`, when the app's bundle ID is known) asks the same before it signs
+  (`signing-client.js originalWarning`): Install (remembered per app in `ifizbox.originalWarned`, so it asks once),
+  Install a Copy (this time the old way, beside the original) or Cancel. My IPAs' Sign Options says it under its switch.
 - The guide: Home > User Guides > Notifications for Signed Apps (`screens/guides.js`, route `guides/keep-bundle-id`),
   linked from those warnings: an explicit App ID with Push, the iPhones' UDIDs, an Ad Hoc profile, import it.
 

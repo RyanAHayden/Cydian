@@ -396,6 +396,57 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   return true;
 }
 
+// B69: the jailbreak app's Modify for an installed app (a record in core/installed.js, as the nav label reads it):
+// Cydia's sheet instead of installing at once. Upgrade or Reinstall, Ignore Upgrades (Settings' Ignored Upgrades,
+// kept on the device: no dpkg hold for an app) while a newer version is out or once it's ignored, Remove (red: the
+// Installed tab's Delete, which asks again), Downgrade (then which version) and Version History. `install(version)`
+// installs one of the app's versions (browse.js: the helper's Install row), `history()` opens Version History (null:
+// no row). Resolves false when the app isn't installed (Install keeps its one tap), true once the sheet took over.
+export const IGNORE_UPGRADES = "Ignore Upgrades";
+export const STOP_IGNORING = "Stop Ignoring Upgrades";
+export function jailbreakModifyButtons({ installed = "", newest = null, held = false, older = false, history = false } = {}) {
+  const upgrade = Boolean(newest && installed && compareVersions(newest, installed) > 0);
+  return [...modifyActions({ installed, newest, build: "jailbreak" }).filter((b) => b !== "Remove"),
+    ...(held ? [STOP_IGNORING] : upgrade ? [IGNORE_UPGRADES] : []), "Remove",
+    ...(older ? ["Downgrade"] : []), ...(history ? ["Version History"] : [])];
+}
+
+export async function jailbreakModify(pkg, { install, history = null, ask = showActionSheet, store = apps, holds = settings.holds,
+  remove = removeAppFromPhone } = {}) {
+  const app = pkg?.stanza?.ipa;
+  if (!app) return false;
+  let rec = null;
+  try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
+  if (!rec) return false;
+  const installed = rec.version || "";
+  const versions = app.versions.filter((x) => x?.version);
+  const newest = versions[0]?.version ?? null;
+  const older = installed ? versions.filter((x) => compareVersions(x.version, installed) < 0) : [];
+  const held = holds.has(app.bundleIdentifier);
+  const buttons = jailbreakModifyButtons({ installed, newest, held, older: older.length > 0, history: Boolean(history) && versions.length > 1 });
+  const i = await ask({ title: app.name, buttons, destructive: buttons.indexOf("Remove") });
+  if (i < 0) return true;
+  const b = buttons[i];
+  if (b === "Upgrade" || b === "Install") await install(versions[0]);
+  else if (b === "Reinstall") await install(versions.find((x) => x.version === installed) ?? versions[0]);
+  else if (b === IGNORE_UPGRADES || b === STOP_IGNORING) await holds.set(app.bundleIdentifier, b === IGNORE_UPGRADES, { dpkg: false });
+  else if (b === "Remove") await remove({ id: app.bundleIdentifier, name: app.name || rec.name || app.bundleIdentifier });
+  else if (b === "Downgrade") {
+    const j = await ask({ title: "Downgrade to", buttons: older.map((x) => x.version) });
+    if (j >= 0) await install(older[j]);
+  } else if (b === "Version History") history();
+  return true;
+}
+
+// B69: Remove from the Modify sheet: the Installed tab's Delete (B46: the helper uninstalls the app behind a HUD once the
+// sheet is confirmed; a record of an app that is gone is only forgotten).
+async function removeAppFromPhone({ id, name }) {
+  const [{ rememberedApps }, { confirmDelete }] = await Promise.all([import("../app-updates.js"), import("./installed.js")]);
+  let r = null;
+  try { r = (await rememberedApps({ mode: "jailbreak" })).find((x) => x?.id === id) ?? null; } catch { /* no records */ }
+  await confirmDelete(r ?? { id, name }, { mode: "jailbreak" });
+}
+
 // F94: the website's Modify, for an app marked installed (core/installed.js's record): Upgrade or Reinstall resolve
 // false, so the caller installs the newest as before (browse.js packageActions: the browser signs it); Downgrade asks
 // which version and installs that one (`siteInstall`); Mark as Not Installed forgets the record. Not installed: false.

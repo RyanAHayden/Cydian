@@ -32,6 +32,7 @@ import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
 import { renderAltSource, renderApp, installRows, appBundleId, formatDate, osRange, appPageAction, appPageCustom } from "./altstore.js";
 import { linksGroup, previewSlot } from "./altstore.js";
+import { jailbreakModify } from "./altstore.js"; // B69
 import { descriptionGroup } from "./description.js";
 import { packageLinks, packageGithub, aptShots, sileoShots, sileoRatings, sileoWhatsNew } from "../core/previews.js";
 import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, whatsNewGroup } from "./storepage.js";
@@ -1224,8 +1225,12 @@ async function packageActions(route, button) {
     // Install at the top right installs: the first row (the source's signed link, or the jailbreak). Download IPA and
     // older versions are on the page, not in a menu in between. On the website the first row is Install (F92: the
     // certificate alert until F93's browser signing).
-    const { rows, options } = installRows(v, st.ipa.sourceUrl, undefined, recordApp(pkg, source, v), undefined, st.ipa.name,
+    const rowsOf = (ver) => installRows(ver, st.ipa.sourceUrl, undefined, recordApp(pkg, source, ver), undefined, st.ipa.name,
       { bundleId: appBundleId(st.ipa, pkg.row?.id ?? id) });
+    // B69: in the jailbreak app Modify (an installed app) opens Cydia's sheet; Install keeps its one tap below.
+    if (ipaInstallAvailable() && await jailbreakModify(pkg, { install: (ver) => rowsOf(ver).rows[0]?.onClick(),
+      history: many ? () => go(versionsHref(route, id)) : null })) return;
+    const { rows, options } = rowsOf(v);
     if (rows[0] && rows[0].label !== "Download IPA") return rows[0].onClick();
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });
     if (many) actions.push({ label: "Version History", run: () => go(versionsHref(route, id)) });
@@ -1250,6 +1255,9 @@ async function packageActions(route, button) {
       const newest = history.versions.find((v) => v.keys.length);
       if (newest && compareVersions(newest.version, installed) > 0) actions.push({ label: "Upgrade", run: () => queue({ op: "install", id, version: newest.version }) });
       if (history.versions.some((v) => v.installed && v.keys.length)) actions.push({ label: "Reinstall", run: () => queue({ op: "install", id, version: installed }) });
+      // B69: Ignore Upgrades (the Installed Package switch, Settings' Ignored Upgrades) while a newer one is out
+      const ignore = ignoreAction(st.package || id, Boolean(newest && compareVersions(newest.version, installed) > 0));
+      if (ignore) actions.push(ignore);
       actions.push({ label: "Remove", run: () => queue({ op: "remove", id }) });
       if (older.length) actions.push({ label: "Downgrade", run: () => sheet("", older.map((v) => ({ label: v.version, run: () => queue({ op: "install", id, version: v.version }) }))) });
     } else {
@@ -1272,6 +1280,13 @@ async function packageActions(route, button) {
     ? `Packages install on the iPhone, from ${NAME}'s jailbreak app or another package manager.`
     : `Installing from ${NAME} comes with its install queue, which this build doesn't have yet.`;
   return sheet(title, actions);
+}
+
+// B69: Modify's Ignore Upgrades for an installed package: offered while an upgrade is out, Stop Ignoring Upgrades once
+// it's ignored (a dpkg hold in the app, core/settings.js holds). Null when neither applies.
+export function ignoreAction(id, upgrade, holds = settings.holds) {
+  if (holds.has(id)) return { label: "Stop Ignoring Upgrades", run: () => holds.set(id, false) };
+  return upgrade ? { label: "Ignore Upgrades", run: () => holds.set(id, true) } : null;
 }
 
 // B11: the nav bar sheet of a paid package its vendor sells, in the app (`paid`: extras.js paidNav). Not installed:

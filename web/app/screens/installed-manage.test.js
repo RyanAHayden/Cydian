@@ -195,7 +195,7 @@ test("bulkHud: the label keeps the app and its place, the bar shows the run's pr
   h.set("Signing 50%");
   h.set("Installing");
   assert.deepEqual(got.set, ["Re-signing Delta (2 of 4) 38%", "Re-signing Delta (2 of 4) 38%"]);
-  assert.deepEqual(got.raw, ["Signing 50%", "Installing"]);
+  assert.deepEqual(got.raw, ["Signing", "Installing"]); // B65: the phase, not each percent
   assert.equal(h.done(), "done"); // the rest is the page's own
 });
 

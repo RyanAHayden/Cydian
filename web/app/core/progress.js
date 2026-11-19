@@ -43,12 +43,17 @@ export function classify({ fd = "out", line = "" } = {}) {
 
 // A HUD's label as the page shows it: the step without its percent, and the percent for the bar. "Installing 3 of 5"
 // stays as it is.
+// B65: the percent may stand anywhere ("Signing 45% Partyboard (2 of 3)", Re-sign's labels): it comes out wherever it
+// is, so the text stays the same for the whole phase and the log gets one line per phase, not one per percent.
 export function hudLine(text) {
   const s = String(text ?? "").trim();
   const m = s.match(/^(.*?)\s*\(?(\d{1,3}(?:\.\d+)?)\s?%\)?$/);
-  if (m && m[1]) return { text: m[1], percent: Math.max(0, Math.min(100, Number(m[2]))) };
+  if (m && m[1]) return { text: m[1], percent: clampPct(m[2]) };
+  const mid = s.match(/^(.*?\S)\s+\(?(\d{1,3}(?:\.\d+)?)\s?%\)?\s+(\S.*)$/);
+  if (mid) return { text: `${mid[1]} ${mid[3]}`, percent: clampPct(mid[2]) };
   return { text: s, percent: null };
 }
+const clampPct = (n) => Math.max(0, Math.min(100, Number(n)));
 
 // Auto-scroll. The page calls scrolled() on every scroll event with the scroller's metrics, touch(true|false) as a
 // finger goes down and up, and asks shouldScroll() after adding lines. Lines are trimmed from the top only while it

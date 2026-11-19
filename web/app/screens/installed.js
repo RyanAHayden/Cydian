@@ -1401,13 +1401,15 @@ export async function manageInstall(job, { verb, i, n, hud = null, sc = null, re
 export function bulkHud(factory, { verb, name, i, n }) {
   return () => {
     let p = 0;
+    let phase = null; // B65: the phase last written to the log, so a percent alone adds no line
     const label = () => `${verb} ${name} (${i} of ${n}) ${Math.round(((i - 1) + p / 100) / n * 100)}%`;
     const h = factory(label());
     const w = Object.create(h);
     w.set = (t) => {
       const { text, percent } = hudLine(t);
       if (percent != null) p = percent;
-      if (text) h.page?.raw?.(String(t));
+      if (text && text !== phase) h.page?.raw?.(text);
+      if (text) phase = text;
       h.set(label());
     };
     return w;

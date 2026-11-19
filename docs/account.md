@@ -1,8 +1,8 @@
 # iFizBox Account
 
 A free, minimal account that keeps a device's sources, the settings that travel (`core/settings.js` TRAVELS),
-Ignored Upgrades, installed-app records (`core/installed.js`) and the signing certificate on ifizbox.com, so a new
-phone, a reinstall or the website gets them back.
+the Wish List, Ignored Upgrades, installed-app records (`core/installed.js`) and the signing certificate the same on
+every device and the website, and brings them back after a reinstall. Purchases stay with each repo's own account.
 
 ## The key
 

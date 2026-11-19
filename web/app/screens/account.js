@@ -191,8 +191,9 @@ export function accountSection() {
   return box;
 }
 
-const ACCOUNT_FOOTER = `Keeps your sources, settings, Ignored Upgrades, installed apps and certificate on ${DOMAIN}, `
-  + "so a new iPhone, a reinstall or the website gets them back. No email, no password: your account key is the account.";
+const ACCOUNT_FOOTER = `Keeps your sources, settings, Wish List and certificate the same on every iPhone and on the website, `
+  + `and brings them back after a reinstall. No email or password: a key made on this iPhone is the account, and ${DOMAIN} `
+  + "can't read what it stores. Purchases stay with each repo.";
 const KEY_WARNING = `Save this key somewhere safe. It is the only way into your account: if you lose it, nobody can get your data back, ${DOMAIN} included.`;
 const CERT_FOOTER = `Your certificate is encrypted with your account key before it leaves this device: ${DOMAIN} can't read it. Off takes it out of your account.`;
 

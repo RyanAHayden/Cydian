@@ -74,7 +74,9 @@ export const SECTIONS = [
 // expiry, with Import or Replace), the provisioning profile, the options (SECTIONS' "signing": Show Expiry Dates,
 // Re-sign Reminder), then the rest, and How Signing Works (the walkthrough) as a link at the bottom.
 // screens/settings.js signingLayout() picks the ones a build shows, in this order.
-export const SIGNING_GROUPS = ["certificate", "files", "profile", "options", "server", "status", "app", "other", "remove", "help"];
+// F254j: `free` is the website's Use a Free Apple ID group (screens/free-apple-id.js freeRouteBlock), shown while no
+// certificate is set, the same group How Signing Works ends with.
+export const SIGNING_GROUPS = ["certificate", "files", "profile", "options", "server", "status", "app", "other", "free", "remove", "help"];
 
 // F128: settings that went (docs/settings.md says why). Nothing reads them; createSettings() drops their stored
 // values, and a full daemonPrefs() sends the daemon's two as null so the shell removes them there too.

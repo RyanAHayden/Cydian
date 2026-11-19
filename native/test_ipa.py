@@ -23,7 +23,11 @@ def signed_macho(entitlements):
     head = bytearray(fake_macho())
     # fake_macho's LC_CODE_SIGNATURE is its last 16 bytes: set dataoff/datasize to the blob appended after it.
     struct.pack_into("<II", head, len(head) - 8, len(head), len(sb))
-    return bytes(head) + sb
+    # strings the real executable carries once idevice is linked in (mkipa.py check looks for them)
+    return bytes(head) + sb + IDEVICE_MARKS
+
+
+IDEVICE_MARKS = b"ifizbox.idevice.pairing\0_remotepairing-pairable-host._tcp\0"
 
 
 class Ipa(unittest.TestCase):
@@ -126,6 +130,10 @@ class Ipa(unittest.TestCase):
         p = " | ".join(self.problems())
         self.assertIn("platform-application", p)
         self.assertIn("no-sandbox", p)
+
+    def test_idevice_missing_flagged(self):
+        self.write("iFizBox", signed_macho({"get-task-allow": True})[:-len(IDEVICE_MARKS)], 0o755)
+        self.assertTrue(any("idevice not linked in" in p for p in self.problems()))
 
     def test_unsigned_and_wrong_binary_flagged(self):
         self.write("iFizBox", fake_macho(cpu=0x01000007, minos=(14, 0), signed=False), 0o755)

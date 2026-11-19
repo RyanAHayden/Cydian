@@ -33,7 +33,7 @@ test("defaults with nothing stored", () => {
 test("F128: exactly these settings remain, and the retired ones are gone", () => {
   assert.deepEqual(SETTINGS.map((d) => d.key), ["appearance", "lightTheme", "darkTheme", "device", "arch", "worksOnMyPhone", "compatMarks",
     "iosVersion", "refreshOnLaunch", "returnHome", "holds", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
-    "keepVersions", "showExpiry", "resignReminder", "keepBundleId", "showExpiryWarning", "expiryWarning"]);
+    "keepVersions", "showExpiry", "resignReminder", "keepBundleId", "showExpiryWarning", "expiryWarning", "installRoute"]);
   assert.deepEqual(RETIRED, ["sideloader", "checkUpdates", "cellular", "notifications", "badge", "allowZoom"]);
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
   for (const k of RETIRED) {
@@ -89,6 +89,7 @@ test("F128: pages like iOS 6's Settings: General, Theme, Updates (Signing in the
     ["general", "General", [compat, ["refreshOnLaunch", "returnHome"]]],
     theme,
     ["updates", "Updates", [["holds"]]],
+    ["installation", "Installation", [["installRoute"]]],
     ["signing", "Signing", [["showExpiry", "resignReminder", "keepBundleId"], ["showExpiryWarning", "expiryWarning"]]], // F244
   ]);
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
@@ -252,7 +253,7 @@ test("rows each mode shows once every feature exists", () => {
       "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
     ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "showExpiry", "resignReminder", "keepBundleId",
-      "showExpiryWarning", "expiryWarning"]);
+      "showExpiryWarning", "expiryWarning", "installRoute"]);
 });
 
 test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone, Ignored Upgrades and Automatic Installs", () => {
@@ -268,7 +269,7 @@ test("rows wait for their feature: today Appearance, the sources settings, Works
 
 test("sections come in page order, empty ones dropped", () => {
   const s = createSettings({ storage: memStorage(), mode: "sideload", features: everything });
-  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "sources", "appearance", "themes", "updates", "signing", "expiry"]);
+  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "sources", "appearance", "themes", "updates", "installation", "signing", "expiry"]);
   assert.equal(s.sections().find((x) => x.id === "appearance").settings[0].key, "appearance");
 });
 

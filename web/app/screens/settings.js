@@ -42,6 +42,7 @@ import { NAME, GITHUB_REPO } from "../brand.js";
 import { profileNotes, keepOn, GUIDE_LINK } from "../core/keepid.js";
 import { keepGuideHref } from "./guides.js";
 import { rowIcon, SETTING_ICONS, PAGE_ICONS } from "../icons/rowicons.js";
+import { drawInstallation, PAGE as INSTALLATION, SUB_TITLES as INSTALLATION_TITLES } from "./installroute.js";
 
 export const title = "Settings";
 
@@ -78,6 +79,7 @@ export function nav(route) {
   const [first, second] = pathOf(route);
   if (first === LOGS) return { title: logsTitle(second) }; // N4: Console Logs
   if (first === "signing" && second === HELP) return { title: HELP_TITLE }; // F134: the walkthrough
+  if (first === INSTALLATION && INSTALLATION_TITLES[second]) return { title: INSTALLATION_TITLES[second] };
   const key = second ?? first;
   if (key && TITLES[key]) return { title: TITLES[key] };
   if (key && settings.pageOf(key)) return { title: settings.pageOf(key).title };
@@ -121,6 +123,7 @@ function draw({ el, route }) {
   else if ((second ?? first) === "holds") el.replaceChildren(holdsPage());
   else if ((second ?? first) === "blocked") el.replaceChildren(blockedPage()); // F226
   else if (first === "signing" && second === HELP) drawSigningHelp(el); // F134
+  else if (first === INSTALLATION && settings.isShown("installRoute")) drawInstallation(el, second, { store: settings }); // sideload
   else if (second) el.replaceChildren(listPage(second));
   else if (first === "signing") drawSigning(el);
   else if (first && settings.pageOf(first)) el.replaceChildren(groupPage(first));

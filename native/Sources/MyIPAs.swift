@@ -245,7 +245,7 @@ enum MyIPAs {
             // B29: the progress page's console, as signing.install has it: the bundle ID and what iOS fetched.
             let log = { (line: String) in c.emitOnMain([["log": line]]) }
             log("Installing the signed copy of \(file): \(s.name) \(s.version) as \(s.bundleID)")
-            Sideload.serveAndOpen(out, server: servers.manifest, app: s.app, record: record, log: log, job: job, opened: { r in
+            let done = { (r: Result<(SignedApp, SignedRecord), Error>) in
                 switch r {
                 case .failure(let e):
                     job.end()
@@ -256,7 +256,9 @@ enum MyIPAs {
                     if let x = rec.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
                     Apt.reply(c, j, nil)
                 }
-            })
+            }
+            if servers.local { return Sideload.installHere(out, app: s.app, record: record, emit: emit, log: log, job: job, opened: done, served: nil) }
+            Sideload.serveAndOpen(out, server: servers.manifest, app: s.app, record: record, log: log, job: job, opened: done)
         }
     }
 

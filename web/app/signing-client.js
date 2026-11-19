@@ -30,6 +30,7 @@ import { progressHUD, lockSelfUpdate, unlockSelfUpdate, TRY_AGAIN_LABEL } from "
 import { recordSelfUpdate } from "./core/selfupdate.js";
 import { showAlert } from "./nav/alert.js";
 import { NAME, GITHUB_REPO } from "./brand.js";
+import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams } from "./core/installroute.js";
 
 // F151: a job's error on the progress page (the HUD interface's fail, nav/progress.js) before its alert; a HUD
 // without one (liveHUD, the tests') just goes.
@@ -308,6 +309,35 @@ const openRoute = (path) => {
 };
 export const openSigning = () => openRoute(["signing"]);
 
+// ---- Settings > Installation's route (core/installroute.js) -----------------------------------------------------
+// The bridge params one install adds for the chosen route: { route: "idevice" } (This iPhone, LocalDevVPN on and
+// paired), {} (the Signing Server), or null when the user tapped Open LocalDevVPN (the install stops; they tap it
+// again once it's on). When This iPhone can't be used, an alert says the install goes through the server. A run of
+// installs (the IPA queue, Re-sign All) asks once: the answer holds for ROUTE_HOLD ms.
+export const ROUTE_HOLD = 60_000;
+let heldRoute = null;
+export async function chooseRoute({ native, alert = showAlert, storage = storageOf(), now = Date.now } = {}) {
+  const choice = storedRoute(storage);
+  if (choice !== "iphone") return {};
+  if (heldRoute && now() - heldRoute.at < ROUTE_HOLD) return heldRoute.params;
+  let status = null;
+  try { status = await bridge(native).call("idevice.status", {}); } catch { status = null; }
+  const d = decideRoute(choice, status);
+  if (d.alert) {
+    const a = ROUTE_ALERTS[d.alert];
+    const { index } = await alert({ title: a.title, message: a.message, buttons: a.buttons, cancel: 0 });
+    if (a.open != null && index === a.open) {
+      try { await bridge(native).call("idevice.openLocalDevVPN", {}); } catch { /* nothing to open: the alert said what to do */ }
+      heldRoute = null;
+      return null;
+    }
+  }
+  const params = routeParams(d);
+  heldRoute = { at: now(), params };
+  return params;
+}
+export const forgetRoute = () => { heldRoute = null; };
+
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an
 // error, which an alert explains (no_server and no_identity then open Settings > Signing).
 // F68: `params` replaces { url } with the look-first sheet's { token, name?, bundleId?, icon?, removeExtensions? }
@@ -322,13 +352,18 @@ export async function installOnDevice(opts, deps) {
 
 async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false },
   { native, hud = progressHUD, alert = showAlert, go = openRoute, later = setTimeout, follow = null } = {}) {
+  forgetRoute();
+  const route = await chooseRoute({ native, alert });
+  if (!route) return false;
+  // This iPhone: installd puts the app (iFizBox too) in place itself, so no Signing Server and no hosting.
+  if (route.route) host = false;
   const h = hud("Downloading");
   h.onCancel?.(() => stopNative(native));
   let result;
   try {
     // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
     // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
-    result = await untilCancel(h, bridge(native).call("signing.install", { ...withKeep(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}) }, (ev) => {
+    result = await untilCancel(h, bridge(native).call("signing.install", { ...withKeep(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}), ...route }, (ev) => {
       if (ev?.log) h.page?.raw?.(ev.log); // the shell's console lines (Sideload.swift install's log)
       const t = phaseLabel(ev);
       if (t) h.set(t);
@@ -465,7 +500,10 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     if (!(await repromptPrepared(row, native))) throw Object.assign(new Error("no longer served"), { code: "gone" });
     opened = { bundleId: row.bundleId, expires: row.expires ?? null };
   } else try {
-    opened = await abortable(native, "signing.open", { token: row.token, manifestServer: getServer(), ...(host ? { host: true } : {}) },
+    const route = await chooseRoute({ native });
+    if (!route) throw Object.assign(new Error("Turn LocalDevVPN on, then try again."), { code: "cancelled" });
+    if (route.route) host = false; // This iPhone: installd updates iFizBox in place
+    opened = await abortable(native, "signing.open", { token: row.token, manifestServer: getServer(), ...(host ? { host: true } : {}), ...route },
       (ev) => { if (ev?.log) log(ev.log); }, { tag, signal });
   } catch (e) { throw rowError(e, name); }
   progress("asking", 0);
@@ -559,7 +597,10 @@ export async function installFromLibrary({ file, name = "", signed = false, onIn
   };
   // Sign first: nothing here needs the network, so an offline phone still ends with a signed copy.
   try { await untilCancel(h, libraryCall("sign", { file }, onEvent, native)); } catch (e) { return fail(e); }
-  if (!(await untilCancel(h, reachable(server)).catch(() => false)) && !h.cancelled) {
+  const route = await chooseRoute({ native, alert });
+  if (!route) { h.hide(); return false; }
+  // This iPhone needs no Signing Server, so no connection either.
+  if (!route.route && !(await untilCancel(h, reachable(server)).catch(() => false)) && !h.cancelled) {
     h.hide();
     await alert({ title: "No Connection", message: offlineText(name, server), buttons: ["OK"] });
     return "offline";
@@ -567,7 +608,7 @@ export async function installFromLibrary({ file, name = "", signed = false, onIn
   if (h.cancelled) return false;
   h.set("Installing");
   let result;
-  try { result = await untilCancel(h, libraryCall("install", { file, manifestServer: server }, onEvent, native)); } catch (e) { return fail(e); }
+  try { result = await untilCancel(h, libraryCall("install", { file, manifestServer: server, ...route }, onEvent, native)); } catch (e) { return fail(e); }
   if (h.cancelled) return false;
   onInstalled(result);
   const followInstall = follow ?? (await import("./signing-sheet.js")).followInstall;

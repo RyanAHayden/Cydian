@@ -222,10 +222,19 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   default, or the user's own) in api.palera.in's place: the manifest comes from the server over HTTPS, the signed
   IPA from a plain HTTP server on 127.0.0.1. The server sees the app's bundle ID, name and version. A hand-trusted
   root CA on the phone doesn't work for this: iOS's installer ignores it. There's no backloop.dev mode.
-- **idevice** (`native/sideload/idevice/`, its README): idevice built from source on Linux and linked statically,
-  with pairing (imported file, or made on the phone on iOS 27), LocalDevVPN detection, AFC upload and
-  installation_proxy with progress, as `idevice.*` bridge calls. Settings doesn't offer it yet, so installs still
-  go through the Signing Server.
+- **This iPhone** (Settings > Installation > Install Apps With; `native/sideload/idevice/`, its README): idevice
+  built from source on Linux and linked statically. The signed IPA goes to this phone's installd over LocalDevVPN
+  (AFC upload to PublicStaging, then installation_proxy), so nothing reaches the Signing Server, no install sheet has
+  to stay up, it works offline, and iFizBox updates itself (installd closes and replaces it). Choosing This iPhone
+  shows what it gives, then the pairing page: on iOS 27 Start Pairing shows a 6-digit code to enter at Settings >
+  Privacy & Security > Developer Mode > "Pair with iFizBox on this iPhone"; before iOS 27 a pairing file made on a
+  computer is imported. Check Connection (`idevice.verify`) offers Pair Again when the pairing is refused. Each
+  install (`chooseRoute`, signing-client.js) asks `idevice.status`: paired and LocalDevVPN on sends
+  `route: "idevice"` with the bridge call (signing.install, signing.open, signing.resign/resignAll,
+  library.install), and Sideload.swift `installHere` installs it, its progress on the progress page's Installing
+  step (upload the first 30%, then installd's percentage). Not paired, LocalDevVPN off or another VPN on: an alert
+  says so and the install goes through the Signing Server ("Another VPN Is On" also offers Open LocalDevVPN, which
+  stops the install). The VPN apps' names come from one list (`VPNS`, core/installroute.js).
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and

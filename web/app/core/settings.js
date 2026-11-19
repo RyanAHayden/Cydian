@@ -28,6 +28,7 @@ import { ARCHES, DEFAULT_ARCH } from "./apt.js";
 import { IOS_VERSIONS, JAILBREAK_ARCH } from "./compat.js";
 import { NAME } from "../brand.js";
 import { OLD_WAY_ALERT } from "./keepid.js";
+import { ROUTE_OPTIONS } from "./installroute.js";
 
 export const MODES = ["site", "jailbreak", "sideload"];
 
@@ -38,7 +39,7 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // "upgrade-notifications": Upgrade Notifications, N5's daemon's "n Upgrades" in the jailbreak app (F65).
 // "auto-install", "rollback": N7's Automatic Installs rows, which F70 hands to the daemon (daemonPrefs below).
 export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device", "resign", "upgrade-notifications",
-  "auto-install", "rollback", "keep-id", "expiry-warning"]); // "keep-id": Keep Bundle IDs (F237); "expiry-warning": F244
+  "auto-install", "rollback", "keep-id", "expiry-warning", "install-route"]); // "keep-id": Keep Bundle IDs (F237); "expiry-warning": F244
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
@@ -51,6 +52,7 @@ export const PAGES = [
   { id: "general", title: "General" },
   { id: "theme", title: "Theme" }, // F205: was Display (route "display"); Compatibility Marks moved to General
   { id: "updates", title: "Updates" },
+  { id: "installation", title: "Installation" }, // sideload: Install Apps With (screens/installroute.js draws it)
   { id: "signing", title: "Signing" },
 ];
 
@@ -63,6 +65,7 @@ export const SECTIONS = [
   { id: "updates", page: "updates" },
   { id: "notifications", page: "updates" },
   { id: "automatic", page: "updates", title: "Automatic Installs" },
+  { id: "installation", page: "installation", title: "Install Apps With" },
   { id: "signing", page: "signing" },
   { id: "expiry", page: "signing" }, // F244: Show Expiry Warning and Expiry Warning, Home's certificate tile
 ];
@@ -246,6 +249,12 @@ export const SETTINGS = [
       { value: 30, label: "1 Month" }, { value: 60, label: "2 Months" },
     ],
     footer: "How far ahead Home shows the warning.",
+  },
+  {
+    // Settings > Installation (core/installroute.js): the Signing Server's install link, or This iPhone's own installd
+    // over LocalDevVPN (native/sideload/idevice). screens/installroute.js draws the page (This iPhone needs pairing).
+    key: "installRoute", section: "installation", kind: "choice", feature: "install-route", modes: ["sideload"], default: "server",
+    label: "Install Apps With", options: ROUTE_OPTIONS,
   },
 ];
 

@@ -11,7 +11,7 @@ import { showAlert } from "../nav/alert.js";
 import { liveHUD } from "../nav/hud.js";
 import { certificateWarnings, revocationLabel, resignLabel, signedAppRows, deviceError, callWithStall } from "../core/signing.js";
 import { resignJob } from "../core/appqueue.js";
-import { getServer } from "../signing-client.js";
+import { getServer, chooseRoute } from "../signing-client.js";
 
 let styled = false;
 function style() {
@@ -164,11 +164,13 @@ export async function resignAll(count, { redraw, native, alert, hud }) {
     message: `${count === 1 ? "The app is" : `All ${count} apps are`} downloaded again, signed with your current certificate and installed, one after another. iOS asks before each install.`,
     buttons: ["Cancel", "Re-sign"], cancel: 0 });
   if (index !== 1) return;
+  const route = await chooseRoute({ native, alert });
+  if (!route) return;
   const h = hud("Re-signing");
   let r;
   try {
-    // F75: each install takes its manifest from the Signing Server, as signing.install does
-    r = await callWithStall(native, "signing.resignAll", { manifestServer: getServer() }, (ev) => { const t = resignLabel(ev); if (t) h.set(t); }); // B65
+    // F75: each install takes its manifest from the Signing Server, as signing.install does (This iPhone: none)
+    r = await callWithStall(native, "signing.resignAll", { manifestServer: getServer(), ...route }, (ev) => { const t = resignLabel(ev); if (t) h.set(t); }); // B65
   } catch (e) {
     h.hide();
     await alertOK(alert, "Couldn't Re-sign", deviceError(e).message);

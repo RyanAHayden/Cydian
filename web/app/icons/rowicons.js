@@ -122,6 +122,7 @@ export const ROW_ICONS = {
   sources: [C.blue, "list"], transfer: [C.green, "transfer"], hidden: [C.grey, "eyeSlash"], recommended: [C.gold, "star"],
   share: [C.blue, "share"], copy: [C.grey, "copy"], saveFile: [C.teal, "save"], qr: [C.dark, "qr"],
   fromFile: [C.teal, "file"], fromClipboard: [C.brown, "clipboard"],
+  installation: [C.blue, "phone"], // Settings > Installation (Signing Server / This iPhone)
 };
 
 // core/settings.js's setting keys -> their row's icon. A key not here is a row with no icon (Appearance's choices).
@@ -134,7 +135,7 @@ export const SETTING_ICONS = {
 };
 
 // Settings' pages (core/settings.js PAGES) -> their root row's icon.
-export const PAGE_ICONS = { general: "general", theme: "theme", updates: "updates", signing: "signing" };
+export const PAGE_ICONS = { general: "general", theme: "theme", updates: "updates", installation: "installation", signing: "signing" };
 
 
 function glyphSvg(parts) {

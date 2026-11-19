@@ -555,10 +555,13 @@ export async function resignApp(job, { sc, native = globalThis.ifizboxNative, hu
   const h = hud ? hud("Re-signing") : progressHUD("Re-signing"); // F151: the progress page
   const fail = (message) => (typeof h.fail === "function" ? h.fail(message) : h.hide());
   let r;
+  // Settings > Installation's route: This iPhone needs no server and no hosting (installd updates iFizBox in place)
+  const route = sc.chooseRoute ? await sc.chooseRoute({ native, alert }) : {};
+  if (!route) { h.hide(); return false; }
   try {
     if (!native?.call) throw new Error(`Re-signing needs the ${NAME} app.`);
     // B65: a phase that goes quiet fails the job with where it stopped (callWithStall); the shell's lines go to the log
-    r = await callWithStall(native, "signing.resign", { bundleId: job.id, manifestServer: sc.getServer(), ...(job.id === SELF_ID ? { host: true } : {}) },
+    r = await callWithStall(native, "signing.resign", { bundleId: job.id, manifestServer: sc.getServer(), ...(job.id === SELF_ID && !route.route ? { host: true } : {}), ...route },
       (ev) => {
         if (ev?.log) h.page?.raw?.(ev.log);
         const t = resignLabel(ev);

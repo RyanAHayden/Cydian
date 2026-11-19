@@ -16,6 +16,7 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 | General | all | Device and iOS Version (website only, one group); Works on My Phone and Compatibility Marks; Refresh Sources on Launch and Return to Home After; Blocked (packages and authors); Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only; Install on the Website is padlocked while Home is locked) |
 | Theme | all | Mode (Automatic / Light / Dark, a segmented control) and Themes (Light and Dark, each a checklist of themes) |
 | Updates | all | Ignored Upgrades; Upgrade Notifications (jailbreak only); Automatic Installs (jailbreak only: Install Updates Automatically, When Charging and Locked, After a Respring Update, Keep Previous Versions); Update Alerts (sideload only) |
+| Installation | sideload | Install Apps With: Signing Server (default) or This iPhone ("With LocalDevVPN. No server, updates iFizBox itself."); see "Settings > Installation" below |
 | Signing | website, sideload | the certificate's name as its detail; see "Settings > Signing" below |
 | Open in iFizBox App | website, not jailbroken | an action, not a setting (screens/importlink.js) |
 | Install from URL | where Install IPA works | an action (screens/ipa-install.js) |
@@ -25,7 +26,7 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 - Switches sit in their rows (`createSwitch`). Choices are checkmark lists on their own page (Device, iOS Version, Install Updates Automatically, After a Respring Update, Keep Previous Versions,
   Re-sign Reminder).
 - Each group's footer says what its rows do in one line. A test keeps each footer to 120 characters or fewer.
-- Routes below Settings (`#/home/settings/…`): `general`, `theme` (`display` opens it too), `updates`, `<page>/<key>` (a list page),
+- Routes below Settings (`#/home/settings/…`): `general`, `theme` (`display` opens it too), `updates`, `installation[/benefits|/pair]`, `<page>/<key>` (a list page),
   `<page>/holds`, `general/blocked`, `signing[/<key>]`, `signing/help` (How Signing Works), `account`, `logs[/<id>]`. The one-segment routes (`device`,
   `iosVersion`, `holds`) open their page too. Home's device hint and a package's "Set iOS Version" use them.
 
@@ -49,6 +50,19 @@ Laid out like an iOS 6 settings page, with one-line footers. `SIGNING_GROUPS` (c
 
 Show Expiry Dates is in the sideload build only: the website keeps no record of the apps it signs, so it shows no
 dates and the switch would do nothing there.
+
+## Settings > Installation
+
+Sideload build only, drawn by `screens/installroute.js` (rules and texts in `core/installroute.js`):
+
+- **Install Apps With**: Signing Server (the manifest and iOS's Install prompt) or This iPhone (installd over
+  LocalDevVPN, docs/sideload.md). Picking This iPhone before it is paired opens a short page of what it gives
+  (`installation/benefits`: private, works offline, updates iFizBox itself, keeps going if iOS pauses iFizBox), whose
+  Set Up opens the pairing page.
+- With This iPhone chosen: **Pairing** (Paired / Not Paired, opens `installation/pair`), **LocalDevVPN** (On, Off or
+  Another VPN) and **Open LocalDevVPN**.
+- **Pair This iPhone** (`installation/pair`): on iOS 27, Start Pairing and the 6-digit code; before iOS 27, Import
+  Pairing File; once paired, Check Connection (Pair Again when the pairing is refused) and Forget Pairing.
 
 ## Retired keys
 
@@ -84,5 +98,6 @@ runs on every launch and costs one lookup per key when nothing is left to remove
 | `autoInstall`, `autoInstallIdle`, `respring`, `keepVersions` | jailbreak | off, on, notify, 1 | the `ifizbox-upgrades` daemon (daemonPrefs) |
 | `showExpiry` | sideload | on | Installed's signature pills (installed.js withSignatures), an app page's Signature row (altstore.js signatureRow), Signed Apps' days (signed-apps.js). Off hides the days; Expired still shows |
 | `resignReminder` | sideload | 2 days | signing.remind, Changes |
+| `installRoute` | sideload | server | signing-client.js chooseRoute: every install, re-sign and queue run |
 
 Nothing kept is only for debugging. Console Logs is an action that shows what installs did, not a setting.

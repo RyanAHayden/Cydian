@@ -169,9 +169,13 @@ enum Sideload {
     // server's POST /sign/host and installs from there. Signing still happens here; the key never leaves the phone.
     // B64: both belong to one call and travel with it (signAndOpen's, serveAndOpen's `servers`). They were once shared
     // statics, and iFizBox's own job, started while another app still signed, made that app upload to /sign/host.
+    // `local` (the call's `route: "idevice"`, Settings > Installation > This iPhone): no server at all; the signed IPA
+    // goes to this phone's installd through LocalDevVPN (installHere, native/sideload/idevice). It wins over `host`:
+    // installd updates iFizBox itself in place.
     struct Servers {
         let manifest: String
         let host: String?
+        var local = false
     }
 
     static let noServer = "no_server: installing needs a Signing Server: set one in Settings > Signing"
@@ -180,6 +184,7 @@ enum Sideload {
     // the host; `allowHost: false` (My IPAs) never hosts.
     static func servers(_ c: Bridge.Call, allowHost: Bool = true) -> Servers? {
         let ms = (c.params["manifestServer"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        if c.params["route"] as? String == "idevice" { return Servers(manifest: ms ?? "", host: nil, local: true) }
         guard let m = ms, m.hasPrefix("https://") else { return nil }
         return Servers(manifest: m, host: allowHost && (c.params["host"] as? Bool ?? false) ? m : nil)
     }
@@ -354,12 +359,63 @@ enum Sideload {
                                   version: app.version, url: url, signed: Date(),
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored)
         emit("installing", 0)
+        if servers.local {
+            installHere(output, app: app, record: record, emit: emit, log: log, job: job, opened: opened, served: served)
+            return
+        }
         if let host = servers.host { // B64: this call's own choice, made when it started
             log?("Uploading to \(host)/sign/host (\(app.name) replaces this app, so iOS installs it from the server)")
             hostAndOpen(output, server: host, app: app, record: record, job: job, opened: opened, served: served)
             return
         }
         serveAndOpen(output, server: servers.manifest, app: app, record: record, log: log, job: job, opened: opened, served: served)
+    }
+
+    // The "This iPhone" route (Servers.local): `output` (deleted after) goes to installd over LocalDevVPN, AFC upload then
+    // installation_proxy (IDevice.install). Progress is the page's "installing" phase: the upload its first 30%, then
+    // installd's own percentage. `opened` and `served` get the result once installd has installed it, so the
+    // signing.progress that follows finds the app there. iFizBox itself: installd ends this process while it installs,
+    // so its record is kept first.
+    static func installHere(_ output: URL, app: SignedApp, record: SignedRecord, emit: ((String, Double) -> Void)?,
+                            log: ((String) -> Void)?, job: SignJob?, opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
+                            served: ((Bool) -> Void)?) {
+        let isSelf = app.bundleID == Bundle.main.bundleIdentifier
+        log?("Installing on this iPhone through LocalDevVPN (\(IDevice.address)); nothing goes to a Signing Server")
+        if isSelf {
+            saveRecords(SignedRecords.adding(record, to: records()))
+            log?("\(app.name) replaces this app: iOS closes it while it installs; open it again once it's done")
+        }
+        DispatchQueue.main.async { KeepAlive.shared.begin() }
+        IDevice.queue.async {
+            let result: Result<Void, Error>
+            do {
+                try job?.check()
+                log?("Copying the IPA to iOS (\(Sideload.size(output))), then iOS installs it")
+                try IDevice.install(output) { step in
+                    switch step {
+                    case .upload(let p): emit?("installing", p * 0.3)
+                    case .install(let p): emit?("installing", 0.3 + p * 0.7)
+                    }
+                }
+                result = .success(())
+            } catch { result = .failure(error) }
+            try? FileManager.default.removeItem(at: output)
+            DispatchQueue.main.async { KeepAlive.shared.end() }
+            SignBridge.queue.async {
+                job?.end()
+                switch result {
+                case .failure(let e):
+                    let text = (e as? IDevice.Failure)?.errorDescription ?? SignBridge.text(e)
+                    log?("This iPhone's install failed: \(text)")
+                    opened(.failure(job?.cancelled == true ? SignJob.cancelledError : Failed(text: text))); served?(false)
+                case .success:
+                    log?("iOS installed \(app.name) \(app.version)")
+                    if !isSelf { saveRecords(SignedRecords.adding(record, to: records())) }
+                    reschedule()
+                    opened(.success((app, record))); served?(true)
+                }
+            }
+        }
     }
 
     // F77: the second half of signAndOpen, for an IPA signed already (My IPAs' signed copy): serves `output` (deleted

@@ -164,6 +164,10 @@ enum SignAhead {
                     Apt.reply(c, j, nil)
                 }
             }
+            if servers.local {
+                Sideload.installHere(k.output, app: k.app, record: k.record, emit: nil, log: log, job: job, opened: opened, served: nil)
+                return
+            }
             if let host = servers.host {
                 log("Uploading to \(host)/sign/host (\(k.app.name) replaces this app, so iOS installs it from the server)")
                 Sideload.hostAndOpen(k.output, server: host, app: k.app, record: k.record, job: job, opened: opened, served: nil)

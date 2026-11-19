@@ -17,9 +17,21 @@ export function appSchemeFor(href) {
   }
   if (host === "youtube.com" || host === "youtu.be") return `youtube://${u.host}${u.pathname}${u.search}`;
   // Discord stays https: a re-signed Unbound opens on discord:// but drops the invite (user 2026-11-18).
+  // A file on GitHub (a release asset, a source archive, a raw file: Download IPA's opentennis-ios.ipa) stays https: the
+  // GitHub app can't download it and only shows its home, so Safari has to fetch the exact URL.
+  if (host === "github.com" && isGitHubFile(parts)) return null;
   if (host === "github.com" && parts.length) return `github://github.com${u.pathname}`; // the GitHub app (user 2026-11-18)
   return null;
 }
+
+// owner/repo/releases/download/<tag>/<file>, owner/repo/releases/latest/download/<file>, owner/repo/archive/…,
+// owner/repo/raw/…, or any path ending in a downloadable file (.ipa, .tipa, .deb, .zip, .plist, .json).
+const isGitHubFile = (parts) => {
+  const [, , kind, sub, sub2] = parts;
+  if (kind === "releases" && (sub === "download" || (sub === "latest" && sub2 === "download"))) return true;
+  if (kind === "archive" || kind === "raw") return true;
+  return /\.(ipa|tipa|deb|zip|plist|json)$/i.test(parts[parts.length - 1] ?? "");
+};
 
 // Opens href from the Home Screen web app: its app's scheme first, then Safari if the app didn't come up in 1.5 s.
 // iOS freezes timers while the web app is in the background, so a timer that fires after the user came back from

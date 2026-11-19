@@ -20,7 +20,7 @@ const EASE = "cubic-bezier(.25,.1,.25,1)";
 const SWIPE_PX = 16;   // an upward drag past this dismisses; a move under TAP_PX is still a tap
 const TAP_PX = 8;
 
-let current = null;
+export const MAX_WAITING = 3;  // banners queued behind the one up; more are dropped
 
 // iFizBox's own icon for where it runs: WEB on the website, LITE in the sideload app, plain in the jailbreak app.
 const ownIcon = () => (!globalThis.ifizboxNative ? "icons/icon-web-glossy-76.png"
@@ -39,10 +39,59 @@ function host(doc) {
   return sheets.length ? sheets[sheets.length - 1] : doc.body;
 }
 
+// B62: one banner is up at a time, and the others wait their turn: a new banner no longer hides the one up (on launch
+// the refresh-failure banner used to replace "iFizBox X is out." before its Upgrade could be tapped). The next one
+// slides in once the current one has gone. A `wait` banner (Press Open / Press Install) can't wait: iOS's prompt is up
+// now, so it goes up at once and a timed banner it pushed off comes back after it, with its full time. A banner with
+// the same title and message as one up or waiting isn't added twice. `present(opts, gone)` draws one and returns its
+// hide; it calls gone() once it has left. The returned function hides the banner, or takes it out of the queue.
+export function bannerQueue(present, { max = MAX_WAITING } = {}) {
+  let shown = null;
+  const waiting = [];
+  const same = (a, b) => a.title === b.title && a.message === b.message;
+  const start = (e) => {
+    shown = e;
+    const run = (e.run = {});
+    e.hide = present(e.opts, () => {
+      if (shown !== e || e.run !== run) return;
+      shown = null;
+      const next = waiting.shift();
+      if (next) start(next);
+    });
+  };
+  const cancel = (e) => {
+    const i = waiting.indexOf(e);
+    if (i >= 0) waiting.splice(i, 1);
+    if (shown === e) e.hide?.();
+  };
+  const show = (opts) => {
+    const twin = [shown, ...waiting].find((x) => x && same(x.opts, opts));
+    if (twin) return () => cancel(twin);
+    const e = { opts, hide: null, run: null };
+    if (!shown) start(e);
+    else if (opts.wait) {
+      // Up at once; the one pushed off slides out meanwhile (its gone() is ignored: it is no longer `shown`).
+      const off = shown;
+      if (!off.opts.wait) waiting.unshift(off);
+      start(e);
+      off.hide();
+    } else if (waiting.length < max) waiting.push(e);
+    else return () => {};
+    return () => cancel(e);
+  };
+  show.state = () => ({ shown: shown?.opts ?? null, waiting: waiting.map((x) => x.opts) });
+  return show;
+}
+
+let queue = null;
+export function showBanner(opts = {}) {
+  queue ??= bannerQueue(present);
+  return queue({ title: NAME, ...opts });
+}
+
 // `action`: { label, onClick } puts a small blue button at the banner's right (Upgrade); a tap on it runs onClick.
 // `onTap` (B23): a tap on the banner hides it and runs onTap (the refresh-failure banner opens Sources).
-export function showBanner({ title = NAME, message = "", icon = ownIcon(), duration = 0, action = null, onTap = null, wait = false } = {}) {
-  current?.();
+function present({ title = NAME, message = "", icon = ownIcon(), duration = 0, action = null, onTap = null, wait = false } = {}, onLeft = () => {}) {
   const b = document.createElement("div");
   b.className = "banner";
   b.setAttribute("role", "status");
@@ -72,12 +121,12 @@ export function showBanner({ title = NAME, message = "", icon = ownIcon(), durat
   const hide = () => {
     if (gone) return;
     gone = true;
-    if (current === hide) current = null;
     document.removeEventListener("visibilitychange", onVis);
     timer?.cancel();
     const from = dragY < 0 ? `translateY(${dragY}px)` : "none";
     const a = b.animate([{ transform: from }, { transform: "translateY(-100%)" }], { duration: 250, easing: "ease-in", fill: "forwards" });
-    a.finished.then(() => b.remove(), () => b.remove());
+    const left = () => { b.remove(); onLeft(); };
+    a.finished.then(left, left);
   };
 
   // Touch: hold pauses the timer; a drag up follows the finger and, past SWIPE_PX, dismisses; else it springs back.
@@ -124,6 +173,5 @@ export function showBanner({ title = NAME, message = "", icon = ownIcon(), durat
     else if (away) hide();
   };
   document.addEventListener("visibilitychange", onVis);
-  current = hide;
   return hide;
 }

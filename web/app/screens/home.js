@@ -429,7 +429,15 @@ function wrap(frag) {
 }
 
 // One tile: a cell link with a glyph, a bold label and the chevron. External links open in a new tab.
-function tile({ label, href, glyph, external = false, subtitle = null }) {
+// F229: the website Home's green install row. Not Jailbroken it installs the Lite (sideload) build, for any iPhone; on a
+// jailbroken device the same row hands over the .deb, so it keeps "The .deb for your jailbreak" and drops "Lite".
+export const APP_ROW = { label: `Install ${NAME} Lite`, subtitle: "For any iPhone · no jailbreak needed" };
+export function appRowWords(offer) {
+  return offer?.action === "deb" ? { label: `Install ${NAME}`, subtitle: "The .deb for your jailbreak" } : APP_ROW;
+}
+
+// `lead`: words in front of the label in their own span (F229: Home's "Jailbroken?" in lavender, normal weight).
+function tile({ label, href, glyph, external = false, subtitle = null, lead = null }) {
   const li = el("li", "cell");
   const a = el("a", "cell-inner chevron home-tile");
   a.href = href;
@@ -437,7 +445,9 @@ function tile({ label, href, glyph, external = false, subtitle = null }) {
   a.append(el("span", "cell-icon home-glyph glyph-" + glyph));
   if (subtitle) {
     const text = el("span", "home-tile-text");
-    text.append(el("span", "cell-label", label), el("span", "cell-subtitle", subtitle));
+    const name = el("span", "cell-label", lead ? "" : label);
+    if (lead) name.append(el("span", "home-tile-lead", lead), " " + label);
+    text.append(name, el("span", "cell-subtitle", subtitle));
     a.append(text);
   } else a.append(el("span", "cell-label", label));
   li.append(a);
@@ -550,10 +560,12 @@ function renderRoot(body) {
   // The website: jailbroken visitors get iFizBox from its own APT repo (Sileo, Zebra) or as a .deb (user 2026-11-18).
   // Its own purple tile (user 2026-11-18): the full iFizBox, for a jailbroken phone, from iFizBox's APT repo or a .deb.
   // F178: the website only; never in the sideload (lite) app, which offers no .deb or APT repo (core/appoffer.js ownBuilds).
-  const debTile = settings.mode === "site" && ownBuilds(settings.mode).deb ? tile({ label: `Install Full ${NAME}`, subtitle: "Jailbroken: tweaks, themes and apt",
+  // F229 (a visitor kept tapping the bright purple tile): the green row says it's for any iPhone, the jailbroken one
+  // asks first ("Jailbroken?" in lavender) and wears a pale lavender tint like the green row's (home.css .purple).
+  const debTile = settings.mode === "site" && ownBuilds(settings.mode).deb ? tile({ lead: "Jailbroken?", label: `Install ${NAME}`, subtitle: "Tweaks, themes and apt",
     href: format({ tab: "home" }), glyph: "jailbreak" }) : null;
   debTile?.querySelector("a").addEventListener("click", (e) => { e.preventDefault(); e.stopImmediatePropagation(); jailbrokenSheet(); }, true);
-  const appRow = tileRow("green stack", tile({ label: `Install ${NAME} App`, subtitle: "Signed with your certificate",
+  const appRow = tileRow("green stack", tile({ label: APP_ROW.label, subtitle: APP_ROW.subtitle,
     href: format(settingsRoute(["signing"])), glyph: "install" }));
   // No Send Settings to iFizBox (user 2026-11-18): Install iFizBox App already carries the certificate and settings.
   const debRow = debTile ? tileRow("purple", debTile) : null;
@@ -570,7 +582,10 @@ function renderRoot(body) {
     const type = settings.deviceType();
     offer = homeOffer({ mode: settings.mode, deviceType: type });
     appRow.hidden = !offer;
-    if (appSub) appSub.textContent = offer?.action === "deb" ? "The .deb for your jailbreak" : "Signed with your certificate";
+    const words = appRowWords(offer);
+    if (appSub) appSub.textContent = words.subtitle;
+    const appLabel = appLink.querySelector(".cell-label");
+    if (appLabel) appLabel.textContent = words.label;
   };
   drawApp();
 

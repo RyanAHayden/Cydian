@@ -4,6 +4,8 @@
 // changes.js. The jailbreak build keeps core/queue.js (apt's queue); this one hands each app to the phone's signer.
 //
 //   const q = createAppQueue();
+//   q.add(job, { quiet })  (B71a: quiet, a row's swipe: listeners don't open Confirm)
+//   q.add({ op: "remove", id, name, installed })  B71a: the jailbreak app's Remove (the helper uninstalls it), mode "remove"
 //   q.add(job)  q.get(id)  q.list()  q.size  q.clear(id)  q.clearAll()  q.subscribe(fn) -> unsubscribe
 //   job: { op: "install", id, name, version, installed, mode, url, size, icon, key, source, sourceName, deps }
 //       mode (core/queue.js modeOf): install | reinstall | upgrade | downgrade
@@ -59,14 +61,24 @@ export function createAppQueue() {
   const emit = (event) => { for (const f of [...listeners]) { try { f(event); } catch { /* a listener's bug isn't the queue's */ } } };
   return {
     // An app is queued once: queuing it again replaces it (Cydia's marks work the same).
-    add({ id, name = null, version = null, installed = null, url, library = null, size = null, icon = null, key = null, source = null, sourceName = null, deps = [], options = null, mode = null }) {
+    // B71a: `quiet` (a row's swipe in the jailbreak app) tells listeners not to open Confirm for it.
+    add({ id, op = null, app = null, name = null, version = null, installed = null, url, library = null, size = null, icon = null, key = null, source = null, sourceName = null, deps = [], options = null, mode = null },
+      { quiet = false } = {}) {
       if (!id) throw new Error("no app id");
+      const emit1 = (job) => emit(quiet ? { type: "add", job, quiet } : { type: "add", job });
+      if (op === "remove" || app === "remove" || mode === "remove") { // B71a: the jailbreak app's helper uninstalls it
+        const job = { op: "remove", id, name: name || null, version: null, installed: installed ?? null, mode: "remove", url: null, size: null,
+          icon, key, source, sourceName, deps: [], options: null };
+        jobs.set(id, job);
+        emit1(job);
+        return job;
+      }
       if (mode === "resign") { // F91: signed again from the phone's record, nothing to download here
         // F221: a marked app's re-sign carries its installed version's IPA url (markedResignJob): that is downloaded
         const job = { op: "resign", id, name: name || null, version: version || installed || null, installed: installed || version || null,
           mode: "resign", url: url || null, size: url ? Number(size) || null : null, icon, key, source, sourceName, deps: [], options: null };
         jobs.set(id, job);
-        emit({ type: "add", job });
+        emit1(job);
         return job;
       }
       // F241: a My IPAs file (`library`: its name in the shell's library) instead of a url: signing.prepare {library}
@@ -77,7 +89,7 @@ export function createAppQueue() {
         deps: Array.isArray(deps) ? deps : [], options: options && typeof options === "object" ? options : null };
       if (file) job.library = file;
       jobs.set(id, job);
-      emit({ type: "add", job });
+      emit1(job);
       return job;
     },
     get: (id) => jobs.get(id) ?? null,

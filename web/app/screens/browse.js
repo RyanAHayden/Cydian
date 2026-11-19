@@ -39,6 +39,7 @@ import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sec
 import { reviewsTab } from "./reviews.js";
 import { reviewsApi, reviewsBase, mergeReviews } from "../core/reviews.js";
 import { showActionSheet } from "../nav/actionsheet.js";
+import { showAlert } from "../nav/alert.js"; // B71a
 import { signAndInstall, localSigning } from "../signing-client.js";
 import { installOptions } from "../core/altstore.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
@@ -361,7 +362,8 @@ function bindRow(row, item, route) {
 function markQueued(row) {
   const item = row._item;
   if (!item) return;
-  const job = installQueue.get(item.id);
+  // B71a: an AltStore app queued in the jailbreak app (app-queue.js) is marked the same way
+  const job = installQueue.get(item.id) ?? (item.kind === "ipa" && appQueue.size && jbAppQueue() ? appQueue.get(String(item.id).replace(/~.*$/, "")) : null); // bundle id~name: a second app with that id
   if (job) row.dataset.queued = job.mode; else delete row.dataset.queued;
   if (job) row._.desc.textContent = queuedFor(job.mode);
   else if (row._.desc.textContent.startsWith("Queued for ")) {
@@ -381,6 +383,10 @@ installQueue.subscribe(() => {
   if (!globalThis.document) return;
   for (const row of document.querySelectorAll(".pkg-row[data-id]")) markQueued(row);
   for (const slot of document.querySelectorAll(".package-queue-slot[data-id]")) fillQueueSlot(slot);
+});
+appQueue.subscribe(() => { // B71a
+  if (!globalThis.document || !jbAppQueue()) return;
+  for (const row of document.querySelectorAll(".pkg-row[data-id]")) markQueued(row);
 });
 
 function loadIcon(row, item) {
@@ -421,8 +427,9 @@ export function packageList(body, route, rows, { letters = true, decorate = null
 // F213: `apps` (the sideload build's app queue, app-queue.js) gives AltStore apps the item instead: `job` is what the
 // app page would queue (altstore.js rowAppJob), `installed` the apps store's version ("" when unknown), `queued` the
 // app queue holds it: Cancel, Install (not installed) or Upgrade (a newer version is out); none when up to date.
-// B71: `jbApps` (the jailbreak build's app rows, once it has an app queue: B71a) gives AltStore apps Install / Upgrade
-// (`job`: the IPA the helper installs, jailbreakAppRowState) or, installed and up to date, Remove. iFizBox's
+// B71: `jbApps` (the jailbreak build's app rows: its app queue, B71a) gives AltStore apps Install / Upgrade
+// (`job`: the IPA the helper installs, jailbreakAppRowState) or, installed and up to date, Remove; Cancel while
+// `queued` (the app queue holds it). iFizBox's
 // own package never lists Remove: up to date it offers Reinstall (when a source has that version), else nothing.
 export function rowMenuItems(item, { queue = false, installed = null, newest = null, queued = false, listKey = null, apps = false, job = null,
   jbApps = false, id: appId = null } = {}) {
@@ -431,7 +438,8 @@ export function rowMenuItems(item, { queue = false, installed = null, newest = n
   if (!id) return items;
   if (jbApps && item.kind === "ipa") {
     const up = newest && installed && compareVersions(newest, installed) > 0;
-    if (job && installed == null) items.push({ kind: "queue", label: "Install", job: { app: "install", ...job } });
+    if (queued) items.push({ kind: "cancel", label: "Cancel" }); // B71a: in the app queue already
+    else if (job && installed == null) items.push({ kind: "queue", label: "Install", job: { app: "install", ...job } });
     else if (job && up) items.push({ kind: "queue", label: "Upgrade", job: { app: "install", ...job } });
     else if (installed != null) items.push({ kind: "queue", label: "Remove", job: { app: "remove", id: job?.id || appId || id, name: job?.name || item.name || id } });
   } else if (queue && item.kind !== "ipa" && id === PACKAGE) {
@@ -482,6 +490,13 @@ function attachRowMenu(listEl, route) {
     // Not while editing or showing a Delete (Wish List), nor on rows with no page (an unadded repo's preview).
     if (!item?.id || !row._.a.getAttribute("href") || row.classList.contains("armed") || row.closest(".editing")) return;
     const x = e.clientX;
+    if (item.kind === "ipa" && jbAppQueue()) { // B71a: the jailbreak app's app queue
+      const st = await jbAppRowState(item);
+      if (!row.isConnected || row._item !== item) return;
+      const items = rowMenuItems(item, { ...st, listKey });
+      showMenu(row, items.map((it) => ({ label: it.label, onClick: () => runJbAppRowMenuItem(it, item, st) })), { x });
+      return;
+    }
     if (item.kind === "ipa" && queueKind() === "apps") { // F213: the sideload build's app queue
       const st = await appRowState(item);
       if (!row.isConnected || row._item !== item) return;
@@ -524,7 +539,7 @@ const queueKind = () => (queueOf() ? "apt" : detectMode() === "sideload" ? "apps
 // The app package and its source, asked at the touch (a short cache, as historyFor); the installed record and the
 // queue are read fresh each time. -> rowMenuItems' { id, job, installed, newest, queued }.
 const appRowPkg = new Map(); // id\nkey -> { at, p }
-async function appRowState(item) {
+function appRowPkgOf(item) {
   const k = `${item.id}\n${item.key || ALL}`;
   let hit = appRowPkg.get(k);
   if (!hit || Date.now() - hit.at > 20000) {
@@ -534,15 +549,18 @@ async function appRowState(item) {
     appRowPkg.set(k, hit);
     if (appRowPkg.size > 200) appRowPkg.delete(appRowPkg.keys().next().value);
   }
-  const { pkg, source } = await hit.p;
+  return hit.p;
+}
+async function appRowState(item) {
+  const { pkg, source } = await appRowPkgOf(item);
   const r = await rowAppJob(pkg, source).catch(() => null);
   const id = r?.job?.id || pkg?.stanza?.ipa?.bundleIdentifier || item.id;
   return { id, job: r?.job ?? null, installed: r ? r.installed : null, newest: r?.newest ?? null, queued: !!appQueue.get(id) };
 }
 
 // ---- B71: app rows in the jailbreak build ------------------------------------------------------------------------
-// What an app row's swipe or hold item would queue there (rowMenuItems' `jbApps`). The jailbreak build has no app
-// queue yet (the app queue signs, which it refuses), so nothing calls this until that queue exists (B71a).
+// What an app row's swipe or hold item would queue there (rowMenuItems' `jbApps`; jbAppRowState asks it, B71a: the
+// app queue there runs through the helper, screens/queue.js runJailbreakApps).
 // Pure: rowMenuItems' { id, job, installed, newest } from the row, its catalog package (`pkg`, or null) and the apps
 // store's record (`rec`). Changes' remembered upgrade rows bring their own installed version and IPA (B68).
 export function jailbreakAppRowState(item, { pkg = null, rec = null, source = null } = {}) {
@@ -557,6 +575,67 @@ export function jailbreakAppRowState(item, { pkg = null, rec = null, source = nu
   }
   if (job) job = { ...job, id, name: job.name || item?.name || null };
   return { id, job, installed, newest };
+}
+
+// B71a: the jailbreak app queues AltStore apps (app-queue.js) beside apt's packages: the same Confirm sheet runs them
+// through the helper (screens/queue.js runJailbreakApps). Its rows' swipe and hold menu use this.
+const jbAppQueue = () => queueKind() === "apt" && ipaInstallAvailable();
+
+// An app row's state there: its package and source (appRowPkgOf's short cache), the apps store's record (asked fresh)
+// and the app queue. -> rowMenuItems' options { jbApps, id, job, installed, newest, queued }.
+async function jbAppRowState(item) {
+  const { pkg, source } = await appRowPkgOf(item);
+  const bid = pkg?.stanza?.ipa?.bundleIdentifier || item.id;
+  let rec = null;
+  try { rec = (await (await apps()).all()).find((r) => r?.id === bid) ?? null; } catch { rec = null; }
+  const st = jailbreakAppRowState(item, { pkg, rec, source: source ? displayName(source) : null });
+  return { jbApps: true, ...st, queued: !!appQueue.get(st.id) };
+}
+
+// The hold menu's item: Install / Upgrade / Remove queue it and open Confirm (as a package's do), Cancel takes it out.
+function runJbAppRowMenuItem(it, item, st) {
+  if (it.kind === "cancel") return appQueue.clear(st.id);
+  if (it.kind === "queue") return appQueue.add(it.job);
+  return runRowMenuItem(it, item, { installed: null, name: item.name });
+}
+
+// The swipe's commit: quietly into the app queue (no Confirm), with the undo bar putting back what was there.
+function commitJbAppSwipe(a) {
+  const { item, id } = a;
+  const prev = appQueue.get(id);
+  const name = prev?.name || a.job?.name || item.name || item.id;
+  if (a.kind === "cancel") appQueue.clear(id);
+  else appQueue.add(a.job, { quiet: true });
+  markHintSeen();
+  showUndoBar({ message: swipeMessage(a, name, prev), onUndo: () => restoreApp(id, prev, { quiet: true }) });
+}
+
+// The app page's Modify (altstore.js jailbreakModify) queues too: `install(version)` an IPA of that version, `remove`
+// the app; a queued app's sheet starts with Clear (Cydia's). -> jailbreakModify's options { install, remove, ask }.
+export function jbModifyQueue(pkg, source, { queue = appQueue, ask = showActionSheet, store = apps } = {}) {
+  const app = pkg?.stanza?.ipa;
+  const id = app?.bundleIdentifier || pkg?.row?.id;
+  const sourceName = source ? displayName(source) : null;
+  const installedNow = async () => {
+    try { return (await (await store()).all()).find((r) => r?.id === id)?.version ?? null; } catch { return null; }
+  };
+  let first = true;
+  return {
+    install: async (v) => {
+      const job = appJob(pkg, { installed: await installedNow(), version: v?.version ?? null, source: sourceName });
+      if (job) queue.add(job);
+      else await showAlert({ title: app?.name || id, message: "This version has no IPA to install with the jailbreak.", buttons: ["OK"] });
+    },
+    remove: async ({ id: rid, name }) => { queue.add({ op: "remove", id: rid, name, installed: await installedNow() }); },
+    ask: async (opts) => {
+      if (!first || !queue.get(id)) { first = false; return ask(opts); }
+      first = false;
+      const shift = (d) => (Array.isArray(d) ? d.filter((i) => i >= 0).map((i) => i + 1) : typeof d === "number" && d >= 0 ? d + 1 : d);
+      const i = await ask({ ...opts, buttons: ["Clear", ...opts.buttons], destructive: shift(opts.destructive) });
+      if (i === 0) { queue.clear(id); return -1; }
+      return i < 0 ? i : i - 1;
+    },
+  };
 }
 
 async function runRowMenuItem(it, item, { installed, name }) {
@@ -632,6 +711,12 @@ function attachQueueSwipe(listEl, route) {
     canStart: (row) => canSwipeRow(row),
     prepare: async (row) => {
       const item = row._item;
+      if (item.kind === "ipa") { // B71a: AltStore apps go to the app queue, where the helper installs them
+        if (!jbAppQueue()) return null;
+        const st = await jbAppRowState(item);
+        const action = rowSwipeAction(item, { ...st, listKey });
+        return action && { ...action, item, app: true, id: st.id };
+      }
       const history = item.kind !== "ipa" ? await historyFor(item.id) : null;
       const installed = installedOf(history);
       const newest = history ? history.versions.find((v) => v.keys.length)?.version ?? null : item.version || null;
@@ -640,6 +725,7 @@ function attachQueueSwipe(listEl, route) {
     },
     kindOf: (a) => a.kind,
     commit: (row, a) => {
+      if (a.app) return commitJbAppSwipe(a); // B71a
       const { item, installed } = a;
       const name = item.name || item.id;
       const prev = installQueue.get(item.id);
@@ -692,10 +778,10 @@ function attachAppSwipe(listEl, route) {
   return swipe;
 }
 
-// Undo: the queue as it was for that app (the job it held, or none).
-function restoreApp(id, prev) {
+// Undo: the queue as it was for that app (the job it held, or none). B71a: `quiet` in the jailbreak app (no Confirm).
+function restoreApp(id, prev, { quiet = false } = {}) {
   if (!prev) return appQueue.clear(id);
-  try { appQueue.add(prev); } catch { /* it can't be queued again: leave it out */ }
+  try { appQueue.add(prev, { quiet }); } catch { /* it can't be queued again: leave it out */ }
 }
 
 // F193's first-run hint: ~0.7 s after the list opens, its top row on screen eases left by 44pt and back, once.
@@ -1278,8 +1364,13 @@ async function packageActions(route, button) {
     const rowsOf = (ver) => installRows(ver, st.ipa.sourceUrl, undefined, recordApp(pkg, source, ver), undefined, st.ipa.name,
       { bundleId: appBundleId(st.ipa, pkg.row?.id ?? id) });
     // B69: in the jailbreak app Modify (an installed app) opens Cydia's sheet; Install keeps its one tap below.
+    // B71a: where the app queue runs through the helper, Modify's Upgrade / Reinstall / Downgrade / Remove queue it (Confirm
+    // opens, as a package's Modify), Clear first while it's queued; a queued app not installed gets Clear alone.
+    const jbq = jbAppQueue() ? jbModifyQueue(pkg, source) : null;
     if (ipaInstallAvailable() && await jailbreakModify(pkg, { install: (ver) => rowsOf(ver).rows[0]?.onClick(),
-      history: many ? () => go(versionsHref(route, id)) : null })) return;
+      history: many ? () => go(versionsHref(route, id)) : null, ...(jbq ?? {}) })) return;
+    const qid = st.ipa.bundleIdentifier || id;
+    if (jbq && appQueue.get(qid)) return sheet(st.ipa.name || "", [{ label: "Clear", run: () => appQueue.clear(qid) }]);
     const { rows, options } = rowsOf(v);
     if (rows[0] && rows[0].label !== "Download IPA") return rows[0].onClick();
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });

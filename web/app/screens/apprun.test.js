@@ -328,9 +328,10 @@ test("B76: phoneLanes asks apps.isInstalled; no bridge or a failed call is unkno
   assert.deepEqual(await bad.isInstalled(["com.a"]), {});
 });
 
-// B85: a 2-app run: the first app's prompt dismissed ends that row Cancelled and the second still goes to iOS; the
-// "Tap Install on the iOS prompt" row's tap asks iOS for the prompt again instead of opening the Log.
-test("B85: tapping the asking row re-prompts; a dismissed prompt cancels that row and the next app goes on", () => withDom(async () => {
+// B85: a 2-app run: the first app's prompt dismissed ends that row (B91: Failed, iOS didn't download it) and the
+// second still goes to iOS; the "Tap Install on the iOS prompt" row's tap asks iOS for the prompt again instead of
+// opening the Log.
+test("B85/B91: tapping the asking row re-prompts; a dismissed prompt fails that row, the next app goes on", () => withDom(async () => {
   const s = setup([app("a", "Alpha"), app("b", "Beta")]);
   const reprompted = [];
   const answers = new Map();
@@ -357,15 +358,55 @@ test("B85: tapping the asking row re-prompts; a dismissed prompt cancels that ro
   assert.equal(s.page.filtered, "b");
   answers.get("a")({ installed: false, dismissed: true });
   await settle();
-  assert.equal(statusOf(rows[0]), "Cancelled on the iOS prompt");
+  assert.equal(statusOf(rows[0]), "Failed: iOS didn't download it"); // B91: not "Cancelled"
   assert.deepEqual(s.l.calls.install, ["a", "b"]);
   assert.equal(statusOf(rows[1]), "Tap Install on the iOS prompt");
   answers.get("b")({ installed: true });
   const r = await done;
-  assert.deepEqual(r.rows.map((x) => x.state), ["cancelled", "installed"]);
+  assert.deepEqual(r.rows.map((x) => x.state), ["failed", "installed"]);
   assert.deepEqual(s.queue.list().map((j) => j.id), ["a"]); // still queued, retryable
-  assert.equal(s.page.lines.at(-1).text, "1 installed, 1 cancelled");
+  assert.equal(s.page.lines.at(-1).text, "1 installed, 1 failed");
+  // B91: nothing reopened by itself; the row's tap (Try Again) offers the served IPA again, no new signing
+  assert.deepEqual(reprompted, ["a"]);
+  const signs = s.l.calls.sign?.length;
+  rows[0].children[0].click();
+  await settle();
+  assert.deepEqual(s.l.calls.install, ["a", "b", "a"]);
+  assert.equal(s.l.calls.sign?.length, signs);
+  assert.equal(statusOf(rows[0]), "Tap Install on the iOS prompt");
+  answers.get("a")({ installed: true });
+  await settle();
+  assert.equal(statusOf(rows[0]), "Installed");
 }));
+
+test("B91: phoneLanes' Try Again reuses the try's tag (Stop ends that serving) and asks openPrepared with again", async () => {
+  const sc = { prepareOnDevice: async (job, o) => o.tag, openPrepared: async (row, o) => [o.tag, Boolean(o.again)], discardPrepared: () => {} };
+  const l = phoneLanes(sc);
+  const row = { id: "a", job: {} };
+  assert.equal(await l.sign(row, {}), "a#1");
+  assert.deepEqual(await l.install(row, {}), ["a#2", false]);
+  assert.deepEqual(await l.install(row, { again: true }), ["a#2", true]);
+  assert.deepEqual(await l.install(row, {}), ["a#3", false]);
+  assert.deepEqual(await l.install({ id: "b" }, { again: true }), ["b#4", true]); // no earlier try: a new tag
+});
+
+test("B91: openPrepared with again asks signing.reprompt, not signing.open, then waits; gone when not served", async () => {
+  let reopened = true;
+  const native = fakeNative({
+    "signing.open": () => assert.fail("signed or served again"),
+    "signing.reprompt": () => Promise.resolve({ reopened }),
+    "signing.progress": () => Promise.resolve({ installed: true }),
+  });
+  const seen = [];
+  const row = { id: "a", name: "Alpha", bundleId: "com.a", expires: "2026-12-01" };
+  const r = await openPrepared(row, { tag: "a#2", native, again: true, progress: (...a) => seen.push(a) });
+  assert.deepEqual(r, { installed: true, expires: "2026-12-01" });
+  assert.deepEqual(native.calls.map((c) => c[0]), ["signing.reprompt", "signing.progress"]);
+  assert.deepEqual(native.calls[1][1], { bundleId: "com.a", wait: 600, tag: "a#2" });
+  assert.deepEqual(seen[0], ["asking", 0]);
+  reopened = false;
+  await assert.rejects(openPrepared(row, { tag: "a#2", native, again: true }), (e) => e.code === "gone");
+});
 
 test("B85: openPrepared passes the shell's dismissed; repromptPrepared asks signing.reprompt by bundle ID", async () => {
   const native = fakeNative({

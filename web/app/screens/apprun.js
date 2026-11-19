@@ -8,8 +8,10 @@
 //     round stop button on a working row: it cancels only that app (its download, its signing or iOS's prompt) and the
 //     next goes on. A failed or cancelled row's tap retries it once the run has ended; a "Tap Install on the iOS
 //     prompt" row's tap shows iOS's prompt for it again (B85, signing.reprompt: the user dismissed it); any other row
-//     opens the Log with that app's lines only. A prompt the user closed with Cancel ends its row "Cancelled on the iOS
-//     prompt" and the next app goes on. The summary ("2 installed, 1 failed") ends the list and the log.
+//     opens the Log with that app's lines only. A prompt that closed without iOS asking for the IPA (the user's Cancel,
+//     or iOS couldn't reach iFizBox: it can't tell which) ends its row "Failed: iOS didn't download it" and the next
+//     app goes on; that row's tap (Try Again) asks iOS again with the IPA still served (B91: the Signing Server's copy
+//     after a freeze), and only that tap opens a new prompt. The summary ("2 installed, 1 failed") ends the list and the log.
 //   Log: one line per phase per app (Downloading Delta 48 MB, Signed Delta, Asked iOS to install Delta, Installed
 //     Delta / the reason it failed) with the shell's own lines grey under its app. Percents only move the rows' bars
 //     and the bottom status.
@@ -32,9 +34,14 @@ import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, e
 export function phoneLanes(sc, { native } = {}) {
   let n = 0;
   const tagOf = (r) => `${r.id}#${++n}`;
+  const served = new Map(); // B91: row id -> the tag its served IPA runs under (Try Again's Stop stops that serving)
   return {
     sign: (r, { signal, progress }, log = () => {}) => sc.prepareOnDevice(r.job, { tag: tagOf(r), signal, progress, log, native }),
-    install: (r, { signal, progress }, log = () => {}) => sc.openPrepared(r, { tag: tagOf(r), signal, progress, log, host: isSelf(r), native }),
+    install: (r, { signal, progress, again = false }, log = () => {}) => {
+      const tag = (again && served.get(r.id)) || tagOf(r);
+      served.set(r.id, tag);
+      return sc.openPrepared(r, { tag, signal, progress, log, host: isSelf(r), native, ...(again ? { again: true } : {}) });
+    },
     discard: (r) => sc.discardPrepared(r.token, native),
     // B85: the "Tap Install on the iOS prompt" row's tap: iOS's prompt for that app again
     reprompt: (r) => sc.repromptPrepared?.(r, native) ?? false,

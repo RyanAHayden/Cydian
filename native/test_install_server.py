@@ -103,11 +103,54 @@ class InstallServerSource(unittest.TestCase):
         host = body(self.sideload, "static func hostAfterFreeze(", "\n    }\n\n")
         self.assertIn("state.begin()", host)
         self.assertIn("copyItem(at: output, to: copy)", host)  # the local route keeps its file
-        self.assertIn("InstallPrompt.open(hosted, bundleID: bid", host)
+        self.assertIn("InstallPrompt.rehost(bid, link: hosted)", host)  # B91: the next tap opens it
         self.assertIn("InstallPrompt.end(bid, link: hosted)", host)
         self.assertNotIn("CloseForUpdate", host)  # that closes iFizBox: only for its own update
         self.assertIn('server + "/sign/host"', body(self.sideload, "static func uploadHosted(", "\n    }\n\n"))
         self.assertIn("InstallPrompt.heard(bid)", body(self.sideload, "private static func pollHosted(", "\n    }\n\n"))
+
+    def test_freeze_after_the_prompt_closed_opens_no_prompt(self):
+        """B91: iFizBox can't tell the user's Cancel from a frozen server, so a freeze after the prompt was shown and
+        closed opens no new prompt: the hosted link waits for the user's tap (signing.reprompt), and InstallPrompt's
+        own re-opens stop once a prompt was shown."""
+        host = body(self.sideload, "static func hostAfterFreeze(", "\n    }\n\n")
+        self.assertNotIn("InstallPrompt.open(", host)
+        self.assertNotIn("UIApplication.shared.open(", host)
+        # the only InstallPrompt.open in Sideload is serveChecked's first hand-off of the local link
+        self.assertEqual(self.sideload.count("InstallPrompt.open("), 1)
+        self.assertIn("InstallPrompt.open(iosLink, bundleID: bid",
+                      body(self.sideload, "private static func serveChecked(", "\n    }\n\n"))
+        # a dismissed prompt keeps its IPA served (and hosted) for the row's Try Again
+        progress = body(self.sideload, "static func progress(")
+        self.assertNotIn("SignJob.cancel(tag:", progress)
+
+        prompt = read("InstallPrompt.swift")
+        self.assertIn("static func mayOpenByItself(everShown: Bool) -> Bool { !everShown }", prompt)
+        # a shown prompt marks the entry for good; nothing but the willResignActive observer sets it
+        self.assertEqual(prompt.count("e.everShown = true"), 1)
+        self.assertNotIn("everShown = false\n", prompt.replace("var everShown = false", ""))
+        observer = prompt[prompt.index("willResignActiveNotification"):prompt.index("didBecomeActiveNotification")]
+        self.assertIn("e.everShown = true", observer)
+        attempt = body(prompt, "private static func attempt(")
+        self.assertIn("guard user || mayOpenByItself(everShown: e.everShown) else {", attempt)
+        self.assertLess(attempt.index("mayOpenByItself"), attempt.index("UIApplication.shared.open("))
+        # the retries inside attempt carry who asked; the automatic ones say user: false
+        self.assertIn("attempt(bid, e, n: n + 1, user: user, done: done)", attempt)
+        self.assertIn("attempt(bid, e, n: n, user: user, done: done)", attempt)
+        check = body(prompt, "private static func checkShown(")
+        self.assertIn("mayOpenByItself(everShown: e.everShown)", check)
+        self.assertIn("user: false", check)
+        self.assertIn("user: false", body(prompt, "static func open("))
+        self.assertIn("user: true", body(prompt, "static func reprompt("))
+        # every call of attempt names who asked
+        self.assertEqual(len(re.findall(r"attempt\(bid", prompt)), len(re.findall(r"attempt\(bid[^)]*user: ", prompt)))
+        # rehost only swaps the link: it never opens one
+        rehost = body(prompt, "static func rehost(")
+        self.assertIn("e.link = link", rehost)
+        self.assertNotIn("attempt(", rehost)
+        self.assertNotIn("open(", rehost.replace("static func rehost(", ""))
+        self.assertIn("e.links.contains(link)", body(prompt, "static func end("))
+        self.assertNotIn("taken as Cancel", prompt)
 
 
 if __name__ == "__main__":

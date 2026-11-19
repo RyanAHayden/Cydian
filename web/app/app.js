@@ -14,7 +14,7 @@ import { createStacks, swipeCommits } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transition.js";
 import { attachEdgeSwipe } from "./nav/swipe.js";
 import { keepRow, ghostFor } from "./nav/selection.js";
-import { createTabbar, tapTab, scrollToTop } from "./nav/tabbar.js";
+import { createTabbar, tapTab, scrollToTop, isSliding } from "./nav/tabbar.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
@@ -322,7 +322,7 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
   const tab = a.dataset.tab;
   // Back to the root of the tab you are on is our own pop, so it slides like Back (not a jump).
   tapTab(tab, router.current(), { selectTab: (t) => { ownBack = true; router.selectTab(t); }, reselect: SCREENS[tab].reselect,
-    scrollTop: () => scrollToTop(stacks.top()?.page.body) });
+    scrollTop: () => scrollToTop(stacks.top()?.page.body), sliding: () => isSliding(stacks.top()?.page.body) });
 });
 
 // Pressed look while a finger is down, like Cydia's: .is-pressed on the bar button or row under it, off when the

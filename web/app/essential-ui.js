@@ -16,6 +16,9 @@ import { showAlert } from "./nav/alert.js";
 import { installOnDevice } from "./signing-client.js";
 import { NAME } from "./brand.js";
 import { showBanner } from "./nav/banner.js";
+import { installQueue } from "./queue.js";
+import { appQueue } from "./app-queue.js";
+import { SELF_ID } from "./core/essential.js";
 
 const native = () => globalThis.ifizboxNative;
 const storage = () => { try { return globalThis.localStorage; } catch { return null; } };
@@ -83,13 +86,27 @@ export function lookForUpdates() {
 }
 
 // The newer iFizBox the last check found, as Changes' row has it: sideload the source or GitHub's release, jailbreak
-// GitHub's (apt's row comes from the same release). Upgrade opens Changes. Once per version per session.
-let bannered = null;
+// GitHub's (apt's row comes from the same release). Upgrade queues it and opens Confirm (B44). Once per version per
+// session, unless Upgrade was tapped: then it comes back at the next check once iFizBox is out of the queue again
+// (user 2026-11-18: Upgrade, then Cancel on Confirm, and the banner never showed again).
+export const bannerSeen = { version: null };
+const selfQueued = () => !!(installQueue.get(SELF_ID) || appQueue.get(SELF_ID));
+
+// Whether the banner for version `v` shows now: there is one, it hasn't shown this session, iFizBox isn't queued.
+export const bannerDue = (v, { shown = bannerSeen.version, queued = selfQueued() } = {}) => !!v && shown !== v && !queued;
+
 async function bannerOnce(mode) {
   const current = await appVersion();
   const release = newerRelease(storage(), current);
   const v = mode === "sideload" ? selfUpgradeRow(selfInfoWith(loadInfo(storage()), release), current)?.version : release?.version;
-  if (!v || bannered === v) return;
-  bannered = v;
-  showBanner({ title: NAME, message: `${NAME} ${v} is out.`, action: { label: "Upgrade", onClick: () => { location.hash = "#/changes"; } } });
+  if (!bannerDue(v)) return;
+  bannerSeen.version = v;
+  showBanner({ title: NAME, message: `${NAME} ${v} is out.`, action: { label: "Upgrade", onClick: () => { bannerUpgrade(); } } });
+}
+
+// B44: Upgrade queues iFizBox's own upgrade and opens Confirm (screens/changes.js upgradeSelf), or Changes when its row
+// isn't there yet. A dynamic import: changes.js imports this module. The tap gives the banner its "once" back.
+export function bannerUpgrade({ load = () => import("./screens/changes.js") } = {}) {
+  bannerSeen.version = null;
+  return load().then((m) => m.upgradeSelf(), () => { location.hash = "#/changes"; return "changes"; });
 }

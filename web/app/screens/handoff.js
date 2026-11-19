@@ -13,12 +13,16 @@ import { showShareSheet, setShare } from "../nav/sharesheet.js";
 import { showHUD } from "../nav/hud.js";
 import { appIcon, loadAppIcons } from "../app-icons.js";
 import { NAME } from "../brand.js";
+import { getBackend } from "../backend.js";
 
 // pkg: an id for a package's page; leave it out on a source's page.
 // Only the visitor's format: APT managers run on jailbroken iPhones, so a phone set to Not Jailbroken (Settings >
 // Device, F37) sees just the add link for an APT source; IPA sources (AltStore, ESign, Scarlet, GBox: F50) show the
 // apps that read their format to everyone.
-export function openInGroup(source, { pkg = null, jailbroken = settings.jailbroken() } = {}) {
+export function openInGroup(source, { pkg = null, jailbroken = settings.jailbroken(), mode = detectMode() } = {}) {
+  // F219: the jailbreak build's package page has no Open In group: the managers this phone has are in its Share sheet
+  // (screens/browse.js packageShareItems, installedManagers below).
+  if (pkg && mode === "jailbreak") return document.createDocumentFragment();
   const apt = formatOf(source) === "apt";
   // An app's page has no Open In group: its Install group installs it (the user's certificate in the sideload app;
   // on the website, Install with the certificate alert until F93, F92) or Download IPA keeps the file (user 2026-11-17).
@@ -96,7 +100,28 @@ export const APP_TILES = {
 export const SIDELOAD_TOOLS = new Set(["AltStore Classic", "AltStore", "SideStore", "Feather", "LiveContainer", "StikStore",
   "TrollApps", "Scarlet", "ESign", "GBox"]);
 
-const tileOf = (app) => APP_TILES[app] ?? { letter: app.charAt(0).toUpperCase(), color: "#5a6270" };
+// F219: the APT package managers' bundle IDs, for asking iOS which this phone has (the jailbreak build's package Share).
+// Sileo's from its Info.plist on the iPhone 7 (2026-11-18), Irisin's from its Xcode project (Lakr233/Irisin main-4.0).
+export const MANAGER_BUNDLES = {
+  Cydia: ["com.saurik.Cydia"],
+  Sileo: ["org.coolstar.SileoStore", "org.coolstar.SileoNightly"],
+  Zebra: ["xyz.willy.Zebra"],
+  Irisin: ["wiki.qaq.irisin"],
+};
+
+// Pure: the manager names whose bundle IDs the answer marks installed (true only; unknown counts as not there).
+export function managersIn(answer) {
+  return new Set(Object.entries(MANAGER_BUNDLES).filter(([, ids]) => ids.some((id) => answer?.[id] === true)).map(([app]) => app));
+}
+
+// The managers this phone has, asked once through the backend (backend-native.js appsInstalled, cached for the
+// session); an empty set where it can't ask (the website, the sideload IPA's older shells).
+export async function installedManagers(backend = getBackend()) {
+  if (typeof backend?.appsInstalled !== "function") return new Set();
+  try { return managersIn(await backend.appsInstalled(Object.values(MANAGER_BUNDLES).flat())); } catch { return new Set(); }
+}
+
+const tileOf = (app) =>APP_TILES[app] ?? { letter: app.charAt(0).toUpperCase(), color: "#5a6270" };
 
 // The source's own URL, the one a person would paste into Add Source.
 export function sourceUrlOf(source) {

@@ -14,6 +14,7 @@
 //   signing.openApp {bundleId}   -> {opened: true | false}: F155, launches an installed app (the progress page's Open)
 //   signing.forget {bundleId}    -> {apps}
 //   signing.isInstalled {bundleIds} -> {installed: {bundleId: true | false | null}}: B46, what iOS has now
+//   apps.isInstalled {bundleIds} -> the same, in every build (F219: the jailbreak build refuses signing.*)
 //   signing.resignAll (stream: {index, count, name, phase, progress}) -> {done: [bundleId], failed: [{bundleId, name, error}]}
 //   signing.resign {bundleId} (stream and reply as resignAll, one app) -> F91's queue job "resign"; not_signed: when
 //        iFizBox has no record of that app (by installed or original bundle ID)
@@ -56,6 +57,16 @@ enum Sideload {
                 var out = [String: Any]()
                 for id in ids { out[id] = Workspace.isInstalled(id).map { $0 as Any } ?? NSNull() }
                 return ["installed": out]
+            }
+        }
+        // F219: the same question in every build. signing.* calls are refused in the jailbreak build (SignBridge.run),
+        // and its package page's Share asks which package managers (Cydia, Sileo, Zebra, Irisin) the phone has.
+        b.on("apps.isInstalled") { c in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let ids = (c.params["bundleIds"] as? [String] ?? []).prefix(64)
+                var out = [String: Any]()
+                for id in ids { out[id] = Workspace.isInstalled(id).map { $0 as Any } ?? NSNull() }
+                Apt.reply(c, ["installed": out], nil)
             }
         }
         b.on("signing.resignAll") { c in resignAll(c) }

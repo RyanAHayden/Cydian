@@ -108,6 +108,9 @@ repo stays in iFizBox as a built-in source, so iFizBox updates itself like any o
 
 ### Sideload app (LITE)
 
+No certificate yet? [docs/developer-account.md](docs/developer-account.md) sets one up from your own Apple Developer
+account, with apps keeping their bundle IDs and notifications.
+
 With your certificate added on the website (**Settings > Signing**), tap **Home > Install iFizBox Lite**: the website
 signs the IPA in your browser and iOS asks to install it. The installed app comes with that certificate (and your
 sources and settings), so it signs and installs apps on the phone straight away. That's all it takes.

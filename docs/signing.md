@@ -102,6 +102,8 @@ server step.
 
 ### Setting it up (once)
 
+Getting the certificate and profile from an Apple Developer account: [developer-account.md](developer-account.md).
+
 1. **Settings > Signing**: the `.p12`, its password and the `.mobileprovision`. In the app they go
    to `signing.import`: the `.p12` is opened with `SecPKCS12Import` and its identity (certificate and private key)
    is added to the iOS Keychain, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` (never synced to iCloud, never in

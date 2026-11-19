@@ -66,7 +66,7 @@ class Icons(unittest.TestCase):
         app = HERE.parent
         manifest = json.loads((app / "manifest.json").read_text())
         srcs = [i["src"].split("?")[0] for i in manifest["icons"]]  # ?v=N makes iOS fetch a changed icon afresh
-        self.assertIn("icons/icon-web-192.png", srcs)  # the website's home-screen icon has the WEB sash
+        self.assertIn("icons/icon-web-192.png", srcs)  # the website's home-screen icon has the WEB band
         self.assertIn("icons/icon-web-512.png", srcs)
         for s in srcs:
             self.assertTrue((app / s).is_file(), s)
@@ -80,7 +80,7 @@ class Icons(unittest.TestCase):
         self.assertIn('rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png', (app / "index.html").read_text())
 
     def test_ipa_takes_the_lite_icon(self):
-        # The sideload IPA has the LITE sash; the .deb keeps the plain icon (native/build.sh bundle()).
+        # The sideload IPA has the LITE band; the .deb keeps the plain icon (native/build.sh bundle()).
         build = (ROOT / "native/build.sh").read_text()
         self.assertIn("icon=AppIconLite60x60", build)
         self.assertIn("icon=AppIcon60x60;", build)

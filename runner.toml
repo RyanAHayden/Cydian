@@ -4,9 +4,9 @@ dir = "plan"
 journal = "journal"
 
 [run]
+weekly_max = 98
 test = "tools/check.sh"
 slots = 5
-mode = "d"
 rules = "AGENTS.md"
 notes = ".runner"
 joinable = ["plan/TODO.md", "plan/DONE.md", "journal/*/*.md"]

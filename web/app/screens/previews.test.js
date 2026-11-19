@@ -22,9 +22,9 @@ function withDom(fn) {
 
 const http = { kind: "http", assetUrl: (u) => `/api/fetch?url=${encodeURIComponent(u)}`, text: async (u) => `proxy:${u}` };
 
-test("galleryImage: lazy, the source's aspect, else the picture's own; landscape is wide", () => withDom(() => {
+test("galleryImage: eager (B54: it loads off the page), the source's aspect, else the picture's own; landscape is wide", () => withDom(() => {
   const a = galleryImage({ url: "https://x.dev/a.png", width: 1179, height: 2556 }, { backend: () => http });
-  assert.equal(a.loading, "lazy");
+  assert.equal(a.loading, "eager");
   assert.equal(a.style.aspectRatio, "1179 / 2556");
   assert.equal(a.classList.contains("wide"), false);
   const b = galleryImage({ url: "https://x.dev/b.png" }, { backend: () => http });

@@ -877,9 +877,16 @@ function attachRowGestures(ul) {
   ul.addEventListener("pointercancel", stop);
 }
 
+// B112: the drawn apps list (not the Install IPAs row's table): in the pinned .search-results under the search bar
+// (C10), else straight in the page body, as drawAppList appends it.
+export function appListOf(view = appView) {
+  const box = view.results?.parentNode === view.body ? view.results : view.body;
+  return [...(box?.children ?? [])].find((n) => n.classList?.contains("table") && !n.classList.contains("install-ipas-top")) ?? null;
+}
+
 function setEditing(on, button) {
   appView.editing = on;
-  appView.body?.querySelector(":scope > .table:not(.install-ipas-top)")?.classList.toggle("editing", on); // the apps, not My IPAs' tile (inside .home-row)
+  appListOf()?.classList.toggle("editing", on); // the apps, not My IPAs' tile (inside .home-row)
   for (const li of appView.body?.querySelectorAll(".installed-app.armed") ?? []) li.classList.remove("armed");
   if (button) {
     button.textContent = on ? "Done" : "Edit";
@@ -1185,7 +1192,7 @@ export function setManaging(on) {
   for (const li of appView.body?.querySelectorAll(".installed-app.armed") ?? []) li.classList.remove("armed");
   const b = manageBar.right;
   if (b?.isConnected) { b.textContent = on ? "Done" : "Manage"; b.classList.toggle("done", Boolean(on)); }
-  const ul = appView.body?.querySelector(":scope > .table:not(.install-ipas-top)");
+  const ul = appListOf();
   ul?.classList.toggle("managing", Boolean(on));
   if (on && ul && !manageBar.summary?.isConnected) {
     const line = manageSummaryLine();

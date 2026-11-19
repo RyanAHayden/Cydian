@@ -110,6 +110,7 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
         b.on("app.badge") { c in
             let n = max(0, (c.params["count"] as? NSNumber)?.intValue ?? 0)
             WidgetStore.save(count: n, names: []) // N8: the Home Screen widget shows the same count
+            UserDefaults.standard.set(n, forKey: BackgroundCheck.pageCountKey) // B47: the background check's badge starts here
             DispatchQueue.main.async {
                 let center = UNUserNotificationCenter.current()
                 if n == 0 { center.removeDeliveredNotifications(withIdentifiers: [upgradesID]) }

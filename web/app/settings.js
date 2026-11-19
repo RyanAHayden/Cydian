@@ -15,7 +15,13 @@ import { parse } from "./router.js";
 
 export function createUpgradeNotices({ settings, native = globalThis.ifizboxNative, current, win = globalThis.window } = {}) {
   // Both app builds: the jailbreak app's daemon counts in the background too, the sideload app counts here.
-  const on = Boolean(native && typeof native.call === "function") && ["jailbreak", "sideload"].includes(detectMode({ ifizboxNative: native }));
+  const mode = native ? detectMode({ ifizboxNative: native }) : "site";
+  const on = Boolean(native && typeof native.call === "function") && ["jailbreak", "sideload"].includes(mode);
+  // B47: in the sideload app nothing counts but this page and the shell's background check (BackgroundCheck.swift,
+  // which starts from the count the page last set), so the icon badge is Changes' count, set again on every count,
+  // 0 included and on any tab: a badge the background check set, or one left from before an update was installed,
+  // never outlives the recount (user 2026-11-18: "I had a badge on IPA but there was no update").
+  const mirror = on && mode === "sideload";
   let count = null; // the Changes tab's last count
   let cleared = false; // the icon badge is 0 as far as we know (until the next count above 0)
   const onChanges = () => (current?.() ?? (win ? parse(win.location.hash) : null))?.tab === "changes";
@@ -32,6 +38,13 @@ export function createUpgradeNotices({ settings, native = globalThis.ifizboxNati
     badge(tab, n) {
       if (tab !== "changes") return false;
       const next = typeof n === "number" ? n : Number(n) || 0;
+      if (mirror) {
+        Promise.resolve(native.call("app.badge", { count: next })).catch(() => {});
+        if (next !== count) Promise.resolve(native.call("app.shortcuts", { upgrades: next })).catch(() => {});
+        count = next;
+        cleared = next === 0;
+        return next === 0;
+      }
       // the app icon shows the count too (Settings > App Icon Badge), not only the daemon's background checks
       if (on && next > 0 && next !== count) Promise.resolve(native.call("app.badge", { count: next })).catch(() => {});
       // the icon's long-press menu offers Upgrade All while there are upgrades (sideload: native Shortcut)

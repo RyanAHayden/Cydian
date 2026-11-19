@@ -7,7 +7,8 @@
 //   rememberedUpgrades(records, candidateOf, holds) -> { available, ignored }: findUpgrades' row shape, the source's
 //       row with `installed` = the remembered version; Settings' Ignored Upgrades (holds) go to ignored
 //   mergeUpgrades(a, b)        -> one { available, ignored }, each id once (a's row wins), sorted by name
-//   watchList(records)         -> [{ id, name, version, source }] the shell's background check follows
+//   watchList(records, { sourceOf, ignored }) -> [{ id, name, version, source }] the shell's background check
+//                                follows: only apps Changes could count (B47)
 //   upgradeKeys(rows)          -> ["<id> <version>"]: the upgrades already counted on screen (the shell's "known")
 //   updatesTitle(n)            -> "1 Update" | "<n> Updates" (the notification's title; Updates.swift title(_:))
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -54,11 +55,20 @@ export function mergeUpgrades(a, b) {
 
 const httpUrl = (u) => (typeof u === "string" && /^https?:\/\//i.test(u.trim()) ? u.trim() : null);
 
-export function watchList(records) {
+// B47: the AltStore source URL a Changes row came from (its key "alt:<url>"), or null (an APT or other source,
+// which the shell's background check can't read).
+export const altSourceOf = (key) => (typeof key === "string" && key.startsWith("alt:") ? httpUrl(key.slice(4)) : null);
+
+// B47: `sourceOf(id)`, when given, is the source Changes reads the app from (altSourceOf its row's key), and an app
+// it answers null for is left out: Changes can't show its upgrade (its source removed, or no longer listing it),
+// so the background check must not badge one either. `ignored`: Settings' Ignored Upgrades and blocked packages,
+// which Changes files under Ignored Upgrades, never counted.
+export function watchList(records, { sourceOf = null, ignored = [] } = {}) {
+  const skip = new Set(ignored ?? []);
   const out = [];
   for (const r of records ?? []) {
-    const source = httpUrl(r?.source);
-    if (!r?.id || r.self || r.id === SELF_ID || !r.version || !source) continue;
+    const source = sourceOf ? (r?.id ? sourceOf(r.id) : null) : httpUrl(r?.source);
+    if (!r?.id || r.self || r.id === SELF_ID || !r.version || !source || skip.has(r.id)) continue;
     out.push({ id: String(r.id), name: String(r.name || r.id), version: String(r.version), source });
   }
   return out.sort((a, b) => a.id.localeCompare(b.id));

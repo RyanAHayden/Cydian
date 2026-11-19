@@ -15,7 +15,8 @@
 //   #/installed/myipas/ipa:<file>/options   Sign Options: name, bundle ID, icon, extensions, arm64e fix-up
 //
 // In the sideload app the files live in iFizBox's Documents (Files > On My iPhone > iFizBox) and the shell signs them
-// (signing-client.js libraryCall, native/Sources/MyIPAs.swift). F212: the jailbreak app uses the same library (its
+// (signing-client.js libraryCall, native/Sources/MyIPAs.swift); an IPA page's Install queues it in the IPA queue
+// (F241, queueLibraryInstall) while the Signing Server answers. F212: the jailbreak app uses the same library (its
 // Documents is /var/mobile/Documents) but doesn't sign: an IPA's page is its details and Delete, and Install runs
 // Install IPA's console over library.helperInstall (ifizbox-helper installs the file as it is). On the website there is no signer on the phone:
 // Add is Choose File (F197: the IPA is kept in this browser's IndexedDB and Install signs it here, signInBrowser with
@@ -48,6 +49,9 @@ import { readIpaFile } from "../core/ipainfo.js";
 import { localSigning, libraryCall, installFromLibrary, signAndInstall, openSigning } from "../signing-client.js";
 import { siteCertificateAlert } from "./altstore.js";
 import { NAME } from "../brand.js";
+import { serverReachable } from "../signing-client.js";
+import { libraryJob } from "../core/appqueue.js";
+import { queueApp } from "./queue.js";
 
 export { MYIPAS };
 
@@ -1089,6 +1093,7 @@ async function install(file) {
     } });
     return;
   }
+  if (await queueLibraryInstall(entry)) return; // F241: through the IPA queue's run when the Signing Server answers
   const name = entry?.options?.name || entry?.name || file.replace(/\.ipa$/i, "");
   await installFromLibrary({ file, name, signed: Boolean(entry?.signed), onInstalled: (r) => {
     if (r?.bundleId) record(r.bundleId, r.name || name, r.version || entry?.version || "", entry?.options?.icon || entry?.icon);
@@ -1097,6 +1102,20 @@ async function install(file) {
   const route = { tab: "installed", path: ipaPath(file) };
   const body = shownBody(route);
   if (body) rerender(body, route);
+}
+
+// F241: the sideload app's Install on an IPA's page queues it in the IPA queue (core/appqueue.js libraryJob: signed
+// from the library file with its Sign Options) and opens Confirm, so several My IPAs (and source apps) install signed
+// ahead, one at a time, each with its own stop (screens/apprun.js). Offline (the Signing Server doesn't answer) it
+// returns false and Install stays installFromLibrary's: signed now, kept in My IPAs, and the No Connection message.
+// -> true once queued.
+export async function queueLibraryInstall(entry, { reachable = serverReachable, add = queueApp, installed = lib.installed } = {}) {
+  const id = installedIdOf(entry);
+  const job = libraryJob(entry, { installed: Boolean(id && installed?.[id]) });
+  if (!job) return false;
+  if (!(await Promise.resolve().then(() => reachable()).catch(() => false))) return false;
+  add(job);
+  return true;
 }
 
 // F212: the jailbreak app's Install for a library file: Install IPA's console (screens/ipa-install.js, as a URL's or a

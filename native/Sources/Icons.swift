@@ -257,3 +257,176 @@ final class PlainGet {
         return nil
     }
 }
+
+// F238: a .deb from a plain http repo (BigBoss and friends) streamed to a file over Network.framework, for
+// share.debFetch (native/share/App/ShareBridge.swift): URLSession's Download can't, as ATS keeps it off http. Same
+// shape as Download (SignBridge.swift): progress 0...1 when the server sends a Content-Length, the size cap, cancel()
+// ending in "cancelled: Cancelled", `done` called once with nil or "<code>: <message>". The answer is decoded by
+// native/share/HTTPStream.swift (Content-Length, chunked or close-delimited). Up to 5 redirects: to http it carries
+// on here, to https it hands over to Download. 60 s without a byte is a timeout, as Download's request timeout.
+final class PlainDownload: DebFetch {
+    static let idle: TimeInterval = 60
+    static let maxRedirects = 5
+
+    private let url: URL, dest: URL, max: Int64, redirects: Int
+    private let progress: (Double) -> Void
+    private var done: ((String?) -> Void)?
+    private let queue = DispatchQueue(label: "ifizbox.deb.http")
+    private var conn: NWConnection?
+    private var stream = HTTPStream()
+    private var file: FileHandle?
+    private var next: DebFetch? // the redirect's download, which cancel() stops too
+    private var lastByte = Date()
+    private var timer: DispatchSourceTimer?
+    private var keep: PlainDownload? // itself until done: the connection's handlers hold it weakly
+
+    private init(_ url: URL, _ dest: URL, _ max: Int64, _ redirects: Int, _ progress: @escaping (Double) -> Void,
+                 _ done: @escaping (String?) -> Void) {
+        self.url = url; self.dest = dest; self.max = max; self.redirects = redirects; self.progress = progress; self.done = done
+    }
+
+    @discardableResult
+    static func start(_ url: URL, to dest: URL, max: Int64, redirects: Int = maxRedirects,
+                      progress: @escaping (Double) -> Void, done: @escaping (String?) -> Void) -> PlainDownload {
+        let d = PlainDownload(url, dest, max, redirects, progress, done)
+        d.keep = d
+        d.queue.async { d.begin() }
+        return d
+    }
+
+    func cancel() {
+        queue.async { [self] in
+            next?.cancel()
+            finish("cancelled: Cancelled")
+        }
+    }
+
+    private func begin() {
+        guard done != nil else { return } // cancelled before it began
+        guard let host = url.host, !host.isEmpty, let port = NWEndpoint.Port(rawValue: UInt16(clamping: url.port ?? 80)) else {
+            return finish("bad_url: no host")
+        }
+        let c = NWConnection(host: NWEndpoint.Host(host), port: port, using: .tcp)
+        conn = c
+        c.stateUpdateHandler = { [weak self] st in
+            guard let self = self else { return }
+            switch st {
+            case .ready: self.send()
+            case .failed(let e), .waiting(let e): self.finish("network: \(e.localizedDescription)")
+            default: break
+            }
+        }
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now() + 5, repeating: 5)
+        t.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            if Date().timeIntervalSince(self.lastByte) > PlainDownload.idle {
+                self.finish("timeout: no answer from \(host) in \(Int(PlainDownload.idle)) s")
+            }
+        }
+        timer = t
+        t.resume()
+        lastByte = Date()
+        c.start(queue: queue)
+    }
+
+    // Once: the connection and timer stop, the file closes, `done` hears the outcome.
+    private func finish(_ err: String?) {
+        timer?.cancel()
+        timer = nil
+        conn?.stateUpdateHandler = nil
+        conn?.cancel()
+        conn = nil
+        try? file?.close()
+        file = nil
+        next = nil
+        guard let d = done else { return }
+        done = nil
+        d(err)
+        keep = nil
+    }
+
+    private func send() {
+        guard let host = url.host else { return }
+        let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        var path = comps?.percentEncodedPath ?? "/"
+        if path.isEmpty { path = "/" }
+        if let q = comps?.percentEncodedQuery { path += "?" + q }
+        let hostHeader = url.port.map { "\(host):\($0)" } ?? host
+        let req = "GET \(path) HTTP/1.1\r\nHost: \(hostHeader)\r\nUser-Agent: \(SourceIcon.userAgent)\r\n"
+            + "Accept: */*\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n"
+        conn?.send(content: Data(req.utf8), completion: .contentProcessed { [weak self] e in
+            guard let self = self else { return }
+            if let e = e { return self.finish("network: \(e.localizedDescription)") }
+            self.receive()
+        })
+    }
+
+    private func receive() {
+        conn?.receive(minimumIncompleteLength: 1, maximumLength: 256 << 10) { [weak self] data, _, isComplete, error in
+            guard let self = self, self.done != nil, self.next == nil else { return }
+            self.lastByte = Date()
+            do {
+                if let data = data, !data.isEmpty {
+                    let wasHeaded = self.stream.headed
+                    let body = try self.stream.feed(data)
+                    if !wasHeaded && self.stream.headed, try self.answered() { return }
+                    if !body.isEmpty { try self.write(body) }
+                }
+                if self.stream.finished { return self.finish(nil) }
+                if let e = error { return self.finish("network: \(e.localizedDescription)") }
+                if isComplete {
+                    try self.stream.end()
+                    return self.finish(nil)
+                }
+                self.receive()
+            } catch let e as HTTPStreamError {
+                self.finish(e.text)
+            } catch {
+                self.finish("network: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // The head is in: true when this download is over (a redirect handed on, an error said), else the file is open.
+    private func answered() throws -> Bool {
+        let st = stream.status
+        if (300..<400).contains(st), let loc = stream.headers["location"] {
+            guard redirects > 0 else { finish("network: too many redirects"); return true }
+            guard let n = URL(string: loc, relativeTo: url)?.absoluteURL, let to = Apt.httpURL(n.absoluteString) else {
+                finish("network: a redirect to a non-http(s) URL"); return true
+            }
+            conn?.stateUpdateHandler = nil
+            conn?.cancel()
+            conn = nil
+            timer?.cancel()
+            timer = nil
+            let pass: (String?) -> Void = { [self] err in queue.async { self.finish(err) } }
+            if to.scheme?.lowercased() == "https" {
+                next = Download.start(to, to: dest, max: max, progress: progress, done: pass)
+            } else {
+                next = PlainDownload.start(to, to: dest, max: max, redirects: redirects - 1, progress: progress, done: pass)
+            }
+            return true
+        }
+        if st >= 400 || !(200..<300).contains(st) { finish("network: the server answered \(st)"); return true }
+        if let n = stream.length, n > max { finish("too_large: the package is bigger than \(max >> 20) MB"); return true }
+        try? FileManager.default.removeItem(at: dest)
+        guard FileManager.default.createFile(atPath: dest.path, contents: nil) else {
+            throw HTTPStreamError("internal", "couldn't create \(dest.lastPathComponent)")
+        }
+        file = try FileHandle(forWritingTo: dest)
+        return false
+    }
+
+    private func write(_ body: Data) throws {
+        if stream.received > max { throw HTTPStreamError("too_large", "the package is bigger than \(max >> 20) MB") }
+        guard let f = file else { return }
+        try f.write(contentsOf: body)
+        if let n = stream.length, n > 0 { progress(Double(stream.received) / Double(n)) }
+    }
+}
+
+// F238: a running .deb download share.debCancel can stop: Download (https) or PlainDownload (http).
+protocol DebFetch: AnyObject { func cancel() }
+extension Download: DebFetch {}

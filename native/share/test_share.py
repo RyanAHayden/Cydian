@@ -72,7 +72,8 @@ class SwiftShare(unittest.TestCase):
             os.symlink("/usr/lib/libncursesw.so.6", os.path.join(shim, "libncurses.so.6"))
             env["LD_LIBRARY_PATH"] = shim + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
         r = subprocess.run([SWIFTC, "-module-cache-path", os.path.join(cls.tmp, "modules"),
-                            os.path.join(HERE, "Share.swift"), os.path.join(NATIVE, "intents", "Core.swift"),
+                            os.path.join(HERE, "Share.swift"), os.path.join(HERE, "HTTPStream.swift"),
+                            os.path.join(NATIVE, "intents", "Core.swift"),
                             os.path.join(NATIVE, "sign", "Updates.swift"), os.path.join(NATIVE, "sign", "Hash.swift"),
                             os.path.join(NATIVE, "sign", "Brand.swift"),
                             os.path.join(HERE, "tests", "main.swift"),
@@ -101,7 +102,8 @@ class SwiftShare(unittest.TestCase):
                      "route: deb is the Confirm sheet in jailbreak mode, needs a jailbreak in sideload mode",
                      "jailbreak ipa: install-ipa through the helper, version for I3",
                      "jailbreak deb: simulate-deb resolves dependencies, install-deb installs",
-                     "F133: a downloaded .deb checked against its stanza's SHA256 or MD5sum"):
+                     "F133: a downloaded .deb checked against its stanza's SHA256 or MD5sum",
+                     "http stream: Content-Length, chunked, close-delimited, any split"):
             self.assertIn("ok   " + name, self.out.stdout)
         self.assertIn("all passed", self.out.stdout)
 

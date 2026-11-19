@@ -333,5 +333,54 @@ test("F133: a downloaded .deb checked against its stanza's SHA256 or MD5sum") {
     check(md5hex([big.prefix(63), big.dropFirst(63).prefix(65), big.dropFirst(128)]) == "1da708a75e25110b1341d16814feb52d", "pieces")
 }
 
+// F238: HTTPStream, the plain-http .deb download's decoder, fed in every split.
+test("http stream: Content-Length, chunked, close-delimited, any split") {
+    func run(_ raw: String, piece: Int) throws -> (HTTPStream, String, Bool) {
+        let d = HTTPStream()
+        let bytes = Array(raw.utf8)
+        var body = Data()
+        var i = 0
+        while i < bytes.count && !d.finished {
+            body.append(try d.feed(Data(bytes[i..<min(i + piece, bytes.count)])))
+            i += piece
+        }
+        var ended = true
+        do { try d.end() } catch { ended = false }
+        return (d, String(decoding: body, as: UTF8.self), ended)
+    }
+    let cl = "HTTP/1.1 200 OK\r\nContent-Length: 11\r\nServer: x\r\n\r\nhello world"
+    let chunked = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5;ext=1\r\nhello\r\n6\r\n world\r\n0\r\nX-T: 1\r\n\r\n"
+    let close = "HTTP/1.0 200 OK\r\nContent-Type: application/x-deb\r\n\r\nhello world"
+    let cont = "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\nhello worldEXTRA"
+    for piece in [1, 2, 3, 7, 1000] {
+        for (name, raw) in [("length", cl), ("chunked", chunked), ("close", close), ("100", cont)] {
+            let (d, body, ended) = try run(raw, piece: piece)
+            check(body == "hello world", "\(name)/\(piece): \(body)")
+            check(d.status == 200 && ended && d.received == 11, "\(name)/\(piece): status \(d.status) ended \(ended)")
+        }
+    }
+    let (d, _, _) = try run(cl, piece: 4)
+    check(d.length == 11 && d.headers["server"] == "x", "length and headers")
+    // redirects and errors say their status; the body isn't wanted
+    let (r, _, _) = try run("HTTP/1.1 302 Found\r\nLocation: https://x/y.deb\r\nContent-Length: 0\r\n\r\n", piece: 5)
+    check(r.status == 302 && r.headers["location"] == "https://x/y.deb" && r.finished, "302")
+    // cut short: Content-Length or chunked not reached is an error at the end
+    let (_, _, shortEnded) = try run("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\nhello", piece: 3)
+    check(!shortEnded, "short Content-Length")
+    let (_, _, chunkEnded) = try run("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhel", piece: 3)
+    check(!chunkEnded, "unfinished chunked")
+    let none = HTTPStream()
+    check((try? none.end()) == nil, "no answer at all")
+    // not HTTP, broken chunks, a bad length
+    func fails(_ raw: String) -> String? {
+        do { _ = try HTTPStream().feed(Data(raw.utf8)); return nil } catch let e as HTTPStreamError { return e.text } catch { return "\(error)" }
+    }
+    check(fails("SSH-2.0-OpenSSH\r\n\r\n")?.hasPrefix("upstream: ") == true, "not HTTP")
+    check(fails("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n") != nil, "bad chunk size")
+    check(fails("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nabXY") != nil, "chunk without CRLF")
+    check(fails("HTTP/1.1 200 OK\r\nContent-Length: -4\r\n\r\n") != nil, "negative length")
+    check(fails("HTTP/1.1 200 OK\r\n" + String(repeating: "X-A: b\r\n", count: 5000)) != nil, "endless header")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

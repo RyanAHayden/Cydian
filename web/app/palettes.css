@@ -68,6 +68,8 @@ html[data-theme="dark"][data-palette="midnight"] {
   --dk-bar-fill: linear-gradient(#93a0ba, #5f6f8e);
   --dk-inset-box: #18253e;
   --dk-green: #102a24;
+  --dk-lavender: #221a3a;
+  --dk-lavender-text: #b49ae0;
   --dk-glyph: #34476b;
   --dk-dim: #56688c;
   --dk-review-btn: linear-gradient(#34476b, #1c2a44);
@@ -140,6 +142,8 @@ html[data-theme="dark"][data-palette="linen"] {
   --dk-bar-fill: linear-gradient(#b9bdc5, #8a8e96);
   --dk-inset-box: #232528;
   --dk-green: #243a2a;
+  --dk-lavender: #332b42;
+  --dk-lavender-text: #c6b3ea;
   --dk-glyph: #4a4d54;
   --dk-dim: #6a6d74;
   --dk-issue-table: #4a2a2a;
@@ -215,6 +219,8 @@ html[data-theme="dark"][data-palette="nord"] {
   --dk-bar-fill: linear-gradient(#88c0d0, #5e81ac);
   --dk-inset-box: #343a48;
   --dk-green: #34403a;
+  --dk-lavender: #463e5c;
+  --dk-lavender-text: #b48ead;
   --dk-glyph: #4c566a;
   --dk-dim: #6b768c;
   --dk-issue-head: #e5b4b9;
@@ -293,6 +299,8 @@ html[data-theme="dark"][data-palette="dracula"] {
   --dk-bar-fill: linear-gradient(#bd93f9, #8a5fe0);
   --dk-inset-box: #2c2e3b;
   --dk-green: #1f3a2a;
+  --dk-lavender: #3e3354;
+  --dk-lavender-text: #bd93f9;
   --dk-glyph: #6272a4;
   --dk-dim: #6272a4;
   --dk-issue-head: #ff9a9a;

@@ -1,0 +1,15 @@
+[
+  { "eval": "localStorage.setItem('ifizbox.appearance','light'); 1" },
+  { "nav": "#/home", "ms": 4000 },
+  { "eval": "[...document.querySelectorAll('.home-row.green.stack .cell-label, .home-row.purple .cell-label, .home-row.green.stack .cell-subtitle, .home-row.purple .cell-subtitle')].map(e=>e.textContent)" },
+  { "shot": "home-light" },
+  { "clipshot": "rows-light", "sel": [".home-row.green.stack", ".home-row.purple"] },
+  { "eval": "localStorage.setItem('ifizbox.appearance','dark'); 1" },
+  { "nav": "#/home", "ms": 4000 },
+  { "shot": "home-dark" },
+  { "clipshot": "rows-dark", "sel": [".home-row.green.stack", ".home-row.purple"] },
+  { "eval": "localStorage.setItem('ifizbox.darkTheme','gunmetal'); document.documentElement.dataset.palette" },
+  { "nav": "#/home", "ms": 4000 },
+  { "eval": "document.documentElement.dataset.palette" },
+  { "clipshot": "rows-dark-gunmetal", "sel": [".home-row.green.stack", ".home-row.purple"] }
+]

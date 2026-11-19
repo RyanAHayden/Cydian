@@ -21,7 +21,7 @@ returns the packages it installed.
 - **Daily update notice.** Automation → Time of Day → Run Immediately. Actions: Check for Updates; Count (Items);
   If Count is greater than 0: Show Notification "iFizBox: (Count) updates".
 - **Update everything at night (jailbreak).** Automation → Time of Day, 03:00, When Charging → Run Immediately.
-  Install All Updates; then Respring if the dialog asked for it (or leave that to Settings > Automatic Updates).
+  Install All Updates; then Respring if the dialog asked for it (or leave that to Settings > Updates > After a Respring Update).
 - **Action button.** Settings → Action Button → Controls (Respring, Userspace Reboot) or Shortcut (any action above).
 - **Add a repo from a link.** Share sheet shortcut (accepts URLs): Add Source with Shortcut Input. iFizBox opens its Add
   Source alert filled in; you still tap Add Source. (iFizBox is also in the share sheet itself: `native/share/README.md`.)

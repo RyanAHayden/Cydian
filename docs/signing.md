@@ -20,7 +20,7 @@ iOS's install prompt.
   on PATH or in `~/emsdk`) and fails when the committed copy differs from what the same emcc builds.
 - **Settings > Signing**: the `.p12`, its password and the `.mobileprovision` in this browser's
   IndexedDB (`signing-client.js`), the profile's details, **Install iFizBox App** and **Bring My Certificate**,
-  Remove Certificate. Home has the Signing tile beside Featured.
+  Remove Certificate. Until signing is set up, Home has the Signing tile beside Featured.
 - **Install** (an app's page, first row; the nav bar's Install runs it): `signing-client.js signInBrowser`:
   1. *Downloading*: the IPA through the Worker's `/api/fetch?url=…&kind=ipa` (most hosts send no CORS headers),
      streamed, up to 512 MB (`MAX_UPLOAD_MB`).
@@ -51,14 +51,17 @@ iOS's install prompt.
   on the website (the install queue is the sideload app's).
 - **My IPAs' links**: Install is the alert saying the certificate is needed, with **Download IPA** beside
   OK (`altstore.js siteCertificateAlert`).
-- **Home's Install iFizBox App** (Not Jailbroken; `home.js installApp`): with a certificate, iFizBox's IPA signed and
+- **Home's Install iFizBox Lite** (Not Jailbroken; `home.js installApp`; Settings > Signing's Install iFizBox App
+  does the same): with a certificate, iFizBox's IPA signed and
   installed as above, carrying the certificate (`ifizbox-identity.plist`, the shell's `BundledIdentity` imports it on
   first launch) unless Bring My Certificate is off, and always the website's sources and settings
   (`web/transfer.link`, which `app.js` imports once on first launch). Both files go in before zsign seals the
-  bundle. Without a certificate it opens Settings > Signing. Jailbroken visitors get the release's `.deb`.
-- **Send Settings** (Open in iFizBox App): sources, travelling settings, Ignored Upgrades and the certificate.
-- iFizBox's own upgrade row in Changes, when the app can't sign iFizBox itself (no bridge), opens ifizbox.com in Safari for Home's
-  Install iFizBox App (`core/essential.js installSelf`).
+  bundle. Without a certificate it opens Settings > Signing, and offers Install Now there once the certificate is in.
+  Jailbroken visitors get Home's **Jailbroken? Install iFizBox** row instead: iFizBox's APT repo in Sileo or Zebra, or
+  the release's `.deb`.
+- **Open in iFizBox App** (Settings): sources, travelling settings, Ignored Upgrades and the certificate.
+- iFizBox's own upgrade row in Changes, when the app can't sign iFizBox itself (no bridge), opens ifizbox.com in Safari
+  (`core/essential.js installSelf`).
 
 What leaves the browser: the IPA's address (to `/api/fetch`) and the signed app (to `/sign/upload`, for 10 minutes).
 The certificate, key and password never do, except inside iFizBox's own signed IPA with Bring My Certificate (that
@@ -123,7 +126,8 @@ uploaded to the Signing Server (`signing.install {host: true}`, `POST /sign/host
 10 minutes and serves it to iOS (`worker/README.md`). The certificate and key stay on the phone; the signed iFizBox
 (which embeds the profile, as every signed app does) is on the server for those 10 minutes.
 
-`signing.export` (the `.p12` and password kept in the Keychain) is in the shell, but nothing on the page calls it.
+`signing.export` (the `.p12` and password kept in the Keychain) is what iFizBox Account reads to sync the certificate
+(`screens/account.js`, with Sync Certificate on).
 
 ### The page's side: setting up
 
@@ -134,8 +138,8 @@ file names stay, until the app quits. The rest of the page comes from `signing.s
 (`core/signing.js deviceSummary`, the signer's `problem` as its footer) and Remove Certificate (`signing.remove`).
 The page is a walkthrough (`screens/signing.js`) of two steps, each ticking green once done: **Import Your
 Certificate** (a big Select All Files button over the three rows: one multi-select pick of the `.p12`, the
-`.mobileprovision` and the password file, or their `.zip`, fills whatever is missing; the picture is today's iOS file
-picker, drawn, unless `web/app/icons/steps/select-files.png` holds a real screenshot) and
+`.mobileprovision` and the password file, or their `.zip`, fills whatever is missing, over a picture of the iOS
+file picker, `web/app/icons/steps/select-files-light.jpg` and `-dark.jpg`) and
 **Signing Server** (the server row and Check Server). Install on an AltStore app's page and Version History's rows
 first look whether both are there (`firstInstallCheck`: `signing.status` and `getServer()`); the first Install with
 one missing opens this page at that step, with no alert. Then `signing.install {url, manifestServer}`
@@ -146,7 +150,7 @@ Signing. Tests: `web/app/signing-client-device.test.js`, `web/app/screens/signin
 
 ### From the website to the app
 
-- **Open in iFizBox App** (Home's Send Settings, and Settings; Not Jailbroken only): `ifizbox://import?d=<base64url of
+- **Open in iFizBox App** (Settings; Not Jailbroken only): `ifizbox://import?d=<base64url of
   gzipped JSON>`, the source list as export lines, the settings in `core/settings.js TRAVELS`, Ignored Upgrades and
   the website's certificate, after a banner saying to press Open. The app adds what's new
   straight away and puts the certificate into the Keychain (`signing.import`). Gzip keeps 400 sources around 5 kB.
@@ -159,7 +163,7 @@ Signing. Tests: `web/app/signing-client-device.test.js`, `web/app/screens/signin
   is installed from it or the user taps Not Now. Other apps' pages offer **Install in iFizBox**
   (`ifizbox://package?id=<id>`: the app opens that app's page, Search's `package:<id>`), Download IPA, then **Install
   on the Website**, greyed out until the user accepts a warning once (its I Understand counts down 5 seconds); the
-  acceptance is kept in localStorage and Settings > Signing > Other Apps turns it back off. iFizBox's own IPA always
+  acceptance is kept in localStorage and Settings > General > Other Apps > Install on the Website turns it back off. iFizBox's own IPA always
   installs from the website.
 
 The shell keeps the latest `ifizbox://` link (`IncomingLink`, at most 512 kB) and tells the page (`ifizbox:url`), which
@@ -301,7 +305,8 @@ no backloop pack expiry check or genPlist URL encoding; and no Zsign-Package (iF
 
 ### My IPAs
 
-Installed > My IPAs is the user's own IPAs. In the sideload app they are plain files in iFizBox's Documents, which
+Installed > Install IPAs (Home's Install IPAs tile) is the user's own IPAs, "My IPAs". In the jailbreak app it lists
+the IPAs in `/var/mobile/Documents` and the root helper installs them, with no signing. In the sideload app they are plain files in iFizBox's Documents, which
 Files shows under On My iPhone > iFizBox (`UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace`), so an IPA
 dropped there from Files is listed too. Add offers Browse (the iOS Files picker, several at once) and From URL (the
 Add alert with Paste); an .ipa another app opens in iFizBox (AirDrop, Files, Mail: the document type in
@@ -337,7 +342,7 @@ the HTTP parsing and ranges. `test_sideload.py`'s Swift also covers `BundledIden
 rule), `IncomingLink` and `gunzip`; its `HandoffSourceTest` reads the sources for the URL hand-off, the launch import
 and that nothing of the local CA is left. Node: `core/transfer.test.js` (the import link's encode/decode and
 review), `incoming.test.js` (the hand-off, `ifizbox://install` and the import's merge), `screens/siteinstall.test.js`
-(the website's Install rows and certificate alert, Home's Install iFizBox App, My IPAs' Install). `rcodesign verify`
+(the website's Install rows and certificate alert, Home's Install iFizBox Lite, My IPAs' Install). `rcodesign verify`
 also passed on the signed fixture and the signed iFizBox.ipa (by hand, not in the gate).
 
 The phone half (Keychain, `NWListener`, opening the links, the scene's URL contexts) compiles in the native build but runs only on an iPhone.

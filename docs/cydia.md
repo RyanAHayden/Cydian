@@ -105,8 +105,8 @@ wording.
   On the 4S that should be something like
   `… Version/6.0 Mobile/10B329 Safari/8536.25 Cydia/1.1.30 CyF/793.00`.
 - For iFizBox:
-  - The proxy and the app's native fetch should send `X-Machine`, `X-Firmware` and the Telesphoreo
-    `User-Agent`. Some repos serve different files or refuse requests without them.
+  - The website's proxy sends `X-Machine`, `X-Firmware` and the Telesphoreo `User-Agent` (`worker/src/index.js`):
+    some repos serve different files or refuse requests without them. In the jailbreak app apt fetches the repos.
   - **Never send a real UDID from the public site.** In the app, send `X-Unique-ID` only if a repo needs it (paid
     repos linked to a device).
 
@@ -269,8 +269,8 @@ to bottom:
   4. Downgrade, if other versions exist. It opens a sheet listing those versions.
 - Depiction web views get `X-Cydia-Cf` and `X-Machine`. Cydia injects the `cydia` JS object only on `file:` pages
   and https pages from bridged hosts. Links with `target="_popup"` open in a modal browser.
-- For iFizBox: show depictions in a sandboxed iframe (site and app) with no bridge. Sileo's native JSON depictions
-  (`SileoDepiction:`) aren't part of Cydia; any support for them is separate work.
+- iFizBox shows depictions in a sandboxed iframe (scripts allowed, no same origin; site and app) with no bridge
+  (`screens/depiction.js`).
 
 ## `cydia://` URLs
 
@@ -302,8 +302,9 @@ Each tab's navigation stack is saved as these URLs (`SavedState.plist`) and rest
 - `cydia://application-icon/<bundle id>`;
 - `cydia://uikit-image/<name>`.
 
-For iFizBox: the site uses hash routes with the same shape, `#/package/<id>`, `#/sources/add`, and so on. The app
-can register its own scheme with these paths. It can't take over `cydia://` while Cydia or Sileo is installed.
+iFizBox uses hash routes, `#/<tab>/<path…>` (`web/app/router.js`), and the app registers its own `ifizbox://`
+scheme (the links are listed in `web/app/incoming.js`). It can't take over `cydia://` while Cydia or Sileo is
+installed.
 Repo websites' "Add to Cydia" buttons are usually `cydia://url/https://cydia.saurik.com/api/share#?source=<repo
 URL>`. That isn't in this source, so the app should read the `source=` parameter of such a link if it receives
 one.
@@ -388,14 +389,14 @@ one.
     example `echo finish:restart >&${CYDIA%% *}`.
   - The button runs the action. Restart and Reload show a "Loading" HUD and restart SpringBoard.
   - After any run, Cydia reloads its data and runs `uicache`.
-- For iFizBox:
-  - The root helper should export `CYDIA="<fd> 1"` and read `finish:` lines from it, so existing
-    `postinst`/`extrainst_` scripts keep working.
-  - It should run apt with `-o APT::Status-Fd=<fd>`, and dpkg's `--status-fd`, to get the
-    `pmstatus`/`pmerror`/`pmconffile` lines.
-  - Stream all three over the bridge as these event types.
-  - Labels: "Return to iFizBox", "Restart SpringBoard" (on rootless: `sbreload`/`killall backboardd`), "Reboot
-    Device".
+- iFizBox:
+  - The root helper exports `CYDIA="3 1"` and reads `finish:` lines from fd 3, so existing
+    `postinst`/`extrainst_` scripts keep working (`native/helper/README.md`).
+  - It runs apt with `-o APT::Status-Fd=3`, and dpkg with `--status-fd 3`, for the
+    `pmstatus`/`pmerror`/`pmconffile` lines, and streams them over the bridge (`core/progress.js`).
+  - The finish button, highest level reached: Close, Reload Data (an app changed: `uicache`), Close iFizBox
+    (iFizBox upgraded itself), Restart SpringBoard (on rootless: `sbreload`, or `killall backboardd`), Reload
+    SpringBoard, Reboot Device (`core/queue.js FINISH_LABEL`).
 
 ## UI strings
 

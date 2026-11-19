@@ -13,7 +13,7 @@ certificate, on the website or in the sideloaded app.</p>
 <a href="https://discord.gg/3XASvpjbgp"><img alt="Discord" src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white"></a></div>
 
 <p align="center">
-  <img src="docs/img/web-home.png" alt="Home on the website" width="30%">
+  <img src="docs/img/jb-home.png" alt="Home in the jailbreak app" width="30%">
   <img src="docs/img/jb-package.png" alt="A package page in the jailbreak app" width="30%">
   <img src="docs/img/jb-log.png" alt="The install log in the jailbreak app" width="30%">
 </p>
@@ -43,8 +43,8 @@ One frontend (`web/app/`, plain HTML, CSS and JavaScript modules with no build s
 | | Build | What it does | Needs |
 |:-:|---|---|---|
 | <img src="web/app/icons/icon-web-glossy-76.png" width="48" alt=""> | **Website**, [ifizbox.com](https://ifizbox.com) | Browse APT repos and AltStore sources, add your own, see what changed, search. Signs and installs apps **in your browser** with your certificate. No login. | Any iPhone with Safari |
-| <img src="web/app/icons/icon-glossy-76.png" width="48" alt=""> | **Jailbreak app** (`iFizBox.deb`) | Everything the website does, plus installing `.deb`s through apt with a root helper, a background upgrade check, and Shortcuts actions. The helper installs IPAs directly, with no signing. | A rootless jailbreak (iOS 15 and later, `iphoneos-arm64`) |
-| <img src="web/app/icons/icon-lite-glossy-76.png" width="48" alt=""> | **Sideload app** (`iFizBox.ipa`, the LITE icon) | The same app without the root helper: AltStore-style sources, apps signed and installed on the phone with your certificate, and updates to the apps you installed. | Your own signing certificate (`.p12` and `.mobileprovision`) |
+| <img src="web/app/icons/icon-glossy-76.png" width="48" alt=""> | **Jailbreak app** (`iFizBox.deb`) | Everything the website does, plus installing `.deb`s through apt with a root helper, a background upgrade check, and Shortcuts actions. The helper installs IPAs directly, with no signing (with AppSync Unified). | A rootless jailbreak (iOS 15 and later, `iphoneos-arm64`) |
+| <img src="web/app/icons/icon-lite-glossy-76.png" width="48" alt=""> | **Sideload app** (`iFizBox.ipa`, the LITE icon) | The same app without the root helper: AltStore-style sources, apps signed and installed on the phone with your certificate, re-signing, and updates to the apps you installed, checked in the background too. | Your own signing certificate (`.p12` and `.mobileprovision`) |
 
 The jailbreak app and the sideload app are one app, two builds: the same `native/` shell, with or without the root
 helper.
@@ -57,10 +57,10 @@ Real pages with live sources, at the iPhone 5's screen size (320×568 points at 
 **Website**
 
 <p align="center">
+  <img src="docs/img/web-home.png" alt="Home on the website" width="24%">
   <img src="docs/img/web-sources.png" alt="Sources" width="24%">
   <img src="docs/img/web-app.png" alt="An app's page" width="24%">
   <img src="docs/img/web-changes.png" alt="Changes" width="24%">
-  <img src="docs/img/web-search.png" alt="Search results for emulator" width="24%">
 </p>
 
 **Jailbreak app** (iPhone 7, iOS 15.8, rootless)
@@ -75,10 +75,10 @@ Real pages with live sources, at the iPhone 5's screen size (320×568 points at 
 <details>
 <summary><b>More screenshots</b></summary>
 
-| | | |
-|:-:|:-:|:-:|
-| ![Installed on the website](docs/img/web-installed.png) | ![Settings](docs/img/web-settings.png) | ![Settings > Signing](docs/img/web-signing.png) |
-| Installed (website) | Settings | Settings > Signing |
+| | | | |
+|:-:|:-:|:-:|:-:|
+| ![Search results for emulator](docs/img/web-search.png) | ![Installed on the website](docs/img/web-installed.png) | ![Settings](docs/img/web-settings.png) | ![Settings > Signing](docs/img/web-signing.png) |
+| Search (website) | Installed (website) | Settings | Settings > Signing |
 
 </details>
 
@@ -113,11 +113,12 @@ sources and settings), so it signs and installs apps on the phone straight away.
 You don't need another sideloading tool, but iFizBox's AltStore source works in Feather, AltStore or SideStore too:
 
 ```text
-https://raw.githubusercontent.com/RyanAHayden/iFizBox/main/web/app/source.json
+https://ifizbox.com/repo/source.json
 ```
 
-`iFizBox.ipa` is also on every [release](https://github.com/RyanAHayden/iFizBox/releases/latest). The app checks
-GitHub for a new release once a day, signs it on the phone and installs it over itself.
+`iFizBox.ipa` is also on every [release](https://github.com/RyanAHayden/iFizBox/releases/latest). The app looks for
+a new release every time it opens: a newer iFizBox shows as an upgrade in Changes, and installing it signs it on the
+phone and installs it over itself.
 
 ## How it works
 
@@ -144,10 +145,12 @@ graph TD
   |---|---|
   | `/` | the website: `web/app/` as static assets, revalidated on every load |
   | `/api/fetch` | the website's fetch proxy (APT repos and AltStore sources don't let a page read them), behind an SSRF guard: no private, loopback or link-local addresses, with size and time limits |
-  | `/api/applookup`, `/api/ipainfo` | App Store details for an app, and an IPA's `Info.plist` (supported iOS versions) |
+  | `/api/applookup`, `/api/appreviews`, `/api/ipainfo` | App Store details and reviews for an app, and an IPA's `Info.plist` (supported iOS versions) |
+  | `/sign/status` | tells Settings > Signing the server answers |
   | `/sign/manifest`, `/sign/host/*` | the install manifest iOS needs when the app signs on the phone, and iFizBox's own update held for 10 minutes while iOS replaces the app |
-  | `/sign/upload` | an app the website signed in the browser, held for 10 minutes for iOS's install prompt |
+  | `/sign/upload`, `/sign/up/*` | an app the website signed in the browser, held for 10 minutes for iOS's install prompt |
   | `/repo/` | iFizBox's flat APT repo, served from the latest GitHub release's assets |
+  | `/repo/source.json` | iFizBox's AltStore source |
   | `/api/account/*` | iFizBox Account (below) |
   | `/reviews/*` | package reviews (Cloudflare D1) |
 
@@ -214,7 +217,7 @@ node worker/node.mjs    # PORT, HOST, HOST_IDS, TTL as in worker/wrangler.toml
 docker build -f worker/Dockerfile -t ifizbox . && docker run -d -p 8787:8787 -v ifizbox-data:/data ifizbox
 ```
 
-Then in iFizBox: **Settings > Signing > Signing Server**, paste your address and tap **Check Server**. iOS accepts
+Then in the sideload app: **Settings > Signing > Signing Server**, paste your address and tap **Check Server**. iOS accepts
 install manifests only over HTTPS with a trusted certificate, so a self-hosted Node server has to sit behind
 Tailscale, a Cloudflare Tunnel or a reverse proxy with a real domain.
 
@@ -229,7 +232,7 @@ ifizbox.com itself is deployed by Cloudflare Workers Builds on every push to `ma
 | `worker/` | the ifizbox.com Cloudflare Worker, and `node.mjs` to run it on Node |
 | `native/` | the Swift shell, the root helper, `build.sh` for the `.deb` and the IPA |
 | `tools/` | the test gate, release and icon scripts, the zsign WebAssembly build |
-| `docs/` | design notes: [Cydia's behaviour](docs/cydia.md), [native](docs/native.md), [signing](docs/signing.md), [sideload](docs/sideload.md), [account](docs/account.md), [releases](docs/release.md) |
+| `docs/` | design notes: [Cydia's behaviour](docs/cydia.md), [Sileo and Zebra](docs/sileo-zebra.md), [native](docs/native.md), [signing](docs/signing.md), [sideload](docs/sideload.md), [settings](docs/settings.md), [account](docs/account.md), [Shortcuts](docs/shortcuts.md), [releases](docs/release.md) |
 | `testrepo/` | sample APT and AltStore sources for the tests |
 
 ## Contributing

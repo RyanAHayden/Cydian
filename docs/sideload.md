@@ -227,9 +227,9 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and
   held on the Signing Server for iOS to fetch.
 - **The IPA itself** is built unsigned, then signed ad hoc (`codesign -s -`/`ldid -S`), as Feather's `Makefile`
-  does. The usual way in is the website's **Install iFizBox App**, which signs this IPA in the browser with the
+  does. The way in is the website's **Install iFizBox Lite** (Home), which signs this IPA in the browser with the
   user's certificate and hands that certificate, sources and settings to the installed app, so it signs other IPAs
-  at once. Feather, SideStore, AltStore or a computer also work.
+  at once. Feather, SideStore, AltStore or a computer also work, but aren't needed.
 - Entitlements: `get-task-allow` and the App Group `group.com.ryha.ifizbox` (for the widget; a profile without it
   just leaves the widget at "Open iFizBox"). Info.plist adds `UIBackgroundModes` `audio` (install keep-alive) and
   `fetch`, `CFBundleDocumentTypes` for `.ipa`, `.p12` and `.mobileprovision`, and the `ifizbox://` URL scheme.

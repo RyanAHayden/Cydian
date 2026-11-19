@@ -97,3 +97,32 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   if (!out?.length) throw fail("sign_failed", zsignError(log));
   return { ipa: out, bundleId, originalId: info.bundleId, name: info.name, version: info.version };
 }
+
+// F260: whether `password` opens the .p12, as zsign itself loads it (OpenSSL with the legacy provider: any .p12 the
+// signer takes, also the ones core/signing.js checkP12Password can't read and answers null for). zsign reads the
+// profile and then the certificate before it looks at the app, so it runs on an empty folder: "Can't find app folder"
+// means both loaded (true), OpenSSL's "mac verify failure" a wrong password (false); anything else is unknown (null:
+// a damaged .p12 or profile, which the sign itself then names). A fresh module, like a sign; it takes milliseconds.
+export async function runPasswordCheck(createZsign, { p12, password = "", profile }) {
+  if (!p12 || !profile) return null;
+  const log = [];
+  const zs = await createZsign({ print: (s) => log.push(s), printErr: (s) => log.push(s) });
+  const { FS } = zs;
+  FS.mkdir("/w");
+  FS.mkdir("/w/tmp");
+  FS.mkdir("/w/none");
+  FS.writeFile("/w/key.p12", new Uint8Array(p12));
+  FS.writeFile("/w/app.mobileprovision", new Uint8Array(profile));
+  try { zs.callMain(["-k", "/w/key.p12", "-p", password ?? "", "-m", "/w/app.mobileprovision", "-t", "/w/tmp", "/w/none"]); } catch (e) {
+    if (typeof e?.status !== "number") return null; // a crash says nothing about the password
+  }
+  return passwordVerdict(log);
+}
+
+// zsign's output on the empty folder, as runPasswordCheck answers it.
+export function passwordVerdict(lines) {
+  const text = lines.map((l) => String(l)).join("\n");
+  if (/Can't find app folder/i.test(text)) return true;
+  if (/Can't load p12/i.test(text) && /mac verify failure/i.test(text)) return false;
+  return null;
+}

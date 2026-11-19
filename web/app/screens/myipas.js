@@ -61,7 +61,7 @@ const known = new Map(); // file -> the last entry seen (titles, the page before
 // F208/F224: the list's swipe and Manage state (core/myipas.js listStep: `editing` is Manage, `armed` the row showing
 // Delete, `selected` the picked files), its controller, the bottom toolbar, the IPAs and which of them iOS has, the
 // search, the price buttons' state (`armed`: the green INSTALL) and the ones running (file -> { label, fill }).
-const lib = { state: listState(), ctl: null, bar: null, list: [], installed: {}, query: "", price: { armed: null }, busy: new Map(),
+const lib = { state: listState(), ctl: null, bar: null, list: [], installed: {}, shared: {}, query: "", price: { armed: null }, busy: new Map(),
   manageBtn: null, selectBtn: null, summary: null };
 
 export const PAGE_TITLE = "Install IPAs";
@@ -186,10 +186,12 @@ async function load() {
 // Which IPAs iOS has: the apps.isInstalled answer per bundle ID, then redrawn when it changed.
 async function refreshInstalled(list, seq) {
   let map;
-  try { map = await installedOf(list, { mode: listMode() }); } catch { return; }
+  let shared;
+  try { map = await installedOf(list, { mode: listMode() }); shared = await sharedInstalls(list, map); } catch { return; }
   if (seq !== view.seq || !view.body?.isConnected) return;
-  const same = JSON.stringify(map) === JSON.stringify(lib.installed);
+  const same = JSON.stringify(map) === JSON.stringify(lib.installed) && JSON.stringify(shared) === JSON.stringify(lib.shared);
   lib.installed = map;
+  lib.shared = shared;
   if (!same) redraw();
 }
 
@@ -212,6 +214,73 @@ export async function installedOf(list, { mode = listMode(), native = globalThis
   return out;
 }
 
+// B80: Installed's record key for an IPA installed from the library (the file it came from), so two IPAs that share a
+// bundle ID can be told apart once one of them is on the phone.
+export const libraryKey = (file) => `library:${file}`;
+const shownName = (e) => e?.options?.name || e?.name || String(e?.file ?? "").replace(/\.ipa$/i, "");
+
+// B80: { bundleId: { file, name } } for each installed bundle ID that two or more IPAs in the library share. `file`:
+// the IPA that matches Installed's record for that ID (its library key first, then the only one with the recorded
+// name and version), or null when nothing tells them apart (no record, installed outside the app, a tie). `name`: the
+// installed app's name (the record's, else the bundle ID). IDs with one IPA are left out: they stay as before.
+export async function sharedInstalls(list, installed = {}, { records = async () => (await apps()).all() } = {}) {
+  const byId = new Map();
+  for (const e of list ?? []) {
+    const id = e && !e.error ? installedIdOf(e) : null;
+    if (id && installed?.[id] === true) byId.set(id, [...(byId.get(id) ?? []), e]);
+  }
+  const out = {};
+  const ids = [...byId].filter(([, es]) => es.length > 1);
+  if (!ids.length) return out;
+  const recs = ((await Promise.resolve().then(records).catch(() => [])) ?? []).filter((r) => r?.id);
+  for (const [id, es] of ids) {
+    const rec = recs.find((r) => r.id === id) ?? null;
+    let match = rec?.key ? es.find((e) => rec.key === libraryKey(e.file)) ?? null : null;
+    if (!match && rec) {
+      const same = es.filter((e) => [shownName(e), e.name].includes(rec.name) && (e.version || "") === (rec.version || ""));
+      if (same.length === 1) [match] = same;
+    }
+    out[id] = { file: match?.file ?? null, name: rec?.name || id };
+  }
+  return out;
+}
+
+// B80: ipaSections with the shared IDs settled per IPA: only `shared[id].file` is Installed, the others Not Installed
+// with "Replaces <name>" ahead of their line (row.replaces: the installed app's name).
+export function sharedSections(list, { installed = {}, shared = {}, ...opts } = {}) {
+  if (!Object.keys(shared ?? {}).length) return ipaSections(list, { installed, ...opts });
+  const all = ipaSections(list, { ...opts, installed: () => false }).flatMap((s) => s.rows);
+  const rows = all.map((r) => {
+    const id = installedIdOf(r);
+    const s = id ? shared[id] : null;
+    if (!s || r.error) return { ...r, installed: !r.error && Boolean(id && installed?.[id] === true) };
+    if (s.file === r.file) return { ...r, installed: true };
+    return { ...r, installed: false, replaces: s.name, line: [`Replaces ${s.name}`, r.line].filter(Boolean).join(" · ") };
+  });
+  return [
+    { key: "notInstalled", header: "Not Installed", rows: rows.filter((r) => !r.installed) },
+    { key: "installed", header: "Installed", rows: rows.filter((r) => r.installed) },
+  ].filter((s) => s.rows.length);
+}
+
+// B80: the IPA another app with its bundle ID is installed over -> that app's name, else null (not shared, or the match).
+export function replacesOf(entry, shared = lib.shared) {
+  const id = entry && !entry.error ? installedIdOf(entry) : null;
+  const s = id ? shared?.[id] : null;
+  return s && s.file !== entry.file ? s.name : null;
+}
+
+// B80: before installing an IPA that replaces another app with its ID, an iOS 6 alert: Cancel or Replace.
+// -> true to go on (nothing to replace, or Replace tapped).
+export async function confirmReplace(entry, { shared = lib.shared, alert = showAlert } = {}) {
+  const other = replacesOf(entry, shared);
+  if (!other) return true;
+  const r = await alert({ title: "Replace App?",
+    message: `${other} is already on this iPhone with the same ID. Installing ${shownName(entry)} will replace it.`,
+    buttons: ["Cancel", "Replace"], cancel: 0 }).catch(() => null);
+  return r?.index === 1;
+}
+
 function draw(list) {
   lib.list = list ?? [];
   redraw();
@@ -225,7 +294,7 @@ function redraw() {
   const files = libraryRows(lib.list, { site: isSite, jailbreak: jb }).map((r) => r.file);
   lib.state = files.length ? listStep(lib.state, { type: "list", files }) : { ...listState(), editing: lib.state.editing };
   if (lib.price.armed && !files.includes(lib.price.armed)) lib.price = { armed: null };
-  lib.ctl = libraryGroup(lib.list, { site: isSite, jailbreak: jb, state: lib.state, installed: lib.installed,
+  lib.ctl = libraryGroup(lib.list, { site: isSite, jailbreak: jb, state: lib.state, installed: lib.installed, shared: lib.shared,
     query: lib.state.editing ? "" : lib.query, price: lib.price, busy: lib.busy,
     on: { change: onListChange, delete: (es) => swipeDelete(es), hold: (e) => holdSheet(e), price: (r) => onPrice(r) } });
   view.body.replaceChildren(lib.ctl.el);
@@ -267,8 +336,8 @@ export function libraryFooterText(site, { jailbreak = false } = {}) {
 // cellOf(file), price(file) (the row's price button) }. on.change(state) after each step, on.delete([row]) for a row's
 // Delete, on.hold(row) for a held row, on.price(row) for a tap on its price button.
 export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jailbreak(), state = listState(), installed = {}, query = "",
-  price = { armed: null }, busy = new Map(), on = {} } = {}) {
-  const sections = ipaSections(list, { installed, query, site: isSite, jailbreak: jb });
+  price = { armed: null }, busy = new Map(), on = {}, shared = {} } = {}) {
+  const sections = sharedSections(list, { installed, shared, query, site: isSite, jailbreak: jb });
   const rows = sections.flatMap((s) => s.rows);
   const any = libraryRows(list, { site: isSite, jailbreak: jb }).length > 0;
   const groups = sections.map((s, i) => ({ header: s.header, rows: s.rows.map((r) => ({
@@ -537,11 +606,13 @@ export async function runManage(kind, { rows = manageRows(), selected = lib.stat
 // Sign (n): each picked IPA signed and installed in turn (installFromLibrary; the website signs a kept file in this
 // browser), its progress page labelled "Signing Delta (1 of 3)" (Installed's bulkHud). The first that doesn't install
 // (an error, already shown; no connection; the walkthrough) stops the run.
-export async function signMany(picked, { isSite = site(), install = installFromLibrary, siteInstall = siteFileInstall, hudFor = null } = {}) {
+export async function signMany(picked, { isSite = site(), install = installFromLibrary, siteInstall = siteFileInstall, hudFor = null,
+  confirm = confirmReplace } = {}) {
   const n = picked.length;
   const out = [];
   for (let i = 0; i < n; i++) {
     const e = picked[i];
+    if (!(await confirm(e))) { out.push("cancelled"); continue; } // B80: Cancel on Replace App? skips that one
     const name = e.options?.name || e.name || e.file.replace(/\.ipa$/i, "");
     const onInstalled = recorder(e, name);
     let r;
@@ -565,7 +636,8 @@ async function bulkHudFor(name, i, n) {
 function recorder(entry, name) {
   return (r) => {
     if (!r?.bundleId) return;
-    apps().then((s) => recordInstall(s, { id: r.bundleId, name: r.name || name, version: r.version || entry?.version || "", source: null,
+    apps().then((s) => recordInstall(s, { id: r.bundleId, name: r.name || name, version: r.version || entry?.version || "",
+      key: entry?.file ? libraryKey(entry.file) : null, source: null,
       sourceName: "My IPAs", icon: (entry?.options?.icon || entry?.icon) ? `data:image/png;base64,${entry.options?.icon || entry.icon}` : null })).catch(() => {});
   };
 }
@@ -612,7 +684,8 @@ async function onPrice(r) {
 // The second tap: the IPA signed and installed with the button as its progress (no progress page); the website's
 // kept file signs in this browser on its own progress page, a link opens its sheet, the jailbreak app's console.
 export async function priceInstall(r, { install = installFromLibrary, siteInstall = siteFileInstall, linkSheet = siteInstallSheet,
-  helper = jailbreakInstall } = {}) {
+  helper = jailbreakInstall, confirm = confirmReplace } = {}) {
+  if (!(await confirm(r))) return; // B80: Cancel on Replace App?
   const name = r.options?.name || r.name || r.file.replace(/\.ipa$/i, "");
   const onInstalled = recorder(r, name);
   const after = () => { lib.busy.delete(r.file); repaintPrices(); refresh(); };
@@ -1075,10 +1148,11 @@ async function confirmDelete(entry) {
 async function install(file) {
   let entry = known.get(file);
   const record = (id, name, version, icon) => apps().then((store) => recordInstall(store, {
-    id, name, version, source: null, sourceName: "My IPAs", icon: icon ? `data:image/png;base64,${icon}` : null })).catch(() => {});
+    id, name, version, key: libraryKey(file), source: null, sourceName: "My IPAs", icon: icon ? `data:image/png;base64,${icon}` : null })).catch(() => {});
   if (site()) {
     entry ??= siteEntries().find((e) => e.file === file);
     if (!entry) return;
+    if (!(await confirmReplace(entry))) return; // B80
     if (entry.stored) {
       await siteFileInstall(entry, { onInstalled: (r) => {
         if (r?.bundleId) record(r.bundleId, r.name || entry.name, r.version || entry.version || "", entry.icon);
@@ -1089,6 +1163,7 @@ async function install(file) {
     return;
   }
   if (jailbreak()) {
+    if (entry && !(await confirmReplace(entry))) return; // B80
     const name = entry?.name || file.replace(/\.ipa$/i, "");
     await jailbreakInstall(file, name, { onInstalled: (r) => {
       if (r?.bundleId) record(r.bundleId, r.name || name, r.version || entry?.version || "", entry?.icon);
@@ -1110,13 +1185,17 @@ async function install(file) {
 // from the library file with its Sign Options) and opens Confirm, so several My IPAs (and source apps) install signed
 // ahead, one at a time, each with its own stop (screens/apprun.js). Offline (the Signing Server doesn't answer) it
 // returns false and Install stays installFromLibrary's: signed now, kept in My IPAs, and the No Connection message.
-// -> true once queued.
-export async function queueLibraryInstall(entry, { reachable = serverReachable, add = queueApp, installed = lib.installed } = {}) {
+// -> true once queued. B80: an IPA that replaces another app with its bundle ID asks first (confirmReplace); Cancel
+// returns "cancelled" (truthy: nothing else installs it). The job carries the file as its key, so Installed's record
+// says which IPA is on the phone.
+export async function queueLibraryInstall(entry, { reachable = serverReachable, add = queueApp, installed = lib.installed,
+  shared = lib.shared, alert = showAlert } = {}) {
   const id = installedIdOf(entry);
   const job = libraryJob(entry, { installed: Boolean(id && installed?.[id]) });
   if (!job) return false;
+  if (!(await confirmReplace(entry, { shared, alert }))) return "cancelled";
   if (!(await Promise.resolve().then(() => reachable()).catch(() => false))) return false;
-  add(job);
+  add({ ...job, key: job.key ?? libraryKey(entry.file) });
   return true;
 }
 

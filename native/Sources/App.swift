@@ -194,6 +194,7 @@ enum Web {
         // WebKit holds requestAnimationFrame near 60 Hz by default on iOS; the JS edge swipe needs 120 (R3).
         WebKitFeature.set({ $0 == "PreferPageRenderingUpdatesNear60FPSEnabled" }, false, c.preferences)
         let w = WKWebView(frame: .zero, configuration: c)
+        FocusKeyboard.enable() // F248: a focus from script brings up the keyboard too
         // Back is web/app/'s JS swipe; WebKit's history gesture would fight it.
         w.allowsBackForwardNavigationGestures = false
         w.allowsLinkPreview = false

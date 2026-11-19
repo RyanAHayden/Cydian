@@ -67,3 +67,14 @@ export async function unzipEntries(zip) {
   }
   return out;
 }
+
+// F248: after a pick, the .p12's password: the saved one if it still opens it, else the first guess (or "") that
+// does. `locked`: none opens it and none saved might (the Password field is focused for typing). passwordOk is true
+// when one opens it, false when the saved one doesn't, null when nothing is known yet.
+export async function resolvePassword(p12, saved, guesses = [], check = checkP12Password) {
+  const savedOk = saved != null ? await check(p12, saved) : null;
+  if (savedOk === true) return { password: saved, passwordOk: true, locked: false };
+  const pw = await findPassword(p12, guesses, check);
+  if (pw != null) return { password: pw, passwordOk: true, locked: false };
+  return { password: saved ?? null, passwordOk: saved != null ? savedOk : null, locked: saved == null || savedOk === false };
+}

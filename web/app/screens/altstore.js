@@ -18,7 +18,7 @@ import { compat } from "../core/compat.js";
 import { currentDevice } from "../device.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall, onAppsChange } from "../core/installed.js";
-import { signAndInstall, localSigning, isSelfIpa } from "../signing-client.js";
+import { signAndInstall, localSigning, isSelfIpa, originalWarning } from "../signing-client.js";
 import { siteGateRows, markiFizBoxInstalled, websiteInstallsOn, SITE_GATE_FOOTER } from "../websign-gate.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
@@ -360,7 +360,7 @@ export function markToggle(app, pkg, source, { store = apps, buzz = haptic, feed
 // website (no queue) the sheet is siteModify's.
 export async function appPageAction(pkg, source, { queue = appQueue, ask = showActionSheet, add = queueApp,
   mode = detectMode(), ready = async () => true, store = apps, version = null, signedOf = (id) => signedRecordOf(id, { mode }),
-  forget = async (id) => removeInstall(await store(), id), siteInstall = siteInstallVersion } = {}) {
+  forget = async (id) => removeInstall(await store(), id), siteInstall = siteInstallVersion, warn = originalWarning } = {}) {
   const app = pkg?.stanza?.ipa;
   if (mode === "site" && app && !version) return siteModify(pkg, source, { ask, store, forget, siteInstall });
   if (mode !== "sideload" || !app) return false; // F89: the website queues nothing
@@ -368,7 +368,13 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
   const job = appJob(pkg, { installed: rec ? rec.version || null : null, version, source: source ? displayName(source) : null });
   if (!job || !(await ready())) return false;
-  if (version) { add(job, { queue }); return true; }
+  // F246: a fresh install (no record) asks F243's once-per-app question before it is queued; Cancel queues nothing.
+  const addFresh = async () => {
+    const j = rec ? job : await queueOriginalCheck(job, warn);
+    if (j) add(j, { queue });
+    return true;
+  };
+  if (version) return addFresh();
   const newest = app.versions[0]?.version ?? null;
   const installed = rec ? rec.version || "" : null;
   const older = installed ? app.versions.map((x) => x.version).filter((v) => v && compareVersions(v, installed) < 0) : [];
@@ -376,7 +382,7 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   // F221: marked as installed (no signature of iFizBox's): Re-sign while the source still has the installed version
   const onSource = !signed && Boolean(markedVersionOnSource(pkg, installed));
   const state = { queued: Boolean(queue.get(job.id)), installed, newest, older: older.length > 0, signed: Boolean(signed), onSource, build: "sideload" };
-  if (!state.queued && installed == null && !state.signed) { add(job, { queue }); return true; }
+  if (!state.queued && installed == null && !state.signed) return addFresh();
   // Modify (installed or queued), as Cydia's: Upgrade/Reinstall, Downgrade (then which version), or Clear.
   const buttons = modifyActions(state);
   const i = await ask({ title: app.name, buttons, destructive: destructiveOf(buttons) });
@@ -394,6 +400,18 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
     if (pick) add(pick, { queue });
   } else add(job, { queue });
   return true;
+}
+
+// F246: F243's original-app warning (signing-client.js originalWarning) for a job the app page is about to queue.
+// -> the job as it goes in (Install a Copy: options.edits.keepBundleId false, the old way, a copy beside the
+// original), or null for Cancel. A failing check queues the job as it was.
+export async function queueOriginalCheck(job, warn = originalWarning) {
+  if (!job) return job;
+  const choice = await Promise.resolve().then(() => warn({ bundleId: job.id, name: job.name || "" })).catch(() => "install");
+  if (choice === "cancel") return null;
+  if (choice !== "copy") return job;
+  const edits = { ...(job.options?.edits ?? {}), keepBundleId: false };
+  return { ...job, options: { ...(job.options ?? {}), edits } };
 }
 
 // B69: the jailbreak app's Modify for an installed app (a record in core/installed.js, as the nav label reads it):

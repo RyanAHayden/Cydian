@@ -46,7 +46,9 @@ Shortcuts recipes live in `docs/shortcuts.md`.
   `background:` shorthand), or it tiles into the border and shows a light line at the bottom. The bar buttons, back
   arrow and switch in `web/app/ios6.css` are the reference: copy their approach for new controls, and check a 3x
   render zoomed in before calling it done.
-- Never commit Apple artwork (UIKit `.artwork` extracts, system icons) or Cydia's logo. Pulled device files go in
+- Never commit Apple artwork (UIKit `.artwork` extracts, system icons) or Cydia's logo. One exception: screenshots
+  of iOS's own Settings screens used as tutorial steps (e.g. the pairing walkthrough) may be committed whole,
+  system icons included (user, 2026-11-19). Pulled device files go in
   `ref/` (gitignored). Use them as a reference and redraw in CSS/SVG. Don't name the product or pages "Cydia".
   `ref/` exists only in the main checkout. In a worktree, link it first:
   `ln -s "$(git rev-parse --path-format=absolute --git-common-dir)/../ref" ref`.

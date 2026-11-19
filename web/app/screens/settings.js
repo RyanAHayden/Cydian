@@ -29,6 +29,7 @@ import { PASSWORD_EVENT } from "../signing-client.js";
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { drawWalkthrough, walkOpen, offerInstall, missingStep, siteReady, deviceRows } from "./signing.js";
 import { storedUdid, udidPending, startUdid, watchUdid, canFindUdid, udidFindRows } from "./signing.js";
+import { freeRouteBlock } from "./free-apple-id.js";
 import { openInAppSection } from "./importlink.js";
 import { accountSection, drawAccount, startAccountSync } from "./account.js";
 import { signingExtras } from "./signed-apps.js";
@@ -1260,6 +1261,7 @@ export function signingLayout({ mode, certificate = false, staged = false, profi
     status: mode === "sideload",
     app: site && ready,
     other: site,
+    free: site && !certificate, // F254j: Use a Free Apple ID, while the website has no certificate
     remove: certificate || staged,
     help: true,
   };
@@ -1482,6 +1484,8 @@ async function drawSiteSigning(el) {
     options: () => withKeepNotes(settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"), profile),
     app: () => { const f = document.createDocumentFragment(); f.append(...siteAppSection(id)); return f; },
     remove: () => grouped([{ rows: [{ label: "Remove Certificate", onClick: () => removeSiteCertificate() }] }]),
+    // F254j: the same Free Apple ID group as How Signing Works' (it stays hidden unless the Worker's relay is on)
+    free: () => freeRouteBlock(),
     help: () => helpGroup(),
   };
   showSigningPage(el, signingLayout({ mode: "site", certificate: ready, staged, profile: split.profile.length > 0, ready,

@@ -45,6 +45,7 @@ Laid out like an iOS 6 settings page, with one-line footers. `SIGNING_GROUPS` (c
 | Signing Server | sideload | the server, Check Server, Run Your Own |
 | Certificate Status, Signed Apps | sideload | Check Certificate; the signed apps (days left, or Expired), Re-sign All |
 | Install iFizBox App, Bring My Certificate | website, certificate working | |
+| Free Apple ID | website, no certificate set, the Worker's Apple relay on | **Use a Free Apple ID**, which opens the free route in place (the same group How Signing Works ends with) |
 | Remove Certificate | when there is a certificate or a picked file | |
 | How Signing Works | website, sideload | a link to `signing/help`: the two-step walkthrough (Select All Files, the Files picker's picture, the server) |
 

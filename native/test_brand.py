@@ -8,6 +8,7 @@ published under the old name). The old name is spelled in pieces here so this fi
 import json
 import os
 import re
+import subprocess
 import sys
 import unittest
 
@@ -94,12 +95,22 @@ def js_strings(src):
     return out
 
 
+def repo_files():
+    """Tracked and untracked-but-not-ignored files, as check.sh lists them: git-ignored build output
+    (worker/.wrangler from `wrangler dev`, worker/.preview-site, Xcode builds) holds bundled copies of brand.js."""
+    out = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                         cwd=ROOT, capture_output=True, check=True).stdout.decode()
+    return {os.path.join(ROOT, rel) for rel in out.split("\0") if rel}
+
+
 def code_files(top, exts, skip=()):
+    listed = repo_files()
     for d, dirs, files in os.walk(top):
-        dirs[:] = [x for x in dirs if x not in ("vendor", "node_modules", "build", "spike", "fixtures", "tests")]
+        dirs[:] = [x for x in dirs if x not in ("vendor", "node_modules", "build", "spike", "fixtures", "tests",
+                                                ".wrangler", ".preview-site")]
         for f in files:
             p = os.path.join(d, f)
-            if f.endswith(exts) and not f.endswith((".test.js", "test.mjs")) and p not in skip:
+            if f.endswith(exts) and not f.endswith((".test.js", "test.mjs")) and p not in skip and p in listed:
                 yield p
 
 

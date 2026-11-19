@@ -28,3 +28,16 @@ that test_sideload.py uses `disk_tmpdir`/`swift_env`, then tick. T15 and T17 are
 - I did not run test_sideload with T14's change from this worktree. T14's own journal reports the three modules
   passing with `TMPDIR=/nonexistent-t14`.
 - I did not reproduce the quota failure. Filling the shared `/tmp` would break the other sessions on this machine.
+
+## Reopened after T14 merged
+
+T14 is on main (a1184c9). `native/test_sideload.py` now imports `disk_tmpdir`/`swift_env` from test_sign and uses
+them for the scratch dir and for both the swiftc build and the binary run, so nothing it does depends on the shared
+`/tmp` quota any more. I checked this with `TMPDIR=/nonexistent-t16 python3 -m unittest
+test_sideload.Sideload.test_ocsp_request`: it passed in 18.7 s, so no step writes to `$TMPDIR`. No code change was
+needed for T16.
+
+## Not verified (after reopen)
+
+- Did not reproduce a full `/tmp` quota on purpose: that would break the other sessions on this machine. The
+  `TMPDIR=/nonexistent` run is standing in for it.

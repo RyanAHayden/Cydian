@@ -4,7 +4,7 @@
 // built from ios6.css's grouped tables (styles in guides.css):
 //   faq          question rows grouped Getting Started / Problems / Sources; each opens faq/<id> on Home's stack: a
 //                bold question, the answer in a white cell (or numbered steps) and a Next group to the places it names
-//   copying      a segmented control (packages.css .segmented): On iPhone (Filza) / Computer (SFTP) / No Jailbreak
+//   copying      a segmented control (nav/ui.js segmented, ios6.css .store-segmented): On iPhone (Filza) / Computer (SFTP) / No Jailbreak
 //   openssh      numbered steps whose blue badges tick green when tapped (kept per guide in localStorage), the
 //                OpenSSH package's Install row, the ssh command in a terminal panel with Copy (F151's log look)
 //   password     a yellow warning row, the whole session as a terminal transcript, then the steps with Copy
@@ -12,7 +12,7 @@
 // Root Password guide, an FAQ about apps, signing and sources only, and Copying Files as the no-jailbreak page
 // (Files, AirDrop, LocalSend; From a Computer per system, F176). Nothing jailbreak-only is named there (guides.test.js).
 // Cydia's Storage Information and Developers Only are left out: there's no storage page to show.
-import { el, grouped, row } from "../nav/ui.js";
+import { el, grouped, row, segmented } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { NAME } from "../brand.js";
 import { GUIDE_ID as KEEP_GUIDE } from "../core/keepid.js";
@@ -417,26 +417,18 @@ function answerView(f) {
 
 function copyingView(first) {
   const wrap = el("div", "guide-copying");
-  const seg = el("div", "segmented guide-segmented");
-  seg.setAttribute("role", "tablist");
   const panes = [onIphoneSections(), computerSections(), noJailbreakSections()].map((s) => {
     const pane = el("div", "guide-pane");
     pane.append(grouped(s));
     return pane;
   });
-  const buttons = COPYING_SEGMENTS.map((label, i) => {
-    const b = el("button", "segment", label);
-    b.type = "button";
-    b.setAttribute("role", "tab");
-    b.addEventListener("click", () => pick(i));
-    return b;
-  });
   const pick = (i) => {
-    buttons.forEach((b, j) => { b.classList.toggle("selected", i === j); b.setAttribute("aria-selected", String(i === j)); });
+    seg.mark(i);
     panes.forEach((p, j) => { p.hidden = i !== j; });
   };
-  seg.append(...buttons);
-  wrap.append(seg, ...panes);
+  const seg = segmented(COPYING_SEGMENTS, { selected: first, onSelect: pick });
+  seg.bar.classList.add("guide-segmented");
+  wrap.append(seg.bar, ...panes);
   pick(first);
   return wrap;
 }

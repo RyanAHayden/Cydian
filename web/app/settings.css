@@ -10,7 +10,7 @@
 /* A problem with the certificate or profile, in the Certificate group's footer (signsheet.css's red, which only
    loads with Signed Apps). */
 .signing-page .group-footer.sign-warning { color: #b5322c; text-shadow: none; }
-/* F199: Theme's Mode, the segmented control (storepage.js segmented(), ios6.css .store-segmented) at a settings
+/* F199: Theme's Mode, the segmented control (nav/ui.js segmented(), ios6.css .store-segmented) at a settings
    group's full width: no margins of its own (the group has them), 44px like a grouped row and its 9.5px corners. */
 .store-segmented.settings-segmented { margin: 0; height: 44px; border-radius: 9.5px; }
 .settings-segmented .store-segment { font-size: 15px; line-height: 42px; }

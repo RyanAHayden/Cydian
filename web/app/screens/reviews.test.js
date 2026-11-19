@@ -212,7 +212,7 @@ test("B82: app page, rated here: This Build | App Store toggle, opening on ours 
   const tab = await reviewsTab(pane, { id: "com.google.ios.youtube", api, build: true, appStore: Promise.resolve(store), now, onRating: (r) => rated.push(r) });
   const seg = one(pane, "store-review-toggle");
   assert.ok(seg, "a toggle when the App Store has the app");
-  assert.deepEqual(find(seg, "segment").map((b) => b.textContent), ["This Build (12)", "App Store (50M)"]);
+  assert.deepEqual(find(seg, "store-segment").map((b) => b.textContent), ["This Build (12)", "App Store (50M)"]);
   assert.equal(tab.toggle.selected(), "build", "always opens on This Build");
   assert.equal(tab.toggle.buttons[0]._cls.has("selected"), true);
   const [buildView, storeView] = tab.toggle.views;
@@ -265,7 +265,7 @@ test("B82: app page, nobody rated here: the empty This Build card, the footer, a
   const { store } = storeSide([]);
   const rated = [];
   const tab = await reviewsTab(pane, { id: "com.google.ios.youtube", api, build: true, appStore: store, now, onRating: (r) => rated.push(r) });
-  assert.deepEqual(find(pane, "segment").map((b) => b.textContent), ["This Build", "App Store (50M)"]);
+  assert.deepEqual(find(pane, "store-segment").map((b) => b.textContent), ["This Build", "App Store (50M)"]);
   const card = one(pane, "store-ratings-group");
   assert.equal(one(card, "store-ratings-big").textContent, "—", "never Apple's average on the This Build card");
   assert.equal(find(card, "store-bar").length, 5, "the empty bars stay");
@@ -304,7 +304,7 @@ test("B82: Tap to Rate redraws the tab on This Build and Apple's reviews are sti
   await tab.toggle.buttons[0].click();
   await tab.rating.picker.buttons[3].click();
   await tab.rating.flush();
-  assert.deepEqual(find(pane, "segment").map((b) => b.textContent), ["This Build (1)", "App Store (50M)"]);
+  assert.deepEqual(find(pane, "store-segment").map((b) => b.textContent), ["This Build (1)", "App Store (50M)"]);
   assert.equal(one(pane, "store-ratings-big").textContent, "4.0");
   assert.deepEqual(rated.at(-1), { average: 4, count: 1, noun: "Ratings", histogram: [0, 1, 0, 0, 0] }, "the header follows: ours now");
   const views = find(pane, "store-review-view");

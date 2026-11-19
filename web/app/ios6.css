@@ -780,7 +780,8 @@ html.has-reload :is(.page-body, .sheet-scroll, .search-results, .progress-scroll
 body:has(.sheet) .reload-bar { z-index: 26; translate: 0 calc(var(--tab-h) - var(--safe-bottom)); }
 @media (prefers-reduced-motion: reduce) { .reload-spinner { animation-duration: 3s; } }
 
-/* ---- F181: the package page's Details / Reviews / Related (screens/storepage.js segmented): UISegmentedControl's
+/* ---- F181: the package page's Details / Reviews / Related (nav/ui.js segmented, the one grey segmented control:
+   depiction tabs, Reviews' toggle, Settings' Mode and the guides use it too): UISegmentedControl's
    plain style at 30pt, colours sampled from the 4S's UISegmentButton / UISegmentButtonHighlighted / UISegmentDivider
    (Shared@2x): a #9e9e9e edge, #fbfbfb -> #cccccc -> #bdbdbd unselected; selected the pressed blue, dark at the top
    (#22488c -> #2e5fb5), flat #407ee6, lighter to #6ea4f9 and a #487bcc foot, in a #093786 edge; the white emboss

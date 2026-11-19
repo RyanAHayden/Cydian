@@ -1,5 +1,5 @@
 /* F157: Home's User Guides as iOS 6 app pages (screens/guides.js). Built on ios6.css's grouped tables and
-   packages.css's .segmented; this file only adds what those don't draw: the answer page's question heading and
+   ios6.css's .store-segmented (nav/ui.js segmented); this file only adds what those don't draw: the answer page's question heading and
    wrapping text, the step number badges (the kit's blue gloss, green once ticked), the terminal panel (F151's log
    look, progress.css .pl-raw) with its Copy button, and the yellow warning row. */
 

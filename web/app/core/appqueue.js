@@ -26,6 +26,10 @@
 //   resignJob({ bundleId, name, version }) -> such a job, from a signing.installed record or a Needs Re-sign row
 //   APP_MODES, APP_MODE_LABEL -> Confirm's Modifications for apps: core/queue.js's modes, Remove out, Re-sign in
 //   modifyActions({ ..., signed }) -> "Re-sign" last for an app iFizBox signed
+// F221: a marked app (installed record, no signature) whose installed version is still on its source re-signs too:
+//   modifyActions({ ..., onSource: true, build: "sideload" | "site" }) -> "Re-sign"
+//   markedVersionOnSource(pkg, installed) -> that version's entry, or null
+//   markedResignJob(pkg, installed, { source }) -> a resign job with that version's IPA url (downloaded and signed anew)
 // F94: Modify's last button for an installed app, per build (user 2026-11-18):
 //   modifyActions({ ..., build }) -> build "sideload" or "site": "Mark as Not Installed" (the phone can't remove apps:
 //       it forgets core/installed.js's record, as the Installed section's row does); "jailbreak": "Remove" (apt's
@@ -55,8 +59,9 @@ export function createAppQueue() {
     add({ id, name = null, version = null, installed = null, url, size = null, icon = null, key = null, source = null, sourceName = null, deps = [], options = null, mode = null }) {
       if (!id) throw new Error("no app id");
       if (mode === "resign") { // F91: signed again from the phone's record, nothing to download here
+        // F221: a marked app's re-sign carries its installed version's IPA url (markedResignJob): that is downloaded
         const job = { op: "resign", id, name: name || null, version: version || installed || null, installed: installed || version || null,
-          mode: "resign", url: null, size: null, icon, key, source, sourceName, deps: [], options: null };
+          mode: "resign", url: url || null, size: url ? Number(size) || null : null, icon, key, source, sourceName, deps: [], options: null };
         jobs.set(id, job);
         emit({ type: "add", job });
         return job;
@@ -132,8 +137,11 @@ export function appNavLabel({ queued = false, installed = null, newest = null } 
 // Downgrade when the source has an older version than the installed one (`older`). F94: then, for an installed app,
 // Mark as Not Installed where the phone can't remove apps (the sideload app, the website), Remove in the jailbreak build.
 export const MARK_NOT_INSTALLED = "Mark as Not Installed";
-export function modifyActions({ queued = false, installed = null, newest = null, older = false, signed = false, build = null } = {}) {
-  const resign = signed ? ["Re-sign"] : []; // F91: an app iFizBox signed can be signed again, as it is
+// F221: `onSource` (a marked app, iFizBox holds no signature for it, whose installed version its source still has)
+// offers Re-sign too, where the phone or the browser signs (sideload, site): markedResignJob downloads that version.
+export function modifyActions({ queued = false, installed = null, newest = null, older = false, signed = false, onSource = false, build = null } = {}) {
+  const marked = onSource && installed && (build === "sideload" || build === "site");
+  const resign = signed || marked ? ["Re-sign"] : []; // F91: an app iFizBox signed can be signed again, as it is
   const last = installed == null ? [] : build === "jailbreak" ? ["Remove"] : build === "sideload" || build === "site" ? [MARK_NOT_INSTALLED] : [];
   if (queued) return ["Clear", verb({ installed, newest }), ...resign, ...last];
   if (installed == null) return [verb({ installed, newest }), ...resign];
@@ -156,6 +164,24 @@ export function resignJob(app) {
   // a Needs Re-sign row (core/signing.js needsResign) shows the days left as its version: the app's own is `installed`
   const v = app.change === "resign" ? app.installed ?? null : app.version ?? app.installed ?? null;
   return { id, name: app.name || app.label || id, version: v || null, installed: v || null, mode: "resign", icon: app.icon ?? null };
+}
+
+// F221: Re-sign for an app marked as installed (core/installed.js's record, no signing.installed one): the version on
+// the phone, downloaded from its source, signed with the user's certificate and installed over the app (iOS keeps its
+// data). A resign job with the IPA's url (screens/queue.js resignApp installs it as an Install would), or null when
+// the source no longer has that version (or only a source-signed link). `pkg`: the catalog package, as appJob's.
+export function markedVersionOnSource(pkg, installed) {
+  const app = pkg?.stanza?.ipa;
+  if (!app || !installed) return null;
+  const v = app.versions?.find((x) => x.version === installed);
+  if (!v) return null;
+  const o = installOptions(v, app.sourceUrl);
+  return o.download && !o.itms ? v : null;
+}
+export function markedResignJob(pkg, installed, { source = null } = {}) {
+  if (!markedVersionOnSource(pkg, installed)) return null;
+  const job = appJob(pkg, { installed, version: installed, source });
+  return job ? { ...job, mode: "resign" } : null;
 }
 
 // F84: signing.install's params for a Custom Install job. The look's token holds the downloaded IPA on the phone for

@@ -28,6 +28,7 @@ import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { appQueue } from "../app-queue.js";
 import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, destructiveOf, sizeText as formatSize } from "../core/appqueue.js";
+import { markedVersionOnSource, markedResignJob } from "../core/appqueue.js"; // F221
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { compareVersions } from "../core/apt.js";
 import { queueApp } from "./queue.js";
@@ -367,7 +368,9 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   const installed = rec ? rec.version || "" : null;
   const older = installed ? app.versions.map((x) => x.version).filter((v) => v && compareVersions(v, installed) < 0) : [];
   const signed = await Promise.resolve().then(() => signedOf(job.id)).catch(() => null); // F91: Modify offers Re-sign
-  const state = { queued: Boolean(queue.get(job.id)), installed, newest, older: older.length > 0, signed: Boolean(signed), build: "sideload" };
+  // F221: marked as installed (no signature of iFizBox's): Re-sign while the source still has the installed version
+  const onSource = !signed && Boolean(markedVersionOnSource(pkg, installed));
+  const state = { queued: Boolean(queue.get(job.id)), installed, newest, older: older.length > 0, signed: Boolean(signed), onSource, build: "sideload" };
   if (!state.queued && installed == null && !state.signed) { add(job, { queue }); return true; }
   // Modify (installed or queued), as Cydia's: Upgrade/Reinstall, Downgrade (then which version), or Clear.
   const buttons = modifyActions(state);
@@ -375,7 +378,11 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   if (i < 0) return true;
   if (buttons[i] === "Clear") queue.clear(job.id);
   else if (buttons[i] === MARK_NOT_INSTALLED) await Promise.resolve().then(() => forget(app.bundleIdentifier)).catch(() => {});
-  else if (buttons[i] === "Re-sign") add({ ...resignJob(signed), id: job.id, icon: job.icon }, { queue });
+  else if (buttons[i] === "Re-sign" && signed) add({ ...resignJob(signed), id: job.id, icon: job.icon }, { queue });
+  else if (buttons[i] === "Re-sign") { // F221
+    const r = markedResignJob(pkg, installed, { source: source ? displayName(source) : null });
+    if (r) add(r, { queue });
+  }
   else if (buttons[i] === "Downgrade") {
     const j = await ask({ title: "Downgrade to", buttons: older });
     const pick = j >= 0 ? appJob(pkg, { installed, version: older[j], source: source ? displayName(source) : null }) : null;
@@ -395,10 +402,12 @@ async function siteModify(pkg, source, { ask, store, forget, siteInstall }) {
   const installed = rec.version || "";
   const newest = app.versions[0]?.version ?? null;
   const older = installed ? app.versions.filter((x) => x.version && compareVersions(x.version, installed) < 0) : [];
-  const buttons = modifyActions({ installed, newest, older: older.length > 0, build: "site" });
+  const same = markedVersionOnSource(pkg, installed); // F221: Re-sign signs the installed version again in the browser
+  const buttons = modifyActions({ installed, newest, older: older.length > 0, onSource: Boolean(same), build: "site" });
   const i = await ask({ title: app.name, buttons, destructive: destructiveOf(buttons) });
   if (i < 0) return true;
   if (buttons[i] === MARK_NOT_INSTALLED) { await Promise.resolve().then(() => forget(app.bundleIdentifier)).catch(() => {}); return true; }
+  if (buttons[i] === "Re-sign") { await siteInstall(pkg, same, source); return true; }
   if (buttons[i] === "Downgrade") {
     const j = await ask({ title: "Downgrade to", buttons: older.map((x) => x.version) });
     if (j >= 0) await siteInstall(pkg, older[j], source);

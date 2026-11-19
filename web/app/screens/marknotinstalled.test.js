@@ -36,8 +36,8 @@ test("sideload app: Modify's Mark as Not Installed is red and removes the record
     add: () => assert.fail("queued"), forget: forgetIn(mem),
     ask: async (o) => { sheet = o; return o.buttons.indexOf(MARK_NOT_INSTALLED); } });
   assert.equal(done, true);
-  assert.deepEqual(sheet.buttons, ["Reinstall", "Downgrade", MARK_NOT_INSTALLED]);
-  assert.equal(sheet.destructive, 2);
+  assert.deepEqual(sheet.buttons, ["Reinstall", "Downgrade", "Re-sign", MARK_NOT_INSTALLED]); // F221: Re-sign, 2 is on the source
+  assert.equal(sheet.destructive, 3);
   assert.deepEqual((await mem.all()).map((r) => r.id), ["com.x.b"]);
   assert.equal(q.size, 0);
 });
@@ -47,8 +47,8 @@ test("website: an installed app's Modify sheet; Mark as Not Installed forgets it
   const base = { mode: "site", store: async () => mem, forget: forgetIn(mem), siteInstall: async () => assert.fail("installed") };
   let sheet = null;
   assert.equal(await appPageAction(A, null, { ...base, ask: async (o) => { sheet = o; return -1; } }), true); // Cancel
-  assert.deepEqual(sheet.buttons, ["Reinstall", "Downgrade", MARK_NOT_INSTALLED]);
-  assert.equal(sheet.destructive, 2);
+  assert.deepEqual(sheet.buttons, ["Reinstall", "Downgrade", "Re-sign", MARK_NOT_INSTALLED]); // F221
+  assert.equal(sheet.destructive, 3);
   assert.equal((await mem.all()).length, 1);
   // Reinstall: false, so the page's own Install (signed in the browser) runs
   assert.equal(await appPageAction(A, null, { ...base, ask: async () => 0 }), false);
@@ -58,7 +58,7 @@ test("website: an installed app's Modify sheet; Mark as Not Installed forgets it
   assert.equal(await appPageAction(A, null, { ...base, siteInstall: async (p, v) => got.push(v.version), ask: async () => answers.shift() }), true);
   assert.deepEqual(got, ["1"]);
   // Mark as Not Installed
-  assert.equal(await appPageAction(A, null, { ...base, ask: async () => 2 }), true);
+  assert.equal(await appPageAction(A, null, { ...base, ask: async () => 3 }), true);
   assert.deepEqual(await mem.all(), []);
   // Not installed now: no sheet, the page installs it
   assert.equal(await appPageAction(A, null, { ...base, ask: async () => assert.fail("asked") }), false);

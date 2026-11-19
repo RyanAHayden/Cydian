@@ -40,6 +40,8 @@ lld=${LD64_LLD:-$(rustc --print sysroot 2>/dev/null || true)/lib/rustlib/x86_64-
 [ -x "$lld" ] || lld=$(command -v ld64.lld || true)
 [ -n "$lld" ] || missing+=("ld64.lld (rustup's, or set LD64_LLD)")
 command -v clang >/dev/null || missing+=("clang")
+# F15: idevice (the "no server" install route), built from source by sideload/idevice/build.sh: Rust + aarch64-apple-ios.
+idevice_why=$(sideload/idevice/build.sh --probe 2>&1) || missing+=("${idevice_why#idevice build: missing }")
 if [ ${#missing[@]} -gt 0 ]; then
   printf 'native build: missing %s\n' "${missing[@]}" >&2
   exit 3
@@ -70,14 +72,15 @@ rd=$out/resource
 mkdir -p "$rd"
 rm -rf "$rd/shims" && cp -r "$tc/usr/lib/swift/shims" "$rd/shims"
 ln -sfn "$tc/usr/lib/swift/clang" "$rd/clang"
+sideload/idevice/build.sh # F15: build/idevice/{lib/libidevice_ffi.a,include}, once per pin
 "$swiftc" -parse-as-library -O -wmo -swift-version 5 -runtime-compatibility-version none \
   -target "$target" -sdk "$sdk" -resource-dir "$rd" -I "$rd/shims" -module-cache-path "$out/modules" \
   -Xcc -Wno-nullability-completeness -Xcc -Wno-nullability-inferred-on-nested-type \
-  -import-objc-header Sources/iFizBox-Bridging-Header.h \
+  -import-objc-header Sources/iFizBox-Bridging-Header.h -I "$out/idevice/include" \
   -emit-const-values-path "$out/$BRAND_NAME.swiftconstvalues" \
   -Xfrontend -const-gather-protocols-file -Xfrontend intents/protocols.json \
   -module-name "$BRAND_NAME" -c Sources/*.swift sign/*.swift intents/*.swift intents/App/*.swift share/*.swift share/App/*.swift \
-  -o "$out/$BRAND_NAME.o"
+  sideload/idevice/*.swift -o "$out/$BRAND_NAME.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/availability.c -o "$out/availability.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/mode.c -o "$out/mode.o"
 # The app's half of the root helper (ifizbox_helper_spawn), and the helper itself (N2's native/helper/).
@@ -85,6 +88,7 @@ hflags=(-target "$target" -isysroot "$sdk" -std=c11 -Wall -Wextra -Werror -O2)
 clang "${hflags[@]}" -c helper/spawn.c -o "$out/spawn.o"
 clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/$BRAND_NAME.o" "$out/availability.o" \
   "$out/mode.o" "$out/spawn.o" -L "$sdk/usr/lib/swift" -lz -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
+  -L "$out/idevice/lib" -lidevice_ffi -liconv \
   -Wl,-weak_framework,AppIntents -o "$out/$BRAND_NAME"
 # N8: AppIntents is iOS 16+ and weak (above), so iFizBox still launches on iOS 15. Nothing else may need it strongly.
 if command -v llvm-objdump >/dev/null || [ -x "$tc/usr/bin/llvm-objdump" ]; then

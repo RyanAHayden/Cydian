@@ -33,13 +33,13 @@ test("F135: Settings is Home's first group, its row with our gear at the left, T
   assert.equal(first.pair, true);
   assert.deepEqual(first.rows.map((r) => r.label), ["Settings", "Theme"]);
   assert.equal(first.rows[0].label, "Settings");
-  assert.equal(first.rows[0].icon.cls, SETTINGS_ICON);
+  assert.equal(first.rows[0].icon, SETTINGS_ICON);
   assert.ok(rest.every((g) => g.rows?.every((r) => r.label !== "Settings")), "Settings only once");
   assert.equal(rest.at(-1).rows[0].label, "Credits / Thank You");
 });
 
-test("F159: the Settings row's gear is a tile glyph with the tiles' padding, so it lines up with them", () => {
-  assert.equal(SETTINGS_ICON, "home-glyph glyph-settings");
+test("F159: the Settings row's gear has the tiles' padding, so it lines up with them", () => {
+  assert.equal(SETTINGS_ICON.cls, "row-icon"); // F223: Settings > General's tile (rowicons.test.js)
   const css = read("../home.css");
   const rule = (sel) => css.match(new RegExp(sel.replace(/[.>]/g, (c) => "\\" + c) + " \\{([^}]*)\\}"))?.[1] ?? "";
   const decl = (body, prop) => body.match(new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`))?.[1].trim();
@@ -47,9 +47,7 @@ test("F159: the Settings row's gear is a tile glyph with the tiles' padding, so 
   assert.ok(decl(tile, "padding"), "the tiles set their padding");
   assert.equal(decl(row, "padding"), decl(tile, "padding"), "same left inset as the tiles");
   assert.equal(decl(row, "gap"), decl(tile, "gap"), "same icon-label gap as the tiles");
-  const glyph = rule(".glyph-settings");
-  assert.match(glyph, /background-color: #8e8e93/, "a grey square");
-  assert.match(glyph, /url\("data:image\/svg\+xml,[^"]*fill='%23fff'/, "a white gear drawn inline, as the other glyphs");
+  assert.equal(decl(rule(".home-settings-row .cell-icon.row-icon"), "margin"), "0", "no .row-icon nudge on top of the inset");
   assert.doesNotMatch(css, /settings\.svg/, "no full-bleed bitmap gear left");
 });
 
@@ -60,8 +58,8 @@ test("F159: grouped() rows put an icon's cls on the cell-icon", async () => {
     const find = (n, cls) => (n.className?.split?.(" ").includes(cls) ? n : (n.children ?? []).map((c) => find(c, cls)).find(Boolean));
     const icon = find(frag, "cell-icon");
     assert.ok(icon, "the Settings row draws an icon");
-    assert.deepEqual(icon.className.split(" "), ["cell-icon", "home-glyph", "glyph-settings"]);
-    assert.equal((icon.children ?? []).length, 0, "no <img>: the glyph is the span's own background");
+    assert.deepEqual(icon.className.split(" "), ["cell-icon", "row-icon"]);
+    assert.equal(icon.children.length, 1, "the tile is an <img> (rowicons.js)");
   });
 });
 

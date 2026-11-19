@@ -49,3 +49,14 @@ test("ios6.css places the tile as the 4S does: 7pt in, the label 11pt after", ()
   assert.match(rule, /margin: 0 3px 0 -3px/); // .cell-inner: 10px padding, 8px gap -> 7 and 11
   assert.match(css, /\.cell-inner \{[^}]*gap: 8px;[^}]*padding: 0 10px;/);
 });
+
+test("F223: Home's Settings row and Settings > General draw one gear, from this file", async () => {
+  const { homeLinks, SETTINGS_ICON } = await import("../screens/home.js");
+  const settingsRow = homeLinks()[0].rows.find((r) => r.label === "Settings");
+  assert.equal(PAGE_ICONS.general, "general");
+  assert.deepEqual(settingsRow.icon, rowIcon(PAGE_ICONS.general), "Home's Settings row is General's tile");
+  assert.equal(SETTINGS_ICON.src, rowIcon("general").src);
+  assert.equal(ROW_ICONS.general[1], "gear");
+  const home = readFileSync(new URL("../home.css", import.meta.url), "utf8");
+  assert.doesNotMatch(home, /\.glyph-settings/, "no second gear drawn in home.css");
+});

@@ -36,6 +36,7 @@ import { markiFizBoxInstalled, browsingLocked, askToBrowse } from "../websign-ga
 import * as guides from "./guides.js";
 import { guideRows, JAILBREAK_INFO_URL } from "./guides.js";
 import { NAME } from "../brand.js";
+import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
 
 const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
 
@@ -117,9 +118,10 @@ export async function signingSetUp(mode, { ready = signingReady, status = () => 
 
 // F123: Home's list below the tiles, as Cydia's: the help links, User Guides, then Credits / Thank You. Settings (it left
 // the tab bar; its pages open on Home's stack, router.js settingsRoute) is its own group, F135: first, directly under
-// the tiles (user 2026-11-18: "move settings up on the main page and give it an icon"). F159: its gear is a tile glyph
-// (.home-glyph.glyph-settings, home.css) with the tiles' inset, so it lines up with Featured/Signing above.
-export const SETTINGS_ICON = "home-glyph glyph-settings";
+// the tiles (user 2026-11-18: "move settings up on the main page and give it an icon"). F159: it has the tiles' inset,
+// so it lines up with Featured/Signing above. F223: its gear is Settings > General's (icons/rowicons.js, the same
+// PAGE_ICONS entry Settings' root draws), one gear in both places (user 2026-11-18).
+export const SETTINGS_ICON = rowIcon(PAGE_ICONS.general);
 // Settings shares its row with Theme (Settings > Theme) as two halves, like the Featured | Signing tiles (user
 // 2026-11-18: "split the homescreen setting button to have setting and theme"); render() makes the group a pair.
 export const THEME_ICON = "home-glyph glyph-theme";
@@ -127,7 +129,7 @@ export const THEME_ICON = "home-glyph glyph-theme";
 // while Settings > Device says so (as F144).
 const guidesLite = () => guides.isLite(settings.deviceType());
 export function homeLinks() {
-  return [{ pair: true, rows: [{ label: "Settings", href: format(settingsRoute()), icon: { cls: SETTINGS_ICON }, cls: "home-settings-row" },
+  return [{ pair: true, rows: [{ label: "Settings", href: format(settingsRoute()), icon: SETTINGS_ICON, cls: "home-settings-row" },
     { label: "Theme", href: format(settingsRoute(["theme"])), icon: { cls: THEME_ICON }, cls: "home-settings-row" }] }, {
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },

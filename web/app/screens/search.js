@@ -22,7 +22,7 @@ import { orderSources, loadOrder } from "../core/sourcelist.js";
 import { getBackend } from "../backend.js";
 import { grouped, el } from "../nav/ui.js";
 import { discoveryGroup } from "./extras.js";
-import { recommendedApps, addRecommended } from "./manage.js";
+import { recommendedApps, addRecommended, onSourcesChanged } from "./manage.js";
 import { matchRecommendedApps } from "../core/recommended.js";
 import { showAlert } from "../nav/alert.js";
 
@@ -62,9 +62,19 @@ export function sourceChoices(list, type, order = null) {
 // tab's reload bar (screens/sources.js loadNew: one shared run, Refresh's words, progress and Cancel), and the query
 // runs again each time one's packages reach the catalog, so they show without leaving Search. Called on opening;
 // `follow.load()` again as a query is typed (a source tried once is not asked again). `alive()` false (the page was
-// left) unsubscribes. `load` and `landed` are for the tests.
-export function followNewSources(ctx, rerun, alive = () => true, { load = loadNew, landed = onLanded } = {}) {
-  const off = landed(() => { if (!alive()) { off(); return; } rerun(); });
+// left) unsubscribes. `load`, `landed`, `changed` and `loaded` are for the tests.
+// B98: an add (Search's Recommended Add Source, Manage's Add / Add All; manage.js onSourcesChanged, whose listener in
+// screens/sources.js starts the load) runs it at once too, so Recommended Sources drops the added source; and so does
+// any catalog load (catalog.onLoaded): Add Source opens the source's page, whose catalog.ensure() often reads the new
+// source before the reload bar's run gets to it, and that path never fires onLanded.
+export function followNewSources(ctx, rerun, alive = () => true,
+  { load = loadNew, landed = onLanded, changed = onSourcesChanged, loaded = catalog.onLoaded } = {}) {
+  const offs = [];
+  const off = () => { for (const f of offs.splice(0)) f?.(); };
+  const listen = (subscribe) => offs.push(subscribe(() => { if (!alive()) { off(); return; } rerun(); }));
+  listen(landed);
+  listen(changed);
+  listen(loaded);
   const kick = async () => { try { return await load(ctx); } catch { return null; } };
   kick();
   return { load: kick, off };
@@ -254,7 +264,13 @@ export function render(body, route, ctx) {
     note.textContent = rows.length ? "" : "No Results";
   }
   // B75: opening Search loads sources never loaded; each one landing runs a typed query again.
-  const follow = followNewSources(ctx, () => { if (searchable(input.value.trim())) run({ again: true }); }, () => body.isConnected);
+  // B98: Recommended Sources is asked again too, so a source just added leaves it once it is in the list.
+  const follow = followNewSources(ctx, () => {
+    const q = input.value.trim();
+    if (!searchable(q)) return;
+    run({ again: true });
+    recs.search(q, { again: true });
+  }, () => body.isConnected);
   cancel.addEventListener("click", () => { input.value = ""; clearTimeout(timer); run(); input.blur(); });
   input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 120); });
   bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); settings.recentSearches.add(input.value); run(); input.blur(); });
@@ -267,14 +283,16 @@ export function render(body, route, ctx) {
 function recommendedGroup(ctx) {
   const box = el("div", "discovery");
   let seq = 0;
-  async function search(q) {
+  // `again` (B98: a source added or landed): no wait and no blank first; the group is swapped once read.
+  async function search(q, { again = false } = {}) {
     const turn = ++seq;
-    box.replaceChildren();
-    if (!q) return;
-    await new Promise((r) => setTimeout(r, 450)); // once typing stops, as Other Sources does
+    if (!again) box.replaceChildren();
+    if (!q) { box.replaceChildren(); return; }
+    if (!again) await new Promise((r) => setTimeout(r, 450)); // once typing stops, as Other Sources does
     if (turn !== seq) return;
     const found = matchRecommendedApps(await recommendedApps().catch(() => []), q);
-    if (turn !== seq || !found.length) return;
+    if (turn !== seq) return;
+    if (!found.length) { box.replaceChildren(); return; }
     box.replaceChildren(grouped([{
       header: "Recommended Sources",
       rows: found.map(({ row, app }) => ({

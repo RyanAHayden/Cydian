@@ -157,7 +157,15 @@ async function run() {
     return loadSource(s, arch, sig);
   }));
   if (reloaded) await recordSeen();
+  if (reloaded) fireLoaded();
   return sources;
+}
+
+// B98: told each time an ensure() put new or refreshed sources' packages in the worker, whoever asked for it (the
+// reload bar, a source page opened right after Add Source, Search), so an open Search runs its query again.
+const loadListeners = new Set();
+function fireLoaded() {
+  for (const f of [...loadListeners]) { try { f(); } catch { /* one listener's error stops no other */ } }
 }
 
 // Loads whatever changed since the last call (new, removed or refreshed sources, or a new arch). Calls made
@@ -355,4 +363,6 @@ export const catalog = {
   statusSource,
   // Called after a refresh filed something new, or the installed list changed; returns unsubscribe.
   onChange: (f) => { changeListeners.add(f); return () => changeListeners.delete(f); },
+  // B98: called after a load put new or refreshed sources in the catalog; returns unsubscribe.
+  onLoaded: (f) => { loadListeners.add(f); return () => loadListeners.delete(f); },
 };

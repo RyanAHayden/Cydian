@@ -50,7 +50,8 @@ export const SEGMENT = "manage";
 export const isManage = (route) => route.path[0] === SEGMENT;
 
 const listeners = new Set();
-export const onSourcesChanged = (f) => listeners.add(f);
+// Returns unsubscribe (B98: Search's page listens while it is on screen).
+export const onSourcesChanged = (f) => { listeners.add(f); return () => listeners.delete(f); };
 // B75: the add paths pass their ctx, so the Sources tab can load what was added under the reload bar (screens/sources.js).
 const changed = (ctx) => { for (const f of listeners) f(ctx); };
 
@@ -622,18 +623,21 @@ export async function recommendedApps() {
   return read.filter(Boolean);
 }
 
-export async function addRecommended(row, ctx) {
+// A successful add tells onSourcesChanged's listeners with `ctx`: screens/sources.js starts loading the new source
+// under the reload bar (loadNew), and an open Search drops it from Recommended Sources and runs its query again
+// once its packages land (B98). `backend` and `alert` are for the tests.
+export async function addRecommended(row, ctx, { backend = getBackend(), alert = showAlert } = {}) {
   const hide = ctx.showHUD("Verifying URL");
   let error = null;
   try {
-    await getBackend().addSource(row.input);
+    await backend.addSource(row.input);
   } catch (e) {
     error = e;
   } finally {
     hide();
   }
   if (error) {
-    await showAlert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
+    await alert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
     return false;
   }
   changed(ctx);

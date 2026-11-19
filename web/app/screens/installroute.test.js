@@ -10,7 +10,7 @@ test("Install Apps With: Signing Server and This iPhone, the chosen one checked,
   assert.equal(g.header, "Install Apps With");
   assert.deepEqual(g.rows.map((r) => [r.label, r.checked]), [["Signing Server", true], ["This iPhone", false]]);
   assert.deepEqual(g.rows[0].subtitle.split("\n"), ["Default", "Uses ifizbox.com"]);
-  assert.deepEqual(g.rows[1].subtitle.split("\n"), ["LocalDevVPN", "No server", "Updates itself"]);
+  assert.deepEqual(g.rows[1].subtitle.split("\n"), ["LocalDevVPN or Tailscale", "No server", "Updates itself"]);
   assert.ok(g.rows.every((r) => r.cls === "route-row"));
   assert.equal(more, undefined);
 });
@@ -18,7 +18,7 @@ test("Install Apps With: Signing Server and This iPhone, the chosen one checked,
 test("This iPhone chosen: Pairing and the VPN's state, and a tap picks", () => {
   const picked = [];
   const gs = installationGroups("iphone", { paired: "rp", localDevVPN: false, otherVPN: true }, { pick: (v) => picked.push(v) });
-  assert.equal(gs.length, 2);
+  assert.equal(gs.length, 4);
   assert.deepEqual(gs[1].rows.map((r) => [r.label, r.detail]), [["Pairing", "Paired"], ["LocalDevVPN", "Another VPN"], ["Open LocalDevVPN", undefined]]);
   assert.match(gs[1].rows[0].href, /installation\/pair$/);
   gs[0].rows[0].onClick();
@@ -68,4 +68,20 @@ test("paired: Paired with a check, then Check Connection and Forget Pairing", ()
   assert.deepEqual(gs[1].rows.map((r) => [r.label, r.checked]), [["Paired", true]]);
   assert.equal(gs[2].rows[0].label, "Check Connection");
   assert.equal(gs[3].rows[0].label, "Forget Pairing");
+});
+
+test("This iPhone: Connect With and Tailscale (Sign In, or the device with Test Connection and Sign Out)", () => {
+  const chosen = [];
+  let gs = installationGroups("iphone", { paired: "rp", tailscale: { connect: "tailscale", signedIn: false } }, { connect: (v) => chosen.push(v) });
+  assert.equal(gs[2].header, "Connect With");
+  assert.deepEqual(gs[2].rows.map((r) => [r.label, r.checked]), [["Automatic", false], ["LocalDevVPN", false], ["Tailscale", true]]);
+  gs[2].rows[0].onClick();
+  assert.deepEqual(chosen, ["auto"]);
+  assert.equal(gs[3].header, "Tailscale");
+  assert.deepEqual(gs[3].rows.map((r) => r.label), ["Sign In"]);
+  gs = installationGroups("iphone", { paired: "rp", tailscale: { connect: "auto", signedIn: true, name: "ifizbox-on-iphone" } });
+  assert.deepEqual(gs[3].rows.map((r) => [r.label, r.detail]), [["Device", "ifizbox-on-iphone"], ["Test Connection", undefined], ["Sign Out", undefined]]);
+  assert.equal(gs[2].rows[0].checked, true);
+  gs = installationGroups("iphone", null, { busy: "Log in on the page" });
+  assert.deepEqual(gs[3].rows.map((r) => [r.label, r.detail]), [["Signing In…", "Log in on the page"]]);
 });

@@ -415,6 +415,8 @@ html[data-theme="dark"] .search-field::after { background-color: var(--dk-clear)
   background: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103); /* .badge's red */
 }
 .pkg-row[data-change="resign"] .pkg-version::before { content: none; }
+/* F221: an app marked as installed: no expiry known, a grey "?" with the same gloss (the grey of the pills' family). */
+.sig-pill[data-sig="unknown"] { background: linear-gradient(#d4d4d4, #9a9a9a 48.8%, #8c8c8c 50.5%, #6e6e6e); background-origin: border-box; }
 /* F103: Sileo's RatingView, ReviewView and WebView. Stars are drawn the iOS 6 App Store way: five grey stars, the
    filled ones dark, clipped to the rating (a fraction shows as part of a star). */
 .dep-rating { margin: 4px 12px; line-height: 0; }

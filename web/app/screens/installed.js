@@ -482,13 +482,16 @@ export function appListRows(records, candidateOf) {
 // F91: each row's signature ({ state, text, long } or none) from signing.installed, by bundle ID (installed or
 // original), and the signed apps no row stands for, as rows of their own (`signedOnly`). -> { rows, extra }
 // F134: `show` false (Show Expiry Dates off) leaves the days out; Expired still shows, since that app won't open.
-export function withSignatures(rows, installed, { now = new Date(), window, show = true } = {}) {
+// F221: `marked` (the sideload app's list): a row iFizBox holds no signature for was marked as installed, so its pill
+// is a grey "?" (no expiry known) and the row says so (`marked: true`); not for iFizBox's own row or one iOS lacks.
+export const MARKED_SIG = { state: "unknown", text: "?", long: "Marked as installed: no expiry known" };
+export function withSignatures(rows, installed, { now = new Date(), window, show = true, marked = false } = {}) {
   const shown = (sig) => (sig && (show || sig.state === "expired") ? sig : null);
   const index = signedIndex(installed);
   const used = new Set();
   const out = rows.map((r) => {
     const a = index.get(r.id);
-    if (!a) return r;
+    if (!a) return marked && show && !r.self && r.actual !== null ? { ...r, sig: MARKED_SIG, marked: true } : r;
     used.add(a.bundleId);
     const sig = shown(signatureState(a.expires, { now, window }));
     return sig ? { ...r, sig } : r;
@@ -567,7 +570,7 @@ function drawAppList() {
   const { listRows, cands, site, hasStatus } = appView.last;
   for (const n of appView.tail ?? []) n.remove();
   // F91: the signature pill in place of the version (the version stays in the subtitle).
-  const signed = appView.signed ? withSignatures(listRows, appView.signed, { window: resignWindow((k) => settings.get(k)), show: settings.get("showExpiry") }) : { rows: listRows, extra: [] };
+  const signed = appView.signed ? withSignatures(listRows, appView.signed, { window: resignWindow((k) => settings.get(k)), show: settings.get("showExpiry"), marked: true }) : { rows: listRows, extra: [] };
   // F127: User (A–Z) or Recent (by day) on the root, narrowed by the search; the jailbreak app's Apps page as before.
   const appSecs = recordsApps() ? appSections(signed.rows, { mode: appView.mode, query: appView.query }) : [{ rows: signed.rows }];
   const extra = recordsApps() ? queryRows(signed.extra, appView.query) : signed.extra;
@@ -592,7 +595,8 @@ function drawAppList() {
 export function appListElement(appSecs, extra, { route, cands = new Map(), signed = null, more = [], editing = appView.editing, hold = {} } = {}) {
   const rows = appSecs.flatMap((sec) => sec.rows);
   const appRow = (r) => ({
-    label: r.name, subtitle: r.sig && !r.upgrade && r.version ? [`Version ${r.version}`, appSubtitle(r)].filter(Boolean).join(" · ") : appSubtitle(r),
+    label: r.name, subtitle: r.marked && !r.upgrade ? markedSubtitle(r)
+      : r.sig && !r.upgrade && r.version ? [`Version ${r.version}`, appSubtitle(r)].filter(Boolean).join(" · ") : appSubtitle(r),
     detail: r.sig && !r.upgrade ? r.sig.text : r.upgrade || r.actual === null ? undefined : r.version,
     badge: r.upgrade ? "Upgrade" : undefined, icon: { text: r.name.charAt(0).toUpperCase() },
     href: appRowHref(r, cands, route),
@@ -608,6 +612,11 @@ export function appListElement(appSecs, extra, { route, cands = new Map(), signe
   attachRowGestures(ul);
   attachRowHold(ul, hold);
   return ul;
+}
+
+// F221: a marked app's subtitle: "Version x · Marked as installed".
+export function markedSubtitle(r) {
+  return [r.version ? `Version ${r.version}` : null, "Marked as installed"].filter(Boolean).join(" · ");
 }
 
 // F91: the row's detail drawn as the signature pill.

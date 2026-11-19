@@ -429,8 +429,15 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
 // F91: a "resign" job: signing.resign {bundleId} signs the app again from the phone's record (Re-sign All's path,
 // one app) and opens iOS's install, the HUD following it; iFizBox's own is hosted on the Signing Server, as its
 // install is (iOS closes iFizBox). True once iOS was asked.
-export async function resignApp(job, { sc, native = globalThis.ifizboxNative, hud = null, alert = showAlert } = {}) {
+// F221: a marked app's re-sign (core/appqueue.js markedResignJob) has no record on the phone to sign from: its url,
+// the installed version on the source, is downloaded, signed and installed over the app as an Install is
+// (`deps`: installOnDevice's, for tests). signing.install records it, so it is a signed app with a pill from then on.
+export async function resignApp(job, { sc, native = globalThis.ifizboxNative, hud = null, alert = showAlert, deps } = {}) {
   sc ??= await import("../signing-client.js");
+  if (job.url) {
+    if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" }, deps);
+    return sc.signAndInstall({ url: job.url, name: job.name || "" });
+  }
   const { resignLabel, deviceError } = await import("../core/signing.js");
   const h = hud ? hud("Re-signing") : progressHUD("Re-signing"); // F151: the progress page
   const fail = (message) => (typeof h.fail === "function" ? h.fail(message) : h.hide());

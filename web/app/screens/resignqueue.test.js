@@ -92,10 +92,13 @@ test("app page: the Signature row, and Modify's Re-sign queues a resign job", as
   assert.equal(await appPageAction(pkg, null, { ...unrecorded, ask: async (o) => { sheet = o; return 1; } }), true);
   assert.deepEqual(sheet.buttons, ["Install", "Re-sign"]);
   assert.equal(q.get("b").mode, "resign");
-  // not signed by iFizBox: no Re-sign
+  // not signed by iFizBox, only marked: Re-sign while its version is on the source (F221), not once it's gone
   q.clearAll();
   await appPageAction(pkg, null, { ...base, signedOf: async () => null, ask: async (o) => { sheet = o; return -1; } });
-  assert.deepEqual(sheet.buttons, ["Reinstall", "Mark as Not Installed"]);
+  assert.deepEqual(sheet.buttons, ["Reinstall", "Re-sign", "Mark as Not Installed"]);
+  const gone = { ...base, signedOf: async () => null, store: async () => ({ all: async () => [{ id: "b", version: "1.0" }] }) };
+  await appPageAction(pkg, null, { ...gone, ask: async (o) => { sheet = o; return -1; } });
+  assert.deepEqual(sheet.buttons, ["Upgrade", "Mark as Not Installed"]);
 });
 
 test("Confirm's run: a resign job goes through signing.resign {bundleId}, iFizBox's hosted and last; a failure stops the run", async () => {

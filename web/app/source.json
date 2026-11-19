@@ -19,6 +19,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.9.9",
+          "date": "2026-11-19T14:18:51Z",
+          "localizedDescription": "Install queues keep going when one package or app fails, with a row for each and Retry All.\nSigned apps keep their own bundle ID, so they get their notifications with a profile that has Push.\nSettings > Signing checks that this iPhone is in your profile and says how to fix it.\nSources refresh one row at a time; a dead source no longer holds the rest.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.9",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.9/iFizBox.ipa",
+          "size": 5386413,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.9.8",
           "date": "2026-11-19T04:14:42Z",
           "localizedDescription": "Installed Manage mode, Install IPAs on one page, and Re-sign for installed apps\nScrolling no longer starts installs, and Home always opens at the top\nMalware check against Canister's piracy list; block packages and authors\nSix new themes with a live preview, and Delete in the jailbreak app uninstalls\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.8",

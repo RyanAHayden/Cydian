@@ -10,6 +10,13 @@ test("appSchemeFor: X profiles and posts, YouTube, GitHub (not Discord); anythin
   assert.equal(appSchemeFor("https://github.com/ProcursusTeam"), "github://github.com/ProcursusTeam");
   assert.equal(appSchemeFor("https://discord.gg/3XASvpjbgp"), null); // Unbound drops the invite on discord://
   assert.equal(appSchemeFor("https://github.com/"), null);
+  // files on GitHub stay https (Safari downloads them; the GitHub app can't)
+  assert.equal(appSchemeFor("https://github.com/FIZL0/opentennis/releases/download/v1.8.0/opentennis-ios.ipa"), null);
+  assert.equal(appSchemeFor("https://github.com/FIZL0/opentennis/releases/latest/download/altstore-source.json"), null);
+  assert.equal(appSchemeFor("https://github.com/a/b/archive/refs/heads/main.zip"), null);
+  assert.equal(appSchemeFor("https://github.com/a/b/raw/main/app.deb"), null);
+  assert.equal(appSchemeFor("https://github.com/FIZL0/opentennis/releases"), "github://github.com/FIZL0/opentennis/releases");
+  assert.equal(appSchemeFor("https://github.com/FIZL0/opentennis"), "github://github.com/FIZL0/opentennis");
   assert.equal(appSchemeFor("http://x.com/saurik"), null);
   assert.equal(appSchemeFor("not a url"), null);
 });

@@ -542,3 +542,23 @@ export async function unsignEntries(entries, { call } = {}) {
   }
   return { done, failed, ipas };
 }
+
+// ---- F269: Installed's Install IPAs row ---------------------------------------------------------------------------
+//   libraryCounts(entries, sections)   { total, notInstalled }: every IPA in the library, and those in the Install IPAs
+//                                  page's Not Installed section (`sections`: ipaSections/sharedSections, so a broken
+//                                  IPA or one whose bundle ID another IPA already installed counts as the page shows it)
+//   ipaCountText(counts)           the row's subtitle: "7 IPAs · 2 not installed", "1 IPA", "No IPAs yet"; null counts
+//                                  (not read yet, or the library couldn't be read) say what the page is for
+export function libraryCounts(entries, sections = []) {
+  const total = (entries ?? []).filter(Boolean).length;
+  const notInstalled = (sections ?? []).find((s) => s?.key === "notInstalled")?.rows?.length ?? 0;
+  return { total, notInstalled: Math.min(notInstalled, total) };
+}
+
+export function ipaCountText(counts) {
+  if (!counts) return "Your own apps, as IPA files";
+  const { total = 0, notInstalled = 0 } = counts;
+  if (!total) return "No IPAs yet";
+  const all = total === 1 ? "1 IPA" : `${total} IPAs`;
+  return notInstalled > 0 ? `${all} · ${notInstalled} not installed` : all;
+}

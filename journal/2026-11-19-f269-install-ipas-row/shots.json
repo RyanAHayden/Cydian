@@ -1,0 +1,9 @@
+[
+  { "eval": "(async()=>{const m=await import('./core/installed.js');const s=await m.openAppStore();for(const [id,name,v] of [['com.example.delta','Delta','1.6'],['com.example.alpha','Alpha','2.0'],['com.example.notes','Notes Plus','3.1'],['com.example.bravo','Bravo','1.0']]) await m.recordInstall(s,{id,name,version:v,sourceName:'Example Source'});localStorage.setItem('ifizbox.myIpas',JSON.stringify([{file:'Delta.ipa',url:'https://example.com/Delta.ipa',name:'Delta',bundleId:'com.example.delta'},{file:'Game.ipa',url:'https://example.com/Game.ipa',name:'Game',bundleId:'com.example.game'},{file:'Tool.ipa',url:'https://example.com/Tool.ipa',name:'Tool',bundleId:'com.example.tool'}]));return 'seeded'})()" },
+  { "nav": "#/installed", "ms": 5000 },
+  { "eval": "document.querySelector('.install-ipas-row')?.textContent" },
+  { "shot": "installed-row" },
+  { "click": ".manage-button", "ms": 1500 },
+  { "eval": "String(document.querySelector('.install-ipas-row')?.hidden)" },
+  { "shot": "installed-managing" }
+]

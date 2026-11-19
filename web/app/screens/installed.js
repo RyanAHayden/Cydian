@@ -75,6 +75,7 @@ import { compareNames, indexLetter } from "../core/catalog.js";
 import { NAME } from "../brand.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { longPress } from "../nav/menu.js";
+import { guarded } from "../nav/tapguard.js";
 import { libraryCall } from "../signing-client.js";
 import { resignJob, appJob, markedResignJob, markedVersionOnSource } from "../core/appqueue.js";
 import { hudLine } from "../core/progress.js";
@@ -754,7 +755,7 @@ function decorateApp(li, r) {
   toggle.addEventListener("click", () => arm(li, !li.classList.contains("armed")));
   const confirm = Object.assign(document.createElement("button"), { type: "button", className: "del-confirm",
     textContent: deleteAction(r)?.label ?? DELETE }); // B46: Delete only where it uninstalls
-  confirm.addEventListener("click", () => confirmDelete(r, { li }));
+  confirm.addEventListener("click", guarded(() => confirmDelete(r, { li }))); // B48: not on a drag's or scroll's click
   li.append(toggle, confirm);
 }
 
@@ -1015,7 +1016,7 @@ export async function appSheet(r, { mode = detectMode(), sheet = showActionSheet
   return buttons[i];
 }
 
-// A hold on a row (500 ms, nav/menu.js longPress) opens its sheet; not while editing or while it shows Delete.
+// A hold on a row (nav/menu.js longPress, HOLD_MS) opens its sheet; not while editing or while it shows Delete.
 export function attachRowHold(ul, opts = {}) {
   longPress(ul, ".installed-app", (li) => {
     if (appView.editing || appView.managing || li.classList.contains("armed") || !li._app) return;

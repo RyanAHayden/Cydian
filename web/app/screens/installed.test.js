@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pageKind, recordsApps, appSubtitle, appListRows, DPKG, APPS } from "./installed.js";
+import { HOLD_MS } from "../nav/menu.js";
 
 const r = (...path) => ({ tab: "installed", path });
 
@@ -448,8 +449,8 @@ test("B36: a hold opens the sheet with the actions that apply", (t) => {
     const ul = appListElement([{ rows: B36_ROWS }], B36_EXTRA, { route: r(), signed: B36_SIGNED, editing: false, hold });
     const cells = ul.querySelectorAll(":scope > .cell");
     ul.fire("pointerdown", { target: cells[1].querySelector(".cell-label"), clientX: 100, clientY: 10 });
-    t.mock.timers.tick(499);
-    assert.equal(sheets.length, 0, "not before 500 ms");
+    t.mock.timers.tick(HOLD_MS - 1); // B48: HOLD_MS (550), no longer 500
+    assert.equal(sheets.length, 0, "not before HOLD_MS");
     t.mock.timers.tick(1);
   });
   return new Promise((done) => setImmediate(done)).then(() => {

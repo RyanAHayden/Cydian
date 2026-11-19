@@ -332,3 +332,90 @@ export function dayHeaders(rows, dates, locale) {
   }
   return out;
 }
+
+// ---- F222: Installed's Manage mode (the apps list without a jailbreak) -------------------------------------------
+//
+// Pure helpers for screens/installed.js's Manage: the rows are the list's own (withSignatures' rows and extra rows,
+// each with `signed`: its signing.installed record or null, and `onSource`: a marked app's installed version is on its
+// source, core/appqueue.js markedVersionOnSource). `selected` is a Set of bundle IDs.
+//
+//   manageKinds(r)                  -> { resign, update, expiring, marked } for a row Manage can pick, or null (iFizBox's own)
+//   manageable(rows)                -> the rows Manage can pick
+//   MANAGE_PRESETS                  -> Select…'s presets: all, expiring, marked (Not Signed Here), updates
+//   presetIds(rows, preset)         -> the ids a preset picks
+//   selectSheet(rows)               -> Select…'s action sheet buttons: [{ preset, label }] ("Expiring Soon (2)")
+//   selectLabel(rows, selected)     -> the nav bar's left button: "Select…", or "Deselect" once every row is picked
+//   manageCounts(rows, selected)    -> { n, resign, update, del, marked }: the picked rows each toolbar button acts on
+//   manageSummary(rows, selected)   -> the grey line above the list: "2 selected · 5 apps · 1 expiring · 3 updates"
+//   manageToolbar(counts)           -> [{ kind, label, disabled }]: Re-sign (n), Update (n), Delete (n)
+//   pruneSelection(selected, rows)  -> the selection without ids the list no longer has
+export const MANAGE_PRESETS = ["all", "expiring", "marked", "updates"];
+export const SELECT = "Select…";
+export const DESELECT = "Deselect";
+const PRESET_LABEL = { all: "All Apps", expiring: "Expiring Soon", marked: "Not Signed Here", updates: "With Updates" };
+
+export function manageKinds(r) {
+  if (!r?.id || r.self) return null;
+  const marked = !r.signed && !r.signedOnly;
+  return {
+    resign: Boolean(r.signed) || (marked && Boolean(r.onSource)),
+    update: Boolean(r.upgrade),
+    expiring: r.sig?.state === "soon" || r.sig?.state === "expired", // inside the re-sign window, or past it
+    marked,
+  };
+}
+
+export const manageable = (rows) => (rows ?? []).filter((r) => manageKinds(r));
+
+export function presetIds(rows, preset) {
+  const pick = { all: () => true, expiring: (k) => k.expiring, marked: (k) => k.marked, updates: (k) => k.update }[preset];
+  if (!pick) return [];
+  return manageable(rows).filter((r) => pick(manageKinds(r))).map((r) => r.id);
+}
+
+export function selectSheet(rows) {
+  return MANAGE_PRESETS.map((preset) => ({ preset,
+    label: preset === "all" ? PRESET_LABEL.all : `${PRESET_LABEL[preset]} (${presetIds(rows, preset).length})` }));
+}
+
+export function selectLabel(rows, selected) {
+  const ids = manageable(rows).map((r) => r.id);
+  return ids.length && ids.every((id) => selected?.has(id)) ? DESELECT : SELECT;
+}
+
+export function manageCounts(rows, selected) {
+  const out = { n: 0, resign: 0, update: 0, del: 0, marked: 0 };
+  for (const r of manageable(rows)) {
+    if (!selected?.has(r.id)) continue;
+    const k = manageKinds(r);
+    out.n++;
+    out.del++; // every row Manage picks can be deleted or removed (B46's rules decide which, per app)
+    if (k.resign) out.resign++;
+    if (k.resign && !r.signed) out.marked++; // downloaded from its source first
+    if (k.update) out.update++;
+  }
+  return out;
+}
+
+export function manageSummary(rows, selected) {
+  const all = manageable(rows);
+  const c = manageCounts(rows, selected);
+  const expiring = all.filter((r) => manageKinds(r).expiring).length;
+  const updates = all.filter((r) => manageKinds(r).update).length;
+  return [`${c.n} selected`, all.length === 1 ? "1 app" : `${all.length} apps`, `${expiring} expiring`,
+    updates === 1 ? "1 update" : `${updates} updates`].join(" · ");
+}
+
+const counted = (label, n) => (n > 0 ? `${label} (${n})` : label);
+export function manageToolbar(c) {
+  return [
+    { kind: "resign", label: counted("Re-sign", c.resign), disabled: !c.resign },
+    { kind: "update", label: counted("Update", c.update), disabled: !c.update },
+    { kind: "delete", label: counted("Delete", c.del), disabled: !c.del },
+  ];
+}
+
+export function pruneSelection(selected, rows) {
+  const have = new Set(manageable(rows).map((r) => r.id));
+  return new Set([...(selected ?? [])].filter((id) => have.has(id)));
+}

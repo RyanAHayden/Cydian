@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- F222: a still of Installed's Manage mode for a 3x render (the real stylesheets, the list's markup as nav/ui.js plain
+     and screens/installed.js draw it). chromium --headless --force-device-scale-factor=3 --screenshot. -->
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../../web/app/style.css">
+<link rel="stylesheet" href="../../web/app/ios6.css">
+<link rel="stylesheet" href="../../web/app/sources.css">
+<link rel="stylesheet" href="../../web/app/packages.css">
+<link rel="stylesheet" href="../../web/app/palettes.css">
+<style>
+  :root { --tab-h: 0px; }
+  body { margin: 0; width: 320px; background: #fff; }
+</style>
+</head>
+<body>
+<div class="page-body plain" style="position:static;overflow:visible">
+  <p class="manage-summary">2 selected · 4 apps · 1 expiring · 1 update</p>
+  <ul class="table plain managing">
+    <li class="section-header">D</li>
+    <li class="cell source-row installed-app manage-row picked"><a class="cell-inner chevron" href="#"><span class="cell-icon">D</span><span class="cell-text"><span class="cell-label">Delta</span><span class="cell-subtitle">Version 1.6 · AltStore</span></span><span class="cell-detail sig-pill" data-sig="soon">2 days</span></a><span class="manage-check"></span></li>
+    <li class="section-header">M</li>
+    <li class="cell source-row installed-app manage-row"><a class="cell-inner chevron" href="#"><span class="cell-icon">M</span><span class="cell-text"><span class="cell-label">Mine</span><span class="cell-subtitle">Version 3 · From My IPAs</span></span><span class="cell-detail sig-pill" data-sig="ok">30 days</span></a><span class="manage-check"></span></li>
+    <li class="cell source-row installed-app manage-row picked"><a class="cell-inner chevron" href="#"><span class="cell-icon">M</span><span class="cell-text"><span class="cell-label">Marked</span><span class="cell-subtitle">Version 2 · Marked as installed</span></span><span class="cell-detail sig-pill" data-sig="unknown">?</span></a><span class="manage-check"></span></li>
+    <li class="section-header">U</li>
+    <li class="cell source-row installed-app manage-row"><a class="cell-inner chevron" href="#"><span class="cell-icon">U</span><span class="cell-text"><span class="cell-label">Up</span><span class="cell-subtitle">Upgrade to 2 · AltStore</span></span><span class="cell-count">Upgrade</span></a><span class="manage-check"></span></li>
+  </ul>
+  <p class="installed-footer">Sign and install your own apps from <a href="#">Install IPAs</a>.</p>
+</div>
+<div class="manage-toolbar shown" role="toolbar" style="position:static;transition:none">
+  <button class="bar-button done manage-resign" type="button">Re-sign (2)</button>
+  <button class="bar-button manage-update" type="button" disabled>Update</button>
+  <button class="bar-button manage-delete" type="button">Delete (2)</button>
+</div>
+</body>
+</html>

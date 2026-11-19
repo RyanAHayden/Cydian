@@ -215,8 +215,8 @@ enum MyIPAs {
 
     static func install(_ c: Bridge.Call) {
         guard let (id, profile) = Sideload.ready(c) else { return }
-        guard Sideload.takeServer(c) != nil else { return Apt.reply(c, nil, Sideload.noServer) }
-        Sideload.hostServer = nil
+        // B64: this call's own server, never hosted (the phone's 127.0.0.1 install server serves it).
+        guard let servers = Sideload.servers(c, allowHost: false) else { return Apt.reply(c, nil, Sideload.noServer) }
         let emit = emitter(c)
         let file = c.params["file"] as? String ?? ""
         let job = SignJob.begin() // F196: until iOS has the IPA (serveAndOpen ends it)
@@ -238,7 +238,7 @@ enum MyIPAs {
             // B29: the progress page's console, as signing.install has it: the bundle ID and what iOS fetched.
             let log = { (line: String) in c.emitOnMain([["log": line]]) }
             log("Installing the signed copy of \(file): \(s.name) \(s.version) as \(s.bundleID)")
-            Sideload.serveAndOpen(out, app: s.app, record: record, log: log, job: job, opened: { r in
+            Sideload.serveAndOpen(out, server: servers.manifest, app: s.app, record: record, log: log, job: job, opened: { r in
                 switch r {
                 case .failure(let e):
                     job.end()

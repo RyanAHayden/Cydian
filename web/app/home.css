@@ -159,3 +159,28 @@ html[data-theme="dark"] .home { --tile-purple: var(--dk-lavender); --tile-purple
 /* F223: the Settings half draws Settings > General's tile (icons/rowicons.js rowIcon, a .row-icon <img>); the row's own
    inset and gap place it, so drop .row-icon's Settings-table nudge. */
 .home-settings-row .cell-icon.row-icon { margin: 0; }
+
+/* F244: the sideload build's certificate-expiry tile (screens/home.js certRow), a full-width stack tile under the
+   welcome, as the approved concept (journal/2026-11-19-cert-warning-concept/): the failed '!' glyph and a bold
+   subtitle in the stage's ink. soon: amber tint; close (inside the Re-sign Reminder's days): red tint; gone (expired):
+   a solid red gradient with white embossed text. Dark: the tints are the ink mixed into the theme's own tile and edge,
+   the ink lifted toward the theme's text so it reads on the dark ground; the solid red stays as it is. */
+.home-row.cert { margin-bottom: 12px; }
+.home-row.cert > .table { background: var(--cert-bg); border-color: var(--cert-edge); }
+.home-row.cert .home-glyph { background-color: var(--cert-ink); }
+.home-row.cert .cell-subtitle { color: var(--cert-ink); font-weight: bold; }
+.home-row.cert.soon  { --cert-bg: #fff6e0; --cert-edge: #e0b65a; --cert-ink: #d98a00; }
+.home-row.cert.close { --cert-bg: #ffe9e6; --cert-edge: #e08a80; --cert-ink: #d1281b; }
+.home-row.cert.gone > .table {
+  background: linear-gradient(#e4473b, #c4261b); background-origin: border-box; border-color: #a01c13;
+}
+.home-row.cert.gone .cell-label, .home-row.cert.gone .cell-subtitle { color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); }
+.home-row.cert.gone .home-glyph { background-color: #8f1a12; }
+.home-row.cert.gone .chevron::after { filter: brightness(10); }
+html[data-theme="dark"] .home-row.cert.soon, html[data-theme="dark"] .home-row.cert.close {
+  --cert-bg: color-mix(in srgb, var(--cert-ink) 18%, var(--tile));
+  --cert-edge: color-mix(in srgb, var(--cert-ink) 55%, var(--tile-edge));
+}
+html[data-theme="dark"] .home-row.cert.soon .cell-subtitle, html[data-theme="dark"] .home-row.cert.close .cell-subtitle {
+  color: color-mix(in srgb, var(--cert-ink) 75%, var(--text));
+}

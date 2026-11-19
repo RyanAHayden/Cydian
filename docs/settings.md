@@ -40,6 +40,7 @@ Laid out like an iOS 6 settings page, with one-line footers. `SIGNING_GROUPS` (c
 | Files | while a file or the password is missing | .p12, .mobileprovision, Password, each with Browse |
 | Provisioning Profile | once there is one | Name, (website: Type), Expires, Devices, App ID |
 | (options) | sideload | **Show Expiry Dates** (switch, on), Re-sign Reminder (list) |
+| (expiry warning) | sideload | **Show Expiry Warning** (switch, on), Expiry Warning (list: 3 Days, 1 Week, 2 Weeks, 1 Month, 2 Months; hidden while the switch is off): how far ahead Home's certificate tile shows. The tile turns amber inside that window, red inside Re-sign Reminder's days, and solid red once the certificate or profile (whichever ends first) has expired. It stays solid red with the switch off |
 | Signing Server | sideload | the server, Check Server, Run Your Own |
 | Certificate Status, Signed Apps | sideload | Check Certificate; the signed apps (days left, or Expired), Re-sign All |
 | Install iFizBox App, Bring My Certificate | website, certificate working | |

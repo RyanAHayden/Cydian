@@ -537,3 +537,18 @@ export function freshUrl(url, now = Date.now()) {
   if (!/^https:\/\/raw\.githubusercontent\.com\//i.test(s) || s.includes("?")) return s;
   return `${s}?t=${Math.floor(now / 60000)}`;
 }
+
+// F220: http sources. A source (a record, an Add input { uri, ... } or a URL) is "not secure" when it's fetched over
+// plain http: anyone on the network could change its files. Add Source tries the https:// twin first
+// (httpsInput); the source page's footer carries insecureNote. Refresh and install say nothing.
+const sourceUri = (s) => String((typeof s === "string" ? s : s?.uri ?? s?.url) ?? "").trim();
+export const isInsecureSource = (s) => /^http:\/\//i.test(sourceUri(s));
+export const INSECURE_NOTE = "Not Secure: this source uses http, so its packages could be changed on the way.";
+export const insecureNote = (s) => (isInsecureSource(s) ? INSECURE_NOTE : null);
+// The same Add input over https (a URL string, or a dist repo { uri, dist, components } with its uri changed), or
+// null when it isn't http.
+export function httpsInput(input) {
+  if (!isInsecureSource(input)) return null;
+  const uri = sourceUri(input).replace(/^http:/i, "https:");
+  return typeof input === "string" ? uri : { ...input, uri };
+}

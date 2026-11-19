@@ -16,7 +16,7 @@
 // Source keys always hold a ':' (deb:..., alt:...), so "manage" can't be one. The parsing, export text and order
 // live in core/sourcelist.js; the QR code in core/qr.js. A change here (add, delete, reorder) tells sources.js
 // through onSourcesChanged, so the tab's list is right when the user goes back.
-import { cleanSourceUrl } from "../core/sources.js";
+import { cleanSourceUrl, httpsInput } from "../core/sources.js";
 import { grouped, plain, collapse, placeholder, el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showSheet } from "../nav/sheet.js";
@@ -333,14 +333,11 @@ export async function addSource(ctx, prefill = null) {
   const typed = cleanSourceUrl(value) || value.trim();
   const input = dist && typed === prefill.url ? { uri: prefill.url, dist: prefill.dist, components: prefill.components } : typed;
   if (!(await confirmWarning(input))) return;
-  const hide = ctx.showHUD("Verifying URL");
   let error = null;
   try {
-    await getBackend().addSource(input);
+    if (!(await addSecure(input, { backend: getBackend(), showHUD: ctx.showHUD }))) return; // F220: Cancel
   } catch (e) {
     error = e;
-  } finally {
-    hide();
   }
   if (error) {
     await showAlert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
@@ -349,6 +346,35 @@ export async function addSource(ctx, prefill = null) {
   changed();
   const body = document.querySelector(".page.is-top .manage-list")?.closest(".page-body");
   if (body) renderSources(body);
+}
+
+// F220: Zebra's warning for an http: source, the iOS 6 way. Cancel is the safe choice, so it gets the darker
+// "Button (Cancel)" look and Escape.
+export const INSECURE_ALERT = {
+  title: "This Source Is Not Secure",
+  message: "Its files are sent without encryption, and someone on the same network could change them. Add it anyway?",
+  buttons: ["Cancel", "Add"],
+  cancel: 0,
+};
+
+// F220: adds `input` under the Verifying URL HUD. An http:// one is tried over https:// first: if that answers, the
+// https source is added and nothing is said; otherwise INSECURE_ALERT asks before the http one is added. Resolves
+// to the saved record, or null on Cancel; throws the backend's error (SourceError) when the add fails.
+export async function addSecure(input, { backend, showHUD = () => () => {}, alert = showAlert } = {}) {
+  const https = httpsInput(input);
+  if (https) {
+    const hide = showHUD("Verifying URL");
+    let saved = null, ok = false;
+    try { saved = await backend.addSource(https); ok = true; } catch { /* no https twin: ask */ } finally { hide(); }
+    if (ok) return saved ?? { input: https };
+    if ((await alert(INSECURE_ALERT)).index !== 1) return null;
+  }
+  const hide = showHUD("Verifying URL");
+  try {
+    return (await backend.addSource(input)) ?? { input };
+  } finally {
+    hide();
+  }
 }
 
 // F19: Cydia's Source Warning, from our own list (core/warnings.js), before anything is fetched. Resolves true to

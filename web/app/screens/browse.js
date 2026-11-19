@@ -22,6 +22,7 @@ import { NO_SECTION, indexLetter, parseAuthor } from "../core/catalog.js";
 import { packageIcon } from "../core/sectionicons.js";
 import { description, parseRelations, compareVersions } from "../core/apt.js";
 import { displayName, releaseDepiction } from "../core/sources.js";
+import { insecureNote } from "../core/sources.js"; // F220
 import { renderSileo, mediaUrl, reviewBody } from "./depiction.js";
 import { settings, createSwitch } from "./settings.js";
 import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js";
@@ -213,6 +214,7 @@ async function drawSections(page) {
       body.prepend(featuredStrip(source)); // F20: the source's sileo-featured.json banners, above its sections
       setSourceShare(body, source);
       body.append(grouped([{ footer: healthOf(source).label }])); // F19: last reached, last Release, Not Responding
+      if (insecureNote(source)) body.append(grouped([{ footer: insecureNote(source) }])); // F220: an http source
       // B23: what apt-get update said about it (the jailbreak app), when the catalog's own load didn't fail
       if (source.aptError && source.aptError !== status?.error) body.append(el("p", "empty source-apt-error", source.aptError));
     }

@@ -1,0 +1,12 @@
+[
+  {"wait": 3000},
+  {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.device','iphoneos-arm64'); localStorage.setItem('ifizbox.arch','iphoneos-arm64'); 'ok'"},
+  {"nav": "#/sources/deb%3Ahttp%3A%2F%2Fapt.thebigboss.org%2Frepofiles%2Fcydia%2F%3Astable", "ms": 20000},
+  {"eval": "(()=>{const b=document.querySelector('.page.is-top .page-body'); b.scrollTop=b.scrollHeight; return b.scrollTop})()"},
+  {"wait": 800},
+  {"shot": "f220-source-page"},
+  {"nav": "#/sources/deb%3Ahttps%3A%2F%2Frepo.chariz.com%2F%3A.%2F", "ms": 20000},
+  {"eval": "(()=>{const b=document.querySelector('.page.is-top .page-body'); b.scrollTop=b.scrollHeight; return b.scrollTop})()"},
+  {"wait": 800},
+  {"shot": "f220-https-source-page"}
+]

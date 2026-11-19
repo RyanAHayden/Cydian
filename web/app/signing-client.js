@@ -17,7 +17,7 @@
 //   await signAndInstall({ url, name, onInstalled, bring })   signs on the phone and installs (installOnDevice), or
 //                                on the website signs in the browser (signInBrowser)
 import { showBanner } from "./nav/banner.js";
-import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError, parseProfile, deviceCheck, notLandedText } from "./core/signing.js";
+import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError, parseProfile, deviceCheck, notLandedText, notInProfileText } from "./core/signing.js";
 import { format, settingsRoute } from "./router.js";
 import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId } from "./core/websign.js";
 import { storedKeep, withKeep, originalState, originalNote } from "./core/keepid.js";
@@ -796,13 +796,24 @@ async function keptBytes(src) {
   throw signFail("missing", "The IPA isn't kept in this browser any more: Safari may have cleared it. Add it again.");
 }
 
-// F236: the website can't read this iPhone's UDID, so a profile that lists devices can't be checked against it: the
-// likely-cause line for watchInstall, or null (all devices, no list, an unreadable profile).
-export function siteCause(id, app) {
+// F236: the likely-cause line for watchInstall, or null (all devices, no list, an unreadable profile, or this phone
+// is in it). F256: `phone` is the UDID F253's profile found (screens/signing.js storedUdid): with it the line names
+// the UDID, and drops out when the profile lists it; without it (null) the website can't check.
+const siteDevice = (id, phone) => deviceCheck(parseProfile(id.profile instanceof Uint8Array ? id.profile : new Uint8Array(id.profile)), phone ?? null);
+export function siteCause(id, app, phone = null) {
+  try { return notLandedText(app, siteDevice(id, phone)); } catch { return null; }
+}
+// F256: the sentence an install refuses with before signing when the stored UDID isn't in the profile (the apps'
+// device_not_in_profile), or null (no UDID, in it, not limited by device, an unreadable profile).
+export function siteRefusal(id, phone) {
   try {
-    const p = parseProfile(id.profile instanceof Uint8Array ? id.profile : new Uint8Array(id.profile));
-    return notLandedText(app, deviceCheck(p, null));
+    const c = siteDevice(id, phone);
+    return c.state === "out" && c.udid ? notInProfileText(c.udid) : null;
   } catch { return null; }
+}
+// The UDID this browser keeps (F253), or null; screens/signing.js is loaded lazily (it imports this module).
+export async function siteUdid() {
+  try { return (await import("./screens/signing.js")).storedUdid(); } catch { return null; }
 }
 
 const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof ArrayBuffer ? b.slice(0) : new Uint8Array(b ?? []).buffer);
@@ -811,7 +822,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   { hud = progressHUD, alert = showAlert, open = (u) => { location.href = u; }, go = openRoute,
     identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "",
     now = identityNow, origin = () => new URL(base || "/", globalThis.location?.href).origin, clock = Date.now,
-    watch = watchInstall } = {}) {
+    watch = watchInstall, phone = siteUdid } = {}) {
   // F121: before anything waits, while Safari still counts this as the user's tap: iOS's install prompt, for a link
   // whose app comes later. Only when the bundle ID it will be signed as is known now (expectedBundleId).
   const expected = expectedBundleId(now(), { url, bundleId });
@@ -833,6 +844,14 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     await alert({ title: "No Certificate", message: "Add your certificate, its password and provisioning profile in Settings > Signing.", buttons: ["OK"] });
     (await import("./screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version, bytes }) }); // F177
     go(["signing"]);
+    return false;
+  }
+  // F256: the UDID F253's profile found, checked against the profile before anything downloads or signs
+  const me = await Promise.resolve().then(phone).catch(() => null);
+  const refusal = siteRefusal(id, me);
+  if (refusal) {
+    drop();
+    await alert({ title: "iPhone Not in Profile", message: refusal + (opened ? `\n\n${iconLeftText(name)}` : ""), buttons: ["OK"] });
     return false;
   }
   const h = hud(bytes ? "Reading" : "Downloading");
@@ -861,7 +880,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
       // iOS's prompt was asked for at the tap and its download now gets the app: nothing more to tap here.
       // F190: the log follows iOS's requests on the link from here (watchInstall); not awaited past its first look.
       await watch(early.token, h, { base, fetcher, app: name || signed.name, itms: early.itms, open, alert,
-        cause: siteCause(id, name || signed.name) }).first;
+        cause: siteCause(id, name || signed.name, me) }).first;
       return true;
     }
     h.hide();

@@ -43,6 +43,18 @@ import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
 import { NAME } from "./brand.js";
 import { takeInstallParam, askFromInstallLink, refreshOnLaunch } from "./websign-gate.js";
+import { notIphonePage } from "./core/platform.js";
+import { showNotIphone } from "./screens/notiphone.js";
+
+// F266: a Mac, PC or Android phone gets the Not-an-iPhone page first, and the app only starts once it's left (Look
+// Around Anyway, or What Is …? onto the FAQ). Decided by user agent before anything is drawn, so an iPhone, an iPad
+// and the native app go straight on and never see it.
+const notIphone = notIphonePage(window);
+if (notIphone) {
+  document.getElementById("boot")?.remove();
+  const route = await showNotIphone(notIphone);
+  if (route) history.replaceState(null, "", location.pathname + location.search + route);
+}
 
 const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
 

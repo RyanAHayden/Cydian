@@ -1,6 +1,6 @@
 # native/: the app (jailbreak .deb and sideload IPA)
 
-A Swift shell around one WKWebView that shows `web/app/` from the app bundle (docs/native.md, "R3 answers").
+A Swift shell around one WKWebView that shows `web/app/` from the app bundle (docs/native.md, "How it's built").
 
 - `Sources/App.swift`: app, scene and the web view. Navigation is web/app/'s own JS stack and edge swipe (R3 (a)).
   The shell switches off WebKit's `PreferPageRenderingUpdatesNear60FPSEnabled` and WebKit's history swipe.

@@ -1,6 +1,6 @@
 # The iPhone 7 test phone
 
-The phone that runs iFizBox's jailbreak build (.deb). Set up 2026-11-18. The iPhone 4S (`ssh 4s`, iOS 6) stays the
+The phone that runs iFizBox's jailbreak build (.deb). The iPhone 4S (`ssh 4s`, iOS 6) stays the
 Cydia look reference only and never runs iFizBox.
 
 | | |
@@ -9,7 +9,7 @@ Cydia look reference only and never runs iFizBox.
 | iOS | 15.8.8 (19H422), the last iOS for the iPhone 7 |
 | Jailbreak | palera1n v2.4, **rootless** (`/var/jb`, iphoneos-arm64), semi-tethered |
 | Network | Wi-Fi `192.168.0.189`, `ssh 7` (Host 7 in `~/.ssh/config` on the desktop) |
-| Login | `mobile`, the desktop's key. `sudo` is passwordless since 2026-11-18 (`/var/jb/etc/sudoers.d/mobile`); if `sudo -n true` fails, ask the user, never store a password |
+| Login | `mobile`, the desktop's key. `sudo` is passwordless (`/var/jb/etc/sudoers.d/mobile`); if `sudo -n true` fails, ask the user, never store a password |
 | Plugged into | the T490 (`ssh rytp@omarchy-tp`), used to re-jailbreak it |
 
 ## Rules
@@ -25,25 +25,27 @@ Cydia look reference only and never runs iFizBox.
 ## Driving the screen: `tools/ui-7.sh`
 
 ```sh
-tools/ui-7.sh lock N6                 # take the lock (fails, naming the holder, if someone else has it)
-tools/ui-7.sh N6 shot before          # screenshot -> ref/7/screens/before.png (750x1334)
-tools/ui-7.sh N6 open ifizbox://sources
-tools/ui-7.sh N6 tap 375 600          # screenshot pixels, portrait
-tools/ui-7.sh N6 swipe 375 2 375 900 0.4   # from the top edge: Notification Centre
-tools/ui-7.sh N6 home
-tools/ui-7.sh unlock N6               # always, also after a failure
+tools/ui-7.sh lock $ID                # your task's ID; fails, naming the holder, if someone else has it
+tools/ui-7.sh $ID shot before         # screenshot -> ref/7/screens/before.png (750x1334)
+tools/ui-7.sh $ID open ifizbox://sources
+tools/ui-7.sh $ID tap 375 600         # screenshot pixels, portrait
+tools/ui-7.sh $ID swipe 375 2 375 900 0.4   # from the top edge: Notification Centre
+tools/ui-7.sh $ID home
+tools/ui-7.sh unlock $ID              # always, also after a failure
 ```
 
 - `open` takes any URL. `ifizbox://<tab>` (home, sources, changes, installed, search, settings) opens iFizBox on
-  that tab, launched or already running (B14); the other `ifizbox://` links are listed in `web/app/incoming.js`.
+  that tab, launched or already running; the other `ifizbox://` links are listed in `web/app/incoming.js`.
 - Coordinates are screenshot pixels (750x1334; points x2), so read a spot off a screenshot and tap it.
-- From the top edge, `swipe 375 2 375 900 0.4` opens Notification Centre (checked 2026-11-18); `home` closes it.
+- From the top edge, `swipe 375 2 375 900 0.4` opens Notification Centre; `home` closes it.
 - **Control Centre doesn't open yet:** bottom-edge swipes (`375 1333 → 375 500`, 0.4 s and 0.8 s) do nothing.
   Bottom-edge gestures probably need something phonectl doesn't send (a touch starting below the screen, or a
-  different digitizer flag). Until that's fixed, a person checks the Control Centre controls (N8).
+  different digitizer flag). Until that's fixed, a person checks iFizBox's Control Centre controls.
 - Left-edge swipe-back (`swipe 2 600 600 600 0.3`) is the same kind of gesture, untested so far.
-- Typing: tap the on-screen keyboard's keys (coordinates in `journal/N6/notes.md`); there is no pbcopy.
-- Tapping a notification in Notification Centre through phonectl does nothing (N6); a person checks notification taps.
+- Typing: tap the on-screen keyboard's keys; there is no pbcopy. In screenshot pixels: row 1 y=958 (q 37, w 112,
+  e 187, r 262, t 337, y 412, u 487, i 562, o 637, p 712), row 2 y=1066 (a 75, s 150, d 225, f 300, g 375, h 450,
+  j 525, k 600, l 675), row 3 y=1174 (z 150 … m 600, backspace 700), "." 250,1284 on the URL keyboard.
+- Tapping a notification in Notification Centre through phonectl does nothing; a person checks notification taps.
 - `lock-button` presses the side button (sleeps or wakes the screen). If a screenshot is all black, the screen is
   asleep: `home` wakes it. The phone has no passcode, so `home` again opens it from the lock screen.
 - A lock unused for 30 minutes is stale and can be taken over.
@@ -76,16 +78,15 @@ ssh 7 'sudo -n apt-get install -y /tmp/iFizBox.deb'  # apt resolves Depends; pla
 ssh 7 'launchctl list | grep com.ryha.ifizbox'       # the app and the upgrades daemon
 ```
 
-`sudo` needs no password (passwordless rule since 2026-11-18); scripts use `sudo -n` so they fail instead of
+`sudo` needs no password; scripts use `sudo -n` so they fail instead of
 hanging at a prompt if the rule is ever gone. Remove with `sudo apt-get remove -y com.ryha.ifizbox`.
 
-iFizBox is installed on the phone: `com.ryha.ifizbox` 0.9.3-1189, built from main at 634040e (checked 2026-11-18 with
-`ssh 7 dpkg-query -W com.ryha.ifizbox`). Leave it installed: later tasks test iFizBox here. A build from before
-F171 has the old package ID, so it installs beside iFizBox instead of over it: don't install one on this phone; if
-one is there, remove it and its files as below. Check the version before assuming
-what a test runs. To reinstall a newer build, install the new .deb over it as above (`--allow-downgrades` if its version is lower).
+iFizBox is installed on the phone as `com.ryha.ifizbox` (`ssh 7 dpkg-query -W com.ryha.ifizbox` shows which build). Leave it installed: other tasks test iFizBox here. A build under the project's old name (another package ID) installs
+beside iFizBox instead of over it: don't install one on this phone; if one is there, remove it and its
+files as below. Check the version before assuming what a test runs. To reinstall a newer build, install the new
+.deb over it as above (`--allow-downgrades` if its version is lower).
 
-Where it lives (F171 renamed every path; the old-name package and all its files were removed from the phone):
+Where it lives:
 
 | | |
 |---|---|
@@ -96,18 +97,15 @@ Where it lives (F171 renamed every path; the old-name package and all its files 
 | State, caches | `/var/jb/var/lib/ifizbox/`, `/var/jb/var/cache/ifizbox/` |
 | WebView data | `/var/mobile/Library/WebKit/com.ryha.ifizbox` (localStorage, IndexedDB; made by postinst), `/var/mobile/Library/{Caches,HTTPStorages}/com.ryha.ifizbox`, `Cookies/com.ryha.ifizbox.binarycookies`, `Saved Application State/com.ryha.ifizbox.savedState` |
 
-A fully clean removal (what F171 did for the old package): `apt-get remove`, then delete the sources file, the
+A fully clean removal: `apt-get remove`, then delete the sources file, the
 state and cache folders and the WebView data above, the app's leftover containers (folders under
 `/var/mobile/Containers/{Data/Application,Shared/AppGroup,Data/PluginKitPlugin}/` whose
 `.com.apple.mobile_container_manager.metadata.plist` names the bundle ID), and run `uicache -a`.
 
-Until a release built after F171 is out, the newest GitHub release (v0.9.2) still ships the old package ID: if the
-app offers it as an update, don't install it on this phone.
-
 ## What's installed
 
 Sileo 2.5.1, apt 2.9.4, dpkg 1.22.6, uikittools (`uicache`, `uiopen`, `sbreload`), `launchctl`, openssh 9.7,
-`unzip` and `ldid` (iFizBox's Depends/Recommends), ElleKit 1.2 (tweak injection, for AppSync/paid tweaks in R10),
+`unzip` and `ldid` (iFizBox's Depends/Recommends), ElleKit 1.2 (tweak injection, for AppSync and paid-tweak tests),
 `curl`. Sources: palera1n, ElleKit, Procursus, Havoc, Chariz, BigBoss. No `awk`.
 
 Known quirks:
@@ -131,7 +129,7 @@ The T490 has `apple_mfi_fastcharge` blacklisted (`/etc/modprobe.d/no-mfi-fastcha
 phone in DFU and breaks checkm8 on Linux. If palera1n says "Resource busy", another palera1n/checkra1n process is
 still holding the phone: kill it and retry.
 
-## Serving a test repo to the phone (N11)
+## Serving a test repo to the phone
 
 The desktop's firewall blocks the phone from reaching it over the LAN. To serve a repo you built, use a reverse
 tunnel instead: `python3 -m http.server 8711 --bind 127.0.0.1` in the repo folder, then
@@ -140,23 +138,23 @@ tunnel instead: `python3 -m http.server 8711 --bind 127.0.0.1` in the repo folde
 stanzas back out of `sileo.sources` and Zebra.
 
 Sileo 2.5 drops a repo whose Release has no `Components:` field. Zebra 1.1.36 can't read files that redirect to very
-long URLs (GitHub release assets; B17).
+long URLs (GitHub release assets; iFizBox's `/repo/` proxy answers with the file itself, see docs/release.md).
 
-## Test IPAs: AppSync Unified and a fakesigned app (R21)
+## Test IPAs: AppSync Unified and a fakesigned app
 
-AppSync Unified 116.0 (`ai.akemi.appsyncunified`, rootless) is installed since 2026-11-18, from the upstream GitHub
-release (github.com/akemin-dayo/AppSync, release 116.0; cydia.akemi.ai answered Cloudflare 522 that day). It worked
-right after install, with no userspace reboot. Leave it installed: the helper's `install-ipa` uses it.
+AppSync Unified 116.0 (`ai.akemi.appsyncunified`, rootless) is installed, from the upstream GitHub release
+(github.com/akemin-dayo/AppSync, release 116.0). Leave it installed: the helper's `install-ipa` uses it.
 
-installd still wants an `application-identifier` entitlement, even with AppSync: `native/testkit.py ipa()`'s unsigned
-binary fails with "Application is missing the application-identifier entitlement". Fakesign the binary on the phone
-with `ldid -Sent.xml <binary>` (an `ent.xml` with `application-identifier` `<TEAM>.<bundle id>` and
-`com.apple.developer.team-identifier` `<TEAM>`, any 10 characters), zip it back into `Payload/<Name>.app/`, and serve
-it as in N11. `ifizbox://install?url=…&name=…` then installs it through the helper and remembers it in Installed > Apps.
-Uninstall a test app afterwards (Installed > Apps, swipe, Delete).
+installd still wants an `application-identifier` entitlement, even with AppSync: an unsigned binary (like
+`native/testkit.py ipa()`'s) fails with "Application is missing the application-identifier entitlement". The
+helper's `install-ipa` fakesigns it itself (`ldid -M -S` on the whole .app when the binary has no
+`application-identifier`). To fakesign one by hand on the phone: `ldid -Sent.xml <binary>` (an `ent.xml` with
+`application-identifier` `<TEAM>.<bundle id>` and `com.apple.developer.team-identifier` `<TEAM>`, any 10
+characters), zip it back into `Payload/<Name>.app/`, and serve it as in "Serving a test repo" above.
+`ifizbox://install?url=…&name=…` installs it through the helper and remembers it in Installed > Apps. Uninstall a
+test app afterwards (Installed > Apps, swipe, Delete).
 
-B59: the helper's `install-ipa` now does that fakesign itself (`ldid -M -S` on the whole .app when the binary has no
-`application-identifier`). Launching such an app also needs AppSync's **FrontBoard** hook in SpringBoard, which only
-loads after a respring: until then SpringBoard logs "signature state: Generic … No code signature found" and refuses
-the launch (the icon dims, nothing opens). AppSync went in at 19:39 without one; `sbreload` at 20:08 fixed it. To see
+Launching such an app also needs AppSync's **FrontBoard** hook in SpringBoard, which only loads after a respring
+following AppSync's install: until then SpringBoard logs "signature state: Generic … No code signature found" and
+refuses the launch (the icon dims, nothing opens); `sbreload` fixes it. To see
 why an app won't launch: `sudo apt-get install oslog`, then `sudo oslog` while opening it (`uiopen --bundleid <id>`).

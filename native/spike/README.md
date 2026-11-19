@@ -1,6 +1,6 @@
 # R3 navigation spike
 
-Throwaway code that answered R3 (`docs/native.md`, "R3 answers"). One iOS app holding both navigation approaches:
+Throwaway code that answered R3 (`docs/native.md`, "How it's built"). One iOS app holding both navigation approaches:
 
 - **Spike A** (`web/a.html`, `web/a.js`): one WKWebView, a JS stack per tab, Web Animations push/pop, and a JS edge
   swipe.

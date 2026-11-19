@@ -551,6 +551,87 @@ class Helper(unittest.TestCase):
         finally:
             os.chmod(os.path.dirname(f), 0o755)
 
+    def test_update_source_plan(self):
+        """F233a: apt-get update on a temp sources file holding the one source; the other lists stay."""
+        fixed = ["-o", "Acquire::AllowInsecureRepositories=true",
+                 "-o", "Dir::Etc::SourceList=/var/jb/etc/apt/ifizbox-update-source.XXXXXX",
+                 "-o", "Dir::Etc::SourceParts=/dev/null", "-o", "APT::Get::List-Cleanup=0"]
+        self.assertEqual(self.plan("update-source", "https://r.test/", "./"),
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "-o", "APT::Status-Fd=3", "update"])
+        self.assertEqual(self.plan("update-source", "https://r.test/deb/", "stable", "main", "extra", fd="-1"),
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "update"])
+        cases = {
+            ("update-source",): "needs a URI and a suite",
+            ("update-source", "https://r.test/"): "needs a URI and a suite",
+            ("update-source", "https://r.test", "./"): "bad URI",
+            ("update-source", "-o", "./"): "bad URI",
+            ("update-source", "file:///etc/", "./"): "bad URI",
+            ("update-source", "https://r.test/ [trusted=yes]", "./"): "bad URI",
+            ("update-source", "https://r.test/\ndeb https://evil.test/", "./"): "bad URI",
+            ("update-source", "https://r.test/", "./\ndeb https://evil.test/ ./"): "bad suite",
+            ("update-source", "https://r.test/", "stable", "main extra"): "bad component",
+            ("update-source", "https://r.test/", "stable", "#main"): "bad component",
+            ("update-source", "https://r.test/", "./", "main"): "flat suite",
+            ("update-source", "https://r.test/", "stable"): "needs components",
+            ("update-source", "https://r.test/", "stable", *(["c"] * 17)): "too many components",
+            ("Update-Source", "https://r.test/", "./"): "unknown verb",
+        }
+        for words, msg in cases.items():
+            with self.subTest(words=words[:4]):
+                out = self.plan(*words)
+                self.assertEqual(len(out), 1, out)
+                self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
+
+    def test_chain_update_source(self):
+        """F233a: the stand-in apt-get sees a sources file with just the one-line source; it's gone afterwards,
+        whatever apt-get's exit; ifizbox.sources is never touched."""
+        p, app, helper = self.chain_prefix()
+        etc = os.path.join(p, "etc/apt")
+        os.makedirs(os.path.join(etc, "sources.list.d"))
+        with open(os.path.join(etc, "sources.list.d/ifizbox.sources"), "w") as f:
+            f.write("Types: deb\nURIs: https://other.test/\nSuites: ./\n")
+        apt = os.path.join(p, "usr/bin/apt-get")
+        with open(apt, "w") as f:
+            f.write('#!/bin/sh\necho "argv: $0 $*"\nfor a in "$@"; do case $a in Dir::Etc::SourceList=*) '
+                    'l=${a#*=}; echo "list: $(cat "$l")"; echo "mode: $(stat -c %a "$l")";; esac; done\n'
+                    'echo "pmstatus:x:1:y" >&3\nexit ${CODE:-0}\n')
+        os.chmod(apt, 0o755)
+        out = self.run_driver("spawn", helper, "update-source", "https://r.test/deb/", "stable", "main", "extra",
+                              driver=app)
+        argv = next(l for l in out if l.startswith("1: argv: "))
+        self.assertRegex(argv, rf"^1: argv: {p}/usr/bin/apt-get -o Acquire::AllowInsecureRepositories=true -o "
+                         rf"Dir::Etc::SourceList={etc}/ifizbox-update-source\.[A-Za-z0-9]{{6}} -o "
+                         r"Dir::Etc::SourceParts=/dev/null -o APT::Get::List-Cleanup=0 -o APT::Status-Fd=3 update$")
+        self.assertIn("1: list: deb https://r.test/deb/ stable main extra", out)
+        self.assertIn("1: mode: 600", out)
+        self.assertIn("3: pmstatus:x:1:y", out)
+        self.assertEqual(out[-1], "exit: 0")
+        self.assertEqual(sorted(os.listdir(etc)), ["sources.list.d"])  # the temp file is deleted
+        self.assertEqual(os.listdir(os.path.join(etc, "sources.list.d")), ["ifizbox.sources"])
+
+        with open(apt, "w") as f:
+            f.write('#!/bin/sh\necho "E: Some index files failed to download" >&2\nexit 100\n')
+        out = self.run_driver("spawn", helper, "update-source", "https://r.test/", "./", driver=app)
+        self.assertEqual(out[-1], "exit: 100")  # apt's own exit, file deleted all the same
+        self.assertEqual(sorted(os.listdir(etc)), ["sources.list.d"])
+
+        out = self.run_driver("spawn", helper, "update-source", "https://r.test/", "./", "main", driver=app)
+        self.assertTrue(any("flat suite" in l for l in out), out)
+        self.assertEqual(out[-1], "exit: 64")
+        out = self.run_driver("spawn", helper, "update-source", "https://r.test/", "./", driver=self.driver)
+        self.assertEqual(out[-1], "exit: 77")
+
+        os.chmod(etc, 0o555)  # can't make the temp file: exit 74, apt never runs
+        try:
+            if os.access(etc, os.W_OK):
+                self.skipTest("running as root: can't make etc/apt unwritable")
+            out = self.run_driver("spawn", helper, "update-source", "https://r.test/", "./", driver=app)
+            self.assertTrue(any("can't create the temp sources file" in l for l in out), out)
+            self.assertEqual(out[-1], "exit: 74")
+            self.assertFalse(any(l.startswith("1: ") for l in out), out)
+        finally:
+            os.chmod(etc, 0o755)
+
     def test_not_root(self):
         """The helper as shipped (root uid 0) refuses a normal user even when the app is the parent."""
         if os.getuid() == 0:

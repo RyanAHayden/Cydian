@@ -7,6 +7,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     ifizbox-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
     ifizbox-helper hold <pkg>... | unhold <pkg>... | showhold
     ifizbox-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
+    ifizbox-helper update-source <uri> <suite> [component...]              (apt-get update for one source)
     ifizbox-helper simulate <item>... | apply <item>... | respring          (N4: the install queue)
     ifizbox-helper apply-ask <item>...                                      (F63: apply that asks about conffiles)
     ifizbox-helper install-ipa <path>                                      (F59: an IPA, through installd)
@@ -32,6 +33,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `showhold`  | `apt-mark showhold`: the held packages on stdout, one per line                              |
 | `addsource` | runs nothing: writes a deb822 stanza (`Types: deb`, `URIs:`, `Suites:`, `Components:`) into `/var/jb/etc/apt/sources.list.d/ifizbox.sources` (F33) |
 | `removesource` | runs nothing: drops the stanza for that URI and suite from `ifizbox.sources`              |
+| `update-source` | `apt-get -o Acquire::AllowInsecureRepositories=true -o Dir::Etc::SourceList=<temp> -o Dir::Etc::SourceParts=/dev/null -o APT::Get::List-Cleanup=0 [-o APT::Status-Fd=3] update`: that one source alone, for a failed Sources row's Retry. Same URI/suite/component checks as `addsource` (the source needn't be in `ifizbox.sources`); `<temp>` is `/var/jb/etc/apt/ifizbox-update-source.XXXXXX` (mkstemp, 0600) holding `deb <uri> <suite> [component...]`, made before and deleted after apt-get, which runs as a child. List-Cleanup off keeps the other sources' lists. Exit 74: the temp file couldn't be made |
 | `simulate`  | `apt-get -s --reinstall --allow-downgrades --allow-unauthenticated install <items>`: the Confirm sheet's plan (N4)       |
 | `apply`     | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --reinstall --allow-downgrades --allow-unauthenticated [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <items>`, with `CYDIA=3 1` in its environment when fd 3 is open (N4) |
 | `apply-ask` | `apt-get -y --reinstall --allow-downgrades --allow-unauthenticated -o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install <items>` (no conffile options; refused without fd 3), `CYDIA=3 1`, as a child whose stdin is a pipe the helper feeds (F63; below) |

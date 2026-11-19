@@ -199,7 +199,7 @@ static int local_deb_plan(int argc, char *const argv[], const char *prefix, int 
 
 /* addsource <uri> <suite> [component...] | removesource <uri> <suite>: checked here, done by helper_sources_apply. */
 static int source_plan(int argc, char *const argv[], const char *prefix, struct helper_plan *p, const char **err) {
-    int add = p->verb == HV_ADDSOURCE;
+    int add = p->verb == HV_ADDSOURCE || p->verb == HV_UPDATE_SOURCE; /* F233a: update-source's words are addsource's */
     if (argc < 3) { *err = "needs a URI and a suite"; return -1; }
     if (!helper_uri_ok(argv[1])) {
         *err = "bad URI (http(s)://host[:port]/path/, ending in /, no user, spaces or . segments)"; return -1;
@@ -218,6 +218,61 @@ static int source_plan(int argc, char *const argv[], const char *prefix, struct 
     for (int i = 0; i < argc; i++) p->argv[i] = argv[i];
     p->argv[argc] = NULL;
     p->argc = argc;
+    return 0;
+}
+
+/* F233a: update-source <uri> <suite> [component...]: checked as addsource, then apt-get update on a sources file
+ * holding only that source (made by helper_update_source_file, run and deleted by main.c). */
+static int update_source_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
+                              const char **err) {
+    static char status_apt[64];
+    if (source_plan(argc, argv, prefix, p, err)) return -1;
+    if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/apt-get", prefix) >= sizeof p->path ||
+        (size_t)snprintf(p->source_tmp, sizeof p->source_tmp, "%s%s", prefix, HELPER_UPDATE_SOURCE_TMP) >=
+            sizeof p->source_tmp) {
+        *err = "prefix too long"; return -1;
+    }
+    snprintf(p->source_opt, sizeof p->source_opt, "Dir::Etc::SourceList=%s", p->source_tmp);
+    /* One-line form: the file's name doesn't end in .sources, so apt reads it as a sources.list. Every word was
+     * checked above (no spaces, newlines, '[' or '#'), so the line can't carry options or a second entry. */
+    size_t n = (size_t)snprintf(p->source_line, sizeof p->source_line, "deb %s %s", argv[1], argv[2]);
+    for (int i = 3; i < argc && n < sizeof p->source_line; i++)
+        n += (size_t)snprintf(p->source_line + n, sizeof p->source_line - n, " %s", argv[i]);
+    if (n + 1 >= sizeof p->source_line) { *err = "source too long"; return -1; }
+    p->source_line[n++] = '\n';
+    p->source_line[n] = 0;
+    int k = 0;
+    const char **a = p->argv;
+    a[k++] = "apt-get";
+    a[k++] = "-o"; a[k++] = "Acquire::AllowInsecureRepositories=true"; /* N6, as update */
+    a[k++] = "-o"; a[k++] = p->source_opt;
+    a[k++] = "-o"; a[k++] = "Dir::Etc::SourceParts=/dev/null";
+    a[k++] = "-o"; a[k++] = "APT::Get::List-Cleanup=0";
+    if (status_fd >= 0) {
+        snprintf(status_apt, sizeof status_apt, "APT::Status-Fd=%d", status_fd);
+        a[k++] = "-o"; a[k++] = status_apt;
+    }
+    a[k++] = "update";
+    a[k] = NULL;
+    p->argc = k;
+    return 0;
+}
+
+int helper_update_source_file(struct helper_plan *p, const char **err) {
+    if (p->verb != HV_UPDATE_SOURCE) { *err = "not the update-source verb"; errno = EINVAL; return -1; }
+    int fd = mkstemp(p->source_tmp);
+    if (fd < 0) { *err = "can't create the temp sources file"; return -1; }
+    size_t len = strlen(p->source_line);
+    ssize_t w = write(fd, p->source_line, len);
+    int e = errno;
+    if (close(fd) || w != (ssize_t)len) {
+        if (w >= 0 && w != (ssize_t)len) e = EIO;
+        unlink(p->source_tmp);
+        errno = e;
+        *err = "can't write the temp sources file";
+        return -1;
+    }
+    snprintf(p->source_opt, sizeof p->source_opt, "Dir::Etc::SourceList=%s", p->source_tmp);
     return 0;
 }
 
@@ -651,6 +706,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "install-deb")) { p->verb = HV_INSTALL_DEB; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "app-versions")) { p->verb = HV_APP_VERSIONS; return app_versions_plan(argc, p, err); }
     else if (!strcmp(verb, "uninstall-app")) { p->verb = HV_UNINSTALL_APP; return uninstall_app_plan(argc, argv, p, err); }
+    else if (!strcmp(verb, "update-source")) { p->verb = HV_UPDATE_SOURCE; return update_source_plan(argc, argv, prefix, status_fd, p, err); }
     else { *err = "unknown verb (" HELPER_VERBS ")"; return -1; }
 
     int n = argc - 1;

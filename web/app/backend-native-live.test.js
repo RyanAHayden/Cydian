@@ -1,6 +1,6 @@
 // F233: the app's refresh drives the Sources rows from apt-get update's lines as the helper streams them, and a
 // failed row's retry asks the helper to update that source alone (update-source), falling back to the whole update on
-// a helper without the verb (the fake helper, like every helper before F233a, refuses it with 64).
+// a helper without the verb (refused with 64; the fake helper does so with FAKE_OLD_HELPER=1).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createNativeBackend } from "./backend-native.js";
@@ -40,13 +40,31 @@ test("F233: refreshSources without onRow streams nothing (as before)", async (t)
 });
 
 test("F233: a retry asks for update-source of that one source; a helper without it runs the whole update", async (t) => {
-  const { backend, native } = setup(t);
+  const { backend, native } = setup(t, { FAKE_OLD_HELPER: "1" });
   const seen = [];
   const out = await backend.refreshSources((s) => seen.push(s.key), { filter: (s) => s.key === PROCURSUS, retry: true, onRow: () => {} });
   const words = native.calls.filter((c) => c.method === "helper.run").map((c) => c.params.words);
   assert.deepEqual(words, [["update-source", "https://apt.procurs.us/", "1800", "main"], ["update"]]);
   assert.deepEqual(seen, [PROCURSUS]);
   assert.equal(out[0].count, 2);
+});
+
+test("F233a: a retry with a helper that has update-source runs only that, and fetches only that source's lists", async (t) => {
+  const { backend, native } = setup(t);
+  const out = await backend.refreshSources(() => {}, { filter: (s) => s.key === PROCURSUS, retry: true, onRow: () => {} });
+  const words = native.calls.filter((c) => c.method === "helper.run").map((c) => c.params.words);
+  assert.deepEqual(words, [["update-source", "https://apt.procurs.us/", "1800", "main"]]);
+  assert.equal(out[0].count, 2);
+  assert.deepEqual(out.failed, []);
+  const havoc = (await backend.sources()).find((s) => s.key === HAVOC);
+  assert.equal(havoc.count, undefined, "the other source wasn't fetched or read");
+});
+
+test("F233a: update-source on a dead source fails that row, as update does", async (t) => {
+  const { backend } = setup(t, { FAKE_DEAD: "https://havoc.app/" });
+  const out = await backend.refreshSources(() => {}, { filter: (s) => s.key === HAVOC, retry: true, onRow: () => {} });
+  assert.equal(out[0].error, "apt-get update couldn't fetch Packages (525)");
+  assert.deepEqual(out.failed.map((f) => f.key), [HAVOC]);
 });
 
 test("F233: updateSource: a helper that has the verb runs it alone; a flat source takes no components", async () => {

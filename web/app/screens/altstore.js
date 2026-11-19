@@ -37,7 +37,7 @@ import { descriptionGroup } from "./description.js";
 import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, updatedTile, whatsNewGroup } from "./storepage.js";
 import { reviewsTab } from "./reviews.js";
 import { reviewsApi, reviewsBase, mergeReviews } from "../core/reviews.js";
-import { needsCheck, savedInfo, withIpaInfo, checkIpa, ipaInfoUrl } from "../core/ipainfo.js";
+import { needsCheck, savedInfo, withIpaInfo, checkIpa, ipaInfoUrl, ipaRaises } from "../core/ipainfo.js";
 import { PUBLIC_SITE } from "../core/handoff.js";
 import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText,
   storeTrackId, storeReviews, reviewsFeedUrl, workerReviewsUrl } from "../core/applookup.js";
@@ -536,7 +536,10 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   if (i) { i.onload = () => i.classList.add("loaded"); icon.append(i); }
   // F160: no iOS range from the source: what the IPA itself said, kept on this device, else asked below (once).
   const ipaStore = localStore();
-  const keptInfo = needsCheck(v) ? savedInfo(ipaStore, v.downloadURL) : null;
+  // B74: the source's range is used too, unless the IPA's own MinimumOSVersion (read before) is higher.
+  const keptAny = savedInfo(ipaStore, v.downloadURL);
+  const keptInfo = needsCheck(v) || ipaRaises(v, keptAny) ? keptAny : null;
+  let raised = ipaRaises(v, keptInfo);
   const fit = compat(keptInfo ? withIpaInfo(st, keptInfo) : st, currentDevice());
   const size = formatSize(v.size);
   // F194: Share sits on the header, where the App Store's install button was (the nav bar keeps Install / Modify).
@@ -638,7 +641,8 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     if (size) info.push({ label: "Size", detail: size });
     if (v.date) info.push({ label: "Updated", detail: formatDate(v.date) });
     info.push({ label: "Category", detail: m.category || pkg.row.section });
-    if (osRange(v)) info.push({ label: "Compatibility", detail: osRange(v) });
+    if (raised && ipaRow) info.push({ label: "Compatibility", detail: ipaRow }); // B74: the IPA needs more than the source says
+    else if (osRange(v)) info.push({ label: "Compatibility", detail: osRange(v) });
     else if (ipaRow) info.push({ label: "Compatibility", detail: ipaRow });
     if (m.version) info.push({ label: "App Store Version", detail: m.version });
     if (m.minimumOs) info.push({ label: "App Store Requires", detail: `iOS ${m.minimumOs} or later` });
@@ -737,6 +741,17 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
         drawDetails();
         drawFit(compat(withIpaInfo(st, info), currentDevice()));
         catalog.setIpaInfo({ [v.downloadURL]: info }); // the rows follow (core/catalog.js setIpaInfo)
+      }, () => {});
+  } else if (!needsCheck(v) && !keptAny && ipaInfoUrl(v.downloadURL)) {
+    // B74: the source gives a range, but it can be too low: the IPA itself is asked (only its own answer counts, no
+    // App Store or description guess; the same question as the jailbreak Install row's, asked once per IPA).
+    ipaCheck(v.downloadURL, { store: ipaStore })
+      .then((info) => {
+        if (!body.isConnected || !ipaRaises(v, info)) return;
+        raised = true;
+        ipaRow = ipaCompatText(withIpaInfo(v, info), info);
+        drawFit(compat(withIpaInfo(st, info), currentDevice()));
+        catalog.setIpaInfo({ [v.downloadURL]: info });
       }, () => {});
   }
 

@@ -9,7 +9,9 @@
 //   textMinOS(text)              -> "15.0" from "iOS 15+", "Requires iOS 15", "iOS 15.0 or later"…; null when none
 //   withIpaInfo(target, info)    -> the stanza or version with the IPA's minOSVersion and deviceFamily filled in where
 //                                   the source gives none (the source's fields win), and ipaChecked: true; `target`
-//                                   itself when there is no info
+//                                   itself when there is no info. B74: a minOSVersion read from the IPA (from: "ipa")
+//                                   above the source's wins over it (ipaFrom: "ipa")
+//   ipaRaises(target, info)      -> true when that happens: the IPA's own MinimumOSVersion is above the source's
 //   savedInfo(store, url, now)   -> the info kept for that IPA, or null (none, or expired)
 //   allSaved(store, now)         -> { url: info } for every kept IPA (the catalog gets these: catalog.setIpaInfo)
 //   checkIpa(url, { get, store, fallback, text, now, queue }) -> Promise<info>, asked once per IPA on this device:
@@ -67,8 +69,24 @@ export function textMinOS(text) {
   return null;
 }
 
+// B74: the IPA's own MinimumOSVersion is above the source's (YouMod Repo says 14.0, its YouTube IPA needs 17.0).
+// Only an answer read from the IPA counts (from: "ipa"); an App Store or description guess never beats the source.
+const newer = (a, b) => {
+  const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0);
+  return false;
+};
+export function ipaRaises(target, info) {
+  const src = osVersion(target?.minOSVersion), ipa = info?.from === "ipa" ? osVersion(info.minOSVersion) : null;
+  return Boolean(src && ipa && newer(ipa, src));
+}
+
 export function withIpaInfo(target, info) {
   if (!target || !info) return target;
+  if (ipaRaises(target, info)) {
+    return { ...target, minOSVersion: osVersion(info.minOSVersion), deviceFamily: families(target.deviceFamily) ?? info.deviceFamily ?? undefined,
+      ipaChecked: true, ipaFrom: "ipa" };
+  }
   const min = str(target.minOSVersion) || info.minOSVersion || undefined;
   const fam = families(target.deviceFamily) ?? info.deviceFamily ?? undefined;
   return { ...target, minOSVersion: min, deviceFamily: fam, ipaChecked: true, ipaFrom: str(target.minOSVersion) ? "source" : info.from ?? null };

@@ -375,6 +375,8 @@ function rawOutput(text) {
 // (Install, Upgrade... with the names, and a tweak's dependencies once tweaks have them: core/appqueue.js appPlan),
 // the Queue (tap one to clear it) and Continue Queuing; Cancel at the top left clears the queue, Confirm at the top
 // right installs it in turn (runAppQueue), each signed on the phone, iFizBox itself last.
+// F235: in the sideload app Confirm's run is runAppQueueRun (screens/apprun.js): every app signed ahead, then handed
+// to iOS one at a time on the black page with rows; runAppQueue stays for the website and Manage's bulk actions.
 
 let appConfirm = null;  // the open Confirm sheet for apps: { refresh(), close() }
 let appRunning = false; // Confirm's installs are going: queuing adds without opening a second sheet
@@ -387,7 +389,9 @@ export function queueApp(job, { queue = appQueue, open = openAppConfirm } = {}) 
   return j;
 }
 
-export function openAppConfirm(queue = appQueue) {
+// F235: `footer` under the sheet (a cancelled run's "Stopped. N installed and cleared from the queue."); Confirm runs
+// the sign-ahead run (runAppQueueRun) in the sideload app, the old one at a time run elsewhere (the website).
+export function openAppConfirm(queue = appQueue, { footer = null, run = null } = {}) {
   if (appConfirm) { appConfirm.refresh(); return; }
   if (!queue.size) return;
   const cancel = confirmCancel();
@@ -399,7 +403,7 @@ export function openAppConfirm(queue = appQueue) {
   cancel.addEventListener("click", () => { close(); queue.clearAll(); });
   ok.addEventListener("click", () => {
     const jobs = queue.list();
-    close().then(() => runAppQueue(jobs, { queue }));
+    close().then(async () => (run ?? ((await useAppRun()) ? runAppQueueRun : runAppQueue))(jobs, { queue }));
   });
   function refresh() {
     const jobs = queue.list();
@@ -411,6 +415,7 @@ export function openAppConfirm(queue = appQueue) {
     }
     // As Cydia's (ref/4s/screens/queue-81.png): Continue Queuing first, then Statistics and Modifications.
     m.scroll.replaceChildren(continueGroup(close), statistics(appPlan(jobs)), modifications(appPlan(jobs), names, APP_MODES, APP_MODE_LABEL));
+    if (footer) m.scroll.append(el("p", "group-footer confirm-stopped", footer));
   }
   const sheet = { refresh, close };
   appConfirm = sheet;
@@ -517,6 +522,35 @@ export async function runAppQueue(jobs, { queue = appQueue, install = installApp
     appRunning = false;
   }
   return done;
+}
+
+// F235: the sideload app signs every app first and hands them to iOS one at a time, on the black page with rows
+// (screens/apprun.js); the website keeps runAppQueue (it signs in the browser, one app at a time).
+async function useAppRun() {
+  const sc = await import("../signing-client.js");
+  return sc.localSigning() && typeof sc.prepareOnDevice === "function";
+}
+
+// Confirm's run in the sideload app: every app downloaded and signed ahead, then given to iOS in order (iFizBox last),
+// each waiting for iOS to install the one before. A failure or a row's stop ends that app only; Cancel abandons the
+// rest and reopens Confirm with what finished cleared. -> the run's first end ({ ok, stopped, rows, installed }), or
+// null when the Signing walkthrough opened instead.
+export async function runAppQueueRun(jobs, { queue = appQueue, record = recordApp, ready = readyToInstall, run = null, lanes = null } = {}) {
+  if (appRunning) return null;
+  appRunning = true;
+  try {
+    if (!(await ready())) { appRunning = false; return null; }
+    const sc = lanes ? null : await import("../signing-client.js");
+    const { runAppRun, phoneLanes } = await import("./apprun.js");
+    return await (run ?? runAppRun)(jobs.filter((j) => queue.get(j.id)), {
+      queue, record, lanes: lanes ?? phoneLanes(sc),
+      onClose: () => { appRunning = false; },
+      reopenConfirm: (footer) => { appRunning = false; openAppConfirm(queue, { footer }); },
+    });
+  } catch (e) {
+    appRunning = false;
+    throw e;
+  }
 }
 
 // ---- the console -----------------------------------------------------------------------------------------------

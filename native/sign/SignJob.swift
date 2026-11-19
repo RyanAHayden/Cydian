@@ -32,9 +32,49 @@ final class SignJob {
         return j?.cancel() ?? false
     }
 
+    // ---- F235: tagged jobs, one per app of the IPA queue's run (web/app/core/apprun.js), several at once: its
+    // signing.prepare, signing.open and signing.progress watch carry the app's tag, and signing.cancel {tag} stops that
+    // app only. A tagged job never becomes `current`, so an untagged Cancel (the single-install page) leaves the
+    // queue alone. A tag cancelled before its job began (Stop tapped as the call went out) starts that job cancelled.
+
+    private static var tagged = [String: SignJob]()
+    private static var cancelledTags = [String]() // the newest last, kept short
+    private static let keptTags = 64
+    private var tag: String?
+
+    static func begin(tag: String) -> SignJob {
+        let j = SignJob()
+        j.tag = tag
+        lock.lock()
+        tagged[tag] = j
+        let early = cancelledTags.contains(tag)
+        lock.unlock()
+        if early { j.cancel() }
+        return j
+    }
+
+    // Stops the job tagged `tag` (and any that begins under it later). False when none was running.
+    @discardableResult
+    static func cancel(tag: String) -> Bool {
+        lock.lock()
+        let j = tagged.removeValue(forKey: tag)
+        if !cancelledTags.contains(tag) {
+            cancelledTags.append(tag)
+            if cancelledTags.count > keptTags { cancelledTags.removeFirst(cancelledTags.count - keptTags) }
+        }
+        lock.unlock()
+        return j?.cancel() ?? false
+    }
+
+    // Whether signing.cancel {tag} was asked for `tag` (a signing.progress watch under it ends).
+    static func wasCancelled(tag: String) -> Bool { lock.lock(); defer { lock.unlock() }; return cancelledTags.contains(tag) }
+
     // The job has ended on its own: no longer the one Cancel stops (a newer job is left alone).
     func end() {
-        SignJob.lock.lock(); if SignJob.running === self { SignJob.running = nil }; SignJob.lock.unlock()
+        SignJob.lock.lock()
+        if SignJob.running === self { SignJob.running = nil }
+        if let t = tag, SignJob.tagged[t] === self { SignJob.tagged[t] = nil }
+        SignJob.lock.unlock()
         lock.lock(); stops.removeAll(); lock.unlock()
     }
 

@@ -182,6 +182,24 @@ test("F196: Cancel stops the signing job") {
     check(!FileManager.default.fileExists(atPath: out.path), "no output")
 }
 
+test("F235: a tagged job stops alone") {
+    let plain = SignJob.begin()
+    let a = SignJob.begin(tag: "a"), b = SignJob.begin(tag: "b")
+    check(SignJob.current === plain, "a tagged job isn't the untagged Cancel's")
+    var stopped = [String]()
+    a.onCancel { stopped.append("a") }
+    b.onCancel { stopped.append("b") }
+    check(SignJob.cancel(tag: "a"), "a cancelled")
+    check(a.cancelled && !b.cancelled && !plain.cancelled && stopped == ["a"], "only a: \(stopped)")
+    check(SignJob.wasCancelled(tag: "a") && !SignJob.wasCancelled(tag: "b"), "a's tag remembered")
+    let again = SignJob.begin(tag: "a")
+    check(again.cancelled, "a job begun under a cancelled tag starts cancelled")
+    check(!SignJob.cancel(tag: "early") && SignJob.begin(tag: "early").cancelled, "Stop before the job began")
+    b.end()
+    check(!SignJob.cancel(tag: "b") && !b.cancelled, "an ended job isn't cancelled")
+    check(SignJob.cancelCurrent() && plain.cancelled, "the untagged job still stops")
+}
+
 test("OCSP") {
     let ca = try fixture("ca.der")
     let req = try OCSP.request(certificate: cert, issuer: ca)

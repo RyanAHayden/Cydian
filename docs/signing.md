@@ -314,6 +314,18 @@ against this phone (`native/sign/DeviceCheck.swift`, and the same check and sent
   the token while it's under 14 minutes old (the phone keeps the looked-at IPA 15), else `{url, ...edits}`, which
   downloads it again; a token goes with one try only. The Queue row says what's custom ("Custom: as \"Name\", ID").
   Version History's rows sign straight away.
+- **The queue's run** in the sideload app (Confirm's Confirm, so app pages, Changes' Upgrade (N), Re-sign and Re-sign
+  All; `screens/apprun.js` on the black progress page, the brain `core/apprun.js`): one row per app, iFizBox's own
+  last. Every app is downloaded and signed first, two at a time (`signing.prepare`, which keeps the signed IPA for 30
+  minutes; a Re-sign without a url signs from the phone's record, `{record: bundleId}`), and the rows read Downloading
+  / Signing / Signed. Then iOS gets them one at a time in order (`signing.open {token}`, then `signing.progress
+  {bundleId, wait: 600}`): "Tap Install on the iOS prompt", and the next waits until iOS has installed it. Each try
+  of an app carries its own `tag`: the working row's round stop button sends `signing.cancel {tag}`, which stops only
+  that app's download, signing, serving or watch, and the next app goes on. A download or signing phase with no
+  progress for 3 minutes fails its row. Top right: the red Cancel while it runs (everything not finished is abandoned,
+  then Confirm again with the finished apps cleared), Retry All after failures, Done when clean. Re-sign rows end
+  "Re-signed, expires <date>". The Log has one line per phase per app; percents only move the bars. A Custom Install
+  job signs from its url with its edits here (the look's token isn't used). The website keeps the one-at-a-time run.
 - **Settings > Signing** (sideload, under the walkthrough; `screens/signed-apps.js`): Certificate Status with Check
   Certificate (`signing.checkCertificate`; the row shows Good / Revoked / Unknown / Not Checked from
   `identity.revocation`) and a red footer when the certificate is revoked or `identity.signatureExpires` is under 7

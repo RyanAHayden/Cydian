@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runRows, neededBy, deadRows, createInstallRun, rowStatus, summaryLine, runStatus, runPercent, mb, sizeText } from "./installrun.js";
 import { parseSimulation } from "./queue.js";
+import { PACKAGE } from "../brand.js";
 
 // apt-get -s: lib (added by apt) <- tweak; other alone; old removed; up upgraded.
 const SIM = [
@@ -40,6 +41,36 @@ test("runRows: removals first, then the queue's order with each package after wh
   assert.equal(rows.find((r) => r.id === "old").op, "remove");
   assert.equal(rows.find((r) => r.id === "up").from, "1.0");
   assert.deepEqual(neededBy(parseSimulation(SIM), JOBS, INFO), { lib: ["tweak"] });
+});
+
+test("runRows: iFizBox's own package goes last, with only what needs it after it (installing it closes the app)", () => {
+  const sim = [
+    `Inst ${PACKAGE} [1.0] (1.1 R [a])`,
+    "Inst small (1 R [a])",
+    "Inst plug (1 R [a])",
+    "Inst plugdep (1 R [a])",
+    "Inst lib (1 R [a])",
+    "Inst late (1 R [a])",
+  ].join("\n");
+  const jobs = [PACKAGE, "small", "plug", "plugdep", "late"].map((id) => ({ op: "install", id }));
+  const info = { [PACKAGE]: { depends: "lib" }, plug: { depends: PACKAGE }, plugdep: { depends: "plug" } };
+  const rows = runRows(parseSimulation(sim), jobs, info);
+  assert.deepEqual(rows.map((r) => r.id), ["lib", "small", "late", PACKAGE, "plug", "plugdep"]);
+  // alone, or with nothing else: unchanged
+  assert.deepEqual(runRows(parseSimulation(`Inst ${PACKAGE} (1 R [a])\nInst small (1 R [a])`),
+    [{ op: "install", id: PACKAGE }, { op: "install", id: "small" }], {}).map((r) => r.id), ["small", PACKAGE]);
+  // removed, it isn't moved (and removals stay first)
+  assert.deepEqual(runRows(parseSimulation(`Remv ${PACKAGE} [1]\nInst small (1 R [a])`),
+    [{ op: "remove", id: PACKAGE }, { op: "install", id: "small" }], {}).map((r) => r.id), [PACKAGE, "small"]);
+});
+
+test("createInstallRun: queued iFizBox + a small package: the small one installs before iFizBox", async () => {
+  const sim = `Inst ${PACKAGE} [1.0] (1.1 R [a])\nInst small (1 R [a])`;
+  const rows = runRows(parseSimulation(sim), [{ op: "install", id: PACKAGE }, { op: "install", id: "small" }], {});
+  const order = [];
+  const run = createInstallRun({ rows, fetch: async () => ({ file: "x" }), install: async (r) => { order.push(r.id); return { ok: true }; } });
+  await run.start();
+  assert.deepEqual(order, ["small", PACKAGE]);
 });
 
 test("deadRows: a failure takes its reverse dependencies (transitively), nothing else", () => {

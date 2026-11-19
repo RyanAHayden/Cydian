@@ -200,10 +200,12 @@ function sourceOf(src) {
 async function zipDirectory({ size, read }) {
   const tailLen = Math.min(size, 65557);
   const tail = await read(size - tailLen, size);
+  // Safari can hand over a File it can't read in full (iCloud Drive, not downloaded yet): say so, not "not a zip".
+  if (tail.length < tailLen) throw badIpa(`Safari read only part of that file (${tail.length} of ${tailLen} bytes at its end). If it's in iCloud Drive, download it in Files first (or move it to On My iPhone), then choose it again.`);
   const tv = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
   let eocd = -1;
   for (let i = tail.length - 22; i >= 0; i--) if (tv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
-  if (eocd < 0) throw badIpa("That file isn't an IPA (not a zip archive).");
+  if (eocd < 0) throw badIpa(`That file isn't a whole IPA: no zip directory at its end (${size} bytes). It may be cut short: download it again.`);
   const dirSize = tv.getUint32(eocd + 12, true), dirAt = tv.getUint32(eocd + 16, true);
   if (dirAt === 0xffffffff || dirAt + dirSize > size) throw badIpa("That IPA's zip directory can't be read.");
   const d = await read(dirAt, dirAt + dirSize);

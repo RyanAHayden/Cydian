@@ -177,3 +177,9 @@ test("Delete frees the kept bytes", async () => {
   await removeSiteEntry({ file: "L.ipa", url: "https://x/L.ipa" }, { storage, store: null });
   assert.deepEqual(siteEntries(storage), []);
 });
+
+test("readIpaFile: a short read (iCloud file not downloaded) and a cut-short IPA say which", async () => {
+  const short = { size: 100000, slice: () => new Blob([new Uint8Array(10)]) };
+  await assert.rejects(readIpaFile(short), (e) => e.code === "bad_ipa" && /read only part/.test(e.message));
+  await assert.rejects(readIpaFile(new Uint8Array(100000)), (e) => e.code === "bad_ipa" && /cut short/.test(e.message));
+});

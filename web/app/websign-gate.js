@@ -171,10 +171,25 @@ export const refreshSourcesNow = () => import("./screens/changes.js").then((c) =
 // At launch, website only and only once browsing is unlocked (Browse Anyway: "later"): a locked Home, the app and
 // the native shells never refresh here (the app has its own update path). -> true when it started one
 export function refreshOnLaunch({ mode = "site", storage = store(), win = globalThis, refresh = refreshSourcesNow } = {}) {
-  if (mode !== "site" || win?.ifizboxApp || win?.ifizboxNative) return false;
+  if (!siteRefreshesItself({ mode, win })) return false;
   if (browsingLocked({ mode, storage })) return false;
   Promise.resolve().then(refresh).catch(() => {});
   return true;
+}
+
+// The plain website (not the app, not a native shell) owns its launch refresh: refreshOnLaunch above.
+export const siteRefreshesItself = ({ mode = "site", win = globalThis } = {}) =>
+  mode === "site" && !win?.ifizboxApp && !win?.ifizboxNative;
+
+// One launch refresh, never two: on the website refreshOnLaunch (F250: every unlocked launch, Reloading Data HUD);
+// everywhere else Settings > Refresh Sources on Launch (`settingOn()`) runs `background` (the Sources tab's quiet
+// refresh). Called at launch and on a fresh open back from the background. -> "site" | "setting" | null
+export function launchRefresh({ mode = "site", win = globalThis, storage = store(), settingOn = () => false,
+  background = () => {}, refresh = refreshSourcesNow } = {}) {
+  if (siteRefreshesItself({ mode, win })) return refreshOnLaunch({ mode, storage, win, refresh }) ? "site" : null;
+  if (!settingOn()) return null;
+  background();
+  return "setting";
 }
 
 // ---- ?install (F184) -------------------------------------------------------------------------------------------

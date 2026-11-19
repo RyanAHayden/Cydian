@@ -42,7 +42,7 @@ import { catalog } from "./catalog.js";
 import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
 import { NAME } from "./brand.js";
-import { takeInstallParam, askFromInstallLink, refreshOnLaunch } from "./websign-gate.js";
+import { takeInstallParam, askFromInstallLink, launchRefresh } from "./websign-gate.js";
 import { notIphonePage } from "./core/platform.js";
 import { showNotIphone } from "./screens/notiphone.js";
 
@@ -433,7 +433,6 @@ if (globalThis.ifizboxNative) {
 }
 router.start();
 askFromInstallLink(installLink, { install: () => home.installiFizBox() }).catch(() => {});
-refreshOnLaunch({ mode: detectMode() }); // F250: the website refreshes its sources each launch once browsing is unlocked
 // F93 (as before F89): first launch of a iFizBox installed from the website: its signed copy carries the website's
 // sources and settings as web/transfer.link (signed in the browser, websign-job.js); import them once, no question.
 // Only on the very first launch (user 2026-11-17: the website is rarely used after that).
@@ -455,8 +454,12 @@ if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.
 // Refresh on Launch: in the background, with the Sources tab's spinning red badge (screens/sources.js).
+// The website instead refreshes each launch once browsing is unlocked (F250), whatever the setting says: one path each
+// (websign-gate.js launchRefresh).
 const refreshSetting = () => settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch");
-if (refreshSetting()) SCREENS.sources.refreshInBackground?.(ctx);
+const refreshAtOpen = () => launchRefresh({ mode: detectMode(), settingOn: refreshSetting,
+  background: () => SCREENS.sources.refreshInBackground?.(ctx) });
+refreshAtOpen();
 
 // Back from the background after Settings' Return to Home After (2 minutes unless changed; Never: 0) counts as a
 // fresh open (user 2026-11-18): Home's root, and the launch refresh again. iOS rarely cold-launches the app or a
@@ -477,7 +480,7 @@ const OVERLAYS = ".alert-scrim, .action-scrim, .hud-scrim, .share-scrim, .sheet,
     if (location.hash === format({ tab: "home", path: [] })) toTop();
     else addEventListener("hashchange", toTop, { once: true });
     router.go({ tab: "home", path: [] });
-    if (refreshSetting()) SCREENS.sources.refreshInBackground?.(ctx);
+    refreshAtOpen();
   });
 }
 

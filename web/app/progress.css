@@ -91,3 +91,64 @@
 /* B49: iFizBox's own update with iOS: the button and Close greyed, not tappable, until iOS closes the app */
 .progress-finish.is-locked { pointer-events: none; }
 .progress-page .sheet-bar .bar-button:disabled { opacity: .5; pointer-events: none; }
+
+/* ---- F234: the queue run (screens/queuerun.js): Packages | Log in the black nav bar, one row per package ---- */
+/* UISegmentBarBlackButton / ...Highlighted / ...Divider (ref/4s/artwork/Shared@2x, sampled): 30px, a #1e1e1e top
+   edge, #767676 -> #262626 to the middle, flat black under it, a white 30% line below; the chosen segment
+   #8f8f8f -> #494848 over flat #3b3b3b; #8f8f8f -> #3c3c3c dividers over #262626. */
+.nav-title.has-seg { display: flex; justify-content: center; align-items: center; }
+.progress-seg {
+  display: inline-flex; height: 30px; border-radius: 5px; overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255,255,255,.3);
+}
+.progress-seg-item {
+  min-width: 82px; height: 30px; padding: 0 12px; border: 1px solid #1e1e1e; border-left-width: 0; cursor: pointer;
+  touch-action: manipulation; font: bold 12px/28px "Helvetica Neue", Helvetica, sans-serif; color: #fff;
+  text-shadow: 0 -1px 0 rgba(0,0,0,.6);
+  background: linear-gradient(#767676 6.7%, #262626 50%, #000 50%); background-origin: border-box;
+}
+.progress-seg-item:first-child { border-left-width: 1px; border-radius: 5px 0 0 5px; }
+.progress-seg-item:last-child { border-radius: 0 5px 5px 0; }
+.progress-seg-item + .progress-seg-item { box-shadow: inset 1px 0 0 #5c5c5c; }
+.progress-seg-item.selected { background: linear-gradient(#8f8f8f 6.7%, #494848 50%, #3b3b3b 50%); background-origin: border-box; }
+
+.progress-pane {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: calc(var(--nav-h) + 4px) env(safe-area-inset-right) 14px env(safe-area-inset-left);
+}
+.progress-pane[hidden], .progress-scroll[hidden] { display: none; }
+.qr-list { list-style: none; margin: 0; padding: 0; }
+.qr-row { display: flex; align-items: center; border-bottom: 1px solid #262626; }
+.qr-main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 9px 4px 9px 14px; border: 0;
+  background: none; text-align: left; cursor: pointer; touch-action: manipulation; color: #fff;
+}
+.qr-main:active { background: #1a1a1a; }
+.qr-name { font: bold 16px/20px "Helvetica Neue", Helvetica, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qr-status { font: 13px/16px "Helvetica Neue", Helvetica, sans-serif; color: #a9a9a9; overflow-wrap: anywhere; }
+.qr-row[data-state="installed"] .qr-status { color: #fff; }
+.qr-row[data-state="failed"] .qr-status { color: #ff453a; }
+.qr-row[data-state="skipped"] .qr-status, .qr-row[data-state="cancelled"] .qr-status { color: #ffd60a; }
+/* UIProgressView's default style (UIProgressBarOuter_Default / Inner_Default, sampled): 9px, round ends; the track
+   #888 edge, #9d9d9d -> #d0d0d0 then white, a #8d8d8d bottom edge; the fill #5f6bb7 edge, #c3d9f7 -> #76a4e4 then
+   #2472d2 -> #398ef4, a #2668a6 bottom edge. */
+.qr-bar {
+  position: relative; height: 9px; margin-top: 3px; border-radius: 4.5px; overflow: hidden;
+  background: linear-gradient(#888 0 .5px, #9d9d9d .5px, #d0d0d0 45%, #fff 50%, #fff 88%, #e1e1e1 88%, #8d8d8d calc(100% - .5px));
+}
+.qr-bar[hidden] { display: none; }
+.qr-fill {
+  height: 100%; border-radius: 4.5px; transform-origin: left; transform: scaleX(0); transition: transform .2s linear;
+  background: linear-gradient(#5f6bb7 0 .5px, #c3d9f7 .5px, #76a4e4 50%, #2472d2 50%, #398ef4 calc(100% - .5px), #2668a6 calc(100% - .5px));
+}
+/* installing, or a download that hasn't said its size: the fill sweeps (transform only) */
+.qr-bar.is-indeterminate .qr-fill { width: 35%; transition: none; animation: qr-sweep 1.1s linear infinite; }
+@keyframes qr-sweep { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+/* the row's stop: a grey disc with a white x, until dpkg takes the package */
+.qr-stop {
+  flex: none; width: 44px; height: 44px; margin-right: 4px; border: 0; cursor: pointer; touch-action: manipulation;
+  background: no-repeat center / 22px 22px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%23636363'/%3E%3Cpath d='M8.8 8.8l8.4 8.4M17.2 8.8l-8.4 8.4' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.qr-stop[hidden] { display: none; }
+.qr-summary { padding: 14px 14px 6px; font: bold 13px/17px "Helvetica Neue", Helvetica, sans-serif; color: #fff; text-align: center; }
+.qr-summary[hidden] { display: none; }

@@ -18,6 +18,10 @@
 //      back to dpkg through backend.answerConffile while the run waits. While apt is still downloading (no dpkg
 //      status line yet) the bar has Cydia's Cancel (F64, backend.cancelApply): the run stops, nothing is installed
 //      and the queue stays.
+//      F234: in the jailbreak app Confirm's run is screens/queuerun.js instead (backend.queueFetch): every package
+//      downloads on its own, 3 at a time, and one dpkg lane installs them in order; a failure skips only what needs
+//      it. Packages | Log in the black page's nav bar, Hide / Cancel / Retry All. The console above stays for Roll
+//      Back, paid installs and a backend without per-package calls.
 //
 // While the queue holds packages: they are marked in every list (browse.js), the Installed tab's badge reads Q'd
 // and its nav bar has a Queue button that reopens Confirm. Styles: queue.css.
@@ -38,6 +42,7 @@ import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
+import { runQueue, markNeededBy } from "./queuerun.js";
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 
@@ -127,7 +132,8 @@ export function confirmCancel() {
   return barButton("Cancel", "red");
 }
 
-function openConfirm() {
+// F234: `footer` under the sheet (a cancelled run's "Stopped. N installed and cleared from the queue.").
+function openConfirm({ footer = null } = {}) {
   if (confirm || running) { confirm?.refresh(); return; }
   if (!installQueue.size) return;
   const cancel = confirmCancel();
@@ -141,7 +147,8 @@ function openConfirm() {
   ok.addEventListener("click", () => {
     if (!ready) return;
     const run = ready;
-    close().then(() => runConsole(run));
+    // F234: the queue run where one failure doesn't stop the rest, where the backend can fetch each package
+    close().then(() => (typeof getBackend().queueFetch === "function" ? runQueueRun(run) : runConsole(run)));
   });
 
   async function refresh() {
@@ -174,13 +181,17 @@ function openConfirm() {
       m.scroll.append(grouped([{ header: "Modifications", rows: [{ label: "Nothing to change" }],
         footer: "apt says everything queued is already as asked." }]));
     } else {
-      m.scroll.append(continueGroup(close), statistics(r.plan), withWaitNotes(modifications(r.plan, names), planIds(r.plan)));
+      const mods = withWaitNotes(modifications(r.plan, names), planIds(r.plan));
+      const modsGroup = mods.querySelector(".group");
+      m.scroll.append(continueGroup(close), statistics(r.plan), mods);
+      markNeededBy(modsGroup, r.plan, jobs, names, catalog); // F234: "needed by X" under what apt added
       ready = { jobs, plan: r.plan, ids: planIds(r.plan) };
       ok.hidden = false;
     }
     // Cydia on the 4S (ref/4s/screens/queue-81.png, queue-83.png): Continue Queuing, Statistics, Modifications and no
     // list of the queue; a package comes out of it from its own page (Modify > Clear).
     if (r && (!r.ok || r.plan.essential.length)) m.scroll.append(rawOutput(r.output));
+    if (footer) m.scroll.append(el("p", "group-footer confirm-stopped", footer));
   }
 
   confirm = { refresh, close };
@@ -527,6 +538,29 @@ export function runPaidInstall({ id, version, name = "", run }) {
   if (running) return null;
   const jobs = [{ op: "install", id, version, installed: null, name, mode: "install" }];
   return runConsole({ jobs, ids: [id], keepQueue: true, asks: false, title: (names) => `Install ${name || names[id] || id} ${version}`, run });
+}
+
+// F234: Confirm's run on screens/queuerun.js: downloads 3 at a time, one dpkg lane, a failure skips only what needs
+// it. What installed leaves the queue as it goes; failed, skipped and cancelled packages stay queued. F189's waiters
+// get each package's own outcome once the page closes.
+async function runQueueRun({ jobs, plan, ids }) {
+  running = true;
+  updateChrome();
+  const waiters = takeWaiters(ids);
+  const names = await namesFor(ids);
+  return runQueue({ jobs, plan }, {
+    backend: getBackend(), catalog, queue: installQueue, runLogs, names, finishAction,
+    setBadge: (text) => ctxRef?.setBadge?.("installed", text),
+    onClose: (result) => {
+      running = false;
+      updateChrome();
+      for (const w of waiters) {
+        const st = result?.rows?.find((r) => r.id === w.id)?.state;
+        w.resolve(st === "installed" ? "installed" : st === "cancelled" || !result ? "cancelled" : "failed");
+      }
+    },
+    reopenConfirm: (footer) => openConfirm({ footer }),
+  });
 }
 
 // asks: the run is apply-ask (F63), so a conffile line opens the Configuration Upgrade alert and its answer goes back

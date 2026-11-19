@@ -33,6 +33,8 @@
 //   c.roulette({ per })                    -> F154: Tweak Roulette's pool, [{ label, icon, rows }] (roulettePool)
 //   c.aptProblems(aptOutput)              -> N4: explainApt over the same index as deps (the Confirm sheet)
 //   c.queueInfo([id])                      -> N4: { id: { name, restart, kind } } for the queue's packages (F151: kind)
+//   c.runInfo([{ id, version }])           -> F234: { id: { name, debUrl, sha256, md5sum, size, depends, preDepends },
+//                                             installed: { name: version } } for the queue run (core/installrun.js)
 //   c.deps(id, key | "*")                  -> F18 (core/deps.js explain): { ok, problems, targets } for an APT
 //                                             package, against every source and the installed list; null if unknown
 //   c.setInstalled(statusText)             -> number of installed packages (dpkg's status file, core/installed.js)
@@ -55,7 +57,7 @@
 //                                             judged with it (the source's own range wins). Returns how many are kept
 //
 // A row is the slim record lists draw: { id, name, short, version, section, icon, key, author, compat, purpose }.
-import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH } from "./apt.js";
+import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH, parseRelations } from "./apt.js";
 import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
 import { compat, compatCode, isIncompatible, normalizeDevice, needText } from "./compat.js";
 import { parseSource, appStanza, isAltKey, runsOn, installOptions } from "./altstore.js";
@@ -881,6 +883,32 @@ export function createCatalog() {
     return out;
   }
 
+  // F234: what the queue run needs for each package apt's plan changes: the stanza of that version (its download
+  // link, hashes, size and dependencies) from any source, and dpkg's version of every name those depend on.
+  function runInfo(items = []) {
+    const all = entries(ALL);
+    const out = { installed: {} };
+    const names = new Set();
+    for (const { id, version = null } of items) {
+      const e = all.get(id);
+      let st = null;
+      for (const [k, { byId }] of sources) {
+        if (isAltKey(k)) continue;
+        const o = byId.get(id);
+        if (!o) continue;
+        st = [o.stanza, ...(o.older ?? [])].find((s) => !version || s.version === version) ?? null;
+        if (st?.debUrl) break;
+      }
+      if (!st) { out[id] = { name: e?.row.name ?? null }; continue; }
+      const { sha256, md5sum } = stanzaHashes(st);
+      out[id] = { name: e?.row.name ?? st.name ?? null, debUrl: st.debUrl ?? null, sha256, md5sum,
+        size: Number(st.size) > 0 ? Number(st.size) : null, depends: st.depends ?? null, preDepends: st.preDepends ?? st["pre-depends"] ?? null };
+      for (const g of [...parseRelations(out[id].depends), ...parseRelations(out[id].preDepends)]) for (const r of g) names.add(r.name);
+    }
+    for (const n of names) { const v = statusById.get(n)?.version; if (v) out.installed[n] = v; }
+    return out;
+  }
+
   // Every (source, id, candidate version) loaded: what the Changes tab files on a refresh (core/changes.js).
   // F51: AltStore apps add every runnable versions[] entry with its date, [key, id, version, date], so the tab
   // files them under the day they came out (and an app with an older version shows as Updated).
@@ -948,7 +976,7 @@ export function createCatalog() {
   return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, setBlocked, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
     categories, browse, popular, free, featured, collection: collectionRows, roulette,
     setInstalled, installed, upgrades, setDevice, setIpaInfo,
-    deps, aptProblems, queueInfo };
+    deps, aptProblems, queueInfo, runInfo };
 }
 
 // F104: a status stanza's Installed-Size (dpkg writes KiB) in bytes, or null.
@@ -965,7 +993,7 @@ export function runCatalog(catalog, op, args = []) {
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice, setIpaInfo: catalog.setIpaInfo,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular, free: catalog.free, featured: catalog.featured,
     collection: catalog.collection, roulette: catalog.roulette,
-    deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo }[op];
+    deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo, runInfo: catalog.runInfo }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);
 }

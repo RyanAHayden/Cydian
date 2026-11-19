@@ -12,6 +12,8 @@
 //   share.debFetch {url, sha256?, md5?}  jailbreak: a .deb link downloaded into the helper's directory -> {file, name,
 //                               checked: "SHA256" | "MD5" | null}; F133: with a hash (the Packages stanza's) a file
 //                               that doesn't match is removed and the call fails "bad_hash: …" (../Share.swift DebChecksum)
+//                               F234: {stream: true} sends {progress: 0...1} events; {tag} names it for share.debCancel
+//   share.debCancel {tag}       F234: stops that share.debFetch (it fails "cancelled: Cancelled")
 //   share.debSimulate {file}    jailbreak: ifizbox-helper simulate-deb -> {ok, code, output, stdout, package, version}
 //   share.debInstall {file, stream}  jailbreak: ifizbox-helper install-deb, streamed as helper.run -> {code, stdout,
 //                               stderr}; the staged file is removed afterwards
@@ -123,6 +125,15 @@ enum SharedInbox {
     }
 }
 
+// F234: the queue run's downloads by tag, for share.debCancel.
+enum DebFetches {
+    private static var running: [String: Download] = [:]
+    private static let lock = NSLock()
+    static func put(_ tag: String, _ d: Download) { lock.lock(); running[tag] = d; lock.unlock() }
+    static func take(_ tag: String) -> Download? { lock.lock(); defer { lock.unlock() }; return running.removeValue(forKey: tag) }
+    static func drop(_ tag: String) { _ = take(tag) }
+}
+
 enum ShareBridge {
     static func register(_ b: Bridge) {
         SharedInbox.queue.async { if AppMode.current == .jailbreak { SharedInbox.sweep() } }
@@ -147,7 +158,18 @@ enum ShareBridge {
                 try FileManager.default.createDirectory(atPath: SharedInbox.dirs.deb, withIntermediateDirectories: true,
                                                         attributes: [.posixPermissions: 0o700])
             } catch { return Apt.reply(c, nil, "internal: \(error.localizedDescription)") }
-            Download.start(url, to: dest, max: ShareInbox.maxDeb, progress: { _ in }) { err in
+            // F234: stream: {progress: 0...1} events, at most one per whole percent; tag: share.debCancel stops it.
+            let stream = (c.params["stream"] as? Bool) ?? false
+            let tag = c.params["tag"] as? String
+            var lastPct = -1
+            let d = Download.start(url, to: dest, max: ShareInbox.maxDeb, progress: { p in
+                guard stream else { return }
+                let pct = Int(p * 100)
+                if pct == lastPct { return }
+                lastPct = pct
+                c.emitOnMain([["progress": p]])
+            }) { err in
+                if let tag { DebFetches.drop(tag) }
                 if let e = err { try? FileManager.default.removeItem(at: dest); return Apt.reply(c, nil, e) }
                 let head = (try? FileHandle(forReadingFrom: dest)).map { h -> Data in defer { try? h.close() }; return h.readData(ofLength: 512) } ?? Data()
                 guard ShareClassifier.classify(file: dest, head: head).kind == .deb else {
@@ -166,6 +188,13 @@ enum ShareBridge {
                     Apt.reply(c, ["file": name, "name": url.lastPathComponent, "checked": checked], nil)
                 }
             }
+            if let tag { DebFetches.put(tag, d) }
+        }
+        // F234: share.debCancel {tag}, a queue row's stop: its share.debFetch fails "cancelled: Cancelled" and the
+        // partial file goes. Nothing running under that tag (it ended) is no error.
+        b.on("share.debCancel") { c in
+            if let tag = c.params["tag"] as? String { DebFetches.take(tag)?.cancel() }
+            Apt.reply(c, nil, nil)
         }
         b.on("share.debSimulate") { c in
             guard let path = staged(c, .deb) else { return }

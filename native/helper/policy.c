@@ -689,6 +689,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "hold")) { p->verb = HV_HOLD; wants_packages = 1; }
     else if (!strcmp(verb, "unhold")) { p->verb = HV_UNHOLD; wants_packages = 1; }
     else if (!strcmp(verb, "showhold")) { p->verb = HV_SHOWHOLD; wants_packages = 0; }
+    else if (!strcmp(verb, "auto")) { p->verb = HV_AUTO; wants_packages = 1; }
     else if (!strcmp(verb, "addsource")) { p->verb = HV_ADDSOURCE; return source_plan(argc, argv, prefix, p, err); }
     else if (!strcmp(verb, "removesource")) { p->verb = HV_REMOVESOURCE; return source_plan(argc, argv, prefix, p, err); }
     else if (!strcmp(verb, "simulate")) { p->verb = HV_SIMULATE; return queue_plan(argc, argv, prefix, status_fd, p, err); }
@@ -716,7 +717,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     for (int i = 1; i < argc; i++)
         if (!helper_name_ok(argv[i])) { *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return -1; }
 
-    int mark = p->verb == HV_HOLD || p->verb == HV_UNHOLD || p->verb == HV_SHOWHOLD;
+    int mark = p->verb == HV_HOLD || p->verb == HV_UNHOLD || p->verb == HV_SHOWHOLD || p->verb == HV_AUTO;
     const char *tool = p->verb == HV_CONFIGURE ? "dpkg" : mark ? "apt-mark" : "apt-get";
     if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/%s", prefix, tool) >= sizeof p->path) {
         *err = "prefix too long"; return -1;
@@ -739,7 +740,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     } else if (mark) {
         /* apt-mark has no progress to report: no status fd. Only a name dpkg knows gets here (helper_first_unknown),
          * so apt-mark never reads one as a pattern. */
-        a[k++] = verb; /* hold, unhold or showhold: the literals checked above */
+        a[k++] = verb; /* hold, unhold, showhold or auto: the literals checked above */
         p->packages = (const char *const *)&a[k];
         p->npackages = n;
         for (int i = 1; i < argc; i++) a[k++] = argv[i];
@@ -798,7 +799,8 @@ static int first_missing(const struct helper_plan *p, const char *found) {
 
 int helper_first_unknown(const char *prefix, const struct helper_plan *p) {
     int queue = p->verb == HV_SIMULATE || p->verb == HV_APPLY || p->verb == HV_APPLY_ASK;
-    if (p->verb != HV_INSTALL && p->verb != HV_REMOVE && p->verb != HV_HOLD && p->verb != HV_UNHOLD && !queue) return -1;
+    if (p->verb != HV_INSTALL && p->verb != HV_REMOVE && p->verb != HV_HOLD && p->verb != HV_UNHOLD && p->verb != HV_AUTO &&
+        !queue) return -1;
     char found[HELPER_MAX_PACKAGES] = {0};
     char path[PATH_MAX];
     snprintf(path, sizeof path, "%s/var/lib/dpkg/status", prefix);

@@ -26,13 +26,13 @@ import { catalog } from "../catalog.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { dayTitle, filterGroups, filterRows, defaultScope } from "../core/changes.js";
-import { apps, installedIds, onAppsChange } from "../core/installed.js";
+import { apps, installedIds, onAppsChange, recordInstall } from "../core/installed.js";
 import { settings } from "./settings.js";
 import { sourceFilter } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
 import { upgradesWithSelf } from "../essential-ui.js";
 import { withAppUpgrades } from "../app-updates.js";
-import { appJob, resignJob } from "../core/appqueue.js";
+import { appJob, resignJob, runOrder } from "../core/appqueue.js";
 import { needsResign, resignWindow } from "../core/signing.js";
 import { vendorSoldIds } from "./extras.js";
 import { SELF_ID } from "../core/essential.js";
@@ -85,7 +85,7 @@ async function badge(upgrades, resign) {
 export function nav(route, ctx) {
   if (route.path.length) return browse.nav(route);
   const info = { title: "Changes", style: "plain", left: { label: "Refresh", onClick: () => refresh(ctx) } };
-  if (canUpgrade()) info.right = { label: upgradeLabel(0), onClick: () => upgradeAll(queueFn(), state.data?.upgrades.available, state.data?.vendorSold) };
+  if (canUpgrade()) info.right = { label: upgradeLabel(0), onClick: () => upgradeAllJailbreak(state.data?.upgrades.available, state.data?.vendorSold) };
   // The sideload app: Upgrade (N) queues each app's new IPA and opens Confirm (F80), signed on the phone in turn.
   else if (detectMode() === "sideload") info.right = { label: upgradeLabel(0), onClick: () => queueAll(state.data?.upgrades.available, state.data?.resign) };
   return info;
@@ -145,6 +145,56 @@ export function upgradeAll(queue, available, skip = null) {
   return jobs;
 }
 
+// ---- B68: the jailbreak app's Upgrade (N) with app (IPA) upgrades --------------------------------------------------
+//
+// Changes lists the remembered apps' upgrades (app-updates.js withAppUpgrades, `remembered`) beside dpkg's, but apt
+// can't fetch them (F87), so upgradeJobs leaves them out; counting only its jobs hid the button whenever every listed
+// upgrade was an app. The count is both, and the tap queues apt's rows in the install queue (Confirm opens) and installs
+// each app's new IPA the way the jailbreak build installs an IPA (ipa-install.js openIpaInstall: AppSync Unified first,
+// then its console), in turn, iFizBox last, after apt's run went through. Only `available` rows: never the ignored ones.
+
+// The remembered apps' rows among the available upgrades (B19's `skip` too).
+export const appUpgradeRows = (available = [], skip = null) =>
+  (available ?? []).filter((r) => r?.id && r.version && r.remembered && !skip?.has(r.id));
+
+// What Upgrade (N) says in the jailbreak app.
+export const jailbreakUpgradeCount = (available = [], skip = null) =>
+  upgradeJobs(available ?? [], skip).length + appUpgradeRows(available, skip).length;
+
+// The tap. `queue`: the install queue's add (queueFn); `wait(id, note)`: screens/queue.js whenQueueRuns; `install(job)`:
+// one IPA's install, resolving { ok, close() } (installIpaJob). -> { apt, apps, installed }.
+export async function upgradeAllJailbreak(available = [], skip = null, { queue = queueFn(), pkgOf = null, install = installIpaJob,
+  wait = (id, note) => import("./queue.js").then((m) => m.whenQueueRuns(id, { note })) } = {}) {
+  const rows = appUpgradeRows(available, skip);
+  const apt = upgradeAll(queue, available, skip);
+  // Before anything awaits, so the waiter is there when Confirm runs.
+  const outcome = apt.length && rows.length
+    ? wait(apt[apt.length - 1].id, `${rows.length === 1 ? "1 app upgrade follows" : `${rows.length} app upgrades follow`} once these are installed.`)
+    : Promise.resolve("installed");
+  const appJobs = runOrder(await queueUpgrades(rows, { add: () => {}, ...(pkgOf ? { pkgOf } : {}) }));
+  if (!appJobs.length) return { apt, apps: [], installed: 0 };
+  if ((await outcome) !== "installed") return { apt, apps: appJobs, installed: 0 };
+  let installed = 0;
+  for (const [i, job] of appJobs.entries()) {
+    let r = null;
+    try { r = await install(job); } catch { r = null; }
+    if (!r?.ok) break; // its console or alert says why; the rest stay listed in Changes
+    installed++;
+    if (i < appJobs.length - 1) await r.close?.(); // the next one's console takes its place; the last stays up
+  }
+  return { apt, apps: appJobs, installed };
+}
+
+// One app upgrade through the jailbreak build's IPA install, remembered at its new version once installed (as an
+// app page's Install row records it, F88).
+async function installIpaJob(job) {
+  const { openIpaInstall } = await import("./ipa-install.js");
+  return openIpaInstall({ url: job.url, name: job.name || "", onInstalled: () => {
+    apps().then((store) => recordInstall(store, { id: job.id, name: job.name, version: job.version, key: job.key, source: job.source,
+      sourceName: job.sourceName || "", icon: job.icon })).catch(() => {});
+  } });
+}
+
 // Sideload Upgrade (N) (F80): every available upgrade with an IPA as an app queue job (core/appqueue.js appJob, the
 // version Changes shows; iFizBox's own row carries its IPA), queued through `add` (screens/queue.js queueApp: the first
 // opens Confirm, the rest redraw it). -> jobs queued.
@@ -154,6 +204,8 @@ export async function upgradeEverything() {
   await catalog.ensure();
   const holds = ignoredIds();
   const u = await withAppUpgrades(await upgradesWithSelf(await catalog.upgrades(holds)), holds);
+  // B68: the jailbreak app has apt's queue and installs IPAs itself (the app queue signs, which it refuses).
+  if (canUpgrade()) { const r = await upgradeAllJailbreak(u.available, await vendorSoldNow(u)); return [...r.apt, ...r.apps]; }
   return queueAll(u.available, await resignNow(u)); // F91: and the apps that need a re-sign
 }
 
@@ -370,7 +422,7 @@ function draw() {
   const { groups, upgrades, installed, resign = [], vendorSold = null } = state.data;
   state.ph?.remove();
   state.ph = null;
-  drawUpgradeButton(canUpgrade() ? upgradeJobs(upgrades.available, vendorSold).length : upgrades.available.length + resign.length); // F87: what Upgrade queues; F91: re-signs too
+  drawUpgradeButton(canUpgrade() ? jailbreakUpgradeCount(upgrades.available, vendorSold) : upgrades.available.length + resign.length); // B68: apt's and the apps'; F91: re-signs too
   const scope = scopeOf(state.scope, installed);
   drawScope(scope);
   const items = itemsOf(groups, undefined, upgrades, { query: state.query, scope, installed, resign });

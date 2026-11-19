@@ -5,6 +5,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -440,7 +441,7 @@ class Helper(unittest.TestCase):
         env = next(l for l in out if l.startswith("1: env: ")).split()[2:]
         names = {e.split("=", 1)[0] for e in env}
         self.assertLessEqual(names, {"PATH", "HOME", "USER", "LOGNAME", "LANG", "DEBIAN_FRONTEND", "PWD", "SHLVL",
-                                     "_", "OLDPWD"})
+                                     "_", "OLDPWD", "IFIZBOX_HELPER_PID"})
         self.assertIn("DEBIAN_FRONTEND=noninteractive", env)
         fds = self.stand_in_fds(out)
         self.assertEqual([f for f in fds if int(f) > 3 and f != "255"], [], fds)  # only 0-3 reach apt (sh may hold one)
@@ -506,6 +507,79 @@ class Helper(unittest.TestCase):
         self.assertIn("2: ifizbox-helper: cancelled: stopping apt-get", out)
         self.assertFalse([l for l in out if l.startswith("1: stdin:")], out)
         self.assertEqual(out[-1], "exit: 130")
+
+    def b84_prefix(self, apt_script):
+        """chain_prefix with apt-get (and dpkg) replaced by apt_script, a /bin/sh body."""
+        p, app, helper = self.chain_prefix()
+        for tool in ("apt-get", "dpkg"):
+            path = os.path.join(p, "usr/bin", tool)
+            with open(path, "w") as f:
+                f.write("#!/bin/sh\n" + apt_script)
+            os.chmod(path, 0o755)
+        return p, app, helper
+
+    def wait_for(self, path, seconds=20):
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            if os.path.exists(path):
+                return True
+            time.sleep(0.05)
+        return False
+
+    def test_chain_outlives_app(self):
+        """B84: the app closing mid-run (iFizBox installing itself: its Replaced watcher or the postinst's uicache)
+        no longer takes apt down: apt's later lines on stdout, stderr and fd 3 go nowhere instead of SIGPIPE, and it
+        runs to the end. The stand-in writes QUIT, waits until the app is gone, then writes plenty on every fd."""
+        for verb in (["apply", "com.repo.tweak"], ["install", "com.repo.tweak"], ["configure"]):
+            with self.subTest(verb=verb[0]):
+                done = os.path.join(tempfile.mkdtemp(dir=self.tmp), "done")
+                gone = done + ".app-gone"
+                p, app, helper = self.b84_prefix(
+                    f'echo QUIT\nn=0; while [ ! -e "{gone}" ] && [ $n -lt 200 ]; do sleep 0.05; n=$((n+1)); done\n'
+                    'i=0; while [ $i -lt 2000 ]; do echo "line $i"; echo "err $i" >&2; '
+                    'echo "pmstatus:x:$i:y" >&3; i=$((i+1)); done\n'
+                    f'echo "$IFIZBOX_HELPER_PID" > "{done}"\n')
+                r = subprocess.run([app, "spawn-quit", helper, *verb], capture_output=True, text=True, timeout=30)
+                self.assertEqual(r.stdout.splitlines(), ["quit"], r.stderr)
+                open(gone, "w").close()
+                self.assertTrue(self.wait_for(done), "apt-get died with the app")
+                with open(done) as f:
+                    self.assertRegex(f.read().strip(), r"^\d+$")  # the postinst's IFIZBOX_HELPER_PID
+
+    def test_chain_helper_pid(self):
+        """B84: IFIZBOX_HELPER_PID is the pid the app waits on (the postinst holds uicache until it is gone), only for
+        verbs that run dpkg; the apt-get child runs in a session of its own, away from the app's process group."""
+        p, app, helper = self.b84_prefix('echo "pid: $IFIZBOX_HELPER_PID ppid: $PPID sid: $(cut -d" " -f6 /proc/$$/stat)"\n'
+                                         'echo "pmstatus:x:1:y" >&3\nexit 3\n')
+        out = self.run_driver("spawn", helper, "apply", "com.repo.tweak", driver=app)
+        line = next(l for l in out if l.startswith("1: pid: ")).split()
+        self.assertEqual(line[2], line[4])  # the helper the app spawned is apt's parent and the pid named
+        self.assertNotEqual(line[6], str(os.getsid(0)))
+        self.assertIn("3: pmstatus:x:1:y", out)
+        self.assertEqual(out[-1], "exit: 3")
+        out = self.run_driver("spawn", helper, "hold", "installed.one", driver=app)
+        self.assertNotIn("IFIZBOX_HELPER_PID", "\n".join(out))
+
+    def test_chain_repairs_interrupted_dpkg(self):
+        """B84: a run that finds dpkg interrupted (numbered files in var/lib/dpkg/updates, what makes apt-get refuse)
+        runs dpkg --configure -a first, then its own command; a clean dpkg, or a run that isn't an install, doesn't."""
+        p, app, helper = self.b84_prefix('echo "ran: $(basename $0) $*"\necho "pmstatus:x:1:y" >&3\n')
+        updates = os.path.join(p, "var/lib/dpkg/updates")
+        os.makedirs(updates)
+        open(os.path.join(updates, "tmp.i"), "w").close()  # dpkg's scratch file alone isn't an interrupted run
+        ran = lambda *w: [l for l in self.run_driver("spawn", helper, *w, driver=app) if "ran:" in l or "interrupted" in l]
+        self.assertEqual(ran("install", "com.repo.tweak"), [f"1: ran: apt-get -y -o Dpkg::Options::=--force-confdef -o "
+                         "Dpkg::Options::=--force-confold --allow-unauthenticated -o APT::Status-Fd=3 install com.repo.tweak"])
+        open(os.path.join(updates, "0007"), "w").close()
+        out = ran("apply", "com.repo.tweak")
+        self.assertEqual(out[0], "2: ifizbox-helper: dpkg was interrupted: running dpkg --configure -a first")
+        self.assertEqual([l for l in out if "ran:" in l],
+                         ["1: ran: dpkg --force-confdef --force-confold --status-fd 3 --configure -a",
+                          "1: ran: apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "
+                          "--reinstall --allow-downgrades --allow-unauthenticated -o APT::Keep-Fds::=3 -o "
+                          "APT::Status-Fd=3 install com.repo.tweak"])
+        self.assertEqual(ran("configure"), ["1: ran: dpkg --force-confdef --force-confold --status-fd 3 --configure -a"])
+        self.assertEqual(ran("hold", "installed.one"), [])  # apt-mark isn't the stand-in; nothing repaired either
 
     def test_chain_holds(self):
         p, app, helper = self.chain_prefix()
@@ -1659,6 +1733,76 @@ class LocalDeb(unittest.TestCase):
                 self.assertEqual(out[-1], f"exit: {code}")
                 self.assertFalse(any(l.startswith("1: ") for l in out), out)
                 self.assertEqual(os.listdir(work), [])
+
+
+class Postinst(unittest.TestCase):
+    """B84: native/deb/postinst holds its uicache (which makes iOS close the running app) until the helper run that
+    installed it has ended, when ifizbox-helper named one in IFIZBOX_HELPER_PID; without it, uicache runs at once.
+    Run with stand-ins for every tool it calls, so nothing on this machine is touched."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.bin = os.path.join(self.tmp, "bin")
+        os.makedirs(self.bin)
+        self.log = os.path.join(self.tmp, "uicache.log")
+        for tool in ("mkdir", "chmod", "chown", "launchctl"):
+            self.tool(tool, "exit 0\n")
+        self.tool("uicache", f'echo "$*" >> "{self.log}"\n')
+        with open(os.path.join(HERE, "..", "deb", "postinst")) as f:
+            self.script = os.path.join(self.tmp, "postinst")
+            with open(self.script, "w") as out:
+                out.write(f.read().replace("$(BRAND_NAME)", "TestApp"))
+
+    def tool(self, name, body):
+        path = os.path.join(self.bin, name)
+        with open(path, "w") as f:
+            f.write("#!/bin/sh\n" + body)
+        os.chmod(path, 0o755)
+
+    def run_postinst(self, env):
+        """Runs it with a pipe on fd 3 (CYDIA's status fd, as under apt), as dpkg would, and returns how long until
+        that pipe reached end of file: what the helper's relay waits for."""
+        r3, w3 = os.pipe()
+        path = f"{self.bin}:/usr/bin:/bin"
+        start = time.monotonic()
+        p = subprocess.Popen(["/bin/sh", self.script], env={"PATH": path, **env}, pass_fds=(w3,),
+                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             preexec_fn=lambda: os.dup2(w3, 3))
+        os.close(w3)
+        self.assertEqual(p.wait(timeout=20), 0)
+        p.stdout.close()
+        p.stderr.close()
+        with os.fdopen(r3, "rb") as f:
+            f.read()
+        return time.monotonic() - start
+
+    def uicache_calls(self):
+        if not os.path.exists(self.log):
+            return []
+        with open(self.log) as f:
+            return f.read().splitlines()
+
+    def test_outside_the_app(self):
+        self.run_postinst({})
+        self.assertEqual(self.uicache_calls(), ["-p /var/jb/Applications/TestApp.app"])
+        self.run_postinst({"IFIZBOX_HELPER_PID": "12x"})  # not a pid: as outside the app
+        self.assertEqual(len(self.uicache_calls()), 2)
+
+    def test_waits_for_the_helper(self):
+        helper = subprocess.Popen(["sleep", "30"])
+        self.addCleanup(helper.wait)
+        self.addCleanup(helper.kill)
+        took = self.run_postinst({"IFIZBOX_HELPER_PID": str(helper.pid)})
+        self.assertLess(took, 5)  # neither dpkg nor the relay's fd 3 waits for the background job
+        time.sleep(1.5)
+        self.assertEqual(self.uicache_calls(), [])  # the helper still runs: the app isn't closed under it
+        helper.kill()
+        helper.wait()
+        deadline = time.monotonic() + 10
+        while not self.uicache_calls() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertEqual(self.uicache_calls(), ["-p /var/jb/Applications/TestApp.app"])
 
 
 if __name__ == "__main__":

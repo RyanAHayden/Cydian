@@ -350,6 +350,144 @@ static int update_source(struct helper_plan *plan, char *const env[]) {
     return WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
 }
 
+/* B84: the verbs that may run dpkg (install, configure or remove packages, iFizBox's own one among them). */
+static int runs_dpkg(enum helper_verb v) {
+    return v == HV_INSTALL || v == HV_REMOVE || v == HV_UPGRADE || v == HV_CONFIGURE || v == HV_APPLY ||
+           v == HV_APPLY_ASK || v == HV_ROLLBACK || v == HV_INSTALL_PAID || v == HV_INSTALL_DEB ||
+           v == HV_INSTALL_DEB_ASK;
+}
+
+/* B84: installing iFizBox over itself closes the running app halfway (its Replaced watcher once the new Info.plist
+ * is on disk, or iOS when the postinst's uicache registers the new copy). apt-get, dpkg and the postinst used to
+ * write straight into the app's pipes, so the first line after that was SIGPIPE: dpkg died in the postinst and left
+ * the package half-configured, with every later apt-get refusing ("dpkg was interrupted").
+ * So for runs_dpkg verbs the helper leaves the app's session (setsid: nothing sent to the app's process group reaches
+ * it) and forks: the child returns and does the verb with pipes of the helper's on fds 1, 2 (and 3); this process
+ * copies them to the app's fds, ignores SIGPIPE and SIGHUP, stops copying to an fd the app has closed (the rest is
+ * read and dropped) and exits with the child's status once it ends, as the app expects of the helper. Lines a
+ * grandchild left behind (a postinst's background job holding an fd) don't keep it waiting. `keep` is closed here
+ * (the answers fd belongs to the child). Returns 0 in the child; -1 (nothing forked) if the pipes or fork failed. */
+static int outlive_caller(int status_fd, int keep) {
+    int nfd = status_fd >= 0 ? 3 : 2, p[3][2];
+    for (int i = 0; i < nfd; i++) {
+        if (pipe(p[i])) {
+            perror("ifizbox-helper: pipe");
+            for (int j = 0; j < i; j++) { close(p[j][0]); close(p[j][1]); }
+            return -1;
+        }
+    }
+    setsid(); /* fails only if already a group leader, which a spawned helper isn't; either way, go on */
+    fflush(stdout);
+    fflush(stderr);
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("ifizbox-helper: fork");
+        for (int i = 0; i < nfd; i++) { close(p[i][0]); close(p[i][1]); }
+        return -1;
+    }
+    if (pid == 0) {
+        for (int i = 0; i < nfd; i++) {
+            if (dup2(p[i][1], i + 1) < 0) _exit(HELPER_EX_EXEC);
+            close(p[i][0]);
+            if (p[i][1] != i + 1) close(p[i][1]);
+        }
+        return 0;
+    }
+    if (keep >= 0) close(keep);
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGHUP, SIG_IGN);
+    int in[3], dead[3] = {0, 0, 0};
+    for (int i = 0; i < nfd; i++) {
+        close(p[i][1]);
+        in[i] = p[i][0];
+        fcntl(in[i], F_SETFL, fcntl(in[i], F_GETFL) | O_NONBLOCK);
+    }
+    int st = 0, ended = 0;
+    for (;;) {
+        if (!ended) {
+            pid_t w = waitpid(pid, &st, WNOHANG);
+            if (w == pid || (w < 0 && errno != EINTR)) ended = 1;
+        }
+        struct pollfd pf[3];
+        int open_fds = 0;
+        for (int i = 0; i < nfd; i++) {
+            pf[i].fd = in[i];
+            pf[i].events = POLLIN;
+            pf[i].revents = 0;
+            if (in[i] >= 0) open_fds++;
+        }
+        if (!open_fds && ended) break;
+        /* Once the child ended, read what is already there and stop (a grandchild may hold a pipe open). */
+        int r = poll(pf, (nfds_t)nfd, ended ? 0 : 200);
+        if (r < 0 && errno != EINTR) break;
+        int got = 0;
+        for (int i = 0; i < nfd; i++) {
+            if (in[i] < 0 || !(pf[i].revents & (POLLIN | POLLHUP | POLLERR))) continue;
+            char buf[16384];
+            ssize_t n = read(in[i], buf, sizeof buf);
+            if (n < 0 && (errno == EINTR || errno == EAGAIN)) continue;
+            if (n <= 0) { close(in[i]); in[i] = -1; continue; }
+            got = 1;
+            for (ssize_t off = 0; off < n && !dead[i];) {
+                ssize_t m = write(i + 1, buf + off, (size_t)(n - off));
+                if (m < 0 && errno == EINTR) continue;
+                if (m <= 0) { dead[i] = 1; break; } /* the app is gone: keep apt running, drop its output */
+                off += m;
+            }
+        }
+        if (ended && !got) break;
+    }
+    _exit(WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st));
+}
+
+/* B84: dpkg was stopped halfway (a run killed in a maintainer script): its journal in <prefix>/var/lib/dpkg/updates
+ * holds files named only by digits, which is what makes apt-get refuse with "dpkg was interrupted". */
+static int dpkg_interrupted(const char *prefix) {
+    char dir[PATH_MAX];
+    snprintf(dir, sizeof dir, "%s/var/lib/dpkg/updates", prefix);
+    DIR *d = opendir(dir);
+    if (!d) return 0;
+    int found = 0;
+    struct dirent *e;
+    while (!found && (e = readdir(d))) {
+        const char *s = e->d_name;
+        if (!*s) continue;
+        while (*s >= '0' && *s <= '9') s++;
+        found = !*s;
+    }
+    closedir(d);
+    return found;
+}
+
+/* B84: before a run that installs or removes, finish an interrupted dpkg with the configure verb's command (dpkg
+ * --configure -a, status lines on fd 3 when it is open), as the console's own "configure" would, so the run isn't
+ * refused. Its exit status is reported but the run goes on either way (apt then says what is still wrong). */
+static void repair_dpkg(const char *prefix, int status_fd, char *const env[]) {
+    if (!dpkg_interrupted(prefix)) return;
+    static struct helper_plan fix;
+    char *words[] = {"configure", NULL};
+    const char *err = NULL;
+    if (helper_plan(1, words, prefix, status_fd, &fix, &err)) {
+        fprintf(stderr, "ifizbox-helper: configure: %s\n", err);
+        return;
+    }
+    fprintf(stderr, "ifizbox-helper: dpkg was interrupted: running dpkg --configure -a first\n");
+    fflush(stdout);
+    fflush(stderr);
+    pid_t pid = fork();
+    if (pid < 0) { perror("ifizbox-helper: fork"); return; }
+    if (pid == 0) {
+        execve(fix.path, (char *const *)fix.argv, env);
+        fprintf(stderr, "ifizbox-helper: %s: %s\n", fix.path, strerror(errno));
+        _exit(HELPER_EX_EXEC);
+    }
+    int st = 0;
+    pid_t w;
+    while ((w = waitpid(pid, &st, 0)) < 0 && errno == EINTR) {}
+    int rc = w < 0 ? HELPER_EX_EXEC : WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
+    if (rc) fprintf(stderr, "ifizbox-helper: dpkg --configure -a exited %d\n", rc);
+}
+
 int main(int argc, char *argv[]) {
     const char *prefix = IFIZBOX_PREFIX, *err = NULL;
     char parent[PATH_MAX], expected[PATH_MAX];
@@ -461,8 +599,17 @@ int main(int argc, char *argv[]) {
     char *cydia_env = (plan.verb == HV_APPLY || plan.verb == HV_APPLY_ASK || plan.verb == HV_ROLLBACK ||
                        plan.verb == HV_INSTALL_PAID || plan.verb == HV_INSTALL_DEB || plan.verb == HV_INSTALL_DEB_ASK) &&
                       status_fd >= 0 ? "CYDIA=3 1" : NULL;
+    /* B84: runs_dpkg verbs tell maintainer scripts the pid the app waits on (this one, which outlive_caller keeps
+     * until the run ends): iFizBox's postinst holds its uicache, which closes the running app, until it is gone. */
+    static char pid_env[64];
+    snprintf(pid_env, sizeof pid_env, "IFIZBOX_HELPER_PID=%d", (int)getpid());
+    int dpkg_verb = !malware && runs_dpkg(plan.verb);
     char *env[] = {path_env, "HOME=/var/root", "USER=root", "LOGNAME=root", "LANG=C", "DEBIAN_FRONTEND=noninteractive",
-                   cydia_env, NULL};
+                   dpkg_verb ? pid_env : cydia_env, dpkg_verb ? cydia_env : NULL, NULL};
+    if (dpkg_verb) {
+        if (outlive_caller(status_fd, answers)) return HELPER_EX_EXEC;
+        if (plan.verb != HV_CONFIGURE) repair_dpkg(prefix, status_fd, env);
+    }
     if (malware) return remove_malware(argc - 2, argv + 2, prefix, env);
     if (plan.verb == HV_UPDATE_SOURCE) return update_source(&plan, env);
     if (plan.verb == HV_INSTALL_IPA) {

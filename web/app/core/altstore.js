@@ -531,15 +531,20 @@ export function withAltSources(calls, backend, opts = {}) {
     },
     // `filter` (F41, core/sources.js sourceFilter): only the sources it keeps are fetched. When it keeps no APT
     // source the wrapped calls aren't asked at all (no proxy fetches, no apt-get update in the app).
-    async refreshSources(onEach = () => {}, { filter } = {}) {
+    // F233: `onRow`, `signal` and `retry` go on to the wrapped calls; onRow(key, "loading") as each AltStore source starts.
+    async refreshSources(onEach = () => {}, { filter, onRow, signal, retry } = {}) {
       const keep = filter ?? (() => true);
       const db = await store().catch(() => null);
       const alt = (db ? await db.list().catch(() => []) : []).filter(keep);
       const aptWanted = aptOk() && (!filter || (await calls.sources().catch(() => [])).some(keep));
+      const more = { ...(onRow ? { onRow } : {}), ...(signal ? { signal } : {}), ...(retry ? { retry } : {}) };
+      const aptOpts = filter || Object.keys(more).length ? { ...(filter ? { filter } : {}), ...more } : undefined;
       const [apt, alts] = await Promise.all([
-        aptWanted ? calls.refreshSources(onEach, filter ? { filter } : undefined) : [],
+        aptWanted ? calls.refreshSources(onEach, aptOpts) : [],
         // F19: in waves, each with a time limit, and the health fields (core/health.js) saved with the result.
         pool(alt, opts.concurrency ?? REFRESH_CONCURRENCY, async (s) => {
+          if (signal?.aborted) return null;
+          onRow?.(s.key, "loading");
           let fields;
           try {
             fields = await withTimeout(refreshAltSource(backend, s), opts.timeout ?? REFRESH_TIMEOUT);
@@ -551,7 +556,7 @@ export function withAltSources(calls, backend, opts = {}) {
           return next;
         }),
       ]);
-      const out = [...(apt ?? []), ...alts];
+      const out = [...(apt ?? []), ...alts.filter(Boolean)];
       if (apt?.failed) out.failed = apt.failed; // B23: the sources apt-get update failed on (backend-native)
       return out;
     },

@@ -24,8 +24,16 @@ import { lockMark } from "../nav/lock.js";
 import { reloadSteps } from "../core/reloadsteps.js";
 import { showBanner } from "../nav/banner.js";
 import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
+import { refreshRows, stripText, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
 
 export const title = "Sources";
+
+// F233: while a refresh runs, every row shows where its source is (core/refreshrows.js): grey Waiting, the spinner,
+// then its package count, or a red badge with the reason in red under its name. A tap on a failed row refreshes that
+// source alone (retry). The strip under the nav bar counts ("Refreshing 5 of 8…", then "6 refreshed, 2 failed"),
+// the Sources tab's badge spins and then counts the failures, and the page can be left while it runs. Each source's
+// packages go to the catalog (Changes, Search) as soon as it has landed, not after the last one.
+const STRIP_HIDE_MS = 4000; // a summary with nothing failed goes after this; one with failures stays
 
 const state = {
   sources: null,   // the list as last loaded, sorted
@@ -36,6 +44,11 @@ const state = {
   query: "",        // F19: the search box's text
   bar: null,        // F19: the search box, kept across redraws so typing keeps its focus
   box: null,        // F19: where the list goes, under the search box
+  rows: null,       // F233: the last refresh's rows (core/refreshrows.js), kept after it ends for the failed ones
+  running: false,   // F233: a refresh (or a row's retry) is under way
+  retrying: null,   // F233: the key a retry runs for
+  strip: null,      // F233: the strip under the nav bar
+  stripTimer: null,
 };
 
 const byKey = (key) => state.sources?.find((s) => s.key === key);
@@ -114,7 +127,9 @@ export function render(el, route, ctx) {
     return;
   }
   state.body = el;
+  state.ctx = ctx; // F233: a failed row's retry, from the list's click handler
   draw();
+  paintStrip();
   load(ctx);
 }
 
@@ -141,6 +156,7 @@ async function firstLoad(ctx) {
       tried: state.tried,
       begin: (keys) => { run = startRun(ctx, [...(keys ?? [])]); },
       onEach: (d) => run?.onEach(d),
+      onRow: (k, st, why) => run?.onRow(k, st, why),
     });
     if (done && !run?.cancelled) {
       state.sources = await getBackend().sources();
@@ -163,23 +179,163 @@ function announce() {
 }
 function markLoading(ctx, keys) {
   for (const k of keys) state.loading.add(k);
+  state.rows = refreshRows(keys);
+  state.running = true;
   announce();
   ctx?.setBadge?.("sources", state.loading.size ? "spinner" : null);
-  for (const li of document.querySelectorAll(".source-row")) li.classList.toggle("is-loading", state.loading.has(li.dataset.key));
+  paintAll();
   return (done) => {
     state.loading.delete(done?.key);
     const i = state.sources?.findIndex((s) => s.key === done?.key) ?? -1;
     if (i >= 0) state.sources[i] = done;
-    const li = document.querySelector(`.source-row[data-key="${CSS.escape(String(done?.key))}"]`);
-    if (li) li.classList.remove("is-loading");
-    if (!state.loading.size) { ctx?.setBadge?.("sources", null); announce(); }
+    state.rows?.land(done);
+    paintKey(done?.key);
+    paintStrip();
+    feedCatalog(ctx);
+    // every source has answered: the badge stops spinning and counts the failures (the catalog load may go on)
+    if (!state.loading.size) { ctx?.setBadge?.("sources", tabBadge(state.rows?.counts(), false)); announce(); }
   };
 }
 function clearLoading(ctx) {
   state.loading.clear();
   announce();
-  ctx?.setBadge?.("sources", null);
-  for (const li of document.querySelectorAll(".source-row.is-loading")) li.classList.remove("is-loading");
+  state.rows?.finish();
+  state.running = false;
+  ctx?.setBadge?.("sources", tabBadge(state.rows?.counts(), false));
+  paintAll();
+  paintStrip();
+}
+
+// F233: apt's live lines (backend-native) and the pools (core/sources.js, core/altstore.js) say when a source starts,
+// and apt when one fails, before its record lands.
+function rowEvent(key, rowState, reason) {
+  if (!state.rows?.has(key)) return;
+  if (rowState === ROW.failed) state.rows.fail(key, reason);
+  else state.rows.set(key, rowState);
+  paintKey(key);
+  paintStrip();
+}
+
+// F233: a landed source's packages into the catalog at once (ctx.loadData: catalog.ensure, which reads only the
+// sources whose refresh time changed), one load at a time however fast they land.
+let feeding = null;
+function feedCatalog(ctx) {
+  if (!ctx?.loadData) return;
+  feeding ??= coalesce(() => ctx.loadData());
+  feeding();
+}
+
+// ---- F233: the rows' states, the strip and the retry --------------------------------------------------------
+
+const rowOf = (key) => document.querySelector(`.source-row[data-key="${CSS.escape(String(key))}"]`);
+function paintKey(key) { const li = key == null ? null : rowOf(key); if (li) paintRow(li); }
+function paintAll() { for (const li of document.querySelectorAll(".source-row")) paintRow(li); }
+
+// One row as its refresh state says. Rows outside a refresh (state.rows null, or a key it doesn't hold) keep what
+// draw() gave them: the stored count, and "Not Responding" for a source whose last refresh failed.
+function paintRow(li) {
+  const r = state.rows?.get(li.dataset.key) ?? null;
+  const st = r?.state ?? null;
+  li.classList.toggle("is-waiting", st === ROW.waiting);
+  li.classList.toggle("is-loading", st === ROW.loading);
+  li.classList.toggle("is-failed", st === ROW.failed);
+  const inner = li.querySelector(".cell-inner");
+  if (!inner) return;
+  const text = inner.querySelector(".cell-text");
+  let count = inner.querySelector(".cell-count");
+  let waiting = inner.querySelector(".row-waiting");
+  if (st === ROW.waiting && !waiting) {
+    waiting = Object.assign(document.createElement("span"), { className: "row-waiting", textContent: "Waiting" });
+    text?.after(waiting);
+  } else if (st !== ROW.waiting) waiting?.remove();
+  if ((st === ROW.done && r.count != null) || st === ROW.failed) {
+    if (!count) { count = Object.assign(document.createElement("span"), { className: "cell-count" }); inner.append(count); }
+    count.classList.toggle("row-failed-badge", st === ROW.failed);
+    count.textContent = st === ROW.failed ? "!" : r.count.toLocaleString();
+  } else count?.classList.remove("row-failed-badge");
+  const sub = inner.querySelector(".cell-subtitle");
+  if (sub) {
+    sub.dataset.plain ??= sub.textContent;
+    const was = sub.dataset.error === "1";
+    if (st === ROW.failed) {
+      if (!was) sub.dataset.wasError = sub.classList.contains("cell-error") ? "1" : "";
+      sub.textContent = r.reason || "Failed";
+      sub.classList.add("cell-error");
+      sub.dataset.error = "1";
+    } else if (was) {
+      sub.textContent = sub.dataset.plain;
+      delete sub.dataset.error;
+      // landed fine this time: no red; no refresh state any more (cancelled): as draw() had it
+      sub.classList.toggle("cell-error", !st && sub.dataset.wasError === "1");
+    }
+  }
+  li.setAttribute("aria-busy", String(st === ROW.waiting || st === ROW.loading));
+  if (st === ROW.failed) inner.setAttribute("aria-description", "Failed to refresh: tap to try again");
+  else inner.removeAttribute("aria-description");
+}
+
+function stripEl() {
+  if (state.strip) return state.strip;
+  const el = document.createElement("div");
+  el.className = "refresh-strip";
+  el.setAttribute("role", "status");
+  el.setAttribute("aria-live", "polite");
+  el.hidden = true;
+  return (state.strip = el);
+}
+
+function paintStrip() {
+  if (!state.strip && !state.body) return; // Sources hasn't been drawn: draw() makes the strip and paints it then
+  const el = stripEl();
+  clearTimeout(state.stripTimer);
+  state.stripTimer = null;
+  const rows = state.rows;
+  if (!rows || !rows.counts().total) { el.hidden = true; return; }
+  const counts = state.retrying != null ? { total: 1, done: 0, failed: 0 } : rows.counts();
+  el.textContent = stripText(counts, state.running);
+  el.classList.toggle("has-failed", !state.running && counts.failed > 0);
+  el.hidden = false;
+  if (!state.running && !counts.failed) state.stripTimer = setTimeout(() => { el.hidden = true; }, STRIP_HIDE_MS);
+}
+
+// F233: a tap on a failed row: that source alone refreshes (the app runs apt-get update for its list only, through
+// refreshSources' `retry`), its row spinning, the strip saying so; afterwards the strip and the badge count again.
+export async function retrySource(ctx, key) {
+  if (state.busy || !state.rows?.has(key)) return false;
+  state.busy = true;
+  state.running = true;
+  state.retrying = key;
+  state.rows.retry(key);
+  state.loading.add(key);
+  announce();
+  ctx?.setBadge?.("sources", "spinner");
+  paintKey(key);
+  paintStrip();
+  let landed = false;
+  try {
+    await getBackend().refreshSources((d) => {
+      if (d?.key !== key) return;
+      landed = true;
+      const i = state.sources?.findIndex((s) => s.key === key) ?? -1;
+      if (i >= 0) state.sources[i] = d;
+      state.rows?.land(d);
+      feedCatalog(ctx);
+    }, { filter: (s) => s?.key === key, retry: true, onRow: (k, st, why) => { if (k === key) rowEvent(k, st, why); } });
+    if (!landed) state.rows?.fail(key, "No answer");
+  } catch (e) {
+    state.rows?.fail(key, e?.message || String(e));
+  } finally {
+    state.loading.delete(key);
+    state.retrying = null;
+    state.running = false;
+    state.busy = false;
+    state.rows?.finish();
+    announce();
+    ctx?.setBadge?.("sources", tabBadge(state.rows?.counts(), false));
+    paintKey(key);
+    paintStrip();
+  }
+  return true;
 }
 
 // At launch (app.js, Settings > Refresh on Launch): every source the device type shows, behind whatever page is
@@ -193,7 +349,7 @@ export async function refreshInBackground(ctx) {
     state.sources = await getBackend().sources();
     const filter = sourceFilter(settings.deviceType());
     run = startRun(ctx, state.sources.filter(filter ?? (() => true)).map((x) => x.key));
-    const job = getBackend().refreshSources(run.onEach, { filter, signal: run.signal });
+    const job = getBackend().refreshSources(run.onEach, { filter, signal: run.signal, onRow: run.onRow });
     if (await run.until(job)) return "cancelled";
     bannerFailed(await job);
     state.sources = await getBackend().sources();
@@ -234,6 +390,8 @@ export function startRun(ctx, keys) {
     signal: ac.signal,
     get cancelled() { return ac.signal.aborted; },
     onEach(d) { if (ac.signal.aborted) return; each(d); steps.each(d); },
+    // F233: a source started (or, from apt's live lines, failed) before its record lands.
+    onRow(key, rowState, reason) { if (!ac.signal.aborted) rowEvent(key, rowState, reason); },
     until: (p) => Promise.race([Promise.resolve(p).then(() => false), stopped.then(() => true)]),
     // Cydia's last steps: the package lists into the catalog ("Loading Data"), then what is worked out from
     // them ("Building Searcher Cache"): ctx.loadData and ctx.buildCache (app.js), skipped where ctx has none.
@@ -250,6 +408,7 @@ export function startRun(ctx, keys) {
   const cancel = () => {
     if (ac.signal.aborted) return;
     ac.abort();
+    state.rows = null; // F233: cancelled: no rows, strip or failure count from a run that didn't finish
     clearLoading(ctx);
     bar?.hide();
     stop();
@@ -304,9 +463,10 @@ function draw() {
     return;
   }
   const bar = searchBar();
-  if (!state.box || state.box.parentNode !== el || bar.parentNode !== el) {
+  const strip = stripEl(); // F233: under the nav bar, above the search box
+  if (!state.box || state.box.parentNode !== el || bar.parentNode !== el || strip.parentNode !== el) {
     state.box = document.createElement("div");
-    el.replaceChildren(bar, state.box);
+    el.replaceChildren(strip, bar, state.box);
   }
   const box = state.box;
   const backend = getBackend();
@@ -361,11 +521,11 @@ function decorate(li, source, backend) {
   li.classList.add("source-row");
   li.dataset.key = source.key;
   const loading = state.loading.has(source.key);
-  li.classList.toggle("is-loading", loading);
   // a source shows as failed only once a load has actually failed, not while one is under way
   if (source.error && !loading) li.querySelector(".cell-subtitle")?.classList.add("cell-error");
   // F16a: a source only its own app can read (an encrypted GBox one) says so under its name; its page says why.
   if (source.unsupported && !source.error) li.querySelector(".cell-subtitle")?.classList.add("cell-error");
+  paintRow(li); // F233: Waiting / spinner / count / red badge, while and after a refresh
   // CydiaIcon.png loads behind the letter and replaces it once it's there (Cydia: unknown.png, then the icon).
   // Cydia's <base>CydiaIcon.png first, then the repo's top level for dist repos (sourceIconUrls).
   // An AltStore source (F9) names its icon in its JSON. A GitHub-hosted source without one gets its owner's
@@ -405,13 +565,24 @@ function attachRowGestures(ul) {
   // Hold a source: iOS 6's black menu with Copy URL.
   longPress(ul, ".source-row", (li, e) => {
     if (state.editing || li.classList.contains("armed") || !li.dataset.url) return;
-    showMenu(li, [{ label: "Copy URL", onClick: () => copyText(li.dataset.url) }], { x: e.clientX });
+    // F233: a failed row's tap retries it, so the menu opens its packages (the lists from before) instead
+    const open = li.classList.contains("is-failed") && state.ctx?.go
+      ? [{ label: "Open", onClick: () => state.ctx.go({ tab: "sources", path: [li.dataset.key] }) }] : [];
+    showMenu(li, [...open, { label: "Copy URL", onClick: () => copyText(li.dataset.url) }], { x: e.clientX });
   });
   let start = null;   // the pointer that may become a swipe
   let swiped = false; // the click that ends a swipe opens nothing
   ul.addEventListener("click", (e) => {
     if (e.target.closest(".del-toggle, .del-confirm")) return;
     const armed = ul.querySelector(".source-row.armed");
+    // F233: a tap on a row whose refresh failed tries that source again instead of opening it
+    const failed = !armed && !swiped ? e.target.closest(".source-row.is-failed") : null;
+    if (failed) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!state.busy) retrySource(state.ctx, failed.dataset.key);
+      return;
+    }
     if (!armed && !swiped) return;
     e.preventDefault();
     e.stopPropagation();
@@ -466,7 +637,7 @@ async function refresh(ctx) {
   try {
     const filter = sourceFilter(settings.deviceType());
     run = startRun(ctx, (state.sources ?? []).filter(filter ?? (() => true)).map((x) => x.key));
-    const job = getBackend().refreshSources(run.onEach, { filter, signal: run.signal });
+    const job = getBackend().refreshSources(run.onEach, { filter, signal: run.signal, onRow: run.onRow });
     if (await run.until(job)) return; // F41: only what's shown
     bannerFailed(await job);
     state.sources = await getBackend().sources();

@@ -257,7 +257,9 @@ test("F150: a run drops the bar and its text follows the refresh to the end; the
   run.onEach({ key: "a" });
   run.onEach({ key: "b" });
   await run.data();
-  assert.deepEqual(log.steps, ["load", "cache"]);
+  // F233: each source that lands goes into the catalog at once (a load, coalesced), then the run's own last steps
+  assert.deepEqual(log.steps.slice(-2), ["load", "cache"]);
+  assert.ok(log.steps.filter((s) => s === "load").length >= 2, "a landed source loaded before the run's Loading Data");
   assert.deepEqual(texts.slice(-2), ["Loading Data", "Building Searcher Cache"]);
   run.end();
   assert.equal(bar.hidden, true);

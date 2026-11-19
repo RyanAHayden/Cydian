@@ -1,0 +1,146 @@
+// F234: the queue run's page (screens/queuerun.js) over a fake backend: a bad-hash package fails alone, what needs it
+// is skipped, the rest installs and leaves the queue; the log's lines know their package; the end has the summary,
+// Close / Retry All and the finish button; Retry All runs the failed and skipped rows again.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { runQueue } from "./queuerun.js";
+import { parseSimulation, createQueue } from "../core/queue.js";
+
+function fakeDom() {
+  const make = (tag) => {
+    const e = {
+      tagName: String(tag).toUpperCase(), children: [], listeners: {}, style: {}, attrs: {}, dataset: {}, parentNode: null,
+      textContent: "", hidden: false, disabled: false, type: "", _cls: new Set(),
+      get className() { return [...e._cls].join(" "); },
+      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
+      classList: { add: (...c) => c.forEach((x) => e._cls.add(x)), remove: (...c) => c.forEach((x) => e._cls.delete(x)),
+        toggle: (c, on) => ((on ?? !e._cls.has(c)) ? e._cls.add(c) : e._cls.delete(c)), contains: (c) => e._cls.has(c) },
+      setAttribute(k, v) { e.attrs[k] = String(v); },
+      append(...c) { for (const x of c) { if (typeof x !== "object") continue; x.parentNode = e; e.children.push(x); } },
+      get firstChild() { return e.children[0] ?? null; },
+      remove() { const p = e.parentNode; if (p) p.children.splice(p.children.indexOf(e), 1); e.parentNode = null; },
+      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
+      click() { for (const f of e.listeners.click ?? []) f({}); },
+    };
+    return e;
+  };
+  return { body: make("body"), createElement: make };
+}
+
+// A stand-in for nav/progress.js's page: records what the run asks of it.
+function fakePage() {
+  const p = {
+    lines: [], statuses: [], finished: null, bars: [], closers: [], closed: false, hidden: false, panes: [], views: [], filtered: null,
+    line(kind, text, pkg) { p.lines.push({ kind, text, pkg }); },
+    status(t) { p.statuses.push(t); }, progress() {},
+    pane(n) { p.panes.push(n); return n; }, view(v) { p.views.push(v); },
+    segmented(labels, onPick) { p.seg = { labels, onPick }; return { select: (i) => { p.selected = i; } }; },
+    filter(pkg) { p.filtered = pkg; },
+    bar(b) { p.bars.push(b); },
+    reopen() { p.finished = null; },
+    finish(f) { p.finished = f; },
+    hide() { p.hidden = true; }, show() { p.hidden = false; },
+    onClose(f) { p.closers.push(f); },
+    close() { p.closed = true; for (const f of p.closers.splice(0)) f(); return Promise.resolve(); },
+  };
+  return p;
+}
+
+const SIM = "Inst lib (2.0 R [a])\nInst tweak (1.0 R [a])\nInst other (1.0 R [a])";
+const plan = parseSimulation(SIM);
+const jobs = [{ op: "install", id: "tweak", name: "Tweak", mode: "install" }, { op: "install", id: "other", name: "Other", mode: "install" }];
+const info = { lib: { name: "Lib", debUrl: "https://r/lib.deb", sha256: "a".repeat(64) }, tweak: { debUrl: "https://r/tweak.deb", depends: "lib" },
+  other: { debUrl: "https://r/other.deb" }, installed: {} };
+
+function setup({ badLib = true } = {}) {
+  const queue = createQueue();
+  for (const j of jobs) queue.add(j);
+  const calls = { fetch: [], install: [], auto: [], logs: [] };
+  let libBad = badLib;
+  const backend = {
+    async queueFetch(r, { progress }) {
+      calls.fetch.push(r.id);
+      progress(0.5);
+      if (r.id === "lib" && libBad) throw new Error("the download isn't the file its source lists (SHA256 differs)");
+      return { file: `${r.id}.deb` };
+    },
+    async queueInstall(r, { file, onEvent }) {
+      calls.install.push([r.id, file]);
+      onEvent({ fd: "status", line: `pmstatus:${r.id}:10:Unpacking ${r.id}` });
+      onEvent({ fd: "status", line: `pmstatus:${r.id}:50:Unpacking ${r.id}` });
+      onEvent({ fd: "out", line: `Selecting previously unselected package ${r.id}.` });
+      return { code: 0, stdout: "", stderr: "" };
+    },
+    async markAuto(ids) { calls.auto.push(ids); return true; },
+  };
+  const catalog = { runInfo: async () => info, queueInfo: async () => ({}), reloadInstalled: async () => {} };
+  const runLogs = { add: (e) => calls.logs.push(e) };
+  const page = fakePage();
+  return { queue, calls, backend, catalog, runLogs, page, fixLib: () => { libBad = false; } };
+}
+
+async function withDom(fn) {
+  const saved = { document: globalThis.document, raf: globalThis.requestAnimationFrame };
+  globalThis.document = fakeDom();
+  globalThis.requestAnimationFrame = (f) => { queueMicrotask(f); return 1; };
+  try { await fn(); } finally { globalThis.document = saved.document; globalThis.requestAnimationFrame = saved.raf; }
+}
+const settle = () => new Promise((r) => setTimeout(r, 5));
+
+test("a bad hash fails one package, skips what needs it, installs the rest; Retry All finishes the job", () => withDom(async () => {
+  const s = setup();
+  const result = await runQueue({ jobs, plan }, { backend: s.backend, catalog: s.catalog, queue: s.queue, runLogs: s.runLogs,
+    names: { tweak: "Tweak", other: "Other" }, open: () => s.page });
+  assert.deepEqual(result.rows.map((r) => [r.id, r.state]), [["lib", "failed"], ["tweak", "skipped"], ["other", "installed"]]);
+  assert.equal(result.ok, false);
+  assert.deepEqual(s.calls.install, [["other", "other.deb"]]);
+  // only what installed left the queue
+  await settle();
+  assert.deepEqual(s.queue.list().map((j) => j.id), ["tweak"]);
+  // the log: one line per step per package, each knowing its package; the summary at its end
+  const unpack = s.page.lines.filter((l) => l.text === "Unpacking Other"); // the id becomes the name
+  assert.equal(unpack.length, 1, "apt's repeated status line once");
+  assert.equal(unpack[0].pkg, "other");
+  assert.ok(s.page.lines.some((l) => l.kind === "raw" && l.pkg === "other"));
+  assert.ok(s.page.lines.some((l) => l.kind === "error" && l.pkg === "lib" && /SHA256/.test(l.text)));
+  assert.ok(s.page.lines.some((l) => l.kind === "step" && l.text === "Downloading Lib" && l.pkg === "lib"));
+  assert.equal(s.page.lines.at(-1).text, "1 installed, 1 failed, 1 skipped");
+  // Packages | Log, Packages first; the bar ends on Close / Retry All; the finish button is Return to <NAME>
+  assert.deepEqual(s.page.seg.labels, ["Packages", "Log"]);
+  assert.equal(s.page.views[0], "pane");
+  assert.equal(s.page.bars.at(-1).left.textContent, "Close");
+  assert.equal(s.page.bars.at(-1).right.textContent, "Retry All");
+  assert.match(s.page.finished.label, /^Return to /);
+  assert.equal(s.calls.logs.length, 1);
+  assert.equal(s.calls.logs[0].code, 1);
+  // the Packages list's summary row
+  const list = s.page.panes[0].children[0];
+  const summary = list.children.at(-1);
+  assert.equal(summary.textContent, "1 installed, 1 failed, 1 skipped");
+  assert.equal(summary.hidden, false);
+  // Retry All: lib downloads fine now, then tweak; apt's lib keeps its Auto-Installed mark
+  s.fixLib();
+  s.page.bars.at(-1).right.click();
+  for (let i = 0; i < 20 && !(s.page.finished && s.calls.logs.length === 2); i++) await settle();
+  assert.deepEqual(s.calls.install.map(([id]) => id), ["other", "lib", "tweak"]);
+  assert.equal(s.page.bars.at(-1).right.textContent, "Done");
+  assert.equal(s.page.bars.at(-1).left ?? null, null);
+  assert.deepEqual(s.calls.auto.at(-1), ["lib"]);
+  await settle();
+  assert.equal(s.queue.size, 0);
+}));
+
+test("a row's tap opens the Log filtered to its package; a failed row's tap retries it", () => withDom(async () => {
+  const s = setup();
+  await runQueue({ jobs, plan }, { backend: s.backend, catalog: s.catalog, queue: s.queue, runLogs: s.runLogs, open: () => s.page });
+  const list = s.page.panes[0].children[0];
+  const rowOf = (name) => list.children.find((li) => li.children?.[0]?.children?.[0]?.textContent === name);
+  rowOf("Other").children[0].click();
+  assert.equal(s.page.filtered, "other");
+  assert.equal(s.page.selected, 1);
+  assert.equal(s.page.views.at(-1), "log");
+  s.fixLib();
+  rowOf("Lib").children[0].click();
+  for (let i = 0; i < 20 && s.calls.logs.length < 2; i++) await settle();
+  assert.deepEqual(s.calls.install.map(([id]) => id), ["other", "lib", "tweak"]);
+}));

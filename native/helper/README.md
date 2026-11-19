@@ -6,6 +6,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 
     ifizbox-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
     ifizbox-helper hold <pkg>... | unhold <pkg>... | showhold
+    ifizbox-helper auto <pkg>...                                            (F234: apt-mark auto)
     ifizbox-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
     ifizbox-helper update-source <uri> <suite> [component...]              (apt-get update for one source)
     ifizbox-helper simulate <item>... | apply <item>... | respring          (N4: the install queue)
@@ -30,6 +31,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `configure` | `dpkg --force-confdef --force-confold [--status-fd 3] --configure -a`                       |
 | `hold`      | `apt-mark hold <pkg>...` (F22: Settings > Ignored Upgrades in jailbreak mode)               |
 | `unhold`    | `apt-mark unhold <pkg>...`                                                                  |
+| `auto`      | `apt-mark auto <pkg>...` (F234: the queue run installs one package at a time, which marks each manual; the ones apt only pulled in get their Auto-Installed mark back). Installed packages only |
 | `showhold`  | `apt-mark showhold`: the held packages on stdout, one per line                              |
 | `addsource` | runs nothing: writes a deb822 stanza (`Types: deb`, `URIs:`, `Suites:`, `Components:`) into `/var/jb/etc/apt/sources.list.d/ifizbox.sources` (F33) |
 | `removesource` | runs nothing: drops the stanza for that URI and suite from `ifizbox.sources`              |

@@ -266,6 +266,30 @@ function queueCalls(backend, q, call) {
       if (rest.length) add(await aptApply(rest, onEvent));
       return out;
     },
+    // F234: the queue run (core/installrun.js, screens/queuerun.js), one package a call.
+    // queueFetch(row, { signal, progress }) downloads a row's .deb through the shell (share.debFetch, checked against
+    // its stanza's hash) -> { file } | { viaApt: true }. A bad hash or a file that isn't a .deb fails the row; any
+    // other failure (a repo that wants apt's own headers, a mirror apt knows better) hands the download to apt in
+    // the install step, except for a full-URL Filename (F131), which apt can't fetch. signal.onabort stops it.
+    queueFetch: (row, hooks) => queueFetch(call, row, hooks),
+    // queueInstall(row, { file, onEvent }) -> { code, stdout, stderr }: a fetched file through install-deb, a removal or
+    // an apt-downloaded row through apply-ask (so dpkg can ask about a conffile, F63) for that one item.
+    async queueInstall(row, { file = null, onEvent = null } = {}) {
+      if (row.op === "remove") return aptApply([{ op: "remove", id: row.id }], onEvent);
+      if (file) {
+        const r = await call("share.debInstall", { file, stream: Boolean(onEvent) }, onEvent);
+        return { code: r?.code ?? -1, stdout: r?.stdout ?? "", stderr: r?.stderr ?? "" };
+      }
+      return aptApply([{ op: "install", id: row.id, version: row.to }], onEvent);
+    },
+    // The packages apt pulled in only for another get their Auto-Installed mark back (ifizbox-helper auto: each
+    // one-package install marked them manual). Best effort: an older helper without the verb leaves them manual.
+    async markAuto(ids) {
+      if (!ids?.length) return false;
+      try { return (await backend.helper(["auto", ...ids])).code === 0; } catch { return false; }
+    },
+    // A fetched file the run won't install (cancelled, skipped).
+    queueDiscard: (file) => call("share.discard", { file, kind: "deb" }).catch(() => {}),
     // F63: the Configuration Upgrade answer for the running apply: "keep" (Keep My Old Copy) or "new".
     answerConffile: async (answer) => { await call("helper.answer", { answer }); },
     // F64: Cancel the running apply while apt is still downloading. Rejects BackendError("helper") once dpkg has
@@ -410,6 +434,29 @@ function linkedDebs(q, call) {
       return { code: r?.code ?? -1, stdout: r?.stdout ?? "", stderr: r?.stderr ?? "" };
     },
   };
+}
+
+// F234: a queue row's download (backend.queueFetch above).
+let fetchTag = 0;
+export async function queueFetch(call, row, { signal = null, progress = () => {} } = {}) {
+  if (!row?.debUrl || !/^https?:\/\//i.test(row.debUrl)) return { viaApt: true };
+  const tag = `q${Date.now().toString(36)}-${++fetchTag}`;
+  signal?.onabort?.(() => { call("share.debCancel", { tag }).catch(() => {}); });
+  const params = { url: row.debUrl, stream: true, tag, ...(row.sha256 ? { sha256: row.sha256 } : {}), ...(row.md5sum ? { md5: row.md5sum } : {}) };
+  try {
+    const r = await call("share.debFetch", params, (ev) => { if (typeof ev?.progress === "number") progress(ev.progress); });
+    if (!r?.file) throw new BackendError("network", `${row.debUrl} gave nothing to install`);
+    if (signal?.aborted) { call("share.discard", { file: r.file, kind: "deb" }).catch(() => {}); return {}; }
+    return { file: r.file };
+  } catch (e) {
+    const msg = String(e?.message ?? e);
+    const why = msg.replace(/^[a-z_]+: /, "");
+    if (/^bad_hash:/.test(msg)) throw new Error(`the download isn't the file its source lists (${why})`);
+    if (/^not_deb:/.test(msg)) throw new Error(why);
+    if (/^cancelled:/.test(msg) || signal?.aborted) throw new Error("Cancelled");
+    if (row.linked) throw new Error(`couldn't download it from ${row.debUrl}: ${why}`);
+    return { viaApt: true };
+  }
 }
 
 // ifizbox-helper rollbacks' "<version> <file>" lines -> [{ version, file }], newest version first, each version once.

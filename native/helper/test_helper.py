@@ -81,6 +81,15 @@ class Helper(unittest.TestCase):
         self.assertEqual(self.plan("unhold", "com.a.b", fd="-1"), ["/var/jb/usr/bin/apt-mark", "apt-mark", "unhold", "com.a.b"])
         self.assertEqual(self.plan("showhold"), ["/var/jb/usr/bin/apt-mark", "apt-mark", "showhold"])
 
+    def test_auto(self):
+        """F234: apt-mark auto for the packages a queue run installed only for another's sake."""
+        self.assertEqual(self.plan("auto", "com.a.b", "libstdc++"),
+                         ["/var/jb/usr/bin/apt-mark", "apt-mark", "auto", "com.a.b", "libstdc++"])
+        for words, why in {("auto",): "no package names", ("auto", "-o", "x"): "bad package name",
+                           ("auto", "a*"): "bad package name", ("Auto", "ab"): "unknown verb"}.items():
+            out = self.plan(*words)
+            self.assertTrue(len(out) == 1 and out[0].startswith("error: ") and why in out[0], (words, out))
+
     def test_refusals(self):
         cases = {
             (): "no verb",
@@ -274,6 +283,8 @@ class Helper(unittest.TestCase):
         self.assertEqual(k("unhold", "half"), "all known")
         self.assertEqual(k("hold", "com.repo.tweak"), "com.repo.tweak")  # not installed: dpkg's status only
         self.assertEqual(k("unhold", "installed"), "installed")  # no prefix match
+        self.assertEqual(k("auto", "installed.one"), "all known")
+        self.assertEqual(k("auto", "com.repo.tweak"), "com.repo.tweak")  # F234: installed ones only
         self.assertEqual(k("showhold"), "all known")
         self.assertEqual(k("update"), "all known")
         empty = tempfile.mkdtemp(dir=self.tmp)

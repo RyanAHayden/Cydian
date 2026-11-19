@@ -57,3 +57,17 @@ html[data-theme="dark"] .confirm-problem .table { background: var(--dk-issue-tab
 .confirm-continue .cell-label { flex: none; color: #385487; font-weight: bold; text-align: center; }
 html[data-theme="dark"] .confirm-continue .cell-label { color: var(--dk-link); }
 .confirm-continue .cell-inner.is-pressed .cell-label { color: #fff; }
+
+/* F234: Confirm's Modifications: a package apt added carries a small grey "needed by X" under its name */
+.confirm-mods .cell-detail .confirm-name { display: block; }
+.confirm-needed { display: block; font-size: 12px; line-height: 15px; color: #8e8e93; font-weight: normal; }
+/* F234: the queue run's Hide: a black strip under every tab's nav bar reopens it; the pages make room for it */
+.qr-strip {
+  position: fixed; z-index: 4; top: var(--nav-h); /* over the bars (3), under sheets (25) */ left: 0; right: 0; height: 30px; display: flex; align-items: center;
+  gap: 8px; padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); border: 0;
+  background: rgba(0,0,0,.88); color: #fff; cursor: pointer; touch-action: manipulation;
+  font: bold 13px/30px "Helvetica Neue", Helvetica, sans-serif; text-align: left;
+}
+.qr-strip-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qr-strip-show { flex: none; color: #8fb6ff; }
+body.qr-stripped .page-body { padding-top: calc(var(--nav-h) + 30px); }

@@ -18,6 +18,12 @@
 //                                          ever). Its tap runs fn() and closes the page; finish() puts Done in its
 //                                          place. stoppable(null) goes back to Close at the end.
 //   p.close() / p.closed / p.onClose(fn)
+//   F234, the queue run's page (screens/queuerun.js):
+//   p.line(kind, text, pkg)                a line that knows its package; p.filter(pkg | null) shows only its lines
+//   p.segmented(labels, onPick)            a segmented control in place of the title -> { select(i) }
+//   p.pane(node) / p.view("pane" | "log")  another view in the body (the Packages list) in place of the log
+//   p.bar({ left, right })                 the caller's own bar buttons in place of Cancel / Close from now on
+//   p.hide() / p.show() / p.hidden         slides away and back, alive (the run goes on under the tabs)
 //
 // Every line is selectable and copyable. The log follows the newest line and stops while the user scrolls up
 // (core/progress.js createFollow); a "New Output" pill brings it back. Lines come in batched, one paint a frame.
@@ -109,14 +115,17 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
   jump.addEventListener("click", () => { follow.jump(); jump.hidden = true; toBottom(); });
 
   // ---- lines, one paint a frame ----
+  let filterPkg = null; // F234: only this package's lines show (page.filter)
   let pending = [];
   let frame = 0;
   const flush = () => {
     frame = 0;
     if (!pending.length) return;
     const frag = document.createDocumentFragment();
-    for (const [kind, text] of pending) {
+    for (const [kind, text, pkg] of pending) {
       const d = el("div", `pl pl-${kind}`, text);
+      if (pkg) d.dataset.pkg = pkg; // F234: the queue run's lines know their package (page.filter)
+      if (filterPkg && pkg !== filterPkg) d.hidden = true;
       if (kind === "error" || kind === "warning") d.setAttribute("role", kind === "error" ? "alert" : "note");
       frag.append(d);
     }
@@ -131,8 +140,12 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
 
   let closed = false;
   let finished = false;
+  let custom = false;      // F234: page.bar put the caller's own buttons up
+  let paneNode = null;     // F234: page.pane's view
+  let hiddenPage = false;  // F234: page.hide
   const closers = [];
-  const setTitle = (t) => { h1.textContent = t; sheet.setAttribute("aria-label", t); };
+  // F234: a segmented title (page.segmented) stays; the page's label still follows
+  const setTitle = (t) => { if (!h1.classList.contains("has-seg")) h1.textContent = t; sheet.setAttribute("aria-label", t); };
   const setProgress = (pct) => { fill.style.transform = `scaleX(${Math.max(0, Math.min(100, Number(pct) || 0)) / 100})`; };
   setProgress(0);
 
@@ -146,7 +159,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
   let lockTimer = 0;
   const rightButton = () => {
     close.textContent = locked ? "Close" : stop ? (finished ? "Done" : "Cancel") : "Close";
-    close.hidden = !locked && !stop && !finished;
+    close.hidden = custom || (!locked && !stop && !finished);
     close.disabled = locked;
   };
   const unlockRight = () => { clearTimeout(lockTimer); lockTimer = 0; locked = false; rightButton(); };
@@ -155,12 +168,80 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     sheet, scroll, out,
     get closed() { return closed; },
     get finished() { return finished; },
-    line(kind, text) {
+    line(kind, text, pkg = null) {
       const t = String(text ?? "");
       if (!t || closed) return;
-      pending.push([["step", "raw", "error", "warning"].includes(kind) ? kind : "raw", t]);
+      pending.push([["step", "raw", "error", "warning"].includes(kind) ? kind : "raw", t, pkg || null]);
       schedule();
     },
+    // ---- F234: the queue run's page (screens/queuerun.js) ----
+    // Only `pkg`'s lines (null: all of them).
+    filter(pkg) {
+      flush();
+      filterPkg = pkg || null;
+      for (const d of out.children) d.hidden = Boolean(filterPkg) && d.dataset.pkg !== filterPkg;
+      toBottom();
+    },
+    get filtered() { return filterPkg; },
+    // A segmented control in place of the title: labels, onPick(index). -> { select(index) }
+    segmented(labels, onPick) {
+      const seg = el("div", "progress-seg");
+      seg.setAttribute("role", "tablist");
+      const buttons = labels.map((label, i) => {
+        const b = el("button", "progress-seg-item", label);
+        b.type = "button";
+        b.setAttribute("role", "tab");
+        b.addEventListener("click", () => { select(i); onPick?.(i); });
+        seg.append(b);
+        return b;
+      });
+      const select = (i) => buttons.forEach((b, j) => { b.classList.toggle("selected", i === j); b.setAttribute("aria-selected", String(i === j)); });
+      select(0);
+      h1.replaceChildren(seg);
+      h1.classList.add("has-seg");
+      return { select };
+    },
+    // Another view in the page's body (the Packages list), shown in place of the log by view("pane").
+    pane(node) {
+      node.classList.add("progress-pane");
+      body.insertBefore(node, jump);
+      paneNode = node;
+      return node;
+    },
+    view(which) {
+      const pane = which === "pane" && paneNode;
+      if (paneNode) paneNode.hidden = !pane;
+      scroll.hidden = Boolean(pane);
+      if (pane) jump.hidden = true;
+      else if (follow.shouldScroll()) toBottom();
+    },
+    // Bar buttons of the caller's own in place of Cancel/Close: { left, right } nodes (null: none there).
+    bar({ left: l = null, right: r = null } = {}) {
+      custom = true;
+      cancel.hidden = true;
+      close.hidden = true;
+      for (const n of [...left.children]) if (n !== cancel) n.remove();
+      for (const n of [...right.children]) if (n !== close) n.remove();
+      if (l) left.append(l);
+      if (r) right.append(r);
+    },
+    // Hide: the page slides down and stays alive (show() brings it back); the caller draws what reopens it.
+    hide() {
+      if (closed || hiddenPage) return;
+      hiddenPage = true;
+      sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 300, easing: EASE, fill: "forwards" })
+        .finished.then(() => { if (hiddenPage) sheet.style.visibility = "hidden"; }, () => {});
+    },
+    show() {
+      if (closed || !hiddenPage) return;
+      hiddenPage = false;
+      sheet.style.visibility = "";
+      sheet.getAnimations?.().forEach((a) => a.cancel());
+      sheet.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 350, easing: EASE });
+      flush();
+      if (follow.shouldScroll()) toBottom();
+    },
+    get hidden() { return hiddenPage; },
     step(text) { page.line("step", text); },
     raw(text) { page.line("raw", text); },
     error(text) { page.line("error", text); },
@@ -169,7 +250,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     progress: setProgress,
     setTitle,
     flush,
-    cancellable(on, { disabled = false } = {}) { cancel.hidden = !on; cancel.disabled = Boolean(disabled); },
+    cancellable(on, { disabled = false } = {}) { cancel.hidden = custom || !on; cancel.disabled = Boolean(disabled); },
     stoppable(fn) { stop = typeof fn === "function" ? fn : null; rightButton(); },
     get stopping() { return Boolean(stop) && !finished; },
     finish({ label = RETURN_LABEL, action = null, status = null, title: t = "Complete", locked: lock = false, unlockAfter = LOCK_LIMIT } = {}) {

@@ -97,7 +97,8 @@ test("the package Confirm sheet (openConfirm) uses the red Cancel too", () => {
   }
 });
 
-test("only Confirm's Cancel uses the red bar button", () => {
+// F234 (user 2026-11-18): the queue run's Cancel is red too (screens/queuerun.js), once.
+test("only Confirm's Cancel and the queue run's Cancel use the red bar button", () => {
   const files = readdirSync(here).filter((f) => f.endsWith(".js") && !f.endsWith(".test.js"));
   const navDir = new URL("../nav/", here);
   const hits = [];
@@ -105,8 +106,10 @@ test("only Confirm's Cancel uses the red bar button", () => {
   for (const f of readdirSync(navDir).filter((x) => x.endsWith(".js") && !x.endsWith(".test.js"))) {
     if (/barButton\([^)]*["']red["']/.test(readFileSync(new URL(f, navDir), "utf8"))) hits.push(`nav/${f}`);
   }
-  assert.deepEqual(hits, ["queue.js"]);
+  assert.deepEqual(hits, ["queue.js", "queuerun.js"]);
   assert.equal(read("queue.js").match(/barButton\([^)]*["']red["']/g).length, 1);
+  assert.match(read("queuerun.js"), /const cancel = barButton\("Cancel", "red"\)/);
+  assert.equal(read("queuerun.js").match(/barButton\([^)]*["']red["']/g).length, 1);
 });
 
 test("ios6.css: .bar-button.red has a pressed state, dark variants, and a border-box gradient everywhere", () => {

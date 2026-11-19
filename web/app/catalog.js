@@ -334,6 +334,7 @@ export const catalog = {
   deps: (id, key = ALL) => ask("deps", [id, key]), // F18: plain-language dependency problems (core/deps.js)
   aptProblems: (output) => ask("aptProblems", [output]), // N4: apt's refusal in F18's words (Confirm sheet)
   queueInfo: (ids) => ask("queueInfo", [ids]), // N4: { id: { name, restart } } for the install queue
+  runInfo: (items) => ask("runInfo", [items]), // F234: links, hashes, sizes and dependencies for the queue run
   // The Changes tab (F51): the last 7 days, [{ day, rows: [{ ...row, change: "new" | "updated", seen }] }],
   // newest day first (core/changes.js dayGroups).
   changes: async (now = Date.now()) => {

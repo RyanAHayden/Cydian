@@ -1,7 +1,7 @@
 /* ifizbox-helper: the one place iFizBox's root work goes through (docs/native.md, "3. Root").
  *
  *   ifizbox-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
- *   ifizbox-helper hold <pkg>... | unhold <pkg>... | showhold
+ *   ifizbox-helper hold <pkg>... | unhold <pkg>... | showhold | auto <pkg>...   (F234: apt-mark auto)
  *   ifizbox-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
  *   ifizbox-helper update-source <uri> <suite> [component...]   (F233a: apt-get update for that one source, from a
  *                                                               temp sources file; the other lists stay; update_source)

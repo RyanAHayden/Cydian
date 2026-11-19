@@ -26,7 +26,7 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 - Switches sit in their rows (`createSwitch`). Choices are checkmark lists on their own page (Device, iOS Version, Install Updates Automatically, After a Respring Update, Keep Previous Versions,
   Re-sign Reminder).
 - Each group's footer says what its rows do in one line. A test keeps each footer to 120 characters or fewer.
-- Routes below Settings (`#/home/settings/…`): `general`, `theme` (`display` opens it too), `updates`, `installation[/benefits|/pair]`, `<page>/<key>` (a list page),
+- Routes below Settings (`#/home/settings/…`): `general`, `theme` (`display` opens it too), `updates`, `installation[/pair]`, `<page>/<key>` (a list page),
   `<page>/holds`, `general/blocked`, `signing[/<key>]`, `signing/help` (How Signing Works), `account`, `logs[/<id>]`. The one-segment routes (`device`,
   `iosVersion`, `holds`) open their page too. Home's device hint and a package's "Set iOS Version" use them.
 
@@ -56,13 +56,15 @@ dates and the switch would do nothing there.
 Sideload build only, drawn by `screens/installroute.js` (rules and texts in `core/installroute.js`):
 
 - **Install Apps With**: Signing Server (the manifest and iOS's Install prompt) or This iPhone (installd over
-  LocalDevVPN, docs/sideload.md). Picking This iPhone before it is paired opens a short page of what it gives
-  (`installation/benefits`: private, works offline, updates iFizBox itself, keeps going if iOS pauses iFizBox), whose
-  Set Up opens the pairing page.
+  LocalDevVPN, docs/sideload.md), each subtitle a short point per line, wrapped. Picking This iPhone before it is
+  paired opens This iPhone's page.
 - With This iPhone chosen: **Pairing** (Paired / Not Paired, opens `installation/pair`), **LocalDevVPN** (On, Off or
   Another VPN) and **Open LocalDevVPN**.
-- **Pair This iPhone** (`installation/pair`): on iOS 27, Start Pairing and the 6-digit code; before iOS 27, Import
-  Pairing File; once paired, Check Connection (Pair Again when the pairing is refused) and Forget Pairing.
+- **This iPhone** (`installation/pair`), one page that runs by itself: a sentence on what it gives, the LocalDevVPN
+  check (Turn On LocalDevVPN alert when it's off, rechecked when the app comes back), then on iOS 27 pairing starts
+  on its own: the 6-digit code and where to type it, a line and a ringed Settings screenshot a step; before iOS 27,
+  Import Pairing File; once paired, Paired with a check, Check Connection (Pair Again when the pairing is refused)
+  and Forget Pairing.
 
 ## Retired keys
 

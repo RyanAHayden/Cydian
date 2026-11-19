@@ -1,14 +1,17 @@
-// Settings > Installation's page (screens/installroute.js): the choice with This iPhone's subtitle, and This iPhone's
-// state rows once it is chosen.
+// Settings > Installation's page (screens/installroute.js): the choice with short subtitles, This iPhone's state rows
+// once it is chosen, and This iPhone's one page in each state.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { installationGroups, vpnDetail, SUB_TITLES, pairGroups } from "./installroute.js";
+import { installationGroups, vpnDetail, SUB_TITLES, setupGroups } from "./installroute.js";
+import { IPHONE_INTRO } from "../core/installroute.js";
 
-test("Install Apps With: Signing Server and This iPhone, the chosen one checked", () => {
+test("Install Apps With: Signing Server and This iPhone, the chosen one checked, a point per subtitle line", () => {
   const [g, more] = installationGroups("server", null);
   assert.equal(g.header, "Install Apps With");
   assert.deepEqual(g.rows.map((r) => [r.label, r.checked]), [["Signing Server", true], ["This iPhone", false]]);
-  assert.match(g.rows[1].subtitle, /LocalDevVPN/);
+  assert.deepEqual(g.rows[0].subtitle.split("\n"), ["Default", "Uses ifizbox.com"]);
+  assert.deepEqual(g.rows[1].subtitle.split("\n"), ["LocalDevVPN", "No server", "Updates itself"]);
+  assert.ok(g.rows.every((r) => r.cls === "route-row"));
   assert.equal(more, undefined);
 });
 
@@ -22,19 +25,47 @@ test("This iPhone chosen: Pairing and the VPN's state, and a tap picks", () => {
   assert.deepEqual(picked, ["server"]);
   assert.equal(vpnDetail({ localDevVPN: true }), "On");
   assert.equal(vpnDetail(null), "Unknown");
-  assert.equal(SUB_TITLES.pair, "Pair This iPhone");
+  assert.equal(SUB_TITLES.pair, "This iPhone");
 });
 
-test("Pair This iPhone: the Developer Mode steps; in pairing mode Cancel with the step or error line", () => {
-  const off = pairGroups(null);
-  assert.match(off[0].footer, /Settings > Privacy & Security > Developer Mode.*type this code/);
-  assert.equal(off[1].rows[0].label, "Start Pairing");
-  assert.equal(off[1].footer, "");
-  let canceled = 0;
-  const on = pairGroups({ pin: "123456", text: "Waiting for the iPhone to connect (port 5).", error: "" }, { cancel: () => canceled++ });
-  assert.equal(on[1].rows[0].label, "Cancel");
-  on[1].rows[0].onClick();
-  assert.equal(canceled, 1);
-  assert.equal(on[1].footer, "Waiting for the iPhone to connect (port 5).");
-  assert.match(pairGroups({ pin: "123456", text: "", error: "bad proof" })[1].footer, /bad proof.*try again/);
+test("This iPhone's page: one sentence under the title, no list of benefits", () => {
+  for (const s of ["connect", "pairing", "paired", "file"]) {
+    const [intro] = setupGroups(s, null, null);
+    assert.equal(intro.header, "Install on This iPhone");
+    assert.equal(intro.footer, IPHONE_INTRO);
+    assert.equal(intro.rows, undefined);
+  }
+});
+
+test("VPN off: its state and Open LocalDevVPN, nothing to pair yet", () => {
+  let opened = 0;
+  const gs = setupGroups("connect", { paired: null, pairOnPhone: true, localDevVPN: false, otherVPN: false }, null, { openVPN: () => opened++ });
+  assert.equal(gs.length, 2);
+  assert.deepEqual(gs[1].rows.map((r) => [r.label, r.detail]), [["LocalDevVPN", "Off"], ["Open LocalDevVPN", undefined]]);
+  gs[1].rows[1].onClick();
+  assert.equal(opened, 1);
+  assert.match(gs[1].footer, /by itself/);
+  assert.ok(!gs.some((g) => g.pin || g.guide));
+});
+
+test("pairing: the code group, then the guide with the step or error line; Try Again only after it stopped", () => {
+  const on = setupGroups("pairing", null, { pin: "123456", text: "Waiting for the iPhone to connect (port 5).", error: "" });
+  assert.deepEqual(on[1].rows.map((r) => [r.label, r.detail]), [["LocalDevVPN", "On"]]);
+  assert.ok(on[2].pin);
+  assert.ok(on[3].guide);
+  assert.equal(on[3].footer, "Waiting for the iPhone to connect (port 5).");
+  assert.equal(on.length, 4);
+  assert.match(setupGroups("pairing", null, { pin: "123456", text: "", error: "bad proof" })[3].footer, /bad proof.*try again/);
+  let tries = 0;
+  const off = setupGroups("pairing", null, null, { failed: true, retry: () => tries++ });
+  assert.equal(off[3].footer, "Pairing stopped.");
+  off[4].rows[0].onClick();
+  assert.equal(tries, 1);
+});
+
+test("paired: Paired with a check, then Check Connection and Forget Pairing", () => {
+  const gs = setupGroups("paired", { paired: "rp" }, null);
+  assert.deepEqual(gs[1].rows.map((r) => [r.label, r.checked]), [["Paired", true]]);
+  assert.equal(gs[2].rows[0].label, "Check Connection");
+  assert.equal(gs[3].rows[0].label, "Forget Pairing");
 });

@@ -51,7 +51,21 @@
 .theme-preview-bar .nav-title { flex: 1; }
 .theme-preview-seg { margin: 10px; }
 .theme-preview-buttons { display: flex; align-items: center; gap: 10px; padding: 0 10px; }
-/* Settings > Installation > Pair This iPhone: the 6-digit code to type into Developer Mode's pairing screen, in the
-   group footer's colour and white shadow, large. */
-.group .pair-code { margin: 6px 0 0; text-align: center; font: bold 44px/1.2 "Helvetica Neue", Helvetica, sans-serif;
-  letter-spacing: 8px; color: #4c566c; text-shadow: 0 1px 0 #fff; }
+/* Settings > Installation > This iPhone: the 6-digit code to type into Developer Mode's pairing screen, in the
+   group footer's colour and emboss, large. */
+.group .pair-code { margin: 0; text-align: center; font: bold 44px/1.2 "Helvetica Neue", Helvetica, sans-serif;
+  letter-spacing: 8px; color: var(--head); text-shadow: var(--emboss); }
+/* Settings > Installation's Install Apps With rows: a short point per line (core ROUTE_OPTIONS), wrapped, never cut. */
+.route-row .cell-subtitle { white-space: pre-line; overflow-wrap: anywhere; line-height: 18px; margin-top: 2px; }
+.route-row .cell-inner { padding-top: 8px; padding-bottom: 8px; }
+/* This iPhone's page: where to type the code, a short line a step in the group header's colour and emboss, and
+   under it the user's screenshot of that Settings row (3x, drawn at the group's width), ringed to say "tap this". */
+.pair-steps { margin: 0; padding: 0 9px; list-style: none; counter-reset: pair-step; }
+.pair-step { counter-increment: pair-step; margin: 0 0 12px; }
+.pair-step-text { display: block; font-size: 15px; font-weight: bold; line-height: 20px; color: var(--head);
+  text-shadow: var(--emboss); }
+.pair-step-text::before { content: counter(pair-step) ". "; }
+.pair-shot { display: block; width: 100%; height: auto; margin: 7px 0 4px; border-radius: 9.5px;
+  box-shadow: 0 0 0 3px #f5a623; }
+/* Paired: the check sits on its own row. */
+.pair-done .cell-label { font-weight: bold; }

@@ -226,9 +226,14 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   built from source on Linux and linked statically. The signed IPA goes to this phone's installd over LocalDevVPN
   (AFC upload to PublicStaging, then installation_proxy), so nothing reaches the Signing Server, no install sheet has
   to stay up, it works offline, and iFizBox updates itself (installd closes and replaces it). Choosing This iPhone
-  shows what it gives, then the pairing page: on iOS 27 Start Pairing shows a 6-digit code to enter at Settings >
-  Privacy & Security > Developer Mode > "Pair with iFizBox on this iPhone"; before iOS 27 a pairing file made on a
-  computer is imported. Check Connection (`idevice.verify`) offers Pair Again when the pairing is refused. Each
+  opens one page that runs by itself (`installation/pair`): one sentence on what it gives, then the connection check
+  (LocalDevVPN on, `idevice.status`; when it's off, a "Turn On LocalDevVPN" alert with Open LocalDevVPN, rechecked
+  every 2 s and when the app comes back), then pairing starts on its own on iOS 27: the 6-digit code big at the
+  top, and where to type it, a short line a step with a ringed screenshot of the Settings row (Privacy & Security,
+  Developer Mode, "Pair with iFizBox"; `web/app/img/pair/`, the user's own iPhone screenshots, named in Credits).
+  Pairing keeps listening while the page is open, and ends when it's left. Paired: "Paired" with a check, Check
+  Connection (`idevice.verify`, Pair Again when the pairing is refused) and Forget Pairing. Before iOS 27 a pairing
+  file made on a computer is imported. Each
   install (`chooseRoute`, signing-client.js) asks `idevice.status`: paired and LocalDevVPN on sends
   `route: "idevice"` with the bridge call (signing.install, signing.open, signing.resign/resignAll,
   library.install), and Sideload.swift `installHere` installs it, its progress on the progress page's Installing

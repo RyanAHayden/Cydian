@@ -6,12 +6,16 @@
 //                      pairing starts on its own: the 6-digit code big at the top and where to type it, a line and a
 //                      screenshot a step; it keeps pairing while the page is open. Paired: a check, Check Connection
 //                      (Pair Again when it fails) and Forget. Older iOS: Import Pairing File.
-// The idevice.* bridge calls are native/sideload/idevice/IDeviceBridge.swift's.
+//   Connect With (Automatic, LocalDevVPN, Tailscale) and Tailscale's Sign In / Test Connection / Sign Out on
+//   installation once paired.
+// The idevice.* bridge calls are native/sideload/idevice/IDeviceBridge.swift's, tailscale.* native/sideload/tailscale's.
 import { grouped, el } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";
+import { copyText } from "../nav/menu.js";
 import { toBase64 } from "../core/signing.js";
-import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, CONNECT_ALERT, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure } from "../core/installroute.js";
+import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, CONNECT_ALERT, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure,
+  CONNECT_OPTIONS, connectFooter, tailscaleFooter, tailscaleTestResult } from "../core/installroute.js";
 import { NAME } from "../brand.js";
 
 export const PAGE = "installation";
@@ -30,8 +34,12 @@ export function vpnDetail(st) {
   return st.otherVPN ? "Another VPN" : "Off";
 }
 
-// The main page's groups (pure, for tests): the choice and, with This iPhone chosen, its state.
-export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {} } = {}) {
+// Tailscale's sign-in while it runs: the step line ("Log in on the page"), or null.
+let signingIn = null;
+
+// The main page's groups (pure, for tests): the choice and, with This iPhone chosen, its state, Connect With and
+// Tailscale. `st.tailscale` is tailscale.status's answer (idevice.status carries it).
+export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", checked: o.value === choice, onClick: () => pick(o.value) })),
@@ -47,8 +55,23 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
         { label: VPN, detail: vpnDetail(st) },
         { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN },
       ],
-      footer: `${VPN} must be on while apps install.`,
+      footer: `${VPN} must be on while apps install, or Tailscale (below).`,
     });
+    const ts = st?.tailscale ?? null;
+    const now = ts?.connect ?? "auto";
+    groups.push({
+      header: "Connect With",
+      rows: CONNECT_OPTIONS.map((o) => ({ label: o.label, checked: o.value === now, onClick: () => connect(o.value) })),
+      footer: connectFooter(now),
+    });
+    const rows = busy
+      ? [{ label: "Signing In…", detail: busy }]
+      : ts?.signedIn
+        ? [{ label: "Device", detail: ts.name || NAME },
+          { label: "Test Connection", cls: "sign-import", onClick: test },
+          { label: "Sign Out", cls: "sign-import", onClick: signOut }]
+        : [{ label: "Sign In", cls: "sign-import", onClick: signIn }];
+    groups.push({ header: "Tailscale", rows, footer: tailscaleFooter(ts) });
   }
   return groups;
 }
@@ -64,9 +87,49 @@ export async function drawInstallation(el, sub, { store, native = globalThis.ifi
       if (s?.paired) store.set(ROUTE_KEY, "iphone"); else goTo("pair");
     },
     openVPN: () => openVPN(native, alert),
+    connect: async (v) => { await call(native, "tailscale.setConnect", { value: v }).catch(() => {}); redraw(); },
+    signIn: () => tailscaleSignIn(native, alert, redraw),
+    test: () => tailscaleTest(native, alert),
+    signOut: async () => {
+      const { index } = await alert({ title: "Sign Out of Tailscale?", message: `${NAME} leaves your tailnet. Installs use LocalDevVPN until you sign in again.`, buttons: ["Cancel", "Sign Out"], cancel: 0 });
+      if (index !== 1) return;
+      await call(native, "tailscale.signOut").catch((e) => alert({ title: "Couldn't Sign Out", message: e?.message || "No answer.", buttons: ["OK"] }));
+      redraw();
+    },
+    busy: signingIn,
   })));
   paint(null);
   if (choice === "iphone") paint(await status(native));
+}
+
+async function tailscaleSignIn(native, alert, redraw) {
+  if (signingIn) return;
+  signingIn = "Starting…";
+  redraw();
+  try {
+    await call(native, "tailscale.signIn", {}, (ev) => {
+      const e = Array.isArray(ev) ? ev[0] : ev;
+      if (e?.step === "login") signingIn = "Log in on the page";
+      if (e?.step === "approval") signingIn = "Waiting for approval";
+      redraw();
+    });
+    signingIn = null;
+    redraw();
+    await alert({ title: "Signed In", message: `${NAME} is on your tailnet. Tap Test Connection to check it reaches this iPhone.`, buttons: ["OK"] });
+  } catch (e) {
+    signingIn = null;
+    redraw();
+    if (!/^cancel+ed/.test(e?.message || "") && e?.code !== "canceled") alert({ title: "Couldn't Sign In", message: e?.message || "No answer.", buttons: ["OK"] });
+  }
+}
+
+async function tailscaleTest(native, alert) {
+  let r;
+  try { r = await call(native, "tailscale.test"); } catch (e) { r = { ok: false, code: "error", detail: e?.message }; }
+  const why = tailscaleTestResult(r);
+  if (!why.copy) return alert({ title: why.title, message: why.message, buttons: ["OK"] });
+  const { index } = await alert({ title: why.title, message: why.message, buttons: ["OK", "Copy Rule"], cancel: 0 });
+  if (index === 1) copyText(why.copy);
 }
 
 async function openVPN(native, alert) {

@@ -2,7 +2,7 @@
 // chooseRoute): This iPhone only with a pairing and LocalDevVPN on; otherwise the Signing Server, said in an alert.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decideRoute, routeParams, storedRoute, pairState, pairEvent, pairFooter, pairFromNative, pinText, verifyFailure, ROUTE_OPTIONS, ALERTS, VPNS, vpnList, STORAGE_KEY, IPHONE_INTRO, setupState, vpnOn, CONNECT_ALERT, PAIR_GUIDE } from "./installroute.js";
+import { decideRoute, routeParams, tailscaleTestResult, tailscaleFooter, connectFooter, keyDaysLeft, aclRule, CONNECT_OPTIONS, storedRoute, pairState, pairEvent, pairFooter, pairFromNative, pinText, verifyFailure, ROUTE_OPTIONS, ALERTS, VPNS, vpnList, STORAGE_KEY, IPHONE_INTRO, setupState, vpnOn, CONNECT_ALERT, PAIR_GUIDE } from "./installroute.js";
 import { existsSync } from "node:fs";
 import { SETTINGS } from "./settings.js";
 
@@ -33,10 +33,10 @@ test("Another VPN Is On offers the server first and Open LocalDevVPN", () => {
   assert.match(ALERTS.vpnOff.message, /Signing Server/);
 });
 
-test("the This iPhone option names the VPN apps from one list, ready for another", () => {
-  assert.deepEqual(VPNS, ["LocalDevVPN"]);
+test("the This iPhone option names the VPN apps from one list: LocalDevVPN and Tailscale", () => {
+  assert.deepEqual(VPNS, ["LocalDevVPN", "Tailscale"]);
   const o = ROUTE_OPTIONS.find((x) => x.value === "iphone");
-  assert.equal(o.subtitle.split("\n")[0], "LocalDevVPN");
+  assert.equal(o.subtitle.split("\n")[0], "LocalDevVPN or Tailscale");
   assert.equal(vpnList(["LocalDevVPN", "Tailscale"]), "LocalDevVPN or Tailscale");
   assert.equal(ROUTE_OPTIONS[0].label, "Signing Server");
   const d = SETTINGS.find((x) => x.key === "installRoute");
@@ -54,7 +54,9 @@ test("This iPhone's page: the VPN first, then pairing by itself; Paired and olde
   assert.equal(setupState({ paired: "rp", localDevVPN: false }), "paired");
   assert.equal(setupState({ paired: null, pairOnPhone: false }), "file");
   assert.equal(vpnOn({ localDevVPN: true }), true);
-  assert.equal(CONNECT_ALERT.title, "Turn On LocalDevVPN");
+  assert.equal(vpnOn({ localDevVPN: false, tailscale: { use: true } }), true); // Tailscale on and signed in
+  assert.equal(setupState({ paired: null, pairOnPhone: true, localDevVPN: false, tailscale: { use: true } }), "pairing");
+  assert.equal(CONNECT_ALERT.title, "Turn On LocalDevVPN or Tailscale");
   assert.deepEqual(CONNECT_ALERT.buttons, ["Cancel", "Open LocalDevVPN"]);
   assert.equal(CONNECT_ALERT.buttons[CONNECT_ALERT.open], "Open LocalDevVPN");
 });
@@ -102,4 +104,39 @@ test("pairing page: the state read back from native after the background", () =>
     { pin: "123456", text: "Listening on port 1.", error: "bad proof" });
   assert.equal(pinText("12345"), "12345");
   assert.equal(pinText(undefined), "");
+});
+
+test("Tailscale: used when the shell says so (no LocalDevVPN alert); chosen but off or signed out says why", () => {
+  const ts = (o) => ({ paired: "rp", localDevVPN: false, otherVPN: true, tailscale: { connect: "auto", signedIn: true, address: "100.1.2.3", use: true, ...o } });
+  assert.deepEqual(decideRoute("iphone", ts({})), { route: "idevice" });
+  assert.deepEqual(decideRoute("iphone", ts({ use: false })), { route: "server", alert: "otherVPN" }); // Automatic, not usable: as before
+  assert.deepEqual(decideRoute("iphone", ts({ use: false, connect: "tailscale" })), { route: "server", alert: "tailscaleOff" });
+  assert.deepEqual(decideRoute("iphone", ts({ use: false, connect: "tailscale", signedIn: false })), { route: "server", alert: "tailscaleSignIn" });
+  assert.deepEqual(decideRoute("iphone", { ...ts({ use: true }), paired: null }), { route: "server", alert: "notPaired" });
+  assert.equal(ALERTS.tailscaleOff.open, undefined);
+  assert.deepEqual(CONNECT_OPTIONS.map((o) => o.label), ["Automatic", "LocalDevVPN", "Tailscale"]);
+  assert.match(connectFooter("auto"), /Tailscale when its VPN is on/);
+});
+
+test("Tailscale's test answer: a check, or the exact fix", () => {
+  assert.equal(tailscaleTestResult({ ok: true, ms: 80 }).title, "Connected");
+  const acl = tailscaleTestResult({ ok: false, code: "acl", name: "ifizbox-on-iphone.tail1.ts.net", address: "100.1.2.3" });
+  assert.equal(acl.title, "Blocked by Your Tailnet");
+  assert.deepEqual(JSON.parse(acl.copy), { action: "accept", src: ["ifizbox-on-iphone.tail1.ts.net"], dst: ["100.1.2.3:*"] });
+  assert.ok(acl.message.includes(acl.copy));
+  assert.equal(tailscaleTestResult({ code: "needs_approval" }).title, "Approve This Device");
+  assert.match(tailscaleTestResult({ code: "expired" }).message, /key expiry/);
+  assert.equal(tailscaleTestResult({ code: "no_interface" }).title, "Tailscale Is Off");
+  assert.equal(tailscaleTestResult(null).title, "Couldn't Connect");
+  assert.match(aclRule(), /<this device>/);
+});
+
+test("Tailscale's footer warns ahead of key expiry", () => {
+  const now = Date.parse("2026-11-19T00:00:00Z");
+  assert.equal(keyDaysLeft("2026-11-29T12:00:00Z", now), 10);
+  assert.equal(keyDaysLeft("", now), null);
+  assert.match(tailscaleFooter({ signedIn: true, keyExpiry: "2026-11-29T12:00:00Z", address: "100.1.2.3" }, now), /expires in 10 days/);
+  assert.match(tailscaleFooter({ signedIn: true, keyExpiry: "2026-11-01T00:00:00Z" }, now), /expired/);
+  assert.match(tailscaleFooter({ signedIn: true, keyExpiry: "2027-05-01T00:00:00Z", address: "100.1.2.3" }, now), /100\.1\.2\.3/);
+  assert.match(tailscaleFooter({ signedIn: false }, now), /joins your tailnet/);
 });

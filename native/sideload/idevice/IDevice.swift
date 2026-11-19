@@ -403,7 +403,7 @@ enum IDevice {
                 ilog("the stuck call ended with: \(e.localizedDescription)")
             }
             relayLibraryLog()
-            throw Failure(code: "timeout", text: "\(why). Check that LocalDevVPN is on, then try again")
+            throw Failure(code: "timeout", text: "\(why). Check that LocalDevVPN (or Tailscale) is on, then try again")
         }
         switch out.result! {
         case .success(let v):
@@ -418,12 +418,12 @@ enum IDevice {
 
     // ---- Connecting
 
-    static func sockaddr4(_ port: UInt16) -> sockaddr_in {
+    static func sockaddr4(_ port: UInt16, host: String = address) -> sockaddr_in {
         var a = sockaddr_in()
         a.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         a.sin_family = sa_family_t(AF_INET)
         a.sin_port = port.bigEndian
-        inet_pton(AF_INET, address, &a.sin_addr)
+        inet_pton(AF_INET, host, &a.sin_addr)
         return a
     }
 
@@ -445,7 +445,19 @@ enum IDevice {
         private var heartbeat: OpaquePointer?
         private var beating = false
         private let watch: Watch
+        private var viaTailscale = false
         let kind: Kind
+        var via: String { viaTailscale ? "Tailscale" : "LocalDevVPN" }
+
+        /// Where to connect for `port`: LocalDevVPN's 10.7.0.1, or (Tailscale.useForInstall) a 127.0.0.1 relay that
+        /// reaches this phone's own Tailscale address over the app's tailnet node (native/sideload/tailscale).
+        private func endpoint(_ port: UInt16) throws -> (String, UInt16) {
+            guard Tailscale.useForInstall() else { return (address, port) }
+            watch.begin("starting Tailscale", Limit.tunnel)
+            let local = try Tailscale.beginInstall(port: port)
+            viaTailscale = true
+            return ("127.0.0.1", local)
+        }
 
         init(watch: Watch) throws {
             self.watch = watch
@@ -455,12 +467,13 @@ enum IDevice {
             self.kind = kind
             switch kind {
             case .remotePairing:
-                watch.begin("connecting to iOS at \(address):\(remotePairingPort) (RemotePairing tunnel, RSD)", Limit.tunnel)
                 ilog("addresses: \(interfaceAddresses())")
+                let (host, port) = try endpoint(remotePairingPort)
+                watch.begin("connecting to iOS at \(host):\(port) through \(via) (RemotePairing tunnel, RSD)", Limit.tunnel)
                 var rp: OpaquePointer?
                 try data.withUnsafeBytes { try check(rp_pairing_file_from_bytes($0.baseAddress?.assumingMemoryBound(to: UInt8.self), UInt(data.count), &rp), "bad_pairing") }
                 defer { rp_pairing_file_free(rp) }
-                var a = sockaddr4(remotePairingPort)
+                var a = sockaddr4(port, host: host)
                 let t0 = Date()
                 let err = withUnsafePointer(to: &a) {
                     $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
@@ -474,10 +487,11 @@ enum IDevice {
                 // A pair-verify that fell back to pair-setup updates the file in place: keep what it is now.
                 if let now = try? IDevice.bytes(rp), now != data { try? savePairing(now, kind: .remotePairing) }
             case .lockdown:
-                watch.begin("connecting to iOS at \(address):\(lockdownPort) (lockdown)", Limit.tunnel)
+                let (host, port) = try endpoint(lockdownPort)
+                watch.begin("connecting to iOS at \(host):\(port) through \(via) (lockdown)", Limit.tunnel)
                 var pf: OpaquePointer?
                 try data.withUnsafeBytes { try check(idevice_pairing_file_from_bytes($0.baseAddress?.assumingMemoryBound(to: UInt8.self), UInt(data.count), &pf), "bad_pairing") }
-                var a = sockaddr4(lockdownPort)
+                var a = sockaddr4(port, host: host)
                 let err = withUnsafePointer(to: &a) {
                     $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { idevice_tcp_provider_new($0, pf, Brand.name, &provider) }
                 }
@@ -550,6 +564,7 @@ enum IDevice {
             if let h = handshake { rsd_handshake_free(h) }
             if let a = adapter { adapter_free(a) }
             if let p = provider { idevice_provider_free(p) }
+            if viaTailscale { Tailscale.endInstall() }
         }
     }
 
@@ -570,7 +585,7 @@ enum IDevice {
         ilog("installing \(ipa.lastPathComponent) (\(mb(size)))")
         try watched("install") { (w: Watch) -> Void in
             let s = try Session(watch: w)
-            note(s.kind == .remotePairing ? "Connected to iOS (RemotePairing tunnel)" : "Connected to iOS (lockdown)")
+            note(s.kind == .remotePairing ? "Connected to iOS through \(s.via) (RemotePairing tunnel)" : "Connected to iOS through \(s.via) (lockdown)")
             progress(.connected)
             let remote = "\(stagingDir)/\(UUID().uuidString).ipa"
             try upload(ipa, size: size, to: remote, session: s, watch: w, note: note, progress: progress)

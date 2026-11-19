@@ -1,5 +1,5 @@
 // The bridge calls for the "no server" install route (IDevice.swift), sideload build only:
-//   idevice.status        {paired: "rp"|"lockdown"|null, ios, pairOnPhone, localDevVPN, otherVPN, tunnels}
+//   idevice.status        {paired: "rp"|"lockdown"|null, ios, pairOnPhone, localDevVPN, otherVPN, tunnels, tailscale}
 //   idevice.vpn           {localDevVPN, otherVPN, tunnels} (VPNCheck)
 //   idevice.import        {data: base64 pairing file} -> status; a lockdown pairing record or a RemotePairing one
 //   idevice.pair          makes the 6-digit code first and emits [{pin}] at once (also posted as a notification, for
@@ -147,6 +147,7 @@ enum IDeviceBridge {
         s["paired"] = IDevice.pairing().map { $0.kind.rawValue as Any } ?? NSNull()
         s["ios"] = "\(v.majorVersion).\(v.minorVersion)"
         s["pairOnPhone"] = v.majorVersion >= 27 // iOS 27 pairs with the app on the phone; older imports a file
+        s["tailscale"] = Tailscale.status() // native/sideload/tailscale: Connect With and the node
         return s
     }
 }

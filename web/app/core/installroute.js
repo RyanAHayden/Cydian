@@ -1,14 +1,16 @@
 // Settings > Installation's route (docs/sideload.md, "This iPhone"): how the sideload app hands a signed IPA to iOS.
 //   "server"  the Signing Server's manifest and iOS's Install prompt (the default)
-//   "iphone"  this phone's own installd over LocalDevVPN (native/sideload/idevice): no server, iFizBox updates itself
+//   "iphone"  this phone's own installd over LocalDevVPN or Tailscale (native/sideload/idevice, native/sideload/tailscale):
+//             no server, iFizBox updates itself
 // Pure: the decision for one install from the idevice.status answer, the texts, and the pairing page's state.
 import { NAME, DOMAIN } from "../brand.js";
 
 export const ROUTE_KEY = "installRoute";
 export const STORAGE_KEY = "ifizbox." + ROUTE_KEY;
 
-// The VPN apps that put the phone at 10.7.0.1. A later one (Tailscale) joins this list; every text says them from it.
-export const VPNS = ["LocalDevVPN"];
+// The VPN apps This iPhone connects through: LocalDevVPN (the phone at 10.7.0.1) or Tailscale (the app's own
+// tailnet node reaching the phone's own Tailscale address). Every text says them from this list.
+export const VPNS = ["LocalDevVPN", "Tailscale"];
 export const vpnList = (vpns = VPNS) => vpns.length < 2 ? vpns.join("") : `${vpns.slice(0, -1).join(", ")} or ${vpns.at(-1)}`;
 
 // Subtitles: one short point per line (the rows wrap them, settings.css .route-row).
@@ -26,11 +28,16 @@ export function storedRoute(storage = globalThis.localStorage) {
 
 // One install's route: { route: "idevice" } or { route: "server" }, with `alert` (a key of ALERTS) when This iPhone
 // is chosen but can't be used now; "otherVPN" asks first (Use Server or Open LocalDevVPN), the rest fall back.
-// `status` is idevice.status ({paired, localDevVPN, otherVPN}), null when the call failed.
+// `status` is idevice.status ({paired, localDevVPN, otherVPN, tailscale}), null when the call failed.
+// `tailscale.use` is the shell's own rule (Connect With: Tailscale, or Automatic with the Tailscale VPN on, and
+// signed in): then it connects through Tailscale, with no LocalDevVPN alert.
 export function decideRoute(choice, status) {
   if (choice !== "iphone") return { route: "server" };
   if (!status) return { route: "server", alert: "noStatus" };
   if (!status.paired) return { route: "server", alert: "notPaired" };
+  const ts = status.tailscale;
+  if (ts?.use) return { route: "idevice" };
+  if (ts?.connect === "tailscale") return { route: "server", alert: ts.signedIn ? "tailscaleOff" : "tailscaleSignIn" };
   if (status.localDevVPN) return { route: "idevice" };
   if (status.otherVPN) return { route: "server", alert: "otherVPN" };
   return { route: "server", alert: "vpnOff" };
@@ -51,6 +58,8 @@ export const ALERTS = {
     message: `This install goes through the Signing Server. Turn ${VPN} on to install on this iPhone.`,
     buttons: ["OK", `Open ${VPN}`], open: 1,
   },
+  tailscaleOff: { title: "Tailscale Is Off", message: "This install goes through the Signing Server. Turn Tailscale on in the Tailscale app to install on this iPhone.", buttons: ["OK"] },
+  tailscaleSignIn: { title: "Sign In to Tailscale", message: `This install goes through the Signing Server. Sign ${NAME} in to Tailscale in Settings > Installation.`, buttons: ["OK"] },
 };
 
 // After Open LocalDevVPN the install waits (signing-client.js waitForVPN): idevice.status is asked every VPN_POLL ms
@@ -59,7 +68,59 @@ export const VPN_POLL = 2000;
 export const vpnWaitText = (vpn = VPN) => `Waiting for ${vpn}…`;
 export const VPN_WAIT = vpnWaitText();
 export const VPN_CONNECTED = `${VPN} is on`;
-export const vpnReady = (status) => Boolean(status?.paired && status?.localDevVPN);
+export const vpnReady = (status) => Boolean(status?.paired && vpnOn(status));
+
+// ---- Tailscale (Settings > Installation > This iPhone)
+
+export const CONNECT_OPTIONS = [
+  { value: "auto", label: "Automatic" },
+  { value: "localdevvpn", label: "LocalDevVPN" },
+  { value: "tailscale", label: "Tailscale" },
+];
+
+export function connectFooter(connect) {
+  if (connect === "tailscale") return `Installs go through Tailscale. Keep the Tailscale app's VPN on; ${NAME} joins your tailnet only while it installs.`;
+  if (connect === "localdevvpn") return "Installs go through LocalDevVPN, which works without the internet.";
+  return `Tailscale when its VPN is on and ${NAME} is signed in, otherwise LocalDevVPN.`;
+}
+
+// Days until the node key expires (keyExpiry: RFC 3339), null when it doesn't expire.
+export function keyDaysLeft(keyExpiry, now = Date.now()) {
+  const t = Date.parse(keyExpiry || "");
+  return Number.isFinite(t) ? Math.floor((t - now) / 86400000) : null;
+}
+
+// The Tailscale group's footer from tailscale.status.
+export function tailscaleFooter(ts, now = Date.now()) {
+  if (!ts?.signedIn) return `${NAME} joins your tailnet as its own device ("${NAME} on iPhone") and reaches this iPhone through it, so Tailscale can stay on.`;
+  const days = keyDaysLeft(ts.keyExpiry, now);
+  if (days != null && days < 0) return "This device's key expired. Sign out and sign in again.";
+  if (days != null && days <= 14) return `This device's key expires in ${days} day${days === 1 ? "" : "s"}. Sign in again, or turn off key expiry for it in the admin console.`;
+  if (!ts.address) return "The Tailscale app's VPN is off.";
+  return `This iPhone is ${ts.address} on your tailnet.`;
+}
+
+// A copyable tailnet policy rule letting the node reach this phone's node on every port (RemotePairing's tunnel
+// uses a second, changing port).
+export const aclRule = (from, to) => JSON.stringify({ action: "accept", src: [from || "<this device>"], dst: [`${to || "<this iPhone>"}:*`] });
+
+// tailscale.test's answer ({ok, code, detail, peer, name, address, ms}) as an alert: { title, message, copy? }.
+export function tailscaleTestResult(r) {
+  if (r?.ok) return { title: "Connected", message: `${NAME} reached this iPhone through Tailscale${r.ms ? ` in ${r.ms} ms` : ""}. Apps install over Tailscale now.` };
+  const d = r?.detail ? ` (${r.detail})` : "";
+  switch (r?.code) {
+    case "no_interface": return { title: "Tailscale Is Off", message: "Turn on the Tailscale app's VPN, then test again." };
+    case "needs_approval": return { title: "Approve This Device", message: `Your tailnet needs new devices approved. Approve "${r.name || NAME}" in the Tailscale admin console (Machines), then test again.` };
+    case "expired": case "needs_login": return { title: "Sign In Again", message: "This device's key expired. Sign out, then sign in again. To avoid it, turn off key expiry for this device in the admin console." };
+    case "acl": {
+      const rule = aclRule(r.name, r.address);
+      return { title: "Blocked by Your Tailnet", message: `Your tailnet's access rules don't let ${r.name || NAME} reach this iPhone${r.peer ? ` (${r.peer})` : ""}${d}. Add this rule to the policy file in the admin console: ${rule}`, copy: rule };
+    }
+    case "refused": return { title: "iPhone Refused", message: `This iPhone refused the connection${d}. Check that Developer Mode is on.` };
+    case "no_answer": return { title: "No Answer", message: `This iPhone didn't answer through Tailscale${d}. Try again.` };
+    default: return { title: "Couldn't Connect", message: `Tailscale didn't connect${d}. Check the internet connection and try again.` };
+  }
+}
 
 // The bridge's params for a decision: route "idevice" sends no server (nothing reaches it) and no host.
 export const routeParams = (decision) => (decision?.route === "idevice" ? { route: "idevice" } : {});
@@ -83,9 +144,9 @@ export function setupState(status, pairing = null) {
   return vpnOn(status) ? "pairing" : "connect";
 }
 
-// The connection the page checks first: LocalDevVPN (10.7.0.1 reachable, idevice.status localDevVPN). Tailscale
-// joins here and in VPNS when its transport lands.
-export const vpnOn = (status) => Boolean(status?.localDevVPN);
+// A way to reach this iPhone: LocalDevVPN (10.7.0.1 reachable, idevice.status localDevVPN) or Tailscale (the shell's
+// tailscale.use: its VPN on and signed in, or Connect With: Tailscale).
+export function vpnOn(status) { return Boolean(status?.localDevVPN || status?.tailscale?.use); }
 
 export const CONNECT_ALERT = {
   title: `Turn On ${vpnList()}`,

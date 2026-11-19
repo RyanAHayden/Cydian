@@ -83,7 +83,7 @@ import { getBackend } from "../backend.js";
 import { liveHUD } from "../nav/hud.js";
 import { onPageOpen } from "../nav/pagestate.js";
 import { flagPiracy, packageWarning, PIRACY_SUBTITLE } from "../core/warnings.js";
-import { scanRequest, malwareFindings, removalIds, malwareAlert } from "../core/known-malware.js";
+import { scanRequest, malwareFindings, removalIds, orphanFiles, malwareAlert, deleteConfirm } from "../core/known-malware.js";
 import { installQueue } from "../queue.js";
 
 // B46: Delete means what it says (user 2026-11-18: "I swiped and deleted an app in Installed and it just got rid of the
@@ -359,16 +359,42 @@ export async function scanMalware(native = globalThis.ifizboxNative, mode = dete
 // One alert per set of findings a session: what was found, why and where it is listed; Remove queues the packages
 // (the IDs, and the packages that own the files), which opens the Confirm sheet as any queued change does.
 const malwareSeen = new Set();
-export async function checkMalware({ scan = scanMalware, alert = showAlert, queue = installQueue, seen = malwareSeen } = {}) {
+// F232: files no package owns get Delete where the backend can (removeMalware: ifizbox-helper remove-malware), after a
+// confirm; the helper resprings, so this app ends there. A refusal or failure is shown in an alert.
+export async function checkMalware({ scan = scanMalware, alert = showAlert, queue = installQueue, seen = malwareSeen,
+  backend = null, hud = liveHUD } = {}) {
   const found = await scan();
   if (!found.length) return found;
   const sig = found.map((f) => f.path || f.id).sort().join("\n");
   if (seen.has(sig)) return found;
   seen.add(sig);
-  const a = malwareAlert(found);
+  const b = backend ?? safeBackend();
+  const a = malwareAlert(found, { canDelete: typeof b?.removeMalware === "function" });
   const pick = await alert(a);
-  if (a.buttons.length > 1 && pick?.index === 1) for (const id of removalIds(found)) queue.add({ op: "remove", id });
+  const button = a.buttons.length > 1 ? a.buttons[pick?.index] : null;
+  if (button === "Remove") for (const id of removalIds(found)) queue.add({ op: "remove", id });
+  if (button === "Delete") await deleteMalwareFiles(orphanFiles(found), { alert, backend: b, hud });
   return found;
+}
+
+function safeBackend() {
+  try { return getBackend(); } catch { return null; }
+}
+
+// F232: confirm, then one remove-malware run for every orphan file (deleted, then SpringBoard restarts).
+async function deleteMalwareFiles(paths, { alert, backend, hud: makeHud }) {
+  if (!paths.length) return;
+  const sure = await alert(deleteConfirm(paths));
+  if (sure?.index !== 1) return;
+  const hud = makeHud(paths.length === 1 ? "Deleting File" : `Deleting ${paths.length} Files`);
+  try {
+    await backend.removeMalware(paths);
+  } catch (e) {
+    hud.hide();
+    await alert({ title: "Couldn't Delete", message: e?.message || String(e), buttons: ["OK"] });
+    return;
+  }
+  hud.done("Deleted");
 }
 
 // Draws the list from what load() read (F104: again when the sort changes, without asking the worker).

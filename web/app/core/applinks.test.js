@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { appSchemeFor } from "./applinks.js";
+import { appSchemeFor, openOutside } from "./applinks.js";
 
 test("appSchemeFor: X profiles and posts, YouTube, GitHub (not Discord); anything else stays a web link", () => {
   assert.equal(appSchemeFor("https://x.com/saurik"), "twitter://user?screen_name=saurik");
@@ -12,4 +12,23 @@ test("appSchemeFor: X profiles and posts, YouTube, GitHub (not Discord); anythin
   assert.equal(appSchemeFor("https://github.com/"), null);
   assert.equal(appSchemeFor("http://x.com/saurik"), null);
   assert.equal(appSchemeFor("not a url"), null);
+});
+
+test("openOutside: Safari when the app didn't come up; never again after a trip away (frozen timer)", () => {
+  const run = ({ hide = false, late = 0 } = {}) => {
+    const went = [];
+    let t = 0, fire, onVis;
+    const doc = { visibilityState: "visible", addEventListener: (_, f) => { onVis = f; }, removeEventListener: () => {} };
+    openOutside("https://github.com/a/b", { go: (u) => went.push(u), doc, wait: (f) => { fire = f; }, now: () => t });
+    if (hide) { doc.visibilityState = "hidden"; onVis(); doc.visibilityState = "visible"; onVis(); }
+    t = 1500 + late;
+    fire();
+    return went;
+  };
+  assert.deepEqual(run(), ["github://github.com/a/b", "x-safari-https://github.com/a/b"]);
+  assert.deepEqual(run({ hide: true }), ["github://github.com/a/b"]);
+  assert.deepEqual(run({ late: 60000 }), ["github://github.com/a/b"]);
+  const went = [];
+  openOutside("https://example.com/", { go: (u) => went.push(u) });
+  assert.deepEqual(went, ["x-safari-https://example.com/"]);
 });

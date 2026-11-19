@@ -20,3 +20,20 @@ export function appSchemeFor(href) {
   if (host === "github.com" && parts.length) return `github://github.com${u.pathname}`; // the GitHub app (user 2026-11-18)
   return null;
 }
+
+// Opens href from the Home Screen web app: its app's scheme first, then Safari if the app didn't come up in 1.5 s.
+// iOS freezes timers while the web app is in the background, so a timer that fires after the user came back from
+// the app (or from Safari) must not open the link again: skip it once the page was hidden or the timer ran late.
+export function openOutside(href, { go, doc = globalThis.document, wait = setTimeout, now = Date.now } = {}) {
+  const app = appSchemeFor(href);
+  if (!app) { go("x-safari-" + href); return; }
+  let left = false;
+  const onVis = () => { if (doc.visibilityState === "hidden") left = true; };
+  doc.addEventListener("visibilitychange", onVis);
+  const start = now();
+  go(app);
+  wait(() => {
+    doc.removeEventListener("visibilitychange", onVis);
+    if (!left && doc.visibilityState === "visible" && now() - start < 3000) go("x-safari-" + href);
+  }, 1500);
+}

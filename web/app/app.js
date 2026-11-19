@@ -29,7 +29,7 @@ import * as search from "./screens/search.js";
 import * as settingsScreen from "./screens/settings.js";
 import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
-import { appSchemeFor } from "./core/applinks.js";
+import { appSchemeFor, openOutside } from "./core/applinks.js";
 import { launchURL } from "./launch.js";
 import { isAddPath, parseAddLink } from "./core/handoff.js";
 import { addSource } from "./screens/manage.js";
@@ -396,12 +396,7 @@ const standalone = !globalThis.ifizboxNative && (navigator.standalone || matchMe
 if (standalone) {
   const outside = (u) => { try { const x = new URL(u, location.href); return /^https?:$/.test(x.protocol) && x.origin !== location.origin ? x.href : null; } catch { return null; } };
   // A site with its own app's scheme (core/applinks.js: X, YouTube) opens that app; Safari only if it didn't come up.
-  const viaSafari = (href) => {
-    const app = appSchemeFor(href);
-    if (!app) { location.href = "x-safari-" + href; return; }
-    location.href = app;
-    setTimeout(() => { if (document.visibilityState === "visible") location.href = "x-safari-" + href; }, 1500);
-  };
+  const viaSafari = (href) => openOutside(href, { go: (u) => { location.href = u; } });
   const open = window.open.bind(window);
   window.open = (u, ...rest) => { const href = outside(u); if (href) { viaSafari(href); return null; } return open(u, ...rest); };
   document.addEventListener("click", (e) => {

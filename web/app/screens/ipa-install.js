@@ -7,7 +7,8 @@
 // F88: a successful install is remembered (core/installed.js) for the Installed tab's Apps page and Changes: the
 // AltStore row's with its source (installRows' onInstall), a URL's or link's by bundle id (rememberIpa).
 // All open the same progress page as the install queue's (F151: nav/progress.js): the shell's and helper's lines as
-// they come, installd's pmstatus progress on the bar, then Reload Data (uicache) or Close iFizBox. F189: AppSync
+// they come, installd's pmstatus progress on the bar, then Reload Data (uicache) or Close iFizBox (B61: Restart
+// SpringBoard when AppSync Unified was just installed, as its SpringBoard hook loads only then: ipaFinish). F189: AppSync
 // Unified first when it's missing (ensureAppSync: akemi's source, then the Confirm sheet with it under Install); a
 // failure there, or installd still refusing the app (no_adhoc), ends in one short alert (appSyncFallback: Try Again,
 // Open Source, OK). Each run is kept in Settings > Console Logs.
@@ -120,6 +121,7 @@ export async function installWithAppSync({ url, name = "", onInstalled = () => {
     let got;
     try { got = await ensure({ name: title }); } catch { got = { ok: false, step: "install" }; } finally { preparing = false; }
     if (got.cancelled) return false;
+    if (got.installed) appSyncRespring = true; // B61: its SpringBoard hook waits for a respring (ipaFinish)
     if (!got.ok) {
       if (await fallback(got.step)) continue;
       return false;
@@ -164,18 +166,56 @@ export async function runIpaConsole({ url, name = "", onInstalled = () => {}, na
   if (r.cancelled) return r;
   if (r.ok) { try { onInstalled(r); } catch { /* the record is a nicety */ } }
 
-  const backend = getBackend();
-  const reload = r.ok && typeof backend?.uicache === "function";
-  const choice = chooseFinish({ ok: reload, kinds: ["app"] });
-  page.finish({ label: choice.label, status: r.ok ? "Done" : "Failed", action: reload ? async () => {
-    try { await backend.uicache(); } catch (e) {
-      await showAlert({ title: "Reload Data", message: e.message || String(e), buttons: ["OK"] });
-      return true;
-    }
-    return false;
-  } : null });
+  const fin = ipaFinish({ ok: r.ok, name: title });
+  if (fin.note) page.line("step", fin.note);
+  page.finish({ label: fin.label, status: r.ok ? "Done" : "Failed", action: fin.action });
   if (r.error && r.error.code !== "no_adhoc") await showAlert({ title: r.error.title, message: r.error.message, buttons: ["OK"] });
   return { ...r, close: () => page.close() };
+}
+
+// B61: AppSync Unified installed in this session and SpringBoard not restarted since. Its FrontBoard hook
+// (AppSyncUnified-FrontBoard.dylib) loads into SpringBoard only on a respring; until then SpringBoard refuses a
+// fakesigned app ("signature state: Generic … No code signature found": the icon dims and nothing opens; B59 on the
+// iPhone 7). Set by installWithAppSync when its queue run installed AppSync, cleared once ipaFinish's respring went
+// through. Kept for the session, so a second IPA before the respring still ends on it (dpkg then says "present").
+let appSyncRespring = false;
+export function appSyncRespringPending() { return appSyncRespring; }
+export function setAppSyncRespring(on) { appSyncRespring = Boolean(on); }
+
+// The IPA console's finish button (runIpaConsole), without the page. -> { label, level, note, action }:
+//   failed                          Close iFizBox, no action
+//   ok, AppSync just installed      Restart SpringBoard (chooseFinish's restart level; uicache first), and a line
+//                                   saying why; where the backend can't respring, Reload Data and a line saying the
+//                                   app opens after a respring
+//   ok                              Reload Data (uicache) where the backend can, else Close iFizBox
+// action() resolves true to keep the page up (it failed and said so).
+export function ipaFinish({ ok, name = "", backend = getBackend(), alert = showAlert, pending = appSyncRespring } = {}) {
+  const canUicache = typeof backend?.uicache === "function";
+  const canRespring = typeof backend?.respring === "function";
+  const app = name ? String(name).replace(/\.ipa$/i, "") : "The app";
+  const restart = Boolean(ok && pending && canRespring);
+  const choice = chooseFinish({ ok: ok && (canUicache || restart), levels: restart ? ["restart"] : [], kinds: ["app"] });
+  let note = null;
+  if (ok && pending) {
+    note = restart
+      ? `${app} opens once SpringBoard restarts: ${APPSYNC_NAME} was just installed and loads into SpringBoard then.`
+      : `${app} opens after a respring: ${APPSYNC_NAME} was just installed and loads into SpringBoard then.`;
+  }
+  const fail = async (title, e) => { await alert({ title, message: e?.message || String(e), buttons: ["OK"] }); return true; };
+  let action = null;
+  if (choice.level === "uicache" || choice.uicache || restart) {
+    action = async () => {
+      if (canUicache && (choice.uicache || choice.level === "uicache")) {
+        try { await backend.uicache(); } catch (e) { return fail("Reload Data", e); }
+      }
+      if (restart) {
+        try { await backend.respring(); } catch (e) { return fail("Restart SpringBoard", e); }
+        appSyncRespring = false;
+      }
+      return false;
+    };
+  }
+  return { label: choice.label, level: choice.level, note, action };
 }
 
 // F196: asks the shell to stop ipa.install (its download, or the helper before it starts: Apt.swift ipa.cancel).

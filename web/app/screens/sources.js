@@ -22,6 +22,7 @@ import { recommendedSeen, jailbreakName } from "../core/recommended.js";
 import { builtinFirst, isBuiltin } from "../core/essential.js";
 import { lockMark } from "../nav/lock.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
+import { pullToRefresh } from "../nav/pullrefresh.js";
 import { reloadSteps } from "../core/reloadsteps.js";
 import { showBanner } from "../nav/banner.js";
 import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
@@ -513,6 +514,8 @@ function draw() {
     el.replaceChildren();
     pinned(el, strip, bar).append(state.box);
   }
+  // F270: pull the list down past its top: Refresh, as the nav button.
+  pullToRefresh(state.box.parentNode, { onRefresh: () => refresh(state.ctx), busy: () => state.busy || state.running, settings });
   const box = state.box;
   const backend = getBackend();
   // F37: Not Jailbroken shows AltStore sources only. F144: and says nothing of APT ones (no count, no hint).

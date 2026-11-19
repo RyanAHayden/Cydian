@@ -267,6 +267,7 @@ const HIDDEN_AUTHORS_KEY = PREFIX + "hiddenAuthors";
 const BLOCKED_KEY = PREFIX + "blockedPackages";
 const BLOCK_HOLDS_KEY = PREFIX + "blockHolds";
 const APP_HOLDS_KEY = PREFIX + "appHolds"; // B69: apps' Ignore Upgrades in the jailbreak app (no dpkg hold)
+const LAST_REFRESH_KEY = PREFIX + "lastRefresh"; // F270: pull to refresh's Last Updated
 
 // F100: Search's Recent table (from Zebra): the last RECENT_MAX queries, newest first, no duplicates (a query
 // already there moves to the top; case and surrounding spaces don't make a new one). Pure, for the tests.
@@ -653,6 +654,13 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     clear: () => writeRecent([]),
   };
 
+  // F270: when the last refresh of the sources finished (ms since 1970), for pull to refresh's "Last Updated" line.
+  // null until one has. Listeners hear ("lastRefresh", ms).
+  const lastRefresh = {
+    get() { const n = Number(store.get(LAST_REFRESH_KEY)); return Number.isFinite(n) && n > 0 ? n : null; },
+    set(ms = Date.now()) { store.set(LAST_REFRESH_KEY, String(ms)); notify("lastRefresh", ms); },
+  };
+
   // F70: the daemon's preferences, { "ifizbox.<key>": value }: string, bool or number as get() gives them, the lists
   // as arrays of package ids. A setting nobody has picked is null (the shell removes the key), so the daemon keeps
   // its own default.
@@ -688,6 +696,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     holds,
     autoMarked,
     recentSearches,
+    lastRefresh, // F270
     daemonPrefs,
     hiddenSections,
     hiddenAuthors,

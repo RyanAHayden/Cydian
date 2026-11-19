@@ -42,12 +42,13 @@ import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optio
   STATE_LABELS, addSiteFile, removeSiteEntry, openIpaStore, memoryIpaStore, listState, listStep, tapOpens,
   deleteSheetTitle, deleteButtonText, deleteEntries, holdActions, HOLD, libraryMode, ipaSections, installedIdOf, priceButton, priceTap, priceAway,
   priceProgress, ipaSelectSheet, ipaSelectLabel, ipaPresetFiles, ipaCounts, ipaSummary, ipaToolbar, ipaSheet, unsignEntries,
-  IPA_SELECT } from "../core/myipas.js";
+  IPA_SELECT, siteTooBig, freshNote } from "../core/myipas.js";
+import { mediaUrl } from "./depiction.js";
 import { barButton } from "../nav/ui.js";
 import { longPress, showMenu, copyText } from "../nav/menu.js";
 import { fitFileNames, isFileName } from "../core/midtrunc.js";
 import { readIpaFile } from "../core/ipainfo.js";
-import { localSigning, libraryCall, installFromLibrary, signAndInstall, openSigning } from "../signing-client.js";
+import { localSigning, libraryCall, installFromLibrary, signAndInstall, openSigning, handOffIpa } from "../signing-client.js";
 import { siteCertificateAlert } from "./altstore.js";
 import { NAME } from "../brand.js";
 import { serverReachable } from "../signing-client.js";
@@ -57,7 +58,7 @@ import { storedKeep, originalState, originalNote, OLD_WAY_ALERT, OLD_WAY_TEXT } 
 
 export { MYIPAS };
 
-const view = { body: null, add: null, search: null, route: null, seq: 0 };
+const view = { body: null, add: null, search: null, route: null, seq: 0, fresh: null };
 const known = new Map(); // file -> the last entry seen (titles, the page before its list call answers)
 // F208/F224: the list's swipe and Manage state (core/myipas.js listStep: `editing` is Manage, `armed` the row showing
 // Delete, `selected` the picked files), its controller, the bottom toolbar, the IPAs and which of them iOS has, the
@@ -125,11 +126,14 @@ export function render(body, route, ctx) {
     const page = el("div", "install-ipas");
     view.route = route;
     lib.query = "";
+    // F257: the link the Too Big alert just kept: its row at the top for this visit, and the note under the bar
+    view.fresh = site() ? freshNote() : null;
     view.search = searchBar("Search IPAs", (q) => { lib.query = q; redraw(); });
     view.add = el("div", "install-ipas-add");
     view.add.append(grouped(addGroups(site())));
     view.body = el("div", "install-ipas-mine");
     view.body.append(note("Loading"));
+    if (view.fresh?.note) page.append(el("p", "myipa-fresh-note", view.fresh.note));
     page.append(view.search, view.add, view.body);
     body.append(page);
     load();
@@ -264,6 +268,17 @@ export function sharedSections(list, { installed = {}, shared = {}, ...opts } = 
   ].filter((s) => s.rows.length);
 }
 
+// F257: the row the Too Big alert's Download IPA just added (`file`) in its own group at the top, headed New, for that
+// visit; the sections without it below. Unchanged when there is no such row.
+export const FRESH_HEADER = "New";
+export function freshFirst(sections, file) {
+  if (!file) return sections;
+  const row = sections.flatMap((s) => s.rows).find((r) => r.file === file);
+  if (!row) return sections;
+  const rest = sections.map((s) => ({ ...s, rows: s.rows.filter((r) => r.file !== file) })).filter((s) => s.rows.length);
+  return [{ key: "new", header: FRESH_HEADER, rows: [{ ...row, fresh: true }] }, ...rest];
+}
+
 // B80: the IPA another app with its bundle ID is installed over -> that app's name, else null (not shared, or the match).
 export function replacesOf(entry, shared = lib.shared) {
   const id = entry && !entry.error ? installedIdOf(entry) : null;
@@ -296,7 +311,7 @@ function redraw() {
   lib.state = files.length ? listStep(lib.state, { type: "list", files }) : { ...listState(), editing: lib.state.editing };
   if (lib.price.armed && !files.includes(lib.price.armed)) lib.price = { armed: null };
   lib.ctl = libraryGroup(lib.list, { site: isSite, jailbreak: jb, state: lib.state, installed: lib.installed, shared: lib.shared,
-    query: lib.state.editing ? "" : lib.query, price: lib.price, busy: lib.busy,
+    query: lib.state.editing ? "" : lib.query, price: lib.price, busy: lib.busy, fresh: view.fresh?.file ?? null,
     on: { change: onListChange, delete: (es) => swipeDelete(es), hold: (e) => holdSheet(e), price: (r) => onPrice(r) } });
   view.body.replaceChildren(lib.ctl.el);
   onListChange(lib.state);
@@ -337,8 +352,8 @@ export function libraryFooterText(site, { jailbreak = false } = {}) {
 // cellOf(file), price(file) (the row's price button) }. on.change(state) after each step, on.delete([row]) for a row's
 // Delete, on.hold(row) for a held row, on.price(row) for a tap on its price button.
 export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jailbreak(), state = listState(), installed = {}, query = "",
-  price = { armed: null }, busy = new Map(), on = {}, shared = {} } = {}) {
-  const sections = sharedSections(list, { installed, shared, query, site: isSite, jailbreak: jb });
+  price = { armed: null }, busy = new Map(), on = {}, shared = {}, fresh = null } = {}) {
+  const sections = freshFirst(sharedSections(list, { installed, shared, query, site: isSite, jailbreak: jb }), fresh);
   const rows = sections.flatMap((s) => s.rows);
   const any = libraryRows(list, { site: isSite, jailbreak: jb }).length > 0;
   const groups = sections.map((s, i) => ({ header: s.header, rows: s.rows.map((r) => ({
@@ -371,6 +386,8 @@ export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jail
     li._ipa = r;
     byFile.set(r.file, li);
     putIcon(li.querySelector(".cell-icon"), r.icon);
+    if (!r.icon && r.iconUrl) putIconUrl(li.querySelector(".cell-icon"), r.iconUrl); // F257: a kept link's app icon
+    if (r.fresh) li.classList.add("is-fresh");
     const spec = priceButton(r, { armed: price.armed, busy: busy.get(r.file) ?? null, site: isSite, jailbreak: jb });
     if (spec) {
       const b = Object.assign(document.createElement("button"), { type: "button", className: "price-btn" });
@@ -841,6 +858,18 @@ function putIcon(box, b64) {
   box.append(img);
 }
 
+// F257: a link's icon from the source (an https URL: through the proxy on the website, as app pages draw it).
+function putIconUrl(box, url) {
+  if (!box || typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
+  const img = new Image();
+  img.alt = "";
+  img.decoding = "async";
+  img.onload = () => img.classList.add("loaded");
+  img.onerror = () => img.remove();
+  img.src = mediaUrl(url);
+  box.append(img);
+}
+
 const refresh = () => { if (view.body?.isConnected) load(); };
 
 // The Add sheet (Files / From URL), for callers outside the page; the page has its own Add an IPA group (F224).
@@ -1234,9 +1263,12 @@ export function shownBody(route) {
 
 // F95: the website's Install for one of the user's links, as an app page's (F92): the certificate alert, whose
 // Download IPA opens the link. -> whether it downloaded.
-export function siteInstallSheet(entry, { alert, open = (u) => { location.href = u; } } = {}) {
+// F257: a link too big for the website (siteTooBig) is handed to a sideloader (signing-client.js handOffIpa), never
+// to the website's signer.
+export function siteInstallSheet(entry, { alert, open = (u) => { location.href = u; }, handoff = handOffIpa } = {}) {
   const url = entry?.url;
   if (!url) return Promise.resolve(false);
+  if (siteTooBig(entry)) return Promise.resolve(handoff({ url, name: entry.name || "" })).then(Boolean);
   return siteCertificateAlert({ download: () => open(url), ...(alert ? { alert } : {}) });
 }
 

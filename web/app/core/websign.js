@@ -15,6 +15,15 @@
 import { parsePlist } from "./signing.js";
 
 export const IPA_MAX = 512 * 1024 * 1024; // the Worker's own cap (worker/src/index.js MAX_UPLOAD)
+
+// F257: the biggest app the website signs, and the words every message uses for it. core/myipas.js SITE_FILE_MAX is
+// the same number. An app's listed size (AltStore versions[].size) is checked against it before anything downloads.
+//   siteMB(bytes)            whole MB, as the messages show them
+//   overSiteLimit(size)      true for a listed size past IPA_MAX (false when unknown)
+//   SITE_LIMIT_TEXT          "The website signs apps up to 512 MB."
+export const siteMB = (n) => Math.round(Number(n) / 1048576);
+export const SITE_LIMIT_TEXT = `The website signs apps up to ${siteMB(IPA_MAX)} MB.`;
+export const overSiteLimit = (size, max = IPA_MAX) => Number.isFinite(Number(size)) && Number(size) > max;
 export const IFIZBOX_ID = "com.ryha.ifizbox";
 export const IDENTITY_FILE = "ifizbox-identity.plist";
 export const TRANSFER_FILE = "web/transfer.link";

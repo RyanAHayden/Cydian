@@ -298,7 +298,8 @@ async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null, env = {}, range 
 const MAX_UPLOAD = 512 * 1024 * 1024;
 export const PART = 20 * 1024 * 1024; // under KV's 25 MB a value and a Worker request's 100 MB
 export const uploadCap = (env) => (env.MAX_UPLOAD_MB === undefined || env.MAX_UPLOAD_MB === "" ? MAX_UPLOAD : Math.max(0, Number(env.MAX_UPLOAD_MB) || 0) * 1024 * 1024);
-const tooBig = (max) => `Apps up to ${Math.round(max / 1024 / 1024)} MB can be signed on the website.`;
+// F257: the website's words for its cap (web/app/core/websign.js SITE_LIMIT_TEXT), the same number (MAX_UPLOAD_MB = IPA_MAX)
+const tooBig = (max) => `The website signs apps up to ${Math.round(max / 1024 / 1024)} MB.`;
 
 // The IPA, streamed through (no buffering: a Worker has 128 MB): headers within 30 s, then as long as the body takes,
 // refused up front when its Content-Length is over maxBytes. `rangeAsked`: the website's Range (bytes=n-) to resume.

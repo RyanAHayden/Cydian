@@ -89,3 +89,12 @@ html[data-theme="dark"] .perm-more .cell-label { color: var(--dk-link); }
 .shots-loading { height: 44px; display: flex; align-items: center; justify-content: center; }
 .shots-spinner { width: 20px; height: 20px; background: var(--spinner-gray) center / 20px no-repeat; animation: hud-spin .96s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .preview-slot { transition: none; } .shots-spinner { animation-duration: 3s; } }
+
+/* F257: a version too big for the website: its Size in iOS 6's red (the sign sheet's warning red), and the Too Big
+   alert's Download IPA as the kit's "Button (Gloss Blue)" (sources.css .bar-button.done's values) over the alert's
+   navy, the way to go; the others stay plain and Cancel dark. background-origin: border-box after each background. */
+.cell.size-over .cell-detail, .store-tile.size-over .store-tile-value { color: #b5322c; }
+.alert-button.blue { border-color: #1f3f86;
+  background: linear-gradient(#79a1f3, #3b71e1 49%, #215fdd 51%, #2361dd); background-origin: border-box; }
+.alert-button.blue:active, .alert-button.blue.is-pressed {
+  background: linear-gradient(#5f86d6, #2a5bc0 49%, #164bb8 51%, #184db9); background-origin: border-box; }

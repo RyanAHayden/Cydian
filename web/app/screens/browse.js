@@ -1362,7 +1362,7 @@ async function packageActions(route, button) {
     // older versions are on the page, not in a menu in between. On the website the first row is Install (F92: the
     // certificate alert until F93's browser signing).
     const rowsOf = (ver) => installRows(ver, st.ipa.sourceUrl, undefined, recordApp(pkg, source, ver), undefined, st.ipa.name,
-      { bundleId: appBundleId(st.ipa, pkg.row?.id ?? id) });
+      { bundleId: appBundleId(st.ipa, pkg.row?.id ?? id), iconUrl: st.ipa.iconURL });
     // B69: in the jailbreak app Modify (an installed app) opens Cydia's sheet; Install keeps its one tap below.
     // B71a: where the app queue runs through the helper, Modify's Upgrade / Reinstall / Downgrade / Remove queue it (Confirm
     // opens, as a package's Modify), Clear first while it's queued; a queued app not installed gets Clear alone.

@@ -1,0 +1,11 @@
+[
+  { "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 1" },
+  { "nav": "#/home", "ms": 3000 },
+  { "eval": "import('/signing-client.js').then((m) => { m.tooBigAlert({ url: 'https://dl.example/BigGame.ipa', name: 'Big Game', size: 700 * 1048576 }); return 'ok'; })" },
+  { "wait": 1200 },
+  { "shot": "alert-3x" },
+  { "eval": "document.querySelector('.alert-scrim')?.remove(); 1" },
+  { "eval": "Promise.all([import('/nav/progress.js'), import('/signing-client.js')]).then(([p, s]) => { const h = p.progressHUD('Downloading'); h.set('Downloading 31%'); h.page.raw(s.droppedText(41 * 1048576)); h.set(s.reconnectText(1)); h.set('Downloading 52%'); h.page.raw(s.droppedText(68 * 1048576)); h.set(s.reconnectText(2)); h.set('Downloading 60%'); h.page.raw(s.droppedText(73 * 1048576)); h.set(s.reconnectText(3)); h.set('Downloading 61%'); h.fail(s.CUT_TEXT); h.page.warning(s.grayIconText('Big Game')); return 'ok'; })" },
+  { "wait": 1500 },
+  { "shot": "log-3x" }
+]

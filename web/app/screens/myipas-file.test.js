@@ -99,7 +99,7 @@ test("Choose File refuses what isn't an IPA, is too big, or doesn't fit Safari's
   const storage = memStorage(), store = memoryIpaStore();
   const read = readIpaFile;
   await assert.rejects(addSiteFile(fileOf(ipa(), "notes.txt"), { storage, store, read }), /isn't an IPA/);
-  await assert.rejects(addSiteFile({ name: "Huge.ipa", size: SITE_FILE_MAX + 1 }, { storage, store, read }), /up to 400 MB.*From URL/);
+  await assert.rejects(addSiteFile({ name: "Huge.ipa", size: SITE_FILE_MAX + 1 }, { storage, store, read }), /website signs apps up to 512 MB/);
   await assert.rejects(addSiteFile(fileOf(ipa()), { storage, store, read, room: async () => 1000 }), /no room/);
   const full = { ...memoryIpaStore(), put: async () => { throw Object.assign(new Error("quota"), { name: "QuotaExceededError" }); } };
   await assert.rejects(addSiteFile(fileOf(ipa()), { storage, store: full, read }), /no room/);

@@ -19,7 +19,9 @@
 import { showBanner } from "./nav/banner.js";
 import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError, parseProfile, deviceCheck, notLandedText, notInProfileText } from "./core/signing.js";
 import { format, settingsRoute } from "./router.js";
-import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId } from "./core/websign.js";
+import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId, siteMB, SITE_LIMIT_TEXT, overSiteLimit } from "./core/websign.js";
+import { addSiteUrl, markFresh, MYIPAS } from "./core/myipas.js";
+import { showActionSheet } from "./nav/actionsheet.js";
 import { storedKeep, withKeep, originalState, originalNote } from "./core/keepid.js";
 import { detectMode } from "./core/settings.js";
 import { progressHUD, lockSelfUpdate, unlockSelfUpdate } from "./nav/progress.js";
@@ -159,8 +161,9 @@ export const isSelfIpa = (url) => SELF_IPA.test(String(url ?? ""));
 // Signs `url` (an IPA) on the phone and installs it. Resolves true once iOS was asked to install; false after an
 // error, which it shows in an alert; false in the jailbreak app (its pages use the helper, so this is only a guard).
 // F93: on the website, signs it in the browser (signInBrowser); `bring` (Install iFizBox App) carries the certificate.
-export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null }) {
-  if (browserSigning()) return signInBrowser({ url, name, onInstalled, bring, bundleId, version, bytes });
+// F257: `size` (the source's listed size) and `iconUrl` are the website's: an app over its cap opens the Too Big alert.
+export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null, size = null, iconUrl = null }) {
+  if (browserSigning()) return signInBrowser({ url, name, onInstalled, bring, bundleId, version, bytes, size, iconUrl });
   if (!localSigning()) {
     await showAlert({ title: "Can't Install Here", message: `Apps are signed in the ${NAME} app. Open this one in ${NAME}, AltStore, SideStore or Feather.`, buttons: ["OK"] });
     return false;
@@ -640,18 +643,28 @@ async function retrying(send, { tries = 3, wait = (ms) => new Promise((r) => set
 // cap and the length are checked only here. A body that broke off is resumed from the bytes already here (Range:
 // bytes=n-, which the Worker passes on), up to CUT_TRIES times while each try brings more; an answer that isn't the
 // asked-for part (200) starts again from byte 0. A try that brings nothing new ends it, in words.
+// F257: up to CUT_TRIES more tries in all, whatever each brought (a big app's download may break more than once), and
+// `onCut({ attempt, of, at })` before each (at: the bytes already here), for the log's "Reconnecting (try 1 of 3)".
 export const CUT_TEXT = "The app's download broke off before the end. Check the connection and tap Install again.";
-export const CUT_TRIES = 5;
+export const CUT_TRIES = 3;
 export async function downloadIpa(url, opts = {}) {
   const got = { buf: null, n: 0 };
   for (let tries = 0; ; tries++) {
-    const before = got.n;
     try { return await downloadIpaOnce(url, opts, got); } catch (e) {
       if (e?.code !== "cut" || opts.signal?.aborted) throw e;
-      if (tries >= CUT_TRIES || (tries >= 1 && got.n <= before)) throw signFail("network", CUT_TEXT);
+      if (tries >= CUT_TRIES) throw signFail("network", CUT_TEXT);
+      try { opts.onCut?.({ attempt: tries + 1, of: CUT_TRIES, at: got.n }); } catch { /* the log only */ }
     }
   }
 }
+
+// F257: the log's lines for a resumed download (signInBrowser's onCut).
+export const reconnectText = (attempt, of = CUT_TRIES) => `Reconnecting (try ${attempt} of ${of})`;
+export const droppedText = (bytes) => {
+  const mb = Number(bytes) / 1048576;
+  return `The connection dropped at ${mb >= 10 ? Math.round(mb) : Math.round(mb * 10) / 10} MB.`;
+};
+export const grayIconText = (app) => `If a gray ${app ? `${app} ` : ""}icon was left on your Home Screen, delete it.`;
 
 async function downloadIpaOnce(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, max = IPA_MAX, wait = undefined, signal = null } = {}, got = { buf: null, n: 0 }) {
   let res;
@@ -666,13 +679,13 @@ async function downloadIpaOnce(url, { base = "", fetcher = globalThis.fetch, onP
   const resumed = got.n > 0 && res.status === 206 && Number(/^bytes (\d+)-/.exec(head("content-range") ?? "")?.[1]) === got.n;
   if (!resumed) { got.n = 0; }
   const total = Number(head("x-ipa-length") || (resumed ? 0 : head("content-length")) || 0);
-  if (total > max) throw signFail("too_large", `Apps up to ${Math.round(max / 1048576)} MB can be signed on the website.`);
+  if (total > max) throw signFail("too_large", tooLargeText(total, max));
   const cut = (e) => (signal?.aborted ? signFail("cancelled", "Cancelled") : signFail("cut", `The download broke off: ${e?.message ?? e}`));
   if (!res.body?.getReader) {
     let whole;
     try { whole = new Uint8Array(await res.arrayBuffer()); } catch (e) { throw cut(e); }
     if (resumed) { const b = new Uint8Array(got.n + whole.length); b.set(got.buf.subarray(0, got.n)); b.set(whole, got.n); whole = b; }
-    if (whole.length > max) throw signFail("too_large", `Apps up to ${Math.round(max / 1048576)} MB can be signed on the website.`);
+    if (whole.length > max) throw signFail("too_large", tooLargeText(whole.length, max));
     got.buf = whole; got.n = whole.length;
     if (total && whole.length < total) throw cut(`${whole.length} of ${total} bytes`);
     return whole;
@@ -688,7 +701,7 @@ async function downloadIpaOnce(url, { base = "", fetcher = globalThis.fetch, onP
     try { step = await reader.read(); } catch (e) { keep(); throw cut(e); }
     const { done, value } = step;
     if (done) break;
-    if (n + value.length > max) { reader.cancel?.(); throw signFail("too_large", `Apps up to ${Math.round(max / 1048576)} MB can be signed on the website.`); }
+    if (n + value.length > max) { reader.cancel?.(); throw signFail("too_large", tooLargeText(0, max)); }
     if (n + value.length > buf.length) { const b = new Uint8Array(Math.max(buf.length * 2, n + value.length)); b.set(buf.subarray(0, n)); buf = b; }
     buf.set(value, n);
     n += value.length;
@@ -818,11 +831,99 @@ export async function siteUdid() {
 
 const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof ArrayBuffer ? b.slice(0) : new Uint8Array(b ?? []).buffer);
 
-export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null },
+// ---- F257: apps too big for the website ----------------------------------------------------------------------
+//
+// An app whose listed size (AltStore versions[].size) is over IPA_MAX never starts on the website: Install opens the
+// Too Big alert before anything downloads, and before the early link (no blank icon is left). Website only: the apps
+// sign on the phone and have no such cap. An app with no listed size is checked on the download's first answer.
+//
+//   await tooBigAlert({ url, name, size, version, iconUrl }, deps)   "download" | "lite" | "other" | "cancel"
+//     Download IPA (blue, first): the link goes into Install IPAs (core/myipas.js addSiteUrl, with what the page
+//     knows), the IPA opens in Safari (it saves to Files), and when the web app is back in front Install IPAs opens
+//     with that row at the top, marked new for the visit, and a note under the bar (markFresh).
+//     Get <NAME> Lite: Home's Install <NAME> App (screens/home.js installApp). Other Sideloader: handOffIpa.
+//   handOffIpa({ url, name })   the sideloaders' own install links (core/otherlinks.js lists their shapes): <NAME> Lite,
+//     AltStore, SideStore, Feather; each downloads and signs on the phone, whatever its size.
+export const TOO_BIG_TITLE = "Too Big for the Website";
+export const TOO_BIG_BUTTONS = ["Download IPA", `Get ${NAME} Lite`, "Other Sideloader", "Cancel"];
+const appOr = (name) => name || "This app";
+export const tooBigText = (name, size) => `${appOr(name)} is ${siteMB(size)} MB. ${SITE_LIMIT_TEXT} Download the IPA and import it into ${NAME} Lite or another sideloader.`;
+export const tooBigNote = (name, size) => `${appOr(name)} (${siteMB(size)} MB) is in Safari's Downloads. It's too big for the website: tap Install to hand it to ${NAME} Lite or another sideloader.`;
+// the app page's footer under Details, by the red Size
+export const TOO_BIG_FOOTER = `${SITE_LIMIT_TEXT} Install this one with ${NAME} Lite, or hand it to another sideloader.`;
+// what the download's first answer says when no size was listed
+const tooLargeText = (n, max) => (n ? `This app is ${siteMB(n)} MB. ` : `This app is over ${siteMB(max)} MB. `)
+  + (max === IPA_MAX ? SITE_LIMIT_TEXT : `The website signs apps up to ${siteMB(max)} MB.`);
+
+// Install links per sideloader, for an IPA's URL: [{ label, link }]. Feather takes only https.
+export function sideloaderLinks(url, name = "") {
+  const u = String(url ?? "");
+  if (!/^https?:\/\//i.test(u)) return [];
+  const e = encodeURIComponent(u);
+  const out = [
+    { label: `${NAME} Lite`, link: `${NAME.toLowerCase()}://install?url=${e}${name ? `&name=${encodeURIComponent(name)}` : ""}` },
+    { label: "AltStore", link: `altstore://install?url=${e}` },
+    { label: "SideStore", link: `sidestore://install?url=${e}` },
+  ];
+  if (/^https:\/\//i.test(u)) out.push({ label: "Feather", link: `feather://install/${u}` });
+  return out;
+}
+
+export async function handOffIpa({ url, name = "" }, { sheet = showActionSheet, open = (u) => { location.href = u; } } = {}) {
+  const links = sideloaderLinks(url, name);
+  if (!links.length) return null;
+  const i = await sheet({ title: name ? `Install ${name} With` : "Install With", buttons: links.map((l) => l.label) });
+  if (i < 0 || !links[i]) return null;
+  open(links[i].link);
+  return links[i].label;
+}
+
+// fn() once the page is back in front after it was left (Safari's download took over), at most once.
+export function whenBack(fn, doc = globalThis.document) {
+  if (!doc?.addEventListener) return () => {};
+  let left = false;
+  const off = () => doc.removeEventListener("visibilitychange", on);
+  function on() {
+    if (doc.visibilityState === "hidden") { left = true; return; }
+    if (doc.visibilityState === "visible" && left) { off(); fn(); }
+  }
+  doc.addEventListener("visibilitychange", on);
+  return off;
+}
+
+export async function tooBigAlert({ url, name = "", size = 0, version = "", iconUrl = null },
+  { alert = showAlert, open = (u) => globalThis.open?.(u, "_blank", "noopener"), storage = globalThis.localStorage, back = whenBack,
+    go = (path) => { location.hash = format({ tab: "installed", path }).replace(/^#/, ""); },
+    lite = async () => (await import("./screens/home.js")).installApp(), handoff = handOffIpa } = {}) {
+  let entry = null;
+  // Download IPA opens the file from the tap itself (Safari opens a new page only inside the user's tap)
+  const onTap = (i) => {
+    if (i !== 0) return;
+    try { entry = addSiteUrl(storage, url, Date.now(), { name, version, size, iconUrl }); } catch { entry = null; }
+    if (entry) {
+      markFresh(entry.file, tooBigNote(name || entry.name, size));
+      back(() => go([MYIPAS]));
+    }
+    open(url);
+  };
+  const { index } = await alert({ title: TOO_BIG_TITLE, message: tooBigText(name, size), buttons: TOO_BIG_BUTTONS, cancel: 3,
+    colors: { 0: "blue" }, onTap });
+  if (index === 0) return "download";
+  if (index === 1) { await Promise.resolve().then(lite).catch(() => {}); return "lite"; }
+  if (index === 2) { await Promise.resolve().then(() => handoff({ url, name })).catch(() => {}); return "other"; }
+  return "cancel";
+}
+
+export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null, size = null, iconUrl = null },
   { hud = progressHUD, alert = showAlert, open = (u) => { location.href = u; }, go = openRoute,
     identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "",
     now = identityNow, origin = () => new URL(base || "/", globalThis.location?.href).origin, clock = Date.now,
-    watch = watchInstall, phone = siteUdid } = {}) {
+    watch = watchInstall, phone = siteUdid, tooBig = tooBigAlert } = {}) {
+  // F257: a listed size over the cap: the Too Big alert, before the early link or any download
+  if (!bytes && url && overSiteLimit(size)) {
+    await tooBig({ url, name, size, version, iconUrl }, { alert });
+    return false;
+  }
   // F121: before anything waits, while Safari still counts this as the user's tap: iOS's install prompt, for a link
   // whose app comes later. Only when the bundle ID it will be signed as is known now (expectedBundleId).
   const expected = expectedBundleId(now(), { url, bundleId });
@@ -857,9 +958,14 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   const h = hud(bytes ? "Reading" : "Downloading");
   const pct = (label) => (p) => h.set(`${label} ${p}%`);
   const signal = h.signal ?? null; // F188: the page's Cancel stops the download, the signer and the upload
+  let cutOnce = false; // F257: the download was resumed at least once (the log said so)
   try {
     const ipa = bytes ? await untilCancel(h, keptBytes(bytes))
-      : await untilCancel(h, downloadIpa(url, { base, fetcher, onProgress: pct("Downloading"), ...(signal ? { signal } : {}) }));
+      : await untilCancel(h, downloadIpa(url, { base, fetcher, onProgress: pct("Downloading"), onCut: ({ attempt, at }) => {
+        cutOnce = true;
+        h.page?.raw?.(droppedText(at)); // F257: grey, then the step
+        h.set(reconnectText(attempt));
+      }, ...(signal ? { signal } : {}) }));
     h.set("Signing");
     const self = isSelfIpa(url) || bring;
     const carry = self ? { identity: Boolean(bring), transfer: await transfer().catch(() => null) } : null;
@@ -894,6 +1000,9 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     drop();
     if (h.cancelled) return false; // F188: Cancel closed the page; no alert after it
     failed(h, String(e?.message ?? e));
+    // F257: the download broke off past its last try: under the red error, what to do with iOS's icon (only once iOS
+    // was sent to the early link: no icon can be left otherwise)
+    if (cutOnce && e?.message === CUT_TEXT && opened) h.page?.warning?.(grayIconText(name));
     const message = String(e?.message ?? e) + (opened ? `\n\n${iconLeftText(name)}` : "");
     await alert({ title: name ? `Couldn't Install ${name}` : "Couldn't Install", message, buttons: ["OK"] });
     return false;

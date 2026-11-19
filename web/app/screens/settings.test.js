@@ -2,6 +2,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { themeMessage, applyTheme, settings } from "./settings.js";
 
+// F230: a localStorage that records what the pages write and remove (before any test opens a theme list, which drops
+// F215's old split key once). The settings store above was made at import, on its own storage.
+const lsLog = [];
+const lsData = new Map([["ifizbox.themePreviewSplit", "0.4"]]);
+Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
+  getItem: (k) => lsData.get(k) ?? null,
+  setItem: (k, v) => { lsLog.push(["set", k]); lsData.set(k, String(v)); },
+  removeItem: (k) => { lsLog.push(["remove", k]); lsData.delete(k); },
+} });
+
 test("the shell gets the fixed theme, or auto while Appearance is Automatic (F23)", () => {
   assert.deepEqual(themeMessage("dark", "dark").params, { style: "dark", theme: "dark", darkPalette: "oled", lightPalette: "classic" });
   assert.deepEqual(themeMessage("light", "light", "gunmetal", "sepia").params,
@@ -346,38 +356,67 @@ test("picking a theme in Theme > Light / Dark switches Mode to that tone", async
   assert.equal(settings.get("appearance"), "dark");
 });
 
-// F215: Theme > Light / Dark's preview is a movable split. Geometry in page px (an iPhone 7 web app: 647 tall, nav to
-// 64, tab bar from 598); rows 44px from y 74 (a group's 10px margin), the footer 40px under the last.
-test("F215: the preview's split: whole rows on entry, a 25% floor, 50% after a tap, the dragged position kept", async () => {
-  const { entrySplit, splitHeight, clampSplit, savedSplit, saveSplit, SPLIT_KEY } = await import("./settings.js");
-  const rowsFrom = (n) => [...Array.from({ length: n }, (_, i) => 74 + 44 * (i + 1)), 74 + 44 * n + 40 + 10];
-  const geo = (n) => ({ top: 64, bottom: 598, screen: 647, edges: rowsFrom(n) });
-  // Dark's six themes: 74 + 6*44 = 338, its footer ends 388; the floor (162) allows the divider down to 436, so the
-  // whole list shows and the preview starts under the footer.
-  assert.equal(entrySplit(geo(6)), 598 - 388);
-  // twelve rows can't all fit: the divider lands on the last row edge at or above 436 (row 8 ends at 426)
+// F215/F230: Theme > Light / Dark's preview is a movable split. Geometry in page px (an iPhone 7 web app: 647 tall, nav
+// to 64, tab bar from 598); rows 44px from y 74 (a group's 10px margin), the footer 40px under the last.
+const rowsFrom = (n) => [...Array.from({ length: n }, (_, i) => 74 + 44 * (i + 1)), 74 + 44 * n + 40 + 10];
+const splitGeo = (n) => ({ top: 64, bottom: 598, screen: 647, edges: rowsFrom(n) });
+
+test("F230: the preview's split: a 100px peek on entry (snapped to a row edge), half after a tap, a drag wins", async () => {
+  const { entrySplit, splitHeight, clampSplit, SPLIT_PEEK, SPLIT_MIN } = await import("./settings.js");
+  const geo = splitGeo;
+  assert.equal(SPLIT_PEEK, 100);
+  assert.ok(SPLIT_PEEK >= SPLIT_MIN);
+  // Dark's six themes end at 388 (footer and gap): far above the peek's line (498), so the preview is just the peek
+  assert.equal(entrySplit(geo(6)), 100);
+  assert.equal(entrySplit(geo(3)), 100); // Light's three
+  // twelve rows reach past the line: the divider snaps up to the row edge above it (row 9 ends at 470), never cutting one
   const twelve = entrySplit(geo(12));
-  assert.equal(twelve, 598 - 426);
-  assert.ok(twelve >= Math.ceil(647 * 0.25));
+  assert.equal(twelve, 598 - 470);
   assert.ok(geo(12).edges.includes(598 - twelve), "the divider sits on a row's bottom edge");
-  // the floor holds even when no row edge fits
-  assert.equal(entrySplit({ top: 64, bottom: 598, screen: 647, edges: [500] }), Math.ceil(647 * 0.25));
-  // a tap: half the screen, or more if the entry split was already taller
+  assert.ok(twelve >= SPLIT_PEEK && twelve < SPLIT_PEEK + 44);
+  // an edge exactly on the line is used as is
+  assert.equal(entrySplit({ top: 64, bottom: 598, screen: 647, edges: [498, 542] }), 100);
+  // a tap: half the screen
   assert.equal(splitHeight(geo(12), { tapped: true }), Math.round(647 / 2));
+  assert.equal(splitHeight(geo(6), { tapped: true }), Math.round(647 / 2));
   assert.equal(splitHeight(geo(12), {}), twelve);
-  assert.equal(splitHeight({ top: 64, bottom: 598, screen: 647, edges: [100] }, { tapped: true }), 598 - 100);
-  // a dragged position wins over both, and stays inside the page
-  assert.equal(splitHeight(geo(12), { saved: 0.4 }), Math.round(647 * 0.4));
-  assert.equal(splitHeight(geo(12), { saved: 0.4, tapped: true }), Math.round(647 * 0.4));
+  // a dragged height (px, this visit) wins over both, and stays inside the page
+  assert.equal(splitHeight(geo(12), { dragged: 259 }), 259);
+  assert.equal(splitHeight(geo(12), { dragged: 259, tapped: true }), 259);
+  assert.equal(splitHeight(geo(12), { dragged: 10, tapped: true }), SPLIT_MIN);
   assert.equal(clampSplit(10, geo(1)), 64);
   assert.equal(clampSplit(900, geo(1)), 598 - 64 - 44);
-  // remembered in ifizbox.* storage, as a fraction of the screen
-  const store = new Map();
-  const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
-  assert.equal(savedSplit(storage), null);
-  saveSplit(259, 647, storage);
+});
+
+test("F230: the split lasts one visit: leave and re-enter -> the peek; nothing stored, F215's key removed once", async () => {
+  const { render, splitTapped, splitDropped, splitNow, SPLIT_KEY } = await import("./settings.js");
+  const dark = { tab: "home", path: ["theme", "darkTheme"] };
+  const geo = splitGeo(12);
+  const peek = 598 - 470;
+  render(fakeElement("div"), dark);
+  assert.equal(splitNow(geo), peek);
+  splitTapped(); // the first theme tap: half
+  assert.equal(splitNow(geo), Math.round(647 / 2));
+  splitTapped(); // later taps keep it
+  assert.equal(splitNow(geo), Math.round(647 / 2));
+  splitDropped(200); // the divider let go at 200
+  splitTapped(); // a tap after a drag keeps the drag
+  assert.equal(splitNow(geo), 200);
+  render(fakeElement("div"), { tab: "home", path: ["theme"] }); // Back to Theme: no reset there...
+  assert.equal(splitNow(geo), 200);
+  render(fakeElement("div"), dark); // ...re-entering a theme list starts fresh
+  assert.equal(splitNow(geo), peek);
+  splitDropped(300); // a drag before any tap: the tap then keeps it
+  splitTapped();
+  assert.equal(splitNow(geo), 300);
+  render(fakeElement("div"), { tab: "home", path: ["theme", "lightTheme"] });
+  assert.equal(splitNow(geo), peek);
+  // localStorage: the old key went, once, and nothing was written for the split
   assert.equal(SPLIT_KEY, "ifizbox.themePreviewSplit");
-  assert.equal(splitHeight(geo(12), { saved: savedSplit(storage), tapped: true }), 259);
-  store.set(SPLIT_KEY, "junk");
-  assert.equal(savedSplit(storage), null);
+  assert.equal(lsData.has(SPLIT_KEY), false);
+  assert.equal(lsLog.filter(([op, k]) => op === "remove" && k === SPLIT_KEY).length, 1);
+  assert.deepEqual(lsLog.filter(([op]) => op === "set"), []);
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  for (const gone of ["savedSplit", "saveSplit", "SPLIT_FLOOR", "setItem(SPLIT_KEY"]) assert.equal(src.includes(gone), false, gone);
 });

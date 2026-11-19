@@ -48,12 +48,21 @@ function deps(id, over = {}) {
   return { d, log };
 }
 
-test("expectedBundleId: explicit profiles, wildcards with a known app ID, else null", () => {
-  assert.equal(expectedBundleId(idFor("com.you.app"), { url: "https://x/a.ipa" }), "com.you.app");
+test("F237: expectedBundleId with Keep Bundle IDs (the default): the app's own ID when known; iFizBox's own the old way", () => {
+  assert.equal(expectedBundleId(idFor("com.you.app"), { url: "https://x/a.ipa", bundleId: "io.dev.delta" }), "io.dev.delta");
+  assert.equal(expectedBundleId(idFor("com.you.*"), { url: "https://x/a.ipa", bundleId: "io.dev.delta" }), "io.dev.delta");
+  assert.equal(expectedBundleId(idFor("com.you.app"), { url: "https://x/a.ipa" }), null); // its own ID comes with the download
   assert.equal(expectedBundleId(idFor("com.you.*"), { url: SELF }), "com.you.ifizbox");
-  assert.equal(expectedBundleId(idFor("com.you.*"), { url: "https://x/a.ipa", bundleId: "io.dev.delta" }), "com.you.delta");
-  assert.equal(expectedBundleId(idFor("*"), { url: "https://x/a.ipa", bundleId: "io.dev.delta" }), "io.dev.delta");
-  assert.equal(expectedBundleId(idFor("com.you.*"), { url: "https://x/a.ipa" }), null); // its own ID comes with the download
+  assert.equal(expectedBundleId(idFor("com.you.app"), { url: SELF }), "com.you.app");
+});
+
+test("expectedBundleId (Keep Bundle IDs off): explicit profiles, wildcards with a known app ID, else null", () => {
+  const off = (o) => ({ ...o, keep: false });
+  assert.equal(expectedBundleId(idFor("com.you.app"), off({ url: "https://x/a.ipa" })), "com.you.app");
+  assert.equal(expectedBundleId(idFor("com.you.*"), off({ url: SELF })), "com.you.ifizbox");
+  assert.equal(expectedBundleId(idFor("com.you.*"), off({ url: "https://x/a.ipa", bundleId: "io.dev.delta" })), "com.you.delta");
+  assert.equal(expectedBundleId(idFor("*"), off({ url: "https://x/a.ipa", bundleId: "io.dev.delta" })), "io.dev.delta");
+  assert.equal(expectedBundleId(idFor("com.you.*"), off({ url: "https://x/a.ipa" })), null); // its own ID comes with the download
   assert.equal(expectedBundleId(null, { url: SELF }), null);
   assert.equal(expectedBundleId({ p12: new Uint8Array(1), profile: new Uint8Array([1, 2]) }, { url: SELF }), null); // not a profile
   assert.equal(expectedBundleId({ ...idFor("com.you.app"), passwordOk: null }, { url: SELF }), null); // password never checked: no early link

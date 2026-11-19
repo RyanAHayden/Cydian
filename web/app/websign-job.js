@@ -1,7 +1,7 @@
 // F93: one signing job on the website, inside the Web Worker (signing-worker.js): zsign (vendor/zsign, WebAssembly)
 // signs an IPA with the user's certificate, all in the worker's memory. Nothing here touches the network.
 //
-//   await runSignJob(createZsign, { ipa, p12, password, profile, bring }, { progress })
+//   await runSignJob(createZsign, { ipa, p12, password, profile, bring, appBundleId, keepBundleId }, { progress })
 //     -> { ipa: Uint8Array (signed), bundleId (signed as), originalId, name, version }
 //   Throws Error with .code: bad_ipa (not an IPA, no app inside), bad_profile, sign_failed (zsign's own reason).
 //
@@ -12,7 +12,7 @@
 // writes the website's ifizbox://import link as web/transfer.link (app.js imports it once); both before zsign seals
 // the bundle, as the old server signer did.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { isZip, profileInfo, targetBundleId, appEntitlements, plistXml, identityPlist, zsignArgs, zsignError, appInfo,
+import { isZip, profileInfo, signingIds, appEntitlements, plistXml, identityPlist, zsignArgs, zsignError, appInfo,
   IFIZBOX_ID, IDENTITY_FILE, TRANSFER_FILE } from "./core/websign.js";
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
@@ -27,7 +27,7 @@ export function removeTree(FS, path) {
   } else FS.unlink(path);
 }
 
-export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null }, { progress = () => {} } = {}) {
+export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null, keepBundleId = true }, { progress = () => {} } = {}) {
   const bytes = ipa instanceof Uint8Array ? ipa : new Uint8Array(ipa);
   if (!isZip(bytes)) throw fail("bad_ipa", "That file isn't an IPA (a zip archive).");
   let prof;
@@ -54,7 +54,9 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   // install link was opened for it, and an IPA under an older ID (0.9.3's) left iOS waiting on a link
   // nothing filled, then a second prompt from Ready to Install (user 2026-11-18).
   const own = appBundleId || info.bundleId;
-  const bundleId = targetBundleId(prof.appId, own);
+  // F237: Keep Bundle IDs (keepBundleId, on unless the user turned it off). iFizBox's own IPA keeps the old way here:
+  // the website can't see under which ID an earlier iFizBox went in, and an update must replace it.
+  const { bundleId, entitlementsId } = signingIds(prof.appId, own, { keep: keepBundleId !== false && own !== IFIZBOX_ID });
   // App extensions (PlugIns, a Watch app) come out: zsign gives every binary the app's own entitlements, which don't
   // match an extension's bundle ID, and iOS then refuses the app ("its integrity could not be verified", user
   // 2026-11-18, iFizBox's Share and Widget). The app's own Sign Options do the same with Remove App Extensions.
@@ -62,7 +64,7 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
 
   FS.writeFile("/w/key.p12", new Uint8Array(p12));
   FS.writeFile("/w/app.mobileprovision", new Uint8Array(profile));
-  FS.writeFile("/w/ents.plist", plistXml(appEntitlements(prof, bundleId)));
+  FS.writeFile("/w/ents.plist", plistXml(appEntitlements(prof, entitlementsId)));
   if (bring && own === IFIZBOX_ID) {
     if (bring.identity) FS.writeFile(`${appDir}/${IDENTITY_FILE}`, identityPlist({ p12, password, profile }));
     if (typeof bring.transfer === "string" && bring.transfer.startsWith("ifizbox://import?")) {

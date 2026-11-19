@@ -18,14 +18,16 @@
 import { showSheet } from "./nav/sheet.js";
 import { showAlert } from "./nav/alert.js";
 import { liveHUD } from "./nav/hud.js";
-import { grouped, el } from "./nav/ui.js";
+import { grouped, el, row } from "./nav/ui.js";
 import { format, settingsRoute } from "./router.js";
 import { installOnDevice, openSigning } from "./signing-client.js";
 import { createSwitch } from "./screens/settings.js";
-import { phaseLabel, deviceError, inspectGroups, installParams, installedId, isCgBI, fromBase64, notLandedText } from "./core/signing.js";
+import { phaseLabel, deviceError, inspectGroups, installParams, installedId, signsAsFor, isCgBI, fromBase64, notLandedText } from "./core/signing.js";
 import { NAME } from "./brand.js";
 import { selfLevels } from "./core/progress.js";
 import { lockSelfUpdate } from "./nav/progress.js";
+import { storedKeep, withKeep, sheetNotes, originalState, OLD_WAY_ALERT, OLD_WAY_TEXT, GUIDE_LINK } from "./core/keepid.js";
+import { keepGuideHref } from "./screens/guides.js";
 
 const ICON_SIZE = 180; // the 60pt @3x icon; the signer writes the same PNG as @2x and @3x
 
@@ -47,7 +49,7 @@ export async function inspectAndInstall({ url, name = "", onInstalled = () => {}
   const h = hud("Downloading");
   let info;
   try {
-    info = await native.call("signing.inspect", { url }, (ev) => { const t = phaseLabel(ev); if (t) h.set(t); });
+    info = await native.call("signing.inspect", withKeep({ url }), (ev) => { const t = phaseLabel(ev); if (t) h.set(t); });
   } catch (e) {
     h.hide();
     if (unknownMethod(e)) return install({ url, name, onInstalled });
@@ -96,7 +98,7 @@ export async function inspectToQueue({ url, name = "", queue },
   const h = hud("Downloading");
   let info;
   try {
-    info = await native.call("signing.inspect", { url }, (ev) => { const t = phaseLabel(ev); if (t) h.set(t); });
+    info = await native.call("signing.inspect", withKeep({ url }), (ev) => { const t = phaseLabel(ev); if (t) h.set(t); });
   } catch (e) {
     h.hide();
     if (unknownMethod(e)) { queue(null); return true; }
@@ -171,7 +173,9 @@ export async function followInstall(_native, bundleId, h, { later = setTimeout, 
 function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } = {}) {
   style();
   const app = info?.app ?? {};
-  const edits = { name: app.name || fallbackName, bundleId: info?.signsAs || app.bundleId || "", icon: null, removeExtensions: [] };
+  // F237: keepBundleId, the Keep Bundle ID switch below, starts as the global setting (inspect echoes what it got)
+  const keep0 = typeof info?.keepBundleId === "boolean" ? info.keepBundleId : storedKeep();
+  const edits = { name: app.name || fallbackName, bundleId: signsAsFor(info, keep0), icon: null, removeExtensions: [], keepBundleId: keep0 };
   const box = el("div", "sheet-scroll page-body grouped sign-sheet");
 
   // The head: the icon, the name and what it signs as, like an App Store page's top.
@@ -224,7 +228,8 @@ function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } =
   };
   ul.append(field("Name", edits.name, (v) => { edits.name = v; title.textContent = v.trim() || app.name || "App"; if (iconBox.classList.contains("is-placeholder")) placeholder(); },
     { placeholder: app.name || "" }));
-  ul.append(field("Bundle ID", edits.bundleId, (v) => { edits.bundleId = v; }, { placeholder: info?.signsAs || app.bundleId || "", inputMode: "url" }));
+  const idLi = field("Bundle ID", edits.bundleId, (v) => { edits.bundleId = v; }, { placeholder: edits.bundleId || app.bundleId || "", inputMode: "url" });
+  ul.append(idLi);
   const iconLi = el("li", "cell sign-files-cell");
   const iconRow = el("div", "cell-inner sign-row ss-icon-row");
   const iconState = el("span", "sign-value", "");
@@ -251,9 +256,55 @@ function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } =
   iconLi.append(iconRow, file, choose);
   ul.append(iconLi);
   g.append(ul);
-  const as = info?.signsAs && info.signsAs !== app.bundleId ? ` Your profile signs it as ${info.signsAs}.` : "";
-  g.append(el("p", "group-footer", `Change the name on the Home Screen, the bundle ID (to install a second copy) or the icon (made ${ICON_SIZE}×${ICON_SIZE}).${as}`));
+  const asText = () => {
+    const s = signsAsFor(info, edits.keepBundleId);
+    return s && s !== app.bundleId ? ` Your profile signs it as ${s}.` : "";
+  };
+  const asFoot = el("p", "group-footer", "");
+  const drawAs = () => { asFoot.textContent = `Change the name on the Home Screen, the bundle ID (to install a second copy) or the icon (made ${ICON_SIZE}×${ICON_SIZE}).${asText()}`; };
+  drawAs();
+  g.append(asFoot);
   box.append(g);
+
+  // F237: Keep Bundle ID, the global setting per app, with what the profile can't do and the original-app warning.
+  const kg = el("div", "group ss-keep");
+  const kul = el("ul", "table grouped");
+  const kli = el("li", "cell");
+  const kinner = el("div", "cell-inner has-switch");
+  const idInput = idLi.querySelector?.("input");
+  kinner.append(el("span", "cell-label", "Keep Bundle ID"), createSwitch({ label: "Keep Bundle ID", checked: keep0, onToggle: async (on) => {
+    if (!on) { // the old way, said plainly first
+      const { index } = await showAlert({ title: OLD_WAY_ALERT.title, message: OLD_WAY_TEXT(edits.name || app.name, info?.appIdAs || ""),
+        buttons: OLD_WAY_ALERT.buttons, cancel: 0 });
+      if (index !== 1) { kinner.querySelector?.(".switch")?.setAttribute("aria-checked", "true"); return; }
+    }
+    const before = signsAsFor(info, edits.keepBundleId);
+    edits.keepBundleId = on;
+    // a Bundle ID left as it was follows the switch; one the user typed stays
+    if (String(edits.bundleId).trim() === before) {
+      edits.bundleId = signsAsFor(info, on);
+      if (idInput) { idInput.value = edits.bundleId; idInput.placeholder = edits.bundleId; }
+    }
+    drawAs();
+    drawKeep();
+  } }));
+  kli.append(kinner);
+  kul.append(kli);
+  const guideLi = row({ label: GUIDE_LINK, chevron: true,
+    onClick: () => { close(); if (globalThis.location) globalThis.location.hash = keepGuideHref().replace(/^#/, ""); } });
+  const kfoot = el("p", "group-footer", "");
+  kg.append(kul, kfoot);
+  box.append(kg);
+  let orig = { installed: false, ours: false };
+  function drawKeep() {
+    const { notes, guide } = sheetNotes(info, { keep: edits.keepBundleId, ...orig, name: edits.name || app.name });
+    kfoot.textContent = notes.length ? notes.map((n) => n.text).join(" ")
+      : "The app keeps its own ID: it replaces the original and can get its notifications.";
+    if (guide && !guideLi.parentNode) kul.append(guideLi);
+    else if (!guide && guideLi.parentNode) guideLi.remove();
+  }
+  drawKeep();
+  originalState(globalThis.ifizboxNative, app.bundleId).then((s) => { orig = s; drawKeep(); }, () => {});
 
   box.append(grouped(inspectGroups(info)));
   // The missing group's rows are a warning: red, as Settings' warnings are.

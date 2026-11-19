@@ -100,11 +100,15 @@ final class IPASigner {
         guard var main = bundles[appDir], let oldID = main.plist["CFBundleIdentifier"] as? String else {
             throw SignError("bad_ipa", "The app has no bundle ID.")
         }
-        let newID = try profile.bundleID(for: options.bundleID ?? oldID)
+        // F237: kept, Info.plist keeps the ID and only the entitlements carry the profile's App ID (entID).
+        let keep = options.keeps(options.bundleID ?? oldID)
+        let (newID, entID) = try profile.signingIDs(for: options.bundleID ?? oldID, keep: keep)
 
-        // An explicit profile covers one app ID: extensions (and Watch apps) would need their own, so they go.
+        // An explicit profile covers one app ID: extensions (and Watch apps) would need their own, so they go. Kept
+        // IDs keep them (R25): each extension keeps its own Info.plist ID, prefixed by the app's as iOS requires,
+        // and is signed under the app's application-identifier.
         var cut = [String]()
-        if !profile.isWildcard {
+        if !profile.isWildcard && !keep {
             for dir in bundles.keys.sorted() where dir != appDir && (dir.hasSuffix(".appex/") || dir.hasSuffix(".app/")) { // sorted: a Dictionary's order changes per run
                 cut.append(dir)
             }
@@ -120,7 +124,8 @@ final class IPASigner {
         for c in cut { removed.append(String(c.dropFirst(appDir.count).dropLast())); }
         bundles = bundles.filter { k, _ in !cut.contains { k.hasPrefix($0) } }
         log("App \(appDir.dropFirst(8).dropLast()): \(oldID)" + (newID == oldID ? "" : " -> \(newID)") + ", \(zip.entries.count) files")
-        for r in removed { log("Left out \(r)" + (profile.isWildcard ? "" : " (the profile covers one app ID)")) }
+        if keep && entID != newID { log("Kept its bundle ID; App ID \(profile.team).\(entID) in the entitlements") }
+        for r in removed { log("Left out \(r)" + (profile.isWildcard || keep ? "" : " (the profile covers one app ID)")) }
         func gone(_ name: String) -> Bool { dropped(name) || cut.contains { name.hasPrefix($0) } }
 
         // New bundle IDs: the app's, and the extensions' that start with the app's old one.
@@ -222,7 +227,7 @@ final class IPASigner {
                 guard files[exe] != nil else { throw SignError("bad_ipa", "\(exe.dropFirst(appDir.count)) is missing.") }
                 let data = fixed(exe, try contents(exe, files, zip))
                 let params = CodeSignParams(identifier: id, team: profile.team,
-                                            entitlements: isApp ? profile.entitlements(for: id) : nil,
+                                            entitlements: isApp ? profile.entitlements(for: keep ? entID : id) : nil,
                                             infoPlist: infoData, codeResources: resources)
                 files[exe] = .data(try MachO.sign(data, params, identity, time: time), mode: mode(exe, files))
             }

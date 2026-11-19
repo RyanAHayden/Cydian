@@ -15,6 +15,7 @@
 import { el, grouped, row } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { NAME } from "../brand.js";
+import { GUIDE_ID as KEEP_GUIDE } from "../core/keepid.js";
 
 export const JAILBREAK_INFO_URL = "https://jailbreakme.dev/";
 
@@ -306,8 +307,35 @@ export const GUIDES = {
   copying: { title: "Copying Files", row: "Copying Files to/from Device" },
   openssh: { title: "OpenSSH", row: "OpenSSH Access How-To", only: "full" },
   password: { title: "Root Password", row: "Root Password How-To", only: "full" },
+  // F237: listed where apps are signed (lite); `linked`: Settings > Signing and Custom Install open it in any mode
+  [KEEP_GUIDE]: { title: "Notifications", row: "Notifications for Signed Apps", only: "lite", linked: true },
 };
 export const guideIds = (lite) => Object.keys(GUIDES).filter((id) => shows(GUIDES[id], lite));
+const opens = (id, lite) => guideIds(lite).includes(id) || Boolean(GUIDES[id]?.linked);
+
+// ---- F237: Notifications for Signed Apps (core/keepid.js, Keep Bundle IDs) ----------------------------------
+// R25's steps made simple (journal/2026-11-18-r25-keep-bundle-id): with Keep Bundle IDs on, an app signed with an Ad
+// Hoc profile whose explicit App ID has Push keeps its own ID and gets its own notifications.
+export const KEEP_INTRO = "A signed app keeps its own bundle ID, so it replaces the original. For its notifications, "
+  + "your profile needs Push: Apple gives it only to an explicit App ID (not a wildcard like com.you.*), in an Ad Hoc "
+  + "profile. You need a paid Apple Developer account and its Apple Distribution certificate.";
+export const DEVELOPER_URL = "https://developer.apple.com/account/resources/identifiers/list";
+STEPS[KEEP_GUIDE] = [
+  { title: "Make an App ID with Push", text: "On developer.apple.com, Certificates, IDs & Profiles > Identifiers > +: "
+    + "App IDs, App. Choose Explicit and type an ID of your own, such as com.yourname.youtube. Tick Push Notifications, "
+    + "then Register. One App ID per app: two apps on one share their sign-ins.",
+    rows: [{ label: "Identifiers", subtitle: "developer.apple.com", chevron: true,
+      onClick: () => globalThis.open?.(DEVELOPER_URL, "_blank", "noopener") }] },
+  { title: "Register Your iPhones", text: "Devices > +: a name and the iPhone's UDID. A Mac's Finder shows it: click "
+    + "the line under the iPhone's name. Settings > Signing says whether this iPhone is in your profile." },
+  { title: "Make an Ad Hoc Profile", text: "Profiles > +: Ad Hoc. Pick the App ID, your Apple Distribution "
+    + "certificate and your iPhones, name it, then Download the .mobileprovision." },
+  { title: "Import It", text: "Settings > Signing: Replace Certificate with your .p12 and the new profile.",
+    rows: [{ label: "Settings > Signing", href: format(settingsRoute(["signing"])) }] },
+  { title: "Install the App", text: "Keep Bundle IDs on (Settings > Signing, or Custom Install per app). If the App "
+    + "Store copy is on the iPhone, delete it first: iOS won't put a signed app over it, and its data goes with it." },
+];
+export const keepGuideHref = (fmt = format) => fmt({ tab: "home", path: ["guides", KEEP_GUIDE] });
 
 // Home's User Guides group: one row per guide, in Cydia's order; lite leaves out the jailbreak ones.
 export const guideRows = (fmt = format, lite = false) =>
@@ -317,7 +345,7 @@ export const guideRows = (fmt = format, lite = false) =>
 // unknown one, shows the list.
 export function guidePage(path, lite) {
   const id = path[1];
-  if (!id || !guideIds(lite).includes(id)) return { page: "list" };
+  if (!id || !opens(id, lite)) return { page: "list" };
   if (id === "faq" && path[2]) {
     const answer = answerFor(path[2], lite);
     return answer ? { page: "answer", id, answer } : { page: "guide", id };
@@ -344,6 +372,7 @@ export function render(body, route, opts = {}) {
   else if (p.id === "copying") page.append(lite ? grouped(noJailbreakSections()) : copyingView(opts.segment ?? 0));
   else if (p.id === "openssh") page.append(stepsView("openssh", opts));
   else if (p.id === "password") page.append(passwordView(opts));
+  else if (p.id === KEEP_GUIDE) page.append(grouped([{ footer: KEEP_INTRO }]), stepsView(KEEP_GUIDE, opts));
   body.append(page);
   return page;
 }

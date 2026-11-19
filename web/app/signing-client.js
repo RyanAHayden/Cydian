@@ -20,6 +20,7 @@ import { showBanner } from "./nav/banner.js";
 import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError, parseProfile, deviceCheck, notLandedText } from "./core/signing.js";
 import { format, settingsRoute } from "./router.js";
 import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId } from "./core/websign.js";
+import { storedKeep, withKeep } from "./core/keepid.js";
 import { detectMode } from "./core/settings.js";
 import { progressHUD, lockSelfUpdate } from "./nav/progress.js";
 import { showAlert } from "./nav/alert.js";
@@ -285,7 +286,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   try {
     // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
     // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
-    result = await untilCancel(h, bridge(native).call("signing.install", { ...(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}) }, (ev) => {
+    result = await untilCancel(h, bridge(native).call("signing.install", { ...withKeep(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}) }, (ev) => {
       if (ev?.log) h.page?.raw?.(ev.log); // the shell's console lines (Sideload.swift install's log)
       const t = phaseLabel(ev);
       if (t) h.set(t);
@@ -341,8 +342,9 @@ export function prepareParams(job) {
   const edits = { ...(job.options?.edits ?? {}) };
   delete edits.token;
   delete edits.url;
-  if (job.library) return { library: job.library, ...edits };
-  return { url: job.url, ...edits };
+  // F237: Keep Bundle IDs off goes with the job, unless its Custom Install chose (edits.keepBundleId)
+  if (job.library) return withKeep({ library: job.library, ...edits });
+  return withKeep({ url: job.url, ...edits });
 }
 
 // native.call that rejects with code "cancelled" the moment `signal` aborts, after asking the shell to stop `tag`.
@@ -605,7 +607,9 @@ export async function uploadSigned(bytes, { bundleId, name, version }, { base = 
 export const EARLY_WINDOW = 8 * 60 * 1000;
 
 // The bundle ID `id`'s profile signs this app as, when it's known before signing; else null.
-export function expectedBundleId(id, { url = "", bundleId = null } = {}) {
+// F237: with Keep Bundle IDs (keep), that is the app's own ID when the caller knows it (websign-job.js keeps
+// iFizBox's own IPA the old way, so its prediction stays the profile's).
+export function expectedBundleId(id, { url = "", bundleId = null, keep = storedKeep() } = {}) {
   // Only a password known to open the .p12: a sign that fails after iOS was sent to the link leaves iOS waiting, and
   // it gives up with "the certificate for <domain> is not valid" (user 2026-11-18). Unchecked (null, e.g. synced from
   // the account) goes the slow way: Ready to Install, or the signing error, with nothing opened.
@@ -613,8 +617,10 @@ export function expectedBundleId(id, { url = "", bundleId = null } = {}) {
   try {
     const { appId } = profileInfo(id.profile instanceof Uint8Array ? id.profile : new Uint8Array(id.profile));
     if (!appId) return null;
-    if (!appId.includes("*")) return appId;
     const own = bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null);
+    if (keep && own && own !== IFIZBOX_ID) return own;
+    if (keep && !own) return null; // its own ID comes with the download
+    if (!appId.includes("*")) return appId;
     return own ? targetBundleId(appId, own) : null;
   } catch { return null; }
 }
@@ -693,7 +699,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     const self = isSelfIpa(url) || bring;
     const carry = self ? { identity: Boolean(bring), transfer: await transfer().catch(() => null) } : null;
     const signed = await untilCancel(h, worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(id.profile), password: id.password ?? "", bring: carry,
-        appBundleId: bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null) },
+        appBundleId: bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null), ...withKeep({}) },
       { onProgress: (t) => h.set(t), ...(signal ? { signal } : {}) }));
     h.set("Uploading");
     const ipaBytes = signed.ipa instanceof Uint8Array ? signed.ipa : new Uint8Array(signed.ipa);

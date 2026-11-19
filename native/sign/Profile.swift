@@ -50,6 +50,20 @@ struct Profile {
         return appID
     }
 
+    // F237: the profile's aps-environment ("production" in an Ad Hoc profile with Push, "development" in a
+    // development one), or nil when its App ID has no Push (every wildcard profile).
+    var pushEnvironment: String? { (entitlements["aps-environment"] as? String).flatMap { $0.isEmpty ? nil : $0 } }
+
+    // F237 (R25's verdict): the IDs one app is signed with. `keep` (Keep Bundle IDs, on by default): Info.plist and
+    // the code signature keep the app's own ID (or the one the user typed), and only the entitlements'
+    // application-identifier and keychain group take the profile's App ID (explicit, or the wildcard narrowed:
+    // bundleID(for:)); iOS's installer never compares the two. Off: the old way, the app becomes a copy under the
+    // profile's ID.
+    func signingIDs(for appBundleID: String, keep: Bool) throws -> (bundleID: String, entitlementsID: String) {
+        let ent = try bundleID(for: appBundleID)
+        return (keep ? appBundleID : ent, ent)
+    }
+
     // The profile's entitlements narrowed to one bundle, the way Xcode signs (I5's app_entitlements).
     func entitlements(for bundleID: String) -> [String: Any] {
         var e = entitlements

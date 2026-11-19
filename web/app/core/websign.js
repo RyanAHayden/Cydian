@@ -3,6 +3,7 @@
 //
 //   profileInfo(bytes)                      { appId, teamId, entitlements } from a .mobileprovision
 //   targetBundleId(appId, bundleId)         the ID the app is signed as (a com.you.* profile signs any app)
+//   signingIds(appId, bundleId, { keep })   F237: Info.plist's ID and the entitlements' (Keep Bundle IDs)
 //   appEntitlements(info, bundleId)         the profile's entitlements narrowed to that app (Xcode's way)
 //   plistXml(value)                         an XML plist (dict, array, string, integer, real, bool, data, date)
 //   identityPlist({ p12, password, profile })   iFizBox's own IPA's ifizbox-identity.plist (native BundledIdentity)
@@ -39,7 +40,17 @@ export function profileInfo(bytes) {
   const teamId = (p.TeamIdentifier ?? [])[0] ?? ent["com.apple.developer.team-identifier"] ?? null;
   const full = String(ent["application-identifier"] ?? "");
   const prefix = [...(p.ApplicationIdentifierPrefix ?? []), teamId].find((x) => x && full.startsWith(x + "."));
-  return { appId: prefix ? full.slice(prefix.length + 1) : full, teamId, entitlements: ent };
+  const push = typeof ent["aps-environment"] === "string" && ent["aps-environment"] ? ent["aps-environment"] : null;
+  return { appId: prefix ? full.slice(prefix.length + 1) : full, teamId, entitlements: ent, push };
+}
+
+// F237 (R25): the IDs an app is signed with. keep (Keep Bundle IDs, the default): Info.plist and the code signature
+// keep the app's own ID, so zsign gets no -b, and only the entitlements carry the profile's App ID (explicit, or the
+// wildcard narrowed: targetBundleId). Off: the old way, the app becomes a copy under the profile's ID.
+//   -> { bundleId (Info.plist), entitlementsId (appEntitlements' ID) }
+export function signingIds(appId, bundleId, { keep = true } = {}) {
+  const entitlementsId = targetBundleId(appId, bundleId);
+  return { bundleId: keep ? bundleId : entitlementsId, entitlementsId };
 }
 
 // A full wildcard ("*") keeps the app's own ID. A prefix wildcard (com.you.*) keeps it if it fits, and otherwise

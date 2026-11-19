@@ -25,9 +25,9 @@ iOS's install prompt.
   1. *Downloading*: the IPA through the Worker's `/api/fetch?url=…&kind=ipa` (most hosts send no CORS headers),
      streamed, up to 512 MB (`MAX_UPLOAD_MB`).
   2. *Signing*: `signing-worker.js` (a module Web Worker) runs `websign-job.js`: unzip, read `Info.plist`, the
-     bundle ID the profile allows (`core/websign.js targetBundleId`: a `com.you.*` profile signs any app as
-     `com.you.<last part>`), the profile's entitlements narrowed to that app (`appEntitlements`, never
-     `get-task-allow`), then zsign on the folder. zsign's own last error is what the alert shows.
+     IDs (`core/websign.js signingIds`, see "Keep Bundle IDs" below), the profile's entitlements narrowed to the
+     profile's App ID (`appEntitlements`, never `get-task-allow`), then zsign on the folder (`-b` only when the app
+     is signed the old way). zsign's own last error is what the alert shows.
   3. *Uploading*: the signed IPA to `POST /sign/upload` in 20 MB parts (KV holds 25 MB a value), kept 10 minutes
      (`TTL`), served at `/sign/up/<token>/manifest.plist` and `app.ipa` (Range too).
   4. iOS's install prompt (`itms-services`), with a banner saying to press Install.
@@ -209,9 +209,11 @@ cross-compiled into the app; this way neither. It writes what Apple's `codesign`
   file with SHA-1 and SHA-256 (nested bundles' files included, as zsign seals them; symlinks as links; `.lproj`
   optional), `embedded.mobileprovision` in apps and extensions, the entitlements narrowed per bundle, as the website does
   (`application-identifier` and the keychain group set to the bundle's ID, `get-task-allow` off);
-- the bundle ID rules: a wildcard profile keeps the app's ID (a `com.you.*` one moves it under the prefix if it
-  doesn't fit), an explicit one renames the app and **leaves out its extensions and Watch apps** (one profile, one
-  app ID), and says which in `removed`. Extensions' IDs follow the app's;
+- the bundle ID rules (see "Keep Bundle IDs" below): kept, Info.plist and every code signature keep the app's and
+  its extensions' own IDs, and the app and its extensions all carry the profile's App ID as `application-identifier`
+  and keychain group. The old way, a wildcard profile keeps the app's ID (a `com.you.*` one moves it under the prefix
+  if it doesn't fit), an explicit one renames the app and **leaves out its extensions and Watch apps** (one profile,
+  one app ID), and says which in `removed`. Extensions' IDs follow the app's;
 - zip to zip: the IPA is read once to hash every file and is never unpacked to disk; untouched entries are copied
   still compressed, only signed binaries, changed Info.plists and the new files are deflated. ZIP64 is read and
   written.
@@ -271,6 +273,35 @@ Plus the arm64e fix-up and the user's edits (below). No dylib injection.
 
 Not in the app: backloop.dev and api.palera.in installs (the Signing Server serves the manifest instead, above), so
 no backloop pack expiry check or genPlist URL encoding; and no Zsign-Package (iFizBox's own signer does the job).
+
+### Keep Bundle IDs
+
+Settings > Signing's **Keep Bundle IDs** (on by default, `core/settings.js keepBundleId`, the website and the
+sideload build), and the same switch per app in Custom Install. Both signers apply it (`Profile.signingIDs`,
+`SignOptions.keepBundleID`; `core/websign.js signingIds`). iOS's installer never compares `application-identifier`
+with the bundle ID, and keys the app's data by the bundle ID:
+
+- **On**: Info.plist's `CFBundleIdentifier` and the code signature's identifier stay the app's own (or the ID typed in
+  Custom Install), extensions keep theirs (prefixed by the app's, as installd requires) and stay in with an explicit
+  profile. Only the entitlements change: `application-identifier` and the keychain group are `TEAM.<App ID>`, the
+  profile's explicit App ID, or a wildcard narrowed (`com.you.*` -> `com.you.<last part>`), for the app and every
+  extension; `aps-environment` comes from the profile. So the app replaces the original instead of sitting beside
+  it, and with an Ad Hoc profile whose App ID has Push it can get its own notifications.
+- **Off** (the old way, asked first: `OLD_WAY_ALERT`): the app becomes a copy under the profile's ID; its
+  notifications won't work and sign-in, iCloud or shared data tied to its ID may not.
+- What is sent: the page adds `keepBundleId: false` to `signing.install`, `signing.prepare` and `signing.inspect`
+  (and the website's worker job) only while it's off (`core/keepid.js withKeep`); absent means on. Custom Install
+  always sends its switch. Records and My IPAs Sign Options saved before the setting existed have no
+  `keepBundleID` and keep the old way, so Re-sign replaces what they installed.
+- iFizBox's own IPA keeps its ID only when the running iFizBox has it (`SignOptions.keeps`); on the website it is
+  always signed the old way (the website can't see under which ID an earlier one went in).
+- Warnings (`core/keepid.js profileNotes`, under the switch and in Custom Install): a wildcard profile (Apple gives
+  it no Push), a development one (sandbox push only), an App ID without Push, and one App ID per app (two apps on
+  one share their keychain). Custom Install also warns when the original (same ID, not signed by iFizBox:
+  `apps.isInstalled`, `signing.installed`) is on the phone: iOS refuses to put a signed app over the App Store copy,
+  which must be deleted first. None of these falls back to the old way: every profile kind installs with the ID kept.
+- The guide: Home > User Guides > Notifications for Signed Apps (`screens/guides.js`, route `guides/keep-bundle-id`),
+  linked from those warnings: an explicit App ID with Push, the iPhones' UDIDs, an Ad Hoc profile, import it.
 
 ### Is this iPhone in the profile?
 

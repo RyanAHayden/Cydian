@@ -247,7 +247,7 @@ struct IPALibrary {
                                 "icon": d.icon?.base64EncodedString() ?? NSNull(), "error": d.error ?? NSNull()]
         let o = options(file)
         j["options"] = ["name": o.name.map { $0 as Any } ?? NSNull(), "bundleId": o.bundleID.map { $0 as Any } ?? NSNull(), "icon": o.icon?.base64EncodedString() ?? NSNull(),
-                        "removeExtensions": o.removeExtensions, "fixArm64e": o.fixArm64e]
+                        "removeExtensions": o.removeExtensions, "fixArm64e": o.fixArm64e, "keepBundleId": o.keepBundleID]
         if let s = signed(file, certificate: certificate, now: now) {
             var sj: [String: Any] = ["at": iso.string(from: s.signed), "bundleId": s.bundleID, "name": s.name, "version": s.version,
                                      "size": stat(signedURL(file)).0]

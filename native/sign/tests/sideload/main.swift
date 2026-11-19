@@ -81,6 +81,28 @@ test("options from the bridge") {
     check(throwsCode("bad_options") { _ = try SignOptions(json: ["icon": Data("GIF89a".utf8).base64EncodedString()]) }, "icon not PNG")
 }
 
+test("F237: Keep Bundle IDs option, stored and the profile's IDs") {
+    check(try SignOptions(json: [:]).keepBundleID, "absent: kept (the default)")
+    check(!(try SignOptions(json: ["keepBundleId": false])).keepBundleID, "false: the old way")
+    // a record written before F237 has no key: it signed the old way, so Re-sign does too
+    let old = try JSONDecoder().decode(SignedRecord.StoredOptions.self, from: Data(#"{"removeExtensions":[],"fixArm64e":true}"#.utf8))
+    check(old.keepBundleID == nil && !SignOptions(old).keepBundleID, "old record: old way")
+    check(old == SignOptions(old).stored, "an old record equals its options written again")
+    var o = SignOptions()
+    check(SignOptions(o.stored).keepBundleID, "round trip keeps it")
+    // iFizBox's own IPA keeps its ID only when the running iFizBox has it
+    check(o.keeps("com.ryha.ifizbox", running: "com.ryha.ifizbox") && !o.keeps("com.ryha.ifizbox", running: "com.you.ifizbox"), "self")
+    check(o.keeps("com.ryha.ifizbox", running: nil) && o.keeps("com.google.ios.youtube", running: "com.you.ifizbox"), "others")
+    o.keepBundleID = false
+    check(!o.keeps("com.google.ios.youtube", running: nil), "off")
+    let x = try Profile(fixture("profile-explicit.mobileprovision"))
+    let kept = try x.signingIDs(for: "com.google.ios.youtube", keep: true)
+    check(kept.bundleID == "com.google.ios.youtube" && kept.entitlementsID == "com.me.only", "explicit kept \(kept)")
+    let moved = try x.signingIDs(for: "com.google.ios.youtube", keep: false)
+    check(moved.bundleID == "com.me.only" && moved.entitlementsID == "com.me.only", "explicit old way \(moved)")
+    check(x.pushEnvironment == nil, "the test profiles have no Push")
+}
+
 test("strings files") {
     let d = SignOptions.parseStrings("/* c */ \"a\" = \"x \\\"y\\\"\\n\";\n// line\nb = c;\n\"u\" = \"\\U00e9\";")
     check(d?["a"] as? String == "x \"y\"\n" && d?["b"] as? String == "c" && d?["u"] as? String == "é", "\(String(describing: d))")
@@ -146,9 +168,18 @@ test("sign with the user's edits") {
     check(throwsCode("bad_options") { _ = try s.sign(fixtures.appendingPathComponent("edit.ipa"), to: work.appendingPathComponent("x.ipa")) },
           "unknown extension")
     let explicit = IPASigner(profile: try Profile(fixture("profile-explicit.mobileprovision")), identity: identity)
-    explicit.options = try SignOptions(json: ["bundleId": "com.me.asked"])
+    explicit.options = try SignOptions(json: ["bundleId": "com.me.asked", "keepBundleId": false])
     let e = try explicit.sign(fixtures.appendingPathComponent("edit.ipa"), to: work.appendingPathComponent("explicit.ipa"))
     check(e.bundleID == "com.me.only" && e.removed.sorted() == ["PlugIns/Share.appex", "PlugIns/Widget.appex"], "explicit \(e.bundleID) \(e.removed)")
+    // F237: kept (the default), the typed ID stays in Info.plist, the profile's App ID goes in the entitlements,
+    // and the extensions stay, signed under the app's application-identifier
+    explicit.options = try SignOptions(json: ["bundleId": "com.me.asked"])
+    let k = try explicit.sign(fixtures.appendingPathComponent("edit.ipa"), to: work.appendingPathComponent("explicit-kept.ipa"))
+    check(k.bundleID == "com.me.asked" && k.removed.isEmpty, "kept \(k.bundleID) \(k.removed)")
+    let kd = try Inspect.ipa(work.appendingPathComponent("explicit-kept.ipa"))
+    check(kd.bundleID == "com.me.asked" && kd.entitlements["application-identifier"] as? String == "TESTTEAM42.com.me.only",
+          "kept entitlements \(kd.bundleID) \(kd.entitlements)")
+    check(kd.extensions.map(\.bundleID).sorted() == ["com.me.asked.share", "com.me.asked.widget"], "kept extensions \(kd.extensions.map(\.bundleID))")
     // no options: the plain I6 behaviour, no fix-up when turned off
     let plain = IPASigner(profile: profile, identity: identity)
     plain.options.fixArm64e = false

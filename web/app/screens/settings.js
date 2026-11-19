@@ -37,6 +37,8 @@ import { versionLines } from "./version-foot.js";
 import { ipaSection } from "./ipa-install.js";
 import { otherLinksOn, setOtherLinks } from "../core/otherlinks.js";
 import { NAME, GITHUB_REPO } from "../brand.js";
+import { profileNotes, keepOn, GUIDE_LINK } from "../core/keepid.js";
+import { keepGuideHref } from "./guides.js";
 import { rowIcon, SETTING_ICONS, PAGE_ICONS } from "../icons/rowicons.js";
 
 export const title = "Settings";
@@ -205,7 +207,14 @@ function makeSwitch(d) {
   const b = createSwitch({
     label: d.label,
     checked: settings.get(d.key) === true,
-    onToggle: (on) => { if ((settings.get(d.key) === true) !== on) settings.set(d.key, on); },
+    onToggle: (on) => {
+      if ((settings.get(d.key) === true) === on) return;
+      if (on || !d.confirmOff) { settings.set(d.key, on); return; }
+      // F237: a switch whose Off needs saying first (Keep Bundle IDs): Cancel puts it back
+      showAlert({ ...d.confirmOff, cancel: 0 }).then(({ index }) => {
+        if (index === 1) settings.set(d.key, false); else syncSwitches(d.key);
+      }, () => syncSwitches(d.key));
+    },
   });
   b.dataset.key = d.key;
   return b;
@@ -1045,6 +1054,20 @@ const serverGroup = (el) => {
       onClick: () => window.open(RUN_YOUR_OWN, "_blank", "noopener") }] }]);
 };
 
+// F237: under Keep Bundle IDs, what the profile can't do with the ID kept (wildcard, development, no Push), or the
+// old way's warning while it's off, with the guide's row. Nothing for an Ad Hoc profile with Push.
+export function keepNotes(profile, keep) {
+  return profileNotes(profile, { keep }).filter((n) => n.id !== "one-app");
+}
+function withKeepNotes(frag, profile) {
+  const notes = keepNotes(profile, keepOn((k) => settings.get(k)));
+  if (notes.length) {
+    const rows = notes.some((n) => n.guide) ? [{ label: GUIDE_LINK, href: keepGuideHref() }] : [];
+    frag.append(grouped([{ rows, footer: notes.map((n) => n.text).join(" ") }]));
+  }
+  return frag;
+}
+
 async function drawDeviceSigning(el) {
   watchReturn();
   const { id, status, failure, kept } = await deviceSigningState(el);
@@ -1058,7 +1081,7 @@ async function drawDeviceSigning(el) {
       footer: `Kept in this iPhone's Keychain, where only ${NAME} can use it.` }),
     files: () => certificateBlock(el, id, status ?? { identity: null }, { files: true }),
     profile: () => profileGroup(split.profile, info.device), // F236: with "This iPhone is in the profile"
-    options: () => settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"),
+    options: () => withKeepNotes(settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"), kept?.profile),
     server: () => serverGroup(el),
     status: () => signingExtras({ identity: kept, redraw: redrawAll, dates: settings.get("showExpiry") }),
     remove: () => grouped([{ rows: [{ label: "Remove Certificate", onClick: () => removeDeviceCertificate() }] }]),
@@ -1305,7 +1328,7 @@ async function drawSiteSigning(el) {
     files: () => certificateBlock(el, id, null, { files: true }),
     // F236: the website can't read the UDID: a profile that lists devices says how to check it
     profile: () => profileGroup(split.profile, profile ? deviceCheckText(deviceCheck(profile, null)) : null),
-    options: () => settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"),
+    options: () => withKeepNotes(settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"), profile),
     app: () => { const f = document.createDocumentFragment(); f.append(...siteAppSection(id)); return f; },
     remove: () => grouped([{ rows: [{ label: "Remove Certificate", onClick: () => removeSiteCertificate() }] }]),
     help: () => helpGroup(),

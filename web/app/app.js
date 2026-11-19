@@ -15,6 +15,7 @@ import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transitio
 import { attachEdgeSwipe } from "./nav/swipe.js";
 import { keepRow, ghostFor } from "./nav/selection.js";
 import { createTabbar, tapTab, scrollToTop, isSliding } from "./nav/tabbar.js";
+import { scrollerOf } from "./nav/searchbar.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
@@ -324,7 +325,8 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
   homeTop.tabTapped(tab); // F211: Home shows at its top when its tab is tapped from elsewhere (nav/hometop.js)
   // Back to the root of the tab you are on is our own pop, so it slides like Back (not a jump).
   tapTab(tab, router.current(), { selectTab: (t) => { ownBack = true; router.selectTab(t); }, reselect: SCREENS[tab].reselect,
-    scrollTop: () => scrollToTop(stacks.top()?.page.body), sliding: () => isSliding(stacks.top()?.page.body) });
+    // C10: a page with the pinned search bar scrolls its results (nav/searchbar.js), not its body.
+    scrollTop: () => scrollToTop(scrollerOf(stacks.top()?.page.body)), sliding: () => isSliding(scrollerOf(stacks.top()?.page.body)) });
 });
 
 // Pressed look while a finger is down, like Cydia's: .is-pressed on the bar button or row under it, off when the

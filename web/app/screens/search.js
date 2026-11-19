@@ -25,6 +25,8 @@ import { discoveryGroup } from "./extras.js";
 import { recommendedApps, addRecommended, onSourcesChanged } from "./manage.js";
 import { matchRecommendedApps } from "../core/recommended.js";
 import { showAlert } from "../nav/alert.js";
+import { searchBar, pinned } from "../nav/searchbar.js";
+import { detectMode } from "../core/settings.js";
 
 export const title = "Search";
 
@@ -104,6 +106,9 @@ export function reselect() {
   return true;
 }
 
+// The field's placeholder (user 2026-11-19): tweaks in the jailbreak app, apps everywhere else.
+export const searchPlaceholder = (mode = detectMode()) => (mode === "jailbreak" ? "Search Tweaks" : "Search Apps");
+
 export function nav(route) {
   if (route.path.length) return browse.nav(route);
   return { title: "Search", style: "plain" };
@@ -114,30 +119,14 @@ export function render(body, route, ctx) {
     browse.render(body, route, ctx);
     return;
   }
-  const bar = document.createElement("form");
-  bar.className = "search-bar has-scope";
-  bar.setAttribute("role", "search");
-  const field = document.createElement("label");
-  field.className = "search-field";
-  const input = document.createElement("input");
-  input.type = "search";
-  input.placeholder = "Search";
-  input.autocapitalize = "off";
-  input.autocomplete = "off";
-  input.spellcheck = false;
-  input.setAttribute("autocorrect", "off");
-  input.setAttribute("aria-label", "Search packages: name, description or author");
-  input.enterKeyHint = "search";
-  input.value = state.query;
+  // The shared bar (nav/searchbar.js): its Cancel empties the field and puts the keyboard away; Search saves the
+  // query to Recent.
+  const bar = searchBar({ placeholder: searchPlaceholder(), ariaLabel: "Search packages: name, description or author",
+    value: state.query, delay: 120, className: "has-scope", onQuery: () => run(),
+    onSubmit: (q) => settings.recentSearches.add(q),
+    onFocus: () => drop?.close() }); // typing a search puts the Filter panel away
+  const input = bar.input;
   rootInput = input;
-  input.addEventListener("focus", () => drop?.close()); // typing a search puts the Filter panel away
-  field.append(input);
-  // iOS 6's search bar Cancel: shown while editing or holding text (packages.css), it empties the field and puts
-  // the keyboard away. pointerdown keeps the focus, or the blur would hide it before the click lands.
-  const cancel = el("button", "search-cancel", "Cancel");
-  cancel.type = "button";
-  cancel.addEventListener("pointerdown", (e) => e.preventDefault());
-  bar.append(field, cancel);
 
   // The scope bar: segments, then Filter.
   const scope = el("div", "search-scope");
@@ -180,10 +169,7 @@ export function render(body, route, ctx) {
   note.className = "empty search-note";
   // The bar and its scope row stay put, as Cydia's search bar does on the 4S (ref/4s/screens/search-85.png); only the
   // results scroll, and bounce, under them (packages.css .search-root).
-  const results = el("div", "search-results");
-  results.setAttribute("data-scroller", "");
-  body.classList.add("search-root");
-  body.append(bar, scope, results);
+  const results = pinned(body, bar, scope);
   // F100: the Recent table, shown in place of the note while the field is empty.
   const recent = el("div", "search-recent");
   results.append(note, recent);
@@ -206,7 +192,6 @@ export function render(body, route, ctx) {
     run();
   });
 
-  let timer = 0;
   function drawRecent() {
     const items = input.value.trim() ? [] : settings.recentSearches.list();
     recent.replaceChildren();
@@ -221,8 +206,7 @@ export function render(body, route, ctx) {
   }
   // A Recent row: search it again, as if typed and Searched (it moves to the top).
   function pick(q) {
-    input.value = q;
-    clearTimeout(timer);
+    bar.set(q);
     settings.recentSearches.add(q);
     run();
     input.blur();
@@ -271,9 +255,6 @@ export function render(body, route, ctx) {
     run({ again: true });
     recs.search(q, { again: true });
   }, () => body.isConnected);
-  cancel.addEventListener("click", () => { input.value = ""; clearTimeout(timer); run(); input.blur(); });
-  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 120); });
-  bar.addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); settings.recentSearches.add(input.value); run(); input.blur(); });
   run();
 }
 

@@ -62,6 +62,7 @@
 import * as browse from "./browse.js";
 import * as myipas from "./myipas.js";
 import { grouped, plain, placeholder, segments, barButton } from "../nav/ui.js";
+import { searchBar, pinned } from "../nav/searchbar.js";
 import { format, mounted, parse } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
 import { showAlert } from "../nav/alert.js";
@@ -179,22 +180,11 @@ function modeControl(modes, current, onPick) {
 }
 
 // The search bar (Search's look) that narrows `view`'s list as it is typed; with `types`, Search's kinds under it.
+// C10: the shared bar (nav/searchbar.js, with Cancel); `types` is the dpkg list: tweaks, else apps.
 function filterControls(view, { types = false, onChange }) {
-  const bar = Object.assign(document.createElement("form"), { className: "search-bar installed-search" + (types ? " has-scope" : "") });
-  bar.setAttribute("role", "search");
-  const field = Object.assign(document.createElement("label"), { className: "search-field" });
-  const input = Object.assign(document.createElement("input"), { type: "search", placeholder: "Search", autocomplete: "off", spellcheck: false });
-  input.autocapitalize = "off";
-  input.setAttribute("autocorrect", "off");
-  input.setAttribute("aria-label", "Search installed packages");
-  input.enterKeyHint = "search";
-  input.value = view.query ?? "";
-  const changed = () => { if (input.value !== view.query) { view.query = input.value; onChange(); } };
-  input.addEventListener("input", changed);
-  input.addEventListener("search", changed); // the field's clear button
-  bar.addEventListener("submit", (e) => { e.preventDefault(); input.blur(); });
-  field.append(input);
-  bar.append(field);
+  const bar = searchBar({ placeholder: types ? "Search Tweaks" : "Search Apps", ariaLabel: "Search installed packages",
+    value: view.query ?? "", className: "installed-search" + (types ? " has-scope" : ""),
+    onQuery: (q) => { if (q !== view.query) { view.query = q; onChange(); } } });
   if (!types) return [bar];
   const scope = Object.assign(document.createElement("div"), { className: "search-scope installed-scope" });
   scope.append(segments(TYPES, {}, view.type, (t) => { view.type = t; onChange(); }));
@@ -407,7 +397,7 @@ async function deleteMalwareFiles(paths, { alert, backend, hud: makeHud }) {
 function draw() {
   const { rows, body } = state;
   const appCount = state.appCount ?? 0;
-  browse.dropList(body, state.list);
+  browse.dropList(state.results?.parentNode === body ? state.results : body, state.list);
   state.list = null;
   if (!rows) {
     const t = emptyText(catalog.statusSource());
@@ -427,13 +417,14 @@ function draw() {
     return;
   }
   body.replaceChildren();
+  // F127: the search bar and kinds go in before the list measures where it starts. C10: they stay put (nav/searchbar.js
+  // pinned); the Apps row and the list scroll under them.
+  state.results = pinned(body, ...filterControls(state, { types: true, onChange: drawList }));
   if (top.length) {
     const g = grouped([{ rows: top }]);
     g.firstElementChild?.classList.add("installed-top"); // F127: stops short of the A–Z index (packages.css)
-    body.append(g);
+    state.results.append(g);
   }
-  // F127: the search bar and kinds go in before the list measures where it starts.
-  body.append(...filterControls(state, { types: true, onChange: drawList }));
   state.tail = [];
   drawList();
 }
@@ -442,7 +433,8 @@ function draw() {
 function drawList() {
   const { rows, body } = state;
   if (!rows?.length || !body) return;
-  browse.dropList(body, state.list);
+  const results = state.results?.parentNode === body ? state.results : body;
+  browse.dropList(results, state.list);
   state.list = null;
   for (const n of state.tail) n.remove();
   const { mode, dates, auto } = state;
@@ -450,13 +442,13 @@ function drawList() {
   const items = flagPiracy(dpkgItems(rows, { mode, type: state.type, query: state.query, dates, auto }));
   if (!items.length) {
     state.tail = [note(state.query.trim() ? "No matches." : mode === "recent" ? "No install dates." : "No packages.")];
-    body.append(...state.tail);
+    results.append(...state.tail);
     return;
   }
   // Cydia: A–Z headers and the index for User and Expert, day headers for Recent.
-  state.list = browse.packageList(body, state.route, items, { letters: mode !== "recent" });
+  state.list = browse.packageList(results, state.route, items, { letters: mode !== "recent" });
   state.tail = [state.list.el];
-  body.append(state.list.el);
+  results.append(state.list.el);
 }
 
 // F87: how many apps (not iFizBox itself) the jailbreak app remembers; 0 when the store can't be read.
@@ -643,7 +635,9 @@ function drawApps(listRows, cands, site, hasStatus) {
   // (Home's tile, linked from the list's footer).
   const head = [];
   if (recordsApps() && listRows.length) head.push(...filterControls(appView, { onChange: drawAppList }));
-  body.replaceChildren(...head);
+  body.replaceChildren();
+  // C10: the bar stays put and the list scrolls under it (nav/searchbar.js pinned); no bar, the page scrolls.
+  appView.results = head.length ? pinned(body, ...head) : body;
   appView.tail = [];
   drawAppList();
 }
@@ -684,7 +678,7 @@ function drawAppList() {
   }
   if (recordsApps() && listRows.length) appView.tail.push(installIpasNote(route, "Sign and install your own apps from ", ".", "installed-footer"));
   if (recordsApps() && appView.managing) appView.tail.unshift(manageSummaryLine());
-  body.append(...appView.tail);
+  (appView.results?.parentNode === body ? appView.results : body).append(...appView.tail);
   syncManage();
 }
 

@@ -21,6 +21,7 @@ import { healthOf } from "../core/health.js";
 import { recommendedSeen, jailbreakName } from "../core/recommended.js";
 import { builtinFirst, isBuiltin } from "../core/essential.js";
 import { lockMark } from "../nav/lock.js";
+import { searchBar, pinned } from "../nav/searchbar.js";
 import { reloadSteps } from "../core/reloadsteps.js";
 import { showBanner } from "../nav/banner.js";
 import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
@@ -479,23 +480,11 @@ export function startRun(ctx, keys) {
 
 // F19: the search box above the list, the iOS 6 grey search bar Search uses (packages.css .search-bar). It filters
 // the rows as you type (core/sourcelist.js filterSources); All Sources steps aside while a search is on.
-function searchBar() {
+// C10: the shared bar (nav/searchbar.js), with Cancel.
+function sourcesSearchBar() {
   if (state.bar) return state.bar;
-  const bar = document.createElement("form");
-  bar.className = "search-bar sources-search";
-  bar.setAttribute("role", "search");
-  const field = document.createElement("label");
-  field.className = "search-field";
-  const input = document.createElement("input");
-  Object.assign(input, { type: "search", placeholder: "Search Sources", autocapitalize: "off", autocomplete: "off",
-    spellcheck: false, enterKeyHint: "search", value: state.query });
-  input.setAttribute("autocorrect", "off");
-  input.setAttribute("aria-label", "Search sources: name or URL");
-  input.addEventListener("input", () => { state.query = input.value; draw(); });
-  bar.addEventListener("submit", (e) => { e.preventDefault(); input.blur(); });
-  field.append(input);
-  bar.append(field);
-  return (state.bar = bar);
+  return (state.bar = searchBar({ placeholder: "Search Sources", ariaLabel: "Search sources: name or URL", value: state.query,
+    className: "sources-search", onQuery: (q) => { if (q !== state.query) { state.query = q; draw(); } } }));
 }
 
 // F19 first run: on a jailbroken type, a row to Recommended (named for the jailbreak once it's known) until
@@ -509,16 +498,20 @@ function recommendedRow() {
 function draw() {
   const el = state.body;
   if (!el) return;
-  if (!state.sources) { el.replaceChildren(); return; }
+  if (!state.sources) { el.classList.remove("search-root"); el.replaceChildren(); return; }
   if (state.loadError) {
+    el.classList.remove("search-root");
     el.replaceChildren(Object.assign(document.createElement("p"), { className: "empty", textContent: state.loadError }));
     return;
   }
-  const bar = searchBar();
+  const bar = sourcesSearchBar();
   const strip = stripEl(); // F233: under the nav bar, above the search box
-  if (!state.box || state.box.parentNode !== el || bar.parentNode !== el || strip.parentNode !== el) {
+  // C10: the strip and the bar stay put; the list scrolls under them (nav/searchbar.js pinned).
+  const results = state.box?.parentNode;
+  if (!state.box || results?.parentNode !== el || bar.parentNode !== el || strip.parentNode !== el) {
     state.box = document.createElement("div");
-    el.replaceChildren(strip, bar, state.box);
+    el.replaceChildren();
+    pinned(el, strip, bar).append(state.box);
   }
   const box = state.box;
   const backend = getBackend();

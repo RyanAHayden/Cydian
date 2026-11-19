@@ -338,8 +338,10 @@ against this phone (`native/sign/DeviceCheck.swift`, and the same check and sent
 
 - **This phone's UDID.** The jailbreak build asks `ifizbox-helper udid` (MobileGestalt's `UniqueDeviceID`). The
   sideload build reads its own `embedded.mobileprovision`: one device there is this phone's UDID; several are a set
-  it is one of, so a profile that lists all of them has it and one that lists none can't. There is no "identify
-  this iPhone" configuration profile. `device.udid` answers it in every build (`native/Sources/PhoneID.swift`).
+  it is one of, so a profile that lists all of them has it and one that lists none can't. The apps use no
+  "identify this iPhone" configuration profile. `device.udid` answers it in every build (`native/Sources/PhoneID.swift`).
+- **The website's UDID** comes from a configuration profile (below): Find This iPhone's UDID, under This iPhone
+  while the check is unknown on an iPhone or iPad.
 - **Settings > Signing**, under the Provisioning Profile: "This iPhone is in the profile.", or in red "This iPhone
   isn't in the profile: add its UDID … to the developer account, then make the profile again." with Copy UDID. When
   the UDID can't be read, it gives the profile's device count and how to find the UDID (Finder, or `idevice_id -l`).
@@ -348,6 +350,26 @@ against this phone (`native/sign/DeviceCheck.swift`, and the same check and sent
 - An enterprise profile (`ProvisionsAllDevices`) or one with no device list skips the check.
 - **When nobody could check** (the website, which can't read a UDID; the app when the check came out unknown), the
   progress page adds a warning once iOS has the app: if it doesn't appear, the likely cause is this, with the steps.
+
+#### The website's UDID, through a configuration profile
+
+A web page can't read the UDID, but iOS gives it to a "Profile Service" profile that asks for it
+(`worker/src/udid.js`, all under `/sign/udid`, so no Worker config changes):
+
+1. Find This iPhone's UDID (`screens/signing.js` `startUdid`) POSTs `/sign/udid`. The Worker makes a challenge,
+   keeps `udid:<challenge>` = `{state: "waiting"}` in the `HOSTED` KV for `TTL`, and answers `{challenge, profile,
+   poll, expiresIn}`. The page keeps `{poll, expires}` (`ifizbox.udid.pending`) and opens `profile`.
+2. `GET /sign/udid/<c>/udid.mobileconfig`: `PayloadType Profile Service`, `DeviceAttributes [UDID, PRODUCT,
+   VERSION]`, `Challenge <c>`, `URL https://…/sign/udid/<c>/answer`. It's unsigned, so iOS shows "Not Verified";
+   the page's footer says that's fine. The user allows the download, then installs it in the Settings app.
+3. iOS POSTs a CMS-signed plist to the answer URL. The Worker finds `<?xml … </plist>` in the bytes (no signature
+   check: the challenge, given out by this Worker and repeated in the plist as `CHALLENGE`, is what ties it to a
+   visit), checks the UDID's shape, stores `{state: "done", udid, product, version}` and answers 301 to
+   `/sign/udid/<c>/done`. An answer for a challenge it never gave out is refused (404), so strangers can't fill KV.
+4. iOS opens the done page in **Safari**, not the Home Screen web app, and the two don't share storage. The done
+   page writes Safari's own copy (`ifizbox.udid`), and the page that started it polls `GET /sign/udid/<c>` every 2 s
+   (and at once when it's shown again: `watchUdid`), saves the UDID in `ifizbox.udid` and redraws. This iPhone
+   then says In Profile, or Not in Profile with the UDID and Copy UDID.
 
 ### The page's side: installing
 

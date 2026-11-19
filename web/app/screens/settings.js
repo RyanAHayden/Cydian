@@ -28,6 +28,7 @@ import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, server
   browserSigning, getBring, setBring, signAndInstall } from "../signing-client.js";
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { drawWalkthrough, walkOpen, offerInstall, missingStep, siteReady, deviceRows } from "./signing.js";
+import { storedUdid, udidPending, startUdid, watchUdid, canFindUdid, udidFindRows } from "./signing.js";
 import { openInAppSection } from "./importlink.js";
 import { accountSection, drawAccount, startAccountSync } from "./account.js";
 import { signingExtras } from "./signed-apps.js";
@@ -1271,11 +1272,13 @@ function certificateGroup(el, { rows, has, staged, notes = [], footer }) {
 
 // The Provisioning Profile group, with F236's "This iPhone" rows and the check's sentence as its footer (red when this
 // iPhone isn't in the profile; Copy UDID puts the UDID on the clipboard for the developer account's Add Device).
-function profileGroup(rows, device) {
+function profileGroup(rows, device, find = null) {
   const extra = deviceRows(device);
   if (!extra) return grouped([{ header: "Provisioning Profile", rows }]);
   const more = extra.rows.map((r) => (r.copy ? { label: r.label, cls: "sign-copy-udid", onClick: (e) => copyUdid(r.copy, e) } : r));
-  const frag = grouped([{ header: "Provisioning Profile", rows: [...rows, ...more], footer: extra.footer }]);
+  // F253: the website's Find This iPhone's UDID row, with its own sentence after the check's
+  const frag = grouped([{ header: "Provisioning Profile", rows: [...rows, ...more, ...(find?.rows ?? [])],
+    footer: find?.footer ? `${extra.footer} ${find.footer}` : extra.footer }]);
   if (extra.warn) frag.querySelector(".group-footer")?.classList.add("sign-warning");
   return frag;
 }
@@ -1406,6 +1409,24 @@ async function removeSiteCertificate() {
   redrawAll();
 }
 
+// F253: Find This iPhone's UDID on the website (screens/signing.js udidFindRows), its row wired to start a visit.
+function siteUdidFind(check) {
+  const find = udidFindRows(check, { pending: Boolean(udidPending()), can: canFindUdid() });
+  if (!find) return null;
+  return { ...find, rows: find.rows.map((r) => (r.find ? { label: r.label, onClick: () => findUdid() } : r)) };
+}
+
+async function findUdid() {
+  let url;
+  try { url = await startUdid(); } catch (e) {
+    await showAlert({ title: "Couldn't Ask for the UDID", message: String(e?.message || e), buttons: ["OK"] });
+    return;
+  }
+  watchUdid(() => redrawAll());
+  redrawAll();
+  location.href = url; // iOS: "This website is trying to download a configuration profile" (Allow)
+}
+
 async function drawSiteSigning(el) {
   const id = await loadIdentity();
   let profile = null;
@@ -1415,12 +1436,15 @@ async function drawSiteSigning(el) {
   const staged = Boolean(id?.p12 || id?.profile) && !ready;
   const rows = profile ? [{ label: "Profile", detail: profile.name || "Unnamed" }, { label: "Type", detail: profileKind(profile) }, ...info.rows] : [];
   const split = splitSummary(rows);
+  const check = profile ? deviceCheck(profile, storedUdid()) : null; // F253: the UDID the profile service fetched
+  watchUdid(() => redrawAll());
   const parts = {
     certificate: () => certificateGroup(el, { rows: split.certificate, has: ready && Boolean(profile), staged, notes: info.problems,
       footer: "Kept in this browser only. Apps are signed here, not on a server." }),
     files: () => certificateBlock(el, id, null, { files: true }),
-    // F236: the website can't read the UDID: a profile that lists devices says how to check it
-    profile: () => profileGroup(split.profile, profile ? deviceCheckText(deviceCheck(profile, null)) : null),
+    // F236: the website can't read the UDID itself: F253's profile fetches it (Find This iPhone's UDID), else a
+    // profile that lists devices says how to check it
+    profile: () => profileGroup(split.profile, check ? deviceCheckText(check) : null, siteUdidFind(check)),
     options: () => withKeepNotes(settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"), profile),
     app: () => { const f = document.createDocumentFragment(); f.append(...siteAppSection(id)); return f; },
     remove: () => grouped([{ rows: [{ label: "Remove Certificate", onClick: () => removeSiteCertificate() }] }]),

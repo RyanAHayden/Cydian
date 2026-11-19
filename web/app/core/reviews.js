@@ -10,8 +10,10 @@
 //     list() answers { enabled: false, ... } when the server keeps no reviews (an older or self-hosted Worker,
 //     anything that isn't its JSON), so the tab still shows the depiction's and the App Store's.
 //   reviewsBase(mode)                         "" on the website (its own origin), the app's server in the app
-//   mergeReviews({ ours, depiction, appStore }) -> { rating, reviews, appStoreReviews, appStoreLabel, footer }  one
-//     ratings card, one list (ours, the depiction's) and B37's App Store reviews (appStore.reviews) as a list of its own
+//   mergeReviews({ ours, depiction }) -> { rating, reviews, footer }  one ratings card, one list (ours, the depiction's)
+//   buildRating(ours), storeRating(appStore), pageRating({ ours, appStore })  B82: an app page's two ratings, kept
+//     apart (This Build / App Store), and the one its header and Rating tile show: ours when rated here, else Apple's
+//   compactCount(n)                           "1.2K", "50M": the This Build / App Store toggle's counts
 //   reviewDate(ms, now)                       "Nov 14" this year, "Nov 14, 2025" before
 //
 // Our reviews carry { ours: true, id } so the tab can offer Report on them; a depiction's carry what
@@ -103,15 +105,15 @@ export const ourReview = (rv, now = Date.now()) => ({ ours: true, id: rv.id, tit
 
 const counted = (r) => r && Number.isFinite(Number(r.average)) && r.average !== null && Number(r.count) > 0;
 
-// ours: reviewsApi().list()'s answer (or null); depiction: sileoRatings() (or null); appStore: { average, count }
-// from core/applookup.js (or null). The rating is the count-weighted average of those that give both; the bar chart
-// only when every one counted gives one (ours always does, the others never), so it is ours alone or none.
-export function mergeReviews({ ours = null, depiction = null, appStore = null, now = Date.now() } = {}) {
+// ours: reviewsApi().list()'s answer (or null); depiction: sileoRatings() (or null). The rating is the count-weighted
+// average of those that give both; the bar chart only when every one counted gives one (ours always does, a
+// depiction never), so it is ours alone or none. B82: the App Store is never merged in (it rates the original app,
+// not this build): app pages show it apart (buildRating, storeRating, pageRating below).
+export function mergeReviews({ ours = null, depiction = null, now = Date.now() } = {}) {
   const parts = [];
   if (ours?.enabled && ours.count > 0) parts.push({ average: ours.average, count: ours.count, histogram: ours.histogram, noun: "Ratings", label: (n) => `${n} from ${n === 1 ? "a user" : "users"} here` });
   if (counted(depiction)) parts.push({ average: depiction.average, count: depiction.count, noun: depiction.noun ?? "Reviews", label: (n) => `${n} in the depiction` });
   else if (depiction && depiction.average != null) parts.push({ average: depiction.average, count: 0, noun: "Reviews", label: () => "the depiction's" });
-  if (counted(appStore)) parts.push({ average: appStore.average, count: appStore.count, noun: "Ratings", label: (n) => `${n.toLocaleString("en-US")} on the App Store` });
   let rating = null;
   if (parts.length === 1) {
     const p = parts[0];
@@ -124,12 +126,33 @@ export function mergeReviews({ ours = null, depiction = null, appStore = null, n
       from: parts.map((p) => p.label(p.count)).join(", ").replace(/^./, (c) => c.toUpperCase()) + "." };
   }
   const reviews = [...(ours?.reviews ?? []).map((rv) => ourReview(rv, now)), ...(depiction?.reviews ?? [])];
-  // B37: the App Store's written reviews (core/applookup.js parseStoreReviews) as a third list, under its own label.
-  const appStoreReviews = (Array.isArray(appStore?.reviews) ? appStore.reviews : []).map((rv) => appStoreReview(rv, now));
-  const fromStore = counted(appStore) || appStoreReviews.length > 0;
-  const said = [ours?.enabled ? "reviews written here" : null, depiction ? "the package's depiction" : null, fromStore ? "the App Store" : null].filter(Boolean);
+  const said = [ours?.enabled ? "reviews written here" : null, depiction ? "the package's depiction" : null].filter(Boolean);
   const footer = said.length ? `Ratings and reviews from ${said.length > 1 ? `${said.slice(0, -1).join(", ")} and ${said.at(-1)}` : said[0]}.` : "No ratings or reviews yet.";
-  return { rating, reviews, appStoreReviews, appStoreLabel: "App Store Reviews", footer };
+  return { rating, reviews, footer };
+}
+
+// B82: an app page keeps two ratings apart. This build's (ours alone, with its histogram) or null when nobody rated
+// it here; the App Store's ({ average, count } from core/applookup.js, marked onAppStore: the header reads
+// "(50,123,456) on the App Store", the Rating tile "App Store") or null; and the page's (header stars, Rating tile):
+// ours when anyone rated this build, else the App Store's. Never an average of the two.
+export const buildRating = (ours) => (ours?.enabled && ours.count > 0 && ours.average != null
+  ? { average: Number(ours.average), count: ours.count, noun: "Ratings", ...(Array.isArray(ours.histogram) ? { histogram: ours.histogram } : {}) }
+  : null);
+export const storeRating = (appStore) => (appStore && appStore.average != null && Number.isFinite(Number(appStore.average)) && Number(appStore.average) > 0
+  ? { average: Number(appStore.average), count: Number(appStore.count) > 0 ? Number(appStore.count) : null, noun: "Ratings", onAppStore: true }
+  : null);
+export const pageRating = ({ ours = null, appStore = null } = {}) => buildRating(ours) ?? storeRating(appStore);
+
+// B82: the toggle's short counts: 980, 1.2K, 12K, 3.4M, 50M.
+export function compactCount(n) {
+  const v = Math.max(0, Math.round(Number(n) || 0));
+  for (const [size, unit] of [[1e9, "B"], [1e6, "M"], [1e3, "K"]]) {
+    if (v < size) continue;
+    const x = v / size;
+    const s = x < 10 ? String(Math.floor(x * 10) / 10) : String(Math.floor(x));
+    return `${s}${unit}`;
+  }
+  return String(v);
 }
 
 // B37: one App Store review as the tab's cell: "by name – Version 2.0.1 – Nov 17" (plain text, drawn with textContent).
@@ -137,7 +160,7 @@ export const appStoreReview = (rv, now = Date.now()) => ({ appStore: true, title
   rating: rv.rating ?? null, version: rv.version || null, date: rv.at ? reviewDate(rv.at, now) : null, text: rv.text });
 
 // F206: the ratings card's bars when the source gives no histogram: the written reviews we have (ours, the
-// depiction's, the App Store's), counted by their whole stars, as [n5, n4, n3, n2, n1]. A review with no rating, or one
+// depiction's; B82: never the App Store's), counted by their whole stars, as [n5, n4, n3, n2, n1]. A review with no rating, or one
 // outside 1-5, isn't counted. `starsOf(review)`: a review's whole stars (a half rounds up), or null.
 export const starsOf = (rv) => {
   const n = Math.round(Number(rv?.rating ?? rv?.stars));

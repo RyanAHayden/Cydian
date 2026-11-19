@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width">
+<!-- B82 render harness: serve the repo root (python3 -m http.server) and open
+     /journal/2026-11-19-b82-reviews-split/harness.html?state=rated|none[&view=appstore][&details][&dark][&nomatch]
+     The real CSS and modules (screens/storepage.js, screens/reviews.js, core/reviews.js) with made-up data. -->
+<link rel=stylesheet href="/web/app/style.css"><link rel=stylesheet href="/web/app/ios6.css"><link rel=stylesheet href="/web/app/packages.css"><link rel=stylesheet href="/web/app/altstore.css"><link rel=stylesheet href="/web/app/reviews.css">
+<style>html,body{margin:0;height:auto!important;overflow:visible!important} .page{visibility:visible!important;position:static!important;transform:none!important} .page-body{position:static!important;overflow:visible!important;height:auto!important}</style></head>
+<body><div class="page"><div class="page-body grouped" id=b></div></div>
+<script type=module>
+const q = new URLSearchParams(location.search);
+if (q.has("dark")) document.documentElement.dataset.theme = "dark";
+const sp = await import("/web/app/screens/storepage.js");
+const { reviewsTab } = await import("/web/app/screens/reviews.js");
+const { pageRating } = await import("/web/app/core/reviews.js");
+const { el } = await import("/web/app/nav/ui.js");
+const body = document.getElementById("b");
+const now = Date.UTC(2026, 10, 19);
+const icon = el("span", "pkg-icon large");
+icon.append(el("span", "pkg-letter", "Y"));
+const header = sp.storeHeader({ art: icon, name: "YouTube Plus", author: "Sideload Dev", line: sp.headerLine({ version: "19.45.4", size: "142 MB", price: "Free" }) });
+const rated = q.get("state") !== "none";
+const day = 864e5;
+const oursList = rated ? [
+  { id: "a1", stars: 5, title: "No ads, background play works", name: "mobileuser", text: "Exactly what I wanted on iOS 15.", version: "19.45.4", date: now - day, updated: now - day },
+  { id: "a2", stars: 4, title: "Good, PiP is flaky", name: "jbfan", text: "Picture in picture drops after a minute.", version: "19.45.4", date: now - 3 * day, updated: now - 3 * day },
+] : [];
+const ours = rated
+  ? { enabled: true, average: 4.4, count: 12, histogram: [7, 3, 1, 1, 0], reviews: oursList, more: false, mine: null }
+  : { enabled: true, average: null, count: 0, histogram: [0, 0, 0, 0, 0], reviews: [], more: false, mine: null };
+const apple = Array.from({ length: 14 }, (_, i) => ({ appStore: true, title: ["Too many ads", "Great app", "Shorts everywhere", "Love it"][i % 4],
+  author: `user${i + 1}`, rating: [1, 5, 2, 5][i % 4], version: "19.45", at: now - (i + 1) * day, text: "A review of the stock App Store app." }));
+const store = q.has("nomatch") ? null
+  : { average: 4.6, count: 50123456, noun: "Ratings", name: "YouTube: Watch, Listen, Stream", seller: "Google LLC", reviews: async () => apple };
+const api = { list: async () => ours, post: async () => ({}), report: async () => ({}), remove: async () => ({}) };
+const tiles = sp.tileRow();
+tiles.set("works", sp.worksOnTile({ status: "works", range: "iOS 15.0 or later" }));
+tiles.set("size", sp.sizeTile("142 MB", "Free"));
+tiles.set("section", sp.sectionTile("Photo & Video", "App"));
+const r = pageRating({ ours, appStore: store });
+header.setRating(r);
+tiles.set("rating", sp.ratingTile(r));
+const tabs = sp.storeTabs({ reviews: async (p) => {
+  const t = await reviewsTab(p, { id: "com.google.ios.youtube", api, build: true, appStore: store, first: Promise.resolve(ours), now });
+  if (q.get("view") === "appstore") { t.toggle.select(1); await t.toggle.loaded(); document.getAnimations().forEach((a) => a.finish()); }
+  document.title = "ready";
+} });
+tabs.panes.details.append(tiles.row);
+body.append(header.head, ...tabs.nodes);
+if (q.has("details")) document.title = "ready"; else tabs.select(1);
+</script></body></html>

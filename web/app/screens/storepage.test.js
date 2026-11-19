@@ -387,3 +387,45 @@ test("F206: the Rating tile holds its place from the first paint and is filled i
   assert.match(css, /\.store-tile > \.store-stars\.small \{ margin: 1px 0; \}/, "stars 10px + 2px = the sub line's 12px");
   assert.deepEqual(sp.tileRow({ rating: false }).row.children, []);
 });
+
+test("B82: the App Store's rating (nobody rated this build) is named as such on the header and the Rating tile", () => {
+  const h = sp.storeHeader({ name: "YouTube" });
+  h.setRating({ average: 4.6, count: 50123456, noun: "Ratings", onAppStore: true });
+  const row = one(h.head, "store-head-rating");
+  assert.equal(one(row, "store-head-count").textContent, "(50,123,456) on the App Store");
+  assert.equal(row.dataset.from, "appstore");
+  h.setRating({ average: 4.5, count: 12, noun: "Ratings" });
+  assert.equal(one(row, "store-head-count").textContent, "(12)", "ours: the count alone");
+  assert.equal(row.dataset.from, "build");
+  h.setRating({ average: 4, count: null, onAppStore: true });
+  assert.equal(one(row, "store-head-count").textContent, "on the App Store");
+  assert.deepEqual(sp.ratingTile({ average: 4.64, count: 50123456, onAppStore: true }), { label: "Rating", value: "4.6", sub: "App Store" });
+  assert.deepEqual(sp.ratingTile({ average: 4.5, count: 12 }), { label: "Rating", value: "4.5", stars: 4.5 });
+});
+
+test("B82: the This Build card (no header, ours only, its own lines) and the App Store card (big average, no bars, the note)", () => {
+  const b = sp.ratingsCard({ average: 4.5, count: 12, noun: "Ratings", histogram: [8, 3, 1, 0, 0] }, { build: true });
+  assert.equal(one(b, "group-header"), undefined);
+  assert.equal(one(b, "store-ratings-from").textContent, "Rated by people using this build. Bars from 12 ratings.");
+  const none = sp.ratingsCard(null, { build: true, reviews: [] });
+  assert.equal(byClass(none, "store-bar").length, 5, "the empty bars stay");
+  assert.equal(one(none, "store-ratings-count").textContent, "No Ratings");
+  assert.equal(one(none, "store-ratings-from").textContent, "Nobody has rated this build yet. Be the first.");
+  assert.equal(one(sp.ratingsCard(null, { build: true, pending: true }), "group-header"), undefined, "the skeleton has the same shape");
+  assert.equal(one(sp.ratingsCard(null), "group-header").textContent, "Ratings", "a tweak page keeps its header");
+
+  const s = sp.appStoreCard({ average: 4.64, count: 50123456 }, { name: "YouTube", seller: "Google LLC" });
+  assert.equal(one(s, "store-appstore-big").textContent, "4.6");
+  assert.equal(one(s, "store-stars").attrs["aria-label"], "4.6 out of 5 stars");
+  assert.equal(one(s, "store-appstore-count").textContent, "50,123,456 Ratings");
+  assert.equal(byClass(s, "store-bar").length, 0);
+  assert.equal(one(s, "store-appstore-note").textContent, "For YouTube by Google LLC on the App Store, not this build.");
+  assert.equal(one(sp.appStoreCard({ average: 5, count: 1 }, { name: "Tiny" }), "store-appstore-note").textContent, "For Tiny on the App Store, not this build.");
+  assert.equal(one(sp.appStoreCard({ average: 5, count: 1 }), "store-appstore-count").textContent, "1 Rating");
+  const unrated = sp.appStoreCard(null, {});
+  assert.equal(one(unrated, "store-appstore-big").textContent, "—");
+  assert.equal(one(unrated, "store-appstore-count").textContent, "No Ratings");
+  assert.equal(one(unrated, "store-appstore-note").textContent, "For the original app on the App Store, not this build.");
+  const css = readFileSync(new URL("../reviews.css", import.meta.url), "utf8");
+  assert.match(css, /\.store-appstore-big \{[^}]*font-size: 28px; font-weight: bold;/, "the concept's bold 28px average");
+});

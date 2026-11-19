@@ -2,7 +2,8 @@
 // how ours merge with a depiction's and the App Store's.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkDraft, deviceToken, reviewsApi, mergeReviews, reviewDate, ourReview, reviewsBase, TOKEN_KEY, LIMITS } from "./reviews.js";
+import { checkDraft, deviceToken, reviewsApi, mergeReviews, reviewDate, ourReview, reviewsBase, TOKEN_KEY, LIMITS,
+  buildRating, storeRating, pageRating, compactCount } from "./reviews.js";
 
 const memStore = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
 
@@ -96,39 +97,43 @@ test("merging: ours alone keep the bar chart; with others, a count-weighted aver
   assert.equal(m.footer, "Ratings and reviews from reviews written here.");
 
   const depiction = { average: 3, count: 2, noun: "Reviews", reviews: [{ title: "Meh", author: "dev", rating: 3, text: "**bold**", raw: false }] };
-  const appStore = { average: 5, count: 6, noun: "Ratings" };
-  m = mergeReviews({ ours, depiction, appStore, now });
-  assert.equal(m.rating.average, Math.round(((4 * 2 + 3 * 2 + 5 * 6) / 10) * 10) / 10);
-  assert.equal(m.rating.count, 10);
+  m = mergeReviews({ ours, depiction, now });
+  assert.equal(m.rating.average, Math.round(((4 * 2 + 3 * 2) / 4) * 10) / 10);
+  assert.equal(m.rating.count, 4);
   assert.equal(m.rating.histogram, undefined, "no bars when only some sources have them");
-  assert.equal(m.rating.from, "2 from users here, 2 in the depiction, 6 on the App Store.");
+  assert.equal(m.rating.from, "2 from users here, 2 in the depiction.");
   assert.deepEqual(m.reviews.map((r) => r.title), ["Great", "Meh"], "ours first, then the depiction's");
   assert.equal(m.reviews[1].ours, undefined);
-  assert.equal(m.footer, "Ratings and reviews from reviews written here, the package's depiction and the App Store.");
+  assert.equal(m.footer, "Ratings and reviews from reviews written here and the package's depiction.");
 
-  // the server off, or nobody rated yet here: the others as they were
-  m = mergeReviews({ ours: { enabled: false, count: 0, reviews: [] }, appStore, now });
-  assert.deepEqual(m.rating, { average: 5, count: 6, noun: "Ratings" });
+  // B82: an App Store rating passed in is never merged (it rates the original app)
+  const appStore = { average: 1, count: 50123456, noun: "Ratings", reviews: [{ title: "x", rating: 1, text: "y" }] };
+  assert.deepEqual(mergeReviews({ ours, appStore, now }).rating, { average: 4, count: 2, noun: "Ratings", histogram: [1, 1, 0, 0, 0] });
+  assert.equal(mergeReviews({ ours: { enabled: false, count: 0, reviews: [] }, appStore, now }).rating, null);
+  assert.equal(mergeReviews({ appStore }).footer, "No ratings or reviews yet.");
   assert.equal(mergeReviews({}).rating, null);
   assert.equal(mergeReviews({}).footer, "No ratings or reviews yet.");
   assert.equal(mergeReviews({ ours: { enabled: true, count: 0, reviews: [] } }).rating, null);
 });
 
-test("B37: the App Store's written reviews are a third list with its own label, not mixed into ours", () => {
-  const now = Date.UTC(2026, 10, 18);
-  const ours = { enabled: true, average: 4, count: 1, histogram: [0, 1, 0, 0, 0], reviews: [{ id: "a1", stars: 4, title: "Mine", name: "Ann", text: "x", date: now, updated: now }] };
-  const appStore = { average: 4.76, count: 28385, noun: "Ratings", reviews: [{ appStore: true, title: "Cool update", author: "D", rating: 5, version: "2.0.1", at: Date.UTC(2026, 10, 17, 12), text: "y" }] };
-  let m = mergeReviews({ ours, appStore, now });
-  assert.deepEqual(m.reviews.map((r) => r.title), ["Mine"]);
-  assert.deepEqual(m.appStoreReviews, [{ appStore: true, title: "Cool update", author: "D", rating: 5, version: "2.0.1", date: "Nov 17", text: "y" }]);
-  assert.equal(m.appStoreLabel, "App Store Reviews");
-  assert.equal(m.rating.count, 28386);
-  // reviews but no rating (a lookup without one): still from the App Store
-  m = mergeReviews({ appStore: { reviews: appStore.reviews }, now });
-  assert.equal(m.rating, null);
-  assert.equal(m.appStoreReviews.length, 1);
-  assert.equal(m.footer, "Ratings and reviews from the App Store.");
-  assert.deepEqual(mergeReviews({}).appStoreReviews, []);
+test("B82: an app page's two ratings stay apart: a 50M App Store count never moves ours; the page falls back to Apple's", () => {
+  const ours = { enabled: true, average: 4.5, count: 12, histogram: [8, 3, 1, 0, 0], reviews: [] };
+  const appStore = { average: 2.1, count: 50123456, noun: "Ratings" };
+  assert.deepEqual(buildRating(ours), { average: 4.5, count: 12, noun: "Ratings", histogram: [8, 3, 1, 0, 0] });
+  assert.deepEqual(storeRating(appStore), { average: 2.1, count: 50123456, noun: "Ratings", onAppStore: true });
+  assert.deepEqual(pageRating({ ours, appStore }), buildRating(ours), "rated here: ours alone, the App Store's 50M ignored");
+  const none = { enabled: true, average: null, count: 0, histogram: [0, 0, 0, 0, 0], reviews: [] };
+  assert.equal(buildRating(none), null);
+  assert.equal(buildRating({ ...ours, enabled: false }), null, "the server off: nothing of ours");
+  assert.deepEqual(pageRating({ ours: none, appStore }), storeRating(appStore), "nobody rated here: the App Store's, marked as such");
+  assert.equal(pageRating({ ours: none, appStore: null }), null);
+  assert.equal(storeRating({ average: null, count: 3 }), null);
+  assert.equal(storeRating({ average: 4, count: null }).count, null, "a lookup without a count");
+});
+
+test("B82: the toggle's compact counts", () => {
+  assert.deepEqual([0, 7, 980, 1000, 1250, 9999, 12345, 999999, 1200000, 50123456, 2.5e9].map(compactCount),
+    ["0", "7", "980", "1K", "1.2K", "9.9K", "12K", "999K", "1.2M", "50M", "2.5B"]);
 });
 
 test("dates and our review's cell: 'by name – Version – date', Anonymous without a name", () => {

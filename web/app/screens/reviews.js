@@ -2,17 +2,22 @@
 // WriteReview.dc.html). The data side is core/reviews.js; the server, worker/src/reviews.js. Styles: reviews.css.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-//   reviewsTab(pane, { id, version, depiction, appStore, api, renderText, now })  -> Promise
-//     The ratings card (ours, the depiction's and the App Store's merged, core/reviews.js mergeReviews) with Tap to
+//   reviewsTab(pane, { id, version, depiction, appStore, build, api, renderText, now })  -> Promise
+//     The ratings card (ours and the depiction's merged, core/reviews.js mergeReviews) with Tap to
 //     Rate under it, Write a Review, the reviews (ours first, newest first, "by name – Version – date", each with
 //     Report; then the depiction's), More Reviews for the next page, and a footer saying where they come from.
 //     F206: the card's skeleton while it loads; the card's five bars filter the list to one rating (`filter`, kept
-//     across a redraw after a post). Returns { card, area, setFilter(stars | null), filter() }.
-//     `depiction`: core/previews.js sileoRatings(); `appStore`: { average, count, reviews? } (core/applookup.js; B37:
-//     its written reviews drawn as an "App Store Reviews" group after ours and the depiction's); both may be
-//     null or a promise. `renderText(review)`: the body of a depiction's review (ours are always plain text).
-//     `first`: page 0 already asked for (the page's header stars), so it isn't asked twice; `onRating(r)`: the merged
-//     rating each time it is drawn again after a post (the header and the Rating tile follow).
+//     across a redraw after a post). Returns { card, area, setFilter(stars | null), filter(), toggle }.
+//     `depiction`: core/previews.js sileoRatings(), null or a promise. `renderText(review)`: the body of a
+//     depiction's review (ours are always plain text).
+//     B82, app pages (`build: true`): the card is This Build's alone (never averaged with Apple's). `appStore` (or a
+//     promise of it): { average, count, name, seller, reviews() -> Promise<list> } when the App Store has the app, else
+//     null. With one, a This Build | App Store toggle sits on top (always opening on This Build); the App Store view is
+//     Apple's card (storepage.js appStoreCard) and its written reviews, asked for once, when the view first opens,
+//     STORE_PAGE at a time behind More Reviews…. Without one, no toggle.
+//     `first`: page 0 already asked for (the page's header stars), so it isn't asked twice; `onRating(r)`: the page's
+//     rating each time it is drawn again after a post (the header and the Rating tile follow; B82: on an app page
+//     ours when rated here, else the App Store's, core/reviews.js pageRating).
 //     F216: Your Rating clears with the same star again or Remove (a written review asks first, confirmDelete);
 //     it sends rateDelay (1.5 s) after the last touch, only the final value, and on pagehide / hidden at once.
 //     `rating.flush()` sends a waiting change now (Write a Review does that first).
@@ -26,8 +31,8 @@
 import { el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
-import { ratingsCard, reviewCell } from "./storepage.js";
-import { checkDraft, mergeReviews, ourReview, withStars, LIMITS } from "../core/reviews.js";
+import { ratingsCard, reviewCell, appStoreCard } from "./storepage.js";
+import { checkDraft, mergeReviews, ourReview, withStars, LIMITS, buildRating, pageRating, compactCount, appStoreReview } from "../core/reviews.js";
 
 // F216: `clearable`: tapping the star that is already the value clears it to 0 (Your Rating; the sheet needs stars).
 export function starPicker(value = 0, onPick = () => {}, { cls = "", clearable = false } = {}) {
@@ -169,16 +174,18 @@ const resolved = (p) => Promise.resolve(p).catch(() => null);
 
 export async function reviewsTab(pane, { id, version = "", depiction = null, appStore = null, api, renderText = null, now = Date.now(),
   first = null, onRating = null, sheet = writeReviewSheet, confirm = confirmReport, confirmDelete = confirmDeleteReview, filter = null,
-  rateDelay = 1500, win = globalThis.window ?? null, doc = globalThis.document ?? null } = {}) {
+  rateDelay = 1500, win = globalThis.window ?? null, doc = globalThis.document ?? null, build = false } = {}) {
   // F206: the card's skeleton (the filled card's shape, "Loading Reviews…" in its last line), not a spinner, so the
   // tab doesn't jump when the reviews arrive.
-  pane.replaceChildren(ratingsCard(null, { pending: true }));
-  const [ours, dep, store] = await Promise.all([first ? resolved(first) : api.list(id, 0).catch(() => null), resolved(depiction), resolved(appStore)]);
+  pane.replaceChildren(ratingsCard(null, { pending: true, build }));
+  const [ours, dep, found] = await Promise.all([first ? resolved(first) : api.list(id, 0).catch(() => null), resolved(depiction), resolved(appStore)]);
+  // B82: Apple's written reviews are asked for once, the first time the App Store view opens (kept across a redraw).
+  const store = found ? { ...found, reviews: onceList(found.reviews) } : null;
   let mine = ours?.mine ?? null;
   let page = 0;
   let stars = [1, 2, 3, 4, 5].includes(filter) ? filter : null; // F206: the star filter, null for all
 
-  const redraw = async () => { await reviewsTab(pane, { id, version, depiction: dep, appStore: store, api, renderText, now: Date.now(), onRating, sheet, confirm, confirmDelete, filter: stars, rateDelay, win, doc }); };
+  const redraw = async () => { await reviewsTab(pane, { id, version, depiction: dep, appStore: store, api, renderText, now: Date.now(), onRating, sheet, confirm, confirmDelete, filter: stars, rateDelay, win, doc, build }); };
   // F207: delete this device's review; the tab draws again (stars, count, list) and Tap to Rate starts empty.
   const removeMine = async () => {
     await api.remove(id, mine?.id ?? null);
@@ -192,16 +199,18 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
     await redraw();
   };
 
-  const merged = mergeReviews({ ours, depiction: dep, appStore: store, now });
-  if (first === null) onRating?.(merged.rating); // drawn again after a post: the header's stars follow
-  // Ours first (each page of More Reviews after the last), then the depiction's; B37's App Store reviews apart.
+  const merged = mergeReviews({ ours, depiction: dep, now });
+  // B82: an app page's card is This Build's alone; its header and Rating tile fall back to the App Store's.
+  const cardRating = build ? buildRating(ours) : merged.rating;
+  if (first === null) onRating?.(build ? pageRating({ ours, appStore: store }) : merged.rating); // drawn again after a post: the header's stars follow
+  // Ours first (each page of More Reviews after the last), then the depiction's; B82: the App Store's never here.
   const oursShown = [...(ours?.reviews ?? [])];
   const theirs = merged.reviews.filter((rv) => !rv.ours);
   const mainReviews = () => [...oursShown.map((rv) => ourReview(rv, now)), ...theirs];
-  const written = () => [...mainReviews(), ...merged.appStoreReviews];
+  const written = mainReviews;
   // F206: the bars count the reviews we have when the source gives no histogram; a row filters the list below to its
   // rating, the same row again (or Show All) clears it.
-  const card = ratingsCard(merged.rating, { reviews: written(), selected: stars, onPick: (n) => setFilter(stars === n ? null : n) });
+  const card = ratingsCard(cardRating, { reviews: written(), selected: stars, build, onPick: (n) => setFilter(stars === n ? null : n) });
   const parts = [card];
   let rating = null; // F216: { picker, flush } of Your Rating
   if (ours?.enabled) {
@@ -368,14 +377,6 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
         out.push(g);
         if (moreLeft) out.push(moreButton());
       }
-      // B37: the App Store's written reviews, newest first, as a group of their own.
-      if (merged.appStoreReviews.length) {
-        const g = el("div", "group store-reviews-group store-reviews-appstore");
-        const l = el("div", "table grouped store-review-list");
-        l.append(...merged.appStoreReviews.map(cellOf));
-        g.append(el("h2", "group-header", merged.appStoreLabel), l);
-        out.push(g);
-      }
     }
     area.replaceChildren(...out);
   }
@@ -387,10 +388,92 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
   }
   fillArea();
   parts.push(area);
-  const foot = el("p", "group-footer store-reviews-footer", merged.footer);
-  parts.push(foot);
-  pane.replaceChildren(...parts);
-  return { card, area, setFilter, filter: () => stars, rating };
+  // B82: an app page says nothing of sources under This Build; with nobody rated yet, it points at the App Store tab.
+  const footText = !build ? merged.footer
+    : store && !cardRating ? "Ratings here are for this build only. The App Store tab has the original app's." : null;
+  if (footText) parts.push(el("p", "group-footer store-reviews-footer", footText));
+  if (!(build && store)) {
+    pane.replaceChildren(...parts);
+    return { card, area, setFilter, filter: () => stars, rating, toggle: null };
+  }
+  const toggle = reviewsToggle(pane, { parts, ours, store, cellOf, now });
+  return { card, area, setFilter, filter: () => stars, rating, toggle };
+}
+
+const memo = new WeakMap();
+// B82: a function asked once whatever calls it later (a redraw passes the same one on); a list given as is stays one.
+function onceList(f) {
+  if (typeof f !== "function") return () => Promise.resolve(Array.isArray(f) ? f : []);
+  if (memo.has(f)) return f;
+  let p = null;
+  const once = () => (p ??= Promise.resolve().then(f).then((l) => (Array.isArray(l) ? l : []), () => []));
+  memo.set(once, true);
+  return once;
+}
+
+export const STORE_PAGE = 10; // Apple's reviews shown per More Reviews… tap (its feed gives up to 50)
+
+// B82: the This Build | App Store toggle (depiction.js's small segmented control, packages.css .segmented) over the
+// two views. It always opens on This Build; the App Store view is filled the first time it is chosen (its card at once,
+// Apple's written reviews when they arrive). Switching fades the view in (opacity only, 120 Hz).
+function reviewsToggle(pane, { parts, ours, store, cellOf, now = Date.now() }) {
+  const views = [el("div", "store-review-view store-review-build"), el("div", "store-review-view store-review-appstore")];
+  views[0].append(...parts);
+  const n = Number(ours?.count) || 0;
+  const labels = [n ? `This Build (${compactCount(n)})` : "This Build",
+    Number(store.count) > 0 ? `App Store (${compactCount(store.count)})` : "App Store"];
+  const seg = el("div", "segmented store-review-toggle");
+  seg.setAttribute("role", "tablist");
+  const buttons = labels.map((t, i) => {
+    const b = el("button", "segment", t);
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.addEventListener("click", () => select(i));
+    seg.append(b);
+    return b;
+  });
+  let at = 0, filled = false, loaded = null;
+  function fillStore() {
+    filled = true;
+    const v = views[1];
+    const g = el("div", "group store-reviews-group store-reviews-appstore");
+    const l = el("div", "table grouped store-review-list");
+    l.append(el("div", "store-reviews-none", "Loading Reviews…"));
+    g.append(el("h2", "group-header", "Reviews"), l);
+    const slot = el("div", "store-appstore-more-slot");
+    v.append(appStoreCard(store, { name: store.name ?? null, seller: store.seller ?? null }), g, slot);
+    loaded = store.reviews().then((list) => {
+      const all = list.map((rv) => appStoreReview(rv, now));
+      if (!all.length) { l.replaceChildren(el("div", "store-reviews-none", "No App Store reviews to show.")); return; }
+      let shown = 0;
+      let more = null;
+      const page = () => {
+        const next = all.slice(shown, shown + STORE_PAGE);
+        if (!shown) l.replaceChildren();
+        l.append(...next.map((rv, i) => cellOf(rv, shown + i)));
+        shown += next.length;
+        if (shown < all.length && !more) {
+          more = el("button", "review-button review-more store-appstore-more", "More Reviews…");
+          more.type = "button";
+          more.addEventListener("click", page);
+          slot.append(more);
+        } else if (shown >= all.length && more) { slot.replaceChildren(); more = null; }
+      };
+      page();
+    });
+  }
+  function select(i) {
+    if (!(i === 0 || i === 1)) return;
+    const changed = i !== at;
+    at = i;
+    buttons.forEach((b, j) => { b.classList.toggle("selected", i === j); b.setAttribute("aria-selected", String(i === j)); });
+    views.forEach((v, j) => { v.hidden = i !== j; });
+    if (i === 1 && !filled) fillStore();
+    if (changed) views[i].animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease-out" });
+  }
+  select(0);
+  pane.replaceChildren(seg, ...views);
+  return { control: seg, buttons, views, select, selected: () => (at ? "appstore" : "build"), loaded: () => loaded };
 }
 
 async function confirmReport() {

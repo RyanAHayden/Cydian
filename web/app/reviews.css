@@ -83,3 +83,13 @@ html[data-theme="dark"] .review-error { color: var(--dk-bad); }
 .review-delete-own { align-self: flex-end; padding: 2px 0; border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #c8231a; cursor: pointer; }
 .review-delete-own:disabled { opacity: .5; }
 html[data-theme="dark"] .review-delete-own { color: var(--dk-bad); }
+
+/* B82: an app page's This Build | App Store toggle (packages.css .segmented, depiction.js's small control) as wide as
+   the groups under it, and its two views; only the view's opacity animates when it switches. */
+.store-review-toggle { margin: 12px 10px 0; }
+.store-review-view[hidden] { display: none; }
+/* the App Store view's card: the average big (bold 28px) beside its stars and count, no bars, then the note row */
+.store-appstore-top { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
+.store-appstore-big { flex: none; font-size: 28px; font-weight: bold; line-height: 32px; letter-spacing: -.02em; color: var(--text); }
+.store-appstore-side { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.store-appstore-count { font-size: 13px; color: var(--subtitle); }

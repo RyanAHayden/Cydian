@@ -77,7 +77,7 @@ import { showActionSheet } from "../nav/actionsheet.js";
 import { longPress } from "../nav/menu.js";
 import { guarded } from "../nav/tapguard.js";
 import { libraryCall } from "../signing-client.js";
-import { resignJob, appJob, markedResignJob, markedVersionOnSource } from "../core/appqueue.js";
+import { resignJob, appJob, markedResignJob, markedVersionOnSource, markedResignProblem } from "../core/appqueue.js";
 import { hudLine } from "../core/progress.js";
 import { deviceError } from "../core/signing.js";
 import { getBackend } from "../backend.js";
@@ -1235,16 +1235,45 @@ export function manageJobs(kind, picked) {
 export const MANAGE_VERB = { resign: "Re-signing", update: "Updating" };
 
 // The confirm sheet's title and its button for Re-sign and Update.
-export function manageSheet(kind, n, marked = 0) {
+// B66: `newest`, how many of the n are a blocked app's newest version installed over it (Re-sign's alert).
+export function manageSheet(kind, n, marked = 0, newest = 0) {
   const apps = n === 1 ? "App" : `${n} Apps`;
   if (kind === "resign") {
     const dl = marked === 0 ? "" : marked === 1 ? " 1 app is downloaded from its source first." : ` ${marked} apps are downloaded from their sources first.`;
-    return { title: `Each app keeps its data.${dl}`, button: n === 1 ? "Re-sign App" : `Re-sign ${apps}` };
+    const nw = newest === 0 ? "" : newest === 1 ? " 1 app is installed at its newest version." : ` ${newest} apps are installed at their newest versions.`;
+    return { title: `Each app keeps its data.${dl}${nw}`, button: n === 1 ? "Re-sign App" : `Re-sign ${apps}` };
   }
   return { title: "Each app is updated to its newest version and keeps its data.", button: n === 1 ? "Update App" : `Update ${apps}` };
 }
 
-// B46 per app for a bulk Delete: { act: [{ r, a }] (uninstalled or removed from the list), stay: [r] (iOS still has
+// B66: Re-sign with picked marked apps it can't sign (core/installed.js manageKinds' `blocked`): an alert names each
+// one and why, and offers what can be done. `others`: how many picked apps Re-sign can sign. -> { title, message,
+// buttons, actions } (actions[i]: what button i does: "cancel", "newest" (install each one's newest version over it,
+// then the others), "skip" (re-sign only the others)); `newest`: the jobs "newest" queues.
+const BLOCKED_WHY = {
+  "no-source": (r) => `${r.name}: no source has it now, so there is no IPA to sign. Add its source again, or sign your own copy from ${myipas.PAGE_TITLE}.`,
+  "no-version": (r) => `${r.name}: its source no longer has version ${r.version}, the one on your iPhone.`,
+  "unknown-version": (r) => `${r.name}: it was marked as installed without a version, so there is no IPA to download.`,
+  "no-download": (r) => `${r.name}: its source has version ${r.version} only as a link, not an IPA to download.`,
+};
+export function resignBlockedAlert(blocked, others = 0) {
+  const lines = [];
+  const newest = [];
+  for (const r of blocked ?? []) {
+    const p = markedResignProblem(r.pkg, r.version || null) ?? { why: "no-source", newest: null };
+    const job = p.newest ? appJob(r.pkg, { installed: r.version || null, source: r.sourceName || null }) : null;
+    if (job) newest.push(job);
+    lines.push(BLOCKED_WHY[p.why](r) + (job ? ` Install the newest (${job.version}) instead: it keeps its data.` : ""));
+  }
+  const title = blocked.length === 1 ? `Can't Re-sign ${blocked[0].name}` : `Can't Re-sign ${blocked.length} Apps`;
+  const actions = ["cancel"];
+  const buttons = [newest.length || others ? "Cancel" : "OK"];
+  if (newest.length) { actions.push("newest"); buttons.push(newest.length === 1 ? "Install Newest" : `Install ${newest.length} Newest`); }
+  if (others) { actions.push("skip"); buttons.push(others === 1 ? "Re-sign the Other App" : `Re-sign the Other ${others}`); }
+  return { title, message: lines.join("\n\n"), buttons, actions, newest };
+}
+
+// B46 per app for a bulk Delete:{ act: [{ r, a }] (uninstalled or removed from the list), stay: [r] (iOS still has
 // them and iFizBox can't delete them: the sideload app) }.
 export function bulkDeletePlan(picked, { mode = detectMode() } = {}) {
   const act = [];
@@ -1274,9 +1303,12 @@ export function bulkDeleteSheet(plan) {
 }
 
 // A toolbar button: the confirm sheet, then the jobs (Re-sign, Update) or the deletes; Manage ends and the list loads
-// again (its pills follow). -> true when it went ahead.
+// again (its pills follow). -> true when it went ahead. B66: Re-sign with picked apps it can't sign alerts first
+// (resignBlockedAlert); a run that doesn't get through keeps Manage on with what's left picked (`keep`); Confirm's run
+// still going (`busy`) is said, not swallowed.
 export async function runManage(kind, { view = appView, mode = detectMode(), sheet = showActionSheet, alert = showAlert, run = runManageJobs,
-  remove = deleteOne, done = () => { setManaging(false); if (appView.body) loadApps(); } } = {}) {
+  remove = deleteOne, done = () => { setManaging(false); if (appView.body) loadApps(); },
+  keep = () => { syncManage(); if (appView.body) loadApps(); }, busy = appQueueBusy } = {}) {
   const picked = manageable(view.manageRows).filter((r) => view.selected.has(r.id));
   if (!picked.length) return false;
   if (kind === "delete") {
@@ -1293,12 +1325,40 @@ export async function runManage(kind, { view = appView, mode = detectMode(), she
     return true;
   }
   const jobs = manageJobs(kind, picked);
-  if (!jobs.length) return false;
-  const s = manageSheet(kind, jobs.length, kind === "resign" ? jobs.filter((j) => j.url).length : 0);
-  if (await sheet({ title: s.title, buttons: [s.button] }) !== 0) return false;
-  await run(kind, jobs);
-  done();
+  // B66: picked marked apps Re-sign can't sign get an alert saying why (and the newest version to install instead),
+  // never a quiet no-op.
+  const blocked = kind === "resign" ? picked.filter((r) => manageKinds(r).blocked) : [];
+  let newest = [];
+  if (blocked.length) {
+    const a = resignBlockedAlert(blocked, jobs.length);
+    const tap = await alert({ title: a.title, message: a.message, buttons: a.buttons, stacked: a.buttons.length > 2 });
+    const act = a.actions[tap?.index] ?? "cancel"; // nav/alert.js resolves { index, value }
+    if (act === "cancel") return false;
+    if (act === "newest") newest = a.newest;
+  }
+  if (!jobs.length && !newest.length) return false;
+  if (jobs.length) { // the newest installs alone were confirmed by the alert
+    const s = manageSheet(kind, jobs.length + newest.length, kind === "resign" ? jobs.filter((j) => j.url).length : 0, newest.length);
+    if (await sheet({ title: s.title, buttons: [s.button] }) !== 0) return false;
+  }
+  const all = [...jobs, ...newest];
+  if (await busy()) {
+    await alert({ title: "Another Install Is Running", message: "Wait for it to finish, then try again. Your selection is kept.", buttons: ["OK"] });
+    return false;
+  }
+  const res = await run(kind, all);
+  // B66: the run stops at the first failure (its alert already shown) or before it starts (the Signing walkthrough):
+  // Manage stays on with the apps that didn't go through still picked, so nothing is dropped quietly.
+  const left = Array.isArray(res?.left) ? res.left.filter((id) => picked.some((r) => r.id === id)) : [];
+  if (!left.length) { done(); return true; }
+  view.selected = new Set(left);
+  keep();
   return true;
+}
+
+// B66: Confirm's run is going (screens/queue.js runAppQueue would return 0 without a word).
+async function appQueueBusy() {
+  return (await import("./queue.js")).appQueueRunning();
 }
 
 // One app of a bulk Delete: the helper's uninstall behind its HUD, or forgetting the record.
@@ -1315,7 +1375,11 @@ export async function runManageJobs(kind, jobs, { queue = null, run = null, inst
   for (const j of jobs) q.add(j);
   let i = 0;
   const n = jobs.length;
-  return runner(jobs, { queue: q, install: (j) => install(j, { verb: MANAGE_VERB[kind] ?? "Installing", i: ++i, n, hud }) });
+  // B66: a blocked app's newest version under Re-sign is an install, and says so
+  const verb = (j) => (kind === "resign" && j.mode !== "resign" ? "Installing" : MANAGE_VERB[kind] ?? "Installing");
+  const done = await runner(jobs, { queue: q, install: (j) => install(j, { verb: verb(j), i: ++i, n, hud }) });
+  // B66: the ids the run didn't get through (still queued: it stopped at a failure, or never started)
+  return { done, left: jobs.filter((j) => q.get(j.id)).map((j) => j.id) };
 }
 
 // One job of the run with the bulk label: a re-sign through screens/queue.js resignApp, an update signed on the phone

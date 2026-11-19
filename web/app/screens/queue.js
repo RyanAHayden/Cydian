@@ -367,6 +367,7 @@ function rawOutput(text) {
 
 let appConfirm = null;  // the open Confirm sheet for apps: { refresh(), close() }
 let appRunning = false; // Confirm's installs are going: queuing adds without opening a second sheet
+export const appQueueRunning = () => appRunning; // B66: Manage says so instead of runAppQueue's quiet 0
 
 // Queues an app (a core/appqueue.js job) and opens Confirm, or redraws the open one. -> the job.
 export function queueApp(job, { queue = appQueue, open = openAppConfirm } = {}) {

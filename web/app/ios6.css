@@ -586,6 +586,7 @@ input.sign-pw-input:read-only { cursor: default; }
 .sign-pw-cell[data-state="waiting"] > .cell-inner { background: #fff; box-shadow: inset 0 0 0 2px #426bf2; border-radius: 8.5px 8.5px 0 0; }
 html[data-theme="dark"] .sign-pw-cell[data-state="waiting"] > .cell-inner { background: var(--plain); }
 .sign-pw-txt { justify-content: center; font: bold 17px "Helvetica Neue", Helvetica, sans-serif; color: var(--detail); cursor: pointer; text-align: center; }
+.sign-pw-txt-cell[hidden] { display: none; } /* B94: once the password is right or not needed */
 .sign-pw-status .sign-pw-wrong { color: #b5322c; text-shadow: none; }
 html[data-theme="dark"] .sign-pw-status .sign-pw-wrong { color: var(--dk-pw-red); }
 html[data-theme="dark"] .sign-pw-glyph.pw-wrong { background-color: var(--dk-pw-red); }

@@ -1,0 +1,16 @@
+[
+  { "eval": "localStorage.setItem('ifizbox.firstVisit','later'); indexedDB.databases ? 1 : 1" },
+  { "nav": "#/home/settings/signing", "ms": 3000 },
+  { "eval": "(async () => { const get = async (n) => new File([await (await fetch('/core/fixtures/signing/' + n)).arrayBuffer()], n); const input = document.querySelector('.page.is-top .sign-import input[type=file]') ?? document.querySelector('.sign-import input[type=file]'); if (!input) return 'no input'; const dt = new DataTransfer(); dt.items.add(await get('test.p12')); dt.items.add(await get('test.mobileprovision')); input.files = dt.files; input.dispatchEvent(new Event('change')); return 'picked'; })()" },
+  { "wait": 3000 },
+  { "eval": "[...document.querySelectorAll('.group-header, .group-footer, .cell-label, .cell-detail, .sign-pw-txt')].filter((e) => e.offsetParent !== null).map((e) => e.textContent.trim()).join(' | ')" },
+  { "shot": "1-p12-no-password" },
+  { "eval": "(() => { const i = document.querySelector('.sign-pw-input'); if (!i) return 'no field'; i.value = 'hunter2'; i.dispatchEvent(new Event('change')); return 'typed'; })()" },
+  { "wait": 3000 },
+  { "eval": "[...document.querySelectorAll('.group-header, .group-footer, .cell-label, .cell-detail, .sign-pw-txt')].filter((e) => e.offsetParent !== null).map((e) => e.textContent.trim()).join(' | ')" },
+  { "shot": "2-right-password" },
+  { "go": "#/home/settings/signing/help", "ms": 2500 },
+  { "eval": "(() => { const p = document.querySelector('.sign-pw-cell'); p?.scrollIntoView({ block: 'center' }); const t = document.querySelector('.sign-pw-txt-cell'); return [p?.dataset.state, t?.hidden, t ? getComputedStyle(t).display : 'none'].join(' '); })()" },
+  { "wait": 500 },
+  { "shot": "3-walkthrough-right" }
+]

@@ -291,6 +291,14 @@ function queueCalls(backend, q, call) {
       const r = await backend.helper(["uninstall-app", id], onEvent);
       if (r.code !== 0) throw new BackendError("helper", uninstallError(r));
     },
+    // F232: Malware Found's Delete. ifizbox-helper remove-malware deletes known-malware dylibs no package owns (the
+    // scan's orphan files), all in one run, then restarts SpringBoard, which ends this app too: a resolve is rare
+    // (the respring command came back first). A refusal (owned, not on the list, gone) is a BackendError("helper").
+    async removeMalware(paths) {
+      const r = await backend.helper(["remove-malware", ...paths]);
+      if (r.code !== 0) throw new BackendError("helper", removeMalwareError(r));
+      return r;
+    },
     async respring() {
       const r = await run(["respring"]);
       if (r.code !== 0) throw new BackendError("helper", `Couldn't restart SpringBoard (${r.code}): ${lastLine(r.stderr) || "no output"}`);
@@ -409,6 +417,13 @@ export function uninstallError(r) {
   const why = lastLine(r?.stderr).replace(/^ifizbox-helper:\s*/, "");
   if (r?.code === 64 && /unknown verb/.test(why)) return "Update the helper (reinstall the package) to delete apps.";
   return why ? why.charAt(0).toUpperCase() + why.slice(1) + "." : `The app couldn't be deleted (${r?.code}).`;
+}
+
+// F232: the sentence for a failed ifizbox-helper remove-malware ({ code, stderr }), as uninstallError does it.
+export function removeMalwareError(r) {
+  const why = lastLine(r?.stderr).replace(/^ifizbox-helper:\s*/, "");
+  if (r?.code === 64 && /unknown verb/.test(why)) return "Update the helper (reinstall the package) to delete these files.";
+  return why ? why.charAt(0).toUpperCase() + why.slice(1) + "." : `The files couldn't be deleted (${r?.code}).`;
 }
 
 // I4: ifizbox-helper app-versions' "<id>\t<short>\t<build>\t<store>" lines -> [{ id, version, build, store }], each

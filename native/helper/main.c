@@ -20,7 +20,9 @@
  *                                 runs nothing; ipa.c)
  *   ifizbox-helper uninstall-app <bundle id>   (B46: Installed's Delete; an app in installd's containers only,
  *                                              uninstalled through installd; ipa.c)
- *   ifizbox-helper notifications on|off   (F65: Settings' Upgrade Notifications; off creates
+ *   ifizbox-helper remove-malware <path>...   (F232: Installed's Malware Found > Delete; known-malware dylibs no dpkg
+ *                                             package owns, in the tweak folders only, then respring; remove_malware)
+ *   ifizbox-helper notifications on|off  (F65: Settings' Upgrade Notifications; off creates
  *                                         <prefix>/var/lib/ifizbox/upgrades.off, which N5's daemon reads; runs nothing)
  *
  * No setuid bit: iFizBox spawns it as root with the persona spawn attributes (spawn.c), which the kernel allows
@@ -38,6 +40,7 @@
 #include "paid.h"
 #include "policy.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -138,6 +141,149 @@ static int ask_relay(const struct helper_plan *plan, char *const env[], int answ
     return WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
 }
 
+/* F232: remove-malware <path>... Installed's Malware Found alert deletes known-malware tweak dylibs no package owns
+ * (F228's scan lists them as orphans; apt can't remove what dpkg doesn't know). Only these names (the copy of
+ * web/app/core/known-malware.js MALWARE_FILES; test_remove_malware.py keeps the two the same), only in the two folders
+ * tweaks load from, with or without the prefix (the same places Apt.swift's malware.scan looks). */
+static const char *const malware_files[] = {
+    "MainRepoEGG.dylib", "MobileSafeMode.dylib", "RocketBootstrapUI.dylib", "SnowBoardSB.dylib", "LicGenerator.dylib",
+};
+static const char *const malware_dirs[] = {"/Library/MobileSubstrate/DynamicLibraries", "/usr/lib/TweakInject"};
+#define MALWARE_NFILES (sizeof malware_files / sizeof *malware_files)
+#define MALWARE_NDIRS (sizeof malware_dirs / sizeof *malware_dirs)
+#define MALWARE_MAX_PATHS 16
+
+struct malware_target {
+    char dir[PATH_MAX]; /* the folder as given (prefixed or not) */
+    const char *name;   /* one of malware_files */
+    const char *path;   /* the caller's word */
+};
+
+/* Which listed file in which tweak folder path names, exactly as spelled (no normalising: "..", "//" or a trailing
+ * "/" match nothing). 0, or -1 + *err. */
+static int malware_target(const char *prefix, const char *path, struct malware_target *t, const char **err) {
+    for (size_t d = 0; d < MALWARE_NDIRS; d++) {
+        for (int pre = 0; pre < 2; pre++) {
+            char dir[PATH_MAX];
+            if ((size_t)snprintf(dir, sizeof dir, "%s%s", pre ? prefix : "", malware_dirs[d]) >= sizeof dir) continue;
+            size_t n = strlen(dir);
+            if (strncmp(path, dir, n) || path[n] != '/') continue;
+            for (size_t f = 0; f < MALWARE_NFILES; f++) {
+                if (strcmp(path + n + 1, malware_files[f])) continue;
+                memcpy(t->dir, dir, n + 1);
+                t->name = malware_files[f];
+                t->path = path;
+                return 0;
+            }
+        }
+    }
+    *err = "not a known-malware file in the Substrate or TweakInject folder";
+    return -1;
+}
+
+/* The dpkg package whose info/<pkg>.list names a file called `name` in any tweak folder (prefixed or not; a folder
+ * may be a link to the other one, so the name anywhere there counts) into owner. 1 owned, 0 not, -1 unreadable. */
+static int malware_owner(const char *prefix, const char *name, char *owner, size_t size) {
+    char info[PATH_MAX], want[MALWARE_NDIRS * 2][PATH_MAX];
+    size_t nwant = 0;
+    for (size_t d = 0; d < MALWARE_NDIRS; d++) {
+        snprintf(want[nwant++], PATH_MAX, "%s%s/%s", prefix, malware_dirs[d], name);
+        snprintf(want[nwant++], PATH_MAX, "%s/%s", malware_dirs[d], name);
+    }
+    snprintf(info, sizeof info, "%s/var/lib/dpkg/info", prefix);
+    DIR *dir = opendir(info);
+    if (!dir) return -1;
+    struct dirent *e;
+    int found = 0;
+    char *line = NULL;
+    size_t cap = 0;
+    while (!found && (e = readdir(dir))) {
+        size_t len = strlen(e->d_name);
+        if (len <= 5 || strcmp(e->d_name + len - 5, ".list")) continue;
+        char file[PATH_MAX];
+        if ((size_t)snprintf(file, sizeof file, "%s/%s", info, e->d_name) >= sizeof file) continue;
+        int fd = open(file, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+        FILE *fp = fd >= 0 ? fdopen(fd, "r") : NULL;
+        if (!fp) { if (fd >= 0) close(fd); continue; }
+        ssize_t n;
+        while (!found && (n = getline(&line, &cap, fp)) > 0) {
+            if (line[n - 1] == '\n') line[--n] = 0;
+            for (size_t w = 0; w < nwant && !found; w++) {
+                if (strcmp(line, want[w])) continue;
+                found = 1;
+                size_t k = len - 5 < size - 1 ? len - 5 : size - 1;
+                memcpy(owner, e->d_name, k);
+                owner[k] = 0;
+                char *colon = strchr(owner, ':'); /* <pkg>:<arch>.list */
+                if (colon) *colon = 0;
+            }
+        }
+        fclose(fp);
+    }
+    free(line);
+    closedir(dir);
+    return found;
+}
+
+/* Checks every path first (listed, not owned by a package, a regular file or a link: never followed), then deletes
+ * them all with unlinkat on the opened folder and restarts SpringBoard (the respring verb's command; a deleted tweak
+ * is still loaded until then). Exit: 64 refused (nothing deleted), 74 couldn't read dpkg's lists or delete anything,
+ * else the respring command's. */
+static int remove_malware(int argc, char *const argv[], const char *prefix, char *const env[]) {
+    static struct malware_target t[MALWARE_MAX_PATHS];
+    const char *err = NULL;
+    if (argc < 1 || argc > MALWARE_MAX_PATHS) {
+        fprintf(stderr, "ifizbox-helper: remove-malware takes 1 to %d paths\n", MALWARE_MAX_PATHS);
+        return HELPER_EX_USAGE;
+    }
+    int dirfd[MALWARE_MAX_PATHS];
+    for (int i = 0; i < argc; i++) {
+        if (malware_target(prefix, argv[i], &t[i], &err)) {
+            fprintf(stderr, "ifizbox-helper: %s: %s\n", argv[i], err);
+            return HELPER_EX_USAGE;
+        }
+        for (int j = 0; j < i; j++)
+            if (!strcmp(argv[i], argv[j])) { fprintf(stderr, "ifizbox-helper: %s: given twice\n", argv[i]); return HELPER_EX_USAGE; }
+        char owner[HELPER_NAME_MAX + 1];
+        int o = malware_owner(prefix, t[i].name, owner, sizeof owner);
+        if (o < 0) { fprintf(stderr, "ifizbox-helper: can't read dpkg's file lists: %s\n", strerror(errno)); return HELPER_EX_IOERR; }
+        if (o > 0) {
+            fprintf(stderr, "ifizbox-helper: %s belongs to the package %s: remove that package instead\n", argv[i], owner);
+            return HELPER_EX_USAGE;
+        }
+    }
+    for (int i = 0; i < argc; i++) {
+        struct stat st;
+        dirfd[i] = open(t[i].dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (dirfd[i] < 0 || fstatat(dirfd[i], t[i].name, &st, AT_SYMLINK_NOFOLLOW)) {
+            int e = errno;
+            fprintf(stderr, "ifizbox-helper: %s: %s\n", t[i].path, strerror(e));
+            return e == ENOENT ? HELPER_EX_USAGE : HELPER_EX_IOERR;
+        }
+        if (!S_ISREG(st.st_mode) && !S_ISLNK(st.st_mode)) {
+            fprintf(stderr, "ifizbox-helper: %s: not a file or a link\n", t[i].path);
+            return HELPER_EX_USAGE;
+        }
+    }
+    int deleted = 0;
+    for (int i = 0; i < argc; i++) {
+        if (unlinkat(dirfd[i], t[i].name, 0)) fprintf(stderr, "ifizbox-helper: %s: %s\n", t[i].path, strerror(errno));
+        else { printf("Deleted %s\n", t[i].path); deleted++; }
+        close(dirfd[i]);
+    }
+    fflush(stdout);
+    if (!deleted) return HELPER_EX_IOERR;
+    struct helper_plan *plan = malloc(sizeof *plan);
+    char *words[] = {"respring", NULL};
+    if (!plan || helper_plan(1, words, prefix, -1, plan, &err)) {
+        fprintf(stderr, "ifizbox-helper: respring: %s\n", plan ? err : "out of memory");
+        return HELPER_EX_EXEC;
+    }
+    execve(plan->path, (char *const *)plan->argv, env);
+    fprintf(stderr, "ifizbox-helper: %s: %s\n", plan->path, strerror(errno));
+    return HELPER_EX_EXEC;
+}
+
 int main(int argc, char *argv[]) {
     const char *prefix = IFIZBOX_PREFIX, *err = NULL;
     char parent[PATH_MAX], expected[PATH_MAX];
@@ -151,11 +297,15 @@ int main(int argc, char *argv[]) {
 
     int status_fd = fcntl(3, F_GETFD) != -1 ? 3 : -1;
     struct helper_plan plan;
-    if (helper_plan(argc - 1, argv + 1, prefix, status_fd, &plan, &err)) {
+    /* F232: remove-malware isn't one of policy.c's plans; it is checked and done by remove_malware, after the clean-up
+     * below (plan stays zeroed: HV_UPDATE, so none of the verb-specific steps on the way run). */
+    int malware = argc >= 2 && !strcmp(argv[1], "remove-malware");
+    if (malware) memset(&plan, 0, sizeof plan);
+    else if (helper_plan(argc - 1, argv + 1, prefix, status_fd, &plan, &err)) {
         fprintf(stderr, "ifizbox-helper: %s\n", err);
         return HELPER_EX_USAGE;
     }
-    int unknown = helper_first_unknown(prefix, &plan);
+    int unknown = malware ? -1 : helper_first_unknown(prefix, &plan);
     if (unknown >= 0) {
         fprintf(stderr, "ifizbox-helper: unknown package: %s\n", plan.packages[unknown]);
         return HELPER_EX_USAGE;
@@ -238,6 +388,7 @@ int main(int argc, char *argv[]) {
                        plan.verb == HV_INSTALL_PAID || plan.verb == HV_INSTALL_DEB) && status_fd >= 0 ? "CYDIA=3 1" : NULL;
     char *env[] = {path_env, "HOME=/var/root", "USER=root", "LOGNAME=root", "LANG=C", "DEBIAN_FRONTEND=noninteractive",
                    cydia_env, NULL};
+    if (malware) return remove_malware(argc - 2, argv + 2, prefix, env);
     if (plan.verb == HV_INSTALL_IPA) {
         int rc = helper_install_ipa(prefix, plan.path, status_fd, env, &err);
         if (rc) fprintf(stderr, "ifizbox-helper: %s\n", err);

@@ -18,6 +18,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     ifizbox-helper userspace-reboot                                         (N8: the Userspace Reboot intent)
     ifizbox-helper uicache                                                  (F151: the console's Reload Data)
     ifizbox-helper uninstall-app <bundle id>                                (B46: Installed's Delete)
+    ifizbox-helper remove-malware <path>...                                 (F232: Malware Found's Delete)
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|
@@ -44,6 +45,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 | `userspace-reboot` | `launchctl reboot userspace` (N8: the Userspace Reboot intent and control)              |
 | `uicache`   | `uicache -a`: rebuilds the home screen's icon cache (F151: the console's Reload Data after an app was installed) |
 | `uninstall-app` | runs nothing: takes a bundle id (`[A-Za-z0-9.-]`), finds the app among installd's containers as `app-versions` reads them (`HELPER_APPS_DIR`; real directories only), and has installd uninstall it (`LSApplicationWorkspace uninstallApplication:withOptions:`, the entitlements' `Uninstall` SPI). A system app or anything in the jailbreak's `/Applications` (iFizBox itself) isn't in the containers, so it is refused (exit 64). `pmstatus:<id>:<percent>:<text>` on fd 3, `Uninstalled <id>` on stdout; installd refusing is exit 1 (B46; `ipa.c`) |
+| `remove-malware` | runs no apt: deletes 1 to 16 known-malware tweak dylibs and restarts SpringBoard (F232, Installed's Malware Found alert > Delete). Each path must be spelled exactly `[/var/jb]/Library/MobileSubstrate/DynamicLibraries/<name>` or `[/var/jb]/usr/lib/TweakInject/<name>`, `<name>` one of `main.c`'s `malware_files` (the copy of `web/app/core/known-malware.js` `MALWARE_FILES`; `test_remove_malware.py` keeps them the same). Refused (exit 64, nothing deleted) when any path isn't one of those, is given twice, is missing, isn't a regular file or a link, or when a file of that name in either tweak folder is listed in a `/var/jb/var/lib/dpkg/info/*.list` (that package's Remove takes it away); dpkg's lists unreadable is exit 74. Then `unlinkat` in the opened folder (a link is deleted itself, never followed), `Deleted <path>` on stdout for each, and the `respring` command is `execve`d (its exit status); none deleted is exit 74 |
 
 **The queue (N4):** `simulate` and `apply` take items: `name` installs the newest, `name=version` that exact
 version (Reinstall, Downgrade and the Version History pick one), `-name` removes. apt gets `name`, `name=version`

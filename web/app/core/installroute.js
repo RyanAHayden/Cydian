@@ -70,7 +70,7 @@ export const PAIR_STEPS = {
   phone: [
     "Tap Start Pairing.",
     "Open Settings > Privacy & Security > Developer Mode.",
-    `Tap "Pair with ${NAME} on this iPhone" and enter the code shown here.`,
+    `Tap "Pair with ${NAME} on this iPhone" and type this code.`,
   ],
   file: [
     "Make a pairing file for this iPhone on a computer (idevice_pair or JitterbugPair).",
@@ -78,22 +78,32 @@ export const PAIR_STEPS = {
   ],
 };
 
-// idevice.pair's events folded into the page's state: { pin, text, error }. A failed try keeps the pairing open (the
-// phone can tap Pair again), so its error stays shown until the next step.
+// idevice.pair's events folded into the page's state: { pin, text, error }. The code comes first, before the phone
+// connects, and stays for every try. A failed try keeps the pairing open (the phone can tap Pair again), so its error
+// stays shown until the next step.
 export function pairEvent(state, ev) {
   const e = Array.isArray(ev) ? ev[0] : ev;
   if (!e) return state;
-  if (e.pin) return { ...state, pin: e.pin, error: "" };
-  if (e.step === "failed") return { ...state, pin: "", error: e.error || "The pairing failed." };
-  if (e.text) return { ...state, text: e.text, ...(e.step === "connected" ? { error: "" } : {}) };
+  if (e.pin) return { ...state, pin: e.pin };
+  if (e.step === "failed") return { ...state, error: e.error || "The pairing failed." };
+  if (e.text) return { ...state, text: e.text, error: "" };
   return state;
 }
 
-// The footer under Cancel while pairing waits.
+// idevice.pairState ({active, pin, step, text, error}, read when the app comes back to the foreground) as the page's
+// state, or null when no pairing is waiting.
+export function pairFromNative(st) {
+  if (!st?.active) return null;
+  return { pin: st.pin || "", text: st.text || "", error: st.error || "" };
+}
+
+// The code as it shows: "123 456".
+export const pinText = (pin) => (/^\d{6}$/.test(pin || "") ? `${pin.slice(0, 3)} ${pin.slice(3)}` : pin || "");
+
+// The step or error line under Cancel while pairing waits.
 export function pairFooter(p) {
-  if (p.pin) return "Enter this code on the iPhone's pairing screen.";
   if (p.error) return `That try didn't pair: ${p.error} Tap Pair on the iPhone to try again.`;
-  return p.text || "Waiting for Developer Mode's Pair button…";
+  return p.text || "Starting…";
 }
 
 // What a failed idevice.verify means: { title, message, again } (`again`: offer Pair Again).

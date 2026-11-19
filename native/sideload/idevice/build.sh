@@ -36,8 +36,12 @@ if [ ${#missing[@]} -gt 0 ]; then
 fi
 [ "${1:-}" = --probe ] && exit 0
 
-# Built already from this pin (commit and features): nothing to do. native/build.sh calls this on every build.
-stamp="$IDEVICE_COMMIT $IDEVICE_FEATURES"
+# Our changes on top of the pinned commit (MIT, like idevice; patches/*.patch, applied in order): part of the stamp,
+# so editing one rebuilds. The corresponding source is the pinned commit plus these patches.
+patches=$(cat "$here"/patches/*.patch 2>/dev/null | sha256sum | cut -c1-16)
+
+# Built already from this pin (commit, features, patches): nothing to do. native/build.sh calls this on every build.
+stamp="$IDEVICE_COMMIT $IDEVICE_FEATURES $patches"
 if [ -f "$out/lib/libidevice_ffi.a" ] && [ "$(cat "$out/stamp" 2>/dev/null)" = "$stamp" ] &&
   cmp -s "$here/module.modulemap" "$out/include/module.modulemap"; then
   exit 0
@@ -59,6 +63,11 @@ if [ ! -f "$built/libidevice_ffi.a" ]; then
     git -C "$src" fetch --filter=blob:none origin "$IDEVICE_COMMIT" 2>/dev/null || git -C "$src" fetch origin
     git -C "$src" checkout -q --detach "$IDEVICE_COMMIT"
   fi
+  # The pinned tree, clean (an earlier build may have left patches or a regenerated idevice.h), then our patches.
+  git -C "$src" checkout -q -f --detach "$IDEVICE_COMMIT"
+  for p in "$here"/patches/*.patch; do
+    [ -f "$p" ] && git -C "$src" apply "$p"
+  done
   # The crates build dylibs too (plist_ffi and idevice-ffi are cdylib as well as staticlib), so cargo needs a
   # linker that can make an iOS Mach-O: clang driving lld against the SDK, as native/build.sh links the app.
   export SDKROOT=$sdk IPHONEOS_DEPLOYMENT_TARGET=15.0
@@ -73,6 +82,7 @@ if [ ! -f "$built/libidevice_ffi.a" ]; then
   # The library goes in last: its presence says the rest is there.
   mkdir -p "$built"
   cp "$src/ffi/idevice.h" "$src/LICENSE.txt" "$built/"
+  cat "$here"/patches/*.patch > "$built/patches.diff" 2>/dev/null || true
   git -C "$src" describe --tags --always > "$built/version"
   cp "$src/target/aarch64-apple-ios/release/libidevice_ffi.a" "$built/libidevice_ffi.a.part"
   mv "$built/libidevice_ffi.a.part" "$built/libidevice_ffi.a"

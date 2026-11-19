@@ -2,14 +2,15 @@
 // This iPhone route's two pages (core/installroute.js holds the rules and texts):
 //   installation           the choice, then (This iPhone) Pairing and the VPN's state
 //   installation/benefits  what This iPhone gives, before it's set up; Set Up opens the pairing page
-//   installation/pair      iOS 27: Start Pairing shows the 6-digit code for Settings > Developer Mode; older iOS:
+//   installation/pair      iOS 27: Start Pairing shows the 6-digit code at once, for Settings > Developer Mode, and
+//                          keeps pairing until it pairs, Cancel, or the page is left; older iOS:
 //                          Import Pairing File; once paired, Check Connection (Pair Again when it fails) and Forget
 // The idevice.* bridge calls are native/sideload/idevice/IDeviceBridge.swift's.
 import { grouped } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { toBase64 } from "../core/signing.js";
-import { ROUTE_KEY, ROUTE_OPTIONS, BENEFITS, VPNS, vpnList, pairState, pairEvent, pairFooter, PAIR_STEPS, verifyFailure } from "../core/installroute.js";
+import { ROUTE_KEY, ROUTE_OPTIONS, BENEFITS, VPNS, vpnList, pairState, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure } from "../core/installroute.js";
 import { NAME } from "../brand.js";
 
 export const PAGE = "installation";
@@ -85,9 +86,42 @@ export function benefitsPage() {
 // ---- Pairing
 
 let pairing = null; // { pin, text, error } while idevice.pair waits for the phone (core pairEvent)
+let shown = null; // { native, redraw } of the pair page on screen, for the hooks below
+
+// The pair page's groups in pairing mode or not (pure, for tests): the steps, then Start Pairing or Cancel with the
+// step or error line under it. The code goes under the steps (drawPair).
+export function pairGroups(p, { start = () => {}, cancel = () => {} } = {}) {
+  const steps = PAIR_STEPS.phone.map((s, i) => `${i + 1}. ${s}`).join(" ");
+  return [
+    { header: "Pair This iPhone", footer: steps },
+    { rows: [p ? { label: "Cancel", cls: "sign-import", onClick: cancel } : { label: "Start Pairing", cls: "sign-import", onClick: start }],
+      footer: p ? pairFooter(p) : "" },
+  ];
+}
+
+// While pairing, the app is in the background (the code is typed in Settings) and events sent then may never reach
+// the page: coming back, it reads the pairing from native. Leaving the page ends the pairing.
+function onPairPage() { return location.hash.replace(/^#/, "") === route("pair").replace(/^#/, ""); }
+async function reread() {
+  if (!pairing || !shown || document.visibilityState !== "visible") return;
+  const { native, redraw } = shown;
+  let st = null;
+  try { st = await call(native, "idevice.pairState"); } catch { return; }
+  const now = pairFromNative(st);
+  if (now && pairing) { pairing = now; redraw(); } // not active: idevice.pair's reply settles it
+}
+if (typeof document !== "undefined" && typeof window !== "undefined") {
+  document.addEventListener("visibilitychange", reread);
+  window.addEventListener("pageshow", reread);
+  window.addEventListener("hashchange", () => {
+    if (pairing && shown && !onPairPage()) call(shown.native, "idevice.pairCancel").catch(() => {});
+  });
+}
 
 async function drawPair(el, { store, native, alert, redraw }) {
-  const st = await status(native);
+  shown = { native, redraw };
+  // In pairing mode the page draws from `pairing` alone, without waiting on idevice.status.
+  const st = pairing ? { paired: null, pairOnPhone: true } : await status(native);
   const state = pairState(st);
   const done = (title, message) => { store.set(ROUTE_KEY, "iphone"); alert({ title, message, buttons: ["OK"] }); redraw(); };
   if (state === "paired") {
@@ -101,26 +135,27 @@ async function drawPair(el, { store, native, alert, redraw }) {
   }
   const steps = PAIR_STEPS[state].map((s, i) => `${i + 1}. ${s}`).join(" ");
   if (state === "phone") {
-    const code = Object.assign(document.createElement("p"), { className: "pair-code", textContent: pairing?.pin ?? "" });
     const start = async () => {
-      pairing = { pin: "" };
+      if (pairing) return;
+      pairing = { pin: "", text: "", error: "" };
       redraw();
       try {
+        // idevice.pair's first event is the code, before anything listens
         await call(native, "idevice.pair", {}, (ev) => { if (pairing) { pairing = pairEvent(pairing, ev); redraw(); } });
         pairing = null;
         done("Paired", `${NAME} installs apps on this iPhone now.`);
       } catch (e) {
         pairing = null;
         redraw();
-        if (e?.code !== "canceled" && e?.code !== "cancelled") alert({ title: "Couldn't Pair", message: e?.message || "No answer.", buttons: ["OK"] });
+        if (e?.code !== "canceled" && e?.code !== "cancelled" && !/^cancel+ed/.test(e?.message || "")) {
+          alert({ title: "Couldn't Pair", message: e?.message || "No answer.", buttons: ["OK"] });
+        }
       }
     };
-    const action = pairing
-      ? { label: "Cancel", cls: "sign-import", onClick: () => call(native, "idevice.pairCancel").catch(() => {}) }
-      : { label: "Start Pairing", cls: "sign-import", onClick: start };
-    const frag = grouped([{ header: "Pair This iPhone", footer: steps }, { rows: [action],
-      footer: pairing ? pairFooter(pairing) : "" }]);
-    if (pairing?.pin) frag.lastElementChild.append(code);
+    const frag = grouped(pairGroups(pairing, { start, cancel: () => call(native, "idevice.pairCancel").catch(() => {}) }));
+    if (pairing?.pin) {
+      frag.firstElementChild.append(Object.assign(document.createElement("p"), { className: "pair-code", textContent: pinText(pairing.pin) }));
+    }
     el.replaceChildren(frag);
     return;
   }

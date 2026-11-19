@@ -13,6 +13,7 @@ import Darwin
 import dnssd
 import Foundation
 import IDeviceFFI
+import os
 import Security
 
 enum IDevice {
@@ -117,7 +118,13 @@ enum IDevice {
     /// What pairOnPhone tells the page while it waits.
     enum PairEvent { case step(String, String), failed(String, String), pin(String) }
 
-    static func log(_ s: String) { NSLog("%@", "\(Brand.name) pair: \(s)") }
+    // os_log, public: NSLog's lines never reached the syslog relay on iOS 27 (f15pair2), and os_log redacts a
+    // dynamic string as <private> unless it is marked public.
+    private static let pairLog = OSLog(subsystem: "ifizbox.idevice", category: "pair")
+    static func log(_ s: String) { os_log("%{public}@", log: pairLog, type: .default, "\(Brand.name) pair: \(s)") }
+
+    /// The 6-digit code for one pairing: made before anything listens, shown at once, and used by every try.
+    static func newPairingCode() -> String { String(format: "%06d", Int.random(in: 0..<1_000_000)) }
 
     private final class PinBox { let show: (String) -> Void; init(_ f: @escaping (String) -> Void) { show = f } }
 
@@ -129,9 +136,9 @@ enum IDevice {
     }
 
     /// Advertises the app as a pairable host and waits (blocking; call it on `queue`) until the phone pairs, the
-    /// user cancels, or it fails. `event` gets the steps, a failed try (the phone can try again) and the 6-digit
-    /// code to type on the phone.
-    static func pairOnPhone(cancel: PairCancel, event: @escaping (PairEvent) -> Void) throws {
+    /// user cancels, or it fails. `code` (newPairingCode) is the 6-digit code pair-setup uses on every try, so the
+    /// page shows it before the phone connects. `event` gets the steps and a failed try (the phone can try again).
+    static func pairOnPhone(code: String, cancel: PairCancel, event: @escaping (PairEvent) -> Void) throws {
         // 1. The identity and what to publish
         var handle: OpaquePointer?
         var sid: UnsafeMutablePointer<CChar>?
@@ -139,6 +146,8 @@ enum IDevice {
         var txtLen: UInt = 0
         try check(pairable_host_prepare(Brand.name, nil, false, &handle, &sid, &txtPtr, &txtLen, nil), "pair_failed")
         defer { pairable_host_free(handle) }
+        // Our code, not one idevice draws after the phone connects (patches/0001: pairable_host_set_pin)
+        try check(pairable_host_set_pin(handle, code), "pair_failed")
         let serviceID = sid.map { String(cString: $0) } ?? ""
         if let sid = sid { idevice_string_free(sid) }
         let txtPlist = txtPtr.map { Data(bytes: $0, count: Int(txtLen)) } ?? Data()
@@ -212,7 +221,7 @@ enum IDevice {
         defer { box.release() }
         let pinCb: @convention(c) (UnsafePointer<CChar>?, UnsafeMutableRawPointer?) -> Void = { p, ctx in
             guard let p = p, let ctx = ctx else { return }
-            IDevice.log("idevice asked for the code to be shown")
+            IDevice.log("pair-setup started; the phone asks for the code")
             Unmanaged<PinBox>.fromOpaque(ctx).takeUnretainedValue().show(String(cString: p))
         }
         while !cancel.isCanceled {

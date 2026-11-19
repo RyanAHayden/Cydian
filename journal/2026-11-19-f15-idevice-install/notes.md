@@ -112,3 +112,28 @@ Log lines (`<name> pair: …`): `identity …, TXT keys …`, `listening on [::]
 `Bonjour: registered NAME._remotepairing-pairable-host._tcp port PORT`, `connection from ADDR port P`,
 `idevice asked for the code to be shown`, `paired; the pairing is saved`, or `pairing with ADDR failed: …`,
 `DNSServiceRegister failed: N`, `canceled`.
+
+## The phone asked for the code, the page never showed one (iPhone 15 Pro, iOS 27.0.1, build 1893)
+
+The connection worked this time: `remotepairingdeviced` resolved `target=rphone.local. port=54214` on en0 (ifindex
+20), held a TCP connection to it (`C38 IPv4…:54214 ready`, f15pair3) and Settings asked "Enter the 6-digit PIN".
+iFizBox showed no code. Why, from the code:
+- The page redrew on every idevice.pair event through `drawPair`, which first awaited `idevice.status`. That call ran
+  on `IDevice.queue`, the serial queue `pairOnPhone` blocks while it waits for the phone. So after the first redraw
+  every redraw hung on `status` until pairing ended: no step lines and no code, even when idevice handed the code
+  over. (The code was only known once the phone had sent pair-setup M1: idevice drew it in `pair_setup`.)
+- Events emitted while iFizBox is in the background (the user is in Settings) may not reach a suspended web view.
+- The `iFizBox pair:` lines were NSLog: none reached the syslog relay on iOS 27 (f15pair2, f15pair3), so the logs
+  couldn't show it either.
+
+Fix:
+- The code is made when Start Pairing is tapped and given to idevice (`patches/0001-pairable-host-set-pin.patch`,
+  `pairable_host_set_pin`, applied by build.sh on the pinned commit), so every try uses it; idevice.pair emits it
+  first and the page shows it at once, with the steps. It's also posted as a notification ("iFizBox Pairing Code",
+  "123 456 — type it in Settings"), removed when pairing ends.
+- `idevice.status`, `idevice.vpn` and the new `idevice.pairState` run off `IDevice.queue`; in pairing mode the page
+  draws without waiting on status, and on `visibilitychange`/`pageshow` it reads `idevice.pairState` (code, step,
+  text, error).
+- No timeout: the listener, Bonjour and KeepAlive's silent audio last until paired, Cancel, or leaving the page
+  (hashchange sends idevice.pairCancel).
+- Logs: os_log `%{public}@`, subsystem `ifizbox.idevice`, category `pair`.

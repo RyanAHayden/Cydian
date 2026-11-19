@@ -7,7 +7,8 @@ so nothing reaches the Signing Server, there's no install sheet to keep alive, a
 | File | What it does |
 | --- | --- |
 | `pin.env` | the idevice commit and the cargo features built |
-| `build.sh` | builds `libidevice_ffi.a` + `idevice.h` for arm64 iOS 15 from that commit on Linux (`--probe`: is the toolchain there) |
+| `patches/*.patch` | our changes on top of that commit (MIT): `pairable_host_set_pin`, a setup code the app picks and shows before the phone connects |
+| `build.sh` | builds `libidevice_ffi.a` + `idevice.h` for arm64 iOS 15 from that commit plus `patches/` on Linux (`--probe`: is the toolchain there) |
 | `module.modulemap` | `import IDeviceFFI` for the Swift files |
 | `IDevice.swift` | pairing (Keychain), connecting over LocalDevVPN, AFC upload, installation_proxy with progress |
 | `VPNCheck.swift` | is LocalDevVPN on (10.7.0.1 answers), is another VPN on instead (tunnel interfaces up) |

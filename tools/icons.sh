@@ -9,10 +9,10 @@
 #   web/app/icons/icon-glossy-{76,152,228}.png  the glossy variant at the Home header's 76pt, 1x/2x/3x
 #   native/icon/AppIcon60x60{,@2x,@3x}.png  the jailbreak app's home-screen icon (60/120/180), flat
 #   web/app/icons/icon-web-{180,192,512,1024}.png  the website's home-screen icon (apple-touch-icon, manifest): a
-#                                       blue WEB band across the bottom, so it isn't taken for the app
+#                                       blue WEB sash across the top-right corner, so it isn't taken for the app
 #   web/app/icons/icon-web-glossy-{76,152,228}.png  the WEB icon with iOS 6 corners, for the website's Home header
-#   native/icon/AppIconLite60x60{@2x,@3x}.png  the sideload IPA's icon: a red LITE band across the bottom, as old
-#                                       trial apps had (the .deb keeps the plain one; native/build.sh picks)
+#   native/icon/AppIconLite60x60{@2x,@3x}.png  the sideload IPA's icon: a red LITE sash, as old trial apps had
+#                                       (the .deb keeps the plain one; native/build.sh picks)
 #
 # Needs rsvg-convert (librsvg). Run it after editing the master and commit what it writes.
 set -euo pipefail
@@ -60,34 +60,35 @@ python3 tools/launch_images.py "$dir/launch" >/dev/null
 # The Home header shows the glossy icon at 76pt: PNGs at 1x/2x/3x (Safari can draw an SVG <img> with an embedded
 # picture at low resolution, which looked blurry and smeared on the phone).
 for n in 76 152 228; do png "$dir/icon-glossy.svg" "$n" "$dir/icon-glossy-$n.png"; done
-# banded <text> <light colour> <dark colour>: the master with an iOS 6-style band across the bottom (SVG on stdout),
-# drawn like SpringBoard's "New" icon sash: top-to-bottom gradient, faint diagonal pinstripes, a light top edge, a
-# shadow cast up onto the icon, white text with a dark shadow above it.
-banded() {
+# sashed <text> <light colour> <dark colour>: the master with an iOS 6-style sash across the top-right corner (SVG on
+# stdout), drawn like SpringBoard's "New" icon sash: a gradient along the sash, faint pinstripes across it, a light
+# outer edge, a darker inner edge, a shadow on the icon, white text with a dark shadow above it.
+sashed() {
   echo '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">'
   perl -0pe 's/<!--.*?-->\n?//gs; s/^.*?<svg[^>]*>\n//s; s/<\/svg>.*//s' "$master"
   cat <<SVG
   <defs>
-    <linearGradient id="band" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="$2"/><stop offset="1" stop-color="$3"/></linearGradient>
-    <pattern id="band-stripes" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <linearGradient id="sash" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="$2"/><stop offset="1" stop-color="$3"/></linearGradient>
+    <pattern id="sash-stripes" width="20" height="20" patternUnits="userSpaceOnUse">
       <rect width="10" height="20" fill="#fff" fill-opacity=".08"/><rect x="10" width="10" height="20" fill="#000" fill-opacity=".08"/>
     </pattern>
-    <filter id="band-shadow" x="-20%" y="-60%" width="140%" height="220%"><feDropShadow dx="0" dy="-10" stdDeviation="9" flood-color="#000" flood-opacity=".6"/></filter>
-    <filter id="band-text" x="-10%" y="-30%" width="120%" height="160%"><feDropShadow dx="0" dy="-9" stdDeviation="0" flood-color="#000" flood-opacity=".45"/></filter>
+    <filter id="sash-shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#000" flood-opacity=".6"/></filter>
+    <filter id="sash-text" x="-10%" y="-30%" width="120%" height="160%"><feDropShadow dx="0" dy="-9" stdDeviation="0" flood-color="#000" flood-opacity=".45"/></filter>
   </defs>
-  <g filter="url(#band-shadow)">
-    <rect x="-10" y="794" width="1044" height="240" fill="url(#band)"/>
-    <rect x="-10" y="794" width="1044" height="240" fill="url(#band-stripes)"/>
-    <rect x="0" y="794" width="1024" height="8" fill="#fff" fill-opacity=".45"/>
-    <text x="512" y="960" text-anchor="middle" font-family="Helvetica Neue" font-weight="bold" font-size="150" letter-spacing="9" fill="#fff" filter="url(#band-text)">$1</text>
-  </g>
+  <g filter="url(#sash-shadow)"><g transform="translate(1024,0) rotate(45)">
+    <rect x="-560" y="250" width="1120" height="250" fill="url(#sash)"/>
+    <rect x="-560" y="250" width="1120" height="250" fill="url(#sash-stripes)"/>
+    <rect x="-560" y="250" width="1120" height="8" fill="#fff" fill-opacity=".45"/>
+    <rect x="-560" y="490" width="1120" height="10" fill="#000" fill-opacity=".3"/>
+    <text x="0" y="428" text-anchor="middle" font-family="Helvetica Neue" font-weight="bold" font-size="150" letter-spacing="9" fill="#fff" filter="url(#sash-text)">$1</text>
+  </g></g>
 </svg>
 SVG
 }
 web=$(mktemp --suffix=.svg) lite=$(mktemp --suffix=.svg)
 trap 'rm -f "$bg" "$web" "$lite"' EXIT
-banded WEB '#4f8dff' '#0f47e8' > "$web"
-banded LITE '#ff4a3b' '#d40d05' > "$lite"
+sashed WEB '#4f8dff' '#0f47e8' > "$web"
+sashed LITE '#ff4a3b' '#d40d05' > "$lite"
 for n in 180 192 512 1024; do png "$web" "$n" "$dir/icon-web-$n.png"; done
 # The website's Home header shows the WEB icon too, glossy (iOS 6 corners) like icon-glossy-*.png.
 webg=$(mktemp --suffix=.svg)

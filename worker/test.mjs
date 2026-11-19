@@ -1109,3 +1109,99 @@ import { appleRelay, relayTarget, MAX_REQUEST, MAX_REPLY } from "./src/apple-rel
   assert.equal((await relay("/apple/status", { headers: { "Sec-Fetch-Site": "cross-site" } })).status, 403);
   console.log("worker apple relay: ok");
 }
+
+// F258: the setup command's code hand-off (src/setup.js): a finished upload gets a short code; the code reads back
+// the IPA's link, the app and where the pairing file goes; the scripts and binaries come from the setup release.
+import { setup, normalCode, newCode, showCode, containerPath, SETUP_ALPHABET, PAIRING_PATH } from "./src/setup.js";
+{
+  assert.equal(SETUP_ALPHABET.length, 31);
+  assert.ok(!/[01OIL]/.test(SETUP_ALPHABET));
+  assert.equal(normalCode(" abcd-2345 "), "ABCD2345");
+  assert.equal(normalCode("ABCD 2345"), "ABCD2345");
+  assert.equal(normalCode("ABCD-234"), null);   // too short
+  assert.equal(normalCode("ABCD-23O5"), null);  // O isn't in the alphabet
+  assert.equal(normalCode(null), null);
+  assert.equal(showCode("ABCD2345"), "ABCD-2345");
+  let calls = 0;
+  const fixed = newCode((n) => { calls++; return calls === 1 ? new Uint8Array(n).fill(250) : Uint8Array.from({ length: n }, (_, i) => i); });
+  assert.equal(fixed, SETUP_ALPHABET.slice(0, 8)); // bytes over 247 are skipped (no bias), then 0..7
+  for (let i = 0; i < 50; i++) assert.ok(normalCode(newCode()));
+  assert.equal(containerPath("Documents/pairingFile.plist"), "Documents/pairingFile.plist");
+  for (const bad of ["", "/etc/passwd", "Documents/../x", "a//b", "./a", "a\\b", "a\nb"]) assert.equal(containerPath(bad), null, bad);
+
+  const app = new Uint8Array([0x50, 0x4b, 9, 8, 7, 6]);
+  const tok = "c".repeat(48);
+  const post = (q) => go(`/sign/setup?${q}`, { method: "POST" });
+  assert.equal((await post("token=xyz")).status, 400);
+  assert.equal((await post(`token=${tok}`)).status, 404); // no such upload
+  await go(`/sign/upload?bundleid=com.kdt.livecontainer.TEAM123&version=3.4&title=LiveContainer&token=${tok}`, { method: "POST" });
+  assert.equal((await post(`token=${tok}`)).status, 409); // reserved, not finished
+  await go(`/sign/upload?bundleid=com.kdt.livecontainer.TEAM123&version=3.4&title=LiveContainer&token=${tok}&size=${app.length}`, { method: "POST" });
+  await go(`/sign/upload/${tok}/0`, { method: "PUT", body: app });
+  await go(`/sign/upload/${tok}/done`, { method: "POST" });
+  assert.equal((await post(`token=${tok}&pairing=../x`)).status, 400);
+  assert.equal((await post(`token=${tok}&sha256=XYZ`)).status, 400);
+  assert.equal((await post(`token=${tok}&bundleid=a/b`)).status, 400);
+  const sha = "ab".repeat(32);
+  let r = await post(`token=${tok}&sha256=${sha}`);
+  const made = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(made));
+  assert.match(made.code, new RegExp(`^[${SETUP_ALPHABET}]{4}-[${SETUP_ALPHABET}]{4}$`));
+  assert.ok(made.expiresIn >= 590 && made.expiresIn <= 600, String(made.expiresIn));
+  // read back: as typed, lowercase and without the dash too
+  for (const typed of [made.code, made.code.toLowerCase().replace("-", "")]) {
+    r = await go(`/sign/setup/${encodeURIComponent(typed)}`);
+    const got = await r.json();
+    assert.equal(r.status, 200, JSON.stringify(got));
+    assert.equal(got.ipa, `https://sign.example/sign/up/${tok}/app.ipa`);
+    assert.equal(got.size, app.length);
+    assert.equal(got.sha256, sha);
+    assert.equal(got.bundleId, "com.kdt.livecontainer.TEAM123");
+    assert.equal(got.name, "LiveContainer");
+    assert.deepEqual(got.pairing, { bundleId: "com.kdt.livecontainer.TEAM123", path: PAIRING_PATH });
+    assert.ok(got.expiresIn > 0);
+  }
+  // the link it gives is the upload's own, whole
+  r = await go(`/sign/up/${tok}/app.ipa`);
+  assert.deepEqual(new Uint8Array(await r.arrayBuffer()), app);
+  // another app's container and path, or no pairing file at all
+  let other = await (await post(`token=${tok}&bundleid=com.other.app&pairing=Documents/x/p.plist`)).json();
+  let got = await (await go(`/sign/setup/${other.code}`)).json();
+  assert.deepEqual(got.pairing, { bundleId: "com.other.app", path: "Documents/x/p.plist" });
+  assert.equal(got.sha256, null);
+  other = await (await post(`token=${tok}&pairing=`)).json();
+  assert.equal((await (await go(`/sign/setup/${other.code}`)).json()).pairing, null);
+  // a bad code, an unknown one, and one whose upload has gone
+  r = await go("/sign/setup/ABC");
+  assert.equal(r.status, 400);
+  assert.equal((await r.json()).code, "bad_code");
+  r = await go("/sign/setup/ZZZZ-ZZZZ");
+  assert.equal(r.status, 404);
+  assert.equal((await r.json()).code, "gone");
+  store.delete(`up.${tok}`);
+  assert.equal((await go(`/sign/setup/${made.code}`)).status, 404);
+
+  // scripts and binaries: only the listed names, from the setup release
+  const fetched = [];
+  const upstream = async (url) => { fetched.push(url); return url.endsWith("/missing") ? new Response("", { status: 404 })
+    : new Response(url.endsWith(".sh") ? "#!/bin/sh\n" : new Uint8Array([1, 2, 3]), { headers: { "content-length": url.endsWith(".sh") ? "10" : "3" } }); };
+  const s = (path, e = env, init) => setup(new Request("https://sign.example" + path, init), new URL("https://sign.example" + path), e, 600, { upstream, repo: "owner/repo" });
+  r = await s("/sign/setup.sh");
+  assert.equal(await r.text(), "#!/bin/sh\n");
+  assert.match(r.headers.get("content-type"), /^text\/plain/);
+  assert.equal(fetched.at(-1), "https://github.com/owner/repo/releases/download/setup/install.sh");
+  await s("/sign/setup.ps1");
+  assert.equal(fetched.at(-1), "https://github.com/owner/repo/releases/download/setup/install.ps1");
+  r = await s("/sign/setup/bin/ifizbox-setup-linux-arm64", { ...env, SETUP_TAG: "setup-test", IFIZBOX_REPO: "me/fork" });
+  assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [1, 2, 3]);
+  assert.equal(r.headers.get("content-type"), "application/octet-stream");
+  assert.equal(fetched.at(-1), "https://github.com/me/fork/releases/download/setup-test/ifizbox-setup-linux-arm64");
+  const n = fetched.length;
+  assert.equal((await s("/sign/setup/bin/evil.exe")).status, 404);
+  assert.equal((await s("/sign/setup/bin/..%2Fx")).status, 404);
+  assert.equal(fetched.length, n); // nothing asked of GitHub for a name not on the list
+  assert.equal((await s("/sign/setup/bin/SHA256SUMS", { ...env, SETUP_TAG: "bad tag!" })).status, 200);
+  assert.equal(fetched.at(-1), "https://github.com/owner/repo/releases/download/setup/SHA256SUMS");
+  assert.equal((await s("/sign/setup.sh", env, { method: "POST" })).status, 404);
+  console.log("worker setup: ok");
+}

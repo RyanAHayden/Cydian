@@ -1,0 +1,28 @@
+[package]
+name = "ifizbox-setup"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "One-time computer setup for the free Apple ID route: install the website-signed app over USB"
+publish = false
+build = "build.rs"
+
+[dependencies]
+ifizbox-setup-core = { path = "../core" }
+# idevice (MIT, Jackson Coxson): the same pinned commit as native/sideload/idevice/pin.env. ring, not aws-lc: no cmake
+# and it cross-builds to musl and Windows with a plain C compiler.
+idevice = { git = "https://github.com/jkcoxson/idevice.git", rev = "2dca9a58a9a1dd02ec7d6213fcfd8fe861e74132", default-features = false, features = [
+  "ring", "usbmuxd", "pair", "afc", "house_arrest", "installation_proxy", "amfi",
+] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros", "fs", "time"] }
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+serde_json = "1"
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

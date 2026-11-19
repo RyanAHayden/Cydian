@@ -4,7 +4,6 @@ from source with only the features the route uses, the bridge registers every ca
 jailbreak build, and (where native/build.sh has built the app) the executable carries idevice statically."""
 import os
 import re
-import subprocess
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -74,30 +73,14 @@ class Bridge(unittest.TestCase):
         self.assertNotIn("UserDefaults", src)
 
 
-EXE = os.path.join(NATIVE, "build", "ipa")
-
-
 class Built(unittest.TestCase):
-    def exe(self):
-        import glob
-        hits = glob.glob(os.path.join(EXE, "*.app"))
-        if not hits:
-            self.skipTest("native/build.sh hasn't built the IPA here")
-        app = hits[0]
-        return os.path.join(app, os.path.basename(app)[:-4])
-
-    def test_idevice_linked_statically(self):
-        exe = self.exe()
-        od = "llvm-objdump"
-        try:
-            libs = subprocess.run([od, "--macho", "--dylibs-used", exe], capture_output=True, text=True, check=True).stdout
-        except (OSError, subprocess.CalledProcessError) as e:
-            self.skipTest(f"no {od}: {e}")
-        self.assertNotIn("idevice", libs)
-        with open(exe, "rb") as f:
-            data = f.read()
-        self.assertIn(b"ifizbox.idevice.pairing", data)  # the Keychain service: IDevice.swift is in
-        self.assertIn(b"_remotepairing-pairable-host._tcp", data)  # idevice's pairable host made it past dead_strip
+    # The built IPA is checked by mkipa.py check right after native/build.sh builds it (the gate's last step). A
+    # check here would read whatever native/build/ipa a checkout last built, from before a merge brought idevice in.
+    def test_ipa_check_looks_for_idevice(self):
+        with open(os.path.join(NATIVE, "mkipa.py")) as f:
+            src = f.read()
+        self.assertIn('b"ifizbox.idevice.pairing"', src)  # the Keychain service: IDevice.swift is in
+        self.assertIn('b"_remotepairing-pairable-host._tcp"', src)  # idevice's pairable host made it past dead_strip
 
 
 if __name__ == "__main__":

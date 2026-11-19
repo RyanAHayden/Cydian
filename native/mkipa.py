@@ -168,6 +168,11 @@ def check(path):
             bad = sorted(k for k in ents if k.startswith(PRIVATE))
             if bad:
                 problems.append("jailbreak entitlements in the IPA: %s" % ", ".join(bad))
+            # The "This iPhone" install route (native/sideload/idevice): idevice linked in statically, its pairable
+            # host past dead_strip, IDevice.swift compiled in.
+            for need in (b"ifizbox.idevice.pairing", b"_remotepairing-pairable-host._tcp"):
+                if need not in data:
+                    problems.append("executable lacks %s (idevice not linked in)" % need.decode())
             summary = "arm64 iOS %s, %d KB executable, entitlements %s" % (
                 minos, len(data) // 1024, ", ".join(sorted(ents)) or "none")
         except (ValueError, struct.error, plistlib.InvalidFileException) as e:

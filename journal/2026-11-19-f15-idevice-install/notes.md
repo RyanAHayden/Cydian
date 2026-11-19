@@ -33,7 +33,7 @@ The engine and the build, not the screens:
   `-I build/idevice/include`, links `-lidevice_ffi -liconv`. One executable for both builds, so the jailbreak
   .deb carries it too (its bridge calls refuse there).
 - `test_idevice.py` (in the gate): the pin, the feature set, the build wiring, every listed bridge call
-  registered, the jailbreak refusal, the Keychain accessibility, and on a built IPA: idevice linked statically and
+  registered, the jailbreak refusal, the Keychain accessibility; `mkipa.py check` (run on every IPA build) checks idevice linked in and
   the pairable host present after dead_strip.
 
 ## Decisions (unattended, written down)
@@ -78,3 +78,9 @@ The engine and the build, not the screens:
 - On a machine without the aarch64-apple-ios Rust target the whole native build is now skipped by the gate (probe
   says what's missing); only this machine was tried.
 - Heartbeat interval handling (`heartbeat_get_marco` timeouts) is from reading idevice, not observed.
+
+## Gate failure after the merge
+
+`test_idevice.py`'s check of the built IPA read `native/build/ipa`, which the gate's Python step finds before the
+native build runs: in the merge checkout that was main's last build, without idevice, so "ifizbox.idevice.pairing"
+was missing. The check moved into `mkipa.py check`, which runs on the IPA `native/build.sh` has just built.

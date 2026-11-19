@@ -45,6 +45,7 @@ import { el, barButton } from "./ui.js";
 import { createFollow, hudLine } from "../core/progress.js";
 import { NAME } from "../brand.js";
 import { FINISH_LABEL } from "../core/queue.js";
+import { createLogBuffer, selectionIn } from "../screens/progress.js";
 
 // B67: the plain finish button, Cydia's "Return to Cydia"
 export const RETURN_LABEL = FINISH_LABEL.return;
@@ -132,27 +133,32 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
 
   // ---- lines, one paint a frame ----
   let filterPkg = null; // F234: only this package's lines show (page.filter)
-  let pending = [];
-  let frame = 0;
-  const flush = () => {
-    frame = 0;
-    if (!pending.length) return;
-    const frag = document.createDocumentFragment();
-    for (const [kind, text, pkg] of pending) {
+  // B93 (screens/progress.js): one append a frame, a repeating byte/percent line updated in place, and nothing
+  // added while a selection is in the log (it goes out once the selection ends). No layout reads on this path.
+  const doc = globalThis.document;
+  const selecting = () => selectionIn(out, doc);
+  const log = createLogBuffer({
+    container: out,
+    fragment: () => doc.createDocumentFragment(),
+    held: selecting,
+    max: MAX_LINES,
+    make: ({ kind, text, pkg }) => {
       const d = el("div", `pl pl-${kind}`, text);
       if (pkg) d.dataset.pkg = pkg; // F234: the queue run's lines know their package (page.filter)
       if (filterPkg && pkg !== filterPkg) d.hidden = true;
       if (kind === "error" || kind === "warning") d.setAttribute("role", kind === "error" ? "alert" : "note");
-      frag.append(d);
-    }
-    pending = [];
-    out.append(frag);
-    if (follow.shouldScroll()) {
-      while (out.childElementCount > MAX_LINES) out.firstElementChild.remove();
-      toBottom();
-    } else if (!follow.following) jump.hidden = false;
-  };
-  const schedule = () => { if (!frame) frame = requestAnimationFrame(flush); };
+      return d;
+    },
+    onFlush: () => {
+      if (follow.shouldScroll()) {
+        while (out.childElementCount > MAX_LINES) out.firstElementChild.remove();
+        scroll.scrollTop = 1e9; // to the bottom without reading scrollHeight (the browser clamps it)
+      } else if (!follow.following) jump.hidden = false;
+    },
+  });
+  const flush = () => { log.flush(); };
+  const onSelection = () => { if (!selecting()) log.release(); };
+  doc?.addEventListener?.("selectionchange", onSelection);
 
   let closed = false;
   let finished = false;
@@ -187,8 +193,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     line(kind, text, pkg = null) {
       const t = String(text ?? "");
       if (!t || closed) return;
-      pending.push([["step", "raw", "error", "warning"].includes(kind) ? kind : "raw", t, pkg || null]);
-      schedule();
+      log.push({ kind: ["step", "raw", "error", "warning"].includes(kind) ? kind : "raw", text: t, pkg: pkg || null });
     },
     // ---- F234: the queue run's page (screens/queuerun.js) ----
     // Only `pkg`'s lines (null: all of them).
@@ -320,7 +325,8 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       if (closed) return Promise.resolve();
       closed = true;
       clearTimeout(lockTimer);
-      if (frame) cancelAnimationFrame(frame);
+      log.cancel();
+      doc?.removeEventListener?.("selectionchange", onSelection);
       for (const f of closers.splice(0)) { try { f(); } catch { /* the page goes anyway */ } }
       const a = sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 300, easing: EASE, fill: "forwards" });
       return a.finished.then(() => sheet.remove(), () => sheet.remove());

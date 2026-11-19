@@ -12,6 +12,8 @@
   padding: calc(var(--nav-h) + 14px) max(12px, env(safe-area-inset-right)) 14px max(12px, env(safe-area-inset-left));
 }
 .progress-out { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; cursor: text; }
+/* B93: a line added or updated re-lays out only the log, not the page around it */
+.progress-out { contain: layout style; }
 
 /* ---- lines ---- */
 .pl { white-space: pre-wrap; overflow-wrap: anywhere; }

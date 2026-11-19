@@ -151,6 +151,7 @@ function render(box, ctx) {
   } else if (flow.view === "signin") parts.push(...signInView(ctx));
   else if (flow.view === "code") parts.push(...codeView(ctx));
   else if (flow.view === "setup") parts.push(...setupView(ctx));
+  else if (flow.view === "devmode") parts.push(...devModeView(ctx));
   else parts.push(...readyView(ctx, saved));
   box.replaceChildren(...parts);
 }
@@ -352,10 +353,12 @@ function readyView(ctx, saved) {
     + "Settings > Signing > Select All Files. iOS refuses free Apple ID apps from a website, so they have to be installed by an "
     + `app on the iPhone through LocalDevVPN; ${NAME}'s own install route for that isn't out yet. Sign in here again for a `
     + "new profile each week (the certificate is kept for its year)." }]));
-  out.push(grouped([{ header: "Before the First Install",
-    footer: "iOS 16 and later: turn on Settings > Privacy & Security > Developer Mode, restart, and confirm. After the first "
-      + "install, trust the developer in Settings > General > VPN & Device Management (needs the internet). If Stolen Device "
-      + "Protection is on, iOS may ask for Face ID and an hour's wait before Developer Mode turns on." }]));
+  // F254i: the Developer Mode + Trust steps, a page of their own; gone once an app on this route installed fine
+  if (!freeInstalled(ctx.store)) {
+    out.push(grouped([{ header: "Before the First Install",
+      rows: [{ label: "Developer Mode and Trust", onClick: () => { flow.view = "devmode"; ctx.redraw(); }, chevron: true }],
+      footer: "iOS 16 and later: a few steps in Settings on the iPhone, once." }]));
+  }
   out.push(button(flow.portal ? "Refresh Profile" : "Sign In Again", () => (flow.portal ? setup(ctx) : signOut(ctx))));
   out.push(button("Forget Free Apple ID", async () => {
     const { index } = await ctx.ask({ title: "Forget Free Apple ID?",
@@ -379,4 +382,116 @@ function style() {
   styled = true;
   const link = Object.assign(document.createElement("link"), { rel: "stylesheet", href: new URL("../freeid.css", import.meta.url).href });
   document.head.append(link);
+}
+
+// ---- F254i: Developer Mode and Trust, step by step ----
+// The Ready page's "Before the First Install" opens this page; it goes away once an app on this route installed fine
+// (markFreeInstalled: the app's install route calls it, or the page's own "An App Installed Fine"). Each step has a
+// picture of the Settings screen it means, redrawn here in today's iOS Settings look (not an iOS 6 screen: the user's
+// iPhone shows today's; F75) and following the page's light or dark theme. No Apple artwork, no copied images.
+//
+//   devModeSteps({ email })              pure: [{ id, title, text, optional, shot }] in order; shot is the picture's
+//                                        spec { back, title, groups: [{ header, rows: [{ label, detail, on, mark }],
+//                                        footer }], alert: { title, message, buttons, bold } }
+//   freeInstalled(store) / markFreeInstalled(store, on = true)
+export const INSTALLED_KEY = "ifizbox.freeid.installed";
+export const freeInstalled = (store) => readJson(store, INSTALLED_KEY) === true;
+export const markFreeInstalled = (store, on = true) => writeJson(store, INSTALLED_KEY, on ? true : null);
+
+export function devModeSteps({ email = "" } = {}) {
+  const cert = `Apple Development: ${email || "you@example.com"}`;
+  const privacy = (devMode) => ({ back: "Settings", title: "Privacy & Security",
+    groups: [{ header: "Security", rows: [{ label: "Developer Mode", detail: devMode, mark: true }, { label: "Lockdown Mode", detail: "Off" }] }] });
+  return [
+    { id: "turn-on", title: "Turn On Developer Mode",
+      text: "Open Settings > Privacy & Security, scroll to the bottom and tap Developer Mode, then turn it on. Developer Mode "
+        + "only shows up there once an app signed with a free Apple ID is on the iPhone: if it isn't there yet, install the "
+        + `app with the ${NAME} app first, then come back.`,
+      shot: privacy("Off") },
+    { id: "restart", title: "Restart the iPhone",
+      text: "iOS asks to restart before Developer Mode turns on. Tap Restart.",
+      shot: { back: "Privacy & Security", title: "Developer Mode",
+        groups: [{ rows: [{ label: "Developer Mode", on: true }],
+          footer: "Developer Mode lets apps signed for development run on this iPhone." }],
+        alert: { title: "Turn On Developer Mode?", message: "Restarting is needed to turn on Developer Mode.", buttons: ["Cancel", "Restart"], bold: 1 } } },
+    { id: "confirm", title: "Confirm After the Restart",
+      text: "Unlock the iPhone after it restarts. iOS asks once more: tap Turn On and enter your passcode.",
+      shot: { ...privacy("On"),
+        alert: { title: "Turn On Developer Mode?", message: "This lowers the iPhone's security for apps signed for development.", buttons: ["Cancel", "Turn On"], bold: 1 } } },
+    { id: "delay", title: "If iOS Asks to Wait", optional: true,
+      text: "With Stolen Device Protection on and the iPhone away from a familiar place like home or work, iOS asks for Face ID, "
+        + "then starts an hour's Security Delay before Developer Mode can be turned on. Wait for it to end and turn it on "
+        + "again, or do it at home.",
+      shot: { back: "Privacy & Security", title: "Developer Mode",
+        groups: [{ header: "Security Delay in Progress", rows: [{ label: "Try again in", detail: "59 min" }],
+          footer: "Stolen Device Protection asks for an hour's wait before this setting changes away from familiar places." }] } },
+    { id: "trust", title: "Trust the Developer",
+      text: "After the first install, the app won't open until you trust its developer: open Settings > General > VPN & Device "
+        + `Management, tap ${cert} under Developer App, then Trust. The iPhone needs the internet for this.`,
+      shot: { back: "General", title: "VPN & Device Management",
+        groups: [{ header: "Developer App", rows: [{ label: cert, mark: true }] }] } },
+  ];
+}
+
+// One picture: a phone screen with a nav bar, grouped rows and maybe an alert over it, drawn as elements (crisp at any
+// scale, themed by freeid.css's .dm-* rules). Read as one image by screen readers: the step's text says the same.
+export function devModeShot(spec) {
+  const fig = el("figure", "dm-shot");
+  fig.setAttribute("role", "img");
+  fig.setAttribute("aria-label", `Settings: ${spec.title}`);
+  const screen = el("div", "dm-screen");
+  const nav = el("div", "dm-nav");
+  nav.append(el("span", "dm-back", spec.back), el("span", "dm-title", spec.title));
+  screen.append(nav);
+  for (const g of spec.groups ?? []) {
+    if (g.header) screen.append(el("div", "dm-header", g.header));
+    const box = el("div", "dm-group");
+    for (const r of g.rows) {
+      const row = el("div", `dm-row${r.mark ? " is-marked" : ""}`);
+      row.append(el("span", "dm-label", r.label));
+      if (r.on !== undefined) row.append(el("span", `dm-switch${r.on ? " is-on" : ""}`));
+      else {
+        if (r.detail) row.append(el("span", "dm-detail", r.detail));
+        if (r.mark || r.detail) row.append(el("span", "dm-chevron"));
+      }
+      box.append(row);
+    }
+    screen.append(box);
+    if (g.footer) screen.append(el("div", "dm-footer", g.footer));
+  }
+  if (spec.alert) {
+    const dim = el("div", "dm-dim");
+    const a = el("div", "dm-alert");
+    a.append(el("div", "dm-alert-title", spec.alert.title), el("div", "dm-alert-text", spec.alert.message));
+    const bs = el("div", "dm-alert-buttons");
+    spec.alert.buttons.forEach((b, i) => bs.append(el("span", `dm-alert-button${i === spec.alert.bold ? " is-bold" : ""}`, b)));
+    a.append(bs);
+    dim.append(a);
+    screen.append(dim);
+  }
+  fig.append(screen);
+  return fig;
+}
+
+function devModeView(ctx) {
+  const page = el("div", "walkthrough free-devmode");
+  page.append(el("p", "group-footer walk-intro", "Apps signed with a free Apple ID need Developer Mode on the iPhone (iOS 16 "
+    + "and later) and a one-time Trust. Do these on the iPhone the apps are for."));
+  const list = el("ol", "walk-steps");
+  devModeSteps({ email: flow.email }).forEach((s, i) => {
+    const li = el("li", `walk-step is-current${s.optional ? " is-optional" : ""}`);
+    li.dataset.step = s.id;
+    const head = el("div", "walk-head free-devmode-head");
+    head.append(el("span", "walk-badge", String(i + 1)), el("span", "walk-title", s.title));
+    const body = el("div", "walk-body");
+    body.append(el("p", "walk-text", s.text), devModeShot(s.shot));
+    li.append(head, body);
+    list.append(li);
+  });
+  page.append(list);
+  const back = () => { flow.view = "ready"; ctx.redraw(); };
+  return [page,
+    button("An App Installed Fine", () => { markFreeInstalled(ctx.store); back(); }, "free-primary"),
+    grouped([{ footer: "Once an app on this route opens fine, these steps are done for good: this page stops showing." }]),
+    button("Back", back)];
 }

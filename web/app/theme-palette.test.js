@@ -156,6 +156,7 @@ test("every dark rule paints with tokens: no fixed colours but black and the kit
       if (/^html\[data-theme="dark"\](\[data-palette="\w+"\])?$/.test(sel.trim())) continue; // the palettes themselves
       if (/\.action-sheet|\.action-button/.test(sel)) continue; // UIAlertSheetBlack*: the kit's own black sheet
       if (/\.scope-filter\.done/.test(sel)) continue; // shared with light: the nav bar's blue Done
+      if (/^html\[data-theme="dark"\] \.dm-shot$/.test(sel.trim())) continue; // F254i: a picture of iOS's own dark Settings
       for (const c of body.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g) ?? []) {
         assert.match(c, allowed, `${file}: ${sel.trim()} has ${c}`);
       }

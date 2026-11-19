@@ -524,10 +524,8 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   const previewKey = `app:${pkg.key}:${pkg.row?.id ?? app.bundleIdentifier}`;
   const shots = altShots(app);
   if (shots.length || need !== "full") details.append(previewSlot(previewKey, { shots, gh: appGithub(app) }));
-  else {
-    const slot = el("div", "preview-slot");
-    details.append(slot);
-    merged.then((m) => slot.replaceWith(previewSlot(previewKey, { shots: m.screenshots.map((url) => ({ url, from: "appstore" })), gh: appGithub(app) })));
+  else { // B54: the loading strip while the App Store answers, not an empty slot swapped later
+    details.append(previewSlot(previewKey, merged.then((m) => ({ shots: m.screenshots.map((url) => ({ url, from: "appstore" })), gh: appGithub(app) }))));
   }
 
   // F181: the sideways info tiles: Rating (once the App Store answers), Works On, Size, Section, Updated.
@@ -762,29 +760,37 @@ export function linksGroup(source, links) {
   return g;
 }
 
-// One picture of the gallery: lazy, sized by the source's width/height or, failing that, the picture's own; an https
+// One picture of the gallery: sized by the source's width/height or, failing that, the picture's own; an https
 // picture its host won't serve to us (hotlink rules) tries once more through the site's proxy.
+// B54: it loads off the page (eager: a lazy picture outside the document never loads) and `i.ready` settles true
+// once it has loaded and decoded, false when it failed for good or was an icon: only ready ones go on the page.
 export function galleryImage(s, { backend = getBackend } = {}) {
   const src = mediaUrl(s.url);
   if (!src) return null;
   const i = el("img", "alt-shot");
   i.alt = "";
   i.decoding = "async";
-  i.loading = "lazy";
+  i.loading = "eager";
   i.referrerPolicy = "no-referrer";
+  let settle;
+  i.ready = new Promise((r) => { settle = r; });
   const ratio = (w, h) => {
     i.style.aspectRatio = `${w} / ${h}`;
     i.classList.toggle("wide", w > h);
   };
   if (s.width && s.height) ratio(s.width, s.height);
   i.onload = () => {
-    if (i.naturalWidth && i.naturalWidth < 120 && i.naturalHeight < 120) return gone(i); // an icon after all
+    if (i.naturalWidth && i.naturalWidth < 120 && i.naturalHeight < 120) { settle(false); return gone(i); } // an icon after all
     if (!(s.width && s.height) && i.naturalWidth && i.naturalHeight) ratio(i.naturalWidth, i.naturalHeight);
+    const d = typeof i.decode === "function" ? i.decode() : null;
+    if (d && typeof d.then === "function") d.then(() => settle(true), () => { settle(false); gone(i); });
+    else settle(true);
   };
   let retried = false;
   i.onerror = () => {
     const b = backend();
     if (!retried && b.kind === "http" && b.assetUrl && /^https:/i.test(s.url)) { retried = true; i.src = b.assetUrl(s.url); return; }
+    settle(false);
     gone(i);
   };
   i.src = src;
@@ -799,12 +805,10 @@ function gone(i) {
 
 // F181: the strip scrolls sideways, snapping one picture at a time, with page dots under it (one per picture; the
 // one in view dark) and a tap on a picture zooms it to the full screen.
-function galleryGroup(shots) {
+// B54: `pics0` are pictures already loaded (galleryImage's ready).
+function galleryGroup(pics0) {
   const strip = el("div", "alt-shots");
-  for (const s of shots) {
-    const pic = galleryImage(s);
-    if (pic) strip.append(pic);
-  }
+  strip.append(...pics0);
   if (!strip.childElementCount) return null;
   const g = el("div", "group shots-group");
   const dots = el("div", "shot-dots");
@@ -892,12 +896,107 @@ export function previewText(url, { backend = getBackend(), fetchFn = globalThis.
 
 // The gallery's place on a page, filled once the pictures are known (at once for a source's own; after a fetch for
 // a depiction page's or a GitHub repo's, cached per app by core/previews.js).
-export function previewSlot(key, sources) {
+// B54: it starts as a short loading strip (iOS 6's grey spinner, 44px: altstore.css .shots-loading) and never shows
+// a blank picture frame: only pictures that loaded and decoded go in. Once the first is ready and the rest have
+// settled (or settleMs passed), the slot grows once to the gallery's height (one height transition on the slot) and
+// the gallery fades in; a picture that loads later joins the strip sideways. When none load the strip shrinks to
+// nothing. `sources` may be a promise of them (an app page waiting for the App Store's screenshots), or null.
+// slot.gallery settles when every picture has: { shown, grows } (pictures on the page, height changes made).
+export function previewSlot(key, sources, { load = loadPreviews, text = previewText, image = galleryImage, settleMs = 1200 } = {}) {
   const slot = el("div", "preview-slot");
-  const fill = (shots) => { const g = galleryGroup(shots); slot.replaceChildren(...(g ? [g] : [])); };
-  if (sources.shots?.length) { fill(dedupeShots(sources.shots)); return slot; }
-  loadPreviews(key, sources, { text: (u) => previewText(u) }).then(fill).catch(() => {});
+  const pending = typeof sources?.then === "function";
+  if (!pending && !sources?.shots?.length && !sources?.html && !sources?.gh) {
+    slot.gallery = Promise.resolve({ shown: 0, grows: 0 });
+    return slot; // nothing to look in: no strip at all
+  }
+  const spin = el("div", "shots-loading");
+  spin.setAttribute("role", "progressbar");
+  spin.setAttribute("aria-label", "Loading Screenshots");
+  spin.append(el("span", "shots-spinner"));
+  slot.classList.add("shots-pending");
+  slot.append(spin);
+  const shots = pending
+    ? Promise.resolve(sources).then((s) => (s ? load(key, s, { text: (u) => text(u) }) : []))
+    : sources.shots?.length ? Promise.resolve(dedupeShots(sources.shots)) : load(key, sources, { text: (u) => text(u) });
+  slot.gallery = shots.catch(() => []).then((list) => fillGallery(slot, list ?? [], { image, settleMs }));
   return slot;
+}
+
+// B54: make the pictures off the page, put in only the ready ones, grow (or collapse) the slot. -> { shown, grows }
+function fillGallery(slot, shots, { image, settleMs }) {
+  const pics = shots.map((s) => image(s)).filter(Boolean);
+  const ready = new Set();
+  let group = null;
+  let strip = null;
+  let grows = 0;
+  let timer = null;
+  const resize = (change) => { if (resizeSlot(slot, change)) grows++; };
+  const show = () => {
+    if (group || !ready.size) return;
+    clearTimeout(timer);
+    group = galleryGroup(pics.filter((p) => ready.has(p)));
+    strip = group.querySelector(".alt-shots");
+    resize(() => { slot.classList.remove("shots-pending"); slot.replaceChildren(group); });
+    fadeIn(group);
+  };
+  const join = (p) => { // a late one: into its place in the strip, faded in; the slot follows if the strip got taller
+    const next = pics.slice(pics.indexOf(p) + 1).find((q) => q.parentNode === strip);
+    resize(() => strip.insertBefore(p, next ?? null));
+    fadeIn(p);
+  };
+  return new Promise((resolve) => {
+    let left = pics.length;
+    const settled = () => {
+      if (--left > 0) return;
+      if (group) return resolve({ shown: ready.size, grows });
+      if (ready.size) show();
+      else resize(() => { slot.classList.remove("shots-pending"); slot.replaceChildren(); });
+      resolve({ shown: ready.size, grows });
+    };
+    if (!left) { left = 1; settled(); return; }
+    for (const p of pics) {
+      Promise.resolve(p.ready ?? true).then((ok) => {
+        if (ok) {
+          ready.add(p);
+          if (group) join(p);
+          else if (!timer) timer = setTimeout(show, settleMs); // the first is in: wait a little for the rest
+        }
+        settled();
+      });
+    }
+  });
+}
+
+// B54: change what's in the slot and move its height from the old to the new in one transition (altstore.css
+// .preview-slot), so the page below slides once instead of jumping. -> whether the height changed.
+function resizeSlot(slot, change) {
+  const from = slot.offsetHeight || 0;
+  slot.endResize?.(); // one still running: measure the new height from the content, not its fixed one
+  change();
+  const to = slot.offsetHeight || 0;
+  if (from === to) return false;
+  if (typeof requestAnimationFrame !== "function" || globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return true;
+  slot.style.height = `${from}px`;
+  void slot.offsetHeight; // start from the old height
+  slot.classList.add("resizing");
+  slot.style.height = `${to}px`;
+  let timer = 0;
+  const end = (e) => {
+    if (e && e.target !== slot) return;
+    slot.removeEventListener("transitionend", end);
+    clearTimeout(timer);
+    slot.classList.remove("resizing");
+    slot.style.height = "";
+    slot.endResize = null;
+  };
+  slot.endResize = end;
+  slot.addEventListener("transitionend", end);
+  timer = setTimeout(end, 500);
+  return true;
+}
+
+function fadeIn(node) {
+  node.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: "ease-out" });
 }
 
 // ---- F213: a list row's swipe and hold menu queue an app in the sideload build -------------------------------------

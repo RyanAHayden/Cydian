@@ -1,0 +1,40 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=390">
+<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="ios6.css"><link rel="stylesheet" href="packages.css">
+<link rel="stylesheet" href="altstore.css">
+<style>body { margin: 0; width: 390px; background: #c5ccd4; } #above, #below { margin: 10px; padding: 10px; background: #fff; border-radius: 8px; height: 60px; }
+#below { background: #ffd; } #out { font: 10px monospace; white-space: pre-wrap; }</style></head>
+<body><div id="above">Above the gallery</div><div id="page"></div><div id="below">Content below (must not jump)</div><pre id="out"></pre>
+<script type="module">
+import { previewSlot } from "./screens/altstore.js";
+const c = new URLSearchParams(location.search).get("case");
+const o = location.origin;
+const sets = {
+  good: [["shot", 0, 600], ["shot", 1, 900], ["shot", 2, 1100]],
+  dead: [["dead", 0, 500], ["dead", 1, 800]],
+  mixed: [["dead", 0, 400], ["shot", 1, 700], ["dead", 2, 900], ["shot", 3, 1000]],
+};
+const shots = sets[c].map(([k, n, ms]) => ({ url: `${o}/${k}/${n}.png?ms=${ms}`, width: 390, height: 844 }));
+const slot = previewSlot(`b54-${c}-${Date.now()}`, { shots });
+document.getElementById("page").append(slot);
+const below = document.getElementById("below");
+const t0 = performance.now();
+const trace = [];
+let last = null;
+const step = () => {
+  const y = Math.round(below.getBoundingClientRect().top * 10) / 10;
+  const t = Math.round(performance.now() - t0);
+  if (y !== last) trace.push([t, y, slot.offsetHeight, Math.round(slot.getBoundingClientRect().top), slot.firstElementChild ? getComputedStyle(slot.firstElementChild).marginTop + "/" + getComputedStyle(slot.firstElementChild).height : "-"]);
+  last = y;
+  if (t < 3500) requestAnimationFrame(step);
+  else {
+    // biggest single-frame move of the content below
+    let jump = 0; for (let i = 1; i < trace.length; i++) jump = Math.max(jump, Math.abs(trace[i][1] - trace[i - 1][1]));
+    slot.gallery.then((g) => {
+      document.getElementById("out").textContent = JSON.stringify({ case: c, gallery: g, positions: trace.length, maxFrameMove: jump, first: trace[0], final: trace.at(-1), trace });
+      document.title = "done";
+    });
+  }
+};
+requestAnimationFrame(step);
+</script></body></html>

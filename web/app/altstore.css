@@ -66,3 +66,12 @@ html[data-theme="dark"] .perm-more .cell-label { color: var(--dk-link); }
 .bar-button.mark-toggle.is-marked::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cmask id='m'%3E%3Crect width='20' height='20' fill='%23fff'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/mask%3E%3Ccircle cx='10' cy='10' r='9.4' fill='%23fff' mask='url(%23m)'/%3E%3C/svg%3E");
 }
+
+/* B54: the gallery's slot (screens/altstore.js previewSlot): a 44px row with iOS 6's grey spinner while the pictures
+   load, then one height transition to the gallery (overflow hidden only while it runs). flow-root keeps the group's
+   margins inside the slot, so its measured height is what the page below moves by. */
+.preview-slot { display: flow-root; transition: height .3s cubic-bezier(.25,.1,.25,1); }
+.preview-slot.resizing { overflow: hidden; }
+.shots-loading { height: 44px; display: flex; align-items: center; justify-content: center; }
+.shots-spinner { width: 20px; height: 20px; background: var(--spinner-gray) center / 20px no-repeat; animation: hud-spin .96s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .preview-slot { transition: none; } .shots-spinner { animation-duration: 3s; } }

@@ -3,7 +3,7 @@
 // the phone's calls are signing-client.js prepareOnDevice / openPrepared (native signing.prepare / signing.open).
 //
 //   appRows(jobs)              -> [row]  one row per queued app (core/appqueue.js jobs), in runOrder (iFizBox last)
-//   row: { id, name, mode, job, size, state, phase, fraction, error, token, bundleId, expires, unsure, dismissed }
+//   row: { id, name, mode, job, size, state, phase, fraction, error, token, bundleId, expires, unsure, dismissed, again }
 //   createAppRun({ rows, sign, install, discard, reprompt, ahead = 2, stallMs, later, clear, onChange, onLog })
 //       sign(row, hooks)    -> { token, bundleId?, expires?, name? }  the download and the signing, ahead of the installs
 //                              (hooks: { signal, progress(phase "downloading" | "signing", fraction 0..1) })
@@ -12,16 +12,20 @@
 //                              while iOS's Install prompt is up, "installing" once iOS reports progress. null: iOS
 //                              can't be asked whether it installed (the row ends as sent). handedOff: true (the
 //                              shell's word that iOS had the whole IPA, or iFizBox was in the background) turns a
-//                              false into "sent" too (B76, below). dismissed: true (B85: the user closed iOS's
-//                              prompt) ends the row Cancelled ("Cancelled on the iOS prompt", retryable) and the
-//                              next app goes on.
+//                              false into "sent" too (B76, below). dismissed: true (B85: iOS's prompt closed and
+//                              iOS never asked for the IPA) ends the row Failed ("Failed: iOS didn't download it":
+//                              B91, the user's Cancel and a frozen server look the same) and the next app goes on.
+//                              hooks.again (B91): that row's Try Again: no new signing; the shell's IPA (still
+//                              served) is offered again (signing.reprompt), and the call throws code "gone" when it
+//                              isn't served any more (the row then signs again from the start)
 //       discard(row)        frees a signed copy that will never be installed (its row stopped, or the run cancelled)
 //       reprompt(row)       -> true | false: B85, iOS's prompt for the app with iOS ("asking") again
 //     .start() -> a promise for the end (every row installed, failed or cancelled)
 //     .stop(id)   the working row's round stop button: aborts that app only (its download, signing or iOS's prompt);
 //                 the next one goes on
 //     .cancel()   the red Cancel: every app not finished is abandoned (in-flight ones aborted)
-//     .retry(id) / .retryAll()   failed and cancelled rows go again (a new pass when the run had ended)
+//     .retry(id) / .retryAll()   failed and cancelled rows go again (a new pass when the run had ended); B91: a row
+//                 iOS didn't download (dismissed) goes back to iOS's prompt without signing again (hooks.again)
 //     .away()     B76: iFizBox went to the background while a row was with iOS: that row is handed off to iOS
 //     .confirm(id) B76: iOS has an app whose row ended "Sent to iOS" (apps.isInstalled on the way back): Installed
 //     .reprompt(id) B85: the "Tap Install on the iOS prompt" row's tap: reprompt(row), logged -> a promise for true | false
@@ -62,9 +66,13 @@ export function appRows(jobs = []) {
   return runOrder(jobs).map((j) => ({
     id: j.id, name: j.name || j.id, mode: j.mode || "install", job: j, size: Number(j.size) > 0 ? Number(j.size) : null,
     state: "waiting", phase: null, fraction: 0, error: null, token: null, bundleId: null, expires: null, unsure: false,
-    dismissed: false,
+    dismissed: false, again: false,
   }));
 }
+
+// B91: a row whose iOS prompt closed without iOS asking for the IPA: the user's Cancel or a frozen server, iFizBox
+// can't tell which, so it doesn't say Cancelled.
+export const DIDNT_DOWNLOAD = "iOS didn't download it";
 
 const label = (r) => r.name || r.id;
 const pct = (f) => Math.round((Number(f) || 0) * 100);
@@ -173,20 +181,29 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
 
   async function startInstall(r) {
     const f = fly(r);
-    set(r, { state: "asking", phase: null, fraction: 0 });
+    const again = Boolean(r.again);
+    set(r, { state: "asking", phase: null, fraction: 0, again: false });
     let res;
     try {
-      res = await install(r, { signal: f.ctl.signal, progress: progressOf(r, f) });
+      res = await install(r, { signal: f.ctl.signal, progress: progressOf(r, f), ...(again ? { again: true } : {}) });
     } catch (e) {
       if (f.why || ended(r)) return;
+      if (again && e?.code === "gone") {
+        // B91: the shell no longer serves that IPA: the row signs it again from the start
+        finishRow(r, "waiting", { token: null, dismissed: false, phase: null, fraction: 0 });
+        log(r, "step", `${label(r)} is no longer with iOS; signing it again`);
+        pump();
+        return;
+      }
       fail(r, e?.message || String(e));
       return;
     }
     if (f.why || ended(r)) return;
     if (res?.dismissed && res?.installed !== true) {
-      // B85: the user closed iOS's prompt: that app is cancelled (retryable), and the next one goes on
-      finishRow(r, "cancelled", { token: null, dismissed: true, phase: null, fraction: 0 });
-      log(r, "step", `Cancelled ${label(r)} on the iOS prompt`);
+      // B85: iOS's prompt closed and iOS never asked for the IPA. B91: Cancel and a frozen server look the same, so
+      // not "Cancelled": Failed, and its Try Again offers the same IPA again. The next app goes on.
+      finishRow(r, "failed", { token: null, dismissed: true, error: DIDNT_DOWNLOAD, phase: null, fraction: 0 });
+      log(r, "error", `${label(r)}: ${DIDNT_DOWNLOAD}`);
       pump();
       return;
     }
@@ -200,6 +217,14 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     else log(r, "step", unsure ? `Sent ${label(r)} to iOS` : `Installed ${label(r)}`);
     pump();
   }
+
+  // A failed or cancelled row going again: from the start, or (B91) a row iOS didn't download straight back to iOS's
+  // prompt with the IPA the shell still serves ("signed" with `again`: the install lane offers it in turn).
+  const retryPatch = (r) => {
+    const back = r.state === "failed" && r.dismissed && Boolean(reprompt) && Boolean(r.bundleId) && !helperRow(r);
+    return { state: back ? "signed" : "waiting", again: back, phase: null, fraction: back ? 1 : 0, error: null,
+      token: null, unsure: false, dismissed: false };
+  };
 
   function pump() {
     if (!running) return;
@@ -284,14 +309,14 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     retry(id) {
       const r = rows.find((x) => x.id === id);
       if (!r || !["failed", "cancelled"].includes(r.state)) return null;
-      set(r, { state: "waiting", phase: null, fraction: 0, error: null, token: null, unsure: false, dismissed: false });
+      set(r, retryPatch(r));
       if (running) { pump(); return endPromise; }
       return start();
     },
     retryAll() {
       const again = rows.filter((r) => ["failed", "cancelled"].includes(r.state));
       if (!again.length) return null;
-      for (const r of again) set(r, { state: "waiting", phase: null, fraction: 0, error: null, token: null, unsure: false, dismissed: false });
+      for (const r of again) set(r, retryPatch(r));
       if (running) { pump(); return endPromise; }
       return start();
     },
@@ -339,7 +364,7 @@ export function rowStatus(row, opts = {}) {
       if (row.mode === "resign") return row.expires ? `Re-signed, expires ${dateText(row.expires, opts)}` : "Re-signed";
       return row.unsure ? "Sent to iOS" : "Installed";
     case "failed": return row.error ? `Failed: ${row.error}` : "Failed";
-    case "cancelled": return row.dismissed ? "Cancelled on the iOS prompt" : "Cancelled";
+    case "cancelled": return "Cancelled";
     default: return "";
   }
 }

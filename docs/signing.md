@@ -132,9 +132,14 @@ One exception for other apps: iOS can freeze iFizBox while it serves an IPA (see
 audio playing), and the frozen app's listening socket stays shut, so iOS's installer can't reach 127.0.0.1 and says
 "Unable to Install". iFizBox notices the freeze once it runs again (a heartbeat that finds a gap), re-creates the
 listener on the same port, and, if iOS doesn't ask for the IPA within 5 s, uploads that app's signed IPA to the
-Signing Server's `POST /sign/host` as for its own update and hands iOS that link (a new Install prompt). That app's
-signed IPA is then on the server for its 10 minutes. The install log says when iFizBox went to the background, the
-phone locked, how long it was frozen, and which copy iOS fetched.
+Signing Server's `POST /sign/host` as for its own update. It opens no new Install prompt by itself: iFizBox can't tell
+the user's Cancel from a frozen server, so the app's row ends "Failed: iOS didn't download it", and its tap (Try
+Again, `signing.reprompt`) hands iOS the server's link. That app's signed IPA is then on the server for its 10
+minutes. The install log says when iFizBox went to the background, the phone locked, how long it was frozen, and
+which copy iOS fetched.
+
+iFizBox opens an Install prompt by itself only until one was shown for that IPA (again when iOS refuses the link, or
+shows nothing within 8 s). Once a prompt was shown and closed, only the user's tap opens another.
 
 iOS won't install the new iFizBox over the running one, so iFizBox closes itself, but only once iOS has the whole
 IPA: after the Install prompt is answered it stays alive (silent audio) and polls `GET /sign/host/<token>/status`;
@@ -400,7 +405,10 @@ A web page can't read the UDID, but iOS gives it to a "Profile Service" profile 
   / Signing / Signed. Then iOS gets them one at a time in order (`signing.open {token}`, then `signing.progress
   {bundleId, wait: 600}`): "Tap Install on the iOS prompt", and the next waits until iOS has installed it. Each try
   of an app carries its own `tag`: the working row's round stop button sends `signing.cancel {tag}`, which stops only
-  that app's download, signing, serving or watch, and the next app goes on. A download or signing phase with no
+  that app's download, signing, serving or watch, and the next app goes on. A prompt that closed without iOS asking
+  for the IPA ends its row "Failed: iOS didn't download it" (the user's Cancel and a frozen server look the same;
+  "Cancelled" is only iFizBox's own Stop and Cancel); the IPA stays served, and the row's Try Again asks iOS again
+  (`signing.reprompt`, no new signing; it signs again when the IPA is no longer served). A download or signing phase with no
   progress for 3 minutes fails its row. Top right: the red Cancel while it runs (everything not finished is abandoned,
   then Confirm again with the finished apps cleared), Retry All after failures, Done when clean. Re-sign rows end
   "Re-signed, expires <date>". The Log has one line per phase per app; percents only move the bars. A Custom Install

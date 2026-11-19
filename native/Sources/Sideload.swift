@@ -12,9 +12,11 @@
 //        -> I6's reply + {fixedArm64e, expires}
 //   signing.progress {bundleId} (stream: {phase: "installing", progress}) -> {installed: true | false | null}
 //        + handedOff (B76): true when a false became null because iFizBox lost sight of the install (Handoff below)
-//        + dismissed (B85): true when the false is iOS's prompt closed without iOS asking for the IPA (Cancel; its
-//        serving stops); the itms-services link opens through InstallPrompt.swift, one prompt at a time
-//   signing.reprompt {bundleId} -> {reopened}: B85, opens that app's install link again (its IPA still served)
+//        + dismissed (B85): true when the false is iOS's prompt closed without iOS asking for the IPA (Cancel, or a
+//        frozen server; B91: it stays served for Try Again); the itms-services link opens through InstallPrompt.swift,
+//        one prompt at a time
+//   signing.reprompt {bundleId} -> {reopened}: B85, opens that app's install link again (its IPA still served; B91:
+//        the Signing Server's link once iOS froze iFizBox). Only the user's tap: iFizBox never re-opens by itself
 //   signing.selfUpdate (stream: {state}) -> {state}: B83, iFizBox's own update after iOS's prompt (CloseForUpdate):
 //        prompt | waiting | downloading, then finished (it exits) | notStarted | stalled | guessed; null: none running
 //   signing.installed            -> {apps: [record], next: {expires, apps} | null}
@@ -530,9 +532,10 @@ enum Sideload {
             !InstallPrompt.dismissed(bid) && Handoff.lostSight(served: Handoff.wasServed(bid), away: away, seen: seen)
         }) { installed, handedOff in
             DispatchQueue.main.async {
-                // B85: a dismissed prompt ends that app: no more serving it, and the run moves on (dismissed: true)
+                // B85: a dismissed prompt ends that app's watch, and the run moves on (dismissed: true). B91: it stays
+                // served (and hosted after a freeze), so the row's Try Again (signing.reprompt) can ask iOS again; the
+                // tag's Stop or Cancel, or the 15-minute expiry, ends it
                 let dismissed = installed == false && InstallPrompt.dismissed(bid)
-                if dismissed, let t = tag { SignJob.cancel(tag: t) }
                 // B85: what the watch saw, so a row that ends wrong says why
                 let seen = "Install watch ended: installed \(installed.map { String($0) } ?? "unknown")"
                     + (handedOff ? " (handed off to iOS)" : "") + (dismissed ? " (prompt dismissed)" : "")
@@ -553,9 +556,10 @@ enum Sideload {
     // iOS 27 can suspend iFizBox while it serves an IPA, and its listening socket stays shut: iOS's installer, sent to
     // 127.0.0.1, says "Unable to Install". Once iFizBox runs again (woken, or opened), and iOS hasn't asked for the IPA
     // within `frozenGrace` of that, the signed IPA goes up to the call's Signing Server (POST /sign/host, as iFizBox's
-    // own update does) and iOS gets that link (InstallPrompt.open: a new prompt once iFizBox is in front). iOS then
-    // installs from the server whether iFizBox is frozen again or not; its GET status says when iOS has the whole IPA.
-    // The local route stays served meanwhile. Once per IPA.
+    // own update does). B91: no new prompt opens by itself (the user may have tapped Cancel, which iFizBox can't tell
+    // from the freeze): InstallPrompt.rehost makes the row's Try Again (signing.reprompt) hand iOS the server's link.
+    // iOS then installs from the server whether iFizBox is frozen again or not; its GET status says when iOS has the
+    // whole IPA. The local route stays served meanwhile. Once per IPA.
 
     static let frozenGrace: TimeInterval = 5
     static let hostedLimit: TimeInterval = 10 * 60 // the Worker keeps a hosted IPA this long
@@ -598,8 +602,8 @@ enum Sideload {
                 note("The upload failed (\(e.localizedDescription)); the IPA stays served here only")
             case .success(let (hosted, status)):
                 if state.over || job?.cancelled == true { return } // iOS got it here meanwhile, or Cancel
-                note("The Signing Server holds \(app.name); handing iOS its link (a new Install prompt)")
-                DispatchQueue.main.async { InstallPrompt.open(hosted, bundleID: bid, name: app.name) { _ in } }
+                // B91: no prompt by itself: the user's tap (signing.reprompt) opens the server's link
+                InstallPrompt.rehost(bid, link: hosted)
                 guard let status = status else {
                     note("The server gave no status route: \(Brand.name) can't tell when iOS has the IPA")
                     return SignBridge.queue.asyncAfter(deadline: .now() + hostedLimit) { done(false) }

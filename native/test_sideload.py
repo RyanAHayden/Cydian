@@ -334,7 +334,7 @@ class HandoffSourceTest(unittest.TestCase):
 
     def test_install_prompt_one_at_a_time(self):
         """B85: the itms-services link opens through InstallPrompt (once iFizBox is in front, again when iOS drops it),
-        a dismissed prompt answers dismissed (not handed off) and stops that app's serving, and signing.reprompt opens
+        a dismissed prompt answers dismissed (not handed off; B91: still served), and signing.reprompt opens
         the link again; what the watch saw goes to the page's console."""
         side = self.files["Sideload.swift"]
         prompt = self.files["InstallPrompt.swift"]
@@ -348,7 +348,8 @@ class HandoffSourceTest(unittest.TestCase):
         self.assertIn("} else if InstallPrompt.dismissed(bid) {", watch)
         progress = self.body(side, "    static func progress(")
         self.assertIn("!InstallPrompt.dismissed(bid) && Handoff.lostSight(", progress)
-        self.assertIn("if dismissed, let t = tag { SignJob.cancel(tag: t) }", progress)
+        # B91: a dismissed prompt keeps its IPA served, for the row's Try Again (signing.reprompt)
+        self.assertNotIn("SignJob.cancel(tag: t)", progress)
         self.assertIn('"dismissed": dismissed', progress)
         self.assertIn("InstallPrompt.summary(bid)", progress)
         # it waits for iFizBox in front, retries a refused open, and opens once more when no prompt showed

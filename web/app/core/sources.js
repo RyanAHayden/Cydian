@@ -66,7 +66,7 @@ export function sourceKey({ uri, dist }) {
   return `deb:${uri}:${dist || "./"}`;
 }
 
-// Cydia's alert texts (docs/cydia.md "UI strings"). `kind`: invalid_url, not_repository, verification.
+// Cydia's alert wording (its Localizable.strings INVALID_URL_EX, NOT_REPOSITORY_EX). `kind`: invalid_url, not_repository, verification.
 const ALERTS = {
   invalid_url: ["Invalid URL", "That is not a valid source URL. Please check it and try again."],
   not_repository: ["Did Not Find Repository", "The indicated repository could not be found. This could be because "

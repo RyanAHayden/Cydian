@@ -9,6 +9,8 @@
  *   test_driver paidpath <dir> <path>...       F57: print "ok" or "bad" per path (helper_paid_path_ok)
  *   test_driver plistid <file>                 F59: the Info.plist's CFBundleIdentifier, or "bad"
  *   test_driver appsync <prefix>               F59: "yes" or "no"
+ *   test_driver oscmp <a> <b> [<a> <b>]...     B72: helper_ipa_os_cmp per pair (-1, 0, 1, or 2: not versions)
+ *   test_driver whyclean <text>                B72: helper_ipa_why_clean's line
  *   test_driver appversions <dir>              I4: helper_app_versions' lines (tabs as " | "), then "count: <n>"
  *   test_driver debname <id> <file>...         F71: the version in each stored .deb name, or "bad"
  *   test_driver rbfile <dir> <id> <version> <root_uid>   F71: the stored .deb's path, or "error: ..."
@@ -139,6 +141,13 @@ int main(int argc, char **argv) {
         else printf("count: %d\n", n);
     } else if (!strcmp(cmd, "appsync") && argc == 3) {
         printf("%s\n", helper_ipa_appsync(argv[2]) ? "yes" : "no");
+    } else if (!strcmp(cmd, "oscmp") && argc >= 3 && argc % 2 == 0) {
+        for (int i = 2; i + 1 < argc; i += 2) printf("%d\n", helper_ipa_os_cmp(argv[i], argv[i + 1]));
+    } else if (!strcmp(cmd, "whyclean") && argc == 3) {
+        char buf[2048];
+        snprintf(buf, sizeof buf, "%s", argv[2]);
+        helper_ipa_why_clean(buf);
+        printf("%s\n", buf);
     } else if (!strcmp(cmd, "debname") && argc >= 3) {
         char ver[HELPER_VERSION_MAX + 1];
         for (int i = 3; i < argc; i++) printf("%s\n", helper_deb_name_version(argv[i], argv[2], ver, sizeof ver) ? ver : "bad");

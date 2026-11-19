@@ -78,7 +78,8 @@ export async function runIpaInstall({ url, name = "" }, view, { native = globalT
   if (stopped()) return cancelled();
   if (error) {
     const first = error.code === "no_adhoc" ? error.detail || error.title : error.message;
-    if (!(error.code === "no_adhoc" && said.has(error.detail))) line("error", first);
+    // B72: not again when it is the helper's own line, word for word (no_adhoc, os_version)
+    if (!(first === error.detail && said.has(error.detail))) line("error", first);
     for (const l of error.lines) line(error.code === "no_adhoc" ? "warning" : "info", l);
     view.status(error.title);
   } else {

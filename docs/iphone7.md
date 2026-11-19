@@ -147,8 +147,12 @@ AppSync Unified 116.0 (`ai.akemi.appsyncunified`, rootless) is installed, from t
 
 installd still wants an `application-identifier` entitlement, even with AppSync: an unsigned binary (like
 `native/testkit.py ipa()`'s) fails with "Application is missing the application-identifier entitlement". The
-helper's `install-ipa` fakesigns it itself (`ldid -M -S` on the whole .app when the binary has no
-`application-identifier`). To fakesign one by hand on the phone: `ldid -Sent.xml <binary>` (an `ent.xml` with
+helper's `install-ipa` fakesigns it itself: each binary without `application-identifier` (the main one and every
+`PlugIns/` or `Extensions/` .appex) gets `ldid -M -S<ent>` on that binary alone, with `<team>.<its own bundle id>`,
+then `ldid -s` on the .app seals the bundle. `ldid -s` keeps the entitlements each binary already has.
+`ldid -M -S` on the whole .app would give every nested .appex the main app's entitlements, ID included (checked on the
+7). With AppSync, installd took an .appex with no `application-identifier`, and one carrying the main app's ID; the
+extension's own ID is the correct signature all the same. To fakesign one by hand on the phone: `ldid -Sent.xml <binary>` (an `ent.xml` with
 `application-identifier` `<TEAM>.<bundle id>` and `com.apple.developer.team-identifier` `<TEAM>`, any 10
 characters), zip it back into `Payload/<Name>.app/`, and serve it as in "Serving a test repo" above.
 `ifizbox://install?url=…&name=…` installs it through the helper and remembers it in Installed > Apps. Uninstall a
@@ -158,3 +162,19 @@ Launching such an app also needs AppSync's **FrontBoard** hook in SpringBoard, w
 following AppSync's install: until then SpringBoard logs "signature state: Generic … No code signature found" and
 refuses the launch (the icon dims, nothing opens); `sbreload` fixes it. To see
 why an app won't launch: `sudo apt-get install oslog`, then `sudo oslog` while opening it (`uiopen --bundleid <id>`).
+
+### Why installd refused an IPA
+
+`ifizbox-helper install-ipa` refuses any caller but the app, so over ssh ask installd yourself: a small tool that
+calls `[[LSApplicationWorkspace defaultWorkspace] installApplication:withOptions:error:]` and prints the NSError's
+`userInfo`. Sign it on the phone with `ldid -Snative/helper/entitlements.plist` and run it with `sudo -n`. The
+helper's final stderr line ("installd refused the app: …") already carries installd's localizedDescription, the
+staging path cut out, and the app's alert shows it.
+
+Apps that need a newer iOS: iOS 15.8.8 is the last iOS for the iPhone 7, and current builds of big apps need more.
+YouMod (YouTube 21.45.4, from the "YouMod Repo" AltStore source) needs iOS 17.0, while its source says
+`minOSVersion` 14.0. installd: "The system version is lower than the minimum OS version … Have 15.8.8; need 17.0"
+(`DeviceOSVersionTooLow`). So iFizBox doesn't trust a source's minOSVersion here. The jailbreak Install asks the
+Worker's `/api/ipainfo` for the IPA's own MinimumOSVersion before downloading, and the app page's Install row says
+"Needs iOS 17.0 (this iPhone has 15.8.8)". The helper checks MinimumOSVersion against `SystemVersion.plist` again
+after unzipping, before ldid or installd.

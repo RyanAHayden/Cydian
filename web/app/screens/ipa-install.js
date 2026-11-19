@@ -23,7 +23,9 @@ import { chooseFinish, selfLevels } from "../core/progress.js";
 import { getBackend } from "../backend.js";
 import { runLogs } from "../queue.js";
 import { ipaInstallAvailable, runIpaInstall } from "../ipa-install.js";
-import { ipaUrl, ipaName, looksLikeIpa, IPA_FOOTER } from "../core/ipainstall.js";
+import { ipaUrl, ipaName, looksLikeIpa, IPA_FOOTER, needsNewerIos, needsIosText } from "../core/ipainstall.js";
+import { checkIpa, ipaInfoUrl } from "../core/ipainfo.js";
+import { PUBLIC_SITE } from "../core/handoff.js";
 import { apps, recordInstall } from "../core/installed.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
@@ -110,13 +112,56 @@ export async function appSyncFallback(step, { alert = showAlert, open = (url) =>
   return index === TRY_AGAIN;
 }
 
+// B72: the IPA's own MinimumOSVersion against this iPhone's iOS, before anything is downloaded. The source's
+// minOSVersion isn't trusted (YouMod's source says 14.0; its YouTube 21.45.4 needs 17.0, and installd said "Have
+// 15.8.8; need 17.0" after a 130 MB download): the Worker's /api/ipainfo reads the IPA's Info.plist with Range
+// requests (core/ipainfo.js checkIpa, kept on this device per URL). Only an answer from the IPA itself counts (not an
+// App Store or description guess). -> { min, ios } when the iPhone's iOS is too old, else null: iOS unknown, no
+// answer within `ms`, or any failure (the helper checks MinimumOSVersion again after the download).
+export const IPA_NEEDS_MS = 8_000;
+export async function ipaNeeds(url, { ios = undefined, check = undefined, store = undefined, ms = IPA_NEEDS_MS } = {}) {
+  try {
+    const have = ios !== undefined ? ios : (await import("../device.js")).currentDevice().ios;
+    if (!have) return null;
+    const kept = store !== undefined ? store : (() => { try { return globalThis.localStorage ?? null; } catch { return null; } })();
+    const ask = check ?? ((u) => checkIpa(u, { store: kept, get: (x) => globalThis.fetch(ipaInfoUrl(x, getBackend().kind === "http" ? "" : PUBLIC_SITE)).then((r) => r.json()) }));
+    const info = await deadline(Promise.resolve().then(() => ask(url)), ms);
+    if (info?.from !== "ipa" || !needsNewerIos(info.minOSVersion, have)) return null;
+    return { min: info.minOSVersion, ios: have };
+  } catch {
+    return null;
+  }
+}
+
+// B72: an app page's jailbreak Install row ("With the jailbreak") says when the IPA needs a newer iOS: its subtitle
+// becomes "Needs iOS 17.0 (this iPhone has 15.8.8)". `group` is the Install group's element. Resolves the answer.
+export const JAILBREAK_SUBTITLE = "With the jailbreak";
+export const NEEDS_SUBTITLE = (n) => `Needs iOS ${n.min} (this iPhone has ${n.ios})`;
+export async function markIpaNeeds(group, url, { needs = ipaNeeds } = {}) {
+  let n = null;
+  try { n = await needs(url); } catch { n = null; }
+  if (!n || !group) return n;
+  for (const s of group.querySelectorAll?.(".cell-subtitle") ?? []) {
+    if (s.textContent === JAILBREAK_SUBTITLE) { s.textContent = NEEDS_SUBTITLE(n); s.classList?.add("needs-ios"); }
+  }
+  return n;
+}
+
 // F189: openIpaInstall's way in: AppSync Unified first (ensureAppSync), its fallback alert when that fails (Try Again
 // goes round again), then the IPA's console; installd still refusing the app (no_adhoc) gets the same short alert.
 // `deps` stand in for ensureAppSync, the alert and the console in tests.
 export async function installWithAppSync({ url, name = "", onInstalled = () => {}, native = undefined },
-  { ensure = ensureAppSync, fallback = appSyncFallback, run = runIpaConsole } = {}) {
+  { ensure = ensureAppSync, fallback = appSyncFallback, run = runIpaConsole, needs = ipaNeeds, alert = showAlert } = {}) {
   if (running || preparing) return false;
   const title = name || ipaName(url);
+  // B72: an IPA that needs a newer iOS than this iPhone's is not downloaded at all (the helper checks again).
+  preparing = true;
+  let need = null;
+  try { need = await needs(url); } catch { need = null; } finally { preparing = false; }
+  if (need) {
+    await alert({ title: `Needs iOS ${need.min}`, message: needsIosText(title, need.min, need.ios), buttons: ["OK"] });
+    return { ok: false, needs: need };
+  }
   for (;;) {
     preparing = true;
     let got;

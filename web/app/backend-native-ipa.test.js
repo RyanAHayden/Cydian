@@ -97,7 +97,7 @@ test("ipa.install's other errors: bad URL, HTTP errors, offline, not an IPA, ins
   await assert.rejects(native.call("ipa.install", { url: "https://apps.example/missing.ipa" }), /^Error: not_found: HTTP 404/);
   await assert.rejects(native.call("ipa.install", { url: URL }), /^Error: bad_ipa: unzip couldn't unpack the IPA$/);
   await assert.rejects(native.call("ipa.install", { url: "https://apps.example/empty.ipa" }), /^Error: bad_ipa: not an IPA/);
-  await assert.rejects(native.call("ipa.install", { url: "https://apps.example/refused.ipa" }), /^Error: install: installd refused the app$/);
+  await assert.rejects(native.call("ipa.install", { url: "https://apps.example/refused.ipa" }), /^Error: install: installd refused the app: fake installd refused it$/);
   assert.deepEqual(readdirSync(ipaDir), []);
   const offline = setup(t, { net: null });
   await assert.rejects(offline.native.call("ipa.install", { url: URL }), /^Error: network: /);

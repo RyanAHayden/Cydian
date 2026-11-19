@@ -33,7 +33,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "./ui.js";
 import { createFollow, hudLine } from "../core/progress.js";
-import { NAME } from "../brand.js";
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 const MAX_LINES = 1500; // lines kept on screen while it follows; the callers' logs keep everything
@@ -154,7 +153,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     cancellable(on, { disabled = false } = {}) { cancel.hidden = !on; cancel.disabled = Boolean(disabled); },
     stoppable(fn) { stop = typeof fn === "function" ? fn : null; rightButton(); },
     get stopping() { return Boolean(stop) && !finished; },
-    finish({ label = `Close ${NAME}`, action = null, status = null, title: t = "Complete" } = {}) {
+    finish({ label = "Close", action = null, status = null, title: t = "Complete" } = {}) {
       flush();
       finished = true;
       setTitle(t);
@@ -213,7 +212,7 @@ let hudPage = null; // the page progressHUD drew last, while it is up
 const running = new WeakMap();
 
 // `open` stands in for openProgress (tests).
-export function progressHUD(label = "Preparing", { open = openProgress, done: doneLabel = `Close ${NAME}` } = {}) {
+export function progressHUD(label = "Preparing", { open = openProgress, done: doneLabel = "Close" } = {}) {
   let page = hudPage && !hudPage.closed ? hudPage : null;
   if (page) page.reopen();
   else {

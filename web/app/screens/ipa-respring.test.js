@@ -4,6 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ipaFinish, installWithAppSync, appSyncRespringPending, setAppSyncRespring } from "./ipa-install.js";
+import { BUNDLE_ID } from "../brand.js";
 
 function fakeBackend({ uicache = true, respring = true, respringFails = false } = {}) {
   const log = [];
@@ -15,20 +16,30 @@ function fakeBackend({ uicache = true, respring = true, respringFails = false } 
 }
 const noAlert = async () => ({ index: 0 });
 
-test("ipaFinish: without a fresh AppSync, Reload Data as before (Close iFizBox when it failed or can't uicache)", async () => {
+// B45: installd puts an IPA's app on the home screen itself, so a normal IPA ends on plain Close (no uicache, never
+// Close iFizBox); only iFizBox's own IPA ends on Close iFizBox (the reopen level).
+test("ipaFinish: without a fresh AppSync, a normal IPA ends on Close, no action (also when it failed)", () => {
   const b = fakeBackend();
-  const f = ipaFinish({ ok: true, name: "A.ipa", backend: b, pending: false, alert: noAlert });
-  assert.equal(f.label, "Reload Data");
-  assert.equal(f.note, null);
-  assert.equal(await f.action(), false);
-  assert.deepEqual(b.log, ["uicache"]);
+  for (const bundleId of [undefined, null, "com.example.opentennis"]) {
+    const f = ipaFinish({ ok: true, name: "A.ipa", bundleId, backend: b, pending: false, alert: noAlert });
+    assert.deepEqual({ label: f.label, level: f.level, note: f.note, action: f.action }, { label: "Close", level: "return", note: null, action: null });
+  }
+  assert.deepEqual(b.log, []);
   const failed = ipaFinish({ ok: false, backend: fakeBackend(), pending: true, alert: noAlert });
-  assert.match(failed.label, /^Close /);
+  assert.equal(failed.label, "Close");
   assert.equal(failed.action, null);
   assert.equal(failed.note, null);
   const bare = ipaFinish({ ok: true, backend: {}, pending: false, alert: noAlert });
-  assert.match(bare.label, /^Close /);
+  assert.equal(bare.label, "Close");
   assert.equal(bare.action, null);
+});
+
+test("ipaFinish: iFizBox's own IPA ends on Close iFizBox (reopen); failed, on Close", () => {
+  const f = ipaFinish({ ok: true, name: "iFizBox.ipa", bundleId: BUNDLE_ID, backend: fakeBackend(), pending: false, alert: noAlert });
+  assert.equal(f.label, "Close iFizBox");
+  assert.equal(f.level, "reopen");
+  assert.equal(f.action, null);
+  assert.equal(ipaFinish({ ok: false, bundleId: BUNDLE_ID, backend: fakeBackend(), pending: false, alert: noAlert }).label, "Close");
 });
 
 test("ipaFinish: right after AppSync went in, Restart SpringBoard (uicache first) with a line saying why", async () => {
@@ -41,8 +52,8 @@ test("ipaFinish: right after AppSync went in, Restart SpringBoard (uicache first
   assert.match(f.note, /AppSync Unified/);
   assert.equal(await f.action(), false);
   assert.deepEqual(b.log, ["uicache", "respring"]);
-  assert.equal(appSyncRespringPending(), false); // done: the next IPA is back to Reload Data
-  assert.equal(ipaFinish({ ok: true, backend: fakeBackend(), alert: noAlert }).label, "Reload Data");
+  assert.equal(appSyncRespringPending(), false); // done: the next IPA is back to Close
+  assert.equal(ipaFinish({ ok: true, backend: fakeBackend(), alert: noAlert }).label, "Close");
 });
 
 test("ipaFinish: a failed respring keeps the page up, says so, and stays pending", async () => {
@@ -57,7 +68,7 @@ test("ipaFinish: a failed respring keeps the page up, says so, and stays pending
 
 test("ipaFinish: a backend that can't respring says the app opens after a respring", () => {
   const f = ipaFinish({ ok: true, name: "A", backend: fakeBackend({ respring: false }), pending: true, alert: noAlert });
-  assert.equal(f.label, "Reload Data");
+  assert.equal(f.label, "Close");
   assert.match(f.note, /^A opens after a respring/);
 });
 

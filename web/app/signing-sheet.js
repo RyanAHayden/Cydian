@@ -24,6 +24,8 @@ import { installOnDevice, openSigning } from "./signing-client.js";
 import { createSwitch } from "./screens/settings.js";
 import { phaseLabel, deviceError, inspectGroups, installParams, installedId, isCgBI, fromBase64 } from "./core/signing.js";
 import { NAME } from "./brand.js";
+import { selfLevels } from "./core/progress.js";
+import { FINISH_LABEL } from "./core/queue.js";
 
 const ICON_SIZE = 180; // the 60pt @3x icon; the signer writes the same PNG as @2x and @3x
 
@@ -149,9 +151,11 @@ export function signSheetButtons({ right, box, onInstall, onCancel, doc = docume
 // Once iOS has the install link, the page says Done and ends on Return: iOS's own install is the user's from there
 // (user 2026-11-18: "after we give the install just say its done"). B27-B29 followed iOS's progress over
 // signing.progress, which could sit on "iOS has the whole IPA" long after the app was in.
-export async function followInstall(_native, _bundleId, h, { later = setTimeout } = {}) {
+// The button is Close (progressHUD's), or Close iFizBox when the app is iFizBox itself (the reopen level).
+export async function followInstall(_native, bundleId, h, { later = setTimeout } = {}) {
   h.set("Done");
-  if (typeof h.finish === "function") h.finish({ status: "Done" });
+  const own = selfLevels([bundleId]).length > 0;
+  if (typeof h.finish === "function") h.finish({ status: "Done", ...(own ? { label: FINISH_LABEL.reopen } : {}) });
   else later(h.hide, 1200);
   return null;
 }

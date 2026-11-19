@@ -7,7 +7,8 @@
 // F88: a successful install is remembered (core/installed.js) for the Installed tab's Apps page and Changes: the
 // AltStore row's with its source (installRows' onInstall), a URL's or link's by bundle id (rememberIpa).
 // All open the same progress page as the install queue's (F151: nav/progress.js): the shell's and helper's lines as
-// they come, installd's pmstatus progress on the bar, then Reload Data (uicache) or Close iFizBox (B61: Restart
+// they come, installd's pmstatus progress on the bar, then Close (installd puts the app on the home screen itself, so
+// no uicache; Close iFizBox only for iFizBox's own IPA, which has to quit) (B61: Restart
 // SpringBoard when AppSync Unified was just installed, as its SpringBoard hook loads only then: ipaFinish). F189: AppSync
 // Unified first when it's missing (ensureAppSync: akemi's source, then the Confirm sheet with it under Install); a
 // failure there, or installd still refusing the app (no_adhoc), ends in one short alert (appSyncFallback: Try Again,
@@ -18,7 +19,7 @@ import { grouped } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { openProgress } from "../nav/progress.js";
-import { chooseFinish } from "../core/progress.js";
+import { chooseFinish, selfLevels } from "../core/progress.js";
 import { getBackend } from "../backend.js";
 import { runLogs } from "../queue.js";
 import { ipaInstallAvailable, runIpaInstall } from "../ipa-install.js";
@@ -135,8 +136,7 @@ export async function installWithAppSync({ url, name = "", onInstalled = () => {
 
 // The console page for one IPA (F151: nav/progress.js, as the queue's). Resolves the run's result once it has ended
 // (the page stays up until Close or the finish button). False when another IPA install's console is already up.
-// N9: `native` stands in for the bridge (a shared file's share.ipaInstall, share.js). An app went in, so the button
-// is Reload Data (uicache, as Cydia runs after a run) when the backend can, else Close iFizBox.
+// N9: `native` stands in for the bridge (a shared file's share.ipaInstall, share.js). The button is ipaFinish's.
 // F189: AppSync Unified comes first when it's missing (installWithAppSync above).
 export function openIpaInstall(opts) {
   return installWithAppSync(opts);
@@ -166,7 +166,7 @@ export async function runIpaConsole({ url, name = "", onInstalled = () => {}, na
   if (r.cancelled) return r;
   if (r.ok) { try { onInstalled(r); } catch { /* the record is a nicety */ } }
 
-  const fin = ipaFinish({ ok: r.ok, name: title });
+  const fin = ipaFinish({ ok: r.ok, name: title, bundleId: r.bundleId });
   if (fin.note) page.line("step", fin.note);
   page.finish({ label: fin.label, status: r.ok ? "Done" : "Failed", action: fin.action });
   if (r.error && r.error.code !== "no_adhoc") await showAlert({ title: r.error.title, message: r.error.message, buttons: ["OK"] });
@@ -183,18 +183,21 @@ export function appSyncRespringPending() { return appSyncRespring; }
 export function setAppSyncRespring(on) { appSyncRespring = Boolean(on); }
 
 // The IPA console's finish button (runIpaConsole), without the page. -> { label, level, note, action }:
-//   failed                          Close iFizBox, no action
+//   failed                          Close (the return level: the sheet closes), no action
 //   ok, AppSync just installed      Restart SpringBoard (chooseFinish's restart level; uicache first), and a line
-//                                   saying why; where the backend can't respring, Reload Data and a line saying the
-//                                   app opens after a respring
-//   ok                              Reload Data (uicache) where the backend can, else Close iFizBox
+//                                   saying why; where the backend can't respring, Close and a line saying the app
+//                                   opens after a respring
+//   ok, iFizBox's own IPA           Close iFizBox (the reopen level: it has to quit for the new copy), no action
+//   ok                              Close, no action: installd puts the app on the home screen itself (B59 on the
+//                                   iPhone 7), so an IPA needs no uicache (Reload Data stays for .deb apps)
 // action() resolves true to keep the page up (it failed and said so).
-export function ipaFinish({ ok, name = "", backend = getBackend(), alert = showAlert, pending = appSyncRespring } = {}) {
+export function ipaFinish({ ok, name = "", bundleId = null, backend = getBackend(), alert = showAlert, pending = appSyncRespring } = {}) {
   const canUicache = typeof backend?.uicache === "function";
   const canRespring = typeof backend?.respring === "function";
   const app = name ? String(name).replace(/\.ipa$/i, "") : "The app";
   const restart = Boolean(ok && pending && canRespring);
-  const choice = chooseFinish({ ok: ok && (canUicache || restart), levels: restart ? ["restart"] : [], kinds: ["app"] });
+  const choice = chooseFinish({ ok, levels: [...(restart ? ["restart"] : []), ...(bundleId ? selfLevels([bundleId]) : [])],
+    kinds: restart ? ["app"] : [] });
   let note = null;
   if (ok && pending) {
     note = restart

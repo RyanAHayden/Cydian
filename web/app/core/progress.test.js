@@ -1,7 +1,8 @@
 // F151: the install progress page's line classes, auto-scroll and finish button (core/progress.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { classify, hudLine, createFollow, packageKind, chooseFinish } from "./progress.js";
+import { classify, hudLine, createFollow, packageKind, chooseFinish, selfLevels } from "./progress.js";
+import { BUNDLE_ID, PACKAGE } from "../brand.js";
 import { parseStatusLine, finishOf } from "./queue.js";
 
 test("classify: apt's status fd lines are steps, with the package and the percent", () => {
@@ -96,8 +97,8 @@ test("packageKind: tweaks by their hooking library or section, apps by section o
 });
 
 test("chooseFinish: Return by default; Restart SpringBoard for a tweak; Reload Data for an app; the highest wins", () => {
-  assert.deepEqual(chooseFinish({}), { level: "return", label: "Close iFizBox", uicache: false });
-  assert.deepEqual(chooseFinish({ kinds: ["package"] }), { level: "return", label: "Close iFizBox", uicache: false });
+  assert.deepEqual(chooseFinish({}), { level: "return", label: "Close", uicache: false });
+  assert.deepEqual(chooseFinish({ kinds: ["package"] }), { level: "return", label: "Close", uicache: false });
   assert.deepEqual(chooseFinish({ kinds: ["tweak"] }), { level: "restart", label: "Restart SpringBoard", uicache: false });
   assert.deepEqual(chooseFinish({ kinds: ["app"] }), { level: "uicache", label: "Reload Data", uicache: false });
   // an app and a tweak in one run: Restart SpringBoard, the icon cache rebuilt first
@@ -121,4 +122,20 @@ test("chooseFinish: a failed run, the sideload IPA and the website only return",
   assert.equal(chooseFinish({ ok: false, kinds: ["tweak"], levels: ["reboot"] }).level, "return");
   assert.equal(chooseFinish({ build: "sideload", kinds: ["tweak"] }).level, "return");
   assert.equal(chooseFinish({ build: "site", levels: ["restart"] }).level, "return");
+});
+
+// B45: Close iFizBox (reopen) is only for iFizBox upgrading itself; every other run ends on plain Close.
+test("selfLevels: a normal apt run ends on Close; iFizBox's own upgrade on Close iFizBox", () => {
+  const run = (jobs, kinds = []) => chooseFinish({ levels: selfLevels(jobs), kinds });
+  assert.deepEqual(run([{ op: "install", id: "com.example.lib" }], ["package"]), { level: "return", label: "Close", uicache: false });
+  assert.equal(run([{ op: "install", id: "com.example.app" }], ["app"]).label, "Reload Data");
+  assert.deepEqual(run([{ op: "install", id: PACKAGE }], ["app"]), { level: "reopen", label: "Close iFizBox", uicache: false });
+  assert.equal(run([{ op: "install", id: "com.example.lib" }, { op: "install", id: PACKAGE }]).label, "Close iFizBox");
+  // a tweak in the same run: the respring outranks it (and ends the old copy too)
+  assert.equal(run([{ op: "install", id: PACKAGE }, { op: "install", id: "com.ex.t" }], ["tweak"]).level, "restart");
+  assert.deepEqual(selfLevels([{ op: "remove", id: PACKAGE }]), []);
+  assert.deepEqual(selfLevels([BUNDLE_ID]), ["reopen"]);
+  assert.deepEqual(selfLevels(["com.example.other", null, undefined]), []);
+  assert.deepEqual(selfLevels([`${BUNDLE_ID}.share`]), []);
+  assert.equal(chooseFinish({ ok: false, levels: selfLevels([{ op: "install", id: PACKAGE }]) }).label, "Close");
 });

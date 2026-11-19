@@ -18,7 +18,7 @@ function fakePage() {
   return p;
 }
 
-test("progressHUD: each label is a step, its percent moves the bar; done ends on Close iFizBox", () => {
+test("progressHUD: each label is a step, its percent moves the bar; done ends on Close (B45: not Close iFizBox)", () => {
   const page = fakePage();
   const h = progressHUD("Downloading", { open: () => page });
   h.set("Downloading 10%");
@@ -27,9 +27,9 @@ test("progressHUD: each label is a step, its percent moves the bar; done ends on
   h.done("Done");
   assert.deepEqual(page.calls.filter(([k]) => k === "step"), [["step", "Downloading"], ["step", "Signing"], ["step", "Done"]]);
   assert.deepEqual(page.calls.filter(([k]) => k === "progress"), [["progress", 10], ["progress", 60]]);
-  assert.deepEqual(page.calls.at(-1), ["finish", "Close iFizBox", "Done"]);
+  assert.deepEqual(page.calls.at(-1), ["finish", "Close", "Done"]);
   h.set("Installing"); // after the end: nothing
-  assert.deepEqual(page.calls.at(-1), ["finish", "Close iFizBox", "Done"]);
+  assert.deepEqual(page.calls.at(-1), ["finish", "Close", "Done"]);
   page.close();
 });
 
@@ -37,7 +37,7 @@ test("progressHUD: fail shows the error in red; hide completes without a word of
   const page = fakePage();
   const h = progressHUD("Signing", { open: () => page });
   h.fail("The certificate was revoked.");
-  assert.deepEqual(page.calls.slice(-2), [["error", "The certificate was revoked."], ["finish", "Close iFizBox", "Failed"]]);
+  assert.deepEqual(page.calls.slice(-2), [["error", "The certificate was revoked."], ["finish", "Close", "Failed"]]);
   h.hide();
   assert.equal(page.calls.filter(([k]) => k === "finish").length, 1);
   page.close();
@@ -46,7 +46,7 @@ test("progressHUD: fail shows the error in red; hide completes without a word of
   const h2 = progressHUD("Installing", { open: () => p2 });
   h2.set("Installed");
   h2.hide();
-  assert.deepEqual(p2.calls.at(-1), ["finish", "Close iFizBox", null]);
+  assert.deepEqual(p2.calls.at(-1), ["finish", "Close", null]);
   p2.close();
 });
 

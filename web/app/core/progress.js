@@ -16,8 +16,10 @@
 //   chooseFinish({ ok, levels, kinds, build }) -> { level, label, uicache }: the big bottom button, as Cydia's
 //                                    finish actions: the highest of the scripts' finish: words and what the kinds
 //                                    of package need. uicache: refresh the home screen's icons before the action.
+//   selfLevels(jobs)              -> ["reopen"] when the run installed iFizBox itself, else []
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseStatusLine, consoleText, needsRestart, finishOf, FINISH_LABEL } from "./queue.js";
+import { BUNDLE_ID, PACKAGE } from "../brand.js";
 
 export function classify({ fd = "out", line = "" } = {}) {
   if (fd === "status") {
@@ -83,6 +85,15 @@ export function packageKind(stanzas = []) {
 }
 
 const KIND_LEVEL = { tweak: "restart", app: "uicache" };
+
+// The reopen level for a run that installed iFizBox itself (its .deb, PACKAGE, or its IPA, BUNDLE_ID): it keeps
+// running the old copy until it quits (the native shell's Replaced watcher also closes it once its Info.plist on
+// disk changes). Nothing else ever ends on reopen. jobs: [{ op, id }] (a queue run's) or bundle ids (an IPA's).
+// -> ["reopen"] or [], to spread into chooseFinish's levels.
+export function selfLevels(jobs = []) {
+  const own = (j) => typeof j === "string" ? j === BUNDLE_ID || j === PACKAGE : j?.op !== "remove" && (j?.id === PACKAGE || j?.id === BUNDLE_ID);
+  return (Array.isArray(jobs) ? jobs : [jobs]).some(own) ? ["reopen"] : [];
+}
 
 // build: "jailbreak" (apt and the helper: every level), else the sideload IPA or the website (just Return).
 export function chooseFinish({ ok = true, levels = [], kinds = [], build = "jailbreak" } = {}) {

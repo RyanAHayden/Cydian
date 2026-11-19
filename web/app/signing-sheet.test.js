@@ -182,7 +182,11 @@ test("followInstall: once iOS has the link the page says Done and ends on Return
   assert.equal(await followInstall(native, "com.a", progressHUD("Installing", { open: () => page }), { later: () => assert.fail("no timer") }), null);
   assert.equal(page.title, "Complete");
   assert.equal(page.finished.status, "Done");
-  assert.equal(page.finished.label, "Close iFizBox");
+  assert.equal(page.finished.label, "Close"); // B45: a normal app's install says just Close
+  page.close(); // else the next job continues on this page (progressHUD)
+  const own = fakePage();
+  await followInstall(native, "com.ryha.ifizbox", progressHUD("Installing", { open: () => own }), { later: () => assert.fail("no timer") });
+  assert.equal(own.finished.label, "Close iFizBox"); // iFizBox's own IPA: the reopen level
   const ui = fakeUI();
   assert.equal(await followInstall(native, "com.a", ui.hud("Installing"), { later: ui.later }), null);
   assert.equal(ui.timers.length, 1); // a plain HUD goes a moment after Done

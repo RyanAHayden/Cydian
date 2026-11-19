@@ -11,7 +11,8 @@
 //      bridge as they come, the status fd's steps in bold white, dpkg's own output in monospace, errors in red, a
 //      progress bar, then the finish button (core/progress.js chooseFinish): Restart SpringBoard when a changed
 //      package is a tweak, Reload Data (uicache) for an app, or what a script asked ($CYDIA's finish: words, up to
-//      Reboot Device), else Close iFizBox. The run's output is
+//      Reboot Device), Close iFizBox when the run upgraded iFizBox itself (it has to quit), else just Close (the
+//      sheet closes). The run's output is
 //      kept (queue.js runLogs) for Settings > Console Logs (logsPage below). A conffile changed by both the user and
 //      the package opens Cydia's Configuration Upgrade alert (F63): Keep My Old Copy or Accept the New Copy, sent
 //      back to dpkg through backend.answerConffile while the run waits. While apt is still downloading (no dpkg
@@ -26,7 +27,7 @@ import { showActionSheet } from "../nav/actionsheet.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { openProgress, progressHUD } from "../nav/progress.js";
-import { classify, chooseFinish } from "../core/progress.js";
+import { classify, chooseFinish, selfLevels } from "../core/progress.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
 import { catalog } from "../catalog.js";
@@ -632,7 +633,7 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
     } catch { /* the raw lines above say it */ }
   }
 
-  const choice = chooseFinish({ ok, levels, kinds });
+  const choice = chooseFinish({ ok, levels: [...levels, ...selfLevels(jobs)], kinds });
   runLogs.add({ title: title ? title(names) : runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] }))), jobs: jobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode })),
     code: error ? -1 : result.code, finish: choice.level, text: log.join("\n") });
   // F189: what waited on a package of this run (whenQueueRuns), out before clearAll would cancel it.

@@ -60,6 +60,8 @@ import { sizeText as formatSize } from "../core/appqueue.js";
 import { dailyPick, browseKind, collectionsFor, dayKey } from "../core/catalog.js";
 import { readSpins, currentStreak, rouletteRow } from "./roulette.js";
 import { NAME } from "../brand.js";
+import { PACKAGE } from "../brand.js"; // B71: iFizBox's own row never queues its Remove
+import { appJob } from "../core/appqueue.js"; // B71
 import { showMenu, longPress, copyText } from "../nav/menu.js";
 import { showShareSheet } from "../nav/sharesheet.js";
 import { showHUD } from "../nav/hud.js";
@@ -419,11 +421,25 @@ export function packageList(body, route, rows, { letters = true, decorate = null
 // F213: `apps` (the sideload build's app queue, app-queue.js) gives AltStore apps the item instead: `job` is what the
 // app page would queue (altstore.js rowAppJob), `installed` the apps store's version ("" when unknown), `queued` the
 // app queue holds it: Cancel, Install (not installed) or Upgrade (a newer version is out); none when up to date.
-export function rowMenuItems(item, { queue = false, installed = null, newest = null, queued = false, listKey = null, apps = false, job = null } = {}) {
+// B71: `jbApps` (the jailbreak build's app rows, once it has an app queue: B71a) gives AltStore apps Install / Upgrade
+// (`job`: the IPA the helper installs, jailbreakAppRowState) or, installed and up to date, Remove. iFizBox's
+// own package never lists Remove: up to date it offers Reinstall (when a source has that version), else nothing.
+export function rowMenuItems(item, { queue = false, installed = null, newest = null, queued = false, listKey = null, apps = false, job = null,
+  jbApps = false, id: appId = null } = {}) {
   const items = [];
   const id = item?.id;
   if (!id) return items;
-  if (apps && item.kind === "ipa") {
+  if (jbApps && item.kind === "ipa") {
+    const up = newest && installed && compareVersions(newest, installed) > 0;
+    if (job && installed == null) items.push({ kind: "queue", label: "Install", job: { app: "install", ...job } });
+    else if (job && up) items.push({ kind: "queue", label: "Upgrade", job: { app: "install", ...job } });
+    else if (installed != null) items.push({ kind: "queue", label: "Remove", job: { app: "remove", id: job?.id || appId || id, name: job?.name || item.name || id } });
+  } else if (queue && item.kind !== "ipa" && id === PACKAGE) {
+    if (queued) items.push({ kind: "cancel", label: "Cancel" });
+    else if (installed && newest && compareVersions(newest, installed) > 0) items.push({ kind: "queue", label: "Upgrade", job: { op: "install", id, version: newest } });
+    else if (installed && newest && compareVersions(newest, installed) === 0) items.push({ kind: "queue", label: "Reinstall", job: { op: "install", id, version: installed } });
+    else if (!installed && newest) items.push({ kind: "queue", label: "Install", job: { op: "install", id, version: newest } });
+  } else if (apps && item.kind === "ipa") {
     if (queued) items.push({ kind: "cancel", label: "Cancel" });
     else if (job && installed == null) items.push({ kind: "queue", label: "Install", job });
     else if (job && installed && newest && compareVersions(newest, installed) > 0) items.push({ kind: "queue", label: "Upgrade", job });
@@ -511,6 +527,25 @@ async function appRowState(item) {
   const r = await rowAppJob(pkg, source).catch(() => null);
   const id = r?.job?.id || pkg?.stanza?.ipa?.bundleIdentifier || item.id;
   return { id, job: r?.job ?? null, installed: r ? r.installed : null, newest: r?.newest ?? null, queued: !!appQueue.get(id) };
+}
+
+// ---- B71: app rows in the jailbreak build ------------------------------------------------------------------------
+// What an app row's swipe or hold item would queue there (rowMenuItems' `jbApps`). The jailbreak build has no app
+// queue yet (the app queue signs, which it refuses), so nothing calls this until that queue exists (B71a).
+// Pure: rowMenuItems' { id, job, installed, newest } from the row, its catalog package (`pkg`, or null) and the apps
+// store's record (`rec`). Changes' remembered upgrade rows bring their own installed version and IPA (B68).
+export function jailbreakAppRowState(item, { pkg = null, rec = null, source = null } = {}) {
+  const app = pkg?.stanza?.ipa ?? null;
+  const id = app?.bundleIdentifier || item?.id || null;
+  const installed = item?.remembered && item.installed != null ? String(item.installed) : rec ? rec.version || "" : null;
+  const newest = item?.remembered ? item.version || null : app?.versions?.find((v) => v?.version)?.version ?? item?.version ?? null;
+  let job = app ? appJob(pkg, { installed: installed || null, version: item?.remembered ? newest : null, source }) : null;
+  if (!job && typeof item?.ipa === "string" && /^https?:\/\//i.test(item.ipa)) {
+    job = { id, name: item.name ?? null, version: newest, installed: installed || null, url: item.ipa, size: null, icon: item.icon ?? null,
+      key: item.key ?? null, source: null, sourceName: null };
+  }
+  if (job) job = { ...job, id, name: job.name || item?.name || null };
+  return { id, job, installed, newest };
 }
 
 async function runRowMenuItem(it, item, { installed, name }) {
@@ -1258,7 +1293,7 @@ async function packageActions(route, button) {
       // B69: Ignore Upgrades (the Installed Package switch, Settings' Ignored Upgrades) while a newer one is out
       const ignore = ignoreAction(st.package || id, Boolean(newest && compareVersions(newest.version, installed) > 0));
       if (ignore) actions.push(ignore);
-      actions.push({ label: "Remove", run: () => queue({ op: "remove", id }) });
+      if ((st.package || id) !== PACKAGE) actions.push({ label: "Remove", run: () => queue({ op: "remove", id }) }); // B71: never itself
       if (older.length) actions.push({ label: "Downgrade", run: () => sheet("", older.map((v) => ({ label: v.version, run: () => queue({ op: "install", id, version: v.version }) }))) });
     } else {
       actions.push({ label: "Install", run: () => queue({ op: "install", id, version: st.version }) });

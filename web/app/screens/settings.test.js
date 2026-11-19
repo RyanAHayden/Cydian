@@ -345,3 +345,39 @@ test("picking a theme in Theme > Light / Dark switches Mode to that tone", async
   pick(d("device"), "none"); // not a theme list: Mode stays
   assert.equal(settings.get("appearance"), "dark");
 });
+
+// F215: Theme > Light / Dark's preview is a movable split. Geometry in page px (an iPhone 7 web app: 647 tall, nav to
+// 64, tab bar from 598); rows 44px from y 74 (a group's 10px margin), the footer 40px under the last.
+test("F215: the preview's split: whole rows on entry, a 25% floor, 50% after a tap, the dragged position kept", async () => {
+  const { entrySplit, splitHeight, clampSplit, savedSplit, saveSplit, SPLIT_KEY } = await import("./settings.js");
+  const rowsFrom = (n) => [...Array.from({ length: n }, (_, i) => 74 + 44 * (i + 1)), 74 + 44 * n + 40 + 10];
+  const geo = (n) => ({ top: 64, bottom: 598, screen: 647, edges: rowsFrom(n) });
+  // Dark's six themes: 74 + 6*44 = 338, its footer ends 388; the floor (162) allows the divider down to 436, so the
+  // whole list shows and the preview starts under the footer.
+  assert.equal(entrySplit(geo(6)), 598 - 388);
+  // twelve rows can't all fit: the divider lands on the last row edge at or above 436 (row 8 ends at 426)
+  const twelve = entrySplit(geo(12));
+  assert.equal(twelve, 598 - 426);
+  assert.ok(twelve >= Math.ceil(647 * 0.25));
+  assert.ok(geo(12).edges.includes(598 - twelve), "the divider sits on a row's bottom edge");
+  // the floor holds even when no row edge fits
+  assert.equal(entrySplit({ top: 64, bottom: 598, screen: 647, edges: [500] }), Math.ceil(647 * 0.25));
+  // a tap: half the screen, or more if the entry split was already taller
+  assert.equal(splitHeight(geo(12), { tapped: true }), Math.round(647 / 2));
+  assert.equal(splitHeight(geo(12), {}), twelve);
+  assert.equal(splitHeight({ top: 64, bottom: 598, screen: 647, edges: [100] }, { tapped: true }), 598 - 100);
+  // a dragged position wins over both, and stays inside the page
+  assert.equal(splitHeight(geo(12), { saved: 0.4 }), Math.round(647 * 0.4));
+  assert.equal(splitHeight(geo(12), { saved: 0.4, tapped: true }), Math.round(647 * 0.4));
+  assert.equal(clampSplit(10, geo(1)), 64);
+  assert.equal(clampSplit(900, geo(1)), 598 - 64 - 44);
+  // remembered in ifizbox.* storage, as a fraction of the screen
+  const store = new Map();
+  const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+  assert.equal(savedSplit(storage), null);
+  saveSplit(259, 647, storage);
+  assert.equal(SPLIT_KEY, "ifizbox.themePreviewSplit");
+  assert.equal(splitHeight(geo(12), { saved: savedSplit(storage), tapped: true }), 259);
+  store.set(SPLIT_KEY, "junk");
+  assert.equal(savedSplit(storage), null);
+});

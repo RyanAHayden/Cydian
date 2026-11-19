@@ -42,6 +42,12 @@ tools/ui-7.sh unlock $ID              # always, also after a failure
   Bottom-edge gestures probably need something phonectl doesn't send (a touch starting below the screen, or a
   different digitizer flag). Until that's fixed, a person checks iFizBox's Control Centre controls.
 - Left-edge swipe-back (`swipe 2 600 600 600 0.3`) is the same kind of gesture, untested so far.
+- Long-press: a swipe that doesn't move, `swipe X Y X Y 2.0`. On an icon that starts Home Screen jiggle mode (tap
+  the badge's minus to remove a web clip); a 1-pixel move turns it into a drag and does nothing.
+- App switcher: two Home presses in one ssh call (`ssh 7 '/var/jb/usr/local/bin/phonectl home;
+  /var/jb/usr/local/bin/phonectl home'`, under your lock). Swipe a card up (`swipe X 700 X 30 0.2`) to close it.
+- Deleting a test app the helper won't remove: `open 'prefs:root=General&path=STORAGE_MGMT'`, then search, pick the
+  app, Delete App twice. `prefs:` links open Settings pages (give them a few seconds to load).
 - Typing: tap the on-screen keyboard's keys; there is no pbcopy. In screenshot pixels: row 1 y=958 (q 37, w 112,
   e 187, r 262, t 337, y 412, u 487, i 562, o 637, p 712), row 2 y=1066 (a 75, s 150, d 225, f 300, g 375, h 450,
   j 525, k 600, l 675), row 3 y=1174 (z 150 … m 600, backspace 700), "." 250,1284 on the URL keyboard.

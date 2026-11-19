@@ -1,0 +1,216 @@
+<!doctype html>
+<!-- Dev-only: the free Apple ID sign-in spike. Served only by the preview Worker (worker/wrangler.preview.toml copies it
+     next to web/app/ as /gsa-spike.html); the site never links to it. It drives core/gsa.js through this origin's
+     /apple/* relay. The password stays in this page's memory; only the anisette machine is kept (IndexedDB). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>GSA spike</title>
+<style>
+  body { font: 15px/1.4 -apple-system, "Helvetica Neue", Helvetica, sans-serif; margin: 0 auto; max-width: 40em; padding: 12px; }
+  fieldset { border: 1px solid #bbb; border-radius: 6px; margin: 0 0 12px; }
+  legend { font-weight: bold; }
+  label { display: block; margin: 6px 0; }
+  input, select { font: inherit; padding: 6px; width: 100%; box-sizing: border-box; }
+  button { font: inherit; padding: 6px 12px; margin: 4px 4px 4px 0; }
+  #log { background: #111; color: #ddd; font: 12px/1.4 ui-monospace, Menlo, monospace; padding: 8px; white-space: pre-wrap;
+    word-break: break-word; min-height: 8em; border-radius: 6px; }
+  .ok { color: #7c7; } .bad { color: #f77; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<h1>Free Apple ID spike</h1>
+<p>Dev-only check of the browser sign-in through this site's <code>/apple/*</code> relay. Use a spare Apple ID.</p>
+
+<fieldset>
+  <legend>1. Relay and anisette</legend>
+  <p id="machine">Machine: none yet.</p>
+  <button id="provision">Provision / check machine</button>
+  <button id="probe">No-account probe</button>
+  <button id="resetMachine">New machine</button>
+</fieldset>
+
+<fieldset>
+  <legend>2. Sign in</legend>
+  <form id="signin" autocomplete="off">
+    <label>Apple ID <input id="email" type="email" autocapitalize="off" autocomplete="off" spellcheck="false" required></label>
+    <label>Password <input id="password" type="password" autocomplete="off" required></label>
+    <button type="submit">Sign In</button>
+  </form>
+</fieldset>
+
+<fieldset id="device" hidden>
+  <legend>3a. Code from a trusted device</legend>
+  <p>A code should show on the account's devices. If none does, ask again, or use SMS.</p>
+  <button id="deviceAsk">Send code again</button>
+  <label>Code <input id="deviceCode" inputmode="numeric" autocomplete="one-time-code"></label>
+  <button id="deviceVerify">Verify</button>
+  <button id="toSms">Use SMS instead</button>
+</fieldset>
+
+<fieldset id="sms" hidden>
+  <legend>3b. Code by SMS</legend>
+  <label>Phone <select id="phones"></select></label>
+  <button id="smsAsk">Send SMS</button>
+  <label>Code <input id="smsCode" inputmode="numeric" autocomplete="one-time-code"></label>
+  <button id="smsVerify">Verify</button>
+</fieldset>
+
+<fieldset id="signedIn" hidden>
+  <legend>4. Signed in</legend>
+  <p id="who"></p>
+  <button id="token">Get Xcode app token</button>
+  <button id="teams">List teams</button>
+  <button id="forget">Forget session</button>
+</fieldset>
+
+<pre id="log"></pre>
+
+<script type="module">
+import { AppleIdSession, DevPortal, anisetteV3, relayTransport, relayWsUrl, signInAlert } from "./core/gsa.js";
+
+const $ = (id) => document.getElementById(id);
+const logEl = $("log");
+function log(msg, cls = "") {
+  const line = document.createElement("div");
+  if (cls) line.className = cls;
+  line.textContent = `${new Date().toISOString().slice(11, 19)} ${msg}`;
+  logEl.append(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+const mask = (s) => (s ? `${String(s).slice(0, 4)}…${String(s).slice(-4)} (${String(s).length} chars)` : "(none)");
+
+// ---- the anisette machine in IndexedDB (anisetteV3 reads storage synchronously, so load it first) ----
+const DB = "ifizbox.gsa-spike", STORE = "kv", KEY = "anisette";
+function idb() {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open(DB, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+async function idbGet(key) {
+  const db = await idb();
+  return new Promise((resolve, reject) => {
+    const r = db.transaction(STORE).objectStore(STORE).get(key);
+    r.onsuccess = () => resolve(r.result ?? null);
+    r.onerror = () => reject(r.error);
+  });
+}
+async function idbPut(key, value) {
+  const db = await idb();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(STORE, "readwrite");
+    t.objectStore(STORE).put(value, key);
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+  });
+}
+
+const transport = relayTransport();
+let saved = await idbGet(KEY).catch((e) => { log(`IndexedDB: ${e.message}`, "bad"); return null; });
+const storage = {
+  load: () => saved,
+  save: (s) => { saved = s; idbPut(KEY, s).catch((e) => log(`IndexedDB save: ${e.message}`, "bad")); },
+};
+const anisette = anisetteV3({ transport, storage, wsUrl: (server) => relayWsUrl(server), log });
+let session = new AppleIdSession({ transport, anisette, log });
+let token = null;
+
+function showMachine() {
+  const m = anisette.machine;
+  $("machine").textContent = m ? `Machine: ${m.deviceId} on ${m.server ?? "?"}, ${m.provisioned ? "provisioned" : "not provisioned"}.` : "Machine: none yet.";
+}
+function show(step) {
+  $("device").hidden = step !== "device";
+  $("sms").hidden = step !== "sms";
+  $("signedIn").hidden = step !== "done";
+  if (step === "done") $("who").textContent = `${session.displayName || "(no name)"}, adsid ${mask(session.adsid)}`;
+}
+function fail(e) {
+  const a = signInAlert(e);
+  log(`${a.title}: ${a.message}${e?.relay ? " (the relay refused it)" : ""}`, "bad");
+  if (e?.stack) console.error(e);
+}
+// One action at a time: a double tap must not send two sign-ins.
+let busy = false;
+function action(fn) {
+  return async (ev) => {
+    ev?.preventDefault?.();
+    if (busy) return;
+    busy = true;
+    document.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+    try { await fn(); } catch (e) { fail(e); } finally {
+      busy = false;
+      document.querySelectorAll("button").forEach((b) => { b.disabled = false; });
+      showMachine();
+    }
+  };
+}
+async function after(result) {
+  log(`sign-in step: ${result.step}${result.au ? ` (au=${result.au})` : ""}`);
+  if (result.step === "device") { await session.requestDeviceCode(); log("asked Apple to show a code on the trusted devices"); }
+  if (result.step === "sms") await loadPhones();
+  if (result.step === "other") log(`Apple wants "${result.au}", which this page doesn't handle`, "bad");
+  if (result.step === "done") log("signed in", "ok");
+  show(result.step);
+}
+async function loadPhones() {
+  const phones = await session.trustedPhones();
+  $("phones").replaceChildren(...phones.map((p) => Object.assign(document.createElement("option"), { value: p.id, textContent: p.number })));
+  log(`${phones.length} trusted phone number(s)`);
+}
+
+$("provision").onclick = action(async () => {
+  await anisette.ensure();
+  const h = await anisette.get();
+  log(`anisette OK from ${h.server}: X-Apple-I-MD-M ${mask(h.headers["X-Apple-I-MD-M"])}`, "ok");
+});
+$("probe").onclick = action(async () => {
+  const probe = new AppleIdSession({ transport, anisette, log });
+  const { resp } = await probe.init(`gsa-spike-${Date.now()}@example.invalid`);
+  const st = resp.Status ?? {};
+  log(`no-account init: ec ${st.ec ?? "none"} "${st.em ?? ""}"`, Number(st.ec) === -20970 ? "ok" : "bad");
+});
+$("resetMachine").onclick = action(async () => { await anisette.reset(); log("new machine provisioned", "ok"); });
+
+$("signin").onsubmit = action(async () => {
+  session = new AppleIdSession({ transport, anisette, log });
+  token = null;
+  const email = $("email").value.trim(), pw = $("password").value;
+  $("password").value = "";
+  await after(await session.login(email, pw));
+});
+$("deviceAsk").onclick = action(async () => { await session.requestDeviceCode(); log("asked for another code"); });
+$("deviceVerify").onclick = action(async () => {
+  const code = $("deviceCode").value; $("deviceCode").value = "";
+  await after(await session.verifyDeviceCode(code));
+});
+$("toSms").onclick = action(async () => { await loadPhones(); show("sms"); });
+$("smsAsk").onclick = action(async () => { await session.requestSmsCode($("phones").value); log("SMS sent (or the last one still works)"); });
+$("smsVerify").onclick = action(async () => {
+  const code = $("smsCode").value; $("smsCode").value = "";
+  await after(await session.verifySmsCode($("phones").value, code));
+});
+$("token").onclick = action(async () => {
+  token = await session.appToken();
+  log(`xcode.auth token ${mask(token.token)}, expiry ${token.expiry ?? "?"}, duration ${token.duration ?? "?"}`, "ok");
+});
+$("teams").onclick = action(async () => {
+  if (!token) token = await session.appToken();
+  const teams = await new DevPortal({ transport, anisette, token: token.token, adsid: session.adsid }).listTeams();
+  log(`${teams.length} team(s)`, "ok");
+  for (const t of teams) log(`  ${t.teamId} ${t.name ?? ""} (${t.type ?? "?"})`);
+});
+$("forget").onclick = action(async () => { session.forget(); token = null; show(null); log("session forgotten"); });
+
+showMachine();
+log(`ready; relay at ${location.origin}/apple/`);
+</script>
+</body>
+</html>

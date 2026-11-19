@@ -33,7 +33,7 @@ test("installStage and the steps", () => {
   const [wait, down, done] = installSteps("Delta");
   assert.equal(wait, "Waiting for iOS…");
   assert.equal(down, "iOS is asking: tap Install.");
-  assert.equal(done, "iOS is installing Delta. Press Home to watch it on the Home Screen.");
+  assert.equal(done, "Sent to iOS. Press Home to watch it install.");
 });
 
 test("a normal install steps through waiting, iOS asking, and completes once iOS starts the download, polling every 500 ms", async () => {

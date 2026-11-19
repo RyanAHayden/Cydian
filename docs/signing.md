@@ -378,7 +378,8 @@ against this phone (`native/sign/DeviceCheck.swift`, and the same check and sent
 - **Before signing**, `signing.install`, Re-sign and My IPAs fail with `device_not_in_profile` and that sentence.
 - An enterprise profile (`ProvisionsAllDevices`) or one with no device list skips the check.
 - **When nobody could check** (the website, which can't read a UDID; the app when the check came out unknown), the
-  progress page adds a warning once iOS has the app: if it doesn't appear, the likely cause is this, with the steps.
+  progress page ends on "Sent to iOS. Press Home to watch it install." and a grey "Not on the Home Screen?" line whose
+  Help button opens Guides > FAQ > "An app won't install", which explains the UDID in the profile and how to find it.
 
 #### The website's UDID, through a configuration profile
 

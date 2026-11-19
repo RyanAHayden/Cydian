@@ -16,6 +16,7 @@ import { el, grouped, row } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { NAME } from "../brand.js";
 import { GUIDE_ID as KEEP_GUIDE } from "../core/keepid.js";
+import { UDID_HOW } from "../core/signing.js";
 
 export const JAILBREAK_INFO_URL = "https://jailbreakme.dev/";
 
@@ -98,7 +99,10 @@ export const FAQ = [
     id: "app", group: "Problems", q: "An app won't install",
     steps: [
       "Settings > Signing: check the certificate and profile are there and the password is right.",
-      "The profile must list this iPhone (its UDID), unless it's an enterprise one.",
+      "The profile must list this iPhone's UDID, unless it's an enterprise one. If it doesn't, the app never appears "
+        + "on the Home Screen, or iOS says its integrity could not be verified: add the UDID to the developer "
+        + "account, make the profile again and import it in Settings > Signing.",
+      UDID_HOW,
       "Free developer accounts sign at most three apps at a time: remove one you don't use.",
       "Try again from Install IPAs or the app's page.",
     ],
@@ -134,6 +138,14 @@ export const faqFor = (lite) => FAQ.filter((f) => shows(f, lite)).map((f) => ({
   ...f, a: lite && f.liteA ? f.liteA : f.a, next: lite && f.liteNext ? f.liteNext : f.next,
 }));
 export const answerFor = (id, lite) => faqFor(lite).find((f) => f.id === id) ?? null;
+// F252: the answer an IPA install's Complete page opens from its "Not on the Home Screen?" Help button
+export const APP_HELP = "app";
+export const appHelpHref = (fmt = format) => fmt({ tab: "home", path: ["guides", "faq", APP_HELP] });
+// The Help button's tap: the progress page goes, Home shows the answer.
+export function openAppHelp(page, { go = (href) => { globalThis.location.hash = href.replace(/^#/, ""); } } = {}) {
+  try { page?.close?.(); } catch { /* the answer opens anyway */ }
+  go(appHelpHref());
+}
 
 // The FAQ page: its question rows, grouped.
 export function faqSections(lite) {

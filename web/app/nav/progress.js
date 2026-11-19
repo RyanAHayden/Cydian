@@ -4,6 +4,7 @@
 //   const p = openProgress({ onCancel })   a black page over everything, "Running" in the black nav bar
 //   p.line(kind, text)                     kind "step" (bold Helvetica Neue, white) | "raw" (monospace, grey)
 //                                          | "error" (red, the x badge) | "warning" (yellow, the warning badge)
+//   p.help(text, { label, action })        F252: a grey line with a bar button (Help) at its right; action(page)
 //   p.status(text) / p.progress(percent)   the status line and the bar at the bottom
 //   p.cancellable(bool)                    Cancel at the top left (onCancel), while a step can be stopped
 //   p.finish({ label, action, status })    "Complete": the big bottom button (drawn from the 4S's
@@ -142,7 +143,8 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     fragment: () => doc.createDocumentFragment(),
     held: selecting,
     max: MAX_LINES,
-    make: ({ kind, text, pkg }) => {
+    make: ({ kind, text, pkg, label, action }) => {
+      if (kind === "help") return helpLine(text, label, action);
       const d = el("div", `pl pl-${kind}`, text);
       if (pkg) d.dataset.pkg = pkg; // F234: the queue run's lines know their package (page.filter)
       if (filterPkg && pkg !== filterPkg) d.hidden = true;
@@ -194,6 +196,13 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       const t = String(text ?? "");
       if (!t || closed) return;
       log.push({ kind: ["step", "raw", "error", "warning"].includes(kind) ? kind : "raw", text: t, pkg: pkg || null });
+    },
+    // F252: a grey line with a bar button at its right (the IPA install's "Not on the Home Screen?" and Help).
+    // action(page) runs on the button's tap.
+    help(text, { label = "Help", action = null } = {}) {
+      const t = String(text ?? "");
+      if (!t || closed) return;
+      log.push({ kind: "help", text: t, label, action: () => action?.(page) });
     },
     // ---- F234: the queue run's page (screens/queuerun.js) ----
     // Only `pkg`'s lines (null: all of them).
@@ -338,6 +347,16 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     page.close();
   });
   return page;
+}
+
+// F252: page.help's line: the text grey on the left, a bar button (the black bar's, .console .bar-button) on the right
+function helpLine(text, label, action) {
+  const d = el("div", "pl pl-help");
+  d.setAttribute("role", "note");
+  const b = barButton(label || "Help", "pl-help-button");
+  b.addEventListener("click", () => action?.());
+  d.append(el("span", "pl-help-text", text), b);
+  return d;
 }
 
 // ---- the HUD interface on the page ------------------------------------------------------------------------------

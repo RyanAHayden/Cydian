@@ -17,7 +17,8 @@
 //   await signAndInstall({ url, name, onInstalled, bring })   signs on the phone and installs (installOnDevice), or
 //                                on the website signs in the browser (signInBrowser)
 import { showBanner } from "./nav/banner.js";
-import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError, parseProfile, deviceCheck, notLandedText, notInProfileText } from "./core/signing.js";
+import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError, parseProfile, deviceCheck, notLandedText, notInProfileText, SENT_TO_IOS } from "./core/signing.js";
+import { openAppHelp } from "./screens/guides.js";
 import { format, settingsRoute } from "./router.js";
 import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId, siteMB, SITE_LIMIT_TEXT, overSiteLimit } from "./core/websign.js";
 import { addSiteUrl, markFresh, MYIPAS } from "./core/myipas.js";
@@ -264,7 +265,7 @@ async function readyStatus(native, wait) {
 }
 
 // F236: the last signing.status's profile.device (is this iPhone in the profile), for an install whose own answer
-// doesn't carry one (My IPAs): followInstall's likely-cause line when it came out "unknown".
+// doesn't carry one (My IPAs): followInstall's help line when it came out "unknown".
 let lastDevice = null;
 function keepDevice(status) {
   let st = status;
@@ -810,9 +811,9 @@ async function keptBytes(src) {
   throw signFail("missing", "The IPA isn't kept in this browser any more: Safari may have cleared it. Add it again.");
 }
 
-// F236: the likely-cause line for watchInstall, or null (all devices, no list, an unreadable profile, or this phone
-// is in it). F256: `phone` is the UDID F253's profile found (screens/signing.js storedUdid): with it the line names
-// the UDID, and drops out when the profile lists it; without it (null) the website can't check.
+// F236/F252: watchInstall's "Not on the Home Screen?" help line, or null (all devices, no list, an unreadable profile,
+// or this phone is in it). F256: `phone` is the UDID F253's profile found (screens/signing.js storedUdid): with it
+// the line drops out when the profile lists it; without it (null) the website can't check.
 const siteDevice = (id, phone) => deviceCheck(parseProfile(id.profile instanceof Uint8Array ? id.profile : new Uint8Array(id.profile)), phone ?? null);
 export function siteCause(id, app, phone = null) {
   try { return notLandedText(app, siteDevice(id, phone)); } catch { return null; }
@@ -1029,17 +1030,18 @@ export const STATUS_EVERY = 500, STATUS_MIN_SHOW = 400, STATUS_ASK_WITHIN = 60 *
 export const installSteps = (app) => [
   "Waiting for iOS…",
   "iOS is asking: tap Install.",
-  `iOS is installing ${app || "the app"}. Press Home to watch it on the Home Screen.`,
+  SENT_TO_IOS, // F252: short; the help line under it (watchInstall's `cause`) covers an app that doesn't appear
 ];
 // The page completes once iOS starts the download (Cydia's Complete, Return under it): Safari can't see the rest, and
 // "iOS is downloading…" left people waiting on a page with nothing more to show (user 2026-11-18).
 export const installStage = (s) => (s?.finished || s?.started ? 2 : s?.manifest ? 1 : 0);
 export const notAskedText = "iOS didn't ask for the app. Tap Install again.";
 
-// F236: `cause` (core/signing.js notLandedText: the website can't read this iPhone's UDID) is added under the last step
-// once iOS has the app, and when it never fetches it, so an install that doesn't land names the likely cause first.
+// F236/F252: `cause` (core/signing.js notLandedText, "Not on the Home Screen?": the website couldn't check this
+// iPhone's UDID) goes under the last step as a grey line with Help (page.help; `help(page)` opens Guides > "An app
+// won't install"), once iOS has the app and when it never fetches it. No Retry there: iOS already has the app.
 export function watchInstall(token, h, { base = "", fetcher = globalThis.fetch, app = "", itms = "", open = () => {}, alert = showAlert,
-  cause = null, every = STATUS_EVERY, minShow = STATUS_MIN_SHOW, askWithin = STATUS_ASK_WITHIN, upTo = EARLY_WINDOW,
+  cause = null, help = openAppHelp, every = STATUS_EVERY, minShow = STATUS_MIN_SHOW, askWithin = STATUS_ASK_WITHIN, upTo = EARLY_WINDOW,
   clock = Date.now, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
   const steps = installSteps(app), t0 = clock();
   let shown = -1, shownAt = 0, firstDone;
@@ -1073,7 +1075,7 @@ export function watchInstall(token, h, { base = "", fetcher = globalThis.fetch, 
       if (installStage(s) === 2) {
         const left = minShow - (clock() - shownAt);
         if (left > 0) await sleep(left);
-        if (cause) h.page?.line?.("warning", cause);
+        if (cause) h.page?.help?.(cause, { action: help });
         if (h.done) h.done(steps[2]); else h.hide();
         return "installed";
       }
@@ -1089,7 +1091,7 @@ export function watchInstall(token, h, { base = "", fetcher = globalThis.fetch, 
         return "not_asked";
       }
       if (clock() - t0 >= upTo) {
-        if (cause) h.page?.line?.("warning", cause);
+        if (cause) h.page?.help?.(cause, { action: help });
         if (h.done) h.done(steps[shown]); else h.hide();
         return "timeout";
       }

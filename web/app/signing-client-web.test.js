@@ -157,11 +157,11 @@ test("Bring My Certificate: on unless turned off", () => {
 const SEVEN = "00008030-001A2B3C4D5E6F70";
 const listing = (...udids) => new TextEncoder().encode(`xx<?xml version="1.0"?><plist version="1.0"><dict><key>ProvisionedDevices</key><array>${udids.map((u) => `<string>${u}</string>`).join("")}</array></dict></plist>xx`);
 
-test("siteCause: names the stored UDID when it isn't listed, drops out when it is, guesses without one", () => {
+test("siteCause: the help line when the stored UDID isn't listed or there is none, drops out when it is listed", () => {
   const id = { profile: listing("aaaa", "bbbb") };
-  assert.match(siteCause(id, "Foo", { udid: SEVEN }), new RegExp(`Add its UDID ${SEVEN} to the developer account`));
+  assert.equal(siteCause(id, "Foo", { udid: SEVEN }), "Not on the Home Screen?"); // F252: the UDID steps are in the guide
   assert.equal(siteCause({ profile: listing("aaaa", SEVEN.toLowerCase()) }, "Foo", { udid: SEVEN }), null);
-  assert.match(siteCause(id, "Foo", null), /likely cause.*\(it lists 2 devices\)/);
+  assert.equal(siteCause(id, "Foo", null), "Not on the Home Screen?");
   assert.equal(siteRefusal(id, null), null);
   assert.equal(siteRefusal({ profile: listing(SEVEN) }, { udid: SEVEN }), null);
   assert.equal(siteRefusal(id, { udid: SEVEN }), notInProfileText(SEVEN));

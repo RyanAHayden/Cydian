@@ -182,11 +182,11 @@ test("F144: an APT manager's link is refused in sideload mode, Add Source in jai
     }
 }
 
-test("route: ipa in jailbreak mode needs AppSync Unified or ldid") {
+test("route: ipa in jailbreak mode goes to the helper, AppSync Unified or not (F189: the app installs it first)") {
     let host = try FakeHost(.jailbreak)
     let item = classifyFile("Demo.ipa")
-    guard case .refuse(let t, let m) = ShareRouter.route(item, host) else { return check(false, "no installer: refused") }
-    check(t == "Can't Install IPAs" && m.contains("AppSync Unified"), "\(t): \(m)")
+    check(host.appInstaller == .none, "bare host")
+    check(ShareRouter.route(item, host) == .helperIPA(item), "no installer: still the helper")
     try host.put("/usr/bin/ldid")
     check(ShareRouter.route(item, host) == .helperIPA(item), "ldid")
     let h2 = try FakeHost(.jailbreak)

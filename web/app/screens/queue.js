@@ -167,7 +167,7 @@ function openConfirm() {
       m.scroll.append(grouped([{ header: "Modifications", rows: [{ label: "Nothing to change" }],
         footer: "apt says everything queued is already as asked." }]));
     } else {
-      m.scroll.append(continueGroup(close), statistics(r.plan), modifications(r.plan, names));
+      m.scroll.append(continueGroup(close), statistics(r.plan), withWaitNotes(modifications(r.plan, names), planIds(r.plan)));
       ready = { jobs, plan: r.plan, ids: planIds(r.plan) };
       ok.hidden = false;
     }
@@ -179,6 +179,46 @@ function openConfirm() {
   confirm = { refresh, close };
   updateChrome();
   refresh();
+}
+
+// ---- F189: work waiting on a queued package (an IPA install on AppSync Unified, screens/ipa-install.js) ---------
+//
+// whenQueueRuns(id, { note }) -> a promise for what became of the queued package `id`: "installed" (a queue run with
+// it went through: its console closes at once, so what waits opens its own), "failed" (the run failed: once its
+// console is closed), "cancelled" (cleared from the queue, Confirm's Cancel among them, or the run's Cancel). `note`
+// is shown under Confirm's Modifications while it waits.
+const waiting = new Map(); // id -> [{ id, note, resolve(outcome), off() }]
+
+export function whenQueueRuns(id, { note = "", queue = installQueue } = {}) {
+  return new Promise((resolve) => {
+    const entry = { id, note, resolve };
+    entry.off = queue.subscribe((e) => {
+      if ((e.type === "clear" && e.id === id) || e.type === "clearAll") { detach(id, entry); resolve("cancelled"); }
+    });
+    waiting.set(id, [...(waiting.get(id) ?? []), entry]);
+  });
+}
+
+function detach(id, entry) {
+  entry.off();
+  const list = (waiting.get(id) ?? []).filter((x) => x !== entry);
+  if (list.length) waiting.set(id, list); else waiting.delete(id);
+}
+
+// The waiters on any of `ids`, taken out (so the run's own clearAll doesn't cancel them); each gets resolve(outcome).
+export function takeWaiters(ids) {
+  const out = [];
+  for (const id of new Set(ids)) {
+    for (const entry of [...(waiting.get(id) ?? [])]) { detach(id, entry); out.push(entry); }
+  }
+  return out;
+}
+
+// Confirm's Modifications group (`frag`) with the waiters' notes on `ids` as its footer.
+function withWaitNotes(frag, ids) {
+  const notes = [...new Set(ids.flatMap((id) => (waiting.get(id) ?? []).map((x) => x.note).filter(Boolean)))];
+  if (notes.length) frag.querySelector(".group")?.append(el("p", "group-footer", notes.join("\n")));
+  return frag;
 }
 
 // F131: each install job whose version's Filename is a full URL gets that link as `debUrl` (core/queue.js debUrlOf);
@@ -582,11 +622,21 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
   const choice = chooseFinish({ ok, levels, kinds });
   runLogs.add({ title: title ? title(names) : runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] }))), jobs: jobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode })),
     code: error ? -1 : result.code, finish: choice.level, text: log.join("\n") });
+  // F189: what waited on a package of this run (whenQueueRuns), out before clearAll would cancel it.
+  const waiters = keepQueue ? [] : takeWaiters(ids);
   // A run that went through empties the queue; one apt stopped keeps it, so Confirm can show what's left to fix.
   if (ok && !keepQueue) installQueue.clearAll();
   const reloaded = catalog.reloadInstalled?.().catch(() => {});
 
   page.onClose(() => { running = false; updateChrome(); });
+  if (waiters.length) {
+    const outcome = ok ? "installed" : stopped ? "cancelled" : "failed";
+    page.onClose(() => { for (const w of waiters) w.resolve(outcome); });
+    // It went through and held only what was waited on: straight on to what waited (the IPA's own console); this
+    // run's output is in Console Logs. With other packages queued too, their finish button (a respring) comes first.
+    const waited = new Set(waiters.map((w) => w.id));
+    if (ok && jobs.every((j) => waited.has(j.id))) { await reloaded; page.close(); return { ok, reloaded }; }
+  }
   page.finish({ label: choice.label, status: ok ? "Done" : stopped ? "Cancelled" : "Failed", action: () => finishAction(choice) });
   return { ok, reloaded };
 }

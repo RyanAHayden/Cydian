@@ -54,15 +54,14 @@ export function ipaStatus(line) {
   return { text: text.trim() || (kind === "dlstatus" ? "Downloading" : "Installing"), percent: kind === "dlstatus" ? p / 5 : 20 + p * 0.8 };
 }
 
+// F189: one line (the ldid and sign-it-yourself options are gone): AppSync Unified is installed for the first IPA
+// (screens/ipa-install.js ensureAppSync), and its short alert says what failed.
 export const NO_ADHOC_HELP = [
-  "This jailbreak can't install an app that isn't signed for this iPhone on its own. Any one of these fixes it:",
-  "• Install AppSync Unified (from its repo, cydia.akemi.ai), then install the IPA again.",
-  `• Or install ldid (Procursus and most jailbreaks' default repos have it): ${NAME} then signs the app ad hoc before installing it.`,
-  "• Or sign the IPA for this iPhone first (with your own certificate or a sideloader) and install that copy.",
+  "This jailbreak installs apps that aren't signed for this iPhone only with AppSync Unified (cydia.akemi.ai).",
 ];
 
-export const IPA_FOOTER = "Downloads the IPA and installs it with the jailbreak: as it is when AppSync Unified is "
-  + "installed, else signed ad hoc with ldid first.";
+export const IPA_FOOTER = "Downloads the IPA and installs it with the jailbreak, through AppSync Unified (installed "
+  + "from cydia.akemi.ai with the first IPA).";
 
 const TITLES = {
   no_adhoc: "Needs AppSync Unified",

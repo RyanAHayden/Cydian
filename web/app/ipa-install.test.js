@@ -78,15 +78,15 @@ test("ipaStatus: the download is the bar's first fifth, installd's percent the r
   assert.equal(ipaStatus("Installed com.example.demo"), null);
 });
 
-test("ipaError: no_adhoc says to install AppSync Unified or ldid, or to sign the IPA", () => {
+test("ipaError: no_adhoc names AppSync Unified in one line (F189: no ldid or sign-it-yourself options)", () => {
   const e = ipaError(new Error("no_adhoc: AppSync Unified isn't installed and there's no ldid"), "Demo");
   assert.equal(e.code, "no_adhoc");
   assert.equal(e.title, "Needs AppSync Unified");
   assert.equal(e.detail, "AppSync Unified isn't installed and there's no ldid");
   assert.match(e.message, /^AppSync Unified isn't installed and there's no ldid\n\n/);
-  assert.match(e.message, /Install AppSync Unified/);
-  assert.match(e.message, /install ldid/);
-  assert.match(e.message, /sign the IPA/);
+  assert.equal(NO_ADHOC_HELP.length, 1);
+  assert.match(NO_ADHOC_HELP[0], /AppSync Unified \(cydia\.akemi\.ai\)/);
+  assert.doesNotMatch(NO_ADHOC_HELP.join("\n"), /ldid|sign the IPA/);
   assert.deepEqual(e.lines, NO_ADHOC_HELP);
   // err.code from bridge.js wins; anything unknown is an install failure with the raw words.
   assert.equal(ipaError(Object.assign(new Error("whatever"), { code: "timeout" })).code, "timeout");

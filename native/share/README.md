@@ -6,7 +6,7 @@ What Safari, Files, AirDrop and Mail can hand iFizBox, and what each build does 
 |---|---|---|
 | link to an APT repo (or any other http(s) page), `cydia://url/…`, `sileo://source/…`, `zbra://sources/add/…`, `installer://add/…` | Add Source's alert, filled in (N8's `ifizbox://add?url=…`) | same |
 | link to an AltStore source (`….json`), `altstore://source?url=…`, `sidestore://…`, `feather://source/…` | Add Source's alert (it takes app sources too) | same |
-| .ipa file or link | "Install?", then `ifizbox-helper install-ipa` in the Install IPA console (needs AppSync Unified, or ldid to sign ad hoc; without either iFizBox says so before copying anything) | into My IPAs, then "Install?": signed on the phone with the user's own .p12 + .mobileprovision and installed through the in-app server (Sideload.swift, I6/F14). No certificate yet: the IPA waits in My IPAs (F77) |
+| .ipa file or link | "Install?", then `ifizbox-helper install-ipa` in the Install IPA console (F189: AppSync Unified missing, iFizBox first adds cydia.akemi.ai and installs it through the Confirm sheet) | into My IPAs, then "Install?": signed on the phone with the user's own .p12 + .mobileprovision and installed through the in-app server (Sideload.swift, I6/F14). No certificate yet: the IPA waits in My IPAs (F77) |
 | .deb file or link | the Confirm sheet for that file (`ifizbox-helper simulate-deb`: `apt-get -s install ./file.deb`, dependencies from the sources), then the console (`install-deb`) | an alert: a .deb needs a jailbreak |
 | anything else | an alert saying what iFizBox takes | same |
 

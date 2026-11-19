@@ -24,6 +24,41 @@ export const IPA_MAX = 512 * 1024 * 1024; // the Worker's own cap (worker/src/in
 export const siteMB = (n) => Math.round(Number(n) / 1048576);
 export const SITE_LIMIT_TEXT = `The website signs apps up to ${siteMB(IPA_MAX)} MB.`;
 export const overSiteLimit = (size, max = IPA_MAX) => Number.isFinite(Number(size)) && Number(size) > max;
+
+// F261: what this browser learnt about its own memory. zsign holds the IPA, the unpacked app and the signed output at
+// once, so how big an app a phone can sign depends on its RAM (an iPhone 7, 2 GB: 70 MB signs, 100 MB mostly runs out;
+// an 8 GB phone far more), and Safari has no navigator.deviceMemory and the same screen and UA for 2-4 GB models. So
+// IPA_MAX stays the one global cap, and each browser remembers the smallest IPA that ran zsign out of memory: an app
+// listed at that size or more opens the Too Big alert (with Try Anyway) instead of failing again. An IPA that size or
+// bigger that then signs forgets it (the failure was the phone's memory at that moment).
+//   memoryLimit(storage)                 bytes of the smallest IPA that ran out of memory here, or null
+//   noteOutOfMemory(storage, bytes)      remember one (keeps the smaller)
+//   noteSigned(storage, bytes)           an IPA that signed: forget a limit at or under its size
+//   overMemoryLimit(size, storage)       a listed size at or past that limit (false when unknown or none)
+//   isOutOfMemory(message)               zsign's error was memory (websign-job.js zsignCrash)
+export const MEMORY_KEY = "ifizbox.signMemory";
+const positive = (n) => (Number.isFinite(Number(n)) && Number(n) > 0 ? Math.round(Number(n)) : null);
+export function memoryLimit(storage) {
+  try { return positive(JSON.parse(storage?.getItem?.(MEMORY_KEY) ?? "null")?.failed); } catch { return null; }
+}
+export function noteOutOfMemory(storage, bytes) {
+  const n = positive(bytes);
+  if (!n) return memoryLimit(storage);
+  const was = memoryLimit(storage);
+  const failed = was ? Math.min(was, n) : n;
+  try { storage?.setItem?.(MEMORY_KEY, JSON.stringify({ failed })); } catch { /* private mode */ }
+  return memoryLimit(storage);
+}
+export function noteSigned(storage, bytes) {
+  const n = positive(bytes), was = memoryLimit(storage);
+  if (n && was && n >= was) { try { storage?.removeItem?.(MEMORY_KEY); } catch { /* private mode */ } return null; }
+  return was;
+}
+export function overMemoryLimit(size, storage) {
+  const n = positive(size), lim = memoryLimit(storage);
+  return Boolean(n && lim && n >= lim);
+}
+export const isOutOfMemory = (message) => /out of memory/i.test(String(message ?? ""));
 export const IFIZBOX_ID = "com.ryha.ifizbox";
 export const IDENTITY_FILE = "ifizbox-identity.plist";
 export const TRANSFER_FILE = "web/transfer.link";

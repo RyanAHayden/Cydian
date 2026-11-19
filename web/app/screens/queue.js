@@ -44,6 +44,7 @@ import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { runQueue, markNeededBy } from "./queuerun.js";
+import { createQueueHint } from "../nav/queuehint.js";
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 
@@ -88,7 +89,9 @@ function nameJobs(ids) {
 // Cydia's Q'd badge (on its Manage tab; ours on Installed, where its Queue button lives) and the Queue button.
 function updateChrome() {
   const n = installQueue.size + jbAppJobs().length; // B71a: queued apps count too
-  ctxRef?.setBadge?.("installed", n && !confirm && !running && !appRunning ? "Q'd" : null);
+  const badge = n && !confirm && !running && !appRunning ? "Q'd" : null;
+  ctxRef?.setBadge?.("installed", badge);
+  updateHint({ queued: n > 0, badge: Boolean(badge), open: () => openConfirm() }); // F272
   const right = globalThis.document?.querySelector?.('.nav-stack[data-tab="installed"] > .nav-item:first-child .nav-right');
   if (!right) return;
   let b = right.querySelector(".queue-button");
@@ -402,6 +405,21 @@ function rawOutput(text) {
 // to iOS one at a time on the black page with rows; runAppQueue stays for the website and Manage's bulk actions.
 
 let appConfirm = null;  // the open Confirm sheet for apps: { refresh(), close() }
+// F272: the "Hold Installed to see the queue" hint and the hold on the tab (nav/queuehint.js), told of every badge
+// change. Built once the tab bar is in the page; its remember flag lives in Settings' storage (settings.queueHint),
+// taken from screens/settings.js once loaded (that module imports this one, so not at the top).
+let hint = null, hintLoading = false, lastHint = null;
+function updateHint(h) {
+  lastHint = h;
+  if (hint) { hint.update(h); return; }
+  const bar = globalThis.document?.getElementById?.("tabbar");
+  if (hintLoading || !bar) return;
+  hintLoading = true;
+  import("./settings.js").then((m) => {
+    hint = createQueueHint({ bar, store: m.settings.queueHint });
+    hint.update(lastHint);
+  }, () => { hintLoading = false; });
+}
 let appRunning = false; // Confirm's installs are going: queuing adds without opening a second sheet
 export const appQueueRunning = () => appRunning; // B66: Manage says so instead of runAppQueue's quiet 0
 
@@ -443,6 +461,7 @@ export function updateAppChrome({ left, open = () => openAppConfirm(appChrome.qu
   const s = appChromeState({ size: appChrome.queue.size, confirmOpen: Boolean(appConfirm) || Boolean(appChrome.starting),
     running: appRunning, managing: appChrome.managing });
   appChrome.ctx?.setBadge?.("installed", s.badge);
+  if (appChrome.ctx) updateHint({ queued: appChrome.queue.size > 0, badge: Boolean(s.badge), open }); // F272
   if (!left) return s;
   let b = left.querySelector(".queue-button");
   if (s.button && !b) {

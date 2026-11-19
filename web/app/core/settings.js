@@ -272,6 +272,7 @@ const BLOCKED_KEY = PREFIX + "blockedPackages";
 const BLOCK_HOLDS_KEY = PREFIX + "blockHolds";
 const APP_HOLDS_KEY = PREFIX + "appHolds"; // B69: apps' Ignore Upgrades in the jailbreak app (no dpkg hold)
 const LAST_REFRESH_KEY = PREFIX + "lastRefresh"; // F270: pull to refresh's Last Updated
+const QUEUE_HINT_KEY = PREFIX + "queueHintHeld"; // F272: the Installed tab was held once; the queue's hint stops
 
 // F100: Search's Recent table (from Zebra): the last RECENT_MAX queries, newest first, no duplicates (a query
 // already there moves to the top; case and surrounding spaces don't make a new one). Pure, for the tests.
@@ -665,6 +666,13 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     set(ms = Date.now()) { store.set(LAST_REFRESH_KEY, String(ms)); notify("lastRefresh", ms); },
   };
 
+  // F272: whether the user has held the Installed tab to open the queue (nav/queuehint.js); once they have, the
+  // "Hold Installed to see the queue" hint never shows again. Listeners hear ("queueHintHeld", true).
+  const queueHint = {
+    held: () => store.get(QUEUE_HINT_KEY) === "true",
+    markHeld() { if (queueHint.held()) return; store.set(QUEUE_HINT_KEY, "true"); notify("queueHintHeld", true); },
+  };
+
   // F70: the daemon's preferences, { "ifizbox.<key>": value }: string, bool or number as get() gives them, the lists
   // as arrays of package ids. A setting nobody has picked is null (the shell removes the key), so the daemon keeps
   // its own default.
@@ -701,6 +709,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     autoMarked,
     recentSearches,
     lastRefresh, // F270
+    queueHint, // F272
     daemonPrefs,
     hiddenSections,
     hiddenAuthors,

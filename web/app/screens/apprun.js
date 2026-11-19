@@ -25,6 +25,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "../nav/ui.js";
 import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL } from "../nav/progress.js";
+import { fitFileNames } from "../core/midtrunc.js";
 import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf } from "../core/apprun.js";
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
@@ -157,7 +158,8 @@ export async function runAppRun(jobs, deps) {
     views.set(r.id, { li, status, bar, fill, act });
   }
   list.append(summary);
-  const WORKING = ["downloading", "signing", "signed", "asking", "installing"];
+  fitFileNames(list); // B92: an app still known by its file name is cut in the middle, keeping the end and .ipa
+  const WORKING =["downloading", "signing", "signed", "asking", "installing"];
   const draw = (r) => {
     const v = views.get(r.id);
     if (!v) return;

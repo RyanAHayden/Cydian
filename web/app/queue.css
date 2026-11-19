@@ -11,6 +11,8 @@ html[data-theme="dark"] .pkg-row[data-queued="remove"] .pkg-desc { color: var(--
 .sheet-left { justify-self: start; display: flex; }
 .confirm-mods .cell-inner { align-items: flex-start; padding-top: 11px; padding-bottom: 11px; }
 .confirm-mods .cell-detail { white-space: pre-line; text-align: right; line-height: 20px; }
+/* B92: a name with no break in it (an IPA's file name) wraps instead of running off the row's edge */
+.confirm-mods .cell-detail { overflow-wrap: anywhere; }
 .confirm-issues .group-header { color: #704d4d; }
 html[data-theme="dark"] .confirm-issues .group-header { color: var(--dk-issue-head); }
 .confirm-problem .table { background: #ffcccc; }

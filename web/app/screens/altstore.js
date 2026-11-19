@@ -250,11 +250,12 @@ function trackingSection(app, pkg, source) {
     try { rec = (await (await apps()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
     const sigRow = signatureRow(await signedRecordOf(app.bundleIdentifier)); // F91
     const versions = app.versions.map((x) => x.version).filter(Boolean);
+    const byHand = handMarking(); // F242: the jailbreak app knows what's installed: no marking rows there
     const rows = rec
       ? [{ label: "Installed Version", detail: rec.version || "Unknown" },
-        ...(versions.length > 1 ? [{ label: "Change Installed Version", onClick: () => pick() }] : []),
-        { label: "Mark as Not Installed", onClick: () => apps().then((store) => removeInstall(store, app.bundleIdentifier)).then(draw, () => {}) }]
-      : [{ label: "Mark as Installed", onClick: () => (versions.length > 1 ? pick() : mark(versions[0] ?? "")) }];
+        ...(byHand && versions.length > 1 ? [{ label: "Change Installed Version", onClick: () => pick() }] : []),
+        ...(byHand ? [{ label: MARK_NOT_INSTALLED_LABEL, onClick: () => apps().then((store) => removeInstall(store, app.bundleIdentifier)).then(draw, () => {}) }] : [])]
+      : byHand ? [{ label: MARK_INSTALLED_LABEL, onClick: () => (versions.length > 1 ? pick() : mark(versions[0] ?? "")) }] : [];
     // The nav bar's button says what it will do, as Cydia's does: Upgrade when a newer version is out than the one
     // installed, Reinstall when it's the same, Install when it isn't installed.
     // F80: Modify while the app is queued, as Cydia's does (core/appqueue.js appNavLabel).
@@ -268,6 +269,7 @@ function trackingSection(app, pkg, source) {
     };
     if (!relabel()) setTimeout(relabel, 0);
     if (sigRow) rows.splice(1, 0, sigRow);
+    if (!rows.length) { box.replaceChildren(); return; } // F242: the jailbreak app, not installed: no section
     box.replaceChildren(grouped([{ header: "Installed", rows,
       footer: rec ? `${NAME} follows this app for updates: they show in Changes.` : `Installed it another way? Mark it, and ${NAME} follows it for updates.` }]));
   }
@@ -300,7 +302,12 @@ export const MARK_NOT_INSTALLED_LABEL = "Mark as Not Installed";
 const markRecordOf = (app, pkg, source, version) => ({ id: app.bundleIdentifier, name: app.name, version, key: pkg?.key ?? null,
   source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL });
 
-export function markToggleApplies(app) {
+// F242: marking an app installed by hand is for builds that can't ask the phone (the site, the sideload app); the
+// jailbreak app can (dpkg, the helper, apps.isInstalled-style calls), so it has no toggle and no Mark rows.
+export const handMarking = (mode = detectMode()) => mode !== "jailbreak";
+
+export function markToggleApplies(app, { mode = detectMode() } = {}) {
+  if (!handMarking(mode)) return false;
   const id = String(app?.bundleIdentifier ?? "");
   if (!id || !app.versions?.some((x) => x?.version)) return false;
   if (id === BUNDLE_ID || id.startsWith(`${BUNDLE_ID}.`)) return false; // iFizBox itself: always listed as it is
@@ -739,9 +746,9 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
 
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on
   // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.
-  // F88: in the jailbreak app too (an IPA installed by another tool, or before iFizBox recorded installs).
+  // F242: not in the jailbreak app, which can tell what's installed: there the section only shows the installed version.
   details.append(trackingSection(app, pkg, source));
-  // F210: and the same in one tap from the nav bar.
+  // F210: and the same in one tap from the nav bar (sideload and site only, F242).
   if (markToggleApplies(app)) {
     const toggle = markToggle(app, pkg, source);
     if (!addNavIcon(body, toggle, "mark")) setTimeout(() => addNavIcon(body, toggle, "mark"), 0);

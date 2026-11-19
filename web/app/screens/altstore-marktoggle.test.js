@@ -3,7 +3,7 @@
 // follows the record.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { markToggle, toggleMarked, markToggleApplies, MARK_INSTALLED_LABEL, MARK_NOT_INSTALLED_LABEL } from "./altstore.js";
+import { markToggle, toggleMarked, markToggleApplies, handMarking, MARK_INSTALLED_LABEL, MARK_NOT_INSTALLED_LABEL } from "./altstore.js";
 import { addNavIcon } from "../nav/navbar.js";
 import { memoryAppStore, recordInstall, removeInstall } from "../core/installed.js";
 import { BUNDLE_ID, GITHUB_REPO, NAME } from "../brand.js";
@@ -146,4 +146,33 @@ test("addNavIcon: after Install in the DOM (setRightLabel still finds Install fi
     assert.deepEqual(right.children, [share, install, again], "the page drawn again: one toggle");
     assert.equal(addNavIcon({ closest: () => null }, fakeElement("button")), false, "no nav item yet");
   });
+});
+
+// F242: the jailbreak app can tell what's installed, so it has no hand marking: no nav toggle, no Mark rows. The
+// sideload app and the website keep both.
+test("handMarking / markToggleApplies: the site and the sideload build mark by hand, the jailbreak build doesn't", () => {
+  assert.equal(handMarking("site"), true);
+  assert.equal(handMarking("sideload"), true);
+  assert.equal(handMarking("jailbreak"), false);
+  assert.equal(markToggleApplies(APP, { mode: "site" }), true);
+  assert.equal(markToggleApplies(APP, { mode: "sideload" }), true);
+  assert.equal(markToggleApplies(APP, { mode: "jailbreak" }), false);
+  assert.equal(markToggleApplies({ ...APP, bundleIdentifier: BUNDLE_ID }, { mode: "sideload" }), false, "iFizBox itself stays hidden");
+});
+
+test("handMarking follows the build the page runs in (detectMode: no native bridge is the site)", () => {
+  const saved = globalThis.ifizboxNative;
+  try {
+    delete globalThis.ifizboxNative;
+    assert.equal(handMarking(), true);
+    assert.equal(markToggleApplies(APP), true);
+    globalThis.ifizboxNative = { mode: "sideload" };
+    assert.equal(handMarking(), true);
+    assert.equal(markToggleApplies(APP), true);
+    globalThis.ifizboxNative = { mode: "jailbreak" };
+    assert.equal(handMarking(), false);
+    assert.equal(markToggleApplies(APP), false);
+  } finally {
+    if (saved === undefined) delete globalThis.ifizboxNative; else globalThis.ifizboxNative = saved;
+  }
 });

@@ -36,6 +36,7 @@
 //                                           the latest release's asset fetched here, redirects followed here
 //   GET  /repo/source.json                  F178: iFizBox's AltStore source (the deployed web/app/source.json, else the
 //                                           latest release's source.json asset), the sideload app's built-in source
+//   GET  /repo/CydiaIcon.png                B58: the repo's icon (also @2x/@3x): the app icon from ASSETS, kept a week
 //
 // Settings (wrangler.toml [vars]): HOST_IDS, the bundle IDs /sign/host takes ("*.ifizbox" = any ending in .ifizbox);
 // TTL (seconds, 600); MAX_UPLOAD_MB (512), the largest IPA /sign/upload and kind=ipa take ("0": no uploads). KV
@@ -151,7 +152,8 @@ export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promis
 // github.com/<repo>/releases/latest/download/<file> redirects to release-assets.githubusercontent.com/...?sig=&jwt=,
 // a URL Zebra 1.1.36 names its cache file after: too long, "the file name is invalid", the source shows red. Here
 // the Worker follows the redirect and answers with the file itself, so https://<DOMAIN>/repo/ has no redirect.
-// Only the repo's own names are fetched (anything else, InRelease, Packages.xz, icons: 404 without asking GitHub).
+// Only the repo's own names are fetched (anything else, InRelease, Packages.xz: 404 without asking GitHub; the icon
+// is the app's own, repoIcon below).
 // IFIZBOX_REPO (owner/name) picks another GitHub repo's releases (default brand.js GITHUB_REPO).
 const SELF_REPO = GITHUB_REPO;
 const REPO_TYPES = { "Release": "text/plain; charset=utf-8", "Packages": "text/plain; charset=utf-8", "Packages.gz": "application/gzip" };
@@ -186,12 +188,30 @@ export async function selfSource(req, u, env = {}, { fetcher = fetch, wait } = {
   return new Response(r.body, { headers: SOURCE_HEADERS });
 }
 
+// B58: /repo/CydiaIcon.png (and @2x/@3x), the repo's icon in package managers' source lists: iFizBox's own app icon,
+// the deployed web/app/icons/icon-180.png (ASSETS; the same PNG as native/icon/AppIcon60x60@3x.png), never GitHub.
+// It changes with a redesign at most: kept a week, a day more stale while revalidating.
+const REPO_ICON = /^\/repo\/CydiaIcon(@[23]x)?\.png$/;
+const REPO_ICON_ASSET = "/icons/icon-180.png";
+export async function repoIcon(req, u, env = {}) {
+  const none = () => new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+  if (!["GET", "HEAD"].includes(req.method) || !env.ASSETS) return none();
+  let r;
+  try { r = await env.ASSETS.fetch(new Request(`${u.origin}${REPO_ICON_ASSET}`)); } catch { return none(); }
+  if (!r?.ok) { r?.body?.cancel?.(); return none(); }
+  const headers = { "Content-Type": "image/png", "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400", "X-Content-Type-Options": "nosniff", ...CORS };
+  for (const h of ["content-length", "etag", "last-modified"]) { const v = r.headers.get(h); if (v) headers[h] = v; }
+  if (req.method === "HEAD") { r.body?.cancel?.(); return new Response(null, { headers }); }
+  return new Response(r.body, { headers });
+}
+
 export async function repo(req, u, env = {}, { fetcher = fetch, wait } = {}) {
   if (u.pathname === "/repo" || u.pathname === "/repo/") {
     if (u.pathname === "/repo") return Response.redirect(`${u.origin}/repo/`, 301);
     return new Response(`${NAME}'s own APT repo: add this address in ${NAME}, Sileo or Zebra.\n${NAME}'s AltStore source (the app without a jailbreak): ${u.origin}/repo/source.json\n`, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=300" } });
   }
   if (u.pathname === "/repo/source.json") return selfSource(req, u, env, { fetcher, wait });
+  if (REPO_ICON.test(u.pathname)) return repoIcon(req, u, env);
   const f = repoFile(u.pathname);
   if (!f || !["GET", "HEAD"].includes(req.method)) return new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
   const name = /^[\w.-]+\/[\w.-]+$/.test(env.IFIZBOX_REPO ?? "") ? env.IFIZBOX_REPO : SELF_REPO;

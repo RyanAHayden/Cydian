@@ -27,6 +27,7 @@ import { detectMode } from "../core/settings.js";
 import { repoLayout } from "../core/apt.js";
 import { packageList } from "./browse.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor } from "../core/sources.js";
+import { sourceIconImage } from "../source-icon.js";
 import { altRecord, parseSource } from "../core/altstore.js";
 import {
   exportText, clipboardText, parseImport, reviewImport, orderSources, loadOrder, saveOrder, recommendedRows, recommendedSeed,
@@ -208,14 +209,7 @@ function editRow(li, source, backend, body) {
   li.classList.add("source-row");
   li.dataset.key = source.key;
   if (source.error) li.querySelector(".cell-subtitle")?.classList.add("cell-error");
-  const img = new Image();
-  img.alt = "";
-  img.decoding = "async";
-  img.onload = () => img.classList.add("loaded");
-  const urls = sourceIcons(source).map((u) => (backend.assetUrl ? backend.assetUrl(u) : u));
-  img.onerror = () => (urls.length ? (img.src = urls.shift()) : img.remove());
-  if (urls.length) img.src = urls.shift();
-  li.querySelector(".cell-icon").append(img);
+  li.querySelector(".cell-icon").append(sourceIconImage(source.key, sourceIcons(source), backend)); // B58: cached
   // F72: iFizBox's own source is built in: a lock where the minus goes, no Delete, and it doesn't move.
   if (isBuiltin(source)) {
     li.dataset.builtin = "1";
@@ -665,14 +659,7 @@ function getButton(row, onAdd) {
 function recIcon(li, row) {
   const backend = getBackend();
   li.querySelector(".cell-icon img")?.remove();
-  const img = new Image();
-  img.alt = "";
-  img.decoding = "async";
-  img.onload = () => img.classList.add("loaded");
-  const urls = row.icons.map((u) => (backend.assetUrl ? backend.assetUrl(u) : u));
-  img.onerror = () => (urls.length ? (img.src = urls.shift()) : img.remove());
-  if (urls.length) img.src = urls.shift();
-  li.querySelector(".cell-icon").append(img);
+  li.querySelector(".cell-icon").append(sourceIconImage(row.key, row.icons, backend)); // B58: cached
 }
 
 const recHref = (row) => (row.added ? format({ tab: "sources", path: [row.key] }) : here("recommended", row.key));

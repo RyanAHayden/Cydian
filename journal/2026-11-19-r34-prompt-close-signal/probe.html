@@ -1,0 +1,40 @@
+<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>R34 probe</title>
+<style>body{font:16px -apple-system;margin:20px}button{font-size:22px;padding:16px;margin:8px 0;width:100%}#box{width:40px;height:40px;background:red;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}pre{font-size:11px;white-space:pre-wrap}</style>
+</head><body>
+<button id="open">Open prompt</button>
+<div id="box"></div>
+<pre id="log"></pre>
+<script>
+const T0 = performance.now();
+const q = [];
+const log = (k, v = {}) => { const e = { t: Math.round(performance.now() - T0), w: Date.now(), k, ...v }; q.push(e); document.getElementById("log").textContent = (k + " " + JSON.stringify(v) + "\n" + document.getElementById("log").textContent).slice(0, 3000); };
+const flush = () => { if (!q.length) return; const body = JSON.stringify(q.splice(0)); fetch("/log", { method: "POST", body, keepalive: true }).catch(() => {}); };
+setInterval(flush, 500);
+for (const ev of ["focus", "blur", "pageshow", "pagehide", "resize", "pointercancel", "touchcancel"]) window.addEventListener(ev, () => log("ev:" + ev, { vis: document.visibilityState, hf: document.hasFocus() }), true);
+document.addEventListener("visibilitychange", () => log("ev:visibilitychange", { vis: document.visibilityState }));
+document.addEventListener("focusout", (e) => log("ev:focusout", { tg: e.target?.id }));
+document.addEventListener("focusin", (e) => log("ev:focusin", { tg: e.target?.id }));
+document.getElementById("box").addEventListener("animationiteration", () => log("anim"));
+// rAF: count frames per 250 ms window and the largest gap
+let frames = 0, maxGap = 0, last = performance.now();
+const raf = (now) => { const g = now - last; last = now; if (g > maxGap) maxGap = g; frames++; requestAnimationFrame(raf); };
+requestAnimationFrame(raf);
+// timer drift: 100 ms interval vs wall clock
+let tlast = performance.now(), maxDrift = 0;
+setInterval(() => { const n = performance.now(); const d = n - tlast - 100; tlast = n; if (d > maxDrift) maxDrift = d; }, 100);
+// summary every 1 s
+setInterval(() => { log("tick", { frames, maxGap: Math.round(maxGap), maxDrift: Math.round(maxDrift), hf: document.hasFocus(), vis: document.visibilityState, ae: document.activeElement?.id || document.activeElement?.tagName }); frames = 0; maxGap = 0; maxDrift = 0; }, 1000);
+const hex = () => [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("");
+document.getElementById("open").addEventListener("click", () => {
+  const q2 = new URLSearchParams({ bundleid: "com.ryha.ifizbox.r34probe", version: "1.0", title: "R34Probe" });
+  const tok = hex();
+  const m = `https://ifizbox.com/sign/up/${tok}/manifest.plist?${q2}`;
+  log("open", { tok });
+  document.getElementById("open").focus();
+  location.href = "itms-services://?action=download-manifest&url=" + encodeURIComponent(m);
+});
+log("load", { ua: navigator.userAgent });
+</script></body></html>

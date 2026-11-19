@@ -154,3 +154,9 @@ with `ldid -Sent.xml <binary>` (an `ent.xml` with `application-identifier` `<TEA
 `com.apple.developer.team-identifier` `<TEAM>`, any 10 characters), zip it back into `Payload/<Name>.app/`, and serve
 it as in N11. `ifizbox://install?url=…&name=…` then installs it through the helper and remembers it in Installed > Apps.
 Uninstall a test app afterwards (Installed > Apps, swipe, Delete).
+
+B59: the helper's `install-ipa` now does that fakesign itself (`ldid -M -S` on the whole .app when the binary has no
+`application-identifier`). Launching such an app also needs AppSync's **FrontBoard** hook in SpringBoard, which only
+loads after a respring: until then SpringBoard logs "signature state: Generic … No code signature found" and refuses
+the launch (the icon dims, nothing opens). AppSync went in at 19:39 without one; `sbreload` at 20:08 fixed it. To see
+why an app won't launch: `sudo apt-get install oslog`, then `sudo oslog` while opening it (`uiopen --bundleid <id>`).

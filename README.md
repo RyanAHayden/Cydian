@@ -98,7 +98,7 @@ Add iFizBox's own APT repo to Sileo or Zebra, then install **iFizBox** (`com.ryh
 https://ifizbox.com/repo/
 ```
 
-On the website, **Home > Install Full iFizBox** does this for you (Add to Sileo, Add to Zebra, Copy Repo URL, or
+On the website, **Home > Jailbroken? Install iFizBox** does this for you (Add to Sileo, Add to Zebra, Copy Repo URL, or
 Download .deb). You can also get `iFizBox.deb` from the
 [latest release](https://github.com/RyanAHayden/iFizBox/releases/latest) and install it with
 `apt-get install ./iFizBox.deb`, which pulls in its dependencies (plain `dpkg -i` doesn't). Once installed, the
@@ -106,7 +106,7 @@ repo stays in iFizBox as a built-in source, so iFizBox updates itself like any o
 
 ### Sideload app (LITE)
 
-With your certificate added on the website (**Settings > Signing**), tap **Home > Install iFizBox App**: the website
+With your certificate added on the website (**Settings > Signing**), tap **Home > Install iFizBox Lite**: the website
 signs the IPA in your browser and iOS asks to install it. The installed app comes with that certificate (and your
 sources and settings), so it signs and installs apps on the phone straight away. That's all it takes.
 

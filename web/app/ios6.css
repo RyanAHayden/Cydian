@@ -104,6 +104,8 @@ html[data-theme="dark"] {
   --dk-bar-fill: linear-gradient(#8d8d93, #5f5f66);
   --dk-inset-box: #161618;
   --dk-green: #0f2414;
+  --dk-lavender: #1a1426; /* F229: Home's jailbroken install tile, --dk-green's lavender twin */
+  --dk-lavender-text: #b49ae0;
   --dk-glyph: #3a3a3e;
   --dk-dim: #55555b;
   --dk-issue-head: #f0b8b8;
@@ -183,6 +185,8 @@ html[data-theme="dark"][data-palette="gunmetal"] {
   --dk-bar-fill: linear-gradient(#b5bac2, #8a9099);
   --dk-inset-box: #30333a;
   --dk-green: #2f4a36;
+  --dk-lavender: #3d344f;
+  --dk-lavender-text: #c6b3ea;
   --dk-glyph: #4a4d52;
   --dk-dim: #6c7178;
   --dk-issue-table: #5a3434;

@@ -342,6 +342,39 @@ test("B66: runManageJobs reports what the queue's run left (a failure stops it),
   assert.deepEqual(seen, ["Re-signing A", "Installing YouMod"]);
 });
 
+test("F240: runManageJobs in the sideload app uses the sign-ahead run; failed and cancelled rows come back as left", async () => {
+  const q = createAppQueue();
+  q.add({ id: "other", name: "Other", url: "https://s/o.ipa" }); // queued before: not part of Manage's run
+  const jobs = [{ id: "a", name: "A", mode: "resign" }, { id: "b", name: "B", mode: "resign" }, { id: "c", name: "C", url: "https://s/c.ipa" }];
+  let got = null;
+  const aheadRun = async (js, { queue }) => {
+    got = js.map((j) => j.id);
+    queue.clear("a"); // installed; b failed and c was cancelled: both stay queued, the run went past b
+    return { ok: false, stopped: false, rows: [], installed: 1 };
+  };
+  assert.deepEqual(await runManageJobs("resign", jobs, { queue: q, ahead: true, aheadRun, install: async () => assert.fail("no HUD path") }),
+    { done: 1, left: ["b", "c"] });
+  assert.deepEqual(got, ["a", "b", "c"]);
+  assert.ok(q.get("other"));
+  // the Signing walkthrough opened instead (null): everything stays picked
+  const q2 = createAppQueue();
+  assert.deepEqual(await runManageJobs("update", jobs, { queue: q2, ahead: true, aheadRun: async () => null }),
+    { done: 0, left: ["a", "b", "c"] });
+  // all through: nothing left, so Manage ends
+  const q3 = createAppQueue();
+  const all = async (js, { queue }) => { for (const j of js) queue.clear(j.id); return { ok: true, installed: js.length }; };
+  assert.deepEqual(await runManageJobs("update", jobs, { queue: q3, ahead: true, aheadRun: all }), { done: 3, left: [] });
+});
+
+test("F240: runManageJobs without signing ahead (the website) keeps the one-at-a-time run", async () => {
+  const q = createAppQueue();
+  let used = null;
+  const run = async (js, { queue }) => { used = "runAppQueue"; for (const j of js) queue.clear(j.id); return js.length; };
+  assert.deepEqual(await runManageJobs("update", [{ id: "x", name: "X", url: "https://s/x.ipa" }], { queue: q, ahead: false, run,
+    aheadRun: async () => assert.fail("sign-ahead on the website") }), { done: 1, left: [] });
+  assert.equal(used, "runAppQueue");
+});
+
 test("B66: markedResignProblem names why and the newest version", async () => {
   const { markedResignProblem } = await import("../core/appqueue.js");
   assert.equal(markedResignProblem(pkg("x", [v("2"), v("1")]), "1"), null);

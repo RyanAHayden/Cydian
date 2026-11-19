@@ -46,7 +46,8 @@ One frontend (`web/app/`, plain HTML, CSS and JavaScript modules with no build s
 | <img src="web/app/icons/icon-glossy-76.png" width="48" alt=""> | **Jailbreak app** (`iFizBox.deb`) | Everything the website does, plus installing `.deb`s through apt with a root helper, a background upgrade check, and Shortcuts actions. The helper installs IPAs directly, with no signing. | A rootless jailbreak (iOS 15 and later, `iphoneos-arm64`) |
 | <img src="web/app/icons/icon-lite-glossy-76.png" width="48" alt=""> | **Sideload app** (`iFizBox.ipa`, the LITE icon) | The same app without the root helper: AltStore-style sources, apps signed and installed on the phone with your certificate, and updates to the apps you installed. | Your own signing certificate (`.p12` and `.mobileprovision`) |
 
-There is no separate non-jailbroken app beyond the sideload build ([docs/ipa.md](docs/ipa.md) explains why).
+The jailbreak app and the sideload app are one app, two builds: the same `native/` shell, with or without the root
+helper.
 
 ## Screenshots
 
@@ -106,8 +107,10 @@ repo stays in iFizBox as a built-in source, so iFizBox updates itself like any o
 ### Sideload app (LITE)
 
 With your certificate added on the website (**Settings > Signing**), tap **Home > Install iFizBox App**: the website
-signs the IPA in your browser and iOS asks to install it. Or add iFizBox's AltStore source to Feather, AltStore or
-SideStore:
+signs the IPA in your browser and iOS asks to install it. The installed app comes with that certificate (and your
+sources and settings), so it signs and installs apps on the phone straight away. That's all it takes.
+
+You don't need another sideloading tool, but iFizBox's AltStore source works in Feather, AltStore or SideStore too:
 
 ```text
 https://raw.githubusercontent.com/RyanAHayden/iFizBox/main/web/app/source.json

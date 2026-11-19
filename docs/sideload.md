@@ -75,7 +75,7 @@ That is AltStore/SideStore's job, and it needs Apple's servers plus an anisette 
 What this means for a profile:
 
 - **Wildcard App ID** (`TEAM.*`): any bundle ID works, extensions included. Push, App Groups and iCloud are
-  missing (see `docs/ipa.md`).
+  missing: Apple doesn't allow those capabilities on a wildcard App ID.
 - **Explicit App ID**: the main app must be re-IDed to exactly that ID, and extensions get IDs the profile
   doesn't cover. iOS refuses the install, so either delete `PlugIns/` (zsign's `m_bRemoveExtensions`) or sign
   each extension with its own profile.
@@ -149,7 +149,7 @@ say so in the UI.
 - Progress: polls private `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`, and Open uses
   `openApplicationWithBundleID:`. Both are reached through base64-hidden selectors
   (`NimbleKit/.../UIApplication+open_private.swift`), and both work from a sideloaded app. That corrects
-  `docs/ipa.md`'s blanket "`LSApplicationWorkspace` is blocked for third-party apps": some calls do work for
+  the early IPA research's blanket (`journal/2026-11-17-r4-ipa-decision/research.md`) "`LSApplicationWorkspace` is blocked for third-party apps": some calls do work for
   sideloaded apps. Listing all installed apps is still not shown to work.
 - Feather won't install **itself** through the server ("use an alternative tool to update it"), because the
   install kills the process that serves the IPA. iFizBox has the same limit: it can't update itself in sideload
@@ -263,10 +263,12 @@ genPlist URL, and the pack-expiry check.
 
 - I2's text says "signed through sidedrop's ad hoc profile". **Overruled the same way.** Build the IPA unsigned,
   then `codesign -s -`/`ldid -S` ad hoc, as Feather's `Makefile` does (`CODE_SIGNING_ALLOWED=NO`, then copy
-  `.app` → `Payload/`, zip). The user signs and installs it with whatever they already use (Feather, SideStore,
-  AltStore, a computer). Once installed, iFizBox signs other IPAs itself.
+  `.app` → `Payload/`, zip). Shipped since: the usual way in is the website's **Install iFizBox App**,
+  which signs this IPA in the browser with the user's certificate and hands that certificate, sources and settings
+  to the installed app, so it signs other IPAs at once. Feather, SideStore, AltStore or a computer also work, but
+  aren't needed.
 - Entitlements for the sideload build: `get-task-allow` only, like Feather. No App Groups or push (wildcard
-  profiles can't have them; see `docs/ipa.md`).
+  profiles can't have them).
 - Info.plist for the sideload build: `UIBackgroundModes: [audio]` (install keep-alive, alongside I3's
   `fetch`/`processing` for BGAppRefreshTask), `CFBundleDocumentTypes` for `.ipa` (`com.apple.itunes.ipa`),
   `.p12`, `.mobileprovision`, a URL scheme (`ifizbox://`), and `apple-magnifier` in `LSApplicationQueriesSchemes`.

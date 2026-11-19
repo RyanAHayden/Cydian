@@ -1,6 +1,6 @@
 # Agent rules
 
-iFizBox: a package manager with the iOS 6 Cydia look, for modern iPhones. Two front doors, one brain:
+iFizBox: a package manager with the iOS 6 Cydia look, for modern iPhones. Three front doors, one brain:
 
 1. `web/app/`: **the one frontend** (HTML, CSS, vanilla JS modules, no build step). It runs on the public site and
    inside the jailbreak app. `core/` is pure JS (parsing, versions, Changes, upgrades), tested with `node --test`.
@@ -12,9 +12,10 @@ iFizBox: a package manager with the iOS 6 Cydia look, for modern iPhones. Two fr
    Rootless iOS 15+ up to the coming iOS 27 jailbreak. Shape and feel rules: `docs/native.md`. It must hold
    120 Hz: animate only transform/opacity, virtualise long lists, parse in a Web Worker.
 
-There is no separate `ipa/`. R4 found a standalone non-jailbroken IPA not worth it (`docs/ipa.md`); the user then
-chose one app, two builds: the `native/` shell also builds as a sideload IPA with no helper (plan section "IPA:
-sideload management", I2-I4).
+3. The sideload IPA (`iFizBox.ipa`, "Lite"): the same `native/` shell built without the root helper, for phones
+   without a jailbreak. It's a main build, used all the time: AltStore sources, signing and installing apps on the
+   phone, re-signing and updating them (plan section "IPA: sideload management"). One app, two builds; there is
+   no separate `ipa/`. (The early "drop the IPA" research was overruled: `journal/2026-11-17-r4-ipa-decision/`.)
 
 Shortcuts recipes live in `docs/shortcuts.md`.
 

@@ -48,6 +48,37 @@ queue cleared, records, log steps, finish button); `runJailbreakApps` (AppSync s
 `afterApps`; `appSyncFirst`; `jbModifyQueue` (queues at a version, Remove, Clear first). The existing
 rowswipe/apprun/queue/jailbreakmodify tests still pass.
 
+## Checked on the iPhone 7 (build 0.9.9-1722, 2026-11-19)
+
+I grepped the installed web files for `jbAppRowState` and `runJailbreakApps` before testing. Screens are in
+`ref/7/screens/b71a-*.png`.
+- **Changes:** swiping OpenTennis (Available Upgrades) left gives "Queued for Upgrade", the undo bar "Upgrade
+  OpenTennis queued", and Q'd on Installed. No Confirm opened. Installed's Queue button opened Confirm with
+  Modifications "Install 2048, Upgrade OpenTennis". Confirm ran the apps' page ("Installing OpenTennis", the
+  helper's "Installed io.github.fizl0.hst", "1 installed"), and after Done the packages' run followed (2048).
+- **Search:** that swipe on "2048" queued an apt package (2048 is a .deb), so it didn't exercise app rows. I then
+  searched "tennis" and swiped OpenTennis (installed, up to date): it showed "Queued for Remove" with no confirm
+  popup. Confirm then ran "Removing OpenTennis" → helper "Uninstalled io.github.fizl0.hst" → "1 removed". A
+  second swipe gave Install, and after Confirm OpenTennis was installed again.
+- **Hold menu:** on a queued row it shows Cancel, Share, Source; Cancel took the app out. On the row it shows
+  Install, Share, Source; Install opened Confirm (Statistics: Downloading 41.0 MB).
+- **Modify** on the app page: Reinstall, Remove (red), Downgrade, Version History. Remove went straight to Confirm
+  ("Remove OpenTennis"), with no Delete sheet. After Continue Queuing, Modify started with Clear, and Clear
+  emptied the queue (the Q'd badge went away).
+- I removed the 2048 test package over ssh afterwards. OpenTennis is installed at 1.8.0, as it was after the
+  upgrade (its app data went with the Remove test).
+
 ## Not verified
 
-(filled in below after the phone check)
+- **The sideload (Lite) build's app-row swipe (F213 `attachAppSwipe`) on a phone.** There is no phone with the Lite
+  build here, and the 7 runs the jailbreak .deb. The code path didn't change: `queueKind() === "apps"` still goes
+  to `attachAppSwipe` before the new branch, and the only change it sees is that `restoreApp` passes
+  `{ quiet: false }` to `appQueue.add`, which the sideload build ignores. `rowswipe-original.test.js` and
+  `appqueue.test.js` still pass.
+- **The AppSync Unified step inside an app run** (`appSyncFirst` → `ensureAppSync` with apt packages queued too).
+  It's already installed on the 7, so it was only covered by unit tests. If AppSync is missing and apt packages are
+  queued as well, AppSync's own Confirm also runs those packages, and its finish button (a respring) can come
+  before the apps run.
+- **Stop, Cancel and Retry on the helper rows on the phone.** `runIpaInstall` gets the row's abort signal, and
+  `uninstall-app` can't be stopped once it has started. These are covered only by the shared `createAppRun` tests.
+- **A run with an IPA that needs a newer iOS (the B72 check in the sign lane).** Covered only by a unit test.

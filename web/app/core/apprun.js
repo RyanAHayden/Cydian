@@ -34,6 +34,9 @@
 //                              iOS prompt", "Re-signed, expires Dec 3, 2026")
 //   summaryLine(rows)          -> "2 installed, 1 re-signed, 1 failed, 1 cancelled"
 //   runStatus(rows) / runPercent(rows)   the bottom status and bar
+//   helperRow(row)             B71a: a jailbreak app run's row (job.helper: the root helper installs the IPA or, mode
+//                              "remove", uninstalls the app): Waiting, Checking, Installing 40% / Removing, Installed /
+//                              Removed; "N removed" in the summary; no Signed line in the log
 //
 // Two lanes. Signing: `ahead` apps at a time in the run's order are downloaded and signed. Installing: one app at a
 // time, strictly in order: the first row that hasn't ended is handed to iOS once it is signed, and the next waits for

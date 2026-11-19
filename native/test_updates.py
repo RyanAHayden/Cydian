@@ -16,6 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from test_sign import toolchain  # noqa: E402
+from test_sign import disk_tmpdir, swift_env  # noqa: E402
 
 SWIFTC = toolchain()
 
@@ -29,9 +30,9 @@ def read(*p):
 class SwiftUpdates(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.mkdtemp(prefix="ifizbox-updatestest-")
+        cls.tmp = disk_tmpdir("ifizbox-updatestest-")  # off /tmp: see test_sign.disk_tmpdir
         binary = os.path.join(cls.tmp, "updatestest")
-        env = dict(os.environ)
+        env = swift_env(cls.tmp)
         shim = os.path.join(cls.tmp, "libshim")
         if os.path.exists("/usr/lib/libncursesw.so.6") and not os.path.exists("/usr/lib/libncurses.so.6"):
             os.makedirs(shim)

@@ -1,0 +1,16 @@
+[
+  {"wait": 3000},
+  {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
+  {"nav": "", "ms": 6000},
+  {"shot": "home"},
+  {"nav": "#/home/settings", "ms": 4000},
+  {"shot": "settings"},
+  {"nav": "#/home/settings/signing", "ms": 4000},
+  {"shot": "signing"},
+  {"nav": "#/sources", "ms": 6000},
+  {"shot": "sources"},
+  {"nav": "#/search", "ms": 4000},
+  {"shot": "search"},
+  {"nav": "#/installed", "ms": 4000},
+  {"shot": "installed"}
+]

@@ -1,0 +1,142 @@
+[
+ {
+  "wait": 3000
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+ },
+ {
+  "nav": "#/home/settings",
+  "ms": 5000
+ },
+ {
+  "size": [
+   560,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   590,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   599,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   600,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   601,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   610,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   639,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   640,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   641,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   700,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   900,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   1200,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ },
+ {
+  "size": [
+   599,
+   800
+  ],
+  "ms": 400
+ },
+ {
+  "eval": "(()=>{const W=innerWidth; const pb=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const r=pb.firstElementChild.getBoundingClientRect(); const tabs=[...document.querySelectorAll('.tab')].map(t=>Math.round(t.getBoundingClientRect().left)); return {W, docSW: document.documentElement.scrollWidth, bodySW: document.body.scrollWidth, pbOverflow: pb.scrollWidth-pb.clientWidth, contentL: Math.round(r.left), contentW: Math.round(r.width), tabs: tabs.join(' ')}})()"
+ }
+]

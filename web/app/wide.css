@@ -1,0 +1,48 @@
+/* F225: big screens (browsers, iPad, a foldable iPhone opened). Layout B and width rules D of the concept canvas.
+   By window width alone, no device sniffing, so a foldable switches live as it folds or unfolds. Under 600px nothing
+   here applies and the phone layout is untouched. From 600px: the nav bar and tab bar stay full width; the tab items
+   cluster in the middle at a fixed width, as on the iPad's iOS 6 tab bar (76pt items, 40pt apart; the Teehan+Lax kit
+   has no iPad sheet); the page content (lists, grouped tables, package pages, sheets, action sheets) is one column of
+   at most 640px in the middle, the pinstripes either side. Every scroller keeps the window's full width, so a wheel
+   or a drag over the pinstripes still scrolls, the scroll indicator stays at the window's edge and nothing scrolls
+   sideways. Linked last in index.html so these win over the per-screen stylesheets at the same specificity.
+   Split view (concept option C) is not part of this; the native app stays iPhone-only (UIDeviceFamily 1). */
+@media (min-width: 600px) {
+  :root {
+    --wide-cap: 640px;
+    /* the room either side of the column: 0 up to 640px wide, so 600-640px is the phone column at full width */
+    --wide-gutter: max(0px, calc((100vw - var(--wide-cap)) / 2));
+    --wide-pin: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
+  }
+
+  /* ---- Tab bar: items clustered in the middle, 76px each, 40px apart (2 x 20px margins) ---- */
+  .tabbar { justify-content: center; }
+  .tab { flex: 0 0 76px; margin-left: 20px; margin-right: 20px; }
+
+  /* ---- The content column: every page scroller pads its sides out to the column ---- */
+  .page-body {
+    padding-left: max(env(safe-area-inset-left), var(--wide-gutter));
+    padding-right: max(env(safe-area-inset-right), var(--wide-gutter));
+  }
+  /* A plain (white) list: the pinstripes either side and the list's white only under the column. The background sits
+     on the scroller's box, which doesn't scroll, so the column runs the window's full height at any scroll. */
+  .page-body.plain {
+    background: linear-gradient(var(--plain), var(--plain)) 50% 0 / min(var(--wide-cap), 100%) 100% no-repeat, var(--wide-pin);
+  }
+  /* The section index (nav/sectionindex.js) runs down the column's right edge, beside the rows it indexes. */
+  .section-index { margin-right: max(2px, env(safe-area-inset-right), calc(var(--wide-gutter) + 2px)); }
+
+  /* ---- Sheets (nav/sheet.js): the sheet's nav bar full width as the page's; its body (a .page-body, or the reviews
+     and console scrollers) in the column. The sheet's own ground is the pinstripes, plain under the column. ---- */
+  .sheet {
+    background: linear-gradient(var(--plain), var(--plain)) 50% 0 / min(var(--wide-cap), 100%) 100% no-repeat, var(--wide-pin);
+  }
+  .review-sheet-scroll { padding-left: var(--wide-gutter); padding-right: var(--wide-gutter); }
+  .console-scroll {
+    padding-left: max(9px, env(safe-area-inset-left), calc(var(--wide-gutter) + 9px));
+    padding-right: max(9px, env(safe-area-inset-right), calc(var(--wide-gutter) + 9px));
+  }
+
+  /* ---- Action sheets (nav/actionsheet.js): the panel as wide as the column, in the middle, over the dim ---- */
+  .action-sheet { left: var(--wide-gutter); right: var(--wide-gutter); }
+}

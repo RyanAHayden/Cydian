@@ -1,0 +1,61 @@
+[
+ {
+  "wait": 3000
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+ },
+ {
+  "nav": "#/sources",
+  "ms": 6000
+ },
+ {
+  "clicktext": "iFizBox",
+  "ms": 5000
+ },
+ {
+  "shot": "source"
+ },
+ {
+  "eval": "(()=>{const a=[...document.querySelectorAll('.tab-stack.is-active .page.is-top a.cell-inner')]; const e=a.find(x=>/package/.test(x.getAttribute('href')||'')) || a[1]; if(!e) return 'none'; e.click(); return e.getAttribute('href')})()"
+ },
+ {
+  "wait": 5000
+ },
+ {
+  "shot": "package"
+ },
+ {
+  "nav": "#/home",
+  "ms": 5000
+ },
+ {
+  "clicktext": "Theme",
+  "ms": 3000
+ },
+ {
+  "shot": "theme"
+ },
+ {
+  "nav": "#/installed",
+  "ms": 4000
+ },
+ {
+  "clicktext": "Add",
+  "ms": 2500
+ },
+ {
+  "shot": "installed-add"
+ },
+ {
+  "nav": "#/home",
+  "ms": 4000
+ },
+ {
+  "clicktext": "About",
+  "ms": 2500
+ },
+ {
+  "shot": "about"
+ }
+]

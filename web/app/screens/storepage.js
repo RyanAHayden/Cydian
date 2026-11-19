@@ -25,7 +25,7 @@
 //
 // A rating r: { average (0-5), count, noun: "Ratings" | "Reviews", histogram?: [n5, n4, n3, n2, n1], from }.
 // Everything moves by transform/opacity only (120 Hz); the panes switch with `hidden`, as the App Store did.
-import { el, grouped } from "../nav/ui.js";
+import { el, grouped, segmented } from "../nav/ui.js";
 import { starCounts } from "../core/reviews.js";
 
 export const TAB_LABELS = ["Details", "Reviews", "Related"];
@@ -102,24 +102,8 @@ export function storeHeader({ art, name, author = null, authorHref = null, line 
 
 // ---- the segmented control and its panes ---------------------------------------------------------------------
 
-export function segmented(labels, { selected = 0, onSelect = () => {} } = {}) {
-  const bar = el("div", "store-segmented");
-  bar.setAttribute("role", "tablist");
-  const buttons = labels.map((label, i) => {
-    const b = el("button", "store-segment", label);
-    b.type = "button";
-    b.setAttribute("role", "tab");
-    b.addEventListener("click", () => onSelect(i));
-    bar.append(b);
-    return b;
-  });
-  const mark = (i) => buttons.forEach((b, j) => {
-    b.classList.toggle("selected", j === i);
-    b.setAttribute("aria-selected", String(j === i));
-  });
-  mark(selected);
-  return { bar, buttons, mark };
-}
+// nav/ui.js segmented(): the one grey segmented control; re-exported for older importers.
+export { segmented };
 
 export function storeTabs({ reviews = null, related = null } = {}) {
   const panes = { details: el("div", "store-pane store-details"), reviews: el("div", "store-pane store-reviews"),

@@ -6,7 +6,7 @@
 //
 //   const el = renderSileo(json, { open(url) })   // open: for depiction-… links (sub-depictions)
 import { getBackend } from "../backend.js";
-import { el } from "../nav/ui.js";
+import { el, segmented } from "../nav/ui.js";
 
 // An image URL the page can load: https as it is, http through the backend (the site's proxy: an https page
 // can't load http images), data: as it is. Anything else (file:, javascript:) is refused.
@@ -82,22 +82,14 @@ const VIEWS = {
     const tabs = Array.isArray(v.tabs) ? v.tabs : [];
     const wrap = el("div", "dep-tabs");
     if (tabs.length > 1) {
-      const seg = el("div", "segmented");
-      seg.setAttribute("role", "tablist");
+      // the store page's grey segmented control (nav/ui.js segmented, ios6.css .store-segmented)
       const panes = tabs.map((t) => { const p = el("div", "dep-pane"); p.append(view(t, opts)); return p; });
-      const buttons = tabs.map((t, i) => {
-        const b = el("button", "segment", t.tabname || `Tab ${i + 1}`);
-        b.type = "button";
-        b.setAttribute("role", "tab");
-        b.addEventListener("click", () => pick(i));
-        return b;
-      });
       const pick = (i) => {
-        buttons.forEach((b, j) => { b.classList.toggle("selected", i === j); b.setAttribute("aria-selected", String(i === j)); });
+        seg.mark(i);
         panes.forEach((p, j) => { p.hidden = i !== j; });
       };
-      seg.append(...buttons);
-      wrap.append(seg, ...panes);
+      const seg = segmented(tabs.map((t, i) => t.tabname || `Tab ${i + 1}`), { onSelect: pick });
+      wrap.append(seg.bar, ...panes);
       pick(0);
     } else if (tabs[0]) wrap.append(view(tabs[0], opts));
     return wrap;

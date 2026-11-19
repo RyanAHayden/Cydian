@@ -145,14 +145,8 @@ a.cell-inner.download .cell-label { color: var(--detail); }
 .dep-button-row.disabled, .dep-button.disabled { opacity: .5; pointer-events: none; }
 .dep-separator { margin: 6px 12px; border: 0; border-top: 1px solid var(--divider); }
 
-/* Segmented control (DepictionTabView): grey segments, the selected one in the kit's matte blue. */
-.segmented { display: flex; margin: 8px 12px; border: 1px solid #8e8e8e; border-radius: 6px; overflow: hidden; }
-.segment {
-  flex: 1; height: 30px; padding: 0 6px; border: 0; cursor: pointer; font-size: 13px; font-weight: bold; color: #6b6b6b;
-  text-shadow: 0 1px 0 rgba(255,255,255,.75); background: linear-gradient(#fdfdfd, #e2e2e2);
-}
-.segment + .segment { border-left: 1px solid #8e8e8e; }
-.segment.selected { color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); background: var(--select); }
+/* DepictionTabView's tabs: the store page's segmented control (ios6.css .store-segmented), at the old margins. */
+.dep-tabs > .store-segmented { margin: 8px 12px; }
 
 /* ---- the modal sheet (nav/sheet.js): its own blue nav bar with Done, slid up by transform ---- */
 .sheet { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; background: var(--plain); will-change: transform; }

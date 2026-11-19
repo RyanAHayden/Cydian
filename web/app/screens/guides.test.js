@@ -160,7 +160,7 @@ test("F157: Copy puts the command on the clipboard and says Copied", async () =>
 
 test("F157: Copying Files: three segments when jailbroken, the no-jailbreak page alone in lite", async () => {
   const page = draw(["guides", "copying"]);
-  const segs = byClass(page, "segment");
+  const segs = byClass(page, "store-segment");
   assert.deepEqual(segs.map((s) => s.textContent), ["On iPhone", "Computer", "No Jailbreak"]);
   const panes = byClass(page, "guide-pane");
   assert.deepEqual(panes.map((p) => p.hidden), [false, true, true]);
@@ -171,7 +171,7 @@ test("F157: Copying Files: three segments when jailbroken, the no-jailbreak page
   for (const v of ["SFTP", "iPhone's IP", "mobile", "22", "Cyberduck", "WinSCP", "FileZilla"]) assert.ok(panes[1].textContent.includes(v), v);
   assert.ok(all(panes[1]).some((x) => x.href === "#/home/guides/openssh"));
   const lite = draw(["guides", "copying"], { lite: true });
-  assert.equal(byClass(lite, "segmented").length, 0);
+  assert.equal(byClass(lite, "store-segmented").length, 0);
   for (const v of ["Files", "AirDrop", "LocalSend", "Finder", "Apple Devices", "PairDrop"]) assert.ok(lite.textContent.includes(v), v);
 });
 

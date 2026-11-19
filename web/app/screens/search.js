@@ -20,7 +20,7 @@ import { displayName, sourcesFor } from "../core/sources.js";
 import { loadNew, onLanded } from "./sources.js";
 import { orderSources, loadOrder } from "../core/sourcelist.js";
 import { getBackend } from "../backend.js";
-import { grouped, el } from "../nav/ui.js";
+import { grouped, el, segments } from "../nav/ui.js";
 import { discoveryGroup } from "./extras.js";
 import { recommendedApps, addRecommended, onSourcesChanged } from "./manage.js";
 import { matchRecommendedApps } from "../core/recommended.js";
@@ -130,20 +130,11 @@ export function render(body, route, ctx) {
 
   // The scope bar: segments, then Filter.
   const scope = el("div", "search-scope");
-  const seg = el("div", "scope-segments");
-  seg.setAttribute("role", "tablist");
-  const segButtons = SCOPES.map((name, i) => {
-    const b = el("button", "scope-segment", name);
-    b.type = "button";
-    b.setAttribute("role", "tab");
-    b.addEventListener("click", () => {
-      state.filters.section = i === 0 ? null : `group:${name}`;
-      drawScope();
-      run();
-    });
-    return b;
+  const seg = segments(SCOPES, {}, null, (name) => {
+    state.filters.section = name === SCOPES[0] ? null : `group:${name}`;
+    drawScope();
+    run();
   });
-  seg.append(...segButtons);
   const filterButton = el("button", "scope-filter", "Filter");
   filterButton.type = "button";
   filterButton.addEventListener("click", () => {
@@ -155,9 +146,8 @@ export function render(body, route, ctx) {
     const shown = scopesFor(settings.deviceType());
     // A Tweaks or Themes scope left from Jailbroken goes back to All once those segments are hidden.
     if (scopeIndex(state.filters.section) > 0 && !shown.includes(SCOPES[scopeIndex(state.filters.section)])) state.filters.section = null;
-    segButtons.forEach((b, i) => { b.hidden = !shown.includes(SCOPES[i]); });
-    const sel = scopeIndex(state.filters.section);
-    segButtons.forEach((b, i) => { b.classList.toggle("selected", i === sel); b.setAttribute("aria-selected", String(i === sel)); });
+    seg.show(shown);
+    seg.select(SCOPES[scopeIndex(state.filters.section)] ?? null);
     // While the panel is open the button is a blue Done that puts it away.
     filterButton.textContent = drop ? "Done" : "Filter";
     filterButton.classList.toggle("done", Boolean(drop));

@@ -28,7 +28,7 @@
 //   starPicker(value, onPick)                 -> { node, set(n), value() }  five tappable stars
 //
 // Everything a person wrote goes in through textContent (nav/ui.js el), never innerHTML.
-import { el } from "../nav/ui.js";
+import { el, segmented } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { ratingsCard, reviewCell, appStoreCard } from "./storepage.js";
@@ -420,7 +420,7 @@ function onceList(f) {
 
 export const STORE_PAGE = 10; // Apple's reviews shown per More Reviews… tap (its feed gives up to 50)
 
-// B82: the This Build | App Store toggle (depiction.js's small segmented control, packages.css .segmented) over the
+// B82: the This Build | App Store toggle (nav/ui.js segmented, ios6.css .store-segmented) over the
 // two views. It always opens on This Build; the App Store view is filled the first time it is chosen (its card at once,
 // Apple's written reviews when they arrive). Switching fades the view in (opacity only, 120 Hz).
 function reviewsToggle(pane, { parts, ours, store, cellOf, now = Date.now() }) {
@@ -429,16 +429,10 @@ function reviewsToggle(pane, { parts, ours, store, cellOf, now = Date.now() }) {
   const n = Number(ours?.count) || 0;
   const labels = [n ? `This Build (${compactCount(n)})` : "This Build",
     Number(store.count) > 0 ? `App Store (${compactCount(store.count)})` : "App Store"];
-  const seg = el("div", "segmented store-review-toggle");
-  seg.setAttribute("role", "tablist");
-  const buttons = labels.map((t, i) => {
-    const b = el("button", "segment", t);
-    b.type = "button";
-    b.setAttribute("role", "tab");
-    b.addEventListener("click", () => select(i));
-    seg.append(b);
-    return b;
-  });
+  const control = segmented(labels, { onSelect: (i) => select(i) });
+  const seg = control.bar;
+  seg.classList.add("store-review-toggle");
+  const { buttons } = control;
   let at = 0, filled = false, loaded = null;
   function fillStore() {
     filled = true;
@@ -473,7 +467,7 @@ function reviewsToggle(pane, { parts, ours, store, cellOf, now = Date.now() }) {
     if (!(i === 0 || i === 1)) return;
     const changed = i !== at;
     at = i;
-    buttons.forEach((b, j) => { b.classList.toggle("selected", i === j); b.setAttribute("aria-selected", String(i === j)); });
+    control.mark(i);
     views.forEach((v, j) => { v.hidden = i !== j; });
     if (i === 1 && !filled) fillStore();
     if (changed) views[i].animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease-out" });

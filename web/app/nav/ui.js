@@ -124,22 +124,57 @@ export function placeholder(kind = "list", rows = kind === "list" ? 9 : 4) {
 // F157: one grouped/plain cell on its own, for a screen that builds its own table (screens/guides.js).
 export const row = (r) => cell(r);
 
-// Search's segmented control (packages.css .scope-segments), labels -> onPick(value) when another is tapped.
+// The blue scope bar's segmented control (packages.css .scope-segments): Search, Changes, Browse, Installed.
+// labels -> onPick(value) when another is tapped. The returned element also carries:
+//   seg.buttons        the segment buttons, in `values` order
+//   seg.select(v)      mark v selected (null or a value not in the bar: none), without calling onPick
+//   seg.show(shown)    hide the segments whose value isn't in `shown` (Search's Jailbroken-only Tweaks/Themes)
+// A trailing button (Search's Filter) goes beside it in the scope row, not inside it.
 export function segments(values, labels, current, onPick) {
   const seg = Object.assign(document.createElement("div"), { className: "scope-segments" });
   seg.setAttribute("role", "tablist");
+  const select = (v) => buttons.forEach((o, i) => {
+    const on = values[i] === v;
+    o.classList.toggle("selected", on);
+    o.setAttribute("aria-selected", String(on));
+  });
   const buttons = values.map((v) => {
     const b = Object.assign(document.createElement("button"), { type: "button", className: "scope-segment", textContent: labels[v] ?? v });
     b.setAttribute("role", "tab");
     b.addEventListener("click", () => {
       if (b.classList.contains("selected")) return;
-      for (const o of buttons) { o.classList.toggle("selected", o === b); o.setAttribute("aria-selected", String(o === b)); }
+      select(v);
       onPick(v);
     });
-    b.classList.toggle("selected", v === current);
-    b.setAttribute("aria-selected", String(v === current));
     return b;
   });
+  select(current);
   seg.append(...buttons);
+  seg.buttons = buttons;
+  seg.select = select;
+  seg.show = (shown) => buttons.forEach((b, i) => { b.hidden = !shown.includes(values[i]); });
   return seg;
+}
+
+// iOS 6's plain grey UISegmentedControl (ios6.css .store-segmented, sampled from the 4S's UISegmentButton art): the
+// package page's Details / Reviews / Related, depiction tabs, Reviews' This Build | App Store, Settings' Mode, the
+// guides. onSelect(i) on every tap; the caller calls mark(i) to move the selection (it may refuse the tap).
+//   segmented(labels, { selected, onSelect }) -> { bar, buttons, mark }
+export function segmented(labels, { selected = 0, onSelect = () => {} } = {}) {
+  const bar = el("div", "store-segmented");
+  bar.setAttribute("role", "tablist");
+  const buttons = labels.map((label, i) => {
+    const b = el("button", "store-segment", label);
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.addEventListener("click", () => onSelect(i));
+    bar.append(b);
+    return b;
+  });
+  const mark = (i) => buttons.forEach((b, j) => {
+    b.classList.toggle("selected", j === i);
+    b.setAttribute("aria-selected", String(j === i));
+  });
+  mark(selected);
+  return { bar, buttons, mark };
 }

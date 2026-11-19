@@ -20,7 +20,7 @@
 // signing.installed), count in the tab badge (and so the icon badge) and in Upgrade (N), which queues them as
 // "resign" jobs (core/appqueue.js resignJob): Cydia's queue does both. An app with an upgrade is left to the upgrade,
 // which signs it anew.
-import { placeholder, el } from "../nav/ui.js";
+import { placeholder, el, segments } from "../nav/ui.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import { pullToRefresh } from "../nav/pullrefresh.js";
 import * as browse from "./browse.js";
@@ -289,28 +289,14 @@ function filterBar() {
     value: state.query, delay: 120, className: "has-scope", onQuery: (q) => { state.query = q; draw(); } });
 
   const scope = el("div", "search-scope");
-  const seg = el("div", "scope-segments");
-  seg.setAttribute("role", "tablist");
-  state.segs = SCOPES.map(([value, label]) => {
-    const b = el("button", "scope-segment", label);
-    b.type = "button";
-    b.dataset.scope = value;
-    b.setAttribute("role", "tab");
-    b.addEventListener("click", () => { state.scope = value; draw(); });
-    return b;
-  });
-  seg.append(...state.segs);
-  scope.append(seg);
+  state.segs = segments(SCOPES.map(([value]) => value), Object.fromEntries(SCOPES), null, (value) => { state.scope = value; draw(); });
+  scope.append(state.segs);
   drawScope();
   return [bar, scope];
 }
 
 function drawScope(current = state.scope ?? (state.data ? scopeOf(null, state.data.installed) : null)) {
-  for (const b of state.segs ?? []) {
-    const on = b.dataset.scope === current;
-    b.classList.toggle("selected", on);
-    b.setAttribute("aria-selected", String(on));
-  }
+  state.segs?.select(current);
 }
 
 function note(text) {

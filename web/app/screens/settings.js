@@ -14,10 +14,9 @@
 // version line (version-foot.js); there is no About page and no manual update check (every launch and Reload checks).
 // It also owns the theme: init() puts the Appearance setting on <html data-theme> and the theme-color metas, and
 // follows the system while Appearance is Automatic. theme-boot.js does the same before first paint.
-import { grouped } from "../nav/ui.js";
+import { grouped, segmented } from "../nav/ui.js";
 import { format, parse, settingsRoute } from "../router.js";
 import { createSettings, detectMode, themeState, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
-import { segmented } from "./storepage.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind, deviceCheck, deviceCheckText } from "../core/signing.js";
@@ -243,7 +242,7 @@ function makeSwitch(d) {
 }
 
 // F199: a "segmented" setting (Theme's Mode: Automatic / Light / Dark) as the iOS 6 segmented control, the same one
-// as the package page's (storepage.js segmented, ios6.css .store-segmented); settings.css fits it into the group.
+// as the package page's (nav/ui.js segmented, ios6.css .store-segmented); settings.css fits it into the group.
 export function modeControl(d, store = settings) {
   const values = d.options.map((o) => o.value);
   const { bar } = segmented(d.options.map((o) => o.label), {

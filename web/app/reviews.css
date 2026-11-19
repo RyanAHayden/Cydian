@@ -84,7 +84,7 @@ html[data-theme="dark"] .review-error { color: var(--dk-bad); }
 .review-delete-own:disabled { opacity: .5; }
 html[data-theme="dark"] .review-delete-own { color: var(--dk-bad); }
 
-/* B82: an app page's This Build | App Store toggle (packages.css .segmented, depiction.js's small control) as wide as
+/* B82: an app page's This Build | App Store toggle (nav/ui.js segmented, ios6.css .store-segmented) as wide as
    the groups under it, and its two views; only the view's opacity animates when it switches. */
 .store-review-toggle { margin: 12px 10px 0; }
 .store-review-view[hidden] { display: none; }

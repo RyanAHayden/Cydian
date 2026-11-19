@@ -1,0 +1,61 @@
+# @NAME@ computer setup for Windows (F258): checks for Apple's device driver, downloads the setup command from
+# @DOMAIN@, checks its SHA-256 against the one written into this script when it was released, and runs it. The
+# command asks for the code @DOMAIN@ shows on the iPhone, then installs the app over USB. It never asks for an
+# Apple ID.
+#
+#   iwr -useb https://@DOMAIN@/sign/setup.ps1 | iex
+#
+# Made by tools/setup/release.sh from tools/setup/install.ps1.in; $env:IFIZBOX_SETUP_BASE downloads from elsewhere.
+# Everything runs inside one script block and ends with `return`, never `exit`: under `iex`, exit would close the
+# PowerShell window.
+& {
+  $ErrorActionPreference = 'Stop'
+  $ProgressPreference = 'SilentlyContinue'  # Invoke-WebRequest's progress bar slows downloads a lot
+  $base = if ($env:IFIZBOX_SETUP_BASE) { $env:IFIZBOX_SETUP_BASE } else { 'https://@DOMAIN@/sign/setup/bin' }
+  $sums = @{ 'x64' = '@SHA_WINDOWS_X64@'; 'arm64' = '@SHA_WINDOWS_ARM64@' }
+
+  # The machine's own architecture (a 32-bit PowerShell on 64-bit Windows reports x86 in PROCESSOR_ARCHITECTURE).
+  $machine = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+  switch ($machine) {
+    'AMD64' { $arch = 'x64' }
+    'ARM64' { $arch = if ($sums['arm64'] -ne 'none') { 'arm64' } else { 'x64' } }  # Windows 11 on ARM runs x64 builds
+    default { Write-Host "@NAME@ setup: no build for Windows on $machine (x64 and ARM64 only)."; return }
+  }
+  if ($sums[$arch] -eq 'none') { Write-Host "@NAME@ setup: there's no Windows build yet."; return }
+
+  # Apple's device driver: the Apple Mobile Device Service answers on 127.0.0.1:27015 (from the Apple Devices app,
+  # or iTunes on Windows 10). Without it Windows can't talk to an iPhone at all.
+  $client = New-Object System.Net.Sockets.TcpClient
+  $up = $false
+  try { $up = $client.ConnectAsync('127.0.0.1', 27015).Wait(1500) } catch { $up = $false } finally { $client.Dispose() }
+  if (-not $up) {
+    $svc = Get-Service -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'Apple Mobile Device*' -or $_.Name -like 'Apple Mobile Device*' }
+    if ($svc -and $svc.Status -ne 'Running') {
+      Write-Host "Apple's device driver is installed but stopped. Open the Apple Devices app (or iTunes) once with the iPhone plugged in, or restart Windows, then run this again."
+      return
+    }
+    if (-not $svc) {
+      Write-Host "Windows talks to an iPhone through Apple's device driver, which isn't installed."
+      Write-Host "Install the Apple Devices app from the Microsoft Store (opening it now), open it once with the iPhone plugged in,"
+      Write-Host "then run this again. On Windows 10 without the Store app: iTunes from https://www.apple.com/itunes/ works too."
+      try { Start-Process 'ms-windows-store://pdp/?ProductId=9NP83LWLPZ9K' } catch { }
+      return
+    }
+  }
+
+  $file = "@BIN@-windows-$arch.exe"
+  $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("@BIN@-" + [guid]::NewGuid().ToString('N'))
+  New-Item -ItemType Directory -Path $dir | Out-Null
+  $exe = Join-Path $dir $file
+  try {
+    Write-Host "Downloading the @NAME@ setup command for Windows ($arch)..."
+    try { Invoke-WebRequest -UseBasicParsing -Uri "$base/$file" -OutFile $exe }
+    catch { Write-Host "@NAME@ setup: couldn't download $base/$file ($($_.Exception.Message))."; return }
+    $got = (Get-FileHash -Algorithm SHA256 -Path $exe).Hash.ToLowerInvariant()
+    if ($got -ne $sums[$arch]) { Write-Host "@NAME@ setup: the download's SHA-256 is $got, not $($sums[$arch]). Nothing was run."; return }
+    & $exe @args
+    $global:LASTEXITCODE = $LASTEXITCODE
+  } finally {
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $dir
+  }
+} @args

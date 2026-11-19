@@ -1,0 +1,10 @@
+[package]
+name = "ifizbox-setup-core"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "The setup command's arguments and steps, with no device or network code (tested on its own)"
+publish = false
+
+# No dependencies on purpose: `cargo test --offline` here works on any machine with cargo (tools/setup/test_setup.py).
+[dependencies]

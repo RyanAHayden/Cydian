@@ -1,0 +1,72 @@
+#!/bin/sh
+# @NAME@ computer setup for macOS and Linux (F258): downloads the setup command for this computer from @DOMAIN@,
+# checks its SHA-256 against the one written into this script when it was released, and runs it. The command asks
+# for the code @DOMAIN@ shows on the iPhone, then installs the app over USB. It never asks for an Apple ID.
+#
+#   curl -fsSL https://@DOMAIN@/sign/setup.sh | sh
+#   curl -fsSL https://@DOMAIN@/sign/setup.sh | sh -s -- ABCD-2345      (the code given up front)
+#
+# Made by tools/setup/release.sh from tools/setup/install.sh.in; IFIZBOX_SETUP_BASE downloads from elsewhere (tests).
+set -eu
+
+base=${IFIZBOX_SETUP_BASE:-https://@DOMAIN@/sign/setup/bin}
+say() { printf '%s\n' "$*"; }
+die() { printf '%s\n' "$*" >&2; exit 1; }
+
+os=$(uname -s)
+arch=$(uname -m)
+case $os in
+  Darwin) file=@BIN@-macos; sum=@SHA_MACOS@ ;;
+  Linux)
+    case $arch in
+      x86_64|amd64) file=@BIN@-linux-x86_64; sum=@SHA_LINUX_X86_64@ ;;
+      aarch64|arm64) file=@BIN@-linux-arm64; sum=@SHA_LINUX_ARM64@ ;;
+      *) die "@NAME@ setup: no build for Linux on $arch (x86_64 and arm64 only)." ;;
+    esac ;;
+  MINGW*|MSYS*|CYGWIN*) die "@NAME@ setup: on Windows, open PowerShell and run: iwr -useb https://@DOMAIN@/sign/setup.ps1 | iex" ;;
+  *) die "@NAME@ setup: no build for $os (macOS, Linux and Windows only)." ;;
+esac
+[ "$sum" != none ] || die "@NAME@ setup: there's no build for this computer ($os $arch) yet."
+
+# usbmuxd is often started by udev when an iPhone is plugged in, so only its absence altogether stops here.
+if [ "$os" = Linux ] && [ -z "${USBMUXD_SOCKET_ADDRESS:-}" ] && [ ! -S /var/run/usbmuxd ] &&
+   ! command -v usbmuxd >/dev/null 2>&1 && [ ! -x /usr/sbin/usbmuxd ]; then
+  say "Linux talks to an iPhone through usbmuxd, which isn't running."
+  say "Install it (Debian/Ubuntu: sudo apt install usbmuxd; Fedora: sudo dnf install usbmuxd; Arch: sudo pacman -S usbmuxd),"
+  say "plug the iPhone in, then run this again."
+  exit 1
+fi
+
+if command -v curl >/dev/null 2>&1; then
+  fetch() { curl -fsSL --retry 2 -o "$2" "$1"; }
+elif command -v wget >/dev/null 2>&1; then
+  fetch() { wget -q -O "$2" "$1"; }
+else
+  die "@NAME@ setup: needs curl or wget."
+fi
+if command -v sha256sum >/dev/null 2>&1; then
+  sha() { sha256sum "$1" | cut -d' ' -f1; }
+elif command -v shasum >/dev/null 2>&1; then
+  sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
+else
+  die "@NAME@ setup: needs sha256sum or shasum to check the download."
+fi
+
+tmp=$(mktemp -d 2>/dev/null || mktemp -d -t @BIN@)
+trap 'rm -rf "$tmp"' EXIT INT TERM
+say "Downloading the @NAME@ setup command for $os ($arch)…"
+fetch "$base/$file" "$tmp/$file" || die "@NAME@ setup: couldn't download $base/$file."
+got=$(sha "$tmp/$file")
+[ "$got" = "$sum" ] || die "@NAME@ setup: the download's SHA-256 is $got, not $sum. Nothing was run."
+chmod +x "$tmp/$file"
+
+# `curl | sh` hands this script to sh on stdin: the command reads the code from the terminal instead.
+rc=0
+if [ -t 0 ]; then
+  "$tmp/$file" "$@" || rc=$?
+elif (: </dev/tty) 2>/dev/null; then
+  "$tmp/$file" "$@" </dev/tty || rc=$?
+else
+  "$tmp/$file" "$@" </dev/null || rc=$?
+fi
+exit $rc

@@ -252,6 +252,39 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   just leaves the widget at "Open iFizBox"). Info.plist adds `UIBackgroundModes` `audio` (install keep-alive) and
   `fetch`, `CFBundleDocumentTypes` for `.ipa`, `.p12` and `.mobileprovision`, and the `ifizbox://` URL scheme.
 
+**Free Apple ID: the one-time computer setup** (`tools/setup/`). iOS refuses a free-profile app from
+itms-services (error 111), so the first install of the free route needs a computer once. The person signs in on
+the website on the phone, the website signs the app and shows a short code, and one line on the computer does the
+rest:
+
+    curl -fsSL https://ifizbox.com/sign/setup.sh | sh          (macOS, Linux; `sh -s -- ABCD-2345` gives the code)
+    iwr -useb https://ifizbox.com/sign/setup.ps1 | iex         (Windows, PowerShell)
+
+- **The scripts** (`install.sh.in`, `install.ps1.in`) pick the build for the computer (macOS universal, Linux
+  x86_64/arm64 static musl, Windows x64; Windows on ARM uses the arm64 build when one was released, else the x64
+  one under emulation), download it, check its SHA-256 against the one written into the script at release, and run
+  it; a mismatch runs nothing. Linux without usbmuxd and Windows without Apple's device driver (nothing on
+  127.0.0.1:27015, no Apple Mobile Device service) say how to get it; the Windows script opens the Apple Devices app
+  in the Microsoft Store.
+- **The command** (`cli/`, on idevice, the commit `native/sideload/idevice/pin.env` pins; the steps and their words
+  are `core/`, tested with fakes): finds the iPhone over USB (waits for it to be plugged in); makes sure the computer
+  is trusted, reusing usbmuxd's pairing record when the iPhone takes it, else pairing (the iPhone asks Trust and its
+  passcode) and saving the record to usbmuxd, with `EnableWifiConnections` on so the app can use it over
+  LocalDevVPN; asks for the code (three tries); reads `GET /sign/setup/<code>`; downloads the signed IPA (size and,
+  when the website sent one, SHA-256 checked); installs it with installation_proxy; writes the pairing file into
+  the app's container (house_arrest `VendContainer`, the path the website chose); and says what's left on the phone
+  (Developer Mode, Trust the developer). It never asks for an Apple ID. `--check` only looks (found, trusted,
+  Developer Mode), `--download-only` saves the IPA without an iPhone.
+- **The code** (`worker/src/setup.js`): the website uploads the signed IPA as usual (`/sign/upload`), then
+  `POST /sign/setup?token=…[&bundleid=…][&pairing=<path>][&sha256=…]` gives `ABCD-2345`, 8 characters without
+  look-alikes, living as long as the upload (the TTL from its `done`). `pairing=` empty writes no pairing file (for
+  an iOS that pairs by itself). The Worker also serves the scripts and binaries from the GitHub release tagged
+  `setup`.
+- **Release**: `tools/setup/release.sh --probe` names what each build needs; `--dry-run` builds into
+  `tools/setup/dist`; without it, it publishes them as the `setup` release's assets (a pre-release, so the app's
+  self-update and the APT repo never see it). macOS is cross-built on Linux with `MACOS_SDK` (a MacOSX.sdk's
+  `usr/` and a few frameworks), clang, rustup's ld64.lld and llvm-lipo.
+
 **Jailbreak build**: the root helper's `install-ipa` installs an IPA through `LSApplicationWorkspace
 installApplication:withOptions:error:`, as AppSync's `appinst` does (`native/helper/README.md`). It needs AppSync
 Unified; when the binary has no `application-identifier`, the helper fakesigns the app with `ldid` first. No
@@ -269,3 +302,7 @@ From reading code, not from a phone:
   their package metadata and code. Untested on any iOS 26/27 jailbreak.
 - Apple's online checks (OCSP, PPQ, enterprise trust) are from general knowledge, not observed traffic.
 - Upstream zsign's per-extension profiles: seen in its README only, not in the code.
+- The computer setup: no install or pairing-file write has run on a phone yet (the website's side that signs the app
+  and asks for a code isn't built); finding the iPhone, the trust check and Developer Mode's status were read from
+  an iPhone on iOS 27 with the Linux (x86_64, arm64 under qemu) and Windows x64 (under wine) builds. Not run on a
+  Mac or on real Windows; the Microsoft Store link to the Apple Devices app is from memory.

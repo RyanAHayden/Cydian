@@ -54,6 +54,7 @@ import { readIpaInfo, IpaError } from "./ipainfo.js";
 import { reviews, isReviewsPath } from "./reviews.js";
 import { udid, isUdidPath } from "./udid.js";
 import { appleRelay, isApplePath } from "./apple-relay.js";
+import { setup, isSetupPath } from "./setup.js";
 import { NAME, GITHUB_REPO, DOMAIN } from "../../web/app/brand.js";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -397,7 +398,7 @@ async function uploads(req, u, env, ttl, ctx = null) {
         const got = await metaOf(env, p[1], i);
         if (got?.n !== partLen(meta, i)) return fail("bad_request", `Part ${i + 1} of ${meta.parts} is missing.`, 409);
       }
-      await env.HOSTED.put(upKey(p[1]), "", { expirationTtl: ttl, metadata: { ...meta, done: true } });
+      await env.HOSTED.put(upKey(p[1]), "", { expirationTtl: ttl, metadata: { ...meta, done: true, doneAt: Date.now() } }); // F258: setup codes count from doneAt
       const m = `${u.origin}/sign/up/${p[1]}/manifest.plist`;
       return json({ itms: "itms-services://?action=download-manifest&url=" + encodeURIComponent(m), manifest: m,
         expiresIn: ttl, bundleId: meta.bundleId, name: meta.title, version: meta.version });
@@ -732,6 +733,7 @@ export default {
     if (u.pathname === "/repo" || u.pathname.startsWith("/repo/")) return repo(req, u, env);
     if (u.pathname === "/healthz") return new Response("ok\n", { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
     if (u.pathname === "/sign/status") return json({ ok: true, ttl, worker: true, zsign: false, upload: uploadCap(env) });
+    if (isSetupPath(u.pathname)) return setup(req, u, env, ttl, { upstream, repo: SELF_REPO }); // F258: src/setup.js
     if (u.pathname.startsWith("/sign/up")) { const r = await uploads(req, u, env, ttl, ctx); if (r) return r; }
 
     if (u.pathname === "/sign/manifest" && req.method === "GET") {

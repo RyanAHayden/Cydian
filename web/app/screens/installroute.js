@@ -9,7 +9,7 @@ import { grouped } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { toBase64 } from "../core/signing.js";
-import { ROUTE_KEY, ROUTE_OPTIONS, BENEFITS, VPNS, vpnList, pairState, PAIR_STEPS, verifyFailure } from "../core/installroute.js";
+import { ROUTE_KEY, ROUTE_OPTIONS, BENEFITS, VPNS, vpnList, pairState, pairEvent, pairFooter, PAIR_STEPS, verifyFailure } from "../core/installroute.js";
 import { NAME } from "../brand.js";
 
 export const PAGE = "installation";
@@ -84,7 +84,7 @@ export function benefitsPage() {
 
 // ---- Pairing
 
-let pairing = null; // { pin } while idevice.pair waits for the phone
+let pairing = null; // { pin, text, error } while idevice.pair waits for the phone (core pairEvent)
 
 async function drawPair(el, { store, native, alert, redraw }) {
   const st = await status(native);
@@ -106,7 +106,7 @@ async function drawPair(el, { store, native, alert, redraw }) {
       pairing = { pin: "" };
       redraw();
       try {
-        await call(native, "idevice.pair", {}, (ev) => { const pin = ev?.pin ?? ev?.[0]?.pin; if (pin && pairing) { pairing.pin = pin; redraw(); } });
+        await call(native, "idevice.pair", {}, (ev) => { if (pairing) { pairing = pairEvent(pairing, ev); redraw(); } });
         pairing = null;
         done("Paired", `${NAME} installs apps on this iPhone now.`);
       } catch (e) {
@@ -119,7 +119,7 @@ async function drawPair(el, { store, native, alert, redraw }) {
       ? { label: "Cancel", cls: "sign-import", onClick: () => call(native, "idevice.pairCancel").catch(() => {}) }
       : { label: "Start Pairing", cls: "sign-import", onClick: start };
     const frag = grouped([{ header: "Pair This iPhone", footer: steps }, { rows: [action],
-      footer: pairing ? (pairing.pin ? "Enter this code on the iPhone's pairing screen." : "Waiting for Developer Mode's Pair button…") : "" }]);
+      footer: pairing ? pairFooter(pairing) : "" }]);
     if (pairing?.pin) frag.lastElementChild.append(code);
     el.replaceChildren(frag);
     return;

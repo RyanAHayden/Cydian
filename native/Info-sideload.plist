@@ -76,6 +76,10 @@
 			</dict>
 		</dict>
 	</array>
+	<!-- Pairing on the phone (iOS 27, IDevice.swift): the app advertises itself as a pairable host with Bonjour.
+	     iOS refuses to publish a service type that isn't listed here, and asks for Local Network access with this text. -->
+	<key>NSLocalNetworkUsageDescription</key><string>To pair with this iPhone in Developer Mode, so apps install without a computer.</string>
+	<key>NSBonjourServices</key><array><string>_remotepairing-pairable-host._tcp</string></array>
 	<key>LSApplicationQueriesSchemes</key><array><string>apple-magnifier</string></array>
 </dict>
 </plist>

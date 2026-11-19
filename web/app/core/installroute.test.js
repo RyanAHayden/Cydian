@@ -2,7 +2,7 @@
 // chooseRoute): This iPhone only with a pairing and LocalDevVPN on; otherwise the Signing Server, said in an alert.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decideRoute, routeParams, storedRoute, pairState, verifyFailure, ROUTE_OPTIONS, ALERTS, VPNS, vpnList, STORAGE_KEY, BENEFITS } from "./installroute.js";
+import { decideRoute, routeParams, storedRoute, pairState, pairEvent, pairFooter, verifyFailure, ROUTE_OPTIONS, ALERTS, VPNS, vpnList, STORAGE_KEY, BENEFITS } from "./installroute.js";
 import { SETTINGS } from "./settings.js";
 
 const mem = (v) => ({ getItem: (k) => (k === STORAGE_KEY ? v : null) });
@@ -51,4 +51,19 @@ test("pairing: on the phone from iOS 27, a file before; Pair Again unless the VP
   assert.equal(verifyFailure(Object.assign(new Error("no route"), { code: "connect_failed" })).again, false);
   assert.equal(verifyFailure(Object.assign(new Error("rejected"), { code: "bad_pairing" })).again, true);
   assert.equal(verifyFailure(new Error("not_paired: none")).again, true);
+});
+
+test("pairing page: the native steps, a failed try and the code", () => {
+  let p = { pin: "" };
+  assert.match(pairFooter(p), /Pair button/);
+  p = pairEvent(p, [{ step: "advertised", text: "Waiting for the iPhone to connect (port 5)." }]);
+  assert.equal(pairFooter(p), "Waiting for the iPhone to connect (port 5).");
+  p = pairEvent(p, [{ step: "failed", failedAt: "pairing", error: "bad proof (3)" }]);
+  assert.match(pairFooter(p), /bad proof \(3\).*try again/);
+  p = pairEvent(p, [{ step: "connected", text: "The iPhone connected. Pairing…" }]);
+  assert.equal(pairFooter(p), "The iPhone connected. Pairing…");
+  p = pairEvent(p, [{ pin: "123456" }]);
+  assert.equal(p.pin, "123456");
+  assert.match(pairFooter(p), /Enter this code/);
+  assert.equal(pairEvent(p, []), p);
 });

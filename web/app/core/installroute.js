@@ -78,6 +78,24 @@ export const PAIR_STEPS = {
   ],
 };
 
+// idevice.pair's events folded into the page's state: { pin, text, error }. A failed try keeps the pairing open (the
+// phone can tap Pair again), so its error stays shown until the next step.
+export function pairEvent(state, ev) {
+  const e = Array.isArray(ev) ? ev[0] : ev;
+  if (!e) return state;
+  if (e.pin) return { ...state, pin: e.pin, error: "" };
+  if (e.step === "failed") return { ...state, pin: "", error: e.error || "The pairing failed." };
+  if (e.text) return { ...state, text: e.text, ...(e.step === "connected" ? { error: "" } : {}) };
+  return state;
+}
+
+// The footer under Cancel while pairing waits.
+export function pairFooter(p) {
+  if (p.pin) return "Enter this code on the iPhone's pairing screen.";
+  if (p.error) return `That try didn't pair: ${p.error} Tap Pair on the iPhone to try again.`;
+  return p.text || "Waiting for Developer Mode's Pair button…";
+}
+
 // What a failed idevice.verify means: { title, message, again } (`again`: offer Pair Again).
 export function verifyFailure(err) {
   const raw = String(err?.message ?? err ?? "");

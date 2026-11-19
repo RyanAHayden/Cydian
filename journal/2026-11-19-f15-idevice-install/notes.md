@@ -84,3 +84,31 @@ The engine and the build, not the screens:
 `test_idevice.py`'s check of the built IPA read `native/build/ipa`, which the gate's Python step finds before the
 native build runs: in the merge checkout that was main's last build, without idevice, so "ifizbox.idevice.pairing"
 was missing. The check moved into `mkipa.py check`, which runs on the IPA `native/build.sh` has just built.
+
+## Pairing on the phone: discovered, never connected (iPhone 15 Pro, iOS 27.0.1, 0.9.9 (1885))
+
+Phone syslog of two tries (Developer Mode > Pair with … appeared, the user tapped it):
+- `remotepairingdeviced` resolved the service: `nw_resolver_bonjour_resolve_callback … ifindex=1 …
+  target=idevice-4f457959.local. port=54096`, then a local-only `getaddrinfo` (ifindex -1) for that host that ended
+  in 1 ms, and 11 s later `Received pairing outcome failure(RemotePairingError(errorCode: -1 …))` plus
+  `SYMPTOM_LIBNETCORE_CONNECTION_SETUP_STALL` for remotepairingdeviced.
+- The kernel's summary of iFizBox's listener when it closed: `tcp listen [IPv4:54096]`, `SYN in/out: 0/0`. Nothing
+  ever reached it.
+- So the advertisement worked (multicast went out without the multicast entitlement) but the address side didn't:
+  idevice's `pairable_host_accept` binds `0.0.0.0` (IPv4 only) and answers mDNS itself (`mdns-sd`, host
+  `idevice-XXXX.local.`, addresses from `enable_addr_auto`). The daemon resolves on loopback/local-only through
+  mDNSResponder, which doesn't hold A/AAAA records for that host there (mdns-sd skips lo0), or gets one the IPv4-only
+  listener can't take.
+
+Fix: idevice only pairs. `pairable_host_prepare` gives the identity, service name and TXT records;
+the app listens on `[::]:0` with `IPV6_V6ONLY` off (IPv4 and IPv6, every interface, as PhonePair does), publishes
+with `DNSServiceRegister` (interface 0: every interface plus local-only, mDNSResponder's own host name and
+addresses), accepts, and hands the socket to `pairable_host_accept_fd`. A failed try keeps listening and is shown on
+the page; `NSBonjourServices` + `NSLocalNetworkUsageDescription` are in the sideload Info.plist (iOS refuses to
+publish an undeclared type: `kDNSServiceErr_NoAuth`/`PolicyDenied`, shown as "Local Network access is off").
+Not NWListener: idevice needs a socket fd, and NWConnection doesn't give one.
+
+Log lines (`<name> pair: …`): `identity …, TXT keys …`, `listening on [::]:PORT …; addresses: lo0 …, en0 …, utunN …`,
+`Bonjour: registered NAME._remotepairing-pairable-host._tcp port PORT`, `connection from ADDR port P`,
+`idevice asked for the code to be shown`, `paired; the pairing is saved`, or `pairing with ADDR failed: …`,
+`DNSServiceRegister failed: N`, `canceled`.

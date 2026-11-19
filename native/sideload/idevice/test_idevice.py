@@ -73,6 +73,26 @@ class Bridge(unittest.TestCase):
         self.assertNotIn("UserDefaults", src)
 
 
+class PairOnPhone(unittest.TestCase):
+    # idevice's all-in-one pairable_host_accept (IPv4-only listener, its own mDNS responder) was resolved by the
+    # iPhone 15 Pro but never reached: the app listens and publishes with Apple's APIs, idevice only pairs.
+    def test_apple_networking_idevice_pairing(self):
+        src = read("IDevice.swift")
+        self.assertIn("pairable_host_prepare(", src)
+        self.assertIn("pairable_host_accept_fd(", src)
+        self.assertNotIn("pairable_host_accept(", src)
+        self.assertIn("DNSServiceRegister(", src)
+        self.assertIn("IPV6_V6ONLY", src)
+
+    def test_bonjour_declared(self):
+        import plistlib
+        with open(os.path.join(NATIVE, "Info-sideload.plist"), "rb") as f:
+            info = plistlib.load(f)
+        self.assertIn("_remotepairing-pairable-host._tcp", info["NSBonjourServices"])
+        self.assertTrue(info["NSLocalNetworkUsageDescription"])
+        self.assertIn('"_remotepairing-pairable-host._tcp"', read("IDevice.swift"))
+
+
 class Built(unittest.TestCase):
     # The built IPA is checked by mkipa.py check right after native/build.sh builds it (the gate's last step). A
     # check here would read whatever native/build/ipa a checkout last built, from before a merge brought idevice in.

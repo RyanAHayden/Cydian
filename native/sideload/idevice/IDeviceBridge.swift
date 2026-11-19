@@ -2,7 +2,9 @@
 //   idevice.status        {paired: "rp"|"lockdown"|null, ios, pairOnPhone, localDevVPN, otherVPN, tunnels}
 //   idevice.vpn           {localDevVPN, otherVPN, tunnels} (VPNCheck)
 //   idevice.import        {data: base64 pairing file} -> status; a lockdown pairing record or a RemotePairing one
-//   idevice.pair          emits [{pin}] once the phone asks for the code, replies status when paired (iOS 27+)
+//   idevice.pair          emits [{step, text}] as it goes (listening, advertised, connected), [{step: "failed", error}]
+//                         when a try fails (it keeps listening: Pair can be tapped again), [{pin}] once the phone
+//                         asks for the code; replies status when paired (iOS 27+)
 //   idevice.pairCancel    ends a waiting idevice.pair (it replies "canceled: ...")
 //   idevice.verify        connects once: {ok: true, kind} or "not_paired:/connect_failed:/bad_pairing: ..."
 //   idevice.forget        deletes the pairing -> status
@@ -36,8 +38,14 @@ enum IDeviceBridge {
             if AppMode.current != .jailbreak { KeepAlive.shared.begin() } // run() refuses the jailbreak build before the defer
             run(c) {
                 defer { lock.lock(); if pairing === cancel { pairing = nil }; lock.unlock(); KeepAlive.shared.end() }
-                try IDevice.pairOnPhone(cancel: cancel) { pin in
-                    DispatchQueue.main.async { c.emit([["pin": pin]]) }
+                try IDevice.pairOnPhone(cancel: cancel) { ev in
+                    let e: [String: Any]
+                    switch ev {
+                    case .pin(let pin): e = ["pin": pin]
+                    case .step(let step, let text): e = ["step": step, "text": text]
+                    case .failed(let step, let error): e = ["step": "failed", "failedAt": step, "error": error]
+                    }
+                    DispatchQueue.main.async { c.emit([e]) }
                 }
                 return status()
             }

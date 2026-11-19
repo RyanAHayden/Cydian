@@ -10,6 +10,7 @@
 // itms-services manifest, so nothing goes to the Signing Server, and the app can update itself (installd closes it).
 // The pairing is a full credential for the phone: it lives in the Keychain, this device only.
 import Darwin
+import dnssd
 import Foundation
 import IDeviceFFI
 import Security
@@ -86,28 +87,198 @@ enum IDevice {
     }
 
     // ---- Pairing on the phone (iOS 27): this app is the "computer" the phone pairs with
+    //
+    // idevice generates the host identity and TXT records (pairable_host_prepare) and runs the pairing on a socket
+    // the phone has connected to (pairable_host_accept_fd); the networking is Apple's. A dual-stack listener on every
+    // interface, published with DNSServiceRegister, so mDNSResponder advertises its own host name and the addresses
+    // the phone's remotepairingdeviced can reach (loopback included). idevice's all-in-one pairable_host_accept
+    // binds IPv4 only and answers mDNS itself (mdns-sd, an "idevice-XXXX.local." host): on the iPhone 15 Pro (iOS
+    // 27.0.1) the phone resolved it but its connection stalled and never reached the listener (SYN in: 0).
 
+    static let pairableHostService = "_remotepairing-pairable-host._tcp" // idevice's PAIRABLE_HOST_SERVICE_TYPE
+
+    /// Ends a waiting pairOnPhone from any thread: stops accepting and shuts down a pairing in progress.
     final class PairCancel {
-        fileprivate let token = pairable_host_cancel_new()
-        func signal() { if let t = token { pairable_host_cancel_signal(t) } }
-        deinit { if let t = token { pairable_host_cancel_free(t) } }
+        private let lock = NSLock()
+        private var canceled = false
+        private var conn: Int32 = -1
+        var isCanceled: Bool { lock.lock(); defer { lock.unlock() }; return canceled }
+        func signal() {
+            lock.lock(); canceled = true; let fd = conn; lock.unlock()
+            if fd >= 0 { shutdown(fd, SHUT_RDWR) } // wakes idevice's read on its dup of this socket
+        }
+        fileprivate func track(_ fd: Int32) -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            conn = fd
+            return !canceled
+        }
     }
+
+    /// What pairOnPhone tells the page while it waits.
+    enum PairEvent { case step(String, String), failed(String, String), pin(String) }
+
+    static func log(_ s: String) { NSLog("%@", "\(Brand.name) pair: \(s)") }
 
     private final class PinBox { let show: (String) -> Void; init(_ f: @escaping (String) -> Void) { show = f } }
 
+    private final class RegBox {
+        let done = DispatchSemaphore(value: 0)
+        var err: DNSServiceErrorType = 0
+        var name = ""
+        var signalled = false
+    }
+
     /// Advertises the app as a pairable host and waits (blocking; call it on `queue`) until the phone pairs, the
-    /// user cancels, or it fails. `pin` gets the 6-digit code to type on the phone.
-    static func pairOnPhone(cancel: PairCancel, pin: @escaping (String) -> Void) throws {
-        let box = Unmanaged.passRetained(PinBox(pin))
+    /// user cancels, or it fails. `event` gets the steps, a failed try (the phone can try again) and the 6-digit
+    /// code to type on the phone.
+    static func pairOnPhone(cancel: PairCancel, event: @escaping (PairEvent) -> Void) throws {
+        // 1. The identity and what to publish
+        var handle: OpaquePointer?
+        var sid: UnsafeMutablePointer<CChar>?
+        var txtPtr: UnsafeMutablePointer<UInt8>?
+        var txtLen: UInt = 0
+        try check(pairable_host_prepare(Brand.name, nil, false, &handle, &sid, &txtPtr, &txtLen, nil), "pair_failed")
+        defer { pairable_host_free(handle) }
+        let serviceID = sid.map { String(cString: $0) } ?? ""
+        if let sid = sid { idevice_string_free(sid) }
+        let txtPlist = txtPtr.map { Data(bytes: $0, count: Int(txtLen)) } ?? Data()
+        if let t = txtPtr { idevice_data_free(t, txtLen) }
+        guard let txt = (try? PropertyListSerialization.propertyList(from: txtPlist, format: nil)) as? [String: String] else {
+            throw Failure(code: "pair_failed", text: "idevice gave no TXT records")
+        }
+        var record = Data() // DNS TXT: length-prefixed key=value strings
+        for (k, v) in txt.sorted(by: { $0.key < $1.key }) {
+            let kv = Data("\(k)=\(v)".utf8).prefix(255)
+            record.append(UInt8(kv.count)); record.append(kv)
+        }
+        log("identity \(serviceID), TXT keys \(txt.keys.sorted().joined(separator: ","))")
+
+        // 2. The listener: IPv6 socket that takes IPv4 too, every interface, a free port
+        let lfd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP)
+        guard lfd >= 0 else { throw Failure(code: "pair_failed", text: "socket: \(String(cString: strerror(errno)))") }
+        defer { close(lfd) }
+        var off: Int32 = 0, on: Int32 = 1
+        setsockopt(lfd, IPPROTO_IPV6, IPV6_V6ONLY, &off, socklen_t(MemoryLayout<Int32>.size))
+        setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &on, socklen_t(MemoryLayout<Int32>.size))
+        var any = sockaddr_in6()
+        any.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
+        any.sin6_family = sa_family_t(AF_INET6)
+        any.sin6_addr = in6addr_any
+        let bound = withUnsafePointer(to: &any) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(lfd, $0, socklen_t(MemoryLayout<sockaddr_in6>.size)) } }
+        guard bound == 0, listen(lfd, 4) == 0 else { throw Failure(code: "pair_failed", text: "listen: \(String(cString: strerror(errno)))") }
+        var got = sockaddr_in6(); var gl = socklen_t(MemoryLayout<sockaddr_in6>.size)
+        _ = withUnsafeMutablePointer(to: &got) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(lfd, $0, &gl) } }
+        let port = UInt16(bigEndian: got.sin6_port)
+        log("listening on [::]:\(port) (IPv4 and IPv6, every interface); addresses: \(interfaceAddresses())")
+        event(.step("listening", "Listening on port \(port)."))
+
+        // 3. Bonjour, by mDNSResponder
+        let reg = RegBox()
+        let regCtx = Unmanaged.passRetained(reg)
+        defer { regCtx.release() }
+        var sdRef: DNSServiceRef?
+        let cb: DNSServiceRegisterReply = { _, _, err, name, _, _, ctx in
+            guard let ctx = ctx else { return }
+            let r = Unmanaged<RegBox>.fromOpaque(ctx).takeUnretainedValue()
+            r.err = err
+            r.name = name.map { String(cString: $0) } ?? ""
+            if !r.signalled { r.signalled = true; r.done.signal() }
+        }
+        let st = record.withUnsafeBytes { buf in
+            DNSServiceRegister(&sdRef, 0, 0, serviceID, pairableHostService, nil, nil, port.bigEndian,
+                               UInt16(buf.count), buf.baseAddress, cb, regCtx.toOpaque())
+        }
+        guard st == kDNSServiceErr_NoError, let sd = sdRef else {
+            log("DNSServiceRegister failed: \(st)")
+            throw Failure(code: "pair_failed", text: bonjourError(st))
+        }
+        let bq = DispatchQueue(label: "ifizbox.idevice.bonjour")
+        defer { bq.sync { DNSServiceRefDeallocate(sd) } } // on its queue: no callback runs after this
+        DNSServiceSetDispatchQueue(sd, bq)
+        if reg.done.wait(timeout: .now() + 10) == .timedOut {
+            log("Bonjour: no answer from mDNSResponder in 10 s; still waiting for the iPhone")
+        } else {
+            let err = bq.sync { reg.err }
+            guard err == kDNSServiceErr_NoError else {
+                log("Bonjour registration failed: \(err)")
+                throw Failure(code: "pair_failed", text: bonjourError(err))
+            }
+            log("Bonjour: registered \(bq.sync { reg.name }).\(pairableHostService) port \(port), every interface")
+        }
+        event(.step("advertised", "Waiting for the iPhone to connect (port \(port))."))
+
+        // 4. Accept: one try at a time; a failed try keeps listening, so Pair can be tapped again on the phone
+        let box = Unmanaged.passRetained(PinBox { event(.pin($0)) })
         defer { box.release() }
-        var out: OpaquePointer?
-        let cb: @convention(c) (UnsafePointer<CChar>?, UnsafeMutableRawPointer?) -> Void = { p, ctx in
+        let pinCb: @convention(c) (UnsafePointer<CChar>?, UnsafeMutableRawPointer?) -> Void = { p, ctx in
             guard let p = p, let ctx = ctx else { return }
+            IDevice.log("idevice asked for the code to be shown")
             Unmanaged<PinBox>.fromOpaque(ctx).takeUnretainedValue().show(String(cString: p))
         }
-        try check(pairable_host_accept(Brand.name, nil, 0, cb, box.toOpaque(), cancel.token, nil, nil, &out), "pair_failed")
-        defer { rp_pairing_file_free(out) }
-        try savePairing(try bytes(out), kind: .remotePairing)
+        while !cancel.isCanceled {
+            var pfd = pollfd(fd: lfd, events: Int16(POLLIN), revents: 0)
+            let n = poll(&pfd, 1, 250)
+            if n < 0 && errno != EINTR { throw Failure(code: "pair_failed", text: "poll: \(String(cString: strerror(errno)))") }
+            guard n > 0 else { continue }
+            var peer = sockaddr_storage(); var pl = socklen_t(MemoryLayout<sockaddr_storage>.size)
+            let cfd = withUnsafeMutablePointer(to: &peer) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { accept(lfd, $0, &pl) } }
+            guard cfd >= 0 else { log("accept failed: \(String(cString: strerror(errno)))"); continue }
+            let from = numericHost(&peer, pl)
+            log("connection from \(from)")
+            event(.step("connected", "The iPhone connected. Pairing…"))
+            guard cancel.track(cfd) else { close(cfd); break }
+            var out: OpaquePointer?
+            let err = pairable_host_accept_fd(handle, cfd, pinCb, box.toOpaque(), nil, &out)
+            _ = cancel.track(-1)
+            close(cfd)
+            do {
+                try check(err, "pair_failed")
+                defer { rp_pairing_file_free(out) }
+                try savePairing(try bytes(out), kind: .remotePairing)
+                log("paired; the pairing is saved")
+                return
+            } catch let e as Failure {
+                if cancel.isCanceled { break }
+                log("pairing with \(from) failed: \(e.text)")
+                event(.failed("pairing", e.text))
+            }
+        }
+        log("canceled")
+        throw Failure(code: "canceled", text: "pairing stopped")
+    }
+
+    private static func bonjourError(_ e: DNSServiceErrorType) -> String {
+        if e == kDNSServiceErr_NoAuth || e == kDNSServiceErr_PolicyDenied {
+            return "Local Network access is off for this app: turn it on in Settings > Privacy & Security > Local Network (Bonjour error \(e))"
+        }
+        return "could not advertise on the local network (Bonjour error \(e))"
+    }
+
+    private static func numericHost(_ ss: UnsafeMutablePointer<sockaddr_storage>, _ len: socklen_t) -> String {
+        var host = [CChar](repeating: 0, count: Int(NI_MAXHOST)), serv = [CChar](repeating: 0, count: Int(NI_MAXSERV))
+        let r = ss.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+            getnameinfo($0, len, &host, socklen_t(host.count), &serv, socklen_t(serv.count), NI_NUMERICHOST | NI_NUMERICSERV)
+        }
+        return r == 0 ? "\(String(cString: host)) port \(String(cString: serv))" : "?"
+    }
+
+    /// This phone's interfaces and addresses, for the log ("lo0 127.0.0.1, en0 fe80::…, utun4 10.7.0.0").
+    static func interfaceAddresses() -> String {
+        var list: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&list) == 0, let first = list else { return "?" }
+        defer { freeifaddrs(list) }
+        var out: [String] = []
+        for p in sequence(first: first, next: { $0.pointee.ifa_next }) {
+            guard let a = p.pointee.ifa_addr, (p.pointee.ifa_flags & UInt32(IFF_UP)) != 0 else { continue }
+            let fam = Int32(a.pointee.sa_family)
+            guard fam == AF_INET || fam == AF_INET6 else { continue }
+            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            let len = socklen_t(fam == AF_INET ? MemoryLayout<sockaddr_in>.size : MemoryLayout<sockaddr_in6>.size)
+            if getnameinfo(a, len, &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 {
+                out.append("\(String(cString: p.pointee.ifa_name)) \(String(cString: host))")
+            }
+        }
+        return out.joined(separator: ", ")
     }
 
     private static func bytes(_ rp: OpaquePointer?) throws -> Data {

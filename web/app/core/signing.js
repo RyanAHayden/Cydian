@@ -449,6 +449,7 @@ export function deviceError(err, name = "") {
 //   installParams(info, edits)           signing.install's params: the token and only the edits that change something
 //   certificateWarnings(identity, now)   the red lines under Check Certificate (revoked; signature ends within 7 days)
 //   resignLabel(ev)                      Re-sign All's HUD text for one progress event
+//   callWithStall(native, m, p, onEvent) B65: a re-sign's bridge call that fails (and cancels) when a phase goes quiet
 //   signedAppRows(installed, now)        Signed Apps' rows from signing.installed
 //   syncReminder(get, call)              signing.remind {days} with Re-sign Reminder's value
 
@@ -601,6 +602,55 @@ export function resignLabel(ev) {
   if (!ev || ev.count == null) return null;
   const which = `${ev.name || "App"} (${Number(ev.index) + 1} of ${ev.count})`;
   return `${phaseLabel(ev) ?? "Re-signing"} ${which}`;
+}
+
+// B65: a re-sign's phases before iOS's install (downloading, reading, signing) each send progress as they go (the
+// signer at least once per bundle and per loose Mach-O). One that sends nothing for STALL_LIMIT has stopped: the call
+// is cancelled (signing.cancel) and fails with where it stopped, instead of a page left at "Signing 50%" for ever.
+// iOS's own install ("installing") has the shell's 15-minute limit (Sideload.swift serveChecked), so it isn't timed here.
+export const STALL_LIMIT = 180_000;
+
+// The failure's text for the last progress event seen (null: none came).
+export function stallMessage(ev, limit = STALL_LIMIT) {
+  const mins = Math.round(limit / 60_000);
+  const span = mins >= 1 ? `${mins} minute${mins === 1 ? "" : "s"}` : `${Math.round(limit / 1000)} seconds`;
+  const where = phaseLabel(ev) ?? "the start";
+  const who = ev?.name ? `${ev.name} stopped` : "Re-signing stopped";
+  return `${who} at ${where}: nothing moved for ${span}, so it was cancelled.`;
+}
+
+// native.call(method, params, onEvent) with the stall limit: resolves or rejects as the call does, or rejects with
+// { code: "stalled", message: stallMessage(...) } once a phase before "installing" goes quiet for `limit` ms (then
+// native.call("signing.cancel") stops the shell's job). Events after that are dropped.
+export function callWithStall(native, method, params, onEvent = () => {}, { limit = STALL_LIMIT, later = setTimeout, clear = clearTimeout } = {}) {
+  return new Promise((resolve, reject) => {
+    let over = false;
+    let timer = null;
+    let last = null;
+    const stop = () => { if (timer != null) clear(timer); timer = null; };
+    const arm = () => {
+      stop();
+      timer = later(() => {
+        if (over) return;
+        over = true;
+        timer = null;
+        Promise.resolve().then(() => native.call("signing.cancel", {})).catch(() => {});
+        const e = new Error(stallMessage(last, limit));
+        e.code = "stalled";
+        reject(e);
+      }, limit);
+    };
+    arm();
+    Promise.resolve().then(() => native.call(method, params, (ev) => {
+      if (over) return;
+      if (ev?.phase) {
+        last = ev;
+        if (ev.phase === "installing") stop(); else arm();
+      }
+      onEvent(ev);
+    })).then((r) => { if (!over) { over = true; stop(); resolve(r); } },
+      (e) => { if (!over) { over = true; stop(); reject(e); } });
+  });
 }
 
 // Signed Apps' rows from signing.installed's { apps: [{ bundleId, originalBundleId, name, version, expires }] },

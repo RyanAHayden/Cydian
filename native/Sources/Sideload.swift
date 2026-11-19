@@ -524,14 +524,21 @@ enum Sideload {
         guard let (id, profile) = ready(c) else { return }
         // F91: iFizBox's own re-sign (signing.resign with `host: true`, one record) is hosted; Re-sign All never is.
         guard let servers = servers(c, allowHost: allowHost) else { return Apt.reply(c, nil, noServer) }
+        // B65: the progress page's console gets each app's steps (as signing.install's), so a run that stops shows where
+        let log = { (s: String) in c.emitOnMain([["log": s]]) }
         SignBridge.queue.async {
             let list = pick(records())
             var done = [String](), failed = [[String: Any]]()
+            var stopped = false // B65: signing.cancel (the page's Cancel, or its stall timeout) ends the whole run
             func step(_ i: Int) {
+                if stopped { return Apt.reply(c, nil, SignBridge.text(SignJob.cancelledError)) }
                 guard i < list.count else {
                     return Apt.reply(c, ["done": done, "failed": failed], nil)
                 }
                 let r = list[i]
+                let job = SignJob.begin() // B65: what signing.cancel stops, one app at a time
+                let next = { job.end(); if job.cancelled { stopped = true }; step(i + 1) }
+                log("Re-signing \(r.name) (\(r.bundleID))")
                 let throttle = Throttle()
                 let emit = { (phase: String, p: Double) in
                     if throttle.pass(phase, p) {
@@ -544,6 +551,7 @@ enum Sideload {
                 }
                 let signThat = { (file: URL) in
                     signAndOpen(file, url: r.url, id: id, profile: profile, options: SignOptions(r.options), servers: servers, emit: emit,
+                                log: log, job: job,
                                 opened: { if case .failure(let e) = $0 { SignBridge.queue.async { fail(e) } } },
                                 served: { ok in
                                     SignBridge.queue.async {
@@ -551,7 +559,7 @@ enum Sideload {
                                         else if !failed.contains(where: { $0["bundleId"] as? String == r.bundleID }) {
                                             fail(Failed(text: "cancelled: iOS didn't fetch it"))
                                         }
-                                        step(i + 1)
+                                        next()
                                     }
                                 })
                 }
@@ -559,15 +567,17 @@ enum Sideload {
                 if MyIPAs.fileOf(r.url) != nil {
                     do {
                         if let file = try MyIPAs.copyForResign(r.url) { return signThat(file) }
-                    } catch { fail(Failed(text: "gone: \(r.name) isn't in My IPAs any more")); return step(i + 1) }
+                    } catch { fail(Failed(text: "gone: \(r.name) isn't in My IPAs any more")); return next() }
                 }
-                guard let url = Apt.httpURL(r.url) else { fail(Failed(text: "bad_url: \(r.url)")); return step(i + 1) }
-                download(url, emit: emit) { res in
+                guard let url = Apt.httpURL(r.url) else { fail(Failed(text: "bad_url: \(r.url)")); return next() }
+                log("Downloading \(url.absoluteString)")
+                let d = download(url, emit: emit) { res in
                     switch res {
-                    case .failure(let e): fail(e); step(i + 1)
-                    case .success(let file): signThat(file)
+                    case .failure(let e): fail(e); next()
+                    case .success(let file): log("Downloaded \(Sideload.size(file))"); signThat(file)
                     }
                 }
+                job.onCancel { d.cancel() }
             }
             step(0)
         }

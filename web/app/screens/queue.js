@@ -434,20 +434,25 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
 // F221: a marked app's re-sign (core/appqueue.js markedResignJob) has no record on the phone to sign from: its url,
 // the installed version on the source, is downloaded, signed and installed over the app as an Install is
 // (`deps`: installOnDevice's, for tests). signing.install records it, so it is a signed app with a pill from then on.
-export async function resignApp(job, { sc, native = globalThis.ifizboxNative, hud = null, alert = showAlert, deps } = {}) {
+export async function resignApp(job, { sc, native = globalThis.ifizboxNative, hud = null, alert = showAlert, deps, stallOpts = null } = {}) {
   sc ??= await import("../signing-client.js");
   if (job.url) {
     if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" }, deps);
     return sc.signAndInstall({ url: job.url, name: job.name || "" });
   }
-  const { resignLabel, deviceError } = await import("../core/signing.js");
+  const { resignLabel, deviceError, callWithStall } = await import("../core/signing.js");
   const h = hud ? hud("Re-signing") : progressHUD("Re-signing"); // F151: the progress page
   const fail = (message) => (typeof h.fail === "function" ? h.fail(message) : h.hide());
   let r;
   try {
     if (!native?.call) throw new Error(`Re-signing needs the ${NAME} app.`);
-    r = await native.call("signing.resign", { bundleId: job.id, manifestServer: sc.getServer(), ...(job.id === SELF_ID ? { host: true } : {}) },
-      (ev) => { const t = resignLabel(ev); if (t) h.set(t.replace(/ \(1 of 1\)$/, "")); });
+    // B65: a phase that goes quiet fails the job with where it stopped (callWithStall); the shell's lines go to the log
+    r = await callWithStall(native, "signing.resign", { bundleId: job.id, manifestServer: sc.getServer(), ...(job.id === SELF_ID ? { host: true } : {}) },
+      (ev) => {
+        if (ev?.log) h.page?.raw?.(ev.log);
+        const t = resignLabel(ev);
+        if (t) h.set(t.replace(/ \(1 of 1\)$/, ""));
+      }, stallOpts ?? undefined);
   } catch (e) {
     const why = deviceError(e, job.name || job.id);
     fail(why.message);

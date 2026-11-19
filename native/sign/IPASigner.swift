@@ -201,7 +201,11 @@ final class IPASigner {
             let id = b.plist["CFBundleIdentifier"] as? String ?? (dir.dropLast().split(separator: "/").last.map { String($0.split(separator: ".")[0]) } ?? "unknown")
 
             // Loose Mach-Os of this bundle (dylibs in Frameworks/, helpers): signed with no entitlements.
-            for path in machos.sorted() where path.hasPrefix(dir) && path != exe && !inner.contains(where: { path.hasPrefix($0) }) {
+            // B65: each one moves the bar within the bundle's share, so a big main bundle doesn't sit at "Signing 50%".
+            let loose = machos.sorted().filter { p in p.hasPrefix(dir) && p != exe && !inner.contains(where: { p.hasPrefix($0) }) }
+            for (k, path) in loose.enumerated() {
+                if k > 0 { progress?("signing", (Double(n) + Double(k) / Double(loose.count + 1)) / Double(dirs.count)) }
+                if stop() { throw SignJob.cancelledError }
                 let data = fixed(path, try contents(path, files, zip))
                 guard let ft = MachO.filetype(data), [2, 6, 8].contains(ft) else { continue } // executables, dylibs, bundles
                 let name = String(path.split(separator: "/").last!)
@@ -209,6 +213,7 @@ final class IPASigner {
                 files[path] = .data(try MachO.sign(data, CodeSignParams(identifier: ident, team: profile.team), identity, time: time),
                                     mode: mode(path, files))
             }
+            if !loose.isEmpty { progress?("signing", (Double(n) + Double(loose.count) / Double(loose.count + 1)) / Double(dirs.count)) }
             if isApp { files[dir + "embedded.mobileprovision"] = .data(profile.data, mode: 0o100644) }
             let infoData = try contents(dir + "Info.plist", files, zip)
             let resources = try codeResources(dir: dir, exe: exe, files: files, order: order + newPaths(files, order))

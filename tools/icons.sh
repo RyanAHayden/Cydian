@@ -11,7 +11,7 @@
 #   web/app/icons/icon-web-{180,192,512,1024}.png  the website's home-screen icon (apple-touch-icon, manifest): a
 #                                       blue WEB sash across the top-right corner, so it isn't taken for the app
 #   web/app/icons/icon-web-glossy-{76,152,228}.png  the WEB icon with iOS 6 corners, for the website's Home header
-#   native/icon/AppIconLite60x60{@2x,@3x}.png  the sideload IPA's icon: a red LITE sash, as old trial apps had
+#   native/icon/AppIconLite60x60{@2x,@3x}.png  the sideload IPA's icon: an orange LITE sash (red read as LIVE)
 #                                       (the .deb keeps the plain one; native/build.sh picks)
 #
 # Needs rsvg-convert (librsvg). Run it after editing the master and commit what it writes.
@@ -88,7 +88,7 @@ SVG
 web=$(mktemp --suffix=.svg) lite=$(mktemp --suffix=.svg)
 trap 'rm -f "$bg" "$web" "$lite"' EXIT
 sashed WEB '#4f8dff' '#0f47e8' > "$web"
-sashed LITE '#ff4a3b' '#d40d05' > "$lite"
+sashed LITE '#ffa53b' '#e8660a' > "$lite"
 for n in 180 192 512 1024; do png "$web" "$n" "$dir/icon-web-$n.png"; done
 # The website's Home header shows the WEB icon too, glossy (iOS 6 corners) like icon-glossy-*.png.
 webg=$(mktemp --suffix=.svg)

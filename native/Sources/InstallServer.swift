@@ -17,9 +17,20 @@ final class InstallServer {
         let log: ((String) -> Void)?
         // Once iOS has every byte of the body, over however many requests (ByteCoverage), once.
         let onServed: (() -> Void)?
+        // B89: the server's own lines (iFizBox frozen, back in front, the listener re-created), not iOS's requests, and
+        // the call when iOS froze iFizBox while this body wasn't served in full yet.
+        var note: ((String) -> Void)? = nil
+        var onFrozen: ((Freeze) -> Void)? = nil
         init(type: String, body: Body, log: ((String) -> Void)? = nil, onServed: (() -> Void)?) {
             self.type = type; self.body = body; self.log = log; self.onServed = onServed
         }
+    }
+
+    // B89: a stretch when iOS had iFizBox frozen (suspended) while it served: the heartbeat found a gap.
+    struct Freeze {
+        let from: Date, to: Date
+        var seconds: Int { Int(to.timeIntervalSince(from).rounded()) }
+        var text: String { "\(seconds) s, \(InstallServer.clock(from)) to \(InstallServer.clock(to))" }
     }
 
     private let queue = DispatchQueue(label: "ifizbox.install-server")
@@ -53,8 +64,10 @@ final class InstallServer {
                         self.port = l.port?.rawValue ?? 0
                         if !answered { answered = true; done(.success(self.port)) }
                     case .failed(let e):
+                        guard self.listener === l else { break } // B89: one revive() replaced
                         self.listener = nil
                         if !answered { answered = true; done(.failure(e)) }
+                        else { self.revive("it failed: \(e.localizedDescription)") } // B89: an IPA may still wait
                     default: break
                     }
                 }
@@ -71,6 +84,7 @@ final class InstallServer {
             self.listener = nil
             self.routes.removeAll()
             self.covered.removeAll()
+            self.stopBeat()
             self.endBackground()
         }
     }
@@ -80,6 +94,7 @@ final class InstallServer {
         queue.async {
             self.routes[path] = route
             self.touch(ttl)
+            self.startBeat()
         }
     }
 
@@ -102,6 +117,7 @@ final class InstallServer {
                 self.idle = nil
                 self.listener?.cancel()
                 self.listener = nil
+                self.stopBeat()
                 self.endBackground()
             }
         }
@@ -114,6 +130,121 @@ final class InstallServer {
     private var gone = [String: (String) -> Void]()
 
     var base: String { "http://127.0.0.1:\(port)" }
+
+    // ---- B89: iOS freezing iFizBox while it serves
+    //
+    // On iOS 27 (user's iPhone19,2, 27.0.1) iOS suspended iFizBox mid-serve despite KeepAlive's audio ("COSMCtrl
+    // evictBackgroundApps"), and Network.framework left the listener's socket suspended ("Resuming inbox socket" only
+    // when it was cancelled 10 minutes later): iOS's installer never reached it and said "Unable to Install". A frozen
+    // app runs no code, so the server can only see it afterwards: a 1 s heartbeat that finds a gap of `freezeGap` or
+    // more. Then it re-creates the listener on the same port (the link names it) and tells each route not yet served
+    // (onFrozen), whose install falls back to the Signing Server (Sideload.serveChecked). The app going to the
+    // background, the phone locking and coming back go to the routes' notes, so a failing attempt's log says when.
+
+    static let freezeGap: TimeInterval = 5
+    private var beat: DispatchSourceTimer?
+    private var lastBeat = Date()
+    private var asked = [String: Date]() // per path, when iOS last asked for it
+    private var observers = [NSObjectProtocol]()
+
+    static func clock(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f.string(from: d)
+    }
+
+    // Whether iOS asked for `path` at or after `since` (any queue but the server's).
+    func asked(_ path: String, since: Date) -> Bool {
+        queue.sync { (asked[path].map { $0 >= since }) ?? false }
+    }
+
+    private func noteAll(_ line: String) {
+        for r in routes.values { r.note?(line) }
+    }
+
+    private func startBeat() {
+        guard beat == nil else { return }
+        lastBeat = Date()
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now() + 1, repeating: 1, leeway: .milliseconds(250))
+        t.setEventHandler { [weak self] in self?.tick() }
+        beat = t
+        t.resume()
+        guard observers.isEmpty else { return }
+        let nc = NotificationCenter.default
+        let watch = { [unowned self] (name: Notification.Name, line: String, check: Bool) in
+            self.observers.append(nc.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
+                self?.queue.async {
+                    guard let self = self, !self.routes.isEmpty else { return }
+                    self.noteAll(line)
+                    if check { self.checkListener() }
+                }
+            })
+        }
+        watch(UIApplication.didEnterBackgroundNotification, "\(Brand.name) went to the background; still serving", false)
+        watch(UIApplication.willEnterForegroundNotification, "\(Brand.name) came back to the front", true)
+        watch(UIApplication.protectedDataWillBecomeUnavailableNotification, "The phone locked", false)
+        watch(UIApplication.protectedDataDidBecomeAvailableNotification, "The phone unlocked", true)
+    }
+
+    private func stopBeat() {
+        beat?.cancel()
+        beat = nil
+    }
+
+    private func tick() {
+        let now = Date()
+        let from = lastBeat
+        lastBeat = now
+        guard now.timeIntervalSince(from) >= InstallServer.freezeGap, !routes.isEmpty else { return }
+        let f = Freeze(from: from, to: now)
+        noteAll("iOS froze \(Brand.name) for \(f.text); its listening socket may have stayed shut")
+        revive("after the freeze")
+        for (path, r) in routes where !fired.contains(path) { r.onFrozen?(f) }
+    }
+
+    // Back in front, or unlocked: a listener that isn't ready is made again.
+    private func checkListener() {
+        let st = listener.map { "\($0.state)" } ?? "none"
+        guard listener?.state != .ready else { return noteAll("The install server is listening on 127.0.0.1:\(port)") }
+        revive("its state was \(st)")
+    }
+
+    // A new listener on the same port, in place of the old (cancelled first, which also frees a suspended socket).
+    // The port may not be free at once after the cancel: up to `tries` goes, half a second apart.
+    private func revive(_ why: String, tries: Int = 5) {
+        guard !routes.isEmpty, port != 0, let p = NWEndpoint.Port(rawValue: port) else { return }
+        let old = listener
+        listener = nil
+        old?.cancel()
+        let params = NWParameters.tcp
+        params.requiredInterfaceType = .loopback
+        params.acceptLocalOnly = true
+        params.allowLocalEndpointReuse = true
+        params.requiredLocalEndpoint = NWEndpoint.hostPort(host: NWEndpoint.Host("127.0.0.1"), port: p)
+        let again = { (e: String) in
+            self.noteAll("Couldn't listen again on 127.0.0.1:\(self.port) (\(e))" + (tries > 1 ? "; trying again" : ""))
+            if tries > 1 { self.queue.asyncAfter(deadline: .now() + 0.5) { self.revive(why, tries: tries - 1) } }
+        }
+        do {
+            let l = try NWListener(using: params)
+            l.stateUpdateHandler = { [weak self, weak l] st in
+                guard let self = self, let l = l, self.listener === l else { return }
+                switch st {
+                case .ready: self.noteAll("The install server listens again on 127.0.0.1:\(self.port) (\(why))")
+                case .waiting(let e): self.noteAll("The install server is waiting to listen: \(e.localizedDescription)")
+                case .failed(let e):
+                    self.listener = nil
+                    l.cancel()
+                    again(e.localizedDescription)
+                default: break
+                }
+            }
+            l.newConnectionHandler = { [weak self] c in self?.accept(c) }
+            listener = l
+            l.start(queue: queue)
+        } catch { again(error.localizedDescription) }
+    }
 
     // ---- connections
 
@@ -159,6 +290,7 @@ final class InstallServer {
         guard req.method == "GET" || req.method == "HEAD" else {
             return send(c, HTTPResponse.head(405, [("Content-Length", "0")]), close: true)
         }
+        asked[req.path] = Date() // B89
         guard let route = routes[req.path] else {
             gone[req.path]?("iOS asked again for \(req.method) \(req.headers["range"] ?? "the whole file") after it stopped being served: 404")
             return send(c, HTTPResponse.head(404, [("Content-Length", "0")]), close: true)

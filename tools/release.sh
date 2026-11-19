@@ -8,7 +8,8 @@
 #   <pkg>_<ver>_<arch>.deb           any other arch build found in --dist under that name (roothide, rootful)
 #   Packages, Packages.gz, Release   iFizBox's own flat APT repo over those .debs (F72, tools/selfrepo.py): the
 #                                    jailbreak app's built-in source, https://$BRAND_DOMAIN/repo/ (the Worker
-#                                    serves releases/latest/download/ of RyanAHayden/iFizBox without the redirect)
+#                                    serves releases/latest/download/ of RyanAHayden/iFizBox without the redirect);
+#                                    B73: Packages also keeps the older releases' .debs, each as <tag>/<asset>
 #   source.json                      F178: the updated AltStore source below, the Worker's fallback for
 #                                    https://$BRAND_DOMAIN/repo/source.json
 # Then it points iFizBox's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new iFizBox.ipa, the
@@ -29,6 +30,7 @@
 #     --sync-piracy  a dry run too fetches Canister's newest piracy list and warns when web/app/core/piracy-list.js
 #                 is older (a real run always refreshes it first and stops when it changed: commit it, run again)
 #   IFIZBOX_RELEASE_REPO  owner/name to publish on (default RyanAHayden/iFizBox)
+#   IFIZBOX_RELEASE_HISTORY  DIR/<tag>/ with the older releases' Packages (or .debs) instead of reading them from GitHub
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . native/brand.env # F170: BRAND_NAME for the release title and notes; F180: the asset names ($BRAND_NAME.ipa, .deb)
@@ -44,7 +46,7 @@ while [ $# -gt 0 ]; do
     --minimum) minimum=${2:?--minimum needs a version}; shift ;;
     --out) out=${2:?--out needs a directory}; shift ;;
     --sync-piracy) sync_piracy=1 ;;
-    -h|--help) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "release: unknown argument $1 (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -175,11 +177,23 @@ for f in "$dist/${pkg}"_*_*.deb; do
   cp "$f" "$stage/$b"
   extra+=("$b")
 done
-# F72: iFizBox's own APT repo over the Debian-named .debs (Filename: is the asset's name beside the Release).
+# F72: iFizBox's own APT repo over the Debian-named .debs. B73: Packages keeps the older releases too (the newest 20
+# in all), so Downgrade and Version History list them; every Filename: is <tag>/<asset>, which the Worker's
+# /repo/<tag>/<file>.deb fetches from that release. A real run reads the older releases' Packages assets (or their
+# Debian-named .debs) from GitHub with gh; a dry run stays offline and lists this release only.
+# IFIZBOX_RELEASE_HISTORY=DIR: read the older releases from DIR/<tag>/ instead (tests; tools/selfrepo.py fetch fills one).
 repodebs=("$stage/$debname")
 for b in "${extra[@]}"; do repodebs+=("$stage/$b"); done
-python3 tools/selfrepo.py "$stage" "${repodebs[@]}" ${minimum:+--minimum "$minimum"} >/dev/null ||
-  die "couldn't write the APT repo files"
+history=${IFIZBOX_RELEASE_HISTORY:-}
+if [ -z "$history" ] && [ $dry = 0 ]; then
+  history=$stage/.history
+  python3 tools/selfrepo.py fetch "$repo" "$history" --skip "$tag" >&2 ||
+    die "couldn't read the older releases' repo files from $repo (Packages would list this release only)"
+fi
+[ -z "$history" ] || [ -d "$history" ] || die "no older-releases directory $history"
+python3 tools/selfrepo.py "$stage" "${repodebs[@]}" --tag "$tag" ${history:+--history "$history"} \
+  ${minimum:+--minimum "$minimum"} >/dev/null || die "couldn't write the APT repo files"
+repoversions=$(sed -n 's/^Version: //p' "$stage/Packages" | tr '\n' ' ')
 repofiles=(Packages Packages.gz Release)
 
 if [ -n "$notes" ]; then
@@ -206,6 +220,8 @@ echo "release: $repo $tag at $sha"
 echo "release: assets: $BRAND_NAME.ipa $BRAND_NAME.deb $debname ${extra[*]:+${extra[*]} }${repofiles[*]} source.json"
 if [ "$repo" = "$BRAND_GITHUB_REPO" ]; then aptrepo=https://$BRAND_DOMAIN/repo/; else aptrepo="https://github.com/$repo/releases/latest/download/ (a Worker with IFIZBOX_REPO=$repo serves it at /repo/)"; fi
 echo "release: apt repo: $aptrepo, from https://github.com/$repo/releases/latest/download/${minimum:+ (minimum $minimum)}"
+if [ -n "$history" ]; then echo "release: apt repo versions: ${repoversions% }"
+else echo "release: apt repo versions: ${repoversions% } (dry run: older releases not read)"; fi
 echo "release: AltStore source: https://$BRAND_DOMAIN/repo/source.json (the sideload app's; the jailbreak app uses the apt repo only)"
 echo "release: notes:"
 sed 's/^/  /' "$stage/notes.md"

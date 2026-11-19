@@ -34,6 +34,7 @@
 //   GET/POST/DELETE /reviews/<package id>[/<review id>[/report]]   F182: user reviews in D1 (src/reviews.js)
 //   GET  /repo/<file>                       B17: iFizBox's own flat APT repo (Release, Packages, Packages.gz, *.deb),
 //                                           the latest release's asset fetched here, redirects followed here
+//   GET  /repo/<tag>/<file>.deb             B73: an older release's .deb (Packages' Filename), from releases/download/<tag>/
 //   GET  /repo/source.json                  F178: iFizBox's AltStore source (the deployed web/app/source.json, else the
 //                                           latest release's source.json asset), the sideload app's built-in source
 //   GET  /repo/CydiaIcon.png                B58: the repo's icon (also @2x/@3x): the app icon from ASSETS, kept a week
@@ -157,13 +158,22 @@ export async function upstream(url, { fetcher = fetch, wait = (ms) => new Promis
 // IFIZBOX_REPO (owner/name) picks another GitHub repo's releases (default brand.js GITHUB_REPO).
 const SELF_REPO = GITHUB_REPO;
 const REPO_TYPES = { "Release": "text/plain; charset=utf-8", "Packages": "text/plain; charset=utf-8", "Packages.gz": "application/gzip" };
+// B73: Packages keeps every release's iFizBox (tools/selfrepo.py), each Filename `<tag>/<file>.deb`: /repo/<tag>/<file>.deb
+// is that release's asset, releases/download/<tag>/<file> (only vX.Y.Z tags and .debs; it never changes once published).
+const DEB_NAME = /^[A-Za-z0-9][A-Za-z0-9.+~_-]{0,200}\.deb$/;
 export function repoFile(pathname) {
+  const t = /^\/repo\/(v\d{1,4}\.\d{1,4}\.\d{1,4})\/([^/]+)$/.exec(pathname);
+  if (t) {
+    let name;
+    try { name = decodeURIComponent(t[2]); } catch { return null; }
+    return DEB_NAME.test(name) ? { name, tag: t[1], type: "application/vnd.debian.binary-package" } : null;
+  }
   const m = /^\/repo\/([^/]+)$/.exec(pathname);
   if (!m) return null;
   let name;
   try { name = decodeURIComponent(m[1]); } catch { return null; }
   if (REPO_TYPES[name]) return { name, type: REPO_TYPES[name] };
-  return /^[A-Za-z0-9][A-Za-z0-9.+~_-]{0,200}\.deb$/.test(name) ? { name, type: "application/vnd.debian.binary-package" } : null;
+  return DEB_NAME.test(name) ? { name, type: "application/vnd.debian.binary-package" } : null;
 }
 // F178: /repo/source.json, iFizBox's AltStore source beside its APT repo (the sideload app's and the site's built-in
 // source, core/essential.js SELF_ALT_URL): the deployed web/app/source.json (ASSETS, updated by tools/release.sh
@@ -215,7 +225,9 @@ export async function repo(req, u, env = {}, { fetcher = fetch, wait } = {}) {
   const f = repoFile(u.pathname);
   if (!f || !["GET", "HEAD"].includes(req.method)) return new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
   const name = /^[\w.-]+\/[\w.-]+$/.test(env.IFIZBOX_REPO ?? "") ? env.IFIZBOX_REPO : SELF_REPO;
-  const src = `https://github.com/${name}/releases/latest/download/${encodeURIComponent(f.name)}`;
+  const src = f.tag
+    ? `https://github.com/${name}/releases/download/${f.tag}/${encodeURIComponent(f.name)}`
+    : `https://github.com/${name}/releases/latest/download/${encodeURIComponent(f.name)}`;
   let r;
   try { r = await upstream(src, { fetcher, token: env.GITHUB_TOKEN ?? null, ...(wait ? { wait } : {}) }); } catch {
     return new Response("GitHub didn't answer\n", { status: 502, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
@@ -227,7 +239,8 @@ export async function repo(req, u, env = {}, { fetcher = fetch, wait } = {}) {
   }
   // Release and Packages change with every release: clients ask again after 5 minutes; a .deb is named by version
   // (iFizBox.deb, the one fixed name, is never in Packages' Filename: apt fetches the versioned name).
-  const headers = { "Content-Type": f.type, "Cache-Control": `public, max-age=${f.name.endsWith(".deb") ? 3600 : 300}`, "X-Content-Type-Options": "nosniff", ...CORS };
+  // A tagged .deb (B73) is a published release's asset, which never changes: a day.
+  const headers = { "Content-Type": f.type, "Cache-Control": `public, max-age=${f.tag ? 86400 : f.name.endsWith(".deb") ? 3600 : 300}`, "X-Content-Type-Options": "nosniff", ...CORS };
   for (const h of ["content-length", "last-modified", "etag"]) { const v = r.headers.get(h); if (v) headers[h] = v; }
   if (req.method === "HEAD") { r.body?.cancel?.(); return new Response(null, { headers }); }
   return new Response(r.body, { headers, encodeBody: "manual" });

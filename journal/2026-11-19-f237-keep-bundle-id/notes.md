@@ -83,3 +83,9 @@ ID, only the entitlements (`application-identifier`, keychain group) carry the p
   run on a phone.
 - **Website zsign with the ID kept** ran only with the fake zsign (no `-b`, entitlements file); the real WebAssembly
   zsign tests still sign iFizBox's own fixture, which stays the old way.
+
+## Push confirmed (user, 2026-11-19)
+
+The user signed Unbound in build 0.9.8 (1630, commit 014c1a2) on their iPhone 15 Pro (stock iOS) with an Arctic Sign
+certificate whose profile has Push. Keep Bundle IDs was on. The app installed and **its notifications arrive**. This
+settles R25's open question: iOS registers push under the Info.plist bundle ID, so the app's own server reaches it.

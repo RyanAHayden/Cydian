@@ -25,7 +25,7 @@ import { addSiteUrl, markFresh, MYIPAS } from "./core/myipas.js";
 import { showActionSheet } from "./nav/actionsheet.js";
 import { storedKeep, withKeep, originalState, originalNote } from "./core/keepid.js";
 import { detectMode } from "./core/settings.js";
-import { progressHUD, lockSelfUpdate, unlockSelfUpdate } from "./nav/progress.js";
+import { progressHUD, lockSelfUpdate, unlockSelfUpdate, TRY_AGAIN_LABEL } from "./nav/progress.js";
 import { recordSelfUpdate } from "./core/selfupdate.js";
 import { showAlert } from "./nav/alert.js";
 import { NAME, GITHUB_REPO } from "./brand.js";
@@ -920,7 +920,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   { hud = progressHUD, alert = showAlert, open = (u) => { location.href = u; }, go = openRoute,
     identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "",
     now = identityNow, origin = () => new URL(base || "/", globalThis.location?.href).origin, clock = Date.now,
-    watch = watchInstall, phone = siteUdid, tooBig = tooBigAlert } = {}) {
+    watch = watchInstall, phone = siteUdid, tooBig = tooBigAlert, prompt = watchPrompt } = {}) {
   // F257: a listed size over the cap: the Too Big alert, before the early link or any download
   if (!bytes && url && overSiteLimit(size)) {
     await tooBig({ url, name, size, version, iconUrl }, { alert });
@@ -940,7 +940,11 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   // B95: the early link dropped once it can't get this app; `intoEarly` is set when the upload goes into it
   let intoEarly = false;
   const opened = Boolean(early); // iOS was sent to a link: the failure text says what to do with its icon
-  const drop =() => { if (early && !intoEarly) { const t = early.token; early = null; return dropEarly(t, { base, fetcher }); } return null; };
+  // B90: iOS's prompt cancelled while this runs (watchPrompt) stops the download, the signer and the upload
+  const ios = early ? promptStop(early.token, { base, fetcher, prompt }) : null;
+  const again = () => signInBrowser({ url, name, onInstalled, bring, bundleId, version, bytes, size, iconUrl },
+    { hud, alert, open, go, identity, fetcher, worker, transfer, base, now, origin, clock, watch, phone, tooBig, prompt });
+  const drop =() => { ios?.stop(); if (early && !intoEarly) { const t = early.token; early = null; return dropEarly(t, { base, fetcher }); } return null; };
   const id = await identity();
   if (!id?.p12 || !id?.profile) {
     drop();
@@ -959,11 +963,13 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   }
   const h = hud(bytes ? "Reading" : "Downloading");
   const pct = (label) => (p) => h.set(`${label} ${p}%`);
-  const signal = h.signal ?? null; // F188: the page's Cancel stops the download, the signer and the upload
+  // F188: the page's Cancel stops the download, the signer and the upload; B90: so does iOS's prompt cancelled
+  const signal = eitherSignal(h.signal ?? null, ios?.signal ?? null);
+  const guard = (p) => untilCancel(h, ios ? ios.race(p) : p);
   let cutOnce = false; // F257: the download was resumed at least once (the log said so)
   try {
-    const ipa = bytes ? await untilCancel(h, keptBytes(bytes))
-      : await untilCancel(h, downloadIpa(url, { base, fetcher, onProgress: pct("Downloading"), onCut: ({ attempt, at }) => {
+    const ipa = bytes ? await guard(keptBytes(bytes))
+      : await guard(downloadIpa(url, { base, fetcher, onProgress: pct("Downloading"), onCut: ({ attempt, at }) => {
         cutOnce = true;
         h.page?.raw?.(droppedText(at)); // F257: grey, then the step
         h.set(reconnectText(attempt));
@@ -971,7 +977,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     h.set("Signing");
     const self = isSelfIpa(url) || bring;
     const carry = self ? { identity: Boolean(bring), transfer: await transfer().catch(() => null) } : null;
-    const signed = await untilCancel(h, worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(id.profile), password: id.password ?? "", bring: carry,
+    const signed = await guard(worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(id.profile), password: id.password ?? "", bring: carry,
         appBundleId: bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null), ...withKeep({}) },
       { onProgress: (t) => h.set(t), ...(signal ? { signal } : {}) }));
     h.set("Uploading");
@@ -979,8 +985,9 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     // the early link takes this app only if it came out with the reserved bundle ID (iOS already has its manifest)
     intoEarly = Boolean(early && signed.bundleId === early.bundleId && (await reserved));
     if (!intoEarly) drop(); // the Ready to Install alert's own link follows
-    const body =await untilCancel(h, uploadSigned(ipaBytes, signed, { base, fetcher, onProgress: pct("Uploading"), token: intoEarly ? early.token : null,
+    const body =await guard(uploadSigned(ipaBytes, signed, { base, fetcher, onProgress: pct("Uploading"), token: intoEarly ? early.token : null,
       ...(signal ? { signal } : {}) }));
+    ios?.stop(); // uploaded: watchInstall follows iOS from here
     if (h.cancelled) return false;
     onInstalled({ ...body, bundleId: signed.bundleId, name: signed.name, version: signed.version });
     const app = name || signed.name || "The app";
@@ -1000,6 +1007,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     return index === 1;
   } catch (e) {
     drop();
+    if (ios?.cancelled && !h.cancelled) return iosCancelled(h, ios.token, { base, fetcher, alert, again }); // B90
     if (h.cancelled) return false; // F188: Cancel closed the page; no alert after it
     failed(h, String(e?.message ?? e));
     // F257: the download broke off past its last try: under the red error, what to do with iOS's icon (only once iOS
@@ -1101,6 +1109,106 @@ export function watchInstall(token, h, { base = "", fetcher = globalThis.fetch, 
     }
   })().catch(() => "unknown").finally(() => firstDone());
   return { first, end };
+}
+
+// ---- B90: iOS's Install prompt cancelled while the website still signs ----------------------------------------
+//
+// The early link opens iOS's prompt at the tap, and the download, the signer and the upload run on behind it. iOS asks
+// for app.ipa only once Install is tapped: the Worker marks that "asked" (GET /sign/up/<token>/status, even while it
+// holds the request for the upload). watchPrompt polls the status from the moment the link opens; once the manifest
+// was fetched (the prompt is up) and the page has come back in front (window focus, visibilitychange to visible,
+// pageshow: the prompt closed; only after the manifest was seen) with no "asked" within `grace` ms, or none `cap` ms after the manifest whatever the
+// page heard, iOS's prompt was cancelled: `onCancel()` runs once. A late "asked" before that carries on. A status
+// without an "asked" key (a Worker before B90), or no status at all, never cancels: the install goes on as before.
+//
+//   const p = watchPrompt(token, { base, fetcher, onCancel })
+//   p.state        "watching" | "asked" | "cancelled" | "unknown" (an older Worker) | "stopped"
+//   p.stop()       stops polling and listening (the upload is done, or the job ended)
+
+// grace: room for iOS's HEAD after an Install tap, its KV mark and the next look; a cancel read wrongly kills a real
+// install, so it errs long
+export const PROMPT_EVERY = 1000, PROMPT_GRACE = 8000, PROMPT_CAP = 30 * 1000;
+export const IOS_CANCELLED_TITLE = "Not Installed", IOS_CANCELLED_TEXT = "Cancelled in iOS.";
+
+export function watchPrompt(token, { base = "", fetcher = globalThis.fetch, onCancel = () => {}, every = PROMPT_EVERY, grace = PROMPT_GRACE,
+  cap = PROMPT_CAP, upTo = EARLY_WINDOW, clock = Date.now, sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  win = globalThis.window ?? globalThis, doc = globalThis.document } = {}) {
+  const t0 = clock();
+  let state = "watching", manifestAt = null, backAt = null;
+  // only a return once the prompt is up counts (one that came with the link opening says nothing)
+  const back = () => { if (manifestAt !== null) backAt = clock(); };
+  const onVisible = () => { if (doc?.visibilityState !== "hidden") back(); };
+  const listen = (on) => {
+    const m = on ? "addEventListener" : "removeEventListener";
+    try { win?.[m]?.("focus", back); win?.[m]?.("pageshow", back); doc?.[m]?.("visibilitychange", onVisible); } catch { /* no events */ }
+  };
+  listen(true);
+  const end = (s) => { if (state === "watching") { state = s; listen(false); } };
+  const look = async () => {
+    try {
+      const res = await fetcher(`${base}/sign/up/${token}/status`, { cache: "no-store" });
+      return res.ok ? await res.json() : null;
+    } catch { return null; }
+  };
+  (async () => {
+    while (state === "watching") {
+      const s = await look();
+      if (state !== "watching") return;
+      if (s && typeof s === "object") {
+        if (!("asked" in s)) { end("unknown"); return; } // a Worker before B90: as before
+        if (s.asked || s.started || s.finished) { end("asked"); return; }
+        if (s.manifest && manifestAt === null) manifestAt = clock();
+      }
+      const now = clock();
+      if (manifestAt !== null && (now - manifestAt >= cap || (backAt !== null && now - Math.max(backAt, manifestAt) >= grace))) {
+        end("cancelled");
+        try { onCancel(); } catch { /* the caller's own */ }
+        return;
+      }
+      if (now - t0 >= upTo) { end("stopped"); return; }
+      await sleep(every);
+    }
+  })().catch(() => end("stopped"));
+  return { get state() { return state; }, stop: () => end("stopped") };
+}
+
+// signInBrowser's side of watchPrompt: { signal (aborts on the cancel), race(p) (p, or a rejection with code
+// "ios_cancelled" once the prompt was cancelled), cancelled, token, stop() }.
+function promptStop(token, { base, fetcher, prompt = watchPrompt }) {
+  const ctl = typeof AbortController === "function" ? new AbortController() : null;
+  let cancelled = false, fire = () => {};
+  const gone = new Promise((_, reject) => { fire = () => reject(signFail("ios_cancelled", IOS_CANCELLED_TEXT)); });
+  gone.catch(() => {});
+  const w = prompt(token, { base, fetcher, onCancel: () => { cancelled = true; try { ctl?.abort(); } catch { /* no signal */ } fire(); } });
+  return { token, signal: ctl?.signal ?? null, get cancelled() { return cancelled; }, race: (p) => Promise.race([p, gone]), stop: () => w?.stop?.() };
+}
+
+// One signal that aborts when either does (AbortSignal.any where the browser has it).
+function eitherSignal(a, b) {
+  if (!a || !b) return a || b || null;
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.any === "function") return AbortSignal.any([a, b]);
+  const c = new AbortController();
+  for (const s of [a, b]) { if (s.aborted) c.abort(); else s.addEventListener("abort", () => c.abort(), { once: true }); }
+  return c.signal;
+}
+
+// The page once iOS's prompt was cancelled: the link dropped (the Worker answers a later app.ipa at once), "Not
+// Installed" with "Cancelled in iOS." in red, and Try Again (the install again from that tap, so a fresh early link)
+// above Return. A HUD without finish: the alert says it. -> false
+async function iosCancelled(h, token, { base, fetcher, alert, again }) {
+  dropEarly(token, { base, fetcher });
+  // run inside the tap itself: Safari opens the new early link only there
+  const retry = () => { try { Promise.resolve(again()).catch(() => {}); } catch { /* its own alert said it */ } };
+  if (typeof h.finish === "function") {
+    h.page?.error?.(IOS_CANCELLED_TEXT);
+    // the new run opens on this page (progressHUD reuses it while it's up): it stays
+    h.finish({ title: IOS_CANCELLED_TITLE, status: IOS_CANCELLED_TEXT, also: { label: TRY_AGAIN_LABEL, action: () => { retry(); return true; } } });
+    return false;
+  }
+  h.hide();
+  await alert({ title: IOS_CANCELLED_TITLE, message: IOS_CANCELLED_TEXT, buttons: ["Cancel", TRY_AGAIN_LABEL], cancel: 0,
+    onTap: (i) => { if (i === 1) retry(); } });
+  return false;
 }
 
 // What iFizBox's own IPA carries for its first launch: the website's sources and settings (Send Settings' link).

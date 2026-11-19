@@ -29,3 +29,15 @@
 (`install`). Lines: `node started in X s: state …`, `sign in: state …`, `signed in as …`, `test 100.x:49152: {…}`,
 `install through 100.x:49152 via 127.0.0.1:P`, `relay for port N: 127.0.0.1:P`, tsnet's `relay … connected in
 … / dial failed … / closed (… bytes up, … down)`, `install connection closed; node stopped`.
+
+## Verified on the iPhone 15 Pro (iOS 27.0.1), build 1926
+
+- First try (build 1925) failed with `connect_failed: Socket(UnexpectedEof "early eof")` and Test Connection
+  alternated ok / `connection reset by peer`. The failing dials had source = destination = the phone's own 100.x
+  address: right after a (re)start tsnet says Running before the netmap has the phone's node, and tsnet's dialer
+  then falls back to the system dialer, which iOS resets (own address). `waitPeer` now waits up to 10 s for the
+  target to appear in the netmap before dialing (Test and every relay connection).
+- Build 1926, LocalDevVPN off, Tailscale on: OpenTennis (42 MB) installed in 7.8 s: tunnel + RSD 1.4 s, AFC 16.8
+  MB/s through the relay, installd 3.6 s. No prompt (installation_proxy).
+- Deleting and reinstalling iFizBox gives a new app container, so a new node (`ifizbox-on-iphone-1`); the old one
+  stays in the admin console until removed.

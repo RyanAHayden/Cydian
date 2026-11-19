@@ -43,16 +43,10 @@ One frontend (`web/app/`, plain HTML, CSS and JavaScript modules with no build s
 | | Build | What it does | Needs |
 |:-:|---|---|---|
 | <img src="web/app/icons/icon-web-glossy-76.png" width="48" alt=""> | **Website**, [ifizbox.com](https://ifizbox.com) | Browse APT repos and AltStore sources, add your own, see what changed, search. Signs and installs apps **in your browser** with your certificate. No login. | Any iPhone with Safari |
-| <img src="web/app/icons/icon-glossy-76.png" width="48" alt=""> | **Jailbreak app** (`iFizBox.deb`) | Everything the website does, plus installing `.deb`s through apt with a root helper (a queue that downloads 3 at a time, where one failed package skips only what needs it), a background upgrade check, and Shortcuts actions. The helper installs IPAs directly, with no signing (with AppSync Unified). | A rootless jailbreak (iOS 15 and later, `iphoneos-arm64`) |
-| <img src="web/app/icons/icon-lite-glossy-76.png" width="48" alt=""> | **Sideload app** (`iFizBox.ipa`, the LITE icon) | The same app without the root helper: AltStore-style sources, apps signed and installed on the phone with your certificate, re-signing, and updates to the apps you installed, checked in the background too. | Your own signing certificate (`.p12` and `.mobileprovision`) |
-
-The jailbreak app and the sideload app are one app, two builds: the same `native/` shell, with or without the root
-helper.
+| <img src="web/app/icons/icon-glossy-76.png" width="48" alt=""> | **Jailbreak app** (`iFizBox.deb`) | Everything the website does, plus `.deb`s through apt, background upgrade checks and Shortcuts. Installs IPAs without signing (AppSync Unified). | A rootless jailbreak (iOS 15 and later, `iphoneos-arm64`) |
+| <img src="web/app/icons/icon-lite-glossy-76.png" width="48" alt=""> | **Sideload app** (`iFizBox.ipa`, the LITE icon) | The same app without apt: signs, installs, re-signs and updates apps on the phone with your certificate. | Your own signing certificate (`.p12` and `.mobileprovision`) |
 
 ## Screenshots
-
-Real pages with live sources at the iPhone 18 Pro's screen size (402×874 points at 3x), in Apple's iPhone 18 Pro
-bezel: silver for the website, black for the jailbreak app. Framed by [`tools/readme_shots.py`](tools/readme_shots.py).
 
 **Website**
 
@@ -63,7 +57,7 @@ bezel: silver for the website, black for the jailbreak app. Framed by [`tools/re
   <img src="docs/img/web-changes.png" alt="Changes" width="24%">
 </p>
 
-**Jailbreak app** (the sources, packages and install of a rootless iPhone)
+**Jailbreak app**
 
 <p align="center">
   <img src="docs/img/jb-home.png" alt="Home in the jailbreak app" width="24%">
@@ -88,47 +82,29 @@ bezel: silver for the website, black for the jailbreak app. Framed by [`tools/re
 
 ### Website
 
-Open **<https://ifizbox.com>** in Safari. Nothing to install and no account. To install apps from the website, add
-your certificate under **Settings > Signing**: the `.p12`, its password and the `.mobileprovision` stay in your
-browser, and apps are signed there.
+Open **<https://ifizbox.com>** in Safari. No install, no account. To install apps, add your certificate under
+**Settings > Signing** (it stays in your browser).
 
 ### Jailbreak app (rootless, iOS 15+)
 
-Add iFizBox's own APT repo to Sileo or Zebra, then install **iFizBox** (`com.ryha.ifizbox`):
+On the website, tap **Home > Jailbroken? Install iFizBox**, or add this repo to Sileo or Zebra:
 
 ```text
 https://ifizbox.com/repo/
 ```
 
-On the website, **Home > Jailbroken? Install iFizBox** does this for you (Add to Sileo, Add to Zebra, Copy Repo URL, or
-Download .deb). You can also get `iFizBox.deb` from the
-[latest release](https://github.com/RyanAHayden/iFizBox/releases/latest) and install it with
-`apt-get install ./iFizBox.deb`, which pulls in its dependencies (plain `dpkg -i` doesn't). Once installed, the
-repo stays in iFizBox as a built-in source, so iFizBox updates itself like any other package.
+Or `apt-get install ./iFizBox.deb` from the [latest release](https://github.com/RyanAHayden/iFizBox/releases/latest).
+iFizBox then updates itself like any other package.
 
 ### Sideload app (LITE)
 
-No certificate yet? [docs/developer-account.md](docs/developer-account.md) sets one up from your own Apple Developer
-account, with apps keeping their bundle IDs and notifications.
+Add your certificate on the website, then tap **Home > Install iFizBox Lite**. The app arrives with your certificate,
+sources and settings, and updates itself.
 
-**Have a developer account? Help your friends by sharing your certificate.** [SideDrop](https://github.com/RyanAHayden/sidedrop)
-is a site you run yourself: friends register their iPhone once, and every app is signed for them with your
-certificate, ready to install from Safari. Anyone who installs from it can pull the certificate out, so share it with
-people you trust.
+No certificate? [docs/developer-account.md](docs/developer-account.md). Have one? Help your friends by sharing it with
+[SideDrop](https://github.com/RyanAHayden/sidedrop) (only with people you trust: they can pull it out).
 
-With your certificate added on the website (**Settings > Signing**), tap **Home > Install iFizBox Lite**: the website
-signs the IPA in your browser and iOS asks to install it. The installed app comes with that certificate (and your
-sources and settings), so it signs and installs apps on the phone straight away. That's all it takes.
-
-You don't need another sideloading tool, but iFizBox's AltStore source works in Feather, AltStore or SideStore too:
-
-```text
-https://ifizbox.com/repo/source.json
-```
-
-`iFizBox.ipa` is also on every [release](https://github.com/RyanAHayden/iFizBox/releases/latest). The app looks for
-a new release every time it opens: a newer iFizBox shows as an upgrade in Changes, and installing it signs it on the
-phone and installs it over itself.
+Also on Feather, AltStore or SideStore: `https://ifizbox.com/repo/source.json`
 
 ## How it works
 
@@ -169,10 +145,8 @@ graph TD
   [zsign](https://github.com/zhlynn/zsign) compiled to WebAssembly (`web/app/vendor/zsign`, built reproducibly by
   `tools/build-zsign-wasm.sh`). No server ever signs anything or sees your key. Details:
   [docs/signing.md](docs/signing.md).
-- **iFizBox Account** ([docs/account.md](docs/account.md)) is optional. It keeps your sources, the settings that
-  travel between devices, ignored upgrades, installed-app records and your certificate, all **end-to-end encrypted**
-  (AES-GCM, with a 128-bit key made on your device), so a new phone or the website can get them back. The server
-  stores only ciphertext under a hash of the id. If you lose the key, nobody can recover the data.
+- **iFizBox Account** ([docs/account.md](docs/account.md)) is optional. It syncs your sources, settings and certificate,
+  **end-to-end encrypted** with a key made on your device. Lose the key and nobody can recover the data.
 - **Shortcuts, Siri and Spotlight:** Check for Updates, Add Source, Install All Updates, Respring and more
   ([docs/shortcuts.md](docs/shortcuts.md)).
 

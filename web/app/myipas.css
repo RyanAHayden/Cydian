@@ -5,6 +5,16 @@
 .myipa-row .cell-icon img:not(.loaded) { opacity: 0; }
 .myipa-row.is-broken .cell-subtitle { color: #b5322c; }
 .myipa-bundle { font-size: 13px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* B92: a file name is never cut on the IPA's page. The header's name wraps when it is the file's; the File row's
+   value takes the room beside its label and wraps, anywhere when a name has no break, the row growing with it
+   (screens/myipas.js markFileRow: a hold copies it). In the list, core/midtrunc.js cuts file names in the middle. */
+.pkg-head-name.myipa-head-file { white-space: normal; overflow-wrap: anywhere; }
+.myipa-file .cell-inner { align-items: flex-start; padding-top: 11px; padding-bottom: 11px; }
+.myipa-file .cell-text { flex: none; }
+.myipa-file .cell-label { line-height: 21px; }
+.myipa-file .cell-detail { flex: 1; min-width: 0; max-width: none; margin-left: 6px; text-align: right; line-height: 21px;
+  white-space: normal; overflow-wrap: anywhere; }
+
 /* Delete: centred red text in its own group, as Settings' Delete Account rows are on iOS 6. */
 .cell-inner.myipa-delete { justify-content: center; }
 .cell-inner.myipa-delete .cell-text { flex: none; }

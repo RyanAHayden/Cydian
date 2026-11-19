@@ -44,7 +44,8 @@ import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optio
   priceProgress, ipaSelectSheet, ipaSelectLabel, ipaPresetFiles, ipaCounts, ipaSummary, ipaToolbar, ipaSheet, unsignEntries,
   IPA_SELECT } from "../core/myipas.js";
 import { barButton } from "../nav/ui.js";
-import { longPress } from "../nav/menu.js";
+import { longPress, showMenu, copyText } from "../nav/menu.js";
+import { fitFileNames, isFileName } from "../core/midtrunc.js";
 import { readIpaFile } from "../core/ipainfo.js";
 import { localSigning, libraryCall, installFromLibrary, signAndInstall, openSigning } from "../signing-client.js";
 import { siteCertificateAlert } from "./altstore.js";
@@ -396,6 +397,7 @@ export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jail
   }
   paint();
   attachLibraryGestures(box, ctl, on);
+  fitFileNames(box); // B92: a row named by its file ('opentennis-be…p146.ipa') is cut in the middle, not at the end
   return ctl;
 }
 
@@ -975,7 +977,7 @@ function header(entry) {
   putIcon(icon, entry.icon);
   const ht = el("div", "pkg-head-text");
   const top = el("span", "pkg-head-top");
-  top.append(el("span", "pkg-head-name", name));
+  top.append(el("span", isFileName(name) ? "pkg-head-name myipa-head-file" : "pkg-head-name", name)); // B92: a file name wraps
   ht.append(top);
   if (entry.version) ht.append(el("span", "pkg-head-version", entry.version));
   ht.append(el("span", "pkg-head-version myipa-bundle", entry.bundleId || (site() ? hostOf(entry.url) : "")));
@@ -1030,6 +1032,7 @@ async function renderIpa(body, route, file) {
   }
   if (jailbreak()) {
     body.append(grouped(jailbreakIpaGroups(entry, () => confirmDelete(entry))));
+    markFileRow(body, entry.file);
     markDelete(body);
     return;
   }
@@ -1061,7 +1064,18 @@ async function renderIpa(body, route, file) {
   groups.push({ header: "Details", rows: details });
   groups.push({ rows: [{ label: "Delete", onClick: () => confirmDelete(entry) }] });
   body.append(grouped(groups));
+  markFileRow(body, entry.file);
   markDelete(body);
+}
+
+// B92: the page's File row shows the whole name, wrapped (myipas.css .myipa-file), and a hold on it shows iOS 6's
+// black Copy callout, as a Contacts value row does; Copy puts the full file name on the clipboard.
+export function markFileRow(body, file, { menu = showMenu, copy = copyText, hold = longPress } = {}) {
+  const li = [...body.querySelectorAll(".cell")].find((c) => c.querySelector(".cell-label")?.textContent === "File");
+  if (!li || !file) return null;
+  li.classList.add("myipa-file");
+  hold(li, ".cell-inner", (inner) => menu(inner, [{ label: "Copy", onClick: () => copy(file) }]));
+  return li;
 }
 
 // F212: an IPA's page in the jailbreak app: its details and Delete; Install (nav bar) hands the file to ifizbox-helper

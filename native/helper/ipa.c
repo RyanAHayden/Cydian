@@ -8,7 +8,9 @@
  *   2. unzip runs as that user (not root) into pkg/ beside the copy, so a hostile zip (symlinks, "../") can only
  *      write where the user already can. CFBundleIdentifier comes from Payload/<one>.app/Info.plist, read with
  *      O_NOFOLLOW.
- *   3. With AppSync Unified (installd takes any signature): install the root-owned copy, as appinst does.
+ *   3. With AppSync Unified (installd takes any signature): install the root-owned copy, as appinst does; but
+ *      installd still wants an application-identifier entitlement (B59), so a main binary without one is
+ *      fakesigned with `ldid -M -S` on the whole .app (as the user) and the unpacked .app installed instead.
  *      Without it: ad hoc sign the .app with ldid (as TrollStore Lite does: `ldid -s`, keeping the entitlements, run
  *      as the user too) and install the unpacked .app (PackageType Developer). No ldid, or installd refuses the ad
  *      hoc app: exit HELPER_EX_ADHOC with a line saying the jailbreak can't install ad hoc apps without AppSync.
@@ -233,6 +235,135 @@ static void remove_tree(const char *path) {
     }
 }
 
+/* B59: run_as with argv's stdout captured into a malloc'd, NUL-terminated *out (at most max bytes; more fails).
+ * Returns the exit status, or -1 when it couldn't start or said too much. */
+static int run_as_capture(uid_t uid, gid_t gid, const char *cwd, char *const env[], const char *const argv[],
+                          size_t max, char **out, size_t *len) {
+    *out = NULL;
+    *len = 0;
+    int fds[2];
+    if (pipe(fds)) return -1;
+    fflush(stdout);
+    pid_t pid = fork();
+    if (pid < 0) { close(fds[0]); close(fds[1]); return -1; }
+    if (pid == 0) {
+        close(fds[0]);
+        if (dup2(fds[1], 1) < 0) _exit(126);
+        if (fds[1] != 1) close(fds[1]);
+        int null = open("/dev/null", O_WRONLY);
+        if (null >= 0) { dup2(null, 2); if (null != 2) close(null); } /* a probe: its complaints aren't the user's */
+        if (geteuid() == 0 && uid != 0) {
+            if (setgroups(0, NULL) || setgid(gid) || setuid(uid)) _exit(126);
+        }
+        if (getuid() == 0 && uid != 0) _exit(126);
+        if (chdir(cwd)) _exit(126);
+        execve(argv[0], (char *const *)argv, env);
+        fprintf(stderr, "ifizbox-helper: %s: %s\n", argv[0], strerror(errno));
+        _exit(126);
+    }
+    close(fds[1]);
+    char *buf = malloc(max + 1);
+    size_t got = 0;
+    int over = !buf;
+    char tmp[4096];
+    ssize_t n;
+    while ((n = read(fds[0], tmp, sizeof tmp)) != 0) {
+        if (n < 0) { if (errno == EINTR) continue; over = 1; break; }
+        if (over || got + (size_t)n > max) { over = 1; continue; } /* drain so the child can finish */
+        memcpy(buf + got, tmp, (size_t)n);
+        got += (size_t)n;
+    }
+    close(fds[0]);
+    int st;
+    while (waitpid(pid, &st, 0) < 0)
+        if (errno != EINTR) { free(buf); return -1; }
+    if (over) { free(buf); return -1; }
+    buf[got] = 0;
+    *out = buf;
+    *len = got;
+    return WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
+}
+
+/* B59: the team id a fakesigned app gets when it has none of its own (installd wants any 10 characters). */
+#define IPA_FAKE_TEAM "FAKESIGNED"
+
+int helper_ipa_team_ok(const char *s) {
+    if (strlen(s) != 10) return 0;
+    for (const char *p = s; *p; p++)
+        if (!((*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9'))) return 0;
+    return 1;
+}
+
+int helper_ipa_exe_ok(const char *s) {
+    if (!helper_app_value_ok(s) || !strcmp(s, ".") || !strcmp(s, "..")) return 0;
+    return strchr(s, '/') == NULL;
+}
+
+static int read_small(const char *path, char **buf, size_t *len);
+
+/* B59: installd refuses an app whose main binary has no application-identifier entitlement, AppSync Unified or
+ * not ("Application is missing the application-identifier entitlement"). Read the binary's entitlements with
+ * `ldid -e` (as the user); when application-identifier is missing, fakesign the .app with `ldid -M -S<ent>`
+ * (sealing the bundle: _CodeSignature/CodeResources), which keeps the app's own entitlements and adds application-identifier <team>.<id> and
+ * com.apple.developer.team-identifier <team> (the app's own team id when it has a usable one).
+ * Returns 0 when the binary already had it, 1 when it was fakesigned, or an exit code with *err. */
+static int fakesign(const char *ldid, uid_t uid, gid_t gid, const char *pkg, const char *work, const char *app,
+                    const char *id, char *const env[], const char **err) {
+    char p[PATH_MAX], exe[HELPER_NAME_MAX + 1], bin[PATH_MAX], ent[PATH_MAX];
+    char *info = NULL, *have = NULL;
+    size_t ilen = 0, hlen = 0;
+    if ((size_t)snprintf(p, sizeof p, "%s/Info.plist", app) >= sizeof p || read_small(p, &info, &ilen)) {
+        *err = "can't read the app's Info.plist";
+        return HELPER_EX_USAGE;
+    }
+    int bad = helper_plist_string(info, ilen, "CFBundleExecutable", exe, sizeof exe) || !helper_ipa_exe_ok(exe);
+    free(info);
+    if (bad) { *err = "no usable CFBundleExecutable in the app's Info.plist"; return HELPER_EX_USAGE; }
+    struct stat st;
+    if ((size_t)snprintf(bin, sizeof bin, "%s/%s", app, exe) >= sizeof bin || lstat(bin, &st) || !S_ISREG(st.st_mode)) {
+        *err = "the app's CFBundleExecutable isn't a plain file in the app";
+        return HELPER_EX_USAGE;
+    }
+
+    /* Unsigned binaries make ldid -e fail: no entitlements at all. */
+    const char *show[] = {ldid, "-e", bin, NULL};
+    int rc = run_as_capture(uid, gid, pkg, env, show, IPA_PLIST_MAX, &have, &hlen);
+    char appid[512] = "", team[HELPER_NAME_MAX + 1] = "";
+    if (rc == 0 && have && hlen) {
+        if (helper_plist_string(have, hlen, "application-identifier", appid, sizeof appid)) appid[0] = 0;
+        if (helper_plist_string(have, hlen, "com.apple.developer.team-identifier", team, sizeof team) ||
+            !helper_ipa_team_ok(team))
+            team[0] = 0;
+    }
+    free(have);
+    if (appid[0]) return 0;
+    if (!team[0]) snprintf(team, sizeof team, "%s", IPA_FAKE_TEAM);
+
+    progress(id, 45, "Adding the application-identifier entitlement (ldid)");
+    if ((size_t)snprintf(ent, sizeof ent, "%s/ent.xml", work) >= sizeof ent) return fail(err, "work path too long");
+    FILE *f = NULL;
+    int fd = open(ent, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0644);
+    if (fd >= 0 && !(f = fdopen(fd, "w"))) close(fd);
+    if (!f) return fail(err, "can't write the entitlements file");
+    /* id passed helper_ipa_bundle_id_ok and team helper_ipa_team_ok: nothing in them needs escaping. */
+    fprintf(f, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+               "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+               "<plist version=\"1.0\">\n<dict>\n"
+               "\t<key>application-identifier</key>\n\t<string>%s.%s</string>\n"
+               "\t<key>com.apple.developer.team-identifier</key>\n\t<string>%s</string>\n"
+               "</dict>\n</plist>\n", team, id, team);
+    if (fclose(f)) return fail(err, "can't write the entitlements file");
+    char sopt[PATH_MAX + 3];
+    snprintf(sopt, sizeof sopt, "-S%s", ent);
+    /* The whole .app, not just the binary: SpringBoard refuses to launch an app whose bundle has no
+     * _CodeSignature/CodeResources ("No code signature found", checked on the 7), even when its binary is signed. */
+    const char *sign[] = {ldid, "-M", sopt, app, NULL};
+    fflush(stdout);
+    rc = run_as(uid, gid, pkg, env, sign);
+    if (rc) { *err = "ldid couldn't add the application-identifier entitlement"; return HELPER_EX_ADHOC; }
+    return 1;
+}
+
 static int do_install(const char *prefix, const char *ipa, char *const env[], const char *work, const char **err) {
     /* 1. The caller's IPA: its directory is the real one (iOS's /var -> /private/var aside, no link on the way), the
      * file a plain one of the user who owns that directory. */
@@ -288,16 +419,24 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
 
     /* 3. installd. */
     char why[512] = "";
+    char ldid[PATH_MAX];
+    if ((size_t)snprintf(ldid, sizeof ldid, "%s/usr/bin/ldid", prefix) >= sizeof ldid) return fail(err, "prefix too long");
     if (helper_ipa_appsync(prefix)) {
+        /* B59: AppSync takes any signature but installd still wants application-identifier: fakesign the binary
+         * when it lacks one and install the unpacked .app (there's no zip to pack it back); otherwise the IPA. */
+        int signed_app = 0;
+        if (!access(ldid, X_OK)) {
+            rc = fakesign(ldid, uid, gid, pkg, work, app, id, env, err);
+            if (rc > 1) return rc;
+            signed_app = rc == 1;
+        }
         progress(id, 50, "Installing (AppSync Unified)");
-        if (install(copy, id, 0, why, sizeof why)) {
+        if (install(signed_app ? app : copy, id, signed_app, why, sizeof why)) {
             fprintf(stderr, "ifizbox-helper: installd: %s\n", why);
             *err = "installd refused the app";
             return 1;
         }
     } else {
-        char ldid[PATH_MAX];
-        if ((size_t)snprintf(ldid, sizeof ldid, "%s/usr/bin/ldid", prefix) >= sizeof ldid) return fail(err, "prefix too long");
         if (access(ldid, X_OK)) {
             *err = "AppSync Unified isn't installed and there's no ldid to sign the app ad hoc: install AppSync "
                    "Unified or ldid, or sign the IPA for this iPhone first";
@@ -307,6 +446,8 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
         const char *ld[] = {ldid, "-s", app, NULL};
         rc = run_as(uid, gid, pkg, env, ld);
         if (rc) { *err = "ldid couldn't sign the app ad hoc"; return HELPER_EX_ADHOC; }
+        rc = fakesign(ldid, uid, gid, pkg, work, app, id, env, err); /* B59 */
+        if (rc > 1) return rc;
         progress(id, 60, "Installing (ad hoc signed)");
         if (install(app, id, 1, why, sizeof why)) {
             fprintf(stderr, "ifizbox-helper: installd: %s\n", why);

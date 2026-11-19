@@ -122,7 +122,7 @@ test("the Reviews tab: ours and the depiction's in one list, Tap to Rate keeps y
   let confirmed = 0, sheets = [];
   const rated = [];
   await reviewsTab(pane, { id: "com.example.velvet", version: "2.0", depiction, api, now, renderText: (x) => Object.assign(document.createElement("div"), { _text: `md:${x.text}` }),
-    confirm: async () => { confirmed++; return true; }, sheet: (o) => sheets.push(o), onRating: (r) => rated.push(r) });
+    confirm: async () => { confirmed++; return true; }, sheet: (o) => sheets.push(o), onRating: (r) => rated.push(r), rateDelay: 0 });
   const titles = () => find(pane, "store-review-title").map((t) => t.textContent);
   assert.deepEqual(titles(), ["1. Theirs <img src=x onerror=alert(1)>", "2. Mine", "3. From the depiction"]);
   assert.ok(all(pane).every((x) => x.tagName !== "IMG"), "a review's text is text, never markup");

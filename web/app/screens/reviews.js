@@ -13,6 +13,9 @@
 //     null or a promise. `renderText(review)`: the body of a depiction's review (ours are always plain text).
 //     `first`: page 0 already asked for (the page's header stars), so it isn't asked twice; `onRating(r)`: the merged
 //     rating each time it is drawn again after a post (the header and the Rating tile follow).
+//     F216: Your Rating clears with the same star again or Remove (a written review asks first, confirmDelete);
+//     it sends rateDelay (1.5 s) after the last touch, only the final value, and on pagehide / hidden at once.
+//     `rating.flush()` sends a waiting change now (Write a Review does that first).
 //   writeReviewSheet({ initial, version, onSend, footnote }) -> { sheet, close, send, stars, fields }
 //     The iOS 6 modal: Cancel / Send, the five stars, Title, Name, Review. onSend(draft) -> Promise; it closes when
 //     that resolves and shows the error under the form when it throws. F207: with `initial` and `onDelete`, a red
@@ -26,7 +29,8 @@ import { showActionSheet } from "../nav/actionsheet.js";
 import { ratingsCard, reviewCell } from "./storepage.js";
 import { checkDraft, mergeReviews, ourReview, withStars, LIMITS } from "../core/reviews.js";
 
-export function starPicker(value = 0, onPick = () => {}, { cls = "" } = {}) {
+// F216: `clearable`: tapping the star that is already the value clears it to 0 (Your Rating; the sheet needs stars).
+export function starPicker(value = 0, onPick = () => {}, { cls = "", clearable = false } = {}) {
   const node = el("span", `review-stars${cls ? ` ${cls}` : ""}`);
   node.setAttribute("role", "radiogroup");
   node.setAttribute("aria-label", "Rating");
@@ -36,7 +40,7 @@ export function starPicker(value = 0, onPick = () => {}, { cls = "" } = {}) {
     b.type = "button";
     b.setAttribute("role", "radio");
     b.setAttribute("aria-label", `${n} star${n === 1 ? "" : "s"}`);
-    b.addEventListener("click", () => { set(n); onPick(n); });
+    b.addEventListener("click", () => { const v = clearable && n === now ? 0 : n; set(v); return onPick(v); });
     node.append(b);
     return b;
   });
@@ -164,7 +168,8 @@ export function writeReviewSheet({ initial = null, version = "", onSend = async 
 const resolved = (p) => Promise.resolve(p).catch(() => null);
 
 export async function reviewsTab(pane, { id, version = "", depiction = null, appStore = null, api, renderText = null, now = Date.now(),
-  first = null, onRating = null, sheet = writeReviewSheet, confirm = confirmReport, confirmDelete = confirmDeleteReview, filter = null } = {}) {
+  first = null, onRating = null, sheet = writeReviewSheet, confirm = confirmReport, confirmDelete = confirmDeleteReview, filter = null,
+  rateDelay = 1500, win = globalThis.window ?? null, doc = globalThis.document ?? null } = {}) {
   // F206: the card's skeleton (the filled card's shape, "Loading Reviews…" in its last line), not a spinner, so the
   // tab doesn't jump when the reviews arrive.
   pane.replaceChildren(ratingsCard(null, { pending: true }));
@@ -173,7 +178,7 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
   let page = 0;
   let stars = [1, 2, 3, 4, 5].includes(filter) ? filter : null; // F206: the star filter, null for all
 
-  const redraw = async () => { await reviewsTab(pane, { id, version, depiction: dep, appStore: store, api, renderText, now: Date.now(), onRating, sheet, confirm, confirmDelete, filter: stars }); };
+  const redraw = async () => { await reviewsTab(pane, { id, version, depiction: dep, appStore: store, api, renderText, now: Date.now(), onRating, sheet, confirm, confirmDelete, filter: stars, rateDelay, win, doc }); };
   // F207: delete this device's review; the tab draws again (stars, count, list) and Tap to Rate starts empty.
   const removeMine = async () => {
     await api.remove(id, mine?.id ?? null);
@@ -198,21 +203,95 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
   // rating, the same row again (or Show All) clears it.
   const card = ratingsCard(merged.rating, { reviews: written(), selected: stars, onPick: (n) => setFilter(stars === n ? null : n) });
   const parts = [card];
+  let rating = null; // F216: { picker, flush } of Your Rating
   if (ours?.enabled) {
     const tap = el("div", "review-tap");
     const status = el("span", "review-tap-status");
-    const picker = starPicker(mine?.stars ?? 0, async (n) => {
-      status.textContent = "Sending…";
-      try {
-        await post({ stars: n, title: mine?.title ?? "", name: mine?.name ?? "", text: mine?.text ?? "", version: version || mine?.version || "" });
-      } catch (e) { status.textContent = e?.message || "Not sent."; picker.set(mine?.stars ?? 0); }
-    }, { cls: "small" });
-    tap.append(el("span", "review-tap-label", mine ? "Your Rating:" : "Tap to Rate:"), status, picker.node);
+    const label = el("span", "review-tap-label");
+    // F216: the same star again clears it; Remove does too. The stars and the label follow each tap at once; the
+    // post (or delete) goes out rateDelay after the last touch, only the final value and only if it changed.
+    const picker = starPicker(mine?.stars ?? 0, (n) => changed(n), { cls: "small", clearable: true });
+    const remove = el("button", "review-tap-remove", "Remove");
+    remove.type = "button";
+    remove.addEventListener("click", () => { picker.set(0); return changed(0); });
+    tap.append(label, status, remove, picker.node);
     card.table.append(tap); // inside the ratings card, under the bars
+    const show = () => {
+      const v = picker.value();
+      label.textContent = v ? "Your Rating:" : "Tap to Rate:";
+      remove.hidden = !v;
+    };
+    show();
+    rating = { picker, flush: () => flushRating() };
+    const hasWords = () => Boolean(mine?.title || mine?.text);
+    let timer = null, down = false, okToDelete = false, sending = null;
+    let lastAsked = mine?.stars ?? 0; // the value a cancelled clear goes back to
+    const onHide = () => { if (doc?.visibilityState === "hidden") flushRating(); };
+    let watching = false;
+    const watch = (on) => {
+      if (on === watching) return;
+      watching = on;
+      const f = on ? "addEventListener" : "removeEventListener";
+      win?.[f]?.("pagehide", flushRating);
+      doc?.[f]?.("visibilitychange", onHide);
+    };
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = null;
+      if (down) { watch(true); return; } // a finger is still on the stars: wait for it to lift
+      timer = setTimeout(() => { timer = null; flushRating(); }, rateDelay);
+      watch(true);
+    };
+    async function changed(n) {
+      status.textContent = "";
+      show();
+      // A review can't stay without stars: clearing one with words asks first, here, while the finger is on it.
+      if (n === 0 && (mine?.stars ?? 0) && hasWords() && !okToDelete) {
+        const prev = timer;
+        clearTimeout(prev);
+        timer = null;
+        if (!(await confirmDelete())) {
+          picker.set(lastAsked);
+          show();
+          if (lastAsked !== (mine?.stars ?? 0)) schedule();
+          return;
+        }
+        okToDelete = true;
+      }
+      if (n) lastAsked = n;
+      schedule();
+    }
+    async function flushRating() {
+      clearTimeout(timer);
+      timer = null;
+      watch(false);
+      if (sending) return sending;
+      const was = mine?.stars ?? 0;
+      const n = picker.value();
+      if (n === was) { status.textContent = ""; return; }
+      status.textContent = "Sending…";
+      sending = (async () => {
+        try {
+          if (n === 0) await removeMine();
+          else await post({ stars: n, title: mine?.title ?? "", name: mine?.name ?? "", text: mine?.text ?? "", version: version || mine?.version || "" });
+        } catch (e) {
+          status.textContent = e?.message || "Not sent.";
+          picker.set(mine?.stars ?? 0); // the last value the server has
+          lastAsked = mine?.stars ?? 0;
+          okToDelete = false;
+          show();
+        } finally { sending = null; }
+      })();
+      return sending;
+    }
+    const press = () => { down = true; clearTimeout(timer); timer = null; };
+    const lift = () => { if (!down) return; down = false; if (watching) schedule(); }; // watching: a change waits
+    for (const t of ["pointerdown", "touchstart"]) picker.node.addEventListener(t, press);
+    for (const t of ["pointerup", "pointercancel", "touchend", "touchcancel"]) picker.node.addEventListener(t, lift);
     const actions = el("div", "review-actions");
     const write = el("button", "review-button", mine?.title || mine?.text ? "Edit Your Review" : "Write a Review");
     write.type = "button";
-    write.addEventListener("click", () => sheet({ initial: mine, version, onSend: post, onDelete: mine ? removeMine : null, confirmDelete }));
+    write.addEventListener("click", async () => { await rating?.flush(); sheet({ initial: mine, version, onSend: post, onDelete: mine ? removeMine : null, confirmDelete }); });
     actions.append(write);
     parts.push(actions);
     if (mine?.hidden) parts.push(el("p", "review-hidden-note", "Your review was hidden after other people reported it. Changing it shows it again."));
@@ -311,7 +390,7 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
   const foot = el("p", "group-footer store-reviews-footer", merged.footer);
   parts.push(foot);
   pane.replaceChildren(...parts);
-  return { card, area, setFilter, filter: () => stars };
+  return { card, area, setFilter, filter: () => stars, rating };
 }
 
 async function confirmReport() {

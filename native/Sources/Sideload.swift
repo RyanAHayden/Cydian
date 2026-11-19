@@ -69,6 +69,7 @@ enum Sideload {
                 Apt.reply(c, ["installed": out], nil)
             }
         }
+        PhoneID.register(b) // F236: device.udid, every build
         b.on("signing.resignAll") { c in resignAll(c) }
         b.on("signing.resign") { c in resignOne(c) }
         b.on("signing.checkCertificate") { c in checkCertificate(c) }
@@ -171,6 +172,7 @@ enum Sideload {
                 var j: [String: Any] = ["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": app.name,
                                         "version": app.version, "removed": app.removed, "fixedArm64e": app.fixedArm64e]
                 if let x = rec.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
+                j["device"] = PhoneID.check(profile).json // F236: "unknown" makes a missing app name the likely cause
                 Apt.reply(c, j, nil)
             }
         }
@@ -290,6 +292,10 @@ enum Sideload {
                     + (profile.expires.map { ", expires \(ISO8601DateFormatter().string(from: $0))" } ?? ""))
             }
             if let p = profile.problem(with: identity.certificate) { throw p }
+            // F236: a profile without this iPhone fails here with what to do, not later with iOS's "integrity" alert
+            let device = PhoneID.check(profile)
+            log?("This iPhone in the profile: \(device.state.rawValue) (\(device.count) devices listed)")
+            if let p = DeviceCheck.problem(device) { throw p }
             try job?.check() // F196: Cancel while it downloaded
             let signer = IPASigner(profile: profile, identity: identity)
             signer.options = options

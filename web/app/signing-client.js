@@ -17,7 +17,7 @@
 //   await signAndInstall({ url, name, onInstalled, bring })   signs on the phone and installs (installOnDevice), or
 //                                on the website signs in the browser (signInBrowser)
 import { showBanner } from "./nav/banner.js";
-import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError } from "./core/signing.js";
+import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError, parseProfile, deviceCheck, notLandedText } from "./core/signing.js";
 import { format, settingsRoute } from "./router.js";
 import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId } from "./core/websign.js";
 import { detectMode } from "./core/settings.js";
@@ -217,9 +217,19 @@ export function statusReady(status) {
 // right after an import, the web view coming back from Safari). null when both fail.
 async function readyStatus(native, wait) {
   for (let i = 0; i < 2; i++) {
-    try { return await deviceStatus(native); } catch { if (i === 0) await wait(400); }
+    try { return keepDevice(await deviceStatus(native)); } catch { if (i === 0) await wait(400); }
   }
   return null;
+}
+
+// F236: the last signing.status's profile.device (is this iPhone in the profile), for an install whose own answer
+// doesn't carry one (My IPAs): followInstall's likely-cause line when it came out "unknown".
+let lastDevice = null;
+function keepDevice(status) {
+  let st = status;
+  if (typeof st === "string") { try { st = JSON.parse(st); } catch { return status; } }
+  lastDevice = st?.identity?.profile?.device ?? null;
+  return status;
 }
 
 export async function importToDevice({ p12, password, profile }, native) {
@@ -299,7 +309,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   // Not for iFizBox itself (host, or its own IPA or ID): iOS closes iFizBox while it installs over it.
   if (result?.bundleId && !host && !isSelfIpa(url) && result.bundleId !== IFIZBOX_ID) {
     const followInstall = follow ?? (await import("./signing-sheet.js")).followInstall;
-    followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name });
+    followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name, device: result.device ?? lastDevice });
     return true;
   }
   // B49: iFizBox itself: the page ends locked on "Closing iFizBox" (no Close to tap) until iOS closes the app.
@@ -378,7 +388,7 @@ export async function installFromLibrary({ file, name = "", signed = false, onIn
   if (h.cancelled) return false;
   onInstalled(result);
   const followInstall = follow ?? (await import("./signing-sheet.js")).followInstall;
-  if (result?.bundleId) followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name });
+  if (result?.bundleId) followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name, device: result.device ?? lastDevice });
   else later(() => (h.done ? h.done("Done") : h.hide()), 1200);
   return "installed";
 }
@@ -552,6 +562,15 @@ async function keptBytes(src) {
   throw signFail("missing", "The IPA isn't kept in this browser any more: Safari may have cleared it. Add it again.");
 }
 
+// F236: the website can't read this iPhone's UDID, so a profile that lists devices can't be checked against it: the
+// likely-cause line for watchInstall, or null (all devices, no list, an unreadable profile).
+export function siteCause(id, app) {
+  try {
+    const p = parseProfile(id.profile instanceof Uint8Array ? id.profile : new Uint8Array(id.profile));
+    return notLandedText(app, deviceCheck(p, null));
+  } catch { return null; }
+}
+
 const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof ArrayBuffer ? b.slice(0) : new Uint8Array(b ?? []).buffer);
 
 export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null },
@@ -601,7 +620,8 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     if (intoEarly && clock() - early.at < EARLY_WINDOW) {
       // iOS's prompt was asked for at the tap and its download now gets the app: nothing more to tap here.
       // F190: the log follows iOS's requests on the link from here (watchInstall); not awaited past its first look.
-      await watch(early.token, h, { base, fetcher, app: name || signed.name, itms: early.itms, open, alert }).first;
+      await watch(early.token, h, { base, fetcher, app: name || signed.name, itms: early.itms, open, alert,
+        cause: siteCause(id, name || signed.name) }).first;
       return true;
     }
     h.hide();
@@ -645,8 +665,10 @@ export const installSteps = (app) => [
 export const installStage = (s) => (s?.finished || s?.started ? 2 : s?.manifest ? 1 : 0);
 export const notAskedText = "iOS didn't ask for the app. Tap Install again.";
 
+// F236: `cause` (core/signing.js notLandedText: the website can't read this iPhone's UDID) is added under the last step
+// once iOS has the app, and when it never fetches it, so an install that doesn't land names the likely cause first.
 export function watchInstall(token, h, { base = "", fetcher = globalThis.fetch, app = "", itms = "", open = () => {}, alert = showAlert,
-  every = STATUS_EVERY, minShow = STATUS_MIN_SHOW, askWithin = STATUS_ASK_WITHIN, upTo = EARLY_WINDOW,
+  cause = null, every = STATUS_EVERY, minShow = STATUS_MIN_SHOW, askWithin = STATUS_ASK_WITHIN, upTo = EARLY_WINDOW,
   clock = Date.now, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
   const steps = installSteps(app), t0 = clock();
   let shown = -1, shownAt = 0, firstDone;
@@ -680,6 +702,7 @@ export function watchInstall(token, h, { base = "", fetcher = globalThis.fetch, 
       if (installStage(s) === 2) {
         const left = minShow - (clock() - shownAt);
         if (left > 0) await sleep(left);
+        if (cause) h.page?.line?.("warning", cause);
         if (h.done) h.done(steps[2]); else h.hide();
         return "installed";
       }
@@ -694,7 +717,11 @@ export function watchInstall(token, h, { base = "", fetcher = globalThis.fetch, 
         }
         return "not_asked";
       }
-      if (clock() - t0 >= upTo) { if (h.done) h.done(steps[shown]); else h.hide(); return "timeout"; }
+      if (clock() - t0 >= upTo) {
+        if (cause) h.page?.line?.("warning", cause);
+        if (h.done) h.done(steps[shown]); else h.hide();
+        return "timeout";
+      }
       await sleep(every);
       s = (await look()) ?? s; // a missed look keeps the last answer
       await show(installStage(s));

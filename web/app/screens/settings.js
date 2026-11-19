@@ -20,14 +20,14 @@ import { createSettings, detectMode, themeState, paletteFor, DARK_THEME_KEY, SET
 import { segmented } from "./storepage.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
-import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind } from "../core/signing.js";
+import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind, deviceCheck, deviceCheckText } from "../core/signing.js";
 import { sortCertFiles, findPassword } from "../core/certfiles.js";
 import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
 import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, serverStatus,
   localSigning, deviceStatus, importToDevice, removeFromDevice, statusReady, defaultServer,
   browserSigning, getBring, setBring, signAndInstall } from "../signing-client.js";
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
-import { drawWalkthrough, walkOpen, offerInstall, missingStep, siteReady } from "./signing.js";
+import { drawWalkthrough, walkOpen, offerInstall, missingStep, siteReady, deviceRows } from "./signing.js";
 import { openInAppSection } from "./importlink.js";
 import { accountSection, drawAccount, startAccountSync } from "./account.js";
 import { signingExtras } from "./signed-apps.js";
@@ -1057,7 +1057,7 @@ async function drawDeviceSigning(el) {
     certificate: () => certificateGroup(el, { rows: split.certificate, has: Boolean(kept), staged, notes,
       footer: `Kept in this iPhone's Keychain, where only ${NAME} can use it.` }),
     files: () => certificateBlock(el, id, status ?? { identity: null }, { files: true }),
-    profile: () => grouped([{ header: "Provisioning Profile", rows: split.profile }]),
+    profile: () => profileGroup(split.profile, info.device), // F236: with "This iPhone is in the profile"
     options: () => settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"),
     server: () => serverGroup(el),
     status: () => signingExtras({ identity: kept, redraw: redrawAll, dates: settings.get("showExpiry") }),
@@ -1151,6 +1151,27 @@ function certificateGroup(el, { rows, has, staged, notes = [], footer }) {
   frag.querySelector(".sign-import")?.append(input);
   if (notes.length) frag.querySelector(".group-footer")?.classList.add("sign-warning");
   return frag;
+}
+
+// The Provisioning Profile group, with F236's "This iPhone" rows and the check's sentence as its footer (red when this
+// iPhone isn't in the profile; Copy UDID puts the UDID on the clipboard for the developer account's Add Device).
+function profileGroup(rows, device) {
+  const extra = deviceRows(device);
+  if (!extra) return grouped([{ header: "Provisioning Profile", rows }]);
+  const more = extra.rows.map((r) => (r.copy ? { label: r.label, cls: "sign-copy-udid", onClick: (e) => copyUdid(r.copy, e) } : r));
+  const frag = grouped([{ header: "Provisioning Profile", rows: [...rows, ...more], footer: extra.footer }]);
+  if (extra.warn) frag.querySelector(".group-footer")?.classList.add("sign-warning");
+  return frag;
+}
+
+async function copyUdid(udid, e) {
+  const label = e?.currentTarget?.querySelector?.(".cell-label") ?? null;
+  try {
+    await navigator.clipboard.writeText(udid);
+    if (label) label.textContent = "Copied";
+  } catch {
+    await showAlert({ title: "UDID", message: udid, buttons: ["OK"] }); // no clipboard: show it to copy by hand
+  }
 }
 
 const helpGroup = () => grouped([{ rows: [{ label: HELP_TITLE, href: format(settingsRoute(["signing", HELP])), icon: rowIcon("help") }] }]);
@@ -1282,7 +1303,8 @@ async function drawSiteSigning(el) {
     certificate: () => certificateGroup(el, { rows: split.certificate, has: ready && Boolean(profile), staged, notes: info.problems,
       footer: "Kept in this browser only. Apps are signed here, not on a server." }),
     files: () => certificateBlock(el, id, null, { files: true }),
-    profile: () => grouped([{ header: "Provisioning Profile", rows: split.profile }]),
+    // F236: the website can't read the UDID: a profile that lists devices says how to check it
+    profile: () => profileGroup(split.profile, profile ? deviceCheckText(deviceCheck(profile, null)) : null),
     options: () => settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"),
     app: () => { const f = document.createDocumentFragment(); f.append(...siteAppSection(id)); return f; },
     remove: () => grouped([{ rows: [{ label: "Remove Certificate", onClick: () => removeSiteCertificate() }] }]),

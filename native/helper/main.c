@@ -22,6 +22,7 @@
  *                                              uninstalled through installd; ipa.c)
  *   ifizbox-helper remove-malware <path>...   (F232: Installed's Malware Found > Delete; known-malware dylibs no dpkg
  *                                             package owns, in the tweak folders only, then respring; remove_malware)
+ *   ifizbox-helper udid                       (F236: this iPhone's UDID from MobileGestalt, one line; runs nothing)
  *   ifizbox-helper notifications on|off  (F65: Settings' Upgrade Notifications; off creates
  *                                         <prefix>/var/lib/ifizbox/upgrades.off, which N5's daemon reads; runs nothing)
  *
@@ -55,6 +56,8 @@
 /* <libproc.h> ships in the macOS SDK but not the iOS one; proc_pidpath is in libSystem on iOS too, so declare it
  * ourselves (as Sileo and Zebra do). */
 #include <stdint.h>
+#include <dlfcn.h>
+#include <CoreFoundation/CoreFoundation.h>
 int proc_pidpath(int pid, void *buffer, uint32_t buffersize);
 #endif
 
@@ -139,6 +142,34 @@ static int ask_relay(const struct helper_plan *plan, char *const env[], int answ
     if (in[1] >= 0) close(in[1]);
     if (answers >= 0) close(answers);
     return WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
+}
+
+/* F236: udid. This iPhone's UDID (MobileGestalt's UniqueDeviceID, a protected key: entitlements.plist allows it),
+ * one line on stdout, for Settings > Signing's "This iPhone is in the profile" check (native/Sources/PhoneID.swift).
+ * Runs nothing. Off iOS there is no MobileGestalt: exit 74 and say so. */
+static int print_udid(void) {
+#ifdef __APPLE__
+    void *mg = dlopen("/usr/lib/libMobileGestalt.dylib", RTLD_LAZY);
+    CFTypeRef (*copy)(CFStringRef) = mg ? (CFTypeRef (*)(CFStringRef))dlsym(mg, "MGCopyAnswer") : NULL;
+    if (!copy) {
+        fprintf(stderr, "ifizbox-helper: udid: libMobileGestalt has no MGCopyAnswer\n");
+        return HELPER_EX_IOERR;
+    }
+    CFTypeRef v = copy(CFSTR("UniqueDeviceID"));
+    char buf[128];
+    int ok = v && CFGetTypeID(v) == CFStringGetTypeID() &&
+             CFStringGetCString((CFStringRef)v, buf, sizeof buf, kCFStringEncodingUTF8) && buf[0];
+    if (v) CFRelease(v);
+    if (!ok) {
+        fprintf(stderr, "ifizbox-helper: udid: MobileGestalt didn't answer UniqueDeviceID\n");
+        return HELPER_EX_IOERR;
+    }
+    printf("%s\n", buf);
+    return fflush(stdout) ? HELPER_EX_IOERR : 0;
+#else
+    fprintf(stderr, "ifizbox-helper: udid: MobileGestalt is only on iOS\n");
+    return HELPER_EX_IOERR;
+#endif
 }
 
 /* F232: remove-malware <path>... Installed's Malware Found alert deletes known-malware tweak dylibs no package owns
@@ -293,6 +324,12 @@ int main(int argc, char *argv[]) {
                          expected, &err)) {
         fprintf(stderr, "ifizbox-helper: %s\n", err);
         return HELPER_EX_NOPERM;
+    }
+
+    /* F236: udid reads one value and runs nothing: no plan, no clean-up for a child. */
+    if (argc >= 2 && !strcmp(argv[1], "udid")) {
+        if (argc != 2) { fprintf(stderr, "ifizbox-helper: udid takes no arguments\n"); return HELPER_EX_USAGE; }
+        return print_udid();
     }
 
     int status_fd = fcntl(3, F_GETFD) != -1 ? 3 : -1;

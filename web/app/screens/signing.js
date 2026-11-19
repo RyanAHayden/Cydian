@@ -217,3 +217,17 @@ export function drawWalkthrough(el, { status = null, failure = "", certificate =
   el.scrollTop = top;
   return states;
 }
+
+// ---- F236: "This iPhone is in the profile", under the Provisioning Profile's rows ------------------------------
+// core/signing.js deviceCheckText's answer ({ ok, text, udid } or null: not checked) as the group's extra rows and
+// its footer: In Profile; Not in Profile (red, with the UDID and Copy UDID when it is known); Unknown (how to find it).
+// Pure: settings.js draws it (Settings > Signing, the app's and the website's).
+export function deviceRows(device) {
+  if (!device?.text) return null;
+  const state = device.ok === true ? "In Profile" : device.ok === false ? "Not in Profile" : "Unknown";
+  const rows = [{ label: "This iPhone", detail: state }];
+  if (device.ok === false && device.udid) {
+    rows.push({ label: "UDID", subtitle: device.udid }, { label: "Copy UDID", copy: device.udid });
+  }
+  return { rows, footer: device.text, warn: device.ok === false };
+}

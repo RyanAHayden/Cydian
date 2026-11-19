@@ -217,6 +217,7 @@ export function parseProfile(buf) {
     created: p.CreationDate instanceof Date ? p.CreationDate : null,
     expires: p.ExpirationDate instanceof Date ? p.ExpirationDate : null,
     devices: (p.ProvisionedDevices ?? []).length,
+    udids: Array.isArray(p.ProvisionedDevices) ? p.ProvisionedDevices.map(String) : [], // F236
     allDevices: p.ProvisionsAllDevices === true,
     getTaskAllow: ent["get-task-allow"] === true,
     certs,
@@ -401,7 +402,8 @@ export function deviceSummary(identity, { now = new Date(), locale, timeZone } =
     if (certExpires && certExpires < now) problems.push(`The certificate expired on ${fmtDate(certExpires, locale, timeZone)}.`);
     if (profExpires && profExpires < now) problems.push(`The provisioning profile expired on ${fmtDate(profExpires, locale, timeZone)}.`);
   }
-  return { rows, problems };
+  // F236: signing.status's profile.device (DeviceCheck.swift): whether this iPhone is in the profile, for the page.
+  return { rows, problems, device: deviceCheckText(p?.device) };
 }
 
 // The HUD's text for a signing.install progress event { phase, progress }.
@@ -424,6 +426,10 @@ export function deviceError(err, name = "") {
   }
   if (code === "no_identity") {
     return { title: "No Certificate", open: "signing", message: "Add your certificate and provisioning profile in Settings > Signing." };
+  }
+  if (code === "device_not_in_profile") {
+    // F236: the shell checked the profile against this phone before signing (DeviceCheck.swift): its own sentence.
+    return { title: "iPhone Not in Profile", open: "signing", message };
   }
   if (code === "no_manifest") {
     // B30: the app fetched the install manifest itself before handing iOS the link (iOS shows nothing when it can't).
@@ -678,4 +684,81 @@ export function needsResign(installed, { now = new Date(), window = RESIGN_WINDO
   }
   const at = (r) => Date.parse(r.expires);
   return out.sort((a, b) => at(a) - at(b) || String(a.name).localeCompare(String(b.name)));
+}
+
+// ---- F236: is this iPhone in the profile? -----------------------------------------------------------------------
+// A development or ad hoc profile installs only on the devices it lists (ProvisionedDevices, by UDID); on any other
+// iPhone iOS refuses the app with "integrity could not be verified", which says nothing useful. So the profile is
+// checked against this phone first. The phone's UDID comes from the jailbreak build's root helper (MobileGestalt), or
+// from the sideload build's own embedded.mobileprovision: one device there is this phone; several are a set it is in.
+// The website can't read it at all. native/sign/DeviceCheck.swift answers the same check (and the same sentences)
+// for signing.status's profile.device and before signing.
+//
+//   phoneFromDevices(udids)          { udid } (one), { candidates } (several) or null (none: unknown)
+//   deviceCheck(profile, phone)      { state: "in" | "out" | "unknown" | "skip", udid, count, shared }
+//                                    profile: parseProfile's { udids, allDevices } or { udids, devices } (-1: all)
+//   deviceCheckText(check)           { ok: true | false | null, text, udid } for Settings > Signing; null for "skip"
+//   notInProfileText(udid)           the sentence an install fails with when this phone isn't in the profile
+//   likelyCauseText({ count, udid }) the first thing an install that didn't land says, when the check couldn't run
+
+export const UDID_HOW = "To find the UDID, plug the iPhone into a Mac and click the line under its name in Finder, "
+  + "or run idevice_id -l on a computer it's plugged into.";
+export const IN_PROFILE_TEXT = "This iPhone is in the profile.";
+export const notInProfileText = (udid) => (udid
+  ? `This iPhone isn't in the profile: add its UDID ${udid} to the developer account, then make the profile again.`
+  : `This iPhone isn't in the profile: add its UDID to the developer account, then make the profile again. ${UDID_HOW}`);
+export const unknownDeviceText = (count) => `This iPhone's UDID can't be read here, so it can't be checked against the `
+  + `profile's ${plural(count, "device")}. If installs fail with "integrity could not be verified", add the UDID to the `
+  + `developer account, then make the profile again. ${UDID_HOW}`;
+export function likelyCauseText({ count = 0, udid = null } = {}) {
+  const list = count > 0 ? ` (it lists ${plural(count, "device")})` : "";
+  return `The likely cause: this iPhone isn't in the provisioning profile${list}. Add its UDID${udid ? ` ${udid}` : ""} to the `
+    + `developer account, make the profile again and import it in Settings > Signing.${udid ? "" : ` ${UDID_HOW}`}`;
+}
+
+// UDIDs compare without case or spaces: the 40-hex ones are often written in capitals, the newer 8-16 ones in either.
+export const normalUdid = (s) => String(s ?? "").trim().toUpperCase();
+
+export function phoneFromDevices(udids) {
+  const list = [...new Set((Array.isArray(udids) ? udids : []).map(normalUdid).filter(Boolean))];
+  if (list.length === 1) return { udid: list[0] };
+  return list.length ? { candidates: list } : null;
+}
+
+export function deviceCheck(profile, phone) {
+  const udids = [...new Set((Array.isArray(profile?.udids) ? profile.udids : []).map(normalUdid).filter(Boolean))];
+  const count = udids.length;
+  // Enterprise (every device) and a profile with no list (App Store distribution) aren't limited by device.
+  if (profile?.allDevices === true || profile?.devices === -1 || profile?.devices === "all" || !count) {
+    return { state: "skip", udid: null, count, shared: 0 };
+  }
+  const has = new Set(udids);
+  const one = phone?.udid ? normalUdid(phone.udid) : null;
+  // the UDID as the phone gave it (the developer account takes it as written); compared without case
+  if (one) return { state: has.has(one) ? "in" : "out", udid: String(phone.udid).trim(), count, shared: has.has(one) ? 1 : 0 };
+  const set = phoneFromDevices(phone?.candidates);
+  const cands = set?.udid ? [set.udid] : set?.candidates ?? [];
+  if (!cands.length) return { state: "unknown", udid: null, count, shared: 0 };
+  const shared = cands.filter((u) => has.has(u));
+  // This phone is one of `cands`: a profile with all of them has it, one with none of them can't.
+  if (shared.length === cands.length) return { state: "in", udid: cands.length === 1 ? cands[0] : null, count, shared: shared.length };
+  if (!shared.length) return { state: "out", udid: null, count, shared: 0 };
+  return { state: "unknown", udid: null, count, shared: shared.length };
+}
+
+export function deviceCheckText(check) {
+  const c = check && typeof check === "object" ? check : null;
+  if (!c || c.state === "skip") return null;
+  if (c.state === "in") return { ok: true, text: IN_PROFILE_TEXT, udid: c.udid ?? null };
+  if (c.state === "out") return { ok: false, text: notInProfileText(c.udid ?? null), udid: c.udid ?? null };
+  return { ok: null, text: unknownDeviceText(Number(c.count) || 0), udid: null };
+}
+
+// An install handed to iOS whose landing nobody could check (the website, where no UDID can be read; the app when
+// its check came out "unknown"): the line the progress page adds under Done, the likely cause first. null when the
+// profile isn't limited by device or the phone is known to be in it.
+export function notLandedText(app, check) {
+  if (!check || check.state === "skip" || check.state === "in") return null;
+  return `If ${app || "the app"} doesn't appear on the Home Screen, or iOS says its integrity could not be verified: `
+    + likelyCauseText({ count: Number(check.count) || 0, udid: check.udid ?? null });
 }

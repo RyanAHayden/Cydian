@@ -16,6 +16,11 @@
 		<string>Uninstall</string>
 		<string>UninstallForLaunchServices</string>
 	</array>
+	<!-- F236: `ifizbox-helper udid` reads MobileGestalt's protected UniqueDeviceID -->
+	<key>com.apple.private.MobileGestalt.AllowedProtectedKeys</key>
+	<array>
+		<string>UniqueDeviceID</string>
+	</array>
 	<key>com.apple.security.exception.mach-lookup.global-name</key>
 	<array>
 		<string>com.apple.mobile.installd</string>

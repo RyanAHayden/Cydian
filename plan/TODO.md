@@ -10,6 +10,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
+- [ ] **B98** Adding a recommended source must load it right away, so going back to Search shows its apps as installable results (not still under 'Recommended Sources'). Today manage.js addRecommended (both Search's offer() and Manage > Recommended's Add / Add All) only calls backend.addSource + changed(); the source stays unloaded until a Refresh, so Search keeps showing the old results. After a successful add, start the load (changes.js reloadSources / the same path B75 uses for never-loaded sources in search.js) and have Search redraw its results when it finishes. Check: on the site, search for an app from a recommended source, Add Source, go back to Search: the app is now a normal result and the Recommended group no longer lists it; add a node --test for the reload call. | files: web/app/screens/manage.js, web/app/screens/search.js, web/app/screens/changes.js
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)

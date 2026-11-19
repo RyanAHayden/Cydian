@@ -94,3 +94,45 @@ test("F87: Upgrade in the jailbreak app queues dpkg's rows, not the remembered a
   assert.deepEqual(upgradeJobs([{ id: "tweak", version: "2", installed: "1", name: "Tweak" },
     { id: "com.rileytestut.Delta", version: "1.7", installed: "1.6", name: "Delta", remembered: true }]).map((j) => j.id), ["tweak"]);
 });
+
+test("B68: the jailbreak app's Upgrade (N) counts and installs the remembered apps' upgrades too, after apt's run", async () => {
+  const { jailbreakUpgradeCount, upgradeAllJailbreak } = await import("./changes.js");
+  const pkg = (id) => ({ key: "alt:k", row: { id, name: id }, stanza: { kind: "ipa", ipa: { bundleIdentifier: id, name: id.toUpperCase(),
+    sourceUrl: "https://s/", versions: [{ version: "2", downloadURL: `https://x/${id}.ipa` }] } } });
+  const delta = { id: "delta", name: "Delta", version: "2", installed: "1", remembered: true };
+  const tweak = { id: "tweak", name: "Tweak", version: "2", installed: "1" };
+  // Every listed upgrade an app: the button used to say Upgrade (0) and hide.
+  assert.equal(jailbreakUpgradeCount([delta]), 1);
+  assert.equal(jailbreakUpgradeCount([tweak, delta, { ...delta, id: "paid" }], new Set(["paid"])), 2);
+  assert.equal(jailbreakUpgradeCount(undefined), 0);
+
+  // Apps only: no apt job, each IPA installed in turn, the console of all but the last closed.
+  const ran = [];
+  const closed = [];
+  const install = async (j) => { ran.push(`${j.id}=${j.version} ${j.url}`); return { ok: true, close: () => closed.push(j.id) }; };
+  let r = await upgradeAllJailbreak([delta, { ...delta, id: "gba" }], null,
+    { queue: () => assert.fail("apt has no package for an app"), pkgOf: async (id) => pkg(id), install, wait: () => assert.fail("nothing to wait on") });
+  assert.deepEqual(ran, ["delta=2 https://x/delta.ipa", "gba=2 https://x/gba.ipa"]);
+  assert.deepEqual(closed, ["delta"]);
+  assert.equal(r.installed, 2);
+
+  // Both: apt's row queued (Confirm), the app waits for that run; a cancelled run installs no app.
+  for (const [outcome, want] of [["installed", 1], ["cancelled", 0]]) {
+    const queued = [];
+    const waited = [];
+    ran.length = 0;
+    r = await upgradeAllJailbreak([tweak, delta], null, { queue: (j) => queued.push(j.id), pkgOf: async (id) => pkg(id), install,
+      wait: async (id, note) => { waited.push(id); assert.match(note, /1 app upgrade follows/); return outcome; } });
+    assert.deepEqual(queued, ["tweak"]);
+    assert.deepEqual(waited, ["tweak"]);
+    assert.equal(ran.length, want);
+    assert.equal(r.installed, want);
+  }
+
+  // A failed install stops the rest.
+  ran.length = 0;
+  r = await upgradeAllJailbreak([delta, { ...delta, id: "gba" }], null,
+    { queue: () => {}, pkgOf: async (id) => pkg(id), install: async (j) => { ran.push(j.id); return { ok: false }; } });
+  assert.deepEqual(ran, ["delta"]);
+  assert.equal(r.installed, 0);
+});

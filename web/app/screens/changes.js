@@ -36,6 +36,7 @@ import { appJob, resignJob, runOrder } from "../core/appqueue.js";
 import { needsResign, resignWindow } from "../core/signing.js";
 import { vendorSoldIds } from "./extras.js";
 import { SELF_ID } from "../core/essential.js";
+import { showHUD } from "../nav/hud.js"; // F250: reloadSources from outside the tab
 import { appQueue } from "../app-queue.js"; // F255: the jailbreak app's Upgrade (N) queues app upgrades there
 
 export const title = "Changes";
@@ -420,18 +421,27 @@ function draw() {
 }
 
 async function refresh(ctx) {
-  if (state.busy) return;
+  await reloadSources({ hud: ctx.showHUD });
+}
+
+// F250: Changes' Refresh as one job, which the website also runs on Browse Anyway and on launch once browsing is
+// unlocked (websign-gate.js refreshSourcesNow / refreshOnLaunch): the enabled sources refreshed (this device's
+// filter), the Reloading Data HUD over it, then the lists reloaded. One at a time: a call while one runs does
+// nothing. -> true when it ran
+export async function reloadSources({ hud = state.ctx?.showHUD ?? showHUD, backend = () => getBackend(), alert = showAlert,
+  reload = async () => { if (catalog.statusSource() === "native") await catalog.reloadInstalled(); await load(); } } = {}) {
+  if (state.busy) return false;
+  const hide = hud("Reloading Data");
   state.busy = true;
-  const hide = ctx.showHUD("Reloading Data");
   try {
-    await getBackend().refreshSources(undefined, { filter: sourceFilter(settings.deviceType()) }); // F41
-    if (catalog.statusSource() === "native") await catalog.reloadInstalled();
-    await load();
+    await backend().refreshSources(undefined, { filter: sourceFilter(settings.deviceType()) }); // F41
+    await reload();
   } catch (e) {
     hide();
-    await showAlert({ title: "Error", message: e.message, buttons: ["OK"] });
+    await alert({ title: "Error", message: e.message, buttons: ["OK"] });
   } finally {
     hide();
     state.busy = false;
   }
+  return true;
 }

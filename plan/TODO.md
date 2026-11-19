@@ -10,7 +10,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **F250** Website (mode site) only: refresh sources automatically, since the site never updates them by itself. (1) Pressing Browse Anyway in the browse gate (websign-gate.js askToBrowse, on Home, a locked tab or Settings) starts a source refresh at once, the same job as Changes' Refresh (changes.js refresh(): backend.refreshSources with sourceFilter(settings.deviceType()), Reloading Data HUD, then reload the lists). (2) Every launch where browsing is already unlocked (browsingLocked() false, firstVisit 'later') also refreshes sources on launch. Not in the native app (it has its own update path), and never while Home is still locked. Reuse one refresh function, don't copy changes.js. Check: node --test on new tests (Browse Anyway calls refreshSources once; launch with 'later' calls it, launch locked or in native mode doesn't), tools/check.sh passes. | files: web/app/websign-gate.js, web/app/screens/home.js, web/app/screens/changes.js, web/app/app.js, web/app/*.test.js, web/app/screens/*.test.js
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)

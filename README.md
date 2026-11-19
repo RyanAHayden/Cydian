@@ -51,30 +51,37 @@ One frontend (`web/app/`, plain HTML, CSS and JavaScript modules with no build s
 **Website**
 
 <p align="center">
-  <img src="docs/img/web-home.png" alt="Home on the website, with the Install iFizBox Lite and Jailbroken? rows" width="24%">
-  <img src="docs/img/web-sources.png" alt="Sources" width="24%">
-  <img src="docs/img/web-app.png" alt="An app's page" width="24%">
-  <img src="docs/img/web-changes.png" alt="Changes" width="24%">
+  <img src="docs/img/web-home.png" alt="Home: Install iFizBox Lite and Jailbroken? Install iFizBox" width="24%">
+  <img src="docs/img/web-sources.png" alt="Sources: APT repos and AltStore sources" width="24%">
+  <img src="docs/img/web-app.png" alt="An app: Provenance's details and what's new" width="24%">
+  <img src="docs/img/web-changes.png" alt="Changes: updates by day" width="24%">
 </p>
 
 **Jailbreak app**
 
 <p align="center">
-  <img src="docs/img/jb-home.png" alt="Home in the jailbreak app" width="24%">
-  <img src="docs/img/jb-sources.png" alt="APT sources in the jailbreak app" width="24%">
-  <img src="docs/img/jb-package.png" alt="A package page" width="24%">
-  <img src="docs/img/jb-log.png" alt="The install log after installing a package" width="24%">
+  <img src="docs/img/jb-home.png" alt="Home: the jailbreak app" width="24%">
+  <img src="docs/img/jb-sources.png" alt="Sources: the jailbreak app's APT repos" width="24%">
+  <img src="docs/img/jb-package.png" alt="A package: ElleKit's details and version history" width="24%">
+  <img src="docs/img/jb-log.png" alt="Install log: apt's output after an install" width="24%">
 </p>
 
 <details>
 <summary><b>More screenshots</b></summary>
 
-| | | | |
-|:-:|:-:|:-:|:-:|
-| ![Search results for emulator](docs/img/web-search.png) | ![Installed in Manage mode, two apps selected](docs/img/web-installed-manage.png) | ![Install IPAs](docs/img/web-myipas.png) | ![Home in the Sepia theme](docs/img/web-theme.png) |
-| Search | Installed, Manage mode | Install IPAs | Theme > Light, with the preview |
-| ![Sources > Manage](docs/img/web-manage.png) | ![Settings](docs/img/web-settings.png) | ![Settings > Signing](docs/img/web-signing.png) | ![Installed in the jailbreak app](docs/img/jb-installed.png) |
-| Sources > Manage | Settings | Settings > Signing | Installed (jailbreak app) |
+<p align="center">
+  <img src="docs/img/web-search.png" alt="Search: results for emulator" width="24%">
+  <img src="docs/img/web-installed-manage.png" alt="Installed: Manage mode, two apps selected" width="24%">
+  <img src="docs/img/web-myipas.png" alt="Install IPAs: Choose File or Download from URL" width="24%">
+  <img src="docs/img/web-theme.png" alt="Theme: Light, with the preview" width="24%">
+</p>
+
+<p align="center">
+  <img src="docs/img/web-manage.png" alt="Sources > Manage: add, edit and remove sources" width="24%">
+  <img src="docs/img/web-settings.png" alt="Settings: Account, General, Theme, Updates and Signing" width="24%">
+  <img src="docs/img/web-signing.png" alt="Settings > Signing: the certificate and its files" width="24%">
+  <img src="docs/img/jb-installed.png" alt="Installed: the jailbreak app's packages, A to Z" width="24%">
+</p>
 
 </details>
 

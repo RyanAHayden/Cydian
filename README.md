@@ -51,19 +51,19 @@ helper.
 
 ## Screenshots
 
-Real pages with live sources, at the iPhone 5's screen size (320×568 points at 2x), framed by
-[`tools/readme_shots.py`](tools/readme_shots.py).
+Real pages with live sources at the iPhone 18 Pro's screen size (402×874 points at 3x), in Apple's iPhone 18 Pro
+bezel: silver for the website, black for the jailbreak app. Framed by [`tools/readme_shots.py`](tools/readme_shots.py).
 
 **Website**
 
 <p align="center">
-  <img src="docs/img/web-home.png" alt="Home on the website" width="24%">
+  <img src="docs/img/web-home.png" alt="Home on the website, with the Install iFizBox Lite and Jailbroken? rows" width="24%">
   <img src="docs/img/web-sources.png" alt="Sources" width="24%">
   <img src="docs/img/web-app.png" alt="An app's page" width="24%">
   <img src="docs/img/web-changes.png" alt="Changes" width="24%">
 </p>
 
-**Jailbreak app** (iPhone 7, iOS 15.8, rootless)
+**Jailbreak app** (the sources, packages and install of a rootless iPhone)
 
 <p align="center">
   <img src="docs/img/jb-home.png" alt="Home in the jailbreak app" width="24%">
@@ -77,8 +77,10 @@ Real pages with live sources, at the iPhone 5's screen size (320×568 points at 
 
 | | | | |
 |:-:|:-:|:-:|:-:|
-| ![Search results for emulator](docs/img/web-search.png) | ![Installed on the website](docs/img/web-installed.png) | ![Settings](docs/img/web-settings.png) | ![Settings > Signing](docs/img/web-signing.png) |
-| Search (website) | Installed (website) | Settings | Settings > Signing |
+| ![Search results for emulator](docs/img/web-search.png) | ![Installed in Manage mode, two apps selected](docs/img/web-installed-manage.png) | ![Install IPAs](docs/img/web-myipas.png) | ![Theme > Light with its preview](docs/img/web-theme.png) |
+| Search | Installed, Manage mode | Install IPAs | Theme > Light, with the preview |
+| ![Sources > Manage](docs/img/web-manage.png) | ![Settings](docs/img/web-settings.png) | ![Settings > Signing](docs/img/web-signing.png) | ![Installed in the jailbreak app](docs/img/jb-installed.png) |
+| Sources > Manage | Settings | Settings > Signing | Installed (jailbreak app) |
 
 </details>
 

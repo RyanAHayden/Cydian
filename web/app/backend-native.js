@@ -9,7 +9,7 @@
 //   net.packages { dir }        -> { text, source }  Packages.xz, .gz or plain in dir, decompressed by the shell
 //   helper.run { words, stream } -> { code, stdout, stderr }  ifizbox-helper <words> as root; stream events
 //                                  { fd: "out" | "err" | "status", line } while it runs
-//   signing.isInstalled { bundleIds } -> { installed: { id: bool | null } }  appsInstalled(ids), cached (F219)
+//   apps.isInstalled { bundleIds } -> { installed: { id: bool | null } }  appsInstalled(ids), cached (F219)
 //
 // The install queue (N4, jailbreak build only: the sideload build has no helper): queue(job) marks a package in the
 // app's one queue (queue.js), which opens the Confirm sheet (screens/queue.js); simulate(jobs) is `apt-get -s` over
@@ -109,7 +109,7 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
     const ask = ids.filter((id) => !appsSeen.has(id));
     if (ask.length) {
       let res = null;
-      try { res = await native.call("signing.isInstalled", { bundleIds: ask }); } catch { /* an older shell: unknown */ }
+      try { res = await native.call("apps.isInstalled", { bundleIds: ask }); } catch { /* an older shell: unknown */ }
       const got = res?.installed ?? {};
       // Only real answers are kept; a failed call asks again next time.
       if (res) for (const id of ask) appsSeen.set(id, typeof got[id] === "boolean" ? got[id] : null);
@@ -143,7 +143,8 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
     // ifizbox-helper <words>; onEvent({ fd, line }) sees its output as it comes. Resolves { code, stdout, stderr }.
     helper: (words, onEvent) => call("helper.run", { words, stream: Boolean(onEvent) }, onEvent),
     dpkgStatus: async () => (await call("apt.dpkgStatus")) ?? null,
-    // F219: which of these apps iOS has (signing.isInstalled, LSApplicationWorkspace applicationIsInstalled:, B46)
+    // F219: which of these apps iOS has (apps.isInstalled, native/Sources/Sideload.swift: LSApplicationWorkspace
+    // applicationIsInstalled: as B46's signing.isInstalled, which the jailbreak build refuses)
     // -> { bundleId: true | false | null }, null where iOS can't be asked. Cached for the session: a package manager
     // is installed or removed with a respring at most, and the package page's Share asks on every open.
     appsInstalled: (bundleIds) => appsInstalled(bundleIds),

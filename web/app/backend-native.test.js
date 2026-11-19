@@ -366,7 +366,7 @@ test("F49: Add Source tries Telesphoreo's dists/ios/<cf>/ from app.info's CoreFo
   }
 });
 
-test("F219: appsInstalled asks signing.isInstalled once per app for the session; a failed call isn't kept", async () => {
+test("F219: appsInstalled asks apps.isInstalled once per app for the session; a failed call isn't kept", async () => {
   const calls = [];
   let fail = false;
   const native = {
@@ -378,7 +378,7 @@ test("F219: appsInstalled asks signing.isInstalled once per app for the session;
   };
   const backend = createNativeBackend({ native });
   assert.deepEqual(await backend.appsInstalled(["org.coolstar.SileoStore", "xyz.willy.Zebra"]), { "org.coolstar.SileoStore": true, "xyz.willy.Zebra": false });
-  assert.deepEqual(calls, [{ method: "signing.isInstalled", params: { bundleIds: ["org.coolstar.SileoStore", "xyz.willy.Zebra"] } }]);
+  assert.deepEqual(calls, [{ method: "apps.isInstalled", params: { bundleIds: ["org.coolstar.SileoStore", "xyz.willy.Zebra"] } }]);
   assert.deepEqual(await backend.appsInstalled(["xyz.willy.Zebra", "org.coolstar.SileoStore"]), { "xyz.willy.Zebra": false, "org.coolstar.SileoStore": true });
   assert.equal(calls.length, 1, "cached");
   assert.deepEqual(await backend.appsInstalled(["xyz.willy.Zebra", "x.unknown"]), { "xyz.willy.Zebra": false, "x.unknown": null });

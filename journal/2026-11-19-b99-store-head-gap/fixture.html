@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- B99 check: the store header (screens/storepage.js storeHeader markup) with a long name and author beside the
+     Share button, using the app's real stylesheets. Open as file:// with ?dark for the dark theme. -->
+<html data-theme="light">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="../../web/app/">
+<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="ios6.css"><link rel="stylesheet" href="sources.css">
+<link rel="stylesheet" href="packages.css"><link rel="stylesheet" href="home.css"><link rel="stylesheet" href="altstore.css">
+<link rel="stylesheet" href="palettes.css"><link rel="stylesheet" href="wide.css">
+<script>if (location.search.includes("dark")) document.documentElement.dataset.theme = "dark";</script>
+<style>body { margin: 0; } .store-head + .store-head { margin-top: 0; }</style>
+</head>
+<body>
+<template id="t">
+  <div class="store-head">
+    <div class="store-icon"><span class="pkg-icon large" style="display:block;background:#6a8"></span><span class="store-icon-gloss"></span></div>
+    <div class="store-head-text">
+      <span class="store-head-top"><span class="store-head-name">NAME</span></span>
+      <a class="store-head-author" href="#">AUTHOR</a>
+      <span class="store-head-rating" data-state="none">No Ratings</span>
+      <span class="store-head-line">Version 1.0 · 12.3 MB</span>
+    </div>
+    <button class="bar-button bar-icon share-button store-head-share" type="button"></button>
+  </div>
+</template>
+<div id="out"></div>
+<script>
+  const rows = [
+    ["Unbound", "Unbound — a DNS resolver"],
+    ["Unbound: Validating, Recursive, Caching DNS Resolver", "NLnet Labs and the Unbound contributors"],
+    ["WWWWWWWWWWWWWWWWWWWWWWWWWWWWWW", "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"],
+  ];
+  for (const [n, a] of rows) {
+    const c = document.getElementById("t").content.cloneNode(true);
+    c.querySelector(".store-head-name").textContent = n;
+    c.querySelector(".store-head-author").textContent = a;
+    document.getElementById("out").append(c);
+  }
+</script>
+</body>
+</html>

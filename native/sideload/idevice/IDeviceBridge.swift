@@ -31,8 +31,11 @@ enum IDeviceBridge {
         b.on("idevice.pair") { c in
             let cancel = IDevice.PairCancel()
             lock.lock(); pairing?.signal(); pairing = cancel; lock.unlock()
+            // The code is typed in the Settings app, so iFizBox is in the background meanwhile: KeepAlive's silent
+            // audio keeps the pairable host listening.
+            if AppMode.current != .jailbreak { KeepAlive.shared.begin() } // run() refuses the jailbreak build before the defer
             run(c) {
-                defer { lock.lock(); if pairing === cancel { pairing = nil }; lock.unlock() }
+                defer { lock.lock(); if pairing === cancel { pairing = nil }; lock.unlock(); KeepAlive.shared.end() }
                 try IDevice.pairOnPhone(cancel: cancel) { pin in
                     DispatchQueue.main.async { c.emit([["pin": pin]]) }
                 }

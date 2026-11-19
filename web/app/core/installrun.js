@@ -4,7 +4,8 @@
 //
 //   runRows(plan, jobs, info)  -> [row]  one row per package apt's plan changes, in the order the dpkg lane takes
 //                                         them: removals first, then each queued package after what it needs (the
-//                                         queue's order otherwise). info: catalog.runInfo's { id: { debUrl, sha256,
+//                                         queue's order otherwise), and iFizBox's own package last (only what
+//                                         needs it after it: installing it closes the app). info: catalog.runInfo's { id: { debUrl, sha256,
 //                                         md5sum, size, depends, preDepends, installed } } plus `installed`, the
 //                                         dpkg versions of every name the rows depend on.
 //   row: { id, name, op: install | remove, mode, from, to, size, debUrl, sha256, md5sum, needs: [[{ name, op?,
@@ -29,6 +30,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseRelations, satisfies } from "./apt.js";
 import { MODES } from "./queue.js";
+import { PACKAGE } from "../brand.js";
 
 export const STATES = ["waiting", "downloading", "ready", "installing", "installed", "failed", "skipped", "cancelled"];
 const ENDED = new Set(["installed", "failed", "skipped", "cancelled"]);
@@ -81,7 +83,24 @@ export function runRows(plan, jobs = [], info = {}) {
     out.push(r);
   };
   for (const r of base) visit(r);
-  return out;
+  return selfLast(out, byId);
+}
+
+// iFizBox's own package goes last in the lane, with only what needs it (transitively) after it: once dpkg puts the
+// new Info.plist on disk the app's Replaced watcher (native App.swift) closes the app, and rows after it would never
+// run. Nothing before it can need a row after it (that row needs iFizBox, so the row before would too), so the
+// dependency order holds.
+function selfLast(out, byId) {
+  const self = out.find((r) => r.id === PACKAGE && r.op === "install");
+  if (!self) return out;
+  const tail = new Set([self.id]);
+  for (const queue = [self]; queue.length;) {
+    for (const id of queue.pop().neededBy) {
+      const r = byId.get(id);
+      if (r && r.op === "install" && !tail.has(id)) { tail.add(id); queue.push(r); }
+    }
+  }
+  return [...out.filter((r) => !tail.has(r.id)), ...out.filter((r) => tail.has(r.id))];
 }
 
 // Confirm's Modifications: for each package apt added (not queued), the rows that need it.

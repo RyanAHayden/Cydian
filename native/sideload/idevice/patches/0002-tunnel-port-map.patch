@@ -1,0 +1,42 @@
+diff --git i/ffi/src/tunnel_provider.rs w/ffi/src/tunnel_provider.rs
+--- i/ffi/src/tunnel_provider.rs
++++ w/ffi/src/tunnel_provider.rs
+@@ -25,6 +25,29 @@
+ use crate::util::{SockAddr, idevice_sockaddr, idevice_socklen_t};
+ use crate::{IdeviceFfiError, ffi_err, provider::IdeviceProviderHandle, run_sync_local};
+ 
++static TUNNEL_PORT_MAP: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
++
++/// Sets a function that maps the TLS tunnel's port (the one the device's
++/// createListener answers) before `tunnel_create_rppairing` connects to it on
++/// the same address. NULL connects to the port as answered. For a relay: the
++/// caller reaches the device through a local forwarder, one port per remote port.
++#[unsafe(no_mangle)]
++pub extern "C" fn tunnel_set_port_map(map: Option<extern "C" fn(port: u16) -> u16>) {
++    TUNNEL_PORT_MAP.store(map.map_or(0, |f| f as usize), std::sync::atomic::Ordering::SeqCst);
++}
++
++fn map_tunnel_port(port: u16) -> u16 {
++    let f = TUNNEL_PORT_MAP.load(std::sync::atomic::Ordering::SeqCst);
++    if f == 0 {
++        return port;
++    }
++    let f: extern "C" fn(u16) -> u16 = unsafe { std::mem::transmute(f) };
++    match f(port) {
++        0 => port,
++        p => p,
++    }
++}
++
+ struct PinCtx(*mut c_void);
+ unsafe impl Send for PinCtx {}
+ unsafe impl Sync for PinCtx {}
+@@ -41,7 +64,7 @@
+ 
+     let tunnel_port = rpc.create_tcp_listener().await?;
+     let mut tunnel_addr = connect_addr;
+-    tunnel_addr.set_port(tunnel_port);
++    tunnel_addr.set_port(map_tunnel_port(tunnel_port));
+     let tunnel_stream = run_global_timeout(|| tokio::net::TcpStream::connect(tunnel_addr))
+         .await
+         .map_err(|e| IdeviceError::InternalError(format!("TLS tunnel: {e}")))?;

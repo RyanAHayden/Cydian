@@ -58,6 +58,7 @@ enum SignBridge {
         MyIPAs.register(b) // F77: library.*, My IPAs under Installed (MyIPAs.swift)
         SignAhead.register(b) // F235: signing.prepare / open / discard, the IPA queue's sign-ahead run
         IDeviceBridge.register(b) // F15: idevice.*, the "no server" install route (native/sideload/idevice/)
+        TailscaleBridge.register(b) // tailscale.*, that route over Tailscale (native/sideload/tailscale/)
     }
 
     static func status() -> [String: Any] {

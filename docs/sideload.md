@@ -240,6 +240,18 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   step (upload the first 30%, then installd's percentage). Not paired, LocalDevVPN off or another VPN on: an alert
   says so and the install goes through the Signing Server ("Another VPN Is On" also offers Open LocalDevVPN, which
   stops the install). The VPN apps' names come from one list (`VPNS`, core/installroute.js).
+- **This iPhone over Tailscale** (`native/sideload/tailscale/`, its README): for Tailscale users, who can't run
+  LocalDevVPN at the same time. The sideload app embeds tsnet (tailscale.com, BSD-3-Clause, a Go c-archive built on
+  Linux with a pinned Go; not in the jailbreak executable) and joins the tailnet as its own device ("iFizBox on
+  <device>"). Settings > Installation > This iPhone has Connect With: Automatic (Tailscale when the Tailscale VPN is
+  on and iFizBox is signed in, else LocalDevVPN), LocalDevVPN or Tailscale, and a Tailscale group: Sign In (the
+  login page opens in the app; approval is waited for), the device's name, Test Connection (RemotePairing's
+  handshake to this phone's own Tailscale address through the tailnet; on failure it names the fix: an access rule
+  to copy, device approval, or an expired key) and Sign Out. The node runs only while signing in, testing or
+  installing. An install through it hands idevice a 127.0.0.1 relay per port (49152, then the tunnel's port via
+  idevice's `tunnel_set_port_map`), each dialed through tsnet to the phone's own 100.x address; iOS resets plain
+  sockets to the phone's own addresses but answers ones that arrive through the Tailscale app's node. Tailscale
+  needs the internet; LocalDevVPN works offline. Pairing is the same one-time step.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and

@@ -2,7 +2,7 @@
 // app Confirm) on F234's black page with rows (nav/progress.js; the brain is core/apprun.js; the looks are
 // progress.css's .qr-* rows, shared with screens/queuerun.js):
 //
-//   Apps (the default): one row per queued app, in the run's order (iFizBox's own IPA last): its name, a grey line
+//   Apps (the default; a run of one app opens on the Log instead): one row per queued app, in the run's order (iFizBox's own IPA last): its name, a grey line
 //     (Waiting / Downloading 12.0 of 48.0 MB / Signing 40% / Signed / Tap Install on the iOS prompt / Installing /
 //     Installed / Re-signed, expires <date> / Failed: why / Cancelled), an iOS 6 progress bar while it works, and the
 //     round stop button on a working row: it cancels only that app (its download, its signing or iOS's prompt) and the
@@ -20,7 +20,7 @@
 // What iOS took leaves the queue (and is recorded for Installed) as it goes; failed and cancelled apps stay queued.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "../nav/ui.js";
-import { openProgress, RETURN_LABEL, CLOSING_LABEL } from "../nav/progress.js";
+import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL } from "../nav/progress.js";
 import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf } from "../core/apprun.js";
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
@@ -56,7 +56,7 @@ export async function runAppRun(jobs, deps) {
   const seg = page.segmented(["Apps", "Log"], (i) => {
     if (i === 0) { page.filter(null); page.view("pane"); } else page.view("log");
   });
-  page.view("pane");
+  openOn(page, seg, rows.length); // F247: one app opens on the Log
   const showLog = (id) => { seg.select(1); page.filter(id); page.view("log"); };
 
   const views = new Map();

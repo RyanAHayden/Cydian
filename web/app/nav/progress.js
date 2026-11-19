@@ -22,6 +22,7 @@
 //   p.line(kind, text, pkg)                a line that knows its package; p.filter(pkg | null) shows only its lines
 //   p.segmented(labels, onPick)            a segmented control in place of the title -> { select(i) }
 //   p.pane(node) / p.view("pane" | "log")  another view in the body (the Packages list) in place of the log
+//   openOn(page, seg, count)               F247: a run of one item opens on the Log tab, two or more on the rows list
 //   p.bar({ left, right })                 the caller's own bar buttons in place of Cancel / Close from now on
 //   p.hide() / p.show() / p.hidden         slides away and back, alive (the run goes on under the tabs)
 //
@@ -47,6 +48,21 @@ import { FINISH_LABEL } from "../core/queue.js";
 
 // B67: the plain finish button, Cydia's "Return to Cydia"
 export const RETURN_LABEL = FINISH_LABEL.return;
+
+// F247: the view a run page with rows (screens/apprun.js, screens/queuerun.js) opens on: a run of one item opens on
+// the Log (a one-row list says nothing the log doesn't), two or more on the rows list. -> "log" | "pane"
+export function startView(count) {
+  return Number(count) === 1 ? "log" : "pane";
+}
+
+// F247: open a rows page on startView(count): selects the segmented control's tab (`seg`, page.segmented's; the rows
+// list is tab 0, the Log tab `logTab`) and shows that view.
+export function openOn(page, seg, count, { logTab = 1 } = {}) {
+  const v = startView(count);
+  seg.select(v === "log" ? logTab : 0);
+  page.view(v);
+  return v;
+}
 
 const EASE = "cubic-bezier(.25,.1,.25,1)";
 const MAX_LINES = 1500; // lines kept on screen while it follows; the callers' logs keep everything

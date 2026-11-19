@@ -1,0 +1,52 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="./new/ios6.css"><link rel="stylesheet" href="./new/queue.css"><link rel="stylesheet" href="./new/progress.css">
+</head><body>
+<script type="module">
+const q = new URLSearchParams(location.search);
+const mod = await import(q.get("m"));
+const page = mod.openProgress();
+const gaps = [];
+let last = performance.now();
+let measuring = false;
+const loop = (t) => { if (measuring) gaps.push(t - last); last = t; requestAnimationFrame(loop); };
+requestAnimationFrame(loop);
+const longs = [];
+try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (measuring) longs.push(Math.round(e.duration)); }).observe({ type: "long-animation-frame", buffered: false }); } catch {}
+const tasks = [];
+try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (measuring) tasks.push(Math.round(e.duration)); }).observe({ type: "longtask" }); } catch {}
+let n = 0;
+const pkgs = ["com.example.alpha", "com.example.beta", "libfoo", "preferenceloader", "mobilesubstrate"];
+const feed = () => {
+  for (let i = 0; i < 6; i++, n++) {
+    if (n % 3 === 0) page.line("raw", `Sent bytes ${n * 65536}-${n * 65536 + 65535}; iOS has ${(n + 1) * 65536} of 40000000 bytes`);
+    else if (n % 50 === 1) page.line("step", `Unpacking ${pkgs[n % 5]} (1.${n % 9})`);
+    else page.line("raw", `Preparing to unpack .../${pkgs[n % 5]}_1.${n % 9}_iphoneos-arm64.deb ...`);
+    page.status(`Installing ${n % 100}%`);
+    page.progress(n % 100);
+  }
+};
+const timer = setInterval(feed, 4);
+await new Promise((r) => setTimeout(r, 1500));
+// select everything in the log, the way Select All does
+const sel = getSelection();
+const range = document.createRange();
+range.selectNodeContents(page.out);
+sel.removeAllRanges(); sel.addRange(range);
+document.dispatchEvent(new Event("selectionchange"));
+measuring = true;
+const selStart = performance.now();
+await new Promise((r) => setTimeout(r, 4000));
+measuring = false;
+const selText = getSelection().toString().length;
+const heldLast = page.out.lastElementChild?.textContent;
+getSelection().removeAllRanges();
+await new Promise((r) => setTimeout(r, 200));
+clearInterval(timer);
+const flowsAgain = page.out.lastElementChild?.textContent !== heldLast;
+gaps.sort((a, b) => b - a);
+window.__result = {
+  frames: gaps.length, worstGapMs: Math.round(gaps[0] ?? 0), gapsOver16: gaps.filter((g) => g > 16.7 * 1.5).length,
+  loafOver50: longs, longtasks: tasks, linesOnScreen: page.out.childElementCount, selectionChars: selText, sent: n, flowsAgain,
+};
+</script></body></html>

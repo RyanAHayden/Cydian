@@ -24,7 +24,11 @@ npx wrangler login
 npx wrangler deploy        # makes the KV storage on the first deploy and prints your https://….workers.dev address
 ```
 
+<img src="../docs/img/crop-signing-server.png" alt="Settings > Signing > Signing Server" width="300" align="right">
+
 Then in iFizBox: **Settings > Signing > Signing Server**, paste that address, and **Check Server**.
+
+<br clear="right">
 
 ### On your own PC or in Docker
 

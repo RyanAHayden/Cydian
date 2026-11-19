@@ -1,0 +1,29 @@
+[
+ {
+  "wait": 4000
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+ },
+ {
+  "nav": "#/home/settings/signing",
+  "ms": 8000
+ },
+ {
+  "eval": "(()=>{const e=[...document.querySelectorAll('body *')].filter(x=>x.offsetParent!==null&&x.textContent.trim()==='Check Server').at(-1); e.closest('.group').scrollIntoView({block:'center'}); return e.closest('.group').previousElementSibling?.outerHTML.slice(0,120)})()"
+ },
+ {
+  "wait": 1000
+ },
+ {
+  "shot": "sl-signing"
+ },
+ {
+  "rect": "sl-signing",
+  "up": ".group",
+  "sel": {
+   "server": "text:Check Server",
+   "run": "text:Run Your Own"
+  }
+ }
+]

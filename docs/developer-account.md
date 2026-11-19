@@ -90,7 +90,7 @@ It should say `production`.
 Import the `.p12`, the `.mobileprovision` and the password in **Settings > Signing**, and leave **Keep Bundle IDs** on.
 Delete the App Store copy of the app first (iOS won't sign over it), install, and allow notifications.
 
-<p align="center"><img src="img/web-signing.png" alt="Settings > Signing" width="30%"></p>
+<p align="center"><img src="img/crop-web-certificate.png" alt="Settings > Signing: Import Certificate" width="320"></p>
 
 ## When it doesn't work
 

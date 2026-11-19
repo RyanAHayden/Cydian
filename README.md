@@ -82,10 +82,17 @@ One frontend (`web/app/`, plain HTML, CSS and JavaScript modules with no build s
 
 ### Website
 
-Open **<https://ifizbox.com>** in Safari. No install, no account. To install apps, add your certificate under
-**Settings > Signing** (it stays in your browser).
+<img src="docs/img/crop-web-certificate.png" alt="Settings > Signing: Import Certificate" width="300" align="right">
+
+Open **<https://ifizbox.com>** in Safari. No install, no account.
+
+To install apps, add your certificate under **Settings > Signing**. It stays in your browser.
+
+<br clear="right">
 
 ### Jailbreak app (rootless, iOS 15+)
+
+<img src="docs/img/crop-jb-sheet.png" alt="Home > Jailbroken? Install iFizBox: Add to Sileo, Add to Zebra, Copy Repo URL, Download .deb" width="300" align="right">
 
 On the website, tap **Home > Jailbroken? Install iFizBox**, or add this repo to Sileo or Zebra:
 
@@ -94,22 +101,35 @@ https://ifizbox.com/repo/
 ```
 
 Or `apt-get install ./iFizBox.deb` from the [latest release](https://github.com/RyanAHayden/iFizBox/releases/latest).
+
 iFizBox then updates itself like any other package.
+
+<br clear="right">
 
 ### Sideload app (LITE)
 
-Add your certificate on the website, then tap **Home > Install iFizBox Lite**. The app arrives with your certificate,
-sources and settings, and updates itself.
+<img src="docs/img/crop-web-lite.png" alt="Home > Install iFizBox Lite" width="300" align="right">
 
-<p align="center">
-  <img src="docs/img/web-signing.png" alt="1. Add your certificate in Settings > Signing" width="30%">
-  <img src="docs/img/web-home.png" alt="2. Tap Install iFizBox Lite on Home" width="30%">
-</p>
+Add your certificate on the website, then tap **Home > Install iFizBox Lite**.
 
-No certificate? [docs/developer-account.md](docs/developer-account.md). Have one? Help your friends by sharing it with
-[SideDrop](https://github.com/RyanAHayden/sidedrop) (only with people you trust: they can pull it out).
+The app arrives with your certificate, sources and settings, and updates itself.
+
+No certificate? [docs/developer-account.md](docs/developer-account.md).
 
 Also on Feather, AltStore or SideStore: `https://ifizbox.com/repo/source.json`
+
+<br clear="right">
+
+### Share your certificate
+
+<img src="docs/img/crop-share-certificate.png" alt="Settings > Signing > Share Your Certificate" width="300" align="right">
+
+Have a developer account? Help your friends sideload with [SideDrop](https://github.com/RyanAHayden/sidedrop): a site
+you run, where every app is signed for them with your certificate.
+
+Share it only with people you trust: they can pull the certificate out.
+
+<br clear="right">
 
 ## How it works
 
@@ -152,6 +172,9 @@ graph TD
   [docs/signing.md](docs/signing.md).
 - **iFizBox Account** ([docs/account.md](docs/account.md)) is optional. It syncs your sources, settings and certificate,
   **end-to-end encrypted** with a key made on your device. Lose the key and nobody can recover the data.
+
+  <img src="docs/img/crop-account.png" alt="Settings > iFizBox Account: Create Account, Sign In With Key" width="280">
+
 - **Shortcuts, Siri and Spotlight:** Check for Updates, Add Source, Install All Updates, Respring and more
   ([docs/shortcuts.md](docs/shortcuts.md)).
 
@@ -205,6 +228,8 @@ Or on your own machine or in Docker:
 node worker/node.mjs    # PORT, HOST, HOST_IDS, TTL as in worker/wrangler.toml
 docker build -f worker/Dockerfile -t ifizbox . && docker run -d -p 8787:8787 -v ifizbox-data:/data ifizbox
 ```
+
+<img src="docs/img/crop-signing-server.png" alt="Settings > Signing > Signing Server: Server, Check Server, Run Your Own" width="300" align="right">
 
 Then in the sideload app: **Settings > Signing > Signing Server**, paste your address and tap **Check Server**. iOS accepts
 install manifests only over HTTPS with a trusted certificate, so a self-hosted Node server has to sit behind

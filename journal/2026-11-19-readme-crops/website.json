@@ -1,0 +1,16 @@
+[
+ {"wait": 5000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
+ {"nav": "", "ms": 15000},
+ {"shot": "home"},
+ {"rect": "home", "up": "li, .home-tile, a, button", "sel": {"nav": ".page.is-top .navbar, .navbar", "signing": "text:Signing", "lite": "text:Install iFizBox Lite", "jb": "text:Install iFizBox", "ipas": "text:Install IPAs"}},
+ {"nav": "#/home/settings/signing", "ms": 6000},
+ {"shot": "signing"},
+ {"rect": "signing", "up": ".group", "sel": {"nav": ".navbar", "cert": "text:Import Certificate", "share": "text:Share Your Certificate"}},
+ {"nav": "#/home/settings/account", "ms": 6000},
+ {"shot": "account"},
+ {"nav": "", "ms": 8000},
+ {"clicktext": "Jailbroken? Install iFizBox", "ms": 2500},
+ {"shot": "jb-sheet"},
+ {"eval": "location.hash"}
+]

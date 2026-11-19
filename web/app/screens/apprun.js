@@ -47,6 +47,46 @@ export function phoneLanes(sc, { native } = {}) {
   };
 }
 
+// B71a: the jailbreak app's side of a run: no signing. The "sign" lane only checks the IPA's own MinimumOSVersion
+// (ipa-install.js ipaNeeds, B72: nothing is downloaded for an app this iPhone's iOS can't run); the install lane hands
+// the IPA to the helper's install-ipa (ipa-install.js runIpaInstall: the shell downloads it, installd installs it, its
+// lines and percent on the row) or a Remove to the helper's uninstall-app (backend.uninstallApp, the Installed tab's
+// Delete). Rows' jobs carry `helper: true` (core/apprun.js helperRow: its words). Every call can be stood in for (tests).
+export function helperLanes({ backend, install, needs, native } = {}) {
+  return {
+    sign: async (r) => {
+      if (r.job?.op !== "remove") {
+        const n = needs ? await needs(r.job.url).catch(() => null) : null;
+        if (n) throw new Error(`needs iOS ${n.min} (this iPhone has ${n.ios})`);
+      }
+      return { token: r.job?.op === "remove" ? "remove" : r.job?.url || "ipa", bundleId: r.id };
+    },
+    install: async (r, { signal, progress }, log = () => {}) => {
+      progress("installing", 0);
+      if (r.job?.op === "remove") {
+        if (typeof backend?.uninstallApp !== "function") throw new Error("This build can't delete apps.");
+        await backend.uninstallApp(r.id, (ev) => {
+          const line = String(ev?.line ?? "").trim();
+          const m = /^pmstatus:[^:]*:([\d.]+):(.+)$/.exec(line);
+          if (m) progress("installing", Number(m[1]) / 100);
+          else if (line) log(line);
+        });
+        return { installed: true };
+      }
+      const view = {
+        line: (type, text) => { if (type !== "status") log(type === "error" ? `E: ${text}` : text); },
+        status: () => {},
+        progress: (pct) => progress("installing", Math.min(99, Number(pct) || 0) / 100),
+      };
+      const res = await install({ url: r.job.url, name: r.name }, view, { ...(native ? { native } : {}), signal });
+      if (res?.cancelled) throw new Error("cancelled");
+      if (!res?.ok) throw new Error(res?.error?.message || res?.error?.title || "the helper didn't install it");
+      return { installed: true };
+    },
+    discard: () => {},
+  };
+}
+
 // B76: iFizBox leaving the screen while an app is with iOS hands that app to iOS (run.away(): a false from the watch
 // then reads "Sent to iOS", not Failed), and coming back asks iOS which "Sent to iOS" rows it has (run.confirm: Installed).
 // Also asked when such a row ends while iFizBox is in front. -> { check, stop }
@@ -70,7 +110,7 @@ export function followHandoff(run, rows, { isInstalled, doc = globalThis.documen
 
 // jobs: the app queue's (core/appqueue.js). deps: { queue, lanes ({ sign, install, discard }, phoneLanes's),
 //   record(job) (Installed's record of an install), reopenConfirm(footer), onClose(result), open (openProgress, tests),
-//   stallMs, later, clear (tests) } -> a promise for the first end: { ok, stopped, rows, installed }.
+//   stallMs, later, clear (tests), finish(result) (B71a: { label, action } for the bottom button, or null) } ->a promise for the first end: { ok, stopped, rows, installed }.
 export async function runAppRun(jobs, deps) {
   const { queue, lanes, record = async () => {}, reopenConfirm = () => {}, open = openProgress } = deps;
   const page = open({ title: "Running" });
@@ -219,7 +259,9 @@ export async function runAppRun(jobs, deps) {
     }
     page.bar(bad.length ? { left: closeB, right: retryAll } : { right: done });
     // B49: iFizBox's own IPA is with iOS, which closes iFizBox to install it: nothing to tap
+    const fin = sentSelf ? null : deps.finish?.(result); // B71a: the jailbreak run's (AppSync Unified's respring)
     if (sentSelf) page.finish({ label: CLOSING_LABEL, status: text, locked: true });
+    else if (fin) page.finish({ label: fin.label, status: text, action: fin.action ?? (() => false) });
     else page.finish({ label: RETURN_LABEL, status: text, action: () => false });
     return result;
   }

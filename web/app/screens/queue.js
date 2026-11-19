@@ -38,7 +38,7 @@ import { getBackend } from "../backend.js";
 import { catalog } from "../catalog.js";
 import { installQueue, runLogs } from "../queue.js";
 import { MODES, MODE_LABEL, changeCount, runTitle, createRepeatFilter, CONFFILE_TITLE,
-  CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf, debLinkOf } from "../core/queue.js";
+  CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf, debLinkOf, mergePlans } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 import { NAME } from "../brand.js";
@@ -64,6 +64,15 @@ export function initQueue(ctx) {
     if (e.type === "clear" && confirm) confirm.refresh();
     if (e.type !== "name") updateChrome();
   });
+  // B71a: AltStore apps queue beside the packages (app-queue.js: a row's swipe or hold menu, an app page's Modify) and
+  // show on the same Confirm sheet, Q'd badge and Queue button; a swipe's add is quiet, as apt's.
+  appQueue.subscribe((e) => {
+    if (!appRunning && !appPreparing) {
+      if (e.type === "add" && !confirm && !running && !e.quiet) openConfirm();
+      else confirm?.refresh();
+    }
+    updateChrome();
+  });
   // A tab's nav bar is built when it is first shown, so the Queue button is put in after each route change too.
   globalThis.addEventListener?.("hashchange", () => requestAnimationFrame(updateChrome));
   requestAnimationFrame(updateChrome);
@@ -78,9 +87,9 @@ function nameJobs(ids) {
 
 // Cydia's Q'd badge (on its Manage tab; ours on Installed, where its Queue button lives) and the Queue button.
 function updateChrome() {
-  const n = installQueue.size;
-  ctxRef?.setBadge?.("installed", n && !confirm && !running ? "Q'd" : null);
-  const right = document.querySelector('.nav-stack[data-tab="installed"] > .nav-item:first-child .nav-right');
+  const n = installQueue.size + jbAppJobs().length; // B71a: queued apps count too
+  ctxRef?.setBadge?.("installed", n && !confirm && !running && !appRunning ? "Q'd" : null);
+  const right = globalThis.document?.querySelector?.('.nav-stack[data-tab="installed"] > .nav-item:first-child .nav-right');
   if (!right) return;
   let b = right.querySelector(".queue-button");
   if (n && !b) {
@@ -136,7 +145,7 @@ export function confirmCancel() {
 // F234: `footer` under the sheet (a cancelled run's "Stopped. N installed and cleared from the queue.").
 function openConfirm({ footer = null } = {}) {
   if (confirm || running) { confirm?.refresh(); return; }
-  if (!installQueue.size) return;
+  if (!installQueue.size && !jbAppJobs().length) return;
   const cancel = confirmCancel();
   const ok = barButton("Confirm", "done");
   ok.hidden = true;
@@ -144,20 +153,30 @@ function openConfirm({ footer = null } = {}) {
   let generation = 0;
   let ready = null; // { jobs, plan, ids } once apt agreed
   const close = () => { confirm = null; updateChrome(); return m.close(); };
-  cancel.addEventListener("click", () => { installQueue.clearAll(); close(); });
+  cancel.addEventListener("click", () => { installQueue.clearAll(); if (!appRunning && !appPreparing) appQueue.clearAll(); close(); });
   ok.addEventListener("click", () => {
     if (!ready) return;
     const run = ready;
     // F234: the queue run where one failure doesn't stop the rest, where the backend can fetch each package
-    close().then(() => (typeof getBackend().queueFetch === "function" ? runQueueRun(run) : runConsole(run)));
+    // B71a: queued apps go first (their run, then the packages'), so a package's respring can't cut them off
+    close().then(() => runConfirmed(run));
   });
 
   async function refresh() {
     const gen = ++generation;
     ready = null;
     ok.hidden = true;
-    if (!installQueue.size) { close(); return; }
+    const apps = jbAppJobs();
+    if (!installQueue.size && !apps.length) { close(); return; }
     m.setTitle("Confirm");
+    if (!installQueue.size) { // B71a: only apps: nothing to ask apt
+      const plan = appPlan(apps);
+      m.scroll.replaceChildren(continueGroup(close), statistics(plan), modifications(plan, appNames(apps)));
+      if (footer) m.scroll.append(el("p", "group-footer confirm-stopped", footer));
+      ready = { jobs: [], plan: null, ids: [], apps };
+      ok.hidden = false;
+      return;
+    }
     m.scroll.replaceChildren(loading("Checking with apt"));
     const jobs = await withDebUrls(installQueue.list());
     if (gen !== generation) return;
@@ -178,15 +197,18 @@ function openConfirm({ footer = null } = {}) {
       m.setTitle("Cannot Comply");
       await drawIssues(m.scroll, r, names, () => close());
       if (gen !== generation) return;
-    } else if (!changeCount(r.plan)) {
+    } else if (!changeCount(r.plan) && !apps.length) {
       m.scroll.append(grouped([{ header: "Modifications", rows: [{ label: "Nothing to change" }],
         footer: "apt says everything queued is already as asked." }]));
     } else {
-      const mods = withWaitNotes(modifications(r.plan, names), planIds(r.plan));
+      // B71a: the queued apps under the same Modifications as apt's packages
+      const plan = apps.length ? mergePlans([r.plan, appPlan(apps)]) : r.plan;
+      const mods = withWaitNotes(modifications(plan, { ...appNames(apps), ...names }), planIds(r.plan));
       const modsGroup = mods.querySelector(".group");
       m.scroll.append(continueGroup(close), statistics(r.plan), mods);
       markNeededBy(modsGroup, r.plan, jobs, names, catalog); // F234: "needed by X" under what apt added
-      ready = { jobs, plan: r.plan, ids: planIds(r.plan) };
+      const changes = changeCount(r.plan) > 0;
+      ready = { jobs: changes ? jobs : [], plan: r.plan, ids: changes ? planIds(r.plan) : [], apps };
       ok.hidden = false;
     }
     // Cydia on the 4S (ref/4s/screens/queue-81.png, queue-83.png): Continue Queuing, Statistics, Modifications and no
@@ -612,6 +634,98 @@ export async function runAppQueueRun(jobs, { queue = appQueue, record = recordAp
   } catch (e) {
     appRunning = false;
     updateAppChrome();
+    throw e;
+  }
+}
+
+// ---- B71a: AltStore apps in the jailbreak app's queue ------------------------------------------------------------
+//
+// The jailbreak app can't sign (the app queue's run above refuses there), so its queued apps (app-queue.js: Install,
+// Upgrade, Reinstall, Downgrade or Remove from a row's swipe or hold menu, or an app page's Modify) run through the
+// root helper instead: AppSync Unified first when an install needs it (ipa-install.js ensureAppSync: its own apt
+// Confirm, then on), then the black page with rows (screens/apprun.js runAppRun on helperLanes): each IPA to the
+// helper's install-ipa, each Remove to its uninstall-app, one at a time. Confirm (openConfirm) lists the apps beside
+// apt's packages and runs them first; the packages' run follows once the apps' page closes.
+
+let appPreparing = false; // AppSync Unified is being got for a jailbreak app run: its own Confirm leaves the apps out
+
+// The queued apps the jailbreak Confirm and chrome show: none while their run is preparing or going.
+const jbAppJobs = () => (appRunning || appPreparing ? [] : appQueue.list());
+
+function appNames(jobs) {
+  const out = {};
+  for (const j of jobs) if (j.name) out[j.id] = j.name;
+  return out;
+}
+
+// Confirm's Confirm: the apps' run, then the packages' (when apt agreed to some).
+function runConfirmed(run) {
+  const apt = (r) => (typeof getBackend().queueFetch === "function" ? runQueueRun(r) : runConsole(r));
+  if (!run.apps?.length) return run.jobs.length ? apt(run) : undefined;
+  return runJailbreakApps(run.apps, { after: run.jobs.length ? () => afterApps(run, apt) : null });
+}
+
+// Once the apps' page closes: the packages Confirm agreed to, while the queue still holds just those; else (AppSync's
+// run took them, or the queue changed) Confirm asks apt again for what is left.
+export function afterApps(run, apt, { queue = installQueue, open = openConfirm } = {}) {
+  const same = queue.size === run.jobs.length && run.jobs.every((j) => queue.get(j.id));
+  if (same) return apt(run);
+  if (queue.size) open();
+  return undefined;
+}
+
+// AppSync Unified before any install (a run of Removes needs none). -> { respring? } to go on, null to stop (Cancel,
+// or its fallback alert's OK): the apps stay queued.
+export async function appSyncFirst(jobs, { ipa = null } = {}) {
+  if (!jobs.some((j) => j.op !== "remove")) return {};
+  const m = ipa ?? (await import("./ipa-install.js"));
+  for (;;) {
+    let got;
+    try { got = await m.ensureAppSync({ name: jobs.length === 1 ? jobs[0].name || "" : "" }); } catch { got = { ok: false, step: "install" }; }
+    if (got?.cancelled) return null;
+    if (got?.installed) m.setAppSyncRespring(true); // B61: its SpringBoard hook loads on a respring
+    if (got?.ok) return got;
+    if (!(await m.appSyncFallback(got?.step ?? "install"))) return null;
+  }
+}
+
+// Installed's record follows the run: an install recorded at its version (recordApp), a Remove forgotten.
+async function recordJbApp(job) {
+  if (job.op !== "remove") return recordApp(job);
+  const { apps, removeInstall } = await import("../core/installed.js");
+  await removeInstall(await apps(), job.id);
+}
+
+// The jailbreak app's run of queued apps. `after(result)`: once its page closes, unless it was cancelled (Cancel
+// reopens Confirm with what finished cleared). Stand-ins for tests: prepare (appSyncFirst), run (runAppRun), lanes,
+// record. -> runAppRun's first end, or null when it didn't start (a run is up, or AppSync's step stopped it).
+export async function runJailbreakApps(jobs, { queue = appQueue, prepare = appSyncFirst, run = null, lanes = null, record = recordJbApp,
+  after = null, finish = null } = {}) {
+  if (appRunning || appPreparing || running) return null;
+  appPreparing = true;
+  updateChrome();
+  let ready;
+  try { ready = await prepare(jobs); } catch { ready = null; } finally { appPreparing = false; }
+  const queued = jobs.filter((j) => queue.get(j.id));
+  if (!ready || !queued.length) { updateChrome(); if (ready === null && queue.size) confirm?.refresh(); return null; }
+  appRunning = true;
+  updateChrome();
+  try {
+    const page = await import("./apprun.js");
+    let fin = finish;
+    if (!lanes || !fin) {
+      const [ipa, low] = await Promise.all([import("./ipa-install.js"), import("../ipa-install.js")]);
+      lanes ??= page.helperLanes({ backend: getBackend(), install: low.runIpaInstall, needs: ipa.ipaNeeds });
+      fin ??= () => (ipa.appSyncRespringPending() ? ipa.ipaFinish({ ok: true }) : null);
+    }
+    return await (run ?? page.runAppRun)(queued.map((j) => ({ ...j, helper: true })), {
+      queue, record, lanes, finish: fin,
+      onClose: (result) => { appRunning = false; updateChrome(); if (!result?.stopped) after?.(result); },
+      reopenConfirm: (footer) => { appRunning = false; openConfirm({ footer }); },
+    });
+  } catch (e) {
+    appRunning = false;
+    updateChrome();
     throw e;
   }
 }

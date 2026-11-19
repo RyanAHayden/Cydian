@@ -98,7 +98,9 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   const progressOf = (r, f) => (phase, fraction = 0) => {
     if (f.ctl.signal.aborted || ended(r)) return;
     const first = r.phase !== phase;
-    if (first) {
+    if (first && helperRow(r)) { // B71a: the jailbreak app's helper: one step per app, no signing, no iOS prompt
+      if (phase === "installing") log(r, "step", `${r.mode === "remove" ? "Removing" : "Installing"} ${label(r)}`);
+    } else if (first) {
       if (phase === "downloading") log(r, "step", `Downloading ${label(r)}${r.size ? ` ${sizeText(r.size)}` : ""}`);
       else if (phase === "signing") log(r, "step", `Signing ${label(r)}`);
       else if (phase === "asking") log(r, "step", `Asked iOS to install ${label(r)}`);
@@ -162,7 +164,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     if (!res?.token) { fail(r, "nothing was signed"); return; }
     set(r, { state: "signed", phase: null, fraction: 1, token: res.token, bundleId: res.bundleId ?? r.bundleId,
       expires: res.expires ?? r.expires, name: r.job?.name ? r.name : res.name || r.name });
-    log(r, "step", `Signed ${label(r)}`);
+    if (!helperRow(r)) log(r, "step", `Signed ${label(r)}`);
     pump();
   }
 
@@ -191,6 +193,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     const unsure = res?.installed !== true;
     finishRow(r, "installed", { token: null, expires, unsure, phase: null, fraction: 1 });
     if (r.mode === "resign") log(r, "step", `Re-signed ${label(r)}${expires ? `, expires ${dateText(expires)}` : ""}`);
+    else if (r.mode === "remove") log(r, "step", `Removed ${label(r)}`);
     else log(r, "step", unsure ? `Sent ${label(r)} to iOS` : `Installed ${label(r)}`);
     pump();
   }
@@ -302,8 +305,24 @@ export function dateText(iso, { locale = undefined, timeZone = undefined } = {})
 
 const mb = (n) => (n / 1024 / 1024).toFixed(1);
 
+// B71a: a row of the jailbreak app's run (job.helper: the helper installs the IPA or uninstalls the app, no signing).
+export const helperRow = (row) => Boolean(row?.job?.helper);
+function helperStatus(row) {
+  const p = pct(row.fraction);
+  const verb = row.mode === "remove" ? "Removing" : "Installing";
+  switch (row.state) {
+    case "waiting": case "signed": return "Waiting";
+    case "downloading": case "signing": return "Checking";
+    case "asking": return verb;
+    case "installing": return p > 0 && p < 100 ? `${verb} ${p}%` : verb;
+    case "installed": return row.mode === "remove" ? "Removed" : "Installed";
+    default: return null;
+  }
+}
+
 export function rowStatus(row, opts = {}) {
   const p = pct(row.fraction);
+  if (helperRow(row)) { const h = helperStatus(row); if (h != null) return h; }
   switch (row.state) {
     case "waiting": return "Waiting";
     case "downloading":
@@ -325,7 +344,8 @@ export function rowStatus(row, opts = {}) {
 export function summaryLine(rows) {
   const n = (f) => rows.filter(f).length;
   const parts = [
-    [n((r) => r.state === "installed" && r.mode !== "resign"), "installed"],
+    [n((r) => r.state === "installed" && r.mode !== "resign" && r.mode !== "remove"), "installed"],
+    [n((r) => r.state === "installed" && r.mode === "remove"), "removed"],
     [n((r) => r.state === "installed" && r.mode === "resign"), "re-signed"],
     [n((r) => r.state === "failed"), "failed"],
     [n((r) => r.state === "cancelled"), "cancelled"],
@@ -336,8 +356,10 @@ export function summaryLine(rows) {
 export function runStatus(rows) {
   const pos = (r) => `${rows.indexOf(r) + 1} of ${rows.length}`;
   const ios = rows.find((r) => WITH_IOS.has(r.state));
+  if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
   if (ios) return ios.state === "asking" ? `Tap Install for ${label(ios)} (${pos(ios)})` : `Installing ${label(ios)} (${pos(ios)})`;
   const s = rows.filter((r) => SIGNING.has(r.state));
+  if (s.length && s.every(helperRow)) return "Preparing";
   if (s.length === 1) return `${s[0].state === "signing" ? "Signing" : "Downloading"} ${label(s[0])} (${pos(s[0])})`;
   if (s.length) return `Signing ${s.length} apps`;
   return "Preparing";

@@ -3,7 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { signInFailure, checklist, handoffFiles, handoffZip, loadFreeIdentity, saveFreeIdentity, forgetFreeIdentity,
-  relayAvailable, resetRelayAnswer, FREE_KEY } from "./free-apple-id.js";
+  relayAvailable, resetRelayAnswer, FREE_KEY, devModeSteps, devModeShot, freeInstalled, markFreeInstalled,
+  INSTALLED_KEY } from "./free-apple-id.js";
 import { unzipEntries } from "../core/certfiles.js";
 import { NAME } from "../brand.js";
 
@@ -78,4 +79,61 @@ test("relayAvailable: only a 200 {on:true} from /apple/status; asked once per pa
   resetRelayAnswer();
   assert.equal(await relayAvailable({ fetcher: async () => { throw new Error("offline"); } }), false);
   resetRelayAnswer();
+});
+
+// ---- F254i: Developer Mode and Trust ----
+test("Developer Mode steps: in order, the Stolen Device Protection step optional, Trust names the certificate", () => {
+  const steps = devModeSteps({ email: "me@example.org" });
+  assert.deepEqual(steps.map((s) => s.id), ["turn-on", "restart", "confirm", "delay", "trust"]);
+  assert.deepEqual(steps.filter((s) => s.optional).map((s) => s.id), ["delay"]);
+  assert.match(steps[0].text, /Privacy & Security/);
+  assert.match(steps[0].text, new RegExp(NAME));
+  assert.match(steps[1].shot.alert.buttons.join(), /Restart/);
+  assert.match(steps[2].shot.alert.buttons.join(), /Turn On/);
+  assert.match(steps[3].text, /Stolen Device Protection/);
+  assert.match(steps[4].text, /VPN & Device Management.*Apple Development: me@example\.org/);
+  assert.equal(steps[4].shot.groups[0].rows[0].label, "Apple Development: me@example.org");
+  for (const s of steps) assert.ok(s.title && s.text && s.shot.title && s.shot.groups.length, s.id);
+  assert.doesNotMatch(devModeSteps().at(-1).text, /undefined/);
+});
+
+test("Developer Mode page stops showing once an app on the route installed fine", () => {
+  const store = memStore();
+  assert.equal(freeInstalled(store), false);
+  markFreeInstalled(store);
+  assert.equal(freeInstalled(store), true);
+  assert.equal(store.getItem(INSTALLED_KEY), "true");
+  markFreeInstalled(store, false);
+  assert.equal(freeInstalled(store), false);
+  store.setItem(INSTALLED_KEY, "{broken");
+  assert.equal(freeInstalled(store), false);
+});
+
+test("devModeShot: nav bar, rows (switch, detail, chevron, mark) and the alert, all as text", () => {
+  const fake = (tag) => {
+    const e = { tag, className: "", textContent: "", children: [], attrs: {},
+      append: (...c) => e.children.push(...c), setAttribute: (k, v) => { e.attrs[k] = v; } };
+    return e;
+  };
+  const saved = globalThis.document;
+  globalThis.document = { createElement: fake };
+  try {
+    const fig = devModeShot(devModeSteps()[1].shot);
+    const all = [];
+    const walk = (n) => { all.push(n); n.children.forEach(walk); };
+    walk(fig);
+    const by = (c) => all.filter((n) => n.className.split(" ").includes(c));
+    assert.equal(fig.attrs.role, "img");
+    assert.equal(fig.attrs["aria-label"], "Settings: Developer Mode");
+    assert.equal(by("dm-title")[0].textContent, "Developer Mode");
+    assert.equal(by("dm-back")[0].textContent, "Privacy & Security");
+    assert.equal(by("dm-switch")[0].className, "dm-switch is-on");
+    assert.deepEqual(by("dm-alert-button").map((b) => [b.textContent, b.className.includes("is-bold")]), [["Cancel", false], ["Restart", true]]);
+    const first = devModeShot(devModeSteps()[0].shot);
+    const rows = first.children[0].children.find((n) => n.className === "dm-group").children;
+    assert.equal(rows[0].className, "dm-row is-marked");
+    assert.deepEqual(rows[0].children.map((n) => n.className), ["dm-label", "dm-detail", "dm-chevron"]);
+  } finally {
+    globalThis.document = saved;
+  }
 });

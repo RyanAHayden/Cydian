@@ -10,13 +10,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { detectMode } from "./core/settings.js";
 import { ipaStatus, ipaError } from "./core/ipainstall.js";
+import { INSECURE_IPA_ALERT, INSTALL_ANYWAY, isInsecure } from "./core/insecureipa.js";
+
+// B113: an http:// IPA link (ifizbox://install, Settings > Install IPA, an app page from an http source). The shell
+// (Apt.swift IPAInstall.fetchHTTP) downloads its https twin; when there is none, ipa.install answers code "insecure"
+// and askInsecureIpa puts INSECURE_IPA_ALERT up: Install Anyway -> true (the call goes again with insecure: true, a
+// plain http download), Cancel -> false. Links let through stay let through for the session (allowedHttp), so Try
+// Again after AppSync's fallback, or a second install of the same link, doesn't ask again.
+const allowedHttp = new Set();
+export async function askInsecureIpa({ alert } = {}) {
+  const show = alert ?? (await import("./nav/alert.js")).showAlert;
+  return (await show(INSECURE_IPA_ALERT))?.index === INSTALL_ANYWAY;
+}
+export function forgetAllowedHttp() { allowedHttp.clear(); } // tests
 
 export const ipaInstallAvailable = (mode = detectMode()) => mode === "jailbreak" && Boolean(globalThis.ifizboxNative?.call);
 
-export async function installIpa(url, onEvent = null, { native = globalThis.ifizboxNative } = {}) {
+export async function installIpa(url, onEvent = null, { native = globalThis.ifizboxNative, insecure = false } = {}) {
   if (!native?.call) throw Object.assign(new Error("sideload: no native bridge"), { code: "sideload" });
   try {
-    return await native.call("ipa.install", { url, stream: Boolean(onEvent) }, onEvent ?? undefined);
+    return await native.call("ipa.install", { url, stream: Boolean(onEvent), ...(insecure ? { insecure: true } : {}) }, onEvent ?? undefined);
   } catch (e) {
     const msg = e?.message || String(e);
     const m = msg.match(/^([a-z_]+): /);
@@ -32,7 +45,10 @@ export async function installIpa(url, onEvent = null, { native = globalThis.ifiz
 // F188: `signal` (the page's Cancel) ends the run at once: it resolves { ok: false, cancelled: true } without waiting
 // for ipa.install and nothing more is drawn (F196: the page also asks the shell's ipa.cancel to stop it,
 // screens/ipa-install.js stopIpaInstall).
-export async function runIpaInstall({ url, name = "" }, view, { native = globalThis.ifizboxNative, signal = null } = {}) {
+// B113: `ask` puts up This Download Is Not Secure for an http link with no https twin (askInsecureIpa); its Cancel
+// resolves { ok: false, cancelled: true, declined: true } (the page closes, as for its own Cancel).
+export async function runIpaInstall({ url, name = "" }, view, { native = globalThis.ifizboxNative, signal = null,
+  ask = askInsecureIpa } = {}) {
   const log = [];
   const line = (type, text) => {
     log.push(type === "error" ? `E: ${text}` : type === "status" ? `» ${text}` : text);
@@ -52,8 +68,9 @@ export async function runIpaInstall({ url, name = "" }, view, { native = globalT
   };
   if (stopped()) return cancelled();
   const aborted = new Promise((resolve) => signal?.addEventListener?.("abort", () => resolve(true), { once: true }));
+  let declined = false;
   try {
-    const job = installIpa(url, ({ fd, line: raw }) => {
+    const onEvent = ({ fd, line: raw }) => {
       if (stopped()) return;
       const text = String(raw ?? "").replace(/\s+$/, "");
       if (!text) return;
@@ -69,13 +86,32 @@ export async function runIpaInstall({ url, name = "" }, view, { native = globalT
       }
       if (fd === "err" && /^ifizbox-helper: /.test(text)) said.add(text.slice(16));
       line(fd === "err" && /^ifizbox-helper: /.test(text) ? "error" : fd === "err" && /^(W:|warning)/i.test(text) ? "warning" : "info", text);
-    }, { native });
+    };
+    // B113: an http link with no https twin asks (askInsecureIpa); Install Anyway sends it again over plain http.
+    const job = (async () => {
+      let insecure = allowedHttp.has(url);
+      for (;;) {
+        try {
+          return await installIpa(url, onEvent, { native, insecure });
+        } catch (e) {
+          if (insecure || !isInsecure(e) || stopped()) throw e;
+          line("warning", `No https copy of the IPA: ${String(e?.message ?? e).replace(/^insecure: /, "")}`);
+          view.status(INSECURE_IPA_ALERT.title);
+          if (!(await ask())) { declined = true; return null; }
+          if (stopped()) return null;
+          allowedHttp.add(url);
+          insecure = true;
+          line("info", "Downloading over plain http (Install Anyway)");
+        }
+      }
+    })();
     job.catch(() => {}); // after Cancel no one waits for it
     result = await (signal ? Promise.race([job, aborted.then(() => null)]) : job);
   } catch (e) {
     if (!stopped()) error = ipaError(e, name);
   }
   if (stopped()) return cancelled();
+  if (declined) return { ...cancelled(), declined: true };
   if (error) {
     const first = error.code === "no_adhoc" ? error.detail || error.title : error.message;
     // B72: not again when it is the helper's own line, word for word (no_adhoc, os_version)

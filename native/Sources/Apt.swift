@@ -107,7 +107,9 @@ enum Apt {
             }
             guard let url = httpURL(c.params["url"]) else { return reply(c, nil, "bad_url: not an http(s) URL") }
             let stream = (c.params["stream"] as? Bool) ?? false
-            IPAInstall.run(url, emit: stream ? { c.emitOnMain($0) } : nil) { reply(c, $0, $1) }
+            // B113: insecure: true is the page's Install Anyway (web/app/ipa-install.js): plain http, no https twin
+            let insecure = c.params["insecure"] as? Bool == true
+            IPAInstall.run(url, insecure: insecure, emit: stream ? { c.emitOnMain($0) } : nil) { reply(c, $0, $1) }
         }
         // F196: ipa.cancel, the IPA install page's Cancel (web/app/screens/ipa-install.js): stops ipa.install's download,
         // or keeps ifizbox-helper from starting; an error once the helper runs (it can't be stopped halfway) or when
@@ -470,7 +472,7 @@ enum IPAInstall {
     }()
 
     // F196: the running ipa.install, for ipa.cancel. Guarded by runLock.
-    final class Run { var task: URLSessionTask?; var cancelled = false; var helper = false }
+    final class Run { var task: URLSessionTask?; var fetch: DebFetch?; var cancelled = false; var helper = false }
     static let runLock = NSLock()
     static var running: Run?
 
@@ -480,9 +482,45 @@ enum IPAInstall {
         guard !r.helper else { throw BridgeError("helper", "ifizbox-helper is already installing the IPA; it can't be stopped halfway") }
         r.cancelled = true
         r.task?.cancel()
+        r.fetch?.cancel()
     }
 
-    static func run(_ url: URL, emit: (([[String: Any]]) -> Void)?, done finished: @escaping (Any?, String?) -> Void) {
+    // B113: an http:// link, as Sideload.download does for the sideload app (B104): IPAInstall.session is URLSession,
+    // which ATS keeps off plain http. Without `insecure` the https twin (Sideload.httpsTwin, 20 s idle limit) is
+    // downloaded instead; when it has none, the call answers "insecure: …" and the page asks (web/app/ipa-install.js,
+    // core/insecureipa.js INSECURE_IPA_ALERT). With `insecure` (Install Anyway) the link itself comes over plain http
+    // through F238's PlainDownload (Network.framework; no ATS exception). The file lands at `path` (in `dir`, where
+    // the helper takes IPAs from); progress goes out as dlstatus lines. -> the running download, for ipa.cancel.
+    static func fetchHTTP(_ url: URL, twin: URL, insecure: Bool, to path: String, emit: (([[String: Any]]) -> Void)?,
+                          done: @escaping (String?) -> Void) -> DebFetch {
+        let dest = URL(fileURLWithPath: path)
+        var shown = -1
+        let progress = { (p: Double) in
+            let pct = Int((min(max(p, 0), 1) * 100).rounded(.down))
+            guard pct != shown else { return }
+            shown = pct
+            emit?([["fd": "status", "line": "dlstatus:ipa:\(pct):Downloading"]])
+        }
+        // Download's and PlainDownload's "the server answered 404" is ipa.install's not_found, as for https links.
+        let finished = { (err: String?) in
+            if let e = err, let r = e.range(of: "network: the server answered 4"), r.lowerBound == e.startIndex {
+                return done("not_found: HTTP \(e.dropFirst("network: the server answered ".count)) for \(url.absoluteString)")
+            }
+            done(err)
+        }
+        if insecure {
+            NSLog("[ipa.install] plain http download (Install Anyway): %@", url.absoluteString)
+            return PlainDownload.start(url, to: dest, max: SignBridge.maxIPA, progress: progress, done: finished)
+        }
+        return Download.start(twin, to: dest, max: SignBridge.maxIPA, timeout: Sideload.twinTimeout, progress: progress) { err in
+            guard let e = err else { return finished(nil) }
+            if !Sideload.twinMissing(e) { return finished(e) }
+            NSLog("[ipa.install] no https twin for %@ (%@)", url.absoluteString, e)
+            finished("insecure: \(url.host ?? url.absoluteString) offers this IPA only over plain http, without encryption")
+        }
+    }
+
+    static func run(_ url: URL, insecure: Bool = false, emit: (([[String: Any]]) -> Void)?, done finished: @escaping (Any?, String?) -> Void) {
         let job = Run()
         runLock.lock(); running = job; runLock.unlock()
         let done = { (v: Any?, e: String?) in
@@ -494,14 +532,8 @@ enum IPAInstall {
             try fm.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         } catch { return done(nil, "install: can't make \(dir): \(error.localizedDescription)") }
         emit?([["fd": "status", "line": "dlstatus:ipa:0:Downloading"]])
-        let task = session.downloadTask(with: url) { tmp, resp, err in
-            if let e = err as? URLError { return done(nil, "\(e.code == .timedOut ? "timeout" : "network"): \(e.localizedDescription)") }
-            if let e = err { return done(nil, "network: \(e.localizedDescription)") }
-            guard let tmp = tmp, let http = resp as? HTTPURLResponse else { return done(nil, "network: no HTTP answer") }
-            if http.statusCode >= 400 { return done(nil, "not_found: HTTP \(http.statusCode) for \(url.absoluteString)") }
-            let path = dir + "/" + UUID().uuidString + ".ipa"
-            do { try FileManager.default.moveItem(atPath: tmp.path, toPath: path) }
-            catch { return done(nil, "install: can't keep the download: \(error.localizedDescription)") }
+        // The downloaded IPA at `path` (in dir) to the helper, then removed.
+        let install = { (path: String) in
             DispatchQueue.global(qos: .userInitiated).async {
                 defer { try? FileManager.default.removeItem(atPath: path) }
                 // F196: Cancel after the download: the helper never starts; from here on ipa.cancel refuses.
@@ -522,6 +554,31 @@ enum IPAInstall {
                 } catch let e as BridgeError { done(nil, e.text) }
                 catch { done(nil, "helper: \(error.localizedDescription)") }
             }
+        }
+        // B113: http links: the https twin, or "insecure" for the page to ask, or plain http after Install Anyway.
+        if let twin = Sideload.httpsTwin(url) {
+            let path = dir + "/" + UUID().uuidString + ".ipa"
+            let fetch = fetchHTTP(url, twin: twin, insecure: insecure, to: path, emit: emit) { err in
+                if let e = err { try? fm.removeItem(atPath: path); return done(nil, e) }
+                install(path)
+            }
+            runLock.lock(); job.fetch = fetch; let stop = job.cancelled; runLock.unlock()
+            if stop { fetch.cancel() }
+            return
+        }
+        let task = session.downloadTask(with: url) { tmp, resp, err in
+            // B104: an https link sent on to plain http: our words (core/insecureipa.js atsText), never iOS's
+            if let e = err as? URLError, e.code == .appTransportSecurityRequiresSecureConnection {
+                return done(nil, "ats: the link leads to a plain http address\((e.failingURL?.host).map { " (\($0))" } ?? ""), which iOS blocks here")
+            }
+            if let e = err as? URLError { return done(nil, "\(e.code == .timedOut ? "timeout" : "network"): \(e.localizedDescription)") }
+            if let e = err { return done(nil, "network: \(e.localizedDescription)") }
+            guard let tmp = tmp, let http = resp as? HTTPURLResponse else { return done(nil, "network: no HTTP answer") }
+            if http.statusCode >= 400 { return done(nil, "not_found: HTTP \(http.statusCode) for \(url.absoluteString)") }
+            let path = dir + "/" + UUID().uuidString + ".ipa"
+            do { try FileManager.default.moveItem(atPath: tmp.path, toPath: path) }
+            catch { return done(nil, "install: can't keep the download: \(error.localizedDescription)") }
+            install(path)
         }
         runLock.lock(); job.task = task; let early = job.cancelled; runLock.unlock()
         if early { task.cancel() }

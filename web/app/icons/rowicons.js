@@ -118,6 +118,7 @@ export const ROW_ICONS = {
   showExpiryWarning: [C.gold, "seal"], expiryWarning: [C.gold, "clock"], // F244: Home's certificate warning
   otherLinks: [C.purple, "link"], lockHome: [C.dark, "lock"], websiteApps: [C.blue, "apps"],
   help: [C.blue, "question"], server: [C.teal, "globe"], checkServer: [C.green, "pulse"], runYourOwn: [C.orange, "cloud"],
+  shareCert: [C.green, "personPlus"], // Share Your Certificate (SideDrop)
   sources: [C.blue, "list"], transfer: [C.green, "transfer"], hidden: [C.grey, "eyeSlash"], recommended: [C.gold, "star"],
   share: [C.blue, "share"], copy: [C.grey, "copy"], saveFile: [C.teal, "save"], qr: [C.dark, "qr"],
   fromFile: [C.teal, "file"], fromClipboard: [C.brown, "clipboard"],

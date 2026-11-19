@@ -1315,7 +1315,17 @@ async function copyUdid(udid, e) {
   }
 }
 
-const helpGroup = () => grouped([{ rows: [{ label: HELP_TITLE, href: format(settingsRoute(["signing", HELP])), icon: rowIcon("help") }] }]);
+const SIDEDROP = "https://github.com/RyanAHayden/sidedrop";
+// How Signing Works, then Share Your Certificate: SideDrop, a site the certificate's owner runs so friends can sideload too.
+const helpGroup = () => {
+  const f = document.createDocumentFragment();
+  f.append(grouped([{ rows: [{ label: HELP_TITLE, href: format(settingsRoute(["signing", HELP])), icon: rowIcon("help") }] }]),
+    grouped([{ rows: [{ label: "Share Your Certificate", subtitle: "Help your friends sideload with SideDrop", chevron: true,
+      icon: rowIcon("shareCert"), onClick: () => window.open(SIDEDROP, "_blank", "noopener") }],
+    footer: "Have a developer account? Run SideDrop, a site of your own: friends register their iPhone once and every app is "
+      + "signed for them with your certificate. Anyone who installs from it can pull the certificate out, so share it only with people you trust." }]));
+  return f;
+};
 
 // The page from its parts, in signingLayout's order, keeping the scroll position.
 function showSigningPage(el, layout, parts) {

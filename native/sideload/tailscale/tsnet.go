@@ -186,10 +186,35 @@ func TSRelay(host *C.char, port C.int) C.int {
 	return C.int(lp)
 }
 
+// waitPeer waits (up to 10 s) for host to show up in the node's network map. Right after a start the node says
+// Running before its peers arrive, and tsnet then dials the address through iOS itself, which resets the
+// connection to the phone's own address ("connection reset by peer", "early eof").
+func waitPeer(ctx context.Context, host string) *ipnstate.PeerStatus {
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if st, err := current(ctx, true); err == nil {
+			for _, p := range st.Peer {
+				for _, ip := range p.TailscaleIPs {
+					if ip.String() == host {
+						return p
+					}
+				}
+			}
+		}
+		if time.Now().After(deadline) || ctx.Err() != nil {
+			return nil
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 func bridge(s *tsnet.Server, c net.Conn, target string) {
 	defer c.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t0 := time.Now()
+	if h, _, _ := net.SplitHostPort(target); waitPeer(ctx, h) == nil {
+		logf("relay %s: not in the network map after %s; dialing anyway", target, time.Since(t0).Round(time.Millisecond))
+	}
 	r, err := s.Dial(ctx, "tcp", target)
 	cancel()
 	if err != nil {
@@ -255,14 +280,7 @@ func TSTest(host *C.char, port C.int) *C.char {
 	case st.BackendState != "Running":
 		return cjson(testResult{Code: "not_running", Detail: st.BackendState})
 	}
-	var peer *ipnstate.PeerStatus
-	for _, p := range st.Peer {
-		for _, ip := range p.TailscaleIPs {
-			if ip.String() == h {
-				peer = p
-			}
-		}
-	}
+	peer := waitPeer(ctx, h)
 	res := testResult{}
 	if peer != nil {
 		res.Peer = strings.TrimSuffix(peer.DNSName, ".")

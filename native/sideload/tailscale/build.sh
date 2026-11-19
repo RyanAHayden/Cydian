@@ -56,7 +56,7 @@ if [ ! -f "$built/libtsnet.a" ]; then
     go build -trimpath -ldflags="-s -w" -buildmode=c-archive -o "$built/libtsnet.a.part" .)
   mv "$built/libtsnet.a.h" "$built/libtsnet.h" # go names the header after the output, minus its last extension
   ts=$(awk '{for (i = 1; i < NF; i++) if ($i == "tailscale.com") print $(i + 1)}' "$work/go.mod")
-  cp "$cache/gopath/pkg/mod/tailscale.com@$ts/LICENSE" "$built/LICENSE-tailscale.txt"
+  install -m 644 "$cache/gopath/pkg/mod/tailscale.com@$ts/LICENSE" "$built/LICENSE-tailscale.txt"
   echo "$GO_VERSION tailscale.com $ts" > "$built/version"
   mv "$built/libtsnet.a.part" "$built/libtsnet.a"
 fi
@@ -64,6 +64,6 @@ flock -u 9
 
 cp "$built/libtsnet.a" "$out/libtsnet.a"
 cp "$built/libtsnet.h" "$out/libtsnet.h"
-cp "$built/LICENSE-tailscale.txt" "$out/LICENSE-tailscale.txt"
+install -m 644 "$built/LICENSE-tailscale.txt" "$out/LICENSE-tailscale.txt"
 printf '%s' "$stamp" > "$out/stamp"
 echo "tailscale: $out/libtsnet.a ($(cat "$built/version"))"

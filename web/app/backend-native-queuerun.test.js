@@ -38,12 +38,27 @@ test("queueFetch: the stanza's link and hash to share.debFetch, its progress to 
 
 test("queueFetch: a bad hash fails the row; a network failure hands it to apt (but not a full-URL Filename)", async () => {
   const bad = bridge({ "share.debFetch": () => { throw new Error("bad_hash: the download's SHA256 is 00, not the aa its source lists"); } });
-  await assert.rejects(queueFetch(bad.call, row), /isn't the file its source lists \(the download's SHA256/);
+  await assert.rejects(queueFetch(bad.call, row), (e) => {
+    assert.equal(e.message, "the download isn't the file its source lists (its SHA256 doesn't match)");
+    assert.match(e.detail, /the download's SHA256 is 00, not the aa/);
+    return true;
+  });
   const net = bridge({ "share.debFetch": () => { throw new Error("network: the server answered 403"); } });
   assert.deepEqual(await queueFetch(net.call, row), { viaApt: true });
   await assert.rejects(queueFetch(net.call, { ...row, linked: true }), /couldn't download it from https:\/\/r\.example/);
   assert.deepEqual(await queueFetch(net.call, { ...row, debUrl: null }), { viaApt: true });
   assert.equal(net.calls.length, 2, "no link: nothing fetched");
+});
+
+test("backend.queueFetch: the bridge's split error (code + message, as bridge.js makes it) still reads as a bad hash", async () => {
+  const native = {
+    async call(method) {
+      if (method !== "share.debFetch") return null;
+      throw Object.assign(new Error("the download's SHA256 is 11, not the 00 its source lists"), { code: "bad_hash" });
+    },
+  };
+  const backend = createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB(), mode: "jailbreak", queue: createQueue() } });
+  await assert.rejects(backend.queueFetch(row, {}), (e) => /its SHA256 doesn't match/.test(e.message) && /SHA256 is 11/.test(e.detail));
 });
 
 test("queueFetch: the row's stop cancels the shell's download by its tag", async () => {

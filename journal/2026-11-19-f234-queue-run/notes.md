@@ -69,7 +69,7 @@ default view; Log is the console as before.
   only `auto`.
 - Linked debs (F131) are fetched again at run time; the copy `simulate` staged is discarded when the queue clears.
 
-## Known gaps (filed as follow-ups)
+## Known gaps (filed as follow-ups F238, F239, B70)
 
 - **http repos fall back to apt.** App Transport Security keeps URLSession off plain http (see Icons.swift,
   B58). For an http source (BigBoss and others), share.debFetch fails, and the row downloads through apt
@@ -84,10 +84,61 @@ default view; Log is the console as before.
 - At first, the scheduler's progress hook took (done, total) bytes, but the shell only knows a fraction. It
   now takes a fraction 0..1, and the row's MB comes from the stanza's Size.
 
-## Device check (iPhone 7)
+- The shell's split errors: bridge.js turns `bad_hash: …` into `e.code` plus an unprefixed message, and the
+  wrapper `backendError` then dropped the code. So the `^bad_hash:` / `^gone:` checks never matched in the
+  app; the node fakes throw prefixed messages, so tests never showed it. That also hit F131's linked-deb
+  bad-hash and gone checks. `backendError` now keeps a code the proxy doesn't share in front of the message.
+  Found on the phone (run 1 below).
 
-(see below)
+## Device check (iPhone 7, 0.9.8-1599 then 0.9.8-1600 of this branch)
+
+The test repo was a flat repo of three empty packages built on the phone with dpkg-deb. `f234test-bad`'s
+Packages stanza lists an all-zero SHA256 and MD5; `f234test-needsbad` depends on it; `f234test-ok` stands
+alone. It was served from the desktop with `python3 -m http.server` through `ssh -R` (the phone can't reach
+the desktop's port directly), so the phone sees it at http://127.0.0.1:18734/. The source was a
+`[trusted=yes]` file in sources.list.d. I queued needsbad (apt added bad) and ok from their package pages,
+then tapped Confirm.
+
+- Confirm's Modifications showed "needed by F234 Test needsbad" in grey under F234 Test bad.
+- Run 1 (build 1599): bad ended Failed, needsbad was Skipped ("Needs F234 Test bad, which failed"), and ok
+  ended Installed. The end showed "1 installed, 1 failed, 1 skipped" at the end of the list and the log, Close
+  / Retry All, and "Return to iFizBox". So the brief's check (a queue with one bad-hash package installs the
+  others) passed. But bad failed in apt (Hash Sum mismatch, after a viaApt fallback), not in the shell's
+  check: that is how I found the split-error bug above. The row also showed apt's last error line ("Unable to
+  fetch some archives…"); it now shows the first one (the cause).
+- Run 2 (build 1600, both fixed): bad failed in the shell's hash check ("the download isn't the file its
+  source lists…"), needsbad was skipped, and ok was installed. Retry All ran a second pass with the same result
+  (the log has both passes). Tapping a failed row retried it. Tapping the installed row opened the Log filtered
+  to that package. After Close, the Installed tab showed Q'd and Queue, and Confirm listed only needsbad (ok had
+  left the queue). Confirm's Cancel cleared it.
+- The Log: one bold line per step per package (Downloading X, Downloaded X, apt's Preparing / Unpacking /
+  Installing / Configuring once each, Installed X), with apt's and dpkg's own output grey under it.
+- http to 127.0.0.1 worked from the shell (ATS lets IP addresses through), so needsbad and ok were fetched by
+  share.debFetch. But apt-get install of the fetched ok file downloaded ok again from the source ("Get:1
+  http://127.0.0.1…"). When the local .deb has the same version and hash as the source's, apt 2.9.4 takes the
+  repo copy. That is harmless here, but it is a second download. Noted below.
+- Cleanup: f234test-ok was removed and the test source, its lists and /tmp files were deleted; this branch's
+  iFizBox (0.9.8-1600) stays installed. The local http server and the ssh tunnel run under `timeout 5400` and
+  stop on their own. I had no pid to stop them earlier, and the rules forbid a pattern kill.
+
+Screenshots are in ref/7/screens/f234-*.png (main checkout's ref/, gitignored).
 
 ## Not verified
 
-(see below)
+- **Hide and its strip, Cancel ("Stopping after X…", back to Confirm with the Stopped footer), and a row's stop
+  button on the phone.** Three tiny packages finish in about a second, so there was no running page to tap.
+  They are covered by the node tests (installrun.test.js for cancel and stop) and by reading the code; the
+  strip's look (queue.css .qr-strip) was never seen on a screen.
+- **The progress bar and indeterminate sweep, and the segmented control's pressed look.** The bars only show
+  while a row downloads or installs, which these runs never held long enough for a screenshot. The segmented
+  control's resting look was seen on the phone; the CSS is from sampled 4S art, but no 3x zoom comparison
+  against the kit was made.
+- **The last polish after run 2** (KB for packages under 1 MB, the shorter bad-hash line with the full sentence
+  as a grey log line): node tests only, not rebuilt onto the phone.
+- **`ifizbox-helper auto` on the phone.** These runs installed no apt-added package (bad always failed), so
+  markAuto never ran there. The helper verb is tested on Linux (test_helper.py).
+- **Conffile questions in the run, a removal row, an upgrade's re-plan with an installed version standing in, and
+  F189 waiters (an IPA waiting on AppSync).** Node tests only.
+- **The apt double download.** When a shell-fetched .deb matches the source's version and hash, apt fetches the
+  source's copy instead of the local file. Seen with ok in run 2; not worked around (a repo that answers apt
+  with 418, like Havoc, would fail such a row even though the shell fetched it).

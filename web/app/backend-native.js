@@ -64,7 +64,10 @@ const CODES = new Set(["bad_url", "refused", "too_large", "timeout", "upstream",
 
 function backendError(e) {
   if (e instanceof BackendError) return e;
-  const msg = e?.message || String(e);
+  let msg = e?.message || String(e);
+  // bridge.js splits the shell's "bad_hash: …" into e.code and the rest; a code the proxy doesn't share (bad_hash,
+  // not_deb, gone, cancelled, …) stays in front of the message, where the share.* callers look for it (F234).
+  if (typeof e?.code === "string" && /^[a-z_]+$/.test(e.code) && !CODES.has(e.code) && !msg.startsWith(`${e.code}: `)) msg = `${e.code}: ${msg}`;
   const m = msg.match(/^([a-z_]+): ([\s\S]*)$/);
   const code = e?.code && CODES.has(e.code) ? e.code : m && CODES.has(m[1]) ? m[1] : "network";
   return new BackendError(code, m && CODES.has(m[1]) ? m[2] : msg, e?.status);
@@ -451,7 +454,11 @@ export async function queueFetch(call, row, { signal = null, progress = () => {}
   } catch (e) {
     const msg = String(e?.message ?? e);
     const why = msg.replace(/^[a-z_]+: /, "");
-    if (/^bad_hash:/.test(msg)) throw new Error(`the download isn't the file its source lists (${why})`);
+    if (/^bad_hash:/.test(msg)) {
+      // the row's line names the hash; the shell's whole sentence (both hashes) is the error's detail for the log
+      const kind = why.match(/\b(SHA256|MD5)\b/i)?.[1]?.toUpperCase() ?? "checksum";
+      throw Object.assign(new Error(`the download isn't the file its source lists (its ${kind} doesn't match)`), { detail: why });
+    }
     if (/^not_deb:/.test(msg)) throw new Error(why);
     if (/^cancelled:/.test(msg) || signal?.aborted) throw new Error("Cancelled");
     if (row.linked) throw new Error(`couldn't download it from ${row.debUrl}: ${why}`);

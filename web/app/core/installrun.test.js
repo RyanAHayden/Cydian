@@ -1,7 +1,7 @@
 // F234: the install queue run (core/installrun.js): rows, order, the re-plan after a failure, the scheduler.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runRows, neededBy, deadRows, createInstallRun, rowStatus, summaryLine, runStatus, runPercent, mb } from "./installrun.js";
+import { runRows, neededBy, deadRows, createInstallRun, rowStatus, summaryLine, runStatus, runPercent, mb, sizeText } from "./installrun.js";
 import { parseSimulation } from "./queue.js";
 
 // apt-get -s: lib (added by apt) <- tweak; other alone; old removed; up upgraded.
@@ -223,6 +223,10 @@ test("words: statuses, summary, bottom status and the bar", () => {
   assert.equal(rowStatus({ ...r, state: "cancelled" }), "Cancelled");
   assert.equal(summaryLine([]), "Nothing to do");
   assert.equal(mb(4_000_000), "4.0");
+  assert.equal(sizeText(4_000_000), "4.0 MB");
+  assert.equal(sizeText(568), "1 KB");
+  assert.equal(sizeText(0), "0 KB");
+  assert.equal(rowStatus({ ...r, state: "downloading", total: 600_000, done: 300_000 }), "Downloading 300 of 600 KB");
   const rows = [{ id: "a", op: "install", state: "installed" }, { id: "b", op: "install", state: "installing" }, { id: "c", op: "install", state: "downloading", fraction: 0.5 }];
   assert.equal(rowStatus(rows[2]), "Downloading 50%");
   assert.equal(runStatus(rows, { b: "Bee" }), "Installing Bee (2 of 3)");

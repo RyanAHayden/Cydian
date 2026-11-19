@@ -154,7 +154,7 @@ export function createInstallRun({ rows, installed = {}, fetch, install, downloa
     const ctl = stopper();
     fetching.set(r.id, ctl);
     set(r, "downloading", { done: 0, fraction: 0, total: r.size, error: null });
-    log(r, "step", `Downloading ${r.name || r.id}${r.size ? ` ${mb(r.size)} MB` : ""}`);
+    log(r, "step", `Downloading ${r.name || r.id}${r.size ? ` ${sizeText(r.size)}` : ""}`);
     let got = null, err = null;
     try {
       got = await fetch(r, { signal: ctl, progress: (fraction) => {
@@ -170,6 +170,7 @@ export function createInstallRun({ rows, installed = {}, fetch, install, downloa
     if (err) {
       set(r, "failed", { error: err?.message || String(err) });
       log(r, "error", `${r.name || r.id}: ${r.error}`);
+      if (err?.detail) log(r, "raw", String(err.detail)); // the whole story (both hashes) for the log only
       replan();
     } else {
       files.set(r.id, got ?? {});
@@ -289,12 +290,17 @@ const verbOf = (rows, id) => (rows.find((r) => r.id === id)?.state === "cancelle
 
 // "1.2" (MB, one decimal), the row's sizes.
 export const mb = (bytes) => (Math.max(0, Number(bytes) || 0) / 1e6).toFixed(1);
+// "4.0 MB", or "568 KB"-style under a megabyte (a tiny package isn't "0.0 MB"): `of` gives the total's unit.
+export function sizeText(bytes, of = bytes) {
+  const n = Math.max(0, Number(bytes) || 0);
+  return Number(of) >= 1e6 ? `${mb(n)} MB` : `${Math.max(n ? 1 : 0, Math.round(n / 1e3))} KB`;
+}
 
 export function rowStatus(row, names = {}) {
   const remove = row.op === "remove";
   switch (row.state) {
     case "waiting": return "Waiting";
-    case "downloading": return row.total ? `Downloading ${mb(row.done)} of ${mb(row.total)} MB`
+    case "downloading": return row.total ? `Downloading ${sizeText(row.done, row.total).replace(/ [KM]B$/, "")} of ${sizeText(row.total)}`
       : row.fraction > 0 ? `Downloading ${Math.round(row.fraction * 100)}%` : "Downloading";
     case "ready": return remove ? "Waiting to remove" : "Waiting to install";
     case "installing": return remove ? "Removing" : row.viaApt ? "Downloading and installing" : "Installing";

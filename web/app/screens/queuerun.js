@@ -169,8 +169,9 @@ export async function runQueue({ jobs, plan }, deps) {
     let res;
     try { res = await backend.queueInstall(r, { file: file?.file ?? null, onEvent }); } catch (e) { return { ok: false, error: e.message || String(e) }; }
     if (res?.code === 0) return { ok: true };
-    const last = String(res?.stderr ?? "").trim().split("\n").filter((l) => /^E: |dpkg: error/.test(l)).pop();
-    return { ok: false, error: last ? last.replace(/^E: /, "") : `apt-get stopped with exit code ${res?.code}` };
+    // apt's first error is the cause ("Failed to fetch … Hash Sum mismatch"); its last only says it gave up
+    const first = String(res?.stderr ?? "").trim().split("\n").find((l) => /^E: |dpkg: error/.test(l));
+    return { ok: false, error: first ? first.replace(/^E: /, "").replace(/\s{2,}/g, " ").trim() : `apt-get stopped with exit code ${res?.code}` };
   };
   const run = createInstallRun({
     rows, installed: info.installed ?? {},

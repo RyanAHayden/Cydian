@@ -16,6 +16,7 @@ import { copyText } from "../nav/menu.js";
 import { toBase64 } from "../core/signing.js";
 import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, CONNECT_ALERT, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure,
   CONNECT_OPTIONS, connectFooter, tailscaleFooter, tailscaleTestResult } from "../core/installroute.js";
+import { ringStyle } from "../core/installroute.js";
 import { NAME } from "../brand.js";
 
 export const PAGE = "installation";
@@ -176,11 +177,19 @@ export function pairGuide(guide = PAIR_GUIDE) {
     const li = el("li", "pair-step");
     li.append(el("span", "pair-step-text", s.text));
     if (s.img) {
-      const img = el("img", "pair-shot");
+      const shot = el("div", "pair-shot");
+      const img = el("img", "pair-shot-img");
       img.src = s.img;
       img.alt = `${s.text} in Settings`;
       img.decoding = "async";
-      li.append(img);
+      if (s.size) { img.width = s.size[0]; img.height = s.size[1]; } // keeps its height before it loads
+      shot.append(img);
+      if (s.box) {
+        const ring = el("div", "pair-ring");
+        Object.assign(ring.style, ringStyle(s.box));
+        shot.append(ring);
+      }
+      li.append(shot);
     }
     ol.append(li);
   }

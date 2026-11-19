@@ -20,6 +20,31 @@ export function mediaUrl(url) {
   return null;
 }
 
+// F228: the package page's banner for a package from a source on the piracy list (core/warnings.js entry: host,
+// reason, link), drawn as a review card (the grouped table's rounded box) with Cydia's "Source Warning" in red.
+// null without an entry.
+export function piracyBanner(entry) {
+  if (!entry?.host) return null;
+  const card = el("div", "dep-review dep-piracy");
+  card.setAttribute("role", "note");
+  const head = el("div", "dep-review-head");
+  head.append(el("span", "dep-review-title", "Source Warning"));
+  const body = el("div", "dep-review-body");
+  body.append(el("p", "dep-label", `${entry.host}: ${entry.reason}`));
+  const link = safeLink(entry.link);
+  if (link) {
+    const a = el("a", "dep-piracy-link", "Why it's listed");
+    a.href = link;
+    a.target = "_blank";
+    a.rel = "noopener";
+    const p = el("p", "dep-label");
+    p.append(a);
+    body.append(p);
+  }
+  card.append(head, body);
+  return card;
+}
+
 const safeLink = (url) => (/^(https?:|mailto:)/i.test(String(url ?? "").trim()) ? String(url).trim() : null);
 
 const ALIGN = ["left", "center", "right"];

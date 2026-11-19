@@ -82,6 +82,9 @@ import { deviceError } from "../core/signing.js";
 import { getBackend } from "../backend.js";
 import { liveHUD } from "../nav/hud.js";
 import { onPageOpen } from "../nav/pagestate.js";
+import { flagPiracy, packageWarning, PIRACY_SUBTITLE } from "../core/warnings.js";
+import { scanRequest, malwareFindings, removalIds, malwareAlert } from "../core/known-malware.js";
+import { installQueue } from "../queue.js";
 
 // B46: Delete means what it says (user 2026-11-18: "I swiped and deleted an app in Installed and it just got rid of the
 // icon, I had to remove it again"). In the jailbreak app, an app the helper sees in installd's containers (`actual`, I4)
@@ -342,6 +345,30 @@ async function load() {
   if (seq !== state.seq) return;
   Object.assign(state, { rows, appCount, dates, auto });
   draw();
+  checkMalware(); // F228: on opening Installed, and after every Refresh (catalog.onChange loads the list again)
+}
+
+// ---- F228: known malware (core/known-malware.js), in the jailbreak app ----------------------------------------
+
+// What malware.scan (Apt.swift) found, as findings; [] where it can't look (the site, the sideload build, an older shell).
+export async function scanMalware(native = globalThis.ifizboxNative, mode = detectMode()) {
+  if (mode !== "jailbreak" || typeof native?.call !== "function") return [];
+  try { return malwareFindings(await native.call("malware.scan", scanRequest())); } catch { return []; }
+}
+
+// One alert per set of findings a session: what was found, why and where it is listed; Remove queues the packages
+// (the IDs, and the packages that own the files), which opens the Confirm sheet as any queued change does.
+const malwareSeen = new Set();
+export async function checkMalware({ scan = scanMalware, alert = showAlert, queue = installQueue, seen = malwareSeen } = {}) {
+  const found = await scan();
+  if (!found.length) return found;
+  const sig = found.map((f) => f.path || f.id).sort().join("\n");
+  if (seen.has(sig)) return found;
+  seen.add(sig);
+  const a = malwareAlert(found);
+  const pick = await alert(a);
+  if (a.buttons.length > 1 && pick?.index === 1) for (const id of removalIds(found)) queue.add({ op: "remove", id });
+  return found;
 }
 
 // Draws the list from what load() read (F104: again when the sort changes, without asking the worker).
@@ -387,7 +414,8 @@ function drawList() {
   state.list = null;
   for (const n of state.tail) n.remove();
   const { mode, dates, auto } = state;
-  const items = dpkgItems(rows, { mode, type: state.type, query: state.query, dates, auto });
+  // F228: a package whose source is on the piracy list says so in place of its description.
+  const items = flagPiracy(dpkgItems(rows, { mode, type: state.type, query: state.query, dates, auto }));
   if (!items.length) {
     state.tail = [note(state.query.trim() ? "No matches." : mode === "recent" ? "No install dates." : "No packages.")];
     body.append(...state.tail);
@@ -499,7 +527,9 @@ async function candidates(rows) {
 export function appSubtitle(r, locale) {
   const date = r.date ? new Date(r.date).toLocaleDateString(locale, { dateStyle: "medium" }) : null;
   // F87: I4's note, where the phone's version isn't the one iFizBox remembered, comes first.
-  return [r.note || null, r.upgrade ? `Upgrade to ${r.upgrade}` : null, r.sourceName || r.source, date].filter(Boolean).join(" · ");
+  // F228: an app from a source on the piracy list says so first.
+  return [packageWarning(r) ? PIRACY_SUBTITLE : null, r.note || null, r.upgrade ? `Upgrade to ${r.upgrade}` : null, r.sourceName || r.source, date]
+    .filter(Boolean).join(" · ");
 }
 
 // F87: the remembered apps for the list; an app the phone doesn't have (I4's `actual` null) offers no upgrade.

@@ -842,3 +842,7 @@ html[data-theme="dark"] .manage-toolbar { background: var(--dk-nav-bar); }
 }
 .manage-toolbar .bar-button:disabled { opacity: .5; cursor: default; }
 html.has-manage-toolbar .page-body::after { content: ""; display: block; flex: none; clear: both; height: 44px; }
+/* F228: the package page's Source Warning card (screens/depiction.js piracyBanner): a review card, its title red. */
+.dep-piracy .dep-review-title { color: #c0392b; }
+html[data-theme="dark"] .dep-piracy .dep-review-title { color: var(--dk-bad); }
+.dep-piracy .dep-label { margin: 4px 0; }

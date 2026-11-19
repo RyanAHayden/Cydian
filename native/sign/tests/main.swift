@@ -461,6 +461,34 @@ test("F77: My IPAs signs a local IPA file") {
     check(((try? FileManager.default.contentsOfDirectory(atPath: lib.store.path)) ?? ["x"]).isEmpty, "sweep clears leftovers")
 }
 
+// F243: an IPA without Sign Options follows the global Keep Bundle IDs (`keep`); one with them, its own switch.
+test("F243: My IPAs' Sign follows Keep Bundle IDs") {
+    let lib = IPALibrary(root: work.appendingPathComponent("lib243/Documents"), store: work.appendingPathComponent("lib243/Store"))
+    let a = try lib.add(fixtures.appendingPathComponent("rich.ipa"), name: "Rich.ipa", move: false)
+    let cert = identity.certificate
+    check(!lib.hasOptions(a) && (lib.json(a, certificate: cert)["options"] as? [String: Any])?["keepBundleId"] is NSNull,
+          "no Sign Options: keepBundleId null")
+    check(lib.options(a, keep: nil).keepBundleID && !lib.options(a, keep: false).keepBundleID && lib.options(a, keep: true).keepBundleID,
+          "no Sign Options: the global setting (absent: on)")
+    let profile = try Profile(try fixture("profile.mobileprovision"))
+    let s = try lib.sign(a, signer: IPASigner(profile: profile, identity: identity), certificate: cert, expires: nil, work: work, keep: false)
+    check(s.options.keepBundleID == false, "signed the old way with the setting off")
+    check(lib.signed(a, certificate: cert, keep: false) != nil, "counts while the setting stays off")
+    check(lib.signed(a, certificate: cert) == nil && lib.signed(a, certificate: cert, keep: true) == nil, "setting on: not signed")
+    check(lib.json(a, certificate: cert, keep: false)["signed"] is [String: Any], "json: signed with the setting off")
+    // Saved Sign Options with the switch on: the setting no longer decides.
+    var o = SignOptions()
+    o.keepBundleID = true
+    try lib.setOptions(a, o)
+    check(lib.hasOptions(a) && lib.options(a, keep: false).keepBundleID, "Sign Options win over the setting")
+    check(lib.signed(a, certificate: cert, keep: false) == nil, "the old-way copy no longer fits")
+    check((lib.json(a, certificate: cert)["options"] as? [String: Any])?["keepBundleId"] as? Bool == true, "json: the saved switch")
+    o.keepBundleID = false
+    try lib.setOptions(a, o)
+    check(!lib.options(a, keep: true).keepBundleID, "saved off stays off with the setting on")
+    try lib.delete(a)
+}
+
 // F236: this iPhone in the profile (DeviceCheck.swift; core/signing.js deviceCheck is the same check).
 test("device check") {
     func prof(_ extra: String) -> Data {

@@ -1349,7 +1349,7 @@ async function signIfReady(app, v, record) {
   // F75: Install goes straight to signAndInstall, which opens the Signing walkthrough at the missing step when the
   // certificate or the server isn't there yet (no sheet first, no alert)
   if (!url || !localSigning()) return false;
-  await signAndInstall({ url, name: app.name, onInstalled: () => record?.() });
+  await signAndInstall({ url, name: app.name, bundleId: app.bundleIdentifier || null, onInstalled: () => record?.() }); // F243: the original-app check
   return true;
 }
 

@@ -20,7 +20,7 @@ import { showBanner } from "./nav/banner.js";
 import { APP_SERVER, LEGACY_SERVER, normalizeServer, toBase64, phaseLabel, deviceError, parseProfile, deviceCheck, notLandedText } from "./core/signing.js";
 import { format, settingsRoute } from "./router.js";
 import { IPA_MAX, IFIZBOX_ID, profileInfo, targetBundleId } from "./core/websign.js";
-import { storedKeep, withKeep } from "./core/keepid.js";
+import { storedKeep, withKeep, originalState, originalNote } from "./core/keepid.js";
 import { detectMode } from "./core/settings.js";
 import { progressHUD, lockSelfUpdate } from "./nav/progress.js";
 import { showAlert } from "./nav/alert.js";
@@ -173,9 +173,44 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {}, b
     (await import("./screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version, bytes }) });
     return false;
   }
+  // F243: the original app (its own ID, not signed by iFizBox) is on the phone: say so once before iOS refuses.
+  const choice = await originalWarning({ bundleId, name });
+  if (choice === "cancel") return false;
   // F81: one tap: Install signs and installs straight away. The look-first sheet (F68, signing-sheet.js) is the app
   // page's Custom Install row (signing-sheet.js customInstall).
+  if (choice === "copy") return installOnDevice({ url, name, onInstalled, params: { url, keepBundleId: false } });
   return installOnDevice({ url, name, onInstalled });
+}
+
+// ---- F243: the original app on the phone, before a plain Install ---------------------------------------------
+//
+//   await originalWarning({ bundleId, name }, { native, alert, storage, keep })   "install" | "copy" | "cancel"
+//
+// With Keep Bundle IDs on, a signed app replaces the app under its own ID, and iOS refuses to put it over the App
+// Store copy. When that ID is on the phone and iFizBox didn't sign it (core/keepid.js originalState), an alert says
+// so, once per app: Install (as asked; remembered, so the next Install of it goes straight on), Install a Copy (this
+// time the old way, a separate copy under the profile's ID beside the original) or Cancel. Nothing to say without a
+// bundle ID, with Keep Bundle IDs off (the old way replaces nothing), for iFizBox itself, or without a bridge.
+export const ORIGINAL_WARNED_KEY = "ifizbox.originalWarned";
+
+const warnedIds = (storage) => {
+  try { const v = JSON.parse(storage?.getItem?.(ORIGINAL_WARNED_KEY) ?? "[]"); return Array.isArray(v) ? v : []; } catch { return []; }
+};
+
+export async function originalWarning({ bundleId = null, name = "" } = {},
+  { native = globalThis.ifizboxNative, alert = showAlert, storage = globalThis.localStorage, keep = storedKeep() } = {}) {
+  if (!bundleId || !keep || bundleId === IFIZBOX_ID || typeof native?.call !== "function") return "install";
+  if (warnedIds(storage).includes(bundleId)) return "install";
+  const state = await originalState(native, bundleId).catch(() => ({ installed: false, ours: false }));
+  const note = originalNote(name, state);
+  if (!note) return "install";
+  const { index } = await alert({ title: "Delete the Original First?", message: `${note.text} Install a Copy puts a separate one beside it, under your ID.`,
+    buttons: ["Cancel", "Install a Copy", "Install"], cancel: 0 });
+  if (index === 2) {
+    try { storage?.setItem?.(ORIGINAL_WARNED_KEY, JSON.stringify([...warnedIds(storage), bundleId].slice(-200))); } catch { /* private mode */ }
+    return "install";
+  }
+  return index === 1 ? "copy" : "cancel";
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -418,8 +453,10 @@ export function discardPrepared(token, native) {
 //                                      (screens/myipas.js queueLibraryInstall, prepareParams's `library` above); this
 //                                      stays the offline path and Sign (n)'s.
 
+// F243: every call but options carries Keep Bundle IDs off (withKeep), so an IPA without Sign Options of its own signs,
+// and counts as signed, the way Settings > Signing says; options sends the Sign Options page's own switch.
 export async function libraryCall(method, params = {}, onEvent, native) {
-  return bridge(native).call(`library.${method}`, params, onEvent);
+  return bridge(native).call(`library.${method}`, method === "options" ? params : withKeep(params), onEvent);
 }
 
 export async function serverReachable(server = getServer(), { timeout = 6000, fetcher = globalThis.fetch } = {}) {

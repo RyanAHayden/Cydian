@@ -5,8 +5,10 @@
 //   library.list                    -> {ipas: [entry], identity: bool}   (entry: IPALibrary.json)
 //   library.add {url} (stream: {phase: "downloading", progress})  -> {file, ipas}
 //   library.pick                    the iOS Files picker (.ipa, several at once) -> {files: [name], ipas} ([] on Cancel)
-//   library.options {file, name?, bundleId?, icon?, removeExtensions?, fixArm64e?}  Sign Options -> entry
+//   library.options {file, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?}  Sign Options -> entry
 //   library.sign {file} (stream: {phase: "signing", progress})   signs offline into the signed copy -> entry
+//   F243: every call takes keepBundleId (Settings > Signing's Keep Bundle IDs, false when off): an IPA without Sign
+//   Options of its own signs, and counts as signed, that way (IPALibrary.options(_:keep:)); one with them, its own way.
 //   library.install {file, manifestServer} (stream as signing.install)  signs if needed, then installs
 //                                   -> signing.install's reply + {file}; the signed copy stays either way
 //   library.export {file}           the share sheet (Save to Files, AirDrop...) for the signed copy -> {shared: bool}
@@ -37,7 +39,7 @@ enum MyIPAs {
     }()
 
     static func register(_ b: Bridge) {
-        b.on("library.list") { c in anyMode(c) { list() } } // F212: list, add, pick, delete in the jailbreak app too
+        b.on("library.list") { c in anyMode(c) { list(keep(c)) } } // F212: list, add, pick, delete in the jailbreak app too
         b.on("library.add") { c in add(c) }
         b.on("library.pick") { c in pick(c) }
         b.on("library.options") { c in
@@ -55,8 +57,8 @@ enum MyIPAs {
                 defer { job.end() }
                 do {
                     let file = c.params["file"] as? String ?? ""
-                    _ = try signIfNeeded(file, id: id, profile: profile, emit: emit, job: job)
-                    Apt.reply(c, library.json(file, certificate: certificate()), nil)
+                    _ = try signIfNeeded(file, id: id, profile: profile, emit: emit, job: job, keep: keep(c))
+                    Apt.reply(c, library.json(file, certificate: certificate(), keep: keep(c)), nil)
                 } catch { Apt.reply(c, nil, SignBridge.text(job.cancelled ? SignJob.cancelledError : error)) }
             }
         }
@@ -67,7 +69,7 @@ enum MyIPAs {
                 let file = c.params["file"] as? String ?? ""
                 _ = try library.url(file)
                 library.dropSigned(file)
-                return list()
+                return list(keep(c))
             }
         }
         b.on("library.helperInstall") { c in helperInstall(c) } // F212
@@ -75,7 +77,7 @@ enum MyIPAs {
         b.on("library.delete") { c in
             anyMode(c) {
                 try library.delete(c.params["file"] as? String ?? "")
-                return list()
+                return list(keep(c))
             }
         }
     }
@@ -110,10 +112,14 @@ enum MyIPAs {
 
     static func certificate() -> Data? { SignStore.identity().flatMap(SignStore.certificateDER) }
 
-    static func list() -> [String: Any] {
+    // F243: `keep`, Settings > Signing's Keep Bundle IDs as the page sends it (keepBundleId: false when off, absent
+    // when on), for IPAs without Sign Options of their own (IPALibrary.options(_:keep:)).
+    static func keep(_ c: Bridge.Call) -> Bool? { c.params["keepBundleId"] as? Bool }
+
+    static func list(_ keep: Bool? = nil) -> [String: Any] {
         library.sweep()
         let cert = certificate()
-        return ["ipas": library.files().map { library.json($0, certificate: cert) }, "identity": cert != nil]
+        return ["ipas": library.files().map { library.json($0, certificate: cert, keep: keep) }, "identity": cert != nil]
     }
 
     static func emitter(_ c: Bridge.Call) -> (String, Double) -> Void {
@@ -124,10 +130,10 @@ enum MyIPAs {
     // The signed copy, signed now when there is none that fits. Runs on SignBridge.queue.
     // F196: `job` stops the signer at its next step (SignJob).
     static func signIfNeeded(_ file: String, id: SecIdentity, profile: Profile, emit: @escaping (String, Double) -> Void,
-                             job: SignJob? = nil) throws -> IPALibrary.Signed {
+                             job: SignJob? = nil, keep: Bool? = nil) throws -> IPALibrary.Signed {
         let identity = try KeychainIdentity(id)
         if let p = DeviceCheck.problem(PhoneID.check(profile)) { throw p } // F236: before iOS's "integrity" alert
-        if let s = library.signed(file, certificate: identity.certificate) { return s }
+        if let s = library.signed(file, certificate: identity.certificate, keep: keep) { return s }
         if let p = profile.problem(with: identity.certificate) { throw p }
         if let why = try library.details(file).error { throw SignError("bad_ipa", why) }
         try job?.check()
@@ -135,7 +141,7 @@ enum MyIPAs {
         if let job = job { signer.stop = { job.cancelled } }
         return try library.sign(file, signer: signer, certificate: identity.certificate,
                                 expires: profile.signatureExpiry(certificate: identity.certificate), work: SignBridge.work,
-                                progress: { emit($0, $1) })
+                                progress: { emit($0, $1) }, keep: keep)
     }
 
     // ---- adding
@@ -154,7 +160,7 @@ enum MyIPAs {
                         name = [d.name, d.version].filter { !$0.isEmpty }.joined(separator: " ")
                     }
                     let file = try library.add(tmp, name: name, move: true)
-                    var out = list()
+                    var out = list(keep(c))
                     out["file"] = file
                     Apt.reply(c, out, nil)
                 } catch {
@@ -177,7 +183,7 @@ enum MyIPAs {
                     for u in urls where u.pathExtension.lowercased() == "ipa" {
                         if let f = try? library.add(u, name: u.lastPathComponent, move: true) { files.append(f) }
                     }
-                    var out = list()
+                    var out = list(keep(c))
                     out["files"] = files
                     Apt.reply(c, out, nil)
                 }
@@ -223,7 +229,7 @@ enum MyIPAs {
         let job = SignJob.begin() // F196: until iOS has the IPA (serveAndOpen ends it)
         SignBridge.queue.async {
             let s: IPALibrary.Signed
-            do { s = try signIfNeeded(file, id: id, profile: profile, emit: emit, job: job); try job.check() } catch {
+            do { s = try signIfNeeded(file, id: id, profile: profile, emit: emit, job: job, keep: keep(c)); try job.check() } catch {
                 job.end()
                 return Apt.reply(c, nil, SignBridge.text(job.cancelled ? SignJob.cancelledError : error))
             }
@@ -277,7 +283,7 @@ enum MyIPAs {
         guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: not in the jailbreak app") }
         let file = c.params["file"] as? String ?? ""
         SignBridge.queue.async {
-            guard let s = library.signed(file, certificate: certificate()) else {
+            guard let s = library.signed(file, certificate: certificate(), keep: keep(c)) else {
                 return Apt.reply(c, nil, "not_signed: sign it first (Sign Now)")
             }
             // Named for the person saving it: "<App> <version> (signed).ipa" in a folder of its own.

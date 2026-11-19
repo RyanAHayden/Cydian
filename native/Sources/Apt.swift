@@ -53,6 +53,17 @@ enum Apt {
         b.on("apt.installDates") { c in work(c) { () throws -> Any? in installDates() } }
         // F130: the packages apt marked as installed only to satisfy another's dependency, for Installed's User mode.
         b.on("apt.autoInstalled") { c in work(c) { () throws -> Any? in autoInstalled() } }
+        // F228: malware.scan {files, packages} (web/app/core/known-malware.js scanRequest): which of those package IDs
+        // dpkg has installed, and which of those file names sit in the Substrate or TweakInject folders, with the
+        // package that owns each file. Reads only; nothing leaves the phone. The sideload build has no dpkg: empty.
+        b.on("malware.scan") { c in
+            work(c) { () throws -> Any? in
+                let files = (c.params["files"] as? [String] ?? []).filter { !$0.isEmpty && !$0.contains("/") && !$0.hasPrefix(".") }
+                let ids = Set(c.params["packages"] as? [String] ?? [])
+                guard AppMode.current == .jailbreak else { return ["packages": [], "files": []] }
+                return malwareScan(files: files, ids: ids)
+            }
+        }
         b.on("net.fetch") { c in
             guard let url = httpURL(c.params["url"]) else { return reply(c, nil, "bad_url: not an http(s) URL") }
             get(url) { res in
@@ -147,6 +158,67 @@ enum Apt {
             if auto && !pkg.isEmpty { out.insert(pkg) }
         }
         return out.sorted()
+    }
+
+    // F228: the folders tweaks are loaded from, rootless first (TweakInject is ElleKit's/libhooker's name for it).
+    static let tweakDirs = ["/Library/MobileSubstrate/DynamicLibraries", "/usr/lib/TweakInject"]
+
+    static func malwareScan(files: [String], ids: Set<String>) -> [String: Any] {
+        var pkgs: [[String: Any]] = []
+        if !ids.isEmpty, let text = readText(Jailbreak.path("/var/lib/dpkg/status")) {
+            for stanza in text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n\n") {
+                var pkg = "", version = "", installed = false
+                for line in stanza.split(separator: "\n") {
+                    guard let colon = line.firstIndex(of: ":"), !line.hasPrefix(" ") else { continue }
+                    let key = line[..<colon].lowercased()
+                    let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+                    if key == "package" { pkg = value }
+                    else if key == "version" { version = value }
+                    else if key == "status" { installed = value.hasSuffix(" installed") }
+                }
+                if installed && ids.contains(pkg) { pkgs.append(["id": pkg, "version": version]) }
+            }
+        }
+        let fm = FileManager.default
+        var found: [String] = []
+        for dir in Set(tweakDirs.map(Jailbreak.path) + tweakDirs).sorted() {
+            for name in files {
+                let p = dir + "/" + name
+                if (try? fm.attributesOfItem(atPath: p)) != nil { found.append(p) } // a dangling link counts too
+            }
+        }
+        let owners = dpkgOwners(Set(found))
+        let out: [[String: Any]] = found.map { p in
+            var f: [String: Any] = ["path": p, "name": (p as NSString).lastPathComponent, "owner": NSNull()]
+            if let o = owners[p] { f["owner"] = o }
+            return f
+        }
+        return ["packages": pkgs, "files": out]
+    }
+
+    // `dpkg -S` for a few paths without running it: the package whose info/<pkg>.list names each path (dpkg writes
+    // the path as installed, /var/jb/... on rootless; the prefix-less form is tried too).
+    static func dpkgOwners(_ paths: Set<String>) -> [String: String] {
+        guard !paths.isEmpty else { return [:] }
+        let dir = Jailbreak.path("/var/lib/dpkg/info")
+        let pre = Jailbreak.prefix
+        var want: [String: String] = [:]
+        for p in paths {
+            want[p] = p
+            if !pre.isEmpty && p.hasPrefix(pre + "/") { want[String(p.dropFirst(pre.count))] = p }
+        }
+        var out: [String: String] = [:]
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? []
+        for name in names where name.hasSuffix(".list") {
+            guard let text = readText(dir + "/" + name) else { continue }
+            var pkg = String(name.dropLast(5))
+            if let colon = pkg.firstIndex(of: ":") { pkg = String(pkg[..<colon]) }
+            for line in text.split(separator: "\n") {
+                if let p = want[String(line)], out[p] == nil { out[p] = pkg }
+            }
+            if out.count == paths.count { break }
+        }
+        return out
     }
 
     static func readText(_ path: String) -> String? {

@@ -24,6 +24,8 @@ import { description, parseRelations, compareVersions } from "../core/apt.js";
 import { displayName, releaseDepiction } from "../core/sources.js";
 import { insecureNote } from "../core/sources.js"; // F220
 import { renderSileo, mediaUrl, reviewBody } from "./depiction.js";
+import { piracyBanner } from "./depiction.js";
+import { packageWarning } from "../core/warnings.js";
 import { settings, createSwitch } from "./settings.js";
 import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js";
 import { compat, markOf, isIncompatible } from "../core/compat.js";
@@ -951,6 +953,9 @@ async function renderPackage(body, route, key, id, ctx) {
   });
   const details = tabs.panes.details;
   body.replaceChildren(header.head, ...tabs.nodes);
+  // F228: from a source on the piracy list: Source Warning at the top of Details.
+  const piracy = piracyBanner(packageWarning({ key: pkg.key, source: source?.uri }));
+  if (piracy) details.append(piracy);
 
   // Depends (and Pre-Depends): each line links to the first alternative we carry.
   const rels = [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)];

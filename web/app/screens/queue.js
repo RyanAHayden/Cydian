@@ -511,7 +511,21 @@ async function installApp(job) {
   if (job.mode === "resign") return resignApp(job, { sc });
   if (job.options && sc.localSigning()) return installCustom(job, { sc });
   if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" });
-  return sc.signAndInstall({ url: job.url, name: job.name || "" });
+  return sc.signAndInstall(siteInstallArgs(job));
+}
+
+// F262: what signAndInstall gets for a queued job: its url and name, and the app's own bundle ID and version (as
+// browse.js passes them), so the website's early link opens iOS's prompt at the tap with Keep Bundle IDs on
+// (signing-client.js expectedBundleId) instead of waiting on Ready to Install. The job's id is the source's
+// bundleIdentifier (core/appqueue.js appJob); a My IPAs id (`library:<file>`) or one renamed by Sign Options isn't
+// what the plain sign gives, so it goes without one (the slow way).
+export function siteInstallArgs(job) {
+  const args = { url: job.url, name: job.name || "" };
+  const id = typeof job.bundleId === "string" && job.bundleId ? job.bundleId : job.id;
+  if (typeof id === "string" && id && !id.startsWith("library:") && !job.library && !job.options?.edits?.bundleId) args.bundleId = id;
+  const version = job.version || job.installed;
+  if (version) args.version = String(version);
+  return args;
 }
 
 // F84: a Custom Install job: signing.install with its own options (core/appqueue.js customParams: the look's token
@@ -535,7 +549,7 @@ export async function resignApp(job, { sc, native = globalThis.ifizboxNative, hu
   sc ??= await import("../signing-client.js");
   if (job.url) {
     if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" }, deps);
-    return sc.signAndInstall({ url: job.url, name: job.name || "" });
+    return sc.signAndInstall(siteInstallArgs(job));
   }
   const { resignLabel, deviceError, callWithStall } = await import("../core/signing.js");
   const h = hud ? hud("Re-signing") : progressHUD("Re-signing"); // F151: the progress page

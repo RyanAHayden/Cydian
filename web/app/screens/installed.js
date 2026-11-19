@@ -1415,7 +1415,7 @@ export async function manageInstall(job, { verb, i, n, hud = null, sc = null, re
     return resign(job, { sc, hud: h, deps: { hud: h } });
   }
   if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" }, { hud: h });
-  return sc.signAndInstall({ url: job.url, name: job.name || "" });
+  return sc.signAndInstall((await import("./queue.js")).siteInstallArgs(job)); // F262: with the app's bundle ID
 }
 
 // A HUD factory for job `i` of `n`: its label is always "<verb> <name> (i of n)", the bar the whole run's progress

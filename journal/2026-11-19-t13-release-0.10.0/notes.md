@@ -15,3 +15,25 @@
 - Worker: no manual deploy. Workers Builds deploys `wrangler.ifizbox.toml` on every push to main
   (worker/README.md), so the committed `web/app/source.json` goes live when the runner pushes the merge.
 - R28 was already ticked (done after 0.9.9), so there was nothing to unblock.
+
+**Version shipped: 0.10.0** (build 2016), <https://github.com/RyanAHayden/iFizBox/releases/tag/v0.10.0>, tag at
+6580b1b on `task/T13`.
+
+- Dry run first (exit 0, build 2015, at the VERSION commit). Its tree-clean check would have refused the real run
+  with this journal untracked, so I committed and pushed the journal, then published from that commit (exit 0).
+- Piracy list: Canister f517ff676e47, current; nothing to commit.
+- Packages carries 0.10.0-2016 plus 0.9.9 back to 0.9.4 (older releases read with gh).
+- Committed the rewritten `web/app/source.json` (0.10.0 first).
+
+## Checks after publishing
+- `https://ifizbox.com/repo/Packages`: first stanza `Version: 0.10.0-2016`,
+  `Filename: v0.10.0/com.ryha.ifizbox_0.10.0-2016_iphoneos-arm64.deb`, then 0.9.9 and older.
+- `https://ifizbox.com/repo/v0.10.0/com.ryha.ifizbox_0.10.0-2016_iphoneos-arm64.deb`: HTTP 200, Debian package type.
+- `releases/latest/download/iFizBox.ipa`: CFBundleShortVersionString 0.10.0, CFBundleVersion 2016.
+- `https://ifizbox.com/repo/source.json` still lists 0.9.9 first: the Worker serves the copy deployed with the
+  site, and the committed 0.10.0 copy deploys when the merge reaches main.
+
+## Not verified
+- Live `/repo/source.json` listing 0.10.0: it needs the runner to merge this branch and Workers Builds to deploy
+  main, which happens after this session ends.
+- No install of 0.10.0 on any phone (the task asked for the release and the server checks only).

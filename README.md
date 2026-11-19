@@ -77,7 +77,7 @@ bezel: silver for the website, black for the jailbreak app. Framed by [`tools/re
 
 | | | | |
 |:-:|:-:|:-:|:-:|
-| ![Search results for emulator](docs/img/web-search.png) | ![Installed in Manage mode, two apps selected](docs/img/web-installed-manage.png) | ![Install IPAs](docs/img/web-myipas.png) | ![Theme > Light with its preview](docs/img/web-theme.png) |
+| ![Search results for emulator](docs/img/web-search.png) | ![Installed in Manage mode, two apps selected](docs/img/web-installed-manage.png) | ![Install IPAs](docs/img/web-myipas.png) | ![Home in the Sepia theme](docs/img/web-theme.png) |
 | Search | Installed, Manage mode | Install IPAs | Theme > Light, with the preview |
 | ![Sources > Manage](docs/img/web-manage.png) | ![Settings](docs/img/web-settings.png) | ![Settings > Signing](docs/img/web-signing.png) | ![Installed in the jailbreak app](docs/img/jb-installed.png) |
 | Sources > Manage | Settings | Settings > Signing | Installed (jailbreak app) |

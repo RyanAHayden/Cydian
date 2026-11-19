@@ -76,9 +76,10 @@ test("queueFetch: the row's stop cancels the shell's download by its tag", async
 
 test("queueInstall: a fetched file through install-deb, a removal or an apt download through apply-ask; markAuto", async () => {
   const words = [];
+  const asks = [];
   const native = {
     async call(method, params, onEvent) {
-      if (method === "share.debInstall") { onEvent?.({ fd: "status", line: "pmstatus:com.a:50:Installing com.a" }); return { code: 0, stdout: "ok", stderr: "" }; }
+      if (method === "share.debInstall") { asks.push(params.ask); onEvent?.({ fd: "status", line: "pmstatus:com.a:50:Installing com.a" }); return { code: 0, stdout: "ok", stderr: "" }; }
       if (method === "helper.run") { words.push(params.words); return { code: 0, stdout: "", stderr: "" }; }
       return null;
     },
@@ -87,6 +88,8 @@ test("queueInstall: a fetched file through install-deb, a removal or an apt down
   const lines = [];
   assert.equal((await backend.queueInstall({ id: "com.a", op: "install", to: "1.0" }, { file: "x.deb", onEvent: (e) => lines.push(e.line) })).code, 0);
   assert.deepEqual(lines, ["pmstatus:com.a:50:Installing com.a"]);
+  await backend.queueInstall({ id: "com.a", op: "install", to: "1.0" }, { file: "y.deb" });
+  assert.deepEqual(asks, [true, false]); // F239: install-deb-ask only when someone can answer
   await backend.queueInstall({ id: "com.b", op: "install", to: "2.0" }, { onEvent: () => {} });
   await backend.queueInstall({ id: "com.c", op: "remove" }, { onEvent: () => {} });
   assert.equal(await backend.markAuto(["com.lib"]), true);

@@ -15,6 +15,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     ifizbox-helper rollbacks <pkg> | rollback <pkg> <version>              (F71: Roll Back to a kept .deb)
     ifizbox-helper install-paid <path.deb> <pkg> <version>                 (F57: a paid package's .deb)
     ifizbox-helper simulate-deb <path.deb> | install-deb <path.deb>         (N9: a .deb shared with iFizBox)
+    ifizbox-helper install-deb-ask <path.deb>                               (F239: install-deb that asks about conffiles)
     ifizbox-helper notifications on|off                                     (F65: Upgrade Notifications)
     ifizbox-helper app-versions                                             (I4: installed apps' real versions)
     ifizbox-helper userspace-reboot                                         (N8: the Userspace Reboot intent)
@@ -140,6 +141,9 @@ the boundary), then runs `apt-get -s --reinstall --allow-downgrades install <cop
 `apt-get -y` (conffile options) `--reinstall --allow-downgrades [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install
 <copy>` with `CYDIA=3 1` (the console), so apt pulls dependencies from the sources (`apt install ./file.deb`). Exit 64
 for a refused path or file, 74 couldn't copy, else apt's.
+`install-deb-ask <path>` (F239, the queue run's shell-fetched .debs) is install-deb as apply-ask is apply: no conffile
+options, fd 3 required, and apt-get runs with a pipe on its stdin that gets only the `Y`/`N` lines from the helper's
+own stdin (`C` cancels), so a conffile both you and the package changed brings the Configuration Upgrade alert.
 
 - **Arguments:** only the verb and package names. A name matches `[a-z0-9][a-z0-9.+-]+` (so never an option), is
   at most 255 bytes, at most 256 of them, and must be known: for `install` a `Package:` line in dpkg's status or an

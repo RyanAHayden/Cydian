@@ -19,11 +19,11 @@ enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, H
                    HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA,
                    HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK, HV_INSTALL_PAID, HV_NOTIFICATIONS,
                    HV_USERSPACE_REBOOT, HV_SIMULATE_DEB, HV_INSTALL_DEB,
-                   HV_APP_VERSIONS, HV_UICACHE, HV_UNINSTALL_APP, HV_UPDATE_SOURCE, HV_AUTO };
+                   HV_APP_VERSIONS, HV_UICACHE, HV_UNINSTALL_APP, HV_UPDATE_SOURCE, HV_AUTO, HV_INSTALL_DEB_ASK };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
                      "simulate, apply, apply-ask, respring, install-ipa, rollbacks, rollback, install-paid, " \
                      "notifications, userspace-reboot, simulate-deb, install-deb, app-versions, uicache, uninstall-app, " \
-                     "update-source, auto"
+                     "update-source, auto, install-deb-ask"
 /* F234: auto <pkg>... is apt-mark auto: the queue run installs one package at a time (apt-get install ./file.deb or
  * name=version), which marks each one manual; the packages apt only pulled in for another get their mark back. Names
  * as hold's (installed ones only). */
@@ -40,6 +40,9 @@ int helper_answer_ok(const char *line, size_t len);
 /* F64: the console's Cancel on apply-ask's stdin: the line "C" (\r allowed), which the helper turns into SIGINT for
  * apt-get instead of passing it on. */
 int helper_cancel_ok(const char *line, size_t len);
+/* F239: install-deb-ask <path.deb> is install-deb as apply-ask is apply: no --force-confdef/--force-confold, the
+ * status fd required, and the answers relayed by main.c the same way (the queue run's shell-fetched .debs, so the
+ * Configuration Upgrade alert comes for them too). */
 #define HELPER_VERSION_MAX 255
 #define HELPER_ITEM_MAX (HELPER_NAME_MAX + 1 + HELPER_VERSION_MAX)
 

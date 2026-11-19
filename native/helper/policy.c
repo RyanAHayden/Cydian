@@ -166,8 +166,13 @@ static int paid_plan(int argc, char *const argv[], const char *prefix, int statu
 static int local_deb_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
                           const char **err) {
     static char status_apt[64], keep_fd[64];
-    int sim = p->verb == HV_SIMULATE_DEB;
-    if (argc != 2) { *err = sim ? "simulate-deb takes one .deb path" : "install-deb takes one .deb path"; return -1; }
+    int sim = p->verb == HV_SIMULATE_DEB, ask = p->verb == HV_INSTALL_DEB_ASK;
+    if (argc != 2) {
+        *err = sim ? "simulate-deb takes one .deb path" : ask ? "install-deb-ask takes one .deb path"
+                                                            : "install-deb takes one .deb path";
+        return -1;
+    }
+    if (ask && status_fd < 0) { *err = "install-deb-ask needs the status fd (3) to ask on"; return -1; }
     if (!helper_paid_path_ok(HELPER_DEB_DIR, argv[1])) { *err = "bad .deb path (only " HELPER_DEB_DIR "/<name>.deb)"; return -1; }
     if ((size_t)snprintf(p->deb, sizeof p->deb, "%s", argv[1]) >= sizeof p->deb) { *err = "path too long"; return -1; }
     if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/apt-get", prefix) >= sizeof p->path) {
@@ -177,6 +182,7 @@ static int local_deb_plan(int argc, char *const argv[], const char *prefix, int 
     const char **a = p->argv;
     a[k++] = "apt-get";
     if (sim) a[k++] = "-s";
+    else if (ask) a[k++] = "-y"; /* F239: dpkg asks about a conffile both sides changed; main.c relays the answer */
     else {
         a[k++] = "-y";
         a[k++] = "-o"; a[k++] = "Dpkg::Options::=--force-confdef";
@@ -705,6 +711,7 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     else if (!strcmp(verb, "notifications")) { p->verb = HV_NOTIFICATIONS; return notify_plan(argc, argv, prefix, p, err); }
     else if (!strcmp(verb, "simulate-deb")) { p->verb = HV_SIMULATE_DEB; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "install-deb")) { p->verb = HV_INSTALL_DEB; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
+    else if (!strcmp(verb, "install-deb-ask")) { p->verb = HV_INSTALL_DEB_ASK; return local_deb_plan(argc, argv, prefix, status_fd, p, err); }
     else if (!strcmp(verb, "app-versions")) { p->verb = HV_APP_VERSIONS; return app_versions_plan(argc, p, err); }
     else if (!strcmp(verb, "uninstall-app")) { p->verb = HV_UNINSTALL_APP; return uninstall_app_plan(argc, argv, p, err); }
     else if (!strcmp(verb, "update-source")) { p->verb = HV_UPDATE_SOURCE; return update_source_plan(argc, argv, prefix, status_fd, p, err); }

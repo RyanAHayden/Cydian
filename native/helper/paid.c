@@ -62,7 +62,7 @@ static int copy_in(const char *from, const char *src, const char *copy, const ch
 /* Copy plan->deb (in `from`) into a fresh root-owned <HELPER_PAID_WORK>/<tag>.XXXXXX/<tag>.deb, check it when `id` is
  * set (install-paid), run plan's apt-get on the copy, remove the directory. */
 static int run_on_copy(const char *prefix, struct helper_plan *plan, char *const env[], const char *from, const char *tag,
-                       const char *id, const char *version, const char **err) {
+                       const char *id, const char *version, helper_deb_runner run, int answers, const char **err) {
     char work[PATH_MAX], copy[PATH_MAX], src[PATH_MAX];
     snprintf(src, sizeof src, "%s", plan->deb);
     if ((size_t)snprintf(work, sizeof work, "%s/ifizbox-%s.XXXXXX", HELPER_PAID_WORK, tag) >= sizeof work) {
@@ -81,6 +81,12 @@ static int run_on_copy(const char *prefix, struct helper_plan *plan, char *const
     }
     if (rc) { remove_work(work, copy); return rc; }
     snprintf(plan->deb, sizeof plan->deb, "%s", copy); /* argv's last word points here */
+    if (run) { /* F239: install-deb-ask, apt-get run by main.c's answer relay */
+        rc = run(plan, env, answers);
+        remove_work(work, copy);
+        *err = NULL;
+        return rc;
+    }
     pid_t pid = fork();
     if (pid < 0) { remove_work(work, copy); *err = "can't run apt-get (fork)"; return HELPER_EX_EXEC; }
     if (pid == 0) {
@@ -97,9 +103,14 @@ static int run_on_copy(const char *prefix, struct helper_plan *plan, char *const
 }
 
 int helper_install_paid(const char *prefix, struct helper_plan *plan, char *const env[], const char **err) {
-    return run_on_copy(prefix, plan, env, HELPER_PAID_DIR, "paid", plan->name_buf[0], plan->item_buf[0], err);
+    return run_on_copy(prefix, plan, env, HELPER_PAID_DIR, "paid", plan->name_buf[0], plan->item_buf[0], NULL, -1, err);
 }
 
 int helper_local_deb(const char *prefix, struct helper_plan *plan, char *const env[], const char **err) {
-    return run_on_copy(prefix, plan, env, HELPER_DEB_DIR, "deb", NULL, NULL, err);
+    return run_on_copy(prefix, plan, env, HELPER_DEB_DIR, "deb", NULL, NULL, NULL, -1, err);
+}
+
+int helper_local_deb_ask(const char *prefix, struct helper_plan *plan, char *const env[], helper_deb_runner run,
+                         int answers, const char **err) {
+    return run_on_copy(prefix, plan, env, HELPER_DEB_DIR, "deb", NULL, NULL, run, answers, err);
 }

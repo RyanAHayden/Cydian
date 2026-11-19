@@ -380,7 +380,8 @@ enum Helper {
         var pid: pid_t = 0
         var fds: (Int32, Int32, Int32) = (-1, -1, -1)
         // F63: apply-ask gets a pipe on its stdin, which helper.answer writes the console's answers into.
-        let ask = words.first == "apply-ask"
+        // F239: install-deb-ask (the queue run's shell-fetched .debs) too.
+        let ask = words.first == "apply-ask" || words.first == "install-deb-ask"
         var input: Int32 = -1
         let rc = cargs.withUnsafeBufferPointer { buf -> Int32 in
             buf.baseAddress!.withMemoryRebound(to: UnsafePointer<CChar>?.self, capacity: buf.count) { args in

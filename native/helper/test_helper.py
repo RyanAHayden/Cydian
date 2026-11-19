@@ -1434,6 +1434,46 @@ class LocalDeb(unittest.TestCase):
                 self.assertFalse(any(l.startswith("2: ifizbox-helper: ") for l in out), out)
                 self.assertEqual(os.listdir(work), [])
 
+    def test_plan_ask(self):
+        """F239: install-deb-ask is install-deb without the conffile options, and needs the status fd to ask on."""
+        deb = DEB_DIR + "/0A1B.deb"
+        self.assertEqual(self.run_driver("plan", "/var/jb", "3", "install-deb-ask", deb),
+                         ["/var/jb/usr/bin/apt-get", "apt-get", "-y", "--reinstall", "--allow-downgrades",
+                          "-o", "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3", "install", deb])
+        self.assertEqual(self.run_driver("plan", "/var/jb", "-1", "install-deb-ask", deb),
+                         ["error: install-deb-ask needs the status fd (3) to ask on"])
+        self.assertEqual(self.run_driver("plan", "/var/jb", "3", "install-deb-ask"),
+                         ["error: install-deb-ask takes one .deb path"])
+        out = self.run_driver("plan", "/var/jb", "3", "install-deb-ask", PAID_DIR + "/x.deb")
+        self.assertTrue(out[0].startswith("error: bad .deb path"), out)
+
+    def test_chain_ask(self):
+        """F239: install-deb-ask runs apt-get on the root-owned copy with a pipe for stdin; only Y and N reach it, and
+        the copy is gone afterwards."""
+        p, app, helper, debs, work = self.chain()
+        with open(os.path.join(p, "usr/bin/apt-get"), "w") as f:
+            f.write('#!/bin/sh\necho "argv: $*"\nfor a; do last=$a; done\necho "copy: $(cat "$last")"\n'
+                    'echo "env: $(env | sort | tr \'\\n\' \' \')"\n'
+                    'echo "pmconffile:/etc/x.conf:50:x" >&3\n'
+                    'if read -r a; then echo "stdin: $a"; else echo "stdin: eof"; fi\nexit 0\n')
+        for mode, answers, want in (("close", "Z,D,N", "N"), ("keep", "Y", "Y"), ("close", "", "eof")):
+            with self.subTest(mode=mode, answers=answers):
+                r = subprocess.run([app, "spawn-ask", mode, helper, "install-deb-ask", self.deb(debs)],
+                                   capture_output=True, text=True, timeout=30, env={**os.environ, "TEST_ANSWERS": answers})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                out = r.stdout.splitlines()
+                self.assertEqual(out[-1], "exit: 0", out)
+                argv = next(l for l in out if l.startswith("1: argv: "))
+                self.assertTrue(argv.startswith("1: argv: -y --reinstall --allow-downgrades "), argv)
+                self.assertNotIn("confold", argv)
+                self.assertTrue(argv.endswith("/deb.deb"), argv)
+                self.assertIn("1: copy: a shared deb", out)
+                self.assertIn(f"1: stdin: {want}", out)
+                self.assertIn("CYDIA=3 1", next(l for l in out if l.startswith("1: env: ")))
+                self.assertEqual(out.count("2: ifizbox-helper: ignored an answer that isn't Y or N"),
+                                 2 if answers.startswith("Z") else 0, out)
+                self.assertEqual(os.listdir(work), [])
+
     def test_chain_refuses(self):
         p, app, helper, debs, work = self.chain()
         good = self.deb(debs)

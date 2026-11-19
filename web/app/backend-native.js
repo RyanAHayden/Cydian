@@ -276,11 +276,12 @@ function queueCalls(backend, q, call) {
     // the install step, except for a full-URL Filename (F131), which apt can't fetch. signal.onabort stops it.
     queueFetch: (row, hooks) => queueFetch(call, row, hooks),
     // queueInstall(row, { file, onEvent }) -> { code, stdout, stderr }: a fetched file through install-deb, a removal or
-    // an apt-downloaded row through apply-ask (so dpkg can ask about a conffile, F63) for that one item.
+    // an apt-downloaded row through apply-ask (so dpkg can ask about a conffile, F63) for that one item. F239: with
+    // onEvent the file goes through install-deb-ask ({ ask: true }), so its conffile question comes too.
     async queueInstall(row, { file = null, onEvent = null } = {}) {
       if (row.op === "remove") return aptApply([{ op: "remove", id: row.id }], onEvent);
       if (file) {
-        const r = await call("share.debInstall", { file, stream: Boolean(onEvent) }, onEvent);
+        const r = await call("share.debInstall", { file, stream: Boolean(onEvent), ask: Boolean(onEvent) }, onEvent);
         return { code: r?.code ?? -1, stdout: r?.stdout ?? "", stderr: r?.stderr ?? "" };
       }
       return aptApply([{ op: "install", id: row.id, version: row.to }], onEvent);

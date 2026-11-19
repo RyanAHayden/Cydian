@@ -14,6 +14,8 @@
  *                                                AppSync's appinst does; ipa.c. Exit 69: can't install ad hoc)
  *   ifizbox-helper simulate-deb | install-deb <path.deb>   (N9: a .deb shared with iFizBox; apt-get -s / install on a
  *                                                           root-owned copy, dependencies from the sources; paid.c)
+ *   ifizbox-helper install-deb-ask <path.deb>   (F239: install-deb, but dpkg asks about changed conffiles, answered
+ *                                               on stdin as apply-ask's; the queue run's shell-fetched .debs)
  *   ifizbox-helper install-paid <path.deb> <pkg> <version>  (F57: a paid package's .deb the app downloaded from the
  *                                                           vendor; copied, its control checked, apt-get install; paid.c)
  *   ifizbox-helper rollbacks <pkg> | rollback <pkg> <version>  (F71: the .debs N7's daemon kept, and apt-get install
@@ -386,9 +388,11 @@ int main(int argc, char *argv[]) {
     long maxfd = sysconf(_SC_OPEN_MAX);
     if (maxfd < 0 || maxfd > 65536) maxfd = 65536;
     for (int fd = status_fd >= 0 ? 4 : 3; fd < maxfd; fd++) close(fd);
-    /* F63: apply-ask keeps the caller's stdin (its answers) on a high fd; apt itself still never reads it. */
-    int answers = plan.verb == HV_APPLY_ASK ? fcntl(0, F_DUPFD_CLOEXEC, 4) : -1;
-    if (plan.verb == HV_APPLY_ASK && answers < 0) { perror("ifizbox-helper: stdin"); return HELPER_EX_EXEC; }
+    /* F63: apply-ask keeps the caller's stdin (its answers) on a high fd; apt itself still never reads it.
+     * F239: install-deb-ask too. */
+    int asking = plan.verb == HV_APPLY_ASK || plan.verb == HV_INSTALL_DEB_ASK;
+    int answers = asking ? fcntl(0, F_DUPFD_CLOEXEC, 4) : -1;
+    if (asking && answers < 0) { perror("ifizbox-helper: stdin"); return HELPER_EX_EXEC; }
     int null = open("/dev/null", O_RDONLY);
     if (null < 0 || dup2(null, 0) < 0) { perror("ifizbox-helper: /dev/null"); return HELPER_EX_EXEC; }
     if (null != 0) close(null);
@@ -455,7 +459,8 @@ int main(int argc, char *argv[]) {
     /* N4: Cydia's finish protocol. Maintainer scripts write "finish:restart" (and so on) to the fd named in CYDIA;
      * apply keeps fd 3 open through apt (APT::Keep-Fds) so those lines reach the console beside apt's status. */
     char *cydia_env = (plan.verb == HV_APPLY || plan.verb == HV_APPLY_ASK || plan.verb == HV_ROLLBACK ||
-                       plan.verb == HV_INSTALL_PAID || plan.verb == HV_INSTALL_DEB) && status_fd >= 0 ? "CYDIA=3 1" : NULL;
+                       plan.verb == HV_INSTALL_PAID || plan.verb == HV_INSTALL_DEB || plan.verb == HV_INSTALL_DEB_ASK) &&
+                      status_fd >= 0 ? "CYDIA=3 1" : NULL;
     char *env[] = {path_env, "HOME=/var/root", "USER=root", "LOGNAME=root", "LANG=C", "DEBIAN_FRONTEND=noninteractive",
                    cydia_env, NULL};
     if (malware) return remove_malware(argc - 2, argv + 2, prefix, env);
@@ -472,6 +477,11 @@ int main(int argc, char *argv[]) {
     }
     if (plan.verb == HV_SIMULATE_DEB || plan.verb == HV_INSTALL_DEB) {
         int rc = helper_local_deb(prefix, &plan, env, &err);
+        if (err) fprintf(stderr, "ifizbox-helper: %s\n", err);
+        return rc;
+    }
+    if (plan.verb == HV_INSTALL_DEB_ASK) { /* F239 */
+        int rc = helper_local_deb_ask(prefix, &plan, env, ask_relay, answers, &err);
         if (err) fprintf(stderr, "ifizbox-helper: %s\n", err);
         return rc;
     }

@@ -343,9 +343,11 @@ enum ShareRun {
         return DebPlan(ok: r.code == 0, code: r.code, output: output, stdout: r.out, package: own?.0, version: own?.1)
     }
 
-    static func installDeb(_ path: String, _ host: ShareHost, emit: ((String, String) -> Void)? = nil) throws -> HelperResult {
+    // F239: ask runs install-deb-ask (dpkg asks about a conffile both sides changed; helper.answer replies).
+    static func installDeb(_ path: String, _ host: ShareHost, ask: Bool = false,
+                           emit: ((String, String) -> Void)? = nil) throws -> HelperResult {
         guard host.mode == .jailbreak else { throw IntentFailure(ShareRouter.needsJailbreak.message) }
-        let r = try host.helper(["install-deb", path], emit: emit)
+        let r = try host.helper([ask ? "install-deb-ask" : "install-deb", path], emit: emit)
         if [64, 77, 126].contains(r.code) { throw IntentFailure("helper: \(IntentsCore.lastError(r))") }
         return r
     }

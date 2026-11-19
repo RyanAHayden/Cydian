@@ -67,7 +67,7 @@ class InstallServerSource(unittest.TestCase):
         self.assertIn("InstallLog.detach(bid)", progress)
         self.assertIn("enum InstallLog", self.sideload)
         install = body(self.myipas, "static func install(")
-        self.assertIn("serveAndOpen(out, app: s.app, record: record, log: log,", install)
+        self.assertIn("serveAndOpen(out, server: servers.manifest, app: s.app, record: record, log: log,", install)
 
 
 if __name__ == "__main__":

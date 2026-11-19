@@ -287,4 +287,21 @@ class HandoffSourceTest(unittest.TestCase):
             for gone in ("LocalTrust", "LocalCA", "ProfileSign", "InstallServer.secure", '"signing.trust"',
                          '"signing.resetTrust"', '"signing.testServer"', "mobileconfig", "NWProtocolTLS"):
                 self.assertFalse(gone in text, f"{name} still has {gone}")
-        self.assertIn("guard takeServer(c) != nil else { return Apt.reply(c, nil, noServer) }", self.files["Sideload.swift"])
+        self.assertIn("guard let servers = servers(c) else { return Apt.reply(c, nil, noServer) }", self.files["Sideload.swift"])
+
+    def test_host_chosen_per_call(self):
+        """B64: whether a signed IPA goes up to the server's /sign/host is the call's own choice, carried with it
+        (Sideload.Servers), never a shared static a later call can change while an earlier one still signs."""
+        import re
+        side, lib = self.files["Sideload.swift"], self.files["MyIPAs.swift"]
+        for name, text in self.files.items():
+            self.assertIsNone(re.search(r"static var (hostServer|manifestServer)\b", text), name)
+            self.assertNotIn("Sideload.hostServer", text, name)
+        sig = side[side.index("static func signAndOpen("):]
+        self.assertIn("servers: Servers,", sig[:sig.index("{")])
+        self.assertIn("if let host = servers.host {", sig)
+        self.assertIn("serveAndOpen(output, server: servers.manifest,", sig)
+        # Re-sign All and My IPAs never host; only signing.install / signing.resign with host: true.
+        self.assertIn("resign(c, allowHost: false) { $0 }", side)
+        self.assertIn("Sideload.servers(c, allowHost: false)", lib)
+        self.assertIn("serveAndOpen(out, server: servers.manifest,", lib)

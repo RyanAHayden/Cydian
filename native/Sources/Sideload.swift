@@ -130,25 +130,29 @@ enum Sideload {
     // leaves it, the server sees only the app's ID, version and name. Set by each signing.install (and resignAll)
     // call's `manifestServer`; F75: there is no install without one (iOS's installer ignores a hand-trusted CA, so
     // the old fully local HTTPS mode never worked), and without one the call answers no_server.
-    static var manifestServer: String?
-    // Set (to the Signing Server) when the IPA is iFizBox itself: iOS closes iFizBox, and its install server with it, as
-    // it installs over it, so the signed IPA goes up to the server's POST /sign/host and installs from there. Signing
-    // still happens here; the key never leaves the phone. Set by each signing.install call's `host`.
-    static var hostServer: String?
+    // `host` is set (to the same Signing Server) only when the call says `host: true`, i.e. the IPA is iFizBox itself:
+    // iOS closes iFizBox, and its install server with it, as it installs over it, so the signed IPA goes up to the
+    // server's POST /sign/host and installs from there. Signing still happens here; the key never leaves the phone.
+    // B64: both belong to one call and travel with it (signAndOpen's, serveAndOpen's `servers`). They were once shared
+    // statics, and iFizBox's own job, started while another app still signed, made that app upload to /sign/host.
+    struct Servers {
+        let manifest: String
+        let host: String?
+    }
 
     static let noServer = "no_server: installing needs a Signing Server: set one in Settings > Signing"
 
-    // `manifestServer` from a call's params: an https:// address, or nil.
-    static func takeServer(_ c: Bridge.Call) -> String? {
+    // A call's servers: `manifestServer` (an https:// address, else nil: no_server) and, with `host: true`, the same as
+    // the host; `allowHost: false` (My IPAs) never hosts.
+    static func servers(_ c: Bridge.Call, allowHost: Bool = true) -> Servers? {
         let ms = (c.params["manifestServer"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
-        manifestServer = (ms?.hasPrefix("https://") ?? false) ? ms : nil
-        return manifestServer
+        guard let m = ms, m.hasPrefix("https://") else { return nil }
+        return Servers(manifest: m, host: allowHost && (c.params["host"] as? Bool ?? false) ? m : nil)
     }
 
     static func install(_ c: Bridge.Call) {
         guard let (id, profile) = ready(c) else { return }
-        guard takeServer(c) != nil else { return Apt.reply(c, nil, noServer) }
-        hostServer = (c.params["host"] as? Bool ?? false) ? manifestServer : nil
+        guard let servers = servers(c) else { return Apt.reply(c, nil, noServer) }
         let options: SignOptions
         do { options = try SignOptions(json: c.params) } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
         let job = SignJob.begin() // F196: what signing.cancel stops
@@ -177,7 +181,7 @@ enum Sideload {
                     return Apt.reply(c, nil, "gone: that IPA was looked at more than 15 minutes ago; start again")
                 }
                 log("Using the IPA downloaded for the look-first sheet (\(p.url))")
-                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, emit: emit, log: log, job: job, opened: finish)
+                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish)
             }
             return
         }
@@ -188,7 +192,7 @@ enum Sideload {
             case .failure(let e): finish(.failure(e))
             case .success(let file):
                 log("Downloaded \(Sideload.size(file))")
-                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, emit: emit, log: log, job: job, opened: finish)
+                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish)
             }
         }
         job.onCancel { d.cancel() }
@@ -228,7 +232,7 @@ enum Sideload {
     }
 
     // Signs `input` (deleted after), serves it on the local HTTP server and opens the itms-services link (the
-    // manifest from `manifestServer`). `opened`
+    // manifest from `servers.manifest`), or, for iFizBox's own call (`servers.host`), uploads it there. `opened`
     // gets the result once iOS has been handed the link; `served` once iOS has fetched the whole IPA (or it expired
     // unfetched: false). Runs on SignBridge.queue.
     // iFizBox's own update: upload the IPA signed here to the server, which holds it for its 10 minutes and answers the
@@ -269,7 +273,7 @@ enum Sideload {
         upload.resume()
     }
 
-    static func signAndOpen(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions,
+    static func signAndOpen(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions, servers: Servers,
                             emit: @escaping (String, Double) -> Void, log: ((String) -> Void)? = nil, job: SignJob? = nil,
                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
                             served: ((Bool) -> Void)? = nil) {
@@ -303,27 +307,22 @@ enum Sideload {
                                   version: app.version, url: url, signed: Date(),
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored)
         emit("installing", 0)
-        if let host = hostServer {
+        if let host = servers.host { // B64: this call's own choice, made when it started
             log?("Uploading to \(host)/sign/host (\(app.name) replaces this app, so iOS installs it from the server)")
             hostAndOpen(output, server: host, app: app, record: record, job: job, opened: opened, served: served)
             return
         }
-        serveAndOpen(output, app: app, record: record, log: log, job: job, opened: opened, served: served)
+        serveAndOpen(output, server: servers.manifest, app: app, record: record, log: log, job: job, opened: opened, served: served)
     }
 
     // F77: the second half of signAndOpen, for an IPA signed already (My IPAs' signed copy): serves `output` (deleted
-    // after) on the local HTTP server, records it and opens the itms-services link with the manifestServer's manifest.
+    // after) on the local HTTP server, records it and opens the itms-services link with `server`'s manifest.
     // F196: `job` (signing.install's, library.install's) stays the one signing.cancel stops until iOS has fetched the
     // IPA or the link expired; Cancel then stops serving it at once and releases KeepAlive.
-    static func serveAndOpen(_ output: URL, app: SignedApp, record: SignedRecord, log: ((String) -> Void)? = nil, job: SignJob? = nil,
-                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
+    static func serveAndOpen(_ output: URL, server remote: String, app: SignedApp, record: SignedRecord, log: ((String) -> Void)? = nil,
+                             job: SignJob? = nil, opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
                              served: ((Bool) -> Void)? = nil) {
         let ipaPath = "/\(SignBridge.token())/app.ipa"
-        guard let remote = manifestServer else {
-            try? FileManager.default.removeItem(at: output)
-            opened(.failure(Failed(text: noServer))); served?(false)
-            return
-        }
         let server = InstallServer.plain
         server.start { res in
             switch res {
@@ -504,7 +503,7 @@ enum Sideload {
     // ---- Re-sign All: each recorded app downloaded again from its URL, signed as before, installed one by one (the
     // next starts once iOS has fetched the previous IPA, or that link expired).
 
-    static func resignAll(_ c: Bridge.Call) { resign(c) { $0 } }
+    static func resignAll(_ c: Bridge.Call) { resign(c, allowHost: false) { $0 } }
 
     // F91: one app, from the queue's "resign" job: the same path with only its record.
     static func resignOne(_ c: Bridge.Call) {
@@ -515,10 +514,10 @@ enum Sideload {
         resign(c) { SignedRecords.only($0, bundleID: bid) }
     }
 
-    static func resign(_ c: Bridge.Call, pick: @escaping ([SignedRecord]) -> [SignedRecord]) {
+    static func resign(_ c: Bridge.Call, allowHost: Bool = true, pick: @escaping ([SignedRecord]) -> [SignedRecord]) {
         guard let (id, profile) = ready(c) else { return }
-        guard takeServer(c) != nil else { return Apt.reply(c, nil, noServer) }
-        hostServer = (c.params["host"] as? Bool ?? false) ? manifestServer : nil // F91: iFizBox's own re-sign is hosted
+        // F91: iFizBox's own re-sign (signing.resign with `host: true`, one record) is hosted; Re-sign All never is.
+        guard let servers = servers(c, allowHost: allowHost) else { return Apt.reply(c, nil, noServer) }
         SignBridge.queue.async {
             let list = pick(records())
             var done = [String](), failed = [[String: Any]]()
@@ -538,7 +537,7 @@ enum Sideload {
                                    "error": (e as? Failed)?.text ?? SignBridge.text(e)])
                 }
                 let signThat = { (file: URL) in
-                    signAndOpen(file, url: r.url, id: id, profile: profile, options: SignOptions(r.options), emit: emit,
+                    signAndOpen(file, url: r.url, id: id, profile: profile, options: SignOptions(r.options), servers: servers, emit: emit,
                                 opened: { if case .failure(let e) = $0 { SignBridge.queue.async { fail(e) } } },
                                 served: { ok in
                                     SignBridge.queue.async {

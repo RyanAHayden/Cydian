@@ -51,6 +51,7 @@
 // percents only move the row's bar and the bottom status.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
+import { VPN_WAIT } from "./installroute.js";
 
 export const APP_STATES = ["waiting", "downloading", "signing", "signed", "asking", "installing", "installed", "failed", "cancelled"];
 const ENDED = new Set(["installed", "failed", "cancelled"]);
@@ -116,6 +117,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       else if (phase === "signing") log(r, "step", `Signing ${label(r)}`);
       else if (phase === "asking") log(r, "step", `Asked iOS to install ${label(r)}`);
       else if (phase === "installing") log(r, "step", `iOS is installing ${label(r)}`);
+      else if (phase === "vpn") log(r, "step", VPN_WAIT); // B110: Open LocalDevVPN: the row waits for it
     }
     const state = SIGNING.has(phase) || WITH_IOS.has(phase) ? phase : r.state;
     set(r, { phase, state, fraction: Math.max(0, Math.min(1, Number(fraction) || 0)) });
@@ -358,7 +360,7 @@ export function rowStatus(row, opts = {}) {
       return p > 0 ? `Downloading ${p}%` : "Downloading";
     case "signing": return p > 0 && p < 100 ? `Signing ${p}%` : "Signing";
     case "signed": return "Signed";
-    case "asking": return "Tap Install on the iOS prompt";
+    case "asking": return row.phase === "vpn" ? VPN_WAIT : "Tap Install on the iOS prompt";
     case "installing": return p > 0 && p < 100 ? `Installing ${p}%` : "Installing";
     case "installed":
       if (row.mode === "resign") return row.expires ? `Re-signed, expires ${dateText(row.expires, opts)}` : "Re-signed";
@@ -385,6 +387,7 @@ export function runStatus(rows) {
   const pos = (r) => `${rows.indexOf(r) + 1} of ${rows.length}`;
   const ios = rows.find((r) => WITH_IOS.has(r.state));
   if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
+  if (ios?.phase === "vpn") return VPN_WAIT;
   if (ios) return ios.state === "asking" ? `Tap Install for ${label(ios)} (${pos(ios)})` : `Installing ${label(ios)} (${pos(ios)})`;
   const s = rows.filter((r) => SIGNING.has(r.state));
   if (s.length && s.every(helperRow)) return "Preparing";

@@ -40,7 +40,7 @@ export function decideRoute(choice, status) {
 }
 
 const VPN = VPNS[0];
-// buttons: the first is the server fallback; `open` is the index of Open LocalDevVPN (the install stops there).
+// buttons: the first is the server fallback; `open` is the index of Open LocalDevVPN (the install waits for it).
 export const ALERTS = {
   noStatus: { title: "Can't Reach This iPhone", message: "This install goes through the Signing Server.", buttons: ["OK"] },
   notPaired: { title: "Not Paired", message: `${NAME} isn't paired with this iPhone yet, so this install goes through the Signing Server. Pair in Settings > Installation.`, buttons: ["OK"] },
@@ -55,6 +55,14 @@ export const ALERTS = {
     buttons: ["OK", `Open ${VPN}`], open: 1,
   },
 };
+
+// After Open LocalDevVPN the install waits (signing-client.js waitForVPN): idevice.status is asked every VPN_POLL ms
+// and when the app comes back to the foreground, and the install goes on once this is true. Only Cancel stops it.
+export const VPN_POLL = 2000;
+export const vpnWaitText = (vpn = VPN) => `Waiting for ${vpn}…`;
+export const VPN_WAIT = vpnWaitText();
+export const VPN_CONNECTED = `${VPN} is on`;
+export const vpnReady = (status) => Boolean(status?.paired && status?.localDevVPN);
 
 // The bridge's params for a decision: route "idevice" sends no server (nothing reaches it) and no host.
 export const routeParams = (decision) => (decision?.route === "idevice" ? { route: "idevice" } : {});

@@ -55,6 +55,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         }
         SelfUpdate.register(self) // F72: app.openURL (below)
         Apt.register(self) // N3: apt's files, the network, ifizbox-helper, haptic.tap (Apt.swift)
+        SourceIcon.register(self) // B58: net.icon, source icons' bytes (http ones past ATS), Icons.swift
         Paid.register(self) // F57: vendors' calls, UDID, Keychain, sign-in sheet, paid installs (Paid.swift)
         SignBridge.register(self) // I6: sign and install IPAs on the phone, sideload build (SignBridge.swift)
         Notifications.register(self) // F65: app.badge, the icon badge (Notifications.swift)

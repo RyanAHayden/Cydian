@@ -336,6 +336,37 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   assert.equal(site.status, 404);
   console.log("worker repo: ok");
 }
+{
+  // B58: /repo/CydiaIcon.png is the app icon from the deployed assets (web/app/icons/icon-180.png), never GitHub,
+  // with a long cache header; @2x/@3x get the same PNG; without ASSETS (or a missing asset) a 404.
+  const { readFile } = await import("node:fs/promises");
+  const png = new Uint8Array(await readFile(new URL("../web/app/icons/icon-180.png", import.meta.url)));
+  const asked = [];
+  const assets = { fetch: async (req) => { asked.push(new URL(req.url).pathname); return new URL(req.url).pathname === "/icons/icon-180.png" ? new Response(png, { headers: { "content-type": "image/png", etag: '"i1"' } }) : new Response("no", { status: 404 }); } };
+  const gh = async () => { throw new Error("GitHub asked for the icon"); };
+  const get = (path, e = { ...env, ASSETS: assets }, init) => w.fetch(new Request("https://ifizbox.example" + path, init), e);
+  for (const path of ["/repo/CydiaIcon.png", "/repo/CydiaIcon@2x.png", "/repo/CydiaIcon@3x.png"]) {
+    const r = await get(path);
+    assert.equal(r.status, 200, path);
+    assert.equal(r.headers.get("content-type"), "image/png");
+    assert.match(r.headers.get("cache-control"), /max-age=604800/);
+    assert.equal(r.headers.get("etag"), '"i1"');
+    assert.deepEqual(new Uint8Array(await r.arrayBuffer()), png, path);
+  }
+  assert.deepEqual([...new Set(asked)], ["/icons/icon-180.png"]);
+  assert.deepEqual([...png.slice(0, 4)], [0x89, 0x50, 0x4e, 0x47]); // a real PNG ships at that path
+  const head = await get("/repo/CydiaIcon.png", undefined, { method: "HEAD" });
+  assert.equal(head.status, 200);
+  assert.equal(await head.text(), "");
+  assert.equal((await get("/repo/CydiaIcon.png", undefined, { method: "POST" })).status, 404);
+  assert.equal((await get("/repo/CydiaIcon@4x.png")).status, 404);
+  assert.equal((await get("/repo/CydiaIcon.png", { ...env })).status, 404); // no ASSETS
+  assert.equal((await get("/repo/CydiaIcon.png", { ...env, ASSETS: { fetch: async () => new Response("no", { status: 404 }) } })).status, 404);
+  const { repo } = await import("./src/index.js");
+  const req = new Request("https://ifizbox.example/repo/CydiaIcon.png");
+  assert.equal((await repo(req, new URL(req.url), { ASSETS: assets }, { fetcher: gh })).status, 200);
+  console.log("worker repo icon: ok");
+}
 
 // F161: /api/applookup asks Apple once per bundle ID and country a day (the cache), answers its first result only.
 import { appLookup } from "./src/index.js";

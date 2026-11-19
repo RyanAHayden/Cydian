@@ -13,6 +13,7 @@ import { showMenu, longPress, copyText, nativePaste } from "../nav/menu.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor, sourceFilter, loadNeverLoaded } from "../core/sources.js";
+import { sourceIconImage } from "../source-icon.js";
 import { settings } from "./settings.js";
 import * as manage from "./manage.js";
 import { orderSources, loadOrder, filterSources } from "../core/sourcelist.js";
@@ -366,17 +367,10 @@ function decorate(li, source, backend) {
   // F16a: a source only its own app can read (an encrypted GBox one) says so under its name; its page says why.
   if (source.unsupported && !source.error) li.querySelector(".cell-subtitle")?.classList.add("cell-error");
   // CydiaIcon.png loads behind the letter and replaces it once it's there (Cydia: unknown.png, then the icon).
-  const img = new Image();
-  img.alt = "";
-  img.decoding = "async";
-  img.onload = () => img.classList.add("loaded");
   // Cydia's <base>CydiaIcon.png first, then the repo's top level for dist repos (sourceIconUrls).
   // An AltStore source (F9) names its icon in its JSON. A GitHub-hosted source without one gets its owner's
-  // avatar (F44, core/sources.js sourceIcons).
-  const urls = sourceIcons(source).map((u) => (backend.assetUrl ? backend.assetUrl(u) : u));
-  img.onerror = () => (urls.length ? (img.src = urls.shift()) : img.remove());
-  img.src = urls.shift();
-  li.querySelector(".cell-icon").append(img);
+  // avatar (F44, core/sources.js sourceIcons). B58: in the app, from the device's icon cache (source-icon.js).
+  li.querySelector(".cell-icon").append(sourceIconImage(source.key, sourceIcons(source), backend));
   li.dataset.url = source.uri; // Copy URL (hold the row)
   // F72: iFizBox's own source is built in: a lock after its name, and no Delete (a swipe arms nothing).
   if (isBuiltin(source)) {

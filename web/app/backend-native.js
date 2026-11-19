@@ -123,6 +123,19 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
     fetch: fetchUrl,
     // Images load straight from the repo: the page's origin is ifizbox://app, which <img> may load http(s) from.
     assetUrl: (url) => url,
+    // B58: a source icon's bytes through the shell (net.icon, native/Sources/Icons.swift): ATS keeps the web view
+    // off plain http, so an <img src=http://…> (BigBoss) never loads. -> { type, bytes } (PNG or JPEG, at most
+    // 256 KB, checked by the shell); errors keep the shell's code (not_found, upstream, bad_type, too_large: the
+    // repo answered; network, timeout: it didn't), which source-icon.js's cache tells apart.
+    async iconBytes(url) {
+      if (!/^https?:\/\//i.test(String(url))) throw new BackendError("bad_url", `not an http(s) URL: ${url}`);
+      let r;
+      try { r = await native.call("net.icon", { url }); } catch (e) {
+        const m = String(e?.message ?? e).match(/^([a-z_]+): /);
+        throw Object.assign(new Error(e?.message ?? String(e)), { code: e?.code ?? m?.[1] ?? "network" });
+      }
+      return { type: r?.type, bytes: fromBase64(r?.body) };
+    },
     async text(url) {
       if (/\/(In)?Release$/.test(url)) {
         const hit = await localList(url);

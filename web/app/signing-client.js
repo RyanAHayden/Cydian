@@ -319,6 +319,90 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   return true;
 }
 
+// ---- F235: the IPA queue's run, sign ahead and install one at a time (core/apprun.js, screens/apprun.js) --------
+//
+//   prepareParams(job)                 signing.prepare's params for a core/appqueue.js job: a Re-sign without a url signs
+//                                      from the phone's record, a My IPAs job (`library`) from its file, a Custom Install
+//                                      with its edits (always from the url: a look's token may be spent or stale)
+//   await prepareOnDevice(job, { tag, signal, progress, log })   download and sign, keep the signed copy
+//                                      -> { token, bundleId, name, version, expires }; progress(phase, fraction) with
+//                                      phase "downloading" | "signing"; the signal's abort sends signing.cancel {tag}
+//   await openPrepared(row, { tag, signal, progress, log, host, wait })   hand it to iOS (progress("asking")), then
+//                                      wait for iOS's install (progress("installing", f)) -> { installed, expires };
+//                                      host (iFizBox's own) doesn't wait: iOS closes iFizBox to install it
+//   discardPrepared(token)             frees a signed copy that won't be installed
+// Errors come as deviceError's message (core/signing.js), so a row's "Failed: ..." reads as the alerts do.
+
+export const ASK_WAIT = 600; // seconds the queue waits for Install on iOS's prompt before the row fails
+
+export function prepareParams(job) {
+  if (!job) return null;
+  if (job.mode === "resign" && !job.url && !job.library) return { record: job.id };
+  const edits = { ...(job.options?.edits ?? {}) };
+  delete edits.token;
+  delete edits.url;
+  if (job.library) return { library: job.library, ...edits };
+  return { url: job.url, ...edits };
+}
+
+// native.call that rejects with code "cancelled" the moment `signal` aborts, after asking the shell to stop `tag`.
+function abortable(native, method, params, onEvent, { tag, signal }) {
+  const n = bridge(native);
+  return new Promise((resolve, reject) => {
+    const stop = () => {
+      try { Promise.resolve(n.call("signing.cancel", { tag })).catch(() => {}); } catch { /* no bridge */ }
+      reject(Object.assign(new Error("Cancelled"), { code: "cancelled" }));
+    };
+    if (signal?.aborted) { stop(); return; }
+    signal?.addEventListener?.("abort", stop, { once: true });
+    Promise.resolve(n.call(method, { ...params, tag }, onEvent)).then(resolve, reject);
+  });
+}
+
+const rowError = (e, name) => {
+  if (e?.code === "cancelled") return e;
+  const why = deviceError(e, name);
+  return Object.assign(new Error(why.message), { code: e?.code ?? null });
+};
+
+export async function prepareOnDevice(job, { tag, signal = null, progress = () => {}, log = () => {}, native } = {}) {
+  const params = prepareParams(job);
+  try {
+    return await abortable(native, "signing.prepare", params, (ev) => {
+      if (ev?.log) { log(ev.log); return; }
+      if (ev?.phase) progress(ev.phase === "downloading" ? "downloading" : "signing", Number(ev.progress) || 0);
+    }, { tag, signal });
+  } catch (e) { throw rowError(e, job?.name || job?.id || ""); }
+}
+
+export async function openPrepared(row, { tag, signal = null, progress = () => {}, log = () => {}, host = false, wait = ASK_WAIT, native } = {}) {
+  const name = row?.name || row?.id || "";
+  let opened;
+  try {
+    opened = await abortable(native, "signing.open", { token: row.token, manifestServer: getServer(), ...(host ? { host: true } : {}) },
+      (ev) => { if (ev?.log) log(ev.log); }, { tag, signal });
+  } catch (e) { throw rowError(e, name); }
+  progress("asking", 0);
+  if (host) return { installed: null, expires: opened?.expires ?? null, host: true };
+  const bundleId = opened?.bundleId || row.bundleId;
+  if (!bundleId) return { installed: null, expires: opened?.expires ?? null };
+  let r;
+  try {
+    r = await abortable(native, "signing.progress", { bundleId, wait }, (ev) => {
+      if (ev?.log) log(ev.log);
+      else if (ev?.phase === "installing") progress("installing", Number(ev.progress) || 0);
+    }, { tag, signal });
+  } catch (e) {
+    if (e?.code === "cancelled") throw e;
+    return { installed: null, expires: opened?.expires ?? null }; // iOS can't be asked: the prompt was shown
+  }
+  return { installed: r?.installed ?? null, expires: opened?.expires ?? null };
+}
+
+export function discardPrepared(token, native) {
+  try { Promise.resolve(bridge(native).call("signing.discard", { token })).catch(() => {}); } catch { /* no bridge */ }
+}
+
 // ---- My IPAs (F77): the user's own IPAs, signed on the phone (native/Sources/MyIPAs.swift, library.*) ----------
 //
 //   await libraryCall(method, params, onEvent, native)   one library.* call ("list", "add", "pick", "options",

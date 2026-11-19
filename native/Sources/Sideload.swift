@@ -21,6 +21,8 @@
 //   signing.checkCertificate     -> {status: "good" | "revoked" | "unknown", checked, revokedAt?}
 //   signing.remind {days}        -> {at | null}: the re-sign reminder, 0 = off
 //   signing.cancel               -> {cancelled}: F196, stops the running install job (cancel below, SignJob)
+//   F235: signing.cancel {tag} stops one app of the IPA queue's run; signing.progress {bundleId, wait?, tag?} waits up
+//        to `wait` s for iOS to start (Install tapped) and ends on that tag's cancel. signing.prepare/open: SignAhead.swift
 // F77: My IPAs' library.* calls are MyIPAs.swift; they install through serveAndOpen, and Re-sign All signs an app
 // recorded from there (url "library:<file>") from the library's file.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -210,6 +212,10 @@ enum Sideload {
     // "cancelled: Cancelled" if it hasn't answered yet. iOS's own install, once it has the whole IPA, goes on.
     static func cancel(_ c: Bridge.Call) {
         guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
+        // F235: {tag} stops one app of the IPA queue's run (its download, signing, serving and watch), nothing else
+        if let tag = c.params["tag"] as? String, !tag.isEmpty {
+            return DispatchQueue.main.async { c.reply(["cancelled": SignJob.cancel(tag: tag)], nil) }
+        }
         DispatchQueue.main.async {
             watchCancels += 1
             c.reply(["cancelled": SignJob.cancelCurrent()], nil)
@@ -456,7 +462,10 @@ enum Sideload {
         guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: not in the jailbreak app") }
         guard let bid = c.params["bundleId"] as? String, !bid.isEmpty else { return Apt.reply(c, nil, "bad_request: bundleId") }
         DispatchQueue.main.async { InstallLog.attach(bid) { c.emitOnMain([["log": $0]]) } }
-        watch(bid, onProgress: { c.emitOnMain([["phase": "installing", "progress": $0]]) }) { installed in
+        // F235: the IPA queue waits longer for the Install tap (`wait` seconds) and stops one app's watch by its `tag`
+        let wait = max(45, min(c.params["wait"] as? Double ?? 45, 15 * 60))
+        let tag = (c.params["tag"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        watch(bid, ask: wait, tag: tag, onProgress: { c.emitOnMain([["phase": "installing", "progress": $0]]) }) { installed in
             DispatchQueue.main.async { InstallLog.detach(bid) }
             Apt.reply(c, ["installed": installed.map { $0 as Any } ?? NSNull()], nil)
         }
@@ -477,7 +486,8 @@ enum Sideload {
     static let nilGrace: TimeInterval = 6, nilGraceDone: TimeInterval = 1.5
 
     // nil: the private API isn't there, so it can't be told.
-    static func watch(_ bid: String, onProgress: @escaping (Double) -> Void, done: @escaping (Bool?) -> Void) {
+    static func watch(_ bid: String, ask: TimeInterval = 45, tag: String? = nil, onProgress: @escaping (Double) -> Void,
+                      done: @escaping (Bool?) -> Void) {
         guard Workspace.available else { return done(nil) }
         let start = Date()
         var cancels: Int?
@@ -486,6 +496,7 @@ enum Sideload {
         func tick() {
             if cancels == nil { cancels = watchCancels }
             if cancels != watchCancels { return done(nil) } // F196: signing.cancel
+            if let t = tag, SignJob.wasCancelled(tag: t) { return done(nil) } // F235: signing.cancel {tag}
             if let p = Workspace.installProgress(bid) {
                 seen = true
                 nilSince = nil
@@ -497,7 +508,7 @@ enum Sideload {
                 if Date().timeIntervalSince(since) >= (last >= 100 ? nilGraceDone : nilGrace) {
                     return done(Workspace.isInstalled(bid))
                 }
-            } else if Date().timeIntervalSince(start) > 45 {
+            } else if Date().timeIntervalSince(start) > ask {
                 return done(false)
             }
             if Date().timeIntervalSince(start) > 15 * 60 { return done(seen ? Workspace.isInstalled(bid) : false) }

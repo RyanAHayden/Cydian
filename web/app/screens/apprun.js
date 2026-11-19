@@ -1,0 +1,194 @@
+// F235: the IPA queue's run (app pages' Install / Upgrade, Changes' Upgrade (N), Re-sign and Re-sign All through the
+// app Confirm) on F234's black page with rows (nav/progress.js; the brain is core/apprun.js; the looks are
+// progress.css's .qr-* rows, shared with screens/queuerun.js):
+//
+//   Apps (the default): one row per queued app, in the run's order (iFizBox's own IPA last): its name, a grey line
+//     (Waiting / Downloading 12.0 of 48.0 MB / Signing 40% / Signed / Tap Install on the iOS prompt / Installing /
+//     Installed / Re-signed, expires <date> / Failed: why / Cancelled), an iOS 6 progress bar while it works, and the
+//     round stop button on a working row: it cancels only that app (its download, its signing or iOS's prompt) and the
+//     next goes on. A failed or cancelled row's tap retries it once the run has ended; any other row opens the Log with
+//     that app's lines only. The summary ("2 installed, 1 failed") ends the list and the log.
+//   Log: one line per phase per app (Downloading Delta 48 MB, Signed Delta, Asked iOS to install Delta, Installed
+//     Delta / the reason it failed) with the shell's own lines grey under its app. Percents only move the rows' bars
+//     and the bottom status.
+//   Top right, as F234's: the red Cancel while it runs (every app not finished is abandoned; then the app Confirm
+//     again with what finished cleared and the footer "Stopped. N installed and cleared from the queue."), Retry All
+//     after failures (Close at the top left), Done when clean.
+//   The bottom: the status and the bar while it runs, then Return to iFizBox; "Closing iFizBox" (locked, B49) when
+//     iFizBox's own IPA went to iOS, which closes iFizBox to install it.
+//
+// What iOS took leaves the queue (and is recorded for Installed) as it goes; failed and cancelled apps stay queued.
+// SPDX-License-Identifier: GPL-3.0-or-later
+import { el, barButton } from "../nav/ui.js";
+import { openProgress, RETURN_LABEL, CLOSING_LABEL } from "../nav/progress.js";
+import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf } from "../core/apprun.js";
+
+// The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
+// row gets its own tag, so signing.cancel {tag} stops that try only.
+export function phoneLanes(sc, { native } = {}) {
+  let n = 0;
+  const tagOf = (r) => `${r.id}#${++n}`;
+  return {
+    sign: (r, { signal, progress }, log = () => {}) => sc.prepareOnDevice(r.job, { tag: tagOf(r), signal, progress, log, native }),
+    install: (r, { signal, progress }, log = () => {}) => sc.openPrepared(r, { tag: tagOf(r), signal, progress, log, host: isSelf(r), native }),
+    discard: (r) => sc.discardPrepared(r.token, native),
+  };
+}
+
+// jobs: the app queue's (core/appqueue.js). deps: { queue, lanes ({ sign, install, discard }, phoneLanes's),
+//   record(job) (Installed's record of an install), reopenConfirm(footer), onClose(result), open (openProgress, tests),
+//   stallMs, later, clear (tests) } -> a promise for the first end: { ok, stopped, rows, installed }.
+export async function runAppRun(jobs, deps) {
+  const { queue, lanes, record = async () => {}, reopenConfirm = () => {}, open = openProgress } = deps;
+  const page = open({ title: "Running" });
+  const rows = appRows(jobs);
+
+  // ---- the log ----
+  const line = (kind, text, id = null) => { if (text) page.line(kind, text, id); };
+
+  // ---- Apps ----
+  const pane = el("div", "qr-pane");
+  const list = el("ul", "qr-list");
+  const summary = el("li", "qr-summary");
+  summary.hidden = true;
+  pane.append(list);
+  page.pane(pane);
+  const seg = page.segmented(["Apps", "Log"], (i) => {
+    if (i === 0) { page.filter(null); page.view("pane"); } else page.view("log");
+  });
+  page.view("pane");
+  const showLog = (id) => { seg.select(1); page.filter(id); page.view("log"); };
+
+  const views = new Map();
+  for (const r of rows) {
+    const li = el("li", "qr-row");
+    const main = el("button", "qr-main");
+    main.type = "button";
+    const name = el("div", "qr-name", r.name);
+    const status = el("div", "qr-status");
+    const bar = el("div", "qr-bar");
+    const fill = el("div", "qr-fill");
+    bar.append(fill);
+    main.append(name, status, bar);
+    const act = el("button", "qr-stop");
+    act.type = "button";
+    act.setAttribute("aria-label", `Stop ${r.name}`);
+    li.append(main, act);
+    list.append(li);
+    main.addEventListener("click", () => {
+      if (!run.running && (r.state === "failed" || r.state === "cancelled")) retry(r.id);
+      else showLog(r.id);
+    });
+    act.addEventListener("click", () => run.stop(r.id));
+    views.set(r.id, { li, status, bar, fill, act });
+  }
+  list.append(summary);
+  const WORKING = ["downloading", "signing", "signed", "asking", "installing"];
+  const draw = (r) => {
+    const v = views.get(r.id);
+    if (!v) return;
+    v.li.dataset.state = r.state;
+    v.status.textContent = rowStatus(r);
+    const busy = ["downloading", "signing", "asking", "installing"].includes(r.state);
+    v.bar.hidden = !busy;
+    v.bar.classList.toggle("is-indeterminate", r.state === "asking" || !r.fraction);
+    v.fill.style.transform = `scaleX(${r.fraction || 0})`;
+    v.act.hidden = !WORKING.includes(r.state) || run.stopping;
+  };
+
+  // ---- the run ----
+  const cleared = new Set();
+  let sentSelf = false;
+  const run = createAppRun({
+    rows,
+    sign: (r, hooks) => lanes.sign(r, hooks, (text) => line("raw", text, r.id)),
+    install: (r, hooks) => lanes.install(r, hooks, (text) => line("raw", text, r.id)),
+    discard: (r) => lanes.discard(r),
+    ...(deps.stallMs ? { stallMs: deps.stallMs } : {}),
+    ...(deps.later ? { later: deps.later, clear: deps.clear } : {}),
+    onChange: (r) => {
+      draw(r);
+      if (r.state === "installed" && !cleared.has(r.id)) {
+        cleared.add(r.id);
+        if (isSelf(r)) sentSelf = true;
+        queue.clear(r.id);
+        Promise.resolve().then(() => record(r.job)).catch(() => {}); // no store: Installed won't list it
+      }
+      tick();
+    },
+    onLog: ({ id, kind, text }) => line(kind, text, id),
+  });
+  let tickQueued = false;
+  const tick = () => {
+    if (tickQueued) return;
+    tickQueued = true;
+    Promise.resolve().then(() => {
+      tickQueued = false;
+      if (run.stopping) page.status("Stopping…");
+      else if (run.running) page.status(runStatus(rows));
+      page.progress(runPercent(rows));
+    });
+  };
+
+  // ---- the bar ----
+  const cancel = barButton("Cancel", "red");
+  const closeB = barButton("Close");
+  const retryAll = barButton("Retry All");
+  const done = barButton("Done", "done");
+  let cancelled = false;
+  cancel.addEventListener("click", () => {
+    if (cancel.disabled) return;
+    if (run.cancel()) { cancelled = true; cancel.disabled = true; for (const r of rows) draw(r); tick(); }
+  });
+  closeB.addEventListener("click", () => page.close());
+  done.addEventListener("click", () => page.close());
+  retryAll.addEventListener("click", () => { const p = run.retryAll(); if (p) drive(p); });
+  const retry = (id) => { const p = run.retry(id); if (p) drive(p); };
+
+  let first = null;
+  let latest = null;
+  if (deps.onClose) page.onClose(() => deps.onClose(latest));
+
+  async function drive(promise) {
+    cancelled = false;
+    page.reopen({ title: "Running", status: runStatus(rows) });
+    cancel.disabled = false;
+    summary.hidden = true;
+    page.bar({ right: cancel });
+    for (const r of rows) draw(r);
+    await promise;
+    return end(cancelled);
+  }
+
+  async function end(wasCancel) {
+    for (const r of rows) draw(r);
+    tick();
+    const installed = rows.filter((r) => r.state === "installed");
+    const bad = rows.filter((r) => r.state === "failed" || r.state === "cancelled");
+    const text = summaryLine(rows);
+    summary.textContent = text;
+    summary.hidden = false;
+    line("step", text);
+    const result = { ok: !bad.length, stopped: wasCancel, rows, installed: installed.length };
+    if (!first) first = result;
+    latest = result;
+    if (wasCancel) {
+      // Cancel: back to the app Confirm with what finished cleared, and a footer that says so
+      await page.close();
+      if (queue.size) reopenConfirm(`Stopped. ${installed.length} installed and cleared from the queue.`);
+      return result;
+    }
+    page.bar(bad.length ? { left: closeB, right: retryAll } : { right: done });
+    // B49: iFizBox's own IPA is with iOS, which closes iFizBox to install it: nothing to tap
+    if (sentSelf) page.finish({ label: CLOSING_LABEL, status: text, locked: true });
+    else page.finish({ label: RETURN_LABEL, status: text, action: () => false });
+    return result;
+  }
+
+  // every row starts drawn
+  for (const r of rows) draw(r);
+  const p = run.start();
+  return drive(p).then(() => first, () => first);
+}
+
+export { ended };

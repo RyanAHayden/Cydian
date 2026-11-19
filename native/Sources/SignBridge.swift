@@ -56,6 +56,7 @@ enum SignBridge {
         b.on("signing.cancel") { c in Sideload.cancel(c) } // F196: the progress page's Cancel
         Sideload.register(b) // F14: inspect, progress, installed, forget, resignAll, checkCertificate, remind
         MyIPAs.register(b) // F77: library.*, My IPAs under Installed (MyIPAs.swift)
+        SignAhead.register(b) // F235: signing.prepare / open / discard, the IPA queue's sign-ahead run
     }
 
     static func status() -> [String: Any] {

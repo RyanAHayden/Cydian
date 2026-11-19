@@ -106,7 +106,9 @@ test("only Confirm's Cancel and the queue run's Cancel use the red bar button", 
   for (const f of readdirSync(navDir).filter((x) => x.endsWith(".js") && !x.endsWith(".test.js"))) {
     if (/barButton\([^)]*["']red["']/.test(readFileSync(new URL(f, navDir), "utf8"))) hits.push(`nav/${f}`);
   }
-  assert.deepEqual(hits, ["queue.js", "queuerun.js"]);
+  // F235: the IPA queue's run (screens/apprun.js) has the same red Cancel, once
+  assert.deepEqual(hits, ["apprun.js", "queue.js", "queuerun.js"]);
+  assert.equal(read("apprun.js").match(/barButton\([^)]*["']red["']/g).length, 1);
   assert.equal(read("queue.js").match(/barButton\([^)]*["']red["']/g).length, 1);
   assert.match(read("queuerun.js"), /const cancel = barButton\("Cancel", "red"\)/);
   assert.equal(read("queuerun.js").match(/barButton\([^)]*["']red["']/g).length, 1);

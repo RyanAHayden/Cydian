@@ -33,3 +33,17 @@ Its session has to take the version that is already on main.
 
 - I did not reproduce the quota failure. Filling the shared `/tmp` would break the other sessions on this machine.
 - I did not run test_sideload with T14's or T15's change from this worktree. Their journals report it passing.
+
+## Reopened after T14 landed
+
+`native/test_sideload.py` on main now imports `disk_tmpdir` and `swift_env` from `test_sign.py`. Its scratch dir is
+under `native/build/tmp` on the checkout's disk. Both swiftc and the test binary run with `env=swift_env(cls.tmp)`, so
+their `TMPDIR` is inside that dir too. Nothing in the module uses `/tmp` any more (I checked with a grep for `mkdtemp`,
+`gettempdir` and `subprocess.` calls). No code change was needed.
+`python3 -m unittest -v test_sideload` in `native/`: 9 tests OK in 19.6 s, `test_signed_with_edits` included, while
+other slots were running.
+
+## Not verified (reopened session)
+
+- I still did not reproduce the original quota failure on purpose, for the same reason as before: filling the
+  shared `/tmp` would hurt the other sessions. The fix takes the build off `/tmp`, so that quota no longer applies.

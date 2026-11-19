@@ -1,8 +1,9 @@
 // F184: ifizbox.com/?install (a site's Add to iFizBox button, when the app isn't installed) opens Home without the
-// param and asks Install iFizBox First once, on the website only, whatever the first-visit state is.
+// param and asks Install iFizBox First once, on the website only, whatever the first-visit state is. F217: it's the
+// plain first-visit popup (Not Now / Install iFizBox), not the browse gate, and Not Now leaves the lock alone.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { takeInstallParam, askFromInstallLink, FIRST_KEY } from "./websign-gate.js";
+import { takeInstallParam, askFromInstallLink, FIRST_KEY, FIRST_VISIT, firstVisitState, browsingLocked } from "./websign-gate.js";
 
 function memory(init = {}) {
   const m = new Map(Object.entries(init));
@@ -17,7 +18,7 @@ function fakeWin(url, extra = {}) {
   return win;
 }
 // Runs a launch as app.js does: take the param before the router, ask after. -> number of popups shown
-async function launch(win, mode, storage = memory(), answer = 2) {
+async function launch(win, mode, storage = memory(), answer = 0) {
   const shown = [];
   const took = takeInstallParam(win, { mode });
   await askFromInstallLink(took, { install: () => {}, storage, alert: async (a) => { shown.push(a); return { index: answer }; } });
@@ -36,8 +37,7 @@ test("?install on the website: Home, the URL cleaned, Install iFizBox First aske
   assert.equal((await launch(win, "site")).length, 0);
 });
 
-test("?install keeps the other params and asks even after Browse Anyway (firstVisitState 'later')", async () => {
-  const win = fakeWin("/?ref=fizl0&install=1#/sources");
+test("?install keeps the other params and asks even after Browse Anyway (firstVisitState 'later')", async () => {  const win = fakeWin("/?ref=fizl0&install=1#/sources");
   const shown = await launch(win, "site", memory({ [FIRST_KEY]: "later" }));
   assert.equal(shown.length, 1);
   assert.deepEqual(win.replaced, ["/?ref=fizl0#/home"]);
@@ -65,7 +65,30 @@ test("no ?install: nothing asked, URL untouched", async () => {
 test("Install iFizBox in the popup runs the install flow it was given", async () => {
   let ran = 0;
   const took = takeInstallParam(fakeWin("/?install"), { mode: "site" });
-  const r = await askFromInstallLink(took, { install: () => { ran++; }, storage: memory(), alert: async () => ({ index: 0 }) });
+  const r = await askFromInstallLink(took, { install: () => { ran++; }, alert: async () => ({ index: 1 }) });
   assert.equal(r, "install");
   assert.equal(ran, 1);
+});
+
+test("F217: the popup is FIRST_VISIT's Not Now / Install iFizBox: no Browse Anyway, no countdown", async () => {
+  const shown = await launch(fakeWin("/?install"), "site");
+  assert.equal(shown.length, 1);
+  assert.deepEqual(shown[0], FIRST_VISIT);
+  assert.equal(shown[0].buttons.length, 2);
+  assert.ok(!shown[0].buttons.some((b) => /Browse/.test(b)));
+  assert.equal(shown[0].countdown, undefined);
+});
+
+test("F217: Not Now runs nothing and leaves Home's lock as it was", async () => {
+  for (const init of [{}, { [FIRST_KEY]: "later" }, { [FIRST_KEY]: "installed" }]) {
+    const storage = memory(init);
+    const before = [firstVisitState(storage), browsingLocked({ storage })];
+    let ran = 0;
+    const took = takeInstallParam(fakeWin("/?install"), { mode: "site" });
+    const r = await askFromInstallLink(took, { install: () => { ran++; }, alert: async () => ({ index: 0 }) });
+    assert.equal(r, null);
+    assert.equal(ran, 0);
+    assert.deepEqual([firstVisitState(storage), browsingLocked({ storage })], before, JSON.stringify(init));
+    assert.deepEqual([...storage.m.entries()], Object.entries(init));
+  }
 });

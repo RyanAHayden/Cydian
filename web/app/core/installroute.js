@@ -2,7 +2,7 @@
 //   "server"  the Signing Server's manifest and iOS's Install prompt (the default)
 //   "iphone"  this phone's own installd over LocalDevVPN (native/sideload/idevice): no server, iFizBox updates itself
 // Pure: the decision for one install from the idevice.status answer, the texts, and the pairing page's state.
-import { NAME } from "../brand.js";
+import { NAME, DOMAIN } from "../brand.js";
 
 export const ROUTE_KEY = "installRoute";
 export const STORAGE_KEY = "ifizbox." + ROUTE_KEY;
@@ -11,17 +11,14 @@ export const STORAGE_KEY = "ifizbox." + ROUTE_KEY;
 export const VPNS = ["LocalDevVPN"];
 export const vpnList = (vpns = VPNS) => vpns.length < 2 ? vpns.join("") : `${vpns.slice(0, -1).join(", ")} or ${vpns.at(-1)}`;
 
+// Subtitles: one short point per line (the rows wrap them, settings.css .route-row).
 export const ROUTE_OPTIONS = [
-  { value: "server", label: "Signing Server" },
-  { value: "iphone", label: "This iPhone", subtitle: `With ${vpnList()}. No server, updates ${NAME} itself.` },
+  { value: "server", label: "Signing Server", subtitle: `Default\nUses ${DOMAIN}` },
+  { value: "iphone", label: "This iPhone", subtitle: `${vpnList()}\nNo server\nUpdates itself` },
 ];
 
-export const BENEFITS = [
-  { title: "Private", text: "Nothing is sent to the Signing Server, not even the app's name." },
-  { title: "Works Offline", text: `With ${vpnList()} on, apps install without the internet.` },
-  { title: "Updates Itself", text: `${NAME} installs its own updates, with no Install prompt.` },
-  { title: "Keeps Going", text: `An install doesn't stop if iOS pauses ${NAME}.` },
-];
+// This iPhone's page says what it gives in one sentence under its title.
+export const IPHONE_INTRO = `Installs straight onto this iPhone: no server, and ${NAME} can update itself.`;
 
 export function storedRoute(storage = globalThis.localStorage) {
   try { return storage?.getItem(STORAGE_KEY) === "iphone" ? "iphone" : "server"; } catch { return "server"; }
@@ -74,12 +71,39 @@ export function pairState(status) {
   return status?.pairOnPhone ? "phone" : "file";
 }
 
+// This iPhone's page (screens/installroute.js drawPair), what it shows from idevice.status and the pairing under way:
+//   "paired"   Paired with a check, Check Connection, Forget Pairing
+//   "file"     older iOS: Import Pairing File
+//   "connect"  iOS 27, the VPN is off: Turn On … (alert and row), rechecked when the app comes back
+//   "pairing"  iOS 27, the VPN is on: pairing runs by itself, the code big at the top, then PAIR_GUIDE
+export function setupState(status, pairing = null) {
+  if (pairing) return "pairing";
+  const s = pairState(status);
+  if (s !== "phone") return s;
+  return vpnOn(status) ? "pairing" : "connect";
+}
+
+// The connection the page checks first: LocalDevVPN (10.7.0.1 reachable, idevice.status localDevVPN). Tailscale
+// joins here and in VPNS when its transport lands.
+export const vpnOn = (status) => Boolean(status?.localDevVPN);
+
+export const CONNECT_ALERT = {
+  title: `Turn On ${vpnList()}`,
+  message: `${NAME} pairs with this iPhone and installs through ${vpnList()}. Turn it on, then come back here.`,
+  buttons: ["Cancel", `Open ${VPN}`], open: 1,
+};
+
+// Where to type the code, one short line a step; `img` is the user's own screenshot of that Settings row (iPhone 15,
+// iOS 27, dark), cropped to the row and ringed on the page.
+export const PAIR_GUIDE = [
+  { text: "Open Settings" },
+  { text: "Privacy & Security", img: "img/pair/1-privacy-security.jpg" },
+  { text: "Developer Mode", img: "img/pair/2-developer-mode.jpg" },
+  { text: `Pair with ${NAME}`, img: "img/pair/3-pair-with-ifizbox.jpg" },
+  { text: "Type the code above" },
+];
+
 export const PAIR_STEPS = {
-  phone: [
-    "Tap Start Pairing.",
-    "Open Settings > Privacy & Security > Developer Mode.",
-    `Tap "Pair with ${NAME} on this iPhone" and type this code.`,
-  ],
   file: [
     "Make a pairing file for this iPhone on a computer (idevice_pair or JitterbugPair).",
     "Save it to Files, then tap Import Pairing File.",

@@ -2,7 +2,8 @@
 // chooseRoute): This iPhone only with a pairing and LocalDevVPN on; otherwise the Signing Server, said in an alert.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decideRoute, routeParams, storedRoute, pairState, pairEvent, pairFooter, pairFromNative, pinText, verifyFailure, ROUTE_OPTIONS, ALERTS, VPNS, vpnList, STORAGE_KEY, BENEFITS } from "./installroute.js";
+import { decideRoute, routeParams, storedRoute, pairState, pairEvent, pairFooter, pairFromNative, pinText, verifyFailure, ROUTE_OPTIONS, ALERTS, VPNS, vpnList, STORAGE_KEY, IPHONE_INTRO, setupState, vpnOn, CONNECT_ALERT, PAIR_GUIDE } from "./installroute.js";
+import { existsSync } from "node:fs";
 import { SETTINGS } from "./settings.js";
 
 const mem = (v) => ({ getItem: (k) => (k === STORAGE_KEY ? v : null) });
@@ -35,13 +36,37 @@ test("Another VPN Is On offers the server first and Open LocalDevVPN", () => {
 test("the This iPhone option names the VPN apps from one list, ready for another", () => {
   assert.deepEqual(VPNS, ["LocalDevVPN"]);
   const o = ROUTE_OPTIONS.find((x) => x.value === "iphone");
-  assert.match(o.subtitle, /^With LocalDevVPN\. No server, updates .+ itself\.$/);
+  assert.equal(o.subtitle.split("\n")[0], "LocalDevVPN");
   assert.equal(vpnList(["LocalDevVPN", "Tailscale"]), "LocalDevVPN or Tailscale");
   assert.equal(ROUTE_OPTIONS[0].label, "Signing Server");
   const d = SETTINGS.find((x) => x.key === "installRoute");
   assert.equal(d.default, "server");
   assert.deepEqual(d.modes, ["sideload"]);
-  assert.equal(BENEFITS.length, 4);
+  assert.match(IPHONE_INTRO, /^Installs straight onto this iPhone: no server, and .+ can update itself\.$/);
+});
+
+test("This iPhone's page: the VPN first, then pairing by itself; Paired and older iOS as before", () => {
+  assert.equal(setupState({ paired: null, pairOnPhone: true, localDevVPN: false }), "connect");
+  assert.equal(setupState({ paired: null, pairOnPhone: true, localDevVPN: false, otherVPN: true }), "connect");
+  assert.equal(setupState(null), "file");
+  assert.equal(setupState({ paired: null, pairOnPhone: true, localDevVPN: true }), "pairing");
+  assert.equal(setupState(null, { pin: "1" }), "pairing"); // pairing under way draws without idevice.status
+  assert.equal(setupState({ paired: "rp", localDevVPN: false }), "paired");
+  assert.equal(setupState({ paired: null, pairOnPhone: false }), "file");
+  assert.equal(vpnOn({ localDevVPN: true }), true);
+  assert.equal(CONNECT_ALERT.title, "Turn On LocalDevVPN");
+  assert.deepEqual(CONNECT_ALERT.buttons, ["Cancel", "Open LocalDevVPN"]);
+  assert.equal(CONNECT_ALERT.buttons[CONNECT_ALERT.open], "Open LocalDevVPN");
+});
+
+test("the pairing guide: a short line a step, screenshots for the three Settings rows, all in the app", () => {
+  assert.deepEqual(PAIR_GUIDE.map((s) => s.text), ["Open Settings", "Privacy & Security", "Developer Mode", "Pair with iFizBox", "Type the code above"]);
+  const shots = PAIR_GUIDE.filter((s) => s.img).map((s) => s.img);
+  assert.equal(shots.length, 3);
+  for (const s of shots) {
+    assert.match(s, /^img\/pair\/.+\.jpg$/);
+    assert.ok(existsSync(new URL(`../${s}`, import.meta.url)), s);
+  }
 });
 
 test("pairing: on the phone from iOS 27, a file before; Pair Again unless the VPN is just off", () => {

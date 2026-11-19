@@ -1024,3 +1024,80 @@ import { readAnswer, udidProfile, UDID_KEY } from "./src/udid.js";
   assert.equal((await go("/sign/udid/nothex")).status, 404);
   console.log("worker udid: ok");
 }
+
+// F251: the Apple relay (src/apple-relay.js): off unless APPLE_RELAY=1, a fixed allow-list, caps, no redirects.
+import { appleRelay, relayTarget, MAX_REQUEST, MAX_REPLY } from "./src/apple-relay.js";
+{
+  const on = { APPLE_RELAY: "1" };
+  const req = (path, init = {}) => new Request("https://sign.example" + path, init);
+  // Off by default (ifizbox.com deploys from main): 404, and the route doesn't fall through to the website.
+  let r = await w.fetch(req("/apple/gsa.apple.com/grandslam/GsService2", { method: "POST", body: "x" }), env);
+  assert.equal(r.status, 404);
+  assert.equal((await r.json()).code, "not_found");
+
+  const tgt = (p, o) => relayTarget(new URL("https://sign.example" + p), o)?.href ?? null;
+  assert.equal(tgt("/apple/gsa.apple.com/grandslam/GsService2"), "https://gsa.apple.com/grandslam/GsService2");
+  assert.equal(tgt("/apple/gsa.apple.com/grandslam/GsService2/validate"), "https://gsa.apple.com/grandslam/GsService2/validate");
+  assert.equal(tgt("/apple/gsa.apple.com/auth/verify/phone/securitycode"), "https://gsa.apple.com/auth/verify/phone/securitycode");
+  assert.equal(tgt("/apple/gsa.apple.com/grandslam/MidService/startMachineProvisioning"), "https://gsa.apple.com/grandslam/MidService/startMachineProvisioning");
+  assert.equal(tgt("/apple/developerservices2.apple.com/services/QH65B2/listTeams.action?clientId=XABBG36SBA"),
+    "https://developerservices2.apple.com/services/QH65B2/listTeams.action?clientId=XABBG36SBA");
+  assert.equal(tgt("/apple/developerservices2.apple.com/services/QH65B2/ios/addAppId.action"), "https://developerservices2.apple.com/services/QH65B2/ios/addAppId.action");
+  assert.equal(tgt("/apple/ani.sidestore.io/v3/get_headers"), "https://ani.sidestore.io/v3/get_headers");
+  for (const bad of ["/apple/evil.example/", "/apple/gsa.apple.com/", "/apple/gsa.apple.com/grandslam/GsService2/../x",
+    "/apple/idmsa.apple.com/appleauth/auth", "/apple/developerservices2.apple.com/services/v1/profiles", "/apple/ani.sidestore.io/v3/provisioning_session",
+    "/apple/127.0.0.1/", "/apple/gsa.apple.com.evil.example/grandslam/GsService2", "/apple/gsa.apple.com"]) assert.equal(tgt(bad), null, bad);
+  assert.equal(tgt("/apple/ani.sidestore.io/v3/provisioning_session", { ws: true }), "https://ani.sidestore.io/v3/provisioning_session");
+  assert.equal(tgt("/apple/gsa.apple.com/grandslam/GsService2", { ws: true }), null);
+
+  const calls = [];
+  const fetcher = async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url.includes("GsService2/lookup")) return new Response(null, { status: 302, headers: { Location: "https://evil.example/" } });
+    if (url.includes("listTeams")) return new Response(new Uint8Array(MAX_REPLY + 1), { status: 200 });
+    if (url.includes("get_headers")) throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
+    if (init.headers?.Upgrade === "websocket") return new Response("ws", { status: 200, headers: { "X-Ws": "1" } });
+    return new Response("<plist/>", { status: 401, headers: { "Content-Type": "text/x-xml-plist", "Set-Cookie": "a=b", "X-Other": "1" } });
+  };
+  const relay = (path, init) => appleRelay(req(path, init), on, { fetcher });
+  r = await relay("/apple/gsa.apple.com/grandslam/GsService2", { method: "POST", body: "<plist/>", headers: {
+    "Content-Type": "text/x-xml-plist", "X-Relay-User-Agent": "akd/1.0", "X-Apple-I-MD": "md", "Cookie": "session=1",
+    "Authorization": "Bearer x", "CF-Connecting-IP": "1.2.3.4", "Origin": "https://sign.example", "security-code": "123456" } });
+  assert.equal(r.status, 401); // Apple's own status
+  assert.equal(r.headers.get("X-Relay-Status"), "401");
+  assert.equal(r.headers.get("Content-Type"), "text/x-xml-plist");
+  assert.equal(r.headers.get("Set-Cookie"), null);
+  assert.equal(r.headers.get("X-Other"), null);
+  assert.equal(r.headers.get("Access-Control-Allow-Origin"), null); // same origin only
+  assert.equal(await r.text(), "<plist/>");
+  const out = calls.at(-1);
+  assert.equal(out.url, "https://gsa.apple.com/grandslam/GsService2");
+  assert.equal(out.init.redirect, "manual");
+  assert.ok(out.init.signal);
+  assert.deepEqual([...out.init.headers.keys()].sort(), ["content-type", "security-code", "user-agent", "x-apple-i-md"]);
+  assert.equal(out.init.headers.get("user-agent"), "akd/1.0");
+  assert.equal(new TextDecoder().decode(out.init.body), "<plist/>");
+
+  assert.equal((await relay("/apple/evil.example/x")).status, 403);
+  assert.equal((await relay("/apple/gsa.apple.com/grandslam/GsService2", { method: "POST", body: "x", headers: { Origin: "https://evil.example" } })).status, 403);
+  assert.equal((await relay("/apple/gsa.apple.com/grandslam/GsService2", { headers: { "Sec-Fetch-Site": "cross-site" } })).status, 403);
+  assert.equal((await relay("/apple/gsa.apple.com/grandslam/GsService2", { method: "DELETE" })).status, 405);
+  assert.equal((await relay("/apple/gsa.apple.com/grandslam/GsService2", { method: "POST", body: new Uint8Array(MAX_REQUEST + 1) })).status, 413);
+  r = await relay("/apple/gsa.apple.com/grandslam/GsService2/lookup");
+  assert.equal(r.status, 502);
+  assert.equal((await r.json()).code, "redirect");
+  r = await relay("/apple/developerservices2.apple.com/services/QH65B2/listTeams.action");
+  assert.equal(r.status, 502);
+  assert.equal((await r.json()).code, "reply_too_large");
+  r = await relay("/apple/ani.sidestore.io/v3/get_headers", { method: "POST", body: "{}" });
+  assert.equal(r.status, 504);
+  assert.equal(r.headers.get("X-Relay-Status"), null); // the relay's own answer, not Apple's
+  // The anisette provisioning WebSocket is handed through (only that path, only GET).
+  r = await relay("/apple/ani.sidestore.io/v3/provisioning_session", { headers: { Upgrade: "websocket" } });
+  assert.equal(r.headers.get("X-Ws"), "1");
+  assert.equal(calls.at(-1).url, "https://ani.sidestore.io/v3/provisioning_session");
+  assert.equal((await relay("/apple/gsa.apple.com/grandslam/GsService2", { headers: { Upgrade: "websocket" } })).status, 403);
+  // Routed by the Worker when on.
+  assert.equal((await w.fetch(req("/apple/evil.example/x"), { ...env, ...on })).status, 403);
+  console.log("worker apple relay: ok");
+}

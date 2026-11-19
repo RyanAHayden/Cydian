@@ -3,6 +3,8 @@
  *   ifizbox-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
  *   ifizbox-helper hold <pkg>... | unhold <pkg>... | showhold
  *   ifizbox-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
+ *   ifizbox-helper update-source <uri> <suite> [component...]   (F233a: apt-get update for that one source, from a
+ *                                                               temp sources file; the other lists stay; update_source)
  *   ifizbox-helper simulate <item>... | apply <item>... | respring      (N4: the install queue; item: name,
  *                                                                        name=version or -name)
  *   ifizbox-helper apply-ask <item>...        (F63: apply, but dpkg asks about changed conffiles; answers "Y"/"N"
@@ -315,6 +317,37 @@ static int remove_malware(int argc, char *const argv[], const char *prefix, char
     return HELPER_EX_EXEC;
 }
 
+/* F233a: update-source. The temp sources file holding the one source, apt-get update on it as a child, then the
+ * file deleted whatever apt did. Exit: 74 the file couldn't be made, 126 apt-get couldn't be run, else apt's
+ * status (128 + signal). */
+static int update_source(struct helper_plan *plan, char *const env[]) {
+    const char *err = NULL;
+    errno = 0;
+    if (helper_update_source_file(plan, &err)) {
+        fprintf(stderr, "ifizbox-helper: %s%s%s\n", err, errno ? ": " : "", errno ? strerror(errno) : "");
+        return HELPER_EX_IOERR;
+    }
+    fflush(stdout);
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("ifizbox-helper: fork");
+        unlink(plan->source_tmp);
+        return HELPER_EX_EXEC;
+    }
+    if (pid == 0) {
+        execve(plan->path, (char *const *)plan->argv, env);
+        fprintf(stderr, "ifizbox-helper: %s: %s\n", plan->path, strerror(errno));
+        _exit(HELPER_EX_EXEC);
+    }
+    int st = 0;
+    pid_t w;
+    while ((w = waitpid(pid, &st, 0)) < 0 && errno == EINTR) {}
+    if (unlink(plan->source_tmp))
+        fprintf(stderr, "ifizbox-helper: can't delete %s: %s\n", plan->source_tmp, strerror(errno));
+    if (w < 0) { perror("ifizbox-helper: waitpid"); return HELPER_EX_EXEC; }
+    return WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
+}
+
 int main(int argc, char *argv[]) {
     const char *prefix = IFIZBOX_PREFIX, *err = NULL;
     char parent[PATH_MAX], expected[PATH_MAX];
@@ -426,6 +459,7 @@ int main(int argc, char *argv[]) {
     char *env[] = {path_env, "HOME=/var/root", "USER=root", "LOGNAME=root", "LANG=C", "DEBIAN_FRONTEND=noninteractive",
                    cydia_env, NULL};
     if (malware) return remove_malware(argc - 2, argv + 2, prefix, env);
+    if (plan.verb == HV_UPDATE_SOURCE) return update_source(&plan, env);
     if (plan.verb == HV_INSTALL_IPA) {
         int rc = helper_install_ipa(prefix, plan.path, status_fd, env, &err);
         if (rc) fprintf(stderr, "ifizbox-helper: %s\n", err);

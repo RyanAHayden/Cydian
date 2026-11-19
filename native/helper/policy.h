@@ -19,10 +19,11 @@ enum helper_verb { HV_UPDATE, HV_INSTALL, HV_REMOVE, HV_UPGRADE, HV_CONFIGURE, H
                    HV_ADDSOURCE, HV_REMOVESOURCE, HV_SIMULATE, HV_APPLY, HV_RESPRING, HV_INSTALL_IPA,
                    HV_ROLLBACKS, HV_ROLLBACK, HV_APPLY_ASK, HV_INSTALL_PAID, HV_NOTIFICATIONS,
                    HV_USERSPACE_REBOOT, HV_SIMULATE_DEB, HV_INSTALL_DEB,
-                   HV_APP_VERSIONS, HV_UICACHE, HV_UNINSTALL_APP };
+                   HV_APP_VERSIONS, HV_UICACHE, HV_UNINSTALL_APP, HV_UPDATE_SOURCE };
 #define HELPER_VERBS "update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, " \
                      "simulate, apply, apply-ask, respring, install-ipa, rollbacks, rollback, install-paid, " \
-                     "notifications, userspace-reboot, simulate-deb, install-deb, app-versions, uicache, uninstall-app"
+                     "notifications, userspace-reboot, simulate-deb, install-deb, app-versions, uicache, uninstall-app, " \
+                     "update-source"
 
 /* N4: the install queue. simulate and apply take items: "name" or "name=version" installs (an exact version is how
  * Downgrade and Reinstall pick theirs), "-name" removes. apt gets "name", "name=version" and "name-" in one
@@ -73,7 +74,24 @@ struct helper_plan {
     char name_buf[HELPER_MAX_PACKAGES][HELPER_NAME_MAX + 1];
     char item_buf[HELPER_MAX_PACKAGES][HELPER_ITEM_MAX + 2];
     char deb[PATH_MAX]; /* F71 rollback: the stored .deb apt-get installs (also in argv) */
+    /* F233a update-source: the temp sources file (a mkstemp template until helper_update_source_file makes it), the
+     * "Dir::Etc::SourceList=<it>" option in argv, and the one-line "deb <uri> <suite> [component...]" it holds */
+    char source_tmp[PATH_MAX];
+    char source_opt[PATH_MAX + 32];
+    char source_line[HELPER_URI_MAX + HELPER_SUITE_MAX + HELPER_MAX_COMPONENTS * (HELPER_COMPONENT_MAX + 1) + 16];
 };
+
+/* F233a: update-source <uri> <suite> [component...]: apt-get update for that one source, as Sources' Retry on a
+ * failed row asks. The words are checked as addsource checks them (the source needn't be in ifizbox.sources).
+ * main.c writes the source to a temp file (helper_update_source_file), runs
+ *   apt-get -o Acquire::AllowInsecureRepositories=true -o Dir::Etc::SourceList=<temp> -o Dir::Etc::SourceParts=/dev/null
+ *           -o APT::Get::List-Cleanup=0 [-o APT::Status-Fd=3] update
+ * as a child (List-Cleanup off: the other sources' lists stay), waits for it and deletes the file. The temp file is
+ * <prefix>HELPER_UPDATE_SOURCE_TMP with mkstemp's six characters in place of the X's. */
+#define HELPER_UPDATE_SOURCE_TMP "/etc/apt/ifizbox-update-source.XXXXXX"
+/* Make plan's temp sources file (mkstemp, 0600) holding its source line, and point the plan's option at it.
+ * 0, or -1 + *err (errno set); on failure nothing is left behind. */
+int helper_update_source_file(struct helper_plan *plan, const char **err);
 
 /* F71: Roll Back. N7's daemon keeps .debs in <prefix>HELPER_ROLLBACK_DIR/<id>/, named as apt's archive cache
  * names them: <id>_<version>_<arch>.deb, the epoch's ':' as "%3a".

@@ -1039,7 +1039,9 @@ function galleryGroup(pics0) {
     const x = strip.scrollLeft;
     let at = 0;
     list.forEach((p, i) => { if (Math.abs(p.offsetLeft - strip.offsetLeft - x) < Math.abs(list[at].offsetLeft - strip.offsetLeft - x)) at = i; });
-    if (strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 2) at = list.length - 1; // the last one, at the end
+    // The last one, at the end. B107: not while the strip is still detached (no width yet: 0 + 0 >= 0 - 2 would
+    // light the last dot at open, and no scroll event follows to fix it).
+    if (strip.clientWidth > 0 && strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 2) at = list.length - 1;
     [...dots.children].forEach((d, i) => d.classList.toggle("on", i === at));
   };
   strip.addEventListener("scroll", () => { if (!frame && typeof requestAnimationFrame === "function") frame = requestAnimationFrame(markDot); }, { passive: true });

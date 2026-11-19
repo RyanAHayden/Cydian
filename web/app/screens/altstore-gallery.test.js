@@ -139,3 +139,23 @@ test("galleryImage: ready only once loaded and decoded; a failed decode or load 
   dead.onerror(); dead.onerror(); // straight, then through the proxy
   assert.equal(await dead.ready, false);
 }));
+
+// B107: the gallery is built before it is in the page, where every layout number is 0. The 'at the end' check
+// (scrollLeft + clientWidth >= scrollWidth - 2) must not light the last dot then: the strip shows the first picture.
+test("previewSlot: built detached (all widths 0), the first dot is the dark one", async () => {
+  const saved = globalThis.document;
+  const detached = (tag) => Object.assign(fakeElement(tag), { scrollLeft: 0, clientWidth: 0, scrollWidth: 0, offsetLeft: 0 });
+  globalThis.document = { createElement: detached };
+  try {
+    const { made, image } = fakePictures();
+    const slot = previewSlot("k", { shots: shots(3) }, { image: (s) => Object.assign(image(s), { offsetLeft: 0 }) });
+    await tick();
+    for (const p of made) p.settle(true);
+    assert.deepEqual(await slot.gallery, { shown: 3, grows: 1 });
+    const dots = slot.querySelector(".shot-dots");
+    assert.equal(dots.children.length, 3);
+    assert.deepEqual(dots.children.map((d) => d.classList.contains("on")), [true, false, false]);
+  } finally {
+    globalThis.document = saved;
+  }
+});

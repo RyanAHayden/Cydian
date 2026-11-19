@@ -4,7 +4,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { iconCache, iconType, openIconStore, ICON_MAX_AGE, ICON_MAX_BYTES } from "./iconcache.js";
-import { sourceIconUrls, DEFAULT_SOURCES } from "./sources.js";
+import { sourceIconUrls, loadTweakSources } from "./sources.js";
+
+const DEFAULT_SOURCES = await loadTweakSources(); // web/app/tweak-sources.json
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const PNG2 = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 9]);

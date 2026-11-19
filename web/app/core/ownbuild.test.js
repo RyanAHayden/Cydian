@@ -6,7 +6,9 @@ import { readFileSync } from "node:fs";
 import { DOMAIN, BUNDLE_ID } from "../brand.js";
 import { APP_SOURCE_URL, APP_APT_REPO, ownBuilds, hiddenAltApps, homeOffer } from "./appoffer.js";
 import { SELF_ALT_URL, SELF_APT_URI, builtinSources } from "./essential.js";
-import { DEFAULT_ALT_SOURCES } from "./sources.js";
+import { loadAppSources } from "./sources.js";
+
+const DEFAULT_ALT_SOURCES = await loadAppSources(); // web/app/app-sources.json
 import { createCatalog } from "./catalog.js";
 
 const SOURCE = readFileSync(new URL("../source.json", import.meta.url), "utf8");

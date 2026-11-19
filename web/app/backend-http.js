@@ -11,7 +11,7 @@
 // not_found, network, rate_limited) and, for code "upstream", the repo's HTTP `status`.
 
 import { freshUrl } from "./core/sources.js";
-import { sourceCalls, sortSources, DEFAULT_ALT_SOURCES } from "./core/sources.js";
+import { sourceCalls, sortSources, loadAppSources } from "./core/sources.js";
 import { withAltSources } from "./core/altstore.js";
 import { validatorCache } from "./core/health.js";
 import { reviewsApi } from "./core/reviews.js";
@@ -86,6 +86,7 @@ export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(g
   };
   // F182: user reviews, on the same server as the proxy (core/reviews.js; worker/src/reviews.js).
   backend.reviews = reviewsApi({ base, fetcher: fetchFn });
-  // AltStore sources (F9) sit beside the APT list, in their own store (core/altstore.js withAltSources).
-  return Object.assign(backend, withAltSources(sourceCalls(backend, sourceOptions), backend, { altDefaults: DEFAULT_ALT_SOURCES, ...sourceOptions, sort: sortSources }));
+  // AltStore sources (F9) sit beside the APT list, in their own store (core/altstore.js withAltSources). Both lists
+  // seed from the site's own tweak-sources.json / app-sources.json (core/sources.js loadTweakSources, loadAppSources).
+  return Object.assign(backend, withAltSources(sourceCalls(backend, sourceOptions), backend, { altDefaults: () => loadAppSources(), ...sourceOptions, sort: sortSources }));
 }

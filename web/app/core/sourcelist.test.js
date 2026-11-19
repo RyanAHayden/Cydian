@@ -8,7 +8,10 @@ import {
   exportText, exportLine, parseImport, reviewImport, entryKeys, orderSources, loadOrder, saveOrder, altLink, ORDER_KEY,
   clipboardText, recommendedRows, recommendedSeed, recommendedInput, listedSource,
 } from "./sourcelist.js";
-import { DEFAULT_SOURCES, DEFAULT_ALT_SOURCES } from "./sources.js";
+import { loadTweakSources, loadAppSources } from "./sources.js";
+
+const DEFAULT_SOURCES = await loadTweakSources(); // web/app/tweak-sources.json
+const DEFAULT_ALT_SOURCES = await loadAppSources(); // web/app/app-sources.json
 import { seedRecord, normalizeAltUrl, looksLikeAltUrl } from "./altstore.js";
 import * as recommended from "./recommended.js";
 

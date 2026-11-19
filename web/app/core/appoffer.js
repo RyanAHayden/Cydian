@@ -7,7 +7,7 @@
 //                                         installed (screens/home.js installApp), or Settings > Signing first
 //     jailbroken (rootless, ...)          downloads the release's .deb for that architecture, to open in Sileo or
 //                                         Filza; an architecture with no .deb yet is told so
-//   iFizBox's own package page: its AltStore source (web/app/source.json, first in DEFAULT_ALT_SOURCES), in the
+//   iFizBox's own package page: its AltStore source (web/app/source.json, first in web/app/app-sources.json), in the
 //   site and the sideload app only (F178 ownBuilds: the jailbreak app hides it).
 import { NAME, GITHUB_REPO, DOMAIN, BUNDLE_ID } from "../brand.js";
 

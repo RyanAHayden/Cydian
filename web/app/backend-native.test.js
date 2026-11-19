@@ -11,6 +11,7 @@ import { createCatalog, ALL } from "./core/catalog.js";
 import { repoLayout } from "./core/apt.js";
 import { createSettings } from "./core/settings.js";
 import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
+import { DOMAIN } from "./brand.js";
 
 function fakeIndexedDB() {
   const dbs = new Map();
@@ -72,7 +73,7 @@ test("sources() is apt's list: .list and .sources files, deb-src and disabled sk
   const list = await backend.sources();
   assert.deepEqual(list.map((s) => s.key), [HAVOC, PROCURSUS]);
   const p = list.find((s) => s.key === PROCURSUS);
-  assert.equal(p.name, "Procursus"); // from core/sources.js DEFAULT_SOURCES, seeded as metadata
+  assert.equal(p.name, "Procursus"); // from web/app/tweak-sources.json (the bundled copy: no network here), seeded as metadata
   assert.match(p.file, /sources\.list\.d\/procursus\.sources$/);
   assert.deepEqual(p.components, ["main"]);
 });
@@ -388,4 +389,11 @@ test("F219: appsInstalled asks apps.isInstalled once per app for the session; a 
   fail = false;
   assert.deepEqual(await backend.appsInstalled(["wiki.qaq.irisin"]), { "wiki.qaq.irisin": false });
   assert.deepEqual(calls.at(-1).params.bundleIds, ["wiki.qaq.irisin"], "asked again after the failure");
+});
+
+test("F267: a new store's defaults are the site's tweak-sources.json, fetched through the shell, when it answers", async (t) => {
+  const site = [{ name: "Procursus (site)", uri: "https://apt.procurs.us/", dist: "1800", components: ["main"] }];
+  const { backend } = setup(t, { net: { [`https://${DOMAIN}/tweak-sources.json`]: JSON.stringify(site) } });
+  const p = (await backend.sources()).find((s) => s.key === PROCURSUS);
+  assert.equal(p.name, "Procursus (site)");
 });

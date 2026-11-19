@@ -2,7 +2,9 @@
 // never loaded, once, and leaves loaded ones (and APT sources) alone.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { firstLoadFilter, loadNeverLoaded, DEFAULT_SOURCES } from "./sources.js";
+import { firstLoadFilter, loadNeverLoaded, loadTweakSources } from "./sources.js";
+
+const DEFAULT_SOURCES = await loadTweakSources(); // web/app/tweak-sources.json
 import { seedRecord, neverLoaded } from "./altstore.js";
 
 const seeded = seedRecord("https://example.com/apps.json");

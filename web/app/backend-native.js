@@ -45,7 +45,7 @@
 // to the user. Counts, origin and refresh times of every source are kept in IndexedDB.
 import { freshUrl } from "./core/sources.js";
 import { BackendError } from "./backend-http.js";
-import { verifySource, refreshSource, openSourceStore, sortSources } from "./core/sources.js";
+import { verifySource, refreshSource, openSourceStore, sortSources, loadTweakSources } from "./core/sources.js";
 import { parseAptSources, listNamesFor } from "./core/aptsources.js";
 import { healthFields } from "./core/health.js";
 import { DEFAULT_ARCH, compareVersions } from "./core/apt.js";
@@ -556,7 +556,9 @@ function coreFoundationOf(call) {
 function nativeSourceCalls(backend, call, opts) {
   let opened = null;
   // The defaults core/sources.js seeds into a new store stay metadata only: just `added` records are listed.
-  const store = () => (opened ??= openSourceStore({ indexedDB: opts.indexedDB, name: opts.name ?? "ifizbox-native-sources" }));
+  // F267: they're the site's tweak-sources.json (through the shell's net.fetch), else the bundled copy.
+  const defaults = opts.tweakDefaults ?? (() => loadTweakSources({ remote: (url) => backend.text(url) }));
+  const store = () => (opened ??= openSourceStore({ indexedDB: opts.indexedDB, name: opts.name ?? "ifizbox-native-sources", defaults }));
   const arch = () => (typeof opts.arch === "function" ? opts.arch() : opts.arch) || DEFAULT_ARCH;
   const count = opts.count;
   const aptSources = async () => parseAptSources((await call("apt.sources")) ?? []);

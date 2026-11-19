@@ -4,7 +4,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { homeOffer, debUrl, debAlert, APP_IPA_URL, APP_DEB_URL, APP_SOURCE_URL } from "./appoffer.js";
 import { parseRelease, debFor } from "./selfupdate.js";
-import { DEFAULT_ALT_SOURCES } from "./sources.js";
+import { loadAppSources } from "./sources.js";
+
+const DEFAULT_ALT_SOURCES = await loadAppSources(); // web/app/app-sources.json
 
 test("Home: Not Jailbroken on the site, the tile hands iFizBox to a sideloader (F89)", () => {
   assert.deepEqual(homeOffer({ mode: "site", deviceType: "none" }), { action: "sideloaders" });

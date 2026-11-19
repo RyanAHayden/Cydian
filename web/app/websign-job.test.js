@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { runSignJob } from "./websign-job.js";
+import { runSignJob, zsignCrash } from "./websign-job.js";
 import { parsePlist } from "./core/signing.js";
 
 const fx = (n) => new Uint8Array(readFileSync(new URL(`./core/fixtures/signing/${n}`, import.meta.url)));
@@ -15,7 +15,7 @@ const text = (b) => (typeof b === "string" ? b : new TextDecoder().decode(b));
 
 // A module with the calls websign-job.js makes. `plist` is the app's Info.plist; `fail` makes main() print and stop.
 function fakeZsign({ plist = { CFBundleIdentifier: "io.github.x.delta", CFBundleName: "Delta", CFBundleShortVersionString: "1.2" },
-  fail = null, unzip = 0, appName = "Delta.app" } = {}) {
+  fail = null, unzip = 0, appName = "Delta.app", throws = undefined } = {}) {
   const files = new Map(), dirs = new Set(["/"]);
   const seen = { args: null, files };
   const create = async ({ print }) => ({
@@ -38,6 +38,7 @@ function fakeZsign({ plist = { CFBundleIdentifier: "io.github.x.delta", CFBundle
     callMain: (args) => {
       seen.args = args;
       seen.inputGone = !files.has("/w/in.ipa");
+      if (throws !== undefined) throw throws;
       if (fail) { for (const l of fail) print(l); return 255; }
       files.set(args[args.indexOf("-o") + 1], new Uint8Array([0x50, 0x4b, 9, 9]));
       return 0;
@@ -102,6 +103,27 @@ test("zsign's own reason when it can't sign; not an IPA; no app inside; no Info.
   await assert.rejects(runSignJob(fakeZsign({ unzip: 1 }).create, job()), /couldn't be unpacked/);
   await assert.rejects(runSignJob(fakeZsign({ plist: null }).create, job()), /no readable Info\.plist/);
   await assert.rejects(runSignJob(fakeZsign().create, job({ profile: new Uint8Array([1, 2]) })), (e) => e.code === "bad_profile");
+});
+
+test("zsign crashing outside exit() names the error: Out of memory for a bare object, RangeError, RuntimeError, abort", async () => {
+  const crash = async (thrown) => {
+    let err;
+    await assert.rejects(runSignJob(fakeZsign({ throws: thrown }).create, job()), (e) => { err = e; return e.code === "sign_failed"; });
+    assert.doesNotMatch(err.message, /\[object Object\]|undefined/);
+    return err.message;
+  };
+  assert.equal(await crash({}), "zsign stopped: Out of memory. The app may be too big for this browser.");
+  assert.match(await crash({ what: 1 }), /stopped: Out of memory\./);
+  assert.match(await crash(new RangeError("Array buffer allocation failed")), /stopped: Out of memory\./);
+  assert.match(await crash(new WebAssembly.RuntimeError("unreachable")), /stopped: Out of memory\./);
+  assert.match(await crash(new Error("Aborted(OOM)")), /stopped: Out of memory\./);
+  assert.match(await crash("Aborted()"), /stopped: Out of memory\./);
+  assert.match(await crash(null), /stopped: Out of memory\./);
+  assert.match(await crash(new TypeError("x is not a function")), /stopped: x is not a function\./);
+  // exit() still reads as zsign's own exit status and log
+  const ex = fakeZsign({ throws: { status: 1 } });
+  await assert.rejects(runSignJob(ex.create, job()), (e) => e.code === "sign_failed" && !/stopped:|too big/.test(e.message));
+  assert.equal(zsignCrash({ name: "RangeError" }), "Out of memory");
 });
 
 // ---- the real thing: zsign as WebAssembly ----------------------------------------------------------------------

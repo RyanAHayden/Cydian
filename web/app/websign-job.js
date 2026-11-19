@@ -17,6 +17,18 @@ import { isZip, profileInfo, signingIds, appEntitlements, plistXml, identityPlis
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
 
+// What zsign threw when main() didn't exit, in words. The browser's memory running out shows as a RangeError (an
+// ArrayBuffer that couldn't grow), a WebAssembly.RuntimeError or an emscripten abort, and sometimes as a bare object
+// with no message (seen on an iPhone 7, a second 100 MB IPA in one tab): all "Out of memory", never [object Object].
+export function zsignCrash(e) {
+  const msg = typeof e === "string" ? e : typeof e?.message === "string" ? e.message : "";
+  const name = typeof e?.name === "string" ? e.name : "";
+  const wasmError = typeof WebAssembly !== "undefined" && WebAssembly.RuntimeError && e instanceof WebAssembly.RuntimeError;
+  if (e instanceof RangeError || name === "RangeError" || wasmError || name === "RuntimeError"
+    || /abort|out of memory|memory|alloc/i.test(msg) || !msg.trim()) return "Out of memory";
+  return msg.trim();
+}
+
 // rm -r inside emscripten's FS; nothing there is fine.
 export function removeTree(FS, path) {
   let st;
@@ -77,7 +89,7 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
     bundleId: bundleId !== info.bundleId ? bundleId : null, input: appDir, output: "/w/out.ipa", temp: "/w/tmp" });
   let code;
   try { code = zs.callMain(args); } catch (e) {
-    if (typeof e?.status !== "number") throw fail("sign_failed", `zsign stopped: ${e?.message ?? e}. The app may be too big for this browser.`);
+    if (typeof e?.status !== "number") throw fail("sign_failed", `zsign stopped: ${zsignCrash(e)}. The app may be too big for this browser.`);
     code = e.status; // exit(): emscripten's ExitStatus
   }
   let out = null;

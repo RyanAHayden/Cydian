@@ -71,7 +71,8 @@ test("Jailbroken? Get iFizBox.deb: iFizBox's APT repo in Sileo and Zebra", async
 test("F123/F135: Home's list starts with Settings in its own group, with its icon; Credits ends it", async () => {
   const { homeLinks } = await import("./home.js");
   const groups = homeLinks();
-  assert.deepEqual(groups[0], { pair: true, rows: [{ label: "Settings", href: "#/home/settings", icon: { cls: "home-glyph glyph-settings" }, cls: "home-settings-row" },
+  const { rowIcon } = await import("../icons/rowicons.js");
+  assert.deepEqual(groups[0], { pair: true, rows: [{ label: "Settings", href: "#/home/settings", icon: rowIcon("general"), cls: "home-settings-row" },
     { label: "Theme", href: "#/home/settings/theme", icon: { cls: "home-glyph glyph-theme" }, cls: "home-settings-row" }] });
   assert.equal(groups[1].rows[0].label, "Upgrading & Jailbreaking Help", "the help links come right after Settings");
   assert.equal(groups[2].header, "User Guides");

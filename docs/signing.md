@@ -259,6 +259,12 @@ Re-sign and `library.add` all use, handles an http link like this:
 
 The twin gets a 20 s idle limit instead of 60 s, so a host whose port 443 hangs asks sooner.
 
+The jailbreak app's `ipa.install` (`native/Sources/Apt.swift IPAInstall.fetchHTTP`: `ifizbox://install`, Settings >
+Install IPA, app pages and queued apps from http sources) follows the same rules: the twin first, else `insecure: …`,
+and `web/app/ipa-install.js runIpaInstall` asks with the same alert on the install page. Install Anyway sends
+`ipa.install` again with `insecure: true` and the link comes over `PlainDownload` into the helper's IPA folder;
+Cancel closes the page (a queued app's row ends as cancelled). An http download shows its percent on the bar.
+
 ### The signer (`native/sign/`)
 
 iFizBox's own, in Swift, with no OpenSSL: the private key stays inside Security.framework (`SecKeyCreateSignature`)

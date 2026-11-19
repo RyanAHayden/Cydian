@@ -13,7 +13,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { NAME } from "../brand.js";
-import { isAts, ATS_TITLE, atsText } from "./insecureipa.js"; // B104
+import { isAts, ATS_TITLE, atsText, isInsecure, INSECURE_IPA_ALERT } from "./insecureipa.js"; // B104, B113
 
 export function ipaUrl(text) {
   let s = String(text ?? "").trim();
@@ -111,6 +111,10 @@ export function ipaError(err, name = "") {
     if (os) return { code: "os_version", title: `Needs iOS ${os[1]}`, message: said, detail: said, lines: [] };
   }
   if (isAts(err)) return { code: "network", title: ATS_TITLE, message: atsText(name), detail: said, lines: [] }; // B104: never iOS's raw ATS text
+  if (isInsecure(err) || /^insecure: /.test(raw)) { // B113: where nothing asked (ipa-install.js asks first)
+    return { code: "insecure", title: INSECURE_IPA_ALERT.title, detail: said, lines: [],
+      message: `${name || "The app"} is only offered over plain http, without encryption, and nothing asked whether to install it anyway. Install it again to choose.` };
+  }
   let message;
   let lines = [];
   switch (code) {

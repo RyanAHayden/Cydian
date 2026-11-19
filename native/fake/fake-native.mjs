@@ -180,12 +180,23 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
     },
     // F59: like IPAInstall.run in Apt.swift: download as <UUID>.ipa into ipaDir, ifizbox-helper install-ipa, remove
     // the download; the helper's exit code picks the error code.
-    async "ipa.install"({ url, stream }, onEvent) {
+    // B113: an http link fetches its https twin instead (port 80 dropped), and with none answers "insecure: …";
+    // insecure: true (Install Anyway) fetches the http link itself, as IPAInstall.fetchHTTP does.
+    async "ipa.install"({ url, stream, insecure }, onEvent) {
       if (mode !== "jailbreak") return fail("sideload: the sideload build installs IPAs through signing.install");
       if (!/^https?:\/\//i.test(url ?? "")) return fail("bad_url: not an http(s) URL");
       mkdirSync(ipaDir, { recursive: true, mode: 0o700 });
       if (stream && onEvent) onEvent({ fd: "status", line: "dlstatus:ipa:0:Downloading" });
-      const r = netGet(url);
+      let r;
+      if (/^http:/i.test(url) && insecure !== true) {
+        const twin = new URL(url);
+        twin.protocol = "https:";
+        if (twin.port === "80") twin.port = "";
+        r = netGet(twin.href);
+        if (!r) return fail("network: The Internet connection appears to be offline.");
+        if (r.status >= 400) return fail(`insecure: ${twin.hostname} offers this IPA only over plain http, without encryption`);
+      }
+      r ??= netGet(url);
       if (!r) return fail("network: The Internet connection appears to be offline.");
       if (r.status >= 400) return fail(`not_found: HTTP ${r.status} for ${url}`);
       const path = join(ipaDir, `${randomUUID().toUpperCase()}.ipa`);

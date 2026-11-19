@@ -208,6 +208,7 @@ export async function runIpaConsole({ url, name = "", onInstalled = () => {}, na
   const r = await runIpaInstall({ url, name: title }, view, { ...(native ? { native } : {}), signal: ctl.signal });
   runLogs.add({ title: `Install ${title}`, jobs: [{ op: "install", id: r.bundleId || url, version: null, mode: "ipa" }],
     code: r.ok ? 0 : -1, text: r.log });
+  if (r.declined) page.close(); // B113: Cancel on This Download Is Not Secure: back where Install was tapped
   if (r.cancelled) return r;
   if (r.ok) { try { onInstalled(r); } catch { /* the record is a nicety */ } }
 

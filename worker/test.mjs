@@ -334,6 +334,31 @@ import { waitFor, MANIFEST_WAIT, IPA_WAIT } from "./src/index.js";
   // the Worker routes /repo/ before the website's assets
   const site = await w.fetch(new Request("https://ifizbox.example/repo/InRelease"), { ...env, ASSETS: { fetch: async () => new Response("asset") } });
   assert.equal(site.status, 404);
+  // B73: /repo/<tag>/<file>.deb, an older release's .deb named by Packages, comes from that release, same rules
+  assert.deepEqual(repoFile("/repo/v0.9.3/com.ryha.ifizbox_0.9.3-9_iphoneos-arm64.deb"),
+    { name: "com.ryha.ifizbox_0.9.3-9_iphoneos-arm64.deb", tag: "v0.9.3", type: "application/vnd.debian.binary-package" });
+  for (const bad of ["/repo/v0.9.3/Packages", "/repo/v0.9.3/Release", "/repo/latest/x.deb", "/repo/v0.9/x.deb", "/repo/v0.9.3/..%2Fx.deb",
+    "/repo/v0.9.3/a/x.deb", "/repo/..%2Fv0.9.3/x.deb", "/repo/v0.9.3/%E0.deb", "/repo/v0.9.3/.deb"]) assert.equal(repoFile(bad), null, bad);
+  const tagged = [];
+  const tfetch = async (url, o = {}) => {
+    tagged.push(url);
+    assert.equal(o.redirect, "follow"); // GitHub's redirect is followed here, never passed on (Zebra)
+    return url.endsWith("/x_1.0-1_iphoneos-arm64.deb") ? new Response("deb", { headers: { "content-length": "3" } }) : new Response("no", { status: 404 });
+  };
+  const old = new Request("https://ifizbox.example/repo/v0.9.3/x_1.0-1_iphoneos-arm64.deb");
+  r = await repo(old, new URL(old.url), {}, { fetcher: tfetch, wait: async () => {} });
+  assert.equal(r.status, 200);
+  assert.equal(await r.text(), "deb");
+  assert.equal(r.headers.get("location"), null);
+  assert.equal(r.headers.get("content-type"), "application/vnd.debian.binary-package");
+  assert.equal(r.headers.get("cache-control"), "public, max-age=86400");
+  assert.equal(tagged[0], "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.3/x_1.0-1_iphoneos-arm64.deb");
+  const gone = new Request("https://ifizbox.example/repo/v0.9.3/y_1_iphoneos-arm64.deb");
+  assert.equal((await repo(gone, new URL(gone.url), {}, { fetcher: tfetch, wait: async () => {} })).status, 404);
+  const n2 = tagged.length;
+  const badTag = new Request("https://ifizbox.example/repo/v0.9.3/Packages");
+  assert.equal((await repo(badTag, new URL(badTag.url), {}, { fetcher: tfetch, wait: async () => {} })).status, 404);
+  assert.equal(tagged.length, n2); // not asked of GitHub
   console.log("worker repo: ok");
 }
 {

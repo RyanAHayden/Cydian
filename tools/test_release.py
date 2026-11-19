@@ -49,7 +49,8 @@ class Release(unittest.TestCase):
         notes = os.path.join(self.tmp, "notes.md")
         with open(notes, "w") as f:
             f.write("- A test release\n")
-        env = {k: v for k, v in os.environ.items() if k not in ("IFIZBOX_RELEASE_REPO", "IFIZBOX_PIRACY_SYNC_ARGS")}
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("IFIZBOX_RELEASE_REPO", "IFIZBOX_PIRACY_SYNC_ARGS", "IFIZBOX_RELEASE_HISTORY")}
         env.update(env_extra or {})
         return subprocess.run([SCRIPT, "--dry-run", "--dist", self.dist, "--notes", notes, *extra], cwd=ROOT,
                               env=env, capture_output=True, text=True, timeout=60)
@@ -111,7 +112,7 @@ class Release(unittest.TestCase):
         with open(os.path.join(out, "Packages")) as f:
             packages = f.read()
         self.assertIn("Package: com.ryha.ifizbox\n", packages)
-        self.assertIn("Filename: %s\n" % debname, packages)
+        self.assertIn("Filename: v%s/%s\n" % (VERSION, debname), packages)  # B73: the release's own asset
         self.assertIn("X-iFizBox-Minimum-Version: %s\n" % VERSION, packages)
         with open(os.path.join(self.dist, "iFizBox.deb"), "rb") as f:
             deb = f.read()
@@ -159,7 +160,27 @@ class Release(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn(other, self.assets(r.stdout))
         with open(os.path.join(out, "Packages")) as f:
-            self.assertIn("Filename: %s\n" % other, f.read())
+            self.assertIn("Filename: v%s/%s\n" % (VERSION, other), f.read())
+
+    def test_repo_keeps_older_releases(self):
+        """B73: Packages names the older releases' .debs too (from IFIZBOX_RELEASE_HISTORY here, GitHub in a real run),
+        each under its own tag, so Downgrade lists them; a dry run without it says it read none."""
+        self.fake_build("%s-7" % VERSION, VERSION)
+        hist = os.path.join(self.tmp, "hist", "v0.0.1")
+        os.makedirs(hist)
+        with open(os.path.join(hist, "Packages"), "w") as f:
+            f.write("Package: com.ryha.ifizbox\nVersion: 0.0.1-3\nArchitecture: iphoneos-arm64\n"
+                    "Filename: com.ryha.ifizbox_0.0.1-3_iphoneos-arm64.deb\nSize: 3\nSHA256: ab\n")
+        out = os.path.join(self.tmp, "out")
+        r = self.dry_run("--out", out, env_extra={"IFIZBOX_RELEASE_HISTORY": os.path.join(self.tmp, "hist")})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(os.path.join(out, "Packages")) as f:
+            packages = f.read()
+        self.assertIn("Filename: v%s/com.ryha.ifizbox_%s-7_iphoneos-arm64.deb\n" % (VERSION, VERSION), packages)
+        self.assertIn("Filename: v0.0.1/com.ryha.ifizbox_0.0.1-3_iphoneos-arm64.deb\n", packages)
+        self.assertIn("apt repo versions: %s-7 0.0.1-3\n" % VERSION, r.stdout)
+        r = self.dry_run("--out", out)
+        self.assertIn("older releases not read", r.stdout)
 
     def piracy_answers(self, sha, hosts):
         """Saved cnstr/manifests API answers for tools/sync-piracy-list.py: the list's tree and its newest commit."""

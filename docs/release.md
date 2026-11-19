@@ -44,10 +44,21 @@ Like Cydia's apt.saurik.com, iFizBox has a source of its own that is built in an
   can't take GitHub's address directly: the redirect ends at a signed `release-assets.githubusercontent.com` URL,
   and Zebra 1.1.36 names its cache file after it ("the file name is invalid"). Release assets, not GitHub Pages:
   `latest/download/<name>` always redirects to the newest published release's asset, so the URL never changes, there is no second branch or Pages setup to keep up, and the
-  .debs are not committed to git. `Packages` names each .deb by its bare asset name (`Filename:
-  com.ryha.ifizbox_0.1.3-12_iphoneos-arm64.deb`), which resolves against the same URL to the same release.
-  Drafts and pre-releases don't count as latest, so a draft doesn't change what the app sees. The repo is unsigned,
-  like most jailbreak repos.
+  .debs are not committed to git. Drafts and pre-releases don't count as latest, so a draft doesn't change what the
+  app sees. The repo is unsigned, like most jailbreak repos.
+
+  `Packages` lists every published release's iFizBox, not just the newest (the newest 20 releases, like the
+  AltStore source), so apt (`apt-cache policy com.ryha.ifizbox`), the app's Modify > Downgrade and its Version
+  History offer the older builds too. Each `Filename:` names the release the .deb belongs to,
+  `v0.9.7/com.ryha.ifizbox_0.9.7-1337_iphoneos-arm64.deb`. The Worker's `/repo/<tag>/<file>.deb` fetches it from
+  `releases/download/<tag>/<file>` the same way: redirect followed by the Worker, only `vX.Y.Z` tags and `.deb`
+  names, cached for a day because a published asset never changes. To build that list, a real release reads the older
+  releases with `gh` (`tools/selfrepo.py fetch`). For each one it takes the release's `Packages` asset, keeping
+  only that release's own stanzas, or, for a release without one, its Debian-named .debs. Only package IDs
+  the new release ships are kept, so builds from before the rename (another package ID) aren't listed. Drafts and
+  pre-releases are left out. The new release's `--minimum` field goes on its own stanza only. A dry run stays
+  offline and lists the new release only, unless `IFIZBOX_RELEASE_HISTORY=DIR` points at a directory laid out as
+  `DIR/<tag>/Packages` (which `tools/selfrepo.py fetch OWNER/NAME DIR` fills).
 - **AltStore source** (the sideload app and the site): `web/app/source.json`, served at
   `https://ifizbox.com/repo/source.json` (the Worker answers with the deployed copy, else the latest release's
   `source.json` asset), rewritten by

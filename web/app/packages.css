@@ -822,10 +822,13 @@ html[data-theme="dark"] .managing .manage-row.picked, html[data-theme="dark"] .m
   border-bottom: 1px solid #e0e0e0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 html[data-theme="dark"] .manage-summary { color: var(--subtitle); border-bottom-color: var(--divider); }
-/* Under the list (and in its empty state): the way to Install IPAs, Home's tile. */
-.installed-footer { margin: 16px 20px 22px; font-size: 14px; text-align: center; color: #7f7f7f; }
-.installed-footer a, p.empty a { color: #385487; text-decoration: none; }
-html[data-theme="dark"] .installed-footer a, html[data-theme="dark"] p.empty a { color: var(--dk-link); }
+/* The empty state's way to Install IPAs, Home's tile. */
+p.empty a { color: #385487; text-decoration: none; }
+html[data-theme="dark"] p.empty a { color: var(--dk-link); }
+/* F269: the Install IPAs row above the apps: a plain cell like theirs, its tile lined up with their icons (not the
+   Settings rows' 3pt nudge); gone while Manage is on. */
+.install-ipas-top .install-ipas-row .cell-icon.row-icon { margin: 0; }
+.install-ipas-row[hidden] { display: none; }
 /* The toolbar: My IPAs' edit toolbar (myipas.css .myipa-toolbar, which loads only with My IPAs, so its rules are
    repeated here): the navigation bar's colours as a 44pt UIToolbar docked above the tab bar, sliding up from behind
    it. Re-sign is the blue Done button, Update a plain bar button, Delete the alert's red; one with nothing to act on

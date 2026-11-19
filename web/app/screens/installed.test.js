@@ -624,12 +624,13 @@ test("B52: a Delete under the Apps page updates the root's Apps count; the cell 
   const { grouped } = await import("../nav/ui.js");
   const body = withDom(() => { // the root's Apps cell as draw() makes it
     const b = document.createElement("div");
-    const g = grouped([{ rows: [{ label: "Apps", subtitle: appsRowSubtitle(2), href: "#/installed/apps" }] }]);
+    const g = grouped([{ rows: [{ label: "Install IPAs", subtitle: "3 IPAs", href: "#/installed/myipas", cls: "install-ipas-row" }, // F269
+      { label: "Apps", subtitle: appsRowSubtitle(2), href: "#/installed/apps", cls: "installed-apps-row" }] }]);
     g.children[0].classList.add("installed-top");
     b.append(g);
     return b;
   });
-  const sub = () => body.querySelector(".installed-top").querySelector(".cell-subtitle").textContent;
+  const sub = () => body.querySelector(".installed-top").querySelector(".installed-apps-row").querySelector(".cell-subtitle").textContent;
   assert.equal(sub(), "2 apps installed from an app page");
   const view = { body, rows: [], appCount: 2, seq: 1 };
   let redraws = 0;
@@ -658,4 +659,53 @@ test("B52: no count refresh off the jailbreak app, before the root is drawn, or 
   const view = { body: {}, rows: [], appCount: 1, seq: 0 };
   await refreshAppCount({ view, mode: "jailbreak", count: async () => { view.seq++; return 5; }, redraw: fail });
   assert.equal(view.appCount, 1, "load()'s own count wins");
+});
+
+// ---- F269: the Install IPAs row at the top of Installed -------------------------------------------------------------
+import { installIpasRow, loadIpaCounts } from "./installed.js";
+import { libraryCounts as ipaCounts, ipaCountText } from "../core/myipas.js";
+
+test("F269: the Install IPAs row: label, href, the not-installed count (none at 0), hidden while managing", () => {
+  const row = installIpasRow(r(), { total: 7, notInstalled: 2 });
+  assert.equal(row.label, "Install IPAs");
+  assert.equal(row.href, "#/installed/myipas");
+  assert.equal(row.subtitle, "7 IPAs · 2 not installed");
+  assert.equal(row.badge, "2");
+  assert.equal(row.cls, "install-ipas-row");
+  assert.equal(row.icon.cls, "row-icon");
+  assert.equal(row.hidden, false);
+  assert.equal(installIpasRow(r(), { total: 3, notInstalled: 0 }).badge, undefined, "no badge at 0");
+  assert.equal(installIpasRow(r(), { total: 3, notInstalled: 0 }).subtitle, "3 IPAs");
+  assert.equal(installIpasRow(r(), null).badge, undefined, "nothing counted yet: no badge");
+  assert.equal(installIpasRow(r(), { total: 7, notInstalled: 2 }, { managing: true }).hidden, true);
+});
+
+test("F269: the row's counts and subtitle", () => {
+  assert.equal(ipaCountText({ total: 1, notInstalled: 1 }), "1 IPA · 1 not installed");
+  assert.equal(ipaCountText({ total: 0, notInstalled: 0 }), "No IPAs yet");
+  assert.equal(typeof ipaCountText(null), "string");
+  const sections = [{ key: "notInstalled", rows: [{}, {}] }, { key: "installed", rows: [{}] }];
+  assert.deepEqual(ipaCounts([{}, {}, {}], sections), { total: 3, notInstalled: 2 });
+  assert.deepEqual(ipaCounts([{}], [{ key: "installed", rows: [{}] }]), { total: 1, notInstalled: 0 });
+  assert.deepEqual(ipaCounts([], []), { total: 0, notInstalled: 0 });
+});
+
+test("F269: loadIpaCounts counts as the Install IPAs page does (phone's answer, broken IPAs not installed)", async () => {
+  const list = [
+    { file: "A.ipa", name: "A", bundleId: "a" }, { file: "B.ipa", name: "B", bundleId: "b" },
+    { file: "C.ipa", name: "C", bundleId: "c" }, { file: "X.ipa", error: "Not an IPA" },
+  ];
+  const native = globalThis.ifizboxNative;
+  globalThis.ifizboxNative = { call: async (m, p) => (m === "apps.isInstalled" ? { installed: { a: true, b: false, c: false } } : assert.fail(m)) };
+  let painted = 0;
+  try {
+    const counts = await loadIpaCounts({ mode: "sideload", call: async () => ({ ipas: list }), paint: () => painted++ });
+    assert.deepEqual(counts, { total: 4, notInstalled: 3 });
+    assert.equal(painted, 1);
+    assert.equal(installIpasRow(r(), counts).subtitle, "4 IPAs · 3 not installed");
+    const failed = await loadIpaCounts({ mode: "sideload", call: async () => { throw new Error("no library"); }, paint: () => painted++ });
+    assert.equal(failed, null, "a library that can't be read: no counts, no badge");
+  } finally {
+    globalThis.ifizboxNative = native;
+  }
 });

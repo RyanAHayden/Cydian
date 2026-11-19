@@ -578,6 +578,22 @@ IPA_DIR = "/var/mobile/Library/Caches/com.ryha.ifizbox/ipa"
 PLIST = ('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n'
          '\t<key>CFBundleExecutable</key><string>Demo</string>\n'
          '\t<key>CFBundleIdentifier</key>\n\t<string>{}</string>\n</dict>\n</plist>\n')
+# The ldid stand-in. -s <app>: ad hoc signs (needs <app>/Info.plist). -e <bin>: prints <bin>.ent, the fixture's
+# entitlements, or fails as ldid does on an unsigned binary. -M -S<file> <bin>: prints the entitlements it was given
+# on one line ("ent: ..."); fails when <app>/Demo.nosign exists.
+LDID = r'''#!/bin/sh
+case "$1" in
+-e) echo "ldid -e $2" >&2
+    [ -f "$2.ent" ] || { echo "ldid: -e, -q, and -h requre a signed binary" >&2; exit 1; }
+    cat "$2.ent" ;;
+-M) echo "ldid $*"
+    echo "ent: $(tr -d '\n\t' < "${2#-S}")"
+    [ ! -f "$3/Demo.nosign" ] ;;
+*) echo "ldid $*"
+   [ -f "$2/Info.plist" ] ;;
+esac
+'''
+ENTS = ('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n{}</dict>\n</plist>\n')
 
 
 @unittest.skipUnless(CC, "no C compiler on this machine")
@@ -684,7 +700,7 @@ class InstallIpa(unittest.TestCase):
         if ldid:
             path = os.path.join(p, "usr/bin/ldid")
             with open(path, "w") as f:
-                f.write('#!/bin/sh\necho "ldid $*"\n[ -f "$2/Info.plist" ] || exit 1\n')
+                f.write(LDID)
             os.chmod(path, 0o755)
         if appsync:
             d = os.path.join(p, "usr/lib/TweakInject")
@@ -695,13 +711,19 @@ class InstallIpa(unittest.TestCase):
                                                 f'-DHELPER_IPA_DIR="{ipa_dir}"', f'-DHELPER_IPA_WORK="{work}"'])
         return p, app, helper, ipa_dir, work
 
-    def ipa(self, ipa_dir, bundle_id="com.example.demo", name="A1.ipa", app="Demo.app"):
+    def ipa(self, ipa_dir, bundle_id="com.example.demo", name="A1.ipa", app="Demo.app", ents=None, plist=None,
+            nosign=False):
+        """ents: the binary's entitlements (the dict's inner XML) as ldid -e shows them; None: unsigned."""
         import zipfile
         path = os.path.join(ipa_dir, name)
         with zipfile.ZipFile(path, "w") as z:
             if app:
-                z.writestr(f"Payload/{app}/Info.plist", PLIST.format(bundle_id))
+                z.writestr(f"Payload/{app}/Info.plist", plist or PLIST.format(bundle_id))
                 z.writestr(f"Payload/{app}/Demo", b"\xcf\xfa\xed\xfe")
+                if ents is not None:
+                    z.writestr(f"Payload/{app}/Demo.ent", ENTS.format(ents))
+                if nosign:
+                    z.writestr(f"Payload/{app}/Demo.nosign", "")
         return path
 
     def spawn(self, app, helper, *words):
@@ -725,12 +747,89 @@ class InstallIpa(unittest.TestCase):
         self.assert_clean(work)
 
     def test_chain_appsync(self):
-        """AppSync Unified: the IPA itself goes to installd, as appinst does; nothing is signed."""
+        """AppSync Unified and a binary with application-identifier: the IPA itself goes to installd, as appinst
+        does; nothing is signed."""
         p, app, helper, ipa_dir, work = self.chain(ldid=True, appsync=True)
+        ents = "\t<key>application-identifier</key>\n\t<string>ABCDE12345.com.example.demo</string>\n"
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, ents=ents))
+        self.assertEqual(out[-1], "exit: 0", out)
+        self.assertIn("1: install ipa com.example.demo", out)
+        self.assertFalse(any(l.startswith("1: ldid") for l in out), out)
+        self.assertFalse(any("ldid -e" in l for l in out), out)  # the probe's stderr stays out of the console
+        self.assert_clean(work)
+        # No ldid at all: the IPA goes as it is (installd may still refuse it)
+        p, app, helper, ipa_dir, work = self.chain(appsync=True)
         out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir))
         self.assertEqual(out[-1], "exit: 0", out)
         self.assertIn("1: install ipa com.example.demo", out)
-        self.assertFalse(any("ldid" in l for l in out), out)
+        self.assert_clean(work)
+
+    def test_chain_appsync_fakesign(self):
+        """B59: AppSync Unified and an unsigned binary: installd still wants application-identifier, so the binary
+        is fakesigned (ldid -M keeps its own entitlements) and the unpacked .app goes to installd."""
+        p, app, helper, ipa_dir, work = self.chain(ldid=True, appsync=True)
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir))
+        self.assertEqual(out[-1], "exit: 0", out)
+        sign = [l for l in out if l.startswith("1: ldid -M -S")]
+        self.assertEqual(len(sign), 1, out)
+        self.assertTrue(sign[0].startswith(f"1: ldid -M -S{work}/ifizbox-ipa."), sign)
+        # the whole .app (B59: SpringBoard won't launch an app whose bundle has no CodeResources)
+        self.assertTrue(sign[0].endswith("/ent.xml " + sign[0].split(" ")[-1]) and
+                        sign[0].endswith("/pkg/Payload/Demo.app"), sign)
+        ent = next(l for l in out if l.startswith("1: ent: "))
+        self.assertIn("<key>application-identifier</key><string>FAKESIGNED.com.example.demo</string>", ent)
+        self.assertIn("<key>com.apple.developer.team-identifier</key><string>FAKESIGNED</string>", ent)
+        self.assertIn("3: pmstatus:com.example.demo:45:Adding the application-identifier entitlement (ldid)", out)
+        self.assertIn("1: install app com.example.demo (PackageType Developer)", out)
+        self.assertIn("1: Installed com.example.demo", out)
+        self.assert_clean(work)
+        # Signed, with entitlements but no application-identifier: its own team id is reused
+        ents = ("\t<key>com.apple.developer.team-identifier</key>\n\t<string>QWERT67890</string>\n"
+                "\t<key>get-task-allow</key>\n\t<true/>\n")
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, name="T.ipa", ents=ents))
+        self.assertEqual(out[-1], "exit: 0", out)
+        ent = next(l for l in out if l.startswith("1: ent: "))
+        self.assertIn("<string>QWERT67890.com.example.demo</string>", ent)
+        self.assertIn("<key>com.apple.developer.team-identifier</key><string>QWERT67890</string>", ent)
+        # A team id that isn't 10 of [A-Z0-9] isn't reused
+        ents = "\t<key>com.apple.developer.team-identifier</key>\n\t<string>bad</string>\n"
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, name="U.ipa", ents=ents))
+        self.assertEqual(out[-1], "exit: 0", out)
+        self.assertIn("<string>FAKESIGNED.com.example.demo</string>", next(l for l in out if l.startswith("1: ent: ")))
+        self.assert_clean(work)
+
+    def test_chain_fakesign_refuses(self):
+        """B59: a CFBundleExecutable that isn't a plain file in the app, or ldid failing, stops before installd."""
+        p, app, helper, ipa_dir, work = self.chain(ldid=True, appsync=True)
+        cases = [(PLIST.replace("<string>Demo</string>", "<string>../Demo</string>"), False,
+                  "no usable CFBundleExecutable", 64),
+                 (PLIST.replace("<string>Demo</string>", "<string>Missing</string>"), False,
+                  "isn't a plain file in the app", 64),
+                 (PLIST.replace("\t<key>CFBundleExecutable</key><string>Demo</string>\n", ""), False,
+                  "no usable CFBundleExecutable", 64),
+                 (None, True, "ldid couldn't add the application-identifier entitlement", 69)]
+        for i, (plist, nosign, msg, code) in enumerate(cases):
+            with self.subTest(msg=msg):
+                pl = plist.format("com.example.demo") if plist else None
+                out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, name=f"R{i}.ipa", plist=pl, nosign=nosign))
+                self.assertTrue(any(l.startswith("2: ifizbox-helper: ") and msg in l for l in out), out)
+                self.assertEqual(out[-1], f"exit: {code}", out)
+                self.assertFalse(any(l.startswith("1: install ") for l in out), out)
+                self.assert_clean(work)
+
+    def test_chain_adhoc_fakesign(self):
+        """B59: no AppSync: after ldid -s, a binary still without application-identifier gets it too."""
+        p, app, helper, ipa_dir, work = self.chain(ldid=True)
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir))
+        self.assertEqual(out[-1], "exit: 0", out)
+        i = next(i for i, l in enumerate(out) if l.startswith("1: ldid -s "))
+        j = next(i for i, l in enumerate(out) if l.startswith("1: ldid -M -S"))
+        self.assertLess(i, j, out)
+        self.assertIn("1: install app com.example.demo (PackageType Developer)", out)
+        ents = "\t<key>application-identifier</key>\n\t<string>ABCDE12345.com.example.demo</string>\n"
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, name="S.ipa", ents=ents))
+        self.assertEqual(out[-1], "exit: 0", out)
+        self.assertFalse(any(l.startswith("1: ldid -M") for l in out), out)
         self.assert_clean(work)
 
     def test_chain_cant_adhoc(self):

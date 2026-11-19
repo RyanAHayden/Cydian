@@ -29,6 +29,11 @@ int helper_ipa_bundle_id_ok(const char *s);
  * any plist format, other systems the XML one only. */
 int helper_ipa_plist_id(const char *data, size_t len, char *out, size_t size);
 
+/* B59: 1 if s is a team id the fakesign reuses (10 of [A-Z0-9]); 1 if s is a CFBundleExecutable the helper signs
+ * (a plain name: no "/", not "." or "..", helper_app_value_ok). */
+int helper_ipa_team_ok(const char *s);
+int helper_ipa_exe_ok(const char *s);
+
 /* I4: app-versions. Every app installd put under dir (HELPER_APPS_DIR: <dir>/<UUID>/<Name>.app, plus App Store
  * apps' <dir>/<UUID>/iTunesMetadata.plist) as one line each, "<id>\t<short>\t<build>\t<store>\n": the bundle id
  * (helper_ipa_bundle_id_ok), Info.plist's CFBundleShortVersionString and CFBundleVersion, and iTunesMetadata's

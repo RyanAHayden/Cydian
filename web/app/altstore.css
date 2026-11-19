@@ -67,6 +67,20 @@ html[data-theme="dark"] .perm-more .cell-label { color: var(--dk-link); }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cmask id='m'%3E%3Crect width='20' height='20' fill='%23fff'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/mask%3E%3Ccircle cx='10' cy='10' r='9.4' fill='%23fff' mask='url(%23m)'/%3E%3C/svg%3E");
 }
 
+/* F242a: the jailbreak app page's queue toggle in the same place (screens/altstore.js queueToggle): the same narrow
+   bordered bar button holding UIKit's Add glyph (UIButtonBarPlus: a 16x17pt plus, 4pt bars) while the app isn't
+   queued, its Stop glyph (UIButtonBarStop: a 17pt round-ended X) while it is; white on the dark shadow 1pt up. */
+.bar-button.bar-icon.queue-toggle { min-width: 34px; width: 34px; }
+.bar-button.queue-toggle::before {
+  content: ""; width: 16px; height: 17px; filter: drop-shadow(0 -1px 0 rgba(0,0,0,.45));
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 34'%3E%3Cpath d='M12 1h8v12h12v9H20v12h-8V22H0v-9h12z' fill='%23fff'/%3E%3C/svg%3E") center / 16px 17px no-repeat;
+}
+.bar-button.queue-toggle.is-queued::before {
+  width: 17px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Cpath d='M4.2 4.2l25.6 25.6M29.8 4.2L4.2 29.8' stroke='%23fff' stroke-width='7.4' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size: 17px 17px;
+}
+
 /* B54: the gallery's slot (screens/altstore.js previewSlot): a 44px row with iOS 6's grey spinner while the pictures
    load, then one height transition to the gallery (overflow hidden only while it runs). flow-root keeps the group's
    margins inside the slot, so its measured height is what the page below moves by. */

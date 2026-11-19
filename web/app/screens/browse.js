@@ -60,7 +60,8 @@ import { showMenu, longPress, copyText } from "../nav/menu.js";
 import { showShareSheet } from "../nav/sharesheet.js";
 import { showHUD } from "../nav/hud.js";
 import { packageLinks as managerLinks, siteOrigin, formatOf } from "../core/handoff.js";
-import { APP_TILES } from "./handoff.js";
+import { APP_TILES, installedManagers } from "./handoff.js";
+import { appIcon, loadAppIcons } from "../app-icons.js";
 import { attachRowSwipe, playHint } from "../nav/rowswipe.js";
 import { showUndoBar } from "../nav/undobar.js";
 import { runLogs } from "../queue.js";
@@ -431,14 +432,19 @@ export function rowMenuItems(item, { queue = false, installed = null, newest = n
 
 // F192: what Share on a package row lists (pure, as handoff.js shareItems): Copy Link, the package's page on the
 // site (Search's package:<id>, which every visitor can open), then, for an APT package on the website with the phone
-// set to Jailbroken, the package managers that open it (core/handoff.js packageLinks, imported as managerLinks). The app is the package manager
-// itself, so it lists no others.
+// set to Jailbroken, the package managers that open it (core/handoff.js packageLinks, imported as managerLinks).
+// F219: the jailbreak build lists the managers this phone has (`managers`, a Set of names from handoff.js
+// installedManagers), none when it has none; the sideload build lists none.
 export function packageShareItems(item, source, { origin = siteOrigin(globalThis.location), mode = detectMode(),
-  jailbroken = settings.jailbroken() } = {}) {
+  jailbroken = settings.jailbroken(), managers = null } = {}) {
   if (!item?.id) return [];
   const items = [{ kind: "copy", label: "Copy Link", text: origin + "/" + format({ tab: "search", path: [token("package", item.id)] }) }];
-  if (mode === "site" && jailbroken && source && formatOf(source) === "apt" && item.kind !== "ipa") {
-    for (const l of managerLinks(item.id, source)) items.push({ kind: "open", label: l.app, url: l.url, ...(APP_TILES[l.app] ?? { letter: l.app[0] }) });
+  const apt = source && formatOf(source) === "apt" && item.kind !== "ipa";
+  const pick = mode === "site" && jailbroken ? () => true : mode === "jailbreak" && managers ? (app) => managers.has(app) : null;
+  if (apt && pick) {
+    for (const l of managerLinks(item.id, source)) {
+      if (pick(l.app)) items.push({ kind: "open", label: l.app, url: l.url, ...(APP_TILES[l.app] ?? { letter: l.app[0] }) });
+    }
   }
   return items;
 }
@@ -507,10 +513,12 @@ async function runRowMenuItem(it, item, { installed, name }) {
   }
 }
 
-function showPackageShare(item, source) {
-  const items = packageShareItems(item, source).map((s) => s.kind === "copy"
+async function showPackageShare(item, source) {
+  // F219: the jailbreak build asks which managers the phone has (cached for the session after the first time).
+  const managers = detectMode() === "jailbreak" ? await installedManagers() : null;
+  const items = packageShareItems(item, source, { managers }).map((s) => s.kind === "copy"
     ? { label: s.label, glyph: "copy", onSelect: () => copyText(s.text).then(() => showHUD("Copying").done("Copied")) }
-    : { label: s.label, letter: s.letter, color: s.color, onSelect: () => { location.href = s.url; } });
+    : { label: s.label, letter: s.letter, color: s.color, image: appIcon(s.label), onSelect: () => { location.href = s.url; } });
   return showShareSheet({ items });
 }
 
@@ -863,6 +871,8 @@ async function renderPackage(body, route, key, id, ctx) {
     line: headerLine({ version: st.version, size, price: pkg.installedOnly ? null : isPaid(st) ? "Paid" : "Free" }),
     // Share on the header, as an app page's (F194); the row hold menu's sheet (F192)
     action: shareHeadButton(() => showPackageShare({ id, key: pkg.key, kind: st.kind }, source)) });
+  // F219: which managers the phone has and their icons, asked now so Share opens at once.
+  if (detectMode() === "jailbreak") installedManagers().then((m) => loadAppIcons([...m])).catch(() => {});
 
   // Depiction: Sileo JSON drawn natively in Details; else an HTML depiction in a sheet, and the description. A package
   // with no Depiction: of its own gets the source's Release template (Cydia's fallback; an own non-http one
@@ -1009,7 +1019,8 @@ async function renderPackage(body, route, key, id, ctx) {
   if (conflicts.length) details.append(grouped([{ header: "Conflicts", rows: conflicts }]));
   // An installed package no source carries (F27) has no source to name: its page is the status stanza alone.
   if (!pkg.installedOnly) details.append(grouped([{ header: pkg.others.length > 1 ? "Sources" : "Source", rows: srcRows }]));
-  // F8: Open In, the package in another package manager (and its source from another device).
+  // F8: Open In, the package in another package manager (and its source from another device). Not in the jailbreak
+  // build (F219: openInGroup returns nothing there; Share lists the installed managers).
   if (!pkg.installedOnly && source) details.append(openInGroup(source, { pkg: st.package || id }));
   if (st.debUrl && getBackend().kind === "http") {
     // Paid packages (cydia::commercial) only download for a buyer's device: the repo refuses the proxy.

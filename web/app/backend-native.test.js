@@ -365,3 +365,27 @@ test("F49: Add Source tries Telesphoreo's dists/ios/<cf>/ from app.info's CoreFo
     assert.ok(!other.native.calls.some((c) => /dists\/ios\//.test(c.params?.url ?? "")));
   }
 });
+
+test("F219: appsInstalled asks signing.isInstalled once per app for the session; a failed call isn't kept", async () => {
+  const calls = [];
+  let fail = false;
+  const native = {
+    call: async (method, params) => {
+      calls.push({ method, params });
+      if (fail) throw new Error("bridge busy");
+      return { installed: Object.fromEntries(params.bundleIds.map((id) => [id, id === "org.coolstar.SileoStore" ? true : id === "x.unknown" ? null : false])) };
+    },
+  };
+  const backend = createNativeBackend({ native });
+  assert.deepEqual(await backend.appsInstalled(["org.coolstar.SileoStore", "xyz.willy.Zebra"]), { "org.coolstar.SileoStore": true, "xyz.willy.Zebra": false });
+  assert.deepEqual(calls, [{ method: "signing.isInstalled", params: { bundleIds: ["org.coolstar.SileoStore", "xyz.willy.Zebra"] } }]);
+  assert.deepEqual(await backend.appsInstalled(["xyz.willy.Zebra", "org.coolstar.SileoStore"]), { "xyz.willy.Zebra": false, "org.coolstar.SileoStore": true });
+  assert.equal(calls.length, 1, "cached");
+  assert.deepEqual(await backend.appsInstalled(["xyz.willy.Zebra", "x.unknown"]), { "xyz.willy.Zebra": false, "x.unknown": null });
+  assert.deepEqual(calls[1].params.bundleIds, ["x.unknown"], "only the new one is asked");
+  fail = true;
+  assert.deepEqual(await backend.appsInstalled(["wiki.qaq.irisin", "org.coolstar.SileoStore"]), { "wiki.qaq.irisin": null, "org.coolstar.SileoStore": true });
+  fail = false;
+  assert.deepEqual(await backend.appsInstalled(["wiki.qaq.irisin"]), { "wiki.qaq.irisin": false });
+  assert.deepEqual(calls.at(-1).params.bundleIds, ["wiki.qaq.irisin"], "asked again after the failure");
+});

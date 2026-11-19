@@ -6,8 +6,9 @@
 //
 //   signing.inspect {url} (stream: {phase: "downloading", progress})
 //        -> {token, app: {name, bundleId, version, minimumOS, size, entitlements, permissions, extensions},
-//            icon (base64 PNG, may be Apple's CgBI form) | null, missing: [entitlement], signsAs, profileKind}
-//   signing.install {url | token, name?, bundleId?, icon?, removeExtensions?, fixArm64e?} (stream as I6)
+//            icon (base64 PNG, may be Apple's CgBI form) | null, missing: [entitlement], signsAs, profileKind,
+//            appIdAs, keepBundleId, push, wildcard, profileAppId}   (params keepBundleId?: Keep Bundle IDs, absent on)
+//   signing.install {url | token, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?} (stream as I6)
 //        -> I6's reply + {fixedArm64e, expires}
 //   signing.progress {bundleId} (stream: {phase: "installing", progress}) -> {installed: true | false | null}
 //   signing.installed            -> {apps: [record], next: {expires, apps} | null}
@@ -111,8 +112,13 @@ enum Sideload {
                        let png = try? z.data(e, limit: 4 << 20) { icon = png.base64EncodedString() }
                     prepared[tok] = Prepared(url: url.absoluteString, file: file, details: d)
                     SignBridge.queue.asyncAfter(deadline: .now() + 15 * 60) { forgetPrepared(tok) }
+                    // F237: signsAs follows Keep Bundle IDs (params keepBundleId, absent: on); appIdAs is the
+                    // profile's App ID the entitlements get either way, and the sheet's warnings read push.
+                    var o = SignOptions(); if let k = c.params["keepBundleId"] as? Bool { o.keepBundleID = k }
+                    let ids = (try? profile.signingIDs(for: d.bundleID, keep: o.keeps(d.bundleID))) ?? (bundleID: d.bundleID, entitlementsID: d.bundleID)
                     Apt.reply(c, ["token": tok, "app": d.json, "icon": icon, "missing": d.missing(from: profile),
-                                  "signsAs": (try? profile.bundleID(for: d.bundleID)) ?? d.bundleID,
+                                  "signsAs": ids.bundleID, "appIdAs": ids.entitlementsID, "keepBundleId": o.keepBundleID,
+                                  "push": profile.pushEnvironment ?? NSNull(), "wildcard": profile.isWildcard, "profileAppId": profile.appID,
                                   "profileKind": profile.kind.rawValue], nil)
                 } catch {
                     try? FileManager.default.removeItem(at: file)

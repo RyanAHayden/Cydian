@@ -10,8 +10,20 @@ struct SignOptions {
     var icon: Data?                    // a PNG (the page sizes it, 180x180 is best); replaces the app's icon
     var removeExtensions: [String] = [] // paths under the app: "PlugIns/Share.appex", "Watch/W.app"
     var fixArm64e = true
+    // F237: keep the app's own bundle ID in Info.plist (the profile's App ID only in the entitlements), so the signed
+    // app replaces the original rather than sitting beside it, and gets its own pushes. False: the old way.
+    var keepBundleID = true
 
     init() {}
+
+    // F237: whether this app keeps its ID. iFizBox's own IPA keeps it only when the running iFizBox has that ID too:
+    // an update to an iFizBox installed under the profile's ID must replace it, not install a second iFizBox.
+    func keeps(_ appBundleID: String, running: String? = Bundle.main.bundleIdentifier) -> Bool {
+        guard keepBundleID else { return false }
+        if appBundleID == SignOptions.selfBundleID, let r = running, !r.isEmpty, r != appBundleID { return false }
+        return true
+    }
+    static let selfBundleID = "com.ryha.ifizbox" // brand.env BRAND_BUNDLE_ID
 
     // From a bridge call's params: {name, bundleId, icon (base64 PNG), removeExtensions: [path]}.
     init(json p: [String: Any]) throws {
@@ -28,6 +40,7 @@ struct SignOptions {
         }
         removeExtensions = (p["removeExtensions"] as? [String] ?? []).map { $0.hasSuffix("/") ? String($0.dropLast()) : $0 }
         if let f = p["fixArm64e"] as? Bool { fixArm64e = f }
+        if let k = p["keepBundleId"] as? Bool { keepBundleID = k } // F237: absent keeps it (the default)
     }
 
     static func validBundleID(_ s: String) -> Bool {

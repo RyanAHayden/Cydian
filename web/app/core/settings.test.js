@@ -33,7 +33,7 @@ test("defaults with nothing stored", () => {
 test("F128: exactly these settings remain, and the retired ones are gone", () => {
   assert.deepEqual(SETTINGS.map((d) => d.key), ["appearance", "lightTheme", "darkTheme", "device", "arch", "worksOnMyPhone", "compatMarks",
     "iosVersion", "refreshOnLaunch", "returnHome", "holds", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
-    "keepVersions", "showExpiry", "resignReminder"]);
+    "keepVersions", "showExpiry", "resignReminder", "keepBundleId"]);
   assert.deepEqual(RETIRED, ["sideloader", "checkUpdates", "cellular", "notifications", "badge", "allowZoom"]);
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
   for (const k of RETIRED) {
@@ -78,6 +78,7 @@ test("F128: pages like iOS 6's Settings: General, Theme, Updates (Signing in the
     ["general", "General", [["device", "iosVersion"], compat, ["refreshOnLaunch", "returnHome"]]],
     theme,
     ["updates", "Updates", [["holds"]]],
+    ["signing", "Signing", [["keepBundleId"]]], // F237: the website signs too
   ]);
   assert.deepEqual(layout("jailbreak"), [
     ["general", "General", [compat, ["refreshOnLaunch", "returnHome"]]],
@@ -88,7 +89,7 @@ test("F128: pages like iOS 6's Settings: General, Theme, Updates (Signing in the
     ["general", "General", [compat, ["refreshOnLaunch", "returnHome"]]],
     theme,
     ["updates", "Updates", [["holds"]]],
-    ["signing", "Signing", [["showExpiry", "resignReminder"]]],
+    ["signing", "Signing", [["showExpiry", "resignReminder", "keepBundleId"]]],
   ]);
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
   assert.equal(s.pageOf("theme").title, "Theme");
@@ -245,12 +246,12 @@ test("holds: the helper is only used in jailbreak mode", async () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "returnHome", "holds"]);
+    ["appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "refreshOnLaunch", "returnHome", "holds", "keepBundleId"]);
   assert.deepEqual(show("jailbreak"),
     ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds",
       "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
-    ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "showExpiry", "resignReminder"]);
+    ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "showExpiry", "resignReminder", "keepBundleId"]);
 });
 
 test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone, Ignored Upgrades and Automatic Installs", () => {
@@ -475,7 +476,7 @@ test("F134: Show Expiry Dates is a switch on Settings > Signing, on by default, 
   assert.equal(d.label, "Show Expiry Dates");
   const s = createSettings({ storage: memStorage(), mode: "sideload" });
   assert.equal(s.get("showExpiry"), true);
-  assert.deepEqual(s.sections().find((x) => x.page === "signing").settings.map((x) => x.key), ["showExpiry", "resignReminder"]);
+  assert.deepEqual(s.sections().find((x) => x.page === "signing").settings.map((x) => x.key), ["showExpiry", "resignReminder", "keepBundleId"]);
   s.set("showExpiry", false);
   assert.equal(s.get("showExpiry"), false);
   for (const mode of ["site", "jailbreak"]) assert.equal(createSettings({ storage: memStorage(), mode }).isShown("showExpiry"), false, mode);

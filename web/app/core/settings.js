@@ -27,6 +27,7 @@
 import { ARCHES, DEFAULT_ARCH } from "./apt.js";
 import { IOS_VERSIONS, JAILBREAK_ARCH } from "./compat.js";
 import { NAME } from "../brand.js";
+import { OLD_WAY_ALERT } from "./keepid.js";
 
 export const MODES = ["site", "jailbreak", "sideload"];
 
@@ -37,7 +38,7 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // "upgrade-notifications": Upgrade Notifications, N5's daemon's "n Upgrades" in the jailbreak app (F65).
 // "auto-install", "rollback": N7's Automatic Installs rows, which F70 hands to the daemon (daemonPrefs below).
 export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device", "resign", "upgrade-notifications",
-  "auto-install", "rollback"]);
+  "auto-install", "rollback", "keep-id"]); // "keep-id": Keep Bundle IDs (F237)
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
@@ -220,6 +221,14 @@ export const SETTINGS = [
       { value: 3, label: "3 Days Before" }, { value: 7, label: "7 Days Before" },
     ],
     footer: "Reminds you before an app's signature expires.",
+  },
+  {
+    // F237 (core/keepid.js): a signed app keeps its own bundle ID (the profile's App ID goes in its entitlements only).
+    // Both builds that sign; Custom Install has the same switch per app. Turning it off asks first (confirmOff,
+    // screens/settings.js makeSwitch).
+    key: "keepBundleId", section: "signing", kind: "toggle", feature: "keep-id", modes: ["site", "sideload"], default: true,
+    label: "Keep Bundle IDs", options: onOff, confirmOff: OLD_WAY_ALERT,
+    footer: "Apps keep their own IDs and notifications. Off: a copy under your ID.",
   },
 ];
 

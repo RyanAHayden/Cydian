@@ -220,6 +220,7 @@ export function parseProfile(buf) {
     udids: Array.isArray(p.ProvisionedDevices) ? p.ProvisionedDevices.map(String) : [], // F236
     allDevices: p.ProvisionsAllDevices === true,
     getTaskAllow: ent["get-task-allow"] === true,
+    push: typeof ent["aps-environment"] === "string" && ent["aps-environment"] ? ent["aps-environment"] : null, // F237
     certs,
   };
 }
@@ -547,7 +548,10 @@ export function installParams(info, edits = {}) {
   const name = String(edits.name ?? "").trim();
   if (name && name !== app.name) p.name = name;
   const id = String(edits.bundleId ?? "").trim();
-  if (id && id !== (info.signsAs ?? app.bundleId)) {
+  // F237: the sheet's Keep Bundle ID switch always goes (it wins over the global setting); the ID it compares with
+  // is what that choice signs as.
+  if (typeof edits.keepBundleId === "boolean") p.keepBundleId = edits.keepBundleId;
+  if (id && id !== signsAsFor(info, p.keepBundleId)) {
     if (!validBundleId(id)) throw new Error(`"${id}" isn't a bundle ID (letters, digits, - and ., like com.you.app).`);
     p.bundleId = id;
   }
@@ -566,7 +570,16 @@ export function validBundleId(s) {
 
 // The bundle ID iOS will know the app by, for signing.progress: what signing.install answered, else what was asked
 // or what inspect said it would sign as.
-export const installedId = (result, params, info) => result?.bundleId || params?.bundleId || info?.signsAs || info?.app?.bundleId || "";
+export const installedId = (result, params, info) => result?.bundleId || params?.bundleId || signsAsFor(info, params?.keepBundleId) || "";
+
+// F237: what signing.inspect's app signs as with Keep Bundle IDs `keep` (undefined: as inspect answered, signsAs).
+// Kept: its own ID. Not: the profile's (appIdAs; an older shell's signsAs was always that).
+export function signsAsFor(info, keep) {
+  const own = info?.app?.bundleId;
+  if (keep === true) return own || info?.signsAs || "";
+  if (keep === false) return info?.appIdAs || info?.signsAs || own || "";
+  return info?.signsAs || own || "";
+}
 
 const DAY = 24 * 60 * 60 * 1000;
 

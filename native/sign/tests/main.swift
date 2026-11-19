@@ -254,7 +254,9 @@ test("re-sign a signed IPA (the old LC_CODE_SIGNATURE is replaced)") {
 test("sign with an explicit profile: renamed, extensions removed") {
     let profile = try Profile(try fixture("profile-explicit.mobileprovision"))
     let out = work.appendingPathComponent("signed-explicit.ipa")
-    let app = try IPASigner(profile: profile, identity: identity).sign(fixtures.appendingPathComponent("rich.ipa"), to: out)
+    let old = IPASigner(profile: profile, identity: identity)
+    old.options.keepBundleID = false // F237: the old way (Keep Bundle IDs off)
+    let app = try old.sign(fixtures.appendingPathComponent("rich.ipa"), to: out)
     check(app.bundleID == "com.me.fixture" && app.originalBundleID == "dev.ifizbox.fixture", "\(app.bundleID)")
     check(app.removed == ["PlugIns/Share.appex"], "removed \(app.removed)")
     let f = try entries(out)
@@ -264,6 +266,38 @@ test("sign with an explicit profile: renamed, extensions removed") {
     check(info?["CFBundleIdentifier"] as? String == "com.me.fixture", "Info.plist renamed")
     try verifySigned(f[a + "Fixture"]!, name: "Fixture-explicit", expectIdent: "com.me.fixture", team: team,
                      info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
+}
+
+// F237 (R25): Keep Bundle IDs, the default. Info.plist and every code signature's identifier keep the app's own IDs;
+// the app and its extension carry the profile's App ID as application-identifier and keychain group.
+test("sign with an explicit profile, bundle ID kept") {
+    let profile = try Profile(try fixture("profile-explicit.mobileprovision"))
+    let out = work.appendingPathComponent("signed-kept.ipa")
+    let app = try IPASigner(profile: profile, identity: identity).sign(fixtures.appendingPathComponent("rich.ipa"), to: out)
+    check(app.bundleID == "dev.ifizbox.fixture" && app.originalBundleID == "dev.ifizbox.fixture", "\(app.bundleID)")
+    check(app.removed.isEmpty, "extensions kept: \(app.removed)")
+    let f = try entries(out)
+    let a = "Payload/Fixture.app/"
+    let info = try PropertyListSerialization.propertyList(from: f[a + "Info.plist"]!, format: nil) as? [String: Any]
+    check(info?["CFBundleIdentifier"] as? String == "dev.ifizbox.fixture", "Info.plist keeps its ID")
+    let share = try PropertyListSerialization.propertyList(from: f[a + "PlugIns/Share.appex/Info.plist"]!, format: nil) as? [String: Any]
+    check(share?["CFBundleIdentifier"] as? String == "dev.ifizbox.fixture.share", "the extension keeps its ID")
+    try verifySigned(f[a + "Fixture"]!, name: "Fixture-kept", expectIdent: "dev.ifizbox.fixture", team: team,
+                     info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
+    try verifySigned(f[a + "PlugIns/Share.appex/Share"]!, name: "Share-kept", expectIdent: "dev.ifizbox.fixture.share", team: team,
+                     info: f[a + "PlugIns/Share.appex/Info.plist"], resources: f[a + "PlugIns/Share.appex/_CodeSignature/CodeResources"], ents: true)
+    for (bin, what) in [(a + "Fixture", "app"), (a + "PlugIns/Share.appex/Share", "extension")] {
+        let s = readSignature(f[bin]!)!
+        let e = try PropertyListSerialization.propertyList(from: s.ents.subdata(in: 8..<s.ents.count), format: nil) as? [String: Any]
+        check(e?["application-identifier"] as? String == "\(team).com.me.fixture", "\(what): application-identifier \(String(describing: e?["application-identifier"]))")
+        check(e?["keychain-access-groups"] as? [String] == ["\(team).com.me.fixture"], "\(what): keychain group")
+        check(e?["get-task-allow"].flatMap(plistBool) == false, "\(what): not debuggable")
+    }
+    // a prefix wildcard narrows the App ID in the entitlements, Info.plist still keeps the app's
+    let pre = try Profile(try fixture("profile-prefix.mobileprovision"))
+    let ids = try pre.signingIDs(for: "io.other.openmx", keep: true)
+    check(ids.bundleID == "io.other.openmx" && ids.entitlementsID == "com.me.openmx", "prefix kept \(ids)")
+    check(try pre.signingIDs(for: "io.other.openmx", keep: false).bundleID == "com.me.openmx", "prefix old way")
 }
 
 test("an unsigned binary gets LC_CODE_SIGNATURE") {

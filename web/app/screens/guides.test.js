@@ -48,10 +48,11 @@ const draw = (path, opts = {}) => { const body = document.createElement("div"); 
 
 test("F157: guide routes and titles, full and lite", () => {
   assert.deepEqual(g.guideIds(false), ["faq", "copying", "openssh", "password"]);
-  assert.deepEqual(g.guideIds(true), ["faq", "copying"]);
+  assert.deepEqual(g.guideIds(true), ["faq", "copying", "keep-bundle-id"]); // F237: where apps are signed
   assert.deepEqual(g.guideRows(undefined, false).map((r) => r.href),
     ["#/home/guides/faq", "#/home/guides/copying", "#/home/guides/openssh", "#/home/guides/password"]);
-  assert.deepEqual(g.guideRows(undefined, true).map((r) => r.label), ["Frequently Asked Questions", "Copying Files to/from Device"]);
+  assert.deepEqual(g.guideRows(undefined, true).map((r) => r.label), ["Frequently Asked Questions", "Copying Files to/from Device",
+    "Notifications for Signed Apps"]);
   assert.equal(g.nav({ path: ["guides"] }, false).title, "User Guides");
   assert.equal(g.nav({ path: ["guides", "openssh"] }, false).title, "OpenSSH");
   assert.equal(g.nav({ path: ["guides", "password"] }, false).title, "Root Password");
@@ -69,7 +70,7 @@ test("F157: guide routes and titles, full and lite", () => {
 test("F157: Home uses the lite guide rows while Not Jailbroken", async () => {
   const rows = home.homeLinks().find((s) => s.header === "User Guides").rows;
   // the tests run as the website with Settings > Device unset: Not Jailbroken
-  assert.deepEqual(rows.map((r) => r.label), ["Frequently Asked Questions", "Copying Files to/from Device"]);
+  assert.deepEqual(rows.map((r) => r.label), ["Frequently Asked Questions", "Copying Files to/from Device", "Notifications for Signed Apps"]);
 });
 
 test("F157: the FAQ's groups, answer pages and their Next rows", () => {
@@ -252,4 +253,19 @@ test("F176: no iTunes File Sharing; Mac, Windows and Linux rows in both builds",
   assert.match(sub(full, "Linux"), /sftp:\/\/.*FileZilla/);
   assert.match(sub(full, "Windows", 1), /Apple Devices/);
   for (const v of ["SFTP", "iPhone's IP", "mobile", "22"]) assert.ok(full.textContent.includes(v), v);
+});
+
+test("F237: Notifications for Signed Apps: R25's steps, opened from Settings > Signing and Custom Install in any mode", () => {
+  assert.equal(g.keepGuideHref(), "#/home/guides/keep-bundle-id");
+  assert.equal(g.guidePage(["guides", "keep-bundle-id"], false).page, "guide", "linked: opens in the jailbreak mode too");
+  assert.equal(g.guideIds(false).includes("keep-bundle-id"), false, "but not listed where nothing is signed");
+  assert.equal(g.nav({ path: ["guides", "keep-bundle-id"] }, true).title, "Notifications");
+  const page = draw(["guides", "keep-bundle-id"], { lite: true, store: { getItem: () => null, setItem: () => {} } });
+  assert.deepEqual(byClass(page, "guide-step-title").map((t) => t.textContent),
+    ["Make an App ID with Push", "Register Your iPhones", "Make an Ad Hoc Profile", "Import It", "Install the App"]);
+  assert.match(page.textContent, /explicit App ID.*Ad Hoc/);
+  assert.match(page.textContent, /Tick Push Notifications/);
+  assert.match(page.textContent, /UDID/);
+  assert.match(page.textContent, /delete it first/);
+  assert.ok(page.textContent.includes("Settings > Signing"));
 });

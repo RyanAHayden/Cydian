@@ -463,7 +463,7 @@ async function uploads(req, u, env, ttl, ctx = null) {
 
 // B95: app.ipa's bytes, part by part from KV into `out`. A part sent whole is KV's own stream piped natively (no JS per
 // chunk, no copy: a 104 MB app copied through JS ran into the Worker's CPU limit); only a Range's first and last
-// part, cut, go through JS, as views of the part read. F190: started with the first part, finished once the app's
+// part, cut, go through pipeCut (streamed, never read whole). F190: started with the first part, finished once the app's
 // last byte is handed over (a Range that stops short of it isn't the end).
 async function upPump(env, t, meta, start, end, n, ttl, out, bodyWait) {
   if (bodyWait) {
@@ -474,18 +474,39 @@ async function upPump(env, t, meta, start, end, n, ttl, out, bodyWait) {
   for (let i = Math.floor(start / meta.partSize); i <= last; i++) {
     const from = i * meta.partSize, size = partLen(meta, i);
     const a = Math.max(0, start - from), b = Math.min(size, end - from + 1);
-    const whole = a === 0 && b === size;
-    const data = await env.HOSTED.get(partKey(t, i), { type: whole ? "stream" : "arrayBuffer" });
+    const data = await env.HOSTED.get(partKey(t, i), { type: "stream" });
     if (!data) throw new Error("expired");
     if (i === Math.floor(start / meta.partSize)) await markIos(env, t, "started", ttl);
-    if (whole) await data.pipeTo(out, { preventClose: true });
-    else {
-      const w = out.getWriter();
-      try { await w.write(new Uint8Array(data, a, b - a)); } finally { w.releaseLock(); }
-    }
+    if (a === 0 && b === size) await data.pipeTo(out, { preventClose: true });
+    else await pipeCut(data, a, b, size, out);
   }
   if (end === n - 1) await markIos(env, t, "finished", ttl);
   await out.close();
+}
+
+// B96: bytes a..b of a part's KV stream (size bytes) into `out`, without reading the part whole (a 20 MB arrayBuffer
+// per cut part cost a Range ~37 ms of Worker CPU). Chunks before `a` are dropped as they come; from the chunk holding
+// `a`, a cut that runs to the part's end hands the rest to a native pipe, and one that stops short cancels KV's
+// stream once it has `b`. Chunks go on as views, never copied.
+async function pipeCut(data, a, b, size, out) {
+  const rd = data.getReader(), w = out.getWriter();
+  let pos = 0, native = false;
+  try {
+    while (pos < b) {
+      const { done, value } = await rd.read();
+      if (done) throw new Error("part cut short");
+      const c = value instanceof Uint8Array ? value : new Uint8Array(value);
+      const lo = Math.max(0, a - pos), hi = Math.min(c.byteLength, b - pos);
+      pos += c.byteLength;
+      if (hi > lo) await w.write(lo === 0 && hi === c.byteLength ? c : c.subarray(lo, hi));
+      if (pos >= a && b === size && pos < b) { native = true; break; }
+    }
+  } finally {
+    w.releaseLock();
+    if (!native) rd.cancel().catch(() => {}); // stops KV's read past b (and releases the stream)
+    else rd.releaseLock();
+  }
+  if (native) await data.pipeTo(out, { preventClose: true });
 }
 
 // F121: how long a reserved link's requests wait (ms), and how often they look again. iOS asks for the manifest the

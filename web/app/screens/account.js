@@ -19,6 +19,7 @@ import { format, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { copyText } from "../nav/menu.js";
+import { onPageOpen } from "../nav/pagestate.js";
 import { qrSvg } from "../core/qr.js";
 import { createAccountSync, keyLink, parseKey, identityOf, identityFiles, ACCOUNT_BASE } from "../core/account.js";
 import { detectMode, TRAVELS } from "../core/settings.js";
@@ -196,6 +197,9 @@ const KEY_WARNING = `Save this key somewhere safe. It is the only way into your 
 const CERT_FOOTER = `Your certificate is encrypted with your account key before it leaves this device: ${DOMAIN} can't read it. Off takes it out of your account.`;
 
 let reveal = false; // Show Account Key: the key's group stays open until the page is left
+// B43: an Account page pushed again opens with the key hidden (nav/pagestate.js).
+export const isAccountPage = (r) => r.tab === "settings" && r.path.length === 1 && r.path[0] === "account";
+onPageOpen(isAccountPage, () => { reveal = false; });
 
 export async function drawAccount(el) {
   pages.add(el);

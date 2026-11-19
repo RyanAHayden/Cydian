@@ -13,6 +13,7 @@
 import { grouped, placeholder, el, segments } from "../nav/ui.js";
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
+import { onPageOpen } from "../nav/pagestate.js";
 import { showSheet } from "../nav/sheet.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
@@ -1545,9 +1546,12 @@ export const TOP_LIMIT = 25;
 export const WEEK_DAYS = 7;
 const SECTION_ICON = (name) => `icons/sections/${name}.png`;
 
-// The choice lives for the session; the page on screen.
+// The choice and the page on screen. B43: each Browse page keeps its own choice (page.filter), so Back finds it as it
+// was left; a Browse page pushed again (from Home or anywhere) opens on Featured (nav/pagestate.js).
 const browseHome = { filter: "featured", page: null };
 export const browseFilterNow = () => browseHome.filter;
+export const isBrowseHome = (route) => route.tab === "home" && route.path.length === 1 && route.path[0] === "browse";
+onPageOpen(isBrowseHome, () => { browseHome.filter = BROWSE_FILTERS[0].id; });
 
 // The Browse page's nav bar: "Browse" (also the back button of the pages above it).
 export function browseHomeNav() {
@@ -1555,18 +1559,23 @@ export function browseHomeNav() {
 }
 
 // The bar at the top of the page: Featured | New | Top 25 (Search's scope bar and segments).
-function filterBar() {
+function filterBar(page) {
   const bar = el("div", "search-scope browse-scope");
   bar.append(segments(BROWSE_FILTERS.map((f) => f.id), Object.fromEntries(BROWSE_FILTERS.map((f) => [f.id, f.label])),
-    browseHome.filter, (id) => setBrowseFilter(id)));
+    page.filter, (id) => setBrowseFilter(id, page)));
   return bar;
 }
 
-// Shows filter `id` (unknown ids: Featured): the page on screen redraws in place, its bar showing the choice.
-export function setBrowseFilter(id) {
+// Shows filter `id` (unknown ids: Featured) on `page` (the last Browse page drawn): it redraws in place, its bar
+// showing the choice.
+export function setBrowseFilter(id, page = browseHome.page) {
   const f = browseFilter(id);
   browseHome.filter = f.id;
-  if (browseHome.page?.body.isConnected) drawBrowseHome(browseHome.page);
+  if (page) {
+    page.filter = f.id;
+    browseHome.page = page;
+    if (page.body.isConnected) drawBrowseHome(page);
+  }
   return f.id;
 }
 
@@ -1581,7 +1590,7 @@ export function filterView(id, { fresh, popular }) {
 
 // `opts`: { jailbroken, featured: () => rows (the sources' featured packages), headers: rows -> items (New's days) }.
 export function renderBrowseHome(body, route, opts = {}) {
-  const page = { body, route, turn: 0, list: null, ...opts };
+  const page = { body, route, turn: 0, list: null, filter: browseHome.filter, ...opts };
   browseHome.page = page;
   return drawBrowseHome(page);
 }
@@ -1591,10 +1600,10 @@ function drawBrowseHome(page) {
   page.list?.destroy();
   page.list = null;
   const { body } = page;
-  const featured = browseHome.filter === "featured";
+  const featured = page.filter === "featured";
   body.classList.toggle("grouped", featured);
   body.classList.toggle("plain", !featured);
-  page.bar = filterBar();
+  page.bar = filterBar(page);
   body.replaceChildren(page.bar);
   body.scrollTop = 0;
   return featured ? drawFeatured(page, turn) : drawFilterList(page, turn);
@@ -1602,7 +1611,7 @@ function drawBrowseHome(page) {
 
 async function drawFilterList(page, turn) {
   const { body, route } = page;
-  const v = filterView(browseHome.filter, { fresh: catalog.fresh, popular: catalog.popular });
+  const v = filterView(page.filter, { fresh: catalog.fresh, popular: catalog.popular });
   body.append(placeholder("list", 8));
   let rows;
   try {

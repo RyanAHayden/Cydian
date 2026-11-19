@@ -67,6 +67,7 @@ import { resignJob } from "../core/appqueue.js";
 import { deviceError } from "../core/signing.js";
 import { getBackend } from "../backend.js";
 import { liveHUD } from "../nav/hud.js";
+import { onPageOpen } from "../nav/pagestate.js";
 
 // B46: Delete means what it says (user 2026-11-18: "I swiped and deleted an app in Installed and it just got rid of the
 // icon, I had to remove it again"). In the jailbreak app, an app the helper sees in installd's containers (`actual`, I4)
@@ -192,6 +193,16 @@ export function pageKind(route, mode = detectMode()) {
   if (!route.path.length) return "apps";
   return route.path.length === 1 && route.path[0] === DPKG && mode === "site" ? "dpkg" : "browse";
 }
+
+// B43: a page pushed onto the stack opens on its defaults (nav/pagestate.js): the apps page on User with an empty
+// field and out of Edit (jailbreak: pushed from Installed), the dpkg page on User / All (the site: pushed from
+// Installed), the Wish List out of Edit. A tab root is built once, so Installed's own root keeps its choice; Back
+// rebuilds nothing, so a page below keeps what it showed.
+onPageOpen((r) => r.tab === "installed" && pageKind(r) === "apps", () => Object.assign(appView, { mode: "user", query: "", editing: false }));
+onPageOpen((r) => r.tab === "installed" && pageKind(r) === "dpkg", () => Object.assign(state, { mode: "user", type: "All", query: "" }));
+onPageOpen((r) => r.tab === "installed" && pageKind(r) === "wishlist", () => { wishView.editing = false; });
+// The live state objects, for tests.
+export const pageStates = () => ({ apps: appView, dpkg: state, wish: wishView });
 
 export function init() {
   catalog.onChange(() => {

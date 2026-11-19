@@ -19,6 +19,7 @@ import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
 import { makeScrollToTop } from "./nav/statusbar.js";
+import { pageOpened } from "./nav/pagestate.js";
 import * as home from "./screens/home.js";
 import * as sources from "./screens/sources.js";
 import * as changes from "./screens/changes.js";
@@ -92,7 +93,8 @@ function button(spec, cls) {
 function makePage(tab, path) {
   const route = mounted({ tab, path }); // another tab's page opened here (router.js mounted): that screen draws it
   const screen = SCREENS[route.tab];
-  const info = (screen.nav && screen.nav(route, ctx)) || {};
+  pageOpened(route); // B43: a page built here starts on its default segment, filter or pane (nav/pagestate.js)
+  const info =(screen.nav && screen.nav(route, ctx)) || {};
   const below = stacks.stack(tab).at(-1);
   const title = info.title ?? screen.title;
 

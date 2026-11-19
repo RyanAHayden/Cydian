@@ -4,9 +4,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { browsePage, nav, BROWSE_SUBTITLE } from "./home.js";
-import { BROWSE_FILTERS, browseFilter, browseFilterNow, setBrowseFilter, filterView, TOP_LIMIT, heroTint, storeLabel } from "./browse.js";
+import { BROWSE_FILTERS, browseFilter, browseFilterNow, setBrowseFilter, filterView, TOP_LIMIT, heroTint, storeLabel, isBrowseHome } from "./browse.js";
+import { pageOpened } from "../nav/pagestate.js";
+import { createStacks } from "../nav/stack.js";
+import { mounted } from "../router.js";
 
-test("the bar offers Featured, New and Top 25; the choice sticks and unknown ones mean Featured", () => {
+test("the bar offers Featured, New and Top 25; unknown ones mean Featured", () => {
   assert.deepEqual(BROWSE_FILTERS.map((f) => f.label), ["Featured", "New", "Top 25"]);
   assert.equal(browseFilter("nope").id, "featured");
   assert.equal(browseFilterNow(), "featured", "Browse opens on Featured");
@@ -14,6 +17,26 @@ test("the bar offers Featured, New and Top 25; the choice sticks and unknown one
   assert.equal(browseFilterNow(), "top");
   assert.equal(setBrowseFilter("new"), "new");
   assert.equal(setBrowseFilter("bogus"), "featured");
+});
+
+test("B43: a Browse page pushed again opens on Featured; Back keeps its choice; other pages don't reset it", () => {
+  const stacks = createStacks({ tabs: ["home", "search"], create: (tab, path) => { pageOpened(mounted({ tab, path })); return {}; } });
+  stacks.sync({ tab: "home", path: [] });
+  stacks.sync({ tab: "home", path: ["browse"] });
+  assert.equal(browseFilterNow(), "featured");
+  setBrowseFilter("top");
+  stacks.sync({ tab: "home", path: ["browse", "package:com.x"] });
+  assert.equal(browseFilterNow(), "top", "a package page above leaves it");
+  stacks.sync({ tab: "home", path: ["browse"] });
+  assert.equal(browseFilterNow(), "top", "Back from a package: still Top 25");
+  stacks.sync({ tab: "search", path: [] });
+  stacks.sync({ tab: "home", path: ["browse"] });
+  assert.equal(browseFilterNow(), "top", "a tab switch keeps it");
+  stacks.sync({ tab: "home", path: [] });
+  stacks.sync({ tab: "home", path: ["browse"] });
+  assert.equal(browseFilterNow(), "featured", "Home > Browse again: Featured");
+  assert.ok(isBrowseHome({ tab: "home", path: ["browse"] }));
+  assert.ok(!isBrowseHome({ tab: "home", path: ["browse", "new"] }));
 });
 
 test("each choice's rows: New is F124's New list, Top 25 is Popular ranked and cut at 25", async () => {

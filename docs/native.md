@@ -1,6 +1,7 @@
-# Native app: decision
+# Native app
 
-Decided by the user on 2026-11-17. R3 fills in the open questions at the bottom; the shape itself is settled.
+The shape, how it holds 120 Hz, how it is built on Linux, how it gets root, the bridge, the launch screen and links
+out of the app.
 
 ## Shape
 
@@ -13,7 +14,7 @@ web/app/            one frontend: HTML, CSS, vanilla JS (ES modules, no build st
   backend-http.js   on the site: talks to the Worker (fetch proxy, install server)
   backend-native.js in the app: talks to Swift over window.webkit.messageHandlers
 worker/             the Cloudflare Worker behind ifizbox.com: serves web/app/, the SSRF-safe fetch proxy
-                    (/api/fetch) and the install server (/sign/*). Thin; no server of our own (F89).
+                    (/api/fetch) and the install server (/sign/*). Thin; no server of our own.
 native/             Swift shell, root helper, daemon
 ```
 
@@ -33,30 +34,29 @@ helper. Parsing, Changes, upgrades and search all run in `core/` in both places.
 - Heavy parsing (`Packages` files are megabytes) runs in a Web Worker, so the UI thread never blocks. The parsed
   index is cached in IndexedDB.
 - Navigation has to feel native: push/pop with the iOS curve and parallax, and an interactive edge-swipe back that
-  follows the finger. R3 decides how (see below).
+  follows the finger (how: "1. Navigation" below).
 - Taps react instantly (`touch-action: manipulation`, active states on `pointerdown`), with no text-selection or
   callout surprises, and the scroll bounce matches iOS.
 
 ## Targets
 
 - The upcoming iOS 27 jailbreak first, and older jailbreakable versions too, since more phones run them:
-  rootless (`/var/jb`, Dopamine, palera1n) from iOS 15 up. Deployment target iOS 15. arm64 only (R3: an app, its
+  rootless (`/var/jb`, Dopamine, palera1n) from iOS 15 up. Deployment target iOS 15. arm64 only (an app, its
   helper and its daemon run as arm64 on arm64e phones; arm64e is only needed for code injected into system processes).
 - The iPhone 4S (iOS 6) is a reference device only. It never runs iFizBox.
 
 
-## R3 answers (2026-11-17)
+## How it's built
 
-The spikes, their build and the traces are in `native/spike/` (README there). Journal:
-`journal/2026-11-17-r3-native-spikes/`.
+The navigation spikes, their build and the traces are in `native/spike/` (README there).
 
 ### 1. Navigation: (a) one WKWebView, JS stack and JS swipe-back
 
-**Picked: (a).** No ProMotion phone was available to this run. A note relayed from the user during the run (by
-another agent session) dropped the on-phone measurement: pick from reasoning plus desktop WebKit/Chromium traces.
-So the choice rests on how WebKit draws on iOS plus desktop traces of both spikes. `native/spike/build.sh` makes an unsigned IPA of the
-spikes with an on-device meter, so the phone numbers can be added whenever a ProMotion phone is free (see
-"Measuring on a phone" below).
+iFizBox uses (a): one WKWebView with a JS navigation stack and a JS swipe-back, rather than (b), native
+UINavigationController/UITabBarController with pooled WKWebViews. The choice rests on how WebKit draws on iOS plus
+desktop WebKit/Chromium traces of both spikes; there are no ProMotion phone numbers. `native/spike/build.sh` makes
+an unsigned IPA of the spikes with an on-device meter, so phone numbers can be taken (see "Measuring on a phone"
+below).
 
 Why (a):
 
@@ -75,7 +75,7 @@ Why (a):
   2 frames at 60 Hz in Chromium and 17–40 ms in WebKitGTK. That's before Swift's `evaluateJavaScript` hop, which
   the trace doesn't include. A push either waits for it (tap latency) or slides in a view that's still blank or stale.
 
-What (a) must do to hold 120 Hz (N1 builds it like this):
+What (a) does to hold 120 Hz:
 
 - `CADisableMinimumFrameDurationOnPhone = YES` (Info.plist).
 - **Switch off WebKit's "prefer page rendering updates near 60 fps".** It's on by default on iOS and keeps
@@ -95,7 +95,7 @@ What (a) must do to hold 120 Hz (N1 builds it like this):
 - **Fallback if a phone shows the JS swipe lagging the finger:** make the back gesture a native scroll. The top two
   screens sit in a horizontal `overflow-x: scroll` + `scroll-snap` box, and the pop fires on `scrollend` at the left
   snap point. It follows the finger at 120 Hz with no JS per frame. Parallax then needs scroll-driven animations
-  (Safari 26+) and is left out below that. This wasn't built.
+  (Safari 26+) and is left out below that. Not built.
 
 Desktop traces (`native/spike/trace/`: `trace.mjs` for Chromium, `trace_webkit.py` for WebKitGTK; both run
 `trace/scenario.js`: 10 pushes, 9 pops, 10 edge swipes with synthetic pointer events, 3 s of fast scroll on the
@@ -116,11 +116,11 @@ Desktop traces (`native/spike/trace/`: `trace.mjs` for Chromium, `trace_webkit.p
 - WebKitGTK paces frames that change layers from JS (swipe, list re-render) at its offscreen compositor's ~60 Hz,
   and frees rAF up to ~240 Hz when only compositor animations run. That shows the split, not phone timing.
 - Spike B's push, pop and swipe are UIKit's own and can't be traced on a desktop. On a phone they run at 120 Hz in
-  the render server: that part of (b) was never in doubt.
+  the render server: that part of (b) is not in doubt.
 
 **Measuring on a phone.** `native/spike/build.sh` → `native/spike/build/iFizBoxSpike.ipa` (unsigned, about 80 KB,
-arm64, iOS 15+). It needs no jailbreak: sideload it with any signer (Feather, AltStore, SideStore) and install it on the
-iPhone 15 Pro. Its menu has Spike A, Spike B, a probe page and Results. There are two switches: the WebKit 60 fps
+arm64, iOS 15+). It needs no jailbreak: sideload it with any signer (Feather, AltStore, SideStore) onto a ProMotion
+phone. Its menu has Spike A, Spike B, a probe page and Results. There are two switches: the WebKit 60 fps
 preference, and the native CADisplayLink meter (which itself holds the display at 120 Hz).
 
 Protocol, for each spike and with the 60 fps switch both on and off:
@@ -138,14 +138,14 @@ folder in the Files app. Paste the table here when it exists.
 
 ### 2. Building on Linux
 
-**Built and checked here (not on a phone yet): Swift 6.4.2 from swift.org + the iOS 27.1 SDK + rustup's
-`ld64.lld`.** Theos isn't needed. `native/spike/build.sh` is the recipe; N1 copies it.
+**Swift 6.4.2 from swift.org + the iOS 27.1 SDK + rustup's `ld64.lld`.** Theos isn't needed.
+`native/build.sh` builds the app this way (`native/spike/build.sh` is the same recipe, smaller).
 
 - **Toolchain:** the swift.org `ubuntu24.04` tarball, unpacked anywhere. Its compiler (6.4.2) has to read the SDK's
   `.swiftinterface` files (made by Apple Swift 6.4). A different minor version refuses with "this SDK is not
   supported by the compiler". On Arch it wants `libncurses.so.6`; a symlink to `libncursesw.so.6` on
   `LD_LIBRARY_PATH` does it.
-- **SDK:** `iPhoneOS.sdk` extracted from an Xcode `.xip` on Linux by iFizBox's own `tools/ios-sdk.sh` (T3), found
+- **SDK:** `iPhoneOS.sdk` extracted from an Xcode `.xip` on Linux by iFizBox's own `tools/ios-sdk.sh`, found
   through `$IOS_SDK`. On this machine an extracted Xcode 27.1 SDK (iOS 27.1) already exists and `$IOS_SDK` can point at it. It also renames `arm64e.x1` to `arm64` in the
   `.tbd` stubs, which lld needs.
 - **Compile:** `swiftc -parse-as-library -wmo -swift-version 5 -target arm64-apple-ios15.0 -sdk $SDK
@@ -163,16 +163,15 @@ folder in the Files app. Paste the table here when it exists.
   apps, setuid/spawned helpers and launch daemons run as arm64 on arm64e phones, and Procursus' rootless packages
   are arm64. Only tweaks injected into arm64e system processes need arm64e. If iFizBox ever needs it, Theos' Linux
   toolchain (`bin/install-theos`, which ships Apple's ld64 via cctools-port) can link it.
-- **Rootless .deb (N1, not built here):**
+- **Rootless .deb:**
   - Package architecture `iphoneos-arm64`. The app goes in `/var/jb/Applications/iFizBox.app`; the helper and daemon
     under `/var/jb/usr/libexec/ifizbox/` and `/var/jb/Library/LaunchDaemons/`. The postinst runs
     `uicache -p /var/jb/Applications/iFizBox.app`.
-  - `dpkg-deb` isn't on this Arch machine. A .deb is an `ar` of `debian-binary`, `control.tar.xz` and
-    `data.tar.xz`, which Python's stdlib (`tarfile`, plus a 60-byte ar header writer) can produce without new
-    dependencies.
-  - Signing: ad hoc with entitlements (the jailbreak trusts ad hoc code). Use `ldid -S<ents>` (Procursus' ldid builds
-    on Linux) or `rcodesign sign --entitlements-xml-file` (Rust, `cargo install apple-codesign`). Neither is
-    installed yet.
+  - No `dpkg-deb` needed: a .deb is an `ar` of `debian-binary`, `control.tar.xz` and `data.tar.xz`, which
+    `native/mkdeb.py` writes with Python's stdlib (`tarfile`, plus a 60-byte ar header writer).
+  - Signing: ad hoc with entitlements (the jailbreak trusts ad hoc code): `ldid -S<ents>` (Procursus' ldid builds
+    on Linux) or `rcodesign sign --entitlements-xml-file` (Rust, `cargo install apple-codesign`), whichever
+    `build.sh` finds.
 - **The `/var/jb` prefix:**
   - On Dopamine and palera1n rootless, `/var/jb` is a symlink to the real (randomised) prefix, so plain
     `/var/jb/...` paths work.
@@ -183,7 +182,7 @@ folder in the Files app. Paste the table here when it exists.
 
 ### 3. Root: no setuid helper on iOS 15+
 
-**What Sileo and Zebra do** (read from their current source, 2026-11-17):
+**What Sileo and Zebra do** (from their source):
 
 - On iOS 13 and later, neither uses its setuid binary. Both spawn apt directly as root with the persona spawn
   attributes: `posix_spawnattr_set_persona_np(&attr, 99, POSIX_SPAWN_PERSONA_FLAGS_OVERRIDE)` plus
@@ -202,26 +201,24 @@ folder in the Files app. Paste the table here when it exists.
 
 - The app gets those four entitlements. It runs one small helper, `/var/jb/usr/libexec/ifizbox/ifizbox-helper`, as
   root through the persona attributes. The helper has no setuid bit.
-- The helper keeps N2's allowlist: only `apt-get update|install|remove|upgrade` and `dpkg --configure -a`, package
-  names matching `[a-z0-9.+-]+`, no options from the caller (N4 added the queue's `simulate`/`apply`, one
-  `apt-get [-s] install` over `name`, `name=version` and `-name` items, and `respring`: native/helper/README.md). Then it `execv`s apt from the resolved prefix. So all
+- The helper keeps an allowlist: only `apt-get update|install|remove|upgrade` and `dpkg --configure -a`, package
+  names matching `[a-z0-9.+-]+`, no options from the caller, plus the queue's `simulate`/`apply` (one
+  `apt-get [-s] install` over `name`, `name=version` and `-name` items) and `respring`: native/helper/README.md. Then it `execv`s apt from the resolved prefix. So all
   root work goes through one checked place even though the app could spawn anything.
 - **Caller check:** without a setuid bit the helper can't become root unless an entitled process spawns it. Any other
   process running it gets plain `mobile`, and apt fails on the lock files. So the check that matters is the
   entitlement, which the kernel enforces. As defence in depth, the helper still refuses unless `getuid() == 0` and
   its parent's executable (`proc_pidpath(getppid())`) is the same file (device + inode) as
   `<prefix>/Applications/iFizBox.app/iFizBox`.
-- **Does it work on Dopamine and palera1n?** Sileo is the default package manager on both, and it works this way
-  there. That's the evidence; iFizBox itself hasn't been run on either (N6).
+- **Dopamine and palera1n:** Sileo is the default package manager on both, and it works this way there. iFizBox
+  runs on palera1n rootless on the iPhone 7 test phone (docs/iphone7.md); it has not been tried on Dopamine.
 - **For the iOS 27 jailbreak:** it isn't out, so this can't be checked. If it doesn't honour private entitlements
   for ad hoc apps, the fallback is a root LaunchDaemon (`/var/jb/Library/LaunchDaemons`, `UserName root`) holding
   the same allowlist behind a Unix socket. It would check the peer's uid and executable with `LOCAL_PEERPID` +
-  `proc_pidpath`. N5's daemon could take that role.
+  `proc_pidpath`. The `ifizbox-upgrades` daemon could take that role.
 - **Output:** spawn with stdout/stderr pipes and pass apt `-o APT::Status-Fd=3` with fd 3 as a third pipe. Status
   lines (`pmstatus:pkg:percent:text`) give the progress bar; stdout/stderr give the console. Sileo and Zebra both
   read status-fd this way.
-
-N2's text still says "a setuid binary (per R3)"; R3 put a note on N2.
 
 ### 4. Bridge and the offline bundle
 
@@ -246,8 +243,9 @@ N2's text still says "a setuid binary (per R3)"; R3 put a note on N2.
   call per frame, not one per line.
 - The final `exit` event is part of the stream so that JS has it even if the reply overtakes the last `emit`. Both
   travel over WebKit IPC and should stay in order, but the probe counts lines to check.
-- The client is `native/spike/web/bridge.js`; the Swift side is `Bridge` in `native/spike/Sources/Bridge.swift`.
-  `backend-native.js` (N3) builds on them.
+- The client is `native/bridge.js` (`ifizboxNative`), injected before `web/app/` runs; the Swift side is
+  `native/Sources/Bridge.swift`. `backend-native.js` builds on them. The spike's versions are in
+  `native/spike/web/bridge.js` and `native/spike/Sources/Bridge.swift`.
 
 **Offline bundle:**
 
@@ -265,12 +263,11 @@ N2's text still says "a setuid binary (per R3)"; R3 put a note on N2.
   - error rejection.
 - **Not verified** until it runs on a phone (the desktop runs used `http://`).
 
-## Launch screen (N10, 2026-11-17)
+## Launch screen
 
 What opening the app shows before the page draws: Home as it loads, like the website's launch images
 (`tools/launch_images.py`, `web/app/icons/launch/`): the nav bar titled iFizBox, the pinstripes with the Loading
-spinner in the middle, the tab bar with its six icons and Home selected. Before N10 the app showed black
-(`UILaunchScreen` was `{UIColorName: ""}`).
+spinner in the middle, the tab bar with its six icons and Home selected.
 
 **Constraints.** The app is built on Linux: no storyboard (no `ibtool`), no asset catalog (no `actool`, so no
 `Assets.car`). That leaves Info.plist's `UILaunchScreen` dictionary (iOS 14+). Keeping one at all matters: without
@@ -282,11 +279,11 @@ spinner in the middle, the tab bar with its six icons and Home selected. Before 
 bar items and no per-screen image.
 
 - `UIColorName` names a colour set in an asset catalog. A colour has no loose-file form, so without `Assets.car`
-  there is no background colour: leave the key out (an empty one is the old black launch).
+  there is no background colour: leave the key out (an empty one gives a black launch).
 - `UIImageName` is looked up by name in the bundle as `UIImage(named:in:)` does, and that finds loose
   `Name@2x.png`/`Name@3x.png` files in the app's top folder as well as catalog images. Apple's docs only say "an
   image in your asset catalog". **Whether SpringBoard's launch-screen renderer takes loose PNGs is not verified**
-  (no phone in this run): see "If it doesn't work" below.
+  on a phone: see "If it doesn't work" below.
 
 **What iFizBox ships** (`native/Info.plist`, images in `native/launch/`, copied into both the .deb's and the IPA's
 `iFizBox.app/` by `build.sh`):
@@ -321,7 +318,7 @@ centred between the bars, so the Loading block can sit up to about 10 pt off; th
 - The cover and the launch images are the light theme. With Appearance set to Dark the page switches to dark when
   the cover fades (the stored theme lives in the web view's localStorage, which the native side can't read before
   the page loads).
-- F198: the shell keeps the last `app.theme` (`{style, darkPalette}`, UserDefaults `ifizbox.shellTheme`). When that
+- The shell keeps the last `app.theme` (`{style, darkPalette}`, UserDefaults `ifizbox.shellTheme`). When that
   was dark (Dark, or Automatic on a dark iPhone), the window and web view start on the palette's ground (black for
   OLED Black, the dark pinstripes for Gunmetal) instead of the light pinstripes. `Theme.apply` repaints them on every
   change. The system launch screen itself is still light.
@@ -335,7 +332,7 @@ after an update. If the launch still looks old, delete and reinstall the app, or
 
 **If it doesn't work** (the launch is white with white bars, or still black, after a reinstall): SpringBoard didn't
 take loose PNGs, and the images need a compiled `Assets.car`. Only Apple's `actool` writes one (CoreUI's
-undocumented BOM format; no Linux writer exists that I know of), so it takes one Mac run:
+undocumented BOM format; no known Linux writer), so it takes one Mac run:
 
 1. Make `Launch.xcassets/` with `LaunchLoading.imageset`, `LaunchNavBar.imageset`, `LaunchTabBar.imageset` (each
    a `Contents.json` listing the @2x and @3x PNGs from `native/launch/` with `"idiom": "universal"`) and
@@ -346,32 +343,14 @@ undocumented BOM format; no Linux writer exists that I know of), so it takes one
    it into `iFizBox.app/`, and add `UIColorName: LaunchBackground` to `UILaunchScreen` (and drop the `UIColorName`
    refusal in `launch_check.py`). Rebuild it whenever the images change.
 
-## Links out of the app (R8, 2026-11-17)
+## Links out of the app
 
-R8 asked whether `window.open` and `location.href` to https, itms-services and other apps' schemes do anything
-in the shell. That shell (`native/Sources/App.swift`) sets a `WKNavigationDelegate` for the launch cover only (no
-`decidePolicyFor`) and no `WKUIDelegate`. No iOS 15+ phone was reachable from the run, so the answer comes from
-WebKit's source (main, `Source/WebKit/UIProcess/Cocoa/`), not from a tap on a phone:
-
-| What the page does | What WebKit does in this shell | Where iFizBox does it |
-|---|---|---|
-| `window.open(url)` (any scheme) | `UIDelegate::UIClient::createNewPage`: no `webView:createWebViewWithConfiguration:…`, so no new page. `window.open` returns `null`. **Nothing happens.** | Home > Source Code, browse.js More Information, AltStore Website, `installRows`' default opener |
-| `location.href = "itms-services://…"`, `feather://`, `altstore://`, `sidestore://`, `cydia://`, `sileo://`… | `NavigationState::NavigationClient::decidePolicyForNavigationAction`, with the delegate method missing: `NSURLConnection canHandleRequest` says no, and only macOS hands the URL to `NSWorkspace`. On iOS it calls `listener->ignore()`. **Nothing happens.** | AltStore Install / Get / Open in (`screens/altstore.js`), handoff.js Open in, `signing-client.js` (`location.href = body.itms`) |
-| `location.href = "https://…"` | Same path, with `canHandleRequest` true: `listener->use()`. If an app claims the URL as a universal link (`tryInterceptNavigation`, LSAppLink) that app opens. Otherwise **the web view itself loads the site, replacing iFizBox's UI**, and there's no way back (no back gesture, no toolbar) short of killing the app. | `openOutside`'s fallback when the shell has no `app.openURL` |
-| `app.openURL` (F72, Bridge.swift) | `UIApplication.shared.open`: works, but takes **only https and itms-services**, so `feather://` and its kind are refused. | `essential-ui.js` `openOutside` (iFizBox's own update) |
-
-So every link out of the app is dead except F72's. The fix is filed as a B: give the shell a `WKUIDelegate` whose
-`createWebViewWith` hands the URL to `UIApplication.shared.open` and returns nil, and a `decidePolicyFor` that
-lets `ifizbox:` (`AppScheme.scheme`, the bundle) and `about:`/`blob:` load. Any other main-frame scheme goes to
-`UIApplication.shared.open` and is cancelled. That fixes all the call sites with no JS change. Also widen
-`app.openURL` to the schemes the page builds (or leave it alone and let the delegate do the work).
-
-**Check on a phone once the fix lands:** Home > Source Code opens Safari (or the GitHub app). An AltStore app's
-Get or Open in Feather opens Feather, or iOS says no app opens it. Install with a signed link brings up iOS's
-install prompt. More Information opens Safari, and iFizBox stays where it was.
-
-**Fixed in B8 (2026-11-17), not yet tried on a phone.** `WebController` (`native/Sources/App.swift`) is now also
-the web view's `WKUIDelegate`, and `LinkOut` decides:
+Without delegates of its own, WebKit on iOS ignores `window.open` (no new page; it returns `null`) and
+`location.href` to itms-services or another app's scheme (`feather://`, `altstore://`, `cydia://`, `sileo://`…),
+and an `https` link replaces iFizBox's UI with the site, with no way back. (From WebKit's source,
+`Source/WebKit/UIProcess/Cocoa/`: `UIDelegate::UIClient::createNewPage` and
+`NavigationState::NavigationClient::decidePolicyForNavigationAction`.) So `WebController`
+(`native/Sources/App.swift`) is also the web view's `WKUIDelegate`, and `LinkOut` decides:
 
 - `decidePolicyFor`: `ifizbox:`, `about:`, `blob:` and `data:` load in the web view, and so does any subframe
   navigation. Any other main-frame navigation (including a new-window one, `targetFrame == nil`) is cancelled and
@@ -382,4 +361,11 @@ the web view's `WKUIDelegate`, and `LinkOut` decides:
 - `app.openURL` takes any scheme except `ifizbox`, `about`, `blob`, `data`, `javascript` and `file`
   (`LinkOut.canOpen`); it replies `{opened: false}` when no app claims the scheme.
 
-No JS changed: every call site in the table above works through the delegates.
+Every call site works through the delegates, with nothing special in the JS: Home > Source Code, browse.js More
+Information, AltStore Website and `installRows`' default opener (`window.open`); AltStore Install / Get / Open in
+(`screens/altstore.js`), handoff.js Open in and `signing-client.js` (`location.href`); `essential-ui.js`
+`openOutside` (`app.openURL`).
+
+**Not tried on a phone yet.** What to check: Home > Source Code opens Safari (or the GitHub app). An AltStore app's
+Get or Open in Feather opens Feather, or iOS says no app opens it. Install with a signed link brings up iOS's
+install prompt. More Information opens Safari, and iFizBox stays where it was.

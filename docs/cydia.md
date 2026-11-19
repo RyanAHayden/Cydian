@@ -1,23 +1,23 @@
 # Cydia reference
 
 Reference for how Cydia looks and behaves, from the iPhone 4S (iOS 6.1, Cydia 1.1.30) and Cydia's GPLv3 source.
-The behaviour notes (R2) cover source fetching, sections, Changes, depictions, `cydia://` URLs and the install
-queue. They only cover what F2, F4, F6 and N4 need. Device pulls live in `ref/4s/` (gitignored, made by
+The behaviour notes cover source fetching, sections, Changes, depictions, `cydia://` URLs and the install
+queue: what iFizBox's sources, sections, Changes and install queue need. Device pulls live in `ref/4s/` (gitignored, made by
 `tools/pull-4s.sh`).
 
 ## Where this comes from
 
-- Cydia source: `git://git.saurik.com/cydia.git` (the `https://` URL returned 503 on 2026-11-17), HEAD `837b7c8`
-  (May 2019, after v1.1.31). The 4S runs 1.1.30. I checked `git diff v1.1.30 HEAD` for the parts below (headers,
-  add-source check, metadata, Changes, icons, `cydia://`, finish codes): none of them changed.
+- Cydia source: `git://git.saurik.com/cydia.git` (or `https://git.saurik.com/cydia.git`), HEAD `837b7c8`
+  (May 2019, after v1.1.31). The 4S runs 1.1.30. `git diff v1.1.30 HEAD` shows no change in the parts below (headers,
+  add-source check, metadata, Changes, icons, `cydia://`, finish codes).
 - Refresh HTTP: saurik's `apt-legacy` (submodule `apt32`, `9439ca0`), `methods/http.cc`. Cydia 1.1.30 calls the
-  device's apt7 0.7.25.3 methods. apt7 is the same Telesphoreo code, but I didn't read the binary on the phone.
+  device's apt7 0.7.25.3 methods. apt7 is the same Telesphoreo code (the binary on the phone is not read).
 - Package page, Confirm sheet and console: web pages from `https://cydia.saurik.com/ui/ios~iphone/1.1/`, read from
   the 4S's `ApplicationCache.db` (`ref/4s/var/mobile/Library/Caches/com.saurik.Cydia/`). They are saurik's server
   pages, not part of the GPL repo. This doc describes what they do; don't copy their code.
 - Line numbers below are `MobileCydia.mm` at `837b7c8`.
 
-## Fetching a source (F2, F4)
+## Fetching a source
 
 ### What a source is
 
@@ -32,7 +32,7 @@ queue. They only cover what F2, F4, F6 and N4 need. Device pulls live in `ref/4s
   or from the web bridge `cydia.addSource(href, dist, sections)`.
 - On first run (`CydiaVersion` 0) Cydia adds BigBoss (`http://apt.thebigboss.org/repofiles/cydia/ stable main`),
   ModMyi (`http://apt.modmyi.com/ stable main`) and ZodTTD (`http://cydia.zodttd.com/repo/cydia/ stable main`).
-  iFizBox's defaults are F4's list instead.
+  iFizBox has its own list of defaults instead.
 - At launch, Cydia drops keys that contain `#` or a space, and URIs that don't end in `/`.
 
 ### Add Source check (`SourcesController`, l.7856–7870, 7726–7808)
@@ -51,7 +51,7 @@ queue. They only cover what F2, F4, F6 and N4 need. Device pulls live in `ref/4s
 5. On success Cydia saves the source as flat (`./`) and refreshes at once ("Updating Sources").
 
 So Cydia rejects a flat repo that only serves `Packages`, `Packages.xz`, `Packages.lzma` or `Packages.zst`. It
-also rejects any dists-style URL. For iFizBox's add-source check (F4), try `Packages.bz2`, `.gz`, `.xz`, `.lzma`,
+also rejects any dists-style URL. For iFizBox's add-source check, try `Packages.bz2`, `.gz`, `.xz`, `.lzma`,
 `.zst` and plain `Packages`, then `Release`. Modern repos often only have `.xz`/`.zst`. Keep Cydia's alert
 wording.
 
@@ -105,7 +105,7 @@ wording.
   On the 4S that should be something like
   `… Version/6.0 Mobile/10B329 Safari/8536.25 Cydia/1.1.30 CyF/793.00`.
 - For iFizBox:
-  - The proxy (F3) and the app's native fetch should send `X-Machine`, `X-Firmware` and the Telesphoreo
+  - The proxy and the app's native fetch should send `X-Machine`, `X-Firmware` and the Telesphoreo
     `User-Agent`. Some repos serve different files or refuse requests without them.
   - **Never send a real UDID from the public site.** In the app, send `X-Unique-ID` only if a repo needs it (paid
     repos linked to a device).
@@ -124,7 +124,7 @@ wording.
 The Sources list sorts sources by name: names that start with a letter come before the others, then Cydia
 compares without case or diacritics (`LaxCompareOptions_`).
 
-## Sources tab (F4)
+## Sources tab
 
 - Plain table with 53 pt rows and two sections:
   - Section 0 is a single "All Sources" row: `folder.png`, subtitle "combined package list for below sources".
@@ -132,10 +132,10 @@ compares without case or diacritics (`LaxCompareOptions_`).
 - A source row has:
   - the icon: `unknown.png` first, then `<base>CydiaIcon.png` fetched in the background (base as above, so
     dist-style repos use `…/dists/<dist>/CydiaIcon.png`). Many dist repos (Procursus) only serve it at the
-    top level, so iFizBox falls back to `<URI>CydiaIcon.png` for dist repos (B1);
+    top level, so iFizBox falls back to `<URI>CydiaIcon.png` for dist repos;
   - the name (Origin) and, underneath, the root URI;
   - a small grey spinner on the right while that source is fetching.
-  Cydia shows **no package count**; F4's count is iFizBox's own addition.
+  Cydia shows **no package count**; iFizBox's count is its own addition.
 - Nav bar:
   - left: Refresh, or Cancel while updating, or Add in edit mode;
   - right: Edit / Done.
@@ -144,7 +144,7 @@ compares without case or diacritics (`LaxCompareOptions_`).
 - Tapping a source opens its Sections list (`cydia://sources/<key>`). "All Sources" opens the Sections list for
   every source.
 
-## Sections and section icons (F2, F4)
+## Sections and section icons
 
 - Section name:
   - Start from the package's `Section` and turn `_` into a space.
@@ -172,16 +172,16 @@ compares without case or diacritics (`LaxCompareOptions_`).
   3. the source's `Default-Icon` if it is `file:///`;
   4. `unknown.png`.
 - Remote `Icon:` URLs are **ignored** in Cydia's lists. The package page swaps in an icon from saurik's API.
-  iFizBox can show http(s) icons (F2 resolves them), but should keep the fallback chain behind them.
+  iFizBox shows http(s) icons, but keeps the fallback chain behind them.
 - Purpose badges: the tag `purpose::<x>` puts `Purposes/<x>.png` on the cell. The 4S has commercial, console,
   daemon, extension, library, uikit and x.
-- iFizBox (F126): `web/app/core/sectionicons.js` and Cydia's own icons in `web/app/icons/sections/` (GPLv3, from
+- iFizBox: `web/app/core/sectionicons.js` and Cydia's own icons in `web/app/icons/sections/` (GPLv3, from
   Cydia's repo: 39 section icons; the 4S's other 29 came from third-party repos).
 - Hidden from every list:
   - packages tagged `cydia::obsolete`;
   - packages whose `role::` tag isn't `enduser`, `hacker` or `developer` (for example `role::cydia`).
 
-## Changes and metadata.cb0 (F6)
+## Changes and metadata.cb0
 
 `/var/mobile/Library/Cydia/metadata.cb0` is a memory-mapped hash table (`Cytore.hpp`, structs at l.1237).
 
@@ -229,7 +229,7 @@ How the Changes tab is built (`ChangesController`, l.6791):
 - Cydia doesn't mark rows "new" or "updated".
 - Refresh: the Changes tab has the same Refresh/Cancel left button as the Sources tab.
 
-iFizBox's version (F6) is in `web/app/core/changes.js`.
+iFizBox's version is in `web/app/core/changes.js`.
 
 ## Package page and depictions
 
@@ -272,7 +272,7 @@ to bottom:
 - For iFizBox: show depictions in a sandboxed iframe (site and app) with no bridge. Sileo's native JSON depictions
   (`SileoDepiction:`) aren't part of Cydia; any support for them is separate work.
 
-## `cydia://` URLs (F4, N4)
+## `cydia://` URLs
 
 Cydia uses the `cydia` scheme two ways.
 
@@ -308,7 +308,7 @@ Repo websites' "Add to Cydia" buttons are usually `cydia://url/https://cydia.sau
 URL>`. That isn't in this source, so the app should read the `source=` parameter of such a link if it receives
 one.
 
-## Install queue (N4)
+## Install queue
 
 ### Queuing
 
@@ -388,7 +388,7 @@ one.
     example `echo finish:restart >&${CYDIA%% *}`.
   - The button runs the action. Restart and Reload show a "Loading" HUD and restart SpringBoard.
   - After any run, Cydia reloads its data and runs `uicache`.
-- For iFizBox (N4):
+- For iFizBox:
   - The root helper should export `CYDIA="<fd> 1"` and read `finish:` lines from it, so existing
     `postinst`/`extrainst_` scripts keep working.
   - It should run apt with `-o APT::Status-Fd=<fd>`, and dpkg's `--status-fd`, to get the

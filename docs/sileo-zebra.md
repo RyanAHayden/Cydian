@@ -1,19 +1,18 @@
-# What Sileo and Zebra do, and what iFizBox should take (R11)
+# What Sileo and Zebra do, and how iFizBox compares
 
-Read on 2026-11-18 from shallow clones: Sileo `c9f7015` (2024-10-08, github.com/Sileo/Sileo) and Zebra `e2f3c27`
-(2026-11-15, github.com/zbrateam/Zebra). File paths below are relative to those repos.
+From Sileo `c9f7015` (2024-10-08, github.com/Sileo/Sileo) and Zebra `e2f3c27` (2026-11-15,
+github.com/zbrateam/Zebra). File paths below are relative to those repos.
 
 **Licences.** Sileo is BSD-4-Clause (its `LICENSE` clause 3, the advertising clause, can't be combined with the GPL):
 take **ideas only**, never its code. Zebra is GPL-3.0, like iFizBox: code may be reused, with credit in the file
-header and on the Credits page. iFizBox is web code and Zebra is Objective-C, so in practice nothing below copies code
-from either app. Each proposal describes behaviour, and each follow-up writes its own JS.
+header and on the Credits page. iFizBox is web code and Zebra is Objective-C, so in practice nothing copies code
+from either app; iFizBox takes behaviour and writes its own JS.
 
-**Short version.** iFizBox already has most of what these two apps are known for: Canister search for sources you
-haven't added (F20), `sileo-featured.json` banners (F20), native Sileo depictions (`screens/depiction.js`), the
-Payment Provider API (F20/F57), plain-language dependency errors (F18), refresh skipping by Release fingerprint, and
-ETag/Last-Modified caching. The gaps worth filling are smaller: search history and ranking polish, a one-tap install
-for Canister results, a Wish List, four depiction views, and two fields missing from the payment request bodies. The
-ranked list of follow-ups is at the end.
+**Short version.** iFizBox has what these two apps are known for: Canister search for sources you haven't added,
+with Add Source & Install in the jailbreak app; `sileo-featured.json` banners; native Sileo depictions
+(`screens/depiction.js`) including the Sileo-only views; the Payment Provider API; plain-language dependency
+errors; Recent Searches; a Wish List; blocking packages by author; refresh skipping by Release fingerprint; and
+ETag/Last-Modified caching.
 
 ## Search
 
@@ -37,15 +36,14 @@ ranked list of follow-ups is at the end.
   `queueCache()` puts it in the install queue on its own, so the user gets **one tap from search to queued**. A
   Settings switch (`ShowProvisional`) turns it off.
 - **Telemetry:** `ingest(packages:)` POSTs every installed package's id, version, author and repo to Canister's
-  `/download/ingest`, along with device headers. iFizBox should **not** do this. Zebra puts Canister behind a privacy
+  `/download/ingest`, along with device headers. iFizBox does **not** do this. Zebra puts Canister behind a privacy
   screen (`Tabs/Home/Canister Privacy Controller`).
 - **Piracy check:** `CanisterResolver.piracy(urls)` asks Canister's `/repository/safety` before adding a source.
 
 ### Zebra
 - **Where it looks:** `Database/ZBDatabaseManager.m` runs SQLite queries. A scope bar under the field picks one
   field: **Name | Description | Author**. Name search is
-  `WHERE NAME LIKE %q% ORDER BY arch weight, (exact = 1, prefix = 2, else 3), NAME COLLATE NOCASE`, which is the same
-  tiers iFizBox uses.
+  `WHERE NAME LIKE %q% ORDER BY arch weight, (exact = 1, prefix = 2, else 3), NAME COLLATE NOCASE`.
 - **Live vs. full search:** with Live Search on (a Settings switch), each keystroke fetches only 7 columns with
   `LIMIT 30` (`ZBProxyPackage`). Pressing Search fetches every result in full.
 - **Short queries:** a one-character query is ignored when the character is Latin (`< 0xFF`) and allowed for CJK
@@ -56,54 +54,48 @@ ranked list of follow-ups is at the end.
 - **Filters:** `Tabs/Home/Settings/Filters` hides whole sections and **authors** (and blocks packages by author)
   everywhere: lists, search and Changes.
 
-### iFizBox today
+### iFizBox
 `screens/search.js` with `core/catalog.js search()`, run in the worker:
 - Every word must appear somewhere in name, id, description, author or maintainer.
 - Rank tiers: exact name or id, then prefix, then the query starting a word in the name or id ("board" in "Snow
   Board", not "Keyboard"), then substring in name or id, then author or maintainer. Within a tier: name length
-  closest to the query, then how many sources list the package, then by name (F101, proposal 2).
-- Any non-blank query searches locally, one character too (`core/catalog.js searchable()`; the user dropped
-  Zebra's one-Latin-character rule). Canister still needs two characters.
+  closest to the query, then how many sources list the package, then by name.
+- Any non-blank query searches locally, one character too (`core/catalog.js searchable()`; Zebra's
+  one-Latin-character rule is not used). Canister needs two characters: it accepts one CJK character but answers
+  nothing for it, so it isn't asked.
 - 120 ms debounce. A scope bar (All, Tweaks, Themes, Apps) plus a Filter panel (section, source, installed,
   free/paid, Show Incompatible).
-- Canister "Other Sources" under the local results (`screens/extras.js discoveryGroup`, 2+ characters even for CJK,
-  10-minute cache, `core/canister.js`). Canister accepts one CJK character but answers nothing for it (checked
-  2026-11-18, F106), so it isn't asked.
-- No search history. Each keystroke scans every row.
+- Canister "Other Sources" under the local results (`screens/extras.js discoveryGroup`, 10-minute cache,
+  `core/canister.js`).
+- **Recent** (from Zebra): with the field empty, a grouped table of the last five queries, newest first, no
+  duplicates, with Clear; tapping a row runs it.
+- No narrowing cache: each keystroke scans every row, which is cheap (below).
 
-### Proposals (iOS 6 style)
-1. **Recent Searches** (from Zebra): with the field empty, the results area shows a grouped table titled "Recent",
-   holding the last 5 queries saved when Search is pressed or a result is opened. Newest first, no duplicates. The
-   header has a Clear button, styled like the Mail and Maps "Clear" in iOS 6. Tapping a row runs it. Store the list
-   in localStorage through `core/settings.js`, the way the other settings are stored. Don't copy Sileo's lost-order
-   bug.
-2. **Ranking tie-breaks** (from Sileo): inside the prefix and substring tiers, sort by name length (closest to the
-   query first), then by how many sources list the package (`rankPopular`'s measure), then by name. Add a tier
-   between "prefix" and "substring" for a **word-start** match, so "board" finds "Snow Board" before "Keyboard Plus".
-3. **Narrowing cache** (from Sileo): in the worker, keep the last query and its hit rows. When the new query extends
-   the old one (`q.startsWith(prev)`, same filters), scan only those rows. This is cheap on a modern phone, and on
-   the 4S it keeps typing smooth with 20+ sources loaded. Measure it before adding it: it is only worth doing if a
-   full scan takes more than ~16 ms on the 4S.
-4. **Single Latin character**: skip local and Canister search for a one-character Latin query. Allow one CJK
-   character (Zebra's rule). Today a one-letter query returns thousands of rows.
+### Search cost
+
+`core/catalog.js search()` timed per keystroke in desktop node 26 (Ryzen 7 9800X3D) with every default source loaded
+(6 typed queries, 39 keystrokes, median of 15 runs each):
+
+| Load | Rows | Typical keystroke | One-letter query | Worst single run |
+| --- | --- | --- | --- | --- |
+| arm64 (what a modern phone reads) | 2,614 | 0.24 ms | 0.5–0.7 ms | 1.6 ms |
+| arm + arm64, every APT source twice (heaviest) | 12,919 | 1.25 ms | 3.4–4.3 ms | 7 ms |
+
+Every keystroke is far below a 16 ms frame, so a Sileo-style narrowing cache isn't worth adding. The scan over
+`_hay` is ~1 ms per 10k rows. One-letter queries cost the most because they sort thousands of hits. Not timed on a
+phone: the 4S is a reference device only and never runs iFizBox.
 
 ## Canister: from search result to installed
 
 Sileo goes from a Canister result to the install queue in one tap: add the repo, refresh, then queue the package.
-iFizBox's alert (`screens/extras.js offer`) offers **Add Source** and then says "Refresh Sources to list it". The user
-has to refresh, search again and tap Install.
 
-**Proposal:** in the jailbreak app, the alert's buttons become **Cancel / Add Source & Install** (and Depiction).
-Tapping Add Source & Install:
-- shows the "Verifying URL" HUD and adds the source;
-- refreshes that one source (the existing per-source refresh);
-- opens the package page and queues the package (`getBackend().queue`), which brings up Confirm as usual.
+**iFizBox.** In the jailbreak app the Other Sources alert (`screens/extras.js offer`) offers **Add Source &
+Install**: it adds the source, refreshes that one source, opens the package page and queues the package, which
+brings up Confirm as usual. On the site and in the sideload build it offers Add Source.
 
-If the refreshed source turns out not to list the package (stale Canister data), say so in an alert. On the site and
-in the sideload build, keep the current Add Source.
-
-iFizBox already has its own static piracy list (`core/warnings.js`, taken from Canister's MIT list). Asking Canister
-live would send every added source URL to a third party, so keep the static list.
+iFizBox has its own static piracy list (`core/warnings.js`, plus Canister's MIT list copied into
+`core/piracy-list.js` at release time). Asking
+Canister live would send every added source URL to a third party, so the list stays static.
 
 ## Native depictions (Sileo JSON)
 
@@ -125,22 +117,11 @@ and skips classes it doesn't know.
   host).
 
 **Who ships them.** The default paid repos (Chariz, Havoc) and most modern repos give tweaks a `SileoDepiction:`.
-F20 checked their featured files live. This task didn't sample depiction JSON across repos: see **Not verified** in
-the journal.
 
-**iFizBox today.** `screens/depiction.js` renders every class in the list above except Rating, Review, WebView,
-MinVersionForce and forms. Markdown is parsed locally and raw HTML goes through an allowlist. Unknown classes are
-skipped, as in Sileo.
-
-**Proposal:** add the four missing views, in iOS 6 style:
-- **RatingView:** five stars drawn in CSS or SVG, in the grey and orange of the iOS 6 App Store.
-- **ReviewView:** a grouped-table cell with the title in bold, then the author and stars, then the markdown.
-- **WebView:** a sandboxed `<iframe>` (no scripts touching us, no top-level navigation), like HTML depictions. Use
-  the `width`/`height` aspect ratio, http through the proxy as `mediaUrl` does.
-- **MinVersionForceView:** compares against Sileo's version numbers, which mean nothing for iFizBox. Render the inner
-  `view` (that's what a current Sileo shows).
-
-Forms stay out (they post user input to the repo). Their button can open the URL outside the app like any link.
+**iFizBox.** `screens/depiction.js` renders every class in the list above except forms, in the iOS 6 style, as plain
+DOM. ReviewView is one grouped cell; MinVersionForceView renders its inner `view` (Sileo's version numbers mean
+nothing for iFizBox). Markdown is parsed locally and raw HTML goes through an allowlist. Unknown classes are skipped,
+as in Sileo. Forms stay out (they post user input to the repo).
 
 ## Featured banners (`sileo-featured.json`)
 
@@ -150,9 +131,9 @@ title, package, hideShadow}]`) sits at the top of that repo's page. Sileo's own 
 `FeaturedButtonView`, …) and only Sileo's own server serves it. Zebra shows featured repos on Home
 (`ZBFeaturedCollectionViewCell`).
 
-**iFizBox.** `core/featured.js` already parses `FeaturedBannersView`, shows banners on the source page, and shows a
-few from each source on Home. Nothing to add. Sileo's store-wide featured file is Sileo's own curation, not a repo
-format, so leave it out.
+**iFizBox.** `core/featured.js` parses `FeaturedBannersView`, shows banners on the source page, and shows a few from
+each source on Home. Sileo's store-wide featured file is Sileo's own curation, not a repo format, so iFizBox leaves
+it out.
 
 ## Payment Provider API (paid packages)
 
@@ -179,16 +160,12 @@ format, so leave it out.
   `payment_secret` (`null` when there is none). Its `authorize_download` adds `version`, **`architecture`** and
   `repo`.
 
-**iFizBox today** (`core/payment.js buildRequest`, `native/Sources/Paid.swift`): the same flow and the same `sileo`
-callback. Keychain items use `.userPresence`/`WhenPasscodeSetThisDeviceOnly` and fall back to plain items when the
-phone has no passcode. Two differences from both apps:
-- `purchase` sends only `{token, payment_secret}`, with no `udid`/`device`.
-- `authorize_download` doesn't send `architecture`.
+**iFizBox** (`core/payment.js buildRequest`, `native/Sources/Paid.swift`): the same flow and the same `sileo`
+callback. Every POST but sign-out carries `udid` and `device`, and `authorize_download` the package's
+`architecture`, so a vendor serving rootful and rootless .debs picks the right one. Keychain items use
+`.userPresence`/`WhenPasscodeSetThisDeviceOnly` and fall back to plain items when the phone has no passcode.
 
-A vendor that checks the device on purchase, or that serves different .debs for rootful and rootless, could refuse
-or send the wrong build. Both are one-line fixes in `buildRequest` (follow-up 1).
-
-**What R10 should check** (R10 is the device test of F57, still blocked for lack of a modern phone):
+**Checking it on a phone:**
 - After a purchase, the vendor's purchase and download records show the right device.
 - `authorize_download` returns an **arm64 (rootless)** .deb. Check the downloaded control file's `Architecture:`.
 - On a phone with no passcode, sign-in and purchase still work (Zebra's `PasscodeNotSet` case).
@@ -209,14 +186,10 @@ or send the wrong build. Both are one-line fixes in `buildRequest` (follow-up 1)
 lists installs, upgrades, removals and the packages they pull in, plus apt's broken packages as errors. Confirm
 stays off while there are errors.
 
-**iFizBox today.** It already does better than Zebra's own resolver. Confirm runs real `apt-get -s` over the whole
-queue (N4) and shows Modifications. "Cannot Comply" carries F18's one-sentence explanations with actions (Add
-Chariz, Remove Y), with apt's output underneath.
-
-**One idea to take:** Zebra's "Dependency of X" subtitle. In Confirm's Modifications, a package apt pulled in that
-the user didn't queue could say why ("For Snowboard") in the iOS 6 grey subtitle. `apt-get -s` doesn't say which
-package pulled what in. `core/deps.js` already has a `via` chain, so the reason can come from there. This is
-low priority.
+**iFizBox.** Confirm runs real `apt-get -s` over the whole queue and shows Modifications. "Cannot Comply" carries
+one-sentence explanations with actions (Add Chariz, Remove Y), with apt's output underneath. Zebra's "Dependency of
+X" subtitle isn't there: `apt-get -s` doesn't say which package pulled what in, though `core/deps.js` has a `via`
+chain the reason could come from.
 
 ## Source refresh speed and caching
 
@@ -226,60 +199,21 @@ low priority.
   hash it doesn't download Packages again. On a normal launch it refreshes only repos older than **3 hours**
   (`repoRequiresUpdate`). Pull to refresh forces all of them.
 - **Zebra** (`Downloads/ZBDownloadManager.m`): `If-Modified-Since` from the saved file's date, parsed into SQLite.
-- **iFizBox today:**
+- **iFizBox:**
   - Release fingerprint (`core/health.js fingerprint`): an unchanged Release skips Packages, the same idea as
     Sileo's hash cache.
   - ETag/Last-Modified kept in IndexedDB (`core/cache.js`).
   - 8 repos at a time with a 20 s timeout each (`REFRESH_CONCURRENCY`, `REFRESH_TIMEOUT`).
   - Parsing runs in a worker.
 
-  Nothing to take here. One thing to check later: does a cold start refresh everything, or only stale sources, as
-  Sileo's 3-hour rule does? That's out of scope here.
+## Other features
 
-## Other things worth having
-
-| Feature | Sileo / Zebra | iFizBox today | Proposal |
-|---|---|---|---|
-| **Wish List** | Both (`Wish List Manager`, `ZBWishListTableViewController`): add a package from its page, then list them all on one page | none | A "Wish List" row on the package page's More sheet ("Add to Wish List"), a Wish List page from Home/Manage as a plain package list. Rows that are installed drop off. Stored like holds |
-| Hide by author | Zebra Filters | sections can be hidden, authors can't | Low: a "Hide Packages by <author>" row on the author page, listed in Manage > Hidden with sections |
-| Installed sort | Sileo: Name / Install Date / Size | A–Z only | Low: a scope bar on Installed (Name, Recent, Size), as on iOS 6's Usage screen. dpkg's `info/<pkg>.list` mtime gives the date |
-| Installed files | Zebra `ZBInstalledFilesTableViewController` | none for dpkg packages | Low: a "Files" row on an installed package's page listing `dpkg -L` (needs a helper call) |
-| News tab | Zebra: r/jailbreak via api.getzbra.com; Sileo: recently updated packages | Changes tab (recent updates, Cydia's) | Skip: Reddit is third-party content, and Changes already covers updates |
-| Community sources | Zebra: a list per jailbreak | `core/recommended.js` | Already there |
-| Telemetry | Sileo: Canister ingest of installed packages | none | Keep it that way |
-
-## Ranked follow-ups
-
-Each one is filed with `agent-runner plan add`, with its files and test.
-
-1. **B10: payment request fields.** `purchase` should send `udid` and `device`, and `authorize_download` should send
-   `architecture`, as both Sileo and Zebra do (`core/payment.js`, test `payment`). This is small, and it's a
-   correctness risk for paid installs.
-2. **F99: Add Source & Install from Canister results.** One tap from a search result to Confirm in the jailbreak app
-   (`screens/extras.js`, test `search`). It's the biggest everyday gain.
-3. **F100: Recent Searches** on the empty Search page: last 5, Clear (`screens/search.js`, test `search`).
-4. **F101: search ranking.** Word-start tier, name-length and source-count tie-breaks, and skip single Latin
-   characters (`core/catalog.js`, `screens/search.js`, test `catalog`).
-5. **F102: Wish List.** Add from the package page, a list page (`core/wishlist.js` new, `screens/browse.js`,
-   `screens/home.js`, test `wishlist`).
-6. **F103: the four missing depiction views.** Rating, Review, WebView, MinVersionForce (`screens/depiction.js`,
-   `packages.css`, new test `depiction`).
-7. **R12 (low): search cost on the 4S.** Time `catalog.search` per keystroke with all default sources loaded, then add
-   the narrowing cache only if it's over 16 ms.
-8. **F104 (low): Installed sort by Recent and Size**, and Hide by Author. Filed together as low. They're small and
-   nobody asked for them.
-
-## Search cost, measured (R12)
-
-`core/catalog.js search()` timed per keystroke in desktop node 26 (Ryzen 7 9800X3D) with every default source loaded,
-2026-11-18 (`journal/2026-11-18-r12-search-cost/bench.mjs`; 6 typed queries, 39 keystrokes, median of 15 runs each):
-
-| Load | Rows | Typical keystroke | One-letter query | Worst single run |
-| --- | --- | --- | --- | --- |
-| arm64 (what a modern phone reads) | 2,614 | 0.24 ms | 0.5–0.7 ms | 1.6 ms |
-| arm + arm64, every APT source twice (heaviest) | 12,919 | 1.25 ms | 3.4–4.3 ms | 7 ms |
-
-Every keystroke is far below the ~16 ms threshold, so **the narrowing cache (proposal 3) was not filed**. The
-scan over `_hay` is ~1 ms per 10k rows. One-letter queries cost the most because they sort thousands of hits, and
-F101's single-Latin-character skip (proposal 4) removes those. The 4S is a reference device only and never runs
-iFizBox, so search was not timed on it. It wasn't timed on a modern iPhone either: no task allows driving one.
+| Feature | Sileo / Zebra | iFizBox |
+|---|---|---|
+| **Wish List** | Both (`Wish List Manager`, `ZBWishListTableViewController`): add a package from its page, then list them all on one page | Add to / Remove from Wish List on the package page, a Wish List page (`core/wishlist.js`); synced by the iFizBox Account |
+| Hide by author | Zebra Filters | Settings > General > Blocked: packages and authors |
+| Installed sort | Sileo: Name / Install Date / Size | Cydia's User / Expert / Recent (Recent needs the jailbreak app's install dates) |
+| Installed files | Zebra `ZBInstalledFilesTableViewController` | none for dpkg packages |
+| News tab | Zebra: r/jailbreak via api.getzbra.com; Sileo: recently updated packages | Changes tab (recent updates, Cydia's); no Reddit feed |
+| Community sources | Zebra: a list per jailbreak | `core/recommended.js` |
+| Telemetry | Sileo: Canister ingest of installed packages | none |

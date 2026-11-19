@@ -1,4 +1,4 @@
-# iFizBox Account (F97)
+# iFizBox Account
 
 A free, minimal account that keeps a device's sources, the settings that travel (`core/settings.js` TRAVELS),
 Ignored Upgrades, installed-app records (`core/installed.js`) and the signing certificate on ifizbox.com, so a new
@@ -29,7 +29,7 @@ same routes, with accounts kept in memory.
 - **When**: one read at launch. One save when the app goes to the background or the page is hidden (`visibilitychange`
   / `pagehide`), but only if something changed since the last sync, or a read found this device ahead of the
   account. Sync Now does both. Signing in is a read only.
-- **Merge**: sources, holds, the Wish List (`wishlist`, F102) and apps are sets merged three ways against `seen` (what the account held after this
+- **Merge**: sources, holds, the Wish List (`wishlist`) and apps are sets merged three ways against `seen` (what the account held after this
   device's last sync, kept in localStorage `ifizbox.account` with the certificate only as a fingerprint): the
   account's list, plus this device's additions, minus this device's removals. So a removal travels to the other
   devices too, and a device that has never synced only adds. Settings and the certificate are last-write-wins per

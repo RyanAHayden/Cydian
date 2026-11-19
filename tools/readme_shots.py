@@ -24,6 +24,11 @@ From the kit (a .sketch file is a zip; pages/*.json hold the layers, images/ the
 - the font: the kit's embedded SF Pro (fonts/, variable; the Semibold instance);
 - the home indicator: "Home Indicators/Portrait - Dark - iPhone" (144x5 at 7 in a 20-point strip at the bottom).
 
+Each phone named in LABELS gets its caption drawn under it, in the PNG, so it always sits under its own phone at
+the same size: the page's name in white on a blue pill, a short line under it in grey (both read on GitHub's light
+and dark themes), in Noto Sans (fc-match). --relabel OUT_DIR... redraws the captions of PNGs this tool already
+framed (it keeps the phone, drops any old caption), for when the captures are gone.
+
 --plain skips the phone: the screen with the iOS rounded corners (55 points) and the padding, for when the kit isn't
 at hand. The kit and anything taken out of it stay in ref/ (gitignored, AGENTS.md); only the framed PNGs are
 committed (Apple publishes these bezels for showing apps). Local tool: needs Pillow, like tools/kitmatch.py; the
@@ -31,6 +36,7 @@ test gate doesn't run it.
 """
 import argparse
 import io
+import subprocess
 import json
 import re
 import sys
@@ -45,6 +51,51 @@ STATUS_SYMBOL = "Status Bars/iPhone 18 Pro/Dark Background"
 HOME_SYMBOL = "Home Indicators/Portrait - Dark - iPhone"
 SCREEN_RADIUS_PT = 55
 SS = 4  # supersampling for the vector status bar
+
+
+# PNG name: (the pill, the line under it).
+LABELS = {
+    "web-home": ("Home", "install the apps from here"), "web-sources": ("Sources", "APT repos and AltStore sources"),
+    "web-app": ("App", "details and what's new"), "web-changes": ("Changes", "updates by day"),
+    "jb-home": ("Home", "the jailbreak app"), "jb-sources": ("Sources", "your APT repos"),
+    "jb-package": ("Package", "details and versions"), "jb-log": ("Install", "apt's log, live"),
+    "web-search": ("Search", "every source at once"), "web-installed-manage": ("Installed", "manage several at once"),
+    "web-myipas": ("Install IPAs", "a file or a URL"), "web-theme": ("Theme", "with a live preview"),
+    "web-manage": ("Manage", "add and edit sources"), "web-settings": ("Settings", "account, theme, signing"),
+    "web-signing": ("Signing", "your certificate"), "jb-installed": ("Installed", "packages, A to Z"),
+}
+LABEL_H = 150  # caption height at the default --scale (a 588 px wide phone)
+SS = 4
+
+
+def label(title, line, width, height=LABEL_H):
+    font = lambda pattern, size: ImageFont.truetype(
+        subprocess.run(["fc-match", "-f", "%{file}", pattern], capture_output=True, text=True, check=True).stdout, size)
+    k = SS * height / LABEL_H
+    img = Image.new("RGBA", (round(width * SS), round(height * SS)), (0, 0, 0, 0))
+    d, cx = ImageDraw.Draw(img), img.width // 2
+    big = font("Noto Sans:bold", round(40 * k))
+    top, ph = round(18 * k), round(60 * k)
+    pw = round(d.textlength(title, font=big) + 52 * k)
+    # the nav bar's blue (sampled off the framed shots, a step darker for the white text), lighter at the top
+    pill = Image.composite(Image.new("RGBA", (pw, ph), (66, 92, 128, 255)), Image.new("RGBA", (pw, ph), (116, 141, 176, 255)),
+                           Image.linear_gradient("L").resize((pw, ph)))
+    mask = Image.new("L", (pw, ph), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, pw - 1, ph - 1), ph // 2, fill=255)
+    img.paste(pill, (cx - pw // 2, top), mask)
+    d.text((cx, top + ph // 2), title, font=big, fill=(255, 255, 255, 255), anchor="mm")
+    d.text((cx, top + ph + round(34 * k)), line, font=font("Noto Sans", round(30 * k)), fill=(140, 149, 159, 255), anchor="mm")
+    return img.resize((round(width), round(height)), Image.LANCZOS)
+
+
+def with_label(phone, name, scale):
+    if name not in LABELS:
+        return phone
+    lab = label(*LABELS[name], phone.width, round(LABEL_H * scale / 0.4))
+    out = Image.new("RGBA", (phone.width, phone.height + lab.height), (0, 0, 0, 0))
+    out.alpha_composite(phone)
+    out.alpha_composite(lab, (0, phone.height))
+    return out
 
 
 def bezel_symbol(finish):
@@ -269,7 +320,18 @@ def main():
     # 0.4 of the 3x bezel (540x1104): sharp at the README's ~200 px per phone on a 2x screen.
     ap.add_argument("--scale", type=float, default=0.4, help="output size, 1.0 = the 3x bezel (1350x2760)")
     ap.add_argument("--pad", type=int, default=24, help="transparent pixels left and right of each phone, at --scale")
+    ap.add_argument("--relabel", action="store_true", help="src and out are framed PNGs: redraw their captions")
     a = ap.parse_args()
+    if a.relabel:
+        a.out.mkdir(parents=True, exist_ok=True)
+        for src in sorted(a.src.glob("*.png")):
+            if src.stem not in LABELS:
+                continue
+            img = Image.open(src).convert("RGBA")
+            phone = img.crop((0, 0, img.width, round(2760 * a.scale)))  # the 3x bezel is 2760 px tall
+            with_label(phone, src.stem, a.scale).save(a.out / src.name, optimize=True)
+            print(a.out / src.name)
+        return
     kit = None
     if a.kit.exists():
         kit = Kit(a.kit)
@@ -282,6 +344,7 @@ def main():
         img = img.resize((round(img.width * a.scale), round(img.height * a.scale)), Image.LANCZOS)
         padded = Image.new("RGBA", (img.width + 2 * a.pad, img.height), (0, 0, 0, 0))
         padded.alpha_composite(img, (a.pad, 0))
+        padded = with_label(padded, src.stem, a.scale)
         dst = a.out / src.name
         padded.save(dst, optimize=True)
         print(f"{dst} {padded.width}x{padded.height} {dst.stat().st_size // 1024} KB")

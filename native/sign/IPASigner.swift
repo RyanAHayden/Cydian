@@ -83,7 +83,9 @@ final class IPASigner {
             var format = PropertyListSerialization.PropertyListFormat.binary
             guard let pl = try? PropertyListSerialization.propertyList(from: try zip.data(e, limit: 16 << 20), format: &format) as? [String: Any]
             else { if dir == appDir { throw SignError("bad_ipa", "The app's Info.plist can't be read.") }; continue }
-            if dir != appDir && pl["CFBundleExecutable"] == nil { continue } // a resource bundle: sealed as files
+            // A resource bundle: sealed as files. An empty CFBundleExecutable counts (YouMod's DontEatMyContent.bundle):
+            // dir + "" is the folder itself, which used to pass the check below and fail with "X.bundle/ is missing".
+            if dir != appDir && (pl["CFBundleExecutable"] as? String ?? "").isEmpty { continue }
             // B21: a nested bundle naming an executable that isn't there (a tweak's .bundle in a modded IPA, YouMod's
             // YTUHD.bundle) has nothing to sign: sealed as files like a resource bundle, as zsign and Feather do.
             // The app's own executable missing stays an error (below).

@@ -237,10 +237,11 @@ final class Download: NSObject, URLSessionDownloadDelegate {
     }
 
     @discardableResult
-    static func start(_ url: URL, to dest: URL, max: Int64, progress: @escaping (Double) -> Void, done: @escaping (String?) -> Void) -> Download {
+    static func start(_ url: URL, to dest: URL, max: Int64, timeout: TimeInterval = 60, progress: @escaping (Double) -> Void,
+                      done: @escaping (String?) -> Void) -> Download {
         let d = Download(dest, max, progress, done)
         let cfg = URLSessionConfiguration.default
-        cfg.timeoutIntervalForRequest = 60
+        cfg.timeoutIntervalForRequest = timeout
         cfg.timeoutIntervalForResource = 60 * 60
         let s = URLSession(configuration: cfg, delegate: d, delegateQueue: nil)
         d.session = s
@@ -286,6 +287,10 @@ final class Download: NSObject, URLSessionDownloadDelegate {
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         if let e = error as? URLError, Download.offline(e) { finish(Download.offlineText(task.originalRequest?.url)) }
+        // B104: an https link sent on to plain http: our words (web/app/core/insecureipa.js atsText), never iOS's
+        else if let e = error as? URLError, e.code == .appTransportSecurityRequiresSecureConnection {
+            finish("ats: the link leads to a plain http address\((task.currentRequest?.url?.host).map { " (\($0))" } ?? ""), which iOS blocks here")
+        }
         else if let e = error as? URLError { finish(e.code == .timedOut ? "timeout: \(e.localizedDescription)" : "network: \(e.localizedDescription)") }
         else if let e = error { finish("network: \(e.localizedDescription)") }
         else { finish(nil) }

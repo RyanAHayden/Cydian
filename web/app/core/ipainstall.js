@@ -13,6 +13,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { NAME } from "../brand.js";
+import { isAts, ATS_TITLE, atsText } from "./insecureipa.js"; // B104
 
 export function ipaUrl(text) {
   let s = String(text ?? "").trim();
@@ -108,6 +109,7 @@ export function ipaError(err, name = "") {
     const os = /\bneeds iOS (\d+(?:\.\d+){0,2}) or later\b/.exec(said) ?? /\bHave [\d.]+; need (\d+(?:\.\d+){0,2})\b/.exec(said);
     if (os) return { code: "os_version", title: `Needs iOS ${os[1]}`, message: said, detail: said, lines: [] };
   }
+  if (isAts(err)) return { code: "network", title: ATS_TITLE, message: atsText(name), detail: said, lines: [] }; // B104: never iOS's raw ATS text
   let message;
   let lines = [];
   switch (code) {

@@ -124,11 +124,15 @@ enum Sideload {
         guard let url = Apt.httpURL(c.params["url"]) else { return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
         let throttle = Throttle()
         let tok = SignBridge.token()
-        let file = SignBridge.work.appendingPathComponent("\(tok)-look.ipa")
-        Download.start(url, to: file, max: SignBridge.maxIPA, progress: { p in
-            if throttle.pass("downloading", p) { c.emitOnMain([["phase": "downloading", "progress": p]]) }
-        }) { err in
-            if let e = err { return Apt.reply(c, nil, e) }
+        // B104: download's http rules (the https twin, or "insecure" for the page to ask; insecure: true is plain http)
+        download(url, http: httpPolicy(c), emit: { phase, p in
+            if throttle.pass(phase, p) { c.emitOnMain([["phase": phase, "progress": p]]) }
+        }) { res in
+            let file: URL
+            switch res {
+            case .failure(let e): return Apt.reply(c, nil, (e as? Failed)?.text ?? SignBridge.text(e))
+            case .success(let f): file = f
+            }
             SignBridge.queue.async {
                 do {
                     let d = try Inspect.ipa(file)
@@ -233,7 +237,7 @@ enum Sideload {
         }
         guard let url = Apt.httpURL(c.params["url"]) else { job.end(); return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
         log("Downloading \(url.absoluteString)")
-        let d = download(url, emit: emit) { res in
+        let d = download(url, http: httpPolicy(c), emit: emit) { res in
             switch res {
             case .failure(let e): finish(.failure(e))
             case .success(let file):
@@ -272,13 +276,66 @@ enum Sideload {
 
     struct Failed: LocalizedError { let text: String; var errorDescription: String? { text } } // the text, not "Sideload.Failed error 1"
 
+    // B104: what an http:// IPA link may do (ATS keeps URLSession, and so Download, off plain http):
+    //   ask       the https twin only; when it has none, the call answers "insecure: …" and the page asks
+    //             (web/app/signing-client.js askInsecure, the "This Download Is Not Secure" alert)
+    //   allow     the page's Install Anyway (params insecure: true): plain http over F238's PlainDownload
+    //   fallback  the https twin, else plain http without asking: Re-sign of a recorded app, whose http link the user
+    //             already let through when it was installed
+    // https links are downloaded as before whatever the policy.
+    enum HTTPPolicy { case ask, allow, fallback }
+    static func httpPolicy(_ c: Bridge.Call) -> HTTPPolicy { c.params["insecure"] as? Bool == true ? .allow : .ask }
+
+    // The same link over https (port 80 dropped), or nil when it isn't http. web/app/core/insecureipa.js httpsTwin.
+    static func httpsTwin(_ url: URL) -> URL? {
+        guard url.scheme?.lowercased() == "http", var c = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        c.scheme = "https"
+        if c.port == 80 { c.port = nil }
+        return c.url
+    }
+
+    // A twin's failure that means "no https copy here" (try http, or ask), not one the http link would share.
+    static func twinMissing(_ err: String) -> Bool {
+        !(err.hasPrefix("cancelled:") || err.hasPrefix("too_large:") || err.hasPrefix("offline:"))
+    }
+    static let twinTimeout: TimeInterval = 20 // a host whose port 443 hangs (BigBoss, B58) asks sooner than Download's 60 s
+
+    // The running part of an http link's download (the twin, then maybe PlainDownload), for the job's Cancel.
+    final class HTTPChain: DebFetch {
+        private let lock = NSLock()
+        private var current: DebFetch?
+        private(set) var cancelled = false
+        func set(_ d: DebFetch) { lock.lock(); current = d; let stop = cancelled; lock.unlock(); if stop { d.cancel() } }
+        func cancel() { lock.lock(); cancelled = true; let d = current; lock.unlock(); d?.cancel() }
+    }
+
     @discardableResult
-    static func download(_ url: URL, emit: @escaping (String, Double) -> Void, done: @escaping (Result<URL, Error>) -> Void) -> Download {
+    static func download(_ url: URL, http: HTTPPolicy = .ask, emit: @escaping (String, Double) -> Void,
+                         done: @escaping (Result<URL, Error>) -> Void) -> DebFetch {
         let file = SignBridge.work.appendingPathComponent("\(SignBridge.token())-in.ipa")
-        return Download.start(url, to: file, max: SignBridge.maxIPA, progress: { emit("downloading", $0) }) { err in
+        let progress = { (p: Double) in emit("downloading", p) }
+        let finished = { (err: String?) in
             if let e = err { try? FileManager.default.removeItem(at: file); return done(.failure(Failed(text: e))) }
             SignBridge.queue.async { done(.success(file)) }
         }
+        guard let twin = httpsTwin(url) else {
+            return Download.start(url, to: file, max: SignBridge.maxIPA, progress: progress, done: finished)
+        }
+        if http == .allow {
+            NSLog("[sideload] plain http download (Install Anyway): %@", url.absoluteString)
+            return PlainDownload.start(url, to: file, max: SignBridge.maxIPA, progress: progress, done: finished)
+        }
+        let chain = HTTPChain()
+        chain.set(Download.start(twin, to: file, max: SignBridge.maxIPA, timeout: twinTimeout, progress: progress) { err in
+            guard let e = err else { return finished(nil) }
+            if chain.cancelled || !twinMissing(e) { return finished(e) }
+            NSLog("[sideload] no https twin for %@ (%@)", url.absoluteString, e)
+            guard http == .fallback else {
+                return finished("insecure: \(url.host ?? url.absoluteString) offers this IPA only over plain http, without encryption")
+            }
+            chain.set(PlainDownload.start(url, to: file, max: SignBridge.maxIPA, progress: progress, done: finished))
+        })
+        return chain
     }
 
     // Signs `input` (deleted after), serves it on the local HTTP server and opens the itms-services link (the
@@ -870,7 +927,7 @@ enum Sideload {
                 }
                 guard let url = Apt.httpURL(r.url) else { fail(Failed(text: "bad_url: \(r.url)")); return next() }
                 log("Downloading \(url.absoluteString)")
-                let d = download(url, emit: emit) { res in
+                let d = download(url, http: .fallback, emit: emit) { res in // B104: its http link was let through at install
                     switch res {
                     case .failure(let e): fail(e); next()
                     case .success(let file): log("Downloaded \(Sideload.size(file))"); signThat(file)

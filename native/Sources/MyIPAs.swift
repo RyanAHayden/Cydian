@@ -148,10 +148,14 @@ enum MyIPAs {
 
     static func add(_ c: Bridge.Call) {
         guard let url = Apt.httpURL(c.params["url"]) else { return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
-        let tmp = SignBridge.work.appendingPathComponent("\(SignBridge.token())-add.ipa")
         let emit = emitter(c)
-        Download.start(url, to: tmp, max: SignBridge.maxIPA, progress: { emit("downloading", $0) }) { err in
-            if let e = err { try? FileManager.default.removeItem(at: tmp); return Apt.reply(c, nil, e) }
+        // B104: Sideload.download's http rules (the https twin, or "insecure" for the page to ask)
+        Sideload.download(url, http: Sideload.httpPolicy(c), emit: emit) { res in
+            let tmp: URL
+            switch res {
+            case .failure(let e): return Apt.reply(c, nil, (e as? Sideload.Failed)?.text ?? SignBridge.text(e))
+            case .success(let f): tmp = f
+            }
             SignBridge.queue.async {
                 do {
                     // A link that doesn't end in .ipa (a redirect, ?download=1): named after the app inside.

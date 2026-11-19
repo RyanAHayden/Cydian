@@ -912,6 +912,7 @@ async function addFromUrl() {
     r = await libraryCall("add", { url }, (ev) => { const t = phaseLabel(ev); if (t && label) label.textContent = t; });
   } catch (e) {
     hide();
+    if (e?.code === "cancelled") return; // B104: Cancel on This Download Is Not Secure
     await showAlert({ title: "Couldn't Download", message: deviceError(e).message, buttons: ["OK"] });
     return;
   }

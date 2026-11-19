@@ -220,7 +220,7 @@ where WebKit has no `DecompressionStream` (before iOS 16.4).
 
 `signing.install {url, manifestServer}`, with progress events (`downloading`, `reading`, `signing`, `installing`):
 
-1. Downloads the IPA to the app's temporary folder (http or https, 4 GB cap).
+1. Downloads the IPA to the app's temporary folder (http or https, 4 GB cap). See "Plain http IPA links" below.
 2. Signs it on the phone (`native/sign/`, below), into a second file.
 3. Starts the plain HTTP server (Network.framework, `NWListener` bound to 127.0.0.1 only), serves `/<token>/app.ipa`
    (ranges supported), and opens `itms-services://?action=download-manifest&url=<server>/sign/manifest?bundleid=…
@@ -236,6 +236,28 @@ where WebKit has no `DecompressionStream` (before iOS 16.4).
    the install sheet covers iFizBox.
 
 Nothing listens on Wi-Fi or cellular; every path has a random 128-bit token.
+
+### Plain http IPA links
+
+App Transport Security keeps URLSession off plain http, and the app has no ATS exception (the WKWebView must never
+get `NSAllowsArbitraryLoads`). So `Sideload.download`, which `signing.install`, `signing.inspect`, `signing.prepare`,
+Re-sign and `library.add` all use, handles an http link like this:
+
+- It first downloads the https twin (the same link over https, port 80 dropped; `web/app/core/insecureipa.js
+  httpsTwin` has the same rule). If that works, nothing is asked.
+- If the twin fails (any error but `cancelled`, `too_large` or `offline`), the call answers `insecure: …`. The page
+  (`signing-client.js askInsecure`) shows "This Download Is Not Secure" with Cancel (the darker safe button) and
+  Install Anyway, the same choice http sources get (`screens/manage.js addSecure`).
+- Install Anyway sends the same call again with `insecure: true`. The shell then downloads over plain http with
+  `PlainDownload` (Network.framework, `native/Sources/Icons.swift`, which also fetches http .debs). A link let through
+  once goes straight to http for the rest of the session, so Custom Install's look and then the queue ask only once.
+- Re-sign of a recorded app tries the twin, then plain http without asking: the user already let that link through
+  when it was installed.
+- An https link that redirects to http still fails under ATS. `Download` answers `ats: …` for it, and
+  `core/signing.js deviceError` (and `core/ipainstall.js ipaError` in the jailbreak app) shows our own message
+  instead of iOS's "App Transport Security policy" sentence.
+
+The twin gets a 20 s idle limit instead of 60 s, so a host whose port 443 hangs asks sooner.
 
 ### The signer (`native/sign/`)
 

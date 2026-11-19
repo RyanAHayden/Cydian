@@ -10,6 +10,7 @@
 // Everything here reads bytes (Uint8Array or ArrayBuffer) and never leaves the phone.
 
 import { DOMAIN, SIGN_HOST } from "../brand.js";
+import { isAts, ATS_TITLE, atsText, INSECURE_IPA_ALERT, insecureText } from "./insecureipa.js"; // B104
 
 const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b));
 
@@ -447,6 +448,9 @@ export function deviceError(err, name = "") {
     return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null,
       message: `${message} Check the connection, or the Signing Server in Settings > Signing.` };
   }
+  // B104: an http link nothing asked about, and any other ATS refusal: our words, never iOS's raw sentence
+  if (code === "insecure") return { title: INSECURE_IPA_ALERT.title, open: null, message: insecureText(name) };
+  if (isAts(err)) return { title: ATS_TITLE, open: null, message: atsText(name) };
   return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null, message };
 }
 

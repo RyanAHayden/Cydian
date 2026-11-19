@@ -20,11 +20,22 @@
 /* Theme > Light / Dark: the controls sample (screens/settings.js themePreview), pinned over the bottom half of the
    screen, just above the tab bar; the theme list above it ends in a spacer as tall, so its last row scrolls clear.
    The sample scrolls on its own. */
-.theme-preview { position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 1; height: 50vh; overflow-y: auto;
-  overscroll-behavior: contain; padding-bottom: 20px; box-sizing: border-box;
+.theme-preview { position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 1; height: 50vh;
+  display: flex; flex-direction: column; box-sizing: border-box; will-change: transform;
   background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
   box-shadow: 0 -1px 0 rgba(0,0,0,.25), 0 -3px 6px rgba(0,0,0,.15); }
+.theme-preview-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 20px;
+  -webkit-overflow-scrolling: touch; }
 .theme-preview-space { height: 50vh; }
+/* F215: the divider on top of the preview, dragged to move the split (screens/settings.js dragSplit). Its grip is
+   UIKit's table grabber (the 4S's Shared@2x/UITableGrabber.png, sampled): three 19pt bars, each a 1pt dark line
+   (#000 at .31), 3pt of #bebebe at .68 and a 1pt white line at .51, 1pt apart. Nothing else is drawn. The strip is
+   taller than it looks to the finger: 12px more above it. */
+.theme-preview-grip { position: relative; flex: none; height: 25px; touch-action: none; cursor: row-resize; }
+.theme-preview-grip::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; bottom: 0; }
+.theme-preview-grip::after { content: ""; position: absolute; left: calc(50% - 9.5px); top: 4px; width: 19px; height: 17px;
+  background: linear-gradient(rgba(0,0,0,.31) 0 1px, rgba(190,190,190,.68) 1px 4px, rgba(255,255,255,.51) 4px 5px, transparent 5px)
+    0 0 / 19px 6px repeat-y; }
 .theme-preview-bar { position: relative; display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 5px; }
 .theme-preview-bar .nav-title { flex: 1; }
 .theme-preview-seg { margin: 10px; }

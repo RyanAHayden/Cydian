@@ -96,6 +96,8 @@ settings.onChange((key) => {
 export function render(el, route) {
   const p = { el, route };
   pages.add(p);
+  const [first, second] = pathOf(route);
+  if (defOf(second ?? first)?.tone) resetSplit(); // F215: a theme list opens at its entry split
   draw(p);
   // Holds can change outside the app (another package manager, apt-mark by hand): ask dpkg each time Settings
   // opens a page; a change redraws through onChange. Without a helper this does nothing.
@@ -287,13 +289,161 @@ function listPage(key) {
     return grouped([{ footer: "This setting is not available here." }]);
   }
   const v = settings.get(key);
+  // F215: a tap on a theme also grows the preview to half the screen (until the divider has been dragged).
+  const choose = (value) => { if (d.tone) split.tapped = true; pick(d, value); if (d.tone) layoutSoon(); };
   const frag = grouped([{
-    rows: d.options.map((o) => ({ label: o.label, subtitle: o.subtitle, checked: o.value === v, onClick: () => pick(d, o.value),
+    rows: d.options.map((o) => ({ label: o.label, subtitle: o.subtitle, checked: o.value === v, onClick: () => choose(o.value),
       ...swatchIcon(o) })),
     footer: settings.footerOf(key),
   }]);
-  if (d.tone) frag.append(Object.assign(document.createElement("div"), { className: "theme-preview-space" }), themePreview());
+  if (d.tone) {
+    const list = frag.firstElementChild;
+    const space = Object.assign(document.createElement("div"), { className: "theme-preview-space" });
+    const box = themePreview();
+    frag.append(space, box);
+    splitPane(box, space, list);
+  }
   return frag;
+}
+
+// ---- F215: Theme > Light / Dark's preview as a movable split (like iOS 6's resizable panes) ---------------------
+// The preview's height, in px, from where the page is laid out (geo: `top` the list's visible top under the nav bar,
+// `bottom` the preview's bottom on the tab bar, `screen` the page's height, `edges` the bottoms of the list's rows and
+// of its footer at scroll 0, all in the page's px). On entry the divider sits on a row's bottom edge: as many whole
+// rows show as fit while the preview keeps a quarter of the screen. A tap on a theme grows it to half. Once dragged,
+// the user's position (a fraction of the screen, in SPLIT_KEY) wins over both.
+export const SPLIT_KEY = "ifizbox.themePreviewSplit";
+export const SPLIT_FLOOR = 0.25;
+export const SPLIT_TAP = 0.5;
+const SPLIT_MIN = 64; // px: the dragged preview keeps its divider and a bit of sample
+const LIST_MIN = 44; // px: and the list one row's height
+
+export function entrySplit({ top, bottom, screen, edges = [] }) {
+  const floor = Math.ceil(screen * SPLIT_FLOOR);
+  const fit = edges.filter((e) => e > top && bottom - e >= floor);
+  return fit.length ? bottom - Math.max(...fit) : floor;
+}
+
+export function clampSplit(h, { top, bottom }) {
+  return Math.round(Math.max(SPLIT_MIN, Math.min(bottom - top - LIST_MIN, h)));
+}
+
+// state: { saved } the stored fraction (or null), { tapped } a theme was tapped since the page opened.
+export function splitHeight(geo, { saved = null, tapped = false } = {}) {
+  if (saved != null && Number.isFinite(saved)) return clampSplit(saved * geo.screen, geo);
+  const entry = entrySplit(geo);
+  return tapped ? Math.max(entry, Math.min(Math.round(geo.screen * SPLIT_TAP), geo.bottom - geo.top - LIST_MIN)) : entry;
+}
+
+export function savedSplit(storage = globalThis.localStorage) {
+  try {
+    const v = parseFloat(storage?.getItem(SPLIT_KEY));
+    return Number.isFinite(v) && v > 0 && v < 1 ? v : null;
+  } catch { return null; }
+}
+
+export function saveSplit(h, screen, storage = globalThis.localStorage) {
+  try { storage?.setItem(SPLIT_KEY, String(Math.round((h / screen) * 10000) / 10000)); } catch { /* private mode */ }
+}
+
+// The live state: the preview on screen, its height now, and whether a theme was tapped since the list opened.
+// A theme tap redraws the page (a new preview), so the height carries over here and the new one animates from it.
+let split = { box: null, space: null, list: null, h: null, tapped: false, moving: false };
+const resetSplit = () => { split = { box: null, space: null, list: null, h: null, tapped: false, moving: false }; };
+
+function splitPane(box, space, list) {
+  Object.assign(split, { box, space, list });
+  if (split.h != null) setSplit(box, space, split.h); // a redraw: keep the height on screen, then move from it
+  box.querySelector(".theme-preview-grip")?.addEventListener?.("pointerdown", (e) => dragSplit(e, box, space));
+  layoutSoon();
+}
+
+function setSplit(box, space, h) {
+  box.style.height = h + "px";
+  box.style.transform = "";
+  space.style.height = h + "px";
+}
+
+let layoutQueued = false;
+function layoutSoon() {
+  if (layoutQueued || !globalThis.requestAnimationFrame) return; // no layout to measure (node's tests)
+  layoutQueued = true;
+  requestAnimationFrame(() => { layoutQueued = false; layoutSplit(); });
+}
+
+function geometry(box, list) {
+  const scroller = box.closest(".page-body");
+  if (!scroller || !box.isConnected) return null;
+  const r = scroller.getBoundingClientRect();
+  const top = r.top + (parseFloat(getComputedStyle(scroller).paddingTop) || 0);
+  const bottom = r.bottom - (parseFloat(getComputedStyle(box).bottom) || 0);
+  const at0 = (el) => el.getBoundingClientRect().bottom + scroller.scrollTop;
+  const rows = [...(list?.querySelectorAll(".table > li") ?? [])];
+  const edges = rows.map((li, i) => at0(i === rows.length - 1 ? li.parentElement : li));
+  const footer = list?.querySelector(".group-footer");
+  if (footer) edges.push(at0(footer) + 10); // the whole list fits: end under its footer, with a group's gap
+  return { top, bottom, screen: r.height, edges };
+}
+
+function layoutSplit() {
+  const { box, space, list } = split;
+  if (!box || split.moving) return;
+  const geo = geometry(box, list);
+  if (!geo) return;
+  const to = splitHeight(geo, { saved: savedSplit(), tapped: split.tapped });
+  const from = split.h;
+  split.h = to;
+  if (from == null || from === to || globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return setSplit(box, space, to);
+  // Transform only (120 Hz): lay it out at the taller of the two once, slide, then settle at the new height.
+  const tall = Math.max(from, to);
+  box.style.height = tall + "px";
+  if (to > from) space.style.height = to + "px";
+  const anim = box.animate([{ transform: `translateY(${tall - from}px)` }, { transform: `translateY(${tall - to}px)` }],
+    { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)", fill: "forwards" });
+  split.moving = true;
+  anim.finished.catch(() => {}).then(() => {
+    split.moving = false;
+    anim.cancel();
+    if (split.box === box) setSplit(box, space, split.h);
+  });
+}
+
+// Dragging the divider: the preview is laid out at its tallest once, the finger moves it by transform, and where it
+// is let go is the height from then on (saved for next time).
+function dragSplit(e, box, space) {
+  if (split.moving && !split.dragging) return;
+  const geo = geometry(box, split.list);
+  if (!geo) return;
+  e.preventDefault();
+  const grip = e.currentTarget;
+  grip.setPointerCapture?.(e.pointerId);
+  grip.classList.add("is-held");
+  const tall = geo.bottom - geo.top - LIST_MIN;
+  const h0 = split.h ?? box.getBoundingClientRect().height;
+  const y0 = e.clientY;
+  let h = h0;
+  split.moving = split.dragging = true;
+  box.style.height = tall + "px";
+  box.style.transform = `translateY(${tall - h0}px)`;
+  const move = (m) => {
+    if (m.pointerId !== e.pointerId) return;
+    h = clampSplit(h0 - (m.clientY - y0), geo);
+    box.style.transform = `translateY(${tall - h}px)`;
+  };
+  const end = (u) => {
+    if (u.pointerId !== e.pointerId) return;
+    grip.removeEventListener("pointermove", move);
+    grip.removeEventListener("pointerup", end);
+    grip.removeEventListener("pointercancel", end);
+    grip.classList.remove("is-held");
+    split.moving = split.dragging = false;
+    split.h = h;
+    if (h !== h0) saveSplit(h, geo.screen);
+    setSplit(box, space, h);
+  };
+  grip.addEventListener("pointermove", move);
+  grip.addEventListener("pointerup", end);
+  grip.addEventListener("pointercancel", end);
 }
 
 // A theme picked in Theme > Light / Dark also switches Mode to that tone, so it shows once back on Theme.
@@ -306,7 +456,12 @@ export function pick(d, value, store = settings) {
 // (settings.css .theme-preview). Inert: nothing in it does anything.
 function themePreview() {
   const make = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls, textContent: text ?? "" });
-  const box = make("div", "theme-preview");
+  // F215: the pane holds the divider (a grip to drag) and the sample, which scrolls on its own under it.
+  const pane = make("div", "theme-preview");
+  const grip = make("div", "theme-preview-grip");
+  grip.setAttribute("aria-hidden", "true");
+  const box = make("div", "theme-preview-body");
+  pane.append(grip, box);
   box.inert = true;
   box.setAttribute("aria-hidden", "true");
   const bar = make("div", "navbar theme-preview-bar");
@@ -330,7 +485,7 @@ function themePreview() {
   sw.append(createSwitch({ label: "Switch", checked: true }));
   sw.classList.add("has-switch");
   box.append(bar, search, seg, buttons, groups);
-  return box;
+  return pane;
 }
 
 function holdsPage() {

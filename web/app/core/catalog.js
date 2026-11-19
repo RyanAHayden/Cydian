@@ -12,6 +12,8 @@
 //   c.setHiddenAuthors(names)              -> Hide by Author (F104, Zebra's filters): packages whose Author or
 //                                             Maintainer is one of these drop out like hidden sections' (author()
 //                                             still lists them, so the author page can show them again)
+//   c.setBlocked(ids)                      -> Block (F226): these package ids drop out like hidden sections'
+//                                             (author() too); package() and upgrades() still see them
 //   c.list(key | "*", section | "*")       -> [row], sorted by name ("*": All Sources / All Packages)
 //   c.search(query)                        -> [row], best matches first (any non-blank query)
 //   c.author(name)                         -> [row]: every package whose Author or Maintainer is `name`
@@ -483,6 +485,7 @@ export function createCatalog() {
   let hidden = new Set();    // Section Visibility (Cydia's CydiaSections Hidden): section names left out of lists
   const shown = new Map();   // key -> sorted rows outside hidden sections (cache)
   let hiddenAuthors = new Set(); // F104: lower-cased author/maintainer names whose packages are left out of lists
+  let blocked = new Set();   // F226: package ids blocked on the device, left out like hidden sections' packages
   let device = null;         // F17: the device rows are judged for (core/compat.js), or null before one is set
   let fitFilter = false;     // and whether rows that can't work on it are left out
   const fitting = new Map(); // key -> sorted rows that can work on the device (cache)
@@ -601,7 +604,15 @@ export function createCatalog() {
     return hiddenAuthors.size;
   }
   const byHiddenAuthor = (r) => hiddenAuthors.size > 0 && (hiddenAuthors.has(r._a) || hiddenAuthors.has(r._m));
-  const isHidden = (r) => hidden.has(r.section) || byHiddenAuthor(r);
+  // F226: Block. These ids drop out of every list, Search, Sections' counts, the author page and Changes;
+  // package() still opens one, so its page can unblock it, and upgrades() still sees it (Changes files it as ignored).
+  function setBlocked(ids) {
+    blocked = new Set((Array.isArray(ids) ? ids : []).filter((n) => typeof n === "string" && n));
+    shown.clear();
+    return blocked.size;
+  }
+  const isBlocked = (r) => blocked.size > 0 && blocked.has(r.id);
+  const isHidden = (r) => hidden.has(r.section) || byHiddenAuthor(r) || isBlocked(r);
 
   // id -> entry for a source, or the merge of all of them: the newest version wins; on a tie, the first source
   // loaded keeps it (apt's default: equal pins, first listed).
@@ -641,7 +652,7 @@ export function createCatalog() {
 
   // fitOf without the hidden sections: what every list, Search and Changes draw from.
   function visibleOf(key) {
-    if (!hidden.size && !hiddenAuthors.size) return fitOf(key);
+    if (!hidden.size && !hiddenAuthors.size && !blocked.size) return fitOf(key);
     let rows = shown.get(key);
     if (!rows) {
       rows = fitOf(key).filter((r) => !isHidden(r));
@@ -654,7 +665,7 @@ export function createCatalog() {
   // are listed too, each marked; without it they are left out.
   function sections(key = ALL, { hidden: withHidden = false } = {}) {
     const counts = new Map();
-    for (const r of fitOf(key)) if (!byHiddenAuthor(r)) counts.set(r.section, (counts.get(r.section) ?? 0) + 1);
+    for (const r of fitOf(key)) if (!byHiddenAuthor(r) && !isBlocked(r)) counts.set(r.section, (counts.get(r.section) ?? 0) + 1);
     const list = [...counts].filter(([name]) => withHidden || !hidden.has(name))
       .map(([name, count]) => (withHidden ? { name, count, hidden: hidden.has(name) } : { name, count }))
       .sort((a, b) => collator.compare(a.name, b.name));
@@ -732,7 +743,7 @@ export function createCatalog() {
     const n = String(name ?? "").trim().toLowerCase();
     if (!n) return [];
     // F104: a hidden author's own page still lists their packages (hidden sections and misfits stay out).
-    return fitOf(ALL).filter((r) => !hidden.has(r.section) && (r._a === n || r._m === n)).map(slim);
+    return fitOf(ALL).filter((r) => !hidden.has(r.section) && !isBlocked(r) && (r._a === n || r._m === n)).map(slim);
   }
 
   function pkg(id, key = ALL) {
@@ -934,7 +945,7 @@ export function createCatalog() {
     return findUpgrades(installedPkgs, (id) => { const e = all.get(id); return e ? slim(e.row) : null; }, holds, opts);
   }
 
-  return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
+  return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, setBlocked, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
     categories, browse, popular, free, featured, collection: collectionRows, roulette,
     setInstalled, installed, upgrades, setDevice, setIpaInfo,
     deps, aptProblems, queueInfo };
@@ -950,7 +961,7 @@ export function installedBytes(st) {
 export function runCatalog(catalog, op, args = []) {
   const f = { load: catalog.load, loadAlt: catalog.loadAlt, altSource: catalog.altSource, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
     search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys,
-    versions: catalog.versions, setHidden: catalog.setHidden, setHiddenAuthors: catalog.setHiddenAuthors, setInstalled: catalog.setInstalled,
+    versions: catalog.versions, setHidden: catalog.setHidden, setHiddenAuthors: catalog.setHiddenAuthors, setBlocked: catalog.setBlocked, setInstalled: catalog.setInstalled,
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice, setIpaInfo: catalog.setIpaInfo,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular, free: catalog.free, featured: catalog.featured,
     collection: catalog.collection, roulette: catalog.roulette,

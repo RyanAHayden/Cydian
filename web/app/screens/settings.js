@@ -65,7 +65,7 @@ export const THEME_COLORS = { classic: "#4f698b", oled: "#000", gunmetal: "#5f65
 const defOf = (key) => SETTINGS.find((d) => d.key === key);
 const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? String(v);
 
-const TITLES = { holds: "Ignored Upgrades", signing: "Signing", account: `${NAME} Account` };
+const TITLES = { holds: "Ignored Upgrades", blocked: "Blocked", signing: "Signing", account: `${NAME} Account` };
 // F205: pages that were renamed, old id -> new, so a saved link still lands (Display became Theme).
 const OLD_PAGES = { display: "theme" };
 const pathOf = (route) => { const [first, second] = route.path; return [OLD_PAGES[first] ?? first, second]; };
@@ -111,6 +111,7 @@ function draw({ el, route }) {
   if (first === LOGS) el.replaceChildren(logsPage(second, () => draw({ el, route })));
   else if (first === "account") drawAccount(el); // F97
   else if ((second ?? first) === "holds") el.replaceChildren(holdsPage());
+  else if ((second ?? first) === "blocked") el.replaceChildren(blockedPage()); // F226
   else if (first === "signing" && second === HELP) drawSigningHelp(el); // F134
   else if (second) el.replaceChildren(listPage(second));
   else if (first === "signing") drawSigning(el);
@@ -133,6 +134,7 @@ function rootPage() {
 // A page under the root (General, Theme, Updates): its groups, then what other parts of the app add there.
 function groupPage(id) {
   const frag = settingsGroups(settings.sections().filter((s) => s.page === id), id);
+  if (id === "general") frag.append(blockedSection()); // F226: Blocked packages and authors, every mode
   if (id === "general") frag.append(sideloadingSection()); // F83, sideload build
   if (id === "general") frag.append(websiteSection()); // F145: Lock Home, Install on the Website; website only
   if (id === "updates") frag.append(notifySection()); // Update Alerts, sideload build
@@ -496,6 +498,44 @@ function holdsPage() {
     rows: held.map((pkg) => ({ label: pkg, checked: true, onClick: () => settings.holds.set(pkg, false) })),
     footer: (settings.footerOf("holds") || "") + " Tap a package to take its upgrades again.",
   }]);
+}
+
+// F226: Settings > General > Blocked (Zebra #1037, #998): the packages blocked from their page and the authors
+// (F104's hidden authors), each with a check; a tap unblocks it. Pure: the groups for nav/ui.js grouped(), for the
+// tests. `entries` [{ id, name }], `authors` [name].
+export function blockedLayout({ entries = [], authors = [], mode = "site" } = {}) {
+  const where = mode === "jailbreak"
+    ? "An installed package you block is also held with dpkg, so other package managers leave it alone."
+    : "Kept on this device.";
+  if (!entries.length && !authors.length) {
+    return [{ footer: `Nothing is blocked. Block a package or its author on the package's page: it leaves Browse, Search, Sections and Changes. ${where}` }];
+  }
+  const groups = [];
+  if (entries.length) {
+    groups.push({ header: "Packages", key: "packages",
+      rows: entries.map((e) => ({ id: e.id, label: e.name, subtitle: e.name !== e.id ? e.id : undefined, checked: true })),
+      footer: `Left out of Browse, Search, Sections and Changes. ${where} Tap a package to unblock it.` });
+  }
+  if (authors.length) {
+    groups.push({ header: "Authors", key: "authors", rows: authors.map((a) => ({ author: a, label: a, checked: true })),
+      footer: "Every package by these authors is left out the same way. Tap an author to unblock them." });
+  }
+  return groups;
+}
+
+// The General page's row: how many are blocked, pushing the list.
+function blockedSection() {
+  const n = settings.blocked.list().length + settings.blocked.authors().length;
+  return grouped([{ rows: [{ label: "Blocked", detail: n ? String(n) : "None", href: format(settingsRoute(["general", "blocked"])), icon: rowIcon("hidden") }] }]);
+}
+
+function blockedPage() {
+  // Unblock lifts a dpkg hold only where the block made it (core/settings.js blocked.set); a change redraws the page.
+  return grouped(blockedLayout({ entries: settings.blocked.entries(), authors: settings.blocked.authors(), mode: detectMode() }).map((g) => ({
+    ...g,
+    rows: (g.rows ?? []).map((r) => ({ label: r.label, subtitle: r.subtitle, checked: true,
+      onClick: () => (r.author ? settings.blocked.setAuthor(r.author, false) : settings.blocked.set(r.id, false).catch(() => {})) })),
+  })));
 }
 
 // ---- Theme ---------------------------------------------------------------------------------------------------

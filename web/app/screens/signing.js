@@ -27,6 +27,7 @@
 import { statusReady } from "../signing-client.js";
 import { normalizeServer } from "../core/signing.js";
 import { NAME, SIGN_HOST } from "../brand.js";
+import { freeRouteBlock } from "./free-apple-id.js";
 
 export const STEPS = [
   { id: "certificate", title: "Import Your Certificate" },
@@ -212,6 +213,8 @@ export function drawWalkthrough(el, { status = null, failure = "", certificate =
     list.append(li);
   }
   page.append(list, ...extra);
+  // F254: the website's Use a Free Apple ID, under the certificate route (hidden unless the Apple relay is on)
+  if (!globalThis.ifizboxNative) page.append(freeRouteBlock());
   const top = el.scrollTop;
   el.replaceChildren(page);
   el.scrollTop = top;

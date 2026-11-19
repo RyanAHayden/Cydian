@@ -1099,5 +1099,13 @@ import { appleRelay, relayTarget, MAX_REQUEST, MAX_REPLY } from "./src/apple-rel
   assert.equal((await relay("/apple/gsa.apple.com/grandslam/GsService2", { headers: { Upgrade: "websocket" } })).status, 403);
   // Routed by the Worker when on.
   assert.equal((await w.fetch(req("/apple/evil.example/x"), { ...env, ...on })).status, 403);
+  // F254: /apple/status says on (and nothing reaches the fetcher); off it's the same 404 as every relay path.
+  const before = calls.length;
+  r = await relay("/apple/status");
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { on: true });
+  assert.equal(calls.length, before);
+  assert.equal((await w.fetch(req("/apple/status"), env)).status, 404);
+  assert.equal((await relay("/apple/status", { headers: { "Sec-Fetch-Site": "cross-site" } })).status, 403);
   console.log("worker apple relay: ok");
 }

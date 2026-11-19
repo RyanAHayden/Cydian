@@ -4,6 +4,7 @@
 //
 //   <METHOD> /apple/<host>/<path>?<query>   ->  <METHOD> https://<host>/<path>?<query>
 //   GET /apple/<anisette host>/v3/provisioning_session with Upgrade: websocket  ->  the server's WebSocket, piped
+//   GET /apple/status   ->  {"on":true} (F254: the Signing page shows Use a Free Apple ID only then; off it's a 404)
 //
 // Rules: only https to the hosts in ALLOW and their path patterns; GET, POST and PUT; the request body up to
 // MAX_REQUEST and the reply up to MAX_REPLY; TIMEOUT_MS per request; redirects aren't followed (an Apple redirect
@@ -85,11 +86,16 @@ async function readCapped(stream, cap) {
 // Off unless the deploy sets APPLE_RELAY = "1" (a preview for the sign-in spike): ifizbox.com deploys from main, and
 // the relay mustn't go live there before the free route is decided.
 export const relayOn = (env) => String(env?.APPLE_RELAY ?? "") === "1";
+export const STATUS_PATH = "/apple/status";
 
 export async function appleRelay(req, env = {}, { fetcher = fetch, timeout = TIMEOUT_MS } = {}) {
   const u = new URL(req.url);
   if (!relayOn(env)) return fail("not_found", "The Apple relay is off on this server (APPLE_RELAY).", 404);
   if (crossSite(req, u)) return fail("cross_site", "This relay is only for this website's own pages.", 403);
+  // F254: the website asks this before it offers Use a Free Apple ID (off: the 404 above).
+  if (u.pathname === STATUS_PATH && req.method === "GET") {
+    return new Response(JSON.stringify({ on: true }), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  }
   const ws = (req.headers.get("Upgrade") || "").toLowerCase() === "websocket";
   const target = relayTarget(u, { ws });
   if (!target) return fail("not_allowed", "That host or path isn't on the relay's list.", 403);

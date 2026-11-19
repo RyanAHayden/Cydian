@@ -96,6 +96,59 @@ less on an iPhone), so very large apps may fail with "zsign stopped … too big 
 
 A browser that still has an old push service worker registered drops it at the next visit (`app.js`).
 
+## Free Apple ID (website)
+
+For people with no certificate. The certificate route stays the recommended one: a free Apple ID signs 3 apps at a
+time, makes 10 App IDs a week, and its profiles last 7 days. iOS refuses apps with a free profile from a website
+(`MIInstallerErrorDomain` 111, "free provisioning profile … not allowed to be installed from this source"), so the
+website does the Apple side only: sign-in, the development certificate and the profiles. Installing is the app's job,
+through `installation_proxy` (pairing file + LocalDevVPN), which the app doesn't have yet.
+
+Where: How Signing Works (the walkthrough Install opens when there's no certificate), under the two steps, as
+**Use a Free Apple ID**. It shows only when the Worker's Apple relay is on (`GET /apple/status` answers
+`{"on":true}`; off, every `/apple/*` path is a 404). The relay is off unless the deploy sets `APPLE_RELAY = "1"`
+(`worker/src/apple-relay.js`, `worker/README.md`), so ifizbox.com doesn't show it today.
+
+The flow (`web/app/screens/free-apple-id.js`):
+
+1. **Sign in**: Apple ID and password. SRP runs in the browser (`core/gsa.js`), so the password never leaves it;
+   anisette v3 comes from a public anisette server with a machine of this browser's own (kept in localStorage).
+   Two-factor: the code screen (a trusted-device push, or an SMS to the first trusted number).
+2. **Setup runs by itself** as a checklist (`core/freeroute.js runSetup`): Register This iPhone (the UDID from Find
+   This iPhone's UDID), Development Certificate (this browser's own if Apple still lists it as issued, else a new
+   RSA key and CSR made in the browser, `core/freecert.js`), App ID (`<bundle ID>.<TEAMID>`: App IDs are unique
+   across Apple, so a free team's always carry the suffix and Keep Bundle IDs doesn't apply), Provisioning Profile
+   (Apple's 7-day team profile for that App ID; it must list this iPhone). Each step shows a spinner, then a tick and
+   a summary; steps not reached are grey. It stops to ask only at Apple's certificate limit: an alert lists the
+   issued certificates (this site's first, SideStore's and other tools' last) to revoke one, with the warning that
+   every app signed with it stops until signed again. Cancel stops setup and revokes nothing.
+3. **Ready**: the team, certificate and profile dates, **Save for the App** (a `.zip` with the `.p12`, its password
+   and the profile, which the app's Select All Files imports), the Developer Mode + Trust note, Refresh Profile,
+   and Forget Free Apple ID (removes the key and certificate from this browser; Apple's copy isn't revoked).
+
+The setup makes the App ID and profile for the app itself (`BUNDLE_ID`, `brand.js`). The certificate (a `.p12`:
+the certificate in a plain bag, the key under PBES2 with PBKDF2-HMAC-SHA256 and AES-256-CBC, an HMAC-SHA256 MAC:
+OpenSSL 3's defaults) is kept in localStorage (`ifizbox.freeid`) for its year, with the last profile and the team.
+
+Sign-in errors are iOS alerts worded by `gsa.js signInAlert`: Incorrect Password (-20101, -22406: the Apple ID
+stays, the password is cleared and focused), Incorrect Code (-21669: the code screen stays), This Apple ID Is Locked
+(-20209, -20283, -20751: a button opens iforgot.apple.com), -36607 (Apple refused this machine: wait 15 minutes; the
+page refuses to try again before then), Apple ID Not Found (-20970), else the step, the code and Apple's message.
+Setup errors (`freeroute.js setupError`): developer agreement not accepted (a button opens
+developer.apple.com/account), session ended, the 10-a-week App ID limit, no UDID yet, else the step and Apple's words.
+
+Rules for apps on this route (`freeroute.js`): `freeEntitlements` keeps `get-task-allow` as the development profile
+allows (with it false iOS says "integrity could not be verified"), drops `aps-environment` (Personal Teams have no
+Push) and takes the profile's keychain group; `freeExpiry` says "soon" 3 days before the 7-day profile ends
+(`FREE_EXPIRY_WARNING`), not the certificate route's setting.
+
+What leaves the browser: every Apple and anisette request goes through the Worker's relay (allow-listed hosts and
+paths, no logging); that includes the Xcode app token and the developer-portal replies, but not the password or
+the private key. Tests: `core/freeroute.test.js` (CSR checked with WebCrypto, the `.p12` opened by
+`checkP12Password` and decrypted back, a real zsign WebAssembly signing run with it, the checklist against a fake
+portal, the limit and Cancel), `screens/free-apple-id.test.js` (the alerts' effects, storage, the hand-off zip read
+back by the import's unzip, the relay check), `worker/test.mjs` (`/apple/status`).
+
 ## On the phone
 
 The iFizBox app's sideload build signs IPAs by itself and serves the signed IPA from the phone; the certificate

@@ -376,6 +376,13 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
         g.append(el("h2", "group-header", "Reviews"), l);
         out.push(g);
         if (moreLeft) out.push(moreButton());
+      } else if (cardRating?.count > 0) {
+        // Rated (Tap to Rate gives stars alone) but nothing written: say so, not a blank under the card.
+        const g = el("div", "group store-reviews-group store-reviews-unwritten");
+        const l = el("div", "table grouped store-review-list");
+        l.append(el("div", "store-reviews-none", "No written reviews yet."));
+        g.append(el("h2", "group-header", "Reviews"), l);
+        out.push(g);
       }
     }
     area.replaceChildren(...out);

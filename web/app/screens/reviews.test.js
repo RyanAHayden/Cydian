@@ -183,6 +183,17 @@ test("a server without reviews: no Tap to Rate or Write a Review, the others' ra
   assert.equal(sheets[0].initial, null);
 });
 
+test("rated by Tap to Rate alone: the card counts it and the list says nothing is written", async () => {
+  const pane = document.createElement("div");
+  const api = fakeApi([{ enabled: true, average: 1, count: 1, histogram: [0, 0, 0, 0, 1], reviews: [], more: false, mine: null }]);
+  await reviewsTab(pane, { id: "com.example.clip", api, build: true, now });
+  assert.equal(one(pane, "store-reviews-none").textContent, "No written reviews yet.");
+  const fresh = document.createElement("div");
+  const api2 = fakeApi([{ enabled: true, average: null, count: 0, histogram: [0, 0, 0, 0, 0], reviews: [], more: false, mine: null }]);
+  await reviewsTab(fresh, { id: "com.example.new", api: api2, build: true, now });
+  assert.equal(one(fresh, "store-reviews-none"), undefined, "no ratings: the card's No Ratings says it");
+});
+
 // B82: an app page's App Store side: Apple's rating, its name and seller, and its written reviews asked for lazily.
 const storeSide = (reviews, extra = {}) => {
   const asked = { n: 0 };

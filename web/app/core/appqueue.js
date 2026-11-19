@@ -30,6 +30,7 @@
 //   modifyActions({ ..., onSource: true, build: "sideload" | "site" }) -> "Re-sign"
 //   markedVersionOnSource(pkg, installed) -> that version's entry, or null
 //   markedResignJob(pkg, installed, { source }) -> a resign job with that version's IPA url (downloaded and signed anew)
+//   markedResignProblem(pkg, installed) -> B66: why it can't be (no source, version gone, ...) and the newest instead
 // F94: Modify's last button for an installed app, per build (user 2026-11-18):
 //   modifyActions({ ..., build }) -> build "sideload" or "site": "Mark as Not Installed" (the phone can't remove apps:
 //       it forgets core/installed.js's record, as the Installed section's row does); "jailbreak": "Remove" (apt's
@@ -182,6 +183,19 @@ export function markedResignJob(pkg, installed, { source = null } = {}) {
   if (!markedVersionOnSource(pkg, installed)) return null;
   const job = appJob(pkg, { installed, version: installed, source });
   return job ? { ...job, mode: "resign" } : null;
+}
+
+// B66: why a marked app can't be re-signed (markedResignJob gave null), and the newest version that can be installed
+// over it instead (keeps its data): { why: "no-source" | "no-version" | "unknown-version" | "no-download", newest }
+// (newest: a version string, or null when the source has nothing to download either), or null when it can be re-signed.
+export function markedResignProblem(pkg, installed) {
+  if (markedVersionOnSource(pkg, installed)) return null;
+  const app = pkg?.stanza?.ipa;
+  const newest = appJob(pkg)?.version ?? null;
+  if (!app) return { why: "no-source", newest: null };
+  if (!installed) return { why: "unknown-version", newest };
+  const has = app.versions?.some((x) => x.version === installed);
+  return { why: has ? "no-download" : "no-version", newest };
 }
 
 // F84: signing.install's params for a Custom Install job. The look's token holds the downloaded IPA on the phone for

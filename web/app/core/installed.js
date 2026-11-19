@@ -339,13 +339,16 @@ export function dayHeaders(rows, dates, locale) {
 // each with `signed`: its signing.installed record or null, and `onSource`: a marked app's installed version is on its
 // source, core/appqueue.js markedVersionOnSource). `selected` is a Set of bundle IDs.
 //
-//   manageKinds(r)                  -> { resign, update, expiring, marked } for a row Manage can pick, or null (iFizBox's own)
+//   manageKinds(r)                  -> { resign, update, expiring, marked, blocked } for a row Manage can pick, or null
+//                                      (iFizBox's own); B66: `blocked`, a marked app Re-sign can't sign (its installed
+//                                      version isn't on its source): Re-sign then explains and offers the newest
 //   manageable(rows)                -> the rows Manage can pick
 //   MANAGE_PRESETS                  -> Select…'s presets: all, expiring, marked (Not Signed Here), updates
 //   presetIds(rows, preset)         -> the ids a preset picks
 //   selectSheet(rows)               -> Select…'s action sheet buttons: [{ preset, label }] ("Expiring Soon (2)")
 //   selectLabel(rows, selected)     -> the nav bar's left button: "Select…", or "Deselect" once every row is picked
-//   manageCounts(rows, selected)    -> { n, resign, update, del, marked }: the picked rows each toolbar button acts on
+//   manageCounts(rows, selected)    -> { n, resign, update, del, marked, blocked }: the picked rows each toolbar button
+//                                      acts on (Re-sign (n) counts what it signs; it is enabled for blocked ones too)
 //   manageSummary(rows, selected)   -> the grey line above the list: "2 selected · 5 apps · 1 expiring · 3 updates"
 //   manageToolbar(counts)           -> [{ kind, label, disabled }]: Re-sign (n), Update (n), Delete (n)
 //   pruneSelection(selected, rows)  -> the selection without ids the list no longer has
@@ -362,6 +365,7 @@ export function manageKinds(r) {
     update: Boolean(r.upgrade),
     expiring: r.sig?.state === "soon" || r.sig?.state === "expired", // inside the re-sign window, or past it
     marked,
+    blocked: marked && !r.onSource,
   };
 }
 
@@ -384,7 +388,7 @@ export function selectLabel(rows, selected) {
 }
 
 export function manageCounts(rows, selected) {
-  const out = { n: 0, resign: 0, update: 0, del: 0, marked: 0 };
+  const out = { n: 0, resign: 0, update: 0, del: 0, marked: 0, blocked: 0 };
   for (const r of manageable(rows)) {
     if (!selected?.has(r.id)) continue;
     const k = manageKinds(r);
@@ -392,6 +396,7 @@ export function manageCounts(rows, selected) {
     out.del++; // every row Manage picks can be deleted or removed (B46's rules decide which, per app)
     if (k.resign) out.resign++;
     if (k.resign && !r.signed) out.marked++; // downloaded from its source first
+    if (k.blocked) out.blocked++; // Re-sign says why it can't, and offers the newest version
     if (k.update) out.update++;
   }
   return out;
@@ -409,7 +414,7 @@ export function manageSummary(rows, selected) {
 const counted = (label, n) => (n > 0 ? `${label} (${n})` : label);
 export function manageToolbar(c) {
   return [
-    { kind: "resign", label: counted("Re-sign", c.resign), disabled: !c.resign },
+    { kind: "resign", label: counted("Re-sign", c.resign), disabled: !c.resign && !c.blocked },
     { kind: "update", label: counted("Update", c.update), disabled: !c.update },
     { kind: "delete", label: counted("Delete", c.del), disabled: !c.del },
   ];

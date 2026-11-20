@@ -34,7 +34,9 @@
 // ifizbox:refreshing count from screens/sources.js falls back to 0: Sources' Refresh, Home's Reload, the launch
 // refresh) and by Changes' Refresh, which refreshes without that count.
 
-export const TRIGGER = 60;   // points of pull where it arms (the 4S's Twitter: about the area's own height)
+import { haptic, hapticTick, bridgeHaptics } from "./haptic.js";
+
+export const TRIGGER = 60;  // points of pull where it arms (the 4S's Twitter: about the area's own height)
 export const AREA_H = 480;   // the area is this tall, its contents at its foot, so a long pull still shows its colour
 export const HOLD = 60;      // while refreshing, the list is held this far down: the area's foot (.pull-inner) shows whole
 const DECIDE = 10;           // px of finger travel at the top before a browser without the rubber band is assumed
@@ -63,11 +65,21 @@ export function rubber(dy, dim = AREA_H) {
 // the state is then "refreshing" (area held open, spinner) until done() (the refresh ended: "closing", the list slides
 // back up) and hidden() (the area is behind the top bar: "idle", the arrow and "Pull down to refresh..." again).
 // A gesture that starts while held is blocked: it never arms and never changes the state.
-export function pullTracker({ threshold = TRIGGER, busy = () => false, onRefresh = () => {}, onState = () => {} } = {}) {
+// B197: onHaptic("tick") each time the pull arms (the arrow turns over), onHaptic("tap") when a release starts the
+// refresh; nothing on a release that runs nothing.
+export function pullTracker({ threshold = TRIGGER, busy = () => false, onRefresh = () => {}, onState = () => {},
+  onHaptic = () => {} } = {}) {
   let state = "idle";
   let active = false;
   let blocked = false;
-  const set = (s) => { if (s !== state) { state = s; onState(s); } };
+  const buzz = (kind) => { try { onHaptic(kind); } catch { /* a haptic never stops the pull */ } };
+  const set = (s) => {
+    if (s === state) return;
+    state = s;
+    if (s === "armed") buzz("tick");
+    else if (s === "refreshing") buzz("tap");
+    onState(s);
+  };
   const held = () => state === "refreshing" || state === "closing";
   return {
     get state() { return state; },
@@ -156,6 +168,15 @@ export function titleFor(state) {
   return state === "armed" ? TEXT.armed : TEXT.pull;
 }
 
+// B197: pull to refresh's haptics, only where the app's bridge plays them (as screens/roulette.js): a pull arms in a
+// scroll event, not a gesture start, where Safari's fallbacks stay silent. "tick" is the smallest there is
+// (haptic.tick), "tap" the regular light one (haptic.tap).
+export function pullHaptic(kind, { bridge = bridgeHaptics, tick = hapticTick, tap = haptic } = {}) {
+  if (!bridge()) return;
+  if (kind === "tick") tick();
+  else if (kind === "tap") tap();
+}
+
 // ---- Last Updated bookkeeping ----------------------------------------------------------------------------------
 
 let watching = null;
@@ -214,6 +235,7 @@ export function pullToRefresh(scroller, opts = {}) {
   };
   const tracker = pullTracker({
     busy,
+    onHaptic: (kind) => pullHaptic(kind),
     onRefresh: () => {
       // Once the list is back at its top: iOS's own spring still runs after the lift, and a refresh that put Sources'
       // strip up mid-spring left the list scrolled down by the strip's height (iPhone 7).

@@ -124,6 +124,13 @@ enum Apt {
                 c.reply(nil, nil)
             }
         }
+        // B197: the smallest tick (pull to refresh arming, web/app/nav/haptic.js hapticTick)
+        b.on("haptic.tick") { c in
+            DispatchQueue.main.async {
+                UISelectionFeedbackGenerator().selectionChanged()
+                c.reply(nil, nil)
+            }
+        }
     }
 
     // ---- files

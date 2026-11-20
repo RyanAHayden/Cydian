@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { pullState, pullTracker, rubber, lastUpdatedText, titleFor, bounceHold, refreshEnd, TRIGGER, HOLD, TEXT,
-  MIN_HOLD_MS, MAX_HOLD_MS } from "./pullrefresh.js";
+  MIN_HOLD_MS, MAX_HOLD_MS, pullHaptic } from "./pullrefresh.js";
 import { createSettings } from "../core/settings.js";
 
 test("pullState: idle at rest, pull under the trigger, armed from it on; idle while busy", () => {
@@ -291,4 +291,82 @@ test("on a grouped page the pull area is the page's pinstripe (and linen's weave
   assert.match(pal, /html\[data-theme="dark"\]\[data-palette="linen"\] \.pull-clip\.grouped > \.pull-refresh \{ background: var\(--weave\); \}/);
   const js = readFileSync(new URL("./pullrefresh.js", import.meta.url), "utf8");
   assert.match(js, /clip\.classList\.toggle\("grouped", scroller\.classList\.contains\("grouped"\)\)/);
+});
+
+// B197: a tick when the pull arms, the light haptic when a release starts the refresh, nothing otherwise.
+function hapticRun({ busyAtEnd = false, pulls }) {
+  let busy = false;
+  const buzz = [];
+  const t = pullTracker({ busy: () => busy, onHaptic: (k) => buzz.push(k) });
+  t.start();
+  busy = busyAtEnd;
+  for (const p of pulls) t.move(p);
+  const went = t.end();
+  return { went, buzz, t };
+}
+
+test("haptics: a tick crossing the trigger, a tap when the armed release starts the refresh", () => {
+  const r = hapticRun({ pulls: [10, 40, 61, 90, 120] });
+  assert.equal(r.went, true);
+  assert.deepEqual(r.buzz, ["tick", "tap"]); // one tick for the arm, however far it goes on
+  r.t.done(); r.t.hidden();
+  assert.deepEqual(r.buzz, ["tick", "tap"]); // closing and idle are silent
+});
+
+test("haptics: none on a release that runs nothing", () => {
+  assert.deepEqual(hapticRun({ pulls: [10, 40, 59] }).buzz, []);            // never armed
+  assert.deepEqual(hapticRun({ pulls: [30, 70, 40] }).buzz, ["tick"]);      // armed, pulled back under: no tap
+  assert.deepEqual(hapticRun({ pulls: [30, 70], busyAtEnd: true }).buzz, ["tick"]); // a refresh started meanwhile
+  const c = pullTracker({ onHaptic: () => assert.fail("no haptic") });
+  c.start(); c.cancel(); c.end();
+});
+
+test("haptics: each re-arm ticks again; a pull while held is silent", () => {
+  const r = hapticRun({ pulls: [70, 40, 70] });
+  assert.deepEqual(r.buzz, ["tick", "tick", "tap"]);
+  const before = r.buzz.length;
+  r.t.start(); r.t.move(120); r.t.end();
+  assert.equal(r.buzz.length, before);
+});
+
+test("haptics: a throwing onHaptic never stops the refresh", () => {
+  let n = 0;
+  const t = pullTracker({ onRefresh: () => n++, onHaptic: () => { throw new Error("bridge gone"); } });
+  t.start(); t.move(90);
+  assert.equal(t.end(), true);
+  assert.equal(n, 1);
+});
+
+test("pullHaptic: only where the app bridge plays haptics; tick -> haptic.tick, tap -> haptic.tap", async () => {
+  const played = [];
+  const fake = { tick: () => played.push("tick"), tap: () => played.push("tap") };
+  pullHaptic("tick", { ...fake, bridge: () => false });
+  pullHaptic("tap", { ...fake, bridge: () => false });
+  assert.deepEqual(played, []);
+  pullHaptic("tick", { ...fake, bridge: () => true });
+  pullHaptic("tap", { ...fake, bridge: () => true });
+  assert.deepEqual(played, ["tick", "tap"]);
+
+  // The real calls: the bridge message each one sends.
+  const sent = [];
+  const saved = { webkit: globalThis.webkit, app: globalThis.ifizboxApp };
+  globalThis.webkit = { messageHandlers: { ifizbox: { postMessage: (m) => { sent.push(m.method); return Promise.resolve(); } } } };
+  globalThis.ifizboxApp = true;
+  try {
+    pullHaptic("tick");
+    pullHaptic("tap");
+    assert.deepEqual(sent, ["haptic.tick", "haptic.tap"]);
+    globalThis.ifizboxApp = undefined; // the site: no bridge, nothing played (and nothing sent)
+    pullHaptic("tick");
+    pullHaptic("tap");
+    assert.deepEqual(sent, ["haptic.tick", "haptic.tap"]);
+  } finally {
+    globalThis.webkit = saved.webkit;
+    globalThis.ifizboxApp = saved.app;
+  }
+});
+
+test("pullToRefresh wires the tracker's haptics through pullHaptic", () => {
+  const src = readFileSync(new URL("./pullrefresh.js", import.meta.url), "utf8");
+  assert.match(src, /onHaptic: \(kind\) => pullHaptic\(kind\)/);
 });

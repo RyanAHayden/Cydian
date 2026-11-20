@@ -45,5 +45,7 @@ test("Sources, Changes and app.js are wired to it", () => {
   }
   assert.match(src("../screens/sources.js"), /label: "Add", [^\n]*pushed: false/);
   // Changes' Upgrade label lookup must not find the moved Refresh (the website has no Upgrade button).
-  assert.ok(src("../screens/changes.js").includes(`.nav-right .bar-button:not(.${MOVED_CLASS})`));
+  // C23: it asks its page handle (nav/go.js), whose rightButton skips the moved copy.
+  assert.ok(src("../screens/changes.js").includes("state.page?.rightButton()"));
+  assert.ok(src("./go.js").includes(`classList.contains("${MOVED_CLASS}")`));
 });

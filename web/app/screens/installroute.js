@@ -32,6 +32,7 @@ import { tailscaleVPNOn, installStatus, CHECKING, STATUS_ACTIONS } from "../core
 import { NAME } from "../brand.js";
 import { showHUD } from "../nav/hud.js";
 import { slideChange } from "../nav/slide.js";
+import { go as navGo, back as navBack } from "../nav/go.js";
 
 export const PAGE = "installation";
 // F300: Installation & Signing's main page links to Install Apps With (`with`: the choice and the chosen route's
@@ -40,7 +41,7 @@ export const SUB_TITLES = { pair: "Pairing", iphone: "This iPhone", with: "Insta
 const VPN = VPNS[0];
 
 const route = (sub) => format(settingsRoute(sub ? [PAGE, sub] : [PAGE]));
-const goTo = (sub) => { location.hash = route(sub).replace(/^#/, ""); };
+const goTo = (sub) => navGo(route(sub));
 const call = (native, m, p = {}, ev) => native?.call ? native.call(m, p, ev) : Promise.reject(new Error(`This needs the ${NAME} app.`));
 // F301: every call the page waits on has a deadline. Past it the row (or the alert) says Not Responding instead of
 // spinning on; a later answer is dropped. idevice.status answers in under a second (VPNCheck: no probe when no tunnel
@@ -715,7 +716,7 @@ export function askLeave(alert = showAlert, onPage) {
 // The guard sits in the capture phase on the document, ahead of app.js's own handlers: a tap on the nav bar's Back or
 // on a tab bar item is held back while asking and replayed (the same element clicked again) after Leave; an edge
 // swipe never starts (its pointerdown stops here) and asks once the finger has moved right as a swipe would, then
-// Leave taps the top page's Back. Any other way off the page (a link from a notification, another app opening a URL)
+// Leave goes Back as the nav bar's Back does (nav/go.js back). Any other way off the page (a link from a notification, another app opening a URL)
 // still ends the visit and cancels the pairing through the hashchange below.
 export const guardHooks = { alert: (q) => showAlert(q) };
 let replaying = false;
@@ -733,7 +734,7 @@ export function guardTap(e) {
   });
 }
 let edge = null; // { id, x0, y0 } of a held-back edge swipe
-export function guardSwipe(e, doc = document) {
+export function guardSwipe(e, back = navBack) {
   if (e.type === "pointerdown") {
     edge = null;
     if (!pendingStep() || !e.target?.closest?.(".edge-swipe") || e.clientX > EDGE) return;
@@ -748,12 +749,7 @@ export function guardSwipe(e, doc = document) {
   if (Math.abs(dy) > SLOP && Math.abs(dy) > Math.abs(dx)) { edge = null; return; } // a scroll
   if (dx <= SLOP || dx <= Math.abs(dy)) return;
   edge = null;
-  askLeave(guardHooks.alert).then((go) => {
-    const back = go && doc.querySelector?.(".nav-item.is-top .bar-button.back");
-    if (!back) return;
-    replaying = true;
-    try { back.click(); } finally { replaying = false; }
-  });
+  askLeave(guardHooks.alert).then((go) => { if (go) back(); });
 }
 
 if (typeof document !== "undefined" && typeof window !== "undefined") {

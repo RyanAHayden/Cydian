@@ -52,6 +52,7 @@ import { haptic } from "../nav/haptic.js";
 import { showHUD } from "../nav/hud.js";
 import { showUndoBar } from "../nav/undobar.js"; // F242a
 import { slideChange } from "../nav/slide.js"; // B191
+import { handleOf } from "../nav/go.js";
 import { APP_MODE_LABEL } from "../core/appqueue.js"; // F242a
 import { installedOnPhone } from "../core/appqueue.js"; // B136
 import { whereFromGroup, reportBanner, reports, reportMalicious } from "./safety.js"; // F291
@@ -268,7 +269,7 @@ export function signatureRow(record, { now = new Date(), window = resignWindow((
   return sig && (show || sig.state === "expired") ? { label: "Signature", detail: sig.long, cls: `sig-row-${sig.state}` } : null;
 }
 
-function trackingSection(app, pkg, source) {
+function trackingSection(app, pkg, source, body = null) {
   const box = el("div");
   const mark = (version) => apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version, key: pkg.key,
     source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).then(draw, () => {});
@@ -287,10 +288,9 @@ function trackingSection(app, pkg, source) {
     // installed, Reinstall when it's the same, Install when it isn't installed.
     // F80: Modify while the app is queued, as Cydia's does (core/appqueue.js appNavLabel).
     const label = appNavLabel({ queued: Boolean(appQueue.get(app.bundleIdentifier)), installed: rec ? rec.version || "" : null, newest: versions[0] });
-    // (the Share icon sits beside it in the same corner: find the button by its label)
+    // (the Share icon sits beside it in the same corner: find the button by its label, on this page's own nav item)
     const relabel = () => {
-      const b = [...document.querySelectorAll(".nav-stack.is-active .nav-item.is-top .nav-right .bar-button")]
-        .find((x) => /^(Install|Upgrade|Reinstall|Modify)$/.test(x.textContent));
+      const b = handleOf(body)?.rightButton((x) => /^(Install|Upgrade|Reinstall|Modify)$/.test(x.textContent));
       if (b) b.textContent = label;
       return Boolean(b);
     };
@@ -912,7 +912,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on
   // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.
   // F242: not in the jailbreak app, which can tell what's installed: there the section only shows the installed version.
-  details.append(trackingSection(app, pkg, source));
+  details.append(trackingSection(app, pkg, source, body));
   // F210: and the same in one tap from the nav bar (sideload and site only, F242).
   if (markToggleApplies(app)) {
     const toggle = markToggle(app, pkg, source);

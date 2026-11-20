@@ -162,3 +162,26 @@ test("Check Connection runs under the HUD; Forget Pairing too, then the page spi
   assert.ok(!box.textContent.includes("Checking…"));
   leave();
 });
+
+test("B167: switching Connect With to Automatic while signed in: Tailscale's row spins Checking… until the status comes, never Sign In", async () => {
+  hudLog(1000);
+  const SIGNED_IN = { ...PAIRED_ON, tailscale: { connect: "tailscale", signedIn: true, name: "ifizbox-on-iphone", address: "100.1.2.3" } };
+  const again = later();
+  let n = 0;
+  const native = bridge({ "idevice.status": () => (n++ ? again.p : Promise.resolve(SIGNED_IN)), "idevice.developerMode": { on: true }, "tailscale.setConnect": null });
+  const box = make("div");
+  await drawInstallation(box, null, { store: store("iphone"), native, alert: async () => ({ index: 0 }) });
+  await flush();
+  assert.ok(labels(box).includes("Sign Out"));
+  tap(box, "Automatic");
+  await flush();
+  await flush();
+  assert.ok(!labels(box).includes("Sign In"), `no Sign In flash: ${labels(box)}`);
+  const tsRows = withClass(box, "cell-inner").filter((c) => withClass(c, "cell-label")[0]?.textContent === "Tailscale");
+  assert.ok(tsRows.some((c) => withClass(c, "loading-spinner").length === 1 && c.textContent.includes("Checking…")), "Tailscale's row spins Checking…");
+  again.answer({ ...SIGNED_IN, tailscale: { ...SIGNED_IN.tailscale, connect: "auto" } });
+  await flush();
+  await flush();
+  assert.ok(labels(box).includes("Sign Out"), "its real state comes back");
+  assert.ok(!labels(box).includes("Sign In"));
+});

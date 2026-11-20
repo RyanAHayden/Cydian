@@ -88,3 +88,16 @@ test("This iPhone: Connect With and Tailscale (Sign In, or the device with Test 
   gs = installationGroups("iphone", null, { busy: "Log in on the page" });
   assert.deepEqual(gs[3].rows.map((r) => [r.label, r.detail]), [["Signing In…", "Log in on the page"]]);
 });
+
+test("Tailscale while its state is unknown: Checking… with the spinner, never Sign In; Connect With keeps the pick", () => {
+  let gs = installationGroups("iphone", null, { reading: true });
+  assert.deepEqual(gs[3].rows.map((r) => [r.label, r.detail, r.spin]), [["Tailscale", "Checking…", true]]);
+  assert.equal(gs[2].rows.find((r) => r.checked).label, "Automatic");
+  gs = installationGroups("iphone", null, { reading: true, connectPick: "tailscale" });
+  assert.equal(gs[2].rows.find((r) => r.checked).label, "Tailscale");
+  gs = installationGroups("iphone", null, { reading: true, busy: "Log in on the page" });
+  assert.equal(gs[3].rows[0].label, "Signing In…", "a running sign-in still shows");
+  gs = installationGroups("iphone", { paired: "rp", tailscale: { connect: "auto", signedIn: false } }, { connectPick: "tailscale" });
+  assert.deepEqual(gs[3].rows.map((r) => r.label), ["Sign In"], "the answer's signed out is Sign In");
+  assert.equal(gs[2].rows.find((r) => r.checked).label, "Automatic", "the answer wins over the pick");
+});

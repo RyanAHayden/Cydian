@@ -1,0 +1,16 @@
+18:04:20.473849 appstored{appstored}[215] <NOTICE>: [UPP3AAE4158/com.ryha.ifizbox] Running HEAD operation to get size for URL: https://sign.ifizbox.com/sign/host/0d1a15b01d59f67044083ea299c2f971b6d00a
+18:04:20.677160 appstored{appstored}[215] <NOTICE>: [UPP3AAE4158/com.ryha.ifizbox] Found size: 18828171 for URL: https://sign.ifizbox.com/sign/host/0d1a15b01d59f67044083ea299c2f971b6d00a069c8a2e7b/app
+18:04:20.759772 appstored{appstored}[215] <NOTICE>: [UPP3AAE4158/com.ryha.ifizbox] Beginning downloading
+18:04:21.684680 appstored{appstored}[215] <NOTICE>: [UPP3AAE4158/com.ryha.ifizbox/9DFBE87B] Response body received speed: 195 Mbps
+18:04:21.686423 appstored{appstored}[215] <NOTICE>: [UPP3AAE4158/com.ryha.ifizbox/9DFBE87B] Completed task: BackgroundDataTask <D5D1300D-FECA-4B79-9E77-171101C58B36>.<2>
+18:04:21.690313 appstored{appstored}[215] <NOTICE>: [UPP3AAE4158/com.ryha.ifizbox] Beginning installation
+18:04:21.699032 appstored{appstored}[215] <NOTICE>: [UPP3AAE4158/com.ryha.ifizbox] Waiting for installation to complete
+18:04:23.650752 iFizBox{iFizBox}[895] <NOTICE>: iFizBox install: self-close: exiting in 0.6 s
+18:04:24.313400 iFizBox{iFizBox}[895] <NOTICE>: iFizBox install: self-close: exit
+18:04:24.727057 SpringBoard{FrontBoard}[37] <NOTICE>: [app<com.ryha.ifizbox>:895] Process exited: <RBSProcessExitContext| voluntary>.
+18:04:24.728490 InputUI{FrontBoard}[191] <NOTICE>: [app<com.ryha.ifizbox>:895] Process exited: <RBSProcessExitContext| voluntary>.
+18:04:24.729971 SpringBoard{SpringBoard}[37] <NOTICE>: Process exited: <FBApplicationProcess: 0x7d87357000; app<com.ryha.ifizbox>:895(v9B7)> -> <RBSProcessExitContext| voluntary>
+18:04:24.890962 installd{MobileInstallation}[303] <NOTICE>: com.ryha.ifizbox/FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5:7:2:1:1:Start : Install (Parallel Placeholder)
+18:04:25.150621 installd{MobileInstallation}[303] <NOTICE>: com.ryha.ifizbox/FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5:7:2:2:1:Success (End) : Install (Parallel Placeholder)
+18:04:42.004033 installd{MobileInstallation}[303] <NOTICE>: com.ryha.ifizbox/FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5:7:7:1:1:Start : Install (Promote From Placeholder)
+18:04:48.476762 installd{MobileInstallation}[303] <NOTICE>: com.ryha.ifizbox/FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5:7:7:2:1:Success (End) : Install (Promote From Placeholder)

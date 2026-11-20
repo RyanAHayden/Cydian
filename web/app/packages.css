@@ -659,6 +659,8 @@ html[data-theme="dark"] .store-tile-sub[data-ok="false"] { color: var(--dk-bad);
 .store-tile-sub { line-height: 12px; }
 .store-tile > .store-stars.small { margin: 1px 0; }
 .store-tile[data-pending="true"] .store-tile-value { color: var(--subtitle); }
+/* B184: the Works On verdict ("Not Your iPhone ✗", "Needs Jailbreak ✗") wraps rather than cut off in a narrow tile. */
+.store-tile-sub[data-ok] { white-space: normal; text-overflow: clip; text-align: center; overflow-wrap: anywhere; }
 
 /* The screenshot strip's page dots (altstore.js galleryGroup): 7px, 7px apart, the one in view dark. */
 .shot-dots { display: flex; justify-content: center; gap: 7px; margin-top: 8px; }

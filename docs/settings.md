@@ -57,7 +57,9 @@ dates and the switch would do nothing there.
 Sideload build only, drawn by `screens/installroute.js` (rules and texts in `core/installroute.js`):
 
 - **Install Apps With**: Signing Server (the manifest and iOS's Install prompt) or This iPhone (installd over
-  LocalDevVPN, docs/sideload.md), each subtitle a short point per line, wrapped. Picking This iPhone before it is
+  LocalDevVPN or Tailscale, docs/sideload.md), each subtitle a short point per line, wrapped. This iPhone's says
+  LocalDevVPN or Tailscale / No server, no install popup / Updates itself: installs through installation_proxy
+  never show iOS's install prompt. Picking This iPhone before it is
   paired opens This iPhone's page.
 - With This iPhone chosen: **Pairing** (Paired / Not Paired, opens `installation/pair`), **LocalDevVPN** (On, Off or
   Another VPN) and **Open LocalDevVPN**.

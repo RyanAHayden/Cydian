@@ -10,7 +10,7 @@ test("Install Apps With: Signing Server and This iPhone, the chosen one checked,
   assert.equal(g.header, "Install Apps With");
   assert.deepEqual(g.rows.map((r) => [r.label, r.checked]), [["Signing Server", true], ["This iPhone", false]]);
   assert.deepEqual(g.rows[0].subtitle.split("\n"), ["Default", "Uses ifizbox.com"]);
-  assert.deepEqual(g.rows[1].subtitle.split("\n"), ["LocalDevVPN or Tailscale", "No server", "Updates itself"]);
+  assert.deepEqual(g.rows[1].subtitle.split("\n"), ["LocalDevVPN or Tailscale", "No server, no install popup", "Updates itself"]);
   assert.ok(g.rows.every((r) => r.cls === "route-row"));
   assert.equal(more, undefined);
 });

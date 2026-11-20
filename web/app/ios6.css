@@ -163,7 +163,7 @@ html[data-theme="dark"][data-palette="gunmetal"] {
   --dk-tabbar: /* the light theme's .tabbar */
     linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) top / 100% 1px no-repeat,
     linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,.1)) 0 1px / 100% 1px no-repeat,
-    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% 48px no-repeat,
+    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% calc(100% - 1px) no-repeat,
     #000;
   --dk-btn-edge: #111;
   --dk-btn: linear-gradient(#4a4f58, #24272c);
@@ -224,6 +224,27 @@ body { color: var(--text); background: #000; }
 html[data-theme="dark"] .navbar { background: var(--dk-nav-bar); } /* the palette's (F198): OLED Black or gunmetal */
 html[data-theme="dark"] .navbar::after { background: var(--dk-nav-shadow); }
 html[data-theme="dark"] .tabbar { background: var(--dk-tabbar); }
+/* The status-bar strip above the nav bar (env(safe-area-inset-top)). In the app (native/Sources/App.swift puts
+   data-shell="app" on <html>, both builds) it is part of the nav bar: a layer over the strip and the bar's top half
+   takes the bar's own background (every theme's nav bar, and the console's, has the same four layers: base line,
+   highlight, gloss, status-bar fill) and stretches the gloss's top half over itself, highlight at the very top. The
+   bar's lower half, and the hard split of the dark glosses, stay where the kit has them; the colours meet at the
+   half, so there is no line or step where the strip was. (Stretching the whole gloss put the dark split on the
+   strip's edge.) */
+html[data-shell="app"] .navbar::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: calc(env(safe-area-inset-top) + 22px);
+  pointer-events: none;
+  background: inherit;
+  background-repeat: no-repeat;
+  background-position: 0 0, top, top, 0 0;
+  background-size: 0 0, 100% 1px, 100% 200%, 0 0;
+}
+/* On the website the strip stays plain black, as iOS's opaque black status bar (index.html) draws it: the nav bar
+   starts below it. */
+html:not([data-shell="app"]) .navbar::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: env(safe-area-inset-top); background: #000;
+  pointer-events: none;
+}
 
 /* Bar buttons and the back arrow, from the 4S's UIKit art (UINavigationBarDefaultButton, ...Pressed, ...Back), the
    versions the user picked (2026-11-17). background-origin: border-box matters: without
@@ -318,11 +339,13 @@ html[data-theme="dark"] .pair-button.delete-button:is(:active, .is-pressed) {
 }
 
 /* ---- Tab bar: "Tab bar" ---- */
+/* The background spans the whole bar, the strip over the home indicator (--safe-bottom) included, so the gloss
+   keeps its half-and-half split instead of ending at 49 pt over a band of plain black. */
 .tabbar {
   background:
     linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) top / 100% 1px no-repeat,          /* top dark highlight */
     linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,.1)) 0 1px / 100% 1px no-repeat, /* top highlight */
-    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% 48px no-repeat,  /* background */
+    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% calc(100% - 1px) no-repeat, /* background */
     #000;
 }
 .tabbar::before { /* Shadow above: 2.5px, black at 18% */

@@ -199,6 +199,11 @@ enum Web {
         c.setURLSchemeHandler(AppScheme(), forURLScheme: AppScheme.scheme)
         c.userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "ifizbox")
         Apt.installScript(c.userContentController) // ifizboxNative, before any page script (native/bridge.js)
+        // The app's look where it differs from the website's, before first paint: ios6.css draws the nav bar's art
+        // through the status-bar strip here (on the website the strip stays plain black). Both builds.
+        c.userContentController.addUserScript(WKUserScript(
+            source: "document.documentElement.setAttribute('data-shell', 'app')",
+            injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
         // WebKit holds requestAnimationFrame near 60 Hz by default on iOS; the JS edge swipe needs 120 (R3).
         WebKitFeature.set({ $0 == "PreferPageRenderingUpdatesNear60FPSEnabled" }, false, c.preferences)
         let w = WKWebView(frame: .zero, configuration: c)

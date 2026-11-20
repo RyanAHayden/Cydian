@@ -232,6 +232,21 @@ enum MachO {
         return d
     }
 
+    // B162: whether the file holds any code signing can keep: a thin 64-bit Mach-O, or a fat one with a 64-bit
+    // slice. A 32-bit-only one (RetroArch 1.12.0's armv7 cores) can't load on iOS 15+ and is left unsigned.
+    static func has64BitCode(_ file: Data) -> Bool {
+        guard file.count >= 8 else { return false }
+        if file.le32(at: 0) == magic64 { return true }
+        guard file.be32(at: 0) == fatMagic else { return false }
+        let n = Int(file.be32(at: 4))
+        for i in 0..<n {
+            let o = 8 + i * 20
+            guard o + 20 <= file.count else { return false }
+            if file.be32(at: o) & 0x0100_0000 != 0 { return true } // CPU_ARCH_ABI64
+        }
+        return false
+    }
+
     static func filetype(_ file: Data) -> UInt32? {
         guard file.count >= 16 else { return nil }
         if file.le32(at: 0) == magic64 { return file.le32(at: 12) }

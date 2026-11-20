@@ -467,6 +467,35 @@ test("B21: a nested bundle or framework without its executable is sealed as reso
     } catch let e as SignError { check(e.code == "bad_ipa" && "\(e)".contains("X is missing"), "\(e)") }
 }
 
+test("B162: a loose 32-bit-only Mach-O is sealed as a resource, not an error") {
+    let profile = try Profile(try fixture("profile.mobileprovision"))
+    let signer = IPASigner(profile: profile, identity: identity)
+    var logged = [String]()
+    signer.log = { logged.append($0) }
+    let input = fixtures.appendingPathComponent("thin32.ipa")
+    let out = work.appendingPathComponent("thin32-signed.ipa")
+    let app = try signer.sign(input, to: out)
+    check(app.skipped == ["modules/fat32_libretro_ios.dylib", "modules/old_libretro_ios.dylib"], "skipped \(app.skipped)")
+    check(logged.contains("Skipped modules/old_libretro_ios.dylib: 32-bit only, iOS 15+ can't load it, sealed as a resource"), "log \(logged)")
+    let f = try entries(out), orig = try entries(input)
+    let a = "Payload/Fixture.app/"
+    for rel in ["modules/old_libretro_ios.dylib", "modules/fat32_libretro_ios.dylib"] {
+        check(f[a + rel] != nil && f[a + rel] == orig[a + rel], "\(rel) kept as it was")
+    }
+    try verifySigned(f[a + "modules/new_libretro_ios.dylib"]!, name: "new-core", expectIdent: "new_libretro_ios", team: team,
+                     info: nil, resources: nil, ents: false)
+    try verifySigned(f[a + "Fixture"]!, name: "Fixture-thin32", expectIdent: "dev.ifizbox.fixture", team: team,
+                     info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
+    let cr = try PropertyListSerialization.propertyList(from: f[a + "_CodeSignature/CodeResources"]!, format: nil) as! [String: Any]
+    let files2 = cr["files2"] as! [String: Any]
+    for rel in ["modules/old_libretro_ios.dylib", "modules/fat32_libretro_ios.dylib", "modules/new_libretro_ios.dylib"] {
+        check((files2[rel] as? [String: Any])?["hash2"] as? Data == sha256(f[a + rel]!), "\(rel) sealed by the app")
+    }
+    let fat = try fixture("fat.macho"), thin = try fixture("unsigned.macho")
+    check(MachO.has64BitCode(fat) && MachO.has64BitCode(thin), "64-bit code found")
+    check(!MachO.has64BitCode(Data([0xCE, 0xFA, 0xED, 0xFE, 12, 0, 0, 0])), "thin armv7 has none")
+}
+
 test("HTTP requests and ranges") {
     check(try HTTPRequest.parse(Data("GET /a HTTP/1.1\r\nHost: x".utf8)) == nil, "incomplete header waits")
     let r = try HTTPRequest.parse(Data("GET /t/app.ipa?x=1 HTTP/1.1\r\nHost: 127.0.0.1\r\nRange: bytes=10-19\r\n\r\n".utf8))!

@@ -96,9 +96,27 @@ def info(bundle_id, exe, name="Fixture", **extra):
     return plistlib.dumps(d, fmt=plistlib.FMT_BINARY)
 
 
-def rich_ipa(main_binary=None, kit=None, loose=None):
+def armv7(filetype=6):
+    """B162: a thin 32-bit (armv7) Mach-O header, all signing needs to see to leave it alone."""
+    return struct.pack("<IiiIIIII", 0xFEEDFACE, 12, 9, filetype, 0, 0, 0, 0) + b"\0" * 64
+
+
+def fat32():
+    """B162: a fat Mach-O with armv7 and armv7s slices and no 64-bit one."""
+    a, s = armv7(), armv7()
+    head = struct.pack(">II", 0xCAFEBABE, 2)
+    head += struct.pack(">IIIII", 12, 9, 0x1000, len(a), 12)
+    head += struct.pack(">IIIII", 12, 11, 0x2000, len(s), 12)
+    body = bytearray(0x2000 + len(s))
+    body[:len(head)] = head
+    body[0x1000:0x1000 + len(a)] = a
+    body[0x2000:] = s
+    return bytes(body)
+
+
+def rich_ipa(main_binary=None, kit=None, loose=None, extra=None):
     """An app with a framework, a loose dylib, a share extension, localisations, a symlink and leftovers of an old
-    signature."""
+    signature. `extra`: more files under the app, {relative path: data}, put executable."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         def put(name, data, mode=0o100644):
@@ -125,6 +143,8 @@ def rich_ipa(main_binary=None, kit=None, loose=None):
         put(A + "PlugIns/Share.appex/Info.plist", info("dev.ifizbox.fixture.share", "Share", "Share",
                                                        CFBundlePackageType="XPC!"))
         put(A + "PlugIns/Share.appex/Share", macho(), 0o100755)
+        for rel, data in (extra or {}).items():
+            put(A + rel, data, 0o100755)
         put("iTunesMetadata.plist", plistlib.dumps({"itemName": "Fixture"}))
     return buf.getvalue()
 
@@ -228,6 +248,10 @@ class OnDeviceSigner(unittest.TestCase):
         w("profile-expired.mobileprovision", T.profile(key, cert, days=-1))
         w("rich.ipa", rich_ipa())
         w("rich-big.ipa", rich_ipa(big_macho(2), big_macho(6, seed=2), big_macho(6, pages=80, seed=3)))
+        # B162: RetroArch 1.12.0 ships armv7-only cores in modules/ beside arm64 ones
+        w("thin32.ipa", rich_ipa(extra={"modules/old_libretro_ios.dylib": armv7(),
+                                        "modules/fat32_libretro_ios.dylib": fat32(),
+                                        "modules/new_libretro_ios.dylib": macho(6)}))
         w("unsigned.macho", macho())
         w("fat.macho", fat())
         w("notanipa.ipa", small_zip({"hello.txt": "hi"}))

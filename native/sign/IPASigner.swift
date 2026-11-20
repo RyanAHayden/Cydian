@@ -12,7 +12,8 @@ struct SignedApp {
     let version: String
     let removed: [String]     // what was left out (extensions an explicit profile can't cover, leftovers)
     var fixedArm64e: [String] = [] // binaries whose old-ABI arm64e slice was fixed up (F14, SignOptions.swift)
-    var skipped: [String] = []     // B21: nested bundles whose executable is missing, sealed as resources
+    var skipped: [String] = []     // B21: nested bundles whose executable is missing, sealed as resources;
+                                   // B162: loose 32-bit-only Mach-Os, also sealed as resources
 }
 
 final class IPASigner {
@@ -219,6 +220,7 @@ final class IPASigner {
         if let icon = options.icon { for f in options.iconFiles { files[appDir + f] = .data(icon, mode: 0o100644) } }
 
         var fixedArm64e = [String]()
+        var thin32 = [String]() // B162: loose Mach-Os with no 64-bit code, left unsigned and sealed as resources
         func fixed(_ path: String, _ data: Data) -> Data {
             guard options.fixArm64e else { return data }
             let (d, changed) = Arm64e.fixup(data)
@@ -247,6 +249,13 @@ final class IPASigner {
                 let path = loose[k]
                 let data = fixed(path, try self.contents(path, current, reader))
                 guard let ft = MachO.filetype(data), [2, 6, 8].contains(ft) else { return nil } // executables, dylibs, bundles
+                // B162: 32-bit-only code (armv7 cores in an old emulator's modules/) can't run on iOS 15+: sealed
+                // as a resource like any other file, as zsign and Feather leave it, instead of failing the IPA.
+                guard MachO.has64BitCode(data) else {
+                    let rel = String(path.dropFirst(appDir.count))
+                    mutex.lock(); thin32.append(rel); mutex.unlock()
+                    return nil
+                }
                 let name = String(path.split(separator: "/").last!)
                 let ident = name.hasSuffix(".dylib") ? String(name.dropLast(6)) : name
                 let m = self.mode(path, current)
@@ -275,6 +284,8 @@ final class IPASigner {
         }
 
         for f in fixedArm64e { log("Fixed the old arm64e slice of \(f)") }
+        for f in thin32.sorted() { log("Skipped \(f): 32-bit only, iOS 15+ can't load it, sealed as a resource") }
+        skipped += thin32
         if stop() { throw SignJob.cancelledError }
         // Write: kept entries in their order (copied raw when untouched), then the new files.
         let out = try ZipWriter(url: output)

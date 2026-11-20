@@ -16,16 +16,22 @@ https://claude.ai/artifact/Nadcgkh55icsRMMMFQYzP5, section "One icon per theme".
     `AppIcon{,Lite}1024.png`: every AppIcon size, the same names as `native/icon/`'s own, so a later build or
     asset-catalog step can use a theme folder in place of `icon/`. Lite also gets the 60x60 1x the top level lacks,
     so every theme has plain + Lite at every size.
-  - `web/app/icons/themes/<theme>/icon{,-lite}-{180,192,512}.png` (flat: apple-touch-icon and manifest sizes) and
-    `icon{,-lite}-glossy-{76,152,228}.png` (iOS 6 corners: the Home header's sizes). I read "at every AppIcon size"
-    for the web folder as the sizes the web side uses (it never uses 20/29/40pt). The 1024 masters only went to
-    native, where the asset catalog needs them.
+  - `web/app/icons/themes/<theme>/icon{,-lite}-{180,192,512}.png` (flat: apple-touch-icon and manifest sizes). I
+    read "at every AppIcon size" for the web folder as the sizes the web side uses. The website never uses
+    20/29/40pt, and copying the native set there would ship about 11 MB of 1024 px masters to the site for nothing.
+    The spec review called this partial against the literal wording. I kept it as a decision, not a gap; if the
+    web folder should mirror native, that's one more loop in icons.sh.
 - Tests: `web/app/icons/test_icons.py` `ThemeIcons` and `native/test_icons.py` `ThemeIcons`: every theme-boot.js theme
   has plain + Lite at every size, no folder for a theme that no longer exists, Classic is byte-for-byte the real icon,
   no two themes share an icon, and the generator's table equals theme-boot.js's lists.
 - `docs/concepts/icon/README.md`: a short "One icon per theme" section that points at the generator.
 
-Output size: native/icon/themes 12 MB (mostly the 1024 masters, about 0.6 MB each), web/app/icons/themes 6.9 MB. No
+Output size: native/icon/themes 12 MB (mostly the 1024 masters, about 0.6 MB each), web/app/icons/themes 4.9 MB.
+
+Spec review: it found the glossy web variants (`icon{,-lite}-glossy-{76,152,228}.png`, for the Home header) were not
+asked for. I removed them from this branch and filed them as F326. Its other points: the extra tests and the Lite
+60x60 1x file serve "plain + Lite at every size", so they stay. scipy is a dependency icon_bg.py already has. The new
+`trap` lists every earlier temp file, so nothing leaks. No
 file is over the 1 MB size guard, and both folders are on its allowlist anyway.
 
 ## Checks

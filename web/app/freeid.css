@@ -1,77 +1,113 @@
 /* F254: Settings > Signing's Free Apple ID (screens/free-apple-id.js). The setup checklist: each step's mark is iOS 6's
    grey spinner while it runs (the same image and spoke-at-a-time turn as the HUD's), the walkthrough's green tick
-   badge once done, a red cross when it failed; steps not reached yet are grey. Fields reuse Signing's .sign-field. */
+   badge once done, a red cross when it failed; steps not reached yet are grey. Fields reuse Signing's .sign-field.
+   Each part's layout is in its own rules; what it paints is in the look-only stretch after them (docs/eras.md), and
+   the iOS 6 decorations (the badges' glosses) come from the tokens in the first stretch. */
 .free-route { margin-top: 8px; }
 .free-route[hidden] { display: none; }
-.free-checklist { list-style: none; padding: 0; }
+.free-checklist { padding: 0; }
 .free-step .cell-inner { gap: 10px; }
-.free-mark { flex: none; width: 22px; height: 22px; border-radius: 50%; box-sizing: border-box; }
+.free-mark { flex: none; width: 22px; height: 22px; box-sizing: border-box; }
+.free-step.is-running .free-mark { animation: hud-spin .96s linear infinite; }
+.free-input { flex: 1; }
+:is(.free-button, .free-primary, .free-danger) .cell-inner { justify-content: center; }
+:is(.free-button, .free-primary, .free-danger) .cell-text { flex: none; }
+@media (prefers-reduced-motion: reduce) { .free-step.is-running .free-mark { animation-duration: 3s; } }
+
+/* ==== look-only { ==== the checklist's marks, fields and buttons */
+:root {
+  /* the walkthrough's badges (signing.css): green done, red failed, grey optional */
+  --free-done: linear-gradient(#7fd36b, #2f9a1f);
+  --free-done-edge: #2a7a1c;
+  --free-failed: linear-gradient(#e2716a, #b5322c);
+  --free-failed-edge: #8f241f;
+  --free-optional: linear-gradient(#b4bccb, #8792a6);
+}
+.free-checklist { list-style: none; }
+.free-mark { border-radius: 50%; }
 .free-step.is-waiting .free-mark { border: 2px solid var(--subtitle); }
 .free-step.is-waiting .cell-label { color: var(--subtitle); }
-.free-step.is-running .free-mark { border-radius: 0; background: var(--spinner-gray) center / 20px no-repeat; animation: hud-spin .96s linear infinite; }
+.free-step.is-running .free-mark { border-radius: 0; background: var(--spinner-gray) center / 20px no-repeat; }
 .free-step.is-done .free-mark {
-  border: 1px solid #2a7a1c;
+  border: 1px solid var(--free-done-edge);
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M7 13.5l4 4 8-9' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat,
-    linear-gradient(#7fd36b, #2f9a1f);
+    var(--free-done);
   background-origin: border-box;
 }
 .free-step.is-failed .free-mark {
-  border: 1px solid #8f241f;
+  border: 1px solid var(--free-failed-edge);
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M8.5 8.5l9 9M17.5 8.5l-9 9' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% no-repeat,
-    linear-gradient(#e2716a, #b5322c);
+    var(--free-failed);
   background-origin: border-box;
 }
 .free-step.is-failed .cell-subtitle { color: #b5322c; }
-.free-input { flex: 1; text-align: left; }
+.free-input { text-align: left; }
 .free-code .free-input { letter-spacing: 4px; font-size: 20px; }
-:is(.free-button, .free-primary, .free-danger) .cell-inner { justify-content: center; }
-:is(.free-button, .free-primary, .free-danger) .cell-text { flex: none; text-align: center; }
+:is(.free-button, .free-primary, .free-danger) .cell-text { text-align: center; }
 .free-primary .cell-label { color: var(--detail); }
 .free-danger .cell-label { color: #b5322c; }
-@media (prefers-reduced-motion: reduce) { .free-step.is-running .free-mark { animation-duration: 3s; } }
+/* ==== } look-only ==== */
 
 /* F254i: Developer Mode and Trust (free-apple-id.js devModeView). The step cards are the Signing walkthrough's
    (signing.css .walk-*, loaded by signing.js, which draws this block); here only: the heads don't tap, optional steps
    get a grey badge. The pictures (.dm-*) are today's iOS Settings redrawn small, 240 px wide like the certificate
    step's screenshot, light or dark with the page's theme. */
 .free-devmode-head { cursor: default; }
+.dm-shot { margin: 14px auto 0; width: 240px; max-width: 100%; box-sizing: border-box; overflow: hidden; -webkit-user-select: none; user-select: none; }
+.dm-screen { position: relative; min-height: 130px; padding: 0 0 12px; }
+.dm-nav { position: relative; height: 30px; display: flex; align-items: center; justify-content: center; }
+.dm-back { position: absolute; left: 6px; max-width: 20%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dm-title { max-width: 56%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dm-header { margin: 10px 18px 3px; }
+.dm-group { margin: 0 10px; overflow: hidden; }
+.dm-row { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 8px 0 10px; }
+.dm-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dm-chevron { width: 5px; height: 5px; transform: rotate(45deg); }
+.dm-switch { flex: none; position: relative; width: 30px; height: 18px; }
+.dm-switch::after { position: absolute; top: 1.5px; left: 1.5px; width: 15px; height: 15px; }
+.dm-switch.is-on::after { left: 13.5px; }
+.dm-footer { margin: 4px 18px 0; }
+.dm-dim { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.dm-alert { width: 170px; overflow: hidden; }
+.dm-alert-title { padding: 10px 10px 2px; }
+.dm-alert-text { padding: 0 10px 10px; }
+.dm-alert-buttons { display: flex; }
+.dm-alert-button { flex: 1; padding: 7px 0; }
+
+/* ==== look-only { ==== Developer Mode's step heads and badges, and the pictures of today's iOS (their own colours) */
 .free-devmode-head:active { background: none; color: var(--text); }
-.walk-step.is-optional .walk-badge { background: linear-gradient(#b4bccb, #8792a6); }
+.walk-step.is-optional .walk-badge { background: var(--free-optional); }
 .dm-shot {
   --dm-bg: #f2f2f7; --dm-cell: #fff; --dm-text: #000; --dm-grey: #8a8a8e; --dm-line: #c6c6c8; --dm-blue: #007aff;
   --dm-alert: rgba(242,242,247,.96); --dm-sep: rgba(60,60,67,.29);
-  margin: 14px auto 0; width: 240px; max-width: 100%; box-sizing: border-box; overflow: hidden;
   border-radius: 12px; border: 1px solid rgba(0,0,0,.22);
-  font: 11px/14px -apple-system, "Helvetica Neue", Helvetica, sans-serif; text-shadow: none; -webkit-user-select: none; user-select: none;
+  font: 11px/14px -apple-system, "Helvetica Neue", Helvetica, sans-serif; text-shadow: none;
 }
 html[data-theme="dark"] .dm-shot {
   --dm-bg: #000; --dm-cell: #1c1c1e; --dm-text: #fff; --dm-grey: #8d8d93; --dm-line: #38383a; --dm-blue: #0a84ff;
   --dm-alert: rgba(44,44,46,.96); --dm-sep: rgba(84,84,88,.6);
   border-color: rgba(255,255,255,.18);
 }
-.dm-screen { position: relative; min-height: 130px; padding: 0 0 12px; background: var(--dm-bg); color: var(--dm-text); }
-.dm-nav { position: relative; height: 30px; display: flex; align-items: center; justify-content: center; }
-.dm-back { position: absolute; left: 6px; color: var(--dm-blue); max-width: 20%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dm-screen { background: var(--dm-bg); color: var(--dm-text); }
+.dm-back { color: var(--dm-blue); }
 .dm-back::before { content: "‹ "; font-size: 15px; }
-.dm-title { font-weight: 600; max-width: 56%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.dm-header { margin: 10px 18px 3px; font-size: 9px; text-transform: uppercase; color: var(--dm-grey); }
-.dm-group { margin: 0 10px; border-radius: 9px; background: var(--dm-cell); overflow: hidden; }
-.dm-row { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 8px 0 10px; }
+.dm-title { font-weight: 600; }
+.dm-header { font-size: 9px; text-transform: uppercase; color: var(--dm-grey); }
+.dm-group { border-radius: 9px; background: var(--dm-cell); }
 .dm-row + .dm-row { box-shadow: inset 10px 0 0 var(--dm-cell), inset 0 .5px 0 var(--dm-line); }
 .dm-row.is-marked { outline: 2px solid var(--dm-blue); outline-offset: -2px; border-radius: 9px; }
-.dm-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .dm-detail { color: var(--dm-grey); }
-.dm-chevron { width: 5px; height: 5px; border: solid var(--dm-line); border-width: 1.5px 1.5px 0 0; transform: rotate(45deg); }
-.dm-switch { flex: none; position: relative; width: 30px; height: 18px; border-radius: 9px; background: var(--dm-line); }
-.dm-switch::after { content: ""; position: absolute; top: 1.5px; left: 1.5px; width: 15px; height: 15px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.dm-chevron { border: solid var(--dm-line); border-width: 1.5px 1.5px 0 0; }
+.dm-switch { border-radius: 9px; background: var(--dm-line); }
+.dm-switch::after { content: ""; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 .dm-switch.is-on { background: #34c759; }
-.dm-switch.is-on::after { left: 13.5px; }
-.dm-footer { margin: 4px 18px 0; font-size: 9px; line-height: 12px; color: var(--dm-grey); }
-.dm-dim { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.35); }
-.dm-alert { width: 170px; border-radius: 10px; background: var(--dm-alert); text-align: center; overflow: hidden; }
-.dm-alert-title { padding: 10px 10px 2px; font-weight: 600; }
-.dm-alert-text { padding: 0 10px 10px; font-size: 9px; line-height: 12px; }
-.dm-alert-buttons { display: flex; box-shadow: inset 0 .5px 0 var(--dm-sep); }
-.dm-alert-button { flex: 1; padding: 7px 0; color: var(--dm-blue); }
+.dm-footer { font-size: 9px; line-height: 12px; color: var(--dm-grey); }
+.dm-dim { background: rgba(0,0,0,.35); }
+.dm-alert { border-radius: 10px; background: var(--dm-alert); text-align: center; }
+.dm-alert-title { font-weight: 600; }
+.dm-alert-text { font-size: 9px; line-height: 12px; }
+.dm-alert-buttons { box-shadow: inset 0 .5px 0 var(--dm-sep); }
+.dm-alert-button { color: var(--dm-blue); }
 .dm-alert-button + .dm-alert-button { box-shadow: inset .5px 0 0 var(--dm-sep); }
 .dm-alert-button.is-bold { font-weight: 600; }
+/* ==== } look-only ==== */

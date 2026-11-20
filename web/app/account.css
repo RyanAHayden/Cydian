@@ -1,5 +1,6 @@
-/* F97: Settings > Account (screens/account.js). The rows are grouped()'s; only the key and Delete Account are drawn here. */
-.account-code .cell-label { font-size: 18px; letter-spacing: 0; white-space: normal; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+/* F97: Settings > Account (screens/account.js). The rows are grouped()'s; only the key and Delete Account are drawn here.
+   The key's type is in the look-only stretch at the end (docs/eras.md). */
+.account-code .cell-label { white-space: normal; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
 .account-qr img { max-width: 240px; }
 /* Delete Account: the action sheet's red button (packages.css .action-button.destructive), full width like iOS 6's Delete Account */
 .account-delete-wrap { display: flex; padding: 10px 10px 30px; }
@@ -7,3 +8,7 @@
 /* Sign Out (F286): the action sheet's plain silver button (packages.css .action-button), above Delete Account */
 .account-signout-wrap { display: flex; padding: 10px 10px 0; }
 .account-signout { flex: 1; }
+
+/* ==== look-only { ==== the account key */
+.account-code .cell-label { font-size: 18px; letter-spacing: 0; }
+/* ==== } look-only ==== */

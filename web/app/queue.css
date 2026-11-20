@@ -1,57 +1,79 @@
 /* The install queue (N4, screens/queue.js): queued rows, the Confirm sheet and the console. Sizes and colours of the
    console from Cydia's progress page (docs/cydia.md "Running: the console"); the black bar is the kit's
-   "Semi-transparent black bar", opaque (#4c4c4c to black at 52%, a white-at-20% line on top, black-at-70% below). */
+   "Semi-transparent black bar", opaque (#4c4c4c to black at 52%, a white-at-20% line on top, black-at-70% below).
+   Each part's layout is in its own rules; what it paints is in the look-only stretch beside them (docs/eras.md), and
+   the iOS 6 decorations (the black bar and its buttons) come from the tokens in the first stretch. */
 
-/* ---- queued packages in every list: "Queued for <mode>" in the kit's detail blue ---- */
-.pkg-row[data-queued] .pkg-desc { color: var(--detail); font-weight: bold; }
-.pkg-row[data-queued="remove"] .pkg-desc { color: #b22a2a; }
-html[data-theme="dark"] .pkg-row[data-queued="remove"] .pkg-desc { color: var(--dk-remove); }
-
-/* ---- Confirm ---- */
-.sheet-left { justify-self: start; display: flex; }
-.confirm-mods .cell-inner { align-items: flex-start; padding-top: 11px; padding-bottom: 11px; }
-.confirm-mods .cell-detail { white-space: pre-line; text-align: right; line-height: 20px; }
-/* B92: a name with no break in it (an IPA's file name) wraps instead of running off the row's edge */
-.confirm-mods .cell-detail { overflow-wrap: anywhere; }
-.confirm-issues .group-header { color: #704d4d; }
-html[data-theme="dark"] .confirm-issues .group-header { color: var(--dk-issue-head); }
-.confirm-problem .table { background: #ffcccc; }
-html[data-theme="dark"] .confirm-problem .table { background: var(--dk-issue-table); }
-.confirm-raw, .console-log {
-  margin: 0; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere;
-  font: 11px/15px ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text;
-}
-
-/* ---- the console (nav/progress.js's page carries .console; its output and foot are progress.css): black page,
-   black bar ---- */
-.console { background: #000; }
-.console .navbar.sheet-bar {
-  background:
+/* ==== look-only { ==== queued packages in every list: "Queued for <mode>" in the kit's detail blue */
+:root {
+  /* the console's black bar and its bar buttons, and pressed */
+  --console-bar:
     linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) bottom / 100% 1px no-repeat,
     linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
     linear-gradient(#4c4c4c, #000 52%) bottom / 100% 44px no-repeat,
     #000;
+  --console-btn: linear-gradient(#4a4f58, #24272c);
+  --console-btn-edge: #111;
+  --console-btn-pressed: linear-gradient(#2a2d32, #121316);
 }
-.console .bar-button { border-color: #111; background: linear-gradient(#4a4f58, #24272c); background-origin: border-box; }
-.console .bar-button:active, .console .bar-button.is-pressed { background: linear-gradient(#2a2d32, #121316); background-origin: border-box; }
+.pkg-row[data-queued] .pkg-desc { color: var(--detail); font-weight: bold; }
+.pkg-row[data-queued="remove"] .pkg-desc { color: #b22a2a; }
+html[data-theme="dark"] .pkg-row[data-queued="remove"] .pkg-desc { color: var(--dk-remove); }
+/* ==== } look-only ==== */
+
+/* ---- Confirm ---- */
+.sheet-left { justify-self: start; display: flex; }
+.confirm-mods .cell-inner { align-items: flex-start; padding-top: 11px; padding-bottom: 11px; }
+.confirm-mods .cell-detail { white-space: pre-line; }
+/* B92: a name with no break in it (an IPA's file name) wraps instead of running off the row's edge */
+.confirm-mods .cell-detail { overflow-wrap: anywhere; }
+.confirm-raw, .console-log {
+  margin: 0; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  -webkit-user-select: text; user-select: text;
+}
+
+/* ==== look-only { ==== Confirm's sections; the console (nav/progress.js's page carries .console; its output and
+   foot are progress.css): black page, black bar */
+.confirm-mods .cell-detail { text-align: right; line-height: 20px; }
+.confirm-issues .group-header { color: #704d4d; }
+html[data-theme="dark"] .confirm-issues .group-header { color: var(--dk-issue-head); }
+.confirm-problem .table { background: #ffcccc; }
+html[data-theme="dark"] .confirm-problem .table { background: var(--dk-issue-table); }
+.confirm-raw, .console-log { font: 11px/15px ui-monospace, Menlo, monospace; }
+
+.console { background: #000; }
+.console .navbar.sheet-bar { background: var(--console-bar); }
+.console .bar-button { border-color: var(--console-btn-edge); background: var(--console-btn); background-origin: border-box; }
+.console .bar-button:active, .console .bar-button.is-pressed { background: var(--console-btn-pressed); background-origin: border-box; }
+/* ==== } look-only ==== */
 
 /* Continue Queuing as on the 4S (ref/4s/screens/queue-81.png): the label centred in Cydia's blue-grey, the chevron
    at the right. */
 .confirm-continue .cell-inner { justify-content: center; position: relative; }
-.confirm-continue .cell-label { flex: none; color: #385487; font-weight: bold; text-align: center; }
-html[data-theme="dark"] .confirm-continue .cell-label { color: var(--dk-link); }
-.confirm-continue .cell-inner.is-pressed .cell-label { color: #fff; }
+.confirm-continue .cell-label { flex: none; }
 
 /* F234: Confirm's Modifications: a package apt added carries a small grey "needed by X" under its name */
 .confirm-mods .cell-detail .confirm-name { display: block; }
-.confirm-needed { display: block; font-size: 12px; line-height: 15px; color: #8e8e93; font-weight: normal; }
+.confirm-needed { display: block; }
 /* F234: the queue run's Hide: a black strip under every tab's nav bar reopens it; the pages make room for it */
 .qr-strip {
   position: fixed; z-index: 4; top: var(--nav-h); /* over the bars (3), under sheets (25) */ left: 0; right: 0; height: 30px; display: flex; align-items: center;
-  gap: 8px; padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); border: 0;
-  background: rgba(0,0,0,.88); color: #fff; cursor: pointer; touch-action: manipulation;
-  font: bold 13px/30px "Helvetica Neue", Helvetica, sans-serif; text-align: left;
+  gap: 8px; padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+  cursor: pointer; touch-action: manipulation;
 }
 .qr-strip-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.qr-strip-show { flex: none; color: #8fb6ff; }
+.qr-strip-show { flex: none; }
 body.qr-stripped .page-body { padding-top: calc(var(--nav-h) + 30px); }
+
+/* ==== look-only { ==== Continue Queuing, "needed by", the queue run's strip */
+.confirm-continue .cell-label { color: #385487; font-weight: bold; text-align: center; }
+html[data-theme="dark"] .confirm-continue .cell-label { color: var(--dk-link); }
+.confirm-continue .cell-inner.is-pressed .cell-label { color: #fff; }
+.confirm-needed { font-size: 12px; line-height: 15px; color: #8e8e93; font-weight: normal; }
+.qr-strip {
+  border: 0;
+  background: rgba(0,0,0,.88); color: #fff;
+  font: bold 13px/30px "Helvetica Neue", Helvetica, sans-serif; text-align: left;
+}
+.qr-strip-show { color: #8fb6ff; }
+/* ==== } look-only ==== */

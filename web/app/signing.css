@@ -2,59 +2,88 @@
    cards: a numbered blue badge that turns into a green tick, the title, a disclosure arrow; the body holds the text,
    the step's rows and buttons, and the certificate step's picture: the user's screenshot of today's iOS Files
    picker (F78; F75: the user's own iPhone shows that one, not an iOS 6 screen). Colours from ios6.css's
-   variables. Only transform and opacity animate. */
+   variables. Only transform and opacity animate.
+   Each part's layout is in its own rules; what it paints is in the look-only stretch after them (docs/eras.md), and
+   the iOS 6 decorations (the badge and button glosses, embosses) come from the tokens in the first stretch. */
 .walkthrough { padding-bottom: 20px; }
 .walk-intro { margin: 14px 19px 0; }
-.walk-failure { margin: 10px 19px 0; color: #b5322c; text-shadow: none; }
-.walk-steps { list-style: none; margin: 0; padding: 0; }
+.walk-failure { margin: 10px 19px 0; }
+.walk-steps { margin: 0; padding: 0; }
+.walk-step { margin: 14px 10px 0; overflow: hidden; }
+.walk-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px 0 10px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.walk-badge { flex: none; width: 26px; height: 26px; box-sizing: border-box; }
+.walk-title { flex: 1; min-width: 0; }
+.walk-disclosure { flex: none; width: 9px; height: 13px; transform: rotate(0deg); transition: transform .2s ease; }
+.walk-head[aria-expanded="true"] .walk-disclosure { transform: rotate(90deg); }
+.walk-body { padding: 0 12px 14px; }
+.walk-text { margin: 10px 2px; }
+.walk-body .sign-files { margin: 0 -10px; }
+.walk-body .sign-files .group-header { display: none; }
+.walk-action { display: block; width: 100%; height: 44px; margin-top: 12px; cursor: pointer; }
+/* Select All Files: the big blue glossy button over the certificate rows (a <label> on a hidden file input) */
+.sign-files .sign-all { box-sizing: border-box; display: block; width: auto; margin: 0 10px 12px; /* inset like the grouped tables (user 2026-11-18) */ -webkit-tap-highlight-color: transparent; }
+
+/* ==== look-only { ==== the walkthrough's cards, badges, text and buttons */
+:root {
+  /* the step badge: blue, the kit's "Button (Green)" tick once done, grey before its turn */
+  --walk-badge: linear-gradient(#85a7e9, #2765db);
+  --walk-badge-edge: rgba(0,0,0,.35);
+  --walk-badge-emboss: 0 -1px 0 rgba(0,0,0,.35);
+  --walk-badge-shine: inset 0 1px 0 rgba(255,255,255,.35);
+  --walk-badge-done: linear-gradient(#7fd36b, #2f9a1f);
+  --walk-badge-done-edge: #2a7a1c;
+  --walk-badge-todo: linear-gradient(#b4bccb, #8792a6);
+  /* the step's blue button, and pressed */
+  --walk-action: linear-gradient(#85a7e9, #2765db);
+  --walk-action-edge: #2d5bb8;
+  --walk-action-emboss: 0 -1px 0 rgba(0,0,0,.4);
+  --walk-action-pressed: linear-gradient(#2765db, #1b4fb5);
+}
+.walk-failure { color: #b5322c; text-shadow: none; }
+.walk-steps { list-style: none; }
 .walk-step {
-  margin: 14px 10px 0; overflow: hidden; background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px;
+  background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px;
   box-shadow: inset 0 .5px .5px var(--table-inset);
 }
-.walk-head {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px 0 10px; border: 0;
-  background: none; color: var(--text); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
-}
+.walk-head { border: 0; background: none; color: var(--text); text-align: left; }
 .walk-head:active { background: var(--select); color: #fff; }
 .walk-badge {
-  flex: none; width: 26px; height: 26px; border-radius: 50%; box-sizing: border-box; border: 1px solid rgba(0,0,0,.35);
-  background: linear-gradient(#85a7e9, #2765db); color: #fff; font-size: 15px; font-weight: bold; line-height: 24px;
-  text-align: center; text-shadow: 0 -1px 0 rgba(0,0,0,.35); box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+  border-radius: 50%; border: 1px solid var(--walk-badge-edge);
+  background: var(--walk-badge); color: #fff; font-size: 15px; font-weight: bold; line-height: 24px;
+  text-align: center; text-shadow: var(--walk-badge-emboss); box-shadow: var(--walk-badge-shine);
 }
 .walk-step.is-done .walk-badge { /* green tick: the kit's "Button (Green)" hue */
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M7 13.5l4 4 8-9' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat,
-    linear-gradient(#7fd36b, #2f9a1f);
-  background-origin: border-box; border-color: #2a7a1c;
+    var(--walk-badge-done);
+  background-origin: border-box; border-color: var(--walk-badge-done-edge);
 }
-.walk-step:not(.is-done):not(.is-current) .walk-badge { background: linear-gradient(#b4bccb, #8792a6); }
-.walk-title { flex: 1; min-width: 0; font-size: 17px; font-weight: bold; }
+.walk-step:not(.is-done):not(.is-current) .walk-badge { background: var(--walk-badge-todo); }
+.walk-title { font-size: 17px; font-weight: bold; }
 .walk-step.is-done .walk-title { color: var(--subtitle); }
-.walk-disclosure {
-  flex: none; width: 9px; height: 13px; background: var(--chevron) center / contain no-repeat; transform: rotate(0deg);
-  transition: transform .2s ease;
-}
-.walk-head[aria-expanded="true"] .walk-disclosure { transform: rotate(90deg); }
-.walk-body { padding: 0 12px 14px; border-top: 1px solid var(--divider); box-shadow: inset 0 1px 0 var(--divider-hi); }
-.walk-text { margin: 10px 2px; font-size: 15px; line-height: 20px; color: var(--text); }
-.walk-body .sign-files { margin: 0 -10px; }
-.walk-body .sign-files .group-header { display: none; }
+.walk-disclosure { background: var(--chevron) center / contain no-repeat; }
+.walk-body { border-top: 1px solid var(--divider); box-shadow: inset 0 1px 0 var(--divider-hi); }
+.walk-text { font-size: 15px; line-height: 20px; color: var(--text); }
 .walk-action {
-  display: block; width: 100%; height: 44px; margin-top: 12px; border: 1px solid #2d5bb8; border-radius: 9px;
-  background: linear-gradient(#85a7e9, #2765db); background-origin: border-box; color: #fff;
-  font: bold 17px/42px "Helvetica Neue", Helvetica, sans-serif; text-shadow: 0 -1px 0 rgba(0,0,0,.4); cursor: pointer;
+  border: 1px solid var(--walk-action-edge); border-radius: 9px;
+  background: var(--walk-action); background-origin: border-box; color: #fff;
+  font: bold 17px/42px "Helvetica Neue", Helvetica, sans-serif; text-shadow: var(--walk-action-emboss);
 }
-.walk-action:active { background: linear-gradient(#2765db, #1b4fb5); background-origin: border-box; }
-/* Select All Files: the big blue glossy button over the certificate rows (a <label> on a hidden file input) */
-.sign-files .sign-all { box-sizing: border-box; display: block; width: auto; margin: 0 10px 12px; /* inset like the grouped tables (user 2026-11-18) */ text-align: center; -webkit-tap-highlight-color: transparent; }
+.walk-action:active { background: var(--walk-action-pressed); background-origin: border-box; }
+.sign-files .sign-all { text-align: center; }
+/* ==== } look-only ==== */
 
 /* ---- the certificate step's picture (F78): the user's own screenshot of the iOS Files picker, light or dark by
    the theme (screens/signing.js picture), set in like an inset screenshot: rounded corners and a thin border */
 .step-picture { margin: 14px auto 0; width: 240px; max-width: 100%; }
-.step-shot {
-  display: block; box-sizing: border-box; width: 100%; height: auto; border-radius: 12px;
-  border: 1px solid rgba(0,0,0,.22); background: #fff;
-}
-html[data-theme="dark"] .step-shot { border-color: rgba(255,255,255,.18); background: #000; }
+.step-shot { display: block; box-sizing: border-box; width: 100%; height: auto; }
 /* The three rows (.p12, .mobileprovision, Password, each with Browse) inset like Select All Files above them, not
    out to the card's edges (user 2026-11-18). */
 .sign-files > .table { margin-left: 10px; margin-right: 10px; }
+
+/* ==== look-only { ==== the certificate step's picture */
+.step-shot { border-radius: 12px; border: 1px solid rgba(0,0,0,.22); background: #fff; }
+html[data-theme="dark"] .step-shot { border-color: rgba(255,255,255,.18); background: #000; }
+/* ==== } look-only ==== */

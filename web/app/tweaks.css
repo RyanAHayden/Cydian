@@ -1,10 +1,11 @@
 /* F288: Inject Tweaks (screens/tweaks.js), in the sign options sheet, My IPAs' Sign Options and the website's IPA
    page. Grouped table cells are ios6.css's; this only lets a long file name end in an ellipsis, makes the add row a
-   plain label row, and colours a problem footer the red of Settings > Signing's warnings (signsheet.css). */
-.ss-tweak, .ss-tweak-add { width: 100%; text-align: left; cursor: pointer; }
+   plain label row, and colours a problem footer the red of Settings > Signing's warnings (signsheet.css).
+   Each part's layout is in its own rules; what it paints is in the look-only stretch after them (docs/eras.md), and
+   the iOS 6 decorations (the ADD button's and the pills' glosses) come from the tokens in the stretch. */
+.ss-tweak, .ss-tweak-add { width: 100%; cursor: pointer; }
 .ss-tweak .cell-text { flex: 1; min-width: 0; }
 .ss-tweak .cell-label, .ss-tweak .cell-subtitle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.group-footer.ss-tweak-problem { color: #b5322c; text-shadow: none; }
 
 /* F302a: the app side. The Add Tweaks row on an app page, the Add Tweaks sheet's rows with an ADD button (iOS 6's App
    Store price button, as myipas.css .price-btn: grey ADD, green ADDED the moment it's tapped, a small spinner in it
@@ -15,24 +16,48 @@
 .tw-row .ss-tweak-add .cell-label { flex: 1; min-width: 0; } /* B186: From Files' chevron at the right edge, as its neighbours' */
 .tw-add {
   flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; position: relative;
-  box-sizing: border-box; height: 24px; min-width: 62px; padding: 0 9px; border-radius: 4px; margin: 0; cursor: pointer;
-  font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #5d6b81; text-shadow: 0 1px 0 #fff;
-  border: 1px solid #8f9aab; background: linear-gradient(#fdfdfe, #e2e6ec); background-origin: border-box;
+  box-sizing: border-box; height: 24px; min-width: 62px; padding: 0 9px; margin: 0; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.tw-add:active { background: linear-gradient(#d6dbe3, #eceff3); background-origin: border-box; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
-.tw-add.on {
-  color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); border-color: #3a7a17; border-top-color: #2f6612;
-  background: linear-gradient(#8fd35d, #62b52c 49%, #52a61d 50%, #5cb024); background-origin: border-box;
-}
 .tw-add .loading-spinner { width: 12px; height: 12px; margin: 0; }
+/* Installed: "2 Tweaks" after a signed app's subtitle, packages.css .sig-pill's shape in grey; "Tweak Update" in green */
+.tweak-pill { display: inline-block; vertical-align: 1px; margin-left: 5px; height: 15px; padding: 0 6px; }
+
+/* ==== look-only { ==== the tweak rows, the ADD button, the pills */
+:root {
+  /* the App Store price button: myipas.css's tokens, the same values (this sheet can load without that one) */
+  --price-btn: linear-gradient(#fdfdfe, #e2e6ec);
+  --price-btn-edge: #8f9aab;
+  --price-btn-emboss: 0 1px 0 #fff;
+  --price-btn-pressed: linear-gradient(#d6dbe3, #eceff3);
+  --price-btn-pressed-inset: inset 0 1px 2px rgba(0,0,0,.25);
+  --price-btn-go: linear-gradient(#8fd35d, #62b52c 49%, #52a61d 50%, #5cb024);
+  --price-btn-go-edge: #3a7a17; --price-btn-go-edge-top: #2f6612;
+  --price-btn-go-emboss: 0 -1px 0 rgba(0,0,0,.35);
+  /* packages.css .sig-pill's gloss in grey, and in green */
+  --tweak-pill: linear-gradient(#c3c8d1, #9199a8 48.8%, #868e9e 50.5%, #737b8c);
+  --tweak-pill-up: linear-gradient(#b8eda6, #4fc232 48.8%, #3cb11d 50.5%, #24900a);
+  --tweak-pill-shadow: 0 1px 1px rgba(0,0,0,.3);
+}
+.ss-tweak, .ss-tweak-add { text-align: left; }
+.group-footer.ss-tweak-problem { color: #b5322c; text-shadow: none; }
+.tw-add {
+  border-radius: 4px;
+  font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #5d6b81; text-shadow: var(--price-btn-emboss);
+  border: 1px solid var(--price-btn-edge); background: var(--price-btn); background-origin: border-box;
+}
+.tw-add:active { background: var(--price-btn-pressed); background-origin: border-box; box-shadow: var(--price-btn-pressed-inset); }
+.tw-add.on {
+  color: #fff; text-shadow: var(--price-btn-go-emboss); border-color: var(--price-btn-go-edge); border-top-color: var(--price-btn-go-edge-top);
+  background: var(--price-btn-go); background-origin: border-box;
+}
 html[data-theme="dark"] .tw-add { color: var(--text); text-shadow: none; border-color: var(--dk-btn-edge); background: var(--dk-btn); background-origin: border-box; }
 html[data-theme="dark"] .tw-add.on { color: var(--text); border-color: var(--dk-btn-edge); background: var(--dk-green); }
 .tw-locked .cell-label, .tw-locked .cell-detail, .tw-locked .cell-subtitle { opacity: .45; }
-/* Installed: "2 Tweaks" after a signed app's subtitle, packages.css .sig-pill's shape in grey; "Tweak Update" in green */
 .tweak-pill {
-  display: inline-block; vertical-align: 1px; margin-left: 5px; height: 15px; padding: 0 6px; border-radius: 8px;
+  border-radius: 8px;
   font-size: 10.5px; font-weight: bold; line-height: 15px; color: #fff; text-shadow: none;
-  box-shadow: 0 1px 1px rgba(0,0,0,.3); background: linear-gradient(#c3c8d1, #9199a8 48.8%, #868e9e 50.5%, #737b8c);
+  box-shadow: var(--tweak-pill-shadow); background: var(--tweak-pill);
 }
-.tweak-pill.up { background: linear-gradient(#b8eda6, #4fc232 48.8%, #3cb11d 50.5%, #24900a); }
+.tweak-pill.up { background: var(--tweak-pill-up); }
+/* ==== } look-only ==== */

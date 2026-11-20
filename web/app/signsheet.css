@@ -1,46 +1,68 @@
 /* F68: the look-first sheet (signing-sheet.js) and Settings > Signing's Certificate Status and Signed Apps
    (screens/signed-apps.js). Grouped tables are ios6.css's; this adds the app's head, the text fields' rows, the red
    warnings, the red Cancel at the foot of the sheet (F81) and the swipe-to-forget rows (sources.css's
-   Delete). Only transform, opacity and clip-path animate. */
+   Delete). Only transform, opacity and clip-path animate.
+   Each part's layout is in its own rules; what it paints is in the look-only stretch after them (docs/eras.md), and
+   the iOS 6 decorations (the icon's shadow, the red button's gloss, embosses) come from the tokens in the first stretch. */
 .sign-sheet { padding-bottom: 24px; }
 .ss-head { display: flex; align-items: center; gap: 14px; margin: 16px 19px 4px; }
-.ss-icon { /* the iOS 6 icon shape: 57pt at 10pt corners, a soft shadow, no gloss (the user's own art) */
-  flex: none; width: 57px; height: 57px; border-radius: 10px; overflow: hidden; background: #fff;
-  box-shadow: 0 1px 2px rgba(0,0,0,.45);
-}
+.ss-icon { flex: none; width: 57px; height: 57px; overflow: hidden; } /* the iOS 6 icon shape: 57pt at 10pt corners, a soft shadow, no gloss (the user's own art) */
 .ss-icon img { display: block; width: 100%; height: 100%; }
-.ss-icon.is-placeholder { display: grid; place-items: center; background: linear-gradient(#c6ccd6, #8c96a8); }
-.ss-icon-letter { color: #fff; font-size: 28px; font-weight: bold; text-shadow: 0 -1px 0 rgba(0,0,0,.35); }
+.ss-icon.is-placeholder { display: grid; place-items: center; }
 .ss-words { display: flex; flex-direction: column; min-width: 0; gap: 3px; }
-.ss-title { font-size: 20px; font-weight: bold; color: var(--text); text-shadow: var(--emboss); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.ss-sub { font-size: 14px; color: var(--head); text-shadow: var(--emboss); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ss-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ss-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .sign-sheet .sign-files-cell { position: relative; }
 .ss-field { padding-right: 10px; }
-.ss-field .sign-value { text-align: right; }
-.ss-icon-row .sign-value { color: var(--subtitle); }
 .ss-ext .cell-text { flex: 1; min-width: 0; }
-.ss-missing .cell-label { color: #b5322c; }
 .sign-sheet .cell-detail { flex: none; }
 /* F81: the sheet's bottom button is a red Cancel (Install is at the top right): the red of the Delete buttons
    (sources.css .del-confirm, UIRemoveControlRed and its pressed art), at the width of a grouped table. */
-.ss-cancel {
-  display: block; width: calc(100% - 20px); height: 44px; margin: 18px 10px 20px; border-radius: 9px;
-  border: 1px solid; border-color: #2c1c1c #6b1516 #721819;
-  background: linear-gradient(#f6989c, #d64a4e 50%, #cf2d2f 50%, #cf2b2d); background-origin: border-box; color: #fff;
-  font: bold 17px/42px "Helvetica Neue", Helvetica, sans-serif; text-shadow: 0 -1px 0 rgba(0,0,0,.4); cursor: pointer;
+.ss-cancel { display: block; width: calc(100% - 20px); height: 44px; margin: 18px 10px 20px; cursor: pointer; }
+
+/* ==== look-only { ==== the sheet's head, field rows and red Cancel */
+:root {
+  --ss-icon-shadow: 0 1px 2px rgba(0,0,0,.45);
+  --ss-icon-placeholder: linear-gradient(#c6ccd6, #8c96a8);
+  --ss-icon-letter-emboss: 0 -1px 0 rgba(0,0,0,.35);
+  /* UIRemoveControlRed and its pressed art, as sources.css .del-confirm */
+  --ss-cancel: linear-gradient(#f6989c, #d64a4e 50%, #cf2d2f 50%, #cf2b2d);
+  --ss-cancel-edge: #2c1c1c #6b1516 #721819;
+  --ss-cancel-emboss: 0 -1px 0 rgba(0,0,0,.4);
+  --ss-cancel-pressed: linear-gradient(#a75a61, #93252e 50%, #8d141e 50%, #8d131e);
 }
-.ss-cancel:active { background: linear-gradient(#a75a61, #93252e 50%, #8d141e 50%, #8d131e); background-origin: border-box; }
+.ss-icon { border-radius: 10px; background: #fff; box-shadow: var(--ss-icon-shadow); }
+.ss-icon.is-placeholder { background: var(--ss-icon-placeholder); }
+.ss-icon-letter { color: #fff; font-size: 28px; font-weight: bold; text-shadow: var(--ss-icon-letter-emboss); }
+.ss-title { font-size: 20px; font-weight: bold; color: var(--text); text-shadow: var(--emboss); }
+.ss-sub { font-size: 14px; color: var(--head); text-shadow: var(--emboss); }
+.ss-field .sign-value { text-align: right; }
+.ss-icon-row .sign-value { color: var(--subtitle); }
+.ss-missing .cell-label { color: #b5322c; }
+.ss-cancel {
+  border-radius: 9px;
+  border: 1px solid; border-color: var(--ss-cancel-edge);
+  background: var(--ss-cancel); background-origin: border-box; color: #fff;
+  font: bold 17px/42px "Helvetica Neue", Helvetica, sans-serif; text-shadow: var(--ss-cancel-emboss);
+}
+.ss-cancel:active { background: var(--ss-cancel-pressed); background-origin: border-box; }
+/* ==== } look-only ==== */
 
 /* Settings > Signing */
-.group-footer.sign-warning { color: #b5322c; text-shadow: none; }
-.cell-detail.sign-warning-text { color: #b5322c; }
 .signed-row { position: relative; touch-action: pan-y; }
 .signed-row .cell-inner { width: 100%; }
 .signed-row .cell-detail { transition: opacity .2s ease; }
-.signed-row.is-expiring .cell-detail { color: #b5322c; }
 /* The width snaps (120 Hz: no layout transitions; the name ellipsizes in one step) and the date fades where it was:
    the untransitioned `translate` puts it back by the 76px the content lost (sources.css's armed rows). */
 .signed-row.armed .cell-inner { width: calc(100% - 76px); }
-.signed-row.armed .cell-detail { opacity: 0; translate: 76px 0; }
+.signed-row.armed .cell-detail { translate: 76px 0; }
 .signed-row.armed .del-confirm { clip-path: inset(0 round 6px); pointer-events: auto; }
-.signed-row.removing { opacity: 0; transition: opacity .2s ease-out; }
+.signed-row.removing { transition: opacity .2s ease-out; }
+
+/* ==== look-only { ==== Settings > Signing's warnings and Signed Apps' rows */
+.group-footer.sign-warning { color: #b5322c; text-shadow: none; }
+.cell-detail.sign-warning-text { color: #b5322c; }
+.signed-row.is-expiring .cell-detail { color: #b5322c; }
+.signed-row.armed .cell-detail { opacity: 0; }
+.signed-row.removing { opacity: 0; }
+/* ==== } look-only ==== */

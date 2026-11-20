@@ -197,16 +197,19 @@ export function attachRowSwipe(listEl, { rowSelector = ".pkg-row", canStart = ()
 
 // F193's first-run hint: the row eases left by `distance` and back once (one movement, no bounce), showing part of
 // the green control. Resolves when it ends (or is cancelled by a recycle or a touch).
-export function playHint(row, { distance = 44, duration = 1100, kind = "add" } = {}) {
+// `fade` (Reduce Motion): nothing moves; the row's content dims to show the control behind it, then comes back.
+export function playHint(row, { distance = 44, duration = 1100, kind = "add", fade = false } = {}) {
   const inner = innerOf(row);
   if (!inner?.animate) return Promise.resolve(false);
   show(row, kind);
   row._swipeBack.classList.add("hint");
   const a = inner.animate(
-    // Eased into and out of each end, so it slows to the turn instead of bouncing off it.
-    [{ transform: "translate3d(0,0,0)", easing: "ease-in-out" }, { transform: `translate3d(${-distance}px,0,0)`, easing: "ease-in-out" },
-      { transform: "translate3d(0,0,0)" }],
-    { duration },
+    fade
+      ? [{ opacity: 1, easing: "ease-in-out" }, { opacity: 0.25, offset: 0.35 }, { opacity: 0.25, offset: 0.65, easing: "ease-in-out" }, { opacity: 1 }]
+      // Eased into and out of each end, so it slows to the turn instead of bouncing off it.
+      : [{ transform: "translate3d(0,0,0)", easing: "ease-in-out" }, { transform: `translate3d(${-distance}px,0,0)`, easing: "ease-in-out" },
+        { transform: "translate3d(0,0,0)" }],
+    { duration: fade ? duration * 1.6 : duration },
   );
   row._hint = a;
   const done = (ok) => { if (row._hint === a) row._hint = null; row._swipeBack?.classList.remove("hint"); hide(row); return ok; };

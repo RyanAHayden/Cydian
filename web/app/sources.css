@@ -1,47 +1,62 @@
 /* The Sources tab's pieces (F4): the UIAlertView (nav/alert.js), table edit mode and swipe-to-delete, source
-   icons and the Done bar button. Sizes are the kit's @2x halved; colours from its layers as named. */
+   icons and the Done bar button. Sizes are the kit's @2x halved; colours from its layers as named.
+   Era readiness (docs/eras.md): each section keeps its layout in plain rules, then paints in a look-only stretch
+   (ios6-css.test.js fails if one sets layout). Splitting a rule in two keeps every declaration's place in the cascade:
+   layout and look properties never overlap, and each kind keeps its order. */
 
 /* ---- "Alert diaglog": 272px wide, 10px corners, #0b1b43 at 80%, a 2px #b1b7c1 -> #e1e3e3 rim, 8px/19px shadow,
    a white gloss over the top 31px that dips in a curve. ---- */
 .alert-scrim {
   /* a screen's height past each edge (nav/alert.js: no white shows when iOS pans for the keyboard) */
   position: fixed; inset: -100vh 0; z-index: 30; display: grid; place-items: center; padding: calc(100vh + 16px) 16px;
-  background: radial-gradient(ellipse at center, rgba(0,0,0,.25), rgba(0,0,0,.6) 70%) center / 100% 100vh no-repeat, rgba(0,0,0,.6);
   /* B32: one column exactly the screen's width. An auto column grew to the text's unwrapped (max-content) width, so a
      long URL in a message pushed the box right and off the screen even though the message itself wraps. */
   grid-template-columns: minmax(0, 1fr);
 }
 .alert {
   /* iOS 6's 284pt, widened to fit longer text and button labels on today's wider screens */
-  position: relative; width: min(340px, 100%); max-width: 100%; min-width: 0; padding: 16px 12px 11px; border-radius: 10px;
+  position: relative; width: min(340px, 100%); max-width: 100%; min-width: 0; padding: 16px 12px 11px;
   transition: translate .3s cubic-bezier(.25,.1,.25,1); /* glides above the keyboard (nav/alert.js) instead of jumping */
+}
+.alert::before { position: absolute; left: 0; right: 0; top: 0; height: 31px; pointer-events: none; }
+.alert-title { position: relative; margin: 0 0 6px; overflow-wrap: anywhere; word-break: break-word; }
+.alert-message { position: relative; margin: 0 0 10px; overflow-wrap: anywhere; word-break: break-word; white-space: pre-line; } /* \n breaks lines, as in Cydia's About */
+.alert-field {
+  display: block; width: 100%; height: 31px; margin: 6px 0 12px; padding: 0 8px; -webkit-user-select: text; user-select: text;
+}
+.alert-buttons { position: relative; display: flex; gap: 8px; margin-top: 4px; }
+.alert-buttons.stacked { flex-direction: column; gap: 9px; }
+.alert-buttons.stacked .alert-button { flex: none; height: 43px; } /* three or more stack at the full height, not squeezed (flex: 1 in a column) */
+.alert-button { flex: 1; min-width: 0; height: 43px; padding: 0 6px; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.alert-button:disabled { cursor: default; }
+/* ==== look-only { ==== the alert: box, gloss, type, field and buttons */
+.alert-scrim {
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.25), rgba(0,0,0,.6) 70%) center / 100% 100vh no-repeat, rgba(0,0,0,.6);
+}
+.alert {
+  border-radius: 10px;
   color: #fff; text-align: center; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
   background: rgba(11,27,67,.8); border: 2px solid #b1b7c1; border-bottom-color: #e1e3e3;
   box-shadow: 0 8px 19px rgba(0,0,0,.9);
 }
 .alert::before { /* "gloss" */
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 31px; border-radius: 8px 8px 0 0;
+  content: ""; border-radius: 8px 8px 0 0;
   background: radial-gradient(ellipse 150% 100% at 50% 0, rgba(255,255,255,.5), rgba(255,255,255,.25) 99%, transparent 100%);
-  pointer-events: none;
 }
-.alert-title { position: relative; margin: 0 0 6px; font-size: 18px; line-height: 22px; font-weight: bold; overflow-wrap: anywhere; word-break: break-word; }
-.alert-message { position: relative; margin: 0 0 10px; font-size: 16px; line-height: 20px; overflow-wrap: anywhere; word-break: break-word; white-space: pre-line; } /* \n breaks lines, as in Cydia's About */
+.alert-title { font-size: 18px; line-height: 22px; font-weight: bold; }
+.alert-message { font-size: 16px; line-height: 20px; }
 .alert-field {
-  display: block; width: 100%; height: 31px; margin: 6px 0 12px; padding: 0 8px; border-radius: 4px;
-  font: inherit; font-size: 16px; color: #000; text-shadow: none; -webkit-user-select: text; user-select: text;
+  border-radius: 4px;
+  font: inherit; font-size: 16px; color: #000; text-shadow: none;
   background: #fff; border: 1px solid #3c4c6d; box-shadow: inset 0 2px 3px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.2);
   outline: none;
 }
-.alert-buttons { position: relative; display: flex; gap: 8px; margin-top: 4px; }
-.alert-buttons.stacked { flex-direction: column; gap: 9px; }
-.alert-buttons.stacked .alert-button { flex: none; height: 43px; } /* three or more stack at the full height, not squeezed (flex: 1 in a column) */
 /* Alert buttons as Cydia's UIAlertView draws them on the 4S (ref/4s/screens/cydia-about.png, sampled): opaque greys
    over the navy, a gloss split at half, a dark edge, no white line on top or below. These are the kit's "Button
    (continue)" values, which match the device. background-origin: border-box after every background. */
 .alert-button {
-  flex: 1; min-width: 0; height: 43px; padding: 0 6px; border-radius: 5px; cursor: pointer;
+  border-radius: 5px;
   font-size: 18px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   border: 1px solid rgba(19,29,57,.9); box-shadow: none;
   background: linear-gradient(#b4b9c8, #5f6882 49%, #596484 51%, #4d597a); background-origin: border-box;
 }
@@ -52,23 +67,35 @@
   background: linear-gradient(#6d7da3, #3c4e7d 49%, #22325e 51%, #2f3f6c); background-origin: border-box;
 }
 /* F96: a button held back by a countdown (showAlert's `countdown`): greyed out, not pressable, until it ends. */
-.alert-button:disabled { cursor: default; color: rgba(255,255,255,.45); text-shadow: none;
+.alert-button:disabled { color: rgba(255,255,255,.45); text-shadow: none;
   background: linear-gradient(#b4b9c8, #5f6882 49%, #596484 51%, #4d597a); background-origin: border-box; }
+/* ==== } look-only ==== */
 
-/* ---- Done: "Button (Gloss Blue)" ---- */
-.bar-button.done {
-  border-color: #1f3f86; border-top-color: #30363e;
-  background: linear-gradient(#79a1f3, #3b71e1 49%, #215fdd 51%, #2361dd);
+/* ---- Done: "Button (Gloss Blue)". Its box is the bordered bar button's (style.css's Era hooks); its paint comes from
+   tokens an era sets. ---- */
+/* ==== look-only { ==== the Done bar button */
+:root {
+  --done-btn-edge: #1f3f86; --done-btn-edge-top: #30363e;
+  --done-btn: linear-gradient(#79a1f3, #3b71e1 49%, #215fdd 51%, #2361dd);
+  --done-btn-pressed: linear-gradient(#5f86d6, #2a5bc0 49%, #164bb8 51%, #184db9);
 }
-.bar-button.done:active { background: linear-gradient(#5f86d6, #2a5bc0 49%, #164bb8 51%, #184db9); }
+.bar-button.done {
+  border-color: var(--done-btn-edge); border-top-color: var(--done-btn-edge-top);
+  background: var(--done-btn);
+}
+.bar-button.done:active { background: var(--done-btn-pressed); }
+/* ==== } look-only ==== */
 
 /* ---- source rows ---- */
 .source-row .cell-inner { min-height: 53px; } /* Cydia's 53pt rows */
 .source-row .cell-icon { position: relative; overflow: hidden; }
-.source-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; }
+.source-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.source-row { position: relative; overflow: hidden; }
+/* ==== look-only { ==== source rows */
+.source-row .cell-icon img { background: #fff; }
 .source-row .cell-icon img:not(.loaded) { opacity: 0; }
 .source-row .cell-error { color: #b0262a; }
-.source-row { position: relative; overflow: hidden; }
+/* ==== } look-only ==== */
 
 /* ---- edit mode and swipe-to-delete, as Cydia does it on the 4S (ref/4s/screens/cy-sources-edit*.png): the red
    minus slides in solid with the row (the row clips it until then), the row's content narrows in step so its text
@@ -76,17 +103,12 @@
    button opens from the right edge while the text makes room. Colours from the 4S art: UIRemoveControlMinus (disc),
    UIRemoveControlRed / ...PressedRed (Delete). No white rows under anything (the art's edge rows aren't drawn). ---- */
 .del-toggle {
-  position: absolute; left: 7px; top: 50%; width: 29px; height: 29px; margin-top: -14.5px; padding: 0; border: 0;
-  background: none; cursor: pointer; transform: translateX(-40px); transition: transform .3s ease-in-out;
+  position: absolute; left: 7px; top: 50%; width: 29px; height: 29px; margin-top: -14.5px; padding: 0;
+  cursor: pointer; transform: translateX(-40px); transition: transform .3s ease-in-out;
 }
-.del-toggle::before { /* UIRemoveControlMinus: 2pt white rim, glossy top half, flat red bottom, soft shadow */
-  content: ""; position: absolute; inset: 0; box-sizing: border-box; border-radius: 50%; border: 2px solid #fff;
-  background: linear-gradient(#dd878d, #c73742 50%, #bd1421 50%, #bd1421); background-origin: border-box;
-  box-shadow: 0 1.5px 2px rgba(0,0,0,.45);
-}
+.del-toggle::before { position: absolute; inset: 0; box-sizing: border-box; }
 .del-toggle::after { /* the white bar, drawn apart from the disc so it can turn */
-  content: ""; position: absolute; left: 8px; right: 8px; top: 13px; height: 3px; border-radius: 1px; background: #fff;
-  box-shadow: 0 -.5px 0 rgba(0,0,0,.2); transition: transform .25s ease-in-out;
+  position: absolute; left: 8px; right: 8px; top: 13px; height: 3px; transition: transform .25s ease-in-out;
 }
 /* 120 Hz (AGENTS.md): only transform and opacity animate. The content's width snaps to its new size at once (the text
    ellipsizes there in one step) while the transform slides it; what sits on the right is held where it shows:
@@ -100,7 +122,6 @@
 .source-row .cell-inner > :is(.cell-detail, .cell-count) { transition: opacity .2s ease, transform .3s ease-in-out; }
 .editing .source-row .del-toggle { transform: none; }
 .editing .source-row .cell-inner { transform: translateX(37px); width: calc(100% - 37px); }
-.editing .source-row .cell-inner.chevron::after { opacity: 0; }
 :is(.editing, .managing) .source-row .cell-inner.chevron::after { translate: 37px 0; }
 :is(.editing, .managing) .source-row .cell-inner > :is(.cell-detail, .cell-count) { margin-left: 37px; margin-right: -37px; transform: translateX(-37px); }
 .source-row.armed .del-toggle::after { transform: rotate(-90deg); }
@@ -116,21 +137,35 @@
 .editing .source-row.wish-row > .cell-inner::after { translate: 37px 0; }
 .source-row.wish-row.armed .pkg-version, .source-row.wish-row.armed > .cell-inner::after { translate: 76px 0; }
 .editing .source-row.wish-row.armed > .cell-inner::after { translate: 113px 0; }
+.del-confirm {
+  position: absolute; right: 9px; top: 50%; height: 32px; margin-top: -16px; padding: 0 11px; cursor: pointer;
+  clip-path: inset(0 0 0 100% round 6px); pointer-events: none; transition: clip-path .22s ease-out;
+}
+.source-row.armed .del-confirm { clip-path: inset(0 round 6px); pointer-events: auto; }
+.source-row.removing { transition: opacity .2s ease-out; }
+.source-row { touch-action: pan-y; }
+/* ==== look-only { ==== the minus, the faded chevron, Delete and a row going away */
+.del-toggle { border: 0; background: none; }
+.del-toggle::before { /* UIRemoveControlMinus: 2pt white rim, glossy top half, flat red bottom, soft shadow */
+  content: ""; border-radius: 50%; border: 2px solid #fff;
+  background: linear-gradient(#dd878d, #c73742 50%, #bd1421 50%, #bd1421); background-origin: border-box;
+  box-shadow: 0 1.5px 2px rgba(0,0,0,.45);
+}
+.del-toggle::after { content: ""; border-radius: 1px; background: #fff; box-shadow: 0 -.5px 0 rgba(0,0,0,.2); }
+.editing .source-row .cell-inner.chevron::after { opacity: 0; }
 .del-confirm { /* UIRemoveControlRed: dark top edge, gloss over the top half, flat red, dark red bottom edge */
-  position: absolute; right: 9px; top: 50%; height: 32px; margin-top: -16px; padding: 0 11px; border-radius: 6px;
-  font-size: 15px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4); cursor: pointer;
+  border-radius: 6px;
+  font-size: 15px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4);
   border: 1px solid; border-color: #2c1c1c #6b1516 #721819;
   background: linear-gradient(#f6989c, #d64a4e 50%, #cf2d2f 50%, #cf2b2d); background-origin: border-box;
   box-shadow: none;
-  clip-path: inset(0 0 0 100% round 6px); pointer-events: none; transition: clip-path .22s ease-out;
 }
 .del-confirm:active, .del-confirm.is-pressed {
   background: linear-gradient(#a75a61, #93252e 50%, #8d141e 50%, #8d131e); background-origin: border-box;
 }
-.source-row.armed .del-confirm { clip-path: inset(0 round 6px); pointer-events: auto; }
 .source-row.armed .cell-detail, .source-row.armed .cell-count, .source-row.armed .cell-inner.chevron::after { opacity: 0; }
-.source-row.removing { opacity: 0; transition: opacity .2s ease-out; }
-.source-row { touch-action: pan-y; }
+.source-row.removing { opacity: 0; }
+/* ==== } look-only ==== */
 
 /* ---- Recommended (F52, screens/manage.js): Sources' rows with a round Add on the right instead of Delete.
    The GET look the user asked for: a white pill with blue bold text and a thin blue rim, filled blue
@@ -138,24 +173,33 @@
 .rec-row .cell-inner { padding-right: 84px; }
 .rec-get {
   position: absolute; right: 10px; top: 50%; min-width: 58px; height: 26px; margin-top: -13px; padding: 0 12px;
-  border-radius: 13px; border: 1px solid #2f7de1; background: #fff; color: #2f7de1; cursor: pointer;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.rec-get.added, .rec-get:disabled { cursor: default; }
+.rec-apps { margin-top: 10px; } /* a preview's apps under its grouped head */
+/* ==== look-only { ==== Recommended's Add pill */
+.rec-get {
+  border-radius: 13px; border: 1px solid #2f7de1; background: #fff; color: #2f7de1;
   font: inherit; font-size: 13px; font-weight: bold; line-height: 24px; text-align: center; text-shadow: none;
-  box-shadow: none; -webkit-tap-highlight-color: transparent;
+  box-shadow: none;
 }
 .rec-get:active:not(:disabled), .rec-get.is-pressed { background: #2f7de1; color: #fff; }
-.rec-get.added, .rec-get:disabled { border-color: #c4c4c9; color: #9a9aa0; background: #fff; cursor: default; }
-.rec-apps { margin-top: 10px; } /* a preview's apps under its grouped head */
+.rec-get.added, .rec-get:disabled { border-color: #c4c4c9; color: #9a9aa0; background: #fff; }
 .rec-packages .pkg-row > .cell-inner::after { content: none; } /* F54: a repo not added yet has no package pages: no chevron */
+/* ==== } look-only ==== */
 
 /* The Add Source alert's field with its Paste button beside it (nav/alert.js input.paste). */
 .alert-field-row { display: flex; gap: 6px; margin: 6px 0 12px; }
 .alert-field-row .alert-field { flex: 1; min-width: 0; margin: 0; }
+.alert-paste { flex: none; height: 31px; padding: 0 10px; cursor: pointer; }
+/* ==== look-only { ==== the alert's Paste button */
 .alert-paste {
-  flex: none; height: 31px; padding: 0 10px; border-radius: 5px; cursor: pointer; font: inherit; font-size: 14px; font-weight: bold; color: #fff;
+  border-radius: 5px; font: inherit; font-size: 14px; font-weight: bold; color: #fff;
   text-shadow: 0 -1px 0 rgba(0,0,0,.8); border: 1px solid rgba(19,29,57,.9);
   background: linear-gradient(#b4b9c8, #5f6882 49%, #596484 51%, #4d597a); background-origin: border-box;
 }
 .alert-paste:active { background: linear-gradient(#8a90a3, #3f4863 49%, #39446a 51%, #2f3a5c); background-origin: border-box; }
+/* ==== } look-only ==== */
 
 /* F72: iFizBox's own source is built in: a lock where Delete's minus would be (Manage's edit list), and a small one
    after its name (nav/lock.js). It never shows Delete. */
@@ -165,8 +209,10 @@
   transition: transform .3s ease-in-out;
 }
 .editing .source-row .source-lock { transform: none; }
-.name-lock { display: inline-block; margin-left: 5px; vertical-align: -1px; line-height: 0; }
+.name-lock { display: inline-block; margin-left: 5px; vertical-align: -1px; }
 .name-lock svg, .source-lock svg { display: block; }
+/* ==== look-only { ==== the small lock's line box; coloured alert buttons */
+.name-lock { line-height: 0; }
 /* Coloured alert buttons (nav/alert.js colors): iOS 6's green "go" and red destructive, the same gloss split at half
    and dark edge as the greys. Greyed while counting down (disabled). */
 .alert-button.green { background: linear-gradient(#6fcf5a, #2f9d22 49%, #1f8c13 50%, #2a961c); background-origin: border-box; border-color: #134f0c; }
@@ -174,49 +220,63 @@
 .alert-button.green:active, .alert-button.green.is-pressed { background: linear-gradient(#4fae3c, #1e7a14 49%, #136a0a 50%, #1a7512); }
 .alert-button.red:active, .alert-button.red.is-pressed { background: linear-gradient(#bf4c4c, #9c1414 49%, #880909 50%, #941010); }
 .alert-button.red:disabled, .alert-button.green:disabled { opacity: .5; }
+/* ==== } look-only ==== */
 
 /* F291: trust labels (screens/safety.js trustPill): a small glossy pill at the start of a source's subtitle and on an
    app page's Source row; Unknown is the plain word, so a list of them doesn't look alarming. The red card is a
    version enough devices reported as malicious. */
-.trust-pill { display: inline-block; font-size: 10.5px; font-weight: bold; line-height: 15px; color: #fff; border-radius: 8px;
-  padding: 0 6px; vertical-align: 1px; text-shadow: 0 -1px 0 rgba(0, 0, 0, .25);
+.trust-pill { display: inline-block; padding: 0 6px; vertical-align: 1px; }
+.where-from .cell-detail .trust-pill { margin-left: 2px; }
+.safety-banner { display: block; margin: 10px 10px 0; padding: 8px 10px; }
+.safety-banner-title { display: block; margin-bottom: 2px; }
+/* ==== look-only { ==== trust pills, where-from details and the safety banner */
+.trust-pill { font-size: 10.5px; font-weight: bold; line-height: 15px; color: #fff; border-radius: 8px;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, .25);
   background: linear-gradient(#5fbd5a, #3a9b39); background-origin: border-box; }
 .trust-pill-grey { background: linear-gradient(#a7aebb, #8a93a3); background-origin: border-box; }
 .trust-word { color: inherit; }
-.where-from .cell-detail .trust-pill { margin-left: 2px; }
 .where-code-public .cell-detail { color: #2f8a3a; }
 .where-code-hidden .cell-detail { color: #a86a10; }
 .where-reports-bad { color: #b0262a !important; }
-.safety-banner { display: block; margin: 10px 10px 0; padding: 8px 10px; border: 1px solid #d9a3a0; border-radius: 9px;
+.safety-banner { border: 1px solid #d9a3a0; border-radius: 9px;
   background: #fff3f2; color: #3a1a19; font-size: 13px; line-height: 1.35; }
-.safety-banner-title { display: block; color: #c0392b; font-size: 14px; margin-bottom: 2px; }
+.safety-banner-title { color: #c0392b; font-size: 14px; }
+/* ==== } look-only ==== */
 
 /* F305: Find More Sources (screens/findmore.js). The Sources list's last row: a grey "+" icon. Find More's rows are
    Recommended's (.rec-row, .rec-get); Add turns green at once, with the small spinner while the repo is added. */
-.find-more-row .cell-icon { background: linear-gradient(#e9edf2, #c9d0da); background-origin: border-box; color: #385487; font-weight: bold; }
-.rec-get.find-add.adding, .rec-get.find-add.added { border-color: #3a9b39; color: #3a9b39; background: #fff; }
 .find-add .find-spinner { display: inline-block; width: 12px; height: 12px; margin: 0 4px 0 -4px; vertical-align: -2px; }
 .find-directory .cell-inner { padding-right: 36px; }
-.find-external { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #7f7f7f; font-size: 14px; }
+.find-external { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); }
+/* ==== look-only { ==== Find More's icon, Add, external mark, credit and labels */
+.find-more-row .cell-icon { background: linear-gradient(#e9edf2, #c9d0da); background-origin: border-box; color: #385487; font-weight: bold; }
+.rec-get.find-add.adding, .rec-get.find-add.added { border-color: #3a9b39; color: #3a9b39; background: #fff; }
+.find-external { color: #7f7f7f; font-size: 14px; }
 .find-credit a { color: inherit; text-decoration: underline; }
 .find-warn .cell-detail { color: #a86a10; }
 .find-label .cell-detail .trust-word { color: inherit; }
+/* ==== } look-only ==== */
 
 /* B177: a failed source's page (screens/sourceerror.js). The error as Cydia draws a package's warnings: a row on a
    pale red (#fdd) ground, here with the whole text, wrapped and selectable. The actions are plain grouped rows;
    Remove Source is red and centred, in a group of its own. */
-.source-error-cell .cell-inner { padding-block: 10px; background: #fdd; }
+.source-error-cell .cell-inner { padding-block: 10px; }
 .source-error-text {
-  flex: 1; min-width: 0; font-size: 15px; line-height: 19px; color: #8b1a1e;
+  flex: 1; min-width: 0;
   overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap;
   -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
 }
 .source-error-text p { margin: 0; }
 .source-error-text p + p { margin-top: 8px; }
 .source-error-refresh .loading-spinner { margin-left: auto; }
-.source-error-remove .cell-label { flex: 1; text-align: center; color: #c0392b; }
+.source-error-remove .cell-label { flex: 1; }
+/* ==== look-only { ==== the error row and Remove Source */
+.source-error-cell .cell-inner { background: #fdd; }
+.source-error-text { font-size: 15px; line-height: 19px; color: #8b1a1e; }
+.source-error-remove .cell-label { text-align: center; color: #c0392b; }
 html[data-theme="dark"] .source-error-cell .cell-inner { /* the palette's cell, tinted (plain where WebKit lacks color-mix: iOS 15) */
   background: var(--table); background: color-mix(in srgb, var(--dk-bad) 16%, var(--table));
 }
 html[data-theme="dark"] .source-error-text { color: var(--dk-bad); }
 html[data-theme="dark"] .source-error-remove .cell-label { color: var(--dk-remove); }
+/* ==== } look-only ==== */

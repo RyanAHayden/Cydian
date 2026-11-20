@@ -68,7 +68,9 @@ test("ios6.css carries nav/spinner.js's images, and every spinner uses one of th
   const root = rules(ios6).filter((r) => r.sel === ":root" && !r.at).map((r) => r.body).join("\n");
   for (const k of Object.keys(SPINNERS)) assert.ok(root.includes(`--spinner-${k}: ${spinnerURL(k)};`), `--spinner-${k} is missing from :root or stale: regenerate it from spinnerURL("${k}")`);
   const drawn = all.filter((r) => SPINNER_SEL.test(r.sel) && /animation:\s*hud-spin/.test(r.body));
-  for (const r of drawn) assert.match(r.body, /background:\s*var\(--spinner-(white|gray|large)\)/, `${r.f}: ${r.sel}`);
+  // the image may sit in the selector's look-only rule beside the animation's (docs/eras.md), in the same sheet
+  const paint = (r) => all.filter((o) => o.f === r.f && o.sel === r.sel && o.at === r.at).map((o) => o.body).join("\n");
+  for (const r of drawn) assert.match(paint(r), /background:\s*var\(--spinner-(white|gray|large)\)/, `${r.f}: ${r.sel}`);
 });
 
 test("the images have UIKit's geometry and alphas (measured from the 4S frames)", () => {

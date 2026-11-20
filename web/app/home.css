@@ -1,12 +1,19 @@
 /* Home (screens/home.js), after Cydia's on the 4S (ref/4s/screens/cydia-home.png). Sizes are the 4S shot's pixels
    halved; colours sampled from it: tile edges #999 with 8px corners, white tiles, the account tile #eefff0, by-line
    #586c90 with a white emboss. Tiles are .cell-inner links, so the held look (blue selection, white text and
-   chevron) is the table cells' from ios6.css. No highlights or bottom lines: the phone draws none. */
+   chevron) is the table cells' from ios6.css. No highlights or bottom lines: the phone draws none.
+   Era readiness (docs/eras.md): each section keeps its layout in plain rules, then paints in a look-only stretch
+   (ios6-css.test.js fails if one sets layout). The tiles' decorations are the tokens on .home below, which an era
+   sets (on `html[data-style=…] .home`) instead of undoing them. */
+/* ==== look-only { ==== Home's tokens: tiles, their edges and corners, the by-line, the icon's shadow */
 .home {
   --tile: #fff;
   --tile-edge: #999;
+  --tile-radius: 8px;
   --tile-green: #eefff0;
+  --tile-glyph-green: #37a94a;
   --by: #586c90;
+  --home-icon-shadow: 0 1px 3px rgba(0,0,0,.45);
 }
 html[data-theme="dark"] .home {
   --tile: var(--table);
@@ -14,36 +21,45 @@ html[data-theme="dark"] .home {
   --tile-green: var(--dk-green);
   --by: var(--detail);
 }
+/* ==== } look-only ==== */
 
 /* Icon and welcome: a 57px icon (Cydia's, 4S shot halved) 16px in from the tiles, the words beside it. */
 .home-head { margin: 0 10px; display: flex; align-items: center; gap: 22px; padding: 11px 0 11px 16px; }
-.home-icon { flex: none; width: 57px; height: 57px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.home-icon { flex: none; width: 57px; height: 57px; }
 .home-icon.tappable { cursor: pointer; }
-.home-icon.tappable:active { filter: brightness(.8); }
 .home-words { min-width: 0; }
 /* F152: the words as one block (lines still flush left, as Cydia's), centred across and down in the space between the
    icon and the tiles' right edge, as on Cydia's Home (4S: 32pt left of the block, 36pt right). Auto margins take the
    free space; the 10px each side is the closest the text comes, kept equal so the centre stays true. */
 .home-head { gap: 0; }
 .home-head > .home-words { margin: 0 auto; padding: 0 10px; }
-.home-title { margin: 0; font-size: 21px; font-weight: normal; line-height: 26px; color: var(--text); text-shadow: var(--emboss); }
-.home-by { margin: 2px 0 0; font-size: 17px; line-height: 21px; color: var(--text); text-shadow: var(--emboss); }
+.home-title { margin: 0; }
+.home-by { margin: 2px 0 0; }
+/* ==== look-only { ==== the icon and the welcome's type */
+.home-icon { border-radius: 10px; box-shadow: var(--home-icon-shadow); }
+.home-icon.tappable:active { filter: brightness(.8); }
+.home-title { font-size: 21px; font-weight: normal; line-height: 26px; color: var(--text); text-shadow: var(--emboss); }
+.home-by { font-size: 17px; line-height: 21px; color: var(--text); text-shadow: var(--emboss); }
 .home-by a { color: var(--by); font-weight: bold; text-decoration: none; }
+/* ==== } look-only ==== */
 
 /* Tile rows: 43px tiles, 10px apart; two halves 9px apart, or one outlined pair split by a line. */
 .home-row { margin: 0 10px; display: flex; gap: 9px; }
 .home-row + .home-row { margin-top: 10px; }
+.home-row > .table { flex: 1; min-width: 0; overflow: hidden; }
+.home-row.pair > .table { display: flex; }
+.home-pair > .cell { flex: 1; min-width: 0; }
+.home-tile { padding: 0 10px 0 6px; gap: 8px; }
+.home-tile .cell-label { flex: 1; min-width: 0; }
+/* ==== look-only { ==== the tiles and their glyphs */
 .home-row > .table {
-  flex: 1; min-width: 0; overflow: hidden; border: 1px solid var(--tile-edge); border-radius: 8px;
+  border: 1px solid var(--tile-edge); border-radius: var(--tile-radius);
   background: var(--tile); box-shadow: none;
 }
-.home-row.pair > .table { display: flex; background: none; } /* Cydia: no fill, the pinstripes show through */
-.home-pair > .cell { flex: 1; min-width: 0; }
+.home-row.pair > .table { background: none; } /* Cydia: no fill, the pinstripes show through */
 .home-pair > .cell + .cell { border-top: 0; border-left: 1px solid var(--tile-edge); }
 .home-pair > .cell + .cell > .cell-inner { box-shadow: none; } /* not a table's divider highlight */
 .home-row.green > .table { background: var(--tile-green); }
-.home-tile { padding: 0 10px 0 6px; gap: 8px; }
-.home-tile .cell-label { flex: 1; min-width: 0; }
 
 /* Glyphs: 29px rounded squares with a white symbol, drawn here (original art, no logos). */
 .home-glyph { box-shadow: none; background-position: center; background-repeat: no-repeat; background-size: 21px 21px; }
@@ -56,7 +72,7 @@ html[data-theme="dark"] .home {
 .glyph-signing { background-color: #8e44ad; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M4 3h12l4 4v8.5a5 5 0 0 0-2-1.2V8h-3V5H6v14h6.6a5 5 0 0 0 .7 2H4zm14 13a3.5 3.5 0 1 1-1.5 6.7L15 24v-3.4A3.5 3.5 0 0 1 18 16zM8 9h7v2H8zm0 4h5v2H8z'/%3E%3C/svg%3E"); }
 .glyph-install { background-color: #2c9b3c; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M11 3h2v9.6l3.3-3.3 1.4 1.4L12 16.4l-5.7-5.7 1.4-1.4 3.3 3.3zM4 18h16v2H4z'/%3E%3C/svg%3E"); }
 .glyph-send { background-color: #2c9b3c; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M3 11h12.2l-4.6-4.6L12 5l7 7-7 7-1.4-1.4 4.6-4.6H3z'/%3E%3C/svg%3E"); }
-.home-row.green .home-glyph { background-color: #37a94a; }
+.home-row.green .home-glyph { background-color: var(--tile-glyph-green); }
 html[data-theme="dark"] .glyph-github { background-color: var(--dk-glyph); }
 .glyph-add { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z'/%3E%3C/svg%3E"); }
 .glyph-upgrades { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M12 2 3 11h6v10h6V11h6z'/%3E%3C/svg%3E"); }
@@ -64,106 +80,129 @@ html[data-theme="dark"] .glyph-github { background-color: var(--dk-glyph); }
 .glyph-current { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 12.5 5 5L20 6.5'/%3E%3C/svg%3E"); }
 .glyph-changes, .glyph-loading { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3.5 2.5'/%3E%3C/svg%3E"); }
 .glyph-loading { opacity: .6; }
+/* ==== } look-only ==== */
 
-/* The help links: a white list with #999 edges like Cydia's, taller rows whose text may wrap. */
+/* The help links: a white list with #999 edges like Cydia's (the tiles' tokens), taller rows whose text may wrap. */
 .group.home-links { margin-top: 10px; }
-.home-links .table.grouped { background: #fff; border-color: #999; border-radius: 8px; box-shadow: none; }
-html[data-theme="dark"] .home-links .table.grouped { background: var(--table); border-color: var(--table-edge); }
 .home-links .cell-inner { min-height: 43px; padding: 9px 10px 9px 15px; }
-.home-links .cell-label { white-space: normal; line-height: 21px; }
-.home-links .cell + .cell { border-top-color: #999; }
+.home-links .cell-label { white-space: normal; }
+/* ==== look-only { ==== the help links' table, dividers and line height */
+.home-links .table.grouped { background: var(--tile); border-color: var(--tile-edge); border-radius: var(--tile-radius); box-shadow: none; }
+html[data-theme="dark"] .home-links .table.grouped { background: var(--table); border-color: var(--table-edge); }
+.home-links .cell-label { line-height: 21px; }
+.home-links .cell + .cell { border-top-color: var(--tile-edge); }
 .home-links .cell + .cell > .cell-inner { box-shadow: none; }
 html[data-theme="dark"] .home-links .cell + .cell { border-top-color: var(--divider); }
+/* ==== } look-only ==== */
 
 /* F37: the Not Jailbroken hint under the welcome, in the grouped footer's type (ios6.css .group-footer); a tap opens
    Settings > Device. Empty box when jailbroken. */
 .home-hint-box:empty { display: none; }
-.home-hint-box { margin: -3px 20px 10px; text-align: center; }
+.home-hint-box { margin: -3px 20px 10px; }
+.home-hint { -webkit-tap-highlight-color: transparent; }
+.home-version { margin: 14px 10px 6px; }
+/* ==== look-only { ==== the hint, the version line and the Signing page's app offer */
+.home-hint-box { text-align: center; }
 .home-hint {
   font-size: 15px; line-height: 19px; color: var(--head); text-shadow: var(--emboss);
-  text-decoration: none; -webkit-tap-highlight-color: transparent;
+  text-decoration: none;
 }
 
 /* Cydia's footer line under Home's links: small, centred, embossed grey. */
-.home-version { margin: 14px 10px 6px; font-size: 13px; line-height: 16px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
+.home-version { font-size: 13px; line-height: 16px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
 
 /* I7: Settings > Signing's Install iFizBox App row, once the certificate works: Home's green tile (the account tile's
-   #eefff0, its green glyph) as a grouped row. */
+   #eefff0, its green glyph) as a grouped row. Not under .home, so the colours are written out. */
 .app-offer .table.grouped { background: #eefff0; }
 html[data-theme="dark"] .app-offer .table.grouped { background: var(--dk-green); }
 .app-offer .home-glyph { background-color: #37a94a; }
+/* ==== } look-only ==== */
 
 /* Home's iFizBox App card (screens/home.js tileRow "green stack"): one green table, two full-width rows with a line
    of explanation each. */
 .home-row.stack > .table { flex: 1; }
-.home-stack > .cell + .cell { border-top: 1px solid var(--tile-edge, rgba(0,0,0,.12)); }
 .home-stack .home-tile { min-height: 58px; }
 .home-tile-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+/* ==== look-only { ==== the card's divider and subtitles */
+.home-stack > .cell + .cell { border-top: 1px solid var(--tile-edge, rgba(0,0,0,.12)); }
 .home-tile-text .cell-subtitle { font-size: 13px; font-weight: normal; color: var(--subtitle); }
+/* ==== } look-only ==== */
 
 /* F82 Home's Reload while it reloads, as Cydia's loadingitem_ (CyteKit/WebViewController.mm): the same bordered nav
    button titled " " (so UIKit's 50pt minimum width), with UIActivityIndicatorViewStyleWhite (20pt, 12 spokes from
    r 4.5 to 9.5, the brightest at 9 o'clock with five fading behind it, the rest at 27%) added inside it at x 15, y 5:
    centred in the bezel. The bezel stays as it is, never pressed or dimmed. */
-.bar-button.is-reloading {
-  position: relative; width: 50px; min-width: 50px; padding: 0; color: transparent; text-shadow: none; cursor: default;
-}
+.bar-button.is-reloading { position: relative; width: 50px; min-width: 50px; padding: 0; cursor: default; }
 .bar-button.is-reloading::after {
-  content: ""; position: absolute; left: 14px; top: 4px; width: 20px; height: 20px; /* 15,5 less the 1px border */
-  background: var(--spinner-white) center / 20px no-repeat;
+  position: absolute; left: 14px; top: 4px; width: 20px; height: 20px; /* 15,5 less the 1px border */
   animation: hud-spin .96s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) { .bar-button.is-reloading::after { animation-duration: 3s; } }
-.home-version.home-commit { margin-top: -10px; font-size: 13px; opacity: .8; }
+.home-version.home-commit { margin-top: -10px; }
 .home-commit:empty { display: none; }
+/* ==== look-only { ==== Reload's hidden title and spinner; the commit line */
+.bar-button.is-reloading { color: transparent; text-shadow: none; }
+.bar-button.is-reloading::after { content: ""; background: var(--spinner-white) center / 20px no-repeat; }
+.home-version.home-commit { font-size: 13px; opacity: .8; }
+/* ==== } look-only ==== */
 
 /* Credits' Special Thanks: big rows like a package page's header: a 58px picture, name, handle, then what for. */
 .thanks-row .cell-inner { padding-top: 10px; padding-bottom: 10px; gap: 12px; }
-.thanks-row .cell-icon { position: relative; overflow: hidden; width: 58px; height: 58px; border-radius: 11px; font-size: 26px; }
-.thanks-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; background: #fff; }
-.thanks-row .cell-icon img.loaded { opacity: 1; }
+.thanks-row .cell-icon { position: relative; overflow: hidden; width: 58px; height: 58px; }
+.thanks-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .thanks-row .cell-icon.thanks-logo img { object-fit: contain; padding: 6px; box-sizing: border-box; } /* a wordmark (zlib): whole, not cropped */
-.thanks-row .cell-subtitle { white-space: pre-line; overflow-wrap: anywhere; line-height: 18px; margin-top: 2px; }
+.thanks-row .cell-subtitle { white-space: pre-line; overflow-wrap: anywhere; margin-top: 2px; }
+/* ==== look-only { ==== Special Thanks' pictures and subtitles */
+.thanks-row .cell-icon { border-radius: 11px; font-size: 26px; }
+.thanks-row .cell-icon img { opacity: 0; background: #fff; }
+.thanks-row .cell-icon img.loaded { opacity: 1; }
+.thanks-row .cell-subtitle { line-height: 18px; }
+/* ==== } look-only ==== */
 
 /* Website, before iFizBox is installed: rows below the iFizBox App card are disabled, iOS 6 style: dimmed text and
    icons, and a small grey padlock where the chevron was (screens/home.js, websign-gate.js askToBrowse). */
+.home-locked .cell-inner.chevron::after { transform: none !important; width: 12px !important; height: 15px !important; }
+/* ==== look-only { ==== locked rows: dimmed, a padlock for the chevron */
 .home-locked .cell-label, .home-locked .cell-detail, .home-locked .cell-subtitle { color: #a3a8af !important; text-shadow: none; }
 .home-locked .home-glyph, .home-locked .cell-icon { filter: grayscale(1); opacity: .45; }
 .home-locked .cell-inner.chevron::after {
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 15'%3E%3Cpath fill='%23a3a8af' d='M3 6V4.2a3 3 0 0 1 6 0V6h.6c.8 0 1.4.6 1.4 1.4v5.2c0 .8-.6 1.4-1.4 1.4H2.4C1.6 14 1 13.4 1 12.6V7.4C1 6.6 1.6 6 2.4 6H3zm1.5 0h3V4.2a1.5 1.5 0 0 0-3 0V6z'/%3E%3C/svg%3E") center / 11px 14px no-repeat !important;
-  border: 0 !important; transform: none !important; width: 12px !important; height: 15px !important;
+  border: 0 !important;
 }
 .home-locked .cell-inner:active, .home-locked .cell-inner.is-pressed { background: none !important; }
 html[data-theme="dark"] .home-locked .cell-label, html[data-theme="dark"] .home-locked .cell-detail { color: var(--dk-dim) !important; }
+/* ==== } look-only ==== */
 
 /* "Jailbroken? Install iFizBox" (the website, for a jailbroken phone): F229, the green tile's pale tint in lavender
    (no more bright purple gradient, which drew taps meant for the green row), normal text and the grey chevron, as
    tall as the green row. "Jailbroken?" in lavender, normal weight. The glyph is an open padlock (drawn here: an
    unlocked lock, jailbreak's usual sign; not anyone's artwork) on a purple gradient. */
+.home-row.purple .home-tile { min-height: 58px; }
+/* ==== look-only { ==== the jailbroken install tile */
 .home { --tile-purple: #f5f0ff; --tile-purple-edge: #a9a2b8; --tile-lead: #6a4fa0; }
 html[data-theme="dark"] .home { --tile-purple: var(--dk-lavender); --tile-purple-edge: var(--tile-edge); --tile-lead: var(--dk-lavender-text); }
 .home-row.purple > .table { background: var(--tile-purple); border-color: var(--tile-purple-edge); }
-.home-row.purple .home-tile { min-height: 58px; }
 .home-tile-lead { color: var(--tile-lead); font-weight: normal; }
 .cell-inner:active .home-tile-lead, .cell-inner.is-pressed .home-tile-lead { color: inherit; }
 .glyph-jailbreak { background-color: #5b2fa3; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' d='M8 10.5V7.5a4 4 0 0 1 7.6-1.7'/%3E%3Crect x='5' y='10.5' width='14' height='10' rx='2' fill='%23fff'/%3E%3Ccircle cx='12' cy='15' r='1.6' fill='%236f43b9'/%3E%3Cpath d='M12 15.5v2.3' stroke='%236f43b9' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E"), linear-gradient(#8a5cd0, #5b2fa3); background-size: 21px 21px, 100% 100%; }
+/* ==== } look-only ==== */
 
 /* F135/F159: Home's Settings row, a tile (grey square, white gear) with the tiles' inset and gap, so its icon
    and label line up with the tiles above. */
 .home-settings-row > .cell-inner { padding: 0 10px 0 6px; gap: 8px; }
 /* Settings | Theme: one grouped table split in two halves (.home-pair's cells and divider, above). */
 .home-links > .table.home-pair { display: flex; }
-.glyph-theme { background-color: #4650b4; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' fill-rule='evenodd' d='M12 2.5a9.5 9.5 0 1 1 0 19a9.5 9.5 0 0 1 0-19zM12 4.8a7.2 7.2 0 0 0 0 14.4z'/%3E%3C/svg%3E"); }
 /* F223: the Settings half draws Settings > General's tile (icons/rowicons.js rowIcon, a .row-icon <img>); the row's own
    inset and gap place it, so drop .row-icon's Settings-table nudge. */
 .home-settings-row .cell-icon.row-icon { margin: 0; }
-
 /* F244: the sideload build's certificate-expiry tile (screens/home.js certRow), a full-width stack tile under the
    welcome, as the approved concept (journal/2026-11-19-cert-warning-concept/): the failed '!' glyph and a bold
    subtitle in the stage's ink. soon: amber tint; close (inside the Re-sign Reminder's days): red tint; gone (expired):
    a solid red gradient with white embossed text. Dark: the tints are the ink mixed into the theme's own tile and edge,
    the ink lifted toward the theme's text so it reads on the dark ground; the solid red stays as it is. */
 .home-row.cert { margin-bottom: 12px; }
+/* ==== look-only { ==== the Theme glyph; the certificate-expiry tile */
+.glyph-theme { background-color: #4650b4; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' fill-rule='evenodd' d='M12 2.5a9.5 9.5 0 1 1 0 19a9.5 9.5 0 0 1 0-19zM12 4.8a7.2 7.2 0 0 0 0 14.4z'/%3E%3C/svg%3E"); }
 .home-row.cert > .table { background: var(--cert-bg); border-color: var(--cert-edge); }
 .home-row.cert .home-glyph { background-color: var(--cert-ink); }
 .home-row.cert .cell-subtitle { color: var(--cert-ink); font-weight: bold; }
@@ -182,3 +221,4 @@ html[data-theme="dark"] .home-row.cert.soon, html[data-theme="dark"] .home-row.c
 html[data-theme="dark"] .home-row.cert.soon .cell-subtitle, html[data-theme="dark"] .home-row.cert.close .cell-subtitle {
   color: color-mix(in srgb, var(--cert-ink) 75%, var(--text));
 }
+/* ==== } look-only ==== */

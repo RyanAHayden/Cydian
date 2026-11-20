@@ -1,114 +1,146 @@
 /* F134: Settings' own rules (screens/settings.js links this file when it first draws a page). Settings > Signing is an
    iOS 6 settings page (.signing-page): the Certificate group with its Import or Replace row, the Files group while a
-   file or the password is missing, the profile, the options, then How Signing Works. Colours from ios6.css. */
+   file or the password is missing, the profile, the options, then How Signing Works. Colours from ios6.css.
+   Era readiness (docs/eras.md): each section keeps its layout in plain rules, then paints in a look-only stretch
+   (ios6-css.test.js fails if one sets layout). The theme preview's decorations are tokens an era sets. */
 .signing-page { padding-bottom: 20px; }
 /* The Files group is a plain .group here: its rows sit at the group's own margins, not inset again as in the
    walkthrough's card (signing.css .sign-files > .table). */
 .signing-page .sign-files > .table { margin-left: 0; margin-right: 0; }
 /* The Import row carries the hidden file input it clicks. */
 .signing-page .sign-import { position: relative; }
-/* A problem with the certificate or profile, in the Certificate group's footer (signsheet.css's red, which only
-   loads with Signed Apps). */
-.signing-page .group-footer.sign-warning { color: #b5322c; text-shadow: none; }
 /* F199: Theme's Mode, the segmented control (nav/ui.js segmented(), ios6.css .store-segmented) at a settings
    group's full width: no margins of its own (the group has them), 44px like a grouped row and its 9.5px corners. */
-.store-segmented.settings-segmented { margin: 0; height: 44px; border-radius: 9.5px; }
-.settings-segmented .store-segment { font-size: 15px; line-height: 42px; }
+.store-segmented.settings-segmented { margin: 0; height: 44px; }
 /* F199: a theme's swatch in Theme > Light / Dark: a small rounded tile, its bar colour over its ground (the gradient
    comes from core/settings.js `swatch`), with a hairline edge so OLED Black shows on a near-black row. */
-.cell-icon.theme-swatch { width: 24px; height: 24px; border-radius: 5px; box-shadow: inset 0 0 0 1px rgba(127,127,127,.45); }
+.cell-icon.theme-swatch { width: 24px; height: 24px; }
 /* Theme > Light / Dark: the controls sample (screens/settings.js themePreview), pinned just above the tab bar; the
    theme list above it ends in a spacer as tall, so its last row scrolls clear. The sample scrolls on its own.
    F230: it opens as a 100px peek (settings.js SPLIT_PEEK), so the first frame before the split is measured matches. */
 .theme-preview { position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 1; height: 100px;
-  display: flex; flex-direction: column; box-sizing: border-box; will-change: transform;
-  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
-  box-shadow: 0 -1px 0 rgba(0,0,0,.25), 0 -3px 6px rgba(0,0,0,.15); }
+  display: flex; flex-direction: column; box-sizing: border-box; will-change: transform; }
 .theme-preview-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 20px;
   -webkit-overflow-scrolling: touch; }
 .theme-preview-space { height: 100px; }
 /* F215: the divider on top of the preview, dragged to move the split (screens/settings.js dragSplit). The strip is
-   taller than it looks to the finger: 12px more above it.
-   F231: its grip is iOS 6's Notification Center grabber, flipped (sampled from the 4S's ref/4s/screens/nc-grabber.png
-   at 2x): a 43x17pt black tab hanging from the preview's top edge, its bottom corners rounded 3pt, 1pt sides of
-   #121212. In it three 3.5pt bars, 1.5pt of black apart, starting 2pt down: each #727375 fading to #666768 over 3pt
-   and a 0.5pt #333435 edge at the bottom (on the phone they run the other way). A bar spans the tab inside its sides
-   at its top and 1pt less each end at its bottom: the black corner triangles cut the slant. */
+   taller than it looks to the finger: 12px more above it. */
 .theme-preview-grip { position: relative; flex: none; height: 25px; touch-action: none; cursor: row-resize; }
-.theme-preview-grip::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; bottom: 0; }
-.theme-preview-grip::after { content: ""; position: absolute; left: calc(50% - 21.5px); top: 0; width: 43px; height: 17px;
-  --nc-l: linear-gradient(to top right, #050505 50%, transparent 50%);
-  --nc-r: linear-gradient(to top left, #050505 50%, transparent 50%);
-  --nc-bar: linear-gradient(#727375, #666768 3px, #333435 3px);
-  border-radius: 0 0 3px 3px; box-shadow: inset 1px 0 #121212, inset -1px 0 #121212;
-  background: var(--nc-l) 1px 2px / 1px 3.5px, var(--nc-r) right 1px top 2px / 1px 3.5px,
-    var(--nc-l) 1px 7px / 1px 3.5px, var(--nc-r) right 1px top 7px / 1px 3.5px,
-    var(--nc-l) 1px 12px / 1px 3.5px, var(--nc-r) right 1px top 12px / 1px 3.5px,
-    var(--nc-bar) 1px 2px / 41px 3.5px, var(--nc-bar) 1px 7px / 41px 3.5px, var(--nc-bar) 1px 12px / 41px 3.5px,
-    #050505;
-  background-repeat: no-repeat; }
+.theme-preview-grip::before { position: absolute; left: 0; right: 0; top: -12px; bottom: 0; }
+.theme-preview-grip::after { position: absolute; left: calc(50% - 21.5px); top: 0; width: 43px; height: 17px; }
 .theme-preview-bar { position: relative; display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 5px; }
 .theme-preview-bar .nav-title { flex: 1; }
 .theme-preview-seg { margin: 10px; }
 .theme-preview-buttons { display: flex; align-items: center; gap: 10px; padding: 0 10px; }
+/* ==== look-only { ==== Signing's warning, Theme's Mode and swatches, the theme preview and its grip */
+/* A problem with the certificate or profile, in the Certificate group's footer (signsheet.css's red, which only
+   loads with Signed Apps). */
+.signing-page .group-footer.sign-warning { color: #b5322c; text-shadow: none; }
+.store-segmented.settings-segmented { border-radius: 9.5px; }
+.settings-segmented .store-segment { font-size: 15px; line-height: 42px; }
+.cell-icon.theme-swatch { border-radius: 5px; box-shadow: inset 0 0 0 1px rgba(127,127,127,.45); }
+/* The theme preview's iOS 6 decorations: its pinstripe ground and the shadow it casts up, and the grip.
+   F231: the grip is iOS 6's Notification Center grabber, flipped (sampled from the 4S's ref/4s/screens/nc-grabber.png
+   at 2x): a 43x17pt black tab hanging from the preview's top edge, its bottom corners rounded 3pt, 1pt sides of
+   #121212. In it three 3.5pt bars, 1.5pt of black apart, starting 2pt down: each #727375 fading to #666768 over 3pt
+   and a 0.5pt #333435 edge at the bottom (on the phone they run the other way). A bar spans the tab inside its sides
+   at its top and 1pt less each end at its bottom: the black corner triangles cut the slant. */
+:root {
+  --preview-ground: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
+  --preview-shadow: 0 -1px 0 rgba(0,0,0,.25), 0 -3px 6px rgba(0,0,0,.15);
+  --preview-grip-l: linear-gradient(to top right, #050505 50%, transparent 50%);
+  --preview-grip-r: linear-gradient(to top left, #050505 50%, transparent 50%);
+  --preview-grip-bar: linear-gradient(#727375, #666768 3px, #333435 3px);
+  --preview-grip:
+    var(--preview-grip-l) 1px 2px / 1px 3.5px, var(--preview-grip-r) right 1px top 2px / 1px 3.5px,
+    var(--preview-grip-l) 1px 7px / 1px 3.5px, var(--preview-grip-r) right 1px top 7px / 1px 3.5px,
+    var(--preview-grip-l) 1px 12px / 1px 3.5px, var(--preview-grip-r) right 1px top 12px / 1px 3.5px,
+    var(--preview-grip-bar) 1px 2px / 41px 3.5px, var(--preview-grip-bar) 1px 7px / 41px 3.5px, var(--preview-grip-bar) 1px 12px / 41px 3.5px,
+    #050505;
+  --preview-grip-edge: inset 1px 0 #121212, inset -1px 0 #121212;
+  --preview-grip-radius: 0 0 3px 3px;
+}
+.theme-preview { background: var(--preview-ground); box-shadow: var(--preview-shadow); }
+.theme-preview-grip::before { content: ""; }
+.theme-preview-grip::after { content: "";
+  border-radius: var(--preview-grip-radius); box-shadow: var(--preview-grip-edge);
+  background: var(--preview-grip);
+  background-repeat: no-repeat; }
+/* ==== } look-only ==== */
+
 /* Settings > Installation > This iPhone: the 6-digit code to type into Developer Mode's pairing screen, in the
    group footer's colour and emboss, large. */
-.group .pair-code { margin: 0; text-align: center; font: bold 44px/1.2 "Helvetica Neue", Helvetica, sans-serif;
-  letter-spacing: 8px; color: var(--head); text-shadow: var(--emboss); }
+.group .pair-code { margin: 0; }
 /* Settings > Installation's Install Apps With rows: a short point per line (core ROUTE_OPTIONS), wrapped, never cut. */
-.route-row .cell-subtitle { white-space: pre-line; overflow-wrap: anywhere; line-height: 18px; margin-top: 2px; }
+.route-row .cell-subtitle { white-space: pre-line; overflow-wrap: anywhere; margin-top: 2px; }
 .route-row .cell-inner { padding-top: 8px; padding-bottom: 8px; }
 /* This iPhone's page: where to type the code, a short line a step in the group header's colour and emboss, and
    under it the user's screenshot of that Settings screen (3x, drawn at the group's width), the row to tap ringed in
    iOS blue: a pill (the rows' own corner shape), placed by core ringStyle() from the row's measured box. */
-.pair-steps { margin: 0; padding: 0 9px; list-style: none; counter-reset: pair-step; }
+.pair-steps { margin: 0; padding: 0 9px; counter-reset: pair-step; }
 .pair-step { counter-increment: pair-step; margin: 0 0 12px; }
-.pair-step-text { display: block; font-size: 15px; font-weight: bold; line-height: 20px; color: var(--head);
-  text-shadow: var(--emboss); }
-.pair-step-text::before { content: counter(pair-step) ". "; }
-.pair-shot { position: relative; margin: 7px 0 4px; border-radius: 9.5px; overflow: hidden; }
+.pair-step-text { display: block; }
+.pair-shot { position: relative; margin: 7px 0 4px; overflow: hidden; }
 .pair-shot-img { display: block; width: 100%; height: auto; }
-.pair-ring { position: absolute; box-sizing: border-box; border: 2.5px solid #0a84ff; border-radius: 999px;
-  pointer-events: none; }
+.pair-ring { position: absolute; box-sizing: border-box; pointer-events: none; }
 /* This iPhone's page: a wait inside a group (the code coming, the iPhone connecting), the grey spinner and its line
    in the footer's place and size, left-aligned like a footer (packages.css .loading draws the spinner). */
-.group .loading.pair-wait { justify-content: flex-start; margin: 8px 9px 0; font-size: 15px; line-height: 19px; }
-/* Paired: the check sits on its own row. */
-.pair-done .cell-label { font-weight: bold; }
+.group .loading.pair-wait { justify-content: flex-start; margin: 8px 9px 0; }
 /* Installation & Signing's nav title (screens/settings.js mergedNav): as wide as a nav title may be beside the back
    button, its font shrinking from 20px so the 22 characters fit (17px at 375pt) instead of ending in "…". */
-.nav-title-fit { display: block; max-width: calc(100vw - 180px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  font-size: min(20px, calc((100vw - 180px) / 11.4)); line-height: 44px; }
+.nav-title-fit { display: block; max-width: calc(100vw - 180px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* ==== look-only { ==== the pairing code, steps, screenshot ring and wait; the fitted nav title */
+.group .pair-code { text-align: center; font: bold 44px/1.2 "Helvetica Neue", Helvetica, sans-serif;
+  letter-spacing: 8px; color: var(--head); text-shadow: var(--emboss); }
+.route-row .cell-subtitle { line-height: 18px; }
+.pair-steps { list-style: none; }
+.pair-step-text { font-size: 15px; font-weight: bold; line-height: 20px; color: var(--head);
+  text-shadow: var(--emboss); }
+.pair-step-text::before { content: counter(pair-step) ". "; }
+.pair-shot { border-radius: 9.5px; }
+.pair-ring { border: 2.5px solid #0a84ff; border-radius: 999px; }
+.group .loading.pair-wait { font-size: 15px; line-height: 19px; }
+/* Paired: the check sits on its own row. */
+.pair-done .cell-label { font-weight: bold; }
+.nav-title-fit { font-size: min(20px, calc((100vw - 180px) / 11.4)); line-height: 44px; }
+/* ==== } look-only ==== */
+
 /* F284: Installation & Signing's main page (screens/installroute.js mainPage), built once and filled in place. A value
    still loading and the value itself share one grid cell (.value-slot), so the swap never moves a row: the grey
    spinner (or the status cell's Checking… text) shows while it loads, then the value fades in, opacity only. */
 .value-slot { display: inline-grid; align-items: center; justify-items: end; }
 .cell-label.value-slot, .cell-subtitle.value-slot { display: grid; justify-items: start; }
 .value-slot > * { grid-area: 1 / 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; transition: opacity .2s ease; }
-.value-slot > .slot-wait { opacity: 0; }
-.value-slot.is-loading > .slot-value { opacity: 0; }
-.value-slot.is-loading > .slot-wait { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .value-slot > * { transition: none; } }
-.install-red, .cell-detail.install-red { color: #c4161c; }
 /* The status cell: a 29pt tile (green check, red !, grey while checking), the state in bold and two lines under it,
    always two lines tall so a longer or shorter answer never moves the rows below. */
 .install-status > .cell-inner { padding-top: 8px; padding-bottom: 8px; gap: 10px; }
-.install-status .cell-subtitle { white-space: normal; line-height: 17px; height: 34px; }
+.install-status .cell-subtitle { white-space: normal; height: 34px; }
 .install-status .cell-subtitle > * { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
-.status-icon { flex: none; width: 29px; height: 29px; border-radius: 6px; background-position: center; background-repeat: no-repeat;
-  background-size: 19px; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.25); transition: opacity .2s ease; }
-.status-icon.tone-wait { background-color: #a9b0ba; background-image: linear-gradient(#c9ced6, #9aa2ae); }
-.status-icon.tone-ok { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4 10.5l4 4 8-9' fill='none' stroke='%23fff' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"), linear-gradient(#7fd36b, #2f9a2a); background-size: 19px, cover; }
-.status-icon.tone-warn { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 4v7.5' stroke='%23fff' stroke-width='2.8' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='15.5' r='1.7' fill='%23fff'/%3E%3C/svg%3E"), linear-gradient(#f08a83, #c4161c); background-size: 19px, cover; }
+.status-icon { flex: none; width: 29px; height: 29px; transition: opacity .2s ease; }
 /* The one action row under it: centred, its label changes with the state; dimmed (and inert) while checking. */
 .install-action > .cell-inner { justify-content: center; }
-.install-action .cell-text { flex: none; text-align: center; }
-.install-action > .cell-inner.is-dim .cell-label { opacity: .4; }
+.install-action .cell-text { flex: none; }
 .install-action > .cell-inner.is-dim { cursor: default; }
 /* B135: Check Connection's answer on its button (screens/installroute.js checkMark): a check and "Successful" in the
    status tile's green, or a red x beside the label; back to plain after a few seconds or on the next tap. */
-.check-mark { display: inline-block; margin-right: 6px; font-weight: bold; }
+.check-mark { display: inline-block; margin-right: 6px; }
+/* ==== look-only { ==== loading values, the status tile, the action row and Check Connection's answer */
+.value-slot > .slot-wait { opacity: 0; }
+.value-slot.is-loading > .slot-value { opacity: 0; }
+.value-slot.is-loading > .slot-wait { opacity: 1; }
+.install-red, .cell-detail.install-red { color: #c4161c; }
+.install-status .cell-subtitle { line-height: 17px; }
+.status-icon { border-radius: 6px; background-position: center; background-repeat: no-repeat;
+  background-size: 19px; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.25); }
+.status-icon.tone-wait { background-color: #a9b0ba; background-image: linear-gradient(#c9ced6, #9aa2ae); }
+.status-icon.tone-ok { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4 10.5l4 4 8-9' fill='none' stroke='%23fff' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"), linear-gradient(#7fd36b, #2f9a2a); background-size: 19px, cover; }
+.status-icon.tone-warn { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 4v7.5' stroke='%23fff' stroke-width='2.8' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='15.5' r='1.7' fill='%23fff'/%3E%3C/svg%3E"), linear-gradient(#f08a83, #c4161c); background-size: 19px, cover; }
+.install-action .cell-text { text-align: center; }
+.install-action > .cell-inner.is-dim .cell-label { opacity: .4; }
+.check-mark { font-weight: bold; }
 [data-check="ok"] .cell-label { color: #2f9a2a; }
 [data-check="fail"] .check-mark { color: #c4161c; }
 html[data-theme="dark"] [data-check="ok"] .cell-label { color: var(--dk-ok); }
 html[data-theme="dark"] [data-check="fail"] .check-mark { color: var(--dk-bad); }
+/* ==== } look-only ==== */

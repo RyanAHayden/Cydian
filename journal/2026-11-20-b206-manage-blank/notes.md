@@ -33,7 +33,10 @@ involved.
   More Sources (website backend, Device = iphoneos-arm64);
 - the same with Device = none: no Find More row;
 - a guard: every literal `rowIcon("…")` in web/app (not tests or vendor) names a `ROW_ICONS` entry.
-With the old `rowIcon("globe")` put back, the first and third tests fail (`no row icon globe`). With the fix,
+`web/app/screens/manage-open-lite.test.js` (a separate file, because the app's mode is read when modules load)
+runs the same press and render check in the sideload app (fake bridge, `mode: "sideload"`), with Find More among
+the rows.
+With the old `rowIcon("globe")` put back, the first and third tests and the Lite test fail (`no row icon globe`). With the fix,
 all three pass. After the fix, the browser repro shows the Manage page with all five rows and no page error.
 
 ## Tried that failed
@@ -41,11 +44,25 @@ all three pass. After the fix, the browser repro shows the Manage page with all 
 - The first test draft used `ifizbox.device = "rootless"`, as rootcopies.test.js does. Device values are
   architectures (`iphoneos-arm64`…), so that setting didn't count as jailbroken there and Find More stayed hidden.
 
+## Released .deb on the 7
+
+Read-only over ssh, without the screen lock: the 7 runs `com.ryha.ifizbox` 0.17.1-2884, and its
+`/var/jb/Applications/iFizBox.app/web/screens/manage.js` contains `rowIcon("globe")` once. That is the same
+faulty line.
+
+## Spec review
+
+The review flagged the missing Lite case, which is now tested (manage-open-lite.test.js), and the missing
+real-device repro: the installed .deb was checked as above, and the tap itself is listed below. It also listed
+as extras the new `findMore` icon in rowicons.js and the repo-wide `rowIcon` guard. I kept both: the icon is
+the fix itself (the only alternative is borrowing the signing server's icon), and the guard is the regression
+test for this kind of bug.
+
 ## Not verified
 
-- The released .deb on the iPhone 7 and the sideload (Lite) app on a phone were not tapped by hand. I found the
-  cause in code that is in both releases, reproduced it in Chromium as the app (fake bridge), and confirmed that
-  the live site serves the same line. Driving the 7 needs its screen lock and an install, and the fix ships
-  only with the next release anyway.
+- On the phones, Manage was not tapped by hand: neither in the released .deb on the iPhone 7 (only its file was
+  read, above) nor in the sideload (Lite) app. Driving the 7's screen needs its lock and a new .deb install for
+  the fixed side. The cause was reproduced in Chromium running as the app, and the fix ships with the next
+  release.
 - ifizbox.com with Settings > Device set to jailbroken was not tapped in a real browser. It runs the same
   `renderRoot` path the jailbroken test covers.

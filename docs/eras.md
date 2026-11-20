@@ -138,11 +138,23 @@ None exist yet. iOS 13 and iOS 26 need three, each off in iOS 6:
 Clean: the nav bar (bar, shadow, title, status-bar strip), bar buttons (bordered, back, red, the Share glyph), the
 tab bar (bar, tabs, glyph fills, badge) and grouped tables with their cells.
 
+Split, with their layout in their own rules and their paint in look-only stretches: `sources.css`, `home.css` and
+`settings.css`. Their iOS 6 decorations are tokens an era sets:
+
+- the Done bar button: `--done-btn`, `--done-btn-edge`, `--done-btn-edge-top`, `--done-btn-pressed` (`:root`);
+- Home's tiles: `--tile`, `--tile-edge`, `--tile-radius`, `--tile-green`, `--tile-glyph-green`, `--tile-purple*`,
+  `--by`, `--home-icon-shadow`, on `.home` (so an era sets them on `html[data-style=…] .home`);
+- Theme's preview: `--preview-ground`, `--preview-shadow`, `--preview-grip` (the grabber's layers, from
+  `--preview-grip-l`, `-r`, `-bar`), `--preview-grip-edge`, `--preview-grip-radius` (`:root`).
+
+Their other colours (the alert, Delete, trust pills, Find More, the certificate tile, the status tiles) are still
+literal look rules: an era restyles them with look rules of its own.
+
 Not yet clean, each queued as its own cleanup:
 
 - the rest of `ios6.css` (switch, plain tables and section header, button pair, HUD, menu, banner, share sheet,
   reload bar, segmented control, undo bar, pull to refresh, placeholders);
-- the other stylesheets (`packages.css`; `sources.css`, `home.css`, `settings.css`; the small ones);
+- the other stylesheets (`packages.css`; the small ones);
 - the light palettes' chrome rules in `palettes.css`;
 - the art the overlays in `nav/` draw from JS (HUD, spinner, share sheet, lock, placeholders);
 - inline SVG icons drawn from JS, to come from a per-style icon map;

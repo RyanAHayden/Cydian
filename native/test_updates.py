@@ -87,7 +87,12 @@ class Wiring(unittest.TestCase):
     def test_badge_is_changes_count(self):
         # B47: the background badge starts from Changes' last count (app.badge stores it) and its keys (updates.watch),
         # never found.count alone, which badged updates Changes didn't list.
-        self.assertIn("UpdateCheck.badge(found, pageCount:", self.src)
+        # B207: through noticeBadge (badge, never under the fresh updates a notice tells of)
+        self.assertIn("UpdateCheck.noticeBadge(found, fresh: fresh,", self.src)
+        self.assertIn("max(badge(found, pageCount: pageCount, pageKeys: pageKeys)", read("sign", "Updates.swift"))
+        # B207: the page's `counted` keys, not `known` (which also holds ignored versions), are what Changes counted
+        self.assertIn('UpdateCheck.pageKeys(known: page, counted: c.params["counted"])', self.src)
+        self.assertIn("counted.sorted(), forKey: pageKeysKey", self.src)
         self.assertNotIn("setBadgeCount(found.count)", self.src)
         self.assertNotIn("applicationIconBadgeNumber = found.count", self.src)
         self.assertIn("forKey: pageKeysKey", self.src)

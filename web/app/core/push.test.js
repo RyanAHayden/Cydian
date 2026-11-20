@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { memStorage as memory } from "../fakes.test-helper.js";
 import { offReason, registration, expiresOf, enablePush, disablePush, syncPush, pushInfo, pushRows, pushState,
-  storedWatch, RENAMED_TEXT, NO_APS_TEXT, DENIED_TEXT, PUSH_KEY } from "./push.js";
+  storedWatch, rememberWatch, RENAMED_TEXT, NO_APS_TEXT, DENIED_TEXT, PUSH_KEY } from "./push.js";
 import { BUNDLE_ID, NAME } from "../brand.js";
 
 const TOKEN = "ab".repeat(32);
@@ -58,6 +58,12 @@ test("the registration body", () => {
     apps: [{ id: "com.x.app", name: "X", version: "1.0", source: "https://s.example/a.json" }], known: ["com.x.app 1.1"],
     expires: [{ id: BUNDLE_ID, name: NAME, at: "2027-01-01T00:00:00.000Z" }] });
   assert.deepEqual(expiresOf({}), []);
+  // B207: Changes' counted keys go along when the page sent them apart from `known`
+  assert.deepEqual(registration({ ...ST, token: TOKEN }, { ...WATCH, counted: [] }).counted, []);
+  assert.equal("counted" in b, false);
+  const storage = memory();
+  rememberWatch({ ...WATCH, counted: ["com.x.app 1.1"] }, storage);
+  assert.deepEqual(storedWatch(storage).counted, ["com.x.app 1.1"]);
 });
 
 test("enable registers with the server; sync sends only changes; disable forgets", async () => {

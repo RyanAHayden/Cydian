@@ -52,11 +52,25 @@ test("Update Alerts: what iOS allows, the last background check, and a way to Se
   const { NAME } = await import("../brand.js");
   const now = Date.parse("2026-11-18T12:00:00Z");
   const rows = (g) => g.rows.map((r) => [r.label, r.detail ?? ""]);
-  // Icon Badge off is a choice shown in Update Alerts, not something the check needs fixed
-  const [alerts, check, extra] = notifyRows({ badges: false, alerts: true, backgroundRefresh: true, lastCheck: null }, now);
+  // B207: Icon Badge off in iOS: Update Alerts says so with the fix row; NAME Updates gets its own group and footer
+  const [offAlerts, offSelf, offCheck, offExtra] = notifyRows({ status: "authorized", badges: false, alerts: true, backgroundRefresh: true, lastCheck: null }, now);
+  assert.equal(offExtra, undefined, "no push: three groups");
+  assert.equal(offAlerts.header, "Update Alerts");
+  assert.deepEqual(rows(offAlerts), [["Notifications", "On"], ["Icon Badge", "Off"], ["Turn On in Settings", ""]]);
+  assert.equal(offAlerts.rows[1].toggle, "ios");
+  assert.equal(offAlerts.rows[2].open, true);
+  assert.equal(offAlerts.footer, "Icon Badge is off in iOS, so update alerts can't show a count on the icon.");
+  assert.equal(offSelf.header, undefined);
+  assert.deepEqual(rows(offSelf), [[`${NAME} Updates`, "On"]]);
+  assert.match(offSelf.footer, new RegExp(`^Off, only your apps' updates alert you`));
+  assert.equal(offCheck.header, "Checking for Updates");
+  // not asked yet (iOS answers no badges then): nothing to fix in Settings, the group as when on
+  const [asked] = notifyRows({ status: "notDetermined", badges: false, alerts: false, backgroundRefresh: true, lastCheck: null }, now);
+  assert.deepEqual(rows(asked).map(([l]) => l), ["Notifications", "Icon Badge", `${NAME} Updates`]);
+  const [alerts, check, extra] = notifyRows({ badges: true, alerts: true, backgroundRefresh: true, lastCheck: null }, now);
   assert.equal(extra, undefined, "no push: two groups");
   assert.equal(alerts.header, "Update Alerts");
-  assert.deepEqual(rows(alerts), [["Notifications", "On"], ["Icon Badge", "Off"], [`${NAME} Updates`, "On"]]);
+  assert.deepEqual(rows(alerts), [["Notifications", "On"], ["Icon Badge", "On"], [`${NAME} Updates`, "On"]]);
   assert.deepEqual(alerts.rows.map((r) => r.toggle), ["ios", "ios", "self"]);
   assert.match(alerts.footer, new RegExp(`^Off, only your apps' updates alert you; ${NAME}'s own update still shows in Changes\\.$`));
   assert.equal(check.header, "Checking for Updates");
@@ -80,7 +94,7 @@ test("Update Alerts: what iOS allows, the last background check, and a way to Se
   assert.deepEqual(rows(both).map(([l]) => l), ["Background Check", "Background App Refresh", "Notifications", "Last Check", "Turn On in Settings"]);
   assert.match(both.footer, /^Background App Refresh and Notifications are off in iOS/);
   // turned off here: no nudge to Settings, the footer says it's off
-  const [quietAlerts, quiet] = notifyRows({ backgroundOn: false, badges: false, alerts: false, backgroundRefresh: false }, now, { selfAlerts: false });
+  const [quietAlerts, quiet] = notifyRows({ backgroundOn: false, badges: true, alerts: false, backgroundRefresh: false }, now, { selfAlerts: false });
   assert.deepEqual(rows(quiet), [["Background Check", "Off"], ["Last Check", "Not yet"]]);
   assert.match(quiet.footer, new RegExp(`^Off, updates are found only while ${NAME} is open\\.$`));
   assert.deepEqual(quietAlerts.rows[2], { label: `${NAME} Updates`, detail: "Off", on: false, toggle: "self" });
@@ -93,7 +107,7 @@ test("Checking for Updates: a Push group and a Background Check group, one foote
   const { notifyRows } = await import("./settings.js");
   const { pushRows } = await import("../core/push.js");
   const now = Date.parse("2026-11-19T12:00:00Z");
-  const st = { badges: false, alerts: true, backgroundRefresh: true, lastCheck: "2026-11-19T11:00:00Z" };
+  const st = { badges: true, alerts: true, backgroundRefresh: true, lastCheck: "2026-11-19T11:00:00Z" };
   const rows = (g) => g.rows.map((r) => [r.label, r.detail ?? ""]);
   const live = pushRows({ state: { on: true }, status: { registered: true, lastPush: "2026-11-19T11:50:00Z" }, reason: null }, now);
   const [, pushGroup, check] = notifyRows(st, now, { push: live });

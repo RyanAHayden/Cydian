@@ -127,6 +127,31 @@ test("B47: the icon badge is Changes' last count plus updates it didn't count") 
     check(UpdateCheck.badge([f("d", "1.6")], pageCount: -3, pageKeys: ["junk"]) == 1, "a bad count or key")
 }
 
+test("B207: a posted notice always carries a badge for what it tells of") {
+    let f = { (id: String, v: String) in found(id, id, "1", v) }
+    // Changes showed nothing (Delta 1.6 ignored, F281, but its key known); Delta 1.7 is a fresh notice: badge 1, not 0.
+    let known: Set<String> = ["d 1.6"]
+    let d17 = [f("d", "1.7")]
+    check(UpdateCheck.badge(d17, pageCount: 0, pageKeys: known) == 0, "the old math left 0")
+    check(UpdateCheck.noticeBadge(d17, fresh: UpdateCheck.fresh(d17, known: known), pageCount: 0, pageKeys: known) == 1,
+          "the notice's badge counts its update")
+    // With `counted` sent apart from `known`, the ignored key no longer stands for a counted row.
+    let page = UpdateCheck.pageKeys(known: known, counted: [] as [Any])
+    check(page.isEmpty, "counted: \(page)")
+    check(UpdateCheck.badge(d17, pageCount: 0, pageKeys: page) == 1, "badge from counted keys")
+    // Two counted rows and an ignored third: its next version adds one.
+    let p2 = UpdateCheck.pageKeys(known: ["a 2", "b 3", "d 1.6"], counted: ["a 2", "b 3", 7] as [Any])
+    check(p2 == ["a 2", "b 3"], "bad entries dropped: \(p2)")
+    let all = [f("a", "2"), f("b", "3"), f("d", "1.7")]
+    check(UpdateCheck.noticeBadge(all, fresh: [f("d", "1.7")], pageCount: 2, pageKeys: p2) == 3, "2 counted + the new one")
+    // No `counted` (an older page): `known` as before.
+    check(UpdateCheck.pageKeys(known: known, counted: nil) == known, "fallback")
+    // A newer version of a counted row is still the same row; nothing fresh, nothing added.
+    check(UpdateCheck.noticeBadge([f("a", "2.1")], fresh: [], pageCount: 1, pageKeys: ["a 2"]) == 1, "same row")
+    // Changes' own count larger than the fresh ones wins.
+    check(UpdateCheck.noticeBadge([f("a", "2.1")], fresh: [f("a", "2.1")], pageCount: 4, pageKeys: ["a 2"]) == 4, "page count")
+}
+
 test("B124: the app's own update handed to iOS comes off the badge") {
     let me: Set<String> = ["com.ryha.ifizbox", "com.ryha.ifizbox.ABCDE12345"]
     // Changes counted iFizBox 0.12.0 and Delta: 1 left.

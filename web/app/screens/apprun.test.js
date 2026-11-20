@@ -233,7 +233,7 @@ test("openPrepared opens the kept copy, then waits for iOS's install under the s
 
 test("phoneLanes: each try gets its own tag; iFizBox's own is hosted and not watched", async () => {
   const sc = { prepareOnDevice: async (job, o) => o.tag, openPrepared: async (row, o) => [o.tag, o.host], discardPrepared: () => {} };
-  const l = phoneLanes(sc);
+  const l = phoneLanes(sc, { run: "" });
   const row = { id: "a", job: {} };
   assert.equal(await l.sign(row, {}), "a#1");
   assert.equal(await l.sign(row, {}), "a#2");
@@ -381,7 +381,7 @@ test("B85/B91: tapping the asking row re-prompts; a dismissed prompt fails that 
 
 test("B91: phoneLanes' Try Again reuses the try's tag (Stop ends that serving) and asks openPrepared with again", async () => {
   const sc = { prepareOnDevice: async (job, o) => o.tag, openPrepared: async (row, o) => [o.tag, Boolean(o.again)], discardPrepared: () => {} };
-  const l = phoneLanes(sc);
+  const l = phoneLanes(sc, { run: "" });
   const row = { id: "a", job: {} };
   assert.equal(await l.sign(row, {}), "a#1");
   assert.deepEqual(await l.install(row, {}), ["a#2", false]);

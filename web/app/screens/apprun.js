@@ -37,9 +37,14 @@ import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED } from "../signing-client.js";
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
 // row gets its own tag, so signing.cancel {tag} stops that try only.
-export function phoneLanes(sc, { native } = {}) {
+// B139: the shell remembers cancelled tags for its whole life (native SignJob: a job begun under one starts cancelled),
+// so the tags carry this run's own id (`run`): a new run of the same queue counting from #1 again reused a tag an
+// earlier run's Stop or Cancel had cancelled, and that app ended "Failed: Cancelled" though nobody cancelled it.
+let runs = 0;
+export const laneRunId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}${++runs}`;
+export function phoneLanes(sc, { native, run = laneRunId() } = {}) {
   let n = 0;
-  const tagOf = (r) => `${r.id}#${++n}`;
+  const tagOf = (r) => `${r.id}#${++n}${run ? `@${run}` : ""}`;
   const served = new Map(); // B91: row id -> the tag its served IPA runs under (Try Again's Stop stops that serving)
   return {
     sign: (r, { signal, progress }, log = () => {}) => sc.prepareOnDevice(r.job, { tag: tagOf(r), signal, progress, log, native }),

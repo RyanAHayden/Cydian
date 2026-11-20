@@ -259,7 +259,11 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
     errors = [];
     showErrors();
     $("route").textContent = hash || "(start)";
-    $("app").srcdoc = srcdoc();
+    // A new iframe each time: the old app is gone at once (no last frame drawn at a changed size or mode, no late
+    // message from it), and the new one starts at the size layout() just set.
+    var old = $("app"), fresh = old.cloneNode(false);
+    fresh.srcdoc = srcdoc();
+    old.replaceWith(fresh);
   }
   function showErrors() {
     $("errors").hidden = !errors.length;
@@ -306,13 +310,13 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
   });
   $("device").value = state.device;
   $("device").addEventListener("change", function () {
-    var was = deviceOf();
     state.device = $("device").value;
     remember();
     layout();
-    // the app takes the new size and safe areas without a reload, unless phone and iPad differ (user agent)
-    if (Boolean(was.ipad) !== Boolean(deviceOf().ipad)) load();
-    else $("app").contentWindow.postMessage({ concept: true, type: "device", sa: inset(deviceOf()) }, "*");
+    // A fresh app at the new size, on the same page: resizing the running one set off the app's ResizeObservers
+    // (nav/slide.js observes new boxes from inside its callback) into "ResizeObserver loop completed with
+    // undelivered notifications". load() swaps in a new iframe in this same task, so the old app never sees the size.
+    load();
   });
   [["light", "Light", meta.palettes.lightTheme], ["dark", "Dark", meta.palettes.darkTheme]].forEach(function (g) {
     var og = document.createElement("optgroup");

@@ -96,6 +96,15 @@ class ConceptPage(unittest.TestCase):
         self.assertNotIn("env(safe-area", css)
         self.assertIn("var(--sa-top, 0px)", css)
 
+    def test_the_mouse_is_a_finger(self):
+        # touch.js runs in the phone after shell.js, and the stylesheets have no hover and a script-driven :active
+        shell = self.meta["shell"]
+        self.assertIn("window.__conceptTouch", shell)
+        self.assertLess(shell.index("ifizboxNative"), shell.index("__conceptTouch"))
+        css = "".join(self.after["files"][p] for p in self.after["files"] if p.endswith(".css"))
+        self.assertNotRegex(css, r":active(?![\w-])|:hover(?![\w-])")
+        self.assertIn(".concept-active", css)
+
     @unittest.skipUnless(NODE, "needs node")
     def test_modules_load(self):
         code = self.meta["runtime"] + "\n" + "\n".join(self.after["modules"][p] for p in sorted(self.after["modules"]))
@@ -139,6 +148,17 @@ class Bundler(unittest.TestCase):
         self.assertEqual((b["seen"], b["viaNs"], a["count"]), (2, 2, 2))  # inc() ran before, and the binding is live
         self.assertEqual((b["renamed"], b["B"], a["C"], b["later"]), (1, "b/c", "x1", 5))
         self.assertEqual(b["meta"], "concept://app/sub/b.js")
+
+
+class TouchCss(unittest.TestCase):
+    def test_rewrites(self):
+        css = ("a:active, .x:not(:active) b, .row:hover { c: 1 }\n:active-ish {}\n"
+               "@media (hover: hover) and (pointer: fine) { .h { c: 2 } }\n@media (hover: none), (any-pointer: coarse) { .t { c: 3 } }")
+        out = build.touch_css(css)
+        self.assertIn("a.concept-active, .x:not(.concept-active) b, .row:not(*) {", out)
+        self.assertIn(":active-ish", out)  # not a pseudo-class of its own
+        self.assertIn("@media (max-width: 0px) and (max-width: 0px)", out)
+        self.assertIn("@media (min-width: 0px), (min-width: 0px)", out)
 
 
 class FrameHtml(unittest.TestCase):

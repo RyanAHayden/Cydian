@@ -521,3 +521,95 @@ struct MD5 {
         h[0] &+= a; h[1] &+= bb; h[2] &+= c; h[3] &+= d
     }
 }
+
+// ---- B166: the hand-off's trail
+
+// Every hop a URL takes from iOS to the page (the scene's willConnectTo / openURLContexts, the app delegate's
+// open URL, Incoming, SharedInbox, MyIPAs) writes a line here, so a report of "nothing happened" shows where it
+// stopped. Kept in a small file (the newest `max` lines), as the page may not be there yet when a launch hands a URL
+// over; the page takes the lines (app.takeOpenLog) into Settings > Console Logs as one entry per hand-off.
+//   add(text)              a hop ("error: " in the text marks a failure)
+//   add(text, scene: true) a lifecycle line (came forward, launched): kept as context, never an entry of its own
+//   take()                 -> the lines since the last take, or [] when only lifecycle lines came (those stay, the
+//                          newest `keepScene`)
+final class OpenTrail {
+    static let scenePrefix = "· "
+    let file: URL
+    let max: Int
+    let keepScene: Int
+    private let lock = NSLock()
+    private let clock: () -> Date
+
+    init(file: URL, max: Int = 200, keepScene: Int = 10, clock: @escaping () -> Date = Date.init) {
+        self.file = file
+        self.max = max
+        self.keepScene = keepScene
+        self.clock = clock
+    }
+
+    func add(_ text: String, scene: Bool = false) {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "HH:mm:ss.SSS"
+        let flat = text.replacingOccurrences(of: "\n", with: " ")
+        let line = f.string(from: clock()) + "  " + (scene ? OpenTrail.scenePrefix : "") + String(flat.prefix(600))
+        lock.lock()
+        defer { lock.unlock() }
+        write(Array((read() + [line]).suffix(max)))
+    }
+
+    func lines() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return read()
+    }
+
+    func take() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        let all = read()
+        guard all.contains(where: { !OpenTrail.isScene($0) }) else {
+            if all.count > keepScene { write(Array(all.suffix(keepScene))) }
+            return []
+        }
+        write([])
+        return all
+    }
+
+    static func isScene(_ line: String) -> Bool {
+        guard let r = line.range(of: "  ") else { return false }
+        return line[r.upperBound...].hasPrefix(scenePrefix)
+    }
+
+    // What a URL is, for the trail: a file's folder and name (not the whole path), a link's scheme, host and the names
+    // of its query items (not their values: an account key or a payload has no place in a log).
+    static func describe(_ url: URL) -> String {
+        if url.isFileURL {
+            let dir = url.deletingLastPathComponent().lastPathComponent
+            return "file …/\(dir)/\(url.lastPathComponent)"
+        }
+        var s = "\(url.scheme ?? "?")://\(url.host ?? "")"
+        if url.path.count > 1 { s += url.path.count > 80 ? String(url.path.prefix(80)) + "…" : url.path }
+        let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let route = q.first(where: { $0.name == "route" })?.value
+        let names = q.map { $0.name == "route" && route != nil ? "route=\(route!)" : $0.name }
+        if !names.isEmpty { s += "?" + names.joined(separator: "&") }
+        return s
+    }
+
+    // The alert for a file URL nothing took (B166: never silence).
+    static func unhandled(_ name: String) -> String {
+        "\(Brand.name) was given \(name) but doesn't open that kind of file. It opens apps (.ipa) and packages (.deb)."
+    }
+
+    private func read() -> [String] {
+        guard let d = try? Data(contentsOf: file) else { return [] }
+        return String(decoding: d, as: UTF8.self).split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+    }
+
+    private func write(_ lines: [String]) {
+        let text = lines.isEmpty ? "" : lines.joined(separator: "\n") + "\n"
+        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? Data(text.utf8).write(to: file, options: .atomic)
+    }
+}

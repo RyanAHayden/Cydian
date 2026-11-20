@@ -17,3 +17,14 @@ Reference images (Cydia's icon, OpenAppMkt's) are not kept here: third-party art
 `dark/gen.py` builds six dark starburst variants of the real icon (same `tools/icon_bg.py` generator, other colour
 ramps; globe shape unchanged): 1 navy, 2 midnight (white globe), 3 black burst (blue halo), 4 twilight, 5 deep sea,
 6 chrome. `dark/sheet.jpg` shows them in that order. Favourites so far: 3, then 2. Not wired into `tools/icons.sh`.
+
+## One icon per theme
+
+The real per-theme icons are built, not concepts: `tools/icon_themes.py` holds the theme table (names from
+`web/app/theme-boot.js`) and writes one master SVG per theme; `tools/icons.sh` sashes each with LITE and renders
+`native/icon/themes/<theme>/` (every AppIcon size, named as `native/icon/`'s own) and `web/app/icons/themes/<theme>/`
+(flat 180/192/512, glossy 76/152/228). Dark themes: the blue glass globe on a bright-centred radial light,
+recoloured per theme around its accent (Gunmetal is the original); OLED Black takes the black starburst with a blue
+burst (`dark/gen.py`'s 3). Light themes: today's starburst, its ramp recoloured along its own brightness (Classic
+unchanged, Sepia warm brown, Solarized cyan on cream). A new theme needs a row in `THEMES` there; the run refuses a
+table that doesn't match theme-boot.js.

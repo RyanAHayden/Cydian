@@ -86,5 +86,53 @@ class Icons(unittest.TestCase):
         self.assertIn("icon=AppIcon60x60;", build)
 
 
+def theme_names():
+    """theme-boot.js's dark and light theme names (tools/icon_themes.py checks its table against the same lists)."""
+    js = (ROOT / "web/app/theme-boot.js").read_text()
+    names = []
+    for var in ("darks", "lights"):
+        m = re.search(var + r"\s*=\s*\[([^\]]*)\]", js)
+        names += re.findall(r'"([a-z0-9-]+)"', m.group(1))
+    return names
+
+
+class ThemeIcons(unittest.TestCase):
+    """F322: tools/icons.sh renders the icon in every theme's colours, plain and LITE-sashed."""
+
+    def test_every_theme_plain_and_lite_at_every_size(self):
+        names = theme_names()
+        self.assertGreaterEqual(len(names), 9)
+        for t in names:
+            for kind in ("icon", "icon-lite"):
+                for n in (180, 192, 512):
+                    with self.subTest(theme=t, file=f"{kind}-{n}.png"):
+                        self.assertEqual(png_size(HERE / "themes" / t / f"{kind}-{n}.png"), (n, n))
+                for n in (76, 152, 228):
+                    with self.subTest(theme=t, file=f"{kind}-glossy-{n}.png"):
+                        self.assertEqual(png_size(HERE / "themes" / t / f"{kind}-glossy-{n}.png"), (n, n))
+
+    def test_no_stray_theme(self):
+        # a theme dropped from theme-boot.js leaves no icons behind
+        self.assertEqual(sorted(p.name for p in (HERE / "themes").iterdir() if p.is_dir()), sorted(theme_names()))
+
+    def test_classic_is_the_real_icon(self):
+        for f in ("icon-180.png", "icon-glossy-152.png", "icon-lite-glossy-228.png"):
+            self.assertEqual((HERE / "themes/classic" / f).read_bytes(), (HERE / f).read_bytes(), f)
+
+    def test_themes_differ(self):
+        seen = {}
+        for t in theme_names():
+            b = (HERE / "themes" / t / "icon-180.png").read_bytes()
+            self.assertNotIn(b, seen, f"{t} has the same icon as {seen.get(b)}")
+            seen[b] = t
+
+    def test_generator_table_matches_theme_boot(self):
+        import sys
+        sys.path.insert(0, str(ROOT / "tools"))
+        import icon_themes  # stdlib at import; numpy/Pillow only when rendering
+        self.assertEqual(icon_themes.names(), theme_names())
+        self.assertEqual(sorted(icon_themes.THEMES), sorted(theme_names()))
+
+
 if __name__ == "__main__":
     unittest.main()

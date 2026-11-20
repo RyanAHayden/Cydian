@@ -128,4 +128,38 @@ for pt in 20 29 40; do
 done
 png "$master" 1024 native/icon/AppIcon1024.png
 png "$lite" 1024 native/icon/AppIconLite1024.png
-echo "icons: wrote $dir/icon-glossy.svg, the PNGs and $dir/launch/"
+
+# One icon per theme (theme table: tools/icon_themes.py, names from theme-boot.js), plain and LITE-sashed:
+#   native/icon/themes/<theme>/AppIcon{,Lite}{20x20,29x29,40x40,60x60}@{2x,3x}.png, AppIcon{,Lite}60x60.png and
+#                       AppIcon{,Lite}1024.png  every AppIcon size, named as native/icon/'s own
+#   web/app/icons/themes/<theme>/icon{,-lite}-{180,192,512}.png  flat (apple-touch-icon, manifest)
+#   web/app/icons/themes/<theme>/icon{,-lite}-glossy-{76,152,228}.png  iOS 6 corners, for the Home header
+# Classic is the master above, copied so every theme has the same set.
+themes=$(mktemp -d)
+trap 'rm -f "$bg" "$web" "$lite" "$webg" "$liteg"; rm -rf "$themes"' EXIT
+python3 -I tools/icon_themes.py "$themes" >/dev/null
+# ios6 <svg>: that icon inside iOS 6's rounded square (SVG on stdout), as icon-lite-glossy above
+ios6() {
+  echo '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">'
+  echo '<defs><clipPath id="ios6-mask"><rect width="1024" height="1024" rx="180" ry="180"/></clipPath></defs><g clip-path="url(#ios6-mask)">'
+  perl -0pe 's/<!--.*?-->\n?//gs; s/^.*?<svg[^>]*>\n//s; s/<\/svg>.*//s' "$1"
+  echo '</g></svg>'
+}
+for t in $(python3 -I tools/icon_themes.py --names); do
+  plain=$themes/$t.svg tlite=$themes/$t-lite.svg
+  master=$plain sashed LITE '#ffa53b' '#e8660a' > "$tlite"
+  nd=native/icon/themes/$t wd=$dir/themes/$t
+  mkdir -p "$nd" "$wd"
+  for kind in plain lite; do
+    if [ $kind = plain ]; then s=$plain n=AppIcon w=icon; else s=$tlite n=AppIconLite w=icon-lite; fi
+    for pt in 20 29 40 60; do
+      for sc in 2 3; do png "$s" $((pt * sc)) "$nd/${n}${pt}x${pt}@${sc}x.png"; done
+    done
+    png "$s" 60 "$nd/${n}60x60.png"
+    png "$s" 1024 "$nd/${n}1024.png"
+    for px in 180 192 512; do png "$s" $px "$wd/$w-$px.png"; done
+    ios6 "$s" > "$themes/$t-$kind-glossy.svg"
+    for px in 76 152 228; do png "$themes/$t-$kind-glossy.svg" $px "$wd/$w-glossy-$px.png"; done
+  done
+done
+echo "icons: wrote $dir/icon-glossy.svg, the PNGs, $dir/launch/ and the per-theme icons in $dir/themes/ and native/icon/themes/"

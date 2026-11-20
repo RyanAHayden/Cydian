@@ -36,7 +36,7 @@ import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
 import { refreshRows, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
 import { labelSource, toggleTrust, trustMenuLabel } from "./safety.js"; // F291
 import { findMoreOn, findMoreRow, labelCanister } from "./findmore.js"; // F305
-import { onPageShow } from "../nav/pagestate.js"; // B172
+import { pageViews } from "../nav/pageviews.js"; // C25
 import { setSourceErrorHooks } from "./sourceerror.js"; // B177
 
 export const title = "Sources";
@@ -49,16 +49,22 @@ export const title = "Sources";
 
 const state = {
   sources: null,   // the list as last loaded, sorted
-  body: null,      // the root page's scroller
   busy: false,     // a refresh is running
   tried: new Set(), // F43: keys first-loaded this session (core/sources.js loadNeverLoaded)
   loading: new Set(), // keys being refreshed right now: their rows spin, the Sources badge spins (Cydia)
-  query: "",        // F19: the search box's text
-  bar: null,        // F19: the search box, kept across redraws so typing keeps its focus
-  box: null,        // F19: where the list goes, under the search box
   rows: null,       // F233: the last refresh's rows (core/refreshrows.js), kept after it ends for the failed ones
   running: false,   // F233: a refresh (or a row's retry) is under way
 };
+
+// C25: the root page can be on screen twice, its own tab and pushed on Home (Home's Loading Sources / Sources Failed
+// tile, Help's and the guides' Refresh Sources: router.js rootOn). Each copy has its own view; the list's data above is
+// shared, and whatever reloads it draws every copy.
+const views = pageViews(() => ({
+  query: "",  // F19: the search box's text
+  bar: null,  // F19: the search box, kept across redraws so typing keeps its focus
+  box: null,  // F19: where the list goes, under the search box
+}));
+const drawAll = () => { for (const v of views.all()) draw(v); };
 
 const byKey = (key) => state.sources?.find((s) => s.key === key);
 
@@ -130,7 +136,7 @@ export function nav(route, ctx) {
 }
 
 // Device (F37) changes which sources show: redraw the list if it is on screen.
-settings.onChange((key) => { if (key === "device" && state.body?.isConnected) draw(); });
+settings.onChange((key) => { if (key === "device") drawAll(); });
 
 // F45: an add, delete or reorder in Manage reloads the list, so it is right when the user goes back.
 // B75: and a source just added starts loading at once, under the reload bar (`ctx` from Manage's Add paths), even
@@ -138,7 +144,7 @@ settings.onChange((key) => { if (key === "device" && state.body?.isConnected) dr
 // B141: and a source that came in already read (Add's IPA record, the website's Open in App import) goes into the
 // catalog at once (feedCatalog: ctx.loadData), so Search finds its apps without a Refresh.
 manage.onSourcesChanged((ctx) => {
-  if (state.body) load(ctx ?? state.ctx); else loadNew(ctx);
+  if (views.all().length) load(ctx ?? state.ctx); else loadNew(ctx);
   feedCatalog(ctx ?? state.ctx);
 });
 
@@ -176,24 +182,10 @@ export function render(el, route, ctx) {
     browse.render(el, route, ctx);
     return;
   }
-  state.body = el;
   state.ctx = ctx; // F233: a failed row's retry, from the list's click handler
-  draw();
+  draw(views.open(el));
   load(ctx);
 }
-
-// B172: Sources' root page can be on screen twice, its own tab and pushed on Home (Home's Loading Sources / Sources
-// Failed tile, Help's and the guides' Refresh Sources: router.js rootOn), and the state above (body, search box, list
-// box) follows the copy drawn last. A copy that comes back to the top while the other one holds it takes it back and
-// is drawn again (draw() moves the search box into it), so its rows keep up. -> true when it redrew.
-export function redrawCopy(el, route, ctx) {
-  if (!el || el === state.body) return false;
-  state.body = el;
-  if (ctx) state.ctx = ctx;
-  draw();
-  return true;
-}
-onPageShow((route) => route.tab === "sources" && !route.path.length, (route, el) => redrawCopy(el, route));
 
 async function load(ctx) {
   if (ctx) state.ctx = ctx;
@@ -203,7 +195,7 @@ async function load(ctx) {
     state.sources = [];
     state.loadError = e.message;
   }
-  draw();
+  drawAll();
   if (!state.loadError) firstLoad(ctx);
 }
 
@@ -232,7 +224,7 @@ function firstLoad(ctx, { fresh = false, backend = getBackend(), retry = null } 
       });
       if (done && !run?.cancelled) {
         state.sources = await backend.sources();
-        draw();
+        drawAll();
       }
     } catch {
       // a failed first load leaves the rows as they were; Refresh shows the error
@@ -350,9 +342,10 @@ function feedCatalog(ctx) {
 
 // ---- F233: the rows' states and the retry --------------------------------------------------------------------
 
-const rowOf = (key) => (state.body ?? document).querySelector( // B172: the copy on screen, not one left behind
-`.source-row[data-key="${CSS.escape(String(key))}"]`);
-function paintKey(key) { const li = key == null ? null : rowOf(key); if (li) paintRow(li); }
+// The source's row in every copy of the page (C25).
+const rowsOf = (key) => views.all().flatMap((v) => [...(v.body.querySelectorAll?.(
+  `.source-row[data-key="${CSS.escape(String(key))}"]`) ?? [])]);
+function paintKey(key) { if (key != null) for (const li of rowsOf(key)) paintRow(li); }
 function paintAll() { for (const li of document.querySelectorAll(".source-row")) paintRow(li); }
 
 // One row as its refresh state says. Rows outside a refresh (state.rows null, or a key it doesn't hold) keep what
@@ -453,7 +446,7 @@ export async function refreshInBackground(ctx) {
     if (await run.until(job)) return "cancelled";
     bannerFailed(await job);
     state.sources = await getBackend().sources();
-    if (state.box?.isConnected) draw();
+    drawAll();
     if (await run.until(run.data())) return "cancelled";
   } catch {
     // a failed refresh shows per source (its row) once it has failed
@@ -530,10 +523,10 @@ export function startRun(ctx, keys) {
 // F19: the search box above the list, the iOS 6 grey search bar Search uses (packages.css .search-bar). It filters
 // the rows as you type (core/sourcelist.js filterSources); All Sources steps aside while a search is on.
 // C10: the shared bar (nav/searchbar.js), with Cancel.
-function sourcesSearchBar() {
-  if (state.bar) return state.bar;
-  return (state.bar = searchBar({ placeholder: "Search Sources", ariaLabel: "Search sources: name or URL", value: state.query,
-    className: "sources-search", onQuery: (q) => { if (q !== state.query) { state.query = q; draw(); } } }));
+function sourcesSearchBar(view) {
+  if (view.bar) return view.bar;
+  return (view.bar = searchBar({ placeholder: "Search Sources", ariaLabel: "Search sources: name or URL", value: view.query,
+    className: "sources-search", onQuery: (q) => { if (q !== view.query) { view.query = q; draw(view); } } }));
 }
 
 // F19 first run: on a jailbroken type, a row to Recommended (named for the jailbreak once it's known) until
@@ -544,8 +537,8 @@ function recommendedRow() {
     href: format({ tab: "sources", path: [manage.SEGMENT, "recommended"] }) };
 }
 
-function draw() {
-  const el = state.body;
+function draw(view) {
+  const el = view?.body;
   if (!el) return;
   if (!state.sources) { el.classList.remove("search-root"); el.replaceChildren(); return; }
   if (state.loadError) {
@@ -553,28 +546,28 @@ function draw() {
     el.replaceChildren(note(state.loadError));
     return;
   }
-  const bar = sourcesSearchBar();
+  const bar = sourcesSearchBar(view);
   // C10: the bar stays put; the list scrolls under it (nav/searchbar.js pinned).
-  const results = state.box?.parentNode;
-  if (!state.box || results?.parentNode !== el || bar.parentNode !== el) {
-    state.box = document.createElement("div");
+  const results = view.box?.parentNode;
+  if (!view.box || results?.parentNode !== el || bar.parentNode !== el) {
+    view.box = document.createElement("div");
     el.replaceChildren();
-    pinned(el, bar).append(state.box);
+    pinned(el, bar).append(view.box);
   }
   // F270: pull the list down past its top: Refresh, as the nav button.
-  pullToRefresh(state.box.parentNode, { onRefresh: () => refresh(state.ctx), busy: () => state.busy || state.running, settings });
-  const box = state.box;
+  pullToRefresh(view.box.parentNode, { onRefresh: () => refresh(state.ctx), busy: () => state.busy || state.running, settings });
+  const box = view.box;
   const backend = getBackend();
   // F37: Not Jailbroken shows AltStore sources only. F144: and says nothing of APT ones (no count, no hint).
   // F45: in the order set in Manage > Sources (none set: by name).
   // F72: iFizBox's own source (built in) stays first whatever the order.
   const ordered = builtinFirst(orderSources(state.sources, loadOrder()));
   const { shown } = sourcesFor(ordered, settings.deviceType());
-  const searching = Boolean(state.query.trim());
-  const list = filterSources(shown, state.query, displayName);
+  const searching = Boolean(view.query.trim());
+  const list = filterSources(shown, view.query, displayName);
   // F302: the sideload app's APT sources, in their own group under the AltStore ones, counting injectable tweaks.
   const tweakShown = tweakSourcesFor(ordered, settings.deviceType(), detectMode());
-  const tweakList = filterSources(tweakShown, state.query, displayName);
+  const tweakList = filterSources(tweakShown, view.query, displayName);
   const rec = searching ? null : recommendedRow();
   const top = searching ? [] : [{
     label: "All Sources",
@@ -680,7 +673,7 @@ function attachRowGestures(ul) {
     // F291: Trust Source / Stop Trusting for a source not on the known-safe list
     const src = byKey(li.dataset.key);
     const trust = src && li.dataset.trust !== "safe"
-      ? [{ label: trustMenuLabel(src), onClick: () => { toggleTrust(src); draw(); } }] : [];
+      ? [{ label: trustMenuLabel(src), onClick: () => { toggleTrust(src); drawAll(); } }] : [];
     showMenu(li, [...open, { label: "Copy URL", onClick: () => copyText(li.dataset.url) }, ...trust], { x: e.clientX });
   });
   let start = null;   // the pointer that may become a swipe
@@ -728,8 +721,9 @@ async function remove(li, source) {
   }
   state.sources = state.sources.filter((s) => s.key !== source.key);
   setTimeout(() => {
-    if (!state.sources.length) { li.remove(); draw(); return; }
+    if (!state.sources.length) { li.remove(); drawAll(); return; }
     collapse(li);
+    for (const v of views.all()) if (!v.body.contains?.(li)) draw(v); // C25: the other copy of the page
   }, 200);
 }
 
@@ -748,7 +742,7 @@ async function refresh(ctx) {
     if (await run.until(job)) return; // F41: only what's shown
     bannerFailed(await job);
     state.sources = await getBackend().sources();
-    draw();
+    drawAll();
     await run.until(run.data());
   } catch (e) {
     if (run?.cancelled) return;

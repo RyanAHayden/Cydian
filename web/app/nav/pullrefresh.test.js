@@ -251,8 +251,9 @@ test("settings.lastRefresh keeps the time on the device", () => {
 
 test("Sources, Changes and Home pull to refresh into their nav button's own refresh", () => {
   const src = (f) => readFileSync(new URL(`../screens/${f}`, import.meta.url), "utf8");
-  assert.match(src("sources.js"), /pullToRefresh\(state\.box\.parentNode, \{ onRefresh: \(\) => refresh\(state\.ctx\)/);
-  assert.match(src("changes.js"), /pullToRefresh\(state\.results, \{ onRefresh: \(\) => refresh\(ctx\)/);
+  // C25: each copy of the page (its view) has its own list box
+  assert.match(src("sources.js"), /pullToRefresh\(view\.box\.parentNode, \{ onRefresh: \(\) => refresh\(state\.ctx\)/);
+  assert.match(src("changes.js"), /pullToRefresh\(view\.results, \{ onRefresh: \(\) => refresh\(ctx\)/);
   assert.match(src("home.js"), /pullToRefresh\(body, \{ onRefresh: \(\) => state\.reloadButton\?\.click\(\)/);
   assert.match(src("home.js"), /label: "Reload", onClick: .*ref: \(b\) => \{ state\.reloadButton = b; \}/);
 });

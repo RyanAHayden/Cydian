@@ -90,9 +90,10 @@ test("a FREE commercial tweak (Chariz answers purchased) downloads once signed i
   assert.deepEqual([...data], [1]);
   assert.deepEqual(calls, [{ id: "com.example.betteralarm", version: "1.2", repo: "https://repo.chariz.com/", architecture: "iphoneos-arm64" },
     { url: "https://chariz.com/dl/once.deb" }]);
-  // signed out it asks for Sign In, not an error; not for sale says so
-  await assert.rejects(paidTweakDeb({ package: "x", version: "1" }, { client: { ...client, signedIn: async () => false }, download: async () => null }),
-    (e) => e instanceof PaidNeeded && e.need === "signin");
+  // signed out and the seller refuses the tokenless ask: Sign In, not an error; not for sale says so
+  await assert.rejects(paidTweakDeb({ package: "x", version: "1" }, { client: { ...client, signedIn: async () => false,
+    authorizeDownload: async () => { throw new Error("Please sign in"); } }, download: async () => null }),
+  (e) => e instanceof PaidNeeded && e.need === "signin");
   await assert.rejects(paidTweakDeb({ package: "x", version: "1" }, { client: { ...client, packageInfo: async () => ({ price: "$1", purchased: false, available: false }) },
     download: async () => null }), (e) => e instanceof PaidNeeded && e.need === "unavailable");
 });
@@ -149,4 +150,43 @@ test("the shell refuses a package name that would step out of its folder", async
   await assert.rejects(native.call("paid.download", { url: "https://vendor.test/dl/x.deb", package: "../x", version: "1" }), /bad_url/);
   await assert.rejects(native.call("paid.cached", { package: "a", version: "../../1" }), /bad_url/);
   assert.equal(existsSync(paidTweakDir), false);
+});
+
+test("F318: signed out, a FREE tweak the seller calls purchased downloads without a token; any refusal asks for Sign In", async () => {
+  const { createPaymentClient } = await import("../core/payment.js");
+  const BASE = "https://chariz.test/api/sileo/";
+  const sent = [];
+  // a Chariz-like seller: package_info FREE + purchased with no token, authorize_download hands out a URL with none
+  let refuse = false;
+  const request = async (req) => {
+    const body = req.body ? JSON.parse(req.body) : null;
+    sent.push({ url: req.url, body });
+    if (req.url.endsWith("/info")) return { status: 200, json: { price: "FREE", purchased: true, available: true } };
+    if (refuse) return { status: 401, json: { error: "Please sign in" } };
+    return { status: 200, json: { url: "https://chariz.test/dl/once.deb" } };
+  };
+  const client = createPaymentClient({ base: BASE, request, device: () => ({ udid: "U1", model: "iPhone14,2" }),
+    credentials: { load: async () => null, save: async () => {}, forget: async () => {} } });
+  const got = [];
+  const s = { package: "com.example.betteralarm", version: "1.2", architecture: "iphoneos-arm64" };
+  const data = await paidTweakDeb(s, { client, repo: "https://repo.chariz.test/", download: async (url) => { got.push(url); return new Uint8Array([7]); } });
+  assert.deepEqual([...data], [7]);
+  assert.deepEqual(got, ["https://chariz.test/dl/once.deb"]);
+  const auth = sent.find((r) => r.url.endsWith("/authorize_download"));
+  assert.deepEqual(auth.body, { udid: "U1", device: "iPhone14,2", version: "1.2", repo: "https://repo.chariz.test/", architecture: "iphoneos-arm64" },
+    "no token field at all");
+  refuse = true;
+  await assert.rejects(paidTweakDeb({ ...s, version: "1.3" }, { client, download: async () => assert.fail("no download after a refusal") }),
+    (e) => e instanceof PaidNeeded && e.need === "signin" && e.price === "FREE");
+  // a priced tweak, or a FREE one not yet "purchased", still asks for Sign In without trying
+  sent.length = 0;
+  for (const info of [{ price: "$1.99", purchased: true }, { price: "FREE", purchased: false }]) {
+    const c = { signedIn: async () => false, packageInfo: async () => ({ ...info, available: true }),
+      authorizeDownload: async () => assert.fail("not tried") };
+    await assert.rejects(paidTweakDeb(s, { client: c, download: async () => null }), (e) => e instanceof PaidNeeded && e.need === "signin");
+  }
+  // the request builder still refuses a tokenless authorize_download unless asked for one
+  const { buildRequest } = await import("../core/payment.js");
+  assert.throws(() => buildRequest(BASE, "authorize_download", { packageId: "a" }), /no token/);
+  assert.equal(JSON.parse(buildRequest(BASE, "authorize_download", { packageId: "a", tokenless: true }).body).token, undefined);
 });

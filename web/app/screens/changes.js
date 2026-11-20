@@ -91,7 +91,8 @@ async function badge(upgrades, resign) {
 
 export function nav(route, ctx) {
   if (route.path.length) return browse.nav(route);
-  const info = { title: "Changes", style: "plain", left: { label: "Refresh", onClick: () => refresh(ctx) } };
+  // B176: pushed on Home (What's New, Check for Changes) Back takes the left: Refresh goes to the right end.
+  const info = { title: "Changes", style: "plain", left: { label: "Refresh", onClick: () => refresh(ctx), pushed: "right" } };
   if (canUpgrade()) info.right = { label: upgradeLabel(0), onClick: () => upgradeAllJailbreak(state.data?.upgrades.available, state.data?.vendorSold) };
   // The sideload app: Upgrade (N) queues each app's new IPA and opens Confirm (F80), signed on the phone in turn.
   else if (detectMode() === "sideload") info.right = { label: upgradeLabel(0), onClick: () => queueAll(state.data?.upgrades.available, state.data?.resign) };
@@ -262,7 +263,7 @@ function drawUpgradeButton(n) {
   if (!stack) return;
   const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
   const item = document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i];
-  const b = item?.querySelector(".nav-right .bar-button");
+  const b = item?.querySelector(".nav-right .bar-button:not(.nav-moved)"); // B176: not a pushed copy's Refresh
   if (!b) return;
   const label = upgradeLabel(n);
   if (b.textContent !== label) b.textContent = label;

@@ -193,8 +193,8 @@ graph TD
   [zsign](https://github.com/zhlynn/zsign) compiled to WebAssembly (`web/app/vendor/zsign`, built reproducibly by
   `tools/build-zsign-wasm.sh`). No server ever signs anything or sees your key. Details:
   [docs/signing.md](docs/signing.md).
-- **iFizBox Account** ([docs/account.md](docs/account.md)) is optional. It syncs your sources, settings and certificate,
-  **end-to-end encrypted** with a key made on your device. Lose the key and nobody can recover the data.
+- **iFizBox Account** ([docs/account.md](docs/account.md)) is optional. It syncs your sources, settings, certificate and repo
+  sign-ins (Chariz, Havoc: the sign-in only; payment details stay on each iPhone), **end-to-end encrypted** with a key made on your device. Lose the key and nobody can recover the data.
 
   <img src="docs/img/crop-account.png" alt="Settings > iFizBox Account: Create Account, Sign In With Key" width="280">
 

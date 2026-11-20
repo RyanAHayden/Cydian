@@ -1,8 +1,9 @@
 # iFizBox Account
 
 A free, minimal account that keeps a device's sources, the settings that travel (`core/settings.js` TRAVELS),
-the Wish List, Ignored Upgrades, installed-app records (`core/installed.js`) and the signing certificate the same on
-every device and the website, and brings them back after a reinstall. Purchases stay with each repo's own account.
+the Wish List, Ignored Upgrades, installed-app records (`core/installed.js`), repo sign-ins and the signing
+certificate the same on every device and the website, and brings them back after a reinstall. Purchases stay with
+each repo's own account; the account only keeps you signed in to it.
 
 ## The key
 
@@ -38,4 +39,11 @@ same routes, with accounts kept in memory.
 - **Sync Certificate** (on by default): when off, this device sends `identity: null`, which takes the certificate
   out of the account, and it takes no certificate in. The jailbreak build doesn't sign, so it leaves the account's
   certificate as it is.
-- Purchases stay with each repo's own account (Havoc, Chariz). They are not part of this.
+- **Repo sign-ins** (`repoLogins`): the sign-in token of every repo with the Payment Provider API (Chariz, Havoc
+  and others), keyed by the repo's payment endpoint, so a new phone, a reinstall or the other build is already
+  signed in. Only the token travels, inside the encrypted payload like the certificate; the payment secret stays in
+  each iPhone's Keychain behind Face ID, so buying on a device that got its sign-in from the account asks you to
+  sign in again there. Merged per repo, last write wins; a sign-out travels too (kept as `token: null`). A device
+  that signed in to a repo itself keeps its own token. Many repos tie a token to the UDID it signed in on: when one
+  turns a synced token down (an `invalidate` answer, or HTTP 401/403), that device drops it and shows Sign In; the
+  account and the other devices keep theirs. Purchases themselves stay with each repo's own account.

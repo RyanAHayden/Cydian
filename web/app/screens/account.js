@@ -1,5 +1,5 @@
 // F97: Settings > Account (iOS 6 grouped tables). iFizBox Account keeps this device's sources, the settings that
-// travel, Ignored Upgrades, the Wish List, installed-app records and the signing certificate on the site (brand.js DOMAIN), encrypted with an account
+// travel, Ignored Upgrades, the Wish List, installed-app records, repo sign-ins (tokens only) and the signing certificate on the site (brand.js DOMAIN), encrypted with an account
 // key only the user's devices have (core/account.js has the rules; worker/src/account.js the storage).
 //
 //   accountSection()          the root Settings page's row: iFizBox Account, Signed In / Off; pushes #/settings/account
@@ -23,6 +23,7 @@ import { onPageOpen } from "../nav/pagestate.js";
 import { go as navGo } from "../nav/go.js";
 import { qrSvg } from "../core/qr.js";
 import { createAccountSync, keyLink, parseKey, identityOf, identityFiles, ACCOUNT_BASE } from "../core/account.js";
+import { createCredentialStore } from "../core/payment.js"; // F309: repo sign-ins
 import { detectMode, TRAVELS } from "../core/settings.js";
 import { exportLine } from "../core/sourcelist.js";
 import { toBase64 } from "../core/signing.js";
@@ -90,8 +91,12 @@ export const sourceLine = (line) => (/^https?:\/\/[^/\s]+$/i.test(line) ? line +
 
 const certBuild = (mode = detectMode()) => mode === "site" || mode === "sideload";
 
+// F309: the repo sign-ins the payment screens keep (screens/extras.js, screens/tweaks.js use the same keys). No
+// Keychain here: the account carries tokens only, and a token it brings comes without a payment secret.
+const repoLogins = () => { try { return createCredentialStore({ storage: globalThis.localStorage }); } catch { return null; } };
+
 export async function collectHere({ syncCert = true, backend = getBackend(), store = settings, native = globalThis.ifizboxNative,
-  mode = detectMode(), appStore = apps, load = loadIdentity, wishes = createWishlist() } = {}) {
+  mode = detectMode(), appStore = apps, load = loadIdentity, wishes = createWishlist(), logins = repoLogins() } = {}) {
   const sources = (await backend.sources().catch(() => [])).filter((s) => s?.uri).map((s) => sourceLine(exportLine(s)));
   const values = {};
   for (const k of TRAVELS) if (store.isShown(k)) values[k] = store.get(k);
@@ -100,6 +105,10 @@ export async function collectHere({ syncCert = true, backend = getBackend(), sto
     ...(store.ignoredVersions?.all && Object.keys(store.ignoredVersions.all()).length ? { ignoredVersions: versionLines(store.ignoredVersions.all()) } : {}), // F281
     apps: recs.filter((r) => r?.id && !r.self).map(({ id, name, version, key, source, sourceName, icon, date }) =>
       ({ id, name, version, key: key ?? null, source: source ?? null, sourceName: sourceName ?? null, icon: icon ?? null, date: date ?? 0 })) };
+  // F309: repo sign-ins (core/payment.js's store, this origin's localStorage), the token only
+  let held = {};
+  try { held = logins?.logins() ?? {}; } catch { held = {}; }
+  if (Object.keys(held).length) out.repoLogins = Object.fromEntries(Object.entries(held).map(([b, token]) => [b, { token }]));
   if (!certBuild(mode)) return out; // the jailbreak app signs nothing: it leaves the account's certificate as it is
   if (!syncCert) return { ...out, identity: null };
   let id = null;
@@ -117,7 +126,10 @@ export async function collectHere({ syncCert = true, backend = getBackend(), sto
 const b64toUrl = (b64) => String(b64).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 export async function applyHere(c, { backend = getBackend(), store = settings, native = globalThis.ifizboxNative, mode = detectMode(),
-  appStore = apps, wishes = createWishlist() } = {}) {
+  appStore = apps, wishes = createWishlist(), logins = repoLogins() } = {}) {
+  // F309: a repo sign-in from another device (kept only where this device didn't sign in itself), or a sign-out
+  for (const { base, token } of c.adoptLogins ?? []) await Promise.resolve().then(() => logins?.adopt(base, token)).catch(() => {});
+  for (const base of c.dropLogins ?? []) await Promise.resolve().then(() => logins?.drop(base)).catch(() => {});
   if (c.removeSources.length) {
     const have = await backend.sources().catch(() => []);
     for (const line of c.removeSources) {
@@ -199,9 +211,11 @@ export function accountSection({ acct = accountSync } = {}) {
   return box;
 }
 
-const ACCOUNT_FOOTER = `Keeps your sources, settings, Wish List and certificate the same on every iPhone and on the website, `
-  + `and brings them back after a reinstall. No email or password: a key made on this iPhone is the account, and ${DOMAIN} `
-  + "can't read what it stores. Purchases stay with each repo.";
+// F309: one hint per group (AGENTS.md, Hints): what the account keeps under Create Account, repo sign-ins in their own
+// sentence; how it signs in under Sign In With Key.
+export const CREATE_FOOTER = "Keeps your sources, settings and certificate the same on every iPhone and on the website. "
+  + "Repo sign-ins come too; payment details stay on each iPhone.";
+export const SIGN_IN_FOOTER = `No email or password: your account key is the account, and ${DOMAIN} can't read what it stores.`;
 const KEY_WARNING = `Save this key somewhere safe. It is the only way into your account: if you lose it, nobody can get your data back, ${DOMAIN} included.`;
 const CERT_FOOTER = `Your certificate is encrypted with your account key before it leaves this device: ${DOMAIN} can't read it. Off takes it out of your account.`;
 
@@ -217,9 +231,8 @@ export async function drawAccount(el) {
   if (!s.signedIn) {
     reveal = false;
     el.replaceChildren(grouped([
-      { rows: [{ label: "Create Account", onClick: () => createFlow(el), icon: rowIcon("createAccount") },
-        { label: "Sign In With Key", onClick: () => signInFlow(el), icon: rowIcon("signInKey") }],
-        footer: ACCOUNT_FOOTER },
+      { rows: [{ label: "Create Account", onClick: () => createFlow(el), icon: rowIcon("createAccount") }], footer: CREATE_FOOTER },
+      { rows: [{ label: "Sign In With Key", onClick: () => signInFlow(el), icon: rowIcon("signInKey") }], footer: SIGN_IN_FOOTER },
     ]));
     return;
   }
@@ -332,7 +345,7 @@ export async function signOutFlow(el, { acct = accountSync(), ask = showAlert, h
 }
 
 async function deleteFlow(el) {
-  const { index } = await showAlert({ title: "Delete Account?", message: `Your saved sources, settings, apps and certificate are deleted from ${DOMAIN}, and every device is signed out. What's on this device stays.`,
+  const { index } = await showAlert({ title: "Delete Account?", message: `Your saved sources, settings, apps, repo sign-ins and certificate are deleted from ${DOMAIN}, and every device is signed out. What's on this device stays.`,
     buttons: ["Cancel", "Delete"], cancel: 0 });
   if (index !== 1) return;
   const hide = showHUD("Deleting");

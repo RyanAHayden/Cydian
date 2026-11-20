@@ -12,7 +12,8 @@
 //   isFreePrice(price)                     -> true for "FREE" / "free" (B13)
 //   parseReply(status, json)               -> { ok, data, error, recoveryUrl, invalidate }
 //   createPaymentClient({ base, request, device, credentials })  the vendor's calls, signed in or not
-//   createCredentialStore({ storage, secure })                    token and payment secret per vendor
+//   createCredentialStore({ storage, secure })                    token and payment secret per vendor (F309: the
+//                                                                 token travels in the iFizBox Account, the secret never)
 //   paidTweakDeb(st, { client, … }), PaidNeeded                   F308: a paid tweak's .deb for the sideload build
 //
 // Checked live on 2026-11-17 (journal/2026-11-17-f20-repo-extras): repo.chariz.com/payment_endpoint ->
@@ -186,7 +187,14 @@ export function createPaymentClient({ base, request, device = () => ({}), creden
     const res = await request(buildRequest(vendor, action, opts));
     const reply = parseReply(res.status, res.json);
     if (!reply.ok) {
-      if (reply.invalidate) await credentials?.forget(vendor);
+      // F309: a token the account brought that the vendor refuses (401/403: often tied to the UDID it signed in on)
+      // is dropped here like an invalidate, so the screen shows Sign In instead of the same error again. Either way
+      // only this device lets it go (decline): the account and the other devices keep theirs.
+      const synced = opts.token && (res.status === 401 || res.status === 403) && (await credentials?.load(vendor))?.synced;
+      if (reply.invalidate || synced) {
+        await (credentials?.decline ?? credentials?.forget)?.call(credentials, vendor);
+        reply.invalidate = true;
+      }
       throw new PaymentError(reply);
     }
     return reply.data;
@@ -236,6 +244,13 @@ export function createPaymentClient({ base, request, device = () => ({}), creden
     },
     async purchase(packageId) {
       const c = (await credentials?.load(vendor)) ?? {};
+      // F309: a sign-in the account brought has no payment secret (it never leaves the iPhone that signed in):
+      // Sign In again here, which brings this device's own secret.
+      if (c.synced && !c.secret) {
+        await credentials?.decline?.(vendor);
+        throw new PaymentError({ error: "Sign in again on this iPhone to buy: your payment details stay on the iPhone you signed in on.",
+          recoveryUrl: null, invalidate: true });
+      }
       return parsePurchase(await send("purchase", { ...(await who()), secret: c.secret, packageId }));
     },
     // The one-time https URL the .deb downloads from (expires in a minute or two: fetch it straight away).
@@ -252,16 +267,30 @@ export function createPaymentClient({ base, request, device = () => ({}), creden
 // Token and payment secret per vendor base URL. The token sits in `storage`; the secret goes to `secure`
 // ({ get(key), set(key, value), remove(key) }, the shell's Keychain behind the passcode or Face ID as the spec asks)
 // when there is one, else beside the token. Screens say which one they got (`secureStorage`).
+//
+// F309: repo sign-ins travel in the iFizBox Account (core/account.js repoLogins), the token only. The record in
+// `storage` is { token, synced?, declined? }: `synced` a token the account brought (no payment secret here: buying
+// asks for Sign In again), `declined` one the repo turned down on this device (many vendors tie a token to the UDID
+// it signed in on). A declined token reads as signed out (load() -> null) but logins() still reports it, so the
+// account doesn't read its absence as a sign-out and other devices keep theirs; adopt() won't bring it back.
+//   logins()               -> { vendor: token }  every token this device holds for the account, declined included
+//   adopt(vendor, token)   the account's token: kept unless this device signed in there itself -> whether taken
+//   drop(vendor)           a sign-out from another device: forgets the token here (no call to the vendor)
+//   decline(vendor)        the vendor turned the token down here: Sign In shows, the account isn't changed
+export const CREDENTIAL_PREFIX = "ifizbox.payment:";
 export function createCredentialStore({ storage = globalThis.localStorage, secure = null } = {}) {
-  const k = (vendor) => "ifizbox.payment:" + vendor;
+  const k = (vendor) => CREDENTIAL_PREFIX + vendor;
+  const read = (vendor) => {
+    try { const rec = JSON.parse(storage?.getItem(k(vendor)) || "null"); return rec?.token ? rec : null; } catch { return null; }
+  };
+  const write = (vendor, rec) => { try { storage?.setItem(k(vendor), JSON.stringify(rec)); } catch { /* storage full */ } };
   return {
     secureStorage: Boolean(secure),
     async load(vendor) {
-      let rec = null;
-      try { rec = JSON.parse(storage?.getItem(k(vendor)) || "null"); } catch { rec = null; }
-      if (!rec?.token) return null;
-      const secret = secure ? await secure.get(k(vendor)).catch(() => null) : rec.secret;
-      return { token: rec.token, secret: secret ?? null };
+      const rec = read(vendor);
+      if (!rec || rec.declined) return null;
+      const secret = rec.synced ? null : secure ? await secure.get(k(vendor)).catch(() => null) : rec.secret;
+      return { token: rec.token, secret: secret ?? null, ...(rec.synced ? { synced: true } : {}) };
     },
     async save(vendor, { token, secret }) {
       if (secure) {
@@ -271,6 +300,37 @@ export function createCredentialStore({ storage = globalThis.localStorage, secur
     },
     async forget(vendor) {
       storage?.removeItem(k(vendor));
+      if (secure) await secure.remove(k(vendor)).catch(() => {});
+    },
+    logins() {
+      const out = {};
+      let n = 0;
+      try { n = storage?.length ?? 0; } catch { n = 0; }
+      const keys = [];
+      for (let i = 0; i < n; i++) { const key = storage.key(i); if (key?.startsWith(CREDENTIAL_PREFIX)) keys.push(key); }
+      for (const key of keys) {
+        const vendor = key.slice(CREDENTIAL_PREFIX.length);
+        const rec = parseEndpoint(vendor) === vendor ? read(vendor) : null;
+        if (rec) out[vendor] = rec.token;
+      }
+      return out;
+    },
+    async adopt(vendor, token) {
+      if (!token || parseEndpoint(vendor) !== vendor) return false;
+      const rec = read(vendor);
+      if (rec?.token === token) return !rec.declined;
+      if (rec && !rec.synced && !rec.declined) return false; // signed in here: this device keeps its own
+      if (secure) await secure.remove(k(vendor)).catch(() => {}); // a secret belongs to the token it came with
+      write(vendor, { token, synced: true });
+      return true;
+    },
+    async drop(vendor) {
+      if (read(vendor)) await this.forget(vendor);
+    },
+    async decline(vendor) {
+      const rec = read(vendor);
+      if (!rec) return;
+      write(vendor, { token: rec.token, ...(rec.synced ? { synced: true } : {}), declined: true });
       if (secure) await secure.remove(k(vendor)).catch(() => {});
     },
   };

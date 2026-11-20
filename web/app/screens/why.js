@@ -26,7 +26,7 @@ export const WHY_POINTS = [
   {
     id: "builds", title: "One App, Jailbroken or Not",
     lines: ["Lite for any iPhone: apps, signing, tweaks in apps.", "The full app for jailbroken iPhones: apt underneath.",
-      "Same screens, same sources, same settings."],
+      "Same screens, same sources, same settings.", "One account keeps your sources, certificate and repo sign-ins."],
     shot: "builds", size: [600, 376], alt: "The website's Home offering Lite and the jailbreak app",
   },
   {

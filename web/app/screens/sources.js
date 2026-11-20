@@ -36,6 +36,7 @@ import { refreshRows, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
 import { labelSource, toggleTrust, trustMenuLabel } from "./safety.js"; // F291
 import { findMoreOn, findMoreRow, labelCanister } from "./findmore.js"; // F305
 import { onPageShow } from "../nav/pagestate.js"; // B172
+import { setSourceErrorHooks } from "./sourceerror.js"; // B177
 
 export const title = "Sources";
 
@@ -138,6 +139,27 @@ settings.onChange((key) => { if (key === "device" && state.body?.isConnected) dr
 manage.onSourcesChanged((ctx) => {
   if (state.body) load(ctx ?? state.ctx); else loadNew(ctx);
   feedCatalog(ctx ?? state.ctx);
+});
+
+// B177: what a failed source's page (screens/sourceerror.js) needs from here: its live reason, Refresh Source (the
+// row's retry, then the catalog load so the page redraws from fresh data), Edit Source (Manage's Enter URL alert
+// filled with its URL) and the list kept in step after a remove.
+setSourceErrorHooks({
+  reason: (key) => { const r = state.rows?.get(key); return r?.state === ROW.failed ? r.reason : null; },
+  async refresh(key) {
+    const ok = await retrySource(state.ctx, key);
+    if (ok) await state.ctx?.loadData?.();
+    return ok;
+  },
+  edit: (ctx, s) => manage.addSource(ctx ?? state.ctx, { url: s.uri, dist: s.dist && s.dist !== "./" ? s.dist : null,
+    components: s.components }, { title: "Edit Source", button: "Save" }),
+  removed(ctx, key) {
+    if (state.sources) state.sources = state.sources.filter((s) => s.key !== key);
+    state.rows?.retry?.(key); // no stale failure count for a source that is gone...
+    state.rows?.land?.({ key, count: null }); // ...it lands as done, out of the badge's count
+    manage.sourcesChanged(ctx ?? state.ctx);
+    (ctx ?? state.ctx)?.setBadge?.("sources", tabBadge(state.rows?.counts(), false));
+  },
 });
 
 // B141: the app's ctx, for loads started where no screen hands one (the website's import at first launch): the
@@ -371,14 +393,16 @@ function paintRow(li) {
     }
   }
   li.setAttribute("aria-busy", String(st === ROW.waiting || st === ROW.loading));
-  if (st === ROW.failed) inner.setAttribute("aria-description", "Failed to refresh: tap to try again");
+  if (st === ROW.failed) inner.setAttribute("aria-description", "Failed to refresh: tap for the error and what to do");
   else inner.removeAttribute("aria-description");
 }
 
 // F233: a tap on a failed row: that source alone refreshes (the app runs apt-get update for its list only, through
 // refreshSources' `retry`), its row spinning; afterwards the badge counts the failures again.
+// B177: also from a source's page (Refresh Source), where no run this session may have rows: one is started for it.
 export async function retrySource(ctx, key) {
-  if (state.busy || !state.rows?.has(key)) return false;
+  if (state.busy || key == null) return false;
+  state.rows ??= refreshRows([]);
   state.busy = true;
   state.running = true;
   state.rows.retry(key);
@@ -649,9 +673,9 @@ function attachRowGestures(ul) {
   // Hold a source: iOS 6's black menu with Copy URL.
   longPress(ul, ".source-row", (li, e) => {
     if (state.editing || li.classList.contains("armed") || !li.dataset.url) return;
-    // F233: a failed row's tap retries it, so the menu opens its packages (the lists from before) instead
-    const open = li.classList.contains("is-failed") && state.ctx?.go
-      ? [{ label: "Open", onClick: () => state.ctx.go({ tab: "sources", path: [li.dataset.key] }) }] : [];
+    // B177: a failed row's tap opens its page; the menu keeps the quick way to try it again
+    const open = li.classList.contains("is-failed")
+      ? [{ label: "Refresh", onClick: () => { if (!state.busy) retrySource(state.ctx, li.dataset.key); } }] : [];
     // F291: Trust Source / Stop Trusting for a source not on the known-safe list
     const src = byKey(li.dataset.key);
     const trust = src && li.dataset.trust !== "safe"
@@ -663,14 +687,8 @@ function attachRowGestures(ul) {
   ul.addEventListener("click", (e) => {
     if (e.target.closest(".del-toggle, .del-confirm")) return;
     const armed = ul.querySelector(".source-row.armed");
-    // F233: a tap on a row whose refresh failed tries that source again instead of opening it
-    const failed = !armed && !swiped ? e.target.closest(".source-row.is-failed") : null;
-    if (failed) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!state.busy) retrySource(state.ctx, failed.dataset.key);
-      return;
-    }
+    // B177: a row whose refresh failed opens its page like any other (the error and Refresh Source are there,
+    // screens/sourceerror.js); F233's tap-to-retry did nothing visible when it failed again.
     if (!armed && !swiped) return;
     e.preventDefault();
     e.stopPropagation();

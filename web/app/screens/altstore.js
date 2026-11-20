@@ -25,6 +25,7 @@ import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { guarded } from "../nav/tapguard.js";
 import { setSourceShare, headerShareButton } from "./handoff.js";
+import { sourceErrorGroup } from "./sourceerror.js"; // B177
 import { openIpaInstall, markIpaNeeds } from "./ipa-install.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
@@ -165,7 +166,10 @@ const downloadRow = (url, opener) => ({ label: "Download IPA", subtitle: decodeU
 
 // ---- the source page -------------------------------------------------------------------------------------------
 
-export async function renderAltSource(body, route, key) {
+export async function renderAltSource(body, route, key, ctx = null) {
+  // B177: a source whose refresh failed: the whole error and what to do, at the top; drawn again after Refresh
+  const failedGroup = (source, status) => sourceErrorGroup(source, { status, ctx,
+    onChange: () => { if (body.isConnected) { body.replaceChildren(); renderAltSource(body, route, key, ctx); } } });
   body.append(placeholder("page"));
   let meta, source;
   try {
@@ -184,6 +188,8 @@ export async function renderAltSource(body, route, key) {
     return;
   }
   if (!meta) {
+    const failed = source && failedGroup(source, status);
+    if (failed) { body.replaceChildren(failed); setSourceShare(body, source); return; }
     body.replaceChildren(note(status?.error || source?.error || "This source could not be loaded. Tap Refresh on Sources."));
     return;
   }
@@ -238,7 +244,9 @@ export async function renderAltSource(body, route, key) {
   // (the iOS 6 share sheet, screens/handoff.js), in place of F8's Open In group.
   setSourceShare(body, source ?? { key });
   if (meta.website) body.append(grouped([{ rows: [{ label: "Website", subtitle: meta.website, onClick: () => window.open(meta.website, "_blank", "noopener") }] }]));
-  if (status?.error) body.append(note(status.error));
+  const failed = source && failedGroup(source, status);
+  if (failed) page.after(failed); // B177: under the header, above All Apps
+  else if (status?.error) body.append(note(status.error));
 }
 
 // ---- the app page ----------------------------------------------------------------------------------------------

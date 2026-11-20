@@ -77,13 +77,30 @@ export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(g
     },
     // A repo's Packages index as plain text: the server tries Packages.xz, .bz2, .gz, then plain in `repoDir`
     // (a flat repo's URL, or a dists/<suite>/<component>/binary-<arch>/ directory) and caches it 30 minutes.
+    // B177: the Worker reads Packages.gz and plain Packages only. BigBoss has Packages.bz2 alone, and its plain
+    // Packages redirects to an HTML page the proxy passes on as the index (0 packages): an HTML answer, or none,
+    // falls back to .bz2 (then .zst) fetched raw through the proxy and unpacked here (core/unpack.js).
     async packages(repoDir) {
-      const res = await call({ url: repoDir, kind: "packages" });
-      return {
-        text: await res.text(),
-        source: res.headers.get("X-Source-URL") || repoDir,
-        cached: res.headers.get("X-Cache") === "HIT",
-      };
+      let res = null, first = null;
+      try { res = await call({ url: repoDir, kind: "packages" }); } catch (e) {
+        if (e?.code !== "not_found") throw e;
+        first = e;
+      }
+      const text = res ? await res.text() : null;
+      if (text != null && !/^\s*</.test(text.slice(0, 512))) {
+        return { text, source: res.headers.get("X-Source-URL") || repoDir, cached: res.headers.get("X-Cache") === "HIT" };
+      }
+      const { decompress } = await import("./core/unpack.js");
+      for (const name of ["Packages.bz2", "Packages.zst"]) {
+        let bytes;
+        try { bytes = new Uint8Array(await (await call({ url: repoDir + name })).arrayBuffer()); } catch (e) {
+          if (e?.code === "upstream" || e?.code === "not_found") continue;
+          throw e;
+        }
+        if (!bytes.length || bytes[0] === 0x3c) continue;
+        try { return { text: new TextDecoder().decode(decompress(name, bytes)), source: repoDir + name, cached: false }; } catch { continue; }
+      }
+      throw first ?? new BackendError("not_found", `no Packages index in ${repoDir} (the repo answered with a web page)`);
     },
   };
   // F182: user reviews, on the same server as the proxy (core/reviews.js; worker/src/reviews.js).

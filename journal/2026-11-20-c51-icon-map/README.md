@@ -34,6 +34,17 @@
   44 shots (6 themes x app pages, plus the website), 0 px and 0 style differences.
 - `node --test web/app/`: 2600 pass, 0 fail. `tools/check.sh` through `run done`.
 
+## Spec review
+
+A fresh subagent was given only the diff and the brief. It found:
+- The tab glyphs are still written twice, once in `ios6.css` and once in the map, with a test keeping them equal. I
+  kept this: `ios6.css` is outside the task's files (see above).
+- `notiphone`/`manage`/`handoff`/`account` are unchanged. I kept that: grep finds no art in them other than
+  `rowIcon` and QR codes, and the new test confirms it.
+- The guide tiles now load at startup, and the tile geometry is part of the map. I kept both: the first is the cost
+  of the module bound, and the second is what an era with a different tile shape needs.
+- A stale comment in `tileSvg`. Fixed.
+
 ## Not verified
 
 - The Copying Files guide page and the Why page are not among `shots.mjs`'s pages, so no screenshot of them was

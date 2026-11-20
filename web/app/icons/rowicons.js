@@ -236,7 +236,7 @@ export function tileSvg(name, style = iconStyle()) {
   if (!entry) throw new Error(`no row icon ${name}`);
   const [colour, glyph] = entry;
   const { size, radius, glyph: across } = { ...ICON_SETS.ios6.tile, ...ICON_SETS[style]?.tile };
-  const g = across / 24; // the glyph's 24 units drawn 19pt across
+  const g = across / 24; // the glyph's 24 units drawn `tile.glyph` across (19pt in iOS 6)
   const off = (size - 24 * g) / 2;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`
     + `<rect width="${size}" height="${size}" rx="${radius}" fill="${colour}"/>`

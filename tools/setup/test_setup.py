@@ -51,11 +51,26 @@ class Cargo(unittest.TestCase):
 
     def test_cli_builds(self):
         m = os.path.join(HERE, "cli", "Cargo.toml")
-        r = subprocess.run(["cargo", "test", "--offline", "--locked", "--quiet", "--manifest-path", m, "--target-dir", os.path.join(TARGET, "cli")],
+        # "cli-rt", not "cli": that one holds build scripts that older checkouts compiled with env!("CARGO_MANIFEST_DIR"),
+        # which cargo would reuse here (see BuildScript below) and which name a worktree that may be gone.
+        r = subprocess.run(["cargo", "test", "--offline", "--locked", "--quiet", "--manifest-path", m, "--target-dir", os.path.join(TARGET, "cli-rt")],
                            capture_output=True, text=True, timeout=900)
         if r.returncode != 0 and re.search(r"--offline was specified|failed to download|failed to load source|can't checkout from", r.stderr):
             self.skipTest("the command's crates aren't on this machine (the first build needs the network): " + r.stderr.strip()[-300:])
         self.assertEqual(r.returncode, 0, r.stdout[-3000:] + r.stderr[-3000:])
+
+
+class BuildScript(unittest.TestCase):
+    """The target dir is shared by every checkout, and cargo's hash for a build script leaves out the checkout's path:
+    a build.rs older than the last compile reuses the binary another checkout built. So build.rs must not bake in
+    a path at compile time (env!/option_env!/include_*!), or it reads files from a worktree that may be deleted."""
+
+    def test_no_compile_time_paths(self):
+        src = read("cli", "build.rs")
+        code = "\n".join(line.split("//")[0] for line in src.splitlines())
+        for m in ("env!", "option_env!", "include_str!", "include_bytes!", "include!"):
+            self.assertNotIn(m, code, "cli/build.rs uses %s: read CARGO_MANIFEST_DIR with std::env::var at run time" % m)
+        self.assertIn('std::env::var("CARGO_MANIFEST_DIR")', code)
 
 
 class Names(unittest.TestCase):

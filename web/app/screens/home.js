@@ -856,7 +856,16 @@ function renderCredits(body) {
         onClick: () => window.open("https://github.com/tealbathingsuit/ellekit", "_blank", "noopener") },
       // F305: Canister's package search and repo index (Search's Other Sources, Find More Sources, the piracy list)
       { label: "Canister", subtitle: "Aarnav Tale\nPackage search and repo index", chevron: true, cls: "thanks-row canister-credit",
-        icon: { text: "C", color: "#7a8a99" }, onClick: () => window.open("https://canister.me/", "_blank", "noopener") }],
+        icon: { text: "C", color: "#7a8a99" }, onClick: () => window.open("https://canister.me/", "_blank", "noopener") },
+      // Third-party notices (native/test_notices.py): what the signer and the install route are built from
+      ...[["zsign", "zhlynn\nApp signing, MIT", "https://github.com/zhlynn/zsign"],
+        ["OpenSSL", "The OpenSSL Project\nzsign's cryptography, Apache-2.0", "https://www.openssl.org/"],
+        ["zlib", "Jean-loup Gailly and Mark Adler\nzsign's compression, zlib licence", "https://zlib.net/"],
+        ["idevice", "Jackson Coxson\nInstalling on this iPhone, MIT", "https://github.com/jkcoxson/idevice"],
+        ["Tailscale", "Tailscale Inc\nInstalling over a tailnet, BSD-3-Clause", "https://github.com/tailscale/tailscale"],
+      ].map(([label, subtitle, url]) => ({ label, subtitle, chevron: true, cls: "thanks-row",
+        icon: { text: label.charAt(0).toUpperCase(), color: "#7a8a99" },
+        onClick: () => window.open(url, "_blank", "noopener") }))],
       footer: `${NAME} adds ElleKit's libellekit.dylib to a signed app when a tweak you inject needs CydiaSubstrate `
         + "and you added none. ElleKit is © 2022 Évelyne Bélanger, under the BSD 3-Clause licence. "
         + "Search's Other Sources, Find More Sources, the piracy list and the Known Safe · Canister label come from "

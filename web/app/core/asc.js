@@ -26,9 +26,11 @@
 //   profileSerials(mobileprovision)         the serials of the certificates a profile lists (for findCertificate)
 //   profileRows(cache)                        the Provisioning Profile rows for the cache
 //
+//   addCaps / refusedCaps                     APP_ID_CAPS on an App ID; what Apple refused, remembered per team
+//
 // The profile cache (the caller keeps it, e.g. as JSON in storage): { [App ID identifier]: entry }, entry =
 //   { identifier, bundleIdId, id, name, content (the .mobileprovision, base64), expires (ISO), udids,
-//     capabilities, certId, push, made (ISO) }
+//     capabilities, certId, push, made (ISO), team }, plus REFUSED_KEY ("#refused"): the refused capabilities
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { NAME, BUNDLE_ID } from "../brand.js";
 import { parsePlist, parseProfile, normalUdid } from "./signing.js";
@@ -37,8 +39,44 @@ import { unpem, certSerial, makeKey, makeCsr, makeP12, sameKey, newPassword } fr
 export const ASC_API = "https://api.appstoreconnect.apple.com/v1";
 export const AUD = "appstoreconnect-v1";
 export const TOKEN_LIFE = 15 * 60; // seconds; Apple refuses more than 20 minutes
-// Push must work; App Groups and Associated Domains are what many apps ask for (sidedrop's APP_ID_CAPS).
-export const APP_ID_CAPS = ["PUSH_NOTIFICATIONS", "APP_GROUPS", "ASSOCIATED_DOMAINS"];
+// Every capability a signing service's profile carries (the user's Arctic Sign profile, 2026-11-19) that the App Store
+// Connect API can turn on, in the order they're asked for: Push first, it must work; the rest are skipped when Apple
+// refuses them (refusedCaps). Apple's capabilityType enum (its 409 lists it, real call 2026-11-19) is ICLOUD,
+// IN_APP_PURCHASE, GAME_CENTER, PUSH_NOTIFICATIONS, WALLET, INTER_APP_AUDIO, MAPS, ASSOCIATED_DOMAINS, PERSONAL_VPN,
+// APP_GROUPS, HEALTHKIT, HOMEKIT, WIRELESS_ACCESSORY_CONFIGURATION, APPLE_PAY, DATA_PROTECTION, SIRIKIT,
+// NETWORK_EXTENSIONS, MULTIPATH, HOT_SPOT, NFC_TAG_READING, CLASSKIT, AUTOFILL_CREDENTIAL_PROVIDER,
+// ACCESS_WIFI_INFORMATION, NETWORK_CUSTOM_PROTOCOL, COREMEDIA_HLS_LOW_LATENCY, SYSTEM_EXTENSION_INSTALL,
+// USER_MANAGEMENT, APPLE_ID_AUTH. MAPS, NETWORK_CUSTOM_PROTOCOL, SYSTEM_EXTENSION_INSTALL and USER_MANAGEMENT put
+// nothing in an iOS profile, so they're left out. Not in the API at all (the developer website only):
+// Communication and Time Sensitive notifications, WeatherKit, App Attest, Fonts, Extended Virtual Addressing,
+// Increased (Debugging) Memory Limit, Multitasking Camera Access.
+// Keep native/Sources/ASC.swift's caps the same.
+export const APP_ID_CAPS = ["PUSH_NOTIFICATIONS", // aps-environment
+  "APP_GROUPS", // com.apple.security.application-groups (comes out empty: the API can't make group IDs)
+  "ASSOCIATED_DOMAINS", // associated-domains "*"
+  "ICLOUD", // icloud-services, ubiquity-* (ICLOUD_VERSION XCODE_6: CloudKit)
+  "GAME_CENTER", "HEALTHKIT", "HOMEKIT", "SIRIKIT", "NETWORK_EXTENSIONS", "PERSONAL_VPN", // vpn.api allow-vpn
+  "MULTIPATH", "HOT_SPOT", "NFC_TAG_READING", "CLASSKIT", "AUTOFILL_CREDENTIAL_PROVIDER",
+  "ACCESS_WIFI_INFORMATION", "COREMEDIA_HLS_LOW_LATENCY", "APPLE_ID_AUTH", // applesignin Default
+  "WALLET", // pass-type-identifiers <team>.*
+  "APPLE_PAY", // in-app-payments (no merchant IDs)
+  "IN_APP_PURCHASE", "INTER_APP_AUDIO", "WIRELESS_ACCESSORY_CONFIGURATION",
+  "DATA_PROTECTION"]; // default-data-protection NSFileProtectionComplete
+// The settings the ones that need them take: without them Apple refuses ICLOUD and APPLE_ID_AUTH, and answers 201 to
+// DATA_PROTECTION without turning it on (real calls 2026-11-19).
+export const APP_ID_CAP_SETTINGS = {
+  ICLOUD: [{ key: "ICLOUD_VERSION", options: [{ key: "XCODE_6" }] }],
+  APPLE_ID_AUTH: [{ key: "APPLE_ID_AUTH_APP_CONSENT", options: [{ key: "PRIMARY_APP_CONSENT" }] }],
+  DATA_PROTECTION: [{ key: "DATA_PROTECTION_PERMISSION_LEVEL", options: [{ key: "COMPLETE_PROTECTION" }] }],
+};
+export const capBody = (cap, bundleIdId) => ({ data: { type: "bundleIdCapabilities",
+  attributes: { capabilityType: cap, ...(APP_ID_CAP_SETTINGS[cap] ? { settings: APP_ID_CAP_SETTINGS[cap] } : {}) },
+  relationships: { bundleId: { data: { type: "bundleIds", id: bundleIdId } } } } });
+// Capabilities Apple refused, per team, kept in the profile cache under this key (no App ID has a '#'):
+// { [team]: { [capabilityType]: { at: ISO, why } } }. Asked again after REFUSED_RETRY (the account holder may have
+// had a managed one granted meanwhile). Push is never remembered: it's asked for on every sign until it's on.
+export const REFUSED_KEY = "#refused";
+export const REFUSED_RETRY = 30 * 24 * 3600 * 1000;
 const EXPIRY_MARGIN = 24 * 3600 * 1000; // remake a day before Apple's date, so a sign never gets an expiring profile
 
 export class AscError extends Error {
@@ -145,21 +183,74 @@ export async function findCertificate(request, serials) {
   return null;
 }
 
-// The explicit App ID (made with APP_ID_CAPS if the account lacks it): { id, identifier, made }.
-export async function ensureAppId(request, identifier) {
+// The explicit App ID: { id, identifier, made, team (Apple's seedId, the team ID) }. A new one gets APP_ID_CAPS
+// (addCaps, Push must succeed); an existing one is topped up by ensureProfile.
+export async function ensureAppId(request, identifier, { cache = {}, now = Date.now(), log = () => {} } = {}) {
   // the filter is a prefix match
   const found = ((await request("GET", `/bundleIds${q({ "filter[identifier]": identifier, limit: 200 })}`)).data ?? [])
     .find((b) => b.attributes?.identifier === identifier);
-  if (found) return { id: found.id, identifier, made: false };
+  if (found) return { id: found.id, identifier, made: false, team: found.attributes?.seedId ?? null };
   const made = (await request("POST", "/bundleIds", { data: { type: "bundleIds",
     attributes: { identifier, name: `${NAME} ${identifier.split(".").pop()}`.slice(0, 60), platform: "IOS" } } })).data;
-  for (const cap of APP_ID_CAPS) {
+  const team = made.attributes?.seedId ?? null;
+  const r = await addCaps({ request, bundleIdId: made.id, caps: APP_ID_CAPS, cache, team, now, log, pushMust: true });
+  return { id: made.id, identifier, made: true, team, capabilities: r.capabilities };
+}
+
+// ---- capabilities Apple refuses: skipped, logged once, remembered per team ----
+const teamKey = (team) => String(team || "default").toUpperCase();
+export function refusedCaps(cache, team, now = Date.now()) {
+  const got = cache?.[REFUSED_KEY]?.[teamKey(team)] ?? {};
+  return new Set(Object.keys(got).filter((c) => now - (Date.parse(got[c]?.at) || 0) < REFUSED_RETRY));
+}
+function remember(cache, team, cap, why, now) {
+  const all = (cache[REFUSED_KEY] ??= {});
+  (all[teamKey(team)] ??= {})[cap] = { at: new Date(now).toISOString(), why: String(why).slice(0, 300) };
+}
+// Apple refused it for this team (a managed capability the account holder must request, one the account can't
+// have, an invalid setting); 401 is the key, 429/5xx/no answer are passing: those aren't remembered.
+const isRefusal = (e) => e?.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 429;
+
+// Asks for `caps` on the App ID, skipping the ones refused for this team, then reads back what it has. A refusal is
+// logged once and remembered; one Apple accepts but doesn't turn on is remembered too, so no sign asks again.
+// `pushMust`: a refused Push throws (a new App ID); otherwise it's logged and asked for again next sign.
+// -> { capabilities (Apple's list, sorted), added, refused (newly remembered), failed (passing errors) }
+export async function addCaps({ request, bundleIdId, caps, cache = {}, team = null, now = Date.now(), log = () => {}, pushMust = false }) {
+  const skip = refusedCaps(cache, team, now);
+  const added = [], refused = [], failed = [];
+  for (const cap of caps) {
+    if (skip.has(cap) && cap !== "PUSH_NOTIFICATIONS") continue;
     try {
-      await request("POST", "/bundleIdCapabilities", { data: { type: "bundleIdCapabilities", attributes: { capabilityType: cap },
-        relationships: { bundleId: { data: { type: "bundleIds", id: made.id } } } } });
-    } catch (e) { if (cap === "PUSH_NOTIFICATIONS") throw e; } // the others are nice to have
+      await request("POST", "/bundleIdCapabilities", capBody(cap, bundleIdId));
+      added.push(cap);
+    } catch (e) {
+      if (e?.status === 401 || (cap === "PUSH_NOTIFICATIONS" && pushMust)) throw e;
+      if (isRefusal(e) && cap !== "PUSH_NOTIFICATIONS") {
+        remember(cache, team, cap, e.message, now);
+        refused.push(cap);
+        log(`Capability ${cap}: Apple refused it for team ${teamKey(team)} (${e.message}); skipped from now on`);
+      } else {
+        failed.push(cap);
+        log(`Capability ${cap}: not added this time (${e?.message ?? e})`);
+      }
+    }
   }
-  return { id: made.id, identifier, made: true };
+  const capabilities = await appIdCaps(request, bundleIdId);
+  for (const cap of added) {
+    if (capabilities.includes(cap) || cap === "PUSH_NOTIFICATIONS") continue;
+    remember(cache, team, cap, "accepted but not turned on", now);
+    refused.push(cap);
+    log(`Capability ${cap}: Apple accepted it but didn't turn it on for team ${teamKey(team)}; skipped from now on`);
+  }
+  return { capabilities, added: added.filter((c) => capabilities.includes(c)), refused, failed };
+}
+
+// The team an App ID belongs to (its seedId), for refusedCaps when the cache doesn't know it yet.
+export async function appIdTeam(request, bundleIdId) {
+  try { return (await request("GET", `/bundleIds/${bundleIdId}`)).data?.attributes?.seedId ?? null; } catch (e) {
+    if (e?.status === 401) throw e;
+    return null;
+  }
 }
 
 export async function appIdCaps(request, bundleIdId) {
@@ -176,20 +267,40 @@ const b64decode = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 // another certificate; without it a reused profile costs one call (the App ID's capabilities).
 // `certIds` (F276): make the profile with these certificates instead of looking up `serials` (a .p12 whose serial
 // isn't known: profileForAnyP12).
-export async function ensureProfile({ request, bundleId, prefix, udid, deviceName, serials, certId = null, certIds = null, cache = {}, now = Date.now() }) {
+// F279: an App ID that lacks some of APP_ID_CAPS (made before the list grew, or by hand) is topped up first, skipping
+// what Apple refused for its team (refusedCaps); the profile is then remade by the "capabilities" rule. `log` hears
+// each refusal once. The result also carries `capsAdded` and `capsRefused`.
+export async function ensureProfile({ request, bundleId, prefix, udid, deviceName, serials, certId = null, certIds = null, cache = {},
+  now = Date.now(), log = () => {} }) {
   const identifier = appIdFor(bundleId, prefix);
   let cached = cache[identifier] ?? null;
   let appId = cached?.bundleIdId ? { id: cached.bundleIdId, identifier, made: false } : null;
   let caps = null;
+  let team = cached?.team ?? null;
   if (appId) {
     try { caps = await appIdCaps(request, appId.id); } catch (e) { if (e.status !== 404) throw e; appId = null; cached = null; }
   }
   if (!appId) {
-    appId = await ensureAppId(request, identifier);
-    caps = await appIdCaps(request, appId.id);
+    appId = await ensureAppId(request, identifier, { cache, now, log });
+    team = appId.team ?? team;
+    caps = appId.capabilities ?? await appIdCaps(request, appId.id);
   }
+  let capsAdded = [], capsRefused = [];
+  const missing = APP_ID_CAPS.filter((c) => !caps.includes(c));
+  if (missing.length) {
+    team ??= await appIdTeam(request, appId.id);
+    const skip = refusedCaps(cache, team, now);
+    const ask = missing.filter((c) => c === "PUSH_NOTIFICATIONS" || !skip.has(c));
+    if (ask.length) {
+      const r = await addCaps({ request, bundleIdId: appId.id, caps: ask, cache, team, now, log });
+      caps = r.capabilities;
+      capsAdded = r.added;
+      capsRefused = r.refused;
+    }
+  }
+  if (cached && team) cached.team = team;
   const reason = remakeReason(cached, { udid, capabilities: caps, certId, now });
-  if (!reason) return { entry: cached, made: false, reason: null, appId: identifier, deviceMade: false };
+  if (!reason) return { entry: cached, made: false, reason: null, appId: identifier, deviceMade: false, capsAdded, capsRefused };
 
   const deviceMade = udid ? (await ensureDevice(request, udid, deviceName)).made : false;
   const cert = certIds?.length ? { id: certIds[0], all: certIds } : await findCertificate(request, serials);
@@ -203,9 +314,10 @@ export async function ensureProfile({ request, bundleId, prefix, udid, deviceNam
   const content = created.attributes.profileContent;
   const info = parseProfile(b64decode(content));
   const entry = { identifier, bundleIdId: appId.id, id: created.id, name, content, expires: info.expires?.toISOString() ?? null,
-    udids: info.udids, capabilities: caps, certId: cert.id, push: info.push, made: new Date(now).toISOString() };
+    udids: info.udids, capabilities: caps, certId: cert.id, push: info.push, made: new Date(now).toISOString(),
+    ...(team ? { team } : {}) };
   cache[identifier] = entry;
-  return { entry, made: true, reason, appId: identifier, deviceMade };
+  return { entry, made: true, reason, appId: identifier, deviceMade, capsAdded, capsRefused };
 }
 
 export function profileBody({ name, bundleIdId, certId, deviceIds }) {

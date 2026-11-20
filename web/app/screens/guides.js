@@ -380,6 +380,16 @@ STEPS[ASC_GUIDE] = [
   { title: "Add It", text: "Settings > Signing > Apple Developer Account > Add API Key: pick the .p8 (and the .txt, "
     + "if you made one). The Issuer ID fills in from the .txt or the clipboard; tap Save.",
   rows: [{ label: "Settings > Signing", href: format(settingsRoute(["signing"])) }] },
+  // F279: what a real call with a paid team's key got (2026-11-19); core/asc.js APP_ID_CAPS
+  { title: "What Each App Gets", text: `Every App ID ${NAME} makes asks Apple for Push Notifications, App Groups, `
+    + "Associated Domains, iCloud (CloudKit), Game Center, HealthKit, HomeKit, Siri, Network Extensions, Personal VPN, "
+    + "Multipath, Hotspot, NFC Tag Reading, ClassKit, AutoFill Credential Provider, Access Wi-Fi Information, "
+    + "Low-Latency HLS, Sign in with Apple, Wallet, Apple Pay, In-App Purchase, Inter-App Audio, Wireless Accessory "
+    + "Configuration and Data Protection. Apple's API can't turn on Communication or Time Sensitive Notifications, "
+    + "WeatherKit, App Attest, Fonts, Extended Virtual Addressing, Increased Memory Limit or Multitasking Camera "
+    + "Access: the Account Holder or an Admin ticks those per App ID on developer.apple.com. One Apple refuses is skipped and not "
+    + "asked for again for a month. App Groups come out empty, because the API can't make group IDs: an app that "
+    + "shares data through a group may not find it." },
 ];
 export const ascGuideHref = (fmt = format) => fmt({ tab: "home", path: ["guides", ASC_GUIDE] });
 

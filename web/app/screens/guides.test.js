@@ -331,7 +331,8 @@ test("F277: the API key guide: where the key is made, the one download, the Issu
   assert.equal(g.guidePage(["guides", "asc-key"], true).page, "guide");
   const page = draw(["guides", "asc-key"], { lite: true, store: { getItem: () => null, setItem: () => {} } });
   assert.deepEqual(byClass(page, "guide-step-title").map((t) => t.textContent),
-    ["Open the API Keys", "Make a Key", "Download It", "Copy the Issuer ID", "Add It"]);
+    ["Open the API Keys", "Make a Key", "Download It", "Copy the Issuer ID", "Add It", "What Each App Gets"]);
+  assert.match(page.textContent, /App Groups come out empty/); // what the capabilities step says (core/asc.js APP_ID_CAPS)
   const t = page.textContent;
   assert.match(t, /Users and Access > Integrations > App Store Connect API > Team Keys/);
   assert.match(t, /Access: Admin/);

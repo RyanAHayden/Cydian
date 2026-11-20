@@ -1,6 +1,7 @@
 // Own provisioning profiles, the app's half (web/app/core/asc.js is the page's). With an App Store Connect API key
 // (AuthKey_<KeyID>.p8 + Issuer ID) in the Keychain, signing an app with Keep Bundle IDs on makes its own explicit
-// App ID (<prefix>.<last component of the app's ID>, with Push, App Groups, Associated Domains) and an Ad Hoc profile
+// App ID (<prefix>.<last component of the app's ID>, with every capability in appIDCaps Apple grants the team: the
+// refused ones are remembered per team and skipped; older App IDs are topped up) and an Ad Hoc profile
 // with every enabled iPhone and the user's certificate, registering this iPhone first when it's missing. The profile
 // is cached per App ID and made again when it's missing, expiring, lacks this iPhone, the App ID's capabilities
 // changed or the certificate did. No server: the JWT is ES256 signed here with CryptoKit and goes only to Apple.
@@ -20,7 +21,15 @@ import Security
 enum ASC {
     struct Key: Codable { let p8: String; let keyId: String; let issuerId: String }
     static let api = "https://api.appstoreconnect.apple.com"
-    static let appIDCaps = ["PUSH_NOTIFICATIONS", "APP_GROUPS", "ASSOCIATED_DOMAINS"] // core/asc.js APP_ID_CAPS
+    // core/asc.js APP_ID_CAPS and APP_ID_CAP_SETTINGS (why each is there, and what Apple's API lacks, is written there):
+    // every capability of a signing service's profile the API can turn on, Push first.
+    static let appIDCaps = ["PUSH_NOTIFICATIONS", "APP_GROUPS", "ASSOCIATED_DOMAINS", "ICLOUD", "GAME_CENTER", "HEALTHKIT", "HOMEKIT", "SIRIKIT", "NETWORK_EXTENSIONS", "PERSONAL_VPN", "MULTIPATH", "HOT_SPOT", "NFC_TAG_READING", "CLASSKIT", "AUTOFILL_CREDENTIAL_PROVIDER", "ACCESS_WIFI_INFORMATION", "COREMEDIA_HLS_LOW_LATENCY", "APPLE_ID_AUTH", "WALLET", "APPLE_PAY", "IN_APP_PURCHASE", "INTER_APP_AUDIO", "WIRELESS_ACCESSORY_CONFIGURATION", "DATA_PROTECTION"]
+    static let capSettings: [String: [[String: Any]]] = [
+        "ICLOUD": [["key": "ICLOUD_VERSION", "options": [["key": "XCODE_6"]]]],
+        "APPLE_ID_AUTH": [["key": "APPLE_ID_AUTH_APP_CONSENT", "options": [["key": "PRIMARY_APP_CONSENT"]]]],
+        "DATA_PROTECTION": [["key": "DATA_PROTECTION_PERMISSION_LEVEL", "options": [["key": "COMPLETE_PROTECTION"]]]],
+    ]
+    static let refusedRetry: TimeInterval = 30 * 86400 // core/asc.js REFUSED_RETRY
     static let service = "com.ryha.ifizbox.asc"
 
     // ---- the key, in the Keychain (this device only, no backup; read at sign time, so no Face ID)
@@ -175,8 +184,15 @@ enum ASC {
             if let b = bundleIdId { capsNow = try capabilities(of: b, k) }
         } catch let f as Failure where f.status == 404 { bundleIdId = nil; entry = nil }
         if bundleIdId == nil {
-            bundleIdId = try ensureAppID(identifier, k, log: log)
+            bundleIdId = try ensureAppID(identifier, team: base.team, k, log: log)
             capsNow = try capabilities(of: bundleIdId!, k)
+        }
+        // App IDs made before the list grew (or by hand) get the missing ones; the profile is then remade by the
+        // capabilities rule. What Apple refused for this team isn't asked for again (core/asc.js ensureProfile).
+        if let b = bundleIdId, let c = capsNow {
+            let skip = refused(team: base.team)
+            let ask = appIDCaps.filter { !c.contains($0) && ($0 == "PUSH_NOTIFICATIONS" || !skip.contains($0)) }
+            if !ask.isEmpty { capsNow = try addCaps(ask, to: b, team: base.team, pushMust: false, k, log: log) }
         }
         guard let bid = bundleIdId, let capList = capsNow else { return nil }
         guard let serial = serialHex(certDER) else { throw SignError("no_cert", "The certificate can't be read.") }
@@ -229,21 +245,68 @@ enum ASC {
         list(try request("GET", "/v1/bundleIds/\(bundleIdId)/bundleIdCapabilities", key: k)).compactMap { attr($0, "capabilityType") }.sorted()
     }
 
-    private static func ensureAppID(_ identifier: String, _ k: Key, log: (String) -> Void) throws -> String {
+    private static func ensureAppID(_ identifier: String, team: String, _ k: Key, log: (String) -> Void) throws -> String {
         // the filter is a prefix match
         if let b = list(try request("GET", "/v1/bundleIds" + q(["filter[identifier]": identifier, "limit": "200"]), key: k))
             .first(where: { attr($0, "identifier") == identifier }), let id = b["id"] as? String { return id }
         let made = try request("POST", "/v1/bundleIds", ["data": ["type": "bundleIds", "attributes": [
             "identifier": identifier, "name": String("\(Brand.name) \(identifier.split(separator: ".").last ?? "")".prefix(60)), "platform": "IOS"]]], key: k)
         guard let id = (made["data"] as? [String: Any])?["id"] as? String else { throw SignError("bad_profile", "Apple made no App ID.") }
-        for cap in appIDCaps {
-            do {
-                try request("POST", "/v1/bundleIdCapabilities", ["data": ["type": "bundleIdCapabilities", "attributes": ["capabilityType": cap],
-                    "relationships": ["bundleId": ["data": ["type": "bundleIds", "id": id]]]]], key: k)
-            } catch { if cap == "PUSH_NOTIFICATIONS" { throw error } }
-        }
-        log("Made the App ID \(identifier) with \(appIDCaps.joined(separator: ", "))")
+        let caps = try addCaps(appIDCaps, to: id, team: (made["data"] as? [String: Any]).flatMap { attr($0, "seedId") } ?? team, pushMust: true, k, log: log)
+        log("Made the App ID \(identifier) with \(caps.count) capabilities")
         return id
+    }
+
+    // ---- capabilities Apple refuses: skipped, logged once, remembered per team (core/asc.js addCaps/refusedCaps)
+    // Signing/auto/refused.caps: {team: {capabilityType: {at, why}}} (not .json, so all() doesn't list it).
+
+    private static var refusedFile: URL { cacheDir.appendingPathComponent("refused.caps") }
+    private static func refusedAll() -> [String: [String: [String: String]]] {
+        (try? Data(contentsOf: refusedFile)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: [String: [String: String]]] } ?? [:]
+    }
+    static func refused(team: String, now: Date = Date()) -> Set<String> {
+        let iso = ISO8601DateFormatter()
+        return Set((refusedAll()[team.uppercased()] ?? [:]).filter { _, v in
+            guard let at = v["at"].flatMap({ iso.date(from: $0) }) else { return false }
+            return now.timeIntervalSince(at) < refusedRetry
+        }.keys)
+    }
+    private static func remember(_ cap: String, team: String, why: String) {
+        var all = refusedAll()
+        all[team.uppercased(), default: [:]][cap] = ["at": ISO8601DateFormatter().string(from: Date()), "why": String(why.prefix(300))]
+        try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        if let d = try? JSONSerialization.data(withJSONObject: all) { try? d.write(to: refusedFile, options: .atomic) }
+    }
+
+    // Asks for `caps`, skipping what's refused for this team, and returns the App ID's capabilities read back. A 4xx
+    // other than 401/429 is a refusal: logged once, remembered (Push never: on a new App ID it throws, else it's asked
+    // again next sign); one Apple accepts but doesn't turn on is remembered too.
+    private static func addCaps(_ caps: [String], to id: String, team: String, pushMust: Bool, _ k: Key, log: (String) -> Void) throws -> [String] {
+        let skip = refused(team: team)
+        var added = [String]()
+        for cap in caps where cap == "PUSH_NOTIFICATIONS" || !skip.contains(cap) {
+            var attrs: [String: Any] = ["capabilityType": cap]
+            if let s = capSettings[cap] { attrs["settings"] = s }
+            do {
+                try request("POST", "/v1/bundleIdCapabilities", ["data": ["type": "bundleIdCapabilities", "attributes": attrs,
+                    "relationships": ["bundleId": ["data": ["type": "bundleIds", "id": id]]]]], key: k)
+                added.append(cap)
+            } catch let f as Failure {
+                if f.status == 401 || (cap == "PUSH_NOTIFICATIONS" && pushMust) { throw f }
+                if (400..<500).contains(f.status), f.status != 429, cap != "PUSH_NOTIFICATIONS" {
+                    remember(cap, team: team, why: f.message)
+                    log("Capability \(cap): Apple refused it for team \(team) (\(f.message)); skipped from now on")
+                } else {
+                    log("Capability \(cap): not added this time (\(f.message))")
+                }
+            }
+        }
+        let now = try capabilities(of: id, k)
+        for cap in added where !now.contains(cap) && cap != "PUSH_NOTIFICATIONS" {
+            remember(cap, team: team, why: "accepted but not turned on")
+            log("Capability \(cap): Apple accepted it but didn't turn it on for team \(team); skipped from now on")
+        }
+        return now
     }
 
     static func profileUDIDs(_ data: Data) -> [String] {

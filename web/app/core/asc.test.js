@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { webcrypto } from "node:crypto";
 import { keyIdFromName, makeJwt, httpTransport, appIdFor, appIdPrefix, remakeReason, ensureProfile, profileBody,
   findCertificate, profileSerials, profileRows, makeCertificate, distributionCerts, revokeCertificate, APP_ID_CAPS, AscError,
+  APP_ID_CAP_SETTINGS, capBody, addCaps, refusedCaps, REFUSED_KEY, REFUSED_RETRY,
   newCertificate, makeOwnSigning, profileForP12, profileForAnyP12, certTeam, LIMIT_TEXT, KEY_ROLE_TEXT, REVOKE_WARNING } from "./asc.js";
 import { certSerial, unpem, tlv, seq, oid } from "./freecert.js";
 import { der, children, checkP12Password } from "./signing.js";
@@ -90,7 +91,9 @@ function fakeProfile({ udids, appId, push = "production", expires }) {
   return Buffer.from(`\x30\x80junk${xml}trailer`, "latin1").toString("base64");
 }
 function fakeAsc({ devices = [], certs = [{ id: "C1", attributes: { serialNumber: "0ABC" } }], bundleIds = [], expires = new Date(Date.UTC(2027, 10, 19)) } = {}) {
-  const s = { devices: [...devices], certs, bundleIds: [...bundleIds], caps: {}, profiles: [], calls: [], n: 0 };
+  // refuse: capabilities Apple answers 409 to; quiet: ones it answers 201 to without turning on; settings: what came
+  const s = { devices: [...devices], certs, bundleIds: [...bundleIds], caps: {}, profiles: [], calls: [], n: 0,
+    refuse: new Set(), quiet: new Set(), down: new Set(), settings: {} };
   s.request = async (method, path, body) => {
     s.calls.push(`${method} ${path.split("?")[0]}`);
     const u = new URL(`https://x${path}`);
@@ -107,13 +110,25 @@ function fakeAsc({ devices = [], certs = [{ id: "C1", attributes: { serialNumber
     if (method === "GET" && u.pathname === "/certificates") return { data: s.certs };
     if (method === "GET" && u.pathname === "/bundleIds") return { data: s.bundleIds.filter((b) => b.attributes.identifier.startsWith(f("identifier"))) };
     if (method === "POST" && u.pathname === "/bundleIds") {
-      const b = { id: id(), attributes: body.data.attributes };
+      const b = { id: id(), attributes: { ...body.data.attributes, seedId: "S8NFX3A2LT" } };
       s.bundleIds.push(b);
       s.caps[b.id] = [];
       return { data: b };
     }
+    const one = /^\/bundleIds\/([^/]+)$/.exec(u.pathname);
+    if (method === "GET" && one) {
+      const b = s.bundleIds.find((x) => x.id === one[1]);
+      if (!b) throw new AscError("gone", { status: 404 });
+      return { data: { ...b, attributes: { seedId: "S8NFX3A2LT", ...b.attributes } } };
+    }
     if (method === "POST" && u.pathname === "/bundleIdCapabilities") {
-      s.caps[body.data.relationships.bundleId.data.id].push(body.data.attributes.capabilityType);
+      const cap = body.data.attributes.capabilityType;
+      if (s.down.has(cap)) throw new AscError("App Store Connect POST /bundleIdCapabilities: HTTP 503", { status: 503 });
+      if (s.refuse.has(cap)) throw new AscError(`App Store Connect POST /bundleIdCapabilities: ${cap} needs a request`, { status: 409, code: "ENTITY_ERROR" });
+      if ((cap === "ICLOUD" || cap === "APPLE_ID_AUTH") && !body.data.attributes.settings) throw new AscError("needs settings", { status: 409 });
+      const list = s.caps[body.data.relationships.bundleId.data.id];
+      if (!s.quiet.has(cap) && !list.includes(cap)) list.push(cap);
+      if (body.data.attributes.settings) s.settings[cap] = body.data.attributes.settings;
       return { data: {} };
     }
     const m = /^\/bundleIds\/([^/]+)\/bundleIdCapabilities$/.exec(u.pathname);
@@ -165,11 +180,14 @@ test("ensureProfile: registers the iPhone, makes the App ID with its capabilitie
   assert.equal(again.made, false);
   assert.deepEqual(asc.calls, [`GET /bundleIds/${e.bundleIdId}/bundleIdCapabilities`]);
 
-  // a capability turned off on the App ID: remade, the old profile deleted first
-  asc.caps[e.bundleIdId] = ["PUSH_NOTIFICATIONS"];
+  // a capability turned off on the App ID that Apple then refuses to turn back on: remade, the old profile deleted first
+  asc.caps[e.bundleIdId] = APP_ID_CAPS.filter((c) => c !== "HEALTHKIT");
+  asc.refuse.add("HEALTHKIT");
   const capped = await ensureProfile({ request: asc.request, bundleId: "io.github.fizl0.hst.beta", prefix: "com.example", udid: "00008130-0018450C3661001C", serials: ["ABC"], cache, now });
   assert.equal(capped.reason, "capabilities");
+  assert.deepEqual(capped.capsRefused, ["HEALTHKIT"]);
   assert.equal(asc.profiles.length, 1);
+  asc.refuse.delete("HEALTHKIT");
 
   // another iPhone: registered, remade
   const third = await ensureProfile({ request: asc.request, bundleId: "io.github.fizl0.hst.beta", prefix: "com.example", udid: "00008150-NEW", serials: ["ABC"], cache, now });
@@ -196,8 +214,12 @@ test("request bodies: device, App ID, capabilities", async () => {
   assert.deepEqual(bid[1].data.attributes, { identifier: "com.example.app", name: bid[1].data.attributes.name, platform: "IOS" });
   assert.ok(bid[1].data.attributes.name.length <= 60);
   const capBodies = rest.filter(([p]) => p === "/bundleIdCapabilities").map(([, b]) => b);
-  assert.deepEqual(capBodies, APP_ID_CAPS.map((cap) => ({ data: { type: "bundleIdCapabilities", attributes: { capabilityType: cap },
-    relationships: { bundleId: { data: { type: "bundleIds", id: asc.bundleIds[0].id } } } } })));
+  assert.deepEqual(capBodies, APP_ID_CAPS.map((cap) => capBody(cap, asc.bundleIds[0].id)));
+  assert.equal(capBodies[0].data.attributes.capabilityType, "PUSH_NOTIFICATIONS"); // Push first
+  assert.deepEqual(capBodies.find((b) => b.data.attributes.capabilityType === "PERSONAL_VPN").data,
+    { type: "bundleIdCapabilities", attributes: { capabilityType: "PERSONAL_VPN" }, relationships: { bundleId: { data: { type: "bundleIds", id: asc.bundleIds[0].id } } } });
+  assert.deepEqual(capBodies.find((b) => b.data.attributes.capabilityType === "ICLOUD").data.attributes.settings,
+    [{ key: "ICLOUD_VERSION", options: [{ key: "XCODE_6" }] }]);
   assert.equal(rest.at(-1)[0], "/profiles");
 });
 
@@ -257,6 +279,153 @@ test("ensureProfile: a cached App ID deleted on Apple's side is made again", asy
   const r = await ensureProfile({ request: asc.request, bundleId: "a.beta", prefix: "com.example", udid: "U1", serials: ["ABC"], cache });
   assert.equal(r.made, true);
   assert.notEqual(cache["com.example.beta"].bundleIdId, "GONE");
+});
+
+// ---- F279: every capability a signing service's profile has ----
+// Apple's capabilityType enum as its 409 listed it (real call 2026-11-19).
+const APPLE_ENUM = ["ICLOUD", "IN_APP_PURCHASE", "GAME_CENTER", "PUSH_NOTIFICATIONS", "WALLET", "INTER_APP_AUDIO", "MAPS",
+  "ASSOCIATED_DOMAINS", "PERSONAL_VPN", "APP_GROUPS", "HEALTHKIT", "HOMEKIT", "WIRELESS_ACCESSORY_CONFIGURATION", "APPLE_PAY",
+  "DATA_PROTECTION", "SIRIKIT", "NETWORK_EXTENSIONS", "MULTIPATH", "HOT_SPOT", "NFC_TAG_READING", "CLASSKIT",
+  "AUTOFILL_CREDENTIAL_PROVIDER", "ACCESS_WIFI_INFORMATION", "NETWORK_CUSTOM_PROTOCOL", "COREMEDIA_HLS_LOW_LATENCY",
+  "SYSTEM_EXTENSION_INSTALL", "USER_MANAGEMENT", "APPLE_ID_AUTH"];
+const TEAM = "S8NFX3A2LT";
+const oldCaps = ["APP_GROUPS", "ASSOCIATED_DOMAINS", "PUSH_NOTIFICATIONS"];
+
+test("capability list: Push first, every one Apple's API knows that puts something in an iOS profile, with settings", () => {
+  assert.equal(APP_ID_CAPS[0], "PUSH_NOTIFICATIONS");
+  assert.equal(new Set(APP_ID_CAPS).size, APP_ID_CAPS.length);
+  for (const c of APP_ID_CAPS) assert.ok(APPLE_ENUM.includes(c), c);
+  // nothing for an iOS profile in these
+  for (const c of ["MAPS", "NETWORK_CUSTOM_PROTOCOL", "SYSTEM_EXTENSION_INSTALL", "USER_MANAGEMENT"]) assert.ok(!APP_ID_CAPS.includes(c), c);
+  // the rest of the enum is all there
+  assert.equal(APP_ID_CAPS.length, APPLE_ENUM.length - 4);
+  assert.deepEqual(Object.keys(APP_ID_CAP_SETTINGS).sort(), ["APPLE_ID_AUTH", "DATA_PROTECTION", "ICLOUD"]);
+  assert.deepEqual(capBody("APPLE_ID_AUTH", "B").data.attributes.settings, [{ key: "APPLE_ID_AUTH_APP_CONSENT", options: [{ key: "PRIMARY_APP_CONSENT" }] }]);
+  assert.deepEqual(capBody("DATA_PROTECTION", "B").data.attributes.settings, [{ key: "DATA_PROTECTION_PERMISSION_LEVEL", options: [{ key: "COMPLETE_PROTECTION" }] }]);
+  assert.equal(capBody("HOMEKIT", "B").data.attributes.settings, undefined);
+  // native/Sources/ASC.swift keeps the same list, in the same order
+  const swift = readFileSync(new URL("../../../native/Sources/ASC.swift", import.meta.url), "utf8");
+  const m = /static let appIDCaps = \[([^\]]+)\]/.exec(swift);
+  assert.ok(m, "ASC.swift appIDCaps");
+  assert.deepEqual([...m[1].matchAll(/"([A-Z_]+)"/g)].map((x) => x[1]), APP_ID_CAPS);
+  for (const [cap, s] of Object.entries(APP_ID_CAP_SETTINGS)) {
+    assert.ok(swift.includes(`"${cap}": [["key": "${s[0].key}", "options": [["key": "${s[0].options[0].key}"]]]]`), `ASC.swift settings ${cap}`);
+  }
+});
+
+test("refused capabilities: skipped, logged once, remembered per team, asked again a month on", async () => {
+  const asc = fakeAsc({ devices: [{ id: "D1", attributes: { udid: "U1", status: "ENABLED" } }] });
+  asc.refuse = new Set(["HEALTHKIT", "CLASSKIT"]);
+  asc.quiet = new Set(["HOT_SPOT"]); // 201, but not turned on
+  const cache = {}, said = [];
+  const now = Date.UTC(2026, 10, 19);
+  const log = (s) => said.push(s);
+  const r = await ensureProfile({ request: asc.request, bundleId: "a.one", prefix: "com.example", udid: "U1", serials: ["ABC"], cache, now, log });
+  assert.equal(r.made, true);
+  assert.deepEqual(r.entry.capabilities, APP_ID_CAPS.filter((c) => !["HEALTHKIT", "CLASSKIT", "HOT_SPOT"].includes(c)).sort());
+  assert.equal(r.entry.team, TEAM);
+  assert.deepEqual(Object.keys(cache[REFUSED_KEY][TEAM]).sort(), ["CLASSKIT", "HEALTHKIT", "HOT_SPOT"]);
+  assert.equal(said.length, 3);
+  assert.ok(said.every((s) => /skipped from now on/.test(s)));
+  assert.deepEqual(asc.settings.ICLOUD, APP_ID_CAP_SETTINGS.ICLOUD);
+  assert.deepEqual(profileRows(cache, now).map((x) => x.label), ["com.example.one"]); // the memory isn't a profile row
+
+  // the same sign again: no capability asked for, nothing logged, the profile reused
+  asc.calls.length = 0;
+  const again = await ensureProfile({ request: asc.request, bundleId: "a.one", prefix: "com.example", udid: "U1", serials: ["ABC"], cache, now, log });
+  assert.equal(again.made, false);
+  assert.deepEqual(asc.calls, [`GET /bundleIds/${r.entry.bundleIdId}/bundleIdCapabilities`]);
+  assert.equal(said.length, 3);
+
+  // another app on the same team: the refused ones aren't asked for
+  asc.calls.length = 0;
+  await ensureProfile({ request: asc.request, bundleId: "a.two", prefix: "com.example", udid: "U1", serials: ["ABC"], cache, now, log });
+  assert.equal(asc.calls.filter((c) => c === "POST /bundleIdCapabilities").length, APP_ID_CAPS.length - 3);
+  assert.equal(said.length, 3);
+
+  // another team keeps its own memory
+  assert.deepEqual([...refusedCaps(cache, TEAM, now)].sort(), ["CLASSKIT", "HEALTHKIT", "HOT_SPOT"]);
+  assert.equal(refusedCaps(cache, "OTHERTEAM1", now).size, 0);
+
+  // a month on (the account holder may have had them granted): asked again, and HEALTHKIT now goes through
+  asc.refuse.delete("HEALTHKIT");
+  const later = now + REFUSED_RETRY + 1;
+  const back = await ensureProfile({ request: asc.request, bundleId: "a.one", prefix: "com.example", udid: "U1", serials: ["ABC"], cache, now: later, log });
+  assert.deepEqual(back.capsAdded, ["HEALTHKIT"]);
+  assert.deepEqual(back.capsRefused.sort(), ["CLASSKIT", "HOT_SPOT"]);
+  assert.equal(back.reason, "capabilities"); // the profile is remade with it
+  assert.ok(back.entry.capabilities.includes("HEALTHKIT"));
+});
+
+test("Push must succeed on a new App ID; a passing error isn't remembered", async () => {
+  const asc = fakeAsc({ devices: [{ id: "D1", attributes: { udid: "U1", status: "ENABLED" } }] });
+  asc.refuse = new Set(["PUSH_NOTIFICATIONS"]);
+  const cache = {};
+  await assert.rejects(ensureProfile({ request: asc.request, bundleId: "a.one", prefix: "com.example", udid: "U1", serials: ["ABC"], cache }),
+    (e) => e.status === 409);
+  assert.equal(cache[REFUSED_KEY], undefined);
+
+  const asc2 = fakeAsc({ devices: [{ id: "D1", attributes: { udid: "U1", status: "ENABLED" } }] });
+  asc2.down = new Set(["WALLET"]);
+  const said = [];
+  const c2 = {};
+  const r = await ensureProfile({ request: asc2.request, bundleId: "a.one", prefix: "com.example", udid: "U1", serials: ["ABC"], cache: c2, log: (s) => said.push(s) });
+  assert.equal(r.made, true);
+  assert.equal(c2[REFUSED_KEY], undefined);
+  assert.ok(said.some((s) => /WALLET: not added this time/.test(s)));
+  // next sign: asked again, and it works now
+  asc2.down.clear();
+  const again = await ensureProfile({ request: asc2.request, bundleId: "a.one", prefix: "com.example", udid: "U1", serials: ["ABC"], cache: c2 });
+  assert.deepEqual(again.capsAdded, ["WALLET"]);
+  assert.equal(again.reason, "capabilities");
+
+  // a 401 is the key: it stops the sign
+  const asc3 = fakeAsc();
+  const request = (m, p, b) => (m === "POST" && p === "/bundleIdCapabilities" && b.data.attributes.capabilityType === "GAME_CENTER"
+    ? Promise.reject(new AscError("key", { status: 401 })) : asc3.request(m, p, b));
+  await assert.rejects(addCaps({ request, bundleIdId: (await asc3.request("POST", "/bundleIds", { data: { attributes: { identifier: "x.y" } } })).data.id,
+    caps: APP_ID_CAPS, cache: {}, team: TEAM }), (e) => e.status === 401);
+});
+
+test("App IDs made before the longer list get the missing capabilities on their next sign, then a new profile", async () => {
+  const now = Date.UTC(2026, 10, 19);
+  const asc = fakeAsc({ devices: [{ id: "D1", attributes: { udid: "U1", status: "ENABLED" } }],
+    bundleIds: [{ id: "B1", attributes: { identifier: "com.example.beta", seedId: TEAM } }] });
+  asc.caps.B1 = [...oldCaps];
+  asc.refuse = new Set(["NFC_TAG_READING"]);
+  // the cache entry from before: no team, the three old capabilities
+  const old = await ensureProfile({ request: asc.request, bundleId: "a.beta", prefix: "com.example", udid: "U1", serials: ["ABC"], cache: {}, now });
+  assert.ok(old); // (made a profile; the App ID now has the full list, put it back to the old three)
+  asc.caps.B1 = [...oldCaps];
+  const cache = { "com.example.beta": { ...old.entry, capabilities: [...oldCaps] } };
+  delete cache["com.example.beta"].team;
+
+  asc.calls.length = 0;
+  const said = [];
+  const r = await ensureProfile({ request: asc.request, bundleId: "a.beta", prefix: "com.example", udid: "U1", serials: ["ABC"], cache, now, log: (s) => said.push(s) });
+  assert.equal(r.reason, "capabilities");
+  assert.equal(r.made, true);
+  assert.deepEqual(r.capsAdded.sort(), APP_ID_CAPS.filter((c) => !oldCaps.includes(c) && c !== "NFC_TAG_READING").sort());
+  assert.deepEqual(r.capsRefused, ["NFC_TAG_READING"]);
+  assert.ok(asc.calls.includes("GET /bundleIds/B1")); // the team, read once
+  assert.equal(cache["com.example.beta"].team, TEAM);
+  assert.deepEqual(cache["com.example.beta"].capabilities, APP_ID_CAPS.filter((c) => c !== "NFC_TAG_READING").sort());
+  assert.equal(asc.profiles.length, 1);
+  assert.equal(said.length, 1);
+
+  // the next sign: one call
+  asc.calls.length = 0;
+  const again = await ensureProfile({ request: asc.request, bundleId: "a.beta", prefix: "com.example", udid: "U1", serials: ["ABC"], cache, now });
+  assert.equal(again.made, false);
+  assert.deepEqual(asc.calls, ["GET /bundleIds/B1/bundleIdCapabilities"]);
+
+  // an App ID found in the account (not in the cache) with only Push: topped up too
+  const asc2 = fakeAsc({ devices: [{ id: "D1", attributes: { udid: "U1", status: "ENABLED" } }],
+    bundleIds: [{ id: "B7", attributes: { identifier: "com.example.gamma", seedId: TEAM } }] });
+  asc2.caps.B7 = ["PUSH_NOTIFICATIONS"];
+  const g = await ensureProfile({ request: asc2.request, bundleId: "a.gamma", prefix: "com.example", udid: "U1", serials: ["ABC"], cache: {}, now });
+  assert.deepEqual(g.entry.capabilities, [...APP_ID_CAPS].sort());
+  assert.ok(!asc2.calls.includes("GET /bundleIds/B7")); // the team came with the App ID
 });
 
 test("findCertificate matches serials without leading zeros, any case", async () => {

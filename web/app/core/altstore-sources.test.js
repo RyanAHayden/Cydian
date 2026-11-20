@@ -29,12 +29,17 @@ const SOURCES = {
   "https://source.ryuksign.com/source.json": ["ryuksign", "RyukSign Source", 4],
   "https://repo.unbound.rip/app-repo.json": ["unbound", "Unbound App Repo", 2],
 };
+// Test sources that are no default (still parsed, added and listed like any source someone adds by hand): AppTesters
+// left the defaults and Known Safe on 2026-11-20 (user).
+const NOT_DEFAULT = ["https://repository.apptesters.org/"];
+const DEFAULT_URLS = Object.keys(SOURCES).filter((u) => !NOT_DEFAULT.includes(u));
 const parse = (name) => parseAltSource(fixture(name));
 const ids = (p) => p.apps.map((a) => a.bundleIdentifier);
 const versions = (app) => app.versions.map((v) => v.version);
 
 test("F28: the default AltStore list is the user's 13 sources, deduped, each with a fixture", () => {
-  assert.deepEqual(DEFAULT_ALT_SOURCES, Object.keys(SOURCES));
+  assert.deepEqual(DEFAULT_ALT_SOURCES, DEFAULT_URLS);
+  for (const u of NOT_DEFAULT) assert.ok(!DEFAULT_ALT_SOURCES.includes(u), u);
   assert.deepEqual(dedupeUrls(["https://A.example/x.json", "https://a.example/x.json", "https://b.example", "ftp://c/",
     "not a url", "https://b.example/"]), ["https://a.example/x.json", "https://b.example/"]);
   // None of them is an APT default, and none is listed twice.
@@ -220,11 +225,12 @@ test("F28: the site seeds the 13 sources once; refresh reads each one's apps; a 
   const fizl0 = "https://fizl0.github.io/apps/source.json";
   assert.equal(altOnly(await b.sources()).find((s) => s.uri === fizl0).name, "FIZL0 2");
 
-  await b.removeSource(altKey("https://repository.apptesters.org/"));
+  const ryuk = "https://source.ryuksign.com/source.json";
+  await b.removeSource(altKey(ryuk));
   b = createHttpBackend({ fetchFn, sourceOptions: { indexedDB: idb } });
   alt = altOnly(await b.sources());
   assert.equal(alt.length, DEFAULT_ALT_SOURCES.length - 1);
-  assert.ok(!alt.some((s) => s.uri === "https://repository.apptesters.org/"));
+  assert.ok(!alt.some((s) => s.uri === ryuk));
 });
 
 test("F28: each source adds from the Add Source alert, by the URL as given (crystall1ne's JSON-at-every-path is no APT repo)", async () => {
@@ -243,9 +249,9 @@ test("F28: each source adds from the Add Source alert, by the URL as given (crys
     assert.equal(added.count, apps, url);
   }
   const list = await b.sources();
-  assert.equal(altOnly(list).length, DEFAULT_ALT_SOURCES.length);
+  assert.equal(altOnly(list).length, Object.keys(SOURCES).length);
   assert.ok(!list.some((s) => s.key.startsWith("deb:https://alt.crystall1ne.dev")), "crystall1ne saved as an APT repo");
   // Adding one again updates it in place.
   await b.addSource("https://alt.crystall1ne.dev");
-  assert.equal(altOnly(await b.sources()).length, DEFAULT_ALT_SOURCES.length);
+  assert.equal(altOnly(await b.sources()).length, Object.keys(SOURCES).length);
 });

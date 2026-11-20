@@ -169,6 +169,15 @@ test("knownSafe never covers a shared host or a sibling repo", () => {
   assert.equal(knownSafe("https://cool-ipas.xyz/"), null);
 });
 
+test("AppTesters is no longer Known Safe, Recommended or a default; added by hand it's just Unknown", async () => {
+  const { loadAppSources } = await import("./sources.js");
+  for (const u of ["https://repository.apptesters.org/", "https://repository.apptesters.org", "alt:https://repository.apptesters.org/"]) {
+    assert.equal(knownSafe(u), null, u);
+  }
+  assert.ok(!RECOMMENDED_SOURCES.some((r) => /apptesters/i.test(r.url)));
+  assert.ok(!(await loadAppSources()).some((u) => /apptesters/i.test(u)));
+});
+
 test("trustOf: Known Safe, Trusted by the user, else Unknown; kept by place", () => {
   const s = mem();
   assert.equal(trustOf({ builtin: true, uri: "https://x.example/" }), "safe");

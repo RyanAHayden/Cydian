@@ -1,0 +1,9 @@
+[
+  { "go": "#/settings", "ms": 2500 },
+  { "eval": "(async()=>{const b=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const f=b.querySelector('.group-footer'); if(!f) return 'no footer'; const h0=f.offsetHeight; f.textContent += ' and now a lot more words so that this footer wraps onto further lines than it had before.'; await new Promise(r=>setTimeout(r,60)); const desc=e=>e.tagName+'.'+e.className.split(' ')[0]; return {h0, h1:f.offsetHeight, anim:[...b.querySelectorAll('*')].filter(l=>l.getAnimations().length).map(e=>desc(e)+':'+e.getAnimations()[0].effect.getKeyframes()[0].transform).slice(0,12)};})()" },
+  { "wait": 500 },
+  { "eval": "(async()=>{const b=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const ul=b.querySelector('ul.table'); const li=ul.firstElementChild.cloneNode(true); li.querySelector('.cell-label').textContent='Checking…'; ul.insertBefore(li, ul.children[1]||null); await new Promise(r=>setTimeout(r,60)); const desc=e=>e.tagName+'.'+e.className.split(' ')[0]+'('+e.textContent.slice(0,14)+')'; return [...b.querySelectorAll('*')].filter(l=>l.getAnimations().length).map(e=>desc(e)+':'+JSON.stringify(e.getAnimations()[0].effect.getKeyframes()[0])).slice(0,12);})()" },
+  { "shot": "b-row-inserted" },
+  { "wait": 500 },
+  { "eval": "(async()=>{const b=document.querySelector('.tab-stack.is-active .page.is-top .page-body'); const t0=performance.now(); for(let i=0;i<20;i++){b.querySelector('.group-footer').textContent+=' x'; await new Promise(r=>setTimeout(r,0));} return {ms:(performance.now()-t0).toFixed(1), boxes: b.querySelectorAll('*').length};})()" }
+]

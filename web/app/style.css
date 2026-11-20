@@ -56,6 +56,9 @@ a, img { -webkit-user-drag: none; }
   padding: var(--nav-h) env(safe-area-inset-right) calc(var(--tab-h) + 20px) env(safe-area-inset-left);
 }
 .page-shade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+/* Sizes change by sliding (nav/slide.js): no browser scroll anchoring under it (iOS WebKit has none), or Chromium
+   would shift the scroll while the boxes slide back from the shift. */
+.page-body, .sheet-body, .search-results { overflow-anchor: none; }
 /* Every tab has its own nav and screen stack, all in the same spot; the inactive ones (later in the DOM) would
    paint over the active one and take its taps even with their contents hidden. The stacks themselves never take
    taps; only their pages and nav items do, and hidden ones can't. */

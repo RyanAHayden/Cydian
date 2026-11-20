@@ -4,8 +4,10 @@
 // while scrolling and fades after; while it shows, dragging it scrubs the list with momentum on release, and a
 // haptic ticks (on touch-down in the app, on release in Safari, the earliest it allows). Moved by transform (the height changes only when the content does).
 import { haptic } from "./haptic.js";
+import { installSlides } from "./slide.js";
 
 export function initScroller(screens) {
+  installSlides(); // every page's content slides when it changes size (nav/slide.js), started with the scrollers
   const sb = document.createElement("div");
   sb.className = "scroll-indicator";
   sb.setAttribute("aria-hidden", "true");

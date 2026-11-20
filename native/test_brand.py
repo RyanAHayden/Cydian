@@ -235,13 +235,14 @@ class NoOldIds(unittest.TestCase):
         self.assertEqual(bad, [], "files that still say the old name (F171: rename it to the brand.env value)")
 
     def test_ids_follow_brand_env(self):
-        """Every com.ryha ID is the brand's bundle ID or one of its suffixes (or the tests' com.ryha.test)."""
+        """Every com.ryha ID is the brand's bundle ID or one of its suffixes (or the tests' com.ryha.test, the wildcard, the rig's WDA)."""
         import subprocess
         out = subprocess.run(["git", "grep", "-ohI", r"com\.ryha\.[A-Za-z0-9_-]*", "--", ".", ":!plan", ":!journal",
                               ":!docs/concepts"], cwd=ROOT, capture_output=True, text=True).stdout.split()
         bundle = brand.BRAND["BRAND_BUNDLE_ID"]
         self.assertEqual(brand.BRAND["BRAND_PACKAGE"], bundle)
-        bad = sorted({i for i in out if i != "com.ryha.test" and not re.match(re.escape(bundle) + r"(?:$|[._])", i)})
+        # com.ryha.* (the team's wildcard profile) and com.ryha.wda: the iPhone 15 rig's WebDriverAgent (docs/iphone15.md)
+        bad = sorted({i for i in out if i not in ("com.ryha.test", "com.ryha.", "com.ryha.wda") and not re.match(re.escape(bundle) + r"(?:$|[._])", i)})
         self.assertEqual(bad, [], f"IDs that aren't {bundle}[.suffix]")
 
     def test_binary_fixtures(self):

@@ -80,17 +80,48 @@ async function removeKey(native, redraw) {
   redraw();
 }
 
+// Where the UDID comes from when it's really needed: the Pairing row shows only once This iPhone is picked.
+export const PAIR_HINT = "This iPhone's UDID isn't known: in Settings > Installation & Signing, pick Install Apps With: This iPhone, "
+  + "then pair it under This iPhone > Pairing, and check again.";
+const SITE_HINT = "This iPhone's UDID isn't known: use Find This iPhone's UDID under the profile.";
+
+// Check Account's line about this iPhone. With its UDID: register it if missing. Without one but with candidates (the
+// devices in the running app's own profile, one of them this iPhone, all of them the team's): every one registered
+// and enabled means this iPhone is too; otherwise name the ones that aren't. Neither: say how to get the UDID.
+export async function deviceLine(request, { udid = null, candidates = [], app = true } = {}) {
+  if (udid) {
+    const { made } = await ensureDevice(request, udid, "iPhone");
+    return made ? `This iPhone (${normalUdid(udid)}) was added to the account.` : "This iPhone is in the account.";
+  }
+  const want = [...new Set([].concat(candidates ?? []).map(normalUdid).filter(Boolean))];
+  if (!want.length) return app ? PAIR_HINT : SITE_HINT;
+  const devices = (await request("GET", "/devices?limit=200")).data ?? [];
+  const status = new Map(devices.map((d) => [normalUdid(d.attributes?.udid), d.attributes?.status ?? "ENABLED"]));
+  const missing = want.filter((u) => !status.has(u));
+  const disabled = want.filter((u) => status.has(u) && status.get(u) !== "ENABLED");
+  const iphones = want.length === 1 ? "the iPhone" : `one of the ${want.length} iPhones`;
+  if (!missing.length && !disabled.length) return `This iPhone is in the account (${iphones} in this app's profile).`;
+  const parts = [];
+  if (missing.length) parts.push(`not in the account: ${missing.join(", ")}`);
+  if (disabled.length) parts.push(`disabled: ${disabled.join(", ")}`);
+  return `This iPhone is ${iphones} in this app's profile. Of those, ${parts.join("; ")}. If one of them is this iPhone, `
+    + `the profiles ${NAME} makes leave it out: pair it (Settings > Installation & Signing > Install Apps With: This iPhone, `
+    + "then This iPhone > Pairing) and check again to add it.";
+}
+
 // Check Account: is the certificate in the account, is this iPhone registered (and register it).
 async function checkAccount(native) {
   const n = nativeOf(native);
   const lines = [];
   try {
     const request = n?.call ? nativeRequest(n) : siteRequest();
-    let serials = [], udid = null;
+    let serials = [], udid = null, candidates = [];
     if (n?.call) {
       const st = await n.call("signing.status", {}).catch(() => null);
       serials = st?.identity?.serial ? [st.identity.serial] : [];
-      udid = (await n.call("device.udid", {}).catch(() => null))?.udid ?? null;
+      const dev = await n.call("device.udid", {}).catch(() => null);
+      udid = dev?.udid ?? null;
+      candidates = Array.isArray(dev?.candidates) ? dev.candidates : [];
       if (!udid) udid = (await n.call("asc.udid", {}).catch(() => null))?.udid ?? null;
     } else {
       const id = await (await import("../signing-client.js")).loadIdentity();
@@ -102,11 +133,7 @@ async function checkAccount(native) {
       lines.push(c ? `Certificate: in the account (${c.attributes?.displayName || c.attributes?.name || c.id}).`
         : "Certificate: not in this account. Import the .p12 of one of this account's certificates (Apple Distribution).");
     } else lines.push("Certificate: none imported yet.");
-    if (udid) {
-      const { made } = await ensureDevice(request, udid, "iPhone");
-      lines.push(made ? `This iPhone (${normalUdid(udid)}) was added to the account.` : "This iPhone is in the account.");
-    } else lines.push(n?.call ? "This iPhone's UDID isn't known: pair This iPhone in Settings > Installation and check again."
-      : "This iPhone's UDID isn't known: use Find This iPhone's UDID under the profile.");
+    lines.push(await deviceLine(request, { udid, candidates, app: !!n?.call }));
   } catch (e) {
     lines.push(String(e?.message ?? e).replace(/^\w+: /, ""));
   }

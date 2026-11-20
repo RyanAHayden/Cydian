@@ -386,9 +386,8 @@ enum Sideload {
             let status = (json?["manifest"] as? String).flatMap { m in
                 m.hasSuffix("/manifest.plist") ? URL(string: String(m.dropLast("manifest.plist".count)) + "status") : nil
             }
-            // B124: iFizBox closes itself with a notification once iOS has the IPA; without permission that notification
-            // never shows (a first self-update can come before anything else asked), so ask now, before iOS's prompt.
-            CloseForUpdate.askToNotify(log: log) {
+            // B178: iFizBox closes itself once iOS has the IPA, with no notification (the progress page says so)
+            DispatchQueue.main.async {
                 UIApplication.shared.open(link)
                 CloseForUpdate.afterPrompt(status: status, app: app)
                 opened(.success((app, record)))
@@ -1238,7 +1237,7 @@ enum Workspace {
 // notification came before iOS had downloaded the IPA, the user opened the old iFizBox, and iOS wouldn't install over
 // it). Now, once iOS's "would like to install" prompt is answered (iFizBox active again), iFizBox stays alive
 // (KeepAlive's silent audio) and polls the Signing Server's GET /sign/host/<t>/status (worker/src/index.js): when iOS
-// has streamed app.ipa to its end it leaves a notification and exits so the install finishes. If iOS hasn't begun
+// has streamed app.ipa to its end it exits so the install finishes (B178: with no notification; the progress page says so). If iOS hasn't begun
 // the download within `startLimit` (the prompt was cancelled, the link failed) or not finished it within
 // `finishLimit` (the link's TTL), it doesn't exit: the progress page (signing.selfUpdate) offers Try Again.
 // A server without the status route (404 three times) gets the old 8 s close.
@@ -1260,30 +1259,6 @@ enum CloseForUpdate {
 
     // B124: the update being handed off (its IDs and version), for the icon badge when iFizBox closes
     private static var handing: (ids: Set<String>, version: String)?
-
-    // B124: the closing notification ("Finishing the iFizBox Update") needs notification permission, and a first
-    // self-update can come before anything asked for it (BackgroundCheck asks only once the page follows an app,
-    // app.badge only at a first count). Asks while undecided, then `go` on the main queue; already refused: `go`
-    // straight away, with a line in the console saying iFizBox will close without telling.
-    static func askToNotify(log: ((String) -> Void)?, _ go: @escaping () -> Void) {
-        let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { s in
-            switch s.authorizationStatus {
-            case .notDetermined:
-                center.requestAuthorization(options: [.alert, .badge, .sound]) { ok, _ in
-                    if !ok { log?(closesQuietly) }
-                    DispatchQueue.main.async(execute: go)
-                }
-            case .denied:
-                log?(closesQuietly)
-                DispatchQueue.main.async(execute: go)
-            default:
-                DispatchQueue.main.async(execute: go)
-            }
-        }
-    }
-    static let closesQuietly = "Notifications are off for \(Brand.name): it closes once iOS has the update but can't tell you; "
-        + "open it again from the Home Screen when its icon has finished installing"
 
     // `status`: the link's GET status URL (nil: the old 8 s close). Main queue.
     static func afterPrompt(status: URL?, app: SignedApp? = nil) {
@@ -1352,22 +1327,16 @@ enum CloseForUpdate {
         }.resume()
     }
 
-    // iOS has the whole IPA: a notification to open the new one, and out, so iOS installs over this one.
+    // iOS has the whole IPA: out, so iOS installs over this one. B178: no notification (user 2026-11-20); the
+    // progress page already says iFizBox closes.
     private static func finish() {
         set(.finished)
-        let c = UNMutableNotificationContent()
-        c.title = "Finishing the \(Brand.name) Update"
-        c.body = "iOS has the new version and is installing it. Tap to open it."
-        closeWith(c, after: 3)
+        closeWith()
     }
 
     private static func guess() {
         set(.guessed)
-        let c = UNMutableNotificationContent()
-        // It arrives 8 s later, by when iOS has usually finished (user 2026-11-18: "tap when it's done" read wrong).
-        c.title = "Updating \(Brand.name)"
-        c.body = "Tap to open the new version."
-        closeWith(c, after: 8)
+        closeWith()
     }
 
     // ---- B159: the This iPhone route (Sideload.installHere, installd over LocalDevVPN / Tailscale RemotePairing)
@@ -1386,16 +1355,13 @@ enum CloseForUpdate {
     // a moment to ask signing.selfUpdate and draw "Closing iFizBox".
     static let hereExit: TimeInterval = 2
 
-    // installd has the new IPA and waits for this copy to go: finished, the notification, and out. Main queue.
+    // installd has the new IPA and waits for this copy to go: finished, and out (B178: no notification). Main queue.
     // B173: closes from any state but finished (a state some other path left behind must not keep iFizBox open).
     static func hereReady() {
         guard state != .finished else { return }
         if state != .waiting { IDevice.ilog("self-close: closing from state \(state?.rawValue ?? "none")") }
         set(.finished)
-        let c = UNMutableNotificationContent()
-        c.title = "Finishing the \(Brand.name) Update"
-        c.body = "iOS has the new version and is installing it. Tap to open it."
-        closeWith(c, after: 3, exitAfter: hereExit)
+        closeWith(exitAfter: hereExit)
     }
 
     // installd answered (installed it, or refused it) while iFizBox was still here: nothing is closing. A watch
@@ -1406,18 +1372,14 @@ enum CloseForUpdate {
         sinks = sinks.filter { $0(nil) }
     }
 
-    private static func closeWith(_ c: UNMutableNotificationContent, after: TimeInterval, exitAfter: TimeInterval = 0.6) {
+    private static func closeWith(exitAfter: TimeInterval = 0.6) {
         // B124: the icon badge counted this very update and iOS keeps it through the install: drop it now (other
-        // updates stay counted), and the notification carries the same count so it can't put the old one back.
-        let n = BackgroundCheck.selfHandedOff(ids: handing?.ids ?? [], version: handing?.version ?? "")
-        c.badge = NSNumber(value: n)
-        let req = UNNotificationRequest(identifier: "ifizbox.updating", content: c,
-                                        trigger: UNTimeIntervalNotificationTrigger(timeInterval: after, repeats: false))
+        // updates stay counted). B178: no notification goes with the close.
+        BackgroundCheck.selfHandedOff(ids: handing?.ids ?? [], version: handing?.version ?? "")
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["ifizbox.updating"])
         IDevice.ilog("self-close: exiting in \(exitAfter) s")
-        UNUserNotificationCenter.current().add(req) { _ in
-            DispatchQueue.main.asyncAfter(deadline: .now() + exitAfter) { IDevice.ilog("self-close: exit"); exit(0) }
-        }
-        // B173: the exit never waits on the notification's answer or on the main queue alone
+        DispatchQueue.main.asyncAfter(deadline: .now() + exitAfter) { IDevice.ilog("self-close: exit"); exit(0) }
+        // B173: the exit never waits on the main queue alone
         exitBackstop("closeWith", after: exitAfter + 1)
     }
 

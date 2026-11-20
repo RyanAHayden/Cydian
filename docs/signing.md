@@ -303,7 +303,9 @@ shows nothing within 8 s). Once a prompt was shown and closed, only the user's t
 
 iOS won't install the new iFizBox over the running one, so iFizBox closes itself, but only once iOS has the whole
 IPA: after the Install prompt is answered it stays alive (silent audio) and polls `GET /sign/host/<token>/status`;
-when iOS has fetched `app.ipa` to its end it leaves a "Finishing the update" notification and exits. If iOS hasn't
+when iOS has fetched `app.ipa` to its end it exits, with no notification (the progress page has said it will close;
+the icon badge drops this update as it goes). The This iPhone route closes the same way, without a notification, once
+installd has accepted the IPA. If iOS hasn't
 started the download within 2 minutes (or not finished it within the link's 10), iFizBox stays open and the progress
 page offers Try Again (`signing.selfUpdate`). The version handed to iOS is remembered, and if the next launch is
 still the older version, a banner says the update didn't finish, with Try Again.

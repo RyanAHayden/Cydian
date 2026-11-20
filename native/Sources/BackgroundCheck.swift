@@ -92,7 +92,7 @@ enum BackgroundCheck {
     // the icon badge drops that update now, rather than at the new version's first launch (app.js lastVersion), which
     // never comes when the install doesn't land. Other updates stay counted. The watch list moves iFizBox to that
     // version so a background run meanwhile doesn't badge it again (the new version's page sends its own list).
-    // Returns the new count, for the closing notification's content.badge. Sideload build only; any queue but this
+    // Returns the new count (B178: no closing notification uses it now). Sideload build only; any queue but this
     // one's own.
     @discardableResult
     static func selfHandedOff(ids: Set<String>, version: String) -> Int {

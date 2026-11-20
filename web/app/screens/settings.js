@@ -1174,9 +1174,9 @@ export function returnWatcher({ doc, win, redraw, status, interval }) {
   return check;
 }
 
-// F134: Settings > Signing as an iOS 6 settings page (signingPage below): the certificate, the files while some are
-// missing, the profile, Show Expiry Dates and Re-sign Reminder, the Signing Server, Certificate Status and Signed
-// Apps, Remove Certificate, and How Signing Works at the bottom. That link opens the walkthrough (screens/signing.js,
+// F134: Settings > Signing as an iOS 6 settings page (signingPage below): the certificate (with Replace and Remove
+// Certificate), the files while some are missing, the profile, Show Expiry Dates and Re-sign Reminder, the Signing
+// Server, Certificate Status and Signed Apps, and How Signing Works at the bottom. That link opens the walkthrough (screens/signing.js,
 // drawSigningHelp), which keeps its steps, picture and Select All Files.
 async function deviceSigningState(el) {
   const id = await loadIdentity();
@@ -1221,13 +1221,12 @@ async function drawDeviceSigning(el) {
   const split = splitSummary(info.rows);
   const parts = {
     certificate: () => certificateGroup(el, { rows: split.certificate, has: Boolean(kept), staged, notes,
-      footer: `Kept in this iPhone's Keychain, where only ${NAME} can use it.` }),
+      footer: `Kept in this iPhone's Keychain, where only ${NAME} can use it.`, remove: () => removeDeviceCertificate() }),
     files: () => certificateBlock(el, id, status ?? { identity: null }, { files: true }),
     profile: () => profileGroup(split.profile, info.device), // F236: with "This iPhone is in the profile"
     options: () => withKeepNotes(settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"), kept?.profile),
     server: () => serverGroup(el),
     status: () => signingExtras({ identity: kept, redraw: redrawAll, dates: settings.get("showExpiry") }),
-    remove: () => grouped([{ rows: [{ label: "Remove Certificate", onClick: () => removeDeviceCertificate() }] }]),
     help: () => helpGroup(),
     install: () => installationBlock({ store: settings }), // F271: Install Apps With and This iPhone's groups
   };
@@ -1289,7 +1288,7 @@ export function signingLayout({ mode, certificate = false, staged = false, profi
     app: site && ready,
     other: site,
     free: site && !certificate, // F254j: Use a Free Apple ID, while the website has no certificate
-    remove: certificate || staged,
+    // B118: no Remove Certificate group: its button is in the Certificate group (certificateActions)
     help: true,
   };
   return SIGNING_GROUPS.filter((g) => on[g]);
@@ -1315,14 +1314,32 @@ export function splitSummary(rows = []) {
 // The Certificate group: its rows (or None / Incomplete), then Import Certificate or Replace Certificate, a row that
 // opens the file picker (the hidden multi-file input Browse uses, clicked in the tap's own handler so iOS allows it;
 // a button row, so it shows the pressed look). Its footer is what's wrong, else `footer`.
-function certificateGroup(el, { rows, has, staged, notes = [], footer }) {
+// B118: once there is something to remove (a certificate in use, or files picked), Remove Certificate sits beside
+// Import or Replace Certificate under the rows, two buttons in one row, the remove one red (ios6.css .pair-button,
+// .delete-button): no group of its own at the bottom any more.
+// `removable`: the website's stored identity counts even when its profile can't be read.
+export function certificateActions({ has = false, staged = false, removable = has || staged } = {}) {
+  const pick = has ? "Replace Certificate" : "Import Certificate";
+  return removable ? [pick, "Remove Certificate"] : [pick];
+}
+function certificateGroup(el, { rows, has, staged, notes = [], footer, remove, removable }) {
   const list = has && rows.length ? rows : [{ label: "Certificate", detail: staged ? "Incomplete" : "None" }];
   const accept = ".p12,.pfx,.mobileprovision,.txt,.zip,application/x-pkcs12,application/zip,text/plain";
   const [input] = browseButton(accept, true, (files) => chooseFiles(el, files, null));
-  const action = { label: has ? "Replace Certificate" : "Import Certificate", cls: "sign-import", onClick: () => input.click() };
-  const frag = grouped([{ header: "Certificate", rows: [...list, action],
+  const [pick, removeLabel] = certificateActions({ has, staged, removable });
+  const action = { label: pick, cls: "sign-import", onClick: () => input.click() };
+  const frag = grouped([{ header: "Certificate", rows: removeLabel ? list : [...list, action],
     footer: notes.length ? notes.join(" ") : has ? footer : "Choose your .p12, its .mobileprovision and the password file, or their .zip." }]);
-  frag.querySelector(".sign-import")?.append(input);
+  if (removeLabel) {
+    const button = (label, cls, onClick) => Object.assign(document.createElement("button"),
+      { type: "button", className: `cell-inner pair-button ${cls}`, textContent: label, onclick: onClick });
+    const pair = document.createElement("div");
+    pair.className = "button-pair";
+    pair.append(button(pick, "sign-import", () => input.click()), button(removeLabel, "delete-button", () => remove()));
+    const table = frag.querySelector(".table");
+    table.after(pair);
+    pair.append(input); // beside the buttons, not in one: a click inside a button would bubble back to its handler
+  } else frag.querySelector(".sign-import")?.append(input);
   if (notes.length) frag.querySelector(".group-footer")?.classList.add("sign-warning");
   return frag;
 }
@@ -1507,14 +1524,14 @@ async function drawSiteSigning(el) {
   watchUdid(() => redrawAll());
   const parts = {
     certificate: () => certificateGroup(el, { rows: split.certificate, has: ready && Boolean(profile), staged, notes: info.problems,
-      footer: "Kept in this browser only. Apps are signed here, not on a server." }),
+      footer: "Kept in this browser only. Apps are signed here, not on a server.", remove: () => removeSiteCertificate(),
+      removable: ready || staged }),
     files: () => certificateBlock(el, id, null, { files: true }),
     // F236: the website can't read the UDID itself: F253's profile fetches it (Find This iPhone's UDID), else a
     // profile that lists devices says how to check it
     profile: () => profileGroup(split.profile, check ? deviceCheckText(check) : null, siteUdidFind(check)),
     options: () => withKeepNotes(settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"), profile),
     app: () => { const f = document.createDocumentFragment(); f.append(...siteAppSection(id)); return f; },
-    remove: () => grouped([{ rows: [{ label: "Remove Certificate", onClick: () => removeSiteCertificate() }] }]),
     // F254j: the same Free Apple ID group as How Signing Works' (it stays hidden unless the Worker's relay is on)
     free: () => freeRouteBlock(),
     help: () => helpGroup(),

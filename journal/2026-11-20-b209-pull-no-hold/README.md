@@ -19,6 +19,10 @@ spinner + "Refreshing...", and a pull during the refresh reveals it (never block
   - `paint()` sets the area's look from the tracker (`spinning` -> `.refreshing` + "Refreshing...", else the arrow /
     "Release to refresh..."); called on every state change and on touchstart (a pull during another refresh, e.g.
     the launch refresh or the nav button, shows the spinner too).
+  - An armed release freezes the area's look ("Release to refresh...", arrow turned) while it springs away; it
+    switches to the spinner once out of sight (`show(false)`), or at once if a touch catches it on the way up. Added
+    after the spec review: the first version painted the spinner at the lift, so it was seen sliding away (shot 2 of
+    `iphone7.png`), against "only if you scroll up out of view again".
   - "closing" (refresh ended) goes to "idle" (arrow) as soon as the area is out of sight: at once if it already is,
     else in `show(false)`. `show()` now caches its state so the per-frame scroll event writes no class.
   - Jitter: with the hold gone, nothing on the native path moves the list by script (B188's per-scroll-event
@@ -56,6 +60,13 @@ spinner + "Refreshing...", and a pull during the refresh reveals it (never block
      row spinners carried on).
   6. after the refresh ended: a short pull shows the arrow again, Last Updated now 5:31.
   Files restored (md5 back to the originals), temp files removed, app closed from the switcher, lock released.
+- iPhone 7 again after the freeze fix (same swap, restored the same way): a 1 s pull, then 4 shots right after the
+  lift and one a second later. `iphone7-release.png`: armed, then two frames of the list springing back with the
+  area still "Release to refresh..." (no spinner), then the list at its top with the refresh running. The list's
+  top climbs steadily back to its rest position, with no hold and no overshoot. An earlier run that time also had a
+  second pull during the refresh show the spinner + "Refreshing...".
+- Spec review (fresh subagent on the diff + brief): fixed the spinner showing during the first spring-back (above).
+  Left as designed: the arrow comes back only once the area is out of sight (no look flip on screen).
 
 ## Not verified
 
@@ -67,3 +78,6 @@ spinner + "Refreshing...", and a pull during the refresh reveals it (never block
   refresh carried on, nothing restarted); the unit tests check it directly.
 - The script path (Chromium/Android, no rubber band) only in the stand-in DOM test, not in a real browser.
 - Changes' and Home's pulls on the phone: same code path as Sources; not driven.
+- Corner case left as is: a pull that starts during *another* refresh (nav button, launch) keeps showing the
+  spinner if that refresh ends while the finger is still down; the next touch repaints it. No refresh-ended event
+  is wired into paint() for that; not seen on the phone.

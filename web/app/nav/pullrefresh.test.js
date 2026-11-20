@@ -413,7 +413,10 @@ test("native rubber band: an armed release lets the list spring back, the hidden
   assert.deepEqual(p.look(), { spinner: false, armed: true, title: TEXT.armed, shown: true });
   assert.match(p.area.style.transform, /translateY\(-390px\)/); // the area's foot on the content's top edge
   p.fire("touchend");
-  for (const top of [-60, -30, -5, 0]) p.scroll(top); // iOS's own bounce: nothing of the list is moved by script
+  p.scroll(-60);
+  // springing back, still on screen: no spinner yet (it is seen only by pulling again)
+  assert.deepEqual(p.look(), { spinner: false, armed: true, title: TEXT.armed, shown: true });
+  for (const top of [-30, -5, 0]) p.scroll(top); // iOS's own bounce: nothing of the list is moved by script
   t.mock.timers.tick(0);
   await p.flush();
   assert.equal(p.refreshes, 1);
@@ -443,6 +446,7 @@ test("script pull (no rubber band): rows follow the finger, spring back to none 
   for (let i = 1; i < seen.length; i++) assert.ok(seen[i] > seen[i - 1], "follows every move, never stalls or snaps");
   assert.equal(p.look().armed, true);
   p.fire("touchend");
+  assert.deepEqual(p.look(), { spinner: false, armed: true, title: TEXT.armed, shown: true }); // springing away
   await p.flush();
   assert.equal(p.refreshes, 1);
   assert.deepEqual(p.rows(), ["", ""]); // straight back: nothing held at 60

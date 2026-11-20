@@ -243,7 +243,11 @@ export function pullToRefresh(scroller, opts = {}) {
   });
   // The area's look: the arrow (turned over when armed), or the spinner and "Refreshing..." while a refresh runs.
   // "armed" goes before "refreshing" comes: the arrow is hidden (and its turn not animated) when it turns back.
+  // While an armed release springs back the area keeps its look ("Release to refresh..."): the spinner is first seen
+  // on a pull after it went out of sight (frozen until show(false), or until a touch catches it on the way up).
+  let frozen = false;
   function paint() {
+    if (frozen) return;
     const spin = tracker.spinning;
     area.classList.toggle("armed", !spin && tracker.state === "armed");
     area.classList.toggle("refreshing", spin);
@@ -269,6 +273,7 @@ export function pullToRefresh(scroller, opts = {}) {
     if (on === shown) return; // a scroll event per frame: no class write when nothing changes
     shown = on;
     clip.classList.toggle("on", on);
+    if (!on && frozen) { frozen = false; paint(); }
     if (!on && tracker.state === "closing") tracker.hidden();
   };
   const k = () => globalThis.devicePixelRatio || 1; // whole device pixels: a fractional offset smeared the rows' edges
@@ -305,6 +310,7 @@ export function pullToRefresh(scroller, opts = {}) {
     g = { y, base: top <= 0 ? y : null, mode: nativeBounce ? "native" : "?", pull: 0, ready: false };
     if (top <= 1) { ensure(); g.ready = true; } // style is read here, never per frame
     tracker.start();
+    frozen = false;
     paint(); // a pull that starts while a refresh runs shows the spinner, never the arrow
     if (top < 0) { follow(-top); show(true); } // caught while springing back
   }, { passive: true });
@@ -349,7 +355,7 @@ export function pullToRefresh(scroller, opts = {}) {
         g.mode = "native"; g.pull = -top; tracker.move(-top);
       } else if (clip.parentNode !== scroller.parentNode) ensure(); // a fling's overshoot
       follow(-top);
-      show(true); // also during the bounce after an armed release: the area slides up showing the spinner
+      show(true); // also during the bounce after an armed release: the area slides up, its look frozen
     } else {
       if (!g || g.mode === "native") show(false);
       if (pending) runNow(); // the spring is over
@@ -360,7 +366,9 @@ export function pullToRefresh(scroller, opts = {}) {
   const end = (e) => {
     if (!g) return;
     const was = g;
+    // An armed release: freeze the look before end() turns the tracker to "refreshing" (the area is still on screen).
     if (e.type === "touchcancel") tracker.cancel();
+    else if (tracker.state === "armed" && shown) { frozen = true; if (!tracker.end()) { frozen = false; paint(); } }
     else tracker.end();
     release();
     g = null;

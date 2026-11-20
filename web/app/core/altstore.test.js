@@ -11,6 +11,7 @@ import { sourceFilter } from "./sources.js";
 import { createCatalog, ALL } from "./catalog.js";
 import { newRecords, changeGroups, recordKey } from "./changes.js";
 import { compat } from "./compat.js";
+import { fakeIndexedDB } from "../test-fakes.js";
 
 const FIXTURE = readFileSync(new URL("./fixtures/altstore-source.json", import.meta.url), "utf8");
 const URL_ = "https://example.dev/apps.json";
@@ -182,45 +183,6 @@ test("altstore: source URLs", () => {
   assert.equal(isAltKey(KEY), true);
   assert.equal(isAltKey("deb:https://x/:./"), false);
 });
-
-// A tiny IndexedDB with get, put, delete and getAll, for the source list.
-function fakeIndexedDB() {
-  const dbs = new Map();
-  const later = (f) => setTimeout(f, 0);
-  return {
-    open(name) {
-      const req = {};
-      later(() => {
-        let db = dbs.get(name);
-        const fresh = !db;
-        if (fresh) {
-          const stores = new Map();
-          db = {
-            objectStoreNames: { contains: (n) => stores.has(n) },
-            createObjectStore(n, { keyPath }) { stores.set(n, { keyPath, rows: new Map() }); },
-            transaction(n) {
-              const s = stores.get(n);
-              const tx = {};
-              const request = (f) => { const r = {}; later(() => { r.result = f(); later(() => tx.oncomplete?.()); }); return r; };
-              tx.objectStore = () => ({
-                put: (v) => request(() => { s.rows.set(v[s.keyPath], structuredClone(v)); }),
-                get: (k) => request(() => structuredClone(s.rows.get(k))),
-                delete: (k) => request(() => { s.rows.delete(k); }),
-                getAll: () => request(() => [...s.rows.values()].map((v) => structuredClone(v))),
-              });
-              return tx;
-            },
-          };
-          dbs.set(name, db);
-        }
-        req.result = db;
-        if (fresh) req.onupgradeneeded?.();
-        req.onsuccess?.();
-      });
-      return req;
-    },
-  };
-}
 
 test("altstore: sources sit beside the APT list: add, list, refresh, remove", async () => {
   let json = FIXTURE;

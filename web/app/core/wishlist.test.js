@@ -1,11 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as fakeStorage } from "../test-fakes.js";
 import { createWishlist, wishLabel, wishRows, WISHLIST_KEY, WISH_ADD, WISH_REMOVE } from "./wishlist.js";
-
-function fakeStorage(init = {}) {
-  const m = new Map(Object.entries(init));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), m };
-}
 
 test("add and remove, kept on the device in the order added", () => {
   const s = fakeStorage();

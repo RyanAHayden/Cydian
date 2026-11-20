@@ -2,6 +2,7 @@
 // (core/safe-sources.js), trust labels (core/trust.js), reports and the malware IPA list (core/malicious.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as mem } from "../test-fakes.js";
 import { EXPLOITABLE_IOS, exposureOf, exposureDue, exposureAlert, loadSeen, markSeen, patchesFor, duePatch, patchAlert, patchRow,
   loadSnooze, snoozePatch, SOFTWARE_UPDATE, UNDERSTOOD, INSTALL_PATCH, LATER, LAST_IOS_LINE, lastIosLine } from "./ios-exposure.js";
 import { KNOWN_SAFE, knownSafe, placeOf } from "./safe-sources.js";
@@ -13,10 +14,6 @@ import { sourceWarning } from "./warnings.js";
 import { compareVersions } from "./selfupdate.js";
 import { DOMAIN } from "../brand.js";
 
-const mem = () => {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
-};
 
 // ---- exploitable iOS --------------------------------------------------------------------------------------------
 

@@ -9,57 +9,8 @@ import { exportText, parseImport, reviewImport, filterSources } from "./sourceli
 import { sourceWarning, inputHost, SOURCE_WARNINGS, warningAlert } from "./warnings.js";
 import { RECOMMENDED_SOURCES, detectJailbreak, jailbreakFromMarkers, recommendedFor, savedJailbreak, saveJailbreak, recommendedSeen, markRecommendedSeen } from "./recommended.js";
 import { createHttpBackend, BackendError } from "../backend-http.js";
+import { fakeIndexedDB, memStorage } from "../test-fakes.js";
 
-// The slice of IndexedDB that sources.js uses, in memory: several keyPath stores, get/getAll/put/delete, async
-// requests and transaction completion.
-function fakeIndexedDB() {
-  const dbs = new Map();
-  const later = (f) => setTimeout(f, 0);
-  return {
-    open(name) {
-      const req = {};
-      later(() => {
-        let db = dbs.get(name);
-        const fresh = !db;
-        if (fresh) {
-          const stores = new Map();
-          db = {
-            objectStoreNames: { contains: (n) => stores.has(n) },
-            createObjectStore(n, { keyPath }) { stores.set(n, { keyPath, rows: new Map() }); },
-            transaction(n, mode) {
-              const s = stores.get(n);
-              const tx = {};
-              const request = (f) => {
-                const r = {};
-                later(() => { r.result = f(); later(() => tx.oncomplete?.()); });
-                return r;
-              };
-              const write = (f) => { if (mode !== "readwrite") throw new Error("read-only"); return request(f); };
-              tx.objectStore = () => ({
-                get: (k) => request(() => structuredClone(s.rows.get(k))),
-                getAll: () => request(() => [...s.rows.values()].map((v) => structuredClone(v))),
-                put: (v) => write(() => { s.rows.set(v[s.keyPath], structuredClone(v)); return v[s.keyPath]; }),
-                delete: (k) => write(() => { s.rows.delete(k); }),
-              });
-              return tx;
-            },
-            close() {},
-          };
-          dbs.set(name, db);
-        }
-        req.result = db;
-        if (fresh) req.onupgradeneeded?.();
-        req.onsuccess?.();
-      });
-      return req;
-    },
-  };
-}
-
-const memStorage = () => {
-  const mem = new Map();
-  return { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
-};
 
 // ---- (1) export and import ---------------------------------------------------------------------------------------
 

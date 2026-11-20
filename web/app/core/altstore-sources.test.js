@@ -10,6 +10,7 @@ import { parseAltSource, altKey, isAltKey } from "./altstore.js";
 import { detect } from "./sources/detect.js";
 import { createCatalog } from "./catalog.js";
 import { createHttpBackend } from "../backend-http.js";
+import { fakeIndexedDB } from "../test-fakes.js";
 
 const DEFAULT_SOURCES = await loadTweakSources(); // web/app/tweak-sources.json
 const DEFAULT_ALT_SOURCES = await loadAppSources(); // web/app/app-sources.json
@@ -136,46 +137,6 @@ test("F28 shape: every source lists its apps as catalog rows", () => {
 });
 
 // ---- through the HTTP backend --------------------------------------------------------------------------------
-
-// A tiny IndexedDB with get, put, delete and getAll.
-function fakeIndexedDB() {
-  const dbs = new Map();
-  const later = (f) => setTimeout(f, 0);
-  return {
-    open(name) {
-      const req = {};
-      later(() => {
-        let db = dbs.get(name);
-        const fresh = !db;
-        if (fresh) {
-          const stores = new Map();
-          db = {
-            objectStoreNames: { contains: (n) => stores.has(n) },
-            createObjectStore(n, { keyPath }) { stores.set(n, { keyPath, rows: new Map() }); },
-            transaction(n) {
-              const s = stores.get(n);
-              const tx = {};
-              const request = (f) => { const r = {}; later(() => { r.result = f(); later(() => tx.oncomplete?.()); }); return r; };
-              tx.objectStore = () => ({
-                put: (v) => request(() => { s.rows.set(v[s.keyPath], structuredClone(v)); }),
-                get: (k) => request(() => structuredClone(s.rows.get(k))),
-                delete: (k) => request(() => { s.rows.delete(k); }),
-                getAll: () => request(() => [...s.rows.values()].map((v) => structuredClone(v))),
-              });
-              return tx;
-            },
-            close() {},
-          };
-          dbs.set(name, db);
-        }
-        req.result = db;
-        if (fresh) req.onupgradeneeded?.();
-        req.onsuccess?.();
-      });
-      return req;
-    },
-  };
-}
 
 // The proxy, as it answers for these hosts: each source URL gives its JSON (after the redirects it followed);
 // alt.crystall1ne.dev answers every path with its JSON, Packages included; anything else is a 404 upstream.

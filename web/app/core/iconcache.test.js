@@ -5,6 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { iconCache, iconType, openIconStore, ICON_MAX_AGE, ICON_MAX_BYTES } from "./iconcache.js";
 import { sourceIconUrls, loadTweakSources } from "./sources.js";
+import { fakeIndexedDB } from "../test-fakes.js";
 
 const DEFAULT_SOURCES = await loadTweakSources(); // web/app/tweak-sources.json
 
@@ -150,43 +151,6 @@ test("a broken store: the icon still loads, nothing thrown", async () => {
   const rec = await iconCache({ store, fetchIcon: net({ "https://r.test/CydiaIcon.png": PNG }).fetchIcon }).load("k", ["https://r.test/CydiaIcon.png"]);
   assert.equal(rec.type, "image/png");
 });
-
-// The slice of IndexedDB openIconStore uses, in memory (as core/cache.test.js's).
-function fakeIndexedDB() {
-  const dbs = new Map();
-  const later = (f) => setTimeout(f, 0);
-  return {
-    open(name) {
-      const req = {};
-      later(() => {
-        let db = dbs.get(name);
-        const fresh = !db;
-        if (fresh) {
-          const stores = new Map();
-          db = {
-            objectStoreNames: { contains: (n) => stores.has(n) },
-            createObjectStore(n, { keyPath }) { stores.set(n, { keyPath, rows: new Map() }); },
-            transaction(n, mode) {
-              const s = stores.get(n);
-              const tx = {};
-              const request = (f) => { const r = {}; later(() => { r.result = f(); later(() => tx.oncomplete?.()); }); return r; };
-              tx.objectStore = () => ({
-                get: (k) => request(() => structuredClone(s.rows.get(k))),
-                put: (v) => { if (mode !== "readwrite") throw new Error("read-only"); return request(() => { s.rows.set(v[s.keyPath], structuredClone(v)); return v[s.keyPath]; }); },
-              });
-              return tx;
-            },
-          };
-          dbs.set(name, db);
-        }
-        req.result = db;
-        if (fresh) req.onupgradeneeded?.();
-        req.onsuccess?.();
-      });
-      return req;
-    },
-  };
-}
 
 test("openIconStore: records survive a reopen (a relaunch)", async () => {
   const indexedDB = fakeIndexedDB();

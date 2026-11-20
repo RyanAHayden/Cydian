@@ -2,12 +2,9 @@
 // `ifizbox-helper notifications on|off`.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "../test-fakes.js";
 import { createSettings } from "./settings.js";
 
-function memStorage(init = {}) {
-  const m = new Map(Object.entries(init));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), map: m };
-}
 const fakeHelper = (code = 0) => {
   const calls = [];
   const f = async (words) => { calls.push(words.join(" ")); return { code, stdout: "" }; };

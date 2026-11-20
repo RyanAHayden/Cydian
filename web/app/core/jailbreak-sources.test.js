@@ -11,6 +11,7 @@ import { recommendedRows } from "./sourcelist.js";
 import { RECOMMENDED_SOURCES } from "./recommended.js";
 import { siteJailbroken } from "../backend.js";
 import { NAME } from "../brand.js";
+import { fakeIndexedDB } from "../test-fakes.js";
 
 const ALT = "https://example.dev/apps.json";
 const ALT_JSON = JSON.stringify({ name: "Example Apps", identifier: "dev.example", apps: [
@@ -18,44 +19,6 @@ const ALT_JSON = JSON.stringify({ name: "Example Apps", identifier: "dev.example
 const REPO = "https://repo.example/";
 const RELEASE = "Origin: Example\nLabel: Example\nSuite: stable\nVersion: 1.0\nCodename: ios\nArchitectures: iphoneos-arm64\nComponents: main\nDescription: x\n";
 const PACKAGES = "Package: com.example.tweak\nVersion: 1.0\nArchitecture: iphoneos-arm64\nName: Tweak\n\n";
-
-function fakeIndexedDB() {
-  const dbs = new Map();
-  const later = (f) => setTimeout(f, 0);
-  return {
-    open(name) {
-      const req = {};
-      later(() => {
-        let db = dbs.get(name);
-        const fresh = !db;
-        if (fresh) {
-          const stores = new Map();
-          db = {
-            objectStoreNames: { contains: (n) => stores.has(n) },
-            createObjectStore(n, { keyPath }) { stores.set(n, { keyPath, rows: new Map() }); },
-            transaction(n) {
-              const s = stores.get(n);
-              const tx = {};
-              const request = (f) => { const r = {}; later(() => { r.result = f(); later(() => tx.oncomplete?.()); }); return r; };
-              tx.objectStore = () => ({
-                put: (v) => request(() => { s.rows.set(v[s.keyPath], structuredClone(v)); }),
-                get: (k) => request(() => structuredClone(s.rows.get(k))),
-                delete: (k) => request(() => { s.rows.delete(k); }),
-                getAll: () => request(() => [...s.rows.values()].map((v) => structuredClone(v))),
-              });
-              return tx;
-            },
-          };
-          dbs.set(name, db);
-        }
-        req.result = db;
-        if (fresh) req.onupgradeneeded?.();
-        req.onsuccess?.();
-      });
-      return req;
-    },
-  };
-}
 
 const backend = () => {
   const files = { [ALT]: ALT_JSON, [REPO + "Release"]: RELEASE };

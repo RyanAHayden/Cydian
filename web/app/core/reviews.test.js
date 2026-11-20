@@ -2,10 +2,10 @@
 // how ours merge with a depiction's and the App Store's.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memStore } from "../test-fakes.js";
 import { checkDraft, deviceToken, reviewsApi, mergeReviews, reviewDate, ourReview, reviewsBase, TOKEN_KEY, LIMITS,
   buildRating, storeRating, pageRating, compactCount } from "./reviews.js";
 
-const memStore = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
 
 test("a draft: stars 1-5, the caps, a written review wants a title, stars alone are fine", () => {
   assert.equal(checkDraft({}).field, "stars");

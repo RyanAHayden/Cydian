@@ -1,11 +1,11 @@
 // F280: core/push.js, with a fake shell and a fake server.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memory } from "../test-fakes.js";
 import { offReason, registration, expiresOf, enablePush, disablePush, syncPush, pushInfo, pushRows, pushState,
   storedWatch, RENAMED_TEXT, NO_APS_TEXT, DENIED_TEXT, PUSH_KEY } from "./push.js";
 import { BUNDLE_ID, NAME } from "../brand.js";
 
-const memory = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
 const TOKEN = "ab".repeat(32);
 const ST = { mode: "sideload", bundleId: BUNDLE_ID, team: "ABCDE12345", environment: "production", authorization: "authorized",
   version: "1.2", ios: "17.2", profileExpires: "2027-01-01T00:00:00Z" };

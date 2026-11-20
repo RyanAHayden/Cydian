@@ -870,7 +870,7 @@ html[data-theme="dark"] .ph-box, html[data-theme="dark"] .ph-bar { background: v
 .reload-bar .reload-cancel { flex: none; margin-left: auto; }
 /* F204: nothing moves for it any more. The scrollers get 44 pt more room at their end while it shows (a block after
    their content, so the scroll position stays where it is), so the last row still scrolls clear of the strip. */
-html.has-reload :is(.page-body, .sheet-scroll, .search-results, .progress-scroll, .console-scroll, .filter-drop-inner)::after {
+html.has-reload :is(.page-body, .sheet-scroll, .search-results, .progress-scroll, .filter-drop-inner)::after {
   content: ""; display: block; flex: none; clear: both; height: 44px;
 }
 /* A reload runs in the background (pull to refresh, the launch refresh), so a sheet can open while it shows. As on

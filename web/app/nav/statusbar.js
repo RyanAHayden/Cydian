@@ -7,7 +7,7 @@
 // one when several are, so the tap moves what the user sees.
 import { scrollToTop } from "./tabbar.js";
 
-export const SCROLLERS = ".page-body, [data-scroller], .sheet-scroll, .sheet-body, .progress-scroll, .console-scroll, "
+export const SCROLLERS = ".page-body, [data-scroller], .sheet-scroll, .sheet-body, .progress-scroll, "
   + ".search-results, .filter-drop-inner, .action-list";
 
 const shown = (el) => !el.getClientRects || el.getClientRects().length > 0;

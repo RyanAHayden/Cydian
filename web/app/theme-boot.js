@@ -18,12 +18,14 @@
   root.setAttribute("data-theme", dark ? "dark" : "light");
   // Each tone's themes, in core/settings.js's order, and the default (its `default`: Gunmetal, Classic): a new theme
   // adds its name here, beside its ios6.css or palettes.css block (F200), and its top-bar colour below.
-  var darks = ["oled", "gunmetal", "midnight", "linen", "nord", "dracula"], lights = ["classic", "sepia", "solarized"];
+  var darks = ["oled", "gunmetal", "midnight", "linen", "nord", "dracula", "leather", "felt", "wood"],
+    lights = ["classic", "sepia", "solarized", "legalpad", "metal"];
   var palette = dark ? (darks.indexOf(d) >= 0 ? d : "gunmetal") : (lights.indexOf(l) >= 0 ? l : "classic");
   root.setAttribute("data-palette", palette);
   // The browser's top bar too (screens/settings.js THEME_COLORS): index.html's meta says light until now.
   var color = { classic: "#4f698b", oled: "#000", gunmetal: "#5f656f", midnight: "#0a1424", linen: "#000",
-    nord: "#2e3440", dracula: "#21222c", sepia: "#7a5c36", solarized: "#2a74a8" }[palette];
+    nord: "#2e3440", dracula: "#21222c", sepia: "#7a5c36", solarized: "#2a74a8",
+    leather: "#4a2e1a", felt: "#6a4220", wood: "#42270f", legalpad: "#5a3218", metal: "#9aa0a9" }[palette];
   var metas = document.querySelectorAll('meta[name="theme-color"]:not([media])');
   for (var i = 0; i < metas.length; i++) metas[i].setAttribute("content", color);
 })();

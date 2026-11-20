@@ -504,6 +504,14 @@ export function withAltSources(calls, backend, opts = {}) {
     if (!rec.unsupported) delete next.unsupported;
     return db.put(next);
   }
+  // F304: a GitHub repo (core/github.js detectGithub): its tweaks as a Tweak Source where the wrapped calls keep them
+  // (`addGithub`: the sideload app's sourceCalls), else its apps as an app source, else Add says why not.
+  async function addGithub(found) {
+    if (found.source && typeof calls.addGithub === "function") return calls.addGithub(found.source);
+    if (found.app) return saveAlt(found.app);
+    const { githubTweaksHereError } = await import("./github.js");
+    throw await githubTweaksHereError(found.repo);
+  }
   // Loaded when first needed: add.js imports core/sources.js, which imports this file.
   async function detectOpts() {
     const { DEFAULT_DISTS } = await import("./sources/add.js");
@@ -525,6 +533,7 @@ export function withAltSources(calls, backend, opts = {}) {
       }
       const { detectSource } = await import("./sources/add.js");
       const found = await detectSource(backend, input, await detectOpts());
+      if (found.kind === "github") return addGithub(found);
       if (found.kind === "ipa") return saveAlt(found.source);
       if (!aptOk()) throw jailbreakSourceError();
       const s = found.source;

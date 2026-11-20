@@ -29,6 +29,7 @@ import { allSaved } from "./core/ipainfo.js";
 import { hiddenAltApps } from "./core/appoffer.js";
 import { detectMode } from "./core/settings.js";
 import { splitIgnoredVersions } from "./core/appupdates.js";
+import { isGithubSource, githubSourceText } from "./core/github.js"; // F304
 
 export { ALL };
 
@@ -149,7 +150,9 @@ async function loadSource(source, arch, sig, { tweaks = false } = {}) {
   try {
     // The last refresh found nothing for this arch (Telesphoreo's Release lists no arm64): nothing to fetch.
     const empty = !tweaks && source.count === 0 && !source.error;
-    const { text, root } = empty ? { text: "", root: null } : tweaks ? await tweakPackagesText(source) : await packagesText(source, arch);
+    // F304: a GitHub repo's releases (core/github.js) stand in for a Packages index.
+    const { text, root } = empty ? { text: "", root: null } : isGithubSource(source) ? await githubSourceText(getBackend(), source)
+      : tweaks ? await tweakPackagesText(source) : await packagesText(source, arch);
     const count = await getParser().catalog("load", [source.key, undefined, root, arch, ...(tweaks ? [{ tweaks: true }] : [])], text);
     loaded.set(source.key, { sig, count, error: null });
   } catch (e) {

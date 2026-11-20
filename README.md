@@ -176,7 +176,7 @@ graph TD
   | Path | What it does |
   |---|---|
   | `/` | the website: `web/app/` as static assets, revalidated on every load |
-  | `/api/fetch` | the website's fetch proxy (APT repos and AltStore sources don't let a page read them), behind an SSRF guard: no private, loopback or link-local addresses, with size and time limits |
+  | `/api/fetch` | the website's fetch proxy (APT repos and AltStore sources don't let a page read them), behind an SSRF guard: no private, loopback or link-local addresses, with size and time limits. A GitHub repo's details and releases (a repo added as a source) go through GitHub's API with the server's token, kept 10 minutes |
   | `/api/applookup`, `/api/appreviews`, `/api/ipainfo` | App Store details and reviews for an app, and an IPA's `Info.plist` (supported iOS versions) |
   | `/sign/status` | tells the sideload app's Settings > Installation & Signing the server answers |
   | `/sign/manifest`, `/sign/host/*` | the install manifest iOS needs when the app signs on the phone, and iFizBox's own update held for 10 minutes while iOS replaces the app |

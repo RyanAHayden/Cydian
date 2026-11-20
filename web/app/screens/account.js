@@ -4,7 +4,7 @@
 //
 //   accountSection()          the root Settings page's row: iFizBox Account, Signed In / Off; pushes #/settings/account
 //   drawAccount(el)           the page: Create Account / Sign In With Key; signed in: Sync Now, Last Synced, the Sync
-//                             Certificate switch, Show Account Key, Delete Account
+//                             Certificate switch, Show Account Key, Sign Out, Delete Account
 //   startAccountSync()        once at start: read on launch; save when the app goes to the background or the page is
 //                             hidden, only if something changed (the free tier's 1,000 writes a day)
 //   signInFromLink(url)       ifizbox://account?k=… (incoming.js): Sign In With Key, filled in
@@ -233,6 +233,12 @@ export async function drawAccount(el) {
   parts.push(grouped([{ rows: [{ label: reveal ? "Hide Account Key" : "Show Account Key", icon: rowIcon(reveal ? "hidden" : "showKey"),
     onClick: () => { reveal = !reveal; drawAccount(el); } }] }]));
   if (reveal && s.code) parts.push(keyBlock(s.code));
+  const out = document.createElement("div"); // F286: Sign Out, above Delete Account, the action sheet's plain button
+  out.className = "account-signout-wrap";
+  const outBtn = Object.assign(document.createElement("button"), { type: "button", className: "action-button account-signout", textContent: "Sign Out" });
+  outBtn.addEventListener("click", () => signOutFlow(el));
+  out.append(outBtn);
+  parts.push(out);
   const del = document.createElement("div");
   del.className = "account-delete-wrap";
   const btn = Object.assign(document.createElement("button"), { type: "button", className: "action-button destructive account-delete", textContent: "Delete Account" });
@@ -300,6 +306,26 @@ async function syncNow(el) {
     else await alertOK("Can't Sync", problem(e));
   }
   await drawAccount(el);
+}
+
+// F286: Sign Out. Only this device: the account, and every other device signed in to it, stay as they are.
+export const SIGN_OUT_ALERT = {
+  title: "Sign Out?",
+  message: `This iPhone stops syncing with your ${NAME} Account. What's on it stays. To sign in again you need your account key.`,
+  buttons: ["Cancel", "Sign Out"], cancel: 0,
+};
+
+export async function signOutFlow(el, { acct = accountSync(), ask = showAlert, hud = showHUD, draw = drawAccount } = {}) {
+  const { index } = await ask({ ...SIGN_OUT_ALERT, buttons: [...SIGN_OUT_ALERT.buttons] });
+  if (index !== 1) return false;
+  const hide = hud("Signing Out");
+  try {
+    await acct.signOut();
+    hide.done ? hide.done("Signed Out") : hide();
+  } catch (e) { hide(); await alertOK("Can't Sign Out", problem(e)); }
+  reveal = false;
+  if (el) await draw(el);
+  return true;
 }
 
 async function deleteFlow(el) {

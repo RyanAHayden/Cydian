@@ -104,7 +104,11 @@ export async function withAppUpgrades(upgrades, holds = [], { mode = detectMode(
   if (mode === "sideload" && native?.call && !failed) {
     const skipped = merged.ignored.filter((r) => r.ignoredVersion);
     const ignored = [...new Set([...(holds ?? []), ...merged.ignored.filter((r) => !r.ignoredVersion).map((r) => r.id)])];
-    lastWatch = { native, watch: shellWatch(records, [...merged.available, ...skipped], { cands, ignored }) };
+    const watch = shellWatch(records, [...merged.available, ...skipped], { cands, ignored });
+    // B207: `known` holds the ignored versions too, which Changes doesn't count: the icon badge (the shell's and the
+    // push server's) starts from the counted rows' keys, sent apart only when they differ.
+    if (skipped.length) watch.counted = upgradeKeys(merged.available);
+    lastWatch = { native, watch };
     sendWatch();
   }
   return merged;

@@ -142,6 +142,8 @@ test("F281 sideload: an app at its ignored version goes under Ignored Upgrades, 
   const watch = calls.at(-1)[1];
   assert.deepEqual(watch.apps.map((a) => a.id), ["delta", "utm"]); // the next Delta still notifies
   assert.deepEqual(watch.known, ["delta 1.6", "utm 4.5"]);
+  // B207: the icon badge starts from what Changes counts, without the ignored version
+  assert.deepEqual(watch.counted, ["utm 4.5"]);
   // The next version shows again, and the entry goes.
   offer.delta = "1.7";
   const next = await withAppUpgrades({ available: [], ignored: [] }, [], { ...opts, versions: { delta: "1.6" } });

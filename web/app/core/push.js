@@ -39,7 +39,8 @@ export function savePushState(storage = globalThis.localStorage, s) {
   try { storage?.setItem?.(PUSH_KEY, JSON.stringify(s)); } catch { /* private mode */ }
 }
 export function rememberWatch(watch, storage = globalThis.localStorage) {
-  try { storage?.setItem?.(WATCH_KEY, JSON.stringify({ apps: watch?.apps ?? [], known: watch?.known ?? [] })); } catch { /* full */ }
+  try { storage?.setItem?.(WATCH_KEY, JSON.stringify({ apps: watch?.apps ?? [], known: watch?.known ?? [],
+    ...(Array.isArray(watch?.counted) ? { counted: watch.counted } : {}) })); } catch { /* full */ }
 }
 export function storedWatch(storage = globalThis.localStorage) {
   try { const v = JSON.parse(storage?.getItem?.(WATCH_KEY) ?? "null"); if (v && Array.isArray(v.apps)) return v; } catch { /* none */ }
@@ -83,7 +84,7 @@ export function expiresOf(st) {
 export function registration(st, watch = { apps: [], known: [] }) {
   return { token: st.token, environment: st.environment, topic: st.bundleId, team: st.team ?? "", version: st.version ?? "",
     ios: st.ios ?? "", apps: (watch.apps ?? []).map(({ id, name, version, source }) => ({ id, name, version, source })),
-    known: watch.known ?? [], expires: expiresOf(st) };
+    known: watch.known ?? [], ...(Array.isArray(watch.counted) ? { counted: watch.counted } : {}), expires: expiresOf(st) };
 }
 
 const errorOf = async (r) => {

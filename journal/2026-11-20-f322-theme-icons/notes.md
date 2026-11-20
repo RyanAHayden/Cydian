@@ -52,4 +52,5 @@ file is over the 1 MB size guard, and both folders are on its allowlist anyway.
   here.
 - Asset catalogs: no `Assets.car` holds the theme icons. That needs actool on the Mac and belongs to the follow-up.
 - The launch images that `tools/icons.sh` now writes differently: I didn't check why. It's out of scope; they
-  were restored, not committed.
+  were restored, not committed. The renderer gives the same bytes on every run, so they are probably just stale
+  (last regenerated 2026-11-18). Filed as T56.

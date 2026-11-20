@@ -1,0 +1,275 @@
+<title>iFizBox Safety Nets</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a short decision page; options as stacked sections, each with a row of phone-sized iOS 6 mockups that wraps on phones. */
+:root{
+  --bg:#eef0f4; --fg:#1d2330; --muted:#5d6678; --card:#ffffff; --line:#d6dbe4;
+  --accent:#3b5b8f; --good:#2f8a3a; --warn:#b7791f; --bad:#c0392b; --pick:#e7eefb;
+  --display:"Helvetica Neue",Helvetica,Arial,sans-serif; --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  /* iOS 6 colours inside the mockups stay fixed: they are pictures of the app */
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#14171d;--fg:#e8ebf1;--muted:#9aa3b5;--card:#1d2129;--line:#2d333e;--accent:#8fb0e6;--good:#5cc46a;--warn:#e3a94a;--bad:#ff6b5e;--pick:#1f2a3d;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171d;--fg:#e8ebf1;--muted:#9aa3b5;--card:#1d2129;--line:#2d333e;--accent:#8fb0e6;--good:#5cc46a;--warn:#e3a94a;--bad:#ff6b5e;--pick:#1f2a3d;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 60px}
+h1{font-family:var(--display);font-size:30px;line-height:1.15;margin:0 0 6px;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:21px;margin:0;text-wrap:balance}
+h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:22px 0 8px}
+p{margin:0 0 10px;max-width:68ch}
+.lede{color:var(--muted);font-size:16px}
+.opt{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-top:22px}
+.opt.rec{border:2px solid var(--accent);background:linear-gradient(var(--pick),var(--card) 140px)}
+.opthead{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:baseline}
+.tag{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:99px;background:var(--accent);color:var(--card)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:18px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px 26px}
+.cols>div{min-width:0}
+ul{margin:0;padding-left:18px} li{margin:3px 0}
+.files{font:13px/1.5 ui-monospace,Menlo,monospace;color:var(--muted);overflow-wrap:anywhere}
+.shots{display:flex;flex-wrap:wrap;gap:18px;margin-top:14px}
+.cap{font-size:13px;color:var(--muted);margin-top:6px;max-width:300px}
+.verdict{margin-top:26px;padding:18px 20px;border-radius:14px;background:var(--pick);border:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600}
+.tbl{overflow-x:auto}
+
+/* ---------- iOS 6 phone mockups (fixed colours: they picture the app) ---------- */
+.phone{width:300px;max-width:100%;border-radius:26px;background:#111;padding:10px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.scr{position:relative;border-radius:16px;overflow:hidden;background:#cbd2dc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='1'%3E%3Crect width='5' height='1' fill='%23c5ccd6'/%3E%3Crect x='5' width='2' height='1' fill='%23d0d6df'/%3E%3C/svg%3E");height:520px;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:#000}
+.scr.white{background:#fff}
+.nav{height:44px;background:linear-gradient(#b0bccd,#6d84a2 50%,#5f789a 50%,#556f93);border-bottom:1px solid #2d3d57;display:flex;align-items:center;justify-content:center;position:relative;color:#fff;font-weight:700;font-size:17px;text-shadow:0 -1px 0 rgba(0,0,0,.45)}
+.nav .b{position:absolute;top:7px;height:28px;padding:0 9px;border-radius:5px;font-size:12px;line-height:28px;background:linear-gradient(#8ea2bf,#4e6a92 50%,#3e5c88 50%,#456390);border:1px solid #2e4565;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.nav .l{left:7px;border-radius:5px 5px 5px 5px;padding-left:12px;clip-path:polygon(9px 0,100% 0,100% 100%,9px 100%,0 50%)}
+.nav .r{right:7px}
+.sec{margin:12px 9px 0;font-size:14px;font-weight:700;color:#4c566c;text-shadow:0 1px 0 #fff}
+.grp{margin:6px 9px 0;background:#f7f7f7;border:1px solid #acb1b9;border-radius:9px;overflow:hidden}
+.cell{display:flex;align-items:center;gap:8px;min-height:40px;padding:6px 10px;border-top:1px solid #d9d9d9;font-size:14px;font-weight:700}
+.cell:first-child{border-top:0}
+.cell .v{margin-left:auto;font-weight:400;color:#385487;font-size:13px;text-align:right}
+.cell .chev{color:#7f7f7f;font-weight:400;margin-left:4px}
+.foot{margin:6px 16px 0;font-size:12px;color:#4c566c;text-align:center;text-shadow:0 1px 0 #fff;line-height:1.35}
+.ok{color:#2f8a3a}.warnc{color:#b7791f}.badc{color:#c0392b}
+.pill{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;border-radius:9px;padding:1px 7px;background:linear-gradient(#5fbd5a,#3a9b39);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.pill.grey{background:linear-gradient(#a7aebb,#8a93a3)}
+.pill.red{background:linear-gradient(#e0605a,#b8322b)}
+.row{display:flex;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid #e0e0e0;background:#fff}
+.ic{width:34px;height:34px;border-radius:8px;flex:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
+.t{font-weight:700;font-size:14px;line-height:1.2}
+.s{font-size:11.5px;color:#7a7a7a;line-height:1.25}
+.hdr{background:linear-gradient(#a4afbf,#8e9aac);color:#fff;font-weight:700;font-size:13px;padding:1px 10px;text-shadow:0 1px 0 rgba(0,0,0,.35);border-top:1px solid #7f8ba0}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
+.alert{width:250px;border-radius:10px;border:2px solid #e8ecf3;background:linear-gradient(rgba(60,80,130,.96),rgba(14,28,72,.96));color:#fff;text-align:center;padding:12px 10px 10px;box-shadow:0 4px 14px rgba(0,0,0,.6);position:relative;overflow:hidden}
+.alert:before{content:"";position:absolute;left:-30%;right:-30%;top:-70px;height:110px;border-radius:50%;background:rgba(255,255,255,.14)}
+.alert h4{margin:0 0 6px;font-size:16px}
+.alert p{font-size:13px;line-height:1.3;margin:0 0 10px;text-shadow:0 -1px 0 rgba(0,0,0,.4)}
+.btns{display:flex;flex-direction:column;gap:7px}
+.btns.two{flex-direction:row}
+.ab{flex:1;height:36px;line-height:36px;border-radius:6px;border:1px solid #0e1a3a;font-weight:700;font-size:14px;background:linear-gradient(rgba(255,255,255,.35),rgba(255,255,255,.12) 50%,rgba(255,255,255,.05) 50%,rgba(255,255,255,.12))}
+.ab.def{background:linear-gradient(rgba(255,255,255,.5),rgba(255,255,255,.25) 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.25))}
+.banner{margin:8px 9px 0;border:1px solid #d9a3a0;background:#fff3f2;border-radius:9px;padding:8px 10px;font-size:12px;line-height:1.35}
+.banner b{color:#c0392b;font-size:13px;display:block;margin-bottom:2px}
+.banner.amber{border-color:#e2c58c;background:#fff8ea}.banner.amber b{color:#a86a10}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(rgba(70,80,100,.92),rgba(30,36,50,.95));padding:12px 14px 14px;display:flex;flex-direction:column;gap:8px;border-top:1px solid #9aa4b6}
+.sheet .q{color:#fff;font-size:12.5px;text-align:center;line-height:1.3;text-shadow:0 -1px 0 #000}
+.sb{height:40px;border-radius:7px;line-height:40px;text-align:center;font-weight:700;font-size:15px;background:linear-gradient(#fdfdfd,#e2e2e2);border:1px solid #333;color:#000}
+.sb.red{background:linear-gradient(#e86a63,#c0201a 50%,#b0130e 50%,#c22a24);color:#fff;text-shadow:0 -1px 0 rgba(0,0,0,.4)}
+.sb.dark{background:linear-gradient(#6b7383,#3f4655 50%,#323846 50%,#3a414f);color:#fff}
+.depth{display:flex;gap:10px;align-items:center;padding:10px}
+.ic.big{width:56px;height:56px;border-radius:12px}
+.tab{position:absolute;left:0;right:0;bottom:0;height:42px;background:linear-gradient(#3b3b3b,#151515 50%,#000 50%);display:flex;justify-content:space-around;align-items:center;color:#9a9a9a;font-size:9.5px;font-weight:700}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <h1>Safety Nets for Exploitable iOS</h1>
+  <p class="lede">Some iOS versions have a public kernel exploit. On those, one bad IPA can take over the phone, and iFizBox makes installing IPAs easy. Below are three levels of protection. Each one includes everything in the level before it. Pick one, or mix pieces.</p>
+
+  <h3>What is already in iFizBox to build on</h3>
+  <div class="cols">
+    <div><p><b>Source Warning</b> (<span class="files">core/warnings.js</span>): Canister's piracy list ships inside the app, with a reason and link per host, checked before Add Source fetches anything. A known-safe list and a malware list can work the same way: shipped, offline, and every entry carries a reason and a link.</p></div>
+    <div><p><b>Reviews</b> (<span class="files">worker/src/reviews.js</span>, D1): no accounts. Each device has its own token and gets one review per app, and 3 reports hide a review. "Report as Malicious" can reuse that table, the token and the rate limits.</p></div>
+  </div>
+
+  <!-- ================= Option A ================= -->
+  <section class="opt" id="a">
+    <div class="opthead"><h2>A. Quiet: one warning, one blocklist</h2></div>
+    <p>The app speaks up only twice: once if your iOS version is exploitable, and when an app is on the malware list. Reports from people go to the maintainer and never show in the app.</p>
+    <div class="shots">
+      <div>
+        <div class="phone"><div class="scr">
+          <div class="nav"><span class="b l">Yingxia</span>Install</div>
+          <div class="grp" style="margin-top:14px"><div class="cell">Yingxia<span class="v">1.8.26</span></div><div class="cell">Install<span class="chev">›</span></div></div>
+          <div class="dim"><div class="alert">
+            <h4>Check Before You Install</h4>
+            <p>iOS 18.6.2 has a known flaw that lets an app take over the phone. Only install apps you trust, from sources you know.</p>
+            <div class="btns"><div class="ab">Software Update</div><div class="ab def">I Understand</div></div>
+          </div></div>
+        </div></div>
+        <div class="cap">Shown once, before the first install from a source you haven't trusted, only on a listed iOS version. "Software Update" appears only when Apple has shipped a fix.</div>
+      </div>
+      <div>
+        <div class="phone"><div class="scr">
+          <div class="nav"><span class="b l">My IPAs</span>Sign</div>
+          <div class="grp" style="margin-top:14px"><div class="cell">FreeVPN Pro<span class="v">2.1</span></div><div class="cell">Sign &amp; Install<span class="chev">›</span></div></div>
+          <div class="dim"><div class="alert">
+            <h4>Known Malware</h4>
+            <p>“FreeVPN Pro” 2.1 is on the known-malware list: it steals login tokens. iFizBox won't sign it.</p>
+            <div class="btns two"><div class="ab">Why It's Listed</div><div class="ab def">OK</div></div>
+          </div></div>
+        </div></div>
+        <div class="cap">Matched on the IPA's SHA-256 and bundle ID, before signing, on the phone and on the website. No "Install Anyway".</div>
+      </div>
+    </div>
+    <div class="cols" style="margin-top:14px">
+      <div><h3>Trade-off</h3><ul><li>Tiny UI, nothing to curate but two lists.</li><li>No help telling a good source from an unknown one.</li><li>Reports take a person to act on.</li></ul></div>
+      <div><h3>Files</h3><p class="files">core/ios-exposure.js (new, shipped list), core/malware-list.js (new, like piracy-list.js), core/apprun.js, screens/myipas.js, native IPASigner check, worker/src/reviews.js (report kind)</p></div>
+    </div>
+  </section>
+
+  <!-- ================= Option B ================= -->
+  <section class="opt rec" id="b">
+    <div class="opthead"><h2>B. Trust labels</h2><span class="tag">Recommended</span></div>
+    <p>Everything in A, plus every source and every app shows where it stands: <b>Known Safe</b> (on a curated list), <b>Trusted</b> (you said so), or <b>Unknown</b>. The install page also shows whether the app's source code is public. Reports from people become a visible warning once enough different devices agree.</p>
+    <div class="shots">
+      <div>
+        <div class="phone"><div class="scr white">
+          <div class="nav"><span class="b l">Refresh</span>Sources<span class="b r">Manage</span></div>
+          <div class="hdr">Individual Sources</div>
+          <div class="row"><div class="ic" style="background:linear-gradient(#5aa0e8,#1f5fb8)"></div><div><div class="t">iFizBox</div><div class="s"><span class="pill">Known Safe</span> ifizbox.com</div></div></div>
+          <div class="row"><div class="ic" style="background:linear-gradient(#ffb44a,#e2662b)"></div><div><div class="t">AppTesters IPA Repo</div><div class="s"><span class="pill">Known Safe</span> repository.apptesters.org</div></div></div>
+          <div class="row"><div class="ic" style="background:linear-gradient(#7d8bff,#4b54d6)"></div><div><div class="t">Feather Repository</div><div class="s"><span class="pill">Known Safe</span> github.com/claration</div></div></div>
+          <div class="row"><div class="ic" style="background:linear-gradient(#c9b29a,#8a6f55)"></div><div><div class="t">FIZL0</div><div class="s"><span class="pill grey">Trusted</span> github.com/fizl0/apps</div></div></div>
+          <div class="row"><div class="ic" style="background:linear-gradient(#888,#444)"></div><div><div class="t">cool-ipas.xyz</div><div class="s">Unknown · cool-ipas.xyz</div></div></div>
+          <div class="tab"><span>Home</span><span style="color:#fff">Sources</span><span>Changes</span><span>Installed</span><span>Search</span></div>
+        </div></div>
+        <div class="cap">A small badge under each source's name. Unknown sources get no badge, just the word, so the list doesn't look alarming.</div>
+      </div>
+      <div>
+        <div class="phone"><div class="scr">
+          <div class="nav"><span class="b l">Search</span>OpenTennis</div>
+          <div class="depth"><div class="ic big" style="background:linear-gradient(#7fd36b,#2f8a3a)"></div><div><div class="t" style="font-size:17px">OpenTennis</div><div class="s">1.8.2 · FIZL0</div></div></div>
+          <div class="sec">Where It Comes From</div>
+          <div class="grp">
+            <div class="cell">Source<span class="v">FIZL0 <span class="pill grey">Trusted</span></span></div>
+            <div class="cell">Source Code<span class="v ok">Public on GitHub</span><span class="chev">›</span></div>
+            <div class="cell">Reports<span class="v">None</span></div>
+          </div>
+          <div class="foot">You marked FIZL0 as Trusted. Apps with public source code can be checked by anyone.</div>
+          <div class="grp" style="margin-top:12px"><div class="cell" style="justify-content:center;color:#385487">Install</div></div>
+        </div></div>
+        <div class="cap">A "Where It Comes From" group on every app page. Source Code reads the source's <i>sourceURL</i>/repo link when it has one; otherwise it says "Not Public".</div>
+      </div>
+      <div>
+        <div class="phone"><div class="scr">
+          <div class="nav"><span class="b l">Search</span>GBA4U</div>
+          <div class="depth"><div class="ic big" style="background:linear-gradient(#a58cf0,#5b3fc7)"></div><div><div class="t" style="font-size:17px">GBA4U</div><div class="s">3.0 · cool-ipas.xyz</div></div></div>
+          <div class="banner"><b>Reported as Malicious</b>14 people reported this version, most for “asks for my Apple ID password”. It is being reviewed. <span style="color:#385487">Details</span></div>
+          <div class="sec">Where It Comes From</div>
+          <div class="grp">
+            <div class="cell">Source<span class="v">Unknown</span></div>
+            <div class="cell">Source Code<span class="v warnc">Not Public</span></div>
+            <div class="cell">Reports<span class="v badc">14</span><span class="chev">›</span></div>
+          </div>
+          <div class="grp" style="margin-top:12px"><div class="cell" style="justify-content:center;color:#385487">Install Anyway…</div></div>
+        </div></div>
+        <div class="cap">After 10 reports from different devices, the red banner shows (the same card as the piracy banner) and Install asks first. When the maintainer confirms a report, the app moves to the malware list from A.</div>
+      </div>
+      <div>
+        <div class="phone"><div class="scr">
+          <div class="nav"><span class="b l">GBA4U</span>Reviews</div>
+          <div class="grp" style="margin-top:14px"><div class="cell">Write a Review<span class="chev">›</span></div><div class="cell">Report as Malicious<span class="chev">›</span></div></div>
+          <div class="sheet">
+            <div class="q">What did it do? Reports are anonymous. One per device, per version.</div>
+            <div class="sb dark">Asks for Passwords or Codes</div>
+            <div class="sb dark">Shows Ads or Pop-Ups It Shouldn't</div>
+            <div class="sb dark">Isn't the App It Says It Is</div>
+            <div class="sb red">Something Else…</div>
+            <div class="sb">Cancel</div>
+          </div>
+        </div></div>
+        <div class="cap">In the Reviews tab beside Write a Review. Reuses the review token, so it's one report per device, rate-limited like reviews.</div>
+      </div>
+      <div>
+        <div class="phone"><div class="scr">
+          <div class="nav"><span class="b l">Refresh</span>Sources<span class="b r">Manage</span></div>
+          <div class="hdr">Individual Sources</div>
+          <div class="row"><div class="ic" style="background:linear-gradient(#5aa0e8,#1f5fb8)"></div><div><div class="t">iFizBox</div><div class="s">ifizbox.com</div></div></div>
+          <div class="dim"><div class="alert">
+            <h4>Unknown Source</h4>
+            <p>cool-ipas.xyz isn't on the known-safe list. That doesn't make it bad, but its apps will show as Unknown until you trust it.</p>
+            <div class="btns"><div class="ab">Add &amp; Trust</div><div class="ab def">Add Source</div><div class="ab">Cancel</div></div>
+          </div></div>
+        </div></div>
+        <div class="cap">Add stays the same Enter APT URL alert as now. After it, a second alert like today's Source Warning, but gentler, appears only for sources that aren't on the list. Known-safe sources add with no second alert. Piracy hosts keep the Source Warning alert.</div>
+      </div>
+    </div>
+
+    <h3>The known-safe list</h3>
+    <div class="cols">
+      <div><p>It ships in the app, like the piracy list: <span class="files">core/safe-sources.js</span>, one entry per host with a one-line reason and a public link (the project's repo or site). Recommended Sources draws from it, so the two can't drift apart.</p>
+      <p><b>Who decides:</b> the maintainer, through a pull request with the link as evidence. The bar: a known developer or team, a public repo or a long track record, and no reports.</p></div>
+      <div><p><b>Seed list:</b> iFizBox's own source, plus the well-known sideload sources (AltStore's official one, SideStore, Feather, LiveContainer, the big community IPA repos). For jailbreak repos, the default repos (Procursus, Havoc, Chariz) are already treated as essential.</p>
+      <p><b>Other lists:</b> I found no maintained public "safe AltStore sources" list to copy, so we would keep our own. If one shows up, a sync script can merge it, as the piracy list does.</p></div>
+    </div>
+
+    <div class="cols" style="margin-top:6px">
+      <div><h3>Trade-off</h3><ul><li>Answers "can I trust this?" on the page where you decide to install.</li><li>A list to curate, and reports to review.</li><li>The report threshold has to resist brigading: 10 distinct devices on one version, a per-network cap, and a developer can ask for a review.</li></ul></div>
+      <div><h3>Files</h3><p class="files">A's files + core/safe-sources.js, core/trust.js (Known Safe / Trusted / Unknown), screens/sources.js, sourcelist, depiction.js / browse.js (app page group), screens/reviews.js (Report as Malicious sheet), worker/src/reviews.js (kind=malicious, threshold, admin confirm → malware list), Settings &gt; Sources trust switch</p></div>
+    </div>
+  </section>
+
+  <!-- ================= Option C ================= -->
+  <section class="opt" id="c">
+    <div class="opthead"><h2>C. Guarded mode</h2></div>
+    <p>Everything in B, plus a stricter mode that turns itself on when your iOS version is on the exploitable list. In this mode every install from an Unknown source asks first, and a switch can hide Unknown sources' apps from Search.</p>
+    <div class="shots">
+      <div>
+        <div class="phone"><div class="scr">
+          <div class="nav"><span class="b l">Settings</span>Safety</div>
+          <div class="grp" style="margin-top:14px">
+            <div class="cell">Guarded Mode<span class="v"><span class="pill">ON</span></span></div>
+            <div class="cell">Only Known-Safe Sources<span class="v"><span class="pill grey">OFF</span></span></div>
+          </div>
+          <div class="foot">On because iOS 18.6.2 has a known flaw. Installs from Unknown sources ask first. Turn off if you know what you install.</div>
+          <div class="sec">This iPhone</div>
+          <div class="grp"><div class="cell">iOS<span class="v badc">18.6.2 · exploitable</span></div><div class="cell">Fix<span class="v">iOS 18.7</span><span class="chev">›</span></div></div>
+        </div></div>
+        <div class="cap">A Safety page in Settings that states your status plainly.</div>
+      </div>
+      <div>
+        <div class="phone"><div class="scr">
+          <div class="nav"><span class="b l">Installed</span>Queue</div>
+          <div class="grp" style="margin-top:14px"><div class="cell">GBA4U<span class="v">Unknown source</span></div><div class="cell">OpenTennis<span class="v ok">Trusted</span></div></div>
+          <div class="sheet">
+            <div class="q">GBA4U comes from a source you haven't trusted, and this iPhone's iOS can be taken over by a bad app.</div>
+            <div class="sb red">Install Anyway</div>
+            <div class="sb dark">Skip This App</div>
+            <div class="sb">Cancel</div>
+          </div>
+        </div></div>
+        <div class="cap">Asked every time, even in the middle of a queue run.</div>
+      </div>
+    </div>
+    <div class="cols" style="margin-top:14px">
+      <div><h3>Trade-off</h3><ul><li>The safest choice for people who don't follow security news.</li><li>Extra taps on every unknown install. Most sideload users are on older iOS on purpose and will just turn it off.</li><li>Risks feeling like a nanny app, which is the opposite of the project's spirit.</li></ul></div>
+      <div><h3>Files</h3><p class="files">B's files + screens/settings.js (Safety page), core/apprun.js (per-app ask in queue runs), screens/search.js filter</p></div>
+    </div>
+  </section>
+
+  <div class="verdict">
+    <h2 style="font-size:19px;margin-bottom:6px">Recommendation: B</h2>
+    <p>B puts the answer on the page where people decide to install, and it never blocks anyone except for confirmed malware. A on its own warns people but gives them nothing to act on. C adds friction most people will turn off. Build B in three steps: (1) the exploitable-iOS list and the one-time alert, (2) the known-safe list and the trust labels, (3) Report as Malicious and the malware list. Each step ships on its own.</p>
+    <p>On every option, the jailbreak build skips the iOS-version alert, because people stay on exploitable versions to jailbreak. It keeps the labels, reports and malware list.</p>
+  </div>
+
+  <h3>Data each piece needs</h3>
+  <div class="tbl"><table>
+    <tr><th>Piece</th><th>Data</th><th>How it updates</th></tr>
+    <tr><td>Exploitable iOS</td><td>Version ranges + a link to the writeup or CVE, + the first fixed version</td><td>Shipped in the app, refreshed each release; on the website, live from the Worker</td></tr>
+    <tr><td>Known Safe</td><td>Host, reason, link</td><td>Shipped (pull request); later maybe a Worker copy so it updates between releases</td></tr>
+    <tr><td>Trusted</td><td>Your choice, per source</td><td>On the device only</td></tr>
+    <tr><td>Reports</td><td>Package or bundle ID + version, reason, device token hash</td><td>Worker D1, beside reviews</td></tr>
+    <tr><td>Malware list</td><td>IPA SHA-256, bundle ID, reason, link</td><td>Shipped + Worker copy, so a confirmed report blocks without a release</td></tr>
+  </table></div>
+</div>

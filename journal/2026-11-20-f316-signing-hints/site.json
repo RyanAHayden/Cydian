@@ -1,0 +1,16 @@
+[
+  { "wait": 2000 },
+  { "eval": "localStorage.removeItem('ifizbox.firstVisit'); 'ok'" },
+  { "nav": "#/home/settings/general", "ms": 5000 },
+  { "eval": "(() => { const g = document.querySelector('.page.is-top .website-settings'); if (!g) return 'none'; document.querySelector('.page.is-top .page-body').scrollTop += g.getBoundingClientRect().top - 110; return g.innerText; })()" },
+  { "wait": 800 },
+  { "shot": "website-locked" },
+  { "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'" },
+  { "nav": "#/home/settings/general", "ms": 5000 },
+  { "eval": "(() => { const g = document.querySelector('.page.is-top .website-settings'); if (!g) return 'none'; document.querySelector('.page.is-top .page-body').scrollTop += g.getBoundingClientRect().top - 110; return g.innerText; })()" },
+  { "wait": 800 },
+  { "shot": "website-unlocked" },
+  { "nav": "#/home/settings/signing/udid", "ms": 5000 },
+  { "eval": "location.hash + '\\n' + document.querySelector('.page.is-top').innerText" },
+  { "shot": "find-udid" }
+]

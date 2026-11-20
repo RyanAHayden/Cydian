@@ -38,7 +38,8 @@ import { signAndInstall } from "../signing/install.js";
 import { PASSWORD_EVENT } from "../signing/password.js";
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { drawWalkthrough, walkOpen, offerInstall, missingStep, siteReady, deviceRows } from "./signing.js";
-import { storedUdid, udidPending, startUdid, watchUdid, canFindUdid, udidFindRows } from "./signing.js";
+import { storedUdid, udidPending, startUdid, watchUdid, canFindUdid, udidFindRows, udidPageSections, UDID_PAGE,
+  UDID_PAGE_TITLE } from "./signing.js";
 const freeRouteBlock = lazyFn("freeAppleId", "freeRouteBlock");
 const accountGroup = lazyFn("devaccount", "accountGroup");
 const openInAppSection = lazyFn("importlink", "openInAppSection");
@@ -120,6 +121,7 @@ export function nav(route) {
   if (opensMerged([first, second], merged())) return mergedNav(); // F271
   if (opensSigningSub([first, second], merged())) return { title: SIGNING_SUBS[second] }; // F284
   if (first === "signing" && second === HELP) return { title: HELP_TITLE }; // F134: the walkthrough
+  if (first === "signing" && second === UDID_PAGE) return { title: UDID_PAGE_TITLE }; // F316: Find UDID's steps
   if (first === INSTALLATION && INSTALLATION_TITLES[second]) return { title: INSTALLATION_TITLES[second] };
   const key = second ?? first;
   if (key && TITLES[key]) return { title: TITLES[key] };
@@ -164,6 +166,7 @@ function draw({ el, route }) {
   else if ((second ?? first) === "holds") el.replaceChildren(holdsPage());
   else if ((second ?? first) === "blocked") el.replaceChildren(blockedPage()); // F226
   else if (first === "signing" && second === HELP) drawSigningHelp(el); // F134
+  else if (first === "signing" && second === UDID_PAGE) drawUdidPage(el); // F316
   else if (opensMerged([first, second], merged())) drawSigning(el); // F271: Installation & Signing
   else if (opensSigningSub([first, second], merged())) drawSigningSub(el, second); // F284
   else if (first === INSTALLATION && settings.isShown("installRoute")) drawInstallation(el, second, { store: settings, server: () => serverSections(el, { footer: true }) }); // sideload
@@ -898,6 +901,9 @@ async function drawSigning(el) {
 // finds the password). Any row's Browse takes several files too.
 // F134: Settings > Signing shows it as its "Files" group while files are picked but not all in (`files`: no Select
 // All Files, which the Certificate group's Import row already is, and a one-line footer); the walkthrough as before.
+export const certFilesFooter = (browser) => (browser
+  ? "Your .p12, its .mobileprovision and the password. They stay in this browser, where apps are signed."
+  : "Your .p12, its .mobileprovision and the password. Once all three are here, they go into this iPhone's Keychain.");
 function certificateBlock(el, id, status = null, { files = false } = {}) {
   const kept = statusReady(status) ? status.identity : null; // F58: what the sideload build's Keychain holds
   const box = document.createElement("div");
@@ -919,10 +925,9 @@ function certificateBlock(el, id, status = null, { files = false } = {}) {
   const p12Shown = !status || id?.p12 ? id?.p12Name ?? (kept ? "In Keychain" : null) : kept ? id?.p12Name ?? "In Keychain" : null;
   const profShown = !status || id?.profile ? id?.profileName ?? kept?.profile?.name : kept ? id?.profileName ?? kept.profile?.name : null;
   ul.append(fileRow(".p12", p12Shown, "p12"), fileRow(".mobileprovision", profShown, "profile"));
-  const kind = browserSigning() ? `They're kept in this browser only, and apps are signed here in the browser: they go to no server, except inside ${NAME}'s own app with Bring My Certificate.`
-    : `Once all three are here, they go into this iPhone's Keychain, where only ${NAME} can use them; the password isn't kept. To change one, choose the .p12 and the profile again.`;
+  // F316: one or two short sentences
   const foot = Object.assign(document.createElement("p"), { className: "group-footer",
-    textContent: files ? "Browse for what's missing." : "Your .p12 (the certificate and its key), its .mobileprovision and the password. Each row's Browse picks one. " + kind });
+    textContent: files ? "Browse for what's missing." : certFilesFooter(browserSigning()) });
   if (files) {
     box.append(head, ul, foot, pw);
     return box;
@@ -1367,7 +1372,7 @@ async function drawDeviceSigning(el, { only = null } = {}) {
   const split = splitSummary(info.rows);
   const parts = {
     certificate: () => certificateGroup(el, { rows: split.certificate, has: Boolean(kept), staged, notes,
-      footer: `Kept in this iPhone's Keychain, where only ${NAME} can use it.`, remove: () => removeDeviceCertificate() }),
+      footer: CERT_KEPT_FOOTER, remove: () => removeDeviceCertificate() }),
     files: () => certificateBlock(el, id, status ?? { identity: null }, { files: true }),
     profile: () => profileGroup(split.profile, info.device), // F236: with "This iPhone is in the profile"
     account: () => accountGroup({ redraw: redrawAll }),
@@ -1476,14 +1481,19 @@ export function certificateActions({ has = false, staged = false, removable = ha
   const pick = has ? "Replace Certificate" : "Import Certificate";
   return removable ? [pick, "Remove Certificate"] : [pick];
 }
+export const CERT_KEPT_FOOTER = "Kept in this iPhone's Keychain.";
+export const CERT_NONE_FOOTER = "Choose your .p12, its .mobileprovision and the password file, or their .zip.";
+export const certificateFooter = ({ notes = [], has = false, footer = CERT_KEPT_FOOTER } = {}) =>
+  (notes.length ? notes[0] : has ? footer : CERT_NONE_FOOTER);
 function certificateGroup(el, { rows, has, staged, notes = [], footer, remove, removable }) {
   const list = has && rows.length ? rows : [{ label: "Certificate", detail: staged ? "Incomplete" : "None" }];
   const accept = ".p12,.pfx,.mobileprovision,.txt,.zip,application/x-pkcs12,application/zip,text/plain";
   const [input] = browseButton(accept, true, (files) => chooseFiles(el, files, null));
   const [pick, removeLabel] = certificateActions({ has, staged, removable });
   const action = { label: pick, cls: "sign-import", onClick: () => input.click() };
+  // F316: only the most important problem (the first: the signer, then the identity, then expiry and password)
   const frag = grouped([{ header: "Certificate", rows: removeLabel ? list : [...list, action],
-    footer: notes.length ? notes.join(" ") : has ? footer : "Choose your .p12, its .mobileprovision and the password file, or their .zip." }]);
+    footer: certificateFooter({ notes, has, footer }) }]);
   if (removeLabel) {
     const button = (label, cls, onClick) => Object.assign(document.createElement("button"),
       { type: "button", className: `cell-inner pair-button ${cls}`, textContent: label, onclick: onClick });
@@ -1500,14 +1510,19 @@ function certificateGroup(el, { rows, has, staged, notes = [], footer, remove, r
 
 // The Provisioning Profile group, with F236's "This iPhone" rows and the check's sentence as its footer (red when this
 // iPhone isn't in the profile; Copy UDID puts the UDID on the clipboard for the developer account's Add Device).
+// F316 (AGENTS.md Hints): three groups, never one joined footer: the profile's status rows (no hint), This iPhone (its
+// UDID and Copy UDID) with deviceHint's state hint, and the website's Find This iPhone's UDID on its own (profileLayout).
+export function profileLayout(rows, device, find = null) {
+  const extra = deviceRows(device, { find: Boolean(find) });
+  if (!extra) return { sections: [{ header: "Provisioning Profile", rows }], warn: false };
+  return { sections: [{ header: "Provisioning Profile", rows }, { rows: extra.rows, footer: extra.footer },
+    ...(find ? [{ rows: find.rows, ...(find.footer ? { footer: find.footer } : {}) }] : [])], warn: extra.warn };
+}
 function profileGroup(rows, device, find = null) {
-  const extra = deviceRows(device);
-  if (!extra) return grouped([{ header: "Provisioning Profile", rows }]);
-  const more = extra.rows.map((r) => (r.copy ? { label: r.label, cls: "sign-copy-udid", onClick: (e) => copyUdid(r.copy, e) } : r));
-  // F253: the website's Find This iPhone's UDID row, with its own sentence after the check's
-  const frag = grouped([{ header: "Provisioning Profile", rows: [...rows, ...more, ...(find?.rows ?? [])],
-    footer: find?.footer ? `${extra.footer} ${find.footer}` : extra.footer }]);
-  if (extra.warn) frag.querySelector(".group-footer")?.classList.add("sign-warning");
+  const { sections, warn } = profileLayout(rows, device, find);
+  const copy = (r) => (r.copy ? { label: r.label, cls: "sign-copy-udid", onClick: (e) => copyUdid(r.copy, e) } : r);
+  const frag = grouped(sections.map((s, i) => (i === 1 ? { ...s, rows: s.rows.map(copy) } : s)));
+  if (warn) frag.querySelectorAll(".group")[1]?.querySelector(".group-footer")?.classList.add("sign-warning");
   return frag;
 }
 
@@ -1528,10 +1543,10 @@ const helpGroup = ({ howItWorks = true } = {}) => {
   if (howItWorks) f.append(grouped([{ rows: [{ label: HELP_TITLE, href: format(settingsRoute(["signing", HELP])), icon: rowIcon("help") }] }]));
   f.append(grouped([{ rows: [{ label: "Share Your Certificate", subtitle: "Help your friends sideload with SideDrop", chevron: true,
       icon: rowIcon("shareCert"), onClick: () => window.open(SIDEDROP, "_blank", "noopener") }],
-    footer: "Have a developer account? Run SideDrop, a site of your own: friends register their iPhone once and every app is "
-      + "signed for them with your certificate. Anyone who installs from it can pull the certificate out, so share it only with people you trust." }]));
+    footer: SHARE_FOOTER }]));
   return f;
 };
+export const SHARE_FOOTER = "SideDrop signs apps for your friends' iPhones with your certificate. Share it only with people you trust: they can pull it out.";
 
 // The page from its parts, in signingLayout's order, keeping the scroll position.
 function showSigningPage(el, layout, parts) {
@@ -1681,11 +1696,22 @@ async function removeSiteCertificate() {
   redrawAll();
 }
 
-// F253: Find This iPhone's UDID on the website (screens/signing.js udidFindRows), its row wired to start a visit.
+// F253: Find This iPhone's UDID on the website (screens/signing.js udidFindRows). F316: its row opens the page with
+// the steps (drawUdidPage), whose Download Profile row starts the visit.
 function siteUdidFind(check) {
   const find = udidFindRows(check, { pending: Boolean(udidPending()), can: canFindUdid() });
   if (!find) return null;
-  return { ...find, rows: find.rows.map((r) => (r.find ? { label: r.label, onClick: () => findUdid() } : r)) };
+  const href = format(settingsRoute(["signing", UDID_PAGE]));
+  return { ...find, rows: find.rows.map(({ find: _, ...r }) => ({ ...r, href })) };
+}
+
+function drawUdidPage(el) {
+  watchUdid(() => redrawAll());
+  const sections = udidPageSections({ pending: Boolean(udidPending()), udid: storedUdid()?.udid ?? null });
+  const top = el.scrollTop;
+  const wire = ({ start, ...r }) => (start ? { ...r, onClick: () => findUdid() } : r);
+  el.replaceChildren(grouped(sections.map((s) => (s.rows ? { ...s, rows: s.rows.map(wire) } : s))));
+  el.scrollTop = top;
 }
 
 async function findUdid() {

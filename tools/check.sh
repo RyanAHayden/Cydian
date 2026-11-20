@@ -7,10 +7,25 @@ cd "$(dirname "$0")/.."
 
 PY=python3
 
+# T42: one TMPDIR on the disk for the whole gate. /tmp is a RAM tmpfs with a per-user quota on the dev machine, shared
+# by every agent slot's gate at once; scratch files there (swiftc objects, zips, mktemp, node's os.tmpdir()) fail with
+# "Disk quota exceeded" for reasons that have nothing to do with the code. Every tool here (mktemp, Python's tempfile,
+# node, swiftc, cc) follows $TMPDIR, so this run gets its own folder under $IFIZBOX_TEST_TMP, else
+# ${XDG_CACHE_HOME:-~/.cache}/ifizbox-tests (the same base as native/disktmp.py), removed when the gate ends.
+# IFIZBOX_GATE_TMPDIR tells tools/test_gate_tmpdir.py which folder that is. When the base can't be made, the default.
+gate_tmp=
+tmp_base=${IFIZBOX_TEST_TMP:-${XDG_CACHE_HOME:-$HOME/.cache}/ifizbox-tests}
+if mkdir -p "$tmp_base" 2>/dev/null && gate_tmp=$(mktemp -d "$tmp_base/gate-XXXXXX" 2>/dev/null); then
+  export TMPDIR=$gate_tmp IFIZBOX_GATE_TMPDIR=$gate_tmp
+else
+  gate_tmp=
+  echo "check: $tmp_base not writable: temp files stay in ${TMPDIR:-/tmp}"
+fi
+
 # T43: everything the gate skips (Python tests, the native and zsign builds) is listed at the end, one line each;
 # IFIZBOX_GATE_STRICT=1 turns any skip into a failure.
 skips=$(mktemp)
-trap 'rm -f "$skips"' EXIT
+trap 'rm -f "$skips"; [ -z "$gate_tmp" ] || rm -rf "$gate_tmp"' EXIT
 
 # T46: no new file over 1 MB in git (allowlist in the script). First, so a stray video fails in a second, not after
 # the builds; the unittest run below runs the same check with its own tests.

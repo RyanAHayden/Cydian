@@ -60,12 +60,17 @@ export const CURATED_SOURCES = [
 // B169: Home's links to Changes push it onto Home's stack (it slides in, Back returns to Home), as every other page
 // opens; a plain #/changes would switch tabs without a slide.
 export const CHANGES_HREF = format(rootOn("changes"));
+// B172: and so do its links to Sources (the green tile's Loading Sources / Sources Failed states) and Search (Find
+// Extensions for Applications); Help's Refresh Sources pushes Sources above Help.
+export const SOURCES_HREF = format(rootOn("sources"));
+export const SEARCH_HREF = format(rootOn("search"));
+const HELP_ROUTE = { tab: "home", path: ["help"] };
 
 // The green tile: what Home suggests next, from the source list and the upgrade count.
 //   sources: the backend's list, or null while it loads; upgrades: a count, or null where nothing knows it yet
 //   (the site has no installed list). Returns { kind, label, href }.
 export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = {}) {
-  if (sources == null) return { kind: "loading", label: "Loading Sources", href: format({ tab: "sources" }) };
+  if (sources == null) return { kind: "loading", label: "Loading Sources", href: SOURCES_HREF };
   if (!sources.length) return { kind: "add", label: "Add a Source", href: format({ tab: "home", path: ["sources"] }) };
   if (upgrades > 0) {
     return { kind: "upgrades", label: `${upgrades} ${upgrades === 1 ? "Upgrade" : "Upgrades"} Available`, href: CHANGES_HREF };
@@ -74,7 +79,7 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
   // The tile keeps what it said (no "Refreshing Sources": user 2026-11-18, it's distracting); the bar shows the refresh.
   const failed = refreshing > 0 ? 0 : sources.filter((s) => s.error).length;
   if (failed) {
-    return { kind: "failed", label: `${failed} ${failed === 1 ? "Source" : "Sources"} Failed to Load`, href: format({ tab: "sources" }) };
+    return { kind: "failed", label: `${failed} ${failed === 1 ? "Source" : "Sources"} Failed to Load`, href: SOURCES_HREF };
   }
   if (upgrades === 0) return { kind: "current", label: "Everything Up to Date", href: CHANGES_HREF };
   return { kind: "changes", label: "See What's New", href: CHANGES_HREF };
@@ -141,7 +146,7 @@ export function homeLinks() {
     { label: "Theme", href: format(settingsRoute(["theme"])), icon: { cls: THEME_ICON }, cls: "home-settings-row" }] }, {
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
-      { label: "Find Extensions for Applications", href: format({ tab: "search" }), chevron: true },
+      { label: "Find Extensions for Applications", href: SEARCH_HREF, chevron: true },
       // Sources > Manage > Recommended, straight there (user 2026-11-18), on Home's own stack (router mountLink): Back comes home.
       { label: "Recommended Sources", href: format({ tab: "sources", path: ["manage", "recommended"] }) },
     ],
@@ -675,7 +680,7 @@ function renderRoot(body) {
     href: format({ tab: "home", path: ["browse"] }), glyph: "browse" }));
   const ipasRow = ipas ? tileRow("halves", tile({ label: ipas.label, href: ipas.href, glyph: "install" })) : null;
 
-  const stateRow = tileRow("green", tile({ label: "", href: format({ tab: "sources" }), glyph: "loading" }));
+  const stateRow = tileRow("green", tile({ label: "", href: SOURCES_HREF, glyph: "loading" }));
   state.tile = stateRow.querySelector("a");
   paintTile(stateTile());
   // Locked Home (the website before iFizBox is installed): Signing full width at the top, Browse down among the
@@ -769,7 +774,7 @@ function renderHelp(body) {
     },
     {
       header: "Upgrading",
-      rows: [{ label: "Check for Changes", href: format(rootOn("changes", { tab: "home", path: ["help"] })) }, { label: "Refresh Sources", href: format({ tab: "sources" }) }],
+      rows: [{ label: "Check for Changes", href: format(rootOn("changes", { tab: "home", path: ["help"] })) }, { label: "Refresh Sources", href: format(rootOn("sources", HELP_ROUTE)) }],
       footer: "Refresh in Sources fetches every source's package list again. Changes then shows what is new "
         + "or updated since the last refresh. Hold a package in Settings to keep it at its version.",
     },

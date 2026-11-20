@@ -103,7 +103,7 @@ test("F157: the FAQ's groups, answer pages and their Next rows", () => {
   const next = byClass(page, "group-header").find((h) => h.textContent === "Next");
   assert.ok(next);
   const hrefs = all(next.parentNode).filter((x) => x.href).map((x) => x.href);
-  assert.deepEqual(hrefs, ["#/home/settings/device", "#/sources"]);
+  assert.deepEqual(hrefs, ["#/home/settings/device", "#/home/guides/faq/package/~sources"]); // B172: pushed
   const prose = draw(["guides", "faq", "expired"], { lite: true });
   assert.match(byClass(prose, "guide-text")[0].textContent, /Settings > Signing/);
 });

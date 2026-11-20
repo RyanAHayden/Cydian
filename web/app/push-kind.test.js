@@ -166,3 +166,71 @@ test("B169: a real Back (history.back to the entry before) is still a pop, not a
   assert.equal(results.at(-1).kind, "pop");
   assert.equal(win.location.hash, "#/home");
 });
+
+// B172: the other links that open a tab's root push it too: Home's green tile while sources load or fail and Help's
+// Refresh Sources (Sources), Find Extensions for Applications (Search), the guides' Refresh Sources and Installed.
+test("B172: Home's links to Sources and Search push that root onto Home's stack, and Back pops it", async () => {
+  const { SOURCES_HREF, SEARCH_HREF } = await import("./screens/home.js");
+  const cases = [
+    [stateTile().href, "#/home/~sources", "sources"], // Loading Sources
+    [stateTile({ sources: [{ error: "x" }], upgrades: 0 }).href, "#/home/~sources", "sources"], // N Sources Failed
+    [SOURCES_HREF, "#/home/~sources", "sources"],
+    [SEARCH_HREF, "#/home/~search", "search"], // Find Extensions for Applications
+  ];
+  for (const [href, hash, tab] of cases) {
+    const { win, router, tap, results } = setup();
+    router.selectTab(tab); // a visit to the tab first: the link must still not be taken for a Back
+    router.selectTab("home");
+    assert.equal(href, hash);
+    const r = tap(href);
+    assert.equal(r.kind, "push", href);
+    assert.equal(win.location.hash, hash);
+    assert.deepEqual(mounted(router.current()), { tab, path: [] }); // that tab's screen draws it, at its root
+    win.history.back();
+    assert.equal(results.at(-1).kind, "pop");
+    assert.equal(win.location.hash, "#/home");
+  }
+});
+
+test("B172: Find Extensions is Home's row to Search's pushed root", async () => {
+  const { homeLinks } = await import("./screens/home.js");
+  const row = homeLinks().flatMap((g) => g.rows).find((r) => r.label === "Find Extensions for Applications");
+  assert.equal(row.href, format(rootOn("search")));
+});
+
+test("B172: Help's Refresh Sources pushes Sources above Help", () => {
+  assert.equal(format(rootOn("sources", { tab: "home", path: ["help"] })), "#/home/help/~sources"); // home.js renderHelp
+  const { win, tap, results } = setup("#/home/help");
+  assert.equal(tap("#/home/help/~sources").kind, "push");
+  assert.equal(win.location.hash, "#/home/help/~sources");
+  win.history.back();
+  assert.equal(results.at(-1).kind, "pop");
+  assert.equal(win.location.hash, "#/home/help");
+});
+
+test("B172: the guides' Refresh Sources and Installed push those roots above the answer page", async () => {
+  const guides = await import("./screens/guides.js");
+  const on = { tab: "home", path: ["guides", "faq", "package"] };
+  assert.equal(guides.linkRow("refresh", undefined, on).href, "#/home/guides/faq/package/~sources");
+  assert.equal(guides.linkRow("installed", undefined, on).href, "#/home/guides/faq/package/~installed");
+  assert.equal(guides.linkRow("refresh").href, "#/sources"); // with no page to sit on: a plain link to the tab
+  for (const id of ["refresh", "installed"]) {
+    const { win, router, tap, results } = setup("#/home/guides/faq/package");
+    const href = guides.linkRow(id, undefined, on).href;
+    assert.equal(tap(href).kind, "push", id);
+    assert.equal(win.location.hash, href);
+    assert.deepEqual(mounted(router.current()), { tab: id === "refresh" ? "sources" : "installed", path: [] });
+    win.history.back();
+    assert.equal(results.at(-1).kind, "pop");
+    assert.equal(win.location.hash, "#/home/guides/faq/package");
+  }
+});
+
+test("B172: a root copy only redraws when it is not the one holding the screen's state", async () => {
+  const sources = await import("./screens/sources.js");
+  const search = await import("./screens/search.js");
+  const installed = await import("./screens/installed.js");
+  assert.equal(sources.redrawCopy(null, { tab: "sources", path: [] }), false);
+  assert.equal(search.showCopy({}), false); // never drawn by Search's render: nothing to resync
+  assert.equal(installed.redrawCopy({}, { tab: "installed", path: ["myipas"] }), false); // not the root
+});

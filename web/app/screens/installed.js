@@ -89,6 +89,7 @@ import { deviceError } from "../core/signing.js";
 import { getBackend } from "../backend.js";
 import { liveHUD } from "../nav/hud.js";
 import { onPageOpen } from "../nav/pagestate.js";
+import { onPageShow } from "../nav/pagestate.js"; // B172
 import { selectPreset } from "../nav/selection.js";
 import { flagPiracy, packageWarning, PIRACY_SUBTITLE } from "../core/warnings.js";
 import { scanRequest, malwareFindings, removalIds, orphanFiles, malwareAlert, deleteConfirm } from "../core/known-malware.js";
@@ -217,6 +218,8 @@ export function pageKind(route, mode = detectMode()) {
 // field and out of Edit (jailbreak: pushed from Installed), the dpkg page on User / All (the site: pushed from
 // Installed), the Wish List out of Edit. A tab root is built once, so Installed's own root keeps its choice; Back
 // rebuilds nothing, so a page below keeps what it showed.
+// B172: before those resets, a root copy about to be built keeps the fields of the copy on screen (redrawCopy below).
+onPageOpen((r) => r.tab === "installed" && isRoot(r), (r) => leaveCopy(pageKind(r)));
 onPageOpen((r) => r.tab === "installed" && pageKind(r) === "apps", () => Object.assign(appView, { mode: "user", query: "", editing: false,
   managing: false, selected: new Set() }));
 onPageOpen((r) => r.tab === "installed" && pageKind(r) === "dpkg", () => Object.assign(state, { mode: "user", type: "All", query: "" }));
@@ -225,6 +228,7 @@ onPageOpen((r) => r.tab === "installed" && pageKind(r) === "wishlist", () => { w
 export const pageStates = () => ({ apps: appView, dpkg: state, wish: wishView });
 
 export function init(ctx) {
+  onPageShow((route) => route.tab === "installed" && isRoot(route), (route, el) => redrawCopy(el, route, ctx)); // B172
   // B81: the IPA queue's Q'd badge and Queue button (the jailbreak app's come from apt's queue, queue.js initQueue).
   if (recordsApps() && typeof document !== "undefined") import("./queue.js").then((q) => q.initAppQueueChrome(ctx), () => {});
   catalog.onChange(() => {
@@ -277,7 +281,11 @@ function navInfo(route) {
       // F127: User | Recent on the apps list's root (the jailbreak app's Apps page stays newest first).
       titleView: recordsApps() ? modeControl(APP_MODES, appView.mode, pickMode) : undefined,
       // F222: Manage (bulk Re-sign, Update, Delete), not Edit or F208's Add: a row still deletes with a swipe.
-      right: recordsApps() ? { label: appView.managing ? "Done" : "Manage", onClick: () => setManaging(!appView.managing),
+      // B172: the button tapped is the one that turns (the root can have two copies, each with its own)
+      right: recordsApps() ? { label: appView.managing ? "Done" : "Manage", onClick: (e) => {
+        if (e?.currentTarget) manageBar.right = e.currentTarget;
+        setManaging(!appView.managing);
+      },
         ref: (b) => { manageBar.right = b; b.classList.add("manage-button"); b.classList.toggle("done", appView.managing); } }
         : { label: appView.editing ? "Done" : "Edit", onClick: (e) => setEditing(!appView.editing, e.currentTarget) } };
   }
@@ -324,6 +332,32 @@ export function render(body, route, ctx) {
   state.route = route;
   body.append(placeholder("list"));
   load();
+}
+
+// B172: Installed's root page can be on screen twice, its own tab and pushed on Home (the guides' Installed link:
+// router.js rootOn), and its list follows the module view drawn last (appView for the apps list, state for dpkg's).
+// Each copy keeps its own User/Recent choice, type and search text: a copy being left stores them under its body,
+// and one that comes back to the top (a tab switch, Back) gets its own back and is drawn again. Manage is ended first:
+// its toolbar belongs to the copy that turned it on.
+const COPY_FIELDS = { apps: ["mode", "query"], dpkg: ["mode", "type", "query"] };
+const copies = new WeakMap(); // a root copy's body -> its fields
+const rootView = (kind) => (kind === "apps" ? appView : kind === "dpkg" ? state : null);
+function leaveCopy(kind) {
+  const view = rootView(kind);
+  if (!view?.body) return;
+  if (kind === "apps" && appView.managing) setManaging(false);
+  copies.set(view.body, Object.fromEntries(COPY_FIELDS[kind].map((k) => [k, view[k]])));
+}
+// -> true when it redrew.
+export function redrawCopy(body, route, ctx) {
+  const kind = isRoot(route) ? pageKind(route) : null;
+  const view = rootView(kind);
+  if (!view || !body || body === view.body) return false;
+  leaveCopy(kind);
+  Object.assign(view, copies.get(body) ?? {});
+  body.replaceChildren();
+  render(body, route, ctx);
+  return true;
 }
 
 export function emptyText(source) {

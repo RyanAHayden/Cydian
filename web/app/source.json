@@ -19,6 +19,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.13.0",
+          "date": "2026-11-20T08:23:58Z",
+          "localizedDescription": "Sideload queue fixes: the next queued app installs after iFizBox was suspended, and runs no longer end Failed: Cancelled on their own.\nInstallation & Signing settings redesigned, with This iPhone, Certificate, Signing Server and Signed Apps pages.\niFizBox's own update follows through to the end and clears its badge.\nSettings > Account has Sign Out; Sideload Settings > Updates reworked, with Push on by default.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.13.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.13.0/iFizBox.ipa",
+          "size": 15713304,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.12.0",
           "date": "2026-11-20T03:32:39Z",
           "localizedDescription": "Push notifications, Make Certificate, every capability for your own App IDs, and Developer Mode status.\nPush notifications: turn on Settings > Updates > Push Notifications to be told about app updates from followed sources, new iFizBox versions and signatures about to expire. Test Push checks it works.\niFizBox keeps its own bundle ID when you sign it, so its notifications work.\nApple Developer Account works with or without a certificate. With an API key, Make Certificate creates an Apple Distribution certificate for you.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.12.0",

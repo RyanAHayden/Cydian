@@ -13,6 +13,13 @@ import { showMenu, longPress, copyText, nativePaste } from "../nav/menu.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor, sourceFilter, loadNeverLoaded } from "../core/sources.js";
+import { tweakSourcesFor, tweakSourcesOn } from "../core/sources.js"; // F302
+import { detectMode } from "../core/settings.js"; // F302
+
+// F302: the sideload app's group of APT sources (injectable tweaks only), under Individual Sources.
+export const TWEAK_SOURCES = "Tweak Sources";
+// Refresh's filter: in the sideload app the Tweak Sources are refreshed too.
+const refreshFilter = () => sourceFilter(settings.deviceType(), { tweaks: tweakSourcesOn(settings.deviceType(), detectMode()) });
 import { sourceIconImage } from "../source-icon.js";
 import { settings } from "./settings.js";
 import * as manage from "./manage.js";
@@ -391,7 +398,7 @@ export async function refreshInBackground(ctx) {
   let run = null;
   try {
     state.sources = await getBackend().sources();
-    const filter = sourceFilter(settings.deviceType());
+    const filter = refreshFilter(); // F302: Tweak Sources too, in the sideload app
     run = startRun(ctx, state.sources.filter(filter ?? (() => true)).map((x) => x.key));
     const job = getBackend().refreshSources(run.onEach, { filter, signal: run.signal, onRow: run.onRow });
     if (await run.until(job)) return "cancelled";
@@ -512,29 +519,37 @@ function draw() {
   // F37: Not Jailbroken shows AltStore sources only. F144: and says nothing of APT ones (no count, no hint).
   // F45: in the order set in Manage > Sources (none set: by name).
   // F72: iFizBox's own source (built in) stays first whatever the order.
-  const { shown } = sourcesFor(builtinFirst(orderSources(state.sources, loadOrder())), settings.deviceType());
+  const ordered = builtinFirst(orderSources(state.sources, loadOrder()));
+  const { shown } = sourcesFor(ordered, settings.deviceType());
   const searching = Boolean(state.query.trim());
   const list = filterSources(shown, state.query, displayName);
+  // F302: the sideload app's APT sources, in their own group under the AltStore ones, counting injectable tweaks.
+  const tweakShown = tweakSourcesFor(ordered, settings.deviceType(), detectMode());
+  const tweakList = filterSources(tweakShown, state.query, displayName);
   const rec = searching ? null : recommendedRow();
   const top = searching ? [] : [{
     label: "All Sources",
     subtitle: "combined package list for the sources below",
     href: format({ tab: "sources", path: ["*"] }),
   }, ...(rec ? [rec] : [])];
+  const sourceRow = (s) => {
+    const health = healthOf(s);
+    return {
+      label: displayName(s),
+      // F44: github.com/<user>/<repo> for GitHub-hosted sources. F19: a source whose last refresh failed says so.
+      subtitle: health.state === "down" ? `Not Responding · ${sourceSubtitle(s)}` : sourceSubtitle(s),
+      icon: { text: displayName(s)[0]?.toUpperCase() ?? "?" },
+      badge: typeof s.count === "number" ? s.count.toLocaleString() : undefined,
+      href: format({ tab: "sources", path: [s.key] }),
+    };
+  };
   const ul = plain([...(top.length ? [{ rows: top }] : []), {
     header: searching ? `${list.length} of ${shown.length}` : "Individual Sources",
-    rows: list.map((s) => {
-      const health = healthOf(s);
-      return {
-        label: displayName(s),
-        // F44: github.com/<user>/<repo> for GitHub-hosted sources. F19: a source whose last refresh failed says so.
-        subtitle: health.state === "down" ? `Not Responding · ${sourceSubtitle(s)}` : sourceSubtitle(s),
-        icon: { text: displayName(s)[0]?.toUpperCase() ?? "?" },
-        badge: typeof s.count === "number" ? s.count.toLocaleString() : undefined,
-        href: format({ tab: "sources", path: [s.key] }),
-      };
-    }),
-  }]);
+    rows: list.map(sourceRow),
+  }, ...(tweakShown.length ? [{
+    header: searching ? `Tweak Sources: ${tweakList.length} of ${tweakShown.length}` : TWEAK_SOURCES,
+    rows: tweakList.map(sourceRow),
+  }] : [])]);
   const cells = ul.querySelectorAll(":scope > .cell");
   if (top.length) {
     cells[0].classList.add("all-sources-row");
@@ -548,9 +563,10 @@ function draw() {
     }).catch(() => {});
   }
   list.forEach((s, i) => decorate(cells[i + top.length], s, backend));
+  tweakList.forEach((s, i) => { const li = cells[i + top.length + list.length]; decorate(li, s, backend); li.classList.add("tweak-source-row"); });
   attachRowGestures(ul);
   box.replaceChildren(ul);
-  if (!list.length) {
+  if (!list.length && !tweakList.length) {
     box.append(note(searching ? "No sources match." : "No sources. Tap Manage, then Sources."));
   }
 }
@@ -678,7 +694,7 @@ async function refresh(ctx) {
   state.busy = true;
   let run = null;
   try {
-    const filter = sourceFilter(settings.deviceType());
+    const filter = refreshFilter(); // F302: Tweak Sources too, in the sideload app
     run = startRun(ctx, (state.sources ?? []).filter(filter ?? (() => true)).map((x) => x.key));
     const job = getBackend().refreshSources(run.onEach, { filter, signal: run.signal, onRow: run.onRow });
     if (await run.until(job)) return; // F41: only what's shown

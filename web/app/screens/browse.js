@@ -77,6 +77,7 @@ import { appQueue } from "../app-queue.js"; // F213: the sideload build's rows q
 import { APP_MODE_LABEL } from "../core/appqueue.js";
 import { rowAppJob, queueOriginalCheck } from "./altstore.js";
 import { queueApp } from "./queue.js";
+import { worksInGroup, addToApp } from "./tweaks.js"; // F302
 
 const ROW_HEIGHT = 58;
 
@@ -1115,6 +1116,9 @@ async function renderPackage(body, route, key, id, ctx) {
   // F228: from a source on the piracy list: Source Warning at the top of Details.
   const piracy = piracyBanner(packageWarning({ key: pkg.key, source: source?.uri }));
   if (piracy) details.append(piracy);
+  // F302: a Tweak Source's tweak in the sideload app: Works In (its filter's apps, read from the .deb on first open,
+  // cached) and Add to App…, in Install's place.
+  if (isSideloadTweak(st)) details.append(worksInGroup(st).el);
 
   // Depends (and Pre-Depends): each line links to the first alternative we carry.
   const rels = [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)];
@@ -1304,8 +1308,13 @@ function rememberPackage(body, route, page) {
   for (const [k, p] of packagePages) if (!p.body.isConnected) packagePages.delete(k);
   packagePages.set(format(route), { body, route, ...page });
   const installed = page.pkg.stanza.kind !== "ipa" && page.history?.versions.some((v) => v.installed);
-  setRightLabel(body, buttonLabel(body, installed));
+  setRightLabel(body, isSideloadTweak(page.pkg.stanza) ? ADD_TO_APP : buttonLabel(body, installed));
 }
+
+// F302: a tweak from a Tweak Source (core/catalog.js marks it `injectable`) in the sideload app: its page's button is
+// Add to App (screens/tweaks.js addToApp), not Install.
+export const ADD_TO_APP = "Add to App";
+export const isSideloadTweak = (st, mode = detectMode()) => Boolean(st?.injectable) && st.kind !== "ipa" && mode === "sideload";
 
 // B11: a paid package a vendor sells (extras.js paidNav) shows its price on the button until it's bought, as Cydia
 // did; Install once the vendor lets this account download it; Modify once it's installed, as for any package.
@@ -1326,7 +1335,7 @@ export async function refreshPackagePages(pages = packagePages, { history = (id,
   label = setRightLabel } = {}) {
   for (const [k, p] of [...pages]) {
     if (!p.body.isConnected) { pages.delete(k); continue; }
-    if (p.pkg.stanza.kind === "ipa") continue;
+    if (p.pkg.stanza.kind === "ipa" || isSideloadTweak(p.pkg.stanza)) continue; // F302: Add to App stays
     const h = await history(p.id, p.key).catch(() => null);
     if (!h || !p.body.isConnected) continue;
     p.history = h;
@@ -1373,6 +1382,7 @@ async function packageActions(route, button) {
   if (!page || !page.body.isConnected) return;
   const { id, pkg, source, history } = page;
   const st = pkg.stanza;
+  if (isSideloadTweak(st)) return addToApp(st); // F302
   const many = (history?.versions.length ?? 0) > 1;
   const actions = [];
   if (st.kind === "ipa" && st.ipa) {

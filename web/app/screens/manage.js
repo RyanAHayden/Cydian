@@ -27,6 +27,7 @@ import { detectMode } from "../core/settings.js";
 import { repoLayout } from "../core/apt.js";
 import { packageList } from "./browse.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor } from "../core/sources.js";
+import { tweakSourcesFor } from "../core/sources.js"; // F302
 import { sourceIconImage } from "../source-icon.js";
 import { altRecord, parseSource } from "../core/altstore.js";
 import {
@@ -107,7 +108,10 @@ export function render(body, route, ctx) {
 async function shownSources() {
   // F72: iFizBox's own source (built in) stays first whatever the order.
   const all = builtinFirst(orderSources(await getBackend().sources(), loadOrder()));
-  return { all, ...sourcesFor(all, settings.deviceType()) };
+  const { shown, hidden } = sourcesFor(all, settings.deviceType());
+  // F302: the sideload app's Tweak Sources are managed (reordered, deleted) with the rest.
+  const tweaks = tweakSourcesFor(all, settings.deviceType(), detectMode());
+  return { all, shown: tweaks.length ? all.filter((s) => shown.includes(s) || tweaks.includes(s)) : shown, hidden: hidden - tweaks.length };
 }
 
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;

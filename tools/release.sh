@@ -29,6 +29,13 @@
 #                 run writes the source there only, never into web/app/source.json
 #     --sync-piracy  a dry run too fetches Canister's newest piracy list and warns when web/app/core/piracy-list.js
 #                 is older (a real run always refreshes it first and stops when it changed: commit it, run again)
+#   tools/release.sh --check-auth             which account a real run would publish as, and stop
+#   tools/release.sh --verify-release X.Y.Z   the checks a real run makes after publishing, on their own: the release
+#                 lists iFizBox.ipa/.deb, Packages(.gz), Release and source.json, and (not a draft)
+#                 releases/latest/download/iFizBox.ipa redirects to vX.Y.Z's asset and answers
+#   tools/release.sh --verify-live X.Y.Z      after web/app/source.json is committed and pushed: poll
+#                 https://$BRAND_DOMAIN/repo/source.json and /repo/Packages until both list X.Y.Z (15 min), else fail
+#   Publishing is done as the owner of the repo (gh auth token --user <owner>) unless GH_TOKEN is set.
 #   IFIZBOX_RELEASE_REPO  owner/name to publish on (default RyanAHayden/iFizBox)
 #   IFIZBOX_RELEASE_HISTORY  DIR/<tag>/ with the older releases' Packages (or .debs) instead of reading them from GitHub
 set -euo pipefail
@@ -36,7 +43,7 @@ cd "$(dirname "$0")/.."
 . native/brand.env # F170: BRAND_NAME for the release title and notes; F180: the asset names ($BRAND_NAME.ipa, .deb)
 
 repo=${IFIZBOX_RELEASE_REPO:-$BRAND_GITHUB_REPO}
-dry=0 notes= dist= draft=() minimum= out= sync_piracy=0
+dry=0 notes= dist= draft=() minimum= out= sync_piracy=0 mode= mode_version=
 while [ $# -gt 0 ]; do
   case $1 in
     --dry-run) dry=1 ;;
@@ -46,12 +53,141 @@ while [ $# -gt 0 ]; do
     --minimum) minimum=${2:?--minimum needs a version}; shift ;;
     --out) out=${2:?--out needs a directory}; shift ;;
     --sync-piracy) sync_piracy=1 ;;
-    -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --check-auth) mode=auth ;;
+    --verify-release) mode=release; mode_version=${2:?--verify-release needs a version}; shift ;;
+    --verify-live) mode=live; mode_version=${2:?--verify-live needs a version}; shift ;;
+    -h|--help) sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "release: unknown argument $1 (see --help)" >&2; exit 2 ;;
   esac
   shift
 done
 die() { echo "release: $*" >&2; exit 1; }
+
+# The release goes up as the repo's owner (RyanAHayden for RyanAHayden/iFizBox), whichever gh account is active: the
+# machine's active account may be one with pull rights only, and gh answers its `release create` with HTTP 404.
+# A GH_TOKEN already in the environment wins (tools/publish.sh sets one the same way; an organisation's repo needs one).
+owner=${repo%%/*}
+gh_auth() {
+  command -v gh >/dev/null || die "needs the gh CLI, logged in as $owner (gh auth login)"
+  if [ -n "${GH_TOKEN:-}" ]; then
+    echo "release: publishing with the GH_TOKEN from the environment"
+    return
+  fi
+  GH_TOKEN=$(gh auth token --user "$owner" 2>/dev/null) || GH_TOKEN=
+  [ -n "$GH_TOKEN" ] || die "gh has no login for $owner, who owns $repo: run 'gh auth login' and sign in as $owner" \
+    "(gh keeps the other accounts; the active one needn't change), or set GH_TOKEN to a token with push rights on $repo"
+  export GH_TOKEN
+  local login
+  login=$(gh api user -q .login 2>/dev/null) || die "gh's token for $owner doesn't work (gh api user failed): gh auth login as $owner again"
+  [ "$login" = "$owner" ] || die "gh's token for $owner belongs to $login"
+  echo "release: publishing as $owner (gh auth token --user $owner)"
+}
+
+# After `gh release create`: the release lists the assets the apps and the Worker read, and (unless it is a draft,
+# which is never "latest") releases/latest/download/<NAME>.ipa redirects to this tag's asset and that answers.
+# GitHub can take a moment to show a new release as latest: retried for IFIZBOX_RELEASE_VERIFY_TIMEOUT seconds (120).
+# IFIZBOX_RELEASE_WEB: the site the download URL is on (https://github.com; tests point it at a local server).
+verify_release() {
+  local t=$1 view draftflag names n missing=() web=${IFIZBOX_RELEASE_WEB:-https://github.com}
+  view=$(gh release view "$t" --repo "$repo" --json isDraft,assets -q '(.isDraft|tostring), .assets[].name') ||
+    die "gh release view $t --repo $repo failed: the release isn't there"
+  draftflag=$(head -n1 <<<"$view")
+  names=$(tail -n +2 <<<"$view")
+  for n in "$BRAND_NAME.ipa" "$BRAND_NAME.deb" Packages Packages.gz Release source.json; do
+    grep -qxF -- "$n" <<<"$names" || missing+=("$n")
+  done
+  [ ${#missing[@]} = 0 ] || die "release $t on $repo lacks ${missing[*]} (it has: $(tr '\n' ' ' <<<"$names"))"
+  echo "release: $t lists $(tr '\n' ' ' <<<"$names")"
+  if [ "$draftflag" = true ]; then
+    echo "release: $t is a draft: releases/latest doesn't point at it until it is published on GitHub (then run --verify-release $t)"
+    return
+  fi
+  local url=$web/$repo/releases/latest/download/$BRAND_NAME.ipa hop code loc got=
+  local deadline=$((SECONDS + ${IFIZBOX_RELEASE_VERIFY_TIMEOUT:-120}))
+  while :; do
+    hop=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 30 "$url" 2>/dev/null) || hop="000 "
+    code=${hop%% *} loc=${hop#* }
+    if [[ $code == 30? ]] && [[ $loc == */releases/download/$t/$BRAND_NAME.ipa ]]; then
+      got=$(curl -sSL -r 0-3 -o /dev/null -w '%{http_code}' --max-time 60 "$loc" 2>/dev/null) || got=000
+      if [ "$got" = 200 ] || [ "$got" = 206 ]; then
+        echo "release: $url -> $loc ($got)"
+        return
+      fi
+    fi
+    [ $SECONDS -lt $deadline ] || die "$url doesn't resolve to $t's $BRAND_NAME.ipa: it answers $code${loc:+ -> $loc}${got:+, which answers $got}"
+    sleep "${IFIZBOX_RELEASE_VERIFY_INTERVAL:-5}"
+  done
+}
+
+# --verify-live VERSION: after web/app/source.json is committed and pushed (Workers Builds deploys the site on push),
+# wait until https://$BRAND_DOMAIN/repo/source.json lists VERSION for $BRAND_BUNDLE_ID and /repo/Packages has a
+# $BRAND_PACKAGE stanza of VERSION, and fail loudly with what each one says when that doesn't happen in time.
+# IFIZBOX_LIVE_BASE (https://$BRAND_DOMAIN), IFIZBOX_LIVE_TIMEOUT (900 s), IFIZBOX_LIVE_INTERVAL (15 s).
+verify_live() {
+  python3 - "${IFIZBOX_LIVE_BASE:-https://$BRAND_DOMAIN}" "$1" "$BRAND_BUNDLE_ID" "$BRAND_PACKAGE" \
+    "${IFIZBOX_LIVE_TIMEOUT:-900}" "${IFIZBOX_LIVE_INTERVAL:-15}" <<'PY'
+import json, sys, time, urllib.request
+base, version, bundle, pkg, timeout, interval = sys.argv[1:]
+deadline = time.monotonic() + float(timeout)
+
+def get(path):
+    # Cloudflare answers Python's default User-Agent (Python-urllib) with 403.
+    req = urllib.request.Request(base.rstrip("/") + path + "?t=%d" % time.time(),
+                                 headers={"Cache-Control": "no-cache", "User-Agent": "release-check/1"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return r.read().decode("utf-8", "replace")
+
+def source():
+    apps = [a for a in json.loads(get("/repo/source.json")).get("apps", []) if a.get("bundleIdentifier") == bundle]
+    if not apps:
+        return False, "no app " + bundle
+    vs = [v.get("version") for v in apps[0].get("versions", [])] or [apps[0].get("version")]
+    return version in vs, "versions " + " ".join(str(v) for v in vs[:5])
+
+def packages():
+    vs, cur = [], None
+    for line in get("/repo/Packages").splitlines() + [""]:
+        if line.startswith("Package:"):
+            cur = line.split(":", 1)[1].strip()
+        elif line.startswith("Version:") and cur == pkg:
+            vs.append(line.split(":", 1)[1].strip())
+        elif not line.strip():
+            cur = None
+    return any(v.split("-")[0] == version for v in vs), pkg + " " + (" ".join(vs[:5]) or "not listed")
+
+while True:
+    said = []
+    ok = True
+    for name, check in (("source.json", source), ("Packages", packages)):
+        try:
+            good, what = check()
+        except Exception as e:  # noqa: BLE001 - a deploy in progress can answer anything
+            good, what = False, "%s: %s" % (type(e).__name__, e)
+        ok = ok and good
+        said.append("%s/repo/%s: %s%s" % (base.rstrip("/"), name, what, "" if good else " (no " + version + ")"))
+    if ok:
+        for s in said:
+            print("release: live: " + s)
+        print("release: live: %s is up" % version)
+        sys.exit(0)
+    if time.monotonic() >= deadline:
+        for s in said:
+            print("release: live: " + s, file=sys.stderr)
+        print("release: live: %s is NOT up after %ss: check the Workers Builds deploy of the pushed commit, and that "
+              "web/app/source.json was committed and pushed" % (version, timeout), file=sys.stderr)
+        sys.exit(1)
+    print("release: live: waiting: " + "; ".join(said), file=sys.stderr)
+    time.sleep(float(interval))
+PY
+}
+
+case ${mode:-} in
+  auth) gh_auth; exit 0 ;;
+  release) [[ $mode_version =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--verify-release takes X.Y.Z, not '$mode_version'"
+    gh_auth; verify_release "v${mode_version#v}"; echo "release: v${mode_version#v} is up on GitHub"; exit 0 ;;
+  live) [[ $mode_version =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--verify-live takes X.Y.Z, not '$mode_version'"
+    verify_live "${mode_version#v}"; exit $? ;;
+esac
 
 version=$(tr -d '[:space:]' < native/VERSION)
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "native/VERSION is '$version', not X.Y.Z"
@@ -68,7 +204,7 @@ sha=$(git rev-parse HEAD)
 
 # A real release comes from a clean, pushed commit, under a tag that doesn't exist yet.
 if [ $dry = 0 ]; then
-  command -v gh >/dev/null || die "needs the gh CLI, logged in with push rights on $repo"
+  gh_auth
   [ -z "$(git status --porcelain --untracked-files=no)" ] || die "the work tree has uncommitted changes"
   git fetch -q origin
   [ -n "$(git branch -r --contains "$sha")" ] || die "HEAD ($sha) is not on origin; push it first"
@@ -247,7 +383,9 @@ gh release create "$tag" --repo "$repo" --target "$sha" --title "$BRAND_NAME $ve
   "${draft[@]}" "${assets[@]}"
 git fetch -q origin "refs/tags/$tag:refs/tags/$tag" || true
 echo "release: published https://github.com/$repo/releases/tag/$tag"
+verify_release "$tag"
 cp "$stage/source.json" web/app/source.json
 python3 tools/altsource.py check
 [ -z "$out" ] || cp web/app/source.json "$out/source.json"
-echo "release: web/app/source.json now names $tag's $BRAND_NAME.ipa: commit it"
+echo "release: web/app/source.json now names $tag's $BRAND_NAME.ipa: commit it, push it, then run" \
+  "tools/release.sh --verify-live $version (waits until https://$BRAND_DOMAIN/repo/ serves it)"

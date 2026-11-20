@@ -11,7 +11,8 @@
 //                                                         core/appqueue.js's job options, then Confirm signs it in turn
 //   await inspectToQueue({ url, name, queue })            that sheet, without the first-install check
 //
-// The sheet's buttons (F81, user 2026-11-17): Install at the top right of its nav bar, a red Cancel at the bottom.
+// The sheet's buttons (F81, user 2026-11-17): Install at the top right of its nav bar, a red Cancel at the bottom,
+// and a plain Cancel at the top left of the nav bar as well (user 2026-11-20).
 //
 // The bridge is globalThis.ifizboxNative; an older shell without signing.inspect installs straight away as before.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -136,8 +137,9 @@ export async function inspectToQueue({ url, name = "", queue },
 }
 
 // The sheet's chrome (F81): `right` (the nav bar's right side) gets Install, done-styled, in place of Done; `box` (the
-// scroll content) ends with a red Cancel. -> { install, cancel }.
-export function signSheetButtons({ right, box, onInstall, onCancel, doc = document }) {
+// scroll content) ends with a red Cancel. `left` (the nav bar's left side, B145) gets a plain Cancel bar button too,
+// closing it the same way. -> { install, cancel, barCancel }.
+export function signSheetButtons({ right, left = null, box, onInstall, onCancel, doc = document }) {
   const install = doc.createElement("button");
   install.type = "button";
   install.className = "bar-button done ss-install";
@@ -150,7 +152,13 @@ export function signSheetButtons({ right, box, onInstall, onCancel, doc = docume
   cancel.textContent = "Cancel";
   cancel.addEventListener("click", () => onCancel());
   box.append(cancel);
-  return { install, cancel };
+  const barCancel = doc.createElement("button");
+  barCancel.type = "button";
+  barCancel.className = "bar-button ss-bar-cancel";
+  barCancel.textContent = "Cancel";
+  barCancel.addEventListener("click", () => onCancel());
+  left?.replaceChildren(barCancel);
+  return { install, cancel, barCancel };
 }
 
 // Once iOS has the install link, the page says Done and ends on Return: iOS's own install is the user's from there
@@ -341,7 +349,8 @@ function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } =
 
   const close = showSheet({ title: edits.name || "Install", body: box, onClose });
   const sheetEl = box.closest(".sheet");
-  signSheetButtons({ right: sheetEl?.querySelector(".sheet-right"), box,
+  // nav/sheet.js's bar row is [spacer, title, right]: the spacer is the left side
+  signSheetButtons({ right: sheetEl?.querySelector(".sheet-right"), left: sheetEl?.querySelector(".sheet-bar-row")?.firstElementChild, box,
     onInstall: () => onSign?.({ ...edits, removeExtensions: [...edits.removeExtensions] }), onCancel: () => close() });
   sheetEl?.classList.add("sign-sheet-modal");
   return close;

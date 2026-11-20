@@ -78,6 +78,26 @@ test("the sheet: Install at the top right (done style, in place of Done), a red 
   assert.deepEqual(log, ["install", "cancel"]);
 });
 
+test("the sheet: a plain Cancel at the top left of the nav bar too, closing it as the red one does", () => {
+  const doc = fakeDoc();
+  const right = doc.make("div");
+  const left = doc.make("div"); // nav/sheet.js's empty spacer
+  const box = doc.make("div");
+  let closed = 0;
+  const { cancel, barCancel } = signSheetButtons({ right, left, box, doc, onInstall: () => {}, onCancel: () => { closed++; } });
+  assert.deepEqual(left.children, [barCancel]);
+  assert.equal(barCancel.textContent, "Cancel");
+  assert.match(barCancel.className, /\bbar-button\b/);
+  assert.doesNotMatch(barCancel.className, /\bdone\b/); // plain, as other sheets' Cancel
+  assert.equal(box.children.at(-1), cancel); // the red one stays
+  barCancel.click();
+  assert.equal(closed, 1);
+  cancel.click();
+  assert.equal(closed, 2);
+  // Without a left side (an older caller): the bottom Cancel alone, no throw.
+  assert.ok(signSheetButtons({ right: doc.make("div"), box: doc.make("div"), doc, onInstall() {}, onCancel() {} }).cancel);
+});
+
 test("Custom Install: the Signing walkthrough first when something is missing, else the sheet", async () => {
   const opened = [];
   const inspect = async (o) => { opened.push(o); return true; };

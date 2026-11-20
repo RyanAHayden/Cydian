@@ -50,6 +50,7 @@ import { addNavIcon } from "../nav/navbar.js";
 import { haptic } from "../nav/haptic.js";
 import { showHUD } from "../nav/hud.js";
 import { showUndoBar } from "../nav/undobar.js"; // F242a
+import { slideChange } from "../nav/slide.js"; // B191
 import { APP_MODE_LABEL } from "../core/appqueue.js"; // F242a
 import { installedOnPhone } from "../core/appqueue.js"; // B136
 import { whereFromGroup, reportBanner, reports, reportMalicious } from "./safety.js"; // F291
@@ -1235,32 +1236,14 @@ function fillGallery(slot, shots, { image, settleMs }) {
   });
 }
 
-// B54: change what's in the slot and move its height from the old to the new in one transition (altstore.css
-// .preview-slot), so the page below slides once instead of jumping. -> whether the height changed.
+// B54: change what's in the slot in one step, so the page below slides once instead of jumping. B191: the slot takes
+// its new height at once and nav/slide.js slides what's below it from its old place (a transform: 120 Hz never
+// animates height); slideChange measures before and after, so the slide starts in the same frame. -> whether the
+// height changed.
 function resizeSlot(slot, change) {
   const from = slot.offsetHeight || 0;
-  slot.endResize?.(); // one still running: measure the new height from the content, not its fixed one
-  change();
-  const to = slot.offsetHeight || 0;
-  if (from === to) return false;
-  if (typeof requestAnimationFrame !== "function" || globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return true;
-  slot.style.height = `${from}px`;
-  void slot.offsetHeight; // start from the old height
-  slot.classList.add("resizing");
-  slot.style.height = `${to}px`;
-  let timer = 0;
-  const end = (e) => {
-    if (e && e.target !== slot) return;
-    slot.removeEventListener("transitionend", end);
-    clearTimeout(timer);
-    slot.classList.remove("resizing");
-    slot.style.height = "";
-    slot.endResize = null;
-  };
-  slot.endResize = end;
-  slot.addEventListener("transitionend", end);
-  timer = setTimeout(end, 500);
-  return true;
+  slideChange(slot, change);
+  return (slot.offsetHeight || 0) !== from;
 }
 
 function fadeIn(node) {

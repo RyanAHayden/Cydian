@@ -88,14 +88,34 @@
   content: ""; position: absolute; left: 8px; right: 8px; top: 13px; height: 3px; border-radius: 1px; background: #fff;
   box-shadow: 0 -.5px 0 rgba(0,0,0,.2); transition: transform .25s ease-in-out;
 }
-.source-row .cell-inner { width: 100%; transition: transform .3s ease-in-out, width .3s ease-in-out; }
-.source-row .cell-inner.chevron::after, .source-row .cell-detail, .source-row .cell-count { transition: opacity .2s ease; }
+/* 120 Hz (AGENTS.md): only transform and opacity animate. The content's width snaps to its new size at once (the text
+   ellipsizes there in one step) while the transform slides it; what sits on the right is held where it shows:
+   - edit mode (and Manage's circles, packages.css / myipas.css .managing): a detail or count keeps its full-width
+     place in the narrowed content (margin 37 in, -37 out) and a -37px transform, sliding with the content's +37px
+     in step, keeps it still on the screen, while the name loses the 37px;
+   - Delete (armed): the right side fades where it was: `translate` (not transitioned) puts it back by the width the
+     content lost, in the same frame. The chevron, faded in edit mode, goes along with the row as it fades. */
+.source-row .cell-inner { width: 100%; transition: transform .3s ease-in-out; }
+.source-row .cell-inner.chevron::after { transition: opacity .2s ease; }
+.source-row .cell-inner > :is(.cell-detail, .cell-count) { transition: opacity .2s ease, transform .3s ease-in-out; }
 .editing .source-row .del-toggle { transform: none; }
 .editing .source-row .cell-inner { transform: translateX(37px); width: calc(100% - 37px); }
 .editing .source-row .cell-inner.chevron::after { opacity: 0; }
+:is(.editing, .managing) .source-row .cell-inner.chevron::after { translate: 37px 0; }
+:is(.editing, .managing) .source-row .cell-inner > :is(.cell-detail, .cell-count) { margin-left: 37px; margin-right: -37px; transform: translateX(-37px); }
 .source-row.armed .del-toggle::after { transform: rotate(-90deg); }
 .source-row.armed .cell-inner { width: calc(100% - 76px); } /* room for Delete; the URL ellipsizes */
 .editing .source-row.armed .cell-inner { width: calc(100% - 37px - 76px); }
+.source-row.armed .cell-inner > :is(.cell-detail, .cell-count), .source-row.armed .cell-inner.chevron::after { translate: 76px 0; }
+:is(.editing, .managing) .source-row.armed .cell-inner.chevron::after { translate: 113px 0; }
+.editing.manage-list .source-row.armed .cell-inner > :is(.cell-detail, .cell-count) { translate: 120px 0; } /* manage.css: 76 + 44 */
+/* The Wish List's package rows (packages.css .wish-row) the same way: their chevron is the inner's ::after, the version
+   sits at the end of the name's line (padding 37 in, margin -37 out: it keeps its place, the name loses the room). */
+.source-row.wish-row .pkg-version { transition: opacity .2s ease, transform .3s ease-in-out; }
+.editing .source-row.wish-row .pkg-version { padding-left: 37px; margin-right: -37px; transform: translateX(-37px); }
+.editing .source-row.wish-row > .cell-inner::after { translate: 37px 0; }
+.source-row.wish-row.armed .pkg-version, .source-row.wish-row.armed > .cell-inner::after { translate: 76px 0; }
+.editing .source-row.wish-row.armed > .cell-inner::after { translate: 113px 0; }
 .del-confirm { /* UIRemoveControlRed: dark top edge, gloss over the top half, flat red, dark red bottom edge */
   position: absolute; right: 9px; top: 50%; height: 32px; margin-top: -16px; padding: 0 11px; border-radius: 6px;
   font-size: 15px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4); cursor: pointer;

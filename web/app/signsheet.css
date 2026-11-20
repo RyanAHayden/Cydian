@@ -35,10 +35,12 @@
 .group-footer.sign-warning { color: #b5322c; text-shadow: none; }
 .cell-detail.sign-warning-text { color: #b5322c; }
 .signed-row { position: relative; touch-action: pan-y; }
-.signed-row .cell-inner { width: 100%; transition: width .3s ease-in-out; }
+.signed-row .cell-inner { width: 100%; }
 .signed-row .cell-detail { transition: opacity .2s ease; }
 .signed-row.is-expiring .cell-detail { color: #b5322c; }
+/* The width snaps (120 Hz: no layout transitions; the name ellipsizes in one step) and the date fades where it was:
+   the untransitioned `translate` puts it back by the 76px the content lost (sources.css's armed rows). */
 .signed-row.armed .cell-inner { width: calc(100% - 76px); }
-.signed-row.armed .cell-detail { opacity: 0; }
+.signed-row.armed .cell-detail { opacity: 0; translate: 76px 0; }
 .signed-row.armed .del-confirm { clip-path: inset(0 round 6px); pointer-events: auto; }
 .signed-row.removing { opacity: 0; transition: opacity .2s ease-out; }

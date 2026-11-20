@@ -233,12 +233,12 @@ export function pushRows(view, now = Date.now()) {
   if (on && state?.lastError) {
     footer = `${state.lastError} ${FALLBACK_TEXT}`;
   } else if (on && status && status.registered === false) {
-    footer = `The server no longer knows this iPhone. Turn Push off and on again. ${FALLBACK_TEXT}`;
+    footer = "The server no longer knows this iPhone. Turn Push off and on again.";
   } else if (on) {
     rows.push({ label: "Last Push", detail: ago(status?.lastPush, now) });
-    footer = "Update alerts arrive within half an hour of an update, even while iOS doesn't run the background check.";
+    footer = "Alerts arrive within half an hour of an update.";
   } else {
-    footer = `Push sends this iPhone's push token and the apps ${NAME} follows (their sources and versions) to the signing server, which checks them every half hour.`;
+    footer = "Push sends this iPhone's push token and the apps you follow to the signing server, which checks them every half hour.";
   }
   return { header: "Push Notifications", rows, footer };
 }

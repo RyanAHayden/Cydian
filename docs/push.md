@@ -15,7 +15,8 @@ The sideload app's Updates page, what you get first, how it's checked after:
 | Group | Rows |
 |---|---|
 | **Update Alerts** | Notifications and Icon Badge (iOS's; flipping opens iOS Settings), iFizBox Updates |
-| **Checking for Updates** | Push, Check in the Background, Background App Refresh (iOS's), Last Push, Last Background Check, Turn On in Settings (when iOS has something off) |
+| **Checking for Updates** | Push, Last Push (its own footer: what Push does, or what's wrong) |
+| *(no header)* | Background Check, Last Check; Background App Refresh and Notifications (iOS's) with Turn On in Settings only when iOS has one off, the footer saying which |
 | **Ignored Upgrades** | the held apps |
 
 **iFizBox Updates** (on by default): off, iFizBox's own entry leaves the list the background check and the push

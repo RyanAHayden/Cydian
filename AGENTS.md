@@ -46,6 +46,9 @@ Shortcuts recipes live in `docs/shortcuts.md`.
   `background:` shorthand), or it tiles into the border and shows a light line at the bottom. The bar buttons, back
   arrow and switch in `web/app/ios6.css` are the reference: copy their approach for new controls, and check a 3x
   render zoomed in before calling it done.
+- Hints (group footers): iOS 6 style, as the 4S's Wi-Fi and Mail > Fetch New Data: a footer explains only the group
+  above it (split groups so each switch gets its own), one or two short sentences, never two hints joined; when
+  something is off the footer says so and the fix row sits in that group; status rows get none; centred.
 - Never commit Apple artwork (UIKit `.artwork` extracts, system icons) or Cydia's logo. One exception: screenshots
   of iOS's own Settings screens used as tutorial steps (e.g. the pairing walkthrough) may be committed whole,
   system icons included (user, 2026-11-19). Pulled device files go in

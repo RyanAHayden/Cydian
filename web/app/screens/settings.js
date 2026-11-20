@@ -1563,30 +1563,29 @@ function showSigningPage(el, layout, parts) {
 
 // The sideload app: what iOS lets iFizBox do for update alerts (badges, notifications, Background App Refresh) and
 // when the background check last ran. A "no" given once can only be changed in iOS Settings: the row opens it.
-// F285: two groups, iOS 6 Settings style, what you get first, how it's checked after:
+// F285, F311: iOS 6 Settings style, what you get first, how it's checked after; each footer explains only its own
+// group (AGENTS.md, Hints):
 //   Update Alerts          Notifications (iOS), Icon Badge (iOS), <NAME> Updates (selfUpdateAlerts)
-//   Checking for Updates   Push, Check in the Background, Background App Refresh (iOS), Last Push,
-//                          Last Background Check, Turn On in Settings; Push's footer, then the check's
+//   Checking for Updates   Push, Last Push; Push's footer (core/push.js pushRows: what it does, or what's wrong)
+//   (no header)            Background Check, Background App Refresh and Notifications (iOS, each only when off),
+//                          Last Check, Turn On in Settings (only when one is off); the footer says what's off, else
+//                          when the check runs
+// No Push group when push can't work here: the Background Check group then takes the header.
 // `push`: core/push.js pushRows (null: no Push rows, as when push can't work here or its state can't be read). Switch rows carry `toggle`:
-// "ours" (Check in the Background), "ios" (opens iOS Settings), "push", "self".
+// "ours" (Background Check), "ios" (opens iOS Settings), "push", "self".
 export function notifyRows(st, now = Date.now(), { push = null, selfAlerts = true } = {}) {
-  const g = checkRows(st, now);
+  const g = checkRows(st, now, { pushOn: Boolean(push?.rows[0]?.on) });
   if (!g) return null;
   const row = (label) => g.rows.find((r) => r.label === label);
-  const pushRow = (label) => push?.rows.find((r) => r.label === label);
   const self = SETTINGS.find((d) => d.key === "selfUpdateAlerts");
   const alerts = { header: "Update Alerts", rows: [row("Notifications"), row("Icon Badge"),
     { label: self.label, detail: selfAlerts ? "On" : "Off", on: selfAlerts, toggle: "self" }], footer: self.footer };
-  const checking = { header: "Checking for Updates", rows: [
-    ...(push ? [{ ...push.rows[0], toggle: "push" }] : []),
-    row("Check in the Background"), row("Background App Refresh"),
-    ...(pushRow("Last Push") ? [pushRow("Last Push")] : []),
-    row("Last Background Check"),
-    ...(row("Turn On in Settings") ? [row("Turn On in Settings")] : [])],
-  footer: [push?.footer, g.footer].filter(Boolean).join(" ") };
-  return [alerts, checking];
+  const check = { rows: g.rows.filter((r) => r.check).map(({ check: _, ...r }) => r), footer: g.footer };
+  if (!push) return [alerts, { header: "Checking for Updates", ...check }];
+  return [alerts, { header: "Checking for Updates", rows: [{ ...push.rows[0], toggle: "push" }, ...push.rows.slice(1)],
+    footer: push.footer }, check];
 }
-function checkRows(st, now) {
+function checkRows(st, now, { pushOn = false } = {}) {
   if (!st) return null;
   const onOff = (v) => (v ? "On" : "Off");
   const ago = (iso) => {
@@ -1595,17 +1594,27 @@ function checkRows(st, now) {
     const m = Math.round((now - t) / 60000);
     return m < 1 ? "Just now" : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
   };
-  const off = st.backgroundOn !== false && (!st.badges || !st.alerts || !st.backgroundRefresh);
-  return { header: "Update Alerts", rows: [
-    // switch rows (our iOS 6 switch, notifySection): ours to flip, or iOS's (flipping opens its Settings)
-    { label: "Check in the Background", detail: onOff(st.backgroundOn !== false), on: st.backgroundOn !== false, toggle: "ours" },
+  // what iOS has off that the check needs (asked only while the check is on: turned off here, nothing to fix)
+  const on = st.backgroundOn !== false;
+  const noRefresh = on && !st.backgroundRefresh;
+  const noAlerts = on && !st.alerts;
+  const footer = !on ? `Off, updates are found only while ${NAME} is open${pushOn ? " or Push brings them" : ""}.`
+    : noRefresh && noAlerts ? "Background App Refresh and Notifications are off in iOS, so this check can't run or alert you."
+      : noRefresh ? "Background App Refresh is off in iOS, so this check can't run."
+        : noAlerts ? "Notifications are off in iOS, so this check can't alert you."
+          : pushOn ? "Used when Push can't reach this iPhone. iOS decides when it runs, usually every few hours."
+            : "iOS decides when this runs, usually every few hours.";
+  return { rows: [
+    // switch rows (our iOS 6 switch, notifySection): ours to flip, or iOS's (flipping opens its Settings). `check`:
+    // the Background Check group's rows, in order; the others are Update Alerts'.
+    { label: "Background Check", detail: onOff(on), on, toggle: "ours", check: true },
     { label: "Icon Badge", detail: onOff(st.badges), on: Boolean(st.badges), toggle: "ios" },
     { label: "Notifications", detail: onOff(st.alerts), on: Boolean(st.alerts), toggle: "ios" },
-    { label: "Background App Refresh", detail: onOff(st.backgroundRefresh), on: Boolean(st.backgroundRefresh), toggle: "ios" },
-    { label: "Last Background Check", detail: ago(st.lastCheck) },
-    ...(off ? [{ label: "Turn On in Settings", chevron: true, open: true }] : [])],
-    footer: off ? `iOS asks only once: anything left off is turned on in Settings > Notifications > ${NAME}, and Settings > General > Background App Refresh.`
-      : "iOS decides when the background check runs, usually every few hours. It badges every update and notifies only about new ones." };
+    ...(noRefresh ? [{ label: "Background App Refresh", detail: "Off", on: false, toggle: "ios", check: true }] : []),
+    ...(noAlerts ? [{ label: "Notifications", detail: "Off", on: false, toggle: "ios", check: true }] : []),
+    { label: "Last Check", detail: ago(st.lastCheck), check: true },
+    ...(noRefresh || noAlerts ? [{ label: "Turn On in Settings", chevron: true, open: true, check: true }] : [])],
+  footer };
 }
 function notifySection() {
   const box = document.createElement("div");

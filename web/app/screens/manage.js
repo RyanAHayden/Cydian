@@ -328,38 +328,44 @@ export const addSourceText = (apt = aptKept()) => apt
 // Add Source, as the Sources tab's Edit mode had it (docs/cydia.md "Sources tab").
 // F8: `prefill` ({ url, dist?, components? }, from a /add?url= link, core/handoff.js parseAddLink) fills the field;
 // a dist repo's suite and components are named in the message and go along while the URL is left as it was.
-export async function addSource(ctx, prefill = null) {
+// B177: `edit` ({ title, button }: a failed source's Edit Source, screens/sourceerror.js) renames the alert, and an
+// unchanged URL saves nothing. Resolves to the saved record (null when nothing was added).
+export async function addSource(ctx, prefill = null, edit = null) {
   const dist = prefill?.dist ? `Suite ${prefill.dist}${prefill.components?.length ? `, ${prefill.components.join(" ")}` : ""}.` : "";
   const { index, value } = await showAlert({
     ...addSourceText(),
     ...(dist ? { message: dist } : {}),
+    ...(edit?.title ? { title: edit.title } : {}),
     input: { placeholder: "https://", value: prefill?.url || "https://", type: "url", paste: cleanSourceUrl },
-    buttons: ["Cancel", "Add Source"],
+    buttons: ["Cancel", edit?.button || "Add Source"],
     cancel: 0,
   });
-  if (index !== 1) return;
+  if (index !== 1) return null;
   // A pasted https://… into the field's own https:// would read https://https://…: cleanSourceUrl fixes it.
   const typed = cleanSourceUrl(value) || value.trim();
+  if (edit && typed === prefill?.url) return null;
   const input = dist && typed === prefill.url ? { uri: prefill.url, dist: prefill.dist, components: prefill.components } : typed;
   if (!(await confirmWarning(input))) return;
   // F291: a source not on the known-safe list: Unknown Source (Add & Trust / Add Source / Cancel)
   const unknown = await confirmUnknownSource(input);
   if (!unknown) return;
   let error = null;
+  let saved = null;
   try {
-    const saved = await addSecure(input, { backend: getBackend(), showHUD: ctx.showHUD });
-    if (!saved) return; // F220: Cancel
+    saved = await addSecure(input, { backend: getBackend(), showHUD: ctx.showHUD });
+    if (!saved) return null; // F220: Cancel
     if (unknown.trust) markTrusted(saved.uri ? saved : input);
   } catch (e) {
     error = e;
   }
   if (error) {
     await showAlert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
-    return;
+    return null;
   }
   changed(ctx);
   const body = document.querySelector(".page.is-top .manage-list")?.closest(".page-body");
   if (body) renderSources(body);
+  return saved;
 }
 
 // F220: Zebra's warning for an http: source, the iOS 6 way. Cancel is the safe choice, so it gets the darker

@@ -50,6 +50,7 @@ import { rememberedApps } from "../app-updates.js";
 import { ignoreVersionLabel, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
 import { openInGroup, setSourceShare, shareHeadButton } from "./handoff.js";
 import { healthOf } from "../core/health.js";
+import { sourceErrorGroup } from "./sourceerror.js"; // B177
 import { addSource } from "./manage.js";
 import { featuredStrip, paymentGroup, paidStateOf, soldByVendor } from "./extras.js";
 import { installQueue } from "../queue.js";
@@ -165,7 +166,7 @@ export function nav(route, sourceName = () => null) {
 export function render(body, route, ctx) {
   const p = pageOf(route);
   switch (p.page) {
-    case "sections": return isAltKey(p.key) ? renderAltSource(body, route, p.key) : renderSections(body, route, p.key);
+    case "sections": return isAltKey(p.key) ? renderAltSource(body, route, p.key, ctx) : renderSections(body, route, p.key, ctx);
     case "section": return renderList(body, route, () => catalog.list(p.key, p.value), true);
     case "author": return renderAuthor(body, route, p.value);
     case "package": return renderPackage(body, route, p.key, p.value, ctx);
@@ -188,9 +189,9 @@ const deeper = (route, seg) => format({ tab: route.tab, path: [...route.path, se
 // Sections pages on screen, by route, so their nav bar's Edit can find them: { body, route, key, editing, title }.
 const sectionPages = new Map();
 
-function renderSections(body, route, key) {
+function renderSections(body, route, key, ctx = null) {
   for (const [k, p] of sectionPages) if (!p.body.isConnected) sectionPages.delete(k);
-  const page = { body, route, key, editing: false, title: null, draw: 0 };
+  const page = { body, route, key, editing: false, title: null, draw: 0, ctx };
   sectionPages.set(format(route), page);
   return drawSections(page);
 }
@@ -220,7 +221,8 @@ async function drawSections(page) {
   }
   body.replaceChildren(ul);
   if (!editing) body.prepend(filterRow(() => drawSections(page)));
-  if (status?.error) body.append(note(status.error));
+  const statusNote = status?.error ? note(status.error) : null; // B177: the error group below takes its place
+  if (statusNote) body.append(statusNote);
   else if (editing ? !data.sections.length : !data.total) {
     body.append(note(data.sections.length ? "Every section is hidden. Tap Edit to show them." : "No packages for this device."));
   }
@@ -229,13 +231,16 @@ async function drawSections(page) {
   if (!editing && key !== ALL) {
     const source = await getBackend().sources().then((l) => l.find((x) => x.key === key)).catch(() => null);
     if (source && turn === page.draw && body.isConnected) {
+      // B177: a source whose refresh failed: the whole error and what to do about it, at the top (screens/sourceerror.js)
+      const failed = sourceErrorGroup(source, { status, ctx: page.ctx, onChange: () => { if (body.isConnected) drawSections(page); } });
       body.prepend(featuredStrip(source)); // F20: the source's sileo-featured.json banners, above its sections
+      if (failed) { statusNote?.remove(); body.prepend(failed); }
       setSourceShare(body, source);
       body.append(grouped([{ footer: healthOf(source).label }])); // F19: last reached, last Release, Not Responding
       if (insecureNote(source)) body.append(grouped([{ footer: insecureNote(source) }])); // F220: an http source
       body.append(canisterFactsSlot(source)); // F305a: HTTPS and Signed Releases, from Canister's cached facts
       // B23: what apt-get update said about it (the jailbreak app), when the catalog's own load didn't fail
-      if (source.aptError && source.aptError !== status?.error) body.append(el("p", "empty source-apt-error", source.aptError));
+      if (!failed && source.aptError && source.aptError !== status?.error) body.append(el("p", "empty source-apt-error", source.aptError));
     }
   }
 }

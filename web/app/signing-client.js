@@ -1192,7 +1192,11 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     ipaSize = ipa?.byteLength ?? ipa?.length ?? 0;
     const self = isSelfIpa(url) || bring;
     const carry = self ? { identity: Boolean(bring), transfer: await transfer().catch(() => null) } : null;
-    const signed = await guard(worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(id.profile), password: id.password ?? "", bring: carry,
+    // own provisioning profiles: with an App Store Connect key, the App ID and Ad Hoc profile made for this app
+    const keep = withKeep({}).keepBundleId !== false && !self;
+    const made = keep ? await guard((await import("./screens/devaccount.js")).autoProfileSite({ ipa, id, bundleId: bundleId || null,
+      log: (t) => h.page?.raw?.(t) })) : null;
+    const signed = await guard(worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(made ?? id.profile), password: id.password ?? "", bring: carry,
         appBundleId: bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null), ...withKeep({}) },
       { onProgress: (t) => h.set(t), ...(signal ? { signal } : {}) }));
     noteSigned(storage, ipaSize); // F261

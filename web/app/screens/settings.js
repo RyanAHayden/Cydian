@@ -30,6 +30,7 @@ import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { drawWalkthrough, walkOpen, offerInstall, missingStep, siteReady, deviceRows } from "./signing.js";
 import { storedUdid, udidPending, startUdid, watchUdid, canFindUdid, udidFindRows } from "./signing.js";
 import { freeRouteBlock } from "./free-apple-id.js";
+import { accountGroup } from "./devaccount.js";
 import { openInAppSection } from "./importlink.js";
 import { accountSection, drawAccount, startAccountSync } from "./account.js";
 import { signingExtras } from "./signed-apps.js";
@@ -1198,6 +1199,7 @@ async function drawDeviceSigning(el) {
       footer: `Kept in this iPhone's Keychain, where only ${NAME} can use it.` }),
     files: () => certificateBlock(el, id, status ?? { identity: null }, { files: true }),
     profile: () => profileGroup(split.profile, info.device), // F236: with "This iPhone is in the profile"
+    account: () => accountGroup({ redraw: redrawAll }),
     options: () => withKeepNotes(settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"), kept?.profile),
     server: () => serverGroup(el),
     status: () => signingExtras({ identity: kept, redraw: redrawAll, dates: settings.get("showExpiry") }),
@@ -1256,6 +1258,7 @@ export function signingLayout({ mode, certificate = false, staged = false, profi
     // the sideload Keychain's with no picks left (its caller clears the picks after an import)
     files: staged && !(site && ready),
     profile,
+    account: certificate && (mode === "sideload" || site), // own profiles with an App Store Connect key (devaccount.js): needs the .p12
     options,
     server: mode === "sideload",
     status: mode === "sideload",
@@ -1481,6 +1484,7 @@ async function drawSiteSigning(el) {
     // F236: the website can't read the UDID itself: F253's profile fetches it (Find This iPhone's UDID), else a
     // profile that lists devices says how to check it
     profile: () => profileGroup(split.profile, check ? deviceCheckText(check) : null, siteUdidFind(check)),
+    account: () => accountGroup({ native: false, redraw: redrawAll }),
     options: () => withKeepNotes(settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"), profile),
     app: () => { const f = document.createDocumentFragment(); f.append(...siteAppSection(id)); return f; },
     remove: () => grouped([{ rows: [{ label: "Remove Certificate", onClick: () => removeSiteCertificate() }] }]),

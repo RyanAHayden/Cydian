@@ -85,17 +85,17 @@ test("F128: page titles for the iOS 6-style routes and the old ones", async () =
 test("F134: the Signing page's groups, in order, for each build and state", async () => {
   const { signingLayout, splitSummary, HELP } = await import("./settings.js");
   const { SIGNING_GROUPS } = await import("../core/settings.js");
-  assert.deepEqual(SIGNING_GROUPS.slice(0, 4), ["certificate", "files", "profile", "options"]);
+  assert.deepEqual(SIGNING_GROUPS.slice(0, 5), ["certificate", "files", "profile", "account", "options"]);
   assert.equal(SIGNING_GROUPS.at(-1), "help");
   // the sideload app, set up
   assert.deepEqual(signingLayout({ mode: "sideload", certificate: true, profile: true, options: true }),
-    ["certificate", "profile", "options", "server", "status", "remove", "help"]);
+    ["certificate", "profile", "account", "options", "server", "status", "remove", "help"]);
   // nothing yet: the certificate's Import row, the options, the server, then the walkthrough's link
   assert.deepEqual(signingLayout({ mode: "sideload", options: true }), ["certificate", "options", "server", "status", "help"]);
   // a file picked, one still missing: the Files group under the certificate
   assert.deepEqual(signingLayout({ mode: "sideload", staged: true, options: true }), ["certificate", "files", "options", "server", "status", "remove", "help"]);
   // the website: no options, server or Signed Apps; Install iFizBox App once the certificate works
-  assert.deepEqual(signingLayout({ mode: "site", certificate: true, profile: true, ready: true }), ["certificate", "profile", "app", "other", "remove", "help"]);
+  assert.deepEqual(signingLayout({ mode: "site", certificate: true, profile: true, ready: true }), ["certificate", "profile", "account", "app", "other", "remove", "help"]);
   // F254j: no certificate on the website: Use a Free Apple ID before the walkthrough's link; never in the app builds
   assert.deepEqual(signingLayout({ mode: "site" }), ["certificate", "other", "free", "help"]);
   assert.ok(signingLayout({ mode: "site", staged: true }).includes("free"));

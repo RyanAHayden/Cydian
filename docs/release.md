@@ -88,10 +88,12 @@ One command does all of it: `tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.
 clean and current and the version is new, commits and pushes `native/VERSION`, builds that exact commit in a clean
 temporary worktree, publishes it with `tools/release.sh` as the repo owner's GitHub account (whichever gh account
 is active; `tools/release.sh --check-auth` runs first, so a missing login stops it before the version commit is
-pushed), commits and pushes the updated `web/app/source.json`, and then waits for the site with
+pushed; `tools/deploy.sh --check-auth` checks wrangler's login the same way), tags a commit that adds the updated
+`web/app/source.json` to the built one (`release.sh --tag-source`), merges that tag into main and pushes it, deploys
+ifizbox.com from the tag (`tools/deploy.sh vX.Y.Z`, "Deploying the site" below), and then waits for the site with
 `tools/release.sh --verify-live X.Y.Z` (step 6 below): it finishes only once `https://ifizbox.com/repo/` lists the
 new version, and fails when the deploy doesn't serve it within 15 minutes. Run it from an interactive shell (it needs `SWIFT_TOOLCHAIN` and `IOS_SDK`). `--dry-run` builds
-and prints what would be published and changes nothing. There is no release on tag push in CI: the build needs the
+and prints what would be published and deployed, and changes nothing. There is no release on tag push in CI: the build needs the
 iOS SDK, which can't go on a hosted runner. The steps below are what it runs.
 
 
@@ -110,7 +112,10 @@ iOS SDK, which can't go on a hosted runner. The steps below are what it runs.
    `gh auth login` as the owner (gh keeps the other accounts), or set `GH_TOKEN`. `tools/release.sh --check-auth`
    shows which account it would publish as. It checks for
    a clean tree, a HEAD that is on origin, and a tag that doesn't exist yet locally, on origin or as a release. Then it
-   runs `gh release create` with the assets above. GitHub creates the tag at HEAD.
+   runs `gh release create` with the assets above. GitHub creates the tag at HEAD; with `--tag-source` (what
+   `publish.sh` passes) the script first commits the updated `web/app/source.json` on top of HEAD and pushes the tag
+   at that commit (the tag only, not a branch), so the tagged commit the site is deployed from already lists the
+   release. If `gh release create` then fails it deletes the tag again.
    Before building it refreshes `web/app/core/piracy-list.js` from Canister (`tools/sync-piracy-list.py`),
    warns when the committed copy is older than cnstr/manifests' newest piracy-list commit, and stops if the file
    changed: commit and push it, then run again (with `publish.sh`, run that again). A dry run stays offline and only
@@ -121,16 +126,33 @@ iOS SDK, which can't go on a hosted runner. The steps below are what it runs.
    `iFizBox.ipa`, which answers (retried for 2 minutes while GitHub catches up). A draft only gets the asset check,
    because it is never "latest". `tools/release.sh --verify-release X.Y.Z` runs the same checks on their own, e.g.
    after publishing a draft on the site.
-5. Commit `web/app/source.json` (the script rewrote it to name the new IPA) and push it to main.
+5. Get `web/app/source.json` (rewritten to name the new IPA) onto main: with `--tag-source`, `git merge vX.Y.Z`
+   (a fast-forward when nothing landed meanwhile), without it commit the file; push main. Then deploy the site
+   from the tag: `tools/deploy.sh vX.Y.Z`.
 6. Verify it is live: `tools/release.sh --verify-live X.Y.Z`. This polls
    `https://ifizbox.com/repo/source.json` and `https://ifizbox.com/repo/Packages` every 15 seconds until both list
    X.Y.Z for iFizBox (other apps and packages don't count), and fails loudly after 15 minutes, printing what each
    one says. Both read the latest release's assets, so if it fails, check the release is published and latest
-   (`--verify-release`), then the Workers Builds deploy.
+   (`--verify-release`), then the deploy (`tools/deploy.sh vX.Y.Z` again).
 
 Both `/repo/Packages` and `/repo/source.json` read the latest release's assets, so `--verify-live` passes within
-the 5-minute cache of the release (step 4) even before the push; step 5 keeps the Worker's fallback copy (used
-only when GitHub fails) current.
+the 5-minute cache of the release (step 4) even before the deploy; step 5's deploy keeps the Worker's fallback copy
+(used only when GitHub fails) current.
+
+## Deploying the site
+
+ifizbox.com (the Worker, `worker/wrangler.ifizbox.toml`) is deployed from release tags only: a push to main deploys
+nothing, so work merged between releases reaches the site with the next release. `tools/deploy.sh vX.Y.Z` checks the
+tag out in a clean temporary worktree, writes `web/app/build.json` there (`tools/buildinfo.sh`) and runs
+`npx wrangler deploy -c wrangler.ifizbox.toml` in its `worker/`, so untracked files and branch work on disk never
+reach the site. `publish.sh` runs it right after tagging; run it by hand to redeploy a tag (a failed deploy, or a
+rollback to an older tag). `--dry-run` builds the Worker and uploads nothing; `--check-auth` says whether wrangler
+is logged in (`cd worker && npx wrangler login` as the account that owns the Worker). `IFIZBOX_WRANGLER` picks the
+wrangler package (default a pinned `wrangler@4.x`).
+
+Cloudflare's Workers Builds must not be connected to the repo with a push deploy on main, or it deploys main
+between releases: turn it off in the Cloudflare dashboard (Workers & Pages > ifizbox > Settings > Build); wrangler's
+login can't change Workers Builds settings.
 
 Options:
 

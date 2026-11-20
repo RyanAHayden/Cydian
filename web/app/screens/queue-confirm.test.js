@@ -94,5 +94,7 @@ test("ios6.css: .bar-button.red has a pressed state, dark variants, and a border
   assert.match(css, /--lt-red: linear-gradient\(#d4848b, #b01a27\);/);
   assert.match(css, /--dk-red: linear-gradient\(#d07079, #b82e3a 51\.7%, #b01825 51\.7%\);/);
   const pal = read("../palettes.css");
-  assert.match(pal, /\[data-palette="solarized"\][^)]*\) \.bar-button\.red:not\(\.back\):not\(\.done\) \{/);
+  // C49: the light palettes paint it through ios6.css's rule above, from the --lt-red* their blocks set
+  assert.doesNotMatch(pal.replace(/\/\*[\s\S]*?\*\//g, ""), /\.bar-button\.red/);
+  assert.match(pal, /html\[data-theme="light"\]\[data-palette="solarized"\] \{[^}]*--lt-red: /);
 });

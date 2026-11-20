@@ -5,8 +5,7 @@
 
 /* ==== look-only { ==== iOS 6's decorations for the search bar, scope bar, Filter, action sheet and store header, as
    tokens so an era (docs/eras.md) swaps values instead of undoing them. The modal sheet paints with --plain and the
-   nav bar's tokens (ios6.css); palettes.css still paints the light palettes' search bar and store header with rules
-   of its own. */
+   nav bar's tokens (ios6.css); the light palettes set these tokens too (palettes.css). */
 :root {
   /* "grey search bar": the bar with its 1px line under it, the field (white, the magnifier, edges, inner shadow) */
   --search-bar: linear-gradient(#81919f, #81919f) bottom / 100% 1px no-repeat, linear-gradient(#b5b9bd, #d3dbdf 7%, #b3bdc5);

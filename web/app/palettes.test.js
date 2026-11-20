@@ -73,6 +73,50 @@ test("text stays readable: body text 7:1, subtitles, headers, details and links 
   }
 });
 
+// C49: eras (docs/eras.md) restyle the chrome through ios6.css's look tokens, so the light palettes set those tokens
+// rather than paint the nav bar, bar buttons, search bar and header band with rules an era rule could not outrank.
+// Brushed Metal's etched text is the one rule left on them, text only (its dark text skips Done and the red button,
+// which a token cannot); the App Store segmented control keeps rules until ios6.css gives it tokens.
+const rules = [...palettes.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g)].map((m) => ({ sel: m[1].trim(), body: m[2] }));
+const packages = read("./packages.css");
+
+test("no palette rule paints the nav bar, bar buttons, search and scope bars or header band: they ride tokens", () => {
+  const chrome = /\.navbar|\.bar-button|\.search-(bar|scope|field|cancel)|\.scope-(segment|filter)|\.store-head/;
+  for (const { sel, body } of rules) {
+    if (!chrome.test(sel)) continue;
+    assert.ok(sel.startsWith('html[data-theme="light"][data-palette="metal"] '), sel);
+    for (const [, prop] of body.matchAll(/([\w-]+)\s*:/g)) assert.ok(["color", "text-shadow", "filter"].includes(prop), `${sel}: ${prop}`);
+  }
+  const map = rules.find((r) => /^html\[data-theme="light"\]:is\([^)]*\)$/.test(r.sel));
+  assert.ok(map, "the light palettes' token block");
+  const set = tokens(map.body);
+  const expect = [
+    [ios6, ["--nav-bar", "--bar-btn", "--bar-btn-edge", "--bar-btn-edge-top", "--bar-btn-pressed", "--bar-btn-pressed-edge",
+      "--bar-btn-pressed-edge-top", "--bar-back", "--bar-back-pressed"]],
+    [packages, ["--search-bar", "--search-bar-scoped", "--search-scope", "--search-field-edge", "--search-field-edge-top",
+      "--search-cancel", "--search-cancel-pressed", "--search-cancel-edge", "--search-cancel-edge-top", "--search-cancel-edge-bottom",
+      "--scope-seg", "--scope-seg-edge", "--scope-seg-edge-top", "--scope-seg-edge-bottom", "--scope-seg-divider",
+      "--scope-seg-selected", "--scope-seg-selected-edge", "--scope-seg-selected-edge-top", "--scope-seg-selected-edge-bottom",
+      "--scope-seg-selected-divider", "--store-head", "--store-head-edge"]],
+  ];
+  for (const [css, keys] of expect) for (const k of keys) {
+    assert.match(css, new RegExp(`var\\(${k}\\)`), `read: ${k}`);
+    assert.match(set.get(k) ?? "", /var\(--lt-[\w-]+\)/, `${k} from an --lt-* token`);
+  }
+});
+
+test("token blocks weigh no more than html plus two attributes, so an era's tone block linked later wins", () => {
+  const blocks = rules.flatMap((r) => r.sel.split(/,(?![^(]*\))/).map((s) => s.trim())).filter((s) => /^html[\[:]/.test(s) && !/\s/.test(s.replace(/:is\([^)]*\)/g, "")));
+  assert.ok(blocks.length >= NEW_DARK.length + NEW_LIGHT.length, blocks.length);
+  for (const s of blocks) {
+    const attrs = (s.replace(/:is\([^)]*\)/g, "[is]").match(/\[[^\]]+\]/g) ?? []).length;
+    assert.ok(attrs <= 2, `${s}: ${attrs} attributes`);
+  }
+  const html = read("./index.html");
+  for (const era of [...html.matchAll(/href="(ios(?!6)\d+\.css)"/g)].map((m) => m[1]))
+    assert.ok(html.indexOf(`href="${era}"`) > html.indexOf('href="palettes.css"'), `${era} after palettes.css`);
+});
+
 test("index.html loads palettes.css after the sheets it overrides", () => {
   const html = read("./index.html");
   const at = (f) => html.indexOf(`href="${f}"`);

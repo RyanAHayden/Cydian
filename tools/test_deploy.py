@@ -148,6 +148,7 @@ class Deploy(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         info = json.loads(re.search(r"build.json=(.*)\n", self.calls()).group(1))
         self.assertEqual(info["build"], git(self.repo, "rev-list", "--count", "v9.9.9"))
+        self.assertEqual(info["commit"], self.tagged[:len(info["commit"])])
 
     def test_dry_run(self):
         r = self.deploy("v9.9.9", "--dry-run")

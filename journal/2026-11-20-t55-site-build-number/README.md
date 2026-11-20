@@ -18,7 +18,13 @@ commit, so tools/deploy.sh's buildinfo run counted one commit more than the apps
   `tools/buildinfo.sh <tmp> --rev v0.17.1^` writes build 2850, commit 9d3787ad.
 
 ## Tried and failed
-- Nothing failed. (Edits to the two scripts were first made with a python heredoc; later edits used the edit tool.)
+- Nothing failed.
+
+## Review
+- Spec review: nothing missing or wrong. It noted that changing the commit hash goes beyond the task's wording.
+  I kept it, because "the site's build" means the footer's whole build line, and a parent count beside the tag's
+  hash would match neither the app nor the tag. Wrapped a long comment line in deploy.sh, and the normal-tag test
+  now checks the hash too.
 
 ## Not verified
 - No real deploy: ifizbox.com/build.json still says 2851 until the next deploy (`tools/deploy.sh v0.17.1` would fix

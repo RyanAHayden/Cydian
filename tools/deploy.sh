@@ -6,8 +6,8 @@
 #
 # tools/publish.sh runs it right after it tags a release; run it by hand to redeploy a tag (a rollback, or a deploy
 # that failed). It checks the tag out in a clean temporary worktree, writes web/app/build.json there
-# (tools/buildinfo.sh, naming the built commit under a source.json-only tag commit) and runs `npx wrangler deploy -c wrangler.ifizbox.toml` in its worker/, so nothing on disk
-# here (untracked files, a branch's work) reaches the site. Needs wrangler logged in to the account that owns the
+# (tools/buildinfo.sh, naming the built commit under a source.json-only tag commit) and runs
+# `npx wrangler deploy -c wrangler.ifizbox.toml` in its worker/, so nothing on disk here (untracked files, a branch's work) reaches the site. Needs wrangler logged in to the account that owns the
 # Worker (`npx wrangler login`; `npx wrangler whoami` shows it). --dry-run builds the Worker (wrangler deploy
 # --dry-run) and uploads nothing.
 #   IFIZBOX_WRANGLER  the wrangler npm package to run (default wrangler@4.164.0)

@@ -33,16 +33,20 @@ def rpath_cmd(path):
 
 
 def macho(filetype, cmds, text_off=0x4000, cpu=(0x0100000C, 0)):
-    """A thin arm64 Mach-O: __TEXT with one __text section at `text_off`, then `cmds` (bytes each)."""
+    """A thin arm64 Mach-O: __TEXT with one __text section at `text_off`, an empty-ish __LINKEDIT after it (signers
+    need one), then `cmds` (bytes each)."""
+    text_size = text_off + 0x4000  # one page of code after the header
     sect = struct.pack("<16s16sQQIIIIIIII", b"__text", b"__TEXT", 0x100000000 + text_off, 16, text_off, 2, 0, 0,
                        0x80000400, 0, 0, 0)
-    seg = struct.pack("<II16sQQQQiiII", 0x19, 72 + 80, b"__TEXT", 0x100000000, text_off + 0x4000, 0, text_off + 16,
+    seg = struct.pack("<II16sQQQQiiII", 0x19, 72 + 80, b"__TEXT", 0x100000000, text_size, 0, text_size,
                       5, 5, 1, 0) + sect
-    body = seg + b"".join(cmds)
-    head = struct.pack("<IiiIIIII", 0xFEEDFACF, cpu[0], cpu[1], filetype, 1 + len(cmds), len(body), 0x85, 0)
+    linkedit = struct.pack("<II16sQQQQiiII", 0x19, 72, b"__LINKEDIT", 0x100000000 + text_size, 0x4000, text_size, 16,
+                           1, 1, 0, 0)
+    body = seg + linkedit + b"".join(cmds)
+    head = struct.pack("<IiiIIIII", 0xFEEDFACF, cpu[0], cpu[1], filetype, 2 + len(cmds), len(body), 0x85, 0)
     out = head + body
     assert len(out) <= text_off
-    return out.ljust(text_off, b"\0") + b"\x1f\x20\x03\xd5" * 4
+    return out.ljust(text_off, b"\0") + (b"\x1f\x20\x03\xd5" * 4).ljust(0x4000, b"\0") + b"\0" * 16
 
 
 def fat(*thins):
@@ -129,7 +133,7 @@ def fixtures():
     kitfw = macho(MH_DYLIB, [dylib_cmd(LC_ID_DYLIB, "@rpath/FixtureUI.framework/FixtureUI"), dylib_cmd(LC_LOAD_DYLIB, LIBSYSTEM)])
     app = macho(MH_EXECUTE, [dylib_cmd(LC_LOAD_DYLIB, LIBSYSTEM)])
     app_rpath = macho(MH_EXECUTE, [dylib_cmd(LC_LOAD_DYLIB, LIBSYSTEM), rpath_cmd("@executable_path/Frameworks")])
-    app_full = macho(MH_EXECUTE, [dylib_cmd(LC_LOAD_DYLIB, LIBSYSTEM)], text_off=0x100)  # no room for more
+    app_full = macho(MH_EXECUTE, [dylib_cmd(LC_LOAD_DYLIB, LIBSYSTEM)], text_off=0x150)  # no room for more
     fw_zip = io.BytesIO()
     with zipfile.ZipFile(fw_zip, "w", zipfile.ZIP_DEFLATED) as z:
         for name, data in [("FixtureUI.framework/FixtureUI", kitfw), ("FixtureUI.framework/Info.plist", b"<plist/>"),

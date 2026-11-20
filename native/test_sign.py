@@ -315,6 +315,43 @@ class OnDeviceSigner(unittest.TestCase):
             self.assertEqual(entry["hash"], hashlib.sha1(files[A + rel]).digest(), rel)
         self.assertEqual(files[A + "embedded.mobileprovision"], self.profile)
 
+    def test_tweaked_ipa(self):
+        """F288: the IPA test_swift signed with tweaks (work/tweaked.ipa; test_swift runs first, by name): the main
+        executable lists the injected dylibs as weak loads with the Frameworks rpath, read here as otool -l would,
+        and the tweaks are in the app, signed and sealed."""
+        path = os.path.join(self.work, "tweaked.ipa")
+        self.assertTrue(os.path.exists(path), "test_swift didn't write tweaked.ipa")
+        with zipfile.ZipFile(path) as z:
+            files = {n: z.read(n) for n in z.namelist() if not n.endswith("/")}
+        cmds = load_commands(files[A + "Fixture"])
+        self.assertIn((0x80000018, "@rpath/Fixture.dylib"), cmds)  # LC_LOAD_WEAK_DYLIB
+        self.assertIn((0x80000018, "@rpath/TweakKit.framework/TweakKit"), cmds)
+        self.assertIn((0x8000001C, "@executable_path/Frameworks"), cmds)  # LC_RPATH
+        self.assertEqual(cmds[-1][0], 0x1D, "LC_CODE_SIGNATURE stays where the signer put it")
+        for rel in ("Frameworks/Fixture.dylib", "Frameworks/TweakKit.framework/TweakKit"):
+            self.assertIn(0, slots(files[A + rel]), rel)  # a CodeDirectory: signed
+        cr = plistlib.loads(files[A + "_CodeSignature/CodeResources"])
+        for rel in ("Frameworks/Fixture.dylib", "Fixture.bundle/Info.plist", "Frameworks/TweakKit.framework/Info.plist"):
+            self.assertEqual(cr["files2"][rel]["hash2"], hashlib.sha256(files[A + rel]).digest(), rel)
+
+
+def load_commands(binary):
+    """otool -l, the part this needs: [(cmd, path)] of a thin 64-bit Mach-O's load commands (path for dylib and rpath
+    commands, else None)."""
+    magic, _, _, _, ncmds, _ = struct.unpack_from("<IiiIII", binary, 0)
+    assert magic == 0xFEEDFACF, hex(magic)
+    out, off = [], 32
+    for _ in range(ncmds):
+        cmd, size = struct.unpack_from("<II", binary, off)
+        name = None
+        if cmd in (0xC, 0xD, 0x80000018, 0x8000001F, 0x8000001C):
+            (at,) = struct.unpack_from("<I", binary, off + 8)
+            name = binary[off + at:off + size].split(b"\0")[0].decode()
+        out.append((cmd, name))
+        off += size
+    return out
+
+
 class BridgeSourceTest(unittest.TestCase):
     """F73: the phone half can't run here, so read the sources: signing.export is registered, answers the three
     fields from the kept Keychain item, and the item is written on import and deleted on remove."""

@@ -262,7 +262,8 @@ test("F237: Notifications for Signed Apps: R25's steps, opened from Settings > S
   assert.equal(g.nav({ path: ["guides", "keep-bundle-id"] }, true).title, "Notifications");
   const page = draw(["guides", "keep-bundle-id"], { lite: true, store: { getItem: () => null, setItem: () => {} } });
   assert.deepEqual(byClass(page, "guide-step-title").map((t) => t.textContent),
-    ["Make an App ID with Push", "Register Your iPhones", "Make an Ad Hoc Profile", "Import It", "Install the App"]);
+    ["Make an App ID with Push", "Give It App Groups", "Register Your iPhones", "Make an Ad Hoc Profile", "Import It",
+      "Install the App", "When the App ID Changes"]);
   assert.match(page.textContent, /explicit App ID.*Ad Hoc/);
   assert.match(page.textContent, /Tick Push Notifications/);
   assert.match(page.textContent, /UDID/);
@@ -321,6 +322,22 @@ test("Notifications guide: the API key route makes a per-app App ID, said the bu
   } finally {
     globalThis.ifizboxNative = was;
   }
+});
+
+// D15: the guide matches docs/developer-account.md step 3: groups made and assigned, both notification capabilities,
+// the website-only extras, and a changed App ID means a new profile, imported, and a re-sign.
+test("D15: Notifications guide: App Groups assigned, Communication + Time Sensitive, remake after App ID changes", () => {
+  const text = draw(["guides", "keep-bundle-id"], { lite: true, store: { getItem: () => null, setItem: () => {} } }).textContent;
+  assert.match(text, /Push Notifications, App Groups, Communication Notifications and Time Sensitive Notifications/);
+  assert.match(text, /group\.com\.yourname\.apps\.1/);
+  assert.match(text, /Make five \(\.1 to \.5\)/);
+  assert.match(text, /App Groups > Configure, select them all/);
+  assert.match(text, /App Services tab, WeatherKit/);
+  assert.match(text, /can't make groups or turn on the two notification capabilities/);
+  assert.match(text, /makes every profile made from it invalid/);
+  assert.match(text, /Make the Ad Hoc profile again, import the new one into Settings > Signing/);
+  assert.match(text, /re-sign the apps/);
+  assert.equal(text.includes("only needs Push"), false, "Push alone is no longer said to be enough");
 });
 
 // F277: Use an App Store Connect API Key, opened from the Apple Developer Account group's footer only.

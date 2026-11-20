@@ -908,7 +908,7 @@ export function softwareSections() {
     // ElleKit (vendor/ellekit): bundled for tweak injection, with its BSD-3-Clause licence
     // literal labels: native/test_notices.py reads `label: "X"` rows and ["X", "subtitle", url] entries
     { header: "Software", rows: [{ label: "ElleKit", subtitle: "Évelyne Bélanger\nTweak injection, BSD-3-Clause", chevron: true, cls: "thanks-row",
-      icon: { text: "E", color: "#7a8a99", src: gh("tealbathingsuit") }, onClick: open("https://github.com/tealbathingsuit/ellekit") }],
+      icon: { text: "E", color: "#7a8a99", src: "https://ellekit.space/favicons/apple-touch-icon.png" }, onClick: open("https://github.com/tealbathingsuit/ellekit") }],
       footer: ELLEKIT_FOOTER },
     // F305: Canister's package search and repo index (Search's Other Sources, Find More Sources, the piracy list)
     { rows: [{ label: "Canister", subtitle: "Aarnav Tale\nPackage search and repo index", chevron: true, cls: "thanks-row", // F317: one class (ui.js classList.add): two threw and broke Credits

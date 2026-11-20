@@ -2,7 +2,6 @@
 // came in, and this sorts them: the .p12, the .mobileprovision, and password candidates from any .txt. Then the
 // first candidate that opens the .p12 is the password.
 import { parseProfile, checkP12Password } from "./signing.js";
-import { keyIdFromName } from "./asc.js";
 
 const ext = (name) => (name.toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1] || "";
 
@@ -102,6 +101,7 @@ export async function sortKeyFiles(files, { unzip = unzipEntries } = {}) {
   }
   const ids = texts.map(issuerFromText).filter(Boolean);
   out.issuerId = ids[0] ?? null;
+  const { keyIdFromName } = out.p8 ? await import("./asc.js") : {}; // F313: asc.js (App Store Connect) loads only for a key
   out.keyId = (out.p8 && keyIdFromName(out.p8.name)) || texts.map(labelledKeyId).find(Boolean) || null;
   return out;
 }

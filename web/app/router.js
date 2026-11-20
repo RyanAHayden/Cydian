@@ -81,6 +81,32 @@ export function parent(route) {
   return { tab: route.tab, path };
 }
 
+// F313: each tab's name in the tab bar and on its root page, here so the tab bar draws before the tabs' screens load
+// (every screen's own `title` says the same: module-graph.test.js).
+export const TAB_TITLES = { home: "Home", sources: "Sources", changes: "Changes", installed: "Installed", search: "Search", settings: "Settings" };
+
+// F313: the modules lazy.js loads on demand that a route's pages draw with, for app.js to load before it shows the
+// route (and ahead of a press on a link to it). By the screen each page belongs to (mounted), root first:
+//   a tab other than Home and Settings: that tab's screen (it imports its own pages);
+//   a Settings page: Settings' parts that only its pages draw;
+//   Home's Browse and Wish List pages: Browse, Tweak Roulette and the featured lists.
+// Home's root and its other pages draw with what app.js loads at startup. A page this misses is drawn again once its
+// module is in (app.js), so the list only has to be right to keep a push's first frame drawn.
+export const LAZY_TABS = ["sources", "changes", "installed", "search"];
+export const SETTINGS_PARTS = ["account", "devaccount", "freeAppleId", "importlink", "signedApps", "websiteSettings",
+  "pushSettings", "queue", "ipaInstall"];
+export const BROWSE_PARTS = ["browse", "roulette", "extras"];
+export function lazyFor(route) {
+  const out = new Set();
+  for (const path of prefixes(route.path)) {
+    const r = mounted({ tab: route.tab, path });
+    if (LAZY_TABS.includes(r.tab)) out.add(r.tab);
+    else if (r.tab === IN_HOME) for (const n of SETTINGS_PARTS) out.add(n);
+    else if (r.tab === "home" && (r.path[0] === "browse" || r.path[0] === "wishlist")) for (const n of BROWSE_PARTS) out.add(n);
+  }
+  return [...out];
+}
+
 function safeDecode(s) {
   try { return decodeURIComponent(s); } catch { return s; }
 }

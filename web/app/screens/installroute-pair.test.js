@@ -3,9 +3,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-// A small fake DOM: enough for nav/ui.js grouped() and the pair page's sections.
 import { fakeDocument } from "../fakes.test-helper.js";
 
+// The shared fake DOM: enough for nav/ui.js grouped() and the pair page's sections.
 globalThis.document = fakeDocument();
 const make = (tag) => document.createElement(tag);
 

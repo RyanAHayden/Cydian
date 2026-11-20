@@ -19,6 +19,8 @@
 //
 // The payload (v: 1): { sources: [core/sourcelist.js exportLine], settings: { TRAVELS key: value }, holds: [package],
 // wishlist: [package] (F102's Wish List, core/wishlist.js; an older payload without it reads as empty),
+// ignoredVersions?: ["<id> <version>"] (F281's Ignore This Version, core/settings.js ignoredVersions.lines; a set merged
+// like holds, left out while empty),
 // identity?: { p12, profile (base64url), password, p12Name, profileName } | null (null: no certificate; left out: this
 // build doesn't say), apps: [core/installed.js appRecord], stamps: { "settings.<key>": ms, identity: ms }, savedAt }.
 //
@@ -170,9 +172,12 @@ export function summarize(p) {
   return {
     sources: [...new Set(p?.sources ?? [])].sort(), holds: [...new Set(p?.holds ?? [])].sort(), wishlist: [...new Set(p?.wishlist ?? [])].sort(),
     settings: { ...(p?.settings ?? {}) }, identity: identityPrint(p?.identity),
-    apps: Object.fromEntries((p?.apps ?? []).map((r) => [r.id, appVer(r)])),
+    apps: Object.fromEntries((p?.apps ?? []).map((r) => [r.id, appVer(r)])), ...versionsField([...new Set(p?.ignoredVersions ?? [])].sort()),
   };
 }
+
+// F281: the ignoredVersions field, only when it holds something (payloads and summaries from before it stay equal).
+const versionsField = (list) => (list?.length ? { ignoredVersions: list } : {});
 
 // (remote + added here since seen) - removed here since seen, the remote order first.
 function mergeSet(remote = [], local = [], seenList = null) {
@@ -189,7 +194,7 @@ export function mergePayload(local, remote, seen = null, now = Date.now()) {
     for (const k of Object.keys(local.settings ?? {})) stamps[`settings.${k}`] = now;
     if (local.identity !== undefined) stamps.identity = now;
     return { v: ACCOUNT_VERSION, sources: [...new Set(local.sources ?? [])], settings: { ...local.settings }, holds: [...new Set(local.holds ?? [])],
-      wishlist: [...new Set(local.wishlist ?? [])],
+      wishlist: [...new Set(local.wishlist ?? [])], ...versionsField([...new Set(local.ignoredVersions ?? [])]),
       ...(local.identity !== undefined ? { identity: local.identity } : {}), apps: [...(local.apps ?? [])], stamps, savedAt: now };
   }
   const rs = remote.stamps ?? {};
@@ -218,7 +223,8 @@ export function mergePayload(local, remote, seen = null, now = Date.now()) {
   });
   return { v: ACCOUNT_VERSION, sources: mergeSet(remote.sources, local.sources, seen?.sources), settings,
     holds: mergeSet(remote.holds, local.holds, seen?.holds),
-    wishlist: mergeSet(remote.wishlist, local.wishlist, seen?.wishlist), ...(identity !== undefined ? { identity } : {}), apps, stamps, savedAt: now };
+    wishlist: mergeSet(remote.wishlist, local.wishlist, seen?.wishlist),
+    ...versionsField(mergeSet(remote.ignoredVersions, local.ignoredVersions, seen?.ignoredVersions)), ...(identity !== undefined ? { identity } : {}), apps, stamps, savedAt: now };
 }
 
 // Whether the account needs writing: what it would hold differs from what it holds (stamps and times aside).
@@ -243,8 +249,14 @@ export function changesFor(local, merged, { syncCert = true } = {}) {
     putApps: (merged.apps ?? []).filter((r) => !la.has(r.id) || appVer(la.get(r.id)) !== appVer(r)),
     removeApps: [...la.keys()].filter((id) => !ma.has(id)),
   };
+  // F281: Ignore This Version's "<id> <version>" lines, only when something changes (older callers see no new keys).
+  const lV = has(local.ignoredVersions), mV = has(merged.ignoredVersions);
+  const addVersions = [...mV].filter((x) => !lV.has(x)), removeVersions = [...lV].filter((x) => !mV.has(x));
+  if (addVersions.length) c.addVersions = addVersions;
+  if (removeVersions.length) c.removeVersions = removeVersions;
   c.empty = !c.addSources.length && !c.removeSources.length && !Object.keys(settings).length && !c.addHolds.length &&
-    !c.removeHolds.length && !c.addWishes.length && !c.removeWishes.length && !identity && !c.putApps.length && !c.removeApps.length;
+    !c.removeHolds.length && !c.addWishes.length && !c.removeWishes.length && !identity && !c.putApps.length && !c.removeApps.length &&
+    !addVersions.length && !removeVersions.length;
   return c;
 }
 

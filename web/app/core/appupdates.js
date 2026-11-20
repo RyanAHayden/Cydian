@@ -77,3 +77,82 @@ export function watchList(records, { sourceOf = null, ignored = [] } = {}) {
 export const upgradeKeys = (rows) => (rows ?? []).filter((r) => r?.id && r.version).map((r) => `${r.id} ${r.version}`).sort();
 
 export const updatesTitle = (n) => (n === 1 ? "1 Update" : `${n} Updates`);
+
+// F281: Ignore This Version. `versions` is { id: version } (core/settings.js ignoredVersions): an available row whose
+// version on offer is that one (compareVersions equal, so "1.0" and "1.0.0"-style spellings dpkg calls the same
+// match too) moves to ignored, marked `ignoredVersion: true`, so the badge, the background check and Upgrade All
+// skip it; a newer version is a row like any other.
+const sameVersion = (a, b) => { try { return compareVersions(String(a), String(b)) === 0; } catch { return String(a) === String(b); } };
+const newer = (a, b) => { try { return compareVersions(String(a), String(b)) > 0; } catch { return false; } };
+
+export function splitIgnoredVersions(upgrades, versions = {}) {
+  const map = versions ?? {};
+  const available = [];
+  const moved = [];
+  for (const r of upgrades?.available ?? []) {
+    const v = r?.id ? map[r.id] : null;
+    if (v && r.version && sameVersion(r.version, v)) moved.push({ ...r, ignoredVersion: true });
+    else available.push(r);
+  }
+  if (!moved.length) return upgrades ?? { available: [], ignored: [] };
+  return { ...upgrades, available, ignored: [...(upgrades?.ignored ?? []), ...moved].sort(byName) };
+}
+
+// F281: the sheet button and row menu item. Ignore This Version while a newer version than the installed one is out
+// (and the item isn't ignored whole, `held`), Stop Ignoring This Version while the version on offer is the ignored
+// one; null otherwise. `ignored`: the item's entry (core/settings.js ignoredVersions.get), or null.
+export const IGNORE_VERSION = "Ignore This Version";
+export const STOP_IGNORING_VERSION = "Stop Ignoring This Version";
+export function ignoreVersionLabel({ installed = null, newest = null, ignored = null, held = false } = {}) {
+  if (!newest || !installed || !newer(newest, installed)) return null;
+  if (ignored && sameVersion(ignored, newest)) return STOP_IGNORING_VERSION;
+  return held ? null : IGNORE_VERSION;
+}
+
+// F281: `buttons` with `label` put after Upgrade (else Reinstall, else first); as they were when `label` is null.
+export function withVersionButton(buttons, label) {
+  if (!label) return buttons;
+  const at = buttons.indexOf("Upgrade") >= 0 ? buttons.indexOf("Upgrade") + 1 : buttons.indexOf("Reinstall") + 1;
+  return [...buttons.slice(0, at), label, ...buttons.slice(at)];
+}
+
+// F281: what a press of `label` stores: the version on offer for Ignore This Version, null (take it back) for Stop
+// Ignoring This Version.
+export const versionToStore = (label, newest) => (label === IGNORE_VERSION ? String(newest) : null);
+
+// F281: Ignore This Version as "<id> <version>" lines (account sync's set) and back.
+export const versionLines = (map) => Object.entries(map ?? {}).map(([id, v]) => `${id} ${v}`).sort();
+const lineOf = (line) => {
+  const m = /^(\S+) (\S+)$/.exec(String(line ?? "").trim());
+  return m ? [m[1], m[2]] : null;
+};
+// `map` with account sync's changes (core/account.js changesFor addVersions / removeVersions): a removed line goes
+// only while the item still has that version, an added one is set (two for one item: the newer stands).
+export function applyVersionLines(map, { add = [], remove = [] } = {}) {
+  const out = { ...(map ?? {}) };
+  for (const l of remove ?? []) { const p = lineOf(l); if (p && out[p[0]] === p[1]) delete out[p[0]]; }
+  const added = new Map();
+  for (const l of add ?? []) {
+    const p = lineOf(l);
+    if (p && (!added.has(p[0]) || newer(p[1], added.get(p[0])))) added.set(p[0], p[1]);
+  }
+  for (const [id, v] of added) out[id] = v;
+  return out;
+}
+
+// F281: the entries that still stand. One goes once a newer version than it is on offer (the item's row offers a
+// version past it) or once the installed version reaches it (`installedOf(id)`, else the row's `installed`). An
+// item with no row and no known installed version keeps its entry: nothing says it went.
+export function settleIgnoredVersions(versions = {}, { upgrades = null, installedOf = () => null } = {}) {
+  const rows = new Map();
+  for (const r of [...(upgrades?.available ?? []), ...(upgrades?.ignored ?? [])]) if (r?.id && !rows.has(r.id)) rows.set(r.id, r);
+  const out = {};
+  for (const [id, v] of Object.entries(versions ?? {})) {
+    const row = rows.get(id);
+    if (row?.version && newer(row.version, v)) continue;
+    const have = installedOf(id) ?? row?.installed ?? null;
+    if (have && !newer(v, have)) continue;
+    out[id] = v;
+  }
+  return out;
+}

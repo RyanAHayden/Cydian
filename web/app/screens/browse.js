@@ -47,6 +47,7 @@ import { IPA_FOOTER } from "../core/ipainstall.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
 import { rememberedApps } from "../app-updates.js";
+import { ignoreVersionLabel, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
 import { openInGroup, setSourceShare, shareHeadButton } from "./handoff.js";
 import { healthOf } from "../core/health.js";
 import { addSource } from "./manage.js";
@@ -93,6 +94,10 @@ initDevice();
 // authors are F104's hidden authors, above.
 catalog.setBlocked(settings.blocked.list());
 settings.onChange((key, value) => { if (key === "blockedPackages") catalog.setBlocked(value); });
+// F281: Ignore This Version ({ id: version }) reaches catalog.upgrades and app-updates.js; entries a newer version or
+// the installed one passed are dropped from the setting (settle).
+catalog.setIgnoredVersions(settings.ignoredVersions.all(), { onSettle: (next) => settings.ignoredVersions.replace(next) });
+settings.onChange((key, value) => { if (key === "ignoredVersions") catalog.setIgnoredVersions(value); });
 
 // Compatibility marks (F35): Settings > Show Compatibility Marks hides them all with one attribute, so rows bound
 // while scrolling never read the setting.
@@ -494,14 +499,14 @@ function attachRowMenu(listEl, route) {
       const st = await jbAppRowState(item);
       if (!row.isConnected || row._item !== item) return;
       const items = rowMenuItems(item, { ...st, listKey });
-      showMenu(row, items.map((it) => ({ label: it.label, onClick: () => runJbAppRowMenuItem(it, item, st) })), { x });
+      showMenu(row, withVersionRowItems(items.map((it) => ({ label: it.label, onClick: () => runJbAppRowMenuItem(it, item, st) })), item), { x });
       return;
     }
     if (item.kind === "ipa" && queueKind() === "apps") { // F213: the sideload build's app queue
       const st = await appRowState(item);
       if (!row.isConnected || row._item !== item) return;
       const items = rowMenuItems(item, { apps: true, ...st, listKey });
-      showMenu(row, items.map((it) => ({ label: it.label, onClick: () => runAppRowMenuItem(it, item, st) })), { x });
+      showMenu(row, withVersionRowItems(items.map((it) => ({ label: it.label, onClick: () => runAppRowMenuItem(it, item, st) })), item), { x });
       return;
     }
     const queue = queueOf();
@@ -510,7 +515,7 @@ function attachRowMenu(listEl, route) {
     const installed = installedOf(history);
     const newest = history ? history.versions.find((v) => v.keys.length)?.version ?? null : item.version || null;
     const items = rowMenuItems(item, { queue: !!queue, installed, newest, queued: !!installQueue.get(item.id), listKey });
-    showMenu(row, items.map((it) => ({ label: it.label, onClick: () => runRowMenuItem(it, item, { installed, name: item.name }) })), { x });
+    showMenu(row, withVersionRowItems(items.map((it) => ({ label: it.label, onClick: () => runRowMenuItem(it, item, { installed, name: item.name }) })), item), { x });
   });
 }
 
@@ -1402,6 +1407,8 @@ async function packageActions(route, button) {
       // B69: Ignore Upgrades (the Installed Package switch, Settings' Ignored Upgrades) while a newer one is out
       const ignore = ignoreAction(st.package || id, Boolean(newest && compareVersions(newest.version, installed) > 0));
       if (ignore) actions.push(ignore);
+      const ignoreVer = ignoreVersionAction(st.package || id, { installed, newest: newest?.version ?? null }); // F281
+      if (ignoreVer) actions.push(ignoreVer);
       if ((st.package || id) !== PACKAGE) actions.push({ label: "Remove", run: () => queue({ op: "remove", id }) }); // B71: never itself
       if (older.length) actions.push({ label: "Downgrade", run: () => sheet("", older.map((v) => ({ label: v.version, run: () => queue({ op: "install", id, version: v.version }) }))) });
     } else {
@@ -1431,6 +1438,31 @@ async function packageActions(route, button) {
 export function ignoreAction(id, upgrade, holds = settings.holds) {
   if (holds.has(id)) return { label: "Stop Ignoring Upgrades", run: () => holds.set(id, false) };
   return upgrade ? { label: "Ignore Upgrades", red: true, run: () => holds.set(id, true) } : null;
+}
+
+// F281: Modify's Ignore This Version for an installed package while an upgrade is out and it isn't ignored whole
+// (holds), Stop Ignoring This Version while the version on offer is the ignored one. Null when neither applies.
+export function ignoreVersionAction(id, { installed = null, newest = null } = {}, { holds = settings.holds, iv = settings.ignoredVersions } = {}) {
+  const label = ignoreVersionLabel({ installed, newest, ignored: iv.get(id), held: holds.has(id) });
+  if (!label) return null;
+  return { label, red: label === IGNORE_VERSION, run: () => iv.set(id, versionToStore(label, newest)) };
+}
+
+// F281: the row hold menu's Ignore This Version for an upgrade row in Changes (Available Upgrades: its `version` is
+// the one on offer, `installed` the one there), or Stop Ignoring This Version on a row Ignore This Version filed under
+// Ignored Upgrades (`ignoredVersion`). [] for any other row.
+export function versionRowItems(item, { holds = settings.holds, blocked = settings.blocked, iv = settings.ignoredVersions } = {}) {
+  if (!item?.id || item.change !== "upgrade" || !item.version || !item.installed) return [];
+  if (!item.ignoredVersion && (holds.has(item.id) || blocked?.has?.(item.id))) return [];
+  const label = ignoreVersionLabel({ installed: item.installed, newest: item.version, ignored: iv.get(item.id) });
+  return label ? [{ label, onClick: () => iv.set(item.id, versionToStore(label, item.version)) }] : [];
+}
+// The hold menu's entries with versionRowItems' put in before Share.
+function withVersionRowItems(entries, item) {
+  const extra = versionRowItems(item);
+  if (!extra.length) return entries;
+  const at = entries.findIndex((e) => e.label === "Share");
+  return at < 0 ? [...entries, ...extra] : [...entries.slice(0, at), ...extra, ...entries.slice(at)];
 }
 
 // B11: the nav bar sheet of a paid package its vendor sells, in the app (`paid`: extras.js paidNav). Not installed:

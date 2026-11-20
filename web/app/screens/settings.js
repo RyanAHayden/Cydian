@@ -199,7 +199,7 @@ function settingsGroups(list, page) {
         if (d.needs) needs.push([rows.length, d]); // F244: shown only while its switch is on (Expiry Warning)
         rows.push({ label: d.label, detail: optionLabel(d, settings.get(d.key)), href: format(settingsRoute([page, d.key])), ...icon(d) });
       } else if (d.kind === "holds") {
-        const n = settings.holds.list().length;
+        const n = settings.holds.list().length + Object.keys(settings.ignoredVersions.all()).length; // F281: this version only too
         rows.push({ label: d.label, detail: n ? String(n) : "None", href: format(settingsRoute([page, "holds"])), ...icon(d) });
       }
     }
@@ -576,13 +576,34 @@ function themePreview() {
 }
 
 function holdsPage() {
-  const held = settings.holds.list();
-  if (!held.length) return grouped([{ footer: "No upgrades are ignored. Turn on Ignore Upgrades on a package's page." }]);
-  return grouped([{
-    header: "Ignored",
-    rows: held.map((pkg) => ({ label: pkg, checked: true, onClick: () => settings.holds.set(pkg, false) })),
-    footer: (settings.footerOf("holds") || "") + " Tap a package to take its upgrades again.",
-  }]);
+  return grouped(holdsLayout({ held: settings.holds.list(), versions: settings.ignoredVersions.all(), footer: settings.footerOf("holds") || "",
+    unhold: (pkg) => settings.holds.set(pkg, false), unversion: (id) => settings.ignoredVersions.set(id, null) }));
+}
+
+// F281: Settings > Ignored Upgrades' groups (nav/ui.js grouped): the packages ignored whole (holds), then those with
+// only the version on offer ignored (Ignore This Version, `versions` { id: version }), each row "this version only"
+// with its version; a tap on either takes it back. Pure, for the tests.
+export function holdsLayout({ held = [], versions = {}, footer = "", unhold = () => {}, unversion = () => {} } = {}) {
+  const only = Object.entries(versions ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  if (!held.length && !only.length) {
+    return [{ footer: "No upgrades are ignored. Turn on Ignore Upgrades on a package's page, or pick Ignore This Version for one upgrade." }];
+  }
+  const groups = [];
+  if (held.length) {
+    groups.push({
+      header: "Ignored",
+      rows: held.map((pkg) => ({ label: pkg, checked: true, onClick: () => unhold(pkg) })),
+      footer: footer + " Tap a package to take its upgrades again.",
+    });
+  }
+  if (only.length) {
+    groups.push({
+      header: "This Version Only",
+      rows: only.map(([id, v]) => ({ label: id, subtitle: `${v}, this version only`, checked: true, onClick: () => unversion(id) })),
+      footer: "Hidden until a newer version comes or this one is installed. Tap one to show its upgrade again.",
+    });
+  }
+  return groups;
 }
 
 // F226: Settings > General > Blocked (Zebra #1037, #998): the packages blocked from their page and the authors

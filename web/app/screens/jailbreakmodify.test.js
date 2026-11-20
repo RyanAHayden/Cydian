@@ -4,7 +4,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { jailbreakModify, jailbreakModifyButtons, IGNORE_UPGRADES, STOP_IGNORING } from "./altstore.js";
-import { ignoreAction } from "./browse.js";
+import { ignoreAction, ignoreVersionAction, versionRowItems } from "./browse.js";
+import { IGNORE_VERSION, STOP_IGNORING_VERSION } from "../core/appupdates.js";
 import { memoryAppStore } from "../core/installed.js";
 import { createSettings } from "../core/settings.js";
 
@@ -18,11 +19,18 @@ function memHolds(list = []) {
   return { calls, has: (id) => s.has(id), set: async (id, on, opts) => { calls.push([id, on, opts]); if (on) s.add(id); else s.delete(id); return true; } };
 }
 
+// F281: Ignore This Version's store (core/settings.js ignoredVersions), in memory.
+function memVersions(init = {}) {
+  const m = { ...init };
+  return { map: m, get: (id) => m[id] ?? null, set: (id, v) => { if (v) m[id] = v; else delete m[id]; } };
+}
+
 const run = async (records, pick, extra = {}) => {
   const installs = [];
   const asked = [];
   const done = await jailbreakModify(pkg, { install: (v) => installs.push(v.version), history: () => installs.push("history"),
     store: async () => memoryAppStore(records), holds: extra.holds ?? memHolds(), remove: extra.remove ?? (() => assert.fail("removed")),
+    iv: extra.iv ?? memVersions(),
     ask: async (o) => { asked.push(o); return typeof pick === "function" ? pick(o, asked.length) : o.buttons.indexOf(pick); } });
   return { done, installs, asked };
 };
@@ -38,8 +46,51 @@ test("installed, upgrade out: the sheet, nothing installed until a button is pic
   assert.equal(r.done, true);
   assert.deepEqual(r.installs, []);
   assert.equal(r.asked[0].title, "A");
-  assert.deepEqual(r.asked[0].buttons, ["Upgrade", IGNORE_UPGRADES, "Remove", "Downgrade", "Version History"]);
-  assert.deepEqual(r.asked[0].destructive, [1, 2]);
+  assert.deepEqual(r.asked[0].buttons, ["Upgrade", IGNORE_VERSION, IGNORE_UPGRADES, "Remove", "Downgrade", "Version History"]);
+  assert.deepEqual(r.asked[0].destructive, [2, 3, 1]);
+});
+
+test("F281: Ignore This Version keeps only the version on offer; Stop Ignoring This Version takes it back", async () => {
+  const iv = memVersions();
+  const r = await run([{ id: "com.x.a", version: "2" }], IGNORE_VERSION, { iv });
+  assert.deepEqual(r.installs, []);
+  assert.deepEqual(iv.map, { "com.x.a": "3" });
+  const again = await run([{ id: "com.x.a", version: "2" }], STOP_IGNORING_VERSION, { iv });
+  assert.deepEqual(again.asked[0].buttons, ["Upgrade", STOP_IGNORING_VERSION, IGNORE_UPGRADES, "Remove", "Downgrade", "Version History"]);
+  assert.deepEqual(iv.map, {});
+  // Ignored whole (Ignore Upgrades): no version button; an older ignored version than the one on offer: Ignore again.
+  const held = await run([{ id: "com.x.a", version: "2" }], () => -1, { holds: memHolds(["com.x.a"]), iv: memVersions() });
+  assert.equal(held.asked[0].buttons.includes(IGNORE_VERSION), false);
+  const old = await run([{ id: "com.x.a", version: "1" }], () => -1, { iv: memVersions({ "com.x.a": "2" }) });
+  assert.equal(old.asked[0].buttons[1], IGNORE_VERSION);
+});
+
+test("F281: the package page's ignoreVersionAction, beside Ignore Upgrades", () => {
+  const iv = memVersions();
+  const a = ignoreVersionAction("p", { installed: "1", newest: "2" }, { holds: memHolds(), iv });
+  assert.equal(a.label, IGNORE_VERSION);
+  assert.equal(a.red, true);
+  a.run();
+  assert.deepEqual(iv.map, { p: "2" });
+  const b = ignoreVersionAction("p", { installed: "1", newest: "2" }, { holds: memHolds(), iv });
+  assert.equal(b.label, STOP_IGNORING_VERSION);
+  b.run();
+  assert.deepEqual(iv.map, {});
+  assert.equal(ignoreVersionAction("p", { installed: "2", newest: "2" }, { holds: memHolds(), iv }), null);
+  assert.equal(ignoreVersionAction("p", { installed: "1", newest: "2" }, { holds: memHolds(["p"]), iv }), null);
+});
+
+test("F281: Changes' hold menu: Ignore This Version on an available upgrade row, Stop Ignoring on one it filed", () => {
+  const iv = memVersions();
+  const deps = { holds: memHolds(), blocked: { has: () => false }, iv };
+  const row = { id: "p", change: "upgrade", version: "2", installed: "1" };
+  const [item] = versionRowItems(row, deps);
+  assert.equal(item.label, IGNORE_VERSION);
+  item.onClick();
+  assert.deepEqual(iv.map, { p: "2" });
+  assert.equal(versionRowItems({ ...row, ignoredVersion: true }, deps)[0].label, STOP_IGNORING_VERSION);
+  assert.deepEqual(versionRowItems({ ...row, change: "updated" }, deps), []); // a day's row, not an upgrade
+  assert.deepEqual(versionRowItems({ id: "q", change: "upgrade", version: "2", installed: "1" }, { ...deps, holds: memHolds(["q"]) }), []);
 });
 
 test("Upgrade installs the newest; Reinstall the installed version; Downgrade asks which", async () => {

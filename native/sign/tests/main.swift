@@ -402,6 +402,18 @@ test("B29: the IPA counts as served only once every byte went out, over all requ
     check(ByteCoverage().covers(size: 0), "an empty file")
 }
 
+test("install server listener reuse (B128)") {
+    let g: TimeInterval = 5
+    // The user's iOS 27 log: the first app served, iFizBox suspended for minutes, the next queued app reused a
+    // listener that still said ready while iOS had shut its socket: ECONNREFUSED. Idle means a fresh listener.
+    check(ListenerStart.decide(has: true, ready: true, serving: false, sinceBeat: 0, gap: g) == .fresh, "idle ready listener")
+    check(ListenerStart.decide(has: true, ready: false, serving: false, sinceBeat: 0, gap: g) == .fresh, "idle broken listener")
+    check(ListenerStart.decide(has: false, ready: false, serving: true, sinceBeat: 0, gap: g) == .fresh, "no listener")
+    check(ListenerStart.decide(has: true, ready: true, serving: true, sinceBeat: 1, gap: g) == .reuse, "serving, beating")
+    check(ListenerStart.decide(has: true, ready: true, serving: true, sinceBeat: 300, gap: g) == .revive, "serving, frozen since")
+    check(ListenerStart.decide(has: true, ready: false, serving: true, sinceBeat: 1, gap: g) == .revive, "serving, not ready")
+}
+
 test("manifest and itms link") {
     let m = try InstallManifest.manifest(ipaURL: "http://127.0.0.1:4242/t/app.ipa", bundleID: "dev.ifizbox.fixture", version: "1.0", title: "Fixture")
     let pl = try PropertyListSerialization.propertyList(from: m, format: nil) as? [String: Any]

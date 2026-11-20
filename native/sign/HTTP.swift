@@ -57,6 +57,20 @@ enum HTTPResponse {
     }
 }
 
+// B128: what InstallServer.start() does with the listener it has. iOS can defunct the listener's socket while
+// iFizBox is suspended and the listener still says .ready; the heartbeat that would notice (B89) only runs while
+// something is served. So an idle listener is never trusted: it is cancelled and a fresh one made (a new random
+// port; the next manifest carries it). While routes are served their links name the port, so it is kept: reused
+// when ready and no freeze shows in the heartbeat, else re-created on the same port.
+enum ListenerStart: Equatable {
+    case reuse, revive, fresh
+
+    static func decide(has: Bool, ready: Bool, serving: Bool, sinceBeat: TimeInterval, gap: TimeInterval) -> ListenerStart {
+        guard has, serving else { return .fresh }
+        return ready && sinceBeat < gap ? .reuse : .revive
+    }
+}
+
 // B29: which bytes of a served file have gone out in full, over every request. iOS's installer may ask for parts
 // (the zip's end first, a resume after a dropped connection), so a request that reaches the last byte doesn't mean
 // iOS has the whole IPA: the file counts as served only once every byte was sent at least once.

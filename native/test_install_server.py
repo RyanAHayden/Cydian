@@ -152,6 +152,29 @@ class InstallServerSource(unittest.TestCase):
         self.assertIn("e.links.contains(link)", body(prompt, "static func end("))
         self.assertNotIn("taken as Cancel", prompt)
 
+    def test_idle_listener_never_reused(self):
+        """B128: on iOS 27 the next queued app got ECONNREFUSED: start() reused a listener that still said .ready
+        though iOS had shut its socket while iFizBox was suspended, and nothing watched it with no route served.
+        start() goes by ListenerStart (sign/HTTP.swift, tested in Swift by native/test_sign.py): idle means a fresh
+        listener, and every install, each item of a queue run included, comes through start()."""
+        start = body(self.server, "func start(")
+        self.assertNotIn("l.state == .ready { return done(.success(self.port)) }", start)
+        self.assertIn("ListenerStart.decide(", start)
+        self.assertIn("serving: !self.routes.isEmpty", start)
+        fresh = start[start.index("case .fresh:"):start.index("do {")]
+        self.assertIn("old?.cancel()", fresh)
+        self.assertIn("self.listener = nil", fresh)
+        self.assertIn("self.revive(", start[start.index("case .revive:"):start.index("case .fresh:")])
+        self.assertIn("guard self.listener === l else { break }", start)  # a replaced listener sets no port
+        self.assertIn("case .cancelled:", start)  # nor leaves its caller waiting
+        decide = read("../sign/HTTP.swift")
+        self.assertIn("guard has, serving else { return .fresh }", decide)
+        serve = body(self.sideload, "static func serveAndOpen(", "\n    }\n\n")
+        self.assertIn("let server = InstallServer.plain\n        server.start {", serve)
+        for name in ("MyIPAs.swift", "SignAhead.swift"):
+            self.assertIn("Sideload.serveAndOpen(", read(name))
+        self.assertIn("serveAndOpen(output,", self.sideload)
+
 
 if __name__ == "__main__":
     unittest.main()

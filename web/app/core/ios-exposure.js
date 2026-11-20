@@ -7,7 +7,8 @@
 //
 // The list ships in the app like core/piracy-list.js: nothing is fetched. Each entry is one public exploit (or a
 // family of them) with the versions it works on, the first version that fixes it, and a public page that backs it up
-// (the CVE's NVD page). To add one, give those three; a patch package needs its package ID, its repo and a link.
+// (the CVE's NVD page, or the write-up when there is no CVE). To add one, give those three; a patch package needs its
+// package ID, its repo and a link.
 //
 //   EXPLOITABLE_IOS                         the list
 //   exposureOf(ios)                         -> { ios, entries, fixed } for a listed version, else null. `fixed`: the
@@ -23,18 +24,49 @@
 import { compareVersions, parseVersion } from "./selfupdate.js";
 
 const NVD = (cve) => `https://nvd.nist.gov/vuln/detail/${cve}`;
+const CORUNA = "https://cloud.google.com/blog/topics/threat-intelligence/coruna-powerful-ios-exploit-kit";
 
-// `from` .. `through` inclusive. `patches`: [{ id, name, repo, link, version? }] (none known yet; the jailbreak build
-// offers one as soon as it is listed here).
+// `from` .. `through` inclusive; `fixed` is the first version on that line that closes it (from the CVE's NVD entry
+// and Apple's security notes; checked 2026-11-20). "Public" means the exploit is out in the open: published code
+// (kfd, MacDirtyCow, multicast_bytecopy) or a kit served from public websites and taken apart in a public write-up
+// (Coruna, DarkSword); an in-the-wild bug with no exploit anyone can pick up is not listed. `cve` is null where the
+// write-up names none, and `link` is then that write-up. A bug Apple fixed on two lines gets one entry per line, so
+// each has its own fix.
+// `patches`: [{ id, name, repo, link, version? }] (no public patch package is known for any of these; the jailbreak
+// build offers one as soon as it is listed here).
 export const EXPLOITABLE_IOS = [
   { id: "multicast-bytecopy", name: "multicast_bytecopy", cve: "CVE-2021-30937", from: "14.0", through: "15.1.1", fixed: "15.2",
     link: NVD("CVE-2021-30937"), patches: [] },
-  { id: "kfd-smith", name: "kfd (smith)", cve: "CVE-2023-32434", from: "15.0", through: "15.7.6", fixed: "15.7.7",
+  // MacDirtyCow: a file overwrite in practice, though Apple rates the bug as kernel code execution.
+  { id: "macdirtycow", name: "MacDirtyCow", cve: "CVE-2022-46689", from: "15.0", through: "15.7.1", fixed: "15.7.2",
+    link: NVD("CVE-2022-46689"), patches: [] },
+  { id: "macdirtycow-16", name: "MacDirtyCow", cve: "CVE-2022-46689", from: "16.0", through: "16.1.2", fixed: "16.2",
+    link: NVD("CVE-2022-46689"), patches: [] },
+  { id: "kfd-physpuppet", name: "kfd (physpuppet)", cve: "CVE-2023-23536", from: "15.0", through: "15.7.3", fixed: "15.7.4",
+    link: NVD("CVE-2023-23536"), patches: [] },
+  { id: "kfd-physpuppet-16", name: "kfd (physpuppet)", cve: "CVE-2023-23536", from: "16.0", through: "16.3.1", fixed: "16.4",
+    link: NVD("CVE-2023-23536"), patches: [] },
+  // smith is also Coruna's "Photon", which reaches back to iOS 14.5.
+  { id: "kfd-smith", name: "kfd (smith)", cve: "CVE-2023-32434", from: "14.5", through: "15.7.6", fixed: "15.7.7",
     link: NVD("CVE-2023-32434"), patches: [] },
   { id: "kfd-smith-16", name: "kfd (smith)", cve: "CVE-2023-32434", from: "16.0", through: "16.5", fixed: "16.5.1",
     link: NVD("CVE-2023-32434"), patches: [] },
-  { id: "kfd-landa", name: "kfd (landa)", cve: "CVE-2023-41974", from: "16.0", through: "16.6.1", fixed: "16.7",
+  // landa (Coruna's "Parallax"): fixed in iOS 17.0, and on iOS 15 only in 15.8.7 (March 2026, for the phones stuck on
+  // 15). Coruna runs it through 16.7; Apple's notes name no 16.7.x fix, so 17.0 stands as the fix for that line.
+  { id: "kfd-landa-15", name: "kfd (landa)", cve: "CVE-2023-41974", from: "15.0", through: "15.8.6", fixed: "15.8.7",
     link: NVD("CVE-2023-41974"), patches: [] },
+  { id: "kfd-landa", name: "kfd (landa)", cve: "CVE-2023-41974", from: "16.0", through: "16.7", fixed: "17.0",
+    link: NVD("CVE-2023-41974"), patches: [] },
+  // Coruna's "Gruber" kernel exploit: 15.2 through 17.2.1, fixed in 16.7.6 and 17.3 (no CVE given). On iOS 15 the
+  // kit's kernel step is the one 15.8.7 closes (kfd-landa-15 above).
+  { id: "coruna-gruber-16", name: "Coruna (Gruber)", cve: null, from: "16.0", through: "16.7.5", fixed: "16.7.6",
+    link: CORUNA, patches: [] },
+  { id: "coruna-gruber-17", name: "Coruna (Gruber)", cve: null, from: "17.0", through: "17.2.1", fixed: "17.3",
+    link: CORUNA, patches: [] },
+  // DarkSword's kernel step (a VFS race giving kernel memory read/write): the kit runs on 18.4 through 18.7; Apple
+  // fixed it in 18.7.2 (and 26.1, which the kit doesn't target).
+  { id: "darksword", name: "DarkSword", cve: "CVE-2025-43520", from: "18.4", through: "18.7.1", fixed: "18.7.2",
+    link: NVD("CVE-2025-43520"), patches: [] },
 ];
 
 const clean = (v) => {
@@ -116,7 +148,7 @@ export const LATER = "Later";
 export function patchAlert(p) {
   return {
     title: PATCH_TITLE,
-    message: `${p.name} closes the ${p.exploit} hole (${p.cve}) on this iOS version, so an app can't use it. Install it now?`,
+    message: `${p.name} closes the ${p.exploit} hole${p.cve ? ` (${p.cve})` : ""} on this iOS version, so an app can't use it. Install it now?`,
     buttons: [LATER, INSTALL_PATCH],
     cancel: 0,
   };
@@ -125,7 +157,7 @@ export function patchAlert(p) {
 // Changes' row (kept beside the alert): opens the package's page, where Install is.
 export function patchRow(p, key = null) {
   return { id: p.id, name: p.name, version: p.version ?? "", installed: null, key, section: PATCH_TITLE,
-    short: `Closes ${p.exploit} (${p.cve}) on this iOS version.`, security: true, link: p.link ?? null, repo: p.repo ?? null };
+    short: `Closes ${p.exploit}${p.cve ? ` (${p.cve})` : ""} on this iOS version.`, security: true, link: p.link ?? null, repo: p.repo ?? null };
 }
 
 // Later: snoozed until the next launch (the session) or a newer patch version (kept per id).

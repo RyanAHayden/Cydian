@@ -159,6 +159,8 @@ export function pullToRefresh(scroller, opts = {}) {
     const pad = parseFloat(getComputedStyle(scroller).paddingTop) || 0;
     clip.style.top = `${scroller.offsetTop + pad}px`;
     clip.style.height = `${Math.max(0, scroller.clientHeight - pad)}px`;
+    // The area wears the page's own background: white on a plain list, the pinstripe on a grouped page (ios6.css).
+    clip.classList.toggle("grouped", scroller.classList.contains("grouped"));
     time.textContent = lastUpdatedText(o.settings?.lastRefresh?.get?.() ?? null);
   };
   const show = (on) => clip.classList.toggle("on", on);

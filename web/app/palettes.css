@@ -156,6 +156,8 @@ html[data-theme="dark"][data-palette="linen"] {
 html[data-theme="dark"][data-palette="linen"] :is(.page-body.grouped, .boot, .filter-drop-inner, .review-sheet) {
   background: var(--weave);
 }
+/* Pull to refresh's area on a grouped page wears the page's weave too (ios6.css .pull-clip.grouped). */
+html[data-theme="dark"][data-palette="linen"] .pull-clip.grouped > .pull-refresh { background: var(--weave); }
 
 /* Nord: Polar Night ground, bars and tables (#2e3440, #3b4252, #434c5e, #4c566a), Snow Storm text, Frost accents,
    Aurora for status colours. */

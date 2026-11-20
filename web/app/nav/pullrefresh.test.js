@@ -131,7 +131,21 @@ test("the pull area is the list's own background in every theme, never a colour 
   const area = rules.find((r) => r[1].trim() === ".pull-refresh");
   assert.match(area[2], /background: var\(--plain\);/);
   for (const [, sel, body] of rules) {
-    if (sel.trim() === ".pull-refresh") continue;
+    if (sel.trim() === ".pull-refresh" || sel.trim() === ".pull-clip.grouped > .pull-refresh") continue;
     assert.doesNotMatch(body, /background/, sel.trim());
   }
+});
+
+test("on a grouped page the pull area is the page's pinstripe (and linen's weave), set from the scroller's class", () => {
+  const css = readFileSync(new URL("../ios6.css", import.meta.url), "utf8");
+  const bg = (sel) => {
+    const m = css.match(new RegExp(`(?:^|\\n)${sel.replace(/[.>]/g, "\\$&")}\\s*\\{([^}]*)\\}`));
+    assert.ok(m, sel);
+    return m[1].match(/background:([^;]+);/)[1].trim();
+  };
+  assert.equal(bg(".pull-clip.grouped > .pull-refresh"), bg(".page-body.grouped"));
+  const pal = readFileSync(new URL("../palettes.css", import.meta.url), "utf8");
+  assert.match(pal, /html\[data-theme="dark"\]\[data-palette="linen"\] \.pull-clip\.grouped > \.pull-refresh \{ background: var\(--weave\); \}/);
+  const js = readFileSync(new URL("./pullrefresh.js", import.meta.url), "utf8");
+  assert.match(js, /clip\.classList\.toggle\("grouped", scroller\.classList\.contains\("grouped"\)\)/);
 });

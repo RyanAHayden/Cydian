@@ -158,6 +158,9 @@ test("F181: Works On: the stated range, and a check or cross for this iPhone", (
   // No iOS range: the jailbreak it's built for, else any iOS; not judged, a question rather than a tick.
   assert.deepEqual(sp.worksOnTile({ status: "no", reason: "rootful", range: null, need: "rootful" }),
     { label: "Works On", value: "Rootful", sub: "Not Your iPhone ✗", ok: false });
+  // B184: a deb on a phone without a jailbreak names the jailbreak, never the iOS version.
+  assert.deepEqual(sp.worksOnTile({ status: "no", reason: "jailbreak", range: "iOS 14.0 or later", need: "rootless" }),
+    { label: "Works On", value: "iOS 14+", sub: "Needs Jailbreak ✗", ok: false });
   assert.deepEqual(sp.worksOnTile({ status: "unknown", range: null, need: "any" }),
     { label: "Works On", value: "Any iOS", sub: "Unknown", ok: null });
   assert.equal(sp.worksOnTile({ status: "unchecked", range: null, need: "any" }).sub, "Not Checked");

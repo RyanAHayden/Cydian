@@ -1258,34 +1258,7 @@ async function renderOptions(body, route, file) {
   };
   ul.append(field("Name", ed.name, entry.name || "", (v) => { ed.name = v; }));
   ul.append(field("Bundle ID", ed.bundleId, entry.bundleId || "", (v) => { ed.bundleId = v; }, { inputMode: "url" }));
-  const iconLi = el("li", "cell sign-files-cell");
-  const iconRow = el("div", "cell-inner sign-row ss-icon-row");
-  const iconState = el("span", "sign-value", ed.icon ? "Chosen" : "The App's");
-  iconRow.append(el("span", "cell-label", "Icon"), iconState);
-  const fileInput = Object.assign(el("input", "visually-hidden"), { type: "file", accept: "image/*" });
-  fileInput.id = "mio" + Math.random().toString(36).slice(2);
-  const choose = Object.assign(el("label", "bar-button sign-browse", ed.icon ? "Reset" : "Choose"), { htmlFor: fileInput.id });
-  choose.addEventListener("click", (e) => {
-    if (!ed.icon) return; // the label opens the picker
-    e.preventDefault();
-    ed.icon = null;
-    iconState.textContent = "The App's";
-    choose.textContent = "Choose";
-  });
-  fileInput.addEventListener("change", async () => {
-    const f = fileInput.files?.[0];
-    fileInput.value = "";
-    if (!f) return;
-    try {
-      ed.icon = await iconPNG(f);
-      iconState.textContent = "Chosen";
-      choose.textContent = "Reset";
-    } catch {
-      await showAlert({ title: "Can't Use This Image", message: `${NAME} couldn't read it. Choose a PNG or JPEG.`, buttons: ["OK"] });
-    }
-  });
-  iconLi.append(iconRow, fileInput, choose);
-  ul.append(iconLi);
+  ul.append(iconCell(ed, { iconPNG }));
   g.append(ul, el("p", "group-footer", "Empty fields keep what the IPA has. A new bundle ID installs a second copy; your profile may still change it."));
   body.append(g);
 
@@ -1345,6 +1318,39 @@ async function renderOptions(body, route, file) {
   body.append(kg);
   drawKeep();
   originalState(globalThis.ifizboxNative, entry.bundleId).then((s) => { orig = s; if (kfoot.isConnected) drawKeep(); }, () => {});
+}
+
+// B164: Sign Options' Icon row: the label, the value at the right and the Choose (or Reset) button inside the row
+// itself (.sign-row.has-browse, ios6.css), so nothing floats over the next group's footer.
+export function iconCell(ed, { iconPNG, alert = showAlert } = {}) {
+  const iconLi = el("li", "cell sign-files-cell");
+  const iconRow = el("div", "cell-inner sign-row ss-icon-row has-browse");
+  const iconState = el("span", "sign-value", ed.icon ? "Chosen" : "The App's");
+  const fileInput = Object.assign(el("input", "visually-hidden"), { type: "file", accept: "image/*" });
+  fileInput.id = "mio" + Math.random().toString(36).slice(2);
+  const choose = Object.assign(el("label", "bar-button sign-browse", ed.icon ? "Reset" : "Choose"), { htmlFor: fileInput.id });
+  choose.addEventListener("click", (e) => {
+    if (!ed.icon) return; // the label opens the picker
+    e.preventDefault();
+    ed.icon = null;
+    iconState.textContent = "The App's";
+    choose.textContent = "Choose";
+  });
+  fileInput.addEventListener("change", async () => {
+    const f = fileInput.files?.[0];
+    fileInput.value = "";
+    if (!f) return;
+    try {
+      ed.icon = await iconPNG(f);
+      iconState.textContent = "Chosen";
+      choose.textContent = "Reset";
+    } catch {
+      await alert({ title: "Can't Use This Image", message: `${NAME} couldn't read it. Choose a PNG or JPEG.`, buttons: ["OK"] });
+    }
+  });
+  iconRow.append(el("span", "cell-label", "Icon"), iconState, choose);
+  iconLi.append(iconRow, fileInput);
+  return iconLi;
 }
 
 // F243: the Sign Options page's Keep Bundle ID at first: the IPA's saved choice (library.options keepBundleId; null

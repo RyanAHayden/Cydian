@@ -1,0 +1,5 @@
+[
+  { "nav": "#/installed/myipas/ipa:Delta.ipa/options", "ms": 5000 },
+  { "shot": "signoptions" },
+  { "eval": "JSON.stringify([...document.querySelectorAll('.page .switch, .page .sign-browse, .page .sign-value')].filter(e=>e.offsetParent).map(e=>{const c=e.closest('.cell-inner').getBoundingClientRect(),b=e.getBoundingClientRect();return [e.className, Math.round(c.left),Math.round(c.top),Math.round(c.right),Math.round(c.bottom), Math.round(b.left),Math.round(b.top),Math.round(b.right),Math.round(b.bottom)]}))" }
+]

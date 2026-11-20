@@ -72,10 +72,48 @@ visible change.
   changed hook value and a changed token value (tried both on scratch copies).
 - `node --test web/app`: 2579 pass, 0 fail.
 - `python3 -m unittest native/test_launch_grounds.py` (reads ios6.css's bars and tokens): OK.
-- Screenshots and computed styles: see below.
+- Screenshots and computed styles: below.
 - `tools/check.sh`: run by `run done`, which refuses to tick unless it passes.
 
-SHOTS
+### No visible change: 3x screenshots and computed styles
+
+`shots.mjs` (this folder: C46's harness, C44's lineage, with C45 routes; `ONLY=<word>` limits it to routes whose name
+holds the word) over a scratch copy of this branch's `web/app` with main's `style.css` and `ios6.css` put back (the
+only runtime files that differ), against this branch, compared with `journal/2026-11-20-c44-era-readiness/diff.py`.
+6 palettes (Classic, Sepia, Solarized, OLED Black, Gunmetal, Midnight) x 15 routes + 2 website shots = 92 per side.
+Routes: Home, Settings, a pushed Settings page, Sources, Changes, Installed, Search, the HUD, the menu callout with a
+queue hint, the banner with its Upgrade button, the share sheet (two system icons, two letter icons), the reload bar,
+the undo bar, a "controls" page (segmented control; ON and OFF switches; signing rows with Choose buttons, an empty
+value and a server field; the button pair with Remove Certificate; the password field waiting with all four glyphs,
+Read From a .txt File and "Wrong password."; a plain table with a section header and a chevron row; both
+placeholders; the empty-state note), and Home's pull area shown at its foot on the pinstripe and on a plain ground.
+The website shots show the locked tab bar.
+
+- Base vs branch: 81 of 92 shots identical, 0 px and 0 computed-style differences. The 11 others differ only in
+  animation timing: the placeholders' `ph-pulse` opacity (0.80258 vs 0.790032, at most 2 levels of pixel value, only
+  inside the placeholder box) on the controls page, and the banner timer's scale (set from JS, 0.968335 vs 0.968334).
+  A second base run against the first shows the same two differences on the same routes (base vs base, 10 shots), so
+  they are the harness, not the CSS.
+- The pull route found nothing on the first run (pullrefresh.js adds its area on the first touch); the route now
+  builds the same markup, and its rerun (both sides, 6 shots each) is identical.
+- `--pressed` (first bar button, back button and cell pressed, badge shown) over the five Settings routes (Settings,
+  pushed page, HUD, menu, controls) x 6 palettes, 30 per side: 0 computed-style differences except the placeholders'
+  pulse (as above). Pixels: the same placeholder noise, and the HUD's spinner one 30° spoke apart in two shots. A
+  rerun of the HUD route put it the other way: base's first run equals the branch's second, and the branch's first
+  equals base's second. So the spinner had advanced a step before the freeze, which is timing.
+- The Share glyph's emboss went onto `--bar-glyph-emboss` after the review, past these runs; cascade.py reran on the
+  final files and still matches (121 new tokens and hooks).
+
+## Spec review
+
+Fresh subagent, diff + brief only. Fixed: the Share glyph's literal `drop-shadow` emboss (C44's stretch) is now
+`--bar-glyph-emboss`, and the decorations test exempts only that rule's `url()` glyph, not its filter; the journal's
+screenshot results (still running at review time) are recorded above. Kept, and why: the five test files outside the
+brief's list (they read the moved CSS literally; pointed at both files, no behaviour change), the new assertion in
+pullrefresh's transition test (its old slice would have passed on nothing), this folder's own harness (C46's plus
+routes for these components). Not changed: flat literal colours in rules (`color: #fff` on pressed and held rows and
+the badge, `.cell-icon`'s `#8c99b3`): the brief asks for decorations (gradients, glosses, embosses, border-images)
+behind tokens, and an era restyles a flat colour in a look rule without undoing anything.
 
 ## Tried and failed
 

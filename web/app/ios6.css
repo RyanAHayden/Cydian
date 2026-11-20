@@ -775,8 +775,9 @@ html[data-theme="dark"] .sign-pw-glyph.pw-right { background-color: var(--dk-pw-
 /* ==== look-only { ==== */
 /* The nav bar's Share button: UIBarButtonSystemItemAction, from the kit's "Action" bordered button (43 x 29 pt, sized in
    style.css; the tray and the arrow sweeping up out of it, white on a dark shadow 1 pt up). */
+:root { --bar-glyph-emboss: drop-shadow(0 -1px 0 rgba(0,0,0,.45)); } /* the bar button's text emboss, for a glyph */
 .bar-button.share-button::before {
-  filter: drop-shadow(0 -1px 0 rgba(0,0,0,.45));
+  filter: var(--bar-glyph-emboss);
   background: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjExNDQgODQzIDUwIDQwIj48ZyBmaWxsPSIjZmZmIj48cGF0aCBkPSJNMTE5MiA4NTggMTE3NiA4NDVWODUzSDExNzNDMTE2Ny4xMyA4NTMgMTE1NiA4NTcuNzUgMTE1NiA4NzEgMTE1NiA4NzEuMTkgMTE2MS41OCA4NjMgMTE3MyA4NjNIMTE3NlY4NzFaIi8+PHBhdGggZD0iTTExODAgODczVjg3N0gxMTUwVjg1N0gxMTU4TDExNjAgODUzSDExNDZMMTE0NS45NyA4ODEuMDEgMTE4NCA4ODFWODcwWiIvPjwvZz48L3N2Zz4=") center / 25px 20px no-repeat;
 }
 /* ==== } look-only ==== */

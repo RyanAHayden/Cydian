@@ -257,7 +257,7 @@ test("C45: ios6.css's decorations come from tokens: no gradient, image or emboss
       const val = v.join(":").trim();
       if (p.trim().startsWith("--")) continue;
       if (/gradient\(/.test(val) || (/url\(/.test(val) && !ICON.has(sel))) bad.push(`${sel}: ${p.trim()}`);
-      if (/^(text-shadow|filter|border-image(-source)?)$/.test(p.trim()) && !/^(var\(|none$|brightness\()/.test(val) && !ICON.has(sel)) bad.push(`${sel}: ${p.trim()}`);
+      if (/^(text-shadow|filter|border-image(-source)?)$/.test(p.trim()) && !/^(var\(|none$|brightness\()/.test(val)) bad.push(`${sel}: ${p.trim()}`);
     }
   }
   assert.deepEqual(bad, []);

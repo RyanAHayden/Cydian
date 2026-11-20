@@ -165,11 +165,18 @@ certificate is imported: the key makes profiles, not certificates, so the `.p12`
 [developer-account.md](developer-account.md).
 
 - **Add API Key**: the `AuthKey_<Key ID>.p8` downloaded from App Store Connect > Users and Access > Integrations (the
-  Key ID is read from the file name, or asked when the name doesn't hold it), then the Issuer ID, typed. The key is
-  saved only once Apple accepts a token made from it. A key with the Admin or App Manager role.
+  Key ID is read from the file name, or asked when the name doesn't hold it), then the Issuer ID. One pick takes the
+  `.p8` with a `.txt` holding the Issuer ID, or the `.zip` they came in (`core/certfiles.js sortKeyFiles`); without a
+  `.txt` the Issuer ID field fills in from the clipboard when it holds a UUID (the app reads it through the shell; the
+  website only where the browser has granted clipboard reading, else the field's Paste button). The Issuer ID isn't in
+  the `.p8` and no Apple call returns it without it. The key is saved only once Apple accepts a token made from it. A
+  key with the Admin or App Manager role. The group's footer links the **How to make an API key** guide (User Guides,
+  `asc-key`: Users and Access > Integrations > App Store Connect API > Team Keys, the one-time download, the Issuer ID).
 - **API Key**, **Issuer ID**, **Check Account** (is the imported certificate in this account; is this iPhone
   registered, and it registers it when it isn't) and **Remove API Key** (iFizBox stops making profiles; the ones it
-  made stay in the account).
+  made stay in the account). In the app, when Check Account can't tell this iPhone is in the account (not paired, and
+  its own profile came from another team), it offers **Find UDID**: the website's Profile Service visit opens in
+  Safari, the app polls for the answer, keeps the UDID (`device.udid.set`) and registers it.
 - **Profiles Made by iFizBox**: one row per App ID, from the cache (`core/asc.js profileRows`).
 
 **When signing**, with Keep Bundle IDs on (for this app), every route that signs (install, My IPAs, sign-ahead,

@@ -2,6 +2,7 @@
 // came in, and this sorts them: the .p12, the .mobileprovision, and password candidates from any .txt. Then the
 // first candidate that opens the .p12 is the password.
 import { parseProfile, checkP12Password } from "./signing.js";
+import { keyIdFromName } from "./asc.js";
 
 const ext = (name) => (name.toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1] || "";
 
@@ -78,3 +79,39 @@ export async function resolvePassword(p12, saved, guesses = [], check = checkP12
   if (pw != null) return { password: pw, passwordOk: true, locked: false };
   return { password: saved ?? null, passwordOk: saved != null ? savedOk : null, locked: saved == null || savedOk === false };
 }
+
+// F277: Add API Key's pick, sorted the same way: the AuthKey_<Key ID>.p8 (by name, or any file holding a PEM private
+// key), and the Issuer ID from a .txt (or a note with no extension) beside it, or the .zip they came in. The Issuer
+// ID isn't in the .p8 and Apple gives it to no call made without it, so it's typed, pasted or read from such a file.
+// files: [{ name, bytes: Uint8Array }]. Returns { p8: { name, text } | null, keyId: string | null, issuerId: string | null }.
+export const UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
+export async function sortKeyFiles(files, { unzip = unzipEntries } = {}) {
+  const out = { p8: null, keyId: null, issuerId: null };
+  const texts = [];
+  const queue = [...files];
+  while (queue.length) {
+    const f = queue.shift();
+    const e = ext(f.name);
+    const base = f.name.split("/").pop();
+    if (f.name.startsWith("__MACOSX/") || base.startsWith("._")) continue;
+    if (e === "zip") { queue.push(...await unzip(f.bytes)); continue; }
+    if (e !== "p8" && e !== "txt" && e !== "md" && e !== "") continue;
+    const text = new TextDecoder().decode(f.bytes);
+    if (/-----BEGIN PRIVATE KEY-----/.test(text)) { if (!out.p8) out.p8 = { name: base, text }; continue; }
+    if (e !== "p8") texts.push(text);
+  }
+  const ids = texts.map(issuerFromText).filter(Boolean);
+  out.issuerId = ids[0] ?? null;
+  out.keyId = (out.p8 && keyIdFromName(out.p8.name)) || texts.map(labelledKeyId).find(Boolean) || null;
+  return out;
+}
+
+// The Issuer ID in a text: a UUID, the one on an "Issuer"-labelled line first. Lowercase, as App Store Connect shows it.
+export function issuerFromText(text) {
+  const s = String(text ?? "");
+  const lines = s.split(/\r?\n/);
+  const labelled = lines.find((l) => /issuer/i.test(l) && UUID_RE.test(l));
+  const m = (labelled ?? s).match(UUID_RE);
+  return m ? m[0].toLowerCase() : null;
+}
+const labelledKeyId = (text) => String(text).match(/key\s*id\s*[:=：-]\s*([A-Z0-9]{10})\b/i)?.[1]?.toUpperCase() ?? null;

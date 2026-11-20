@@ -92,3 +92,17 @@ The .deb went from 8.4 MB to about 28 MB.
   itself wasn't driven (Control Centre can't be opened through phonectl).
 - **Clear hidden below iOS 18** on the phone itself: added after the phone run (unit-tested with its user agent).
 - The 3x shots are in the scratchpad at full size; the journal keeps downsized JPEGs (the 1 MB size guard).
+
+## Spec review
+
+Fixed: a Clear pick saved earlier (on the same data, before the iOS 18 rule) now counts as the theme's icon below
+iOS 18, for the rows, Home's header and app.icon (appicon.js `readIcons`); the website's theme preview is back to
+what it was (the Home header there is the apps' only). Kept, as decisions:
+- The grid's groups follow the approved mockup's Dark Icon screen (Themes: this mode's themes; Special: Clear and
+  the other mode's), mirrored for Light, rather than the brief's literal "Themes: every theme's icon", which would
+  list the light themes twice in the Dark grid.
+- With Match Theme off, the switch's footer gives way to "Pick an icon for each mode." under Light/Dark, as the
+  mockup's off screen shows.
+- No Your Icons group or Add tile: a tile that does nothing until F329; noted on F329 where the grid lives.
+- `clearOffered(null)` offers Clear: in the apps the web view's user agent always carries the iOS version, so null
+  only happens off-phone (tests, desktop browsers).

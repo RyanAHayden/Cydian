@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createSettings, iconFor, iconState, iconGroups, clearOffered, APP_ICONS, LIGHT_PALETTES, DARK_PALETTES } from "./core/settings.js";
-import { iconMessage, tellIcon, resetTold, iconSrc, clearHere } from "./appicon.js";
+import { iconMessage, tellIcon, resetTold, iconSrc, clearHere, readIcons } from "./appicon.js";
 
 function memStorage() {
   const m = new Map();
@@ -103,4 +103,14 @@ test("tellIcon sends app.icon once per change, only in the apps", () => {
   }
   assert.deepEqual(iconMessage((k) => s.get(k), "dark").params.onScreen, "oled");
   assert.equal(iconSrc("clear"), "appicon/clear.png");
+});
+
+test("a Clear pick saved earlier counts as the theme's icon where Clear isn't offered", () => {
+  const s = store();
+  s.set("iconMatch", false);
+  s.set("darkIcon", "clear");
+  const raw = (k) => s.get(k);
+  assert.equal(iconFor("dark", readIcons(raw, true)), "clear");
+  assert.equal(iconFor("dark", readIcons(raw, false)), "gunmetal");
+  assert.deepEqual(iconState(readIcons(raw, false), "dark"), { light: "classic", dark: "gunmetal", onScreen: "gunmetal" });
 });

@@ -20,7 +20,12 @@ export const nativeIcons = (s = settings) => Boolean(nativeBridge()) && s.isShow
 export const iconSrc = (name) => `appicon/${name}.png`;
 
 const toneOnScreen = () => (globalThis.document?.documentElement?.dataset.theme === "dark" ? "dark" : "light");
-const get = (k) => settings.get(k);
+// A Clear pick doesn't count where Clear isn't offered (below iOS 18): that mode shows its theme's icon.
+export const readIcons = (read, clear = clearHere()) => (k) => {
+  const v = read(k);
+  return !clear && (k === "lightIcon" || k === "darkIcon") && v === "clear" ? "theme" : v;
+};
+const get = (k) => readIcons((key) => settings.get(key))(k);
 
 // The icon a slot shows: "current" the tone on screen's, "light" / "dark" that tone's.
 export function iconOf(slot, read = get, onScreen = toneOnScreen()) {
@@ -48,7 +53,7 @@ export const iconMessage = (read, onScreen) => ({ method: "app.icon", params: ic
 let lastSent = "";
 export function tellIcon(onScreen, s = settings, native = nativeBridge()) {
   if (!nativeIcons(s) || !hasNativeCall(native)) return false;
-  const { method, params } = iconMessage((k) => s.get(k), onScreen);
+  const { method, params } = iconMessage(readIcons((k) => s.get(k)), onScreen);
   const key = JSON.stringify(params);
   if (key === lastSent) return false;
   lastSent = key;

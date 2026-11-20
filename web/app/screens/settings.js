@@ -68,7 +68,7 @@ import { onPageShow, patchDetails, cellsOf } from "../nav/pagestate.js";
 import { refreshInstallation } from "./installroute.js";
 import { loadStyle, EASE, DURATION } from "../nav/motion.js";
 import { APP_ICONS, iconGroups } from "../core/settings.js";
-import { nativeIcons, iconSrc, iconOf, iconImage, refreshIcons, tellIcon, clearHere } from "../appicon.js";
+import { nativeIcons, iconSrc, iconOf, iconImage, refreshIcons, tellIcon, clearHere, readIcons } from "../appicon.js";
 
 // F284: Installation & Signing's own sub-pages under signing/ (the main page's Signing rows), sideload build only.
 // How Signing Works stays signing/help.
@@ -539,14 +539,17 @@ function themePreview(tone) {
   box.setAttribute("aria-hidden", "true");
   const bar = make("div", "navbar theme-preview-bar");
   bar.append(make("span", "bar-button back", "Back"), make("span", "nav-title", "Preview"), make("span", "bar-button", "Edit"));
-  // F323: a small Home header, its icon the one this theme (or Theme > App Icon's pick) gives the app; the website
-  // keeps its own WEB icon there, as on Home.
-  const home = make("div", "theme-preview-home");
-  const icon = make("img", "theme-preview-icon");
-  icon.alt = "";
-  if (nativeIcons()) iconImage(icon, tone);
-  else Object.assign(icon, { src: "icons/icon-web-glossy-76.png", srcset: "icons/icon-web-glossy-76.png 1x, icons/icon-web-glossy-152.png 2x, icons/icon-web-glossy-228.png 3x" });
-  home.append(icon, make("span", "theme-preview-home-title", `Welcome to ${NAME}`));
+  // F323: in the apps, a small Home header, its icon the one this theme (or Theme > App Icon's pick) gives the app.
+  // The website's preview stays as it was (its icon never changes).
+  const home = document.createDocumentFragment();
+  if (nativeIcons()) {
+    const head = make("div", "theme-preview-home");
+    const icon = make("img", "theme-preview-icon");
+    icon.alt = "";
+    iconImage(icon, tone);
+    head.append(icon, make("span", "theme-preview-home-title", `Welcome to ${NAME}`));
+    home.append(head);
+  }
   const search = make("div", "search-bar");
   const field = make("label", "search-field");
   field.append(Object.assign(document.createElement("input"), { type: "search", placeholder: "Search" }));
@@ -581,7 +584,7 @@ const iconThumb = (name) => ({ icon: { cls: "app-icon-thumb", src: iconSrc(name)
 export function appIconLayout(store = settings) {
   const pick = (key) => {
     const d = defOf(key);
-    const name = iconOf(d.iconTone, (k) => store.get(k));
+    const name = iconOf(d.iconTone, readIcons((k) => store.get(k)));
     return { key, label: d.label, detail: iconLabel(name), icon: name, href: format(settingsRoute(["theme", key])) };
   };
   return [

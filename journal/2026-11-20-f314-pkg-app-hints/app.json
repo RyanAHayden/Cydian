@@ -1,0 +1,19 @@
+[
+  { "wait": 3000 },
+  { "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'" },
+  { "nav": "#/sources", "ms": 6000 },
+  { "eval": "(()=>{const e=[...document.querySelectorAll('.page.is-top li a')].find(x=>/source\\.json/.test(decodeURIComponent(x.getAttribute('href')||''))); if(!e) return 'none'; location.hash = e.getAttribute('href'); return e.getAttribute('href')})()" },
+  { "wait": 8000 },
+  { "eval": "location.hash + ' | ' + document.querySelector('.page.is-top')?.innerText.slice(0,300)" },
+  { "eval": "(()=>{const e=[...document.querySelectorAll('.page.is-top li a')].filter(x=>x.offsetParent!==null).at(-1); if(!e) return 'none'; location.hash = e.getAttribute('href'); return e.getAttribute('href')})()" },
+  { "wait": 6000 },
+  { "eval": "(()=>{const e=[...document.querySelectorAll('.page.is-top a[href]')].filter(x=>x.offsetParent!==null && /package|app/.test(decodeURIComponent(x.getAttribute('href')))).at(0); if(!e) return 'none: ' + document.querySelector('.page.is-top')?.innerHTML.slice(0,600); location.hash = e.getAttribute('href'); return e.getAttribute('href')})()" },
+  { "wait": 8000 },
+  { "eval": "location.hash + '\\n' + [...document.querySelectorAll('.page.is-top .group-header, .page.is-top .group li, .page.is-top .group-footer')].map(e => e.className.split(' ')[0] + ': ' + e.textContent.trim().replace(/\\s+/g, ' ').slice(0, 120)).join('\\n')" },
+  { "eval": "(() => { const h = [...document.querySelectorAll('.page.is-top .group-header')].find(e => e.textContent === 'Information'); if (!h) return 'no group'; const b = document.querySelector('.page.is-top .page-body'); b.scrollTop += h.getBoundingClientRect().top - 120; return b.scrollTop; })()" },
+  { "wait": 800 },
+  { "shot": "app-info" },
+  { "eval": "(() => { const h = [...document.querySelectorAll('.page.is-top .group-header')].find(e => e.textContent === 'Where It Comes From'); if (!h) return 'no group'; const b = document.querySelector('.page.is-top .page-body'); b.scrollTop += h.getBoundingClientRect().top - 120; return b.scrollTop; })()" },
+  { "wait": 800 },
+  { "shot": "app-install" }
+]

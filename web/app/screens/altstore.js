@@ -20,7 +20,7 @@ import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall, onAppsChange } from "../core/installed.js";
 import { signAndInstall, localSigning, isSelfIpa, originalWarning, TOO_BIG_FOOTER } from "../signing-client.js";
 import { overSiteLimit } from "../core/websign.js";
-import { siteGateRows, markiFizBoxInstalled, websiteInstallsOn, SITE_GATE_FOOTER } from "../websign-gate.js";
+import { siteGateRows, markiFizBoxInstalled, websiteInstallsOn } from "../websign-gate.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { guarded } from "../nav/tapguard.js";
@@ -45,7 +45,6 @@ import { PUBLIC_SITE } from "../core/handoff.js";
 import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText,
   storeTrackId, storeReviews, reviewsFeedUrl, workerReviewsUrl } from "../core/applookup.js";
 import { NAME, BUNDLE_ID } from "../brand.js";
-import { signingPage } from "../core/signingpage.js"; // C15: Installation & Signing in the sideload build
 import { addNavIcon } from "../nav/navbar.js";
 import { haptic } from "../nav/haptic.js";
 import { showHUD } from "../nav/hud.js";
@@ -654,8 +653,35 @@ export async function appPageCustom(pkg, source, opts, { queue = appQueue, add =
 
 // The website's Install group (F93: it signs in the browser; F92: only Install and Download IPA).
 export const SITE_INSTALL_SUBTITLE = "Signed in the browser with your certificate";
-export const SITE_INSTALL_FOOTER = "Install signs the app here in the browser with your certificate (Settings > Signing). "
-  + "Download IPA keeps the file.";
+export const SITE_INSTALL_FOOTER = "Install signs the app here in the browser with your certificate (Settings > Signing).";
+
+// F314: the app page's Install rows in the iOS 6 hint style (AGENTS.md, Hints): one or two short sentences under the
+// rows they explain, never joined. The install rows (Install, Custom Install) get one footer, Download IPA a group of
+// its own with none; on the website's gate (websign-gate.js siteGateRows: Install in NAME, Download IPA, Install on
+// the Website) Install on the Website gets its own group too, with the slow note that only the site has.
+export const LOCAL_INSTALL_FOOTER = "Signed with your certificate on this iPhone.";
+export const ITMS_FOOTER = "Installs over the air with the source's signed link.";
+export const GATE_FOOTER = `Opens in the ${NAME} app, which signs and installs it.`;
+export const SITE_SLOW_FOOTER = "Signs here in the browser: slower, and can fail on big apps.";
+export function installSections(rows, { gated = false, itms = false, jailbreak = false, local = false, download = true } = {}) {
+  const isDownload = (r) => r.label === "Download IPA";
+  if (gated) {
+    return rows.map((r, i) => (i === 0 ? { header: "Install", rows: [r], footer: GATE_FOOTER }
+      : isDownload(r) ? { rows: [r] } : { rows: [r], footer: SITE_SLOW_FOOTER }));
+  }
+  const footer = jailbreak ? IPA_FOOTER : itms ? ITMS_FOOTER : local ? LOCAL_INSTALL_FOOTER : download ? SITE_INSTALL_FOOTER : null;
+  const keep = rows.filter(isDownload);
+  return [{ header: "Install", rows: rows.filter((r) => !isDownload(r)), footer }, ...(keep.length ? [{ rows: keep }] : [])];
+}
+
+// F314: Information's hints, each under the rows it explains: past the website's size cap (F257) the rows through
+// Size form the first group with TOO_BIG_FOOTER, the rest (Compatibility among them) the next with the fit detail.
+export function infoSections(info, { fitDetail = null, tooBig = false } = {}) {
+  const cut = tooBig ? info.findIndex((r) => r.label === "Size") + 1 : 0;
+  if (!cut) return [{ header: "Information", rows: info, footer: fitDetail || null }];
+  return [{ header: "Information", rows: info.slice(0, cut), footer: TOO_BIG_FOOTER },
+    ...(info.length > cut ? [{ rows: info.slice(cut), footer: fitDetail || null }] : [])];
+}
 // F95: My IPAs' website Install (screens/myipas.js siteInstallSheet) still says the certificate is needed, with
 // Download IPA beside OK.
 export const SITE_CERT_TITLE = "Certificate Needed";
@@ -802,8 +828,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     if (m.version) info.push({ label: "App Store Version", detail: m.version });
     if (m.minimumOs) info.push({ label: "App Store Requires", detail: `iOS ${m.minimumOs} or later` });
     info.push({ label: "Bundle ID", detail: app.bundleIdentifier });
-    detailsBox.replaceChildren(grouped([{ header: "Information", rows: info,
-      footer: [lastFit.detail, tooBig ? TOO_BIG_FOOTER : null].filter(Boolean).join("\n\n") }]));
+    detailsBox.replaceChildren(grouped(infoSections(info, { fitDetail: lastFit.detail, tooBig })));
   };
   drawDetails();
   details.append(detailsBox);
@@ -875,12 +900,8 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   const { rows, options, gated } = installRows(v, app.sourceUrl, undefined, record, queued ? () => appPageAction(pkg, source) : null, app.name,
     { ...(queued ? { customize: (o) => appPageCustom(pkg, source, o) } : {}), appId: pkg.row?.id ?? st.package ?? app.bundleIdentifier,
       bundleId: appBundleId(app, pkg.row?.id), iconUrl: app.iconURL });
-  const installGroup = grouped([{ header: "Install", rows,
-    footer: gated ? SITE_GATE_FOOTER
-      : options.download && ipaInstallAvailable() ? IPA_FOOTER
-      : options.itms ? "Installs over the air with the source's signed link."
-      : localSigning() ? `Install queues it and opens Confirm, which signs it with your own certificate (${signingPage()}) and installs it. Custom Install first lets you change its bundle ID, name, icon or extensions. Download IPA keeps the file.`
-      : options.download ? SITE_INSTALL_FOOTER : null }]);
+  const installGroup = grouped(installSections(rows, { gated, itms: Boolean(options.itms),
+    jailbreak: Boolean(options.download && ipaInstallAvailable()), local: localSigning(), download: Boolean(options.download) }));
   const installBox = installGroup.firstElementChild; // grouped() gives a fragment, empty once appended
   details.append(installGroup);
   // B72: the IPA's own MinimumOSVersion (the source's can be wrong) on the jailbreak Install row

@@ -22,7 +22,8 @@ html[data-theme="dark"] .confirm-problem .table { background: var(--dk-issue-tab
   font: 11px/15px ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text;
 }
 
-/* ---- the console: black page, black bar, grey output, white bold status, red errors ---- */
+/* ---- the console (nav/progress.js's page carries .console; its output and foot are progress.css): black page,
+   black bar ---- */
 .console { background: #000; }
 .console .navbar.sheet-bar {
   background:
@@ -33,25 +34,6 @@ html[data-theme="dark"] .confirm-problem .table { background: var(--dk-issue-tab
 }
 .console .bar-button { border-color: #111; background: linear-gradient(#4a4f58, #24272c); background-origin: border-box; }
 .console .bar-button:active, .console .bar-button.is-pressed { background: linear-gradient(#2a2d32, #121316); background-origin: border-box; }
-.console-scroll {
-  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
-  padding: calc(var(--nav-h) + 20px) max(9px, env(safe-area-inset-right)) calc(20px + var(--safe-bottom)) max(9px, env(safe-area-inset-left));
-  display: flex; flex-direction: column; min-height: 100%;
-}
-.console-out { flex: 1; font-size: 12px; line-height: 16px; color: #a9a9a9; -webkit-user-select: text; user-select: text; }
-.console-line { white-space: pre-wrap; overflow-wrap: anywhere; }
-.console-line.status { color: #fff; font-weight: bold; }
-.console-line.error { color: #ff3b30; }
-.console-line.warning { color: #ffd60a; }
-.console-foot { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 20px; }
-.console-status { min-height: 16px; max-width: 100%; color: #fff; font-size: 12px; font-weight: bold; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.console-progress { width: 158px; height: 12px; padding: 3px; border: 1px solid #fff; border-radius: 6px; box-sizing: border-box; }
-.console-fill { height: 4px; width: 100%; border-radius: 2px; background: #eee; transform-origin: left; transform: scaleX(0); transition: transform .2s linear; }
-.console-finish {
-  width: 300px; max-width: 100%; padding: 12px; border: 1px solid #fff; border-radius: 9px; background: none; cursor: pointer;
-  color: #fff; font-size: 22px; font-weight: bold; touch-action: manipulation;
-}
-.console-finish:active { background: rgba(255,255,255,.2); }
 
 /* Continue Queuing as on the 4S (ref/4s/screens/queue-81.png): the label centred in Cydia's blue-grey, the chevron
    at the right. */

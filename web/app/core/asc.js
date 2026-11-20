@@ -161,8 +161,6 @@ export function remakeReason(cached, { udid = null, capabilities: caps = null, c
   if (certId && cached.certId && certId !== cached.certId) return "certificate";
   return null;
 }
-export const REASON_TEXT = { missing: "None yet", expired: "Expired", device: "This iPhone wasn't in it",
-  capabilities: "The App ID's capabilities changed", certificate: "The certificate changed" };
 
 // ---- steps ----
 export async function ensureDevice(request, udid, name = "iPhone") {

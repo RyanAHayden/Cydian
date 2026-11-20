@@ -42,5 +42,14 @@ they stay. Check here before removing or merging one.
 - **app.js's service-worker unregister**: returning browsers may still hold an old push worker.
 - **No `__init__.py` in native/ or native/spike/**: with one, `unittest discover -s native` finds the spike tests
   too, and the gate runs them twice.
+- **The row-state lists `APP_STATES` (core/apprun.js) and `STATES` (core/installrun.js)**: nothing reads them, but
+  each is the only full list of the states a run's rows go through; they stay as the modules' vocabulary.
+- **native/spike/web/meter.js `getPhase`**: unused, but part of a spike (see native/spike/ above).
+- **Exports used only inside their own module** (~200, e.g. guides.js's text constants, worker/src/index.js's
+  TTLs): the `export` is harmless and some are there for tests to reach; the scan above lists them with the
+  never-referenced ones, so check how often the name appears in its own file before deleting.
+- **`.console`, `.console .navbar.sheet-bar`, `.console .bar-button` and `.console-log` in queue.css**: the
+  console page is nav/progress.js's (`cls: "console progress-page"`) and a saved run's log uses `console-log`
+  (screens/queue.js); the rest of that page's look is progress.css's `progress-*`.
 - **Speed**: nothing in core/ looks slow enough to change without a phone to measure on; the gate's slow parts are
   the Swift builds (test_sign, test_sideload, the native package), which need the compile.

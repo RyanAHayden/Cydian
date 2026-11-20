@@ -146,7 +146,7 @@ test("Check Connection runs under the HUD; Forget Pairing too, then the page spi
   verify.answer({});
   await checking;
   assert.deepEqual(log, ["Checking Connection", "hide"]);
-  assert.deepEqual(alerts, ["Connected"]);
+  assert.deepEqual(alerts, [], "B135: a success shows on the button, not in an alert");
 
   const forgetting = tap(box, "Forget Pairing");
   await new Promise((r) => setTimeout(r, 5));

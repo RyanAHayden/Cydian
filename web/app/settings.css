@@ -105,3 +105,10 @@
 .install-action .cell-text { flex: none; text-align: center; }
 .install-action > .cell-inner.is-dim .cell-label { opacity: .4; }
 .install-action > .cell-inner.is-dim { cursor: default; }
+/* B135: Check Connection's answer on its button (screens/installroute.js checkMark): a check and "Successful" in the
+   status tile's green, or a red x beside the label; back to plain after a few seconds or on the next tap. */
+.check-mark { display: inline-block; margin-right: 6px; font-weight: bold; }
+[data-check="ok"] .cell-label { color: #2f9a2a; }
+[data-check="fail"] .check-mark { color: #c4161c; }
+html[data-theme="dark"] [data-check="ok"] .cell-label { color: var(--dk-ok); }
+html[data-theme="dark"] [data-check="fail"] .check-mark { color: var(--dk-bad); }

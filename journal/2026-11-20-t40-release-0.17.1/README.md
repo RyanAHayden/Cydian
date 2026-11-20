@@ -9,7 +9,9 @@
 - Notes cover the user-facing work since v0.17.0: the task's list (B171, F305a, B172, B176, B179, C18, B177, B178,
   B180, F306, F307) and what else landed meanwhile: paid sideload tweaks (F308, F318, F319, F309), push on by
   default (F310), hint style (F311, F314, F315, F317), pull to refresh (B188, B197), switch (B187), theme defaults
-  (F320), lazy loading (F313), B181–B186, B192, B199, B200. C18 (a Credits row removed) gets no line of its own.
+  (F320), lazy loading (F313), B181–B186, B192, B199, B200. C18 (a Credits row removed) was missing from the first
+  notes; the spec review caught it, so a line went into Fixes and `gh release edit v0.17.1 --notes-file` updated the
+  published body (the first 4 lines, the only ones the app and source.json use, did not change).
   Gate, tests, refactors and server hardening (B189, B190, F312) are left out as not user-facing.
 - `tools/release.sh --check-auth` (RyanAHayden), `tools/deploy.sh --check-auth` (wrangler logged in), `--dry-run`,
   then `tools/release.sh --tag-source --notes …`. Piracy list: Canister f517ff676e47, current.
@@ -34,4 +36,4 @@
 - No install of 0.17.1 on any phone (iPhone 7 or otherwise), and no in-app check that Changes offers it: the task
   asked for the release and the server check only, and phones are touched only when a task says so.
 - The site's build.json says build 2851 while the release's apps are 2850: deploy.sh's buildinfo counts the tag
-  commit (one more than the built commit). Cosmetic, not looked into further.
+  commit (one more than the built commit). Cosmetic; filed as T55 (low).

@@ -77,7 +77,17 @@ test("B40: the reload bar sits whole right above the tab bar, and the last row c
   assert.ok(Number(/height\s*:\s*(\d+)px/.exec(room.decl)?.[1]) >= h, "at least the strip's height");
   assert.match(room.decl, /display\s*:\s*block/);
   assert.match(room.decl, /clear\s*:\s*both/, "below the rubber-band float, not beside it");
-  const over = rules.find((x) => x.sel === "body:has(.sheet) .reload-bar");
-  assert.ok(over, "over a sheet");
-  assert.match(over.decl, /translate\s*:\s*0 calc\(var\(--tab-h\) - var\(--safe-bottom\)\)/, "down by the tab bar's 49 pt only");
+});
+
+// B154: a modal sheet covers the reload bar, as on iOS 6: no rule lifts the strip over a sheet, and its z-index stays
+// under the sheets' and the dark action sheets' scrim, so it shows again when the sheet closes.
+test("B154: modal sheets cover the reload bar", () => {
+  const pk = readFileSync(new URL("./packages.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const z = zOf(css, ".reload-bar");
+  assert.ok(z < zOf(pk, ".sheet"), "under the modal sheets");
+  assert.ok(z < zOf(pk, ".action-scrim"), "under the action sheets");
+  for (const r of rules.filter((x) => /reload-bar/.test(x.sel) && x.sel !== ".reload-bar")) {
+    assert.doesNotMatch(r.decl, /z-index/, `${r.sel} must not lift the strip`);
+  }
+  assert.ok(!rules.some((x) => /\.sheet\b[^,{]*\.reload-bar/.test(x.sel)), "no rule moves the strip onto a sheet");
 });

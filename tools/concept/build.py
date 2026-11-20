@@ -62,6 +62,23 @@ def css_for_frame(text):
     return SAFE_AREA.sub(lambda m: f"var(--sa-{m.group(1)}, {m.group(2).strip() if m.group(2) else '0px'})", text)
 
 
+# A mouse over the phone is a finger (tools/concept/touch.js): no hover, :active only while the finger is down and
+# not panning (touch.js sets .concept-active), and the media queries a phone answers. touch.js's matchMedia does
+# the same for script.
+TOUCH_CSS = [
+    (re.compile(r":active(?![\w-])"), ".concept-active"),
+    (re.compile(r":hover(?![\w-])"), ":not(*)"),
+    (re.compile(r"\(\s*(?:any-)?(?:hover\s*:\s*hover|pointer\s*:\s*fine)\s*\)"), "(max-width: 0px)"),
+    (re.compile(r"\(\s*(?:any-)?(?:hover\s*:\s*none|pointer\s*:\s*coarse|hover|pointer)\s*\)"), "(min-width: 0px)"),
+]
+
+
+def touch_css(text):
+    for rx, to in TOUCH_CSS:
+        text = rx.sub(to, text)
+    return text
+
+
 def script_safe(js):
     """Text that can sit inside an inline <script>: no "</script" or "<!--" in it (both kept equivalent in JS)."""
     return re.sub(r"</(script)", r"<\\/\1", js, flags=re.I).replace("<!--", "<\\!--")
@@ -104,7 +121,7 @@ def split_tree(tree):
         if is_module(path):
             modules[path] = data.decode("utf-8")
         elif suffix == ".css":
-            files[path] = css_for_frame(data.decode("utf-8"))
+            files[path] = touch_css(css_for_frame(data.decode("utf-8")))
         elif suffix == ".json" and "/" not in path:
             files[path] = data.decode("utf-8")
         elif suffix in IMAGE_TYPES and path.startswith(("icons/", "img/")) and not path.startswith(ASSET_SKIP) and len(data) <= ASSET_MAX:
@@ -187,7 +204,7 @@ def build(app=None, before="main", start="", title="Concept", note="", mode="jai
         "net": sample.net(app), "apt": sample.apt(), "names": sample.names(app),
         "domain": domain(app),
         "version": (ROOT / "native/VERSION").read_text().strip() if (ROOT / "native/VERSION").exists() else "1.0",
-        "shell": script_safe((HERE / "shell.js").read_text(encoding="utf-8")),
+        "shell": script_safe((HERE / "shell.js").read_text(encoding="utf-8") + "\n" + (HERE / "touch.js").read_text(encoding="utf-8")),
         "runtime": script_safe(esm.RUNTIME),
     }
     page = (HERE / "frame.html").read_text(encoding="utf-8")

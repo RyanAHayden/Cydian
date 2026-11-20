@@ -8,6 +8,14 @@
 //   node tools/concept/check.mjs PAGE.html [--devices iphone-se,iphone-17-pro-max] [--themes light:classic,dark:gunmetal]
 //                                [--modes jailbreak,sideload,site] [--version after|before] [--shots DIR]
 //                                [--viewport 1280x900] [--tap '.tabbar a:nth-child(2)'] [--route '#/sources'] [--probe 'return …']
+//                                [--drag-route '#/home/credits' | none]
+//
+// The mouse is a finger in the phone (tools/concept/touch.js), so each run also opens --drag-route and drags its
+// list by mouse: the row pressed shows its pressed state and the app saw a touch (pointerType "touch", touchstart),
+// the list follows the drag, keeps going after the release (momentum) and lets go of the press, and pulling past the
+// top rubber-bands and springs back; a drag from the left edge goes back; on Sources a left drag shows a row's
+// Delete, a tap puts it away and a hold shows the row's menu. Then the device changes to another size and back with the app running, and
+// window error events count as errors too, in the page and in the phone (ResizeObserver's loop warning is one).
 //
 // Exit 0: every run clean; 1: an error or a failed check (listed); 2: Chromium didn't start.
 import { spawn } from "node:child_process";
@@ -27,6 +35,7 @@ const ROUTE = opt("--route", null);
 const PROBE = opt("--probe", null); // JS run in the app's frame (d: document, w: window) after each run; its value printed
 const TAP = opt("--tap", "#tabbar a, #tabbar button, .tabbar a, .tabbar button");
 const [VW, VH] = opt("--viewport", "1280x900").split("x").map(Number);
+const DRAG = opt("--drag-route", "#/home/credits"); // a page that scrolls at every device: the mouse-as-finger checks run there ("none": skip)
 const PAGE = args[0];
 if (!PAGE) { console.error("usage: node tools/concept/check.mjs PAGE.html [options]"); process.exit(2); }
 const CHROME = process.env.CHROMIUM ?? "chromium";
@@ -77,6 +86,10 @@ const inApp = (body) => ev(`(() => { const d = document.getElementById("app").co
 const until = async (expr, ms) => { const end = Date.now() + ms; while (Date.now() < end) { try { if (await inApp(expr)) return true; } catch {} await sleep(150); } return false; };
 
 await send("Page.enable"); await send("Runtime.enable"); await send("Log.enable");
+// window error events that reach no console (ResizeObserver's "loop completed with undelivered notifications" is one),
+// in the page and in every frame
+await send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__conceptErrors = [];
+  addEventListener("error", (e) => window.__conceptErrors.push(String(e.message || e.error || "error")));` });
 await send("Emulation.setDeviceMetricsOverride", { width: VW, height: VH, deviceScaleFactor: 1, mobile: false });
 await send("Page.navigate", { url: base });
 await sleep(800);
@@ -99,6 +112,115 @@ async function tap(css) {
 }
 async function set(control, value) {
   await ev(`(() => { const s = document.getElementById(${JSON.stringify(control)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event("change")); })()`);
+}
+
+// ---- the mouse as a finger (tools/concept/touch.js)
+const mouse = (type, x, y, extra = {}) => send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1, ...extra });
+// The list showing in the phone and a pressable row in its middle, in page coordinates (through the phone's scale).
+const FIND = `const f = document.getElementById("app"), d = f.contentDocument, w = f.contentWindow;
+  const fr = f.getBoundingClientRect(), k = fr.width / f.offsetWidth;
+  const sc = d.elementFromPoint(f.offsetWidth / 2, f.offsetHeight / 2)?.closest(".page-body");
+  const toPage = (x, y) => ({ x: fr.left + x * k, y: fr.top + y * k });`;
+async function fingerChecks(name) {
+  await inApp(`w.location.hash = ${JSON.stringify(DRAG)}`);
+  await sleep(1500);
+  const at = await ev(`(() => { ${FIND}
+    if (!sc) return null;
+    const r = sc.getBoundingClientRect(), mid = r.top + r.height / 2;
+    const row = [...sc.querySelectorAll("a.cell-inner, button.cell-inner")].map((e) => [e, e.getBoundingClientRect()])
+      .filter(([, b]) => b.height && b.top > r.top + 40 && b.bottom < r.bottom - 40).sort((a, b) => Math.abs(a[1].top - mid) - Math.abs(b[1].top - mid))[0];
+    if (!row) return null;
+    row[0].setAttribute("data-concept-check", "");
+    sc.setAttribute("data-concept-check-list", "");
+    sc.scrollTop = 0;
+    w.__seen = [];
+    for (const t of ["pointerdown", "touchstart", "pointercancel", "click"]) d.addEventListener(t, (e) => w.__seen.push(t + ":" + (e.pointerType ?? "")), { capture: true, once: true });
+    return { ...toPage(row[1].left + row[1].width / 2, row[1].top + row[1].height / 2), range: sc.scrollHeight - sc.clientHeight, hash: w.location.hash };
+  })()`);
+  if (!check(at && at.range > 20, `${name}: ${DRAG} has a list that scrolls (${at ? at.range + " px" : "none found"})`)) return;
+  const state = () => inApp(`const row = d.querySelector("[data-concept-check]"), sc = d.querySelector("[data-concept-check-list]");
+    const kid = sc.firstElementChild, m = kid ? new DOMMatrixReadOnly(getComputedStyle(kid).transform) : null;
+    return { pressed: row.classList.contains("is-pressed"), active: row.classList.contains("concept-active"), top: sc.scrollTop,
+      band: m ? Math.round(m.m42) : 0, seen: w.__seen.slice(), hash: w.location.hash, anyPressed: d.querySelectorAll(".is-pressed:not(.sel-ghost), .concept-active").length }`);
+
+  // a press: the row goes down, the app saw a touch
+  await mouse("mousePressed", at.x, at.y);
+  await sleep(120);
+  const held = await state();
+  check(held.pressed && held.active, `${name}: pressing a row shows its pressed state (is-pressed ${held.pressed}, :active ${held.active})`);
+  check(held.seen.includes("pointerdown:touch") && held.seen.includes("touchstart:"), `${name}: the app saw a touch (${held.seen.join(" ")})`);
+  // a quick drag up: the list follows, the press lets go, and it glides on after the release
+  for (let i = 1; i <= 6; i++) { await mouse("mouseMoved", at.x, at.y - i * 12); await sleep(10); }
+  await mouse("mouseReleased", at.x, at.y - 72);
+  const let_ = await state();
+  await sleep(900);
+  const glide = await state();
+  check(let_.top > 10, `${name}: the list followed the drag (scrollTop ${let_.top})`);
+  check(glide.top > let_.top, `${name}: the list kept going after the release (${let_.top} -> ${glide.top})`);
+  check(!let_.pressed && !let_.active && glide.anyPressed === 0, `${name}: the drag let go of the press`);
+  check(glide.seen.includes("pointercancel:touch") && !glide.seen.some((s) => s.startsWith("click")) && glide.hash === at.hash,
+    `${name}: a drag is no tap (${glide.seen.join(" ")}; ${glide.hash})`);
+  // pulling down past the top: the content follows less and less, then springs back
+  await inApp(`d.querySelector("[data-concept-check-list]").scrollTop = 0`);
+  await sleep(100);
+  await mouse("mousePressed", at.x, at.y);
+  for (let i = 1; i <= 8; i++) { await mouse("mouseMoved", at.x, at.y + i * 15); await sleep(16); }
+  await sleep(100);
+  const pulled = await state();
+  await mouse("mouseReleased", at.x, at.y + 120);
+  await sleep(1200);
+  const back = await state();
+  check(pulled.band > 5 && pulled.band < 120, `${name}: pulling past the top rubber-bands (${pulled.band} px for a 120 px pull)`);
+  check(Math.abs(back.band) < 1 && back.hash === at.hash, `${name}: and springs back (${back.band} px)`);
+  // a drag from the left edge swipes the page back (nav/swipe.js, pointer events with touch-action: none); the
+  // website leaves that to Safari's own swipe (app.js webBack: the edge strip is off)
+  const edge = await ev(`(() => { ${FIND} const r = sc.getBoundingClientRect(), strip = d.querySelector(".edge-swipe");
+    return strip && !strip.classList.contains("off") ? toPage(r.left + 4, r.top + r.height / 2) : null; })()`);
+  if (!edge) { console.log(`ok   ${name}: no edge swipe here (the website's back swipe is Safari's)`); return; }
+  await mouse("mousePressed", edge.x, edge.y);
+  for (let i = 1; i <= 10; i++) { await mouse("mouseMoved", edge.x + i * 25, edge.y + i); await sleep(16); }
+  await mouse("mouseReleased", edge.x + 250, edge.y + 10);
+  await sleep(1000);
+  const popped = await inApp("return w.location.hash");
+  check(popped !== at.hash, `${name}: dragging from the left edge went back (${at.hash} -> ${popped})`);
+}
+// On Sources: a left drag on a row shows its Delete (screens/sources.js), a tap on another row only puts it away,
+// and holding a row shows the black Copy URL menu (nav/menu.js longPress).
+async function rowChecks(name) {
+  await inApp(`w.location.hash = "#/sources"`);
+  await sleep(1500);
+  const rows = await ev(`(() => { ${FIND} if (!sc) return [];
+    return [...sc.querySelectorAll(".source-row[data-url]")].slice(0, 3).map((li, i) => { li.setAttribute("data-concept-row", i);
+      const b = li.getBoundingClientRect(); return toPage(b.left + b.width * 0.6, b.top + b.height / 2); }); })()`);
+  if (rows.length < 3) { console.log(`ok   ${name}: no source rows to swipe here (${rows.length})`); return; }
+  const row = (i, expr) => inApp(`const li = d.querySelector('[data-concept-row="${i}"]'); return ${expr}`);
+  await mouse("mousePressed", rows[1].x, rows[1].y);
+  for (let i = 1; i <= 8; i++) { await mouse("mouseMoved", rows[1].x - i * 15, rows[1].y); await sleep(16); }
+  await mouse("mouseReleased", rows[1].x - 120, rows[1].y);
+  await sleep(600);
+  check(await row(1, `li.classList.contains("armed")`), `${name}: a left drag on a source row shows its Delete`);
+  const hash = await inApp("return w.location.hash");
+  await tap('[data-concept-row="2"]');
+  await sleep(600);
+  check(!(await row(1, `li.classList.contains("armed")`)) && (await inApp("return w.location.hash")) === hash,
+    `${name}: a tap on another row only puts the Delete away`);
+  await mouse("mousePressed", rows[2].x, rows[2].y);
+  await sleep(900);
+  const menu = await inApp(`const m = d.querySelector(".menu"); return Boolean(m && m.getClientRects().length)`);
+  await mouse("mouseReleased", rows[2].x, rows[2].y);
+  await sleep(300);
+  check(menu && (await inApp("return w.location.hash")) === hash, `${name}: holding a row shows its menu (and opens nothing)`);
+}
+// The device changes size with the app running, and back (frame.html loads a fresh app at the new size; resizing
+// the running one set off ResizeObserver's loop warning).
+async function liveResize(device) {
+  const other = await ev(`[...document.getElementById("device").options].map((o) => o.value).find((v) => v !== ${JSON.stringify(device)} && !/ipad/.test(v))`);
+  for (const d of [other, device]) {
+    await set("device", d);
+    await sleep(300);
+    check(await until(`return d.querySelector(".page") && !d.getElementById("boot")`, 15000), `the app came up again after changing the device to ${d}`);
+    await sleep(1000);
+  }
 }
 
 const top = await ev(`({ title: document.title, theme: document.getElementById("theme").value, hasDevice: !!document.getElementById("device").options.length,
@@ -134,7 +256,11 @@ for (const mode of MODES) {
         const after = await inApp("return w.location.hash");
         check(tabs > 0 && which && after !== before, `${name}: tapping "${which}" in the tab bar went ${before} -> ${after}`);
       }
+      if (DRAG !== "none") { await fingerChecks(name); await rowChecks(name); }
+      await liveResize(device);
       if (PROBE) console.log(`     probe: ${JSON.stringify(await inApp(PROBE))}`);
+      for (const m of (await ev("window.__conceptErrors.splice(0)")) ?? []) errors.push("page: " + m);
+      for (const m of (await inApp("return (w.__conceptErrors || []).splice(0)")) ?? []) errors.push("phone: " + m);
       if (SHOTS) {
         await mkdir(SHOTS, { recursive: true });
         const r = await send("Page.captureScreenshot", { format: "png" });

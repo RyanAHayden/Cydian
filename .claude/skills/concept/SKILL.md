@@ -54,7 +54,11 @@ The controls outside the phone are plain page UI; leave them as the tool draws t
        python3 tools/concept/build.py ... --standalone -o "$SCRATCH/check.html"
        node tools/concept/check.mjs "$SCRATCH/check.html" --modes jailbreak,sideload,site --route '#/sources' --shots "$SCRATCH/shots"
 
-   It runs under a CSP like the Artifact viewer's and fails on any error, CSP refusal or request. Look at the shots.
+   It runs under a CSP like the Artifact viewer's and fails on any error, CSP refusal or request, window error
+   events included (ResizeObserver's loop warning is one). At each device and theme it also drags a list by mouse
+   on `--drag-route` (default `#/home/credits`, a page long enough to scroll on every device; `none` skips it): the
+   pressed row's state, a touch seen by the app, the list following and gliding on, the rubber band at the top, a
+   swipe back from the left edge; then it changes the device and back. Look at the shots.
 5. Publish the non-standalone file with the Artifact tool (`icon: "phone"`, a short title like "More Sources Live",
    a one-line description), and send the user the link. To revise, rebuild to the same path and publish it again:
    same file path, same URL.
@@ -71,6 +75,18 @@ The controls outside the phone are plain page UI; leave them as the tool draws t
   in Website mode, both answered from `tools/concept/sample.py`'s sample sources (repo fixtures; an unknown source
   answers a made-up empty one); an in-memory localStorage seeded with the theme; images as data: URIs; safe areas
   per device (`env(safe-area-inset-*)` becomes `var(--sa-*)` at build time); an iPhone or iPad user agent.
+- The mouse is a finger inside the phone (`tools/concept/touch.js`, after shell.js), as in Chromium's device mode:
+  the app gets pointer events with `pointerType: "touch"` and touch events, never the mouse, so its touch code
+  runs (pressed rows, long press, swipe back, swipe to delete, pull to refresh, switches). A drag past 10 px pans
+  the nearest scroller the element's `touch-action` allows, with momentum and a rubber band at the ends; the
+  pointer gets `pointercancel` then, as a browser's would. A tap ends in the compatibility mouse events and a
+  click. `:active` in the app's CSS becomes `.concept-active` (set while the finger is down and not panning),
+  `:hover` matches nothing and `(hover)`/`(pointer)` media queries answer as a phone (build.py `touch_css`,
+  touch.js's `matchMedia`); the cursor is a round touch dot. Text fields keep the mouse's native focus and caret.
+  The mouse wheel still scrolls natively.
+- Changing the device loads a fresh app at the new size, on the same page (frame.html `load()` swaps in a new
+  iframe): resizing the running app set off `nav/slide.js`'s ResizeObserver into "ResizeObserver loop completed
+  with undelivered notifications". An open sheet or scroll position doesn't survive a device change.
 - Calls the fake bridge doesn't know answer null, as in `tools/readme_shots.py`'s capture route. If a concept needs
   data the sample hasn't got, add it to `sample.py` (fixtures only, nothing fetched) rather than faking it in screen
   code.

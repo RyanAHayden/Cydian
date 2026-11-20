@@ -7,7 +7,7 @@ import { grouped } from "../nav/ui.js";
 import { showSheet } from "../nav/sheet.js";
 import { qrSvg } from "../core/qr.js";
 import { sourceLinks, packageLinks, addLink, siteOrigin, formatOf, isIpaFormat } from "../core/handoff.js";
-import { settings } from "./settings.js";
+import { settings } from "../settings-store.js";
 import { detectMode } from "../core/settings.js";
 import { showShareSheet, setShare } from "../nav/sharesheet.js";
 import { showHUD } from "../nav/hud.js";

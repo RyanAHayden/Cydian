@@ -29,7 +29,7 @@ import { grouped, el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { mediaUrl } from "./depiction.js";
-import { settings } from "./settings.js";
+import { settings } from "../settings-store.js";
 import { runPaidInstall } from "./queue.js";
 import { createFeaturedStore, MAX_BANNERS, bannersInCatalog } from "../core/featured.js";
 import { createCanister, mapResults, priceFor, normalRepo, askable } from "../core/canister.js";

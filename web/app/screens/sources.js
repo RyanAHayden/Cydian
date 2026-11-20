@@ -20,7 +20,7 @@ export const TWEAK_SOURCES = "Tweak Sources";
 // Refresh's filter: in the sideload app the Tweak Sources are refreshed too.
 const refreshFilter = () => sourceFilter(settings.deviceType(), { tweaks: tweakSourcesOn(settings.deviceType(), detectMode()) });
 import { sourceIconImage } from "../source-icon.js";
-import { settings } from "./settings.js";
+import { settings } from "../settings-store.js";
 import * as manage from "./manage.js";
 import { orderSources, loadOrder, filterSources } from "../core/sourcelist.js";
 import { healthOf } from "../core/health.js";

@@ -43,7 +43,8 @@ import {
 import { copyText, nativePaste } from "../nav/menu.js";
 import { builtinFirst, isBuiltin, exportable } from "../core/essential.js";
 import { lockMark } from "../nav/lock.js";
-import { settings, createSwitch } from "./settings.js";
+import { settings } from "../settings-store.js";
+import { createSwitch } from "../nav/switch.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { confirmUnknownSource, markTrusted, labelSource } from "./safety.js"; // F291

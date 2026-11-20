@@ -17,7 +17,9 @@
 // follows the system while Appearance is Automatic. theme-boot.js does the same before first paint.
 import { grouped, segmented } from "../nav/ui.js";
 import { format, parse, settingsRoute } from "../router.js";
-import { createSettings, detectMode, themeState, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
+import { settings } from "../settings-store.js";
+import { createSwitch } from "../nav/switch.js";
+import { detectMode, themeState, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
 import { showAlert, alertOK } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind, deviceCheck, deviceCheckText } from "../core/signing.js";
@@ -94,9 +96,9 @@ export const title = "Settings";
 // F134: this page's own stylesheet (settings.css), linked once from this module's folder (no build step).
 function style() { loadStyle("settings.css"); }
 
-// The one store the app uses (both modes and the site read it through here). In the jailbreak app the bridge's
-// helper makes Ignored Upgrades real dpkg holds (F22); the bridge itself is N3's.
-export const settings = createSettings({ mode: detectMode(), helper: globalThis.ifizboxNative?.helper, native: globalThis.ifizboxNative });
+// The one store the app uses lives in settings-store.js and the iOS 6 switch in nav/switch.js, so screens that need
+// only those don't import this screen (C24 broke the import cycle that made). Re-exported for the screen's own users.
+export { settings, createSwitch };
 
 // Light: the top of the blue status bar under the nav bar; dark: "Status Bar (Black)".
 // By palette (F198): OLED Black's status bar is #000, Gunmetal's the top of its bar. ios6.css --dk-ground matches.
@@ -316,60 +318,6 @@ export function swatchIcon(o) {
   if (!o.swatch) return {};
   const [bar, ground] = o.swatch;
   return { icon: { cls: "theme-swatch", color: `linear-gradient(${bar} 0 45%, ${ground} 45%)` } };
-}
-
-// The iOS 6 switch (ios6.css .switch), for settings rows (makeSwitch) and anything else (F24's Section
-// Visibility): `checked` is where it starts, `onToggle(on)` hears every change.
-export function createSwitch({ label, checked = false, onToggle = () => {} }) {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = "switch";
-  b.setAttribute("role", "switch");
-  b.setAttribute("aria-label", label);
-  b.innerHTML = '<span class="sw-track"></span><span class="sw-knob"></span>';
-  const TRAVEL = 50; // px the knob moves: 77px track, 25px knob 1px inside it (the kit's switch)
-  const isOn = () => b.getAttribute("aria-checked") === "true";
-  const set = (on) => {
-    b.style.removeProperty("--x");
-    const was = isOn();
-    b.setAttribute("aria-checked", String(on));
-    if (was !== on) onToggle(on);
-  };
-  b.setAttribute("aria-checked", String(Boolean(checked)));
-  // Hold, drag and tap like iOS: the knob darkens while held and follows the finger; letting go settles it on the
-  // side it's nearer, or flips it if it hardly moved. Keyboard and VoiceOver activation come through click.
-  let drag = null;
-  b.addEventListener("pointerdown", (e) => {
-    const on = isOn();
-    drag = { id: e.pointerId, x0: e.clientX, start: on ? TRAVEL : 0, x: on ? TRAVEL : 0, moved: false };
-    b.setPointerCapture?.(e.pointerId);
-    b.classList.add("is-held");
-  });
-  b.addEventListener("pointermove", (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const dx = e.clientX - drag.x0;
-    if (!drag.moved && Math.abs(dx) < 4) return;
-    drag.moved = true;
-    drag.x = Math.max(0, Math.min(TRAVEL, drag.start + dx));
-    b.classList.add("is-dragging");
-    b.style.setProperty("--x", drag.x + "px");
-  });
-  const end = (e, cancelled) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const { moved, x, start } = drag;
-    drag = null;
-    b.classList.remove("is-held", "is-dragging");
-    if (cancelled) { set(isOn()); return; }
-    set(moved ? x > TRAVEL / 2 : start === 0);
-    b.dataset.handled = "1"; // the click that follows this pointerup is already done
-  };
-  b.addEventListener("pointerup", (e) => end(e, false));
-  b.addEventListener("pointercancel", (e) => end(e, true));
-  b.addEventListener("click", () => {
-    if (b.dataset.handled) { delete b.dataset.handled; return; }
-    set(!isOn());
-  });
-  return b;
 }
 
 function listPage(key) {

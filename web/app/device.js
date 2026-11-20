@@ -11,7 +11,8 @@
 import { plain } from "./nav/ui.js";
 import { getArch } from "./backend.js";
 import { catalog } from "./catalog.js";
-import { settings, createSwitch } from "./screens/settings.js";
+import { settings } from "./settings-store.js";
+import { createSwitch } from "./nav/switch.js";
 import { bridgeArch } from "./core/settings.js";
 import { iosFromUserAgent, jailbreakOfArch, badge, normalizeDevice } from "./core/compat.js";
 

@@ -23,7 +23,7 @@ import { showAlert } from "../nav/alert.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { NAME } from "../brand.js";
-import { settings } from "./settings.js";
+import { settings } from "../settings-store.js";
 import { detectMode } from "../core/settings.js";
 import { tweakSourcesOn, sourceIcons } from "../core/sources.js";
 import { sourceIconImage } from "../source-icon.js";

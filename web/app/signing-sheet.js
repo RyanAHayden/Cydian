@@ -24,7 +24,7 @@ import { format, settingsRoute } from "./router.js";
 import { installOnDevice } from "./signing/route.js";
 import { openSigning } from "./signing/device.js";
 import { askInsecure } from "./signing/common.js"; // B104
-import { createSwitch } from "./screens/settings.js";
+import { createSwitch } from "./nav/switch.js";
 import { phaseLabel, deviceError, inspectGroups, installParams, installedId, signsAsFor, isCgBI, fromBase64, notLandedText, SENT_TO_IOS } from "./core/signing.js";
 import { NAME } from "./brand.js";
 import { selfLevels } from "./core/progress.js";

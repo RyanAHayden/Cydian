@@ -30,7 +30,7 @@ import { showAlert } from "../nav/alert.js";
 import { dayTitle, filterGroups, filterRows, defaultScope } from "../core/changes.js";
 import { apps, installedIds, onAppsChange } from "../core/installed.js";
 import { signedAppsNamed } from "../core/installed.js"; // B150
-import { settings } from "./settings.js";
+import { settings } from "../settings-store.js";
 import { sourceFilter } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
 import { upgradesWithSelf } from "../essential-ui.js";

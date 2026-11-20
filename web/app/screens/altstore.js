@@ -12,7 +12,7 @@ import { getBackend } from "../backend.js";
 import { mediaUrl } from "./depiction.js";
 import { installOptions } from "../core/altstore.js";
 import { appLinks, appGithub, altShots, loadPreviews, dedupeShots } from "../core/previews.js";
-import { settings } from "./settings.js";
+import { settings } from "../settings-store.js";
 import { displayName, githubAvatarUrl } from "../core/sources.js";
 import { compat } from "../core/compat.js";
 import { currentDevice } from "../device.js";

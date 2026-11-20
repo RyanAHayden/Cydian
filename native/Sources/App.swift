@@ -62,6 +62,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         w.overrideUserInterfaceStyle = Theme.style(Theme.saved.style)
         w.makeKeyAndVisible()
         window = w
+        (w.rootViewController as? WebController)?.showCover(in: w) // B180: the launch screen until the page draws
         // F75: launched by a ifizbox:// link; B166: or a file another app handed over (Open in iFizBox). Every one,
         // logged (OpenLog), and a launch with none says so too: the trail then shows whether iOS handed anything over.
         OpenLog.scene("launched: \(options.urlContexts.count) URL(s), \(options.userActivities.count) activity(ies)\(options.sourceApplication.map { ", from \($0)" } ?? "")")
@@ -231,13 +232,18 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
         super.viewDidLoad()
         web.navigationDelegate = self
         web.uiDelegate = self // B8: window.open goes out of the app (LinkOut)
-        // N10: the launch screen's Home-as-it-loads, exact for this screen, over the web view until the page has
-        // drawn its own (index.html's #boot looks the same), so the hand-over from the launch screen shows no jump.
-        if false, let c = Launch.cover(frame: UIScreen.main.bounds) { // off: per-screen images only fit known sizes
-            web.addSubview(c)
-            cover = c
-        }
         web.load(URLRequest(url: AppScheme.url("index.html")))
+    }
+
+    // B180: the launch screen (Launch.cover) on the window, over the web view, until the page has drawn #boot under
+    // the same bars, so the hand-over from iOS's splash shows no jump and no bare pinstripes in between. On the
+    // window, not in the web view: a WKWebView's subviews get no safe area, so the bars came out 44 pt and 0 pt there.
+    func showCover(in window: UIWindow) {
+        guard cover == nil, let c = Launch.cover() else { return }
+        c.frame = window.bounds
+        c.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        window.addSubview(c)
+        cover = c
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { dropCover() }
@@ -430,18 +436,14 @@ enum Launch {
         if #available(iOS 15.0, *) { w.underPageBackgroundColor = g.plain }
     }
 
-    // The website's launch image for this screen (web/icons/launch/launch-<W>x<H>.png, in device pixels, made by
-    // tools/launch_images.py): nav bar titled iFizBox, the pinstripes with Loading, the tab bar with Home selected.
-    // nil on a screen it has no image for; the window's pinstripes show there instead.
-    static func cover(frame: CGRect) -> UIView? {
-        let px = UIScreen.main.nativeBounds.size // portrait pixels
-        let name = "launch-\(Int(min(px.width, px.height)))x\(Int(max(px.width, px.height)))"
-        guard let path = Bundle.main.path(forResource: name, ofType: "png", inDirectory: "web/icons/launch"),
-              let image = UIImage(contentsOfFile: path) else { return nil }
-        let v = UIImageView(image: image)
-        v.frame = frame
-        v.contentMode = .scaleToFill
-        v.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    // B180: the launch screen itself (LaunchScreen.storyboardc, from native/launch/LaunchScreen.storyboard): the
+    // bars laid out against the safe area of whatever it is put in, as iOS lays out the splash. Touches pass through.
+    // nil if the bundle has no storyboard (UIStoryboard would throw).
+    static func cover() -> UIView? {
+        guard Bundle.main.path(forResource: "LaunchScreen", ofType: "storyboardc") != nil,
+              let v = UIStoryboard(name: "LaunchScreen", bundle: .main).instantiateInitialViewController()?.view
+        else { return nil }
+        v.isUserInteractionEnabled = false
         return v
     }
 }

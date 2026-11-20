@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The launch screen (docs/native.md, "Launch screen"): the page's first frame (index.html #boot under the app's
+     bars, web/app/ios6.css with data-shell="app"), laid out against the safe area so it lines up on every screen:
+     the nav bar's gloss runs up through the status-bar strip (its top half stretched over the strip and the bar's top
+     22 pt, the bottom half in the last 22 pt), and the tab bar's black runs down over the home indicator under its
+     49 pt gloss. Images: launch/make.py. Compiled on a Mac by launch/storyboard.sh into LaunchScreen.storyboardc,
+     which is committed; App.swift shows the same storyboard over the web view until the page has drawn. -->
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24127" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="Lvc-00-000">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24063"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <scene sceneID="Lsc-00-000">
+            <objects>
+                <viewController id="Lvc-00-000" sceneMemberID="viewController">
+                    <view key="view" clipsSubviews="YES" contentMode="scaleToFill" id="Lrt-00-000">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView userInteractionEnabled="NO" contentMode="scaleToFill" image="LaunchStripes" translatesAutoresizingMaskIntoConstraints="NO" id="Lst-00-000">
+                                <rect key="frame" x="0.0" y="0.0" width="600" height="852"/>
+                            </imageView>
+                            <imageView userInteractionEnabled="NO" contentMode="scaleToFill" image="LaunchNavTop" translatesAutoresizingMaskIntoConstraints="NO" id="Lnt-00-000">
+                                <rect key="frame" x="0.0" y="0.0" width="393" height="81"/>
+                            </imageView>
+                            <imageView userInteractionEnabled="NO" contentMode="scaleToFill" image="LaunchNavBottom" translatesAutoresizingMaskIntoConstraints="NO" id="Lnb-00-000">
+                                <rect key="frame" x="0.0" y="81" width="393" height="22"/>
+                            </imageView>
+                            <view userInteractionEnabled="NO" contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Lnh-00-000">
+                                <rect key="frame" x="0.0" y="0.0" width="393" height="1"/>
+                                <color key="backgroundColor" red="0.93725490196078431" green="0.94901960784313721" blue="0.96862745098039216" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            </view>
+                            <view userInteractionEnabled="NO" contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Lnl-00-000">
+                                <rect key="frame" x="0.0" y="102" width="393" height="1"/>
+                                <color key="backgroundColor" red="0.17647058823529413" green="0.21176470588235294" blue="0.25882352941176473" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            </view>
+                            <imageView userInteractionEnabled="NO" contentMode="scaleToFill" image="LaunchNavShadow" translatesAutoresizingMaskIntoConstraints="NO" id="Lns-00-000">
+                                <rect key="frame" x="0.0" y="103" width="393" height="2.5"/>
+                            </imageView>
+                            <view userInteractionEnabled="NO" contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Ltb-00-000">
+                                <rect key="frame" x="0.0" y="769" width="393" height="83"/>
+                                <subviews>
+                                    <imageView userInteractionEnabled="NO" contentMode="scaleToFill" image="LaunchTabGloss" translatesAutoresizingMaskIntoConstraints="NO" id="Ltg-00-000">
+                                        <rect key="frame" x="0.0" y="1" width="393" height="48"/>
+                                    </imageView>
+                                    <view userInteractionEnabled="NO" contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Lth-00-000">
+                                        <rect key="frame" x="0.0" y="1" width="393" height="1"/>
+                                        <color key="backgroundColor" red="1" green="1" blue="1" alpha="0.10000000000000001" colorSpace="custom" customColorSpace="sRGB"/>
+                                    </view>
+                                </subviews>
+                                <color key="backgroundColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                <constraints>
+                                    <constraint firstItem="Ltg-00-000" firstAttribute="top" secondItem="Ltb-00-000" secondAttribute="top" constant="1" id="Lc1-00-000"/>
+                                    <constraint firstItem="Ltg-00-000" firstAttribute="leading" secondItem="Ltb-00-000" secondAttribute="leading" id="Lc2-00-000"/>
+                                    <constraint firstAttribute="trailing" secondItem="Ltg-00-000" secondAttribute="trailing" id="Lc3-00-000"/>
+                                    <constraint firstItem="Ltg-00-000" firstAttribute="height" constant="48" id="Lc4-00-000"/>
+                                    <constraint firstItem="Lth-00-000" firstAttribute="top" secondItem="Ltb-00-000" secondAttribute="top" constant="1" id="Lc5-00-000"/>
+                                    <constraint firstItem="Lth-00-000" firstAttribute="leading" secondItem="Ltb-00-000" secondAttribute="leading" id="Lc6-00-000"/>
+                                    <constraint firstAttribute="trailing" secondItem="Lth-00-000" secondAttribute="trailing" id="Lc7-00-000"/>
+                                    <constraint firstItem="Lth-00-000" firstAttribute="height" constant="1" id="Lc8-00-000"/>
+                                </constraints>
+                            </view>
+                            <imageView userInteractionEnabled="NO" contentMode="scaleToFill" image="LaunchTabShadow" translatesAutoresizingMaskIntoConstraints="NO" id="Lts-00-000">
+                                <rect key="frame" x="0.0" y="766.5" width="393" height="2.5"/>
+                            </imageView>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="Lsa-00-000"/>
+                        <color key="backgroundColor" red="0.80784313725490198" green="0.82745098039215681" blue="0.86274509803921573" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <!-- pinstripes: top to bottom from the left edge, at the image's own 600 pt width (only stretched
+                                 down, so the stripes keep their widths; the screen clips the rest) -->
+                            <constraint firstItem="Lst-00-000" firstAttribute="top" secondItem="Lrt-00-000" secondAttribute="top" id="Ld01-0-000"/>
+                            <constraint firstItem="Lst-00-000" firstAttribute="leading" secondItem="Lrt-00-000" secondAttribute="leading" id="Ld02-0-000"/>
+                            <constraint firstItem="Lst-00-000" firstAttribute="width" constant="600" id="Ld03-0-000"/>
+                            <constraint firstAttribute="bottom" secondItem="Lst-00-000" secondAttribute="bottom" id="Ld04-0-000"/>
+                            <!-- nav gloss, top half: screen top to safe area top + 22 -->
+                            <constraint firstItem="Lnt-00-000" firstAttribute="top" secondItem="Lrt-00-000" secondAttribute="top" id="Ld05-0-000"/>
+                            <constraint firstItem="Lnt-00-000" firstAttribute="leading" secondItem="Lrt-00-000" secondAttribute="leading" id="Ld06-0-000"/>
+                            <constraint firstAttribute="trailing" secondItem="Lnt-00-000" secondAttribute="trailing" id="Ld07-0-000"/>
+                            <constraint firstItem="Lnt-00-000" firstAttribute="bottom" secondItem="Lsa-00-000" secondAttribute="top" constant="22" id="Ld08-0-000"/>
+                            <!-- nav gloss, bottom half: the bar's last 22 -->
+                            <constraint firstItem="Lnb-00-000" firstAttribute="top" secondItem="Lnt-00-000" secondAttribute="bottom" id="Ld09-0-000"/>
+                            <constraint firstItem="Lnb-00-000" firstAttribute="leading" secondItem="Lrt-00-000" secondAttribute="leading" id="Ld10-0-000"/>
+                            <constraint firstAttribute="trailing" secondItem="Lnb-00-000" secondAttribute="trailing" id="Ld11-0-000"/>
+                            <constraint firstItem="Lnb-00-000" firstAttribute="height" constant="22" id="Ld12-0-000"/>
+                            <!-- nav highlight: 1 pt at the very top -->
+                            <constraint firstItem="Lnh-00-000" firstAttribute="top" secondItem="Lrt-00-000" secondAttribute="top" id="Ld13-0-000"/>
+                            <constraint firstItem="Lnh-00-000" firstAttribute="leading" secondItem="Lrt-00-000" secondAttribute="leading" id="Ld14-0-000"/>
+                            <constraint firstAttribute="trailing" secondItem="Lnh-00-000" secondAttribute="trailing" id="Ld15-0-000"/>
+                            <constraint firstItem="Lnh-00-000" firstAttribute="height" constant="1" id="Ld16-0-000"/>
+                            <!-- nav bottom edge: the bar's last 1 pt -->
+                            <constraint firstItem="Lnl-00-000" firstAttribute="bottom" secondItem="Lnb-00-000" secondAttribute="bottom" id="Ld17-0-000"/>
+                            <constraint firstItem="Lnl-00-000" firstAttribute="leading" secondItem="Lrt-00-000" secondAttribute="leading" id="Ld18-0-000"/>
+                            <constraint firstAttribute="trailing" secondItem="Lnl-00-000" secondAttribute="trailing" id="Ld19-0-000"/>
+                            <constraint firstItem="Lnl-00-000" firstAttribute="height" constant="1" id="Ld20-0-000"/>
+                            <!-- nav shadow: 2.5 pt under the bar -->
+                            <constraint firstItem="Lns-00-000" firstAttribute="top" secondItem="Lnb-00-000" secondAttribute="bottom" id="Ld21-0-000"/>
+                            <constraint firstItem="Lns-00-000" firstAttribute="leading" secondItem="Lrt-00-000" secondAttribute="leading" id="Ld22-0-000"/>
+                            <constraint firstAttribute="trailing" secondItem="Lns-00-000" secondAttribute="trailing" id="Ld23-0-000"/>
+                            <constraint firstItem="Lns-00-000" firstAttribute="height" constant="2.5" id="Ld24-0-000"/>
+                            <!-- tab bar: safe area bottom - 49 to the screen's bottom -->
+                            <constraint firstItem="Ltb-00-000" firstAttribute="top" secondItem="Lsa-00-000" secondAttribute="bottom" constant="-49" id="Ld25-0-000"/>
+                            <constraint firstItem="Ltb-00-000" firstAttribute="leading" secondItem="Lrt-00-000" secondAttribute="leading" id="Ld26-0-000"/>
+                            <constraint firstAttribute="trailing" secondItem="Ltb-00-000" secondAttribute="trailing" id="Ld27-0-000"/>
+                            <constraint firstAttribute="bottom" secondItem="Ltb-00-000" secondAttribute="bottom" id="Ld28-0-000"/>
+                            <!-- tab shadow: 2.5 pt over the bar -->
+                            <constraint firstItem="Lts-00-000" firstAttribute="bottom" secondItem="Ltb-00-000" secondAttribute="top" id="Ld29-0-000"/>
+                            <constraint firstItem="Lts-00-000" firstAttribute="leading" secondItem="Lrt-00-000" secondAttribute="leading" id="Ld30-0-000"/>
+                            <constraint firstAttribute="trailing" secondItem="Lts-00-000" secondAttribute="trailing" id="Ld31-0-000"/>
+                            <constraint firstItem="Lts-00-000" firstAttribute="height" constant="2.5" id="Ld32-0-000"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="Lfr-00-000" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="0.0" y="0.0"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="LaunchStripes" width="600" height="1"/>
+        <image name="LaunchNavTop" width="0.5" height="256"/>
+        <image name="LaunchNavBottom" width="0.5" height="256"/>
+        <image name="LaunchTabGloss" width="0.5" height="48"/>
+        <image name="LaunchNavShadow" width="0.5" height="2.5"/>
+        <image name="LaunchTabShadow" width="0.5" height="2.5"/>
+    </resources>
+</document>

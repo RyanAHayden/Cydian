@@ -189,7 +189,6 @@ export const siteTooBig = (entry) => Boolean(entry && !entry.stored && Number(en
 let fresh = null;
 export function markFresh(file, note = "") { fresh = file ? { file: String(file), note: String(note ?? "") } : null; }
 export function freshNote() { const f = fresh; fresh = null; return f; }
-export const hasFresh = () => Boolean(fresh);
 
 export function removeSiteUrl(storage, file) {
   saveSite(storage, siteEntries(storage).filter((e) => e.file !== file));

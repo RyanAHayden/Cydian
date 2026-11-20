@@ -196,7 +196,6 @@ export const SFTP_APPS = [
   ["Windows", "WinSCP, or FileZilla"],
   ["Linux", "The file manager's sftp:// address, or FileZilla"],
 ];
-export const SYSTEMS = ["Mac", "Windows", "Linux"];
 const systemGlyph = (s) => glyph(s.toLowerCase(), s[0]);
 export const COPYING_SEGMENTS = ["On iPhone", "Computer", "No Jailbreak"];
 export const IFUSE_EXAMPLE = "ifuse --documents <bundle id> <dir>";

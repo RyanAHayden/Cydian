@@ -167,23 +167,7 @@ html.native .navbar.sheet-bar { display: block; } /* the app hides the web nav b
 .pkg-row[data-change="new"] .pkg-version::before { content: "New "; font-weight: bold; }
 .pkg-row[data-change="updated"] .pkg-version::before { content: "Updated "; font-weight: bold; }
 
-/* ---- Works on my phone (F17): a small outlined tag beside the name and on the package page; the switch row above
-   the Sections list and Search's results ---- */
-.pkg-compat {
-  flex: none; padding: 0 4px; border: 1px solid currentColor; border-radius: 4px;
-  font-size: 10px; font-weight: bold; line-height: 13px; white-space: nowrap; color: var(--subtitle);
-}
-.pkg-compat:empty { display: none; }
-.pkg-compat[data-compat="works"] { color: #3e8e2f; }
-.pkg-compat[data-compat="ios"], .pkg-compat[data-compat="rootful"], .pkg-compat[data-compat="rootless"],
-.pkg-compat[data-compat="roothide"], .pkg-compat[data-compat="jailbreak"], .pkg-compat[data-compat="arch"] { color: #c0392b; }
-:root[data-theme="dark"] .pkg-compat[data-compat="works"] { color: var(--dk-ok); }
-:root[data-theme="dark"] .pkg-compat[data-compat="ios"], :root[data-theme="dark"] .pkg-compat[data-compat="rootful"],
-:root[data-theme="dark"] .pkg-compat[data-compat="rootless"], :root[data-theme="dark"] .pkg-compat[data-compat="roothide"],
-:root[data-theme="dark"] .pkg-compat[data-compat="jailbreak"], :root[data-theme="dark"] .pkg-compat[data-compat="arch"] { color: var(--dk-bad); }
-.pkg-compat[data-compat="ipad"] { color: #c0392b; } /* F160: iPad-only (the IPA's UIDeviceFamily) */
-:root[data-theme="dark"] .pkg-compat[data-compat="ipad"] { color: var(--dk-bad); }
-.pkg-head-text .pkg-compat { align-self: flex-start; }
+/* ---- Works on my phone (F17): the switch row above the Sections list and Search's results ---- */
 .compat-filter .cell-inner { min-height: 50px; }
 
 /* ---- Search's scope bar (F35): iOS 6's UISearchBar scope buttons under the field. The bar runs on in the search
@@ -333,9 +317,6 @@ html[data-theme="dark"] .action-button:not(.cancel):not(.destructive):not(:activ
 html[data-theme="dark"] .action-button.cancel { /* UIAlertSheetBlackCancelButton */
   background: linear-gradient(#878787, #686868 7%, #545454 23%, #383838 38%, #1a1a1a 54%, #020202 69%, #000 77%, #131313); background-origin: border-box;
 }
-
-/* ---- The package page's head (F29): the author under the name, as a link to their packages ---- */
-.pkg-head-author { font-size: 14px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-decoration: none; }
 
 /* ---- Version History (F29, browse.js renderVersions): one cell per version, version and marks on top, sources or
    date and size beside, release notes under; versions this iPhone can't run are greyed ---- */
@@ -696,9 +677,7 @@ html[data-theme="dark"] .shot-dot.on { background: var(--head); }
 .store-ratings-avg { flex: none; width: 84px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .store-ratings-big { font-size: 40px; font-weight: bold; line-height: 44px; letter-spacing: -.02em; color: var(--text); }
 .store-ratings-count { font-size: 12px; color: var(--subtitle); }
-.store-ratings-from, .store-ratings-none { padding: 11px 12px; font-size: 13px; color: var(--subtitle); }
-.store-ratings-from { border-top: 1px solid var(--divider); box-shadow: inset 0 1px 0 var(--divider-hi); }
-.store-ratings-none { text-align: center; font-size: 15px; padding: 14px 12px; }
+.store-ratings-from { padding: 11px 12px; font-size: 13px; color: var(--subtitle); border-top: 1px solid var(--divider); box-shadow: inset 0 1px 0 var(--divider-hi); }
 /* F206: the five bars are always drawn, each a real button (32px + its 1px divider), iOS 6 style: five small stars
    (the rating's dark #6d6d6d, the rest light grey), the grey bar, the count in bold, a chevron. Pressed: a grey wash;
    the row filtering the list: iOS 6's selection blue. Only the fill's transform animates. */

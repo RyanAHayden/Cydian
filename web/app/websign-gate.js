@@ -73,8 +73,6 @@ export function idFromHash(hash = globalThis.location?.hash ?? "") {
 const IN_IFIZBOX_SUBTITLE = "Signed and installed on the iPhone: faster";
 export const WEBSITE_ON_SUBTITLE = "Signed in the browser with your certificate";
 export const WEBSITE_OFF_SUBTITLE = "Slow, and can fail on big apps: tap to read why";
-export const SITE_GATE_FOOTER = `Install in ${NAME} opens this app in the ${NAME} app, which signs and installs it on the `
-  + "iPhone. Download IPA keeps the file. Installing on the website is slower and can fail on big apps.";
 
 // The website's rows for an app that isn't iFizBox, in order: Install in iFizBox, Download IPA (`download`, the row
 // installRows makes), Install on the Website (greyed out until accepted; once accepted it runs `install`).

@@ -457,8 +457,9 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
 .cell-inner.has-switch { padding-right: 9px; }
 /* B164: a bare label before a switch takes the row's room, so the switch sits at the right edge as in Settings. */
 .cell-inner.has-switch > .cell-label { flex: 1; min-width: 0; }
-/* On/off switch. Size from the Teehan+Lax kit ("switch (off|on)"): 77x27 track, 25pt knob 1pt inside it, 50pt of
-   travel (a bigger knob over the outline looked too large). Colours from the 4S's UISwitch art.
+/* On/off switch. Size from the Teehan+Lax kit ("switch (off|on)"): 77x27 track, 27pt knob over the outline, 50pt of
+   travel. Colours sampled off the 4S's Settings > Wi-Fi (ref/4s/screens/hints-wifi.png): each track is a flat colour
+   down to just under the middle, then a lighter gloss band; the edge is dark blue when on, grey when off.
    Everything rides on --x (0 off, 50px on; settings.js sets it while dragging): the knob, the blue fill that ends at
    the knob's centre, and both labels move together, so ON and OFF behave the same when tapped or dragged. */
 .switch {
@@ -468,19 +469,20 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
 }
 .switch[aria-checked="true"] { --x: 50px; }
 .sw-track {
-  position: absolute; inset: 0; border: 1px solid #a7a7a7; border-radius: 13.5px; overflow: hidden; pointer-events: none;
-  background: linear-gradient(#e6e6e6, #fefefe); box-shadow: inset 0 2px 3px rgba(0,0,0,.3);
+  position: absolute; inset: 0; border: 1px solid #b4b4b4; border-radius: 13.5px; overflow: hidden; pointer-events: none;
+  background: linear-gradient(#dbdbdb, #eee 16%, #eee 48%, #fafafa 48%, #fefefe);
   font-size: 16px; font-weight: bold; line-height: 25px; text-align: left;
 }
+.switch[aria-checked="true"] .sw-track { border-color: #306591; }
 .sw-track::before { /* blue fill + ON, ending at the knob's centre (x + 13.5px) */
   content: "ON"; position: absolute; top: 0; bottom: 0; left: 0; width: 77px; padding-left: 25.5px; box-sizing: border-box;
   color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35);
-  background: linear-gradient(#1b68d8, #3f8cf3 55%, #5da1f6); transform: translateX(calc(var(--x) - 63.5px));
+  background: linear-gradient(#0065bb, #0079df 8%, #007fea 16%, #007fea 48%, #218fec 48%, #74b3e9); transform: translateX(calc(var(--x) - 63.5px));
 }
 .sw-track::after { content: "OFF"; position: absolute; top: 0; right: 12px; color: #808080; transform: translateX(var(--x)); }
 .sw-knob {
-  position: absolute; top: 1px; left: 1px; width: 25px; height: 25px; box-sizing: border-box; border-radius: 50%;
-  background: linear-gradient(#cfcfcf, #fcfcfc); border: 1px solid rgba(0,0,0,.42); box-shadow: 0 1px 2px rgba(0,0,0,.3);
+  position: absolute; top: 0; left: 0; width: 27px; height: 27px; box-sizing: border-box; border-radius: 50%;
+  background: linear-gradient(#d1d1d1, #fdfdfd); border: 1px solid #747474; border-bottom-color: #9b9b9b;
   transform: translateX(var(--x)); pointer-events: none;
 }
 .sw-track::before, .sw-track::after, .sw-knob { transition: transform .2s ease; }

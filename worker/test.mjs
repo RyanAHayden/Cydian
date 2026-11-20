@@ -1440,4 +1440,52 @@ import { fileURLToPath } from "node:url";
   } finally { child.kill(); }
   console.log("worker limits: ok");
 }
+{ // node.mjs: static files stay inside WEB (not a sibling folder sharing its prefix), X-Forwarded-Host only with TRUST_PROXY=1
+  const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join: pjoin } = await import("node:path");
+  const httpReq = (port, path, headers = {}) => new Promise((ok, no) => {
+    const q = http.request({ host: "127.0.0.1", port, path, headers, timeout: 15000 }, (r) => {
+      let b = ""; r.setEncoding("utf8"); r.on("data", (d) => { b += d; }); r.on("end", () => ok({ status: r.statusCode, body: b, location: r.headers.location }));
+    });
+    q.on("timeout", () => q.destroy(new Error("timeout"))); q.on("error", no); q.end();
+  });
+  const root = await mkdtemp(pjoin(tmpdir(), "ifizbox-node-"));
+  await mkdir(pjoin(root, "site")); await mkdir(pjoin(root, "site-secret"));
+  await writeFile(pjoin(root, "site", "index.html"), "home");
+  await writeFile(pjoin(root, "site-secret", "secret.txt"), "SECRET");
+  const start = async (extra) => {
+    const free = http.createServer();
+    await new Promise((ok) => free.listen(0, "127.0.0.1", ok));
+    const port = free.address().port;
+    await new Promise((ok) => free.close(ok));
+    const child = spawn(process.execPath, [fileURLToPath(new URL("./node.mjs", import.meta.url))],
+      { env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", REVIEWS_DB: "off", WEB: pjoin(root, "site"), TRUST_PROXY: "", ...extra }, stdio: ["ignore", "pipe", "inherit"] });
+    await new Promise((ok, no) => {
+      const deadline = setTimeout(() => no(new Error("node.mjs didn't start in 15 s")), 15000);
+      child.stdout.on("data", (d) => { if (String(d).includes("ifizbox:")) { clearTimeout(deadline); ok(); } });
+      child.on("exit", (c) => { clearTimeout(deadline); no(new Error(`node.mjs exited ${c}`)); });
+    });
+    return { port, child };
+  };
+  let s = await start({});
+  try {
+    assert.equal((await httpReq(s.port, "/")).body, "home");
+    for (const p of ["/../site-secret/secret.txt", "/..%2fsite-secret/secret.txt", "/%2e%2e/site-secret/secret.txt", "/..%5csite-secret%5csecret.txt"]) {
+      const r = await httpReq(s.port, p);
+      assert.ok(!r.body.includes("SECRET"), `${p} reached the sibling folder`);
+    }
+    // a spoofed X-Forwarded-Host doesn't move the repo page's addresses (nor the install manifests')
+    const r = await httpReq(s.port, "/repo/", { "X-Forwarded-Host": "evil.example" });
+    assert.ok(r.body.includes(`http://127.0.0.1:${s.port}/repo/source.json`), r.body);
+    assert.ok(!r.body.includes("evil.example"), r.body);
+    assert.ok(!String((await httpReq(s.port, "/repo", { "X-Forwarded-Host": "evil.example" })).location).includes("evil.example"));
+  } finally { s.child.kill(); }
+  s = await start({ TRUST_PROXY: "1" });
+  try {
+    const r = await httpReq(s.port, "/repo/", { "X-Forwarded-Host": "box.example.ts.net", "X-Forwarded-Proto": "https" });
+    assert.ok(r.body.includes("https://box.example.ts.net/repo/source.json"), r.body);
+  } finally { s.child.kill(); await rm(root, { recursive: true, force: true }); }
+  console.log("worker node static/host: ok");
+}
 await import("./test-push.mjs"); // F280

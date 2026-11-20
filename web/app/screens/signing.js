@@ -28,6 +28,7 @@ import { statusReady } from "../signing/device.js";
 import { normalizeServer } from "../core/signing.js";
 import { NAME, SIGN_HOST } from "../brand.js";
 import { loadStyle } from "../nav/motion.js";
+import { go as navGo } from "../nav/go.js";
 import { mod } from "../lazy.js";
 // F313: free-apple-id.js loads with Settings' pages (router.js lazyFor), the only place the walkthrough is drawn.
 const freeRouteBlock = (...args) => mod("freeAppleId").freeRouteBlock(...args);
@@ -98,12 +99,10 @@ function watchTrip() {
   addEventListener("hashchange", () => { if (!onSigning(globalThis.location?.hash)) forgetInstall(); });
 }
 
-const goHash = (hash) => { if (globalThis.location) globalThis.location.hash = hash.replace(/^#/, ""); };
-
 // The website's certificate is ready to sign with: the .p12, the profile and a password not known to be wrong.
 export const siteReady = (id) => Boolean(id?.p12 && id?.profile && id.password != null && id.passwordOk !== false);
 
-export async function offerInstall(ready, { alert = null, go = goHash } = {}) {
+export async function offerInstall(ready, { alert = null, go = navGo } = {}) {
   if (!ready) return null;
   const from = returnTo;
   returnTo = null;

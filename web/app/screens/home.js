@@ -21,6 +21,7 @@ import { popupOpen, whenNoPopup } from "../nav/popups.js";
 import { sourceKey, sourcesFor } from "../core/sources.js";
 import { settings } from "./settings.js";
 import { pullToRefresh } from "../nav/pullrefresh.js";
+import { go as navGo } from "../nav/go.js";
 import { lazyNs, load } from "../lazy.js";
 // F313: Browse and Tweak Roulette load at their routes (lazy.js; router.js lazyFor), not with Home.
 const browse = lazyNs("browse");
@@ -98,7 +99,7 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
 // F96: once iOS was asked to install it, the website stops asking "Install iFizBox First" (websign-gate.js).
 // F177: on the way to Signing it remembers this install (signing.js rememberInstall), so Signing offers Install Now
 // once the certificate is in.
-export async function installApp({ ready = signingReady, install = signAndInstall, bring = getBring, go = (h) => { location.hash = h; },
+export async function installApp({ ready = signingReady, install = signAndInstall, bring = getBring, go = navGo,
   installed = markiFizBoxInstalled, remember = rememberInstall } = {}) {
   const run = () => install({ url: APP_IPA_URL, name: APP_NAME, bring: bring(), onInstalled: () => installed() });
   if (!(await ready())) {

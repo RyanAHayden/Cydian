@@ -123,7 +123,7 @@ test("the edge swipe while pairing never starts; moving right asks, and Leave ta
   await pairingPage(native);
   const asked = answering(1);
   let backs = 0;
-  const doc = { querySelector: (s) => (s === ".nav-item.is-top .bar-button.back" ? { click: () => { backs++; } } : null) };
+  const doc = () => { backs++; }; // nav/go.js back
   const strip = { closest: (s) => (s === ".edge-swipe" ? strip : null) };
   const pe = (type, x, y = 100) => ({ type, pointerId: 7, clientX: x, clientY: y, target: strip, stopped: false, stopImmediatePropagation() { this.stopped = true; } });
   const down = pe("pointerdown", 5);

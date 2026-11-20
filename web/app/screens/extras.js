@@ -43,6 +43,7 @@ import {
 } from "../core/payment.js";
 import { NAME } from "../brand.js";
 import { showBanner } from "../nav/banner.js";
+import { go as navGo } from "../nav/go.js";
 import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
 
 const pkgHref = (key, id) => format({ tab: "sources", path: [key, `package:${id}`] });
@@ -245,7 +246,7 @@ export async function offerTweak(r, ctx, { viewRepo = true, sheet = showActionSh
   const i = await sheet({ title: `${r.name} is in ${r.repo.name}, which you haven't added.${unknown}`, buttons });
   if (buttons[i] === VIEW_REPO) {
     const href = repoHref({ ...r.repo, count: null });
-    (go ?? ((h) => { location.hash = h.replace(/^#/, ""); }))(href);
+    (go ?? navGo)(href);
     return "view";
   }
   if (buttons[i] !== ADD_SOURCE_AND_ADD) return "cancel";
@@ -337,7 +338,7 @@ async function offer(r, ctx) {
     const { catalog } = await import("../catalog.js"); // late: catalog.js pulls in the parse worker
     await addSourceAndInstall(r, {
       backend, catalog, showHUD: ctx?.showHUD ?? showHUD, showAlert,
-      go: (href) => { location.hash = href.replace(/^#/, ""); },
+      go: navGo,
     });
     return;
   }

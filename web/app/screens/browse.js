@@ -74,6 +74,7 @@ import { APP_TILES, installedManagers } from "./handoff.js";
 import { appIcon, loadAppIcons } from "../app-icons.js";
 import { attachRowSwipe, playHint } from "../nav/rowswipe.js";
 import { showUndoBar } from "../nav/undobar.js";
+import { go as navGo, handleOf } from "../nav/go.js";
 import { runLogs } from "../queue.js";
 import { appQueue } from "../app-queue.js"; // F213: the sideload build's rows queue apps
 import { APP_MODE_LABEL } from "../core/appqueue.js";
@@ -253,10 +254,10 @@ function toggleVisibility(route, button) {
   page.editing = !page.editing;
   button.textContent = page.editing ? "Done" : "Edit";
   button.classList.toggle("done", page.editing);
-  const h1 = button.closest(".nav-item")?.querySelector(".nav-title");
-  if (h1) {
-    if (page.editing) { page.title = h1.textContent; h1.textContent = "Section Visibility"; }
-    else if (page.title != null) h1.textContent = page.title;
+  const nav = handleOf(page.body);
+  if (nav) {
+    if (page.editing) { page.title = nav.title(); nav.setTitle("Section Visibility"); }
+    else if (page.title != null) nav.setTitle(page.title);
   }
   drawSections(page);
 }
@@ -1357,7 +1358,7 @@ const installedOf = (history) => history?.versions.find((v) => v.installed)?.ver
 const queueOf = (extra = {}) => { const b = getBackend(); return typeof b.queue === "function" ? (job) => b.queue({ ...extra, ...job }) : null; };
 const isPaid = (st) => /(^|,)\s*cydia::commercial\s*(,|$)/.test(st?.tag ?? "");
 const versionsHref = (route, id) => deeper(route, token("versions", id));
-const go = (href) => { location.hash = href.replace(/^#/, ""); };
+const go = navGo;
 
 function downloadDeb(url, name) {
   const a = document.createElement("a");
@@ -1644,14 +1645,9 @@ async function renderVersions(body, route, key, id) {
   body.append(versionsGroup(cells, `Every version of ${history.name} your sources offer. ${how}`));
 }
 
-// The nav bar's right button on this page (Install / Modify), found the way setTitle finds the title.
+// The nav bar's right button on this page (Install / Modify): its page handle's (F76: not the Share icon).
 function setRightLabel(body, label) {
-  const page = body.closest(".page");
-  const stack = page?.parentElement;
-  if (!stack) return;
-  const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
-  const item = document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i];
-  const b = item?.querySelector(".nav-right .bar-button:not(.share-button)"); // F76: not the Share icon
+  const b = handleOf(body)?.rightButton();
   if (b && b.textContent !== label) b.textContent = label;
 }
 
@@ -1752,16 +1748,9 @@ function depActionRow(p, route, ctx) {
   }
 }
 
-// A deep link titles the page with the id until the package loads; then its name goes in the nav bar. app.js
-// keeps each tab's pages and nav items in step, so the item has the page's index.
+// A deep link titles the page with the id until the package loads; then its name goes in the nav bar.
 function setTitle(body, title) {
-  const page = body.closest(".page");
-  const stack = page?.parentElement;
-  if (!stack) return;
-  const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
-  const item = document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i];
-  const h1 = item?.querySelector(".nav-title");
-  if (h1 && h1.textContent !== title) h1.textContent = title;
+  handleOf(body)?.setTitle(title);
 }
 
 function downloadGroup(st) {

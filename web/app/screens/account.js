@@ -20,6 +20,7 @@ import { showAlert, alertOK } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { copyText } from "../nav/menu.js";
 import { onPageOpen } from "../nav/pagestate.js";
+import { go as navGo } from "../nav/go.js";
 import { qrSvg } from "../core/qr.js";
 import { createAccountSync, keyLink, parseKey, identityOf, identityFiles, ACCOUNT_BASE } from "../core/account.js";
 import { detectMode, TRAVELS } from "../core/settings.js";
@@ -342,7 +343,7 @@ async function deleteFlow(el) {
 }
 
 // ifizbox://account?k=… : the Account page, and Sign In With Key filled in.
-export async function signInFromLink(url, { open = (hash) => { location.hash = hash.replace(/^#/, ""); } } = {}) {
+export async function signInFromLink(url, { open = navGo } = {}) {
   const bytes = parseKey(url);
   open(format(settingsRoute(["account"])));
   if (!bytes) { await alertOK("Can't Sign In", "That account link is damaged."); return; }

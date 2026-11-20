@@ -63,10 +63,11 @@ import { libraryJob } from "../core/appqueue.js";
 import { queueApp } from "./queue.js";
 import { storedKeep, originalState, originalNote, OLD_WAY_ALERT, OLD_WAY_TEXT } from "../core/keepid.js";
 import { loadStyle } from "../nav/motion.js";
+import { go as navGo, back, handleOf } from "../nav/go.js";
 
 export { MYIPAS };
 
-const view = { body: null, add: null, search: null, route: null, seq: 0, fresh: null };
+const view = { body: null, page: null, add: null, search: null, route: null, seq: 0, fresh: null };
 const known = new Map(); // file -> the last entry seen (titles, the page before its list call answers)
 // F208/F224: the list's swipe and Manage state (core/myipas.js listStep: `editing` is Manage, `armed` the row showing
 // Delete, `selected` the picked files), its controller, the bottom toolbar, the IPAs and which of them iOS has, the
@@ -123,16 +124,14 @@ export function nav(route) {
   }
 }
 
-let back = () => history.back();
-
-export function render(body, route, ctx) {
-  if (ctx?.back) back = ctx.back;
+export function render(body, route, ctx, nav = handleOf(body)) {
   style();
   const p = pageOf(route);
   if (p?.page === "list") {
     // One wrapper (the first child of a page stretches, ios6.css): the search bar over the IPAs, Add an IPA, the IPAs.
     const page = el("div", "install-ipas");
     view.route = route;
+    view.page = nav; // its nav item: Select… goes in the back button's place (syncManage)
     lib.query = "";
     // F257: the link the Too Big alert just kept: its row at the top for this visit, and the note under the bar
     view.fresh = site() ? freshNote() : null;
@@ -160,7 +159,7 @@ export function render(body, route, ctx) {
 
 function style() { loadStyle("myipas.css"); loadStyle("signsheet.css"); }
 
-const go = (path) => { location.hash = format({ tab: "installed", path }).replace(/^#/, ""); };
+const go = (path) => navGo({ tab: "installed", path });
 const ipaPath = (file) => [MYIPAS, ipaToken(file)];
 
 // ---- the library ----------------------------------------------------------------------------------------------
@@ -516,7 +515,7 @@ function syncManage() {
     if (lib.summary.parentNode !== view.body.parentNode) view.body.before?.(lib.summary);
   } else lib.summary?.remove();
   // Select… in the back button's place (the nav bar's left side).
-  const left = b?.closest?.(".nav-item")?.querySelector(".nav-left");
+  const left = b && view.page?.left();
   if (left) {
     for (const x of left.children) if (x !== lib.selectBtn) x.hidden = on;
     if (on) {
@@ -956,12 +955,7 @@ async function entryOf(file) {
 }
 
 function setTitle(body, title) {
-  const page = body.closest(".page");
-  const stack = page?.parentElement;
-  if (!stack) return;
-  const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
-  const h1 = document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i]?.querySelector(".nav-title");
-  if (h1 && h1.textContent !== title) h1.textContent = title;
+  handleOf(body)?.setTitle(title);
 }
 
 const dateText = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" }) : "");

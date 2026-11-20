@@ -31,6 +31,7 @@ import { searchBar, pinned } from "../nav/searchbar.js";
 import { pullToRefresh } from "../nav/pullrefresh.js";
 import { reloadSteps } from "../core/reloadsteps.js";
 import { showBanner } from "../nav/banner.js";
+import { go as navGo } from "../nav/go.js";
 import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
 import { refreshRows, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
 import { labelSource, toggleTrust, trustMenuLabel } from "./safety.js"; // F291
@@ -466,7 +467,7 @@ export async function refreshInBackground(ctx) {
 
 // B23: the sources apt-get update failed on (refreshSources' `failed`, the jailbreak app) in a banner that goes by
 // itself and opens Sources when tapped, never an alert: their rows are marked (Not Responding) for Edit to remove.
-export function bannerFailed(rows, { banner = showBanner, go = (href) => { location.hash = href.replace(/^#/, ""); } } = {}) {
+export function bannerFailed(rows, { banner = showBanner, go = navGo } = {}) {
   const words = failedBanner(rows?.failed);
   if (!words) return false;
   banner({ ...words, duration: FAILED_BANNER_MS, onTap: () => go(format({ tab: "sources", path: [] })) });

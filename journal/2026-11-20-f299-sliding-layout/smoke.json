@@ -1,0 +1,12 @@
+[
+  { "eval": "window.__errs=[]; addEventListener('error',e=>__errs.push(String(e.message))); addEventListener('unhandledrejection',e=>__errs.push(String(e.reason))); 'ok'" },
+  { "go": "#/sources", "ms": 2500 },
+  { "go": "#/changes", "ms": 2000 },
+  { "go": "#/search", "ms": 2000 },
+  { "go": "#/installed", "ms": 2000 },
+  { "go": "#/settings", "ms": 2000 },
+  { "clicktext": "Signing", "ms": 2000 },
+  { "shot": "c-signing" },
+  { "go": "#/home", "ms": 2000 },
+  { "eval": "JSON.stringify({errs:__errs, ghostsLeft:document.querySelectorAll('[data-slide-ghost]').length})" }
+]

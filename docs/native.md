@@ -37,6 +37,12 @@ helper. Parsing, Changes, upgrades and search all run in `core/` in both places.
   follows the finger (how: "1. Navigation" below).
 - Taps react instantly (`touch-action: manipulation`, active states on `pointerdown`), with no text-selection or
   callout surprises, and the scroll bounce matches iOS.
+- Every size change slides through one helper, `web/app/nav/slide.js`; nothing teleports. It watches every page,
+  sheet, pinned Search results and alert: when something grows, shrinks, shows or goes (a row loading, a spinner
+  line, a banner, a list filling in, text wrapping to a second line), the boxes around it start at their old place
+  and ease to the new one by `translateY`, new boxes fade in and gone ones fade out, in iOS 6's .3s
+  `cubic-bezier(.25,.1,.25,1)`. A screen only changes its DOM, even redrawing a page whole. Opt a box out with
+  `data-noslide`; virtualised lists and the install console are never slid.
 
 ## Targets
 

@@ -33,6 +33,7 @@ import { isAltKey } from "../core/altstore.js";
 import { renderAltSource, renderApp, installRows, appBundleId, formatDate, osRange, appPageAction, appPageCustom } from "./altstore.js";
 import { linksGroup, previewSlot } from "./altstore.js";
 import { jailbreakModify } from "./altstore.js"; // B69
+import { ALL_APPS, ALL_APPS_LABEL, allAppsRows } from "../core/allapps.js"; // F297
 import { descriptionGroup } from "./description.js";
 import { packageLinks, packageGithub, aptShots, sileoShots, sileoRatings, sileoWhatsNew } from "../core/previews.js";
 import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, whatsNewGroup } from "./storepage.js";
@@ -134,8 +135,9 @@ export const rememberNames = (rows) => { for (const r of rows) names.set(r.id, r
 // What a route below the tab's own root shows: { key, page: "sections" | token kind, value }.
 export function pageOf(route) {
   if (route.tab === "sources") {
-    const key = route.path[0];
-    if (route.path.length === 1) return { key, page: "sections" };
+    // F297: Sources' All Apps (core/allapps.js): its list, and pages under it from the merged catalog
+    const key = route.path[0] === ALL_APPS ? ALL : route.path[0];
+    if (route.path.length === 1) return { key, page: route.path[0] === ALL_APPS ? "apps" : "sections" };
     const t = parseToken(route.path.at(-1));
     return { key, page: t.kind, value: t.value };
   }
@@ -152,6 +154,7 @@ export function nav(route, sourceName = () => null) {
       right: { label: "Edit", onClick: (e) => toggleVisibility(route, e.currentTarget) },
     };
     case "section": return { title: p.value === ALL ? "All Packages" : p.value, style: "plain" };
+    case "apps": return { title: ALL_APPS_LABEL, style: "plain" }; // F297
     case "author": return { title: p.value || "Author", style: "plain" };
     // F29: Install (Modify once the page knows it's installed) opens the action sheet of what can be done here.
     case "package": return { title: names.get(p.value) || p.value,
@@ -166,6 +169,7 @@ export function render(body, route, ctx) {
   switch (p.page) {
     case "sections": return isAltKey(p.key) ? renderAltSource(body, route, p.key) : renderSections(body, route, p.key);
     case "section": return renderList(body, route, () => catalog.list(p.key, p.value), true);
+    case "apps": return renderList(body, route, async () => allAppsRows(await catalog.list(ALL, ALL)), true); // F297
     case "author": return renderAuthor(body, route, p.value);
     case "package": return renderPackage(body, route, p.key, p.value, ctx);
     case "versions": return renderVersions(body, route, p.key, p.value);

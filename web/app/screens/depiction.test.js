@@ -4,27 +4,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { renderSileo, stars, webUrl } from "./depiction.js";
 
-function fakeElement(tag) {
-  const e = {
-    tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, style: { setProperty(k, v) { e.style[k] = v; } },
-    className: "", textContent: "", hidden: false,
-    classList: { add: (...c) => { e.className = [e.className, ...c].filter(Boolean).join(" "); }, toggle() {}, contains: (c) => e.className.split(" ").includes(c) },
-    append(...k) { for (const c of k) { if (typeof c === "string") e.children.push({ nodeType: 3, textContent: c }); else if (c?.tagName === "#FRAG") e.children.push(...c.children); else if (c) e.children.push(c); } },
-    setAttribute(a, v) { e.attrs[a] = String(v); }, getAttribute: (a) => e.attrs[a] ?? null,
-    addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-  };
-  return e;
-}
-
-function withDom(fn) {
-  const saved = globalThis.document;
-  globalThis.document = { createElement: fakeElement, createDocumentFragment: () => fakeElement("#frag") };
-  try { return fn(); } finally { globalThis.document = saved; }
-}
+import { withDocument as withDom } from "../fakes.test-helper.js";
 
 const all = (root, out = []) => { out.push(root); for (const c of root.children ?? []) all(c, out); return out; };
-const byClass = (root, cls) => all(root).filter((n) => n.className?.split?.(" ").includes(cls));
-const text = (n) => (n.nodeType === 3 ? n.textContent : n.textContent + (n.children ?? []).map(text).join(""));
+const byClass = (root, cls) => all(root).filter((n) => n._cls?.has(cls));
+const text = (n) => n.textContent;
 const stack = (...views) => ({ class: "DepictionStackView", views });
 
 test("F103: RatingView draws five stars filled to the rating, clamped to 0-5", () => withDom(() => {
@@ -119,7 +103,7 @@ test("B18: a ButtonView with isLink and a nested view draws the view inside a pl
   assert.equal(label?.textContent, "Version History", "the nested label is inside the button");
   assert.equal(label.style.textAlign, "right");
   assert.equal(history.href, "https://chariz.com/get/oneko/changelog");
-  assert.equal(history.textContent, "", "no duplicate text beside the view");
+  assert.equal(history._text, "", "no duplicate text beside the view");
   assert.equal(history.attrs["aria-label"], "Version History");
   assert.match(email.href, /^mailto:/);
   assert.equal(byClass(email, "dep-label")[0].textContent, "Email Support");

@@ -5,26 +5,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { iconCell } from "./myipas.js";
+import { withDocument } from "../fakes.test-helper.js";
 
 const css = readFileSync(new URL("../ios6.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, decl]) => ({ sel: sel.trim(), decl }));
 const decl = (sel) => rules.filter((r) => r.sel.split(",").map((s) => s.trim()).includes(sel)).map((r) => r.decl).join(";");
 
-// Just enough DOM for iconCell.
-function fakeDocument() {
-  const make = (tag) => ({
-    tagName: tag.toUpperCase(), className: "", textContent: "", children: [], parent: null, listeners: {},
-    append(...c) { for (const k of c) { if (typeof k === "object") k.parent = this; this.children.push(k); } },
-    setAttribute() {}, addEventListener(t, f) { (this.listeners[t] ??= []).push(f); },
-    get classList() { return { contains: (c) => this.className.split(/\s+/).includes(c), add: (c) => { this.className += " " + c; } }; },
-  });
-  return { createElement: make };
-}
-
 test("Icon row: the Choose button is a child of the row, after the value", () => {
-  const saved = globalThis.document;
-  globalThis.document = fakeDocument();
-  try {
+  withDocument(() => {
     const li = iconCell({ icon: null }, { iconPNG: async () => "x" });
     const row = li.children.find((c) => c.className.includes("cell-inner"));
     assert.ok(row, "the row");
@@ -41,9 +29,7 @@ test("Icon row: the Choose button is a child of the row, after the value", () =>
     btn.listeners.click[0]({ preventDefault() {} });
     assert.equal(btn.textContent, "Choose");
     assert.equal(chosen.children[0].children[1].textContent, "The App's");
-  } finally {
-    if (saved === undefined) delete globalThis.document; else globalThis.document = saved;
-  }
+  });
 });
 
 test("ios6.css: a row's own button is a static flex item, with no room kept for an absolute one", () => {

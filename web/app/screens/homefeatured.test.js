@@ -9,24 +9,7 @@ import { homeFeatured, featuredPlaceholder, FEATURED_PLACEHOLDERS } from "./extr
 const here = new URL(".", import.meta.url);
 const read = (rel) => readFileSync(new URL(rel, here), "utf8");
 
-function fakeEl(tag) {
-  const classes = new Set();
-  const e = {
-    tagName: tag.toUpperCase(), children: [], style: { setProperty() {} }, attrs: {}, textContent: "",
-    get className() { return [...classes].join(" "); },
-    set className(v) { classes.clear(); for (const c of String(v).split(" ").filter(Boolean)) classes.add(c); },
-    classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) },
-    setAttribute(k, v) { e.attrs[k] = v; },
-    append(...kids) { e.children.push(...kids); },
-    replaceChildren(...kids) { e.children = [...kids]; },
-  };
-  return e;
-}
-async function withDom(fn) {
-  const saved = globalThis.document;
-  globalThis.document = { createElement: fakeEl, createDocumentFragment: () => fakeEl("#fragment") };
-  try { return await fn(); } finally { globalThis.document = saved; }
-}
+import { withDocument as withDom } from "../fakes.test-helper.js";
 
 test("F135: Settings is Home's first group, its row with our gear at the left, Theme its other half", () => {
   const [first, ...rest] = homeLinks();

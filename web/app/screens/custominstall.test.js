@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { installRows } from "./altstore.js";
 import { signSheetButtons, customInstall } from "../signing-sheet.js";
+import { fakeDocument } from "../fakes.test-helper.js";
 
 const V = { version: "1.2", downloadURL: "https://example.com/Delta.ipa" };
 const labels = (rows) => rows.map((r) => r.label);
@@ -45,18 +46,8 @@ test("Install group: by default Custom Install shows only in the sideload app", 
   }
 });
 
-// Just enough DOM for the buttons.
-function fakeDoc() {
-  const make = (tag) => {
-    const e = { tagName: tag.toUpperCase(), className: "", textContent: "", type: "", children: [], listeners: {},
-      append(...c) { this.children.push(...c); },
-      replaceChildren(...c) { this.children = [...c]; },
-      addEventListener(t, f) { (this.listeners[t] ??= []).push(f); },
-      click() { for (const f of this.listeners.click ?? []) f(); } };
-    return e;
-  };
-  return { createElement: make, make };
-}
+// The shared fake DOM, with `make` as a short name for createElement.
+const fakeDoc = () => { const doc = fakeDocument(); return Object.assign(doc, { make: doc.createElement }); };
 
 test("the sheet: Install at the top right (done style, in place of Done), a red Cancel at the bottom", () => {
   const doc = fakeDoc();

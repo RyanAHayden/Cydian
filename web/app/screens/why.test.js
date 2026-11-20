@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { NAME } from "../brand.js";
+import { fakeDocument, withDocument } from "../fakes.test-helper.js";
 import { WHY_POINTS, WHY_ROUTE, whyHref, nav, whySections, endGroup, showsWhyTile, shotSrc, ensureWhyStyle, WHY_TILE,
   WHY_OPENED_KEY, whyOpened, markWhyOpened, whyAboutSection } from "./why.js";
 
@@ -88,20 +89,14 @@ test("route, tile visibility and what to do next per build", () => {
   assert.ok(!whySections()[1].lead);
 });
 
-// A Storage-like map, and a page body that takes what render() appends.
+// A Storage-like map; the page body is the shared fake DOM's.
 const memStore = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
-function fakeEl(tag) {
-  const e = { tagName: tag, children: [], classList: { add() {} }, append(...k) { e.children.push(...k); },
-    querySelector: () => ({ append() {} }), set textContent(t) { e.text = t; }, set className(c) { e.cls = c; } };
-  return e;
-}
 
 test("F306: installed apps show the tile until the page is opened, then Settings > About has the row", async () => {
   // opening the page in an installed app stores ifizbox.whyOpened; on the website it doesn't
-  const prevDoc = globalThis.document;
-  globalThis.document = { head: null, createElement: fakeEl, createDocumentFragment: () => fakeEl("#frag"),
-    createTextNode: (t) => ({ text: t }), getElementById: () => null };
-  try {
+  const doc = Object.assign(fakeDocument(), { head: null, getElementById: () => null });
+  const fakeEl = (tag) => doc.createElement(tag);
+  await withDocument(async () => {
     const { render } = await import("./why.js");
     for (const mode of ["sideload", "jailbreak"]) {
       const store = memStore();
@@ -120,9 +115,7 @@ test("F306: installed apps show the tile until the page is opened, then Settings
     assert.equal(site.m.size, 0);
     assert.equal(showsWhyTile("site", true), true);
     assert.equal(whyAboutSection("site"), null);
-  } finally {
-    globalThis.document = prevDoc;
-  }
+  }, doc);
   assert.equal(WHY_OPENED_KEY, "ifizbox.whyOpened");
   // storage that throws (private mode) keeps the tile
   assert.equal(whyOpened({ getItem() { throw new Error("blocked"); } }), false);

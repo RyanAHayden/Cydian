@@ -6,32 +6,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-// A small fake DOM: enough for nav/ui.js grouped().
-function make(tag, frag = false) {
-  const e = {
-    tagName: String(tag).toUpperCase(), isFragment: frag, children: [], attrs: {}, listeners: {}, style: {}, _text: "", _cls: new Set(),
-    get className() { return [...e._cls].join(" "); },
-    set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-    classList: { add: (...c) => c.forEach((x) => e._cls.add(x)), contains: (c) => e._cls.has(c) },
-    get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-    set textContent(v) { e._text = String(v); e.children = []; },
-    get firstChild() { return e.children[0] ?? null; },
-    setAttribute(k, v) { e.attrs[k] = String(v); },
-    append(...c) {
-      for (const x of c) {
-        if (x.isFragment) { x.children.splice(0).forEach((k) => e.append(k)); continue; }
-        x.parent = e;
-        e.children.push(x);
-      }
-    },
-    querySelector(sel) { const c = sel.replace(/^\./, ""); const walk = (n) => n.children.find((k) => k._cls.has(c)) ?? n.children.map(walk).find(Boolean); return walk(e) ?? null; },
-    querySelectorAll(sel) { const c = sel.replace(/^\./, ""); const out = []; const walk = (n) => n.children.forEach((k) => { if (k._cls.has(c)) out.push(k); walk(k); }); walk(e); return out; },
-    replaceChildren(...c) { e.children = []; e.append(...c); },
-    addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-  };
-  return e;
-}
-globalThis.document = { createElement: (t) => make(t), createDocumentFragment: () => make("#fragment", true) };
+import { fakeDocument } from "../fakes.test-helper.js";
+
+// The shared fake DOM: enough for nav/ui.js grouped().
+globalThis.document = fakeDocument();
+const make = (tag) => document.createElement(tag);
 
 const { drawInstallation, hudHooks, TIMEOUTS, NOT_RESPONDING, forgetStatus, cachedStatus, within, leave } = await import("./installroute.js");
 

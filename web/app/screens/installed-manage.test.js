@@ -8,6 +8,7 @@ import { manageKinds, manageable, presetIds, selectSheet, selectLabel, manageCou
 import { withManage, fromMyIpas, manageJobs, manageSheet, bulkDeletePlan, bulkDeleteSheet, runManage, runManageJobs, manageInstall,
   bulkHud, selectButton, togglePick, setManaging, pickMode, pageStates, withSignatures, extraRow, appSections, HOME_SCREEN, REMOVE, appListOf } from "./installed.js";
 import { createAppQueue } from "../core/appqueue.js";
+import { fakeDocument, withDocument } from "../fakes.test-helper.js";
 
 const DAY = 86400000;
 const now = new Date("2026-11-18T12:00:00Z");
@@ -386,29 +387,18 @@ test("B66: markedResignProblem names why and the newest version", async () => {
 
 // ---- B112: Manage on marks the drawn list, which sits in the pinned .search-results under the search bar -----------
 
-// Just enough DOM for setManaging: elements with classes, children, before() and a query that finds nothing.
-function fakeEl(className = "") {
-  const el = { className, children: [], parentNode: null, hidden: false, isConnected: true,
-    classList: {
-      contains: (c) => el.className.split(" ").includes(c),
-      toggle: (c, on) => { const s = new Set(el.className.split(" ").filter(Boolean)); if (on) s.add(c); else s.delete(c); el.className = [...s].join(" "); },
-    },
-    append: (...ns) => { for (const n of ns) { n.parentNode = el; el.children.push(n); } },
-    before: (n) => { const p = el.parentNode; n.parentNode = p; p.children.splice(p.children.indexOf(el), 0, n); },
-    remove: () => { const p = el.parentNode; if (p) p.children.splice(p.children.indexOf(el), 1); el.isConnected = false; },
-    querySelector: () => null, querySelectorAll: () => [],
-  };
-  return el;
-}
+// The shared fake DOM; the page bodies go in its on-screen body.
+const manageDom = fakeDocument();
+const fakeEl = (className = "") => Object.assign(manageDom.createElement("div"), { className });
 
-test("Manage on marks the drawn apps list inside the pinned results and puts the grey line above it; off undoes both", () => {
-  const saved = { document: globalThis.document, native: globalThis.ifizboxNative };
+test("Manage on marks the drawn apps list inside the pinned results and puts the grey line above it; off undoes both", () => withDocument(() => {
+  const saved = { native: globalThis.ifizboxNative };
   globalThis.ifizboxNative = { mode: "sideload" };
-  globalThis.document = { createElement: () => fakeEl() };
   const { apps } = pageStates();
   const keep = { body: apps.body, results: apps.results, tail: apps.tail };
   try {
     const body = fakeEl("page plain search-root");
+    manageDom.body.append(body);
     const bar = fakeEl("searchbar");
     const results = fakeEl("search-results");
     const top = fakeEl("table install-ipas-top");
@@ -427,6 +417,7 @@ test("Manage on marks the drawn apps list inside the pinned results and puts the
     assert.ok(!results.children.includes(line));
     // no search bar: the list sits straight in the body
     const plainBody = fakeEl("page plain");
+    manageDom.body.append(plainBody);
     const list2 = fakeEl("table");
     plainBody.append(list2);
     Object.assign(apps, { body: plainBody, results: plainBody, tail: [list2] });
@@ -434,7 +425,6 @@ test("Manage on marks the drawn apps list inside the pinned results and puts the
   } finally {
     setManaging(false);
     Object.assign(apps, keep);
-    globalThis.document = saved.document;
     globalThis.ifizboxNative = saved.native;
   }
-});
+}, manageDom));

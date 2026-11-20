@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { themeMessage, applyTheme, settings } from "./settings.js";
 import { keepHint } from "./settings.js";
+import { fakeDocument } from "../fakes.test-helper.js";
 
 // F230: a localStorage that records what the pages write and remove (before any test opens a theme list, which drops
 // F215's old split key once). The settings store above was made at import, on its own storage.
@@ -297,26 +298,16 @@ test("B20: window focus doesn't redraw the Signing page unless the certificate c
 });
 
 // F183: no About page (no Check for Updates, no Skip This Version); the root ends with Home's version line.
-function fakeElement(tag) {
-  const e = {
-    tagName: String(tag).toUpperCase(), children: [], attrs: {}, style: {}, dataset: {}, className: "", textContent: "", hidden: false,
-    classList: { add: (...c) => { e.className = [e.className, ...c].filter(Boolean).join(" "); }, remove() {}, toggle() {}, contains: (c) => e.className.split(" ").includes(c) },
-    append(...k) { for (const c of k) if (c && typeof c === "object") { if (c.tagName === "#FRAG") e.children.push(...c.children); else e.children.push(c); } },
-    prepend(...k) { e.append(...k); }, replaceChildren(...k) { e.children = []; e.append(...k); },
-    setAttribute(a, v) { e.attrs[a] = v; }, getAttribute: (a) => e.attrs[a] ?? null, removeAttribute(a) { delete e.attrs[a]; },
-    addEventListener() {}, removeEventListener() {}, querySelector: () => null, querySelectorAll: () => [], closest: () => null,
-    remove() {}, replaceWith() {}, isConnected: true, scrollTop: 0, firstChild: null,
-  };
-  return e;
-}
-const texts = (n, out = []) => { if (n.textContent) out.push(n.textContent); for (const c of n.children ?? []) texts(c, out); return out; };
+// The shared fake DOM, without a <head> (the pages' styles stay out).
+const settingsDoc = () => Object.assign(fakeDocument(), { head: null });
+const fakeElement = (tag) => settingsDoc().createElement(tag);
+// Each node's own text, in tree order.
+const texts = (n, out = []) => { if (n._text) out.push(n._text); for (const c of n.children) texts(c, out); return out; };
 
 test("F183: the about route is gone and Settings' root ends with the version line", async () => {
   // The root's sections fill in later (certificate, signer status) against this fake DOM: it stays (each test file
   // runs in its own process).
-  globalThis.document = { createElement: fakeElement, createTextNode: (t) => ({ textContent: t }), createDocumentFragment: () => fakeElement("#frag"),
-    head: null, body: fakeElement("body"), documentElement: fakeElement("html"), querySelector: () => null, querySelectorAll: () => [],
-    addEventListener() {} };
+  globalThis.document = settingsDoc();
   const { render, nav } = await import("./settings.js");
   const { footLine } = await import("./home.js");
   assert.equal(nav({ path: ["about"] }).title, "Settings");
@@ -341,23 +332,7 @@ test("F183: settings.js has no About page or update check left", async () => {
 // F205: iOS 6 Settings' row tiles. The root's page rows and General's settings carry one; Theme's Appearance choices
 // (Automatic / Light / Dark) stay bare, as iOS 6 leaves option rows. Compatibility Marks is on General now.
 test("F205: Settings root, General and Theme rows carry iOS 6 tiles where iOS 6 would", async () => {
-  // fakeElement with querySelector(All) for one class (".group", ".cell-inner"): the pages put switches in by them.
-  const find = (n, cls, out = []) => {
-    for (const c of n.children ?? []) {
-      if (String(c.className).split(" ").includes(cls)) out.push(c);
-      find(c, cls, out);
-    }
-    return out;
-  };
-  const rich = (tag) => {
-    const e = fakeElement(tag);
-    e.querySelectorAll = (sel) => (/^\.[\w-]+$/.test(sel) ? find(e, sel.slice(1)) : []);
-    e.querySelector = (sel) => e.querySelectorAll(sel)[0] ?? null;
-    return e;
-  };
-  globalThis.document = { createElement: rich, createTextNode: (t) => ({ textContent: t }), createDocumentFragment: () => rich("#frag"),
-    head: null, body: rich("body"), documentElement: rich("html"), querySelector: () => null, querySelectorAll: () => [],
-    addEventListener() {}, removeEventListener() {} };
+  globalThis.document = settingsDoc(); // the pages put switches in by querySelector(".group"), (".cell-inner")
   const { render } = await import("./settings.js");
   const cells = (n, out = []) => {
     if (n.className === "cell") out.push(n);
@@ -413,7 +388,6 @@ test("F199: Theme page: Mode's segmented control, then Light > Classic and Dark 
     assert.equal(mode.children[0].textContent, "Mode");
     const bar = mode.children[1];
     assert.equal(bar.attrs.role, "radiogroup");
-    // (the fake classList can't toggle "selected": aria-selected is set beside it)
     assert.deepEqual(bar.children.map((b) => [b.textContent, b.attrs.role, b.attrs["aria-selected"]]),
       [["Automatic", "radio", "false"], ["Light", "radio", "false"], ["Dark", "radio", "true"]]);
     assert.equal(themes.children[0].textContent, "Themes");

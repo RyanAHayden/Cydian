@@ -45,7 +45,12 @@ sheet and sheets behind tokens, with no visible change.
   checked on fixtures first (a moved look rule that changes the order is caught; a moved one that keeps it passes).
 - `node --test web/app`: 2575 pass, 0 fail (ios6-css.test.js's "every look-only stretch in web/app/*.css paints only,
   and every one is closed" now covers packages.css's 37 stretches).
-- Screenshots: SHOTS
+- Screenshots: `shots.mjs` (this folder, C44's harness plus four routes: Search with text typed, Search with the
+  Filter panel open, an action sheet with a red button over Search, a modal sheet holding the store header) over
+  a scratch copy of `web/app` with main's packages.css vs this branch, 6 palettes x 11 routes + 2 site shots = 68,
+  compared with `journal/2026-11-20-c44-era-readiness/diff.py`: **same**, 0 px and 0 computed-style differences in
+  every shot. (A first base run used the sheet route without `sheet-scroll page-body`, which put the header under
+  the nav bar; both sides were rerun with the fixed route.)
 - `tools/check.sh`: run by `run done`, which refuses to tick unless it passes.
 
 ## Notes
@@ -57,4 +62,19 @@ sheet and sheets behind tokens, with no visible change.
 
 ## Not verified
 
-NOTVERIFIED
+- Pixels of the pages the harness can't reach without package data (package rows, Sections, the package page,
+  depictions, Version History, Browse, Roulette, Manage, the store page's tiles, reviews and related rows): the
+  fake bridge has no sources. They are covered only by `cascade.py`'s declaration-order proof, which is exact for
+  this kind of change but is not a render.
+- Pressed looks (`:active` on scope segments, Cancel, action buttons): headless Chromium can't hold `:active`, and
+  the C44 `--pressed` option only presses bar buttons, cells and the badge. cascade.py covers their rules.
+- The phones: no device run; a CSS change with identical computed styles needs none.
+
+## Spec review
+
+Fresh subagent, diff + brief only. Fixed: the dark scope bar's literal `#000` selected edge and divider now read
+`--dk-scope-seg-selected-edge` / `--dk-scope-seg-divider`; screenshots were still running at review time and are
+recorded above. Not changed: the three test edits (needed: they read one rule for both halves); the dark action
+sheet tokens (dark rules read `--dk-*` tokens, as docs/eras.md asks); `.store-btn` (Browse's price button, not the
+store header); palettes.css's own search bar / store header rules (docs/eras.md's known palette limit, outside this
+file); `-webkit-box-reflect` filed as T61. Follow-ups: D21 (docs/eras.md's clean list), T61.

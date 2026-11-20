@@ -1,19 +1,22 @@
 // Archive readers for tweak injection (core/tweaks.js), in plain JS so they run the same on the website, in the app's
 // web view (an iOS 15 WebKit has no DecompressionStream) and under node --test: DEFLATE (raw, gzip, zip), LZMA
-// (.lzma "alone" files) and xz (LZMA2 blocks), ar (a .deb's outer file), tar and zip. Everything works on
+// (.lzma "alone" files), xz (LZMA2 blocks), zstd and bzip2, ar (a .deb's outer file), tar and zip. Everything works on
 // Uint8Arrays in memory; a tweak is a few megabytes at most.
 //
 //   inflate(bytes) -> bytes          raw DEFLATE (RFC 1951)
 //   gunzip(bytes) -> bytes           gzip members (RFC 1952), concatenated
 //   unlzma(bytes) -> bytes           an LZMA "alone" file (13-byte header), with or without its end marker
 //   unxz(bytes) -> bytes             an xz stream of LZMA2 blocks (no BCJ or delta filters: debs don't use them)
-//   decompress(name, bytes) -> bytes by the file's extension (.gz .xz .lzma or none); throws for .zst and .bz2
+//   unzstd(bytes) -> bytes           zstd frames (RFC 8878), no dictionaries; the checksum is skipped
+//   bunzip2(bytes) -> bytes          bzip2 streams, each block's CRC checked
+//   decompress(name, bytes) -> bytes by the file's extension (.gz .xz .lzma .zst .bz2 or none)
 //   readAr(bytes) -> [{ name, data }]                  a Unix ar archive (a .deb's outer layer)
 //   readTar(bytes) -> [{ path, type, data, link }]     ustar/GNU/pax; type "file" | "dir" | "symlink" | "link"
 //   readZip(bytes) -> [{ path, data, dir }]            stored and deflated entries (no ZIP64, no encryption)
 //
 // Errors are UnpackError with a sentence a person can read. The LZMA decoder follows the LZMA SDK's reference
-// decoder (LzmaSpec.cpp, public domain) and xz's file format spec (public domain); inflate follows RFC 1951.
+// decoder (LzmaSpec.cpp, public domain) and xz's file format spec (public domain); inflate follows RFC 1951; zstd
+// follows RFC 8878 (and zstd's educational decoder, BSD); bzip2 follows the format as libbzip2 writes it.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 export class UnpackError extends Error {
@@ -444,6 +447,490 @@ function lzma2(src, pos, out, limit) {
   }
 }
 
+// ---- zstd (RFC 8878) -------------------------------------------------------------------------------------------
+// Frames of raw, RLE and compressed blocks: Huffman literals (1 or 4 streams, treeless repeats), FSE-coded sequences
+// (predefined, RLE, described or repeated tables) and the three repeat offsets. No dictionaries; skippable frames are
+// skipped; the optional XXH64 checksum is skipped, not checked (tar's own checks catch a damaged archive).
+
+// Reads a zstd backward bit stream: bytes [start, end), whose last byte's highest set bit marks the end. Reading past
+// the start gives zeros and drives `off` below zero, which is how a stream says it has run out.
+class BackBits {
+  constructor(src, start, end) {
+    if (end <= start) fail("The zstd data is damaged (an empty bit stream).");
+    const last = src[end - 1];
+    if (!last) fail("The zstd data is damaged (a bit stream without its end mark).");
+    this.src = src; this.start = start;
+    this.off = (end - start - 1) * 8 + (31 - Math.clz32(last));
+  }
+  read(n) {
+    if (!n) return 0;
+    this.off -= n;
+    let pos = this.off, k = n, shift = 0;
+    if (pos < 0) { k += pos; shift = -pos; pos = 0; }
+    let v = 0, mul = 1;
+    while (k > 0) {
+      const sh = pos & 7, take = Math.min(8 - sh, k);
+      v += ((this.src[this.start + (pos >>> 3)] >>> sh) & ((1 << take) - 1)) * mul;
+      mul *= 1 << take; pos += take; k -= take;
+    }
+    return v * 2 ** shift;
+  }
+}
+
+// An FSE decoding table from normalised counts (-1: "less than one").
+function fseTable(norm, al) {
+  const size = 1 << al, symbols = new Uint8Array(size), bits = new Uint8Array(size), base = new Uint16Array(size);
+  const next = new Uint16Array(norm.length);
+  let high = size;
+  for (let s = 0; s < norm.length; s++) if (norm[s] === -1) { symbols[--high] = s; next[s] = 1; }
+  const step = (size >>> 1) + (size >>> 3) + 3, mask = size - 1;
+  let pos = 0;
+  for (let s = 0; s < norm.length; s++) {
+    if (norm[s] <= 0) continue;
+    next[s] = norm[s];
+    for (let i = 0; i < norm[s]; i++) {
+      symbols[pos] = s;
+      do pos = (pos + step) & mask; while (pos >= high);
+    }
+  }
+  if (pos !== 0) fail("The zstd data is damaged (a bad FSE table).");
+  for (let i = 0; i < size; i++) {
+    const d = next[symbols[i]]++;
+    bits[i] = al - (31 - Math.clz32(d));
+    base[i] = (d << bits[i]) - size;
+  }
+  return { al, symbols, bits, base };
+}
+
+const fseRle = (s) => ({ al: 0, symbols: Uint8Array.of(s), bits: Uint8Array.of(0), base: Uint16Array.of(0) });
+
+// An FSE table description (forward bits, little-endian) at src[pos]; returns { table, end }.
+function fseRead(src, pos, end, maxAl, maxSym) {
+  let bitPos = pos * 8;
+  const bits = (n) => {
+    let v = 0;
+    for (let i = 0; i < n; i++, bitPos++) {
+      const byte = bitPos >>> 3;
+      if (byte >= end) fail("The zstd data ends too soon.");
+      v |= ((src[byte] >>> (bitPos & 7)) & 1) << i;
+    }
+    return v;
+  };
+  const al = bits(4) + 5;
+  if (al > maxAl) fail("The zstd data is damaged (an FSE table too precise).");
+  let remaining = 1 << al;
+  const norm = [];
+  while (remaining > 0) {
+    if (norm.length > maxSym) fail("The zstd data is damaged (too many FSE symbols).");
+    const n = 32 - Math.clz32(remaining + 1);
+    let v = bits(n);
+    const lowMask = (1 << (n - 1)) - 1, threshold = (1 << n) - 1 - (remaining + 1);
+    if ((v & lowMask) < threshold) { bitPos--; v &= lowMask; } else if (v > lowMask) v -= threshold;
+    const p = v - 1;
+    remaining -= Math.abs(p);
+    norm.push(p);
+    if (p === 0) {
+      for (;;) {
+        const rep = bits(2);
+        for (let i = 0; i < rep; i++) norm.push(0);
+        if (rep !== 3) break;
+      }
+    }
+  }
+  if (remaining !== 0 || norm.length > maxSym + 1) fail("The zstd data is damaged (a bad FSE table).");
+  return { table: fseTable(norm, al), end: (bitPos + 7) >>> 3 };
+}
+
+const fseSym = (t, state) => t.symbols[state.v];
+const fseNext = (t, state, br) => { state.v = t.base[state.v] + br.read(t.bits[state.v]); };
+
+// A Huffman table from a literals section at src[pos]; returns { table, end }.
+function hufRead(src, pos, end) {
+  const head = src[pos++];
+  const weights = [];
+  if (head >= 128) {
+    const n = head - 127;
+    if (pos + ((n + 1) >>> 1) > end) fail("The zstd data ends too soon.");
+    for (let i = 0; i < n; i++) weights.push(i & 1 ? src[pos + (i >>> 1)] & 15 : src[pos + (i >>> 1)] >>> 4);
+    pos += (n + 1) >>> 1;
+  } else {
+    if (pos + head > end) fail("The zstd data ends too soon.");
+    const { table, end: tEnd } = fseRead(src, pos, pos + head, 6, 255);
+    const br = new BackBits(src, tEnd, pos + head);
+    const s1 = { v: br.read(table.al) }, s2 = { v: br.read(table.al) };
+    for (;;) {
+      if (weights.length > 255) fail("The zstd data is damaged (too many Huffman weights).");
+      weights.push(fseSym(table, s1)); fseNext(table, s1, br);
+      if (br.off < 0) { weights.push(fseSym(table, s2)); break; }
+      weights.push(fseSym(table, s2)); fseNext(table, s2, br);
+      if (br.off < 0) { weights.push(fseSym(table, s1)); break; }
+    }
+    pos += head;
+  }
+  let total = 0;
+  for (const w of weights) { if (w > 12) fail("The zstd data is damaged (a bad Huffman weight)."); if (w) total += 1 << (w - 1); }
+  if (!total) fail("The zstd data is damaged (no Huffman weights).");
+  const maxBits = 32 - Math.clz32(total);
+  const rest = (1 << maxBits) - total;
+  if (rest & (rest - 1) || maxBits > 11) fail("The zstd data is damaged (bad Huffman weights).");
+  weights.push(32 - Math.clz32(rest));
+  if (weights.length > 256) fail("The zstd data is damaged (too many Huffman weights).");
+  const nb = weights.map((w) => (w ? maxBits + 1 - w : 0));
+  const count = new Uint16Array(maxBits + 2);
+  for (const b of nb) count[b]++;
+  const rank = new Uint32Array(maxBits + 2);
+  for (let b = maxBits; b >= 1; b--) rank[b - 1] = rank[b] + count[b] * (1 << (maxBits - b));
+  const size = 1 << maxBits, symbols = new Uint8Array(size), bits = new Uint8Array(size);
+  for (let s = 0; s < nb.length; s++) {
+    if (!nb[s]) continue;
+    const len = 1 << (maxBits - nb[s]);
+    symbols.fill(s, rank[nb[s]], rank[nb[s]] + len);
+    bits.fill(nb[s], rank[nb[s]], rank[nb[s]] + len);
+    rank[nb[s]] += len;
+  }
+  return { table: { maxBits, symbols, bits }, end: pos };
+}
+
+function hufStream(t, src, start, end, out, o, n) {
+  const br = new BackBits(src, start, end), mask = (1 << t.maxBits) - 1;
+  let state = br.read(t.maxBits);
+  for (let i = 0; i < n; i++) {
+    out[o + i] = t.symbols[state];
+    const b = t.bits[state];
+    state = ((state << b) & mask) | br.read(b);
+  }
+  if (br.off !== -t.maxBits) fail("The zstd data is damaged (a Huffman stream of the wrong length).");
+}
+
+const LL_BASE = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 40, 48, 64, 128, 256,
+  512, 1024, 2048, 4096, 8192, 16384, 32768, 65536];
+const LL_BITS = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+const ML_BASE = [...Array(32).keys()].map((i) => i + 3).concat([35, 37, 39, 41, 43, 47, 51, 59, 67, 83, 99, 131, 259, 515,
+  1027, 2051, 4099, 8195, 16387, 32771, 65539]);
+const ML_BITS = Array(32).fill(0).concat([1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+let ZSTD_DEFAULT = null;
+const zstdDefaults = () => ZSTD_DEFAULT || (ZSTD_DEFAULT = {
+  ll: fseTable([4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 1, 1, 1, 1, 1, -1, -1, -1, -1], 6),
+  ml: fseTable([1, 4, 3, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, -1], 6),
+  of: fseTable([1, 1, 1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1], 5),
+});
+
+// One compressed block, src[pos, end), appended to `out`; `st` carries tables and repeat offsets across the frame.
+function zstdBlock(src, pos, end, out, st, frameStart, limit) {
+  // literals
+  const h0 = src[pos], ltype = h0 & 3, sf = (h0 >>> 2) & 3;
+  let lits;
+  if (ltype < 2) {
+    let size;
+    if (sf === 0 || sf === 2) { size = h0 >>> 3; pos += 1; }
+    else if (sf === 1) { size = (h0 >>> 4) + (src[pos + 1] << 4); pos += 2; }
+    else { size = (h0 >>> 4) + (src[pos + 1] << 4) + (src[pos + 2] << 12); pos += 3; }
+    if (size > 1 << 17) fail("The zstd data is damaged (too many literals).");
+    if (ltype === 0) {
+      if (pos + size > end) fail("The zstd data ends too soon.");
+      lits = src.subarray(pos, pos + size); pos += size;
+    } else {
+      if (pos >= end) fail("The zstd data ends too soon.");
+      lits = new Uint8Array(size).fill(src[pos++]);
+    }
+  } else {
+    let regen, csize, streams = sf === 0 ? 1 : 4;
+    if (sf < 2) {
+      const h = h0 | (src[pos + 1] << 8) | (src[pos + 2] << 16);
+      regen = (h >>> 4) & 0x3ff; csize = (h >>> 14) & 0x3ff; pos += 3;
+    } else if (sf === 2) {
+      const h = (h0 | (src[pos + 1] << 8) | (src[pos + 2] << 16) | (src[pos + 3] << 24)) >>> 0;
+      regen = (h >>> 4) & 0x3fff; csize = h >>> 18; pos += 4;
+    } else {
+      const h = (h0 | (src[pos + 1] << 8) | (src[pos + 2] << 16) | (src[pos + 3] << 24)) >>> 0;
+      regen = (h >>> 4) & 0x3ffff; csize = (h >>> 22) + (src[pos + 4] << 10); pos += 5;
+    }
+    if (regen > 1 << 17) fail("The zstd data is damaged (too many literals).");
+    const lend = pos + csize;
+    if (lend > end) fail("The zstd data ends too soon.");
+    if (ltype === 2) { const r = hufRead(src, pos, lend); st.huf = r.table; pos = r.end; }
+    else if (!st.huf) fail("The zstd data is damaged (a repeated Huffman table before any).");
+    lits = new Uint8Array(regen);
+    if (streams === 1) hufStream(st.huf, src, pos, lend, lits, 0, regen);
+    else {
+      if (pos + 6 > lend) fail("The zstd data ends too soon.");
+      const s1 = src[pos] | (src[pos + 1] << 8), s2 = src[pos + 2] | (src[pos + 3] << 8), s3 = src[pos + 4] | (src[pos + 5] << 8);
+      const a = pos + 6, b = a + s1, c = b + s2, d = c + s3;
+      if (d > lend) fail("The zstd data is damaged (bad Huffman stream sizes).");
+      const q = (regen + 3) >>> 2;
+      if (q * 3 > regen) fail("The zstd data is damaged (too few literals for four streams).");
+      hufStream(st.huf, src, a, b, lits, 0, q);
+      hufStream(st.huf, src, b, c, lits, q, q);
+      hufStream(st.huf, src, c, d, lits, 2 * q, q);
+      hufStream(st.huf, src, d, lend, lits, 3 * q, regen - 3 * q);
+    }
+    pos = lend;
+  }
+  // sequences
+  if (pos >= end) fail("The zstd data ends too soon.");
+  let nseq = src[pos++];
+  if (nseq >= 128) {
+    if (nseq === 255) { nseq = src[pos] + (src[pos + 1] << 8) + 0x7f00; pos += 2; }
+    else { nseq = ((nseq - 128) << 8) + src[pos]; pos += 1; }
+  }
+  if (!nseq) {
+    if (out.n + lits.length > limit) fail("The file unpacks too big.");
+    out.bytes(lits);
+    return;
+  }
+  if (pos >= end) fail("The zstd data ends too soon.");
+  const modes = src[pos++];
+  if (modes & 3) fail("The zstd data is damaged (reserved bits set).");
+  const def = zstdDefaults();
+  const table = (mode, key, maxAl, maxSym) => {
+    if (mode === 0) st[key] = def[key];
+    else if (mode === 1) { if (pos >= end) fail("The zstd data ends too soon."); const s = src[pos++]; if (s > maxSym) fail("The zstd data is damaged."); st[key] = fseRle(s); }
+    else if (mode === 2) { const r = fseRead(src, pos, end, maxAl, maxSym); st[key] = r.table; pos = r.end; }
+    else if (!st[key]) fail("The zstd data is damaged (a repeated table before any).");
+    return st[key];
+  };
+  const llT = table(modes >>> 6, "ll", 9, 35), ofT = table((modes >>> 4) & 3, "of", 8, 31), mlT = table((modes >>> 2) & 3, "ml", 9, 52);
+  const br = new BackBits(src, pos, end);
+  const ll = { v: br.read(llT.al) }, of = { v: br.read(ofT.al) }, ml = { v: br.read(mlT.al) };
+  const r = st.reps;
+  let lp = 0;
+  for (let i = 0; i < nseq; i++) {
+    const oc = fseSym(ofT, of), mc = fseSym(mlT, ml), lc = fseSym(llT, ll);
+    if (oc > 31 || mc > 52 || lc > 35) fail("The zstd data is damaged (a bad sequence code).");
+    const ov = 2 ** oc + br.read(oc);
+    const mlen = ML_BASE[mc] + br.read(ML_BITS[mc]);
+    const llen = LL_BASE[lc] + br.read(LL_BITS[lc]);
+    let off;
+    if (ov > 3) { off = ov - 3; r[2] = r[1]; r[1] = r[0]; r[0] = off; }
+    else {
+      const idx = ov - 1 + (llen === 0 ? 1 : 0);
+      if (idx === 0) off = r[0];
+      else {
+        off = idx < 3 ? r[idx] : r[0] - 1;
+        if (idx > 1) r[2] = r[1];
+        r[1] = r[0]; r[0] = off;
+      }
+    }
+    if (i + 1 < nseq) { fseNext(llT, ll, br); fseNext(mlT, ml, br); fseNext(ofT, of, br); }
+    if (lp + llen > lits.length) fail("The zstd data is damaged (more literals than it holds).");
+    if (out.n + llen + mlen > limit) fail("The file unpacks too big.");
+    out.bytes(lits.subarray(lp, lp + llen)); lp += llen;
+    if (!off || off > out.n - frameStart) fail("The zstd data is damaged (a distance too far back).");
+    out.room(mlen);
+    const b = out.buf;
+    for (let k = 0; k < mlen; k++) { b[out.n] = b[out.n - off]; out.n++; }
+  }
+  if (br.off !== 0) fail("The zstd data is damaged (a sequence stream of the wrong length).");
+  if (out.n + lits.length - lp > limit) fail("The file unpacks too big.");
+  out.bytes(lits.subarray(lp));
+}
+
+export function unzstd(src, limit = 1 << 30) {
+  const out = new Out(src.length * 4);
+  let pos = 0, frames = 0;
+  const u32 = (p) => (src[p] | (src[p + 1] << 8) | (src[p + 2] << 16) | (src[p + 3] << 24)) >>> 0;
+  while (pos < src.length) {
+    if (pos + 4 > src.length) fail("The zstd data ends too soon.");
+    const magic = u32(pos);
+    if ((magic & 0xfffffff0) === 0x184d2a50) { // skippable frame
+      if (pos + 8 > src.length) fail("The zstd data ends too soon.");
+      pos += 8 + u32(pos + 4);
+      frames++;
+      continue;
+    }
+    if (magic !== 0xfd2fb528) { if (frames) fail("The zstd data is damaged (junk after a frame)."); fail("That isn't zstd data."); }
+    frames++;
+    pos += 4;
+    const fhd = src[pos++];
+    if (fhd & 8) fail("The zstd data is damaged (reserved bits set).");
+    const single = fhd & 0x20, checksum = fhd & 4, didFlag = fhd & 3, fcsFlag = fhd >>> 6;
+    if (!single) pos++; // window descriptor: everything stays in memory
+    const didSize = [0, 1, 2, 4][didFlag];
+    let did = 0;
+    for (let i = 0; i < didSize; i++) did += src[pos + i] * 256 ** i;
+    if (did) fail("The zstd data needs a dictionary, which this can't unpack.");
+    pos += didSize;
+    const fcsSize = [single ? 1 : 0, 2, 4, 8][fcsFlag];
+    let fcs = -1;
+    if (fcsSize) {
+      fcs = 0;
+      for (let i = 0; i < fcsSize; i++) fcs += src[pos + i] * 256 ** i;
+      if (fcsSize === 2) fcs += 256;
+      if (fcs > limit) fail("The file unpacks too big.");
+      out.room(fcs);
+    }
+    pos += fcsSize;
+    const frameStart = out.n;
+    const st = { huf: null, ll: null, of: null, ml: null, reps: [1, 4, 8] };
+    for (let last = 0; !last;) {
+      if (pos + 3 > src.length) fail("The zstd data ends too soon.");
+      const bh = src[pos] | (src[pos + 1] << 8) | (src[pos + 2] << 16);
+      pos += 3;
+      last = bh & 1;
+      const type = (bh >>> 1) & 3, size = bh >>> 3;
+      if (type === 3) fail("The zstd data is damaged (a reserved block type).");
+      if (size > 1 << 17) fail("The zstd data is damaged (a block too big).");
+      if (type === 1) {
+        if (pos >= src.length) fail("The zstd data ends too soon.");
+        if (out.n + size > limit) fail("The file unpacks too big.");
+        out.room(size);
+        out.buf.fill(src[pos], out.n, out.n + size);
+        out.n += size;
+        pos += 1;
+        continue;
+      }
+      if (pos + size > src.length) fail("The zstd data ends too soon.");
+      if (type === 0) {
+        if (out.n + size > limit) fail("The file unpacks too big.");
+        out.bytes(src.subarray(pos, pos + size));
+      } else zstdBlock(src, pos, pos + size, out, st, frameStart, limit);
+      pos += size;
+    }
+    if (fcs >= 0 && out.n - frameStart !== fcs) fail("The zstd data is damaged (the wrong size).");
+    if (checksum) pos += 4;
+  }
+  if (pos > src.length) fail("The zstd data ends too soon.");
+  return out.result();
+}
+
+// ---- bzip2 -----------------------------------------------------------------------------------------------------
+// Streams of blocks: Huffman-coded MTF/RLE2 symbols, then the inverse Burrows-Wheeler transform and the RLE1 runs.
+// Each block's CRC is checked. Randomised blocks (bzip2 0.9.0's, never written since) are refused.
+
+const BZ_CRC = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i << 24;
+    for (let k = 0; k < 8; k++) c = c & 0x80000000 ? (c << 1) ^ 0x04c11db7 : c << 1;
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+
+export function bunzip2(src, limit = 1 << 30) {
+  const out = new Out(src.length * 6);
+  let pos = 0, cur = 0, left = 0;
+  const bit = () => {
+    if (!left) { if (pos >= src.length) fail("The bzip2 data ends too soon."); cur = src[pos++]; left = 8; }
+    return (cur >>> --left) & 1;
+  };
+  const bits = (n) => { let v = 0; while (n--) v = v * 2 + bit(); return v; };
+  let streams = 0;
+  while (pos < src.length) {
+    left = 0; // streams start on a byte
+    if (src[pos] !== 0x42 || src[pos + 1] !== 0x5a || src[pos + 2] !== 0x68 || !(src[pos + 3] >= 0x31 && src[pos + 3] <= 0x39)) {
+      if (streams) break;
+      fail("That isn't bzip2 data.");
+    }
+    streams++;
+    const maxBlock = (src[pos + 3] - 0x30) * 100000;
+    pos += 4;
+    const tt = new Uint32Array(maxBlock), block = new Uint8Array(maxBlock);
+    for (;;) {
+      const m1 = bits(24), m2 = bits(24);
+      if (m1 === 0x177245 && m2 === 0x385090) { bits(32); break; } // end of stream and its CRC
+      if (m1 !== 0x314159 || m2 !== 0x265359) fail("The bzip2 data is damaged (a bad block mark).");
+      const crc = bits(32) >>> 0;
+      if (bit()) fail("The bzip2 data is randomised, an old form this can't unpack.");
+      const orig = bits(24);
+      // symbols in use
+      const used = bits(16), seqToUnseq = [];
+      for (let i = 0; i < 16; i++) if (used & (0x8000 >>> i)) {
+        const m = bits(16);
+        for (let j = 0; j < 16; j++) if (m & (0x8000 >>> j)) seqToUnseq.push(i * 16 + j);
+      }
+      if (!seqToUnseq.length) fail("The bzip2 data is damaged (no symbols).");
+      const alpha = seqToUnseq.length + 2;
+      const nGroups = bits(3), nSel = bits(15);
+      if (nGroups < 2 || nGroups > 6 || !nSel) fail("The bzip2 data is damaged (bad Huffman groups).");
+      const mtfG = [...Array(nGroups).keys()], sel = new Uint8Array(nSel);
+      for (let i = 0; i < nSel; i++) {
+        let j = 0;
+        while (bit()) if (++j >= nGroups) fail("The bzip2 data is damaged (a bad selector).");
+        const g = mtfG[j];
+        mtfG.splice(j, 1); mtfG.unshift(g);
+        sel[i] = g;
+      }
+      const groups = [];
+      for (let g = 0; g < nGroups; g++) {
+        const lens = new Uint8Array(alpha);
+        let len = bits(5);
+        for (let s = 0; s < alpha; s++) {
+          for (;;) {
+            if (len < 1 || len > 20) fail("The bzip2 data is damaged (a bad code length).");
+            if (!bit()) break;
+            len += bit() ? -1 : 1;
+          }
+          lens[s] = len;
+        }
+        const count = new Uint16Array(21), offs = new Uint16Array(21), symbols = new Uint16Array(alpha);
+        for (const l of lens) count[l]++;
+        for (let i = 1; i < 21; i++) offs[i] = offs[i - 1] + count[i - 1];
+        for (let s = 0; s < alpha; s++) symbols[offs[lens[s]]++] = s;
+        groups.push({ count, symbols });
+      }
+      const decode = (h) => {
+        let code = 0, first = 0, index = 0;
+        for (let len = 1; len <= 20; len++) {
+          code |= bit();
+          const c = h.count[len];
+          if (code - c < first) return h.symbols[index + (code - first)];
+          index += c; first += c; first <<= 1; code <<= 1;
+        }
+        return fail("The bzip2 data is damaged (a bad Huffman code).");
+      };
+      // MTF and RLE2 into `block`
+      const mtf = [...Array(seqToUnseq.length).keys()], counts = new Uint32Array(256);
+      const EOB = alpha - 1;
+      let n = 0, run = 0, runBit = 1, gi = 0, inGroup = 0, h = null;
+      const flush = () => {
+        if (!run) return;
+        if (n + run > maxBlock) fail("The bzip2 data is damaged (a block too big).");
+        const b = seqToUnseq[mtf[0]];
+        block.fill(b, n, n + run); counts[b] += run; n += run;
+        run = 0; runBit = 1;
+      };
+      for (;;) {
+        if (!inGroup) { if (gi >= nSel) fail("The bzip2 data is damaged (too few selectors)."); h = groups[sel[gi++]]; inGroup = 50; }
+        inGroup--;
+        const s = decode(h);
+        if (s <= 1) { run += runBit << s; runBit <<= 1; if (run > maxBlock) fail("The bzip2 data is damaged (a run too long)."); continue; }
+        flush();
+        if (s === EOB) break;
+        if (n >= maxBlock) fail("The bzip2 data is damaged (a block too big).");
+        const v = mtf[s - 1];
+        mtf.splice(s - 1, 1); mtf.unshift(v);
+        const b = seqToUnseq[v];
+        block[n++] = b; counts[b]++;
+      }
+      if (orig >= n) fail("The bzip2 data is damaged (a bad start pointer).");
+      // inverse BWT
+      const cf = new Uint32Array(256);
+      for (let i = 1; i < 256; i++) cf[i] = cf[i - 1] + counts[i - 1];
+      for (let i = 0; i < n; i++) tt[cf[block[i]]++] = i;
+      // RLE1: four equal bytes, then a count of more
+      let p = tt[orig], last = -1, same = 0, c = 0xffffffff;
+      const put = (b) => { out.byte(b); c = ((c << 8) ^ BZ_CRC[(c >>> 24) ^ b]) >>> 0; };
+      for (let i = 0; i < n; i++) {
+        const b = block[p];
+        p = tt[p];
+        if (same === 4) {
+          if (out.n + b > limit) fail("The file unpacks too big.");
+          for (let k = 0; k < b; k++) put(last);
+          same = 0; last = -1;
+          continue;
+        }
+        if (out.n >= limit) fail("The file unpacks too big.");
+        put(b);
+        if (b === last) same++; else { last = b; same = 1; }
+      }
+      if ((~c >>> 0) !== crc) fail("The bzip2 data is damaged (a block's CRC is wrong).");
+    }
+  }
+  return out.result();
+}
+
 // ---- by name, and the containers ------------------------------------------------------------------------------
 
 export function decompress(name, data, limit = 1 << 30) {
@@ -451,8 +938,8 @@ export function decompress(name, data, limit = 1 << 30) {
   if (n.endsWith(".gz")) return gunzip(data, limit);
   if (n.endsWith(".xz")) return unxz(data, limit);
   if (n.endsWith(".lzma")) return unlzma(data, limit);
-  if (n.endsWith(".zst") || n.endsWith(".zstd")) fail("This .deb is packed with zstd, which can't be unpacked here. Add its .dylib instead.");
-  if (n.endsWith(".bz2")) fail("This .deb is packed with bzip2, which can't be unpacked here. Add its .dylib instead.");
+  if (n.endsWith(".zst") || n.endsWith(".zstd")) return unzstd(data, limit);
+  if (n.endsWith(".bz2")) return bunzip2(data, limit);
   if (n.endsWith(".tar")) return data;
   return fail(`${name} is packed in a way this can't unpack.`);
 }

@@ -469,8 +469,8 @@ Plus the arm64e fix-up, the user's edits and tweak injection (below).
   keep the prepared tweaks too, so Re-sign All and the IPA queue inject them without the page. The page does the
   unpacking for both signers (`web/app/core/tweaks.js prepareTweaks`, archive readers in `core/unpack.js`, plain JS
   so an iOS 15 web view without `DecompressionStream` runs it):
-  - a `.deb` is read as ar, then its `data.tar` (`.gz`, `.xz`, `.lzma` or plain; `.zst` and `.bz2` are refused with
-    "add its .dylib instead"); paths lose `./` and the rootless `var/jb/` prefix. `Library/MobileSubstrate/
+  - a `.deb` is read as ar, then its `data.tar` (`.gz`, `.xz`, `.lzma`, `.zst`, `.bz2` or plain; a zstd frame that
+    needs a dictionary is refused); paths lose `./` and the rootless `var/jb/` prefix. `Library/MobileSubstrate/
     DynamicLibraries/*.dylib` and `usr/lib/TweakInject/*.dylib` go to `Frameworks/` and are injected;
     `Library/Frameworks/*.framework` and `usr/lib/*.dylib` go to `Frameworks/` as what the tweaks link;
     `Library/Application Support/*.bundle` goes to the app's top folder; symlinks and the rest (filter plists,

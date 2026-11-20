@@ -51,7 +51,7 @@ export function fakeIndexedDB() {
           db = {
             stores, version,
             objectStoreNames: { contains: (n) => stores.has(n) },
-            createObjectStore(n, { keyPath }) { stores.set(n, { keyPath, rows: new Map() }); },
+            createObjectStore(n, { keyPath } = {}) { stores.set(n, { keyPath, rows: new Map() }); },
             transaction(n, mode) {
               const s = stores.get(n);
               const tx = {};
@@ -67,7 +67,7 @@ export function fakeIndexedDB() {
                 get: (k) => request(() => structuredClone(s.rows.get(k))),
                 getAll: () => request(() => [...s.rows.values()].map((v) => structuredClone(v))),
                 getAllKeys: () => request(() => [...s.rows.keys()].sort()),
-                put: (v) => write(() => { s.rows.set(v[s.keyPath], structuredClone(v)); return v[s.keyPath]; }),
+                put: (v, k) => write(() => { const key = s.keyPath ? v[s.keyPath] : k; s.rows.set(key, structuredClone(v)); return key; }),
                 delete: (k) => write(() => { s.rows.delete(k); }),
                 clear: () => write(() => { s.rows.clear(); }),
               });

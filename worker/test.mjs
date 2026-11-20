@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import w, { manifest, allowed, loopbackUrl, appOf } from "./src/index.js";
 const store = new Map();
 const kvReads = [], kvCancels = []; // B96: every KV get's type, every KV stream cancelled
-const env = { HOST_IDS: "*.ifizbox", TTL: "600", HOSTED: {
+const env = { HOST_IDS: "*.ifizbox", TTL: "600", FETCH_RATE: "0", HOST_RATE: "0", UPLOAD_RATE: "0", HOSTED: { // F312's limits: tested on their own
   put: async (k, v, o) => store.set(k, { v, m: o.metadata }),
   // B95: type "stream" as KV gives it (app.ipa pipes whole parts), the value in two chunks
   get: async (k, o) => {
@@ -1370,5 +1370,74 @@ import { fileURLToPath } from "node:url";
     }
   } finally { child.kill(); }
   console.log("worker ssrf: ok");
+}
+{ // F312: per-address limits on /api/fetch, /sign/host and /sign/upload (src/limits.js)
+  const { ROUTE_LIMITS, rateOf } = await import("./src/limits.js");
+  const lenv = { ...env, FETCH_RATE: undefined, HOST_RATE: undefined, UPLOAD_RATE: undefined };
+  const call = (path, ip, init = {}, e = lenv) => w.fetch(new Request("https://sign.example" + path,
+    { ...init, headers: { ...(init.headers ?? {}), "CF-Connecting-IP": ip } }), e);
+  const fetchPath = "/api/fetch?url=" + encodeURIComponent("http://127.0.0.1/"); // refused (403) before any fetch
+  const hostInit = () => ({ method: "POST", body: new Uint8Array([1, 2, 3]), headers: { "Content-Length": "3" } });
+  const uploadPath = "/sign/upload?bundleid=com.a.b&version=1&title=A&size=100";
+  assert.deepEqual([rateOf(lenv, "fetch"), rateOf(lenv, "host"), rateOf(lenv, "upload")], [300, 10, 12]);
+  assert.equal(rateOf({ HOST_RATE: "3" }, "host"), 3);
+  assert.equal(rateOf({ HOST_RATE: "x" }, "host"), 10);
+  // the Nth request in a minute gets 429, per route and per address, defaults as shipped
+  for (const [route, path, init] of [["fetch", fetchPath, () => ({})], ["host", "/sign/host?bundleid=com.ryha.ifizbox&version=1&title=X", hostInit],
+    ["upload", uploadPath, () => ({ method: "POST" })]]) {
+    const n = ROUTE_LIMITS[route].rate, ip = `198.51.100.${n}`;
+    for (let i = 0; i < n; i++) assert.notEqual((await call(path, ip, init())).status, 429, `${route} #${i + 1}`);
+    const r = await call(path, ip, init());
+    assert.equal(r.status, 429, `${route} #${n + 1}`);
+    assert.equal(r.headers.get("Retry-After"), "60");
+    assert.equal(r.headers.get("Access-Control-Allow-Origin"), "*", "the website can read the 429");
+    assert.equal((await r.json()).code, "rate_limited");
+    assert.notEqual((await call(path, "203.0.113.9", init())).status, 429, `${route}: another address has its own count`);
+  }
+  // upload parts aren't counted: an install of a big app sends many
+  const big = await (await call("/sign/upload?bundleid=com.a.b&version=1&title=A&size=100", "192.0.2.77", { method: "POST" }, { ...lenv, UPLOAD_RATE: "1" })).json();
+  for (let i = 0; i < 3; i++) assert.notEqual((await call(`/sign/upload/${big.token}/0`, "192.0.2.77", { method: "PUT", body: new Uint8Array(5) }, { ...lenv, UPLOAD_RATE: "1" })).status, 429);
+  assert.equal((await call(uploadPath, "192.0.2.77", { method: "POST" }, { ...lenv, UPLOAD_RATE: "1" })).status, 429);
+  // "0": no limit
+  for (let i = 0; i < 15; i++) assert.notEqual((await call(uploadPath, "192.0.2.78", { method: "POST" }, { ...lenv, UPLOAD_RATE: "0" })).status, 429);
+  // the binding counts when bound (across isolates), keyed by route and address; a binding that throws falls back to memory
+  const keys = [];
+  const rl = (n) => { const used = new Map(); return { async limit({ key }) { keys.push(key); const k = used.get(key) ?? 0; used.set(key, k + 1); return { success: k < n }; } }; };
+  const benv = { ...lenv, HOST_RATE_LIMIT: rl(2) };
+  const hostPath = "/sign/host?bundleid=com.ryha.ifizbox&version=1&title=X";
+  assert.deepEqual([(await call(hostPath, "192.0.2.5", hostInit(), benv)).status, (await call(hostPath, "192.0.2.5", hostInit(), benv)).status,
+    (await call(hostPath, "192.0.2.5", hostInit(), benv)).status].map((s) => s === 429), [false, false, true]);
+  assert.equal(keys[0], "host:192.0.2.5");
+  const broken = { ...lenv, HOST_RATE: "1", HOST_RATE_LIMIT: { async limit() { throw new Error("down"); } } };
+  assert.notEqual((await call(hostPath, "192.0.2.6", hostInit(), broken)).status, 429);
+  assert.equal((await call(hostPath, "192.0.2.6", hostInit(), broken)).status, 429);
+  // other routes have none of these limits
+  for (let i = 0; i < 20; i++) assert.notEqual((await call("/sign/status", "192.0.2.7", {}, { ...lenv, HOST_RATE: "1", UPLOAD_RATE: "1", FETCH_RATE: "1" })).status, 429);
+
+  // node.mjs: the same limits in memory, counted by the socket's address, never by a header the visitor sends
+  const free = http.createServer();
+  await new Promise((ok) => free.listen(0, "127.0.0.1", ok));
+  const port = free.address().port;
+  await new Promise((ok) => free.close(ok));
+  const child = spawn(process.execPath, [fileURLToPath(new URL("./node.mjs", import.meta.url))],
+    { env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", REVIEWS_DB: "off", FETCH_RATE: "3", UPLOAD_RATE: "2" }, stdio: ["ignore", "pipe", "inherit"] });
+  try {
+    await new Promise((ok, no) => {
+      const deadline = setTimeout(() => no(new Error("node.mjs didn't start in 15 s")), 15000);
+      child.stdout.on("data", (d) => { if (String(d).includes("ifizbox:")) { clearTimeout(deadline); ok(); } });
+      child.on("exit", (c) => { clearTimeout(deadline); no(new Error(`node.mjs exited ${c}`)); });
+    });
+    const get = (path, headers = {}, method = "GET") => fetch(`http://127.0.0.1:${port}${path}`, { method, headers, signal: AbortSignal.timeout(15000) });
+    // a proxy on this machine: its X-Forwarded-For entry (the last) is the address
+    const statuses = [];
+    for (let i = 0; i < 4; i++) statuses.push((await get(fetchPath, { "X-Forwarded-For": `10.0.0.${i}, 198.51.100.40` })).status);
+    assert.deepEqual(statuses.map((s) => s === 429), [false, false, false, true]);
+    assert.notEqual((await get(fetchPath, { "X-Forwarded-For": "198.51.100.41" })).status, 429, "another address behind the proxy");
+    // a spoofed CF-Connecting-IP picks no new bucket
+    const up = [];
+    for (let i = 0; i < 3; i++) up.push((await get(uploadPath, { "CF-Connecting-IP": `192.0.2.${100 + i}` }, "POST")).status);
+    assert.deepEqual(up.map((s) => s === 429), [false, false, true]);
+  } finally { child.kill(); }
+  console.log("worker limits: ok");
 }
 await import("./test-push.mjs"); // F280

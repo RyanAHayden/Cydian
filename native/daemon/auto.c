@@ -204,8 +204,10 @@ int auto_deb_version(const char *file, const char *id, char *ver, size_t size) {
 
 #define PRUNE_MAX 256
 
+static int ver_cmp(const char *a, const char *b); /* dpkg's order, defined with ver_part_cmp below */
+
 int auto_prune(const char *listing, const char *id, const char *installed, int keep, char *out, size_t size) {
-    struct { const char *name; size_t len; long mtime; int other; } f[PRUNE_MAX];
+    struct { const char *name; size_t len; long mtime; int other; char ver[UPD_FIELD]; } f[PRUNE_MAX];
     int nf = 0;
     if (size) out[0] = 0;
     if (keep < 0) keep = 0;
@@ -225,6 +227,7 @@ int auto_prune(const char *listing, const char *id, const char *installed, int k
                     f[nf].name = p;
                     f[nf].len = nl;
                     f[nf].mtime = strtol(sp + 1, NULL, 10);
+                    memcpy(f[nf].ver, ver, sizeof ver);
                     f[nf].other = !(keep > 0 && installed && !strcmp(ver, installed));
                     nf++;
                 }
@@ -232,14 +235,18 @@ int auto_prune(const char *listing, const char *id, const char *installed, int k
         }
         p = next;
     }
-    /* The newest `keep` of the others stay: count, for each, how many others are newer (ties: the earlier line). */
+    /* The newest `keep` of the others stay: count, for each, how many others are newer. Files stashed in one run
+     * share an mtime, so ties go by version (the higher is newer), then by the earlier line. */
     int deleted = 0;
     size_t at = 0;
     for (int i = 0; i < nf; i++) {
         if (!f[i].other) continue;
         int newer = 0;
         for (int j = 0; j < nf; j++)
-            if (j != i && f[j].other && (f[j].mtime > f[i].mtime || (f[j].mtime == f[i].mtime && j < i))) newer++;
+            if (j != i && f[j].other) {
+                int c = f[j].mtime > f[i].mtime ? 1 : f[j].mtime < f[i].mtime ? -1 : ver_cmp(f[j].ver, f[i].ver);
+                if (c > 0 || (c == 0 && j < i)) newer++;
+            }
         if (newer < keep) continue;
         if (at + f[i].len + 2 <= size) {
             memcpy(out + at, f[i].name, f[i].len);
@@ -413,6 +420,15 @@ static int same_version_n(const char *a, size_t la, const char *b, size_t lb) {
     ver_split(a, la, &x);
     ver_split(b, lb, &y);
     return x.epoch == y.epoch && !ver_part_cmp(x.up, x.lup, y.up, y.lup) && !ver_part_cmp(x.rev, x.lrev, y.rev, y.lrev);
+}
+
+static int ver_cmp(const char *a, const char *b) {
+    struct ver_parts x, y;
+    ver_split(a, strlen(a), &x);
+    ver_split(b, strlen(b), &y);
+    if (x.epoch != y.epoch) return x.epoch > y.epoch ? 1 : -1;
+    int c = ver_part_cmp(x.up, x.lup, y.up, y.lup);
+    return c ? c : ver_part_cmp(x.rev, x.lrev, y.rev, y.lrev);
 }
 
 int auto_same_version(const char *a, const char *b) {

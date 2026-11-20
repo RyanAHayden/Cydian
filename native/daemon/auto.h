@@ -103,8 +103,9 @@ int auto_deb_version(const char *file, const char *id, char *ver, size_t size);
 
 /* Which cached .debs of one package to delete. listing: one "<file> <mtime>" line per file in its rollback folder.
  * Kept: the installed version's .deb (it is what an upgrade rolls back to) and the `keep` newest of the others, by
- * mtime (the daemon touches a file when it stores it); keep 0 deletes them all. Names that aren't this package's
- * .debs are left alone. Writes the files to delete into out, one per line; returns how many. */
+ * mtime (the daemon touches a file when it stores it), equal mtimes by Debian version; keep 0 deletes them all.
+ * Names that aren't this package's .debs are left alone. Writes the files to delete into out, one per line;
+ * returns how many. */
 int auto_prune(const char *listing, const char *id, const char *installed, int keep, char *out, size_t size);
 
 /* The notification after automatic installs: "1 Package Updated" / "<n> Packages Updated", and "<name> <to> was

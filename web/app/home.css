@@ -134,7 +134,7 @@ html[data-theme="dark"] .app-offer .table.grouped { background: var(--dk-green);
    centred in the bezel. The bezel stays as it is, never pressed or dimmed. */
 .bar-button.is-reloading { position: relative; width: 50px; min-width: 50px; padding: 0; cursor: default; }
 .bar-button.is-reloading::after {
-  position: absolute; left: 14px; top: 4px; width: 20px; height: 20px; /* 15,5 less the 1px border */
+  content: ""; position: absolute; left: 14px; top: 4px; width: 20px; height: 20px; /* 15,5 less the 1px border */
   animation: hud-spin .96s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) { .bar-button.is-reloading::after { animation-duration: 3s; } }
@@ -142,7 +142,7 @@ html[data-theme="dark"] .app-offer .table.grouped { background: var(--dk-green);
 .home-commit:empty { display: none; }
 /* ==== look-only { ==== Reload's hidden title and spinner; the commit line */
 .bar-button.is-reloading { color: transparent; text-shadow: none; }
-.bar-button.is-reloading::after { content: ""; background: var(--spinner-white) center / 20px no-repeat; }
+.bar-button.is-reloading::after { background: var(--spinner-white) center / 20px no-repeat; }
 .home-version.home-commit { font-size: 13px; opacity: .8; }
 /* ==== } look-only ==== */
 

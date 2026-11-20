@@ -130,7 +130,9 @@ const capture = async (name) => {
   console.log("shot", name);
 };
 
+const ONLY = process.env.ONLY ? new RegExp(process.env.ONLY) : null; // C47: ONLY=<regex> shoots just the matching names
 const run = async (shell, theme, route) => {
+  if (ONLY && !ONLY.test(`${shell}-${theme.palette}-${route.replace(/\//g, "_")}`)) return;
   const script = await send("Page.addScriptToEvaluateOnNewDocument", { source: PREP(shell, theme) });
   const [path, ...steps] = route.split("+");
   const push = steps.includes("push");

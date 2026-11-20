@@ -26,8 +26,8 @@
 /* F215: the divider on top of the preview, dragged to move the split (screens/settings.js dragSplit). The strip is
    taller than it looks to the finger: 12px more above it. */
 .theme-preview-grip { position: relative; flex: none; height: 25px; touch-action: none; cursor: row-resize; }
-.theme-preview-grip::before { position: absolute; left: 0; right: 0; top: -12px; bottom: 0; }
-.theme-preview-grip::after { position: absolute; left: calc(50% - 21.5px); top: 0; width: 43px; height: 17px; }
+.theme-preview-grip::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; bottom: 0; }
+.theme-preview-grip::after { content: ""; position: absolute; left: calc(50% - 21.5px); top: 0; width: 43px; height: 17px; }
 .theme-preview-bar { position: relative; display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 5px; }
 .theme-preview-bar .nav-title { flex: 1; }
 .theme-preview-seg { margin: 10px; }
@@ -61,8 +61,7 @@
   --preview-grip-radius: 0 0 3px 3px;
 }
 .theme-preview { background: var(--preview-ground); box-shadow: var(--preview-shadow); }
-.theme-preview-grip::before { content: ""; }
-.theme-preview-grip::after { content: "";
+.theme-preview-grip::after {
   border-radius: var(--preview-grip-radius); box-shadow: var(--preview-grip-edge);
   background: var(--preview-grip);
   background-repeat: no-repeat; }

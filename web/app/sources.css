@@ -18,7 +18,7 @@
   position: relative; width: min(340px, 100%); max-width: 100%; min-width: 0; padding: 16px 12px 11px;
   transition: translate .3s cubic-bezier(.25,.1,.25,1); /* glides above the keyboard (nav/alert.js) instead of jumping */
 }
-.alert::before { position: absolute; left: 0; right: 0; top: 0; height: 31px; pointer-events: none; }
+.alert::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 31px; pointer-events: none; }
 .alert-title { position: relative; margin: 0 0 6px; overflow-wrap: anywhere; word-break: break-word; }
 .alert-message { position: relative; margin: 0 0 10px; overflow-wrap: anywhere; word-break: break-word; white-space: pre-line; } /* \n breaks lines, as in Cydia's About */
 .alert-field {
@@ -40,7 +40,7 @@
   box-shadow: 0 8px 19px rgba(0,0,0,.9);
 }
 .alert::before { /* "gloss" */
-  content: ""; border-radius: 8px 8px 0 0;
+  border-radius: 8px 8px 0 0;
   background: radial-gradient(ellipse 150% 100% at 50% 0, rgba(255,255,255,.5), rgba(255,255,255,.25) 99%, transparent 100%);
 }
 .alert-title { font-size: 18px; line-height: 22px; font-weight: bold; }
@@ -106,9 +106,9 @@
   position: absolute; left: 7px; top: 50%; width: 29px; height: 29px; margin-top: -14.5px; padding: 0;
   cursor: pointer; transform: translateX(-40px); transition: transform .3s ease-in-out;
 }
-.del-toggle::before { position: absolute; inset: 0; box-sizing: border-box; }
+.del-toggle::before { content: ""; position: absolute; inset: 0; box-sizing: border-box; }
 .del-toggle::after { /* the white bar, drawn apart from the disc so it can turn */
-  position: absolute; left: 8px; right: 8px; top: 13px; height: 3px; transition: transform .25s ease-in-out;
+  content: ""; position: absolute; left: 8px; right: 8px; top: 13px; height: 3px; transition: transform .25s ease-in-out;
 }
 /* 120 Hz (AGENTS.md): only transform and opacity animate. The content's width snaps to its new size at once (the text
    ellipsizes there in one step) while the transform slides it; what sits on the right is held where it shows:
@@ -147,11 +147,11 @@
 /* ==== look-only { ==== the minus, the faded chevron, Delete and a row going away */
 .del-toggle { border: 0; background: none; }
 .del-toggle::before { /* UIRemoveControlMinus: 2pt white rim, glossy top half, flat red bottom, soft shadow */
-  content: ""; border-radius: 50%; border: 2px solid #fff;
+  border-radius: 50%; border: 2px solid #fff;
   background: linear-gradient(#dd878d, #c73742 50%, #bd1421 50%, #bd1421); background-origin: border-box;
   box-shadow: 0 1.5px 2px rgba(0,0,0,.45);
 }
-.del-toggle::after { content: ""; border-radius: 1px; background: #fff; box-shadow: 0 -.5px 0 rgba(0,0,0,.2); }
+.del-toggle::after { border-radius: 1px; background: #fff; box-shadow: 0 -.5px 0 rgba(0,0,0,.2); }
 .editing .source-row .cell-inner.chevron::after { opacity: 0; }
 .del-confirm { /* UIRemoveControlRed: dark top edge, gloss over the top half, flat red, dark red bottom edge */
   border-radius: 6px;

@@ -796,45 +796,39 @@ html[data-theme="light"][data-palette="metal"] {
   --lt-red-pressed: linear-gradient(#b28b8e, #70272d);
 }
 
-/* The light palettes' chrome: ios6.css's nav bar, bar buttons and back arrow, with their colours from the --lt-*
-   tokens above (shapes, borders and shadows unchanged; the blue Done stays the kit's, as on iOS 6). Each new light
-   palette adds its name to this list. */
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) { background: var(--lt-ground); }
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .navbar { background: var(--lt-nav-bar); }
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button:not(.back):not(.done) {
-  border-color: var(--lt-btn-edge); border-top-color: var(--lt-btn-edge-top);
-  background: var(--lt-btn); background-origin: border-box;
+/* The light palettes' chrome: ios6.css's nav bar, bar buttons and back arrow (--nav-bar, --bar-btn*, --bar-back*)
+   and packages.css's search bar, scope bar, Cancel and package header band (--search-*, --scope-seg*, --store-head*)
+   read look tokens, and here they take the --lt-* colours above, so no rule of this file paints that chrome and an
+   era's own rules and tokens are never outranked by one (docs/eras.md). Shapes and shadows stay theirs; a pressed
+   button, Cancel or scope segment keeps its unpressed edges, and the scope bar draws its segments as bar buttons
+   (one edge colour all round, dividers included); the blue Done and Filter's Done, and the red button (ios6.css, from
+   the --lt-red* each block sets), are their own rules. html stays at two attributes, the weight of an era's tone
+   block (html[data-style][data-theme]), which is linked after this file and so wins. Each new light palette adds
+   its name to this list. */
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) {
+  background: var(--lt-ground);
+  --nav-bar: var(--lt-nav-bar);
+  --bar-btn: var(--lt-btn);
+  --bar-btn-edge: var(--lt-btn-edge); --bar-btn-edge-top: var(--lt-btn-edge-top);
+  --bar-btn-pressed: var(--lt-btn-pressed);
+  --bar-btn-pressed-edge: var(--lt-btn-edge); --bar-btn-pressed-edge-top: var(--lt-btn-edge-top);
+  --bar-back: var(--lt-back);
+  --bar-back-pressed: var(--lt-back-pressed);
+  --search-bar: linear-gradient(var(--lt-search-line), var(--lt-search-line)) bottom / 100% 1px no-repeat, var(--lt-search-bar);
+  --search-bar-scoped: var(--lt-search-bar);
+  --search-scope: linear-gradient(var(--lt-search-line), var(--lt-search-line)) bottom / 100% 1px no-repeat, var(--lt-scope-fill);
+  --search-field-edge: var(--lt-field-edge); --search-field-edge-top: var(--lt-field-edge-top);
+  --search-cancel: var(--lt-btn); --search-cancel-pressed: var(--lt-btn-pressed);
+  --search-cancel-edge: var(--lt-btn-edge); --search-cancel-edge-top: var(--lt-btn-edge-top); --search-cancel-edge-bottom: var(--lt-btn-edge);
+  --scope-seg: var(--lt-btn);
+  --scope-seg-edge: var(--lt-btn-edge); --scope-seg-edge-top: var(--lt-btn-edge-top); --scope-seg-edge-bottom: var(--lt-btn-edge);
+  --scope-seg-divider: var(--lt-btn-edge);
+  --scope-seg-selected: var(--lt-btn-pressed);
+  --scope-seg-selected-edge: var(--lt-btn-edge); --scope-seg-selected-edge-top: var(--lt-btn-edge-top);
+  --scope-seg-selected-edge-bottom: var(--lt-btn-edge); --scope-seg-selected-divider: var(--lt-btn-edge);
+  --store-head: var(--lt-store-head); --store-head-edge: var(--lt-store-edge);
 }
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button:not(.back):not(.done):is(:active, .is-pressed) {
-  background: var(--lt-btn-pressed); background-origin: border-box;
-}
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button.back { border-image-source: var(--lt-back); }
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button.back:is(:active, .is-pressed) {
-  border-image-source: var(--lt-back-pressed);
-}
-/* packages.css's search bar, its scope bar and segments (as bar buttons), and its Cancel */
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .search-bar {
-  background: linear-gradient(var(--lt-search-line), var(--lt-search-line)) bottom / 100% 1px no-repeat, var(--lt-search-bar);
-}
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .search-bar.has-scope { background: var(--lt-search-bar); }
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .search-scope {
-  background: linear-gradient(var(--lt-search-line), var(--lt-search-line)) bottom / 100% 1px no-repeat, var(--lt-scope-fill);
-}
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .search-field {
-  border-color: var(--lt-field-edge); border-top-color: var(--lt-field-edge-top);
-}
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) :is(.scope-segment, .scope-filter:not(.done), .search-cancel) {
-  border-color: var(--lt-btn-edge); border-top-color: var(--lt-btn-edge-top);
-  background: var(--lt-btn); background-origin: border-box;
-}
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) :is(.scope-segment.selected, .scope-segment:active, .scope-filter:not(.done):is(.selected, :active), .search-cancel:active) {
-  background: var(--lt-btn-pressed); background-origin: border-box;
-}
-/* packages.css's package-page header band and ios6.css's App Store segmented control (its blue selected segment
-   stays the kit's) */
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .store-head {
-  background: var(--lt-store-head); border-bottom-color: var(--lt-store-edge);
-}
+/* ios6.css's App Store segmented control (its blue selected segment stays the kit's): rules until it has tokens */
 html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .store-segmented { border-color: var(--lt-seg-edge); }
 html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .store-segment:not(.selected) {
   color: var(--head); background: var(--lt-seg); background-origin: border-box;
@@ -846,24 +840,17 @@ html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], 
 
 /* F218: the red bar button (ios6.css .bar-button.red, Confirm's Cancel). Palettes with a published red use it in the
    UIKit art's steps (light: top 46% toward white, edge 74%; dark: gloss 39% / 6% toward white over the flat red, edge
-   55%; pressed darker the same way); the others keep UIKit's red, as they keep the kit's blue Done. The light rule
-   beats the bar-button rule above; the dark palettes only set tokens, which ios6.css's dark rule reads. The tokens
-   sit at the end of each palette's block (Sepia sets UIKit's, since every light palette sets every --lt-*). */
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button.red:not(.back):not(.done) {
-  border-color: var(--lt-red-edge); border-top-color: var(--lt-red-edge-top);
-  background: var(--lt-red); background-origin: border-box;
-}
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button.red:not(.back):not(.done):is(:active, .is-pressed) {
-  border-color: var(--lt-red-pressed-edge); border-top-color: var(--lt-red-pressed-edge-top);
-  background: var(--lt-red-pressed); background-origin: border-box;
-}
+   55%; pressed darker the same way); the others keep UIKit's red, as they keep the kit's blue Done. Both tones only
+   set tokens (--lt-red* / --dk-red*), which ios6.css's red rules read. The tokens sit at the end of each palette's
+   block (Sepia sets UIKit's, since every light palette sets every --lt-*). */
 
 /* F325: Brushed Metal's silver bars take dark etched text (white emboss below) on the title and on the silver
-   buttons; the blue Done and the red button keep their white text. */
-html[data-theme="light"][data-palette="metal"] :is(.nav-title, .bar-button:not(.done):not(.red), .scope-segment, .scope-filter:not(.done), .search-cancel) {
+   buttons; the blue Done, the red button and My IPAs' red Delete keep their white text, and so does the console
+   (queue.css: its own black bar and grey buttons in every theme). */
+html[data-theme="light"][data-palette="metal"] :is(.nav-title, .bar-button:not(.done):not(.red):not(.manage-delete), .scope-segment, .scope-filter:not(.done), .search-cancel):not(.console *) {
   color: #2f343b; text-shadow: 0 1px 0 rgba(255,255,255,.7);
 }
 /* and their glyph buttons (Share, the Installed mark, the queue toggle: white glyphs) darkened the same way */
-html[data-theme="light"][data-palette="metal"] .bar-button.bar-icon:not(.done)::before {
+html[data-theme="light"][data-palette="metal"] .bar-button.bar-icon:not(.done):not(.console *)::before {
   filter: brightness(.2) drop-shadow(0 1px 0 rgba(255,255,255,.7));
 }

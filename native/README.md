@@ -4,7 +4,7 @@ A Swift shell around one WKWebView that shows `web/app/` from the app bundle (do
 
 - `Sources/App.swift`: app, scene and the web view. Navigation is web/app/'s own JS stack and edge swipe (R3 (a)).
   The shell switches off WebKit's `PreferPageRenderingUpdatesNear60FPSEnabled` and WebKit's history swipe.
-- `Sources/Bridge.swift`: the `ifizbox` message handler (`ping`, `app.info`, `app.theme`: the Appearance setting drives the window's interface style, F23), the `ifizbox://app/` scheme
+- `Sources/Bridge.swift`: the `ifizbox` message handler (`app.info`, `app.theme`: the Appearance setting drives the window's interface style, F23), the `ifizbox://app/` scheme
   serving `iFizBox.app/web/`, and the private WebKit feature switch.
 - `Sources/Apt.swift` (N3): the calls behind `web/app/backend-native.js`: `apt.sources`, `apt.list`, `apt.dpkgStatus`
   (apt's and dpkg's files under the jailbreak prefix), `net.fetch`/`net.packages` (repos fetched by the shell; .xz and

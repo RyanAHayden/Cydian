@@ -75,7 +75,7 @@ import { recordInstall, unrecordedSigned, sourceRecordFor } from "../core/instal
 import { mediaUrl } from "./depiction.js";
 import { rememberedApps } from "../app-updates.js";
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
-import { settings } from "./settings.js";
+import { settings } from "../settings-store.js";
 import { wishRows, wishCount, WISH_EMPTY } from "../core/wishlist.js";
 import { compareNames, indexLetter } from "../core/catalog.js";
 import { NAME } from "../brand.js";

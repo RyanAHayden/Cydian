@@ -14,7 +14,7 @@ import { detectMode } from "../core/settings.js";
 import { showAlert } from "../nav/alert.js";
 import { websiteInstallsOn, setWebsiteInstalls, acceptWebsiteInstalls, firstVisitState, setFirstVisit,
   browsingLocked, askToBrowse } from "../websign-gate.js";
-import { createSwitch } from "./settings.js";
+import { createSwitch } from "../nav/switch.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 

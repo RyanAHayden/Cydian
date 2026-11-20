@@ -21,7 +21,7 @@ import { encodeLink, decodeLink, reviewLink, toB64url, fromB64url } from "../cor
 import { toBase64 } from "../core/signing.js";
 import { getBackend } from "../backend.js";
 import { loadIdentity, saveIdentity } from "../signing/identity.js";
-import { settings } from "./settings.js";
+import { settings } from "../settings-store.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 

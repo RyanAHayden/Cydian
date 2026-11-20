@@ -26,7 +26,8 @@ import { insecureNote } from "../core/sources.js"; // F220
 import { renderSileo, mediaUrl, reviewBody } from "./depiction.js";
 import { piracyBanner } from "./depiction.js";
 import { packageWarning } from "../core/warnings.js";
-import { settings, createSwitch } from "./settings.js";
+import { settings } from "../settings-store.js";
+import { createSwitch } from "../nav/switch.js";
 import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js";
 import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";

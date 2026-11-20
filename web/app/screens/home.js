@@ -19,7 +19,7 @@ import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { popupOpen, whenNoPopup } from "../nav/popups.js";
 import { sourceKey, sourcesFor } from "../core/sources.js";
-import { settings } from "./settings.js";
+import { settings } from "../settings-store.js";
 import { pullToRefresh } from "../nav/pullrefresh.js";
 import { go as navGo } from "../nav/go.js";
 import { lazyNs, load } from "../lazy.js";

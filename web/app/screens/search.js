@@ -14,7 +14,8 @@
 import * as browse from "./browse.js";
 import { catalog, ALL } from "../catalog.js";
 import { compatFilterOn } from "../device.js";
-import { settings, createSwitch } from "./settings.js";
+import { settings } from "../settings-store.js";
+import { createSwitch } from "../nav/switch.js";
 import { SECTION_GROUPS, searchable } from "../core/catalog.js";
 import { displayName, sourcesFor } from "../core/sources.js";
 import { tweakSourcesOn } from "../core/sources.js"; // F305

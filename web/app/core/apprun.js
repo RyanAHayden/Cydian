@@ -100,6 +100,13 @@ export const copyingText = (row) => `Copying ${label(row)} to this iPhone`;
 // can't tell which, so it doesn't say Cancelled.
 export const DIDNT_DOWNLOAD = "iOS didn't download it";
 
+// B139: only the user's Cancel or a row's stop marks an app Cancelled (cancelRow). A call that answers "cancelled"
+// when neither was tapped (the shell's job for it was stopped from elsewhere) fails the row with these words instead,
+// and the next app goes on.
+export const NOT_YOU = "stopped before it finished (not by Cancel)";
+const errorText = (e) => (e?.code === "cancelled" || /^cancel+ed$/i.test(String(e?.message ?? "").trim())
+  ? NOT_YOU : e?.message || String(e));
+
 const label = (r) => r.name || r.id;
 const pct = (f) => Math.round((Number(f) || 0) * 100);
 
@@ -200,7 +207,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       res = await sign(r, { signal: f.ctl.signal, progress: progressOf(r, f) });
     } catch (e) {
       if (f.why || ended(r)) return; // stopped, cancelled or timed out: its row says so already
-      fail(r, e?.message || String(e));
+      fail(r, errorText(e));
       return;
     }
     if (f.why || ended(r)) { if (res?.token) { try { discard({ ...r, token: res.token }); } catch { /* runs out */ } } return; }
@@ -229,7 +236,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
         pump();
         return;
       }
-      fail(r, e?.message || String(e));
+      fail(r, errorText(e));
       return;
     }
     if (f.why || ended(r)) return;

@@ -153,6 +153,9 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { dropCover() }
+    // F287: a page that loads again (a reload, WebKit's content process restarting) holds no job yet; on commit,
+    // before its scripts run, so a job the new page starts keeps its hold
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) { KeepAwake.reset() }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { dropCover() }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         dropCover()

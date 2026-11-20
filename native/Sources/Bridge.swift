@@ -65,6 +65,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         ShareBridge.register(self) // N9: share.*, what the share sheet and Open in iFizBox handed over (share/App/)
         AccountKey.register(self) // F97: account.key.*, the iFizBox Account key in the Keychain (Account.swift)
         ASC.register(self) // asc.*: the App Store Connect key and the profiles iFizBox makes with it (ASC.swift)
+        KeepAwake.register(self) // F287: app.keepAwake, the screen stays on while work runs (KeepAwake.swift)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }

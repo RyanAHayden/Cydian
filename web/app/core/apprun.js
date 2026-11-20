@@ -39,6 +39,8 @@
 //     .rows / .running / .stopping / .current (the row with iOS) / .pass (B153: how many times it started)
 //   onStart(pass)  B153: start() of an idle run (the first, or a retry, Retry All or ownIdRetry after the run ended)
 //                 begins pass n: the page clears its log, so a new pass never shows the last one's lines
+//   keepAwake(on)  F287: true when a pass starts, false once every row has ended (installed, failed, stopped or
+//                 cancelled), exactly once each: the backend's keepAwake keeps the screen from locking meanwhile
 //
 // B76: a stock phone can't watch iOS's install once iFizBox is in the background, so installed: false after a handoff
 // (handedOff, or .away() during the watch) means "lost sight", not "refused": the row ends Done as sent (unsure) and
@@ -169,7 +171,8 @@ export function stallText(row, limit = APP_STALL) {
 }
 
 export function createAppRun({ rows, sign, install, discard = () => {}, reprompt = null, ahead = 2, stallMs = APP_STALL,
-  later = setTimeout, clear = clearTimeout, onChange = () => {}, onLog = () => {}, local = () => false, onStart = () => {} }) {
+  later = setTimeout, clear = clearTimeout, onChange = () => {}, onLog = () => {}, local = () => false, onStart = () => {}, keepAwake = () => {} }) {
+  const awake = (on) => { try { Promise.resolve(keepAwake(on)).catch(() => {}); } catch { /* the screen may lock */ } }; // F287
   const flights = new Map(); // id -> { ctl: AbortController, timer, why }
   let running = false;
   let pass = 0; // B153: each start() of an idle run is a new pass (onStart(pass)), so its page starts a clean log
@@ -354,6 +357,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       const done = resolveEnd;
       resolveEnd = null;
       endPromise = null;
+      awake(false);
       done?.();
     }
   }
@@ -365,6 +369,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     endPromise = new Promise((res) => { resolveEnd = res; });
     const p = endPromise;
     pass++;
+    awake(true);
     try { onStart(pass); } catch { /* the page's bug isn't the run's */ }
     // a microtask later, so the caller can draw the rows first
     Promise.resolve().then(pump);

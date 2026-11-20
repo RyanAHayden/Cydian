@@ -71,6 +71,7 @@ import { apps, appRows, appUpgrades, removeInstall, onAppsChange, MODES, MODE_LA
   dayHeaders, dayLabel, markedRows, manageKinds, manageable, presetIds, selectSheet, selectLabel, manageCounts, manageSummary,
   manageToolbar, pruneSelection, SELECT } from "../core/installed.js";
 import { signedAppsNamed } from "../core/installed.js"; // B150
+import { recordInstall, unrecordedSigned, sourceRecordFor } from "../core/installed.js"; // B156
 import { mediaUrl } from "./depiction.js";
 import { rememberedApps } from "../app-updates.js";
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
@@ -609,6 +610,27 @@ async function signedApps(native = globalThis.ifizboxNative) {
   try { return await signedAppsNamed(native); } catch { return null; } // B150: a source app keeps its source name
 }
 
+// B156: a signed app no record stands for whose IPA a source offers (core/installed.js sourceRecordFor) gets its
+// record back, so it reads its source and sorts under its letter; recordInstall's onAppsChange draws the list again.
+// `pkgsOf(id)`: the catalog's packages for an ID on every source. -> the records written
+export async function restoreSourceRecords(signed, records, { pkgsOf = catalogPkgs, record = async (rec) => recordInstall(await apps(), rec, rec.date) } = {}) {
+  const out = [];
+  for (const a of unrecordedSigned(signed, records)) {
+    const ids = [...new Set([a.originalBundleId, a.bundleId].filter(Boolean))];
+    const pkgs = (await Promise.all(ids.map((id) => pkgsOf(id).catch(() => [])))).flat();
+    const rec = sourceRecordFor(a, pkgs);
+    if (!rec) continue;
+    try { out.push(await record(rec)); } catch { /* no store: the row stays signed-only */ }
+  }
+  return out;
+}
+async function catalogPkgs(id) {
+  const first = await catalog.package(id, ALL);
+  if (!first?.stanza?.ipa) return [];
+  const others = await Promise.all((first.others ?? []).map((o) => catalog.package(id, o.key).catch(() => null)));
+  return [first, ...others.filter((p) => p?.stanza?.ipa)];
+}
+
 async function loadApps() {
   const seq = ++appView.seq;
   if (recordsApps()) loadIpaCounts(); // F269: the Install IPAs row's counts, painted in when they come
@@ -628,6 +650,7 @@ async function loadApps() {
   if (seq !== appView.seq) return;
   if (!recordsApps()) rows = rows.filter((r) => !r?.self); // iFizBox's own row is dpkg's there
   appView.signed = signed; // F91
+  if (signed && recordsApps()) restoreSourceRecords(signed, rows).catch(() => {}); // B156
   drawApps(appListRows(rows, () => null), new Map(), site, hasStatus);
   const ids = await installedIds;
   if (seq !== appView.seq) return;

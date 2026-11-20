@@ -120,9 +120,21 @@ export function helperLanes({ backend, install, needs, native } = {}) {
 // Also asked when such a row ends while iFizBox is in front. -> { check, stop }
 // B136: `answered(row, onPhone)` hears iOS's answer for each row asked (true, false, or null when iOS gave none), so
 // the run records an app only once iOS has it (core/apprun.js recordWhen).
-export function followHandoff(run, rows, { isInstalled, doc = globalThis.document, answered = () => {} } = {}) {
+// B156: a "no" can come while iOS is still installing (the icon still loading on the home screen), and nothing asked
+// again, so the app was never recorded. A row iOS said no to is asked again every `retryMs`, `tries` times, while
+// iFizBox is in front; stop() ends it.
+export function followHandoff(run, rows, { isInstalled, doc = globalThis.document, answered = () => {}, retryMs = 5000, tries = 12,
+  later = (f, ms) => { const t = setTimeout(f, ms); t?.unref?.(); return t; }, clear = (t) => clearTimeout(t) } = {}) {
   const hidden = () => doc?.visibilityState === "hidden";
   let asking = false;
+  let timer = null;
+  let left = tries;
+  let stopped = false;
+  const again = () => {
+    if (stopped || timer || left <= 0) return;
+    left--;
+    timer = later(() => { timer = null; check(); }, retryMs);
+  };
   const check = async () => {
     if (!isInstalled || asking || hidden()) return;
     const sent = rows.filter((r) => r.state === "installed" && r.unsure && r.mode !== "resign" && r.bundleId && !isSelf(r));
@@ -131,15 +143,22 @@ export function followHandoff(run, rows, { isInstalled, doc = globalThis.documen
     let answer = {};
     try { answer = (await isInstalled(sent.map((r) => r.bundleId))) ?? {}; } catch { /* unknown: they stay sent */ }
     asking = false;
+    let no = false;
     for (const r of sent) {
       const v = answer[r.bundleId];
       if (v === true) run.confirm(r.id);
+      if (v === false) no = true;
       try { answered(r, typeof v === "boolean" ? v : null); } catch { /* the page's bug isn't the check's */ }
     }
+    if (no) again(); // B156
   };
   const onVisibility = () => { if (hidden()) run.away(); else check(); };
   doc?.addEventListener?.("visibilitychange", onVisibility);
-  return { check, stop: () => doc?.removeEventListener?.("visibilitychange", onVisibility) };
+  return { check, stop: () => {
+    stopped = true;
+    if (timer) { clear(timer); timer = null; }
+    doc?.removeEventListener?.("visibilitychange", onVisibility);
+  } };
 }
 
 // jobs: the app queue's (core/appqueue.js). deps: { queue, lanes ({ sign, install, discard }, phoneLanes's),

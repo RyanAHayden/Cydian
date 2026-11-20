@@ -34,6 +34,11 @@ Three things lined up, all in code that assumed the kept pairing and port 49152 
   `recheckPairing` verifies a kept pairing once (only with the VPN route on); when the phone no longer accepts it,
   the pairing is forgotten and Pairing opens and pairs again (redraws if already there). Other failures (VPN off,
   timeout) say nothing there; Check Connection explains them.
+- After the spec review: `recheckPairing` also runs after picking This iPhone again (Install Apps With) and after a
+  Connect With pick, so setting local signing up again checks the kept pairing too; a refusal is verified once more
+  after 3 s before the pairing is forgotten (remotepairingd restarting after a VPN restart refuses for a moment);
+  `findRemotePairingPort` falls back to a port that didn't answer, never to one that refused, and keeps the watchdog
+  alive per probe (a Tailscale probe can wait up to 13 s); Tailscale's test catches only `refused`.
 - The last good port is kept in memory only: `test_idevice.py` forbids UserDefaults in IDevice.swift (nothing of
   the route outside the Keychain), and a fresh run tries 49152 then mDNS anyway.
 

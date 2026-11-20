@@ -443,17 +443,17 @@ enum IDevice {
     }
 
     /// The port this phone answers RemotePairing on, by `probe` (a TCP connect over the route in use). Throws
-    /// "refused" when every candidate refused; with no answer at all it returns the first known port, and the connect
-    /// says what's wrong (the VPN off, a tailnet rule). Blocking.
+    /// "refused" when every candidate refused; otherwise the first port that didn't answer (a refused one can't be
+    /// it), and the connect says what's wrong (the VPN off, a tailnet rule). Blocking.
     static func findRemotePairingPort(probe: (UInt16) -> VPNCheck.Probe) throws -> UInt16 {
-        var tried: [UInt16] = [], refused: [UInt16] = []
+        var tried: [UInt16] = [], refused: [UInt16] = [], silent: [UInt16] = []
         func attempt(_ ports: [UInt16]) -> UInt16? {
             for p in ports where !tried.contains(p) {
                 tried.append(p)
                 switch probe(p) {
                 case .connected: return p
                 case .refused: refused.append(p)
-                case .silent: break
+                case .silent: silent.append(p)
                 }
             }
             return nil
@@ -469,7 +469,8 @@ enum IDevice {
             if p != lastRemotePairingPort { lastRemotePairingPort = p; ilog("RemotePairing is on port \(p)") }
             return p
         }
-        guard !refused.isEmpty, refused.count == tried.count else { return known[0] }
+        // A port that didn't answer may still be the one (a slow route); one that refused isn't
+        if let p = silent.first { return p }
         throw Failure(code: "refused", text: "this iPhone refused RemotePairing on port \(refused.map(String.init).joined(separator: ", ")): it no longer has this pairing. Pair again")
     }
 
@@ -595,7 +596,11 @@ enum IDevice {
                 // B220: the port it listens on now, by a probe over the same route (Tailscale's node is up by now)
                 watch.begin("finding RemotePairing's port through \(via)", Limit.tunnel)
                 let tailnet = viaTailscale
-                let rpPort = try IDevice.findRemotePairingPort { tailnet ? Tailscale.probe($0) : VPNCheck.probe($0) }
+                let w = watch
+                let rpPort = try IDevice.findRemotePairingPort { p in
+                    w.alive("probing port \(p)") // each probe gets the step's whole limit
+                    return tailnet ? Tailscale.probe(p) : VPNCheck.probe(p)
+                }
                 if rpPort != remotePairingPort {
                     if tailnet {
                         let local = Tailscale.mapPort(rpPort)

@@ -236,7 +236,11 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       refreshing: { device: devWait && cached, tailscale: tsWait && Boolean(view?.tailscale) }, late, testing,
       connectPick, connectBusy, hint: lastStatus, server, picking: devWait && picked === choice,
       // the store's set redraws Settings' pages (this one too); a store that doesn't, redraws it here
-      pick: (v) => { if (v === choice && !picked) return; picked = v; pickRoute(v, { set: (r) => store.set(ROUTE_KEY, r) }); if (mine()) redraw(); },
+      pick: (v) => {
+        if (v === choice && !picked) return;
+        picked = v; pickRoute(v, { set: (r) => store.set(ROUTE_KEY, r) }); if (mine()) redraw();
+        if (v === "iphone" && v !== choice) recheckPairing(native, alert, redraw); // B220: set up again, the kept pairing checked
+      },
       openVPN: () => openVPN(native, alert),
       // F300: checked at once with the spinner in its row (no HUD), until setConnect and then the status answer.
       // F301: setConnect answers with tailscale.status, which fills the Tailscale part at once.
@@ -249,6 +253,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
         try { ts = await within(call(native, "tailscale.setConnect", { value: v }), TIMEOUTS.tailscale).catch(() => null); } finally { connectBusy = null; }
         if (ts && typeof ts === "object" && ts.connect && lastStatus) lastStatus = { ...lastStatus, tailscale: ts };
         redraw();
+        if (ts) recheckPairing(native, alert, redraw); // B220: a new way in, the kept pairing checked over it
       },
       signIn: () => tailscaleSignIn(native, alert, redraw),
       test: async () => {
@@ -396,23 +401,29 @@ async function tailscaleSignIn(native, alert, redraw, done = `${NAME} is on your
 // After a sign-in the kept pairing is checked once (the VPN route on); when the phone no longer accepts it
 // (verifyFailure's `unusable`: refused, or turned down) it is forgotten and the pair step runs again on Pairing. Other
 // failures (the VPN off, no answer) say nothing here: Check Connection explains them.
-export const recheckHooks = { goPair: () => goTo("pair") }; // tests
+// A refusal is tried again once after `retryMs` before the pairing is forgotten: remotepairingd restarting (the VPN
+// just came back) refuses for a moment, and redoing the pair step costs the user the 6-digit code.
+export const recheckHooks = { goPair: () => goTo("pair"), retryMs: 3000 }; // tests
 export async function recheckPairing(native, alert, redraw) {
   const st = await status(native);
   if (!st?.paired || !vpnOn(st)) return "skipped";
-  try {
-    await busy("Checking Pairing", () => within(call(native, "idevice.verify"), TIMEOUTS.verify));
-    return "ok";
-  } catch (e) {
-    const why = isLate(e) ? null : verifyFailure(e);
-    if (!why?.unusable) return "failed";
-    await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
-    forgetStatus();
-    if (visit) visit.started = false;
-    await alert({ title: why.title, message: `This iPhone no longer accepts ${NAME}'s pairing, so every connection was refused. Pairing starts again now.`, buttons: ["OK"] });
-    if (typeof location !== "undefined" && onPairPage()) redraw(); else recheckHooks.goPair();
-    return "repair";
-  }
+  const verify = async () => {
+    try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); return null; } catch (e) { return isLate(e) ? { late: true } : verifyFailure(e); }
+  };
+  const why = await busy("Checking Pairing", async () => {
+    const first = await verify();
+    if (!first?.unusable) return first;
+    await new Promise((r) => setTimeout(r, recheckHooks.retryMs));
+    return verify();
+  });
+  if (!why) return "ok";
+  if (!why.unusable) return "failed";
+  await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
+  forgetStatus();
+  if (visit) visit.started = false;
+  await alert({ title: why.title, message: `This iPhone no longer accepts ${NAME}'s pairing, so every connection was refused. Pairing starts again now.`, buttons: ["OK"] });
+  if (typeof location !== "undefined" && onPairPage()) redraw(); else recheckHooks.goPair();
+  return "repair";
 }
 
 // F301: the test runs with the spinner in its own row (installationGroups' `testing`, no HUD), at most TIMEOUTS.test;

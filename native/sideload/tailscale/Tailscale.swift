@@ -281,7 +281,7 @@ enum TailscaleBridge {
         // B220: the port RemotePairing listens on now (it isn't always 49152); every advertised port refused means
         // this phone no longer serves the pairing: the page says to pair again.
         let port: UInt16
-        do { port = try IDevice.findRemotePairingPort { Tailscale.probe($0, host: own) } } catch let e as IDevice.Failure {
+        do { port = try IDevice.findRemotePairingPort { Tailscale.probe($0, host: own) } } catch let e as IDevice.Failure where e.code == "refused" {
             Tailscale.log("test \(own): \(e.text)")
             return ["ok": false, "code": "refused", "detail": e.text, "address": own, "name": st["name"] ?? NSNull()]
         }

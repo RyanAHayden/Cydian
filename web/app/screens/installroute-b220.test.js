@@ -10,6 +10,7 @@ globalThis.document = fakeDocument();
 const { recheckPairing, recheckHooks, hudHooks, cachedStatus, rememberStatus } = await import("./installroute.js");
 hudHooks.show = () => () => {};
 hudHooks.delay = 0;
+recheckHooks.retryMs = 5;
 
 const PAIRED_TS = { paired: "rp", pairOnPhone: true, localDevVPN: false, otherVPN: true, tailscale: { connect: "auto", signedIn: true, address: "100.64.0.2", use: true } };
 const fail = (message, code) => Object.assign(new Error(message), { code });
@@ -31,7 +32,7 @@ test("refused on every port: the pairing is forgotten and Pairing opens to pair 
   rememberStatus(PAIRED_TS);
   const o = await run({ "idevice.status": PAIRED_TS, "idevice.verify": fail("refused: this iPhone refused RemotePairing on port 49152", "refused"), "idevice.forget": {} });
   assert.equal(o.r, "repair");
-  assert.deepEqual(o.calls, ["idevice.status", "idevice.verify", "idevice.forget"]);
+  assert.deepEqual(o.calls, ["idevice.status", "idevice.verify", "idevice.verify", "idevice.forget"], "tried again once first");
   assert.equal(o.alerts.length, 1);
   assert.match(o.alerts[0].message, /Pairing starts again/);
   assert.equal(o.wentToPair, 1);
@@ -42,6 +43,14 @@ test("a pairing the phone turns down is redone too", async () => {
   const o = await run({ "idevice.status": PAIRED_TS, "idevice.verify": fail("pairing_rejected: RemotePairing(PairVerifyFailed)", "pairing_rejected"), "idevice.forget": {} });
   assert.equal(o.r, "repair");
   assert.ok(o.calls.includes("idevice.forget"));
+});
+
+test("refused for a moment (remotepairingd restarting): the retry connects and the pairing stays", async () => {
+  let n = 0;
+  const o = await run({ "idevice.status": PAIRED_TS, "idevice.verify": () => (n++ ? { ok: true, kind: "rp" } : Promise.reject(fail("refused: port 49152", "refused"))) });
+  assert.equal(o.r, "ok");
+  assert.deepEqual(o.alerts, []);
+  assert.ok(!o.calls.includes("idevice.forget"));
 });
 
 test("a good pairing stays, with no alert", async () => {
@@ -67,4 +76,10 @@ test("Tailscale's sign-in checks the kept pairing once it's in", () => {
   const src = readFileSync(new URL("./installroute.js", import.meta.url), "utf8");
   const body = src.slice(src.indexOf("async function tailscaleSignIn"), src.indexOf("export const recheckHooks"));
   assert.match(body, /Signed In[\s\S]*await recheckPairing\(native, alert, redraw\)/);
+});
+
+test("picking This iPhone again, or a new Connect With, checks it too (setting up local signing again)", () => {
+  const src = readFileSync(new URL("./installroute.js", import.meta.url), "utf8");
+  assert.match(src, /if \(v === "iphone" && v !== choice\) recheckPairing\(native, alert, redraw\)/);
+  assert.match(src, /if \(ts\) recheckPairing\(native, alert, redraw\)/);
 });

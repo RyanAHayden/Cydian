@@ -187,12 +187,13 @@ export function lastSyncedText(t, now = Date.now()) {
   return m < 1 ? "Just now" : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
 }
 
-export function accountSection() {
+// B148: the detail is live (nav/pagestate.js liveText): Back from the Account page after Sign In or Sign Out says
+// On / Off in place.
+export const accountDetail = (acct = accountSync) => acct().status().then((s) => (s?.signedIn ? "On" : "Off"), () => "Off");
+export function accountSection({ acct = accountSync } = {}) {
   const box = document.createElement("div");
-  const fill = (detail) => box.replaceChildren(grouped([{ rows: [{ label: `${NAME} Account`, detail,
+  box.append(grouped([{ rows: [{ label: `${NAME} Account`, detail: "", live: () => accountDetail(acct),
     href: format(settingsRoute(["account"])), icon: rowIcon("account") }] }]));
-  fill("");
-  accountSync().status().then((s) => fill(s.signedIn ? "On" : "Off")).catch(() => fill("Off"));
   return box;
 }
 

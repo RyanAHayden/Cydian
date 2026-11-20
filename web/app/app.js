@@ -20,7 +20,7 @@ import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
 import { makeScrollToTop } from "./nav/statusbar.js";
-import { pageOpened } from "./nav/pagestate.js";
+import { pageOpened, pageShown } from "./nav/pagestate.js";
 import { createHomeTop, homeRootOf } from "./nav/hometop.js";
 import * as home from "./screens/home.js";
 import * as sources from "./screens/sources.js";
@@ -216,6 +216,10 @@ const router = createRouter({
     if (running) running.finish();
     const r = stacks.sync(route);
     const all = stacks.stack(r.tab);
+    // B148: a kept page on top again (Back, a tab switch) refreshes its state-made details in place; one just built is
+    // fresh. A swipe already did it when it began.
+    if (r.to && r.kind !== "none" && !r.added.includes(r.to) && r.to !== shownBySwipe) showAgain(r.to);
+    shownBySwipe = null;
     if (r.kind === "tab") {
       for (const t of BAR_TABS) {
         tabStacks[t].classList.toggle("is-active", t === r.tab);
@@ -275,6 +279,12 @@ function updateEdge() {
   edgeEl.classList.toggle("off", webBack || stacks.stack(stacks.activeTab()).length < 2);
 }
 
+// B148 (nav/pagestate.js pageShown): an existing page shown again refreshes what it read from state.
+let shownBySwipe = null; // the page a swipe already refreshed as it began to reveal it
+function showAgain(entry) {
+  pageShown(mounted({ tab: entry.tab, path: entry.path }), entry.page.body).catch(() => {});
+}
+
 let gesture = null; // the edge swipe in progress: { pair, top, below, width }
 attachEdgeSwipe(edgeEl, {
   canStart: () => !webBack && !running && !gesture && stacks.stack(stacks.activeTab()).length > 1,
@@ -283,6 +293,7 @@ attachEdgeSwipe(edgeEl, {
     const [top, below] = [all.at(-1), all.at(-2)];
     gesture = { pair: pairOf(top, below, true), top, below, width: screensEl.clientWidth };
     setMoving(gesture.pair, true, false);
+    if (shownBySwipe !== below) { shownBySwipe = below; showAgain(below); } // B148: right as it is revealed
     return gesture.width;
   },
   move(dx) {
@@ -299,7 +310,7 @@ attachEdgeSwipe(edgeEl, {
     const speed = Math.abs(vx) * DURATION / width; // full slides per DURATION at the finger's speed
     const duration = Math.max(120, Math.min(DURATION, rest * DURATION / Math.max(1, speed)));
     slide(top, below, p, commit ? 0 : 1, () => {
-      if (!commit) return;
+      if (!commit) { shownBySwipe = null; return; } // B148: a later Back to it refreshes again
       swipedBack = true;
       unselect(below); // faded out with the swipe
       setTop(below, true);

@@ -52,6 +52,8 @@ import { ROUTE_KEY } from "../core/installroute.js";
 import { mainPage } from "./installroute.js";
 import { certificateDetail } from "../core/installroute.js";
 import { signedAppRows } from "../core/signing.js";
+import { onPageShow, patchDetails, cellsOf } from "../nav/pagestate.js";
+import { refreshInstallation } from "./installroute.js";
 
 // F284: Installation & Signing's own sub-pages under signing/ (the main page's Signing rows), sideload build only.
 // How Signing Works stays signing/help.
@@ -191,6 +193,13 @@ function groupPage(id) {
   return frag;
 }
 
+// B148: a list row's detail (its choice) and Ignored Upgrades' count, as drawn and as refreshed on Back.
+export const listDetail = (d, store = settings) => optionLabel(d, store.get(d.key));
+export function holdsDetail(store = settings) {
+  const n = store.holds.list().length + Object.keys(store.ignoredVersions.all()).length; // F281: this version only too
+  return n ? String(n) : "None";
+}
+
 // Groups of setting rows on page `page`; a list row pushes <page>/<key>.
 function settingsGroups(list, page) {
   const switches = [];
@@ -211,10 +220,10 @@ function settingsGroups(list, page) {
         rows.push({ label: d.label, ...icon(d) });
       } else if (d.kind === "list") {
         if (d.needs) needs.push([rows.length, d]); // F244: shown only while its switch is on (Expiry Warning)
-        rows.push({ label: d.label, detail: optionLabel(d, settings.get(d.key)), href: format(settingsRoute([page, d.key])), ...icon(d) });
+        // B148: live, so Back from its list page shows the choice in place (nav/pagestate.js)
+        rows.push({ label: d.label, detail: listDetail(d), live: () => listDetail(d), href: format(settingsRoute([page, d.key])), ...icon(d) });
       } else if (d.kind === "holds") {
-        const n = settings.holds.list().length + Object.keys(settings.ignoredVersions.all()).length; // F281: this version only too
-        rows.push({ label: d.label, detail: n ? String(n) : "None", href: format(settingsRoute([page, "holds"])), ...icon(d) });
+        rows.push({ label: d.label, detail: holdsDetail(), live: () => holdsDetail(), href: format(settingsRoute([page, "holds"])), ...icon(d) });
       }
     }
     return { header: s.title, footer: s.footer, rows, id: s.id, switches: switches.splice(0), segs: segs.splice(0), needs: needs.splice(0) };
@@ -644,9 +653,12 @@ export function blockedLayout({ entries = [], authors = [], mode = "site" } = {}
 }
 
 // The General page's row: how many are blocked, pushing the list.
-function blockedSection() {
-  const n = settings.blocked.list().length + settings.blocked.authors().length;
-  return grouped([{ rows: [{ label: "Blocked", detail: n ? String(n) : "None", href: format(settingsRoute(["general", "blocked"])), icon: rowIcon("hidden") }] }]);
+export function blockedDetail(store = settings) {
+  const n = store.blocked.list().length + store.blocked.authors().length;
+  return n ? String(n) : "None";
+}
+function blockedSection() { // B148: live, so Back from Blocked shows the count in place
+  return grouped([{ rows: [{ label: "Blocked", detail: blockedDetail(), live: () => blockedDetail(), href: format(settingsRoute(["general", "blocked"])), icon: rowIcon("hidden") }] }]);
 }
 
 function blockedPage() {
@@ -1119,15 +1131,15 @@ function browseButton(accept, multiple, onFiles) {
 // F128: the root's Signing row, the certificate as its detail (the page explains the rest).
 // F271: named Installation & Signing where it opens the merged page, without the certificate as its detail (beside
 // the longer name it left "Installatio…" at 375pt; the page shows the certificate first thing).
-const signingRow = (box, detail) => box.replaceChildren(grouped([{ rows: [{ label: merged() ? MERGED_TITLE : "Signing", detail: merged() ? "" : detail,
-  href: format(settingsRoute(["signing"])), icon: rowIcon("signing") }] }]));
-function deviceSigningSection(box) {
-  const fill = (detail) => signingRow(box, detail);
-  fill("");
-  Promise.all([deviceStatus().catch(() => null), loadIdentity()]).then(([st, id]) => {
-    // F69: statusReady, the rule Install goes by: the row names a certificate only when Install will use it
-    fill(statusReady(st) ? (st.identity.name || "In Keychain") : id?.p12 || id?.profile ? "Incomplete" : "None");
-  });
+// B148: the detail is live (nav/pagestate.js liveText): Back from Signing after an import or a removal shows the
+// certificate now in use, in place. The merged row has no detail, so nothing to follow.
+const signingRow = (box, detail) => box.replaceChildren(grouped([{ rows: [{ label: merged() ? MERGED_TITLE : "Signing", detail: "",
+  ...(merged() ? {} : { live: detail }), href: format(settingsRoute(["signing"])), icon: rowIcon("signing") }] }]));
+// F69: statusReady, the rule Install goes by: the row names a certificate only when Install will use it
+export const deviceSigningDetail = (st, id) => (statusReady(st) ? (st.identity.name || "In Keychain") : id?.p12 || id?.profile ? "Incomplete" : "None");
+const readDeviceSigning = () => Promise.all([deviceStatus().catch(() => null), loadIdentity()]);
+export function deviceSigningSection(box, read = readDeviceSigning) {
+  signingRow(box, () => read().then(([st, id]) => deviceSigningDetail(st, id)));
   return box;
 }
 
@@ -1301,6 +1313,36 @@ function drawMain(el) {
     el.replaceChildren(m.el);
   }
   m.refresh();
+}
+
+// B148: a Settings page shown again (Back to it) refreshes in place what it read from state when it was drawn. Rows
+// with a `live` detail (the root's iFizBox Account and Signing, list rows' choices, Ignored Upgrades, Blocked) follow
+// on their own (nav/pagestate.js liveText); these pages refresh their own:
+//   Installation & Signing   the main page's refresh() (F284: every slot in place)
+//   This iPhone              idevice.status again, its rows' details patched (installroute.js refreshInstallation)
+//   Certificate              the certificate and profile rows' details from signing.status again
+const patchEl = (el, rows) => patchDetails(cellsOf(el), rows);
+export function settingsShown(route, el, { main = (e) => mainKept.get(e), installation = refreshInstallation, certificate = refreshCertificate,
+  isMerged = merged } = {}) {
+  const [first, second] = pathOf(route);
+  if (opensMerged([first, second], isMerged())) return main(el)?.refresh();
+  if (first === INSTALLATION && second && second !== "pair") return installation(el, second, { store: settings, patch: patchEl });
+  if (opensSigningSub([first, second], isMerged()) && second === "certificate") return certificate(el);
+  return undefined;
+}
+onPageShow((r) => r.tab === "settings", (route, el) => settingsShown(route, el));
+
+// The Certificate page's rows as drawDeviceSigning draws them, from a fresh read (for the patch above).
+export function certificateRows({ kept, staged }) {
+  const info = deviceSummary(kept);
+  const split = splitSummary(info.rows);
+  const cert = kept && split.certificate.length ? split.certificate : [{ label: "Certificate", detail: staged ? "Incomplete" : "None" }];
+  return [...cert, ...split.profile, ...(deviceRows(info.device)?.rows ?? [])];
+}
+async function refreshCertificate(el) {
+  const { id, failure, kept } = await deviceSigningState(el);
+  if (failure) return;
+  patchEl(el, certificateRows({ kept, staged: Boolean(id?.p12 || id?.profile) }));
 }
 
 // F284: the Signing rows' pages: Certificate (the certificate, files, profile, account and options groups, and Share
@@ -1605,16 +1647,14 @@ function notifySection() {
 // page and Home's Install iFizBox App sign in the browser with them (zsign as WebAssembly, signing-worker.js) and the
 // Worker only hosts the signed IPA for iOS's install prompt.
 
+export function siteSigningDetail(id) {
+  if (id?.profile) {
+    try { return summary({ profile: parseProfile(id.profile) }).rows[0].detail; } catch { return "Unreadable"; }
+  }
+  return id?.p12 ? "Incomplete" : "None";
+}
 function siteSigningSection(box) {
-  const fill = (detail) => signingRow(box, detail);
-  fill("");
-  loadIdentity().then((id) => {
-    let name = "None";
-    if (id?.profile) {
-      try { name = summary({ profile: parseProfile(id.profile) }).rows[0].detail; } catch { name = "Unreadable"; }
-    } else if (id?.p12) name = "Incomplete";
-    fill(name);
-  });
+  signingRow(box, () => loadIdentity().then(siteSigningDetail)); // B148: live
   return box;
 }
 

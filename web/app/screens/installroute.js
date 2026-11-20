@@ -749,3 +749,16 @@ export function checkMark(inner, text = STATUS_ACTIONS.check) {
   };
   return { show, reset, expire, active: () => on };
 }
+
+// B148: This iPhone's page (installation/iphone) shown again, Back from Pairing: idevice.status read again and each
+// row's detail (Pairing: Paired / Not Paired, the VPN, Tailscale's Device) put on the row already drawn, in place.
+// Rows the fresh answer would add or drop (Developer Mode once paired) wait for the page's next full draw.
+export function installationRows(sub, st, { store } = {}) {
+  const choice = sub === "iphone" ? "iphone" : store.get(ROUTE_KEY);
+  return subGroups(installationGroups(choice, st), sub).flatMap((g) => g.rows);
+}
+export async function refreshInstallation(el, sub, { store, native = globalThis.ifizboxNative, patch } = {}) {
+  if (sub === "pair") return;
+  const st = await status(native);
+  patch(el, installationRows(SUB_TITLES[sub] ? sub : null, st, { store }));
+}

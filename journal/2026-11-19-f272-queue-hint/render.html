@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- F272 render check: the real tab bar (nav/tabbar.js) with the Q'd badge and the queue's hint over Installed.
+     Serve the repo root over http and open /journal/2026-11-19-f272-queue-hint/render.html (?dark for the dark theme). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../web/app/style.css">
+  <link rel="stylesheet" href="../../web/app/ios6.css">
+  <link rel="stylesheet" href="../../web/app/palettes.css">
+</head>
+<body>
+  <main id="screens"></main>
+  <nav class="tabbar" id="tabbar" aria-label="Tabs"></nav>
+  <script type="module">
+    import { createTabbar } from "../../web/app/nav/tabbar.js";
+    import { createQueueHint } from "../../web/app/nav/queuehint.js";
+    if (location.search.includes("dark")) document.documentElement.dataset.theme = "dark";
+    const titles = { home: "Home", sources: "Sources", changes: "Changes", installed: "Installed", search: "Search" };
+    const bar = createTabbar(document.getElementById("tabbar"), Object.keys(titles), (t) => titles[t]);
+    bar.select("home");
+    bar.setBadge("installed", "Q'd");
+    const hint = createQueueHint({ bar: document.getElementById("tabbar"), store: { held: () => false, markHeld() {} }, showMs: 1e9 });
+    hint.update({ queued: true, badge: true, open: () => {} });
+    for (const a of document.getAnimations()) a.finish(); // headless screenshots don't run the fade in
+    document.body.style.background = location.search.includes("dark") ? "#000" : "#c5ccd4"; // grouped-table grey behind it
+  </script>
+</body>
+</html>

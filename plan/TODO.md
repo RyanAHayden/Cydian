@@ -10,6 +10,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
+- [ ] **F298** AltStore source page (screens/altstore.js): the "All Apps" row sits at the bottom; move it to the top, right below the source's header image, above the sections/featured apps. Nothing else changes. User 2026-11-20 (F297 misread this). | files: web/app/screens/altstore.js
 - [~] **F15d** (follow-up, later) Phone check of the idevice route (F15b), with the user in the coordinator session: on the iPhone 15 (iOS 27) pair via Developer Mode > Pair with iFizBox, install a test IPA with LocalDevVPN on, LocalDevVPN-off and other-VPN alerts, self-update. Open questions: mdns pairable-host advertisement without the multicast entitlement (fallback: NWListener Bonjour _remotepairing-pairable-host._tcp), LocalDevVPN URL scheme (localdevvpn:// guessed), VPNCheck with Tailscale on, port 49152 on other phones; iOS 15 lockdown path on a sideload iPhone. | files: native/sideload/idevice/**, journal/** BLOCKED: being done with the user in the coordinator session (test build at the tailnet page) — Done with the user 2026-11-19 on the iPhone 15 (iOS 27.0.1): paired via Developer Mode > Pair with iFizBox (PIN), installed openMX through LocalDevVPN in 2.3 s with no prompt and no server. iOS 15 lockdown path on a sideload phone still unchecked.
 ### Research (any time, parallel)
 

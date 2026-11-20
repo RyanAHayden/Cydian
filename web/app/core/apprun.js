@@ -36,7 +36,9 @@
 //     .notTaken(id, why) B123: an ended run's "Sent to iOS" row that iOS never took turns Failed (why) -> true | false
 //     .ownIdRetry(id) B151: a row the App Store's install coordinator blocked (IX Code 46: row.busy, coordinatorBusy)
 //                 goes again with Keep Bundle IDs off for that app (its own bundle ID) -> the end promise | null
-//     .rows / .running / .stopping / .current (the row with iOS)
+//     .rows / .running / .stopping / .current (the row with iOS) / .pass (B153: how many times it started)
+//   onStart(pass)  B153: start() of an idle run (the first, or a retry, Retry All or ownIdRetry after the run ended)
+//                 begins pass n: the page clears its log, so a new pass never shows the last one's lines
 //
 // B76: a stock phone can't watch iOS's install once iFizBox is in the background, so installed: false after a handoff
 // (handedOff, or .away() during the watch) means "lost sight", not "refused": the row ends Done as sent (unsure) and
@@ -161,9 +163,10 @@ export function stallText(row, limit = APP_STALL) {
 }
 
 export function createAppRun({ rows, sign, install, discard = () => {}, reprompt = null, ahead = 2, stallMs = APP_STALL,
-  later = setTimeout, clear = clearTimeout, onChange = () => {}, onLog = () => {}, local = () => false }) {
+  later = setTimeout, clear = clearTimeout, onChange = () => {}, onLog = () => {}, local = () => false, onStart = () => {} }) {
   const flights = new Map(); // id -> { ctl: AbortController, timer, why }
   let running = false;
+  let pass = 0; // B153: each start() of an idle run is a new pass (onStart(pass)), so its page starts a clean log
   let stopping = false;
   let resolveEnd = null;
   let endPromise = null;
@@ -346,6 +349,8 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     stopping = false;
     endPromise = new Promise((res) => { resolveEnd = res; });
     const p = endPromise;
+    pass++;
+    try { onStart(pass); } catch { /* the page's bug isn't the run's */ }
     // a microtask later, so the caller can draw the rows first
     Promise.resolve().then(pump);
     return p;
@@ -356,6 +361,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     get running() { return running; },
     get stopping() { return stopping; },
     get current() { return rows.find((r) => WITH_IOS.has(r.state)) ?? null; },
+    get pass() { return pass; },
     start,
     away() {
       let n = 0;
@@ -418,9 +424,11 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       if (!r || r.state !== "failed" || !ownIdOk(r)) return null;
       r.job = ownIdJob(r.job);
       set(r, { ...retryPatch(r), state: "waiting", again: false, fraction: 0, bundleId: null });
+      // B153: logged after start(), so a new pass's clean log opens with it
+      const p = running ? endPromise : start();
       log(r, "step", `Installing ${label(r)} with its own bundle ID`);
-      if (running) { pump(); return endPromise; }
-      return start();
+      if (running) pump();
+      return p;
     },
     retryAll() {
       const again = rows.filter((r) => ["failed", "cancelled"].includes(r.state));

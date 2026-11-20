@@ -5,7 +5,7 @@
 # the result (and its .source-sha256); web/app/core/groupfix.test.js checks the committed dylib matches the current source.
 #
 #   build.sh            build it
-#   build.sh <out>      build it to <out> instead (the test's rebuild)
+#   build.sh <out>      build it to <out> instead (a look at it; no .source-sha256)
 #
 # Needs IOS_SDK, clang and ld64.lld, as native/build.sh (LD64_LLD, else rustup's or the one on PATH).
 set -euo pipefail
@@ -15,9 +15,9 @@ lld=${LD64_LLD:-$(rustc --print sysroot 2>/dev/null || true)/lib/rustlib/x86_64-
 [ -x "$lld" ] || lld=$(command -v ld64.lld)
 out=${1:-../../web/app/vendor/groupfix/ifizbox-groupfix.dylib}
 mkdir -p "$(dirname "$out")"
-# No debug paths or UUID that differ per checkout, so the same source builds the same bytes.
+# No debug paths that differ per checkout (lld's LC_UUID is a hash of the output, which dyld needs for new SDKs).
 clang -target arm64-apple-ios15.0 -isysroot "$sdk" -dynamiclib -fobjc-arc -O2 -Wall -Wextra -Werror \
-  -fdebug-prefix-map="$PWD"=. -fuse-ld=lld --ld-path="$lld" -Wl,-no_uuid -Wl,-adhoc_codesign \
+  -fdebug-prefix-map="$PWD"=. -fuse-ld=lld --ld-path="$lld" -Wl,-adhoc_codesign \
   -install_name @rpath/ifizbox-groupfix.dylib -framework Foundation -framework Security \
   -o "$out" groupfix.m
 # The source it was built from, for the test (no toolchain needed to tell a stale dylib).

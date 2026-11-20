@@ -803,6 +803,9 @@ test("B211: group fix") {
     check(GroupFix.plan(original: insta, profile: ["com.apple.security.application-groups": ["group.com.burbn.instagram"]])?.groups == [], "a group the profile has stays")
     check(GroupFix.plan(original: ["application-identifier": "OLD.x"], profile: mine) == nil, "nothing to fix")
     check(GroupFix.plan(original: nil, profile: mine) == nil, "unsigned")
+    let prev = try GroupFix.adding(GroupFix.plan(original: insta, profile: [:])!, dylib: Data(), to: nil).files[1].data
+    check(GroupFix.plan(original: ["keychain-access-groups": ["T.x"]], profile: mine, previous: prev)?.groups == ["group.com.burbn.instagram"],
+          "signed again: the earlier config's groups still count")
     let p = try Profile(try fixture("profile.mobileprovision"))
     let narrowed = p.entitlements(for: "com.burbn.instagram")
     check(p.entitlements.keys.allSatisfy { narrowed[$0] != nil }, "every profile entitlement (its app groups too) stays")

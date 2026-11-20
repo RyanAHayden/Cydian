@@ -25,11 +25,16 @@ enum GroupFix {
     private static func strings(_ v: Any?) -> [String] { (v as? [Any] ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty } }
 
     // The original's groups the profile doesn't have, to the profile's first group; nil when there's nothing to fix.
-    static func plan(original: [String: Any]?, profile: [String: Any]) -> Plan? {
-        guard let o = original else { return nil }
+    // `previous`: the config an earlier sign left in the app (an IPA signed again), whose groups still count.
+    static func plan(original: [String: Any]?, profile: [String: Any], previous: Data? = nil) -> Plan? {
+        let prev = previous.flatMap { try? PropertyListSerialization.propertyList(from: $0, format: nil) as? [String: Any] } ?? [:]
+        let o = original ?? [:]
         let have = strings(profile["com.apple.security.application-groups"])
-        let groups = strings(o["com.apple.security.application-groups"]).filter { !have.contains($0) }
-        let keychain = !strings(o["keychain-access-groups"]).isEmpty
+        var groups = [String]()
+        for g in strings(o["com.apple.security.application-groups"]) + strings(prev["groups"]) where !have.contains(g) && !groups.contains(g) {
+            groups.append(g)
+        }
+        let keychain = !strings(o["keychain-access-groups"]).isEmpty || (prev["keychain"] as? Bool) == true
         guard !groups.isEmpty || keychain else { return nil }
         return Plan(groups: groups, target: have.first ?? "", keychain: keychain)
     }

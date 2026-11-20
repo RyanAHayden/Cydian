@@ -8,7 +8,9 @@
 //
 //   machoEntitlements(bin)                  the entitlements (XML slot) of a Mach-O's first slice, or null when unsigned
 //   entitlementsRead(read)                  the same through read(pos, len), reading only the parts it needs
-//   groupFixPlan(original, profileEnts)     { groups, target, keychain } to fix, or null when the app needs nothing
+//   groupFixPlan(original, profileEnts, previous)  { groups, target, keychain } to fix, or null when the app needs
+//                                           nothing; previous: the config an earlier sign left in the app
+//   readConfig(bytes)                       that config's { groups, keychain }, or null
 //   groupFixTweaks(plan, dylib)             { files, inject } for the F288 tweak path (putTweaks / TweakSet)
 //   withGroupFix(tweaks, plan, dylib)       a prepared tweak set (or null) with the fix added
 //   GROUPFIX                                its file under web/app, and the paths in the app
@@ -38,8 +40,12 @@ export function machoEntitlements(bin) {
 export function entitlementsRead(read) {
   try {
     const dv = (pos, len) => { const u = read(pos, len); return u.length < len ? null : new DataView(u.buffer, u.byteOffset, len); };
+    // the first 64-bit slice of a fat file (as Inspect.swift), the file itself when thin
     const head = read(0, 4096);
-    const off = head.length >= 8 ? slices(head)[0][0] : 0;
+    const off = head.length < 8 ? 0 : slices(head).map(([o]) => o).find((o) => {
+      const m = dv(o, 4);
+      return m && m.getUint32(0, true) === 0xfeedfacf;
+    }) ?? 0;
     const h = dv(off, 32);
     if (!h || h.getUint32(0, true) !== 0xfeedfacf) return null;
     const ncmds = h.getUint32(16, true), sizeofcmds = h.getUint32(20, true);
@@ -72,12 +78,21 @@ export function entitlementsRead(read) {
 
 // The original's groups the profile doesn't have, mapped to the profile's first group ("" for none: a folder in the
 // app's own container); keychain when the original names keychain access groups.
-export function groupFixPlan(original, profileEnts = {}) {
+// `previous`: the config an earlier sign left in the app (an IPA signed again), whose groups still count: its
+// executable now carries the profile's groups, not the original ones.
+export function groupFixPlan(original, profileEnts = {}, previous = null) {
   const have = strings(profileEnts?.[APP_GROUPS]);
-  const groups = strings(original?.[APP_GROUPS]).filter((g) => !have.includes(g));
-  const keychain = strings(original?.[KEYCHAIN]).length > 0;
+  const groups = [...new Set([...strings(original?.[APP_GROUPS]), ...strings(previous?.groups)])].filter((g) => !have.includes(g));
+  const keychain = strings(original?.[KEYCHAIN]).length > 0 || previous?.keychain === true;
   if (!groups.length && !keychain) return null;
   return { groups, target: have[0] ?? "", keychain };
+}
+
+export function readConfig(bytes) {
+  try {
+    const c = parsePlist(new TextDecoder().decode(bytes));
+    return c && typeof c === "object" && !Array.isArray(c) ? c : null;
+  } catch { return null; }
 }
 
 export function groupFixTweaks(plan, dylib) {

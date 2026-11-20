@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { machoEntitlements, entitlementsRead, groupFixPlan, groupFixTweaks, withGroupFix, GROUPFIX } from "./groupfix.js";
+import { machoEntitlements, entitlementsRead, groupFixPlan, groupFixTweaks, withGroupFix, readConfig, GROUPFIX } from "./groupfix.js";
 import { appEntitlements, plistXml } from "./websign.js";
 import { parsePlist } from "./signing.js";
 import { idOf, isMachO } from "./tweaks.js";
@@ -53,6 +53,21 @@ test("groupFixPlan: the original's groups go to the profile's own group, or to a
   assert.deepEqual(groupFixPlan({ "keychain-access-groups": ["OLD.x"] }, {}), { groups: [], target: "", keychain: true });
   assert.equal(groupFixPlan({ "application-identifier": "OLD.x" }, withGroup), null, "nothing to fix");
   assert.equal(groupFixPlan(null, withGroup), null, "unsigned");
+  // signed again: the executable now has the profile's groups, the config left by the first sign keeps the originals
+  const previous = readConfig(groupFixTweaks(groupFixPlan(INSTA, {}), new Uint8Array(4)).files[1].data);
+  assert.deepEqual(groupFixPlan({ "keychain-access-groups": ["T.com.burbn.instagram"] }, withGroup, previous),
+    { groups: ["group.com.burbn.instagram", "group.com.burbn.shared"], target: "group.com.me.box", keychain: true });
+  assert.equal(readConfig(new Uint8Array([1, 2])), null);
+});
+
+test("machoEntitlements reads the first 64-bit slice of a fat armv7+arm64 file", () => {
+  const thin = Buffer.from(signedMacho(INSTA));
+  const v7 = Buffer.alloc(0x1000); v7.writeUInt32LE(0xfeedface, 0);
+  const fh = Buffer.alloc(0x4000);
+  fh.writeUInt32BE(0xcafebabe, 0); fh.writeUInt32BE(2, 4);
+  fh.writeUInt32BE(12, 8); fh.writeUInt32BE(9, 12); fh.writeUInt32BE(0x4000, 16); fh.writeUInt32BE(v7.length, 20);
+  fh.writeUInt32BE(0x0100000c, 28); fh.writeUInt32BE(0, 32); fh.writeUInt32BE(0x5000, 36); fh.writeUInt32BE(thin.length, 40);
+  assert.deepEqual(machoEntitlements(new Uint8Array(Buffer.concat([fh, v7, thin]))), INSTA);
 });
 
 test("appEntitlements keeps the profile's own app groups (the fix maps the app's onto them)", () => {

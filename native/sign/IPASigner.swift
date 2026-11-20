@@ -243,7 +243,8 @@ final class IPASigner {
         var tweaks = options.tweaks
         if oldID != SignOptions.selfBundleID, let exe = main.plist["CFBundleExecutable"] as? String, files[appDir + exe] != nil,
            let plan = GroupFix.plan(original: Inspect.entitlements(try contents(appDir + exe, files, zip)),
-                                    profile: profile.entitlements(for: entID)),
+                                    profile: profile.entitlements(for: entID),
+                                    previous: files[appDir + GroupFix.configPath] == nil ? nil : try? contents(appDir + GroupFix.configPath, files, zip)),
            let dylib = GroupFix.dylib() {
             tweaks = try GroupFix.adding(plan, dylib: dylib, to: tweaks)
             log("Group fix: \(plan.groups.isEmpty ? "no app groups" : plan.groups.joined(separator: ", ")) -> "

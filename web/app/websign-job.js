@@ -18,7 +18,7 @@
 import { isZip, profileInfo, signingIds, appEntitlements, plistXml, identityPlist, zsignArgs, zsignError, appInfo,
   IFIZBOX_ID, IDENTITY_FILE, TRANSFER_FILE } from "./core/websign.js";
 import { injectInto } from "./core/tweaks.js";
-import { entitlementsRead, groupFixPlan, withGroupFix } from "./core/groupfix.js";
+import { entitlementsRead, groupFixPlan, withGroupFix, readConfig, GROUPFIX } from "./core/groupfix.js";
 import { MALWARE_REFUSED } from "./core/malicious.js";
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
@@ -105,7 +105,10 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   }
   // B211: the original signature's app groups and keychain groups, read before signing, decide whether the app gets
   // the group fix (core/groupfix.js); never iFizBox's own IPA.
-  const plan = groupFix?.length && own !== IFIZBOX_ID ? groupFixPlan(fileEntitlements(FS, `${appDir}/${plist.CFBundleExecutable || ""}`), prof.entitlements) : null;
+  let previous = null;
+  try { previous = readConfig(FS.readFile(`${appDir}/${GROUPFIX.config}`)); } catch { /* first sign */ }
+  const plan = groupFix?.length && own !== IFIZBOX_ID
+    ? groupFixPlan(fileEntitlements(FS, `${appDir}/${plist.CFBundleExecutable || ""}`), prof.entitlements, previous) : null;
   const all = withGroupFix(tweaks, plan, groupFix);
   // F288: tweaks (core/tweaks.js prepareTweaks, done on the page): their files into the app, and the weak load commands
   // into the main executable, before zsign signs it all (it signs Frameworks/' dylibs and frameworks as any other).

@@ -117,7 +117,7 @@ static void rebindSection(const struct section_64 *sect, intptr_t slide, const s
         for (size_t h = 0; h < sizeof(hooks) / sizeof(hooks[0]); h++) {
             if (strcmp(name, hooks[h].name) != 0 || ptrs[i] == hooks[h].to) continue;
             vm_address_t page = (vm_address_t)&ptrs[i] & ~(vm_address_t)(vm_page_size - 1);
-            vm_protect(mach_task_self(), page, vm_page_size, 0, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
+            if (vm_protect(mach_task_self(), page, vm_page_size, 0, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY) != KERN_SUCCESS) continue;
             ptrs[i] = hooks[h].to;
         }
     }

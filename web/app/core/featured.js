@@ -7,6 +7,7 @@
 //   createFeaturedStore({ getText, storage, ttl, now })
 //     .get(source)                   -> the parsed banners (cached; a repo without the file caches as null)
 //     .forHome(sources, perSource)   -> [{ ...banner, key, source }] a few from each source, in list order
+//   bannersInCatalog(banners, has)   -> the banners whose package `has(id)` (async ok) finds, in order (B182)
 //
 // Chariz and Havoc (both default sources) serve this exact shape on 2026-11-17: class FeaturedBannersView,
 // itemSize "{263, 148}", itemCornerRadius 10, banners [{ url, title, package }] (Chariz adds displayText: false,
@@ -68,6 +69,21 @@ export function parseFeatured(input, base = null) {
   }
   const r = Number(j.itemCornerRadius);
   return { itemSize: parseSize(j.itemSize), radius: r >= 0 && r <= 100 ? r : DEFAULT_RADIUS, banners };
+}
+
+// B182: the banners whose package `has(id)` finds in the source's loaded catalog, in order. A repo's banners can name
+// packages this build never loads: the sideload app keeps only a Tweak Source's injectable tweaks (Chariz's
+// SpringBoard tweaks drop out), and the jailbreak app only this arch's. Those tiles would open "Package not found",
+// so they are left out. `has` may be async; each id is asked once; a lookup that throws counts as missing.
+export async function bannersInCatalog(banners, has) {
+  const list = Array.isArray(banners) ? banners : [];
+  const asked = new Map();
+  const found = (id) => {
+    if (!asked.has(id)) asked.set(id, Promise.resolve().then(() => has(id)).then(Boolean, () => false));
+    return asked.get(id);
+  };
+  const keep = await Promise.all(list.map((b) => found(b?.package)));
+  return list.filter((_, i) => keep[i]);
 }
 
 // `getText(url)` fetches (backend.text); a failure (404, not JSON) is remembered as "none" for the same `ttl`, so

@@ -207,6 +207,11 @@ class Decisions(Base):
         self.assertEqual(prune("1.1", 1), ["x_1.0_arm.deb", "x_1.2_arm.deb"])
         self.assertEqual(prune("1.3", 0), ["x_1.0_arm.deb", "x_1.1_arm.deb", "x_1.2_arm.deb", "x_1.3_arm.deb"])
         self.assertEqual(prune("9.9", 2), ["x_1.0_arm.deb", "x_1.1_arm.deb"])
+        # Stashed in one run, so the same mtime: the higher version is the newer, whatever the listing's order.
+        for tied in ("x_2%3a3.2-1_arm.deb 500\nx_2%3a3.10-1_arm.deb 500\nx_2%3a3.3-1_arm.deb 600\n",
+                     "x_2%3a3.10-1_arm.deb 500\nx_2%3a3.2-1_arm.deb 500\nx_2%3a3.3-1_arm.deb 600\n"):
+            out = sorted(self.run_driver("prune", self.file(tied), "x", "2:3.3-1", 1).split())
+            self.assertEqual(out, ["x_2%3a3.2-1_arm.deb"], tied)
 
     def test_words(self):
         plan = "".join("Inst p%d [1.0] (1.1 R)\n" % i for i in range(5))

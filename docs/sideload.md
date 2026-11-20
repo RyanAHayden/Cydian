@@ -253,8 +253,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Connection (`idevice.verify`, Pair Again when the pairing is refused) and Forget Pairing. Settings shows no
   Developer Mode row (iOS needs it for every kind of profile, iOS 27's Ad Hoc too, and an app can't open without it):
   an install that fails because of it says so in its alert, with the steps to turn it on (core/installroute.js
-  `developerModeFailure`). The shell still answers `idevice.developerMode` (lockdown GetValue, domain
-  `com.apple.security.mac.amfi`, key `DeveloperModeStatus`). Before iOS 27 a pairing
+  `developerModeFailure`). Before iOS 27 a pairing
   file made on a computer is imported. Each
   install (`chooseRoute`, signing-client.js) asks `idevice.status`: paired and LocalDevVPN on sends
   `route: "idevice"` with the bridge call (signing.install, signing.open, signing.resign/resignAll,

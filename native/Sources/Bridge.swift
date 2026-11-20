@@ -22,7 +22,6 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
 
     override init() {
         super.init()
-        on("ping") { $0.reply(["pong": $0.params["i"] ?? 0], nil) }
         on("app.info") { c in
             let info = Bundle.main.infoDictionary ?? [:]
             c.reply(["version": info["CFBundleShortVersionString"] ?? "", "build": info["CFBundleVersion"] ?? "",

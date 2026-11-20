@@ -4,7 +4,7 @@
 // (worker/src/push.js), which checks those sources on a schedule and pushes. The local background check keeps running
 // either way; push only makes the alert come sooner.
 //
-// Push can't work, and Settings says why (offReason), when:
+// Push can't work (offReason; Settings then shows no Push switch), when:
 //   - this iFizBox runs under another bundle ID than brand.js BUNDLE_ID: APNs delivers by the app's Info.plist ID,
 //     and the server's key reaches only that topic (a signer renamed this copy: install again keeping the ID);
 //   - its provisioning profile has no aps-environment (its App ID has no Push Notifications);
@@ -15,8 +15,9 @@
 //   offReason(st, server)                 {code, text} | null: st = push.status (+ token), server = GET /api/push
 //   registration(st, watch)               the /api/push/register body
 //   expiresOf(st)                         iFizBox's own signature end, as `expires`
-//   await enablePush(deps) / disablePush(deps) / syncPush(deps) / testPush(deps) / pushInfo(deps)
-//   await autoEnablePush(deps)            F285: on by default, at launch, once the server can push (not after an Off)
+//   await enablePush(deps) / disablePush(deps) / syncPush(deps) / pushInfo(deps)
+//   await autoEnablePush(deps)            on by default: at launch, once the server can push, asking iOS if never
+//                                         asked (not after an Off or a denied prompt)
 //   pushRows(view, now)                   Settings > Updates > Push Notifications' rows (screens/push-settings.js)
 // deps: { native (ifizboxNative), server (the signing server, signing-client.js getServer), fetcher, storage, watch }.
 // Device tokens and watch lists go only to that server, never to a log.
@@ -139,7 +140,8 @@ export function userTurnedOff(storage = globalThis.localStorage) {
 export function setUserTurnedOff(off, storage = globalThis.localStorage) {
   try { if (off) storage?.setItem?.(USER_OFF_KEY, "1"); else storage?.removeItem?.(USER_OFF_KEY); } catch { /* private mode */ }
 }
-const ALLOWED = ["authorized", "provisional"];
+// notDetermined: push.register asks iOS once; a No leaves Push off (denied, never asked again)
+const ALLOWED = ["authorized", "provisional", "notDetermined"];
 export async function autoEnablePush(deps = {}) {
   const { native, server, fetcher, storage } = defaults(deps);
   if (!native?.call || !server || pushState(storage).on || userTurnedOff(storage)) return { enabled: false };
@@ -183,16 +185,6 @@ export async function syncPush(deps = {}) {
   } catch { return { sent: false }; }
 }
 
-export async function testPush(deps = {}) {
-  const { server, fetcher, storage } = defaults(deps);
-  const s = pushState(storage);
-  if (!s.token) return { ok: false, text: "Turn Push on first." };
-  try {
-    const r = await post(server, "test", { token: s.token }, fetcher);
-    return r.ok ? { ok: true, text: "Sent. It should arrive in a few seconds." } : { ok: false, text: `APNs refused it (${r.reason}).` };
-  } catch (e) { return { ok: false, text: e.message }; }
-}
-
 // What Settings shows: {state, st, server, status (POST /api/push/status), reason}.
 export async function pushInfo(deps = {}) {
   const { native, server, fetcher, storage } = defaults(deps);
@@ -230,20 +222,20 @@ const ago = (iso, now) => {
   return m < 1 ? "Just now" : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
 };
 
-// Settings' group: {header, rows: [{label, detail?, toggle?, on?, test?}], footer}.
+// Settings' group: {header, rows: [{label, detail?, toggle?, on?}], footer}, or null when push can't work here
+// (offReason): no switch and no explanation, the background check still alerts.
 export function pushRows(view, now = Date.now()) {
   const { state, status, reason } = view ?? {};
+  if (reason) return null;
   const on = Boolean(state?.on);
   const rows = [{ label: "Push", toggle: true, on }];
   let footer;
-  if (reason) {
-    footer = `${reason.text} ${FALLBACK_TEXT}`;
-  } else if (on && state?.lastError) {
+  if (on && state?.lastError) {
     footer = `${state.lastError} ${FALLBACK_TEXT}`;
   } else if (on && status && status.registered === false) {
     footer = `The server no longer knows this iPhone. Turn Push off and on again. ${FALLBACK_TEXT}`;
   } else if (on) {
-    rows.push({ label: "Last Push", detail: ago(status?.lastPush, now) }, { label: "Test Push", test: true });
+    rows.push({ label: "Last Push", detail: ago(status?.lastPush, now) });
     footer = "Update alerts arrive within half an hour of an update, even while iOS doesn't run the background check.";
   } else {
     footer = `Push sends this iPhone's push token and the apps ${NAME} follows (their sources and versions) to the signing server, which checks them every half hour.`;

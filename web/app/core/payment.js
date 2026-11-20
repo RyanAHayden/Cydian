@@ -63,10 +63,12 @@ function pkgPath(id) {
 // Like Sileo and Zebra (B10, docs/sileo-zebra.md), every POST but sign_out carries udid and device, and
 // authorize_download the package's architecture, so a vendor serving rootful and rootless debs picks the right one.
 // Fields the spec marks optional (token on package_info) are left out when unknown rather than sent empty.
+// F318: `tokenless: true` lets authorize_download go without a token (a FREE package the vendor says is purchased
+// while signed out: Chariz hands its .deb out that way).
 export function buildRequest(base, action, opts = {}) {
   const b = parseEndpoint(base);
   if (!b) throw new Error(`not an https payment endpoint: ${base}`);
-  const { token, secret, udid, device, packageId, version, repo, architecture } = opts;
+  const { token, secret, udid, device, packageId, version, repo, architecture, tokenless = false } = opts;
   const who = () => clean({ token, udid, device });
   let path, body = null, method = "POST";
   switch (action) {
@@ -78,7 +80,7 @@ export function buildRequest(base, action, opts = {}) {
       need(token, "token"); need(secret, "payment secret");
       path = pkgPath(packageId) + "purchase"; body = { ...clean({ token, udid, device }), payment_secret: String(secret) }; break;
     case "authorize_download":
-      need(token, "token");
+      if (!tokenless) need(token, "token");
       path = pkgPath(packageId) + "authorize_download"; body = clean({ token, udid, device, version, repo, architecture }); break;
     default: throw new Error(`unknown payment action: ${action}`);
   }
@@ -238,8 +240,9 @@ export function createPaymentClient({ base, request, device = () => ({}), creden
     },
     // The one-time https URL the .deb downloads from (expires in a minute or two: fetch it straight away).
     // `architecture`: the package's own (its stanza's Architecture), not the device's guess.
-    async authorizeDownload(packageId, { version, repo, architecture } = {}) {
-      const d = await send("authorize_download", { ...(await who()), packageId, version, repo, architecture });
+    // F318: `tokenless` sends it signed out (no token); signed in, the token goes as usual.
+    async authorizeDownload(packageId, { version, repo, architecture, tokenless = false } = {}) {
+      const d = await send("authorize_download", { ...(await who()), packageId, version, repo, architecture, tokenless });
       if (typeof d.url !== "string" || !/^https:\/\//i.test(d.url)) throw new PaymentError(parseReply(502, { error: "the vendor gave no https download URL" }));
       return d.url;
     },
@@ -283,6 +286,9 @@ export function createCredentialStore({ storage = globalThis.localStorage, secur
 //
 // Not bought or signed out is not an error for the screen: it offers Sign In or Buy (screens/tweaks.js offerPaid).
 // A token the vendor no longer takes (invalidate: the store forgets it) asks for Sign In again.
+// F318: signed out, a FREE package the vendor already calls purchased (Chariz's betterAlarm) is first asked for
+// without a token (Chariz's authorize_download hands it out, checked live 2026-11-20); any refusal there asks for
+// Sign In as before.
 export class PaidNeeded extends Error {
   constructor(need, { price = null, packageId = "" } = {}) {
     super(need === "signin" ? "Sign in to its seller to download this tweak."
@@ -302,11 +308,22 @@ export async function paidTweakDeb(st, { client, repo = "", architecture = "", c
   if (hit?.length) return hit;
   const [signedIn, info] = await Promise.all([client.signedIn(), client.packageInfo(id)]);
   if (!info.available) throw new PaidNeeded("unavailable", { price: info.price, packageId: id });
-  if (!signedIn) throw new PaidNeeded("signin", { price: info.price, packageId: id });
+  const freeOpen = !signedIn && info.purchased && isFreePrice(info.price);
+  if (!signedIn && !freeOpen) throw new PaidNeeded("signin", { price: info.price, packageId: id });
   if (!info.purchased) throw new PaidNeeded("purchase", { price: info.price, packageId: id });
+  const ask = { version, repo, architecture: st?.architecture || architecture };
+  if (freeOpen) {
+    let url;
+    try {
+      url = await client.authorizeDownload(id, { ...ask, tokenless: true });
+    } catch {
+      throw new PaidNeeded("signin", { price: info.price, packageId: id });
+    }
+    return download(url, st);
+  }
   let url;
   try {
-    url = await client.authorizeDownload(id, { version, repo, architecture: st?.architecture || architecture });
+    url = await client.authorizeDownload(id, ask);
   } catch (e) {
     if (e instanceof PaymentError && e.invalidate) throw new PaidNeeded("signin", { price: info.price, packageId: id });
     throw e;

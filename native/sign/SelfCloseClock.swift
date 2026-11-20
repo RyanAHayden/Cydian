@@ -1,41 +1,48 @@
-// B159: when iFizBox closes itself during its own update on the This iPhone route (Sideload.swift installHere). On
-// iOS 17.4+ (RemotePairing) installd doesn't end the running copy: it takes the new IPA and then waits, its
-// percentage standing still, until the old copy is gone (user 2026-11-20: stuck on "iOS is installing it" until the
-// app was closed from the app switcher, then it finished). So once the IPA is copied, the clock runs: no percentage
-// from installd for `firstQuiet`, or its percentage unchanged for `quiet`, means installd is waiting on this copy,
-// and iFizBox closes (CloseForUpdate.hereReady). A repeated percentage doesn't restart the clock; a new one does.
+// When iFizBox closes itself during its own update on the This iPhone route (Sideload.swift installHere), over
+// LocalDevVPN or Tailscale. On iOS 17.4+ (RemotePairing) installd doesn't end the running copy: it takes the new IPA
+// and then waits until the old copy is gone, so installation_proxy's Complete never comes while iFizBox runs (user
+// 2026-11-20: stuck on "iOS is installing it" until the app was swiped away, then it finished). Waiting for installd
+// to stand still (the first rule) still left it hanging on Tailscale, so the rule is now: once installd has accepted
+// the install (its first status, any percentage), iFizBox closes `accepted` later; installd goes on without it. If
+// installd sends no status at all, `firstQuiet` after the copy ended. Later statuses change nothing.
 // Pure, no UIKit: native/sign/tests/sideload/main.swift tests it on Linux.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
 struct SelfCloseClock {
-    static let firstQuiet: TimeInterval = 10 // the IPA is copied and installd hasn't said a percentage yet
-    static let quiet: TimeInterval = 5 // installd's percentage hasn't moved
+    static let firstQuiet: TimeInterval = 10 // the IPA is copied and installd hasn't sent a status yet
+    static let accepted: TimeInterval = 1 // installd's first status: it has the install, close this soon after
 
     private(set) var copiedAt: Date?
-    private(set) var percent: Int?
-    private(set) var movedAt: Date?
+    private(set) var acceptedAt: Date?
+    private(set) var percent: Int? // installd's first percentage, for the log
 
-    // The IPA's copy to iOS has ended: the clock starts (once).
+    // The IPA's copy to iOS has ended: the fallback clock starts (once).
     mutating func copied(at t: Date) {
         if copiedAt == nil { copiedAt = t }
     }
 
-    // installd's percentage (0...100). -> true when it moved (the caller re-arms its timer)
+    // installd sent a status (0...100). -> true for the first one (the caller re-arms its timer and logs it)
     @discardableResult
     mutating func installd(_ pct: Int, at t: Date) -> Bool {
-        if copiedAt == nil { copiedAt = t } // a percentage means the copy is over
-        guard pct != percent else { return false }
+        if copiedAt == nil { copiedAt = t } // a status means the copy is over
+        guard acceptedAt == nil else { return false }
+        acceptedAt = t
         percent = pct
-        movedAt = t
         return true
     }
 
-    // When iFizBox closes if nothing moves before then; nil while the IPA is still being copied.
+    // When iFizBox closes; nil while the IPA is still being copied.
     var closeAt: Date? {
-        if let m = movedAt { return m.addingTimeInterval(Self.quiet) }
+        if let a = acceptedAt { return a.addingTimeInterval(Self.accepted) }
         return copiedAt?.addingTimeInterval(Self.firstQuiet)
     }
 
     func due(_ now: Date) -> Bool { closeAt.map { now >= $0 } ?? false }
+
+    // Why it closes, for the logs.
+    var reason: String {
+        if let p = percent { return "installd accepted the install (\(p)%)" }
+        return "installd sent no status \(Int(Self.firstQuiet)) s after the copy"
+    }
 }

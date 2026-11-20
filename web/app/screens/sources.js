@@ -4,8 +4,7 @@
 // and reorder, Import & Export, Recommended). A left swipe on a row shows Delete. Rows keep the order set there. The list lives on the
 // device and comes through the backend (core/sources.js sourceCalls), so the app runs this file unchanged.
 // Above the sources, Cydia's "All Sources" row; a source (or All Sources) opens its Sections, and everything
-// below that is screens/browse.js. Beside it (or in its place when only AltStore sources show), All Apps: every
-// AltStore source's apps in one list (core/allapps.js).
+// below that is screens/browse.js.
 import { cleanSourceUrl } from "../core/sources.js";
 import { plain, collapse, note } from "../nav/ui.js";
 import * as browse from "./browse.js";
@@ -29,8 +28,6 @@ import { showBanner } from "../nav/banner.js";
 import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
 import { refreshRows, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
 import { labelSource, toggleTrust, trustMenuLabel } from "./safety.js"; // F291
-import { ALL_APPS, ALL_APPS_LABEL, ALL_APPS_SUBTITLE, topRowsOf } from "../core/allapps.js"; // F297
-import { isAltKey } from "../core/altstore.js";
 
 export const title = "Sources";
 
@@ -519,19 +516,11 @@ function draw() {
   const searching = Boolean(state.query.trim());
   const list = filterSources(shown, state.query, displayName);
   const rec = searching ? null : recommendedRow();
-  // F297: All Apps (core/allapps.js): in All Sources' place when only AltStore sources show, beside it otherwise
-  // once one is added.
-  const tops = topRowsOf({ appsOnly: settings.deviceType() === "none", hasAlt: shown.some((s) => isAltKey(s.key)), searching });
-  const folders = [...(tops.allSources ? [{
+  const top = searching ? [] : [{
     label: "All Sources",
     subtitle: "combined package list for the sources below",
     href: format({ tab: "sources", path: ["*"] }),
-  }] : []), ...(tops.allApps ? [{
-    label: ALL_APPS_LABEL,
-    subtitle: ALL_APPS_SUBTITLE,
-    href: format({ tab: "sources", path: [ALL_APPS] }),
-  }] : [])];
-  const top = [...folders, ...(rec ? [rec] : [])];
+  }, ...(rec ? [rec] : [])];
   const ul = plain([...(top.length ? [{ rows: top }] : []), {
     header: searching ? `${list.length} of ${shown.length}` : "Individual Sources",
     rows: list.map((s) => {
@@ -547,15 +536,14 @@ function draw() {
     }),
   }]);
   const cells = ul.querySelectorAll(":scope > .cell");
-  folders.forEach((_, i) => {
-    cells[i].classList.add("all-sources-row");
-    cells[i].querySelector(".cell-inner").prepend(Object.assign(document.createElement("span"), { className: "folder" }));
-  });
+  if (top.length) {
+    cells[0].classList.add("all-sources-row");
+    cells[0].querySelector(".cell-inner").prepend(Object.assign(document.createElement("span"), { className: "folder" }));
+  }
   if (rec) {
-    const recCell = cells[folders.length];
-    recCell.classList.add("recommended-row");
+    cells[1].classList.add("recommended-row");
     manage.currentJailbreak().then((jb) => {
-      const label = recCell.querySelector(".cell-label");
+      const label = cells[1].querySelector(".cell-label");
       if (jb.id && jb.id !== "other" && label) label.textContent = `Recommended for ${jailbreakName(jb.id)}`;
     }).catch(() => {});
   }

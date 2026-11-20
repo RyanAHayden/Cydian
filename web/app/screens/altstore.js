@@ -1,8 +1,8 @@
 // AltStore sources (F9): a source's own page and an app's page. The parsing and the rules (which versions this
 // phone runs, how an app installs) are core/altstore.js; the apps are catalog rows (core/catalog.js loadAlt), so
 // lists, Search and Changes draw them with screens/browse.js like any package. browse.js hands this file:
-//   the Sources tab's `alt:<url>` page  -> renderAltSource: header in the source's tint, news, featured apps,
-//                                         All Apps, Website; Share in the nav bar (F76)
+//   the Sources tab's `alt:<url>` page  -> renderAltSource: header in the source's tint, All Apps, news,
+//                                         featured apps, Website; Share in the nav bar (F76)
 //   a package page whose stanza is an app (kind "ipa") -> renderApp
 // Styles: altstore.css. Every remote image goes through mediaUrl (http ones through the proxy on the site).
 import { grouped, placeholder, el, note } from "../nav/ui.js";
@@ -203,6 +203,9 @@ export async function renderAltSource(body, route, key) {
   head.append(id);
   page.append(head);
   body.replaceChildren(page);
+  // All Apps first, right under the header, above the description, news and featured apps.
+  body.append(grouped([{ rows: [{ label: "All Apps", detail: String(meta.count), href: deeper(route, `section:${ALL}`) }],
+    footer: meta.count ? null : "No app on this source runs on this iPhone's iOS version." }]));
 
   if (meta.description) body.append(descriptionGroup(meta.description)); // F165: own group, long ones fold behind More
 
@@ -229,8 +232,6 @@ export async function renderAltSource(body, route, key) {
 
   const appRow = (r) => ({ label: r.name, subtitle: r.short, detail: r.version, href: deeper(route, `package:${r.id}`) });
   if (meta.featured.length) body.append(grouped([{ header: "Featured", rows: meta.featured.map(appRow) }]));
-  body.append(grouped([{ rows: [{ label: "All Apps", detail: String(meta.count), href: deeper(route, `section:${ALL}`) }],
-    footer: meta.count ? null : "No app on this source runs on this iPhone's iOS version." }]));
 
   // F76: Share in the nav bar: Copy Link, the add link's QR code and every sideloader that takes the source
   // (the iOS 6 share sheet, screens/handoff.js), in place of F8's Open In group.

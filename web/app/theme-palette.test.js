@@ -138,7 +138,8 @@ test("F325: the textured themes paint a still CSS texture and keep the nav bar's
     assert.equal(layers(t.get(bar).replace(/\/\*[\s\S]*?\*\//g, "")).length, 4, `${p}: four nav bar layers`);
     assert.match(pal, new RegExp(`\\[data-palette="${p}"\\][^{]*\\.page-body\\.grouped`), `${p}: the texture on grouped pages`);
   }
-  assert.doesNotMatch(pal.replace(/\/\*[\s\S]*?\*\//g, ""), /animation|@keyframes|transition/, "no animated texture");
+  // the textures sit still: no keyframe animation in the palettes (transitions on other rules stay allowed)
+  assert.doesNotMatch(pal.replace(/\/\*[\s\S]*?\*\//g, ""), /animation|@keyframes/, "no animated texture");
 });
 
 // ---- the stylesheets ----

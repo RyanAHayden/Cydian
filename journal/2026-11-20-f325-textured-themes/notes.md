@@ -45,6 +45,24 @@ Home, Changes, Settings, Theme list, a package page (Provenance), an alert. `nav
 Looked at each: text readable on every page; stitches, grain, felt, ruled paper and brushed silver show; the alert
 keeps the kit's blue. First pass found Brushed Metal's glyph buttons white on silver: fixed (filter) and reshot.
 
+## Spec review
+
+Fresh subagent on the diff + brief. Fixed: the F325 test's "no animation" check also refused any `transition` in
+palettes.css, stricter than the brief; it now refuses only `animation` / `@keyframes`. Kept, on purpose:
+- App.swift / test_launch_grounds.py and the three updated tests outside the brief's file list: the existing tests
+  require every Settings palette to have a launch ground, and they counted the old palettes.
+- Metal's dark text on bar buttons, scope segments and Cancel (beyond the title): white text on silver is unreadable.
+- Swatches follow the list's convention [bar colour, ground colour] (Felt: its wooden bar over green; Metal: silver bar
+  over silver ground), not the detail colour.
+- Opaque tables instead of the mockup's rgba glass: the contrast test needs hex, and on a still texture an opaque
+  mix looks the same.
+
+## Gate
+
+`node --test` of the theme tests passed (48/48) before the review. A first `tools/check.sh` failed one test I had
+missed: screens/settings.test.js (F205) lists the Theme > Light / Dark rows by name; updated to the new lists, now
+21/21. The final gate runs in `done`.
+
 ## Not verified
 
 - The jailbreak app / sideload IPA on a phone: no device test (task doesn't ask; the iPhone 7 needs its lock). The

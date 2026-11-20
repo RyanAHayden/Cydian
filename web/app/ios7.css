@@ -217,6 +217,31 @@ html[data-style="ios7"] .store-segment + .store-segment.selected { border-left-c
 html[data-style="ios7"] .store-segment:active:not(.selected) { background: var(--i7-seg-pressed); }
 html[data-style="ios7"] .store-segment.selected { color: var(--i7-tint-text); background: var(--i7-tint); }
 
+/* Scope bar (Changes' All / Installed, Installed's title, Search's scopes): the same tinted outline control. The
+   [data-theme] copies tie with packages.css's dark rules and win by order. */
+html[data-style="ios7"] .scope-segments,
+html[data-style="ios7"][data-theme] .scope-segments { box-shadow: none; }
+html[data-style="ios7"] .scope-segment, html[data-style="ios7"] .scope-filter,
+html[data-style="ios7"][data-theme] .scope-segment, html[data-style="ios7"][data-theme] .scope-filter {
+  font-size: 13px; font-weight: 400; color: var(--i7-tint); text-shadow: none;
+  border-color: var(--i7-tint); background: none;
+}
+html[data-style="ios7"] .scope-segment:first-child { border-radius: 4px 0 0 4px; }
+html[data-style="ios7"] .scope-segment:last-child { border-radius: 0 4px 4px 0; }
+html[data-style="ios7"] .scope-filter { border-radius: 4px; }
+html[data-style="ios7"] .scope-segment + .scope-segment,
+html[data-style="ios7"][data-theme] .scope-segment + .scope-segment,
+html[data-style="ios7"][data-theme] .scope-segment.selected + .scope-segment { border-left-color: var(--i7-tint); }
+html[data-style="ios7"] .scope-segment:active, html[data-style="ios7"] .scope-filter:active,
+html[data-style="ios7"][data-theme] .scope-segment:active, html[data-style="ios7"][data-theme] .scope-filter:active {
+  border-color: var(--i7-tint); background: var(--i7-seg-pressed);
+}
+html[data-style="ios7"] .scope-segment.selected, html[data-style="ios7"] .scope-filter.selected,
+html[data-style="ios7"][data-theme] .scope-segment.selected, html[data-style="ios7"][data-theme] .scope-filter.selected {
+  color: var(--i7-tint-text); border-color: var(--i7-tint); background: var(--i7-tint);
+}
+html[data-style="ios7"] .nav-segments .scope-segments { box-shadow: none; }
+
 /* Search bar: the field is a 5pt rounded white box; Cancel is tinted text. */
 html[data-style="ios7"] .search-field { border-radius: 5px; }
 html[data-style="ios7"] .search-cancel { font-size: 17px; font-weight: 400; }

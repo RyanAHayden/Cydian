@@ -796,18 +796,67 @@ export function addTweaksGroup({ bundleId, name = "", open = (o) => openAddTweak
 export const searchAllFooter = (name) => `Search All Repos finds tweaks for ${name || "this app"} in repos you haven't added.`;
 export const openSearchAllRepos = (o) => import("./findmore.js").then((m) => m.searchAllRepos(o));
 
+// B186: Add Tweaks opens as a pushed page (user: the same back arrow as other pushed pages, and the push slide like
+// every page). nav/sheet.js's scaffold (its own bar and body over everything) with ios6.css's back arrow in place of
+// Done, slid in from the right while the page under it moves a third as far and darkens (nav/transition.js's push);
+// Back (or Escape) slides it out the same way. Transform and opacity only.
+//   const close = showPushedPage({ title, back, body, onClose })   back: the arrow's label, the opener's title
+export const backLabel = (t) => { const s = String(t ?? "").trim(); return s && s.length <= 12 ? s : "Back"; };
+export function showPushedPage({ title = "", back = "", body = null, onClose = () => {} } = {}) {
+  let out = null, gone = false;
+  const close = () => { if (out) return out(); gone = true; return Promise.resolve(); };
+  Promise.all([import("../nav/sheet.js"), import("../nav/transition.js")]).then(([{ showSheet }, { DURATION, EASE }]) => {
+    if (gone) { onClose(); return; }
+    const doc = globalThis.document;
+    const btn = el("button", "bar-button back", backLabel(back));
+    btn.type = "button";
+    const s = showSheet({ title, body, left: btn, right: null, escape: false, onClose });
+    for (const a of s.sheet.getAnimations?.() ?? []) a.cancel(); // showSheet's rise: this page pushes instead
+    const under = doc.querySelector?.(".tab-stack.is-active > .page.is-top") ?? null; // the page shown (style.css)
+    const shade = under?.querySelector?.(".page-shade") ?? null;
+    const item = doc.querySelector?.(".nav-stack.is-active > .nav-item.is-top") ?? null; // its bar's title and buttons
+    const slide = (p0, p1, fill = "none") => {
+      const o = { duration: DURATION, easing: EASE, fill };
+      item?.animate?.([{ transform: `translate3d(${-50 * p0}%,0,0)`, opacity: String(1 - p0) }, { transform: `translate3d(${-50 * p1}%,0,0)`, opacity: String(1 - p1) }], { duration: DURATION, easing: EASE });
+      under?.animate?.([{ transform: `translate3d(${-30 * p0}%,0,0)` }, { transform: `translate3d(${-30 * p1}%,0,0)` }], { duration: DURATION, easing: EASE });
+      shade?.animate?.([{ opacity: String(0.1 * p0) }, { opacity: String(0.1 * p1) }], { duration: DURATION, easing: EASE });
+      return s.sheet.animate?.([{ transform: `translate3d(${(1 - p0) * 100}%,0,0)` }, { transform: `translate3d(${(1 - p1) * 100}%,0,0)` }], o);
+    };
+    slide(0, 1);
+    const onKey = (e) => { if (e.key === "Escape") out(); };
+    let leaving = null;
+    out = () => {
+      leaving ??= new Promise((resolve) => {
+        doc.removeEventListener?.("keydown", onKey);
+        const end = () => {
+          s.sheet.animate = null; // showSheet's close slides down: already off to the right, so it just goes
+          s().then(resolve, resolve);
+        };
+        const a = slide(1, 0, "forwards");
+        if (a?.finished) a.finished.then(end, end); else end();
+      });
+      return leaving;
+    };
+    btn.addEventListener("click", () => out());
+    doc.addEventListener?.("keydown", onKey);
+  });
+  return close;
+}
+
 // The Add Tweaks sheet. `pkg(row)` -> the package's stanza (the catalog's).
 export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, store = tweakStore, storage, fetchDeb, alert = showAlert,
   sheet = showActionSheet, show = null, pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza,
   browse = pickSourceTweak, onChange = () => {}, searchAll = openSearchAllRepos, paid = null } = {}) {
   style();
   return new Promise((resolve) => {
-    const body = el("div", "tweak-pick tw-add-page");
+    // B186: the page's own scroller with the grouped pinstripes (page-body grouped, as Settings), so From Files scrolls
+    // into view on a short screen; pushed from the right with a back arrow (showPushedPage).
+    const body = el("div", "sheet-scroll page-body grouped tweak-pick tw-add-page");
     const loading = el("div", "loading");
     loading.append(el("span", "loading-spinner"), el("span", null, "Loading Tweaks"));
     body.append(loading);
-    const opened = show ?? ((o) => { let c = () => {}; import("../nav/sheet.js").then(({ showSheet }) => { c = showSheet(o); }); return () => c(); });
-    opened({ title: "Add Tweaks", body, onClose: () => resolve() });
+    const opened = show ?? showPushedPage;
+    opened({ title: "Add Tweaks", back: name, body, onClose: () => resolve() });
     let made = [];
     const input = Object.assign(el("input", "visually-hidden"), { type: "file", accept: TWEAK_ACCEPT, multiple: true });
     input.id = "tw" + Math.random().toString(36).slice(2);

@@ -47,6 +47,12 @@ after: 2555 tests, 2555 pass both times, and the sorted `ok` names diff empty.
 - I wrote the first `withDocument` addition with a heredoc append and one file's block removal with a short python
   edit before switching to the file-edit tool for the rest; both results were read back and tested.
 
+## Spec review
+
+A fresh subagent found nothing missing. It flagged a stale comment in installroute-pair (fixed). As "not asked" it
+listed the thin per-test wrappers and the `_text` reads; both are kept because without them the old assertions
+would not read the same, and the brief says to grow the shared fakes "where one needs more".
+
 ## Not verified
 
 none (the gate `tools/check.sh` runs in `done`).

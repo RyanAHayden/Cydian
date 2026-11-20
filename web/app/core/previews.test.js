@@ -1,6 +1,7 @@
 // F122: an app's or package's links, and every kind of preview picture a source offers, into one gallery.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memStore } from "../fakes.test-helper.js";
 import {
   githubRepoOf, githubOf, appLinks, appGithub, packageLinks, packageGithub, sileoLinks,
   altShots, rawAltShots, aptShots, sileoShots, htmlShots, readmeShots, releaseShots, dedupeShots, isScreenshotUrl,
@@ -197,11 +198,6 @@ test("a package's links: Homepage:, GitHub from it or the depiction's buttons, t
   assert.deepEqual(packageGithub({ homepage: "https://github.com/dev/x" }), { owner: "dev", repo: "x" });
   assert.deepEqual(packageLinks({}), []);
 });
-
-function memStore() {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), m };
-}
 
 test("loadPreviews: the source's own first; else the depiction page; else GitHub; cached per app for a day", async () => {
   clearPreviewMemory();

@@ -1,6 +1,7 @@
 // N4: the install queue's model (core/queue.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "../fakes.test-helper.js";
 import { createQueue, modeOf, queueWords, parseSimulation, parseStatusLine, consoleText, finishOf, needsRestart,
   createRunLog, trimLog, runTitle, changeCount, queuedFor, LOG_KEY } from "./queue.js";
 
@@ -124,11 +125,6 @@ test("needsRestart: a package (or its other version) depending on mobilesubstrat
   assert.equal(needsRestart([{ package: "mobilesubstrate" }]), true);
   assert.equal(needsRestart([]), false);
 });
-
-function memStorage() {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
-}
 
 test("the run log keeps the newest runs, trimmed, and survives a reload of the same storage", () => {
   const st = memStorage();

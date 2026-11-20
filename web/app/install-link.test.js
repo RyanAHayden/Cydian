@@ -3,12 +3,9 @@
 // plain first-visit popup (Not Now / Install iFizBox), not the browse gate, and Not Now leaves the lock alone.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memory } from "./fakes.test-helper.js";
 import { takeInstallParam, askFromInstallLink, FIRST_KEY, FIRST_VISIT, firstVisitState, browsingLocked } from "./websign-gate.js";
 
-function memory(init = {}) {
-  const m = new Map(Object.entries(init));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
-}
 // A window whose replaceState moves location, as a browser's does.
 function fakeWin(url, extra = {}) {
   const win = { ...extra, replaced: [] };

@@ -2,6 +2,7 @@
 // own Changes row and its sideload install path. F183: the Essential Upgrade alert is gone.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "../fakes.test-helper.js";
 import {
   builtinSources, withBuiltins, withBuiltinRecords, builtinFirst, exportable, isBuiltin, BuiltinError,
   minimumOf, selfFromAltSource, selfUpgradeRow, withSelfUpgrade, selfInfoWith, lookForSelfUpdate, installSelf, loadInfo, saveInfo,
@@ -10,11 +11,6 @@ import {
 import { altKey } from "./altstore.js";
 import { sourceKey, refreshSource } from "./sources.js";
 import { exportText } from "./sourcelist.js";
-
-const memStorage = () => {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
-};
 
 // ---- the built-in source -------------------------------------------------------------------------------------
 

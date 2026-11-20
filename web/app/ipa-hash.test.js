@@ -3,6 +3,7 @@
 // version and the IPA's own, and refused before signing when MALWARE_IPAS lists it (refuseSha256, code "malware").
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memory } from "./fakes.test-helper.js";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { runSignJob, ipaSha256 } from "./websign-job.js";
@@ -14,10 +15,6 @@ const P12 = fx("test.p12"), PROFILE = fx("test.mobileprovision");
 const ZIP = new Uint8Array([0x50, 0x4b, 3, 4, 0, 0, 7, 7]);
 const SHA = createHash("sha256").update(ZIP).digest("hex");
 
-function memory() {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
-}
 
 // The smallest zsign the job gets through with: one app, an Info.plist, an output file.
 function fakeZsign() {

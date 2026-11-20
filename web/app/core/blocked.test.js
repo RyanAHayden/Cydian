@@ -2,6 +2,7 @@
 // settings keep the list on the device, and in jailbreak mode a block on an installed package also holds it with dpkg.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "../fakes.test-helper.js";
 import { createCatalog, runCatalog } from "./catalog.js";
 import { createSettings } from "./settings.js";
 import { dayGroups } from "./changes.js";
@@ -16,10 +17,6 @@ function catalog() {
   return c;
 }
 
-function memStorage(init = {}) {
-  const m = new Map(Object.entries(init));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), map: m };
-}
 
 // ifizbox-helper's hold/unhold/showhold (apt-mark), as settings.test.js fakes it.
 function fakeHelper({ held = [], fail = new Set() } = {}) {

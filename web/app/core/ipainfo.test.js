@@ -2,17 +2,13 @@
 // IPA says into compat (the source's fields win), what is kept on the device, the fallbacks, and the catalog's rows.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memoryStore } from "../fakes.test-helper.js";
 import { needsCheck, ipaInfoUrl, textMinOS, withIpaInfo, ipaRaises, savedInfo, allSaved, checkIpa, createQueue, clearIpaMemory,
   UNKNOWN_TTL, GUESS_TTL } from "./ipainfo.js";
 import { compat, compatCode, markOf, isIncompatible, badge, needText } from "./compat.js";
 import { createCatalog, ALL } from "./catalog.js";
 import { ipaCheck } from "../screens/altstore.js";
 
-const memoryStore = () => {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k),
-    key: (i) => [...m.keys()][i] ?? null, get length() { return m.size; }, m };
-};
 const IPA = "https://github.com/a/b/releases/download/v1/App.ipa";
 const iphone = (ios) => ({ ios, jailbreak: "none" });
 const app = (extra = {}) => ({ package: "com.ex.app", kind: "ipa", downloadURL: IPA, ...extra });

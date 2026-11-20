@@ -2,10 +2,10 @@
 // edit, swipe and selection states, and a held row's sheet.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "../fakes.test-helper.js";
 import { totalSize, libraryFooter, deleteLabel, deleteButtonText, deleteSheetTitle, listState, listStep, tapOpens,
   allSelected, holdActions, HOLD, deleteEntries, addSiteUrl, siteEntries, memoryIpaStore, formatBytes } from "./myipas.js";
 
-const memStorage = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)) }; };
 const MB = 1048576;
 
 test("the footer: how many IPAs and their total size; links count nothing", () => {

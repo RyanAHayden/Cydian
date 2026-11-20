@@ -3,6 +3,7 @@
 // and the ifizbox://package link the app opens at that app's page (incoming.js).
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memory } from "./fakes.test-helper.js";
 import {
   ACCEPT_KEY, FIRST_KEY, websiteInstallsOn, setWebsiteInstalls, acceptWebsiteInstalls, WARNING, WARNING_SECONDS,
   packageLink, packageIdOf, idFromHash, siteGateRows, WEBSITE_ON_SUBTITLE, WEBSITE_OFF_SUBTITLE,
@@ -13,10 +14,6 @@ import { handleIncoming } from "./incoming.js";
 import { showAlert } from "./nav/alert.js";
 import { format } from "./router.js";
 
-function memory(init = {}) {
-  const m = new Map(Object.entries(init));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
-}
 const labels = (rows) => rows.map((r) => r.label);
 const OTHER = { version: "1.2", downloadURL: "https://example.com/Delta.ipa" };
 const IFIZBOX = { version: "0.3.7", downloadURL: "https://github.com/RyanAHayden/iFizBox/releases/download/v0.3.7/iFizBox.ipa" };

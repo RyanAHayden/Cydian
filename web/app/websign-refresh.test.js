@@ -3,13 +3,10 @@
 // Both run Changes' Refresh job (screens/changes.js reloadSources).
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memory } from "./fakes.test-helper.js";
 import { askToBrowse, refreshOnLaunch, FIRST_KEY, firstVisitState } from "./websign-gate.js";
 import { reloadSources } from "./screens/changes.js";
 
-function memory(init = {}) {
-  const m = new Map(Object.entries(init));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
-}
 const tick = () => new Promise((r) => setTimeout(r, 0));
 const counter = () => { const f = () => { f.n++; }; f.n = 0; return f; };
 

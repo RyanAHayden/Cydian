@@ -2,6 +2,7 @@
 // reaches the daemon again at launch. Jailbreak app only.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "./fakes.test-helper.js";
 import { createUpgradeNotices, createPrefsMirror } from "./settings.js";
 import { createSettings } from "./core/settings.js";
 
@@ -94,10 +95,6 @@ test("app.js wires it beside the tab badge and starts it after the router", asyn
 });
 
 // F70: N7's settings reach the daemon through the shell's prefs.set (Bridge.swift Prefs).
-function memStorage() {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)) };
-}
 
 test("the prefs mirror sends every daemon key at launch, then each change on its own", async () => {
   const native = fakeNative();

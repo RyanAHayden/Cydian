@@ -2,15 +2,11 @@
 // and Reload runs (against fakes for the bridge and the alerts: it must never call one).
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "../fakes.test-helper.js";
 import {
   parseVersion, compareVersions, isNewer, noteLines, parseRelease, debFor, installPath, loadState, saveState,
   newerRelease, fetchRelease, checkForUpdates, STORE_KEY, RELEASES_URL,
 } from "./selfupdate.js";
-
-function memStorage(init = {}) {
-  const m = new Map(Object.entries(init));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), map: m };
-}
 
 const GH = {
   tag_name: "v0.2.0",

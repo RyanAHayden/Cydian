@@ -2,52 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openSeenStore, recordRefresh, changeGroups, newRecords, recordKey } from "./changes.js";
 
-// The slice of IndexedDB changes.js uses, in memory: open with upgradeneeded, one keyPath store, async requests,
-// several requests per transaction, completion after the last one.
-function fakeIndexedDB() {
-  const dbs = new Map();
-  const later = (f) => setTimeout(f, 0);
-  return {
-    open(name) {
-      const req = {};
-      later(() => {
-        let db = dbs.get(name);
-        const fresh = !db;
-        if (fresh) {
-          const stores = new Map();
-          db = {
-            objectStoreNames: { contains: (n) => stores.has(n) },
-            createObjectStore(n, { keyPath }) { stores.set(n, { keyPath, rows: new Map() }); },
-            transaction(n, mode) {
-              const s = stores.get(n);
-              const tx = {};
-              let pending = 0;
-              const request = (f) => {
-                const r = {};
-                pending++;
-                later(() => { r.result = f(); if (--pending === 0) later(() => tx.oncomplete?.()); });
-                return r;
-              };
-              tx.objectStore = () => ({
-                put: (v) => { if (mode !== "readwrite") throw new Error("read-only"); return request(() => { s.rows.set(v[s.keyPath], structuredClone(v)); return v[s.keyPath]; }); },
-                getAll: () => request(() => [...s.rows.values()].map((v) => structuredClone(v))),
-                getAllKeys: () => request(() => [...s.rows.keys()].sort()),
-                clear: () => request(() => { s.rows.clear(); }),
-              });
-              return tx;
-            },
-            close() {},
-          };
-          dbs.set(name, db);
-        }
-        req.result = db;
-        if (fresh) req.onupgradeneeded?.();
-        req.onsuccess?.();
-      });
-      return req;
-    },
-  };
-}
 
 const DAY = 86400000;
 const row = (id, version, key = "r1") => ({ id, name: id, version, key, short: "", section: "Tweaks" });
@@ -118,6 +72,7 @@ test("changes: no IndexedDB is a rejection, not a throw", async () => {
 // ---- F51: by day, the last 7 days ----
 import { dayGroups, dayTitle, dayOf, filterRows, filterGroups, defaultScope, WINDOW_DAYS } from "./changes.js";
 import { installedIds } from "./installed.js";
+import { fakeIndexedDB } from "../fakes.test-helper.js";
 
 const at = (d, h = 12) => new Date(2026, 10, d, h).getTime(); // November 2026, local time
 const rec = (id, version, first, date) => ({ k: recordKey("r1", id, version), key: "r1", id, version, first, ...(date != null ? { date } : {}) });

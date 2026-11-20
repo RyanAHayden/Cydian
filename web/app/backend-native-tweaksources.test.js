@@ -2,47 +2,10 @@
 // tweak-sources.json's "inject" repos, refreshed through the shell's net.packages and counted by injectable tweaks.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { fakeIndexedDB as memoryIndexedDB } from "./fakes.test-helper.js";
 import { createNativeBackend } from "./backend-native.js";
 import { injectSourcesFrom, tweakSourcesFor, tweakSourcesOn, sourceFilter } from "./core/sources.js";
 
-function memoryIndexedDB() {
-  const dbs = new Map();
-  const later = (f) => setTimeout(f, 0);
-  return {
-    open(name) {
-      const req = {};
-      later(() => {
-        let db = dbs.get(name);
-        const fresh = !db;
-        if (fresh) {
-          const stores = new Map();
-          db = {
-            objectStoreNames: { contains: (n) => stores.has(n) },
-            createObjectStore(n, { keyPath }) { stores.set(n, { keyPath, rows: new Map() }); },
-            transaction(n) {
-              const s = stores.get(n);
-              const tx = {};
-              const request = (f) => { const r = {}; later(() => { r.result = f(); later(() => tx.oncomplete?.()); }); return r; };
-              tx.objectStore = () => ({
-                get: (k) => request(() => structuredClone(s.rows.get(k))),
-                getAll: () => request(() => [...s.rows.values()].map((v) => structuredClone(v))),
-                put: (v) => request(() => { s.rows.set(v[s.keyPath], structuredClone(v)); return v[s.keyPath]; }),
-                delete: (k) => request(() => { s.rows.delete(k); }),
-              });
-              return tx;
-            },
-            close() {},
-          };
-          dbs.set(name, db);
-        }
-        req.result = db;
-        if (fresh) req.onupgradeneeded?.();
-        req.onsuccess?.();
-      });
-      return req;
-    },
-  };
-}
 
 const PACKAGES = [
   "Package: com.x.yt\nArchitecture: iphoneos-arm64\nSection: Tweaks\nDepends: mobilesubstrate\n",

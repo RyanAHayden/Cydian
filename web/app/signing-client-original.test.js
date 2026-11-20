@@ -2,6 +2,7 @@
 // and library.* calls carrying Keep Bundle IDs (libraryCall).
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "./fakes.test-helper.js";
 import { originalWarning, ORIGINAL_WARNED_KEY, libraryCall } from "./signing-client.js";
 import { IFIZBOX_ID } from "./core/websign.js";
 
@@ -16,10 +17,6 @@ function fakeNative({ installed = {}, records = [] } = {}) {
       return {};
     },
   };
-}
-function memStorage() {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), m };
 }
 const answering = (index, seen) => async (a) => { seen.push(a); return { index }; };
 

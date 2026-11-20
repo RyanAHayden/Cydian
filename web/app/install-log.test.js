@@ -2,20 +2,9 @@
 // IPAs). Once iOS has the link the page ends on Done (user 2026-11-18), so the server's later lines aren't shown.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { fakeNative } from "./fakes.test-helper.js";
 import { installFromLibrary } from "./signing-client.js";
 
-function fakeNative(answers = {}) {
-  const calls = [];
-  return {
-    mode: "sideload", calls,
-    async call(method, params, onEvent) {
-      calls.push({ method, params });
-      const a = answers[method];
-      if (a instanceof Error) throw a;
-      return typeof a === "function" ? a(params, onEvent) : a ?? null;
-    },
-  };
-}
 function fakeHUD() {
   const h = { labels: [], lines: [], hidden: 0 };
   h.set = (x) => h.labels.push(x);

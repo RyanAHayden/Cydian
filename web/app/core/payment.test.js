@@ -1,5 +1,6 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "../fakes.test-helper.js";
 import http from "node:http";
 import {
   isCommercial, paymentEndpointUrl, parseEndpoint, buildRequest, authenticateUrl, parseCallback, parseReply,
@@ -106,11 +107,6 @@ async function request({ method, url, headers, body }) {
   let json = null;
   try { json = await res.json(); } catch { json = null; }
   return { status: res.status, json };
-}
-
-function memStorage() {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
 }
 
 test("against a fake vendor: price, sign in, buy, authorize the download, sign out", async () => {

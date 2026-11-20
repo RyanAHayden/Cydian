@@ -2,6 +2,7 @@
 // page), the week-long cache, and where the website and the app ask.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memStore } from "../fakes.test-helper.js";
 import { lookupUrl, workerLookupUrl, regionOf, parseLookup, lookupNeed, mergeDetails, pageLinks, pageKey, lookupApp,
   clearLookupMemory, LOOKUP_TTL } from "./applookup.js";
 import { appLinks } from "./previews.js";
@@ -126,11 +127,6 @@ test("pageLinks: never two rows to one page", () => {
   // nothing found and no website: just the source
   assert.deepEqual(pageLinks({ source }).map((r) => r.kind), ["source"]);
 });
-
-function memStore() {
-  const m = new Map();
-  return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m };
-}
 
 test("lookupApp: cached per bundle ID a week, not-found too; a failed fetch isn't cached", async () => {
   clearLookupMemory();

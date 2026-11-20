@@ -2,6 +2,7 @@
 // sources, lists and dpkg status, and native/fake/ifizbox-helper), fed into the same core as the site.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { fakeIndexedDB } from "./fakes.test-helper.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import vm from "node:vm";
@@ -13,49 +14,6 @@ import { createSettings } from "./core/settings.js";
 import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
 import { DOMAIN } from "./brand.js";
 
-function fakeIndexedDB() {
-  const dbs = new Map();
-  const later = (f) => setTimeout(f, 0);
-  return {
-    open(name) {
-      const req = {};
-      later(() => {
-        let db = dbs.get(name);
-        const fresh = !db;
-        if (fresh) {
-          const stores = new Map();
-          db = {
-            objectStoreNames: { contains: (n) => stores.has(n) },
-            createObjectStore(n, { keyPath }) { stores.set(n, { keyPath, rows: new Map() }); },
-            transaction(n, mode) {
-              const s = stores.get(n);
-              const tx = {};
-              const request = (f) => {
-                const r = {};
-                later(() => { r.result = f(); later(() => tx.oncomplete?.()); });
-                return r;
-              };
-              const write = (f) => { if (mode !== "readwrite") throw new Error("read-only"); return request(f); };
-              tx.objectStore = () => ({
-                get: (k) => request(() => structuredClone(s.rows.get(k))),
-                getAll: () => request(() => [...s.rows.values()].map((v) => structuredClone(v))),
-                put: (v) => write(() => { s.rows.set(v[s.keyPath], structuredClone(v)); return v[s.keyPath]; }),
-                delete: (k) => write(() => { s.rows.delete(k); }),
-              });
-              return tx;
-            },
-            close() {},
-          };
-          dbs.set(name, db);
-        }
-        req.result = db;
-        if (fresh) req.onupgradeneeded?.();
-        req.onsuccess?.();
-      });
-      return req;
-    },
-  };
-}
 
 const PROCURSUS = "deb:https://apt.procurs.us/:1800";
 const HAVOC = "deb:https://havoc.app/:./";

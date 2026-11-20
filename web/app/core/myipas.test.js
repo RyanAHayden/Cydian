@@ -1,6 +1,7 @@
 // F77: My IPAs' list and states (core/myipas.js), and the website's library of links.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memoryStorage } from "../fakes.test-helper.js";
 import { stateOf, libraryRows, ipaSubtitle, formatBytes, nameFromUrl, ipaToken, fileOfToken, optionsParams, siteEntries,
   addSiteUrl, removeSiteUrl, STATE_LABELS, MYIPAS } from "./myipas.js";
 
@@ -61,11 +62,6 @@ test("Sign Options: only what changes, a bad bundle ID refused", () => {
   { file: "Delta.ipa", name: "Delta 2", bundleId: "com.me.delta", removeExtensions: ["PlugIns/Widget.appex"], fixArm64e: false, icon: "iVBO" });
   assert.throws(() => optionsParams(info, { bundleId: "not a bundle id" }), /isn't a bundle ID/);
 });
-
-function memoryStorage() {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
-}
 
 test("the website's library: links kept on this device, one entry per link, unique names", () => {
   const s = memoryStorage();

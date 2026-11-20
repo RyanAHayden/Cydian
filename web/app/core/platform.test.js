@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as storage } from "../fakes.test-helper.js";
 import { notIphoneKind, notIphonePage, dismissNotIphone, notIphoneText, DISMISS_KEY } from "./platform.js";
 import { NAME } from "../brand.js";
 
@@ -43,11 +44,6 @@ test("an unknown user agent (crawler, link preview, none) gets the app", () => {
   assert.equal(notIphoneKind({ userAgent: "" }), null);
   assert.equal(notIphoneKind(undefined), null);
 });
-
-function storage(init = {}) {
-  const m = new Map(Object.entries(init));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), m };
-}
 
 test("Look Around Anyway is remembered in ifizbox.* storage", () => {
   assert.ok(DISMISS_KEY.startsWith("ifizbox."));

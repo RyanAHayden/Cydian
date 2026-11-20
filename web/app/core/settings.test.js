@@ -1,14 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "../fakes.test-helper.js";
 import { createSettings, detectMode, themeFor, SETTINGS, FEATURES, bridgeArch, DAEMON_KEYS, DAEMON_LISTS, RETIRED,
   RETIRED_DAEMON_KEYS, dropRetired, PAGES, SECTIONS } from "./settings.js";
 import { autoMarkShown } from "./automark.js";
 import { DEFAULT_ARCH } from "./apt.js";
 
-function memStorage(init = {}) {
-  const m = new Map(Object.entries(init));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), map: m };
-}
 const everything = new Set(SETTINGS.map((d) => d.feature));
 const keysOf = (s) => s.visible().map((d) => d.key);
 

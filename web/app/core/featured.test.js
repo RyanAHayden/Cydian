@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "../fakes.test-helper.js";
 import { readFileSync } from "node:fs";
 import { parseFeatured, parseSize, featuredUrl, createFeaturedStore, DEFAULT_ITEM_SIZE } from "./featured.js";
 
@@ -59,11 +60,6 @@ test("featuredUrl sits at the repo's URI", () => {
   assert.equal(featuredUrl({ uri: "https://repo.chariz.com" }), "https://repo.chariz.com/sileo-featured.json");
   assert.equal(featuredUrl({ key: "alt:https://x" }), null);
 });
-
-function memStorage() {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
-}
 
 test("the store caches hits and misses, and Home takes a few from each source in turn", async () => {
   const asked = [];

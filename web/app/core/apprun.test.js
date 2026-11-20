@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, stallText } from "./apprun.js";
+import { coordinatorBusy, busyBundleId, ownIdOk, BUSY_ROW, BUSY_ROW_KEPT } from "./apprun.js"; // B151
 import { SELF_ID } from "./appqueue.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -480,4 +481,77 @@ test("B137: a local row whose install goes through the Signing Server after all 
   assert.equal(runStatus(rows), "Tap Install for A (1 of 2)");
   rows[0].local = false; rows[0].phase = null; // no local hint (website, tests): the old words
   assert.equal(rowStatus(rows[0]), "Tap Install on the iOS prompt");
+});
+
+// B151: the user's error from the This iPhone route (installd), as the row's failure reached the run.
+const IX46 = 'Error Domain=IXErrorDomain Code=46 "A coordinated app install already exists for com.atebits.Tweetie2 ' +
+  '(creator App Store) but request by mobile_installation_proxy had scope requirement ' +
+  'IXCoordinatorScopeRequirementRequired" UserInfo={NSLocalizedDescription=A coordinated app install already exists ' +
+  'for com.atebits.Tweetie2, SourceFileLine=123, FunctionName=+[IXAppInstallCoordinator ...]} (APIInternalError)';
+
+test("B151: the App Store's install coordinator (IX Code 46) reads in plain words, and the row's tap installs it with its own bundle ID", async () => {
+  assert.equal(coordinatorBusy(IX46), true);
+  assert.equal(coordinatorBusy("IXErrorDomain Code=46"), true);
+  assert.equal(coordinatorBusy("IXErrorDomain Code=4"), false);
+  assert.equal(coordinatorBusy("ApplicationVerificationFailed"), false);
+  assert.equal(busyBundleId(IX46), "com.atebits.Tweetie2");
+
+  const ph = phone();
+  const lines = [];
+  const rows = appRows([{ id: "com.atebits.Tweetie2", name: "X", mode: "install", url: "https://x/x.ipa" }]);
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, discard: ph.discard, onLog: (l) => lines.push(l) });
+  const end = run.start();
+  await flush();
+  ph.signed("com.atebits.Tweetie2");
+  await flush();
+  ph.pending.install.get("com.atebits.Tweetie2").reject(new Error(IX46));
+  await end;
+  const r = rows[0];
+  assert.equal(r.state, "failed");
+  assert.equal(r.busy, true);
+  assert.equal(rowStatus(r), `Failed: ${BUSY_ROW}`);
+  assert.ok(!rowStatus(r).includes("IXErrorDomain"), "never installd's dump as the main line");
+  const err = lines.filter((l) => l.kind === "error").map((l) => l.text);
+  assert.equal(err.length, 1);
+  assert.ok(!err[0].includes("IXErrorDomain"));
+  assert.match(err[0], /^X: the App Store holds an install of com\.atebits\.Tweetie2 /);
+  assert.match(err[0], /restarting the iPhone doesn't clear it/);
+  assert.match(err[0], /its own bundle ID/);
+  assert.equal(summaryLine(rows), "1 failed");
+
+  // the tap: signed again from the start with Keep Bundle IDs off for this app only
+  const again = run.ownIdRetry("com.atebits.Tweetie2");
+  assert.ok(again);
+  assert.equal(r.busy, false);
+  assert.equal(r.job.options.edits.keepBundleId, false);
+  assert.ok(lines.some((l) => l.text === "Installing X with its own bundle ID"));
+  await flush();
+  assert.equal(r.state, "downloading");
+  ph.signed("com.atebits.Tweetie2", { bundleId: "com.atebits.Tweetie2.ABCDE12345" });
+  await flush();
+  ph.installed("com.atebits.Tweetie2");
+  await again;
+  assert.equal(r.state, "installed");
+  assert.equal(r.bundleId, "com.atebits.Tweetie2.ABCDE12345");
+  // already its own ID: no second offer
+  assert.equal(ownIdOk(r), false);
+  assert.equal(run.ownIdRetry("com.atebits.Tweetie2"), null);
+});
+
+test("B151: iFizBox itself and a record-only re-sign get the plain words without the own-ID offer", async () => {
+  const ph = phone();
+  const lines = [];
+  const rows = appRows([{ id: "rec", name: "Rec", mode: "resign" }, { id: SELF_ID, name: "Self", mode: "install", url: "https://x/s.ipa" }]);
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, discard: ph.discard, onLog: (l) => lines.push(l) });
+  const end = run.start();
+  await flush();
+  ph.pending.sign.get("rec").reject(new Error(IX46));
+  ph.pending.sign.get(SELF_ID).reject(new Error(IX46));
+  await end;
+  for (const r of rows) {
+    assert.equal(r.busy, false);
+    assert.equal(rowStatus(r), `Failed: ${BUSY_ROW_KEPT}`);
+    assert.equal(run.ownIdRetry(r.id), null);
+  }
+  assert.ok(lines.filter((l) => l.kind === "error").every((l) => /^[^:]+: the App Store holds .*Cancel the App Store's download/.test(l.text)));
 });

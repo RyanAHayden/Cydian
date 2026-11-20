@@ -11,7 +11,9 @@
 //     opens the Log with that app's lines only. A prompt that closed without iOS asking for the IPA (the user's Cancel,
 //     or iOS couldn't reach iFizBox: it can't tell which) ends its row "Failed: iOS didn't download it" and the next
 //     app goes on; that row's tap (Try Again) asks iOS again with the IPA still served (B91: the Signing Server's copy
-//     after a freeze), and only that tap opens a new prompt. The summary ("2 installed, 1 failed") ends the list and the log.
+//     after a freeze), and only that tap opens a new prompt. A row the App Store's install coordinator blocked (IX
+//     Code 46, "Failed: the App Store holds this app's install. Tap to install it with its own bundle ID") goes
+//     again on its tap with Keep Bundle IDs off for that app (B151, run.ownIdRetry). The summary ("2 installed, 1 failed") ends the list and the log.
 //   Log: one line per phase per app (Downloading Delta 48 MB, Signed Delta, Asked iOS to install Delta, Installed
 //     Delta / the reason it failed) with the shell's own lines grey under its app. Percents only move the rows' bars
 //     and the bottom status.
@@ -180,7 +182,8 @@ export async function runAppRun(jobs, deps) {
     li.append(main, act);
     list.append(li);
     main.addEventListener("click", () => {
-      if (!run.running && (r.state === "failed" || r.state === "cancelled")) retry(r.id);
+      if (!run.running && r.state === "failed" && r.busy) ownId(r.id); // B151: the App Store holds its bundle ID
+      else if (!run.running && (r.state === "failed" || r.state === "cancelled")) retry(r.id);
       else if (r.state === "asking" && lanes.reprompt) run.reprompt(r.id); // B85: the prompt again
       else showLog(r.id);
     });
@@ -266,6 +269,7 @@ export async function runAppRun(jobs, deps) {
   done.addEventListener("click", () => page.close());
   retryAll.addEventListener("click", () => { const p = run.retryAll(); if (p) drive(p); });
   const retry = (id) => { const p = run.retry(id); if (p) drive(p); };
+  const ownId = (id) => { const p = run.ownIdRetry(id); if (p) drive(p); };
 
   let first = null;
   let latest = null;

@@ -372,14 +372,6 @@ export function reviewsGroup(reviews, renderText) {
   return g;
 }
 
-// The Reviews tab: the ratings card, the reviews, and a footer saying where they come from.
-export function reviewsPane(pane, { rating = null, reviews = [], renderText, footer = null } = {}) {
-  const parts = [ratingsCard(rating, { reviews })];
-  if (reviews.length) parts.push(reviewsGroup(reviews, renderText));
-  pane.replaceChildren(...parts);
-  if (footer) pane.append(grouped([{ footer }]));
-}
-
 // ---- What's New ------------------------------------------------------------------------------------------------
 
 // The What's New card: "What's New in 2.1.3" with the date on the right, the notes, and Version History under them

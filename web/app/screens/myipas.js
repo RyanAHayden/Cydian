@@ -809,20 +809,6 @@ function putIconUrl(box, url) {
 
 const refresh = () => { if (view.body?.isConnected) load(); };
 
-// The Add sheet (Files / From URL), for callers outside the page; the page has its own Add an IPA group (F224).
-export async function addMenu() {
-  if (site()) {
-    // F197: the picker opens from the sheet's tap (Safari opens a file input only inside the user's tap).
-    const i = await showActionSheet({ buttons: ["Choose File", "From URL"] });
-    if (i === 0) return chooseSiteFile();
-    if (i === 1) return addFromUrl();
-    return;
-  }
-  const i = await showActionSheet({ buttons: ["Files", "From URL"] }); // F79: Browse is the page's own section now
-  if (i === 0) return pickFiles();
-  if (i === 1) return addFromUrl();
-}
-
 async function pickFiles() {
   let r;
   try { r = await libraryCall("pick", {}); } catch (e) {
@@ -1438,6 +1424,3 @@ async function saveOptions(file) {
 }
 
 export { STATE_LABELS };
-
-// N9: an IPA shared with iFizBox (share.js): Install, as the IPA page's button does (signs, installs, remembers it).
-export const installLibraryFile = (file) => install(file);

@@ -1,5 +1,5 @@
 // IPA source formats -> the AltStore shape (F16), so every format becomes the same catalog rows as F9's AltStore
-// sources (core/altstore.js parseAltSource + appStanza): Sources, Changes, Search, upgrades and push need nothing
+// sources (core/altparse.js parseAltSource + appStanza): Sources, Changes, Search, upgrades and push need nothing
 // per format.
 //
 //   toAltSource(format, json)         -> AltStore source JSON (what parseAltSource reads) for altstore, esign,
@@ -12,7 +12,7 @@
 //
 // Apps with no bundle id (ESign often, GBox always) get a stable made-up one: `<format>.<name slug>`, so a refresh
 // keeps the same row and Changes sees a version bump, not a new app.
-import { parseAltSource, appStanza, str, httpUrl } from "../altstore.js";
+import { parseAltSource, appStanza, str, httpUrl } from "../altparse.js";
 import { NAME } from "../../brand.js";
 import { githubToAlt } from "../github.js"; // F304
 

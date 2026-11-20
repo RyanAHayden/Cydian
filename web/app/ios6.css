@@ -455,6 +455,8 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
    #878787), track #007fe9 or #ededed with an inner shadow, ON in white or OFF in grey, and the 27px handle
    (#fbfbfb to #cfcfcf, black edge at 49%) that slides across by transform. Same in both themes, as the kit's. */
 .cell-inner.has-switch { padding-right: 9px; }
+/* B164: a bare label before a switch takes the row's room, so the switch sits at the right edge as in Settings. */
+.cell-inner.has-switch > .cell-label { flex: 1; min-width: 0; }
 /* On/off switch. Size from the Teehan+Lax kit ("switch (off|on)"): 77x27 track, 25pt knob 1pt inside it, 50pt of
    travel (a bigger knob over the outline looked too large). Colours from the 4S's UISwitch art.
    Everything rides on --x (0 off, 50px on; settings.js sets it while dragging): the knob, the blue fill that ends at
@@ -646,6 +648,10 @@ input.sign-field::placeholder { color: var(--field-hint); opacity: 1; }
 .cell.server-field .cell-detail { color: var(--field-text); }
 .cell.server-field-default .cell-detail { color: var(--field-hint); }
 .sign-browse { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); min-width: 0; display: inline-block; }
+/* B164: a row that holds its own button (My IPAs' Sign Options Icon row): the button is a flex item at the row's right
+   edge, the value right-aligned before it, no room kept for an absolute button. */
+.sign-row.has-browse { padding-right: 9px; }
+.sign-row.has-browse > .sign-browse { position: static; transform: none; flex: none; }
 /* F248: the Password group under the certificate's files (settings.js passwordBlock): a full-width secure field after
    a state glyph, "Read From a .txt File" as a centred bold blue button row, the state in the footer. While it waits
    the field's row is white with a 2px blue ring drawn inside it (no glow), its top corners the table's. */

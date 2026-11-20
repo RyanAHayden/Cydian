@@ -1,0 +1,6 @@
+[
+  { "eval": "localStorage.setItem('ifizbox.appearance', 'dark'); localStorage.setItem('ifizbox.darkTheme', 'gunmetal'); 'ok'" },
+  { "nav": "#/installed/myipas/ipa:Delta.ipa/options", "ms": 5000 },
+  { "shot": "signoptions" },
+  { "eval": "document.documentElement.dataset.theme + ' ' + document.documentElement.dataset.palette" }
+]

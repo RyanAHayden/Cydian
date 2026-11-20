@@ -118,6 +118,7 @@ function fakeAsc({ devices = [], certs = [{ id: "C1", attributes: { serialNumber
     }
     const m = /^\/bundleIds\/([^/]+)\/bundleIdCapabilities$/.exec(u.pathname);
     if (method === "GET" && m) {
+      if (u.search) throw new AscError(`App Store Connect GET ${u.pathname}: query parameters are not allowed`, { status: 400, code: "PARAMETER_ERROR.ILLEGAL" });
       if (!s.caps[m[1]]) throw new AscError("gone", { status: 404 });
       return { data: s.caps[m[1]].map((c) => ({ attributes: { capabilityType: c } })) };
     }

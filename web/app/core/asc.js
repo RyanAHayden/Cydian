@@ -162,7 +162,8 @@ export async function ensureAppId(request, identifier) {
 }
 
 export async function appIdCaps(request, bundleIdId) {
-  const r = await request("GET", `/bundleIds/${bundleIdId}/bundleIdCapabilities${q({ limit: 200 })}`);
+  // No query string: Apple answers 400 PARAMETER_ERROR.ILLEGAL to 'limit' on this path (real call 2026-11-19).
+  const r = await request("GET", `/bundleIds/${bundleIdId}/bundleIdCapabilities`);
   return (r.data ?? []).map((c) => c.attributes?.capabilityType).filter(Boolean).sort();
 }
 

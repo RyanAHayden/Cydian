@@ -546,6 +546,26 @@ enum IDevice {
             return c
         }
 
+        /// This phone's UDID from lockdown (GetValue UniqueDeviceID): for registering it in the developer account
+        /// (native/Sources/ASC.swift), when the app's own profile lists several devices.
+        func udid() throws -> String {
+            watch.begin("asking lockdown for the UDID", Limit.service)
+            var c: OpaquePointer?
+            switch kind {
+            case .remotePairing: try check(lockdownd_connect_rsd(adapter, handshake, &c), "udid_failed")
+            case .lockdown: try check(lockdownd_connect(provider, &c), "udid_failed")
+            }
+            defer { lockdownd_client_free(c) }
+            var value: plist_t?
+            try check(lockdownd_get_value(c, "UniqueDeviceID", nil, &value), "udid_failed")
+            defer { plist_free(value) }
+            var s: UnsafeMutablePointer<CChar>?
+            plist_get_string_val(value, &s)
+            guard let p = s else { throw Failure(code: "udid_failed", text: "lockdown gave no UniqueDeviceID") }
+            defer { plist_mem_free(p) }
+            return String(cString: p)
+        }
+
         func installationProxy() throws -> OpaquePointer? {
             watch.begin("connecting to installation_proxy", Limit.service)
             var c: OpaquePointer?
@@ -569,7 +589,20 @@ enum IDevice {
     }
 
     /// Connects once with the stored pairing: "is the pairing still good and LocalDevVPN on". Blocking.
-    static func verify() throws -> Kind { try watched("verify") { try Session(watch: $0).kind } }
+    static func verify() throws -> Kind {
+        try watched("verify") { w in
+            let s = try Session(watch: w)
+            if let u = try? s.udid() { PhoneID.remember(u) } // a check is a free chance to learn it
+            return s.kind
+        }
+    }
+
+    /// This phone's UDID through the pairing (blocking). PhoneID keeps it.
+    static func readUDID() throws -> String {
+        let u = try watched("udid") { try Session(watch: $0).udid() }
+        PhoneID.remember(u)
+        return u
+    }
 
     // ---- Installing
 

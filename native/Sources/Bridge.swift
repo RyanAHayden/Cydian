@@ -64,6 +64,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         BackgroundCheck.register(self) // I3: updates.watch, the sideload build's background update check
         ShareBridge.register(self) // N9: share.*, what the share sheet and Open in iFizBox handed over (share/App/)
         AccountKey.register(self) // F97: account.key.*, the iFizBox Account key in the Keychain (Account.swift)
+        ASC.register(self) // asc.*: the App Store Connect key and the profiles iFizBox makes with it (ASC.swift)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }

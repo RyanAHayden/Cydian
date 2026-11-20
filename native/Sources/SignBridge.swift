@@ -66,6 +66,7 @@ enum SignBridge {
         let iso = ISO8601DateFormatter()
         if let id = SignStore.identity(), let der = SignStore.certificateDER(id), let cert = try? Certificate(der: der) {
             var ident: [String: Any] = ["name": cert.commonName ?? "", "team": cert.team ?? ""]
+            if let s = ASC.serialHex(der) { ident["serial"] = s } // Settings' Check Account (screens/devaccount.js)
             if let x = cert.notAfter { ident["expires"] = iso.string(from: x) }
             if let p = SignStore.profile() {
                 var prof: [String: Any] = ["name": p.name, "team": p.team, "appId": p.appID, "devices": p.devices,

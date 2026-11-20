@@ -109,7 +109,8 @@ export { settings, createSwitch };
 export const THEME_COLORS = { classic: "#4f698b", oled: "#000", gunmetal: "#5f656f", midnight: "#0a1424", linen: "#000",
   nord: "#2e3440", dracula: "#21222c", sepia: "#7a5c36", solarized: "#2a74a8",
   // F325: the textured ones, each its bar's status-bar colour
-  leather: "#4a2e1a", felt: "#6a4220", wood: "#42270f", legalpad: "#5a3218", metal: "#9aa0a9" };
+  leather: "#4a2e1a", felt: "#6a4220", wood: "#42270f", legalpad: "#5a3218", metal: "#9aa0a9",
+  white: "#f7f7f7" }; // F201: iOS 7's White, its #f7f7f7 bar
 
 const defOf = (key) => SETTINGS.find((d) => d.key === key);
 const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? String(v);
@@ -763,7 +764,8 @@ export function applyTheme(doc = document, win = window) {
   const lightTheme = settings.get("lightTheme");
   const darkPalette = settings.get("darkTheme");
   const preview = currentPreview(win);
-  const { theme, palette } = themeState({ appearance, lightTheme, darkTheme: darkPalette, preview }, dark);
+  const { theme, palette, style } = themeState({ style: settings.get("style"), appearance, lightTheme, darkTheme: darkPalette, preview }, dark);
+  doc.documentElement.dataset.style = style; // F201: the era, ios6.css alone or ios7.css over it
   doc.documentElement.dataset.theme = theme;
   doc.documentElement.dataset.palette = palette; // F198/F199: Mode's tone in its chosen theme
   // A meta with a media query (light or dark) is painted for its own scheme while Mode is Automatic; a fixed
@@ -771,7 +773,8 @@ export function applyTheme(doc = document, win = window) {
   // A fresh meta element, not a changed one: Safari doesn't always repaint its top bar when only `content` changes.
   for (const m of doc.querySelectorAll('meta[name="theme-color"]')) {
     const own = m.media?.includes("dark") ? "dark" : m.media?.includes("light") ? "light" : null;
-    const color = THEME_COLORS[appearance === "auto" && own && !preview ? paletteFor(own, darkPalette, lightTheme) : palette];
+    const color = THEME_COLORS[appearance === "auto" && own && !preview
+      ? themeState({ style, appearance: own, lightTheme, darkTheme: darkPalette }, false).palette : palette]; // F201: the era's pair
     if (m.content === color) continue;
     const fresh = m.cloneNode();
     fresh.content = color;
@@ -826,7 +829,7 @@ export function init() {
   window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => applyTheme());
   window.addEventListener?.("hashchange", () => applyTheme()); // F199: a theme list's preview starts and ends
   settings.onChange((key) => {
-    if (key === "appearance" || key === "lightTheme" || key === "darkTheme") applyTheme();
+    if (key === "style" || key === "appearance" || key === "lightTheme" || key === "darkTheme") applyTheme(); // F201: style
     if (key === "iconMatch" || key === "lightIcon" || key === "darkIcon") applyTheme(); // F323
     if (key === "resignReminder") remindNow();
   });

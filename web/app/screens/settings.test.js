@@ -380,10 +380,11 @@ test("F205: Settings root, General and Theme rows carry iOS 6 tiles where iOS 6 
   assert.equal(at("Compatibility Marks"), at("Works on My Phone") + 1);
   for (const r of general) assert.equal(r[1], "cell-icon row-icon", r[0]);
   // F199: Theme is Mode (a segmented control, no rows) and Themes' two push rows, bare like iOS 6's.
+  // F201: Style's two choice rows come first.
   const theme = rows(["theme"]);
-  assert.deepEqual(theme.map((r) => r[0]), ["Light", "Dark"]);
+  assert.deepEqual(theme.map((r) => r[0]), ["iOS 6", "iOS 7", "Light", "Dark"]);
   for (const r of theme) assert.equal(r[1], null, r[0]);
-  assert.deepEqual(rows(["display"]).map((r) => r[0]), ["Light", "Dark"]); // the old route
+  assert.deepEqual(rows(["display"]).map((r) => r[0]), ["iOS 6", "iOS 7", "Light", "Dark"]); // the old route
   // each theme list: a checked row per theme, each with its swatch
   // (then the preview's sample rows, which start at Sources)
   const list = (k) => { const r = rows(["theme", k]); return r.slice(0, r.findIndex((x) => x[0] === "Sources")).map((x) => [x[0], x[1]]); };
@@ -404,7 +405,8 @@ test("F199: Theme page: Mode's segmented control, then Light > Classic and Dark 
     settings.set("darkTheme", "oled");
     const root = fakeElement("div");
     render(root, { tab: "home", path: ["theme"] });
-    const [mode, themes] = root.children;
+    const [style, mode, themes] = root.children; // F201: Style first
+    assert.equal(style.children[0].textContent, "Style");
     assert.deepEqual(mode.children.map((c) => String(c.className).split(" ")[0]), ["group-header", "store-segmented", "group-footer"]);
     assert.equal(mode.children[0].textContent, "Mode");
     const bar = mode.children[1];
@@ -417,6 +419,39 @@ test("F199: Theme page: Mode's segmented control, then Light > Classic and Dark 
     settings.set("darkTheme", "gunmetal");
     assert.equal(settings.get("darkTheme"), "gunmetal");
   } finally { settings.set("appearance", was[0]); settings.set("darkTheme", was[1]); }
+});
+
+// F201: Theme > Style: iOS 6 checked by default; picking iOS 7 checks it, hides iOS 6's Themes rows and puts
+// data-style="ios7" on <html> with its own two themes.
+test("F201: Theme > Style picks iOS 7, which hides the Themes rows and sets data-style", async () => {
+  const { render, settings, applyTheme } = await import("./settings.js");
+  const labels = (root) => {
+    const out = [];
+    const walk = (n) => { for (const c of n.children ?? []) { if (c.className === "cell-label") out.push(c.textContent); walk(c); } };
+    walk(root);
+    return out;
+  };
+  const was = [settings.get("style"), settings.get("appearance")];
+  try {
+    assert.equal(settings.defaultOf("style"), "ios6");
+    settings.set("style", "ios7");
+    const root = fakeElement("div");
+    render(root, { tab: "home", path: ["theme"] });
+    assert.deepEqual(labels(root).slice(0, 2), ["iOS 6", "iOS 7"]);
+    assert.equal(labels(root).includes("Light"), false);
+    assert.equal(labels(root).includes("Dark"), false);
+    const html = { dataset: {} };
+    const doc = { documentElement: html, querySelectorAll: () => [] };
+    settings.set("appearance", "light");
+    applyTheme(doc, { matchMedia: () => ({ matches: false }), location: { hash: "" } });
+    assert.deepEqual([html.dataset.style, html.dataset.theme, html.dataset.palette], ["ios7", "light", "white"]);
+    settings.set("appearance", "dark");
+    applyTheme(doc, { matchMedia: () => ({ matches: false }), location: { hash: "" } });
+    assert.deepEqual([html.dataset.style, html.dataset.theme, html.dataset.palette], ["ios7", "dark", "oled"]);
+    settings.set("style", "ios6");
+    applyTheme(doc, { matchMedia: () => ({ matches: false }), location: { hash: "" } });
+    assert.equal(html.dataset.style, "ios6");
+  } finally { settings.set("style", was[0]); settings.set("appearance", was[1]); }
 });
 
 test("F199: the theme lists preview their tone; other routes don't", async () => {

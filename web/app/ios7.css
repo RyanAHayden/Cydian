@@ -1,0 +1,228 @@
+/* iOS 7 (F201): the second era, drawn over ios6.css when <html data-style="ios7"> (Theme > Style; theme-boot.js sets
+   it before first paint). Flat: #f7f7f7 bars with a hairline, text-only #007aff bar buttons and a chevron back
+   button, edge-to-edge white tables with inset hairlines on #efeff4, uppercase 13px #6d6d72 group headers, outline tab
+   icons (filled when chosen), a flat switch and segmented control. Two themes of its own: White (data-palette
+   "white": ios6.css's light tokens, then these) and OLED Black (data-palette "oled": ios6.css's dark block, then
+   these). Colours after the Teehan+Lax iOS 7 kit (ref/teehanlax/src/teehanlax-iOS7-iPhone.psd).
+
+   Clean as docs/eras.md defines it: geometry only through style.css's hooks, colours and decorations through
+   ios6.css's and packages.css's tokens, and look-only rules for what no token carries. ios6-css.test.js fails if a
+   rule here sets layout. Hooks go on html[data-style="ios7"] (both tones); colours on [data-theme="light"] /
+   [data-theme="dark"], or a colour token here would tie with ios6.css's dark block and win in dark too. Linked after
+   palettes.css (index.html), so a tone block here outranks the palette blocks of the same specificity. */
+
+/* ---- Geometry hooks (style.css "Era hooks"): the same in both tones ---- */
+html[data-style="ios7"] {
+  --bar-btn-h: 44px; --bar-btn-min-w: 0px; --bar-btn-pad: 0 8px;
+  --bar-back-h: 44px; --bar-back-pad: 0 8px 0 3px;
+  --tab-item-h: 49px; --tab-item-margin: 0; --tab-item-pad-top: 6px;
+  --group-margin: 35px 0 0; --group-gap: 35px; --group-first-head: 0px;
+  --group-head-margin: 0 15px 7px; --group-foot-margin: 7px 15px 0;
+  --cell-min-h: 44px; --cell-pad: 0 15px;
+}
+
+/* ---- White ---- */
+html[data-style="ios7"][data-theme="light"] {
+  color-scheme: light;
+  /* era colours the look-only rules below read */
+  --i7-tint: #007aff; --i7-tint-text: #fff; --i7-red: #ff3b30; --i7-green: #4cd964;
+  --i7-bar: #f7f7f7; --i7-hairline: rgba(0,0,0,.3); --i7-label: #000;
+  --i7-sw-track: #fff; --i7-sw-edge: #e5e5e5; --i7-knob: #fff;
+  --i7-knob-shadow: 0 3px 8px rgba(0,0,0,.15), 0 1px 1px rgba(0,0,0,.16), 0 3px 1px rgba(0,0,0,.1);
+  --i7-knob-edge: rgba(0,0,0,.04); --i7-knob-held: #f2f2f2;
+  --i7-seg-pressed: rgba(0,122,255,.2);
+  /* ios6.css's shared tokens */
+  --pin-dark: #efeff4; --pin-light: #efeff4; /* every pinstripe ground goes flat */
+  --head: #6d6d72; --emboss: none; --detail: #8e8e93; --subtitle: #8e8e93;
+  --text: #000; --field-text: #000; --field-hint: #c7c7cd;
+  --table: #fff; --table-edge: #c8c7cc; --table-inset: transparent;
+  --divider: #c8c7cc; --divider-hi: transparent;
+  --select: #d9d9d9; --count: #8e8e93; --plain: #fff; --keyline: #c8c7cc;
+  --category: #f7f7f7;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 13'%3E%3Cpath d='M1.5 1.2 6.8 6.5 1.5 11.8' fill='none' stroke='%23c7c7cc' stroke-width='2'/%3E%3C/svg%3E");
+  /* nav bar */
+  --nav-bar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) bottom / 100% .5px no-repeat, #f7f7f7;
+  --nav-shadow: none; --nav-title: #000; --nav-title-emboss: none; --site-strip: #f7f7f7;
+  /* bar buttons: text only */
+  --bar-btn-text: #007aff; --bar-btn-emboss: none;
+  --bar-btn-edge: transparent; --bar-btn-edge-top: transparent; --bar-btn: none; --bar-btn-shadow: none;
+  --bar-btn-pressed: none; --bar-btn-pressed-edge: transparent; --bar-btn-pressed-edge-top: transparent;
+  --lt-red-edge: transparent; --lt-red-edge-top: transparent; --lt-red: none;
+  --lt-red-pressed-edge: transparent; --lt-red-pressed-edge-top: transparent; --lt-red-pressed: none;
+  /* the back chevron, in the 13px slot ios6.css's border-image gives the arrow (the slice is drawn at 1/2 x, 11/15 y,
+     so the shape is pre-squashed: on screen a 9 x 21pt chevron, 3pt thick) */
+  --bar-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M20 15.7 24.2 18.6 8.4 30 24.2 41.5 20 44.3 2 30z' fill='%23007aff'/%3E%3C/svg%3E");
+  --bar-back-pressed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M20 15.7 24.2 18.6 8.4 30 24.2 41.5 20 44.3 2 30z' fill='%23007aff' fill-opacity='.3'/%3E%3C/svg%3E");
+  /* tab bar */
+  --tabbar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) top / 100% .5px no-repeat, #f7f7f7;
+  --tabbar-shadow: none;
+  --tab-text: #929292; --tab-text-active: #007aff; --tab-active: none; --tab-active-edge: none;
+  --tab-icon: currentColor; --tab-icon-active: currentColor; --tab-icon-emboss: none; --tab-icon-emboss-active: none;
+  --badge-ring: 0 solid transparent; --badge: #ff3b30; --badge-shadow: none;
+  /* grouped tables */
+  --grouped-ground: #efeff4;
+  /* packages.css: search bar and scope bar */
+  --search-bar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) bottom / 100% .5px no-repeat, #c9c9ce;
+  --search-bar-scoped: #c9c9ce;
+  --search-field: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='6.5' cy='6.5' r='5.3' fill='none' stroke='%238e8e93' stroke-width='1.4'/%3E%3Cpath d='m10.4 10.4 4.4 4.4' stroke='%238e8e93' stroke-width='1.5'/%3E%3C/svg%3E") 10px 50% / 13px 13px no-repeat;
+  --search-field-edge: transparent; --search-field-edge-top: transparent; --search-field-shadow: none;
+  --search-text: #000; --search-hint: #8e8e93;
+  --search-clear: #8e8e93 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2.5 2.5l5 5M7.5 2.5l-5 5' stroke='%23fff' stroke-width='1.4'/%3E%3C/svg%3E") center / 9px 9px no-repeat;
+  --search-cancel: none; --search-cancel-pressed: none;
+  --search-cancel-edge: transparent; --search-cancel-edge-top: transparent; --search-cancel-edge-bottom: transparent;
+  --search-cancel-text: #007aff; --search-cancel-emboss: none; --search-cancel-shadow: none;
+  --search-scope: linear-gradient(var(--i7-hairline), var(--i7-hairline)) bottom / 100% .5px no-repeat, #c9c9ce;
+  --scope-seg: transparent; --scope-seg-edge: #007aff; --scope-seg-edge-top: #007aff; --scope-seg-edge-bottom: #007aff;
+  --scope-seg-divider: #007aff; --scope-seg-text: #007aff; --scope-seg-emboss: none; --scope-seg-shadow: none;
+  --scope-seg-selected: #007aff; --scope-seg-selected-edge: #007aff; --scope-seg-selected-edge-top: #007aff;
+  --scope-seg-selected-edge-bottom: #007aff; --scope-seg-selected-divider: #007aff;
+  --scope-done: none; --scope-done-pressed: none; --scope-done-edge: transparent; --scope-done-edge-top: transparent;
+  --filter-shadow: none;
+  /* packages.css: the action sheet, iOS 7's white rounded buttons over a dimmed page */
+  --action-dim: rgba(0,0,0,.4); --action-sheet: none;
+  --action-title: #8f8f8f; --action-title-emboss: none;
+  --action-btn: rgba(248,248,248,.97); --action-btn-text: #007aff; --action-btn-emboss: none;
+  --action-btn-edge: transparent; --action-btn-shadow: none;
+  --action-btn-pressed: #e5e5e5; --action-btn-pressed-text: #007aff; --action-btn-pressed-emboss: none;
+  --action-destructive: rgba(248,248,248,.97); --action-destructive-text: #ff3b30; --action-destructive-emboss: none;
+  --action-cancel: rgba(248,248,248,.97); --action-cancel-pressed: #e5e5e5;
+  --action-cancel-text: #007aff; --action-cancel-emboss: none;
+  --store-head: #f7f7f7; --store-head-edge: #c8c7cc; --store-head-emboss: none;
+}
+
+/* ---- OLED Black: the same shapes, white on black; ios6.css's dark rules read the --dk-* tokens ---- */
+html[data-style="ios7"][data-theme="dark"] {
+  color-scheme: dark;
+  --i7-tint: #0a84ff; --i7-tint-text: #fff; --i7-red: #ff453a; --i7-green: #30d158;
+  --i7-bar: #000; --i7-hairline: #262626; --i7-label: #fff;
+  --i7-sw-track: #39393d; --i7-sw-edge: #39393d; --i7-knob: #fff;
+  --i7-knob-shadow: 0 3px 8px rgba(0,0,0,.3), 0 1px 1px rgba(0,0,0,.3);
+  --i7-knob-edge: transparent; --i7-knob-held: #e5e5e5;
+  --i7-seg-pressed: rgba(10,132,255,.25);
+  --pin-dark: #000; --pin-light: #000;
+  --head: #8d8d93; --emboss: none; --detail: #8d8d93; --subtitle: #8d8d93;
+  --text: #fff; --field-text: #fff; --field-hint: #6e6e74;
+  --table: #1c1c1e; --table-edge: #38383a; --table-inset: transparent;
+  --divider: #38383a; --divider-hi: transparent;
+  --select: #3a3a3c; --count: #48484e; --plain: #000; --keyline: #38383a;
+  --category: #1c1c1e;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 13'%3E%3Cpath d='M1.5 1.2 6.8 6.5 1.5 11.8' fill='none' stroke='%235a5a5f' stroke-width='2'/%3E%3C/svg%3E");
+  --nav-title: #fff; --nav-title-emboss: none; --site-strip: #000;
+  --dk-ground: #000;
+  --dk-nav-bar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) bottom / 100% .5px no-repeat, #000;
+  --dk-nav-shadow: none;
+  --dk-tabbar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) top / 100% .5px no-repeat, #000;
+  --bar-btn-text: #0a84ff; --bar-btn-emboss: none; --bar-btn-shadow: none;
+  --bar-btn-edge: transparent; --bar-btn-edge-top: transparent; --bar-btn-pressed: none;
+  --bar-btn-pressed-edge: transparent; --bar-btn-pressed-edge-top: transparent;
+  --dk-btn-edge: transparent; --dk-btn: none; --dk-btn-pressed: none;
+  --dk-red-edge: transparent; --dk-red-edge-top: transparent; --dk-red: none;
+  --dk-red-pressed-edge: transparent; --dk-red-pressed-edge-top: transparent; --dk-red-pressed: none;
+  --dk-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M20 15.7 24.2 18.6 8.4 30 24.2 41.5 20 44.3 2 30z' fill='%230a84ff'/%3E%3C/svg%3E");
+  --dk-ctl-hi: transparent; --dk-seg: none; --dk-seg-pressed: none;
+  --tab-text: #8d8d93; --tab-text-active: #0a84ff; --tab-active: none; --tab-active-edge: none;
+  --tab-icon: currentColor; --tab-icon-active: currentColor; --tab-icon-emboss: none; --tab-icon-emboss-active: none;
+  --badge-ring: 0 solid transparent; --badge: #ff453a; --badge-shadow: none;
+  --grouped-ground: #000;
+  --dk-search-line: #262626; --dk-search-bar: #000; --dk-search-fill: #000;
+  --dk-field: #1c1c1e; --dk-field-edge: transparent; --dk-clear: #8d8d93;
+  --search-cancel-text: #0a84ff; --search-cancel-emboss: none; --search-cancel-shadow: none;
+  --search-field-shadow: none;
+  --search-field: #1c1c1e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='6.5' cy='6.5' r='5.3' fill='none' stroke='%238d8d93' stroke-width='1.4'/%3E%3Cpath d='m10.4 10.4 4.4 4.4' stroke='%238d8d93' stroke-width='1.5'/%3E%3C/svg%3E") 10px 50% / 13px 13px no-repeat;
+  --scope-seg-text: #0a84ff; --scope-seg-emboss: none; --scope-seg-shadow: none;
+  --dk-action-sheet: none; --dk-action-btn: #1c1c1e; --dk-action-cancel: #1c1c1e;
+  --action-dim: rgba(0,0,0,.6); --action-title: #8d8d93; --action-title-emboss: none;
+  --action-btn-text: #0a84ff; --action-btn-emboss: none; --action-btn-edge: transparent; --action-btn-shadow: none;
+  --action-btn-pressed: #2c2c2e; --action-btn-pressed-text: #0a84ff; --action-btn-pressed-emboss: none;
+  --action-destructive: #1c1c1e; --action-destructive-text: #ff453a; --action-destructive-emboss: none;
+  --action-cancel-text: #0a84ff; --action-cancel-emboss: none; --action-cancel-pressed: #2c2c2e;
+}
+
+/* ---- Look-only rules: type, and the shapes no token carries ---- */
+/* Nav bar: a 17pt semibold title; bar buttons are tinted text that dims while held. */
+html[data-style="ios7"] .nav-title { font-size: 17px; font-weight: 600; }
+html[data-style="ios7"] .bar-button { font-size: 17px; font-weight: 400; line-height: 44px; border-radius: 0; }
+html[data-style="ios7"] .bar-button.done { font-weight: 600; }
+html[data-style="ios7"] .bar-button:active, html[data-style="ios7"] .bar-button.is-pressed { opacity: .3; }
+html[data-style="ios7"] .bar-button.back:active, html[data-style="ios7"] .bar-button.back.is-pressed { opacity: .3; filter: none; }
+html[data-style="ios7"] .bar-button.red:not(.back):not(.done) { color: var(--i7-red); }
+html[data-style="ios7"] .bar-button.share-button::before {
+  filter: none;
+  background-color: var(--i7-tint);
+  background-image: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 26'%3E%3Cpath d='M7 9H2.5v15.5h15V9H13' fill='none' stroke='%23000' stroke-width='1.3'/%3E%3Cpath d='M10 16.5V1.5M5.8 5.6 10 1.4l4.2 4.2' fill='none' stroke='%23000' stroke-width='1.3'/%3E%3C/svg%3E") center / 17px 22px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 26'%3E%3Cpath d='M7 9H2.5v15.5h15V9H13' fill='none' stroke='%23000' stroke-width='1.3'/%3E%3Cpath d='M10 16.5V1.5M5.8 5.6 10 1.4l4.2 4.2' fill='none' stroke='%23000' stroke-width='1.3'/%3E%3C/svg%3E") center / 17px 22px no-repeat;
+}
+
+/* Tab bar: 10pt regular labels, outline glyphs, the chosen tab's glyph filled (ios6.css's own) and tinted. */
+html[data-style="ios7"] .tab { font-weight: 400; border-radius: 0; }
+html[data-style="ios7"] .badge { font-weight: 400; line-height: 20px; letter-spacing: 0; }
+html[data-style="ios7"] .tab[data-tab="home"]:not(.active) { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' fill='none' stroke='%23000' stroke-width='1.6' stroke-linejoin='round'%3E%3Cpath d='M3.5 13.5 14 4l10.5 9.5'/%3E%3Cpath d='M6.5 11v14h5.5v-7h4v7h5.5V11'/%3E%3C/svg%3E"); }
+html[data-style="ios7"] .tab[data-tab="sources"]:not(.active) { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' fill='none' stroke='%23000' stroke-width='1.6'%3E%3Crect x='3.8' y='3.8' width='20.4' height='4.9' rx='1.6'/%3E%3Crect x='3.8' y='11.55' width='20.4' height='4.9' rx='1.6'/%3E%3Crect x='3.8' y='19.3' width='20.4' height='4.9' rx='1.6'/%3E%3C/svg%3E"); }
+html[data-style="ios7"] .tab[data-tab="changes"]:not(.active) { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' fill='none' stroke='%23000' stroke-width='1.6'%3E%3Ccircle cx='14' cy='14' r='11.2'/%3E%3Cpath d='M14 7.5V14l4.6 3.3'/%3E%3C/svg%3E"); }
+html[data-style="ios7"] .tab[data-tab="installed"]:not(.active) { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' fill='none' stroke='%23000' stroke-width='1.6' stroke-linejoin='round'%3E%3Cpath d='M14 2.5v13M9 10.5l5 5 5-5'/%3E%3Cpath d='M2.8 17.8h5.4l2 3h7.6l2-3h5.4v7.4H2.8z'/%3E%3C/svg%3E"); }
+html[data-style="ios7"] .tab[data-tab="search"]:not(.active) { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' fill='none' stroke='%23000'%3E%3Ccircle cx='11.5' cy='11.5' r='8.2' stroke-width='1.6'/%3E%3Cpath d='m17.4 17.4 7.6 7.6' stroke-width='2.2'/%3E%3C/svg%3E"); }
+html[data-style="ios7"] .tab[data-tab="settings"]:not(.active) { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' fill='none' stroke='%23000'%3E%3Ccircle cx='14' cy='14' r='4.2' stroke-width='1.6'/%3E%3Ccircle cx='14' cy='14' r='9' stroke-width='1.6'/%3E%3Ccircle cx='14' cy='14' r='11.3' stroke-width='2.6' stroke-dasharray='3.6 5.27'/%3E%3C/svg%3E"); }
+
+/* Grouped tables: edge to edge with a hairline top and bottom, separators inset 15pt (drawn on the cell, so the
+   pressed grey covers them as iOS 7 hides a selected row's lines), uppercase 13pt headers, left-aligned footers. */
+html[data-style="ios7"] .group-header { font-size: 13px; font-weight: 400; line-height: 16px; letter-spacing: 0; text-transform: uppercase; }
+html[data-style="ios7"] .group-footer { font-size: 13px; line-height: 17px; text-align: left; }
+html[data-style="ios7"] .table.grouped { border-width: .5px 0; border-radius: 0; }
+html[data-style="ios7"] .grouped .cell + .cell {
+  border-top-width: 0;
+  background: linear-gradient(var(--divider), var(--divider)) 15px 0 / calc(100% - 15px) .5px no-repeat;
+}
+html[data-style="ios7"] .grouped .cell + .cell > .cell-inner { box-shadow: none; }
+html[data-style="ios7"] .cell-label { font-size: 17px; font-weight: 400; }
+html[data-style="ios7"] .cell-count { font-weight: 400; }
+html[data-style="ios7"] .cell-check::after { font-weight: 400; color: var(--i7-tint); }
+html[data-style="ios7"] .cell-inner.is-pressed { color: var(--text); }
+html[data-style="ios7"] .cell-inner.is-pressed * { color: inherit; }
+html[data-style="ios7"] .cell-inner.is-pressed .cell-subtitle { color: var(--subtitle); }
+html[data-style="ios7"] .cell-inner.is-pressed .cell-detail { color: var(--detail); }
+html[data-style="ios7"] .cell-inner.chevron.is-pressed::after { background-image: var(--chevron); }
+
+/* Plain tables: the flat grey section bar. */
+html[data-style="ios7"] .section-header { font-size: 15px; font-weight: 600; color: var(--i7-label); text-shadow: none; }
+
+/* Switch: flat, the kit's green with a white knob and no ON / OFF (iOS 6's 77 x 27 box: its size is not a hook yet). */
+html[data-style="ios7"] .sw-track,
+html[data-style="ios7"][data-theme] .sw-track {
+  border: 1.5px solid var(--i7-sw-edge); background: var(--i7-sw-track); box-shadow: none;
+}
+html[data-style="ios7"] .switch[aria-checked="true"] .sw-track { border-color: var(--i7-green); }
+html[data-style="ios7"] .sw-track::before,
+html[data-style="ios7"][data-theme] .sw-track::before { content: ""; text-shadow: none; background: var(--i7-green); }
+html[data-style="ios7"] .sw-track::after { content: ""; }
+html[data-style="ios7"] .sw-knob,
+html[data-style="ios7"][data-theme] .sw-knob {
+  border: .5px solid var(--i7-knob-edge); background: var(--i7-knob); box-shadow: var(--i7-knob-shadow);
+}
+html[data-style="ios7"] .switch.is-held .sw-knob,
+html[data-style="ios7"][data-theme] .switch.is-held .sw-knob { background: var(--i7-knob-held); }
+
+/* Segmented control: tinted 1pt outline and dividers, tinted text, the chosen segment filled. */
+html[data-style="ios7"] .store-segmented,
+html[data-style="ios7"] .store-segmented:has(.store-segment.selected) {
+  border-color: var(--i7-tint); border-radius: 4px; box-shadow: none;
+}
+html[data-style="ios7"] .store-segment,
+html[data-style="ios7"] .store-segment:not(.selected) {
+  font-size: 13px; font-weight: 400; color: var(--i7-tint); text-shadow: none; background: none;
+}
+html[data-style="ios7"] .store-segment + .store-segment,
+html[data-style="ios7"] .store-segment.selected + .store-segment,
+html[data-style="ios7"] .store-segment + .store-segment.selected { border-left-color: var(--i7-tint); }
+html[data-style="ios7"] .store-segment:active:not(.selected) { background: var(--i7-seg-pressed); }
+html[data-style="ios7"] .store-segment.selected { color: var(--i7-tint-text); background: var(--i7-tint); }
+
+/* Search bar: the field is a 5pt rounded white box; Cancel is tinted text. */
+html[data-style="ios7"] .search-field { border-radius: 5px; }
+html[data-style="ios7"] .search-cancel { font-size: 17px; font-weight: 400; }
+html[data-style="ios7"][data-theme="dark"] .search-cancel { background: none; }
+
+/* Action sheet: rounded white buttons, regular weight, Cancel bold. */
+html[data-style="ios7"] .action-button { font-size: 20px; font-weight: 400; border-radius: 4px; }
+html[data-style="ios7"] .action-button.cancel { font-weight: 600; }
+html[data-style="ios7"][data-theme="dark"] .action-button.destructive { background: var(--action-destructive); }

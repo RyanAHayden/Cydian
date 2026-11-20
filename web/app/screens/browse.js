@@ -233,6 +233,7 @@ async function drawSections(page) {
       setSourceShare(body, source);
       body.append(grouped([{ footer: healthOf(source).label }])); // F19: last reached, last Release, Not Responding
       if (insecureNote(source)) body.append(grouped([{ footer: insecureNote(source) }])); // F220: an http source
+      body.append(canisterFactsSlot(source)); // F305a: HTTPS and Signed Releases, from Canister's cached facts
       // B23: what apt-get update said about it (the jailbreak app), when the catalog's own load didn't fail
       if (source.aptError && source.aptError !== status?.error) body.append(el("p", "empty source-apt-error", source.aptError));
     }
@@ -2056,4 +2057,26 @@ export function heroCard(row, { jailbroken = true, href = null } = {}) {
   words.append(foot);
   card.append(words);
   return card;
+}
+
+// ---- F305a: Canister's facts on an added APT source's own page -----------------------------------------------------
+
+// A slot under the source's sections that fills with a Trust group (HTTPS, Signed Releases) once Canister's facts for
+// the repo are in (screens/findmore.js canisterTrust: cached a week per repo). Stays empty for AltStore and GitHub
+// sources, repos Canister doesn't list, and offline. `trust` is a seam for the tests; `slot.ready` resolves with the
+// facts (or null) once it is filled.
+export const yesNoUnknown = (v) => (v == null ? "Unknown" : v ? "Yes" : "No");
+export function canisterFactsGroup(r) {
+  if (!r || (r.https == null && r.gpg == null)) return null;
+  return grouped([{ header: "Trust", rows: [
+    { label: "HTTPS", detail: yesNoUnknown(r.https), cls: r.https === false ? "find-warn" : null },
+    { label: "Signed Releases", detail: yesNoUnknown(r.gpg) },
+  ], footer: "From Canister (canister.me), which checks this repo's files." }]);
+}
+export function canisterFactsSlot(source, { trust = (s) => import("./findmore.js").then((m) => m.canisterTrust(s)) } = {}) {
+  const slot = el("div", "source-canister");
+  slot.ready = Promise.resolve()
+    .then(() => (source?.uri && !String(source.key ?? "").startsWith("alt:") ? trust(source) : null))
+    .then((r) => { const g = canisterFactsGroup(r); if (g) slot.append(g); return g ? r : null; }, () => null);
+  return slot;
 }

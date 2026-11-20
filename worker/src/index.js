@@ -635,7 +635,7 @@ async function hosted(req, u, env, ttl, t, what, ctx = null) {
 }
 
 // ---- B215: /sign/host's parts. The token's key holds {bundleId, version, title, size, parts, partSize, done} and no
-// value; part i is at hostPartKey (outliving the token by a few minutes, so a link never points at half an app).
+// value; part i is at hostPartKey (outliving the token, so a link never points at half an app).
 // HOST_MAX caps a parted upload; HOST_BODY_MAX one plain body (a Worker request takes ~100 MB).
 export const HOST_MAX = 512 * 1024 * 1024, HOST_BODY_MAX = 95 * 1024 * 1024;
 const hostPartKey = (t, i) => `${t}.${i}`;
@@ -702,7 +702,9 @@ async function hostPart(req, u, env, ttl, t, which) {
   const body = new Uint8Array(await req.arrayBuffer());
   if (body.byteLength !== partLen(meta, i)) return fail("bad_request", `Part ${i + 1} should be ${partLen(meta, i)} bytes.`);
   if (i === 0 && (body[0] !== 0x50 || body[1] !== 0x4b)) return fail("bad_ipa", "That isn't an IPA (a zip archive).");
-  await env.HOSTED.put(hostPartKey(t, i), body.buffer, { expirationTtl: ttl + 300, metadata: { n: body.byteLength } });
+  // the token expires `ttl` after its size POST unless done comes first, and done gives it `ttl` again: a part put
+  // any time in between must outlive both
+  await env.HOSTED.put(hostPartKey(t, i), body.buffer, { expirationTtl: 2 * ttl + 300, metadata: { n: body.byteLength } });
   return json({ ok: true, part: i });
 }
 
@@ -888,6 +890,7 @@ export default {
       }
       // One body (the apps before B215 send it so): cut into the same parts as it streams in, never held whole.
       const size = Number(req.headers.get("Content-Length") || 0);
+      if (size > 0 && size < 4) return fail("bad_ipa", "That isn't an IPA (a zip archive).");
       if (!size || size > HOST_BODY_MAX) return fail("too_large", `Send the signed IPA as the body (up to ${HOST_BODY_MAX / 1024 / 1024} MB), or in parts (size=).`, 413);
       const t = token(), meta = { ...app, size, parts: Math.ceil(size / PART), partSize: PART, done: true };
       const bad = await hostBody(req.body, meta, (i, buf) => env.HOSTED.put(hostPartKey(t, i), buf, { expirationTtl: ttl + 300, metadata: { n: buf.byteLength } }));

@@ -43,6 +43,23 @@ and everything else is within a few KB; the whole growth is **`web/icons/themes/
 Tailscale/idevice. build.sh copies web/app/ whole, and no app code reads `icons/themes/` (the Home header and Theme
 pages use the shell's `appicon/<name>.png`, F323). Filed **C55** to leave it out of the native bundles.
 
+## Spec review
+
+A fresh subagent read only the diff and the brief. What I changed after it:
+- **Fixed** the client's 413 fallback: a new server's "over HOST_MAX" is also a 413, so `HostUpload` falls back to
+  one body only when the IPA is at most 25 MB (an older server couldn't take a bigger one anyway).
+- **Fixed** the part TTLs: the token expires `ttl` after its size POST and gets `ttl` again at done, so a part put
+  late could expire before the link. Parts are now put with `2*ttl+300`. The test checks it.
+- **Fixed** a body of 1-3 bytes: refused as not an IPA. Before, it skipped the `PK` check.
+- **Filed B217**: /sign/upload has the same part-TTL gap. It was there before this task.
+- **Kept** what the reviewer called unasked:
+  - The one-body path up to 95 MB: without it, every Lite already installed could not upgrade to 0.17.2, since its
+    own code sends one body. That is the bug the brief describes ("every hosted self-update is broken").
+  - The HOST_MAX cap for size=: any size field needs a cap.
+  - The README row, the limits comment and C55: C55 answers the brief's "look at why the IPA grew".
+- **Left** the CORS `Allow-Methods` without PUT: only the native app sends parts, and it doesn't use CORS. /sign/upload
+  is the same.
+
 ## Not verified
 
 - **On a phone**: no Upgrade from an older Lite to an IPA over 25 MB was run. It needs this Worker deployed to

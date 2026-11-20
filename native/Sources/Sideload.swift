@@ -1545,8 +1545,10 @@ final class HostUpload {
         guard size > 0 else { done(.failure(Sideload.Failed(text: "server: the signed IPA is missing"))); return self }
         var q = URLComponents(string: base)!
         q.queryItems = query + [URLQueryItem(name: "size", value: String(size))]
-        // a Signing Server from before B215 answers a POST without a body 413: it gets the IPA as one body (up to 25 MB)
-        send(q.url!, "POST", nil, failed: { code, e in code == 413 ? self.whole() : self.done(.failure(e)) }) { j in
+        // a Signing Server from before B215 answers a POST without a body 413: it gets the IPA as one body, which it takes
+        // up to 25 MB (a bigger IPA keeps the server's 413, as does a new server's "over HOST_MAX")
+        let old = size <= 25 * 1024 * 1024
+        send(q.url!, "POST", nil, failed: { code, e in code == 413 && old ? self.whole() : self.done(.failure(e)) }) { j in
             guard let t = j["token"] as? String, let part = (j["partSize"] as? NSNumber)?.int64Value, part > 0,
                   let parts = (j["parts"] as? NSNumber)?.intValue, parts > 0 else {
                 return self.whole()

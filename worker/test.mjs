@@ -904,7 +904,8 @@ import { d1 } from "./src/d1-sqlite.js";
   const { PART: P, HOST_MAX, hostBody } = await import("./src/index.js");
   const sizes = [];
   const kept = [];
-  const kv = { ...env.HOSTED, put: async (k, v, o) => { sizes.push(typeof v === "string" ? v.length : v.byteLength); return env.HOSTED.put(k, v, o); } };
+  const ttls = {};
+  const kv = { ...env.HOSTED, put: async (k, v, o) => { sizes.push(typeof v === "string" ? v.length : v.byteLength); ttls[k] = o?.expirationTtl; return env.HOSTED.put(k, v, o); } };
   const henv = { ...env, WAIT_SCALE: "0.02", HOSTED: kv };
   const at = (path, init) => w.fetch(new Request("https://sign.example" + path, init), henv, { waitUntil: (p) => kept.push(p) });
   const big = new Uint8Array(29.6 * 1024 * 1024 | 0);
@@ -947,6 +948,9 @@ import { d1 } from "./src/d1-sqlite.js";
   assert.equal((await at(`/sign/host/${up.token}/1`, { method: "PUT", body: big.subarray(P) })).status, 409, "finished");
   assert.equal((await (await at(`/sign/host/${up.token}/done`, { method: "POST" })).json()).manifest, done.manifest, "done again (a retry) answers the link");
   await check(up.token);
+  // a part put just before the token's first ttl ran out outlives the token's second ttl, given at done
+  assert.ok(ttls[`${up.token}.0`] >= 2 * 600, "parts outlive the link");
+  assert.equal((await at(q, { method: "POST", body: new Uint8Array([0x50]), headers: { "Content-Length": "1" } })).status, 400, "too small to be an IPA");
   assert.equal((await at(q + "&size=" + (HOST_MAX + 1), { method: "POST" })).status, 413);
   assert.equal((await at(q + "&size=x", { method: "POST" })).status, 400);
   // one body, as the apps before B215 send it

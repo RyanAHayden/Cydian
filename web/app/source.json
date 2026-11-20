@@ -19,6 +19,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.15.0",
+          "date": "2026-11-20T10:38:02Z",
+          "localizedDescription": "Inject tweaks when signing: add .dylib, .deb or .framework tweaks to any IPA\nSafety nets: Known Safe / Trusted / Unknown labels on sources, an Unknown Source check when adding one\nA one-time note before untrusted installs on iOS versions with public exploits, and Report as Malicious\nSelf-update on This iPhone closes iFizBox only once iOS is ready to install\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.15.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.15.0/iFizBox.ipa",
+          "size": 15846917,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.14.0",
           "date": "2026-11-20T09:37:13Z",
           "localizedDescription": "Updates keep the App ID they were installed with, and signing is 3-4x faster\nBig apps no longer fail to sign: 32-bit leftovers are skipped, memory use is down\nPhone stays awake while installs and signing run\n.ipa files opened from Safari's download preview land in My IPAs\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.14.0",

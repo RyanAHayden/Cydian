@@ -13,7 +13,8 @@
 // The mouse is a finger in the phone (tools/concept/touch.js), so each run also opens --drag-route and drags its
 // list by mouse: the row pressed shows its pressed state and the app saw a touch (pointerType "touch", touchstart),
 // the list follows the drag, keeps going after the release (momentum) and lets go of the press, and pulling past the
-// top rubber-bands and springs back. Then the device changes to another size and back with the app running, and
+// top rubber-bands and springs back; a drag from the left edge goes back; on Sources a left drag shows a row's
+// Delete, a tap puts it away and a hold shows the row's menu. Then the device changes to another size and back with the app running, and
 // window error events count as errors too, in the page and in the phone (ResizeObserver's loop warning is one).
 //
 // Exit 0: every run clean; 1: an error or a failed check (listed); 2: Chromium didn't start.
@@ -183,6 +184,33 @@ async function fingerChecks(name) {
   const popped = await inApp("return w.location.hash");
   check(popped !== at.hash, `${name}: dragging from the left edge went back (${at.hash} -> ${popped})`);
 }
+// On Sources: a left drag on a row shows its Delete (screens/sources.js), a tap on another row only puts it away,
+// and holding a row shows the black Copy URL menu (nav/menu.js longPress).
+async function rowChecks(name) {
+  await inApp(`w.location.hash = "#/sources"`);
+  await sleep(1500);
+  const rows = await ev(`(() => { ${FIND} if (!sc) return [];
+    return [...sc.querySelectorAll(".source-row[data-url]")].slice(0, 3).map((li, i) => { li.setAttribute("data-concept-row", i);
+      const b = li.getBoundingClientRect(); return toPage(b.left + b.width * 0.6, b.top + b.height / 2); }); })()`);
+  if (rows.length < 3) { console.log(`ok   ${name}: no source rows to swipe here (${rows.length})`); return; }
+  const row = (i, expr) => inApp(`const li = d.querySelector('[data-concept-row="${i}"]'); return ${expr}`);
+  await mouse("mousePressed", rows[1].x, rows[1].y);
+  for (let i = 1; i <= 8; i++) { await mouse("mouseMoved", rows[1].x - i * 15, rows[1].y); await sleep(16); }
+  await mouse("mouseReleased", rows[1].x - 120, rows[1].y);
+  await sleep(600);
+  check(await row(1, `li.classList.contains("armed")`), `${name}: a left drag on a source row shows its Delete`);
+  const hash = await inApp("return w.location.hash");
+  await tap('[data-concept-row="2"]');
+  await sleep(600);
+  check(!(await row(1, `li.classList.contains("armed")`)) && (await inApp("return w.location.hash")) === hash,
+    `${name}: a tap on another row only puts the Delete away`);
+  await mouse("mousePressed", rows[2].x, rows[2].y);
+  await sleep(900);
+  const menu = await inApp(`const m = d.querySelector(".menu"); return Boolean(m && m.getClientRects().length)`);
+  await mouse("mouseReleased", rows[2].x, rows[2].y);
+  await sleep(300);
+  check(menu && (await inApp("return w.location.hash")) === hash, `${name}: holding a row shows its menu (and opens nothing)`);
+}
 // The device changes size with the app running, and back (frame.html loads a fresh app at the new size; resizing
 // the running one set off ResizeObserver's loop warning).
 async function liveResize(device) {
@@ -228,7 +256,7 @@ for (const mode of MODES) {
         const after = await inApp("return w.location.hash");
         check(tabs > 0 && which && after !== before, `${name}: tapping "${which}" in the tab bar went ${before} -> ${after}`);
       }
-      if (DRAG !== "none") await fingerChecks(name);
+      if (DRAG !== "none") { await fingerChecks(name); await rowChecks(name); }
       await liveResize(device);
       if (PROBE) console.log(`     probe: ${JSON.stringify(await inApp(PROBE))}`);
       for (const m of (await ev("window.__conceptErrors.splice(0)")) ?? []) errors.push("page: " + m);

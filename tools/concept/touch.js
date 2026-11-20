@@ -13,7 +13,7 @@
 // early touchmove that calls preventDefault keeps the drag for the app; so does a scroller the app sets to
 // overflow: hidden mid-drag (pull to refresh, the scroll indicator's grab).
 //
-// The rest of the touch look: :active and :hover are rewritten at build time (build.py css_for_frame) to
+// The rest of the touch look: :active and :hover are rewritten at build time (build.py touch_css) to
 // .concept-active, set here on the touched element and its ancestors while the finger is down and off once it pans,
 // and to nothing (no hover on a phone); (hover)/(pointer) media queries answer as a phone's, in CSS and matchMedia;
 // the cursor is a round touch dot.
@@ -245,7 +245,7 @@
     if (e.button !== 0) return;
     if (g) up(null, true);
     var stopped = stopGlide();
-    g = { target: e.target, capture: null, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, state: "down",
+    g = { target: e.target, capture: null, mouseId: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, state: "down",
       samples: [{ t: e.timeStamp, x: e.clientX, y: e.clientY }], noScroll: false, noClick: stopped, noMouse: false, sc: null, axis: null };
     try { realSet.call(doc.documentElement, e.pointerId); } catch (err) { /* moves outside the phone are lost, that's all */ }
     doc.documentElement.classList.add("concept-touching");
@@ -310,7 +310,7 @@
     var t = g;
     if (!t) return;
     if (e) { t.x = e.clientX; t.y = e.clientY; }
-    try { realRelease.call(doc.documentElement, 1); } catch (err) { /* not held */ }
+    try { realRelease.call(doc.documentElement, t.mouseId); } catch (err) { /* not held */ }
     doc.documentElement.classList.remove("concept-touching");
     activeOff();
     if (t.state === "down") {

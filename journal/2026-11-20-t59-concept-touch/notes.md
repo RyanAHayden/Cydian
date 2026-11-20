@@ -29,7 +29,7 @@ page what Chromium's device mode does with touch emulation on:
   element. Fields (`input, textarea, select, contenteditable`) keep the native mousedown, so focus, caret and the
   select picker still work. The wheel scrolls natively.
 
-Checked by hand (scratch copy of check.mjs, not kept) on #/sources, iPhone 15/16, jailbroken: a left drag on a
+First checked by hand (scratch copy of check.mjs; now in check.mjs as rowChecks) on #/sources, iPhone 15/16, jailbroken: a left drag on a
 source row arms its Delete (nav/rowswipe-style code in screens/sources.js), a tap elsewhere puts it away, a 900 ms
 hold shows the black Copy URL menu (nav/menu.js longPress). The first try said long press failed: my script had
 tapped the Delete button first, which deleted the row; not the emulation.
@@ -63,6 +63,14 @@ Results (`node tools/concept/check.mjs PAGE --modes …`, iPhone SE + 17 Pro Max
 jailbreak, sideload and site all clean (202 checks in the first full run; its only failures were the edge swipe in
 Website mode, where app.js leaves the back swipe to Safari and turns the strip off, so the check now expects it only
 where the strip is on; the re-run of site + jailbreak was all clean, 138 checks).
+
+Spec review (fresh subagent on the diff + brief): added long press and swipe-to-delete to check.mjs (rowChecks on
+#/sources: left drag arms Delete, tap on another row puts it away without opening, a hold shows the menu; skipped
+with an ok line where there are under 3 source rows); dropped shell.js's now-unsenderless "device" message
+listener; fixed a comment naming css_for_frame for touch_css; the real mouse capture is released by the id it was
+taken with. Not changed: its claim that `:not(:hover)` -> `:not(:not(*))` matches nothing (it matches everything,
+as on a phone), and the device change reloading (that is the fix for (2), noted in SKILL.md, root cause filed B213).
+Final run, 3 modes x 2 devices x 2 themes: 242 checks, all clean.
 
 ## (3) Eras
 

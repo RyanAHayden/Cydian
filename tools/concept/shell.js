@@ -45,11 +45,7 @@
     var s = document.documentElement.style;
     ["top", "right", "bottom", "left"].forEach(function (k) { s.setProperty("--sa-" + k, (sa[k] || 0) + "px"); });
   }
-  setSafeArea(C.device.sa);
-  addEventListener("message", function (e) {
-    var m = e.data;
-    if (m && m.concept && m.type === "device") setSafeArea(m.sa);
-  });
+  setSafeArea(C.device.sa); // a device change loads a fresh app (frame.html load()), so this is set once
 
   // ---- the app's own files: concept://app/<path> (import.meta.url in the bundle) or a path relative to web/app
   function appPath(u) {

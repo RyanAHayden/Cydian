@@ -189,6 +189,10 @@ case ${mode:-} in
     verify_live "${mode_version#v}"; exit $? ;;
 esac
 
+# T47: both builds bundle web/app/ as it is on disk, so an untracked or ignored file there (a leftover .ipa) would
+# ship: refuse it, dry runs too. IFIZBOX_STRAY_ROOT: the checkout to look in instead of this one (tests).
+tools/stray-check.sh "${IFIZBOX_STRAY_ROOT:-$PWD}" || die "web/app/ has files git doesn't track (above); not releasing"
+
 version=$(tr -d '[:space:]' < native/VERSION)
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "native/VERSION is '$version', not X.Y.Z"
 tag=v$version

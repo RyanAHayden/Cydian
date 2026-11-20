@@ -45,6 +45,12 @@ while [ $# -gt 0 ]; do
 done
 die() { echo "setup release: $*" >&2; exit 1; }
 
+# T47: the release ships from this checkout, so stray files in web/app/ (untracked or ignored, a leftover .ipa) stop
+# it, dry runs too; --probe only looks at toolchains. IFIZBOX_STRAY_ROOT: the checkout to look in instead (tests).
+if [ "$mode" != probe ]; then
+  "$root/tools/stray-check.sh" "${IFIZBOX_STRAY_ROOT:-$root}" || die "web/app/ has files git doesn't track (above); not releasing"
+fi
+
 bin=$(printf '%s' "$BRAND_NAME" | tr '[:upper:]' '[:lower:]')-setup
 manifest="$here/cli/Cargo.toml"
 targetdir="$here/cli/target"

@@ -21,6 +21,8 @@ export const LAZY = {
   browse: "./screens/browse.js",
   roulette: "./screens/roulette.js",
   extras: "./screens/extras.js",
+  // C32: the User Guides (Home's root lists them from screens/guide-index.js)
+  guides: "./screens/guides.js",
   // Settings' parts that only its pages draw
   account: "./screens/account.js",
   devaccount: "./screens/devaccount.js",

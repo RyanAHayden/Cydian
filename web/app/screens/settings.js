@@ -55,7 +55,7 @@ const ipaSection = lazyFn("ipaInstall", "ipaSection");
 import { otherLinksOn, setOtherLinks } from "../core/otherlinks.js";
 import { NAME, GITHUB_REPO } from "../brand.js";
 import { profileNotes, keepOn, GUIDE_LINK } from "../core/keepid.js";
-import { keepGuideHref } from "./guides.js";
+import { keepGuideHref } from "./guide-index.js"; // C32: not guides.js, which loads at #/home/guides
 import { rowIcon, SETTING_ICONS, PAGE_ICONS } from "../icons/rowicons.js";
 import { drawInstallation, PAGE as INSTALLATION, SUB_TITLES as INSTALLATION_TITLES } from "./installroute.js";
 import { installationBlock } from "./installroute.js";

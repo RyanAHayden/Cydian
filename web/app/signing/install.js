@@ -6,7 +6,8 @@ import { GITHUB_REPO, NAME } from "../brand.js";
 import { browserSigning, localSigning } from "./common.js";
 import { firstInstallCheck } from "./device.js";
 import { installOnDevice } from "./route.js";
-import { signInBrowser } from "./browser.js";
+// C32: the website's signer (signing/browser.js and its parts, ~650 lines) loads with import() where the site signs,
+// never at startup.
 
 // F72: an IPA of iFizBox itself (its GitHub releases, where iFizBox's own source points).
 // Only iFizBox's own IPA files count: a release's ${NAME}.ipa, or the test source's <name>-<version>.ipa (F180: no
@@ -29,7 +30,7 @@ async function safetyFirst({ url, name, bundleId, version, source = null }) {
 export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null, size = null, iconUrl = null }) {
   // F291: Known Malware refuses, a reported version asks, the exploitable-iOS alert once (screens/safety.js)
   if (!isSelfIpa(url) && !(await safetyFirst({ url, name, bundleId, version }))) return false;
-  if (browserSigning()) return signInBrowser({ url, name, onInstalled, bring, bundleId, version, bytes, size, iconUrl });
+  if (browserSigning()) return (await import("./browser.js")).signInBrowser({ url, name, onInstalled, bring, bundleId, version, bytes, size, iconUrl });
   if (!localSigning()) {
     await showAlert({ title: "Can't Install Here", message: `Apps are signed in the ${NAME} app. Open this one in ${NAME}, AltStore, SideStore or Feather.`, buttons: ["OK"] });
     return false;

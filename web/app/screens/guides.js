@@ -20,10 +20,10 @@ import { GUIDE_ID as KEEP_GUIDE } from "../core/keepid.js";
 import { UDID_HOW } from "../core/signing.js";
 import { pageName } from "../core/signingpage.js";
 
-export const JAILBREAK_INFO_URL = "https://jailbreakme.dev/";
-
-// Lite: what a Not Jailbroken device sees. `type` is settings.deviceType() ("none" in the sideload build).
-export const isLite = (type) => type === "none";
+// C32: the guide list, isLite and the guide links are in guide-index.js, which Home's root loads without this file.
+import { shows, GUIDES, guideIds, guideRows, ASC_GUIDE } from "./guide-index.js";
+export { JAILBREAK_INFO_URL, isLite, GUIDES, guideIds, guideRows, keepGuideHref, ascGuideHref,
+  ASC_GUIDE } from "./guide-index.js";
 
 // ---- the places answers point at (their Next rows) ----------------------------------------------------------
 export const PACKAGES = { openssh: "openssh", filza: "com.tigisoftware.filza" };
@@ -138,7 +138,6 @@ export const FAQ = [
   },
 ];
 
-const shows = (item, lite) => !item.only || item.only === (lite ? "lite" : "full");
 export const faqFor = (lite) => FAQ.filter((f) => shows(f, lite)).map((f) => ({
   ...f, a: lite && f.liteA ? f.liteA : f.a, next: lite && f.liteNext ? f.liteNext : f.next,
 }));
@@ -318,15 +317,7 @@ export function toggleStep(id, n, store = globalThis.localStorage) {
 }
 
 // ---- the guides, routes and Home's rows ---------------------------------------------------------------------
-export const GUIDES = {
-  faq: { title: "Frequently Asked Questions", row: "Frequently Asked Questions" },
-  copying: { title: "Copying Files", row: "Copying Files to/from Device" },
-  openssh: { title: "OpenSSH", row: "OpenSSH Access How-To", only: "full" },
-  password: { title: "Root Password", row: "Root Password How-To", only: "full" },
-  // F237: listed where apps are signed (lite); `linked`: Settings > Signing and Custom Install open it in any mode
-  [KEEP_GUIDE]: { title: "Notifications", row: "Notifications for Signed Apps", only: "lite", linked: true },
-};
-export const guideIds = (lite) => Object.keys(GUIDES).filter((id) => shows(GUIDES[id], lite));
+// GUIDES, guideIds, guideRows and the guide links live in guide-index.js (Home's root draws with them; C32).
 const opens = (id, lite) => guideIds(lite).includes(id) || Boolean(GUIDES[id]?.linked);
 
 // ---- F237: Notifications for Signed Apps (core/keepid.js, Keep Bundle IDs) ----------------------------------
@@ -370,18 +361,15 @@ STEPS[KEEP_GUIDE] = [
     + "made from it invalid. Make the Ad Hoc profile again, import the new one into Settings > Signing (the old one "
     + "stays in use until you do) and re-sign the apps with it." },
 ];
-export const keepGuideHref = (fmt = format) => fmt({ tab: "home", path: ["guides", KEEP_GUIDE] });
 
 // ---- F277: Use an App Store Connect API Key (screens/devaccount.js, the Apple Developer Account group) -------
 // Opened only from that group's footer (`only: "link"`: listed nowhere). The Issuer ID isn't in the .p8 and no Apple
 // call returns it without it, so the guide says to copy it (or keep it in a .txt picked with the key).
-export const ASC_GUIDE = "asc-key";
 export const ASC_GUIDE_LINK = "How to make an API key";
 export const ASC_URL = "https://appstoreconnect.apple.com/access/integrations/api";
 export const ASC_INTRO = `With an App Store Connect API key, ${NAME} makes each app's App ID and Ad Hoc profile (with `
   + "Push) itself and adds this iPhone to your account, so you never download a profile again. You need a paid Apple "
   + "Developer account; only its Account Holder or an Admin can make a key.";
-GUIDES[ASC_GUIDE] = { title: "API Key", row: "Use an App Store Connect API Key", only: "link", linked: true };
 STEPS[ASC_GUIDE] = [
   { title: "Open the API Keys", text: "On appstoreconnect.apple.com: Users and Access > Integrations > App Store "
     + "Connect API > Team Keys. The first time, the Account Holder taps Request Access and agrees.",
@@ -406,11 +394,6 @@ STEPS[ASC_GUIDE] = [
     + "asked for again for a month. App Groups come out empty, because the API can't make group IDs: an app that "
     + "shares data through a group may not find it." },
 ];
-export const ascGuideHref = (fmt = format) => fmt({ tab: "home", path: ["guides", ASC_GUIDE] });
-
-// Home's User Guides group: one row per guide, in Cydia's order; lite leaves out the jailbreak ones.
-export const guideRows = (fmt = format, lite = false) =>
-  guideIds(lite).map((id) => ({ label: GUIDES[id].row, href: fmt({ tab: "home", path: ["guides", id] }) }));
 
 // What a guides/ route shows: { page: "list" | "guide" | "answer", id, answer }. A guide lite doesn't have, or an
 // unknown one, shows the list.

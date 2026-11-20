@@ -103,6 +103,7 @@ export function lazyFor(route) {
     if (LAZY_TABS.includes(r.tab)) out.add(r.tab);
     else if (r.tab === IN_HOME) for (const n of SETTINGS_PARTS) out.add(n);
     else if (r.tab === "home" && (r.path[0] === "browse" || r.path[0] === "wishlist")) for (const n of BROWSE_PARTS) out.add(n);
+    else if (r.tab === "home" && r.path[0] === "guides") out.add("guides"); // C32
   }
   return [...out];
 }

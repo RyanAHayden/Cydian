@@ -14,10 +14,10 @@
 //                                                                         (no-op where there's no Worker: node, tests)
 export const PASSWORD_EVENT = "ifizbox:password";
 export const needsConfirm = (id) => Boolean(id?.p12 && id?.profile && id.passwordOk !== true && id.passwordOk !== false);
-import { browserSigning } from "./common.js";
+import { browserSigning, buffer } from "./common.js";
 import { loadIdentity, saveIdentity } from "./identity.js";
-import { runInWorker } from "./browser.js";
-import { buffer } from "./early.js";
+// C32: runInWorker (signing/browser.js) loads with import() on the first check, not at startup.
+const runInWorker = async (job) => (await import("./browser.js")).runInWorker(job);
 
 const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b ?? []));
 const sameBytes = (a, b) => {

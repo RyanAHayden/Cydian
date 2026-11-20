@@ -796,6 +796,7 @@ async function chooseFiles(el, files, slot) {
     locked = r.locked;
   }
   if (id?.p12) await recheckPassword(el, false);
+  if (id?.p12 && !id.profile) await (await import("./devaccount.js")).profileFromKey(localSigning() ? undefined : false); // F276: the profile from an API key
   if (localSigning()) await importIfComplete(el, false);
   if (locked) wantPasswordFocus(el);
   redrawAll();

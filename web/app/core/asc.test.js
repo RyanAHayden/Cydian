@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { webcrypto } from "node:crypto";
 import { keyIdFromName, makeJwt, httpTransport, appIdFor, appIdPrefix, remakeReason, ensureProfile, profileBody,
   findCertificate, profileSerials, profileRows, makeCertificate, distributionCerts, revokeCertificate, APP_ID_CAPS, AscError,
-  newCertificate, makeOwnSigning, profileForP12, certTeam, LIMIT_TEXT, KEY_ROLE_TEXT, REVOKE_WARNING } from "./asc.js";
+  newCertificate, makeOwnSigning, profileForP12, profileForAnyP12, certTeam, LIMIT_TEXT, KEY_ROLE_TEXT, REVOKE_WARNING } from "./asc.js";
 import { certSerial, unpem, tlv, seq, oid } from "./freecert.js";
 import { der, children, checkP12Password } from "./signing.js";
 import { NAME, BUNDLE_ID } from "../brand.js";
@@ -408,4 +408,22 @@ test("certTeam reads the subject's OU, not the issuer's", () => {
   const csr = "-----BEGIN CERTIFICATE REQUEST-----\n" + Buffer.from(seq(seq(tlv(0x02, Uint8Array.of(0)), seq(), seq(seq(), Uint8Array.of(3, 1, 0)), tlv(0xa0)))).toString("base64") + "\n-----END CERTIFICATE REQUEST-----";
   assert.equal(certTeam(fakeCert(csr, "01", "ABCDE12345")), "ABCDE12345");
   assert.equal(certTeam(Uint8Array.of(1, 2, 3)), null);
+});
+
+test("a .p12 alone whose serial isn't known: the profile lists every distribution certificate, prefix from their team", async () => {
+  const csr = "-----BEGIN CERTIFICATE REQUEST-----\n" + Buffer.from(seq(seq(tlv(0x02, Uint8Array.of(0)), seq(), seq(seq(), Uint8Array.of(3, 1, 0)), tlv(0xa0)))).toString("base64") + "\n-----END CERTIFICATE REQUEST-----";
+  const content = Buffer.from(fakeCert(csr, "01", "ABCDE12345")).toString("base64");
+  const asc = fakeAsc({ certs: [
+    { id: "A1", attributes: { certificateType: "DISTRIBUTION", serialNumber: "01", certificateContent: content } },
+    { id: "A2", attributes: { certificateType: "IOS_DISTRIBUTION", serialNumber: "02" } },
+    { id: "DEV", attributes: { certificateType: "DEVELOPMENT", serialNumber: "03" } }] });
+  const r = await profileForAnyP12({ request: asc.request, cache: {} });
+  assert.equal(r.certs, 2);
+  assert.equal(r.appId, appIdFor(BUNDLE_ID, appIdPrefix(null, "ABCDE12345")));
+  assert.deepEqual(asc.lastProfile.data.relationships.certificates.data.map((c) => c.id), ["A1", "A2"]);
+  const none = fakeAsc({ certs: [{ id: "DEV", attributes: { certificateType: "DEVELOPMENT" } }] });
+  await assert.rejects(profileForAnyP12({ request: none.request, cache: {} }), (e) => e.code === "no-cert");
+  assert.ok(!none.calls.includes("POST /profiles"));
+  // the single-certificate body is unchanged
+  assert.deepEqual(profileBody({ name: "n", bundleIdId: "b", certId: "C1", deviceIds: [] }).data.relationships.certificates.data, [{ type: "certificates", id: "C1" }]);
 });

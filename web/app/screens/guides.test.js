@@ -304,3 +304,21 @@ test("Notifications guide: one Push App ID for every app, any signer, renamed co
   assert.match(text, /enough for every app's notifications/);
   assert.equal(text.includes("One App ID per app:"), false, "no longer reads as one App ID per app being needed");
 });
+
+// The API key's own profiles (Apple Developer Account) make one App ID per app: the guide says that route exists and
+// that per-app IDs only keep keychains and App Groups apart, beside the one Push App ID that covers every app.
+test("Notifications guide: the API key route makes a per-app App ID, said the build's way", () => {
+  const store = { getItem: () => null, setItem: () => {} };
+  const text = draw(["guides", "keep-bundle-id"], { lite: true, store }).textContent;
+  assert.ok(text.includes("Settings > Signing > Apple Developer Account"));
+  assert.match(text, /makes that per-app App ID and its Ad Hoc profile itself/);
+  assert.match(text, /keychains and App Groups apart/);
+  const was = globalThis.ifizboxNative;
+  globalThis.ifizboxNative = { mode: "sideload" };
+  try {
+    const lite = draw(["guides", "keep-bundle-id"], { lite: true, store }).textContent;
+    assert.ok(lite.includes("Settings > Installation & Signing > Apple Developer Account"));
+  } finally {
+    globalThis.ifizboxNative = was;
+  }
+});

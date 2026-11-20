@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Test gate for agent-runner: every test_*.py under the repo, the zsign WebAssembly build (where emcc is),
 # `node --test web/app` and the Worker's own tests (every worker/test*.mjs).
-# The native builds (jailbreak .deb and sideload IPA) come first, when their toolchain is there.
+# The native builds (jailbreak .deb and sideload IPA) start first, when their toolchain is there, and run in the
+# background beside the tests that don't need them; the tests that read native/build run after they pass.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -25,7 +26,18 @@ fi
 # T43: everything the gate skips (Python tests, the native and zsign builds) is listed at the end, one line each;
 # IFIZBOX_GATE_STRICT=1 turns any skip into a failure.
 skips=$(mktemp)
-trap 'rm -f "$skips"; [ -z "$gate_tmp" ] || rm -rf "$gate_tmp"' EXIT
+native_pid= native_log=
+gate_cleanup() {
+  # T49: a native build still running (the gate failed before waiting for it) is stopped, its whole process group,
+  # so it doesn't go on writing native/build after the gate has exited.
+  if [ -n "$native_pid" ]; then
+    kill -- "-$native_pid" 2>/dev/null || kill "$native_pid" 2>/dev/null || true
+    wait "$native_pid" 2>/dev/null || true
+  fi
+  rm -f "$skips" ${native_log:+"$native_log"}
+  [ -z "$gate_tmp" ] || rm -rf "$gate_tmp"
+}
+trap gate_cleanup EXIT
 
 # T46: no new file over 1 MB in git (allowlist in the script). First, so a stray video fails in a second, not after
 # the builds; the unittest run below runs the same check with its own tests.
@@ -35,18 +47,63 @@ trap 'rm -f "$skips"; [ -z "$gate_tmp" ] || rm -rf "$gate_tmp"' EXIT
 # skip when they're older than the sources, so building after the tests skipped them cold and tested the last build
 # warm. Only where their toolchain is set up (SWIFT_TOOLCHAIN or swiftc on PATH,
 # IOS_SDK, ld64.lld). build.sh builds native/build/iFizBox.deb and iFizBox.ipa and checks them (mkdeb.py/mkipa.py).
+# T49: it runs in the background while the tests that don't read its output run (the Python dirs in early_dirs, the
+# zsign build, node); the gate waits for it before the rest. Its output goes to a log, printed when it ends, so it
+# doesn't interleave with the tests'. setsid gives it a process group of its own for gate_cleanup to stop.
 if native/build.sh --probe 2>/dev/null; then
-  make -s -C native package
+  native_log=$(mktemp)
+  echo "check: native build started in the background"
+  if command -v setsid >/dev/null; then
+    setsid make -s -C native package >"$native_log" 2>&1 </dev/null &
+  else
+    make -s -C native package >"$native_log" 2>&1 </dev/null &
+  fi
+  native_pid=$!
 else
   echo "check: native build skipped: $(native/build.sh --probe 2>&1 | tr '\n' ' ')" | tee -a "$skips"
 fi
 
+# Waits for the background native build and prints its output; a failed build fails the gate here.
+wait_native() {
+  [ -n "$native_pid" ] || return 0
+  local rc=0
+  wait "$native_pid" || rc=$?
+  native_pid=
+  if [ "$rc" != 0 ]; then
+    echo "check: native build output (last 60 lines):"
+    tail -n 60 "$native_log"
+    echo "check: native build failed (make -C native package exited $rc)"
+    exit 1
+  fi
+  cat "$native_log"
+  echo "check: native build done"
+}
+# Between the stages that run beside it: a build that has already ended is collected now, so a failed one stops the
+# gate here rather than after every parallel test.
+poll_native() {
+  if [ -n "$native_pid" ] && ! kill -0 "$native_pid" 2>/dev/null; then wait_native; fi
+}
+
 # ponytail: unittest exits 5 when it finds no tests; that's an empty dir, not a failure.
 # Discover per directory: dirs like web/ are not packages, so one discover from the root would skip them.
-git ls-files --cached --others --exclude-standard | grep -E '(^|/)test_[^/]*\.py$' | xargs -r -n1 dirname | sort -u |
-  while read -r d; do
-    "$PY" tools/gate_unittest.py "$d" "$skips"
+py_dirs=$(git ls-files --cached --others --exclude-standard | grep -E '(^|/)test_[^/]*\.py$' | xargs -r -n1 dirname | sort -u)
+# T49: the Python dirs whose tests neither read native/build nor write files the build reads, so they run beside the
+# native build. Every other dir runs after it: native/ and its Built cases, tools/ (test_deploy.py publishes
+# native/build), and any new dir until it is checked and listed here.
+early_dirs='^(native/daemon|native/helper|native/sideload/tailscale|native/spike|tools/setup|web/app/icons|worker)$'
+run_py_dirs() {
+  local d
+  for d in "$@"; do
+    "$PY" tools/gate_unittest.py "$d" "$skips" || { echo "check: Python tests in $d failed"; exit 1; }
   done
+}
+early=() late=()
+while read -r d; do
+  [ -n "$d" ] || continue
+  if [[ $d =~ $early_dirs ]]; then early+=("$d"); else late+=("$d"); fi
+done <<<"$py_dirs"
+run_py_dirs ${early[@]+"${early[@]}"}
+poll_native
 
 # F93: the website's zsign WebAssembly (web/app/vendor/zsign), rebuilt from its pinned sources where emcc is (emsdk on
 # PATH or in ~/emsdk). With the emcc that built the committed copy (vendor/zsign/SOURCE) the build is byte for byte
@@ -70,12 +127,17 @@ else
   echo "check: zsign wasm build skipped: $why" | tee -a "$skips"
 fi
 
+poll_native
 node --test web/app
 # The Worker's Node tests, each worker/test*.mjs on its own (test.mjs, test-push.mjs, test-github.mjs, ...): a new
 # one runs without a wrapper test_*.py or an import at the end of test.mjs.
 for t in worker/test*.mjs; do
   node "$t" || { echo "check: $t failed"; exit 1; }
 done
+
+# T49: the native build has to be done (and pass) before the tests that read it.
+wait_native
+run_py_dirs ${late[@]+"${late[@]}"}
 
 # T43: the skip summary, after everything else so it's the last thing on screen.
 if [ -s "$skips" ]; then

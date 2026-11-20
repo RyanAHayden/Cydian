@@ -3,11 +3,12 @@
 //   node worker/node.mjs            PORT (8787), HOST (0.0.0.0), WEB (../web/app), HOST_IDS, TTL as in wrangler.toml
 //   F187: reviews (/reviews/*) in SQLite at REVIEWS_DB (reviews.db, "off" for none); REVIEWS_ADMIN, REVIEWS_SALT,
 //   REVIEW_DAILY, REPORT_HIDE as the Worker's. F312: FETCH_RATE, HOST_RATE, UPLOAD_RATE as the Worker's (src/limits.js).
+//   TRUST_PROXY=1: take the host from X-Forwarded-Host (only behind a proxy that sets it).
 // iOS takes the install manifest only over HTTPS with a trusted certificate: put it behind Tailscale
 // (`tailscale serve --bg 8787`), a Cloudflare Tunnel or Caddy with a domain (worker/README.md).
 import http from "node:http";
 import { readFile, stat } from "node:fs/promises";
-import { extname, join, normalize, resolve, dirname } from "node:path";
+import { extname, join, normalize, resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import worker from "./src/index.js";
 import { guardedFetch } from "./src/ssrf-node.js";
@@ -44,7 +45,7 @@ const ASSETS = {
   async fetch(req) {
     const path = normalize(decodeURIComponent(new URL(req.url).pathname)).replace(/^(\.\.[/\\])+/, "");
     let file = join(WEB, path);
-    if (!file.startsWith(WEB)) return new Response("Not found", { status: 404 });
+    if (file !== WEB && !file.startsWith(WEB + sep)) return new Response("Not found", { status: 404 });
     try { if ((await stat(file)).isDirectory()) file = join(file, "index.html"); } catch { file = join(WEB, "index.html"); }
     try {
       return new Response(await readFile(file), { headers: { "Content-Type": TYPES[extname(file)] ?? "application/octet-stream",
@@ -66,7 +67,7 @@ setInterval(() => { const now = Date.now(); for (const [k, e] of looked) if (e.u
 
 // B190: every fetch the proxy routes make (/api/fetch, /api/ipainfo, /api/applookup, /api/appreviews) goes through
 // the SSRF guard Cloudflare gives the Worker for free: hosts resolved and checked, redirects followed by hand.
-const env = { FETCH: guardedFetch(), HOSTED, ASSETS, LOOKUP_CACHE, HOST_IDS: process.env.HOST_IDS ?? "*.ifizbox", TTL: process.env.TTL ?? "600", MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB };
+const env = { FETCH: guardedFetch(), HOSTED, ASSETS, LOOKUP_CACHE, HOST_IDS: process.env.HOST_IDS ?? "*", TTL: process.env.TTL ?? "600", MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB };
 // F312: the Worker's per-address limits (src/limits.js), counted in memory; FETCH_RATE, HOST_RATE, UPLOAD_RATE as its [vars].
 for (const k of ["FETCH_RATE", "HOST_RATE", "UPLOAD_RATE"]) if (process.env[k] !== undefined) env[k] = process.env[k];
 
@@ -89,10 +90,14 @@ if (REVIEWS_DB !== "off") {
     for (const k of ["REVIEWS_ADMIN", "REVIEWS_SALT", "REVIEW_DAILY", "REPORT_HIDE"]) if (process.env[k]) env[k] = process.env[k];
   } catch (e) { console.warn(`reviews off: ${e?.message ?? e}`); }
 }
+const TRUST_PROXY = process.env.TRUST_PROXY === "1";
 const server = http.createServer(async (inc, out) => {
   try {
     const proto = inc.headers["x-forwarded-proto"] ?? "http";
-    const url = `${proto}://${inc.headers["x-forwarded-host"] ?? inc.headers.host}${inc.url}`;
+    // X-Forwarded-Host only from a proxy you put in front (TRUST_PROXY=1): otherwise any visitor could name the host
+    // the install manifests and the repo page point at; tailscale serve, cloudflared and Caddy pass Host through
+    const host = (TRUST_PROXY && inc.headers["x-forwarded-host"]) || inc.headers.host;
+    const url = `${proto}://${host}${inc.url}`;
     const body = ["GET", "HEAD"].includes(inc.method) ? undefined : inc;
     const headers = { ...inc.headers, "cf-connecting-ip": clientAddress(inc.socket.remoteAddress, inc.headers) };
     const req = new Request(url, { method: inc.method, headers, body, duplex: "half" });

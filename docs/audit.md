@@ -31,6 +31,12 @@ they stay. Check here before removing or merging one.
 - **native/spike/**: the measurement spikes, still tested (test_spike.py) and cited by docs/native.md.
 - **tools/themecmp.py, tools/kitmatch.py**: local reference tools (Pillow/numpy), referenced by journals and
   still used.
+- **tools/spinnercmp.py**: local reference tool (Pillow, needs ref/) that compares nav/spinner.js's spinners with
+  the 4S's frames; rerun it whenever the spinner drawing changes. Nothing in the gate calls it.
+- **tools/gsa-spike.html**: the dev-only free Apple ID sign-in page; `worker/wrangler.preview.toml` copies it into
+  the preview Worker's assets. The site never links to it.
+- **tools/ipa-plist-probe.py**: the standalone proof of reading an IPA's minimum iOS with range requests;
+  worker/src/ipainfo.js's header points to it as the reference it was ported from.
 - **web/fixtures/ beside web/app/core/fixtures/**: moving the apt fixtures under web/app would put them in the
   static assets and the app bundle; the two folders stay.
 - **app.js's service-worker unregister**: returning browsers may still hold an old push worker.

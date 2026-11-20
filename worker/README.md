@@ -54,6 +54,9 @@ iOS takes the install manifest **only over HTTPS with a trusted certificate**, s
 - **Tailscale** (phone on your tailnet): `tailscale serve --bg 8787` gives `https://<machine>.<tailnet>.ts.net`;
 - **Cloudflare Tunnel** (`cloudflared tunnel --url http://localhost:8787`) or **Caddy** with your own domain.
 
+These pass the `Host` header through, which is the address the install links use. `X-Forwarded-Host` is ignored
+unless you set `TRUST_PROXY=1` (only behind a proxy that sets it), so a visitor can't point those links elsewhere.
+
 Then put that `https://` address in **Settings > Installation & Signing > Signing Server**.
 
 ### Settings (`wrangler.toml`)

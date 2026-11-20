@@ -1,0 +1,14 @@
+[
+  { "nav": "#/installed/myipas", "ms": 4000 },
+  { "eval": "(async()=>{const f=async n=>new Uint8Array(await (await fetch('/core/fixtures/tweaks/'+n)).arrayBuffer());const m=await import('/screens/tweaks.js');await m.saveTweaks('com.rileytestut.Delta',[{name:'FixtureTweak.deb',data:await f('tweak-xz.deb')},{name:'ellekit_1.1.3_iphoneos-arm64.deb',data:await f('ellekit.deb')},{name:'Plain.dylib',data:await f('Plain.dylib')}]);return 'seeded'})()" },
+  { "eval": "import('/signing-sheet.js').then(m=>{m.inspectAndInstall({url:'https://example.com/Delta.ipa',name:'Delta'});return 'opened'})" },
+  { "wait": 2500 },
+  { "eval": "(()=>{const g=document.querySelector('.ss-tweaks');g.scrollIntoView({block:'center'});return g.innerText})()" },
+  { "wait": 600 },
+  { "shot": "sheet-tweaks" },
+  { "eval": "(async()=>{const f=async n=>new Uint8Array(await (await fetch('/core/fixtures/tweaks/'+n)).arrayBuffer());const m=await import('/screens/tweaks.js');await m.saveTweaks('com.rileytestut.Delta',[{name:'FixtureTweak.deb',data:await f('tweak-xz.deb')}]);location.hash='#/installed/myipas/ipa:Delta.ipa/options';return 'reseeded'})()" },
+  { "nav": "#/installed/myipas/ipa:Delta.ipa/options", "ms": 4000 },
+  { "eval": "(()=>{const g=[...document.querySelectorAll('.ss-tweaks')].at(-1);g.scrollIntoView({block:'center'});return g.innerText})()" },
+  { "wait": 600 },
+  { "shot": "options-problem" }
+]

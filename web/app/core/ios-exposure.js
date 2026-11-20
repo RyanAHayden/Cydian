@@ -11,8 +11,10 @@
 // package ID, its repo and a link.
 //
 //   EXPLOITABLE_IOS                         the list
-//   exposureOf(ios)                         -> { ios, entries, fixed } for a listed version, else null. `fixed`: the
-//                                              newest first-fixed version among its entries (update to at least that)
+//   exposureOf(ios, list, { machine })      -> { ios, entries, fixed, stuck } for a listed version, else null. `fixed`:
+//                                              the newest fix the phone's model can get that leaves it on no listed
+//                                              version (update to at least that); `stuck`: the model can't get one
+//   LAST_IOS_LINE, lastIosLine(machine)     the newest iOS line a model (hw.machine) can run
 //   exposureDue({ mode, ios, untrusted, seen }) -> whether the alert shows now
 //   exposureAlert(exposure, { canOpenSettings }) -> the alert { title, message, buttons, cancel }
 //   loadSeen(storage), markSeen(storage, ios)   the iOS version the alert was last shown for
@@ -76,13 +78,44 @@ const clean = (v) => {
 
 const inRange = (ios, e) => compareVersions(ios, e.from) >= 0 && compareVersions(ios, e.through) <= 0;
 
-export function exposureOf(ios, list = EXPLOITABLE_IOS) {
+// The newest iOS line (major.minor, any patch on it) a model can run, from hw.machine (Bridge.swift app.info
+// `machine`). Models not listed (iPhone 11 and later, iPads, unknown) take any update. Only lines a listed exploit
+// reaches matter: older phones (iPhone 6 and before, on iOS 12) are on no listed version.
+export const LAST_IOS_LINE = {
+  "iPhone8,1": "15.8", "iPhone8,2": "15.8", "iPhone8,4": "15.8",                     // 6s, 6s Plus, SE
+  "iPhone9,1": "15.8", "iPhone9,2": "15.8", "iPhone9,3": "15.8", "iPhone9,4": "15.8", // 7, 7 Plus
+  "iPod9,1": "15.8",                                                                   // iPod touch (7th)
+  "iPhone10,1": "16.7", "iPhone10,2": "16.7", "iPhone10,3": "16.7",                   // 8, 8 Plus, X
+  "iPhone10,4": "16.7", "iPhone10,5": "16.7", "iPhone10,6": "16.7",
+  "iPhone11,2": "18.7", "iPhone11,4": "18.7", "iPhone11,6": "18.7", "iPhone11,8": "18.7", // XS, XS Max, XR
+};
+export const lastIosLine = (machine) => (typeof machine === "string" && LAST_IOS_LINE[machine.trim()]) || null;
+
+// Within reach of a phone whose newest line is `line` (null: any version).
+const reachable = (v, line) => {
+  if (!line) return true;
+  const p = parseVersion(v);
+  return Boolean(p) && compareVersions(`${p[0]}.${p[1]}`, line) <= 0;
+};
+
+// `fixed`: the version to update to, null when no update in reach closes every listed exploit. It is the newest fix
+// among the entries that the phone can get (`machine`, or `lastLine` directly); when that version is itself listed
+// (17.0 closes landa but Gruber runs on it) the newest reachable fix of that one follows, until a clean version.
+// `stuck`: the phone's model is known and no update in its reach is clean.
+export function exposureOf(ios, list = EXPLOITABLE_IOS, { machine = null, lastLine = lastIosLine(machine) } = {}) {
   const v = clean(ios);
   if (!v) return null;
   const entries = list.filter((e) => inRange(v, e));
   if (!entries.length) return null;
-  const fixed = entries.map((e) => e.fixed).filter(Boolean).reduce((a, b) => (!a || compareVersions(b, a) > 0 ? b : a), null);
-  return { ios: String(ios).trim(), entries, fixed };
+  let fixed = null;
+  for (let at = entries; at.length;) {
+    const next = at.map((e) => e.fixed).filter((f) => f && reachable(f, lastLine))
+      .reduce((a, b) => (!a || compareVersions(b, a) > 0 ? b : a), null);
+    if (!next || (fixed && compareVersions(next, fixed) <= 0)) { fixed = null; break; }
+    fixed = next;
+    at = list.filter((e) => inRange(clean(next), e));
+  }
+  return { ios: String(ios).trim(), entries, fixed, stuck: !fixed && Boolean(lastLine) };
 }
 
 // The alert shows in the sideload app and on the website (never the jailbreak build), on a listed version, when the
@@ -98,7 +131,8 @@ export const EXPOSURE_TITLE = "Check Before You Install";
 export const SOFTWARE_UPDATE = "Software Update";
 export const UNDERSTOOD = "I Understand";
 export function exposureAlert(ex, { canOpenSettings = false } = {}) {
-  const fix = ex.fixed ? ` iOS ${ex.fixed} fixes it${canOpenSettings ? "" : " (Settings > General > Software Update)"}.` : "";
+  const fix = ex.fixed ? ` iOS ${ex.fixed} fixes it${canOpenSettings ? "" : " (Settings > General > Software Update)"}.`
+    : ex.stuck ? " No iOS update for this iPhone fixes it." : "";
   const button = canOpenSettings && ex.fixed;
   return {
     title: EXPOSURE_TITLE,

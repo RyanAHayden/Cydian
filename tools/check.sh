@@ -7,6 +7,10 @@ cd "$(dirname "$0")/.."
 
 PY=python3
 
+# T46: no new file over 1 MB in git (allowlist in the script). First, so a stray video fails in a second, not after
+# the builds; the unittest run below runs the same check with its own tests.
+"$PY" tools/test_sizeguard.py --list || { echo "check: size guard failed"; exit 1; }
+
 # Native builds (native/, N1 and I2), before the tests: native/*/test_*.py's Built cases check these outputs and
 # skip when they're older than the sources, so building after the tests skipped them cold and tested the last build
 # warm. Only where their toolchain is set up (SWIFT_TOOLCHAIN or swiftc on PATH,

@@ -59,14 +59,12 @@ class Rules(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, True)  # also when the build below fails
         cls.driver = os.path.join(cls.tmp, "test_driver")
-        subprocess.run([CC, "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1", "-o", cls.driver,
+        # -pipe and TMPDIR: cc's scratch files stay out of the shared /tmp, which other gates can fill (EDQUOT).
+        subprocess.run([CC, "-pipe", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1", "-o", cls.driver,
                         os.path.join(HERE, "test_driver.c"), os.path.join(HERE, "upgrades.c")],
-                       check=True, capture_output=True)
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.tmp)
+                       check=True, capture_output=True, env=dict(os.environ, TMPDIR=cls.tmp))
 
     def file(self, name, text):
         if text is None:

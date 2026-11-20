@@ -1,10 +1,11 @@
 // Why <NAME> (F303, user 2026-11-20): one page on Home's stack (#/home/why) listing what the app does that other
-// app stores and sideloaders don't, led by APT tweaks injected into sideloaded apps. iOS 6 grouped tables: each
+// app stores and sideloaders don't, led by the two builds and APT tweaks injected into sideloaded apps. iOS 6 grouped tables: each
 // point is a group whose header names it, a few short lines as rows, and a real screenshot in the last cell
 // (web/app/img/why/, cropped from the README captures, F288's Sign Options capture and F290's showcase stills).
 //
-// Linked from the website's Home (always: phones and, past the Not-an-iPhone page, desktops), the sideload app's Home
-// while signing isn't set up (home.js showsWhyTile), and the Not-an-iPhone page desktops see first (notiphone.js).
+// Linked from the website's Home (always: phones and, past the Not-an-iPhone page, desktops), the installed apps'
+// Home until it has been opened there (showsWhyTile), then their Settings > About (whyAboutSection), and the
+// Not-an-iPhone page desktops see first (notiphone.js).
 // It stays open while the website's Home is locked (home.js OPEN_WHILE_LOCKED).
 //
 // Styles live here (WHY_CSS, put in the document once by ensureWhyStyle) so the page and Home's tile need no new
@@ -12,6 +13,7 @@
 import { el, grouped } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { NAME } from "../brand.js";
+import { rowIcon } from "../icons/rowicons.js";
 
 export const WHY_ROUTE = { tab: "home", path: ["why"] };
 export const whyHref = (fmt = format) => fmt(WHY_ROUTE);
@@ -19,20 +21,20 @@ export const WHY_TITLE = `Why ${NAME}`;
 export const WHY_TILE = { label: `Why ${NAME}?`, subtitle: "Tweaks in sideloaded apps, and more" };
 
 // Each point: title (the group header), lines (short, one row each), shot (img/why/<shot>.jpg, its pixel size so the
-// page keeps its height while it loads), alt. The first is the lead.
+// page keeps its height while it loads), alt. The first is the lead (F306: the two builds, then tweaks in apps).
 export const WHY_POINTS = [
+  {
+    id: "builds", title: "One App, Jailbroken or Not",
+    lines: ["Lite for any iPhone: apps, signing, tweaks in apps.", "The full app for jailbroken iPhones: apt underneath.",
+      "Same screens, same sources, same settings."],
+    shot: "builds", size: [600, 376], alt: "The website's Home offering Lite and the jailbreak app",
+  },
   {
     id: "tweaks", title: "Tweaks in Sideloaded Apps",
     lines: ["Add tweaks from APT repos to any app you sign.", "Havoc, Chariz, BigBoss: no jailbreak needed.",
       "ElleKit comes bundled for tweaks that need it.", "Or add your own .deb, .dylib or .framework.",
       "The tweaks stay with the app when it's re-signed."],
     shot: "tweaks", size: [600, 456], alt: "Sign Options with three tweaks under Inject Tweaks",
-  },
-  {
-    id: "builds", title: "One App, Jailbroken or Not",
-    lines: ["Lite for any iPhone: apps, signing, tweaks in apps.", "The full app for jailbroken iPhones: apt underneath.",
-      "Same screens, same sources, same settings."],
-    shot: "builds", size: [600, 376], alt: "The website's Home offering Lite and the jailbreak app",
   },
   {
     id: "look", title: "Cydia's iOS 6 Look",
@@ -130,8 +132,9 @@ export function endGroup(mode, install = null) {
 
 export const nav = () => ({ title: WHY_TITLE });
 
-export function render(body, { mode = "site", install = null } = {}) {
+export function render(body, { mode = "site", install = null, storage = globalThis.localStorage } = {}) {
   ensureWhyStyle();
+  if (mode !== "site") markWhyOpened(storage); // F306: Home's tile goes for good in the installed apps
   const page = el("div", "why-page");
   page.append(el("p", "why-intro", `What ${NAME} does that other app stores don't.`));
   const sections = whySections({ mode, install });
@@ -159,6 +162,21 @@ export function render(body, { mode = "site", install = null } = {}) {
   return page;
 }
 
-// Where Home shows the Why tile: the website always (its visitors haven't set the app up), the sideload app until
-// signing is set up, never in the jailbreak app.
-export const showsWhyTile = (mode, setUp = false) => mode === "site" || (mode === "sideload" && !setUp);
+// Where Home shows the Why tile (F306, user 2026-11-20): the website always; the installed apps (sideload and
+// jailbreak) only until the page has been opened once there (WHY_OPENED_KEY, kept in localStorage, which the app's
+// web view keeps across launches). After that the page is reached from Settings' About group (whyAboutSection).
+export const WHY_OPENED_KEY = `${NAME.toLowerCase()}.whyOpened`; // the lowercase name's storage prefix, from brand.js
+export const showsWhyTile = (mode, opened = false) => mode === "site" || !opened;
+export function whyOpened(storage = globalThis.localStorage) {
+  try { return storage?.getItem(WHY_OPENED_KEY) === "1"; } catch { return false; }
+}
+export function markWhyOpened(storage = globalThis.localStorage) {
+  try { storage?.setItem(WHY_OPENED_KEY, "1"); } catch { /* private mode: the tile stays */ }
+}
+
+// Settings' root in the installed apps: an About group with a row to the page (both builds; the website keeps the
+// tile on Home instead). null on the website.
+export function whyAboutSection(mode) {
+  if (mode === "site") return null;
+  return { header: "About", rows: [{ label: WHY_TILE.label, href: whyHref(), chevron: true, icon: rowIcon("recommended") }] };
+}

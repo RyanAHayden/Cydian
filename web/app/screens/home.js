@@ -602,14 +602,14 @@ function renderRoot(body) {
   // both (Top 25, and the Themes collection).
   const halves = tileRow("halves", tile({ label: "Signing", href: format(settingsRoute(["signing"])), glyph: "signing" }));
   let setUp = true; // hidden until signingSetUp answers: no tile flashing in and out once it is set up
-  // F303: Why <NAME>, high on Home where nobody has set the app up yet (why.js showsWhyTile): the website always, the
-  // sideload app until signing is set up. Its glyph and the page's styles come from why.js (ensureWhyStyle).
+  // F303: Why <NAME>, high on Home (why.js showsWhyTile): the website always, the installed apps until the page has
+  // been opened there (F306), then Settings > About has it. Its glyph and the page's styles come from why.js.
   why.ensureWhyStyle();
   const whyRow = tileRow("stack why", tile({ label: why.WHY_TILE.label, subtitle: why.WHY_TILE.subtitle, href: why.whyHref(), glyph: "why" }));
   const drawThemes = () => {
     const themes = showsThemes(settings.deviceType());
     halves.hidden = lockedNow || themes || !showsSigningTile(settings.mode, setUp);
-    whyRow.hidden = !why.showsWhyTile(settings.mode, setUp); // F303
+    whyRow.hidden = !why.showsWhyTile(settings.mode, why.whyOpened()); // F306: until opened, in the installed apps
     for (const row of lockedTop) row.hidden = !showsSigningTile(settings.mode, setUp);
   };
   // Asked again each time Home's root comes back (Settings > Signing is on Home's stack: Back from it lands here).
@@ -620,7 +620,9 @@ function renderRoot(body) {
   };
   const onHash = () => {
     if (!halves.isConnected) { removeEventListener("hashchange", onHash); return; }
-    if (/^#\/home\/?$/.test(location.hash)) checkSigning();
+    if (!/^#\/home\/?$/.test(location.hash)) return;
+    checkSigning();
+    if (!whyRow.hidden && !why.showsWhyTile(settings.mode, why.whyOpened())) drawThemes(); // F306: Back from Why
   };
   addEventListener("hashchange", onHash);
   const lockedNow = browsingLocked({ mode: settings.mode });

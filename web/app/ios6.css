@@ -163,7 +163,7 @@ html[data-theme="dark"][data-palette="gunmetal"] {
   --dk-tabbar: /* the light theme's .tabbar */
     linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) top / 100% 1px no-repeat,
     linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,.1)) 0 1px / 100% 1px no-repeat,
-    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% calc(100% - 1px) no-repeat,
+    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% 48px no-repeat,
     #000;
   --dk-btn-edge: #111;
   --dk-btn: linear-gradient(#4a4f58, #24272c);
@@ -339,13 +339,15 @@ html[data-theme="dark"] .pair-button.delete-button:is(:active, .is-pressed) {
 }
 
 /* ---- Tab bar: "Tab bar" ---- */
-/* The background spans the whole bar, the strip over the home indicator (--safe-bottom) included, so the gloss
-   keeps its half-and-half split instead of ending at 49 pt over a band of plain black. */
+/* The gloss is the kit's 49 pt bar from the top, split at the bar's own half (24.5 pt), where the icons expect it.
+   The strip over the home indicator (--safe-bottom) is the base colour under it, which every theme's --dk-tabbar
+   keeps equal to the gloss's last (dark) colour, so the bottom half carries on over the strip with no seam.
+   (Stretching the gloss over the strip put the split at half of 49 pt + the strip: through the icons.) */
 .tabbar {
   background:
     linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) top / 100% 1px no-repeat,          /* top dark highlight */
     linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,.1)) 0 1px / 100% 1px no-repeat, /* top highlight */
-    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% calc(100% - 1px) no-repeat, /* background */
+    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% 48px no-repeat, /* background */
     #000;
 }
 .tabbar::before { /* Shadow above: 2.5px, black at 18% */

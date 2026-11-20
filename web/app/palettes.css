@@ -113,7 +113,7 @@ html[data-theme="dark"][data-palette="linen"] {
   --dk-tabbar:
     linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) top / 100% 1px no-repeat,
     linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,.1)) 0 1px / 100% 1px no-repeat,
-    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% calc(100% - 1px) no-repeat,
+    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% 48px no-repeat,
     #000;
   --dk-btn-edge: #111;
   --dk-btn: linear-gradient(#4a4d54, #222428);
@@ -186,7 +186,7 @@ html[data-theme="dark"][data-palette="nord"] {
     linear-gradient(#4c566a, #3b4252 50%, #343a48 51%, #2b303b) bottom / 100% 44px no-repeat,
     #2e3440;
   --dk-nav-shadow: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,0));
-  --dk-tabbar: linear-gradient(#1f232c, #1f232c) top / 100% 1px no-repeat, linear-gradient(#3b4252, #2b303b) 0 1px / 100% calc(100% - 1px) no-repeat, #2b303b;
+  --dk-tabbar: linear-gradient(#1f232c, #1f232c) top / 100% 1px no-repeat, linear-gradient(#3b4252, #2b303b) 0 1px / 100% 48px no-repeat, #2b303b;
   --dk-btn-edge: #1f232c;
   --dk-btn: linear-gradient(#4c566a, #2e3440);
   --dk-btn-pressed: linear-gradient(#353c4a, #232831);
@@ -266,7 +266,7 @@ html[data-theme="dark"][data-palette="dracula"] {
     linear-gradient(#4f5268, #383b4c 50%, #2c2e3b 51%, #21222c) bottom / 100% 44px no-repeat,
     #21222c;
   --dk-nav-shadow: linear-gradient(rgba(0,0,0,.4), rgba(0,0,0,0));
-  --dk-tabbar: linear-gradient(#15161c, #15161c) top / 100% 1px no-repeat, linear-gradient(#383b4c, #21222c) 0 1px / 100% calc(100% - 1px) no-repeat, #21222c;
+  --dk-tabbar: linear-gradient(#15161c, #15161c) top / 100% 1px no-repeat, linear-gradient(#383b4c, #21222c) 0 1px / 100% 48px no-repeat, #21222c;
   --dk-btn-edge: #15161c;
   --dk-btn: linear-gradient(#5a5e78, #2c2e3b);
   --dk-btn-pressed: linear-gradient(#383b4c, #1e1f28);

@@ -460,7 +460,7 @@ export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg 
 //                                           count made for this app (cached checks) or of those added; opens the page
 //   await openAddTweaks({ bundleId, name }) the Add Tweaks sheet: "Made for <app>" with ADD buttons (green at once, a
 //                                           spinner while the .deb is read and checked), what's added, Browse Tweak
-//                                           Sources, From Files…; resolves once it's closed
+//                                           Sources, Search All Repos (Canister), From Files…; resolves once it's closed
 //   await installTweaksChoice({ … })        the install popup before an app is queued: "<app> <version>" and what goes in,
 //                                           "Tweaks: N" (or "Add Tweaks…"), Install. true: install, false: cancelled
 //   await keptTweakParams(params, job)      signing.prepare's params with the app's kept tweaks (prepared, ElleKit when
@@ -625,10 +625,14 @@ export function addTweaksGroup({ bundleId, name = "", open = (o) => openAddTweak
   return { el: g, ready, refresh };
 }
 
+// F305a: Add Tweaks' Search All Repos (screens/findmore.js, loaded when tapped so this module doesn't pull it in).
+export const searchAllFooter = (name) => `Search All Repos finds tweaks for ${name || "this app"} in repos you haven't added.`;
+export const openSearchAllRepos = (o) => import("./findmore.js").then((m) => m.searchAllRepos(o));
+
 // The Add Tweaks sheet. `pkg(row)` -> the package's stanza (the catalog's).
 export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, store = tweakStore, storage, fetchDeb, alert = showAlert,
   sheet = showActionSheet, show = null, pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza,
-  browse = pickSourceTweak, onChange = () => {} } = {}) {
+  browse = pickSourceTweak, onChange = () => {}, searchAll = openSearchAllRepos } = {}) {
   style();
   return new Promise((resolve) => {
     const body = el("div", "tweak-pick tw-add-page");
@@ -726,12 +730,15 @@ export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, sto
         }))));
       }
       const browseLi = cell("Browse Tweak Sources", null, null, () => browse({ bundleId, storage, alert, onPick: async (one) => { await keepItem(bundleId, one, store); onChange(); draw(); } }));
+      // F305a: Canister's package search for this app, in repos not added yet (findmore.js searchAllRepos)
+      const searchLi = cell("Search All Repos", null, el("span", "cell-detail", "Canister"), () => searchAll({ appName: name, ctx: null }));
+      searchLi.classList.add("tw-search-all");
       const filesLi = el("li", "cell tw-row");
       const files = Object.assign(el("label", "cell-inner chevron ss-tweak-add"), { htmlFor: input.id });
       files.append(el("span", "cell-label", "From Files…"));
       filesLi.append(files, input);
-      groups.push(group(made.length || others.length ? "More Tweaks" : "Tweaks", [browseLi, filesLi],
-        `Only tweaks that work without a jailbreak are listed. ${ELLEKIT.name} goes in for the ones that need it. They go into ${name || "the app"} the next time it's signed.`));
+      groups.push(group(made.length || others.length ? "More Tweaks" : "Tweaks", [browseLi, searchLi, filesLi],
+        `Only tweaks that work without a jailbreak are listed. ${ELLEKIT.name} goes in for the ones that need it. They go into ${name || "the app"} the next time it's signed. ${searchAllFooter(name)}`));
       body.replaceChildren(...groups);
     }
     madeForRows(bundleId, { rows, storage }).then((m) => { made = m; }, () => {}).finally(() => draw());

@@ -225,3 +225,20 @@ test("Installed rows: '2 Tweaks' after a signed app's subtitle, 'Tweak Update' w
   assert.ok(b.all("tweak-pill")[0].classList.contains("up"));
   assert.equal(addTweakPill(li(), { bundleId: "com.b" }, []), null);
 }));
+
+test("Add Tweaks: Search All Repos sits beside Browse Tweak Sources (detail Canister), opens findmore's sheet with the app's name", () => withDoc(async () => {
+  let body = null;
+  const opened = [];
+  openAddTweaks({ bundleId: "com.x.tube", name: "YouTube", store: memStore(), storage: storage(), rows: async () => [],
+    show: (o) => { body = o.body; return () => {}; }, searchAll: (o) => { opened.push(o); } });
+  for (let i = 0; i < 5; i++) await tick();
+  const row = body.all("tw-search-all")[0];
+  assert.ok(row, "the row is there");
+  assert.match(row.textContent, /^Search All ReposCanister$/);
+  const labels = body.all("cell-label").map((x) => x.textContent);
+  assert.deepEqual(labels, ["Browse Tweak Sources", "Search All Repos", "From Files…"]);
+  assert.match(body.textContent, /Search All Repos finds tweaks for YouTube in repos you haven't added\./);
+  await row.all("cell-inner")[0].fire("click");
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0].appName, "YouTube");
+}));

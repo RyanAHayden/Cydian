@@ -44,13 +44,17 @@ function bridgeScript(mode, storage) {
 
 async function boot(port, mode) {
   const prof = await mkdtemp(join(tmpdir(), "ifizbox-startup-"));
-  const dport = 9400 + Math.floor(Math.random() * 500);
-  const chrome = spawn(chromium, ["--headless", "--no-first-run", `--remote-debugging-port=${dport}`, `--user-data-dir=${prof}`, "about:blank"], { stdio: "ignore" });
+  // Port 0: Chromium picks a free port and writes it to <profile>/DevToolsActivePort, so two Chromiums at once
+  // (other gates, the build's bundled-web run beside this one) can't meet on a guessed port and attach to each other.
+  const chrome = spawn(chromium, ["--headless", "--no-first-run", "--remote-debugging-port=0", `--user-data-dir=${prof}`, "about:blank"], { stdio: "ignore" });
   const errors = [];
   try {
-    let ws;
+    let ws, dport;
     for (let i = 0; i < 75 && !ws; i++) {
-      try { const p = (await (await fetch(`http://127.0.0.1:${dport}/json/list`)).json()).find((t) => t.type === "page"); if (p) ws = new WebSocket(p.webSocketDebuggerUrl); } catch {}
+      try {
+        dport ??= Number((await readFile(join(prof, "DevToolsActivePort"), "utf8")).split("\n")[0]) || undefined;
+        if (dport) { const p = (await (await fetch(`http://127.0.0.1:${dport}/json/list`)).json()).find((t) => t.type === "page"); if (p) ws = new WebSocket(p.webSocketDebuggerUrl); }
+      } catch {}
       if (!ws) await sleep(200);
     }
     assert.ok(ws, "Chromium's DevTools didn't come up");

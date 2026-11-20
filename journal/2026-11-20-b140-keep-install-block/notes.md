@@ -30,6 +30,15 @@ I put the tests in a new file so they stay out of the way of other slots editing
 - The two calls left both start in the same first moment: the page is built twice right after it opens, before
   any of the slow answers arrive. They don't make the rows flicker, so I left them alone.
 
+## Gate environment
+
+- /tmp (shared tmpfs) ran out of quota during this run. The first `run done` failed: 25 errors in
+  native/helper/test_helper.py and a failed cc build in native/daemon/test_auto.py, all from temp files that
+  couldn't be written. With TMPDIR on the home filesystem, test_helper passed but test_auto's
+  `test_rollback_keeps_previous_versions` failed every time. It passes on tmpfs. Its keep choice falls back on
+  readdir order when mtimes match. Filed as T27 (low).
+- The gate that passed ran with `TMPDIR=/dev/shm/<own dir>` (tmpfs, like /tmp).
+
 ## Not verified
 
 - On a phone: this was an unattended run with no phone in reach. It's checked only in Chromium with the fake bridge.

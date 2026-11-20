@@ -119,8 +119,8 @@ through `installation_proxy` (pairing file + LocalDevVPN), which the app doesn't
 Where: How Signing Works (the walkthrough Install opens when there's no certificate), under the two steps, as
 **Use a Free Apple ID**. It shows only when the Worker's Apple relay is on (`GET /apple/status` answers
 `{"on":true}`; off, `/apple/status` and every sign-in, developer-services and anisette path are a 404). The relay is
-off unless the deploy sets `APPLE_RELAY = "1"` (`worker/src/apple-relay.js`, `worker/README.md`), so ifizbox.com
-doesn't show it today. The App Store Connect pass-through for your own API key (below) is not part of it and works
+off unless the deploy sets `APPLE_RELAY = "1"` (`worker/src/apple-relay.js`, `worker/README.md`), and ifizbox.com's
+deploy does (`worker/wrangler.ifizbox.toml`), so the site shows it. The App Store Connect pass-through for your own API key (below) is not part of it and works
 either way.
 
 The flow (`web/app/screens/free-apple-id.js`):

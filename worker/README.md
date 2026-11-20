@@ -10,7 +10,9 @@ server for two things, and this Worker is that server:
 - **Apps the website signed in the browser** (F93): the website signs with zsign as WebAssembly in your browser and
   leaves the signed app here for the same 10 minutes, for iOS's install prompt.
 
-It stores nothing else and logs nothing. iFizBox uses `https://sign.ifizbox.com` unless you set your own.
+Beside those it stores only what you send it for other features: iFizBox Account's encrypted blobs (KV, ciphertext
+only), package reviews (the `REVIEWS` D1 database, tokens and addresses hashed) and push devices with the sources
+they follow (the `PUSH` D1 database). It logs no request bodies. iFizBox uses `https://sign.ifizbox.com` unless you set your own.
 
 ## Host your own (free, about a minute)
 
@@ -81,7 +83,7 @@ Then put that `https://` address in **Settings > Installation & Signing > Signin
   (`src/apple-relay.js`, used by `web/app/core/gsa.js`). It forwards only to gsa.apple.com's sign-in paths,
   developerservices2.apple.com's Xcode API and a few public anisette servers, from this site's own pages, with size
   and time caps, and it never logs or keeps what passes through. Off, `/apple/status` and those paths are a 404, and
-  the website hides Use a Free Apple ID; ifizbox.com leaves it off. Self-hosted with `node.mjs`, gsa.apple.com needs
+  the website hides Use a Free Apple ID; ifizbox.com turns it on (`wrangler.ifizbox.toml`). Self-hosted with `node.mjs`, gsa.apple.com needs
   Apple Root CA (`NODE_EXTRA_CA_CERTS`).
   `/apple/api.appstoreconnect.apple.com/v1/{devices,certificates,bundleIds,bundleIdCapabilities,profiles}` is not
   part of it and passes through **even with `APPLE_RELAY` off**: the website's own provisioning profiles with your

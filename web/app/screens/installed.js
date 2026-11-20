@@ -300,24 +300,17 @@ export function nav(route, ctx) {
   return info;
 }
 
-function navInfo(route, view) {
-  const kind = pageKind(route);
-  if (kind === "browse") return browse.nav(route);
-  if (kind === "myipas") return myipas.nav(route);
-  if (kind === "app") return { title: appNames.get(appIdOf(route.path.at(-1))) || appIdOf(route.path.at(-1)) };
-  if (kind === "wishlist") {
-    return { title: "Wish List", style: "plain",
-      right: { label: wishView.editing ? "Done" : "Edit", onClick: (e) => setWishEditing(!wishView.editing, e.currentTarget) } };
-  }
-  if (kind === "apps") {
-    return { title: recordsApps() ? "Installed" : "Apps", style: "plain", // F87: "Apps" one row down in the jailbreak app
-      // F127: User | Recent on the apps list's root (the jailbreak app's Apps page stays newest first).
-      titleView: recordsApps() ? modeControl(APP_MODES, view.mode, (m) => pickMode(m, view)) : undefined,
-      // F222: Manage (bulk Re-sign, Update, Delete), not Edit or F208's Add: a row still deletes with a swipe.
-      right: recordsApps() ? { label: view.managing ? "Done" : "Manage", onClick: () => setManaging(!view.managing, view),
-        ref: (b) => { view.right = b; b.classList.add("manage-button"); b.classList.toggle("done", view.managing); } }
-        : { label: view.editing ? "Done" : "Edit", onClick: (e) => setEditing(!view.editing, e.currentTarget, view) } };
-  }
+function appsNav(view) {
+  return { title: recordsApps() ? "Installed" : "Apps", style: "plain", // F87: "Apps" one row down in the jailbreak app
+    // F127: User | Recent on the apps list's root (the jailbreak app's Apps page stays newest first).
+    titleView: recordsApps() ? modeControl(APP_MODES, view.mode, (m) => pickMode(m, view)) : undefined,
+    // F222: Manage (bulk Re-sign, Update, Delete), not Edit or F208's Add: a row still deletes with a swipe.
+    right: recordsApps() ? { label: view.managing ? "Done" : "Manage", onClick: () => setManaging(!view.managing, view),
+      ref: (b) => { view.right = b; b.classList.add("manage-button"); b.classList.toggle("done", view.managing); } }
+      : { label: view.editing ? "Done" : "Edit", onClick: (e) => setEditing(!view.editing, e.currentTarget, view) } };
+}
+
+function dpkgNav(view) {
   const info = { title: recordsApps() ? "dpkg Status" : "Installed", style: "plain" };
   // F127: Cydia's User | Expert | Recent in place of the title.
   const modes = dpkgModes(canReadDates());
@@ -328,36 +321,44 @@ function navInfo(route, view) {
   return info;
 }
 
+// The tab's pages, one entry each: `match` is the route's pageKind(), `nav` its bar (given the apps/dpkg page's own
+// view, C25), `render` its page. nav() and render() only look the kind up here.
+const ROUTES = [
+  { match: "browse", nav: (route) => browse.nav(route), render: (body, route, ctx) => browse.render(body, route, ctx) },
+  { match: "myipas", nav: (route) => myipas.nav(route), render: (body, route, ctx) => myipas.render(body, route, ctx) },
+  { match: "app", nav: (route) => ({ title: appNames.get(appIdOf(route.path.at(-1))) || appIdOf(route.path.at(-1)) }),
+    render: (body, route, ctx) => { renderAppPage(body, route, ctx); } },
+  { match: "wishlist",
+    nav: () => ({ title: "Wish List", style: "plain",
+      right: { label: wishView.editing ? "Done" : "Edit", onClick: (e) => setWishEditing(!wishView.editing, e.currentTarget) } }),
+    render: (body, route) => {
+      wishView.body = body;
+      wishView.route = route;
+      body.append(placeholder("list"));
+      loadWish();
+    } },
+  { match: "apps", nav: (route, view) => appsNav(view),
+    render: (body, route) => {
+      const view = takeView("apps", body, route);
+      body.append(placeholder("list", 6));
+      loadApps(view);
+    } },
+  { match: "dpkg", nav: (route, view) => dpkgNav(view),
+    render: (body, route) => {
+      const view = takeView("dpkg", body, route);
+      body.append(placeholder("list"));
+      load(view);
+    } },
+];
+
+const routeOf = (kind) => ROUTES.find((r) => r.match === kind);
+
+function navInfo(route, view) {
+  return routeOf(pageKind(route)).nav(route, view);
+}
+
 export function render(body, route, ctx) {
-  const kind = pageKind(route);
-  if (kind === "browse") {
-    browse.render(body, route, ctx);
-    return;
-  }
-  if (kind === "myipas") {
-    myipas.render(body, route, ctx);
-    return;
-  }
-  if (kind === "app") {
-    renderAppPage(body, route, ctx);
-    return;
-  }
-  if (kind === "wishlist") {
-    wishView.body = body;
-    wishView.route = route;
-    body.append(placeholder("list"));
-    loadWish();
-    return;
-  }
-  if (kind === "apps") {
-    const view = takeView(kind, body, route);
-    body.append(placeholder("list", 6));
-    loadApps(view);
-    return;
-  }
-  const view = takeView("dpkg", body, route);
-  body.append(placeholder("list"));
-  load(view);
+  routeOf(pageKind(route)).render(body, route, ctx);
 }
 
 export function emptyText(source) {

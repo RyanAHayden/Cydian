@@ -4,6 +4,7 @@ dir = "plan"
 journal = "journal"
 
 [run]
+auto_upgrade = true  # upgrade agent-runner by itself when a newer release is out, between merges
 weekly_max = 98
 test = "tools/check.sh"
 slots = 5

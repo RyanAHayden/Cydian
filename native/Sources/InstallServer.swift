@@ -44,10 +44,25 @@ final class InstallServer {
 
     private init() {}
 
-    // Starts listening if it isn't (a random free port), then calls back with the port.
+    // Starts listening if it isn't (a random free port), then calls back with the port. Each install (every item
+    // of a queue run) comes through here, so each one checks the listener (B128, ListenerStart in sign/HTTP.swift).
     func start(_ done: @escaping (Result<UInt16, Error>) -> Void) {
         queue.async {
-            if let l = self.listener, l.state == .ready { return done(.success(self.port)) }
+            let since = Date().timeIntervalSince(self.lastBeat)
+            switch ListenerStart.decide(has: self.listener != nil, ready: self.listener?.state == .ready, serving: !self.routes.isEmpty,
+                                        sinceBeat: self.beat == nil ? 0 : since, gap: InstallServer.freezeGap) {
+            case .reuse: return done(.success(self.port))
+            case .revive:
+                // routes still served name this port: re-create it there (B89), the freeze noted if there was one
+                if self.beat != nil && since >= InstallServer.freezeGap { self.tick() } else { self.revive("a new install found it not ready") }
+                return done(.success(self.port))
+            case .fresh:
+                // B128: an idle listener may say .ready while iOS shut its socket during a suspension: never reuse it
+                let old = self.listener
+                self.listener = nil
+                old?.cancel()
+                self.port = 0
+            }
             do {
                 let params = NWParameters.tcp
                 params.requiredInterfaceType = .loopback
@@ -61,8 +76,11 @@ final class InstallServer {
                 l.stateUpdateHandler = { st in // the server lives as long as the app
                     switch st {
                     case .ready:
+                        guard self.listener === l else { break } // B128: one a later start() replaced
                         self.port = l.port?.rawValue ?? 0
                         if !answered { answered = true; done(.success(self.port)) }
+                    case .cancelled: // B128: a later start() replaced it before it was ready: that caller isn't left waiting
+                        if !answered { answered = true; done(.failure(NWError.posix(.ECANCELED))) }
                     case .failed(let e):
                         guard self.listener === l else { break } // B89: one revive() replaced
                         self.listener = nil

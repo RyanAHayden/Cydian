@@ -1262,6 +1262,7 @@ enum CloseForUpdate {
     private(set) static var state: State?
     private static var sinks = [(State?) -> Bool]() // signing.selfUpdate watches; false: done with it
     private static var run = 0 // each afterPrompt bumps it: an older run's polls stop
+    private static var downloadingSince: Date? // B208: when the server first said iOS started the download
     static let startLimit: TimeInterval = 120, finishLimit: TimeInterval = 600, pollEvery: TimeInterval = 2
 
     // B124: the update being handed off (its IDs and version), for the icon badge when iFizBox closes
@@ -1298,7 +1299,17 @@ enum CloseForUpdate {
         backgroundToken.map(nc.removeObserver)
         backgroundToken = nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in begin() }
         DispatchQueue.main.asyncAfter(deadline: .now() + promptGrace) { if !resigned { begin() } }
+        // B208: resigned, but neither active again nor in the background (the prompt's answer never brought a
+        // become-active): the wait begins anyway, so the page never sits on "Waiting for iOS" with nothing polling
+        DispatchQueue.main.asyncAfter(deadline: .now() + promptLimit) { begin() }
     }
+
+    // B208: how long after the prompt opened the wait begins whatever iFizBox heard (begin only acts from .prompt)
+    static let promptLimit: TimeInterval = 30
+    // B208: once iOS has begun the download (it fetches from the server, not from iFizBox, so closing can't break it),
+    // how long iFizBox waits for the server's finished mark before it closes anyway (guessed). It used to wait the
+    // whole `finishLimit` (10 minutes), the page locked, when the mark never came.
+    static let downloadGuess: TimeInterval = 60
 
     // signing.selfUpdate: `sink` gets the state now (nil: no self-update running) and each change after; it answers
     // false once it is done listening.
@@ -1321,7 +1332,12 @@ enum CloseForUpdate {
                 guard mine == run else { return }
                 let known = code == 200 && marks?["finished"] != nil
                 if known, marks?["finished"] as? Bool == true { return finish() }
-                if known, marks?["started"] as? Bool == true, state != .downloading { set(.downloading) }
+                if known, marks?["started"] as? Bool == true, state != .downloading { downloadingSince = Date(); set(.downloading) }
+                // B208: iOS is downloading, but the finished mark hasn't come within downloadGuess: close anyway
+                if state == .downloading, let d = downloadingSince, Date().timeIntervalSince(d) > downloadGuess {
+                    IDevice.ilog("self-close: iOS began the download \(Int(downloadGuess)) s ago and the server never said finished; closing")
+                    return guess()
+                }
                 // an older Signing Server, without the status route: the old guess
                 let miss = !known && code == 404 ? misses + 1 : (known ? 0 : misses)
                 if miss >= 3, state == .waiting { return guess() }

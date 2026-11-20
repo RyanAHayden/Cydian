@@ -12,6 +12,12 @@ export const SELF_UPDATE_FAILED = {
   notStarted: `The update didn't start: iOS didn't download the new ${NAME}. If Install was pressed, try again.`,
   stalled: `The update didn't finish: iOS stopped downloading the new ${NAME}.`,
 };
+// B208: iOS began downloading the new iFizBox but the shell hasn't closed DOWNLOAD_HINT later (the server's finished
+// mark lost or late; the shell itself closes downloadGuess, 60 s, after the start): the page says how to close it by
+// hand and unlocks (Return), and keeps following, so a later finished/guessed still turns it to "Closing iFizBox".
+export const DOWNLOAD_HINT = 15_000;
+export const DOWNLOAD_BY_HAND = `If the new ${NAME} is installing on the Home Screen (its icon dimmed or "Waiting"), close this one from the app switcher so iOS can finish.`;
+
 // B123: `waiting` (the page was locked on WAITING_LABEL): finished or guessed turn it to CLOSING_LABEL, and if iFizBox
 // is still here CLOSE_GRACE later, or the shell can't be followed (older shell, none running), the page unlocks with
 // CLOSE_BY_HAND. Without it, B83's behaviour (the caller's CLOSING_LABEL lock stays).
@@ -29,8 +35,15 @@ export async function followSelfUpdate(h, { native, retry = null, waiting = fals
     later(byHand, CLOSE_GRACE);
   };
   let last = null;
+  let hinted = false;
+  const hint = () => { // B208
+    if (closing || h?.page?.closed || typeof h?.finish !== "function") return;
+    h.page?.step?.(DOWNLOAD_BY_HAND);
+    h.finish({ label: RETURN_LABEL, status: "Done" });
+  };
   const say = (s) => {
     if (s === "finished" || s === "guessed") close();
+    if (s === "downloading" && waiting && !hinted) { hinted = true; later(hint, DOWNLOAD_HINT); }
     if (s && s !== last && SELF_UPDATE_LINES[s]) { last = s; h?.page?.step?.(SELF_UPDATE_LINES[s]); }
   };
   const s = await watchSelfUpdate(say, native);

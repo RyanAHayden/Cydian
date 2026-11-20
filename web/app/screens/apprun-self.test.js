@@ -8,6 +8,7 @@ import { runAppRun, phoneLanes } from "./apprun.js";
 import { createAppQueue, SELF_ID } from "../core/appqueue.js";
 import { createAppRun, appRows, rowStatus } from "../core/apprun.js";
 import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, watchSelfUpdate, HERE_CLOSING_LINE } from "../signing-client.js";
+import { DOWNLOAD_HINT, DOWNLOAD_BY_HAND, followSelfUpdate } from "../signing/selfupdate.js";
 import { WAITING_LABEL, CLOSING_LABEL, TRY_AGAIN_LABEL, RETURN_LABEL, CLOSE_BY_HAND, RESTART_BY_HAND, CLOSE_GRACE } from "../nav/progress.js";
 import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
@@ -99,6 +100,64 @@ test("self row, hosted: Waiting for iOS (locked) while the shell waits, a line a
   assert.ok(!s.page.finished.locked);
   assert.equal(s.queue.size, 0);
 }));
+
+// B208: the user's stuck run: iOS began the download, then nothing (the server's finished mark was lost); the page
+// sat locked on "Waiting for iOS" for the shell's 10 minutes. Now DOWNLOAD_HINT after downloading it says how to close
+// it by hand and unlocks, and a later guessed (the shell's own close, downloadGuess after the start) still locks on Closing.
+test("self row, hosted: stuck on downloading: the by-hand hint and Return within seconds, still following", () => withDom(async () => {
+  const w = selfWatch();
+  const s = setup([self()], { selfUpdate: w.fn });
+  await s.done;
+  await settle();
+  w.push("prompt");
+  w.push("waiting");
+  assert.ok(!s.timers.some((t) => t.ms === DOWNLOAD_HINT), "no hint before iOS starts the download");
+  w.push("downloading");
+  w.push("downloading");
+  const hints = s.timers.filter((t) => t.ms === DOWNLOAD_HINT);
+  assert.equal(hints.length, 1, "one hint timer");
+  assert.ok(DOWNLOAD_HINT <= 20_000, "within seconds");
+  assert.deepEqual([s.page.finished.label, s.page.finished.locked], [WAITING_LABEL, true]);
+  hints[0].f();
+  assert.ok(steps(s.page).includes(DOWNLOAD_BY_HAND));
+  assert.equal(s.page.finished.label, RETURN_LABEL);
+  assert.ok(!s.page.finished.locked);
+  // the shell closes on its own after all
+  w.end("guessed");
+  await settle();
+  assert.deepEqual([s.page.finished.label, s.page.finished.locked], [CLOSING_LABEL, true]);
+  assert.ok(s.timers.some((t) => t.ms === CLOSE_GRACE));
+}));
+
+test("self row, hosted: finished before the hint is due: the hint never shows", () => withDom(async () => {
+  const w = selfWatch();
+  const s = setup([self()], { selfUpdate: w.fn });
+  await s.done;
+  await settle();
+  w.push("downloading");
+  w.push("finished");
+  s.timers.find((t) => t.ms === DOWNLOAD_HINT).f();
+  assert.ok(!steps(s.page).includes(DOWNLOAD_BY_HAND));
+  assert.deepEqual([s.page.finished.label, s.page.finished.locked], [CLOSING_LABEL, true]);
+}));
+
+test("followSelfUpdate (single install), stuck on downloading: the hint and Return, then Closing at a late finish", async () => {
+  const lines = [], finishes = [], timers = [];
+  const page = { closed: false, step: (t) => lines.push(t), error: (t) => lines.push(t) };
+  const h = { page, finish: (o) => finishes.push(o) };
+  let push, end;
+  const native = { call: (m, p, onEvent) => { push = (st) => onEvent({ state: st }); return new Promise((r) => { end = r; }); } };
+  const done = followSelfUpdate(h, { native, waiting: true, later: (f, ms) => timers.push({ f, ms }) });
+  await settle();
+  push("waiting");
+  push("downloading");
+  timers.find((t) => t.ms === DOWNLOAD_HINT).f();
+  assert.ok(lines.includes(DOWNLOAD_BY_HAND));
+  assert.equal(finishes.at(-1).label, RETURN_LABEL);
+  end({ state: "finished" });
+  assert.equal(await done, "finished");
+  assert.deepEqual([finishes.at(-1).label, finishes.at(-1).locked], [CLOSING_LABEL, true]);
+});
 
 test("self row, hosted: a guess (older server) is Closing too; a closed page gets no late instruction", () => withDom(async () => {
   const w = selfWatch();

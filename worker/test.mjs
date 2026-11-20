@@ -876,6 +876,28 @@ import { d1 } from "./src/d1-sqlite.js";
   console.log("worker host status: ok");
 }
 
+// B208: the finished mark goes to ctx.waitUntil (Cloudflare cancels the request once iOS has every byte, and a put
+// still pending then was lost: the app never saw finished and never closed itself); started needs none (it is written
+// before the first byte goes out).
+{
+  const kept = [];
+  const ctx = { waitUntil: (p) => kept.push(p) };
+  const at = (path, init) => w.fetch(new Request("https://sign.example" + path, init), env, ctx);
+  const big = new Uint8Array(1024 * 1024 + 3);
+  big[0] = 0x50; big[1] = 0x4b;
+  let r = await at("/sign/host?bundleid=com.ryha.ifizbox&version=1.0&title=iFizBox", { method: "POST", body: big, headers: { "Content-Length": String(big.length) } });
+  const tok = /\/sign\/host\/([0-9a-f]{48})\//.exec((await r.json()).manifest)[1];
+  r = await at(`/sign/host/${tok}/app.ipa`, { headers: { Range: "bytes=0-9" } });
+  await r.arrayBuffer();
+  assert.equal(kept.length, 0, "a Range short of the end marks nothing finished");
+  r = await at(`/sign/host/${tok}/app.ipa`);
+  assert.equal((await r.arrayBuffer()).byteLength, big.length);
+  assert.equal(kept.length, 1, "the finished mark is kept alive past the response");
+  await Promise.all(kept);
+  assert.equal((await (await at(`/sign/host/${tok}/status`)).json()).finished, true);
+  console.log("worker host finished mark kept: ok");
+}
+
 // F178/B165: iFizBox's AltStore source at https://<DOMAIN>/repo/source.json: the latest release's source.json
 // (live the moment a release is published), else the deployed web/app/source.json (ASSETS) when GitHub fails; and
 // the site's proxy answers its own /repo/ URLs without fetching itself.
